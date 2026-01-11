@@ -35,3 +35,7 @@ docs2/
 node_modules/
 package-lock.json
 yarn.lock
+
+# Backup files
+*.backup
+.gitignore.backup
