@@ -49,5 +49,37 @@ export {
   type RegistrySnapshot,
 } from './compatibility/index.js';
 
+// Cache Management (I2.T2)
+export {
+  CacheService,
+  type ICacheService,
+  type ICacheAdapter,
+  type CacheEntry,
+  type CacheIndex,
+  type CacheOperationOptions,
+  type CacheOperationResult,
+  type CachePromotionData,
+  type CacheStagingData,
+  type CacheStats,
+  type EvictionResult,
+  type EvictionLogEntry,
+  EvictionReason,
+} from './cache/index.js';
+
+// Registry Management (I2.T2)
+export {
+  RegistryService,
+  type IRegistryService,
+  type InstalledPlugin,
+  type InstalledPluginRegistry,
+  type RegistryBackup,
+  type RegistryMetadata,
+  type RegistryOperationResult,
+  type RegistryQuery,
+  type RegistryUpdateOptions,
+  type TelemetrySnapshot,
+  InstallState,
+} from './registry/index.js';
+
 // Package version
-export const version = '1.1.0';
+export const version = '1.2.0';

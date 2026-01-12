@@ -1,0 +1,249 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/registry.schema.json",
+  "title": "Claude Code Plugin Registry Schema",
+  "description": "Schema for .claude-plugin/registry.json tracking locally installed plugins with transaction IDs, telemetry, and lifecycle consent",
+  "type": "object",
+  "required": ["metadata", "plugins", "activePins"],
+  "additionalProperties": false,
+  "properties": {
+    "metadata": {
+      "$ref": "#/definitions/RegistryMetadata",
+      "description": "Registry metadata for versioning and integrity"
+    },
+    "plugins": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "$ref": "#/definitions/InstalledPlugin"
+      },
+      "description": "Array of installed plugin records"
+    },
+    "activePins": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$"
+      },
+      "uniqueItems": true,
+      "description": "Plugin IDs that are pinned (protected from eviction). Must reference existing plugin IDs."
+    },
+    "telemetry": {
+      "type": "object",
+      "patternProperties": {
+        "^tel-": {
+          "$ref": "#/definitions/TelemetrySnapshot"
+        }
+      },
+      "description": "Telemetry snapshots keyed by telemetry ID. Optional field for observability."
+    }
+  },
+  "definitions": {
+    "RegistryMetadata": {
+      "type": "object",
+      "required": ["registryVersion", "lastUpdated", "totalInstallations"],
+      "additionalProperties": false,
+      "properties": {
+        "registryVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$",
+          "description": "Registry schema version for migration support (e.g., '1.0', '1.1'). Current: 1.0"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of last registry modification"
+        },
+        "modifiedBy": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "CLI version that last modified this registry (semver, optional)"
+        },
+        "totalInstallations": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total number of plugin installations tracked (matches plugins array length)"
+        },
+        "checksum": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 checksum of registry file for integrity validation (optional)"
+        }
+      }
+    },
+    "InstalledPlugin": {
+      "type": "object",
+      "required": [
+        "pluginId",
+        "version",
+        "source",
+        "installState",
+        "installedAt",
+        "cachePath",
+        "transactionId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Unique plugin identifier (kebab-case, matches marketplace ID)"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Installed semantic version (e.g., '1.2.3')"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Source URI or path where plugin was installed from (marketplace path, git URL, local path)"
+        },
+        "installState": {
+          "type": "string",
+          "enum": ["STAGING", "INSTALLED", "FAILED", "UNINSTALLING", "DISABLED"],
+          "description": "Current installation state. STAGING: downloading. INSTALLED: active. FAILED: install failed. UNINSTALLING: being removed. DISABLED: installed but not active."
+        },
+        "installedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of installation"
+        },
+        "cachePath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Absolute path to cached artifacts directory (e.g., '<pluginDir>/cache/<pluginId>/<version>/')"
+        },
+        "symlinkTarget": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Symlink target for active installation (e.g., '<installDir>/<pluginId>' → cachePath). Optional."
+        },
+        "lastValidatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last integrity validation timestamp (optional)"
+        },
+        "transactionId": {
+          "type": "string",
+          "pattern": "^tx-",
+          "minLength": 5,
+          "maxLength": 64,
+          "description": "Transaction ID for this installation (for tracing/rollback, format: 'tx-<timestamp>-<random>')"
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "Whether this version is pinned (priority during eviction, should also be in activePins array). Optional, defaults to false."
+        },
+        "telemetryRef": {
+          "type": "string",
+          "pattern": "^tel-",
+          "description": "Reference to telemetry snapshot ID in telemetry object. Optional."
+        },
+        "lifecycleConsentRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "SHA-256 digest of lifecycle script that was consented to"
+          },
+          "uniqueItems": true,
+          "description": "Array of lifecycle script digests user consented to. Optional."
+        },
+        "errorDetails": {
+          "type": "object",
+          "required": ["code", "message", "failedAt"],
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50,
+              "description": "Error code (e.g., 'DOWNLOAD_FAILED', 'VALIDATION_ERROR')"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "Human-readable error message"
+            },
+            "failedAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 timestamp of failure"
+            }
+          },
+          "description": "Error details if installation failed (only present when installState is FAILED). Optional."
+        }
+      }
+    },
+    "TelemetrySnapshot": {
+      "type": "object",
+      "required": [
+        "id",
+        "transactionId",
+        "commandType",
+        "durationMs",
+        "success",
+        "capturedAt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^tel-",
+          "minLength": 5,
+          "maxLength": 64,
+          "description": "Unique telemetry snapshot ID (format: 'tel-<timestamp>-<random>')"
+        },
+        "transactionId": {
+          "type": "string",
+          "pattern": "^tx-",
+          "description": "Associated transaction ID"
+        },
+        "commandType": {
+          "type": "string",
+          "enum": [
+            "install",
+            "uninstall",
+            "update",
+            "rollback",
+            "validate",
+            "list",
+            "search",
+            "pin",
+            "unpin"
+          ],
+          "description": "CLI command that triggered this operation"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Operation duration in milliseconds"
+        },
+        "success": {
+          "type": "boolean",
+          "description": "Whether operation succeeded"
+        },
+        "errorCode": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "Error code if operation failed (optional)"
+        },
+        "capturedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when snapshot was captured"
+        },
+        "context": {
+          "type": "object",
+          "description": "Additional contextual metadata (plugin IDs, versions, etc.). Optional free-form object."
+        }
+      }
+    }
+  }
+}

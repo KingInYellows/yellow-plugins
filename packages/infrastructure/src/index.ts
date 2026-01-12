@@ -40,5 +40,12 @@ export {
   createFingerprintProvider,
 } from './system/fingerprint.js';
 
+// Cache filesystem adapter (I2.T2)
+export {
+  CacheAdapter,
+  getCacheAdapter,
+  resetCacheAdapter,
+} from './fs/cacheAdapter.js';
+
 // Package version
-export const version = '1.1.0';
+export const version = '1.2.0';
