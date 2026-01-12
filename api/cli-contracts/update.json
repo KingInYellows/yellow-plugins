@@ -4,6 +4,28 @@
   "title": "Update Command Contract",
   "description": "JSON envelope for update command request and response payloads (includes CRIT-008 changelog fields)",
   "version": "1.1.0",
+  "changelog": [
+    {
+      "version": "1.1.0",
+      "date": "2024-01-01",
+      "description": "Added CRIT-008 changelog-related fields and extended observability/telemetry metadata for the update command contract.",
+      "changes": [
+        "Introduced additional changelog fields in request/response envelopes.",
+        "Expanded TelemetryContext and feature flag evaluation metadata.",
+        "Clarified compatibility intent semantics for update requests."
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2023-12-01",
+      "description": "Initial version of the update command contract schema.",
+      "changes": [
+        "Defined base request and response envelopes for the update command.",
+        "Specified compatibility intent and core execution parameters.",
+        "Established error reporting structure for update failures."
+      ]
+    }
+  ],
   "definitions": {
     "CompatibilityIntent": {
       "type": "object",
