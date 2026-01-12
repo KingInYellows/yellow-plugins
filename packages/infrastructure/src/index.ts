@@ -5,10 +5,20 @@
  * for the plugin marketplace. This package contains schema validators, file system
  * operations, git operations, and other infrastructure concerns.
  *
- * Part of Task I1.T1: Bootstrap pnpm workspace
+ * Enhanced in Task I1.T2: Configuration provider implementation
  */
 
-// Export infrastructure services and adapters here
-// This will be expanded in later iterations with validators, cache, git client, etc.
+// Configuration provider and utilities
+export {
+  ConfigProvider,
+  getConfigProvider,
+  resetConfigProvider,
+} from './config/configProvider.js';
 
+export type {
+  CliFlags,
+  ConfigProviderOptions,
+} from './config/configProvider.js';
+
+// Package version
 export const version = '1.1.0';

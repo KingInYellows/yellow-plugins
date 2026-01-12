@@ -4,10 +4,22 @@
  * Domain layer - Core business logic and entities for the plugin marketplace.
  * This package contains domain models, value objects, and business rules.
  *
- * Part of Task I1.T1: Bootstrap pnpm workspace
+ * Enhanced in Task I1.T2: Configuration and feature-flag contracts
  */
 
-// Export domain entities and models here
-// This will be expanded in later iterations with actual domain logic
+// Configuration and feature-flag contracts
+export type {
+  Config,
+  FeatureFlags,
+  IConfigProvider,
+  ConfigValueMetadata,
+  ConfigSource,
+} from './config/contracts.js';
 
+export {
+  DEFAULT_CONFIG,
+  DEFAULT_FEATURE_FLAGS,
+} from './config/contracts.js';
+
+// Package version
 export const version = '1.1.0';

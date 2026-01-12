@@ -62,6 +62,8 @@ module.exports = {
     ],
     'import/no-cycle': 'error',
     'import/no-self-import': 'error',
+    // Disable import/no-unresolved since TypeScript handles module resolution
+    'import/no-unresolved': 'off',
 
     // General code quality
     'no-console': ['warn', { allow: ['warn', 'error'] }],
