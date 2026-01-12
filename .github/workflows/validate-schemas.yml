@@ -1,0 +1,181 @@
+name: Validate Marketplace Schemas
+
+on:
+  pull_request:
+    paths:
+      - '.claude-plugin/marketplace.json'
+      - 'plugins/**/.claude-plugin/plugin.json'
+      - 'schemas/*.schema.json'
+      - 'scripts/validate-*.js'
+  push:
+    branches:
+      - main
+    paths:
+      - '.claude-plugin/marketplace.json'
+      - 'plugins/**/.claude-plugin/plugin.json'
+      - 'schemas/*.schema.json'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5  # NFR-MAINT-002: CI must complete in < 5 minutes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for proper validation
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'  # Use Node.js 20 LTS (compatible with Claude Code 2.0.12+)
+          cache: 'npm'
+
+      - name: Install AJV CLI for JSON Schema validation
+        run: npm install -g ajv-cli@5.0.0
+
+      - name: Install validation dependencies
+        run: |
+          npm install --no-save ajv@8.12.0 semver@7.5.3
+        working-directory: ${{ github.workspace }}
+
+      # VALIDATION RULE 1 & 2: Validate marketplace.json against schema
+      - name: Validate marketplace.json schema
+        run: |
+          echo "::group::Validating marketplace.json"
+          ajv validate \
+            -s schemas/marketplace.schema.json \
+            -d .claude-plugin/marketplace.json \
+            --strict=true \
+            --all-errors
+          echo "::endgroup::"
+
+      # VALIDATION RULE 1 & 2: Validate all plugin.json files against schema
+      - name: Validate plugin.json schemas
+        run: |
+          echo "::group::Finding plugin manifests"
+          PLUGIN_MANIFESTS=$(find plugins -type f -name 'plugin.json' -path '*/.claude-plugin/plugin.json')
+
+          if [ -z "$PLUGIN_MANIFESTS" ]; then
+            echo "No plugin.json files found. Skipping validation."
+            exit 0
+          fi
+
+          echo "Found plugin manifests:"
+          echo "$PLUGIN_MANIFESTS"
+          echo "::endgroup::"
+
+          echo "::group::Validating plugin schemas"
+          for manifest in $PLUGIN_MANIFESTS; do
+            echo "Validating: $manifest"
+            ajv validate \
+              -s schemas/plugin.schema.json \
+              -d "$manifest" \
+              --strict=true \
+              --all-errors
+          done
+          echo "::endgroup::"
+
+      # VALIDATION RULES 3-10: Custom business logic validation
+      - name: Run marketplace validation script
+        run: |
+          echo "::group::Running custom validation rules"
+          echo "Validating:"
+          echo "  Rule 3: All plugin IDs are unique"
+          echo "  Rule 4: All plugin source paths exist"
+          echo "  Rule 5: All plugin versions are valid semver"
+          echo "  Rule 6: marketplace version matches plugin.json versions"
+          echo "  Rule 7: All categories are in official enum"
+          echo "  Rule 8: All tags use kebab-case"
+          echo "  Rule 9: schemaVersion is valid semver"
+          echo "  Rule 10: updatedAt is valid ISO 8601"
+          node scripts/validate-marketplace.js
+          echo "::endgroup::"
+
+      # OPTIONAL: Validate plugin manifests (12 rules from plugin schema design)
+      - name: Run plugin validation script
+        if: success()
+        run: |
+          echo "::group::Running plugin validation script"
+          PLUGIN_MANIFESTS=$(find plugins -type f -name 'plugin.json' -path '*/.claude-plugin/plugin.json')
+
+          if [ -z "$PLUGIN_MANIFESTS" ]; then
+            echo "No plugin.json files found. Skipping validation."
+            exit 0
+          fi
+
+          for manifest in $PLUGIN_MANIFESTS; do
+            echo "Validating plugin: $manifest"
+            node scripts/validate-plugin.js --plugin "$manifest"
+          done
+          echo "::endgroup::"
+
+      # SUCCESS: Report validation summary
+      - name: Validation summary
+        if: success()
+        run: |
+          echo "::notice::✅ All schemas validated successfully"
+          echo "::notice::✅ marketplace.json: PASS"
+          echo "::notice::✅ All plugin.json files: PASS"
+          echo "::notice::✅ Business rules validation: PASS"
+
+      # FAILURE: Report validation errors
+      - name: Validation failed
+        if: failure()
+        run: |
+          echo "::error::❌ Schema validation failed"
+          echo "::error::Check the errors above and fix the schema violations"
+          echo "::error::See docs/SPECIFICATION-PART1.md Section 4.5 for error handling guidance"
+          exit 1
+
+  # Optional job: Validate example files (ensures examples stay valid)
+  validate-examples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install AJV CLI
+        run: npm install -g ajv-cli@5.0.0
+
+      - name: Validate marketplace example
+        run: |
+          echo "::group::Validating marketplace.example.json"
+          ajv validate \
+            -s schemas/marketplace.schema.json \
+            -d examples/marketplace.example.json \
+            --strict=true \
+            --all-errors
+          echo "::endgroup::"
+
+      - name: Validate plugin examples
+        run: |
+          echo "::group::Validating plugin.example.json"
+          ajv validate \
+            -s schemas/plugin.schema.json \
+            -d examples/plugin.example.json \
+            --strict=true \
+            --all-errors
+          echo "::endgroup::"
+
+          echo "::group::Validating plugin-minimal.example.json"
+          ajv validate \
+            -s schemas/plugin.schema.json \
+            -d examples/plugin-minimal.example.json \
+            --strict=true \
+            --all-errors
+          echo "::endgroup::"
+
+      - name: Examples validation summary
+        if: success()
+        run: |
+          echo "::notice::✅ All example files validated successfully"

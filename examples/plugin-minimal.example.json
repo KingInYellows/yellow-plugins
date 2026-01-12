@@ -1,0 +1,18 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "description": "Minimal plugin example with single command",
+  "author": {
+    "name": "developer"
+  },
+  "entrypoints": {
+    "commands": ["commands/hello.md"]
+  },
+  "compatibility": {
+    "claudeCodeMin": "2.0.12"
+  },
+  "permissions": [],
+  "docs": {
+    "readme": "https://github.com/example/hello-world/README.md"
+  }
+}

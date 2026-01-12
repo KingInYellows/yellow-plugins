@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/marketplace.schema.json",
+  "title": "Claude Code Plugin Marketplace Schema",
+  "description": "Schema for .claude-plugin/marketplace.json defining available plugins in a personal marketplace",
+  "type": "object",
+  "required": ["schemaVersion", "marketplace", "plugins"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Marketplace schema version (semver). Current: 1.0.0. Enables future evolution without breaking changes."
+    },
+    "marketplace": {
+      "type": "object",
+      "required": ["name", "author", "updatedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Marketplace display name (e.g., 'KingInYellows Plugin Marketplace')"
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Marketplace maintainer (GitHub username or full name)"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Marketplace description explaining purpose and scope (optional)"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Marketplace homepage URL (typically GitHub repository) (optional)"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last marketplace update timestamp (ISO 8601 format, e.g., '2026-01-11T10:00:00Z')"
+        }
+      }
+    },
+    "plugins": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "$ref": "#/definitions/PluginReference"
+      },
+      "description": "Array of plugin references. Each entry points to a plugin directory containing plugin.json (not embedded full manifests)."
+    }
+  },
+  "definitions": {
+    "PluginReference": {
+      "type": "object",
+      "required": ["id", "name", "version", "source", "category"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "Unique plugin identifier in kebab-case (e.g., 'hookify', 'pr-review-toolkit'). Must be unique across marketplace. Used in install commands."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Human-readable plugin name for display (e.g., 'Hookify', 'PR Review Toolkit')"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Latest plugin version (semantic versioning, e.g., '1.2.3'). MUST match version in plugin.json at source path."
+        },
+        "author": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Plugin author name or GitHub username (optional, useful for multi-author marketplaces)"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 280,
+          "description": "Short plugin description (like tweet length). Displayed in list/search views. (optional)"
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9/_.-]+$",
+          "description": "Relative path from marketplace root to plugin directory containing plugin.json (e.g., 'plugins/hookify', 'plugins/pr-review-toolkit'). MUST exist in repository."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "development",
+            "productivity",
+            "security",
+            "learning",
+            "testing",
+            "design",
+            "database",
+            "deployment",
+            "monitoring"
+          ],
+          "description": "Primary plugin category. MUST be one of the official Claude Code categories from research."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "maxItems": 10,
+          "uniqueItems": true,
+          "description": "Searchable tags in kebab-case (e.g., 'code-review', 'hooks', 'testing'). Used for discovery/filtering. (optional)"
+        },
+        "featured": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether plugin is featured in marketplace browse views. For personal marketplaces, highlights your most-used plugins. (optional)"
+        },
+        "verified": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether plugin is verified by marketplace maintainer. For personal marketplaces, indicates production-ready status. (optional)"
+        },
+        "downloads": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total install count (optional tracking field for analytics). Can be omitted for personal marketplaces."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last plugin update timestamp (ISO 8601). Should match latest commit affecting plugin source directory. (optional)"
+        }
+      }
+    }
+  }
+}

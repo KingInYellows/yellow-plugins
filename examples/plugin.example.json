@@ -1,0 +1,72 @@
+{
+  "name": "hookify",
+  "version": "1.2.3",
+  "description": "Create hooks to prevent unwanted AI behaviors through conversation analysis and explicit rules",
+  "author": {
+    "name": "kinginyellow",
+    "email": "dev@kingin-yellows.dev",
+    "url": "https://github.com/kinginyellow"
+  },
+  "entrypoints": {
+    "skills": [
+      "skills/hookify.md",
+      "skills/hookify-configure.md"
+    ],
+    "commands": [
+      "commands/hookify-list.md",
+      "commands/hookify-create.md"
+    ],
+    "agents": [
+      "agents/conversation-analyzer.md"
+    ]
+  },
+  "compatibility": {
+    "claudeCodeMin": "2.0.12",
+    "nodeMin": "18",
+    "os": ["linux", "macos"],
+    "arch": ["x64", "arm64"]
+  },
+  "permissions": [
+    {
+      "scope": "filesystem",
+      "reason": "Read conversation history to analyze unwanted behaviors and patterns",
+      "paths": [".claude/conversations/"]
+    },
+    {
+      "scope": "filesystem",
+      "reason": "Write hook configuration files to prevent future unwanted behaviors",
+      "paths": [".claude/hooks/"]
+    },
+    {
+      "scope": "shell",
+      "reason": "Execute git commands to track hook changes in version control",
+      "commands": ["git"]
+    }
+  ],
+  "docs": {
+    "readme": "https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/README.md",
+    "changelog": "https://github.com/kinginyellow/yellow-plugins/blob/main/plugins/hookify/CHANGELOG.md",
+    "examples": "https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/examples"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinginyellow/yellow-plugins.git"
+  },
+  "lifecycle": {
+    "install": "scripts/install.sh",
+    "uninstall": "scripts/uninstall.sh"
+  },
+  "dependencies": {
+    "ajv": "^8.12.0",
+    "glob": "^10.3.10"
+  },
+  "keywords": [
+    "hooks",
+    "behavior",
+    "safety",
+    "ai-control",
+    "conversation-analysis"
+  ],
+  "license": "MIT",
+  "homepage": "https://kingin-yellows.dev/plugins/hookify"
+}
