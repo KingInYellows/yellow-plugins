@@ -23,6 +23,7 @@
     - [Extensibility NFRs (3 total)](#extensibility-nfrs-3-total)
     - [NFR Testing Summary](#nfr-testing-summary)
   - [Matrix 5: Documentation Tooling Traceability](#matrix-5-documentation-tooling-traceability)
+  - [Matrix 6: CLI Documentation Coverage for FR-001..FR-010](#matrix-6-cli-documentation-coverage-for-fr-001fr-010)
   - [Overall Traceability Assessment](#overall-traceability-assessment)
     - [Coverage Statistics](#coverage-statistics)
     - [Traceability Confidence by Item](#traceability-confidence-by-item)
@@ -366,6 +367,23 @@ Task `I1.T5` establishes typedoc, doctoc, markdownlint, and ADR traceability tem
 | **Typedoc baseline + `pnpm docs:build`** | FR-003 (Detail View), FR-009 (Simple Publishing) | NFR-MAINT-004 (Documentation coverage) | API references for CLI/domain/infrastructure stay regenerated alongside code, preserving Section 4 documentation directives. |
 | **Doctoc + markdownlint automation via `pnpm docs:lint`** | FR-009 (Simple Publishing), FR-011 (Release Automation) | NFR-MAINT-001 (≤ 2 manual publish steps), NFR-MAINT-004 (Documentation coverage) | Automatic TOC refresh + lint gating ensures delivery workflows remain two-command compliant and spec addenda never drift. |
 | **ADR template relocation (`docs/plans/ADR-template.md`)** | FR-001 – FR-013 (global traceability mandate) | NFR-MAINT-005 (Error actionability), CRIT-021 (Traceability enforcement) | Template now forces FR/NFR references per ADR so each change records lineage before runtime work (Tasks I1.T1–I1.T5). |
+
+---
+
+## Matrix 6: CLI Documentation Coverage for FR-001..FR-010
+
+| FR ID | Requirement Name | Documentation Evidence | Status |
+|-------|------------------|------------------------|--------|
+| **FR-001** | Marketplace Index Validation | `docs/cli/browse.md#caching-performance` documents cache TTLs, stale warnings, and offline enforcement | ✅ Covered |
+| **FR-002** | Plugin Manifest Validation | `docs/contracts/cli-contracts.md#2-common-structures` defines shared schema fields and AJV expectations | ✅ Covered |
+| **FR-003** | Plugin Detail View | `docs/operations/onboarding.md#3-1-discovery` walks through `plugin info` output and metadata expectations | ✅ Covered |
+| **FR-004** | One-Command Install | `docs/operations/onboarding.md#3-2-installation` highlights the single install command plus lifecycle consent flow | ✅ Covered |
+| **FR-005** | Compatibility Enforcement | `docs/cli/update.md#breaking-change-detection` showcases compatibility gates, error messaging, and remediation links | ✅ Covered |
+| **FR-006** | Version Pinning | `docs/cli/update.md#pin-awareness` (and `docs/cli/pin.md`) describe pin detection, force overrides, and guidance | ✅ Covered |
+| **FR-007** | Rollback Capability | `docs/operations/onboarding.md#9-3-walkthrough-rollback-recovery` demonstrates cached rollback flows end-to-end | ✅ Covered |
+| **FR-008** | Update Notifications | `docs/cli/update.md#changelog-awareness` details grouped advisories, changelog statuses, and next steps | ✅ Covered |
+| **FR-009** | Simple Publishing | `docs/operations/onboarding.md#8-next-steps` directs users to publish workflow references and CI automation | ✅ Covered |
+| **FR-010** | Semantic Versioning | `docs/contracts/cli-contracts.md#install-contract` enforces semver regex for every request/response payload | ✅ Covered |
 
 ---
 
