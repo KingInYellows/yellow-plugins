@@ -394,3 +394,74 @@ export interface InstallOperationOptions {
    */
   readonly telemetryContext?: Record<string, unknown>;
 }
+
+/**
+ * Cache retention policy for uninstall operations.
+ */
+export type CacheRetentionPolicy = 'purge-all' | 'keep-last-n' | 'keep-all';
+
+/**
+ * Uninstall request parameters from CLI layer.
+ */
+export interface UninstallRequest {
+  /**
+   * Plugin identifier to uninstall
+   */
+  readonly pluginId: string;
+
+  /**
+   * Cache retention policy (default: 'keep-last-n')
+   */
+  readonly cacheRetentionPolicy?: CacheRetentionPolicy;
+
+  /**
+   * Number of versions to keep when using 'keep-last-n' (default: 3)
+   */
+  readonly keepLastN?: number;
+
+  /**
+   * Script review digest (proves user saw lifecycle scripts)
+   */
+  readonly scriptReviewDigest?: string;
+
+  /**
+   * Confirmation token (user acknowledged uninstall action)
+   */
+  readonly confirmationToken?: string;
+
+  /**
+   * Force uninstall without prompts
+   */
+  readonly force?: boolean;
+
+  /**
+   * Correlation ID for tracing
+   */
+  readonly correlationId?: string;
+
+  /**
+   * Dry-run mode (simulate without mutations)
+   */
+  readonly dryRun?: boolean;
+}
+
+/**
+ * Uninstall operation result.
+ * Reuses InstallResult structure for consistency.
+ */
+export type UninstallResult = InstallResult & {
+  /**
+   * Cache retention summary
+   */
+  readonly cacheRetention?: {
+    readonly policy: CacheRetentionPolicy;
+    readonly versionsRemoved: number;
+    readonly versionsRetained: number;
+    readonly freedMb: number;
+  };
+
+  /**
+   * Lifecycle uninstall script result
+   */
+  readonly uninstallScript?: LifecycleExecutionResult;
+};

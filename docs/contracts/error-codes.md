@@ -574,6 +574,50 @@ The plugin manifest file (plugin.json) is invalid or corrupted.
 
 ---
 
+### ERROR-INST-008: Lifecycle Consent Required (Uninstall)
+
+**Severity**: ERROR  
+**Category**: INSTALLATION  
+**Spec Reference**: CRIT-004, CRIT-011  
+**Operational Reference**: `docs/operations/uninstall.md#lifecycle-hooks`
+
+**Description**:  
+Uninstall command detected a lifecycle uninstall script that has not been reviewed or whose digest no longer matches the consented version.
+
+**Resolution**:
+- Review the script preview surfaced by the CLI
+- Confirm digest matches the script content
+- Re-run `plugin uninstall <id>` after typing the consent token
+- Use `--force` only in trusted automation scenarios
+
+**Related Errors**:
+- `ERR-UNINSTALL-CONSENT` (domain layer)
+- `ERROR-INST-006` (install lifecycle failure)
+
+---
+
+### ERROR-INST-009: Cache Purge Failure (FR-010)
+
+**Severity**: ERROR  
+**Category**: INSTALLATION  
+**Spec Reference**: FR-010, CRIT-011  
+**Operational Reference**: `docs/operations/uninstall.md#fr-010-cache-purge-errors`
+
+**Description**:  
+Cache retention policy failed to remove one or more versions during uninstall (permissions, disk I/O, pinned entries).
+
+**Resolution**:
+- Review CLI output for affected versions
+- Ensure `~/.claude-plugin/cache` is writable and not read-only
+- Manually remove offending cache directories and re-run cache validation
+- Re-run uninstall with `--purge-cache` if additional cleanup is required
+
+**Telemetry**:
+- Logged to `.claude-plugin/audit/uninstall-*.json`
+- Refer to CRIT-011 guidance for remediation steps
+
+---
+
 ## Discovery Errors (DISC)
 
 ### ERROR-DISC-001: Marketplace Not Found

@@ -387,4 +387,23 @@ it('should detect when cache is over limit', async () => {
       expect(entry?.pinned).toBe(false);
     });
   });
+
+  describe('removeEntry', () => {
+    it('removes cached versions when requested explicitly', async () => {
+      const stageResult = await service.stageArtifacts('cleanup-plugin', '1.0.0');
+      adapter.setDirectorySize(stageResult.data!.stagingPath, 64 * 1024);
+      await service.promoteArtifacts('cleanup-plugin', '1.0.0', stageResult.data!.stagingPath);
+
+      const removed = await service.removeEntry('cleanup-plugin', '1.0.0');
+      expect(removed).toBeDefined();
+      expect(removed?.version).toBe('1.0.0');
+
+      const entries = service.listEntries('cleanup-plugin');
+      expect(entries).toHaveLength(0);
+
+      const stats = service.getStats();
+      expect(stats.totalEntries).toBe(0);
+      expect(stats.totalSizeBytes).toBe(0);
+    });
+  });
 });

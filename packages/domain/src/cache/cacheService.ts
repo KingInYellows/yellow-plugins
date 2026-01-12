@@ -516,6 +516,42 @@ export class CacheService implements ICacheService {
     return corrupted;
   }
 
+  /**
+   * Remove a specific cached entry and update the index.
+   */
+  async removeEntry(pluginId: string, version: string): Promise<CacheEntry | undefined> {
+    const index = await this.loadIndex();
+    const pluginEntries = index.entries[pluginId];
+
+    if (!pluginEntries || pluginEntries.length === 0) {
+      return undefined;
+    }
+
+    const entry = pluginEntries.find((candidate) => candidate.version === version);
+    if (!entry) {
+      return undefined;
+    }
+
+    try {
+      await this.adapter.removeDirectory(entry.cachePath);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code && err.code !== 'ENOENT') {
+        throw new Error(
+          `Failed to remove cache entry ${pluginId}@${version}: ${(error as Error).message}`
+        );
+      }
+    }
+
+    const removed = this.removeFromIndex(index, pluginId, version);
+    if (removed) {
+      (index as { lastUpdated: Date }).lastUpdated = new Date();
+      await this.persistIndex(index);
+    }
+
+    return removed ?? undefined;
+  }
+
   // Private helper methods
 
   /**

@@ -26,8 +26,11 @@ import type {
   InstallRequest,
   InstallResult,
   RollbackRequest,
+  UninstallRequest,
+  UninstallResult,
   UpdateRequest,
 } from './types.js';
+import { UninstallService } from './uninstallService.js';
 
 /**
  * Install service implementation.
@@ -37,11 +40,13 @@ export class InstallService implements IInstallService {
   private readonly config: Config;
   private readonly cacheService: ICacheService;
   private readonly registryService: IRegistryService;
+  private readonly uninstallService: UninstallService;
 
   constructor(config: Config, cacheService: ICacheService, registryService: IRegistryService) {
     this.config = config;
     this.cacheService = cacheService;
     this.registryService = registryService;
+    this.uninstallService = new UninstallService(config, cacheService, registryService);
   }
 
   /**
@@ -243,6 +248,13 @@ export class InstallService implements IInstallService {
         error
       );
     }
+  }
+
+  /**
+   * Delegate uninstall handling to UninstallService implementation.
+   */
+  uninstall(request: UninstallRequest): Promise<UninstallResult> {
+    return this.uninstallService.uninstall(request);
   }
 
   /**

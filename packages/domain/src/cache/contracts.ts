@@ -104,6 +104,12 @@ export interface ICacheService {
    * Returns list of corrupted entries.
    */
   validateIntegrity(): Promise<CacheEntry[]>;
+
+  /**
+   * Remove a cached entry for a specific plugin version.
+   * Returns metadata for the removed entry if it existed.
+   */
+  removeEntry(pluginId: string, version: string): Promise<CacheEntry | undefined>;
 }
 
 /**

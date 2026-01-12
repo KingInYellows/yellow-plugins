@@ -15,6 +15,8 @@ import type {
   InstallRequest,
   InstallResult,
   RollbackRequest,
+  UninstallRequest,
+  UninstallResult,
   UpdateRequest,
 } from './types.js';
 
@@ -88,4 +90,23 @@ export interface IInstallService {
       pinned: boolean;
     }>
   >;
+
+  /**
+   * Uninstall a plugin from the system.
+   * Runs lifecycle uninstall hooks, removes symlinks, updates registry,
+   * and handles cache retention based on policy.
+   *
+   * Steps:
+   * 1. Validate plugin exists in registry
+   * 2. Load lifecycle uninstall scripts for consent
+   * 3. Execute lifecycle hooks in sandbox (after consent)
+   * 4. Remove symlink atomically
+   * 5. Update registry (remove entry)
+   * 6. Apply cache retention policy
+   * 7. Emit telemetry and create audit log
+   *
+   * @param request - Uninstall request parameters
+   * @returns Uninstall result with transaction ID and metadata
+   */
+  uninstall(request: UninstallRequest): Promise<UninstallResult>;
 }
