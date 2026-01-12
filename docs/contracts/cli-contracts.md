@@ -483,6 +483,17 @@ interface UpdateResponse extends BaseResponse {
       currentVersion: string;
       latestVersion: string;
       changelogUrl?: string;
+      changelogStatus?:
+        | 'success'
+        | 'cached'
+        | 'not-provided'
+        | 'timeout'
+        | 'not-found'
+        | 'server-error'
+        | 'network-error';
+      changelogMessage?: string;
+      changelogFetchDurationMs?: number;
+      pinned?: boolean;
     }[];
 
     /** Registry delta */
@@ -572,7 +583,9 @@ pnpm cli update --all --check-only
     "cacheStatus": "partial",
     "bytesDownloaded": 4096000,
     "lifecycleScriptsRun": 2,
-    "registryMutations": 2
+    "registryMutations": 2,
+    "changelogsFetched": 3,
+    "changelogCacheHits": 1
   }
 }
 ```

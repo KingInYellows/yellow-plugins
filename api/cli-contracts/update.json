@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://yellow-plugins.dev/schemas/cli-contracts/update/v1.json",
   "title": "Update Command Contract",
-  "description": "JSON envelope for update command request and response payloads",
-  "version": "1.0.0",
+  "description": "JSON envelope for update command request and response payloads (includes CRIT-008 changelog fields)",
+  "version": "1.1.0",
   "definitions": {
     "CompatibilityIntent": {
       "type": "object",
@@ -156,6 +156,16 @@
           "type": "number",
           "description": "Number of registry mutations",
           "minimum": 0
+        },
+        "changelogsFetched": {
+          "type": "number",
+          "description": "Number of changelogs fetched (CRIT-008)",
+          "minimum": 0
+        },
+        "changelogCacheHits": {
+          "type": "number",
+          "description": "Number of changelog cache hits (CRIT-008)",
+          "minimum": 0
         }
       },
       "required": ["durationMs"],
@@ -301,6 +311,24 @@
           "type": "string",
           "format": "uri",
           "description": "URL to changelog (optional)"
+        },
+        "changelogStatus": {
+          "type": "string",
+          "enum": ["success", "cached", "not-provided", "timeout", "not-found", "server-error", "network-error"],
+          "description": "Changelog fetch status per CRIT-008"
+        },
+        "changelogMessage": {
+          "type": "string",
+          "description": "Changelog content or fallback message (up to 1000 chars)"
+        },
+        "changelogFetchDurationMs": {
+          "type": "number",
+          "description": "Changelog fetch duration in milliseconds",
+          "minimum": 0
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "Whether plugin is pinned to current version"
         }
       },
       "required": ["pluginId", "currentVersion", "latestVersion"],

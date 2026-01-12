@@ -2,8 +2,8 @@
   {
     "task_id": "I3.T1",
     "iteration_id": "I3",
-    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements—leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
-    "description": "Implement marketplace ingestion & caching (git fetch, signature verification, stale index warnings), plus browse/search/info commands with deterministic ranking (category ➜ name ➜ version) and documentation anchors.",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "description": "Implement marketplace ingestion & caching (git fetch, signature verification, stale index warnings), plus browse/search/info commands with deterministic ranking (category \u279c name \u279c version) and documentation anchors.",
     "agent_type_hint": "BackendAgent",
     "inputs": "Section 2 data models, assumption 1 (deterministic ranking), CLI scaffolding from `I1`.",
     "target_files": [
@@ -26,12 +26,12 @@
       "I2.T4"
     ],
     "parallelizable": true,
-    "done": false
+    "done": true
   },
   {
     "task_id": "I3.T2",
     "iteration_id": "I3",
-    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements—leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
     "description": "Build changelog-aware update/check-updates pipeline (parallelizable fetch with timeout fallback, changelog metadata cache) and integrate warnings per CRIT-008; extend CLI contract catalog with update payloads.",
     "agent_type_hint": "BackendAgent",
     "inputs": "Section 2 communication patterns, Section 2.1 artifact references, Task `I2.T3` instrumentation.",
@@ -54,12 +54,12 @@
       "I2.T5"
     ],
     "parallelizable": false,
-    "done": false
+    "done": true
   },
   {
     "task_id": "I3.T3",
     "iteration_id": "I3",
-    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements—leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
     "description": "Implement pin management (pin/unpin commands, pinned priority ordering, registry persistence) and ensure cache eviction respects pins; add docs describing workflows + CLI usage.",
     "agent_type_hint": "BackendAgent",
     "inputs": "Section 2 data model, Section 4 directives, registry schema from `I2.T2`.",
@@ -85,7 +85,7 @@
   {
     "task_id": "I3.T4",
     "iteration_id": "I3",
-    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements—leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
     "description": "Enhance uninstall experience (lifecycle uninstall scripts, cache retention options, telemetry updates, uninstall documentation) and ensure rollback/resolution instructions align with 23 error scenarios.",
     "agent_type_hint": "BackendAgent",
     "inputs": "Section 2 components, Section 4 security directive, error catalog from `I1.T3`.",
@@ -111,10 +111,10 @@
   {
     "task_id": "I3.T5",
     "iteration_id": "I3",
-    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements—leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
     "description": "Polish CLI UX + docs (ANSI palettes, help examples, onboarding walkthroughs), update CLI contract catalog with discovery/update/uninstall payloads, and ensure docs/traceability entries tracked for FR-001..FR-010 coverage.",
     "agent_type_hint": "DocumentationAgent",
-    "inputs": "Section 2 API style, Section 6 accessibility notes, tasks `I3.T1`–`I3.T4` outputs.",
+    "inputs": "Section 2 API style, Section 6 accessibility notes, tasks `I3.T1`\u2013`I3.T4` outputs.",
     "target_files": [
       "docs/cli/browse.md",
       "docs/cli/update.md",

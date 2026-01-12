@@ -66,6 +66,16 @@ export {
   EvictionReason,
 } from './cache/index.js';
 
+// Install Transactions (I2.T3)
+export {
+  InstallService,
+  type IInstallService,
+  type InstallRequest,
+  type InstallResult,
+  type RollbackRequest,
+  type UpdateRequest as InstallUpdateRequest,
+} from './install/index.js';
+
 // Registry Management (I2.T2)
 export {
   RegistryService,
@@ -111,6 +121,30 @@ export {
   type IndexFreshnessStatus,
   MarketplaceIndexService,
 } from './marketplace/index.js';
+
+// Changelog Service (I3.T2)
+export {
+  ChangelogService,
+  type IChangelogService,
+  type IHttpAdapter,
+  type ChangelogFetchResult,
+  type ChangelogFetchOptions,
+  type ChangelogCache,
+  type ChangelogCacheEntry,
+  ChangelogStatus,
+} from './changelog/index.js';
+
+// Update Service (I3.T2)
+export {
+  UpdateService,
+  type IUpdateService,
+  type UpdateCheckRequest,
+  type UpdateCheckResult,
+  type UpdateExecutionRequest,
+  type UpdateExecutionResult,
+  type BatchUpdateResult,
+  type PluginUpdateCheck,
+} from './update/index.js';
 
 // Package version
 export const version = '1.2.0';
