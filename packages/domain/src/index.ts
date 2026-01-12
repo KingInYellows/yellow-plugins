@@ -98,5 +98,19 @@ export {
   TelemetryEventFactory,
 } from './telemetry/index.js';
 
+// Marketplace Discovery (I3.T1)
+export {
+  type IMarketplaceIndexService,
+  type MarketplaceMetadata,
+  type PluginEntry,
+  type PluginCategory,
+  type MarketplaceIndex,
+  type MarketplaceQuery,
+  type MarketplaceSortOrder,
+  type MarketplaceQueryResult,
+  type IndexFreshnessStatus,
+  MarketplaceIndexService,
+} from './marketplace/index.js';
+
 // Package version
 export const version = '1.2.0';

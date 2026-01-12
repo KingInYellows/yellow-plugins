@@ -15,6 +15,7 @@ import type {
 
 import { browseCommand } from './browse.js';
 import { checkUpdatesCommand } from './check-updates.js';
+import { infoCommand } from './info.js';
 import { installCommand } from './install.js';
 import { metricsCommand } from './metrics.js';
 import { pinCommand } from './pin.js';
@@ -41,6 +42,7 @@ const commandRegistryDefinition = {
   // Discovery commands
   browse: toBaseMetadata(browseCommand),
   search: toBaseMetadata(searchCommand),
+  info: toBaseMetadata(infoCommand),
 
   // Version management
   rollback: toBaseMetadata(rollbackCommand),
@@ -94,7 +96,7 @@ const requireRegisteredCommand = (name: RegisteredCommand): CommandMetadata => {
 export function getCommandsByCategory(): Record<string, CommandMetadata[]> {
   const categories: Record<string, RegisteredCommand[]> = {
     'Plugin Lifecycle': ['install', 'update', 'uninstall'],
-    'Plugin Discovery': ['browse', 'search'],
+    'Plugin Discovery': ['browse', 'search', 'info'],
     'Version Management': ['rollback', 'pin', 'check-updates'],
     Publishing: ['publish'],
     Observability: ['metrics'],

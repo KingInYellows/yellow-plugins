@@ -1,18 +1,15 @@
 /**
- * @yellow-plugins/cli - Browse Command
+ * @yellow-plugins/cli - Info Command
  *
- * Handles browsing and discovering plugins in the marketplace.
- * Implements deterministic ranking and offline-first caching.
+ * Displays detailed information about a specific plugin.
+ * Part of Task I3.T1: Marketplace ingestion & caching implementation.
  *
- * Part of Task I1.T4: CLI command manifest
- * Enhanced in Task I3.T1: Marketplace ingestion & caching
- *
- * @specification FR-001, FR-002, CRIT-006
+ * @specification FR-002, CRIT-007
  */
 
 import * as path from 'node:path';
 
-import { MarketplaceIndexService, type MarketplaceQuery } from '@yellow-plugins/domain';
+import { MarketplaceIndexService } from '@yellow-plugins/domain';
 import { createValidator } from '@yellow-plugins/infrastructure';
 
 import {
@@ -23,31 +20,22 @@ import {
 } from '../lib/io.js';
 import type { CommandHandler, CommandMetadata, BaseCommandOptions } from '../types/commands.js';
 
-interface BrowseOptions extends BaseCommandOptions {
-  category?: string;
-  tag?: string;
-  limit?: number;
-  featured?: boolean;
-  verified?: boolean;
+interface InfoOptions extends BaseCommandOptions {
+  plugin: string;
 }
 
 /**
- * Browse request payload
+ * Info request payload
  */
-interface BrowseRequest {
-  category?: string;
-  tag?: string;
-  limit?: number;
-  offset?: number;
-  featured?: boolean;
-  verified?: boolean;
+interface InfoRequest {
+  pluginId: string;
   correlationId?: string;
 }
 
 /**
- * Browse response payload
+ * Info response payload
  */
-interface BrowseResponse {
+interface InfoResponse {
   success: boolean;
   status: 'success' | 'error' | 'warning';
   message: string;
@@ -56,19 +44,20 @@ interface BrowseResponse {
   timestamp: string;
   cliVersion: string;
   data?: {
-    plugins: Array<{
+    plugin: {
       id: string;
       name: string;
       version: string;
       author?: string;
       description?: string;
+      source: string;
       category: string;
       tags?: string[];
       featured?: boolean;
       verified?: boolean;
-    }>;
-    totalCount: number;
-    query: MarketplaceQuery;
+      downloads?: number;
+      updatedAt?: string;
+    };
   };
   warnings?: string[];
   error?: {
@@ -81,26 +70,40 @@ interface BrowseResponse {
   };
 }
 
-const browseHandler: CommandHandler<BrowseOptions> = async (options, context) => {
+const infoHandler: CommandHandler<InfoOptions> = async (options, context) => {
   const { logger, config, correlationId, startTime } = context;
   const startTimeMs = startTime.getTime();
 
-  logger.info('Browse command invoked', { options });
+  logger.info('Info command invoked', { pluginId: options.plugin });
 
   try {
     // Load request from JSON input or build from CLI arguments
-    const request = await loadRequest<BrowseRequest>(
+    const request = await loadRequest<InfoRequest>(
       options,
       {
-        category: options.category,
-        tag: options.tag,
-        limit: options.limit,
-        featured: options.featured,
-        verified: options.verified,
+        pluginId: options.plugin,
         correlationId,
       },
       context
     );
+
+    // Validate required pluginId field
+    if (!request.pluginId || request.pluginId.trim() === '') {
+      const errorResponse: InfoResponse = {
+        ...buildBaseResponse({ success: false, message: 'Plugin ID is required' }, context),
+        error: {
+          code: 'ERR-INFO-001',
+          message: 'Missing required argument: plugin',
+          severity: 'ERROR',
+          category: 'VALIDATION',
+          specReference: 'FR-002',
+          resolution: 'Provide a plugin ID',
+        },
+      };
+
+      await writeResponse(errorResponse, options, context);
+      return toCommandResult(errorResponse);
+    }
 
     // Initialize validator and marketplace service
     const validator = await createValidator();
@@ -113,7 +116,7 @@ const browseHandler: CommandHandler<BrowseOptions> = async (options, context) =>
     try {
       await marketplaceService.loadIndex(indexPath);
     } catch (error) {
-      const errorResponse: BrowseResponse = {
+      const errorResponse: InfoResponse = {
         ...buildBaseResponse({ success: false, message: 'Failed to load marketplace index' }, context),
         error: {
           code: 'ERR-DISC-001',
@@ -155,50 +158,58 @@ const browseHandler: CommandHandler<BrowseOptions> = async (options, context) =>
       logger.warn('Marketplace index signature verification failed');
     }
 
-    // Build query
-    const query: MarketplaceQuery = {
-      category: request.category as MarketplaceQuery['category'],
-      tag: request.tag,
-      featured: request.featured,
-      verified: request.verified,
-      limit: request.limit ?? 50,
-      offset: request.offset ?? 0,
-    };
+    // Get plugin info
+    const plugin = await marketplaceService.getPluginInfo(request.pluginId);
 
-    // Execute browse query
-    const result = await marketplaceService.browse(query);
+    if (!plugin) {
+      const errorResponse: InfoResponse = {
+        ...buildBaseResponse(
+          { success: false, message: `Plugin '${request.pluginId}' not found` },
+          context
+        ),
+        error: {
+          code: 'ERR-INFO-002',
+          message: `Plugin '${request.pluginId}' not found in marketplace`,
+          severity: 'ERROR',
+          category: 'DISCOVERY',
+          specReference: 'FR-002',
+          resolution: 'Check the plugin ID and try again, or run "plugin browse" to see available plugins',
+        },
+        warnings: warnings.length > 0 ? warnings : undefined,
+      };
 
-    logger.info('Browse query executed', {
-      totalCount: result.totalCount,
-      returnedCount: result.plugins.length,
-      query,
+      await writeResponse(errorResponse, options, context);
+      return toCommandResult(errorResponse);
+    }
+
+    logger.info('Plugin info retrieved', {
+      pluginId: plugin.id,
+      version: plugin.version,
     });
 
     const endTimeMs = Date.now();
     const durationMs = endTimeMs - startTimeMs;
 
     // Build response
-    const response: BrowseResponse = {
+    const response: InfoResponse = {
       ...buildBaseResponse(
         {
           success: true,
           status: warnings.length > 0 ? 'warning' : 'success',
-          message: `Found ${result.totalCount} plugin(s)${warnings.length > 0 ? ' (with warnings)' : ''}`,
+          message: `Plugin '${plugin.name}' (${plugin.id})${warnings.length > 0 ? ' (with warnings)' : ''}`,
         },
         context
       ),
       data: {
-        plugins: result.plugins,
-        totalCount: result.totalCount,
-        query: result.query,
+        plugin,
       },
       warnings: warnings.length > 0 ? warnings : undefined,
     };
 
-    logger.info('Browse command completed', {
+    logger.info('Info command completed', {
       durationMs,
       warnings: warnings.length,
-      totalCount: result.totalCount,
+      pluginId: plugin.id,
     });
 
     await writeResponse(response, options, context);
@@ -207,18 +218,18 @@ const browseHandler: CommandHandler<BrowseOptions> = async (options, context) =>
     const endTimeMs = Date.now();
     const durationMs = endTimeMs - startTimeMs;
 
-    logger.error('Browse command failed', { error, durationMs });
+    logger.error('Info command failed', { error, durationMs });
 
-    const errorResponse: BrowseResponse = {
+    const errorResponse: InfoResponse = {
       ...buildBaseResponse(
         {
           success: false,
-          message: `Browse failed: ${(error as Error).message}`,
+          message: `Info failed: ${(error as Error).message}`,
         },
         context
       ),
       error: {
-        code: 'ERR-BROWSE-999',
+        code: 'ERR-INFO-999',
         message: (error as Error).message,
         severity: 'ERROR',
         category: 'EXECUTION',
@@ -230,54 +241,30 @@ const browseHandler: CommandHandler<BrowseOptions> = async (options, context) =>
   }
 };
 
-export const browseCommand: CommandMetadata<BrowseOptions> = {
-  name: 'browse',
-  aliases: ['list', 'ls'],
-  description: 'Browse available plugins in the marketplace',
-  usage: 'plugin browse [--category <cat>] [--tag <tag>] [--limit <n>]',
-  requiredFlags: ['enableBrowse'],
-  specAnchors: ['FR-006', 'CRIT-006', '3-3-cli-workflow-control'],
-  errorCodes: ['ERR-BROWSE-001', 'ERR-BROWSE-002'],
+export const infoCommand: CommandMetadata<InfoOptions> = {
+  name: 'info',
+  aliases: ['show', 'details'],
+  description: 'Display detailed information about a specific plugin',
+  usage: 'plugin info <plugin-id>',
+  requiredFlags: undefined,
+  specAnchors: ['FR-002', 'CRIT-007', '3-3-cli-workflow-control'],
+  errorCodes: ['ERR-INFO-001', 'ERR-INFO-002', 'ERR-DISC-001'],
   examples: [
     {
-      command: 'plugin browse',
-      description: 'List all available plugins',
+      command: 'plugin info hookify',
+      description: 'Show detailed information about the hookify plugin',
     },
     {
-      command: 'plugin browse --category productivity',
-      description: 'Browse plugins in a specific category',
-    },
-    {
-      command: 'plugin browse --tag ai --limit 10',
-      description: 'Browse plugins with a specific tag, limited to 10 results',
+      command: 'plugin info pr-review-toolkit --output -',
+      description: 'Output plugin information as JSON to stdout',
     },
   ],
-  handler: browseHandler,
+  handler: infoHandler,
   builder: (yargs) => {
-    return yargs
-      .option('category', {
-        describe: 'Filter by plugin category',
-        type: 'string',
-        alias: 'c',
-      })
-      .option('tag', {
-        describe: 'Filter by plugin tag',
-        type: 'string',
-        alias: 't',
-      })
-      .option('featured', {
-        describe: 'Show only featured plugins',
-        type: 'boolean',
-      })
-      .option('verified', {
-        describe: 'Show only verified plugins',
-        type: 'boolean',
-      })
-      .option('limit', {
-        describe: 'Maximum number of results to display',
-        type: 'number',
-        alias: 'l',
-        default: 50,
-      });
+    return yargs.positional('plugin', {
+      describe: 'Plugin identifier',
+      type: 'string',
+      demandOption: true,
+    });
   },
 };
