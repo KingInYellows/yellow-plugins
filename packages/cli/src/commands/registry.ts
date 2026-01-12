@@ -7,7 +7,11 @@
  * Part of Task I1.T4: CLI command manifest
  */
 
-import type { CommandMetadata, CommandRegistry } from '../types/commands.js';
+import type {
+  BaseCommandOptions,
+  CommandMetadata,
+  CommandRegistry,
+} from '../types/commands.js';
 
 import { browseCommand } from './browse.js';
 import { checkUpdatesCommand } from './check-updates.js';
@@ -23,24 +27,30 @@ import { updateCommand } from './update.js';
  * Central command registry mapping command names to their metadata.
  * Order defines the display order in help output.
  */
-export const commandRegistry: CommandRegistry = {
+const toBaseMetadata = <T extends BaseCommandOptions>(
+  metadata: CommandMetadata<T>
+): CommandMetadata => metadata as CommandMetadata;
+
+const commandRegistryDefinition = {
   // Core lifecycle commands
-  install: installCommand,
-  update: updateCommand,
-  uninstall: uninstallCommand,
+  install: toBaseMetadata(installCommand),
+  update: toBaseMetadata(updateCommand),
+  uninstall: toBaseMetadata(uninstallCommand),
 
   // Discovery commands
-  browse: browseCommand,
-  search: searchCommand,
+  browse: toBaseMetadata(browseCommand),
+  search: toBaseMetadata(searchCommand),
 
   // Version management
-  rollback: rollbackCommand,
-  pin: pinCommand,
-  'check-updates': checkUpdatesCommand,
+  rollback: toBaseMetadata(rollbackCommand),
+  pin: toBaseMetadata(pinCommand),
+  'check-updates': toBaseMetadata(checkUpdatesCommand),
 
   // Publishing
-  publish: publishCommand,
-};
+  publish: toBaseMetadata(publishCommand),
+} as const satisfies CommandRegistry;
+
+export const commandRegistry: CommandRegistry = commandRegistryDefinition;
 
 /**
  * Get all registered commands as an array.
@@ -67,23 +77,29 @@ export function getCommand(nameOrAlias: string): CommandMetadata | undefined {
 /**
  * Get commands grouped by category for help display.
  */
-export function getCommandsByCategory(): Record<string, CommandMetadata[]> {
-  const {
-    install,
-    update,
-    uninstall,
-    browse,
-    search,
-    rollback,
-    pin,
-    publish,
-  } = commandRegistry;
-  const checkUpdates = commandRegistry['check-updates'];
+type RegisteredCommand = keyof typeof commandRegistryDefinition;
 
-  return {
-    'Plugin Lifecycle': [install, update, uninstall],
-    'Plugin Discovery': [browse, search],
-    'Version Management': [rollback, pin, checkUpdates],
-    Publishing: [publish],
+const requireRegisteredCommand = (name: RegisteredCommand): CommandMetadata => {
+  const command = commandRegistry[name];
+  if (!command) {
+    throw new Error(`Command "${name}" is not registered.`);
+  }
+  return command;
+};
+
+export function getCommandsByCategory(): Record<string, CommandMetadata[]> {
+  const categories: Record<string, RegisteredCommand[]> = {
+    'Plugin Lifecycle': ['install', 'update', 'uninstall'],
+    'Plugin Discovery': ['browse', 'search'],
+    'Version Management': ['rollback', 'pin', 'check-updates'],
+    Publishing: ['publish'],
   };
+
+  const grouped: Record<string, CommandMetadata[]> = {};
+
+  for (const [category, keys] of Object.entries(categories)) {
+    grouped[category] = keys.map((key) => requireRegisteredCommand(key));
+  }
+
+  return grouped;
 }

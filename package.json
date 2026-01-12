@@ -24,6 +24,10 @@
     "validate:schemas": "node scripts/validate-marketplace.js && node scripts/validate-plugin.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "docs:build": "typedoc",
+    "docs:lint:toc": "doctoc --notitle docs/traceability-matrix.md docs/plans",
+    "docs:lint:md": "markdownlint \"CONTRIBUTING.md\" \"docs/plans/**/*.md\"",
+    "docs:lint": "pnpm run docs:lint:toc && pnpm run docs:lint:md",
     "prepare": "husky install || true"
   },
   "devDependencies": {
@@ -32,10 +36,13 @@
     "@typescript-eslint/parser": "^6.21.0",
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",
+    "doctoc": "^2.2.1",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
+    "markdownlint-cli": "^0.39.0",
     "prettier": "^3.2.4",
+    "typedoc": "^0.28.0",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0"
   },

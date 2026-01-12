@@ -1,3 +1,51 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Requirements Traceability Matrix](#requirements-traceability-matrix)
+  - [KingInYellows Personal Plugin Marketplace](#kinginyellows-personal-plugin-marketplace)
+  - [Executive Summary](#executive-summary)
+    - [Traceability Confidence: **100%** ✅](#traceability-confidence-100%25-)
+  - [Matrix 1: PRD to Specification Coverage](#matrix-1-prd-to-specification-coverage)
+    - [Complete PRD Requirements Traceability](#complete-prd-requirements-traceability)
+    - [Coverage Summary](#coverage-summary)
+  - [Matrix 2: Success Metrics to Requirements Traceability](#matrix-2-success-metrics-to-requirements-traceability)
+    - [Primary Success Metric (PSM)](#primary-success-metric-psm)
+    - [Secondary Success Metrics (SSM)](#secondary-success-metrics-ssm)
+  - [Matrix 3: Risks to Mitigations Traceability](#matrix-3-risks-to-mitigations-traceability)
+    - [High-Priority Risks (RPN ≥ 100)](#high-priority-risks-rpn-%E2%89%A5-100)
+    - [Mitigation Evidence](#mitigation-evidence)
+  - [Matrix 4: NFRs to Test Strategy Traceability](#matrix-4-nfrs-to-test-strategy-traceability)
+    - [Performance NFRs (5 total)](#performance-nfrs-5-total)
+    - [Reliability NFRs (6 total)](#reliability-nfrs-6-total)
+    - [Maintainability NFRs (5 total)](#maintainability-nfrs-5-total)
+    - [Security NFRs (3 total)](#security-nfrs-3-total)
+    - [Usability NFRs (4 total)](#usability-nfrs-4-total)
+    - [Extensibility NFRs (3 total)](#extensibility-nfrs-3-total)
+    - [NFR Testing Summary](#nfr-testing-summary)
+  - [Matrix 5: Documentation Tooling Traceability](#matrix-5-documentation-tooling-traceability)
+  - [Overall Traceability Assessment](#overall-traceability-assessment)
+    - [Coverage Statistics](#coverage-statistics)
+    - [Traceability Confidence by Item](#traceability-confidence-by-item)
+    - [Specification Completeness](#specification-completeness)
+      - [Part 1 (Essential Sections)](#part-1-essential-sections)
+      - [Part 2 (Advanced Sections)](#part-2-advanced-sections)
+    - [Combined Specification Assessment](#combined-specification-assessment)
+  - [Gap Analysis](#gap-analysis)
+    - [Potential Gaps Identified: **NONE** ✅](#potential-gaps-identified-none-)
+    - [Specification Strengths](#specification-strengths)
+    - [Specification Quality Metrics](#specification-quality-metrics)
+  - [Recommendations for Implementation](#recommendations-for-implementation)
+    - [Phase 1 Implementation Priorities](#phase-1-implementation-priorities)
+    - [For Adversarial Reviewer (Next Agent)](#for-adversarial-reviewer-next-agent)
+  - [Appendices](#appendices)
+    - [Appendix A: Requirements Cross-Reference](#appendix-a-requirements-cross-reference)
+    - [Appendix B: Success Metrics Cross-Reference](#appendix-b-success-metrics-cross-reference)
+    - [Appendix C: Risk Mitigation Cross-Reference](#appendix-c-risk-mitigation-cross-reference)
+  - [Conclusion](#conclusion)
+    - [Traceability Status: **COMPLETE** ✅](#traceability-status-complete-)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Requirements Traceability Matrix
 ## KingInYellows Personal Plugin Marketplace
 
@@ -306,6 +354,18 @@ grep -q "Commands: git" <<< "$output"
 - Extensibility: 3/3 (100%) automated
 
 **Overall NFR Testability**: ✅ (21 of 21 testable, 16 of 21 fully automated)
+
+---
+
+## Matrix 5: Documentation Tooling Traceability
+
+Task `I1.T5` establishes typedoc, doctoc, markdownlint, and ADR traceability templates so documentation artifacts stay synchronized with product requirements.
+
+| Artifact / Task | FR Alignment | NFR Alignment | Notes / Evidence |
+|-----------------|-------------|---------------|------------------|
+| **Typedoc baseline + `pnpm docs:build`** | FR-003 (Detail View), FR-009 (Simple Publishing) | NFR-MAINT-004 (Documentation coverage) | API references for CLI/domain/infrastructure stay regenerated alongside code, preserving Section 4 documentation directives. |
+| **Doctoc + markdownlint automation via `pnpm docs:lint`** | FR-009 (Simple Publishing), FR-011 (Release Automation) | NFR-MAINT-001 (≤ 2 manual publish steps), NFR-MAINT-004 (Documentation coverage) | Automatic TOC refresh + lint gating ensures delivery workflows remain two-command compliant and spec addenda never drift. |
+| **ADR template relocation (`docs/plans/ADR-template.md`)** | FR-001 – FR-013 (global traceability mandate) | NFR-MAINT-005 (Error actionability), CRIT-021 (Traceability enforcement) | Template now forces FR/NFR references per ADR so each change records lineage before runtime work (Tasks I1.T1–I1.T5). |
 
 ---
 

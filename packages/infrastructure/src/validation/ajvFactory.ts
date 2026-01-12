@@ -10,8 +10,18 @@
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 
-import Ajv, { type ErrorObject, type ValidateFunction } from 'ajv';
+import Ajv, { type ErrorObject, type Options as AjvOptions, type ValidateFunction } from 'ajv';
 import addFormats from 'ajv-formats';
+
+type AjvInstance = import('ajv').default;
+type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
+type AddFormatsFn = (ajv: AjvInstance) => AjvInstance;
+
+const AjvCtor: AjvConstructor =
+  (Ajv as unknown as { default?: AjvConstructor }).default ?? (Ajv as unknown as AjvConstructor);
+
+const applyFormats: AddFormatsFn =
+  (addFormats as unknown as { default?: AddFormatsFn }).default ?? (addFormats as unknown as AddFormatsFn);
 
 /**
  * Validation result containing success status and typed errors
@@ -61,12 +71,12 @@ interface CachedValidator {
  * ```
  */
 export class AjvValidatorFactory {
-  private ajv: Ajv; // AJV instance
+  private ajv: AjvInstance; // AJV instance
   private validatorCache: Map<string, CachedValidator>;
 
   constructor() {
     // Initialize AJV with strict configuration
-    this.ajv = new Ajv({
+    this.ajv = new AjvCtor({
       strict: true,              // Strict schema validation
       allErrors: true,           // Collect all errors (not just first)
       verbose: true,             // Include schema and data in errors
@@ -76,7 +86,7 @@ export class AjvValidatorFactory {
     });
 
     // Add format validators (uri, email, date-time, etc.)
-    addFormats(this.ajv);
+    applyFormats(this.ajv);
 
     this.validatorCache = new Map();
   }

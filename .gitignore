@@ -31,6 +31,9 @@ docs2/
 .agentdb/
 .serena/
 
+# Generated documentation (Task I1.T5: documentation tooling)
+docs/api/
+
 # Node.js dependencies
 node_modules/
 **/node_modules/

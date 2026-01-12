@@ -121,4 +121,4 @@ export interface CommandMetadata<TOptions extends BaseCommandOptions = BaseComma
 /**
  * Registry mapping command names to their metadata.
  */
-export type CommandRegistry = Record<string, CommandMetadata<any>>; // eslint-disable-line @typescript-eslint/no-explicit-any
+export type CommandRegistry = Record<string, CommandMetadata<BaseCommandOptions>>;

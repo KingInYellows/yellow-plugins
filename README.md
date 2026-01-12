@@ -125,6 +125,12 @@ pnpm build
 
 # Validate schemas
 pnpm validate:schemas
+
+# Generate API documentation
+pnpm docs:build
+
+# Lint and update markdown documentation
+pnpm docs:lint
 ```
 
 **Package Structure**:

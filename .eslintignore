@@ -18,6 +18,9 @@ coverage/
 # Serena Python project (unrelated)
 serena/
 
+# Generated documentation
+docs/api/
+
 # Code Machine artifacts
 .codemachine/
 
