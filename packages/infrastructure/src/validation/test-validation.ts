@@ -8,6 +8,8 @@
  * Usage: node --loader tsx test-validation.ts
  */
 
+/* eslint-disable no-console */
+
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 
@@ -15,7 +17,7 @@ import { ValidationStatus, type DomainValidationError } from '@yellow-plugins/do
 
 import { createValidator } from './validator.js';
 
-async function main() {
+async function main(): Promise<void> {
   console.log('🔍 Validation Test Script');
   console.log('=' .repeat(60));
   console.log();

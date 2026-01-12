@@ -11,6 +11,7 @@
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
+    "cli": "pnpm --filter @yellow-plugins/cli exec tsx src/index.ts",
     "build": "pnpm -r run build",
     "clean": "pnpm -r run clean && rm -rf node_modules",
     "test": "pnpm -r run test",
@@ -50,5 +51,9 @@
     "cli",
     "git-native",
     "schema-validation"
-  ]
+  ],
+  "dependencies": {
+    "@types/yargs": "^17.0.35",
+    "yargs": "^18.0.0"
+  }
 }
