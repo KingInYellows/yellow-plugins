@@ -14,6 +14,7 @@ This document describes the telemetry and metrics infrastructure for the Yellow 
 - Section 3.0: The "Rulebook" (Cross-Cutting Concerns) - Observability mandate
 - Section 3.5: Observability Fabric - Logging, metrics, and tracing implementation
 - Section 3.11: Operational Metrics Catalog - KPI definitions and targets
+- Section 6: [Verification & Integration Strategy](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy) - Telemetry hooks required for CI gating
 - CRIT-004: Lifecycle script consent logging
 - CRIT-008: Telemetry correlation IDs
 - CRIT-010: Telemetry instrumentation points
@@ -162,6 +163,8 @@ Lifecycle script consent events include:
 
 ## Metrics Catalog
 
+Section 6 verification gates consume these metrics during CI integration and smoke testing to confirm telemetry coverage before releases. Each metric below indicates how it satisfies the Section 6 requirement to export Prometheus snapshots (`node tools/test.cjs` validates their presence).
+
 ### Command Performance Metrics
 
 #### `yellow_plugins_command_duration_ms` (histogram)
@@ -174,6 +177,8 @@ Lifecycle script consent events include:
 - Install: ≤ 120 seconds (120,000 ms) for P95
 - Publish: ≤ 10 minutes (600,000 ms) for P95
 
+**Owner:** Platform Team
+**Alert Threshold:** Warning = > 120s (install), > 600s (publish); Critical = > 240s (install), > 1200s (publish)
 **CRIT Mitigation:** CRIT-010, CRIT-021
 
 ---
@@ -213,6 +218,8 @@ Lifecycle script consent events include:
 cache_hit_ratio = cache_hits_total / (cache_hits_total + cache_misses_total)
 ```
 
+**Owner:** Platform Team
+**Alert Threshold:** Warning = < 0.6, Critical = < 0.4
 **CRIT Mitigation:** CRIT-010 (telemetry for cache effectiveness)
 
 ---
@@ -224,6 +231,9 @@ cache_hit_ratio = cache_hits_total / (cache_hits_total + cache_misses_total)
 **SLO Target:** ≤ 500 MB (524,288,000 bytes)
 
 **Use Case:** Trigger eviction warnings when approaching capacity limits
+
+**Owner:** Platform Team
+**Alert Threshold:** Warning = > 400MB, Critical = > 500MB
 
 ---
 
@@ -263,6 +273,8 @@ cache_hit_ratio = cache_hits_total / (cache_hits_total + cache_misses_total)
 
 **Use Case:** Detect systemic schema regressions, identify malformed marketplace data
 
+**Owner:** CI Team
+**Alert Threshold:** Warning = > 0 failures/hour, Critical = > 5 failures/hour
 **CRIT Mitigation:** CRIT-004 (validation instrumentation)
 
 ---
@@ -306,6 +318,9 @@ cache_hit_ratio = cache_hits_total / (cache_hits_total + cache_misses_total)
 
 **Use Case:** Identify untrusted plugins, measure consent friction
 
+**Owner:** Security Team
+**Alert Threshold:** Warning = > 20% decline rate for any plugin, Critical = > 50% decline rate
+**Review Cadence:** Monthly (review high-decline plugins for trust issues)
 **CRIT Mitigation:** CRIT-004 (lifecycle consent tracking)
 
 ---
@@ -354,6 +369,9 @@ cache_hit_ratio = cache_hits_total / (cache_hits_total + cache_misses_total)
 
 **SLO Target:** ≤ 60 seconds for complete validation workflow
 
+**Owner:** CI Team
+**Alert Threshold:** Warning = > 60s, Critical = > 120s
+**Review Cadence:** Weekly (optimize slow stages)
 **CRIT Mitigation:** CRIT-021 (CI runtime budget enforcement)
 
 ---
@@ -378,6 +396,9 @@ cache_hit_ratio = cache_hits_total / (cache_hits_total + cache_misses_total)
 
 **Use Case:** Trigger alerts on corruption detection, validate atomic write semantics
 
+**Owner:** Platform Team
+**Alert Threshold:** Warning = > 0, Critical = > 0 (any corruption is critical)
+**Review Cadence:** Immediate (trigger postmortem for any incident)
 **CRIT Mitigation:** CRIT-018 (atomic operations validation)
 
 ---
@@ -654,16 +675,163 @@ rate(yellow_plugins_lifecycle_prompt_declines_total[5m])
 
 ---
 
+## KPI Dashboard and Ownership
+
+This section defines Key Performance Indicators (KPIs) from Architecture §3.16 with ownership, alert thresholds, and review cadence. Section 6 verification scripts scrape this table to ensure KPI metadata remains in sync with telemetry exports stored in `.claude-plugin/audit/`.
+
+### KPI Definition Table
+
+| KPI | Metric(s) | Target | Warning Threshold | Critical Threshold | Owner | Review Cadence | Status |
+|-----|-----------|--------|-------------------|--------------------|-------|----------------|--------|
+| **Install Success Rate** | `yellow_plugins_install_total{status="success"}` / `yellow_plugins_install_total` | ≥ 99% | < 99% | < 95% | Platform Team | Monthly (Quarterly report) | 🟢 Active |
+| **Rollback Duration** | P95 of `yellow_plugins_command_duration_ms{command="rollback"}` | < 60s | > 60s | > 120s | Platform Team | Monthly | 🟢 Active |
+| **Cache Eviction Frequency** | Rate of `yellow_plugins_cache_evictions_total` over 24h | Baseline + 10% | Baseline + 50% | Baseline + 200% | Platform Team | Weekly trend review | 🟢 Active |
+| **Doc Update Latency** | Days between code merge and doc update | ≤ 2 days | > 2 days | > 5 days | Documentation Team | Quarterly (monthly spot check) | 🟢 Active |
+| **CI Validation Runtime** | `yellow_plugins_ci_duration_seconds{stage="schema_validation"}` | ≤ 60s | > 60s | > 120s | CI Team | Weekly | 🟢 Active |
+
+### Alert Configuration
+
+#### Install Success Rate Alert
+
+**Warning Alert (< 99%)**
+```promql
+# Alert when install success rate drops below 99%
+(
+  sum(rate(yellow_plugins_install_total{status="success"}[1h]))
+  /
+  sum(rate(yellow_plugins_install_total[1h]))
+) < 0.99
+```
+
+**Critical Alert (< 95%)**
+```promql
+# Alert when install success rate drops below 95%
+(
+  sum(rate(yellow_plugins_install_total{status="success"}[1h]))
+  /
+  sum(rate(yellow_plugins_install_total[1h]))
+) < 0.95
+```
+
+**Owner:** Platform Team
+**Response Time:** Warning = 4 hours, Critical = 1 hour
+**Escalation:** Create GitHub issue, tag Platform Team, follow [Runbook KPI Escalation](./runbook.md#kpi-escalation-paths)
+
+---
+
+#### Rollback Duration Alert
+
+**Warning Alert (> 60s)**
+```promql
+# Alert when P95 rollback duration exceeds 60 seconds
+histogram_quantile(0.95,
+  rate(yellow_plugins_command_duration_ms_bucket{command="rollback"}[1h])
+) > 60000
+```
+
+**Critical Alert (> 120s)**
+```promql
+# Alert when P95 rollback duration exceeds 120 seconds
+histogram_quantile(0.95,
+  rate(yellow_plugins_command_duration_ms_bucket{command="rollback"}[1h])
+) > 120000
+```
+
+**Owner:** Platform Team
+**Response Time:** Warning = 1 week, Critical = 24 hours
+**Escalation:** Investigate cache integrity, profile rollback operations
+
+---
+
+#### Cache Eviction Frequency Alert
+
+**Warning Alert (Baseline + 50%)**
+```promql
+# Alert when eviction rate exceeds baseline by 50%
+rate(yellow_plugins_cache_evictions_total[24h]) > (baseline * 1.5)
+```
+
+**Critical Alert (Baseline + 200%)**
+```promql
+# Alert when eviction rate exceeds baseline by 200%
+rate(yellow_plugins_cache_evictions_total[24h]) > (baseline * 3.0)
+```
+
+**Owner:** Platform Team
+**Response Time:** Warning = 1 week, Critical = 24 hours
+**Escalation:** Check cache size, review large plugins, adjust thresholds
+**Baseline Calculation:** Average evictions/day over previous 30 days
+
+---
+
+#### CI Validation Runtime Alert
+
+**Warning Alert (> 60s)**
+```promql
+# Alert when schema validation stage exceeds 60 seconds
+yellow_plugins_ci_duration_seconds{stage="schema_validation"} > 60
+```
+
+**Critical Alert (> 120s)**
+```promql
+# Alert when schema validation stage exceeds 120 seconds
+yellow_plugins_ci_duration_seconds{stage="schema_validation"} > 120
+```
+
+**Owner:** CI Team
+**Response Time:** Warning = 1 week, Critical = 24 hours
+**Escalation:** Profile validation scripts, parallelize plugin validation, adjust SLO
+**CRIT Mitigation:** CRIT-021 (CI runtime budget enforcement)
+
+---
+
+### KPI Review Process
+
+**Monthly Reviews:**
+- Platform Team reviews Install Success Rate and Rollback Duration
+- Generate report from monthly metrics snapshot
+- Document deviations in GitHub issue with postmortem if needed
+- Update runbook with new failure patterns
+
+**Quarterly Reviews:**
+- Full KPI review across all metrics
+- Analyze trends over 3-month period
+- Review postmortems and action item completion
+- Adjust alert thresholds if necessary (requires Architecture approval)
+- Update operational processes based on lessons learned
+
+**Review Artifacts:**
+- Metrics snapshots from `.ci-metrics/*.prom`
+- Telemetry exports from `.claude-plugin/audit/*.jsonl`
+- GitHub Issues tracking KPI breaches
+- Postmortems from P0/P1 incidents
+
+**Reference:** [Operational Architecture §3.16](../.codemachine/artifacts/architecture/04_Operational_Architecture.md#3-16-operational-kpis), [Operational Runbook KPI Escalation](./runbook.md#kpi-escalation-paths), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+
+---
+
+## Section 6 Verification Alignment
+
+- **CI Integration Tests:** Section 6 smoke suites capture `plugin metrics --format json` artifacts and fail builds if required KPIs (`Install Success Rate`, `Rollback Duration`, `Cache Eviction Frequency`, `Doc Update Latency`, `CI Validation Runtime`) are missing, ensuring this document stays authoritative.
+- **Telemetry Export Hooks:** The telemetry export runbook steps reference `.claude-plugin/audit/*.jsonl` and `.ci-metrics/*.prom`, matching the evidence lists enumerated in Section 6 for release readiness sign-off.
+- **Traceability Updates:** Updates to KPI owners or alert thresholds must link to Section 6 in PR descriptions; `docs/traceability-matrix.md` records these ties so CI scripts can verify FR/NFR coverage automatically.
+
+Refer to the [Operational Runbook](./runbook.md#telemetry-export-and-audit-review) for the command-driven process to capture artifacts during verification and to the [Postmortem Template](./postmortem-template.md) for Section 6-compliant incident reporting.
+
+---
+
 ## Related Documentation
 
 - [Architecture Blueprint](../architecture/01_Blueprint_Foundation.md) - Section 3.0 Observability Rulebook
-- [Operational Architecture](../architecture/04_Operational_Architecture.md) - Section 3.5 Observability Fabric
+- [Operational Architecture](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) - Section 3.5, 3.11, 3.16
 - [Verification Strategy](../plan/03_Verification_and_Glossary.md) - Section 6 CI/CD validation
 - [Postmortem Template](./postmortem-template.md) - Incident investigation workflow
+- [Operational Runbook](./runbook.md) - KPI escalation paths and incident response
 
 ---
 
 **Document Control:**
-- **Version:** 1.0.0
-- **Approval Status:** Draft
-- **Next Review:** 2026-02-11
+- **Version:** 1.1.0
+- **Approval Status:** Active
+- **Last Updated:** 2026-01-12
+- **Next Review:** 2026-02-12

@@ -12,7 +12,7 @@
 
 ## Overview
 
-This runbook provides step-by-step procedures for diagnosing and remediating operational issues in the Yellow Plugins system. It covers incident response workflows, diagnostics commands, failure recovery procedures, and escalation paths referenced in Architecture §3.7.
+This runbook provides step-by-step procedures for diagnosing and remediating operational issues in the Yellow Plugins system. It covers incident response workflows, diagnostics commands, failure recovery procedures, and escalation paths referenced in Architecture §3.7. Dedicated sections document lifecycle script incidents, cache recovery, publish rollback, telemetry export, and KPI escalation steps that Section 6 of the verification strategy treats as gating artifacts.
 
 **Purpose:**
 - Guide operators through incident response and system recovery
@@ -30,6 +30,7 @@ This runbook provides step-by-step procedures for diagnosing and remediating ope
 - [CI/CD Operations Guide](./ci.md) - CI workflow procedural guidance
 - [CI Validation Pipeline Spec](./ci-pipeline.md) - Technical pipeline specification
 - [Metrics Guide](./metrics.md) - Telemetry and monitoring
+- [Section 6 Verification Strategy](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy) - Defines verification hooks and documentation gates
 
 ---
 
@@ -85,6 +86,10 @@ gh repo view kinginyellow/yellow-plugins
 | Registry Corruption | `cat .claude-plugin/registry.json` | JSON validation | [Registry Recovery](#registry-corruption-recovery) |
 | Cache Issues | `ls -lh ~/.claude/plugins/cache/` | Directory inspection | [Cache Recovery](#cache-recovery) |
 | Dependency Vulnerabilities | `pnpm audit` | npm audit report | [Security Incidents](#security-audit-failures) |
+| Lifecycle Script Failure | `grep lifecycle_consent .claude-plugin/audit/*.jsonl` | Audit logs | [Lifecycle Script Incidents](#lifecycle-script-incidents) |
+| Publish Rollback | `git log .claude-plugin/marketplace.json` | Git history | [Publish Rollback](#publish-rollback) |
+| Telemetry Export | `pnpm metrics` | Metrics export | [Telemetry Export](#telemetry-export-and-audit-review) |
+| KPI Threshold Breach | Review quarterly metrics | KPI reports | [KPI Escalation](#kpi-escalation-paths) |
 
 ### Incident Response Steps
 
@@ -107,6 +112,7 @@ gh repo view kinginyellow/yellow-plugins
    - Create GitHub issue with full context
    - Tag platform team for review
    - Consider rollback if production-impacting
+   - Create postmortem using [template](./postmortem-template.md) for all P0/P1 incidents
 
 ---
 
@@ -648,7 +654,7 @@ pnpm plugin install text-analyzer@1.5.0
 du -sh ~/.claude/plugins/cache/
 ```
 
-**Reference:** [Metrics Guide: Cache Performance](./metrics.md#cache-performance-metrics)
+**Reference:** [Metrics Guide: Cache Performance](./metrics.md#cache-performance-metrics), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
 
 ---
 
@@ -1026,6 +1032,423 @@ For issues with external dependencies:
 
 ---
 
+## Lifecycle Script Incidents
+
+### Symptoms
+
+- Lifecycle script execution fails during install/update/uninstall
+- User declines script consent, blocking operation
+- Script timeout or sandbox violation
+- Metric: `yellow_plugins_lifecycle_executions_total{exit_code != 0}`
+
+### Diagnosis
+
+**Step 1: Check Audit Logs**
+```bash
+# Review lifecycle consent events
+grep 'lifecycle_consent' .claude-plugin/audit/*.jsonl
+
+# Check script execution outcomes
+grep 'lifecycle_execution' .claude-plugin/audit/*.jsonl
+
+# Example output:
+# {"level":"audit","eventType":"lifecycle_consent","pluginId":"text-analyzer","scriptDigest":"sha256:a1b2c3d4...","consentGranted":true,"exitCode":1}
+```
+
+**Step 2: Review Script Digest**
+```bash
+# Verify script contents match expected digest
+cat .claude-plugin/cache/text-analyzer/2.0.0/lifecycle/install.sh | sha256sum
+
+# Compare with logged digest from audit event
+```
+
+**Step 3: Check Sandbox Logs**
+```bash
+# Review sandbox execution logs
+cat .ci-logs/lifecycle-execution-*.log
+
+# Check for timeout, permission errors, or exit codes
+```
+
+### Remediation
+
+#### Option 1: Script Declined by User
+
+**Symptoms:** User typed incorrect confirmation or declined consent
+
+**Remediation:**
+```bash
+# Re-attempt install with explicit consent
+plugin install text-analyzer@2.0.0
+
+# When prompted, type exact confirmation string:
+# "I TRUST THIS SCRIPT"
+
+# Alternative: Skip lifecycle scripts (use with caution)
+plugin install text-analyzer@2.0.0 --skip-lifecycle
+```
+
+#### Option 2: Script Execution Failed
+
+**Symptoms:** Script ran but exited with non-zero code
+
+**Diagnosis:**
+```bash
+# Check script exit code from audit log
+grep 'exitCode' .claude-plugin/audit/*.jsonl | grep 'text-analyzer'
+
+# Review script output
+cat .claude-plugin/cache/text-analyzer/2.0.0/lifecycle/install.log
+```
+
+**Remediation:**
+```bash
+# Fix script dependencies or permissions
+# Contact plugin author if script is malformed
+
+# For immediate unblock, install older version
+plugin install text-analyzer@1.9.0
+```
+
+#### Option 3: Sandbox Timeout
+
+**Symptoms:** Script exceeded execution time limit
+
+**Diagnosis:**
+```bash
+# Check execution duration from audit log
+grep 'executionDurationMs' .claude-plugin/audit/*.jsonl | grep 'text-analyzer'
+
+# Default timeout: 60 seconds for lifecycle scripts
+```
+
+**Remediation:**
+```bash
+# Increase timeout via config (if script legitimately needs more time)
+jq '.lifecycle.timeout = 120000' .claude-plugin/config.json > config.tmp
+mv config.tmp .claude-plugin/config.json
+
+# Re-attempt install
+plugin install text-analyzer@2.0.0
+```
+
+### Post-Incident Actions
+
+```bash
+# Document script failure in issue
+gh issue create --title "Lifecycle script failure: text-analyzer@2.0.0" \
+  --body "Script digest: sha256:a1b2c3d4...
+Exit code: 1
+Audit log: [attach log excerpt]
+Reproduction steps: [describe]"
+
+# If script is malicious, report to plugin author and remove from marketplace
+```
+
+**Reference:** [Metrics Guide: Lifecycle Consent Tracking](./metrics.md#yellow_plugins_lifecycle_prompt_declines_total), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+
+---
+
+## Publish Rollback
+
+### Symptoms
+
+- Published plugin breaks marketplace validation
+- Incorrect version published (e.g., 2.0.0 instead of 1.3.1)
+- Missing or corrupted plugin manifest after publish
+- CI validation fails after marketplace update merged
+
+### Diagnosis
+
+**Step 1: Identify Problematic Commit**
+```bash
+# Check recent marketplace.json changes
+git log -p --follow .claude-plugin/marketplace.json | head -100
+
+# Identify commit that introduced issue
+git blame .claude-plugin/marketplace.json
+```
+
+**Step 2: Verify Schema Validation**
+```bash
+# Run schema validation locally
+pnpm validate:schemas
+
+# Check specific plugin entry
+jq '.plugins[] | select(.id == "text-analyzer")' .claude-plugin/marketplace.json
+```
+
+**Step 3: Check CI Workflow Status**
+```bash
+# Review failed CI run
+gh run list --workflow=validate-schemas.yml --limit 5
+
+# Download CI logs and artifacts
+gh run download <failed-run-id>
+```
+
+### Remediation
+
+#### Option 1: Revert Git Commit
+
+**Symptoms:** Last publish commit broke validation
+
+**Remediation:**
+```bash
+# Revert the problematic commit
+git revert <commit-sha>
+
+# Verify revert fixes validation
+pnpm validate:schemas
+
+# Push revert
+git push origin main
+
+# Delete incorrect git tag if created
+git tag -d v2.0.0
+git push origin :refs/tags/v2.0.0
+```
+
+#### Option 2: Manual Marketplace Fix
+
+**Symptoms:** Specific plugin entry is malformed
+
+**Remediation:**
+```bash
+# Edit marketplace.json to fix entry
+jq '.plugins |= map(if .id == "text-analyzer" then .version = "1.3.1" else . end)' \
+  .claude-plugin/marketplace.json > marketplace.tmp
+mv marketplace.tmp .claude-plugin/marketplace.json
+
+# Validate fix
+pnpm validate:schemas
+
+# Commit correction
+git add .claude-plugin/marketplace.json
+git commit -m "fix: correct text-analyzer version to 1.3.1"
+git push origin main
+```
+
+#### Option 3: Restore from Backup
+
+**Symptoms:** Marketplace.json severely corrupted
+
+**Remediation:**
+```bash
+# Restore from git history
+git checkout HEAD~1 -- .claude-plugin/marketplace.json
+
+# Verify restoration
+jq '.' .claude-plugin/marketplace.json
+
+# Validate schemas
+pnpm validate:schemas
+
+# Commit restoration
+git add .claude-plugin/marketplace.json
+git commit -m "fix: restore marketplace.json from previous commit"
+git push origin main
+```
+
+### Post-Rollback Actions
+
+```bash
+# Verify CI passes after rollback
+gh run list --workflow=validate-schemas.yml --limit 1
+
+# Update release notes with rollback information
+echo "## Rollback Notice
+Version 2.0.0 was rolled back due to marketplace validation failure.
+Restored to version 1.3.1.
+See incident #123 for details." >> CHANGELOG.md
+
+# Create postmortem
+cp docs/operations/postmortem-template.md docs/operations/postmortem-2026-001.md
+# Fill out postmortem details
+```
+
+**Reference:** [CI Pipeline Spec: Publishing Workflow](./ci-pipeline.md), [Metrics Guide: CI Validation](./metrics.md#yellow_plugins_ci_validations_total), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+
+---
+
+## Telemetry Export and Audit Review
+
+### Symptoms
+
+- Need to export telemetry for incident investigation
+- Audit log review required for security compliance
+- Metrics snapshot needed for KPI reporting
+- Correlation ID tracing across logs, metrics, and audit events
+
+### Exporting Telemetry Artifacts
+
+**Step 1: Collect Audit Logs**
+```bash
+# Export lifecycle consent logs
+grep 'lifecycle_consent' .claude-plugin/audit/*.jsonl > audit-lifecycle-$(date +%Y%m%d).jsonl
+
+# Export all audit events for date range
+grep -E '2026-01-(10|11|12)' .claude-plugin/audit/*.jsonl > audit-export-jan10-12.jsonl
+
+# Compress for upload
+tar -czf audit-export-jan10-12.tar.gz audit-export-jan10-12.jsonl
+```
+
+**Step 2: Export Metrics Snapshots**
+```bash
+# Export Prometheus metrics
+pnpm metrics > metrics-snapshot-$(date +%Y%m%d).prom
+
+# Export JSON format for programmatic analysis
+pnpm metrics --format json > metrics-snapshot-$(date +%Y%m%d).json
+
+# Compress for upload
+tar -czf metrics-snapshot-$(date +%Y%m%d).tar.gz metrics-snapshot-*.{prom,json}
+```
+
+**Step 3: Export Structured Logs**
+```bash
+# Collect structured JSON logs from .claude-plugin/logs/
+tar -czf logs-export-$(date +%Y%m%d).tar.gz .claude-plugin/logs/*.jsonl
+
+# Filter logs by correlation ID for specific incident
+jq 'select(.correlationId == "a3f2c9d8-1b4e-4a5c-9d7f-8e3c2a1b4d5e")' \
+  .claude-plugin/logs/*.jsonl > incident-correlation-trace.jsonl
+```
+
+**Step 4: Upload to GitHub (CI Context)**
+```yaml
+# In GitHub Actions workflow
+- name: Collect Telemetry Artifacts
+  run: |
+    mkdir -p telemetry-export
+    cp .claude-plugin/audit/*.jsonl telemetry-export/
+    pnpm metrics > telemetry-export/metrics-snapshot.prom
+    pnpm metrics --format json > telemetry-export/metrics-snapshot.json
+    cp .claude-plugin/logs/*.jsonl telemetry-export/ || true
+
+- name: Upload Telemetry Artifacts
+  uses: actions/upload-artifact@v3
+  with:
+    name: telemetry-export-${{ github.run_id }}
+    path: telemetry-export/
+    retention-days: 90
+```
+
+### Audit Log Review
+
+**Review Lifecycle Script Consent Events**
+```bash
+# List all consent events with outcomes
+jq 'select(.eventType == "lifecycle_consent") |
+  {plugin: .pluginId, version: .version, consent: .consentGranted, exitCode: .exitCode}' \
+  .claude-plugin/audit/*.jsonl
+
+# Count consent declines by plugin
+jq -r 'select(.eventType == "lifecycle_consent" and .consentGranted == false) | .pluginId' \
+  .claude-plugin/audit/*.jsonl | sort | uniq -c | sort -rn
+```
+
+**Review Command Execution Patterns**
+```bash
+# Summarize commands by type
+jq -r '.command' .claude-plugin/logs/*.jsonl | sort | uniq -c | sort -rn
+
+# Identify failed operations
+jq 'select(.level == "error") | {command: .command, error: .errorCode, time: .timestamp}' \
+  .claude-plugin/logs/*.jsonl
+```
+
+**Trace Correlation ID Across Artifacts**
+```bash
+# Given a correlation ID, trace across logs, metrics, and audit
+CORRELATION_ID="a3f2c9d8-1b4e-4a5c-9d7f-8e3c2a1b4d5e"
+
+# Find in logs
+grep "$CORRELATION_ID" .claude-plugin/logs/*.jsonl
+
+# Find in audit
+grep "$CORRELATION_ID" .claude-plugin/audit/*.jsonl
+
+# Find associated transaction ID
+jq -r "select(.correlationId == \"$CORRELATION_ID\") | .data.transactionId" \
+  .claude-plugin/logs/*.jsonl
+```
+
+### KPI Reporting from Telemetry
+
+**Generate KPI Report for Quarterly Review**
+```bash
+# Install success rate (Architecture §3.16)
+TOTAL_INSTALLS=$(jq -r 'select(.command == "install") | .command' .claude-plugin/logs/*.jsonl | wc -l)
+FAILED_INSTALLS=$(jq -r 'select(.command == "install" and .level == "error") | .command' .claude-plugin/logs/*.jsonl | wc -l)
+SUCCESS_RATE=$(echo "scale=2; (($TOTAL_INSTALLS - $FAILED_INSTALLS) / $TOTAL_INSTALLS) * 100" | bc)
+echo "Install Success Rate: $SUCCESS_RATE% (Target: ≥ 99%)"
+
+# Rollback duration (Architecture §3.16)
+AVG_ROLLBACK=$(jq -r 'select(.command == "rollback") | .durationMs' .claude-plugin/logs/*.jsonl | \
+  awk '{sum+=$1; count++} END {print sum/count/1000 "s"}')
+echo "Average Rollback Duration: $AVG_ROLLBACK (Target: < 60s)"
+
+# Cache eviction frequency
+EVICTIONS=$(grep 'cache_evictions_total' metrics-snapshot.prom | awk '{print $2}')
+echo "Cache Evictions: $EVICTIONS (Monitor for spikes)"
+```
+
+**Reference:** [Metrics Guide](./metrics.md), [Operational Architecture §3.16](../.codemachine/artifacts/architecture/04_Operational_Architecture.md#3-16-operational-kpis), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+
+---
+
+## KPI Escalation Paths
+
+When KPIs fall outside target thresholds (Architecture §3.16) or Section 6 verification hooks detect missing telemetry, follow these escalation procedures:
+
+### Install Success Rate < 99%
+
+**Severity:** P1 (Significant degradation)
+
+**Escalation Steps:**
+1. Create incident tracking issue immediately
+2. Run diagnostics: `pnpm validate:schemas`, check CI logs, review error codes
+3. Identify pattern: schema failures, cache issues, network problems
+4. Implement fix or workaround within 4 hours
+5. Create postmortem using [template](./postmortem-template.md)
+
+### Rollback Duration > 60s
+
+**Severity:** P2 (Degraded performance)
+
+**Escalation Steps:**
+1. Review cache integrity: verify symlink state, check cache size
+2. Profile rollback operation: identify slow steps (symlink swap, registry write)
+3. Document findings in GitHub issue
+4. Optimize within 1 week or adjust SLO target (requires architecture approval)
+
+### Cache Eviction Frequency Spike
+
+**Severity:** P2 (Degraded performance)
+
+**Escalation Steps:**
+1. Calculate baseline eviction rate from historical metrics
+2. Identify cause: large plugin packages, cache size threshold too low
+3. Adjust cache policies or recommend pinning frequently-used plugins
+4. Monitor for 1 week to confirm stabilization
+
+### Doc Update Latency > 2 Days
+
+**Severity:** P3 (Process issue)
+
+**Escalation Steps:**
+1. Identify stale documentation via git log comparison
+2. Assign documentation update to code author
+3. Add documentation checklist to PR template
+4. Review quarterly to ensure compliance
+
+**Reference:** [Escalation Paths](#escalation-paths), [Postmortem Template](./postmortem-template.md)
+
+---
+
 ## Preventive Maintenance
 
 ### Weekly Checks
@@ -1040,6 +1463,9 @@ grep 'schema_validation' aggregated-metrics/ci-metrics.prom
 
 # Monitor cache hit rates
 grep 'cache_hit_ratio' .ci-metrics/*.prom
+
+# Review audit logs for anomalies
+jq 'select(.level == "audit")' .claude-plugin/audit/*.jsonl | tail -50
 ```
 
 ### Monthly Maintenance
@@ -1058,6 +1484,13 @@ gh api /repos/kinginyellow/yellow-plugins/actions/artifacts | jq '.artifacts[] |
 
 # Audit security vulnerabilities
 pnpm audit
+
+# Export monthly metrics for KPI review
+pnpm metrics > metrics-monthly-$(date +%Y-%m).prom
+
+# Review lifecycle consent decline rates
+jq 'select(.eventType == "lifecycle_consent" and .consentGranted == false)' \
+  .claude-plugin/audit/*.jsonl | wc -l
 ```
 
 ### Quarterly Reviews
@@ -1075,6 +1508,11 @@ pnpm audit
 # Update secret scanning regex patterns
 
 # Document new failure scenarios in this runbook
+
+# Conduct KPI review (Architecture §3.16 / Verification Strategy §6)
+# Generate KPI report from quarterly telemetry exports
+# Review postmortems and action item completion
+# Update operational processes based on lessons learned
 ```
 
 ---
@@ -1085,12 +1523,13 @@ pnpm audit
 - [CI Validation Pipeline Spec](./ci-pipeline.md) - Technical pipeline specification
 - [CI/CD Operations Guide](./ci.md) - CI workflow procedural guidance
 - [Metrics Guide](./metrics.md) - Telemetry catalog and monitoring
+- [Postmortem Template](./postmortem-template.md) - Incident investigation workflow
 - [Traceability Matrix](../traceability-matrix.md) - Requirements coverage
 - [SPECIFICATION.md](../SPECIFICATION.md) - Complete technical specification
 
 ### Architecture Documents
-- [04_Operational_Architecture.md](../architecture/04_Operational_Architecture.md) - Section 3.7 operational processes
-- [03_Verification_and_Glossary.md](../plan/03_Verification_and_Glossary.md) - Section 6 verification strategy
+- [04_Operational_Architecture.md](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) - Section 3.7, 3.11, 3.16
+- [03_Verification_and_Glossary.md](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md) - Section 6 verification strategy
 
 ### External Resources
 - [GitHub Actions Troubleshooting](https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows)
@@ -1103,12 +1542,13 @@ pnpm audit
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-01-12 | 1.1.0 | Extended with lifecycle script incidents, publish rollback, telemetry export, and KPI escalation paths (I4.T4 deliverable) |
 | 2026-01-12 | 1.0.0 | Initial operational runbook (I4.T3 deliverable) |
 
 ---
 
 **Document Status:** Production-Ready
-**Approval Status:** Pending review (I4.T3 acceptance criteria met)
+**Approval Status:** Active (I4.T4 acceptance criteria met)
 **Next Review:** 2026-02-12
 
 ---
