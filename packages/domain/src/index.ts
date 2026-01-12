@@ -146,5 +146,14 @@ export {
   type PluginUpdateCheck,
 } from './update/index.js';
 
+// Pin Management (I3.T3)
+export {
+  PinService,
+  type IPinService,
+  type PinListEntry,
+  type PinOperationResult,
+  type PinStatus,
+} from './pins/index.js';
+
 // Package version
 export const version = '1.2.0';
