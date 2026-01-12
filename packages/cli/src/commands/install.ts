@@ -1,12 +1,23 @@
 /**
  * @yellow-plugins/cli - Install Command
  *
- * Handles plugin installation operations.
- * Placeholder implementation for Task I1.T4.
+ * Handles plugin installation operations with JSON contract support.
+ * Updated for Task I2.T4: CLI Contract Catalog implementation.
  *
  * Part of Task I1.T4: CLI command manifest
+ * Part of Task I2.T4: CLI contract catalog and I/O helpers
+ *
+ * @specification docs/contracts/cli-contracts.md#install-contract
+ * @schema api/cli-contracts/install.json
  */
 
+import {
+  loadRequest,
+  writeResponse,
+  toCommandResult,
+  buildBaseResponse,
+  buildCompatibilityIntent,
+} from '../lib/io.js';
 import type { CommandHandler, CommandMetadata, BaseCommandOptions } from '../types/commands.js';
 
 interface InstallOptions extends BaseCommandOptions {
@@ -15,79 +26,204 @@ interface InstallOptions extends BaseCommandOptions {
   force?: boolean;
 }
 
+/**
+ * Install request payload matching api/cli-contracts/install.json schema.
+ */
+interface InstallRequest {
+  pluginId: string;
+  version?: string;
+  force?: boolean;
+  compatibilityIntent: {
+    nodeVersion: string;
+    os: string;
+    arch: string;
+    claudeVersion?: string;
+  };
+  skipLifecycle?: boolean;
+  lifecycleConsent?: Array<{
+    scriptType: string;
+    digest: string;
+    consentedAt: string;
+  }>;
+  correlationId?: string;
+  dryRun?: boolean;
+  flagOverrides?: Record<string, boolean>;
+  telemetryContext?: {
+    sessionId?: string;
+    gitCommit?: string;
+    tags?: Record<string, string>;
+  };
+}
+
+/**
+ * Install response payload matching api/cli-contracts/install.json schema.
+ */
+interface InstallResponse {
+  success: boolean;
+  status: 'success' | 'error' | 'dry-run' | 'partial';
+  message: string;
+  transactionId: string;
+  correlationId: string;
+  timestamp: string;
+  cliVersion: string;
+  data?: {
+    pluginId: string;
+    version: string;
+    installState: 'active' | 'staged' | 'failed';
+    cachePath: string;
+    symlinkTarget?: string;
+    registryDelta?: {
+      added: string[];
+      modified: string[];
+    };
+    lifecycleScripts?: Array<{
+      scriptType: string;
+      exitCode: number;
+      durationMs: number;
+      digest: string;
+    }>;
+    flagEvaluations?: {
+      flags: Record<string, boolean>;
+      source: 'config' | 'override' | 'default';
+      appliedFlags: string[];
+    };
+  };
+  error?: {
+    code: string;
+    message: string;
+    severity: 'ERROR' | 'WARNING';
+    category: string;
+    specReference?: string;
+    resolution?: string;
+    context?: Record<string, unknown>;
+  };
+  telemetry?: {
+    durationMs: number;
+    cacheStatus?: 'hit' | 'miss' | 'partial';
+    bytesDownloaded?: number;
+    lifecycleScriptsRun?: number;
+    registryMutations?: number;
+  };
+}
+
 const installHandler: CommandHandler<InstallOptions> = async (options, context) => {
-  const { logger, correlationId } = context;
+  const { logger, correlationId, startTime } = context;
+  const startTimeMs = startTime.getTime();
 
   logger.info('Install command invoked', { pluginId: options.plugin, version: options.version });
 
-  // Validate required options
-  if (!options.plugin) {
-    logger.error('Plugin ID is required');
-    return {
-      success: false,
-      status: 'error',
-      message: 'Plugin ID is required',
-      error: {
-        code: 'ERR-INSTALL-001',
-        message: 'Missing required argument: plugin',
-      },
-    };
-  }
-
   try {
-    // TODO: Initialize InstallService with config, cacheService, registryService
-    // For now, this is a skeleton implementation that would be wired up in iteration completion
-
-    logger.info('Preparing installation request', {
-      pluginId: options.plugin,
-      version: options.version || 'latest',
-      force: options.force || false,
-    });
-
-    // Build install request following Architecture §3.7 CLI contract
-    const installRequest = {
-      pluginId: options.plugin,
-      version: options.version,
-      force: options.force,
-      correlationId,
-      dryRun: options.dryRun,
-      compatibilityIntent: {
-        // TODO: Gather from system fingerprint
-        nodeVersion: process.version,
-        os: process.platform,
-        arch: process.arch,
+    // Load request from JSON input or build from CLI arguments
+    const request = await loadRequest<InstallRequest>(
+      options,
+      {
+        pluginId: options.plugin!,
+        version: options.version,
+        force: options.force,
+        compatibilityIntent: buildCompatibilityIntent(),
+        correlationId,
+        dryRun: options.dryRun,
       },
-    };
+      context
+    );
 
-    logger.info('Install request prepared', { request: installRequest });
+    // Validate required fields
+    if (!request.pluginId) {
+      const errorResponse: InstallResponse = {
+        ...buildBaseResponse({ success: false, message: 'Plugin ID is required' }, context),
+        error: {
+          code: 'ERR-INSTALL-001',
+          message: 'Missing required argument: plugin',
+          severity: 'ERROR',
+          category: 'VALIDATION',
+          specReference: 'FR-001, CRIT-001',
+          resolution: 'Provide pluginId in JSON input or as CLI argument',
+        },
+      };
 
-    // TODO: Call installService.install(installRequest)
-    // const installResult = await installService.install(installRequest);
+      await writeResponse(errorResponse, options, context);
+      return toCommandResult(errorResponse);
+    }
 
-    // Placeholder response until service wiring is complete
-    return {
-      success: true,
-      status: 'success',
-      message: `Install handler ready for ${options.plugin}${options.version ? `@${options.version}` : ''} (service wiring pending)`,
+    logger.info('Install request prepared', { request });
+
+    // TODO: Call installService.install(request)
+    // For now, return placeholder response demonstrating contract structure
+    // const installResult = await installService.install(request);
+
+    const endTimeMs = new Date().getTime();
+    const durationMs = endTimeMs - startTimeMs;
+
+    // Build response following api/cli-contracts/install.json schema
+    const response: InstallResponse = {
+      ...buildBaseResponse(
+        {
+          success: true,
+          status: request.dryRun ? 'dry-run' : 'success',
+          message: `Install handler ready for ${request.pluginId}${request.version ? `@${request.version}` : ''} (service wiring pending)`,
+        },
+        context
+      ),
       data: {
-        command: 'install',
-        request: installRequest,
-        note: 'Full implementation requires service dependency injection in CLI layer',
+        pluginId: request.pluginId,
+        version: request.version || 'latest',
+        installState: request.dryRun ? 'staged' : 'active',
+        cachePath: `.claude-plugin/cache/${request.pluginId}-${request.version || 'latest'}`,
+        symlinkTarget: `.claude-plugin/plugins/${request.pluginId}`,
+        registryDelta: {
+          added: [request.pluginId],
+          modified: [],
+        },
+        flagEvaluations: {
+          flags: context.flags as unknown as Record<string, boolean>,
+          source: 'config',
+          appliedFlags: [],
+        },
+      },
+      telemetry: {
+        durationMs,
+        cacheStatus: 'miss',
+        bytesDownloaded: 0,
+        lifecycleScriptsRun: 0,
+        registryMutations: request.dryRun ? 0 : 1,
       },
     };
+
+    // Write response to JSON output if requested
+    await writeResponse(response, options, context);
+
+    // Return CLI-compatible result
+    return toCommandResult(response);
   } catch (error) {
     logger.error('Install command failed', { error });
 
-    return {
-      success: false,
-      status: 'error',
-      message: `Installation failed: ${(error as Error).message}`,
+    const endTimeMs = new Date().getTime();
+    const durationMs = endTimeMs - startTimeMs;
+
+    const errorResponse: InstallResponse = {
+      ...buildBaseResponse(
+        {
+          success: false,
+          message: `Installation failed: ${(error as Error).message}`,
+        },
+        context
+      ),
       error: {
         code: 'ERR-INSTALL-999',
         message: (error as Error).message,
-        details: error,
+        severity: 'ERROR',
+        category: 'EXECUTION',
+        context: {
+          error: String(error),
+        },
+      },
+      telemetry: {
+        durationMs,
       },
     };
+
+    await writeResponse(errorResponse, options, context);
+    return toCommandResult(errorResponse);
   }
 };
 

@@ -1,0 +1,348 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://yellow-plugins.dev/schemas/cli-contracts/rollback/v1.json",
+  "title": "Rollback Command Contract",
+  "description": "JSON envelope for rollback command request and response payloads",
+  "version": "1.0.0",
+  "definitions": {
+    "TelemetryContext": {
+      "type": "object",
+      "description": "Observability metadata for structured logging",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "User session identifier",
+          "examples": ["sess-12345"]
+        },
+        "gitCommit": {
+          "type": "string",
+          "description": "Git commit hash",
+          "pattern": "^[a-f0-9]{7,40}$",
+          "examples": ["abc123def456"]
+        },
+        "tags": {
+          "type": "object",
+          "description": "Custom tags for categorization",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "FlagEvaluations": {
+      "type": "object",
+      "description": "Feature flags evaluated during execution",
+      "properties": {
+        "flags": {
+          "type": "object",
+          "description": "Flag key to boolean value mapping",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of flag values",
+          "enum": ["config", "override", "default"]
+        },
+        "appliedFlags": {
+          "type": "array",
+          "description": "Flags that influenced command behavior",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["flags", "source", "appliedFlags"],
+      "additionalProperties": false
+    },
+    "ErrorDetails": {
+      "type": "object",
+      "description": "Structured error information",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Error code from error catalog",
+          "pattern": "^ERR(OR)?-[A-Z]+-\\d{3}$",
+          "examples": ["ERR-ROLLBACK-001", "ERROR-CACHE-001"]
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["ERROR", "WARNING"]
+        },
+        "category": {
+          "type": "string",
+          "description": "Error category"
+        },
+        "specReference": {
+          "type": "string",
+          "description": "Specification requirement references"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Suggested resolution steps"
+        },
+        "context": {
+          "type": "object",
+          "description": "Additional error context",
+          "additionalProperties": true
+        }
+      },
+      "required": ["code", "message", "severity", "category"],
+      "additionalProperties": false
+    },
+    "TelemetryMetrics": {
+      "type": "object",
+      "description": "Command execution metrics",
+      "properties": {
+        "durationMs": {
+          "type": "number",
+          "description": "Command execution duration in milliseconds",
+          "minimum": 0
+        },
+        "cacheStatus": {
+          "type": "string",
+          "enum": ["hit", "miss", "partial"]
+        },
+        "bytesDownloaded": {
+          "type": "number",
+          "description": "Total bytes downloaded",
+          "minimum": 0
+        },
+        "lifecycleScriptsRun": {
+          "type": "number",
+          "description": "Number of lifecycle scripts executed",
+          "minimum": 0
+        },
+        "registryMutations": {
+          "type": "number",
+          "description": "Number of registry mutations",
+          "minimum": 0
+        }
+      },
+      "required": ["durationMs"],
+      "additionalProperties": false
+    },
+    "RollbackRequest": {
+      "type": "object",
+      "description": "Rollback command request payload",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier to rollback",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "examples": ["example-plugin"]
+        },
+        "targetVersion": {
+          "type": "string",
+          "description": "Target version to rollback to (omit for interactive selection)",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "examples": ["1.2.0"]
+        },
+        "cachePreference": {
+          "type": "string",
+          "description": "Cache preference strategy",
+          "enum": ["cached-only", "download-if-missing"],
+          "default": "cached-only"
+        },
+        "confirmationToken": {
+          "type": "string",
+          "description": "User confirmation token for rollback operation",
+          "minLength": 1,
+          "examples": ["user-confirmed-20260111"]
+        },
+        "listTargets": {
+          "type": "boolean",
+          "description": "List available rollback targets without executing",
+          "default": false
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Request correlation identifier",
+          "minLength": 1,
+          "examples": ["req-rollback-20260111-003"]
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Dry-run mode (no side effects)",
+          "default": false
+        },
+        "flagOverrides": {
+          "type": "object",
+          "description": "Feature flag overrides (must include enableRollback: true)",
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "properties": {
+            "enableRollback": {
+              "type": "boolean",
+              "const": true,
+              "description": "Rollback feature flag (required)"
+            }
+          },
+          "required": ["enableRollback"]
+        },
+        "telemetryContext": {
+          "$ref": "#/definitions/TelemetryContext"
+        }
+      },
+      "required": ["pluginId", "cachePreference"],
+      "additionalProperties": false
+    },
+    "RollbackTarget": {
+      "type": "object",
+      "description": "Available rollback target information",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Version available for rollback",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "cached": {
+          "type": "boolean",
+          "description": "Whether version is cached locally"
+        },
+        "installedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when version was installed (ISO 8601)"
+        },
+        "cachePath": {
+          "type": "string",
+          "description": "Path to cached files (if cached)"
+        }
+      },
+      "required": ["version", "cached", "installedAt"],
+      "additionalProperties": false
+    },
+    "RollbackResponseData": {
+      "type": "object",
+      "description": "Rollback command response data payload",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier"
+        },
+        "fromVersion": {
+          "type": "string",
+          "description": "Version before rollback"
+        },
+        "toVersion": {
+          "type": "string",
+          "description": "Version after rollback"
+        },
+        "installState": {
+          "type": "string",
+          "enum": ["active", "staged", "failed"],
+          "description": "Installation state after rollback"
+        },
+        "cacheSource": {
+          "type": "string",
+          "enum": ["cached", "downloaded"],
+          "description": "Source of rolled-back version"
+        },
+        "availableTargets": {
+          "type": "array",
+          "description": "Available rollback targets (listTargets mode)",
+          "items": {
+            "$ref": "#/definitions/RollbackTarget"
+          }
+        },
+        "checkpointId": {
+          "type": "string",
+          "description": "Rollback checkpoint identifier for auditing",
+          "examples": ["ckpt-20260111-001"]
+        },
+        "registryDelta": {
+          "type": "object",
+          "description": "Registry mutations",
+          "properties": {
+            "modified": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Plugin IDs modified in registry"
+            }
+          },
+          "required": ["modified"],
+          "additionalProperties": false
+        },
+        "flagEvaluations": {
+          "$ref": "#/definitions/FlagEvaluations"
+        }
+      },
+      "required": ["pluginId"],
+      "additionalProperties": false
+    },
+    "RollbackResponse": {
+      "type": "object",
+      "description": "Rollback command response payload",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Success indicator"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "dry-run", "partial"],
+          "description": "Command execution status"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable result message",
+          "minLength": 1
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "Transaction identifier for atomicity tracking",
+          "minLength": 1
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID echoed from request",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Command execution timestamp (ISO 8601)"
+        },
+        "cliVersion": {
+          "type": "string",
+          "description": "CLI version that executed the command",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "data": {
+          "$ref": "#/definitions/RollbackResponseData"
+        },
+        "error": {
+          "$ref": "#/definitions/ErrorDetails"
+        },
+        "telemetry": {
+          "$ref": "#/definitions/TelemetryMetrics"
+        }
+      },
+      "required": ["success", "status", "message", "correlationId", "timestamp", "cliVersion"],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Rollback Request Schema",
+      "$ref": "#/definitions/RollbackRequest"
+    },
+    {
+      "title": "Rollback Response Schema",
+      "$ref": "#/definitions/RollbackResponse"
+    }
+  ]
+}

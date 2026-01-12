@@ -61,7 +61,7 @@ export interface CommandResult {
   /** Success status */
   success: boolean;
   /** Status code or implementation state */
-  status: 'success' | 'error' | 'not-implemented';
+  status: 'success' | 'error' | 'partial' | 'dry-run' | 'not-implemented';
   /** Human-readable message */
   message: string;
   /** Additional structured data */
