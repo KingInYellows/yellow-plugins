@@ -1,0 +1,137 @@
+[
+  {
+    "task_id": "I4.T1",
+    "iteration_id": "I4",
+    "iteration_goal": "Finalize publish workflow, expand GitHub Actions automation, document operational playbooks, and ensure metrics/quality gates meet release criteria.",
+    "description": "Implement publish command (manifest validation, git status checks, lifecycle consent for publish hooks, optional push/tag actions) plus documentation for PAT/SSH expectations per assumptions.",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 API style, assumption 2 (git auth), Section 4 security directives.",
+    "target_files": [
+      "packages/domain/src/publish/publishService.ts",
+      "packages/cli/src/commands/publish.ts",
+      "docs/cli/publish.md",
+      "docs/operations/git-auth.md"
+    ],
+    "input_files": [
+      "packages/cli/src/commands/publish.ts",
+      "docs/SPECIFICATION.md",
+      ".github/workflows/validate-schemas.yml"
+    ],
+    "deliverables": "Publish service + CLI command, docs covering authentication prerequisites and rollback steps for failed pushes.",
+    "acceptance_criteria": "Publish command validates manifests, prompts before push, logs actions, and records audit entries; docs map to FR-008.",
+    "dependencies": [
+      "I2.T3",
+      "I2.T4",
+      "I3.T5"
+    ],
+    "parallelizable": false,
+    "done": false
+  },
+  {
+    "task_id": "I4.T2",
+    "iteration_id": "I4",
+    "iteration_goal": "Finalize publish workflow, expand GitHub Actions automation, document operational playbooks, and ensure metrics/quality gates meet release criteria.",
+    "description": "Expand GitHub Actions workflow to include lint/tests/schema validation/contract drift checks/metrics export, leveraging Docker Node 20 slim with digest pinning and artifact uploads.",
+    "agent_type_hint": "DevOpsAgent",
+    "inputs": "Section 2 technology stack, Section 6 verification strategy, outputs from `I2.T4` and `I3.T5`.",
+    "target_files": [
+      ".github/workflows/validate-schemas.yml",
+      ".github/workflows/publish-release.yml",
+      "Dockerfile",
+      "docs/operations/ci.md"
+    ],
+    "input_files": [
+      ".github/workflows/validate-schemas.yml",
+      "Dockerfile",
+      "package.json"
+    ],
+    "deliverables": "Updated workflow (matrix builds, caching, artifact uploads), optional release workflow, supporting documentation.",
+    "acceptance_criteria": "CI run time under 1 minute for validation job; artifacts include logs/metrics; workflow docs highlight budgets + failure triage; Dockerfile pinned to digest.",
+    "dependencies": [
+      "I4.T1"
+    ],
+    "parallelizable": false,
+    "done": false
+  },
+  {
+    "task_id": "I4.T3",
+    "iteration_id": "I4",
+    "iteration_goal": "Finalize publish workflow, expand GitHub Actions automation, document operational playbooks, and ensure metrics/quality gates meet release criteria.",
+    "description": "Produce CI Validation Pipeline Spec (Section 2.1 artifact) describing job graph, caching, metrics, artifact retention, and integrate validation scripts + CLI smoke commands invoked within workflows.",
+    "agent_type_hint": "DocumentationAgent",
+    "inputs": "Task `I4.T2` outputs, Section 2.1 artifact plan, Section 6 verification expectations.",
+    "target_files": [
+      "docs/operations/ci-pipeline.md",
+      "docs/operations/runbook.md",
+      "docs/traceability-matrix.md"
+    ],
+    "input_files": [
+      ".github/workflows/validate-schemas.yml",
+      "docs/operations/ci.md",
+      "docs/SPECIFICATION.md"
+    ],
+    "deliverables": "Markdown spec (flow diagram references, job tables, runtime budgets), runbook updates.",
+    "acceptance_criteria": "Document lists triggers, job steps, environment matrix, artifact locations; diagrams validated; traceability matrix references new artifact.",
+    "dependencies": [
+      "I4.T2"
+    ],
+    "parallelizable": false,
+    "done": false
+  },
+  {
+    "task_id": "I4.T4",
+    "iteration_id": "I4",
+    "iteration_goal": "Finalize publish workflow, expand GitHub Actions automation, document operational playbooks, and ensure metrics/quality gates meet release criteria.",
+    "description": "Build operational runbooks + metrics spec updates (cache recovery, registry repair, telemetry export, KPI dashboards) and finalize Section 6 verification plan deliverables.",
+    "agent_type_hint": "DocumentationAgent",
+    "inputs": "Section 6 verification strategy, telemetry outputs from `I2.T5`, discovery/publish docs from `I3`/`I4.T1`.",
+    "target_files": [
+      "docs/operations/runbook.md",
+      "docs/operations/metrics.md",
+      "docs/operations/postmortem-template.md",
+      "docs/traceability-matrix.md"
+    ],
+    "input_files": [
+      "docs/operations/runbook.md",
+      "docs/operations/metrics.md",
+      ".claude-plugin/audit/"
+    ],
+    "deliverables": "Updated runbook, metrics definitions (KPIs, alert thresholds), postmortem template, traceability updates.",
+    "acceptance_criteria": "All KPIs enumerated with owners + review cadence; runbook covers lifecycle script incidents, cache recovery, publish rollback; docs cross-link Section 6.",
+    "dependencies": [
+      "I2.T5",
+      "I3.T4",
+      "I4.T1"
+    ],
+    "parallelizable": true,
+    "done": false
+  },
+  {
+    "task_id": "I4.T5",
+    "iteration_id": "I4",
+    "iteration_goal": "Finalize publish workflow, expand GitHub Actions automation, document operational playbooks, and ensure metrics/quality gates meet release criteria.",
+    "description": "Package release artifacts (npm publish or git tag flow), ensure README/CHANGELOG highlight feature flags + instructions, run final smoke tests, and prepare release checklist referencing Section 4 directives.",
+    "agent_type_hint": "ReleaseEngineer",
+    "inputs": "Outputs of prior iterations, CI pipeline, publication docs.",
+    "target_files": [
+      "CHANGELOG.md",
+      "docs/operations/release-checklist.md",
+      "README.md",
+      ".github/releases.md"
+    ],
+    "input_files": [
+      "README.md",
+      "CHANGELOG.md",
+      ".github/ISSUE_TEMPLATE/",
+      "docs/operations/release-checklist.md"
+    ],
+    "deliverables": "Release notes, documented flag states, smoke test report, release checklist updates.",
+    "acceptance_criteria": "Release checklist signed, tags/publish instructions validated, smoke tests run per matrix (macOS/Linux/WSL), docs updated with anchors for FR/NFR coverage.",
+    "dependencies": [
+      "I4.T1",
+      "I4.T4"
+    ],
+    "parallelizable": false,
+    "done": false
+  }
+]

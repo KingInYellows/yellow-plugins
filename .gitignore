@@ -39,3 +39,8 @@ yarn.lock
 # Backup files
 *.backup
 .gitignore.backup
+.codemachine/logs
+.codemachine/memory
+.codemachine/prompts
+.codemachine/agents
+.codemachine/template.json

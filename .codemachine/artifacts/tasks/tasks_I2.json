@@ -1,0 +1,142 @@
+[
+  {
+    "task_id": "I2.T1",
+    "iteration_id": "I2",
+    "iteration_goal": "Implement compatibility policy enforcement, cache/registry infrastructure, install/rollback orchestrators (with lifecycle sandbox integration), and the first version of the CLI contract catalog so transactional flows satisfy CRIT-001/002/004/010/018.",
+    "description": "Build the Compatibility & Policy Engine that ingests host fingerprint data, manifest compatibility matrices, and conflict policies, producing deterministic verdicts (`compatible|warn|block`) with evidence payloads.",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 components, Section 5 iteration goals, `I1` validation services.",
+    "target_files": [
+      "packages/domain/src/compatibility/index.ts",
+      "packages/infrastructure/src/system/fingerprint.ts",
+      "packages/cli/src/lib/compatCommandBridge.ts",
+      "docs/contracts/compatibility.md"
+    ],
+    "input_files": [
+      "packages/domain/src/compatibility/contracts.ts",
+      "packages/infrastructure/src/system/fingerprint.ts",
+      "docs/SPECIFICATION.md"
+    ],
+    "deliverables": "Compatibility service, host fingerprint adapter, CLI integration helper, documentation describing policies + error codes.",
+    "acceptance_criteria": "Unit tests cover Node min/max, OS/arch, Claude runtime, and plugin conflict cases; CLI commands log verdict evidence; docs link to CRIT-019 + FR-004 references.",
+    "dependencies": [
+      "I1.T2",
+      "I1.T3",
+      "I1.T4"
+    ],
+    "parallelizable": true,
+    "done": false
+  },
+  {
+    "task_id": "I2.T2",
+    "iteration_id": "I2",
+    "iteration_goal": "Implement compatibility policy enforcement, cache/registry infrastructure, install/rollback orchestrators (with lifecycle sandbox integration), and the first version of the CLI contract catalog so transactional flows satisfy CRIT-001/002/004/010/018.",
+    "description": "Implement cache manager + registry persistence (atomic writes, eviction policy, temp directories) and align JSON schema for `registry.json` with instrumentation fields (transactionId, telemetry snapshots, lifecycle consent references).",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 data models, `.claude-plugin` layout, Section 4 atomic persistence directive.",
+    "target_files": [
+      "packages/domain/src/cache/cacheService.ts",
+      "packages/domain/src/registry/registryService.ts",
+      "packages/infrastructure/src/fs/cacheAdapter.ts",
+      ".claude-plugin/registry.schema.json",
+      "docs/contracts/registry-format.md"
+    ],
+    "input_files": [
+      "docs/SPECIFICATION.md",
+      ".claude-plugin/registry.json",
+      ".claude-plugin/cache/",
+      "docs/diagrams/data-erd.puml"
+    ],
+    "deliverables": "Cache manager, registry writer with temp rename semantics, schema for registry, docs describing eviction + rollback semantics.",
+    "acceptance_criteria": "Integration tests simulate staging/promote/evict flows; registry schema validates sample data; eviction logs capture pinned protection.",
+    "dependencies": [
+      "I1.T1",
+      "I1.T3"
+    ],
+    "parallelizable": false,
+    "done": false
+  },
+  {
+    "task_id": "I2.T3",
+    "iteration_id": "I2",
+    "iteration_goal": "Implement compatibility policy enforcement, cache/registry infrastructure, install/rollback orchestrators (with lifecycle sandbox integration), and the first version of the CLI contract catalog so transactional flows satisfy CRIT-001/002/004/010/018.",
+    "description": "Implement Install Transaction Orchestrator (staging directories, checksum verification, lifecycle sandbox invocation, rollback script) and author PlantUML sequence diagram documenting the install/update/rollback flow per Section 2.1.",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 communication patterns, Section 2.1 artifact plan, tasks `I2.T1` & `I2.T2` outputs.",
+    "target_files": [
+      "packages/domain/src/install/installService.ts",
+      "packages/cli/src/commands/install.ts",
+      "packages/cli/src/commands/rollback.ts",
+      "docs/diagrams/install-sequence.puml",
+      "docs/operations/transaction-boundaries.md"
+    ],
+    "input_files": [
+      "packages/domain/src/install/installService.ts",
+      "packages/infrastructure/src/fs/tempWorkspace.ts",
+      "docs/diagrams/component-overview.mmd",
+      "docs/diagrams/data-erd.puml"
+    ],
+    "deliverables": "Working install/update/rollback services (without discovery UI), lifecycle sandbox integration, PlantUML sequence diagram, transaction boundary doc.",
+    "acceptance_criteria": "Integration tests cover success/failure/rollback; lifecycle scripts obey typed consent; diagram renders; doc maps steps to FR/NFR IDs.",
+    "dependencies": [
+      "I2.T1",
+      "I2.T2"
+    ],
+    "parallelizable": false,
+    "done": false
+  },
+  {
+    "task_id": "I2.T4",
+    "iteration_id": "I2",
+    "iteration_goal": "Implement compatibility policy enforcement, cache/registry infrastructure, install/rollback orchestrators (with lifecycle sandbox integration), and the first version of the CLI contract catalog so transactional flows satisfy CRIT-001/002/004/010/018.",
+    "description": "Draft the CLI Contract Catalog detailing JSON envelopes for install/update/rollback commands, feature-flag annotations, telemetry metadata, and error code schemas, then wire CLI to emit/accept these contracts via `--input/--output` flags.",
+    "agent_type_hint": "DocumentationAgent",
+    "inputs": "Section 2 API style, Task `I2.T3` behavior, Section 4 documentation directive.",
+    "target_files": [
+      "docs/contracts/cli-contracts.md",
+      "api/cli-contracts/install.json",
+      "api/cli-contracts/update.json",
+      "api/cli-contracts/rollback.json",
+      "packages/cli/src/lib/io.ts"
+    ],
+    "input_files": [
+      "docs/SPECIFICATION.md",
+      "docs/contracts/error-codes.md",
+      "packages/cli/src/commands/"
+    ],
+    "deliverables": "Markdown overview, JSON schema files for command I/O, CLI helper for `--input/--output`, doc references linking to SPEC anchors.",
+    "acceptance_criteria": "Schemas validate with AJV; CLI accepts JSON input to drive dry runs; contract doc cross-links FR/NFR IDs; automation snippet included in docs.",
+    "dependencies": [
+      "I2.T3"
+    ],
+    "parallelizable": false,
+    "done": false
+  },
+  {
+    "task_id": "I2.T5",
+    "iteration_id": "I2",
+    "iteration_goal": "Implement compatibility policy enforcement, cache/registry infrastructure, install/rollback orchestrators (with lifecycle sandbox integration), and the first version of the CLI contract catalog so transactional flows satisfy CRIT-001/002/004/010/018.",
+    "description": "Integrate telemetry & audit logging across compatibility, cache, and install paths (JSON logs, Prometheus counters, OTEL spans) and expose metrics snapshot command plus docs referencing Section 6 strategy.",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 components, Section 6 observability plan, outputs of `I2.T1`–`I2.T3`.",
+    "target_files": [
+      "packages/domain/src/telemetry/events.ts",
+      "packages/infrastructure/src/telemetry/prometheus.ts",
+      "packages/cli/src/commands/metrics.ts",
+      "docs/operations/metrics.md",
+      ".claude-plugin/logs/.gitkeep"
+    ],
+    "input_files": [
+      "packages/cli/src/lib/logger.ts",
+      "packages/domain/src/install/installService.ts",
+      "docs/operations/metrics.md"
+    ],
+    "deliverables": "Telemetry event contracts, Prometheus exporter, CLI metrics command, docs describing counters/histograms and retention.",
+    "acceptance_criteria": "Metrics snapshot validated via tests; structured logs include correlationId + transactionId; docs reference CRIT-004/008/021 mitigations.",
+    "dependencies": [
+      "I2.T3"
+    ],
+    "parallelizable": false,
+    "done": false
+  }
+]
