@@ -129,6 +129,7 @@ export interface PluginCompatibility {
   claudeCodeMin: string;
   claudeCodeMax?: string;
   nodeMin?: string;
+  nodeMax?: string;
   os?: string[];
   arch?: string[];
   pluginDependencies?: string[];

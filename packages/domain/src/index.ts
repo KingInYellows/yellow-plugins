@@ -37,5 +37,17 @@ export {
   getErrorCodesByCategory,
 } from './validation/index.js';
 
+// Compatibility & Policy Engine (I2.T1)
+export {
+  CompatibilityStatus,
+  CompatibilityService,
+  type ICompatibilityService,
+  type IHostFingerprintProvider,
+  type CompatibilityCheck,
+  type CompatibilityVerdict,
+  type CompatibilityPolicyOverrides,
+  type RegistrySnapshot,
+} from './compatibility/index.js';
+
 // Package version
 export const version = '1.1.0';

@@ -34,5 +34,11 @@ export {
   createValidator,
 } from './validation/validator.js';
 
+// System fingerprint provider (I2.T1)
+export {
+  HostFingerprintProvider,
+  createFingerprintProvider,
+} from './system/fingerprint.js';
+
 // Package version
 export const version = '1.1.0';
