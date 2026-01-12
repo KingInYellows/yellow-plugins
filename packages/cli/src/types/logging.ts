@@ -30,6 +30,8 @@ export interface StructuredLogEntry {
   command: string;
   /** Correlation ID for this invocation */
   correlationId: string;
+  /** Transaction ID for multi-step operations */
+  transactionId?: string;
   /** Human-readable message */
   message: string;
   /** Additional structured data */
@@ -48,6 +50,8 @@ export interface LoggerContext {
   command: string;
   /** Correlation ID for this invocation */
   correlationId: string;
+  /** Transaction ID for multi-step operations */
+  transactionId?: string;
 }
 
 /**
@@ -88,4 +92,9 @@ export interface ILogger {
    * Get the current logger context.
    */
   getContext(): Readonly<LoggerContext>;
+
+  /**
+   * Attach a transaction ID for correlation across logs.
+   */
+  setTransactionId(transactionId: string): void;
 }

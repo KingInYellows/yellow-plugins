@@ -81,5 +81,22 @@ export {
   InstallState,
 } from './registry/index.js';
 
+// Telemetry & Observability (I2.T5)
+export {
+  type BaseTelemetryEvent,
+  type InstallEvent,
+  type CacheEvent,
+  type CompatibilityEvent,
+  type ValidationEvent,
+  type LifecycleConsentEvent,
+  type FeatureFlagEvent,
+  type CIValidationEvent,
+  type RegistryEvent,
+  type CommandEvent,
+  type TelemetryEvent,
+  type ITelemetryEmitter,
+  TelemetryEventFactory,
+} from './telemetry/index.js';
+
 // Package version
 export const version = '1.2.0';

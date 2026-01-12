@@ -13,7 +13,7 @@ import type { Argv } from 'yargs';
 import { getAllCommands } from '../commands/registry.js';
 import type { BaseCommandOptions, CommandContext } from '../types/commands.js';
 
-import { createLogger } from './logger.js';
+import { createLogger, generateTransactionId } from './logger.js';
 
 /**
  * Register all commands from the registry into the yargs instance.
@@ -35,6 +35,7 @@ export function registerCommands(cli: Argv, configProvider: IConfigProvider): vo
         const flags = configProvider.getFeatureFlags();
         const verbose = Boolean(argv['verbose']);
         const logger = createLogger(command.name, verbose);
+        logger.setTransactionId(generateTransactionId(logger.getContext().correlationId));
 
         const context: CommandContext = {
           config,

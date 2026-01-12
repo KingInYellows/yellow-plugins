@@ -57,6 +57,10 @@ class Logger implements ILogger {
     return this.context;
   }
 
+  setTransactionId(transactionId: string): void {
+    this.context.transactionId = transactionId;
+  }
+
   /**
    * Core logging method that writes to both channels.
    */
@@ -67,6 +71,7 @@ class Logger implements ILogger {
       level,
       command: this.context.command,
       correlationId: this.context.correlationId,
+      transactionId: this.context.transactionId,
       message,
     };
 
@@ -161,4 +166,13 @@ export function createLoggerWithContext(context: LoggerContext, verbose = false)
  */
 export function generateCorrelationId(): string {
   return randomUUID();
+}
+
+/**
+ * Generate a transaction ID for multi-step operations.
+ */
+export function generateTransactionId(correlationId?: string): string {
+  const timestamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 15);
+  const suffix = correlationId ? correlationId.replace(/-/g, '').slice(-6) : randomUUID().slice(0, 6);
+  return `txn-${timestamp}-${suffix}`;
 }

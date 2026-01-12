@@ -16,6 +16,7 @@ import type {
 import { browseCommand } from './browse.js';
 import { checkUpdatesCommand } from './check-updates.js';
 import { installCommand } from './install.js';
+import { metricsCommand } from './metrics.js';
 import { pinCommand } from './pin.js';
 import { publishCommand } from './publish.js';
 import { rollbackCommand } from './rollback.js';
@@ -48,6 +49,9 @@ const commandRegistryDefinition = {
 
   // Publishing
   publish: toBaseMetadata(publishCommand),
+
+  // Observability
+  metrics: toBaseMetadata(metricsCommand),
 } as const satisfies CommandRegistry;
 
 export const commandRegistry: CommandRegistry = commandRegistryDefinition;
@@ -93,6 +97,7 @@ export function getCommandsByCategory(): Record<string, CommandMetadata[]> {
     'Plugin Discovery': ['browse', 'search'],
     'Version Management': ['rollback', 'pin', 'check-updates'],
     Publishing: ['publish'],
+    Observability: ['metrics'],
   };
 
   const grouped: Record<string, CommandMetadata[]> = {};

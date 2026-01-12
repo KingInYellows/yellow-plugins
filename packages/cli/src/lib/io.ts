@@ -15,6 +15,8 @@ import * as path from 'node:path';
 
 import type { BaseCommandOptions, CommandContext, CommandResult } from '../types/commands.js';
 
+import { generateTransactionId } from './logger.js';
+
 /**
  * Load request payload from JSON input or build from CLI arguments.
  *
@@ -238,8 +240,12 @@ export function buildBaseResponse<T extends { success: boolean; message: string 
     status = result.success ? 'success' : 'error';
   }
 
-  // Generate transaction ID (timestamped unique ID)
-  const transactionId = `txn-${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}-${context.correlationId.slice(-6)}`;
+  const existingTransactionId = context.logger.getContext().transactionId;
+  const transactionId = existingTransactionId ?? generateTransactionId(context.correlationId);
+
+  if (!existingTransactionId) {
+    context.logger.setTransactionId(transactionId);
+  }
 
   return {
     success: result.success,

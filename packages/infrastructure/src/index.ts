@@ -47,5 +47,11 @@ export {
   resetCacheAdapter,
 } from './fs/cacheAdapter.js';
 
+// Telemetry & Metrics (I2.T5)
+export {
+  PrometheusExporter,
+  globalPrometheusExporter,
+} from './telemetry/prometheus.js';
+
 // Package version
 export const version = '1.2.0';
