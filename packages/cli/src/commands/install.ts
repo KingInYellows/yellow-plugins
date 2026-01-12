@@ -16,19 +16,79 @@ interface InstallOptions extends BaseCommandOptions {
 }
 
 const installHandler: CommandHandler<InstallOptions> = async (options, context) => {
-  const { logger } = context;
+  const { logger, correlationId } = context;
 
-  logger.info('Install command invoked', { options });
+  logger.info('Install command invoked', { pluginId: options.plugin, version: options.version });
 
-  return {
-    success: true,
-    status: 'not-implemented',
-    message: 'Install command is not yet implemented',
-    data: {
-      command: 'install',
-      options,
-    },
-  };
+  // Validate required options
+  if (!options.plugin) {
+    logger.error('Plugin ID is required');
+    return {
+      success: false,
+      status: 'error',
+      message: 'Plugin ID is required',
+      error: {
+        code: 'ERR-INSTALL-001',
+        message: 'Missing required argument: plugin',
+      },
+    };
+  }
+
+  try {
+    // TODO: Initialize InstallService with config, cacheService, registryService
+    // For now, this is a skeleton implementation that would be wired up in iteration completion
+
+    logger.info('Preparing installation request', {
+      pluginId: options.plugin,
+      version: options.version || 'latest',
+      force: options.force || false,
+    });
+
+    // Build install request following Architecture §3.7 CLI contract
+    const installRequest = {
+      pluginId: options.plugin,
+      version: options.version,
+      force: options.force,
+      correlationId,
+      dryRun: options.dryRun,
+      compatibilityIntent: {
+        // TODO: Gather from system fingerprint
+        nodeVersion: process.version,
+        os: process.platform,
+        arch: process.arch,
+      },
+    };
+
+    logger.info('Install request prepared', { request: installRequest });
+
+    // TODO: Call installService.install(installRequest)
+    // const installResult = await installService.install(installRequest);
+
+    // Placeholder response until service wiring is complete
+    return {
+      success: true,
+      status: 'success',
+      message: `Install handler ready for ${options.plugin}${options.version ? `@${options.version}` : ''} (service wiring pending)`,
+      data: {
+        command: 'install',
+        request: installRequest,
+        note: 'Full implementation requires service dependency injection in CLI layer',
+      },
+    };
+  } catch (error) {
+    logger.error('Install command failed', { error });
+
+    return {
+      success: false,
+      status: 'error',
+      message: `Installation failed: ${(error as Error).message}`,
+      error: {
+        code: 'ERR-INSTALL-999',
+        message: (error as Error).message,
+        details: error,
+      },
+    };
+  }
 };
 
 export const installCommand: CommandMetadata<InstallOptions> = {

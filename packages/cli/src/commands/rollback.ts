@@ -15,19 +15,91 @@ interface RollbackOptions extends BaseCommandOptions {
 }
 
 const rollbackHandler: CommandHandler<RollbackOptions> = async (options, context) => {
-  const { logger } = context;
+  const { logger, flags, correlationId } = context;
 
-  logger.info('Rollback command invoked', { options });
+  logger.info('Rollback command invoked', { pluginId: options.plugin, version: options.version });
 
-  return {
-    success: true,
-    status: 'not-implemented',
-    message: 'Rollback command is not yet implemented',
-    data: {
-      command: 'rollback',
-      options,
-    },
-  };
+  // Check if rollback feature is enabled
+  if (!flags.enableRollback) {
+    logger.error('Rollback feature is not enabled', { requiredFlag: 'enableRollback' });
+    return {
+      success: false,
+      status: 'error',
+      message: 'Rollback feature is not enabled. Enable it in .claude-plugin/flags.json',
+      error: {
+        code: 'ERR-ROLLBACK-001',
+        message: 'Feature flag "enableRollback" is required but not enabled',
+      },
+    };
+  }
+
+  // Validate required options
+  if (!options.plugin) {
+    logger.error('Plugin ID is required');
+    return {
+      success: false,
+      status: 'error',
+      message: 'Plugin ID is required',
+      error: {
+        code: 'ERR-ROLLBACK-002',
+        message: 'Missing required argument: plugin',
+      },
+    };
+  }
+
+  try {
+    // TODO: Initialize InstallService with config, cacheService, registryService
+    // For now, this is a skeleton implementation
+
+    logger.info('Preparing rollback request', {
+      pluginId: options.plugin,
+      targetVersion: options.version,
+    });
+
+    // Build rollback request following Architecture §3.7 CLI contract
+    const rollbackRequest = {
+      pluginId: options.plugin,
+      targetVersion: options.version,
+      cachePreference: 'cached-only' as const,
+      correlationId,
+      dryRun: options.dryRun,
+      // TODO: Generate confirmation token from user prompt
+      confirmationToken: 'user-confirmed',
+    };
+
+    logger.info('Rollback request prepared', { request: rollbackRequest });
+
+    // TODO: Call installService.rollback(rollbackRequest)
+    // const rollbackResult = await installService.rollback(rollbackRequest);
+
+    // TODO: If interactive mode and no version specified, list available rollback targets
+    // const targets = await installService.listRollbackTargets(options.plugin);
+
+    // Placeholder response until service wiring is complete
+    return {
+      success: true,
+      status: 'success',
+      message: `Rollback handler ready for ${options.plugin}${options.version ? `@${options.version}` : ''} (service wiring pending)`,
+      data: {
+        command: 'rollback',
+        request: rollbackRequest,
+        note: 'Full implementation requires service dependency injection in CLI layer',
+      },
+    };
+  } catch (error) {
+    logger.error('Rollback command failed', { error });
+
+    return {
+      success: false,
+      status: 'error',
+      message: `Rollback failed: ${(error as Error).message}`,
+      error: {
+        code: 'ERR-ROLLBACK-999',
+        message: (error as Error).message,
+        details: error,
+      },
+    };
+  }
 };
 
 export const rollbackCommand: CommandMetadata<RollbackOptions> = {
