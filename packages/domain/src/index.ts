@@ -76,6 +76,17 @@ export {
   type UpdateRequest as InstallUpdateRequest,
 } from './install/index.js';
 
+// Publish Transactions (I4.T1)
+export {
+  PublishService,
+  type IPublishService,
+  type PublishRequest,
+  type PublishResult,
+  type GitProvenance,
+  type ManifestValidationResult,
+  PublishPhase,
+} from './publish/index.js';
+
 // Registry Management (I2.T2)
 export {
   RegistryService,
