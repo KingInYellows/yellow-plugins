@@ -1,0 +1,54 @@
+{
+  "name": "yellow-plugins-root",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Git-native, schema-validated plugin marketplace for Claude Code",
+  "author": "KingInYellows",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0 <=24.x",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "build": "pnpm -r run build",
+    "clean": "pnpm -r run clean && rm -rf node_modules",
+    "test": "pnpm -r run test",
+    "test:unit": "pnpm -r run test:unit",
+    "test:integration": "pnpm -r run test:integration",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "typecheck": "tsc --noEmit",
+    "validate": "pnpm run lint && pnpm run typecheck",
+    "validate:schemas": "node scripts/validate-marketplace.js && node scripts/validate-plugin.js",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "prepare": "husky install || true"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinginyellow/yellow-plugins.git"
+  },
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "marketplace",
+    "cli",
+    "git-native",
+    "schema-validation"
+  ]
+}

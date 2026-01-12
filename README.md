@@ -100,10 +100,64 @@ A git-native, schema-validated plugin marketplace for Claude Code that enables:
 
 ---
 
+## Workspace Setup
+
+**Prerequisites**:
+- Node.js 18-24 LTS
+- pnpm 8.0.0 or higher
+
+**Quick Start**:
+```bash
+# Install dependencies
+pnpm install
+
+# Type check all packages
+pnpm typecheck
+
+# Lint all packages
+pnpm lint
+
+# Run tests
+pnpm test
+
+# Build all packages
+pnpm build
+
+# Validate schemas
+pnpm validate:schemas
+```
+
+**Package Structure**:
+- `@yellow-plugins/domain` - Business logic and entities (zero dependencies on other layers)
+- `@yellow-plugins/infrastructure` - External dependencies, schema validators, file system
+- `@yellow-plugins/cli` - Command-line interface (depends on domain + infrastructure)
+
+**Architecture Rules**:
+- Domain layer CANNOT import from infrastructure or CLI
+- Infrastructure layer CANNOT import from CLI
+- CLI layer can import from both domain and infrastructure
+- ESLint enforces these boundaries automatically
+
+---
+
 ## File Organization
 
 ```
 yellow-plugins/
+├── packages/
+│   ├── cli/                          # CLI layer
+│   │   ├── src/index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   ├── domain/                       # Domain layer
+│   │   ├── src/index.ts
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   └── infrastructure/               # Infrastructure layer
+│       ├── src/index.ts
+│       ├── package.json
+│       └── tsconfig.json
+│
 ├── docs/
 │   ├── SPECIFICATION.md              # Complete merged specification (29K words)
 │   ├── EXECUTIVE-SUMMARY.md          # Quick reference (5-minute read)
@@ -116,8 +170,7 @@ yellow-plugins/
 │
 ├── schemas/
 │   ├── marketplace.schema.json       # Validates marketplace index (production)
-│   ├── plugin.schema.json            # Validates plugin manifests (production)
-│   └── package.json                  # Validation tooling
+│   └── plugin.schema.json            # Validates plugin manifests (production)
 │
 ├── scripts/
 │   ├── validate-marketplace.js       # 10 validation rules
@@ -131,6 +184,11 @@ yellow-plugins/
 ├── .github/workflows/
 │   └── validate-schemas.yml          # CI automation (< 1min execution)
 │
+├── pnpm-workspace.yaml               # Workspace configuration
+├── package.json                      # Root package with workspace scripts
+├── tsconfig.base.json                # Base TypeScript config
+├── tsconfig.json                     # Root TypeScript config with references
+├── .eslintrc.cjs                     # ESLint config with layer enforcement
 └── README.md                         # This file
 ```
 

@@ -22,7 +22,6 @@ const path = require('path');
 
 // Configuration
 const DEFAULT_MARKETPLACE_PATH = '.claude-plugin/marketplace.json';
-const SCHEMA_PATH = 'schemas/marketplace.schema.json';
 const PROJECT_ROOT = process.cwd();
 
 // Colors for terminal output

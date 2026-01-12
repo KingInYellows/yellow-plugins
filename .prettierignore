@@ -1,0 +1,29 @@
+# Prettier ignore patterns
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+build/
+**/build/
+
+# Coverage
+coverage/
+**/coverage/
+
+# Serena Python project
+serena/
+
+# Code Machine artifacts
+.codemachine/
+
+# Git
+.git/
+
+# Lockfiles
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
