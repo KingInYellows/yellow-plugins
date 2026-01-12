@@ -86,7 +86,8 @@ interface CheckUpdatesResponse {
       changelogUrl?: string;
       changelogStatus?: string;
       changelogMessage?: string;
-    }>;
+      changelogFetchDurationMs?: number;
+      pinned?: boolean;
     upToDate: string[];
     skipped: Array<{
       pluginId: string;
@@ -170,7 +171,10 @@ const checkUpdatesHandler: CommandHandler<CheckUpdatesOptions> = async (options,
       pinned: update.pinned ?? false,
     }));
 
-    const status: CheckUpdatesResponse['status'] = !result.success
+    const status: CheckUpdatesResponse['status'] =
+      request.dryRun
+        ? 'dry-run'
+        : !result.success
       ? 'error'
       : result.skipped.length > 0
       ? 'partial'

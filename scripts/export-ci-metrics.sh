@@ -10,7 +10,7 @@
 # Arguments:
 #   stage: CI stage name (lint, unit_test, integration_test, schema_validation, build)
 #   status: Job status (success, failure, cancelled)
-#   additional-labels: Optional K=V pairs (e.g., target=marketplace)
+#   additional-labels: Optional K=V pairs (e.g., target="marketplace")
 #
 # Output:
 #   Writes Prometheus text format metrics to stdout
@@ -29,7 +29,11 @@ TIMESTAMP=$(date +%s)
 # Parse arguments
 STAGE="${1:-unknown}"
 STATUS="${2:-unknown}"
-shift 2 || true
+if [[ $# -ge 2 ]]; then
+  shift 2
+else
+  set --
+fi
 ADDITIONAL_LABELS=()
 
 # Parse additional label arguments (format: key=value)
@@ -41,7 +45,9 @@ done
 # Build label string
 LABELS="stage=\"${STAGE}\",status=\"${STATUS}\""
 for label in "${ADDITIONAL_LABELS[@]}"; do
-  LABELS="${LABELS},${label}"
+  key=${label%%=*}
+  value=${label#*=}
+  LABELS="${LABELS},${key}=\"${value}\""
 done
 
 # Calculate elapsed time based on CI-provided timers
@@ -59,7 +65,7 @@ fi
 # Output Prometheus metrics
 cat <<EOF
 # HELP ${METRIC_PREFIX}_duration_seconds Duration of CI validation stages in seconds
-# TYPE ${METRIC_PREFIX}_duration_seconds histogram
+# TYPE ${METRIC_PREFIX}_duration_seconds gauge
 ${METRIC_PREFIX}_duration_seconds{${LABELS}} ${ELAPSED}
 
 # HELP ${METRIC_PREFIX}_validations_total Total number of CI validation runs

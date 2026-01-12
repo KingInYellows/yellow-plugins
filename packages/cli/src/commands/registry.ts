@@ -70,7 +70,7 @@ export function getAllCommands(): CommandMetadata[] {
  */
 export function getCommand(nameOrAlias: string): CommandMetadata | undefined {
   // Direct lookup
-  if (commandRegistry[nameOrAlias]) {
+  if (Object.prototype.hasOwnProperty.call(commandRegistry, nameOrAlias)) {
     return commandRegistry[nameOrAlias];
   }
 

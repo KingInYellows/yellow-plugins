@@ -7,7 +7,7 @@ const OUTPUT_FILE = path.join(ARCH_DIR, 'architecture_manifest.json');
 // Read all .md files in architecture directory
 function findArchitectureFiles() {
   if (!fs.existsSync(ARCH_DIR)) {
-    console.error(`Error: Architecture directory not found: $`);
+    console.error(`Error: Architecture directory not found: ${ARCH_DIR}`);
     process.exit(1);
   }
 
@@ -70,7 +70,7 @@ function generateManifest() {
 
   // Write manifest
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(manifest, null, 2), 'utf8');
-  console.log(`Architecture manifest generated: $`);
+  console.log(`Architecture manifest generated: ${OUTPUT_FILE}`);
   console.log(`Found ${Object.keys(manifest.files).length} files with anchors`);
 }
 

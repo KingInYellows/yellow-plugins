@@ -7,7 +7,7 @@
  * Part of Task I1.T4: CLI command manifest
  * Enhanced in Task I3.T1: Marketplace ingestion & caching
  *
- * @specification FR-001, FR-002, CRIT-006
+ * @specification FR-001, FR-002, FR-006, CRIT-006
  */
 
 import * as path from 'node:path';
@@ -237,7 +237,7 @@ export const browseCommand: CommandMetadata<BrowseOptions> = {
   usage: 'plugin browse [--category <cat>] [--tag <tag>] [--limit <n>]',
   requiredFlags: ['enableBrowse'],
   specAnchors: ['FR-006', 'CRIT-006', '3-3-cli-workflow-control'],
-  errorCodes: ['ERR-BROWSE-001', 'ERR-BROWSE-002'],
+  errorCodes: ['ERR-DISC-001', 'ERR-BROWSE-999'],
   examples: [
     {
       command: 'plugin browse',

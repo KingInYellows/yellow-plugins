@@ -21,7 +21,7 @@ describe('Bootstrap Flags', () => {
     it('should generate a banner with default config and flags', () => {
       const banner = getPreflightBanner(DEFAULT_FEATURE_FLAGS, DEFAULT_CONFIG);
 
-      expect(banner).toContain('Yellow Plugins CLI v1.1.0');
+      expect(banner[0]).toBe('Yellow Plugins CLI v1.1.0');
       expect(banner).toContain('Plugin marketplace for Claude Code');
       expect(banner).toContain('Configuration:');
       expect(banner).toContain('Feature Flags:');

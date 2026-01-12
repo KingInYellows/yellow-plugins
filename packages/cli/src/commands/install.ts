@@ -234,7 +234,7 @@ export const installCommand: CommandMetadata<InstallOptions> = {
   usage: 'plugin install <plugin-id> [--version <version>] [--force]',
   requiredFlags: undefined, // No feature flag required for install
   specAnchors: ['FR-001', 'CRIT-001', '3-3-cli-workflow-control'],
-  errorCodes: ['ERR-INSTALL-001', 'ERR-INSTALL-002', 'ERR-COMPAT-001'],
+  errorCodes: ['ERR-INSTALL-001', 'ERR-INSTALL-002', 'ERR-COMPAT-001', 'ERR-INSTALL-999'],
   examples: [
     {
       command: 'plugin install example-plugin',

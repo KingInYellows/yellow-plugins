@@ -339,7 +339,12 @@ async function resolveLifecycleConsent(
   }
 
   if (!details.script) {
-    logger.warn('Lifecycle script details missing; cannot prompt for consent');
+    logger.error('Lifecycle script details missing; cannot prompt for consent', {
+      reason: details.reason,
+    });
+    throw new Error(
+      'Publish lifecycle script metadata was not provided by the publish service; cannot request consent.'
+    );
     return undefined;
   }
 

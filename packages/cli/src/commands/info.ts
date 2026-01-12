@@ -50,7 +50,7 @@ interface InfoResponse {
       version: string;
       author?: string;
       description?: string;
-      source: string;
+      source?: string;
       category: string;
       tags?: string[];
       featured?: boolean;
@@ -248,7 +248,7 @@ export const infoCommand: CommandMetadata<InfoOptions> = {
   usage: 'plugin info <plugin-id>',
   requiredFlags: undefined,
   specAnchors: ['FR-002', 'CRIT-007', '3-3-cli-workflow-control'],
-  errorCodes: ['ERR-INFO-001', 'ERR-INFO-002', 'ERR-DISC-001'],
+  errorCodes: ['ERR-INFO-001', 'ERR-INFO-002', 'ERR-DISC-001', 'ERR-INFO-999'],
   examples: [
     {
       command: 'plugin info hookify',

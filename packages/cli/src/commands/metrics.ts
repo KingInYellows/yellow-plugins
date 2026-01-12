@@ -44,6 +44,15 @@ const metricsHandler: CommandHandler<MetricsOptions> = async (options, context) 
         metricCount: Object.keys(jsonMetrics).length,
       });
 
+      if (options.reset) {
+        globalPrometheusExporter.reset();
+        logger.info('Metrics reset after export');
+      }
+
+      const durationMs = Date.now() - startTime;
+
+      logger.timing('Metrics command completed', durationMs);
+
       return {
         success: true,
         status: 'success',
@@ -51,6 +60,9 @@ const metricsHandler: CommandHandler<MetricsOptions> = async (options, context) 
         data: {
           format: 'json',
           metrics: jsonMetrics,
+          timestamp: new Date().toISOString(),
+          reset: options.reset || false,
+          durationMs,
           timestamp: new Date().toISOString(),
         },
       };
@@ -207,7 +219,7 @@ function parsePrometheusToJson(prometheusText: string): Record<string, ParsedMet
     }
 
     // Parse metric line
-    const metricMatch = trimmed.match(/^(\S+?)(\{[^}]+\})?\s+(\S+)$/);
+    const metricMatch = trimmed.match(/^(\S+?)(\{[^}]+\})?\s+(\S+)(?:\s+\S+)?$/);
     if (metricMatch) {
       const metricName = metricMatch[1];
       const labelsStr = metricMatch[2] || '';
