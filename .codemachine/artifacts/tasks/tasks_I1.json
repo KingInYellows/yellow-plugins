@@ -25,7 +25,7 @@
     "acceptance_criteria": "pnpm install/test succeed; `tsc --noEmit` works; package boundaries follow layered import rules; README quickstart updated.",
     "dependencies": [],
     "parallelizable": true,
-    "done": false
+    "done": true
   },
   {
     "task_id": "I1.T2",
@@ -52,7 +52,7 @@
       "I1.T1"
     ],
     "parallelizable": true,
-    "done": false
+    "done": true
   },
   {
     "task_id": "I1.T3",
@@ -79,7 +79,7 @@
       "I1.T1"
     ],
     "parallelizable": false,
-    "done": false
+    "done": true
   },
   {
     "task_id": "I1.T4",

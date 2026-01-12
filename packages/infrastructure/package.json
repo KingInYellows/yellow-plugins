@@ -24,10 +24,12 @@
   "dependencies": {
     "@yellow-plugins/domain": "workspace:*",
     "ajv": "^8.12.0",
-    "ajv-formats": "^2.1.1"
+    "ajv-formats": "^2.1.1",
+    "semver": "^7.5.4"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
+    "@types/semver": "^7.7.1",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0"
   },

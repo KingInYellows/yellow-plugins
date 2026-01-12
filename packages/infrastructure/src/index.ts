@@ -6,6 +6,7 @@
  * operations, git operations, and other infrastructure concerns.
  *
  * Enhanced in Task I1.T2: Configuration provider implementation
+ * Enhanced in Task I1.T3: Validation toolkit exports
  */
 
 // Configuration provider and utilities
@@ -19,6 +20,19 @@ export type {
   CliFlags,
   ConfigProviderOptions,
 } from './config/configProvider.js';
+
+// Validation toolkit exports (I1.T3)
+export {
+  AjvValidatorFactory,
+  sharedValidatorFactory,
+  type ValidationError,
+  type ValidationResult,
+} from './validation/ajvFactory.js';
+
+export {
+  SchemaValidator,
+  createValidator,
+} from './validation/validator.js';
 
 // Package version
 export const version = '1.1.0';
