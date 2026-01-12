@@ -28,6 +28,7 @@
     "docs:lint:toc": "doctoc --notitle docs/traceability-matrix.md docs/plans",
     "docs:lint:md": "markdownlint \"CONTRIBUTING.md\" \"docs/plans/**/*.md\"",
     "docs:lint": "pnpm run docs:lint:toc && pnpm run docs:lint:md",
+    "release:check": "pnpm run validate:schemas && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run docs:lint",
     "prepare": "husky install || true"
   },
   "devDependencies": {
