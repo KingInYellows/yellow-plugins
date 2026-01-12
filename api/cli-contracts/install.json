@@ -1,0 +1,418 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://yellow-plugins.dev/schemas/cli-contracts/install/v1.json",
+  "title": "Install Command Contract",
+  "description": "JSON envelope for install command request and response payloads",
+  "version": "1.0.0",
+  "definitions": {
+    "CompatibilityIntent": {
+      "type": "object",
+      "description": "Platform and environment fingerprint for compatibility validation",
+      "properties": {
+        "nodeVersion": {
+          "type": "string",
+          "description": "Node.js version (semver)",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "examples": ["20.10.0", "18.19.0"]
+        },
+        "os": {
+          "type": "string",
+          "description": "Operating system (process.platform)",
+          "enum": ["linux", "darwin", "win32"],
+          "examples": ["linux", "darwin"]
+        },
+        "arch": {
+          "type": "string",
+          "description": "CPU architecture (process.arch)",
+          "enum": ["x64", "arm64"],
+          "examples": ["x64", "arm64"]
+        },
+        "claudeVersion": {
+          "type": "string",
+          "description": "Claude Code version (semver, optional)",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "examples": ["2.5.0"]
+        }
+      },
+      "required": ["nodeVersion", "os", "arch"],
+      "additionalProperties": false
+    },
+    "TelemetryContext": {
+      "type": "object",
+      "description": "Observability metadata for structured logging",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "User session identifier",
+          "examples": ["sess-12345"]
+        },
+        "gitCommit": {
+          "type": "string",
+          "description": "Git commit hash",
+          "pattern": "^[a-f0-9]{7,40}$",
+          "examples": ["abc123def456"]
+        },
+        "tags": {
+          "type": "object",
+          "description": "Custom tags for categorization",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "examples": [
+            {
+              "environment": "ci",
+              "pipeline": "deploy"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "LifecycleConsent": {
+      "type": "object",
+      "description": "User consent record for lifecycle script execution",
+      "properties": {
+        "scriptType": {
+          "type": "string",
+          "description": "Lifecycle script type",
+          "enum": ["preInstall", "install", "postInstall", "uninstall"]
+        },
+        "digest": {
+          "type": "string",
+          "description": "SHA-256 digest of script content",
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "examples": ["sha256:abc123..."]
+        },
+        "consentedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Consent timestamp (ISO 8601)",
+          "examples": ["2026-01-11T10:00:00Z"]
+        }
+      },
+      "required": ["scriptType", "digest", "consentedAt"],
+      "additionalProperties": false
+    },
+    "FlagEvaluations": {
+      "type": "object",
+      "description": "Feature flags evaluated during execution",
+      "properties": {
+        "flags": {
+          "type": "object",
+          "description": "Flag key to boolean value mapping",
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "examples": [
+            {
+              "enableRollback": true,
+              "strictCompatibility": false
+            }
+          ]
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of flag values",
+          "enum": ["config", "override", "default"]
+        },
+        "appliedFlags": {
+          "type": "array",
+          "description": "Flags that influenced command behavior",
+          "items": {
+            "type": "string"
+          },
+          "examples": [["strictCompatibility", "enableRollback"]]
+        }
+      },
+      "required": ["flags", "source", "appliedFlags"],
+      "additionalProperties": false
+    },
+    "ErrorDetails": {
+      "type": "object",
+      "description": "Structured error information",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Error code from error catalog",
+          "pattern": "^ERR(OR)?-[A-Z]+-\\d{3}$",
+          "examples": ["ERR-INSTALL-001", "ERROR-SCHEMA-002"]
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["ERROR", "WARNING"]
+        },
+        "category": {
+          "type": "string",
+          "description": "Error category",
+          "examples": ["SCHEMA_VALIDATION", "COMPATIBILITY", "INSTALLATION"]
+        },
+        "specReference": {
+          "type": "string",
+          "description": "Specification requirement references",
+          "examples": ["FR-001, CRIT-007"]
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Suggested resolution steps"
+        },
+        "context": {
+          "type": "object",
+          "description": "Additional error context",
+          "additionalProperties": true
+        }
+      },
+      "required": ["code", "message", "severity", "category"],
+      "additionalProperties": false
+    },
+    "TelemetryMetrics": {
+      "type": "object",
+      "description": "Command execution metrics",
+      "properties": {
+        "durationMs": {
+          "type": "number",
+          "description": "Command execution duration in milliseconds",
+          "minimum": 0
+        },
+        "cacheStatus": {
+          "type": "string",
+          "enum": ["hit", "miss", "partial"],
+          "description": "Cache utilization status"
+        },
+        "bytesDownloaded": {
+          "type": "number",
+          "description": "Total bytes downloaded",
+          "minimum": 0
+        },
+        "lifecycleScriptsRun": {
+          "type": "number",
+          "description": "Number of lifecycle scripts executed",
+          "minimum": 0
+        },
+        "registryMutations": {
+          "type": "number",
+          "description": "Number of registry mutations",
+          "minimum": 0
+        }
+      },
+      "required": ["durationMs"],
+      "additionalProperties": false
+    },
+    "InstallRequest": {
+      "type": "object",
+      "description": "Install command request payload",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier (kebab-case)",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "examples": ["example-plugin", "my-tool"]
+        },
+        "version": {
+          "type": "string",
+          "description": "Version to install (semver or 'latest')",
+          "pattern": "^(\\d+\\.\\d+\\.\\d+|latest)$",
+          "examples": ["1.2.3", "latest"]
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Force reinstall if already installed",
+          "default": false
+        },
+        "compatibilityIntent": {
+          "$ref": "#/definitions/CompatibilityIntent"
+        },
+        "skipLifecycle": {
+          "type": "boolean",
+          "description": "Skip lifecycle script execution",
+          "default": false
+        },
+        "lifecycleConsent": {
+          "type": "array",
+          "description": "Lifecycle script consent records",
+          "items": {
+            "$ref": "#/definitions/LifecycleConsent"
+          }
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Request correlation identifier",
+          "minLength": 1,
+          "examples": ["req-install-20260111-001"]
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Dry-run mode (no side effects)",
+          "default": false
+        },
+        "flagOverrides": {
+          "type": "object",
+          "description": "Feature flag overrides for this request",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "telemetryContext": {
+          "$ref": "#/definitions/TelemetryContext"
+        }
+      },
+      "required": ["pluginId", "compatibilityIntent"],
+      "additionalProperties": false
+    },
+    "LifecycleScriptResult": {
+      "type": "object",
+      "description": "Lifecycle script execution result",
+      "properties": {
+        "scriptType": {
+          "type": "string",
+          "enum": ["preInstall", "install", "postInstall", "uninstall"]
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Script exit code"
+        },
+        "durationMs": {
+          "type": "number",
+          "description": "Execution duration in milliseconds",
+          "minimum": 0
+        },
+        "digest": {
+          "type": "string",
+          "description": "SHA-256 digest of executed script",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "required": ["scriptType", "exitCode", "durationMs", "digest"],
+      "additionalProperties": false
+    },
+    "InstallResponseData": {
+      "type": "object",
+      "description": "Install command response data payload",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Installed plugin identifier"
+        },
+        "version": {
+          "type": "string",
+          "description": "Installed version"
+        },
+        "installState": {
+          "type": "string",
+          "enum": ["active", "staged", "failed"],
+          "description": "Installation state"
+        },
+        "cachePath": {
+          "type": "string",
+          "description": "Path to cached plugin files"
+        },
+        "symlinkTarget": {
+          "type": "string",
+          "description": "Active symlink target path"
+        },
+        "registryDelta": {
+          "type": "object",
+          "description": "Registry mutations",
+          "properties": {
+            "added": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Plugin IDs added to registry"
+            },
+            "modified": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Plugin IDs modified in registry"
+            }
+          },
+          "required": ["added", "modified"],
+          "additionalProperties": false
+        },
+        "lifecycleScripts": {
+          "type": "array",
+          "description": "Lifecycle scripts executed",
+          "items": {
+            "$ref": "#/definitions/LifecycleScriptResult"
+          }
+        },
+        "flagEvaluations": {
+          "$ref": "#/definitions/FlagEvaluations"
+        }
+      },
+      "required": ["pluginId", "version", "installState", "cachePath"],
+      "additionalProperties": false
+    },
+    "InstallResponse": {
+      "type": "object",
+      "description": "Install command response payload",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Success indicator"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "dry-run", "partial"],
+          "description": "Command execution status"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable result message",
+          "minLength": 1
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "Transaction identifier for atomicity tracking",
+          "minLength": 1,
+          "examples": ["txn-20260111-123456"]
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID echoed from request",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Command execution timestamp (ISO 8601)"
+        },
+        "cliVersion": {
+          "type": "string",
+          "description": "CLI version that executed the command",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "data": {
+          "$ref": "#/definitions/InstallResponseData"
+        },
+        "error": {
+          "$ref": "#/definitions/ErrorDetails"
+        },
+        "telemetry": {
+          "$ref": "#/definitions/TelemetryMetrics"
+        }
+      },
+      "required": ["success", "status", "message", "correlationId", "timestamp", "cliVersion"],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Install Request Schema",
+      "$ref": "#/definitions/InstallRequest"
+    },
+    {
+      "title": "Install Response Schema",
+      "$ref": "#/definitions/InstallResponse"
+    }
+  ]
+}

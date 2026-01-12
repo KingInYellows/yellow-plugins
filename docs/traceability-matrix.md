@@ -1,3 +1,52 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Requirements Traceability Matrix](#requirements-traceability-matrix)
+  - [KingInYellows Personal Plugin Marketplace](#kinginyellows-personal-plugin-marketplace)
+  - [Executive Summary](#executive-summary)
+    - [Traceability Confidence: **100%** ✅](#traceability-confidence-100%25-)
+  - [Matrix 1: PRD to Specification Coverage](#matrix-1-prd-to-specification-coverage)
+    - [Complete PRD Requirements Traceability](#complete-prd-requirements-traceability)
+    - [Coverage Summary](#coverage-summary)
+  - [Matrix 2: Success Metrics to Requirements Traceability](#matrix-2-success-metrics-to-requirements-traceability)
+    - [Primary Success Metric (PSM)](#primary-success-metric-psm)
+    - [Secondary Success Metrics (SSM)](#secondary-success-metrics-ssm)
+  - [Matrix 3: Risks to Mitigations Traceability](#matrix-3-risks-to-mitigations-traceability)
+    - [High-Priority Risks (RPN ≥ 100)](#high-priority-risks-rpn-%E2%89%A5-100)
+    - [Mitigation Evidence](#mitigation-evidence)
+  - [Matrix 4: NFRs to Test Strategy Traceability](#matrix-4-nfrs-to-test-strategy-traceability)
+    - [Performance NFRs (5 total)](#performance-nfrs-5-total)
+    - [Reliability NFRs (6 total)](#reliability-nfrs-6-total)
+    - [Maintainability NFRs (5 total)](#maintainability-nfrs-5-total)
+    - [Security NFRs (3 total)](#security-nfrs-3-total)
+    - [Usability NFRs (4 total)](#usability-nfrs-4-total)
+    - [Extensibility NFRs (3 total)](#extensibility-nfrs-3-total)
+    - [NFR Testing Summary](#nfr-testing-summary)
+  - [Matrix 5: Documentation Tooling Traceability](#matrix-5-documentation-tooling-traceability)
+  - [Matrix 6: CLI Documentation Coverage for FR-001..FR-010](#matrix-6-cli-documentation-coverage-for-fr-001fr-010)
+  - [Overall Traceability Assessment](#overall-traceability-assessment)
+    - [Coverage Statistics](#coverage-statistics)
+    - [Traceability Confidence by Item](#traceability-confidence-by-item)
+    - [Specification Completeness](#specification-completeness)
+      - [Part 1 (Essential Sections)](#part-1-essential-sections)
+      - [Part 2 (Advanced Sections)](#part-2-advanced-sections)
+    - [Combined Specification Assessment](#combined-specification-assessment)
+  - [Gap Analysis](#gap-analysis)
+    - [Potential Gaps Identified: **NONE** ✅](#potential-gaps-identified-none-)
+    - [Specification Strengths](#specification-strengths)
+    - [Specification Quality Metrics](#specification-quality-metrics)
+  - [Recommendations for Implementation](#recommendations-for-implementation)
+    - [Phase 1 Implementation Priorities](#phase-1-implementation-priorities)
+    - [For Adversarial Reviewer (Next Agent)](#for-adversarial-reviewer-next-agent)
+  - [Appendices](#appendices)
+    - [Appendix A: Requirements Cross-Reference](#appendix-a-requirements-cross-reference)
+    - [Appendix B: Success Metrics Cross-Reference](#appendix-b-success-metrics-cross-reference)
+    - [Appendix C: Risk Mitigation Cross-Reference](#appendix-c-risk-mitigation-cross-reference)
+  - [Conclusion](#conclusion)
+    - [Traceability Status: **COMPLETE** ✅](#traceability-status-complete-)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Requirements Traceability Matrix
 ## KingInYellows Personal Plugin Marketplace
 
@@ -306,6 +355,44 @@ grep -q "Commands: git" <<< "$output"
 - Extensibility: 3/3 (100%) automated
 
 **Overall NFR Testability**: ✅ (21 of 21 testable, 16 of 21 fully automated)
+
+---
+
+## Matrix 5: Documentation Tooling Traceability
+
+Task `I1.T5` establishes typedoc, doctoc, markdownlint, and ADR traceability templates so documentation artifacts stay synchronized with product requirements.
+
+| Artifact / Task | FR Alignment | NFR Alignment | Notes / Evidence |
+|-----------------|-------------|---------------|------------------|
+| **Typedoc baseline + `pnpm docs:build`** | FR-003 (Detail View), FR-009 (Simple Publishing) | NFR-MAINT-004 (Documentation coverage) | API references for CLI/domain/infrastructure stay regenerated alongside code, preserving Section 4 documentation directives. |
+| **Doctoc + markdownlint automation via `pnpm docs:lint`** | FR-009 (Simple Publishing), FR-011 (Release Automation) | NFR-MAINT-001 (≤ 2 manual publish steps), NFR-MAINT-004 (Documentation coverage) | Automatic TOC refresh + lint gating ensures delivery workflows remain two-command compliant and spec addenda never drift. |
+| **ADR template relocation (`docs/plans/ADR-template.md`)** | FR-001 – FR-013 (global traceability mandate) | NFR-MAINT-005 (Error actionability), CRIT-021 (Traceability enforcement) | Template now forces FR/NFR references per ADR so each change records lineage before runtime work (Tasks I1.T1–I1.T5). |
+| **CI Validation Pipeline Spec (`docs/operations/ci-pipeline.md`)** | FR-001 (Marketplace validation), FR-002 (Plugin validation), FR-009 (Simple publishing), FR-011 (Release automation) | NFR-MAINT-002 (CI < 5 minutes), CRIT-021 (CI runtime budget enforcement) | Section 2.1 artifact detailing job graph, matrix strategy, caching, metrics, artifact retention, and SLO enforcement. Provides complete technical specification for `.github/workflows/validate-schemas.yml` with job tables, environment vars, script invocations, and integration points for CLI smoke commands. Task I4.T3 deliverable. |
+| **Operational Runbook (`docs/operations/runbook.md`)** | FR-001 – FR-013 (diagnostic support), FR-004 (Install recovery), FR-007 (Rollback), FR-009 (Publish workflow recovery) | NFR-REL-002 (Rollback recovery), NFR-REL-004 (Schema validation recovery), NFR-MAINT-002 (CI troubleshooting), Architecture §3.7, §3.16 | Architecture §3.7 operational procedures implementation with step-by-step incident response, diagnostics commands, failure recovery procedures (registry corruption, cache recovery, CI failures, security audit, lifecycle script incidents, publish rollback, telemetry export), KPI escalation paths, and explicit cross-links to Section 6 verification hooks/postmortem template. Task I4.T4 deliverable. |
+| **Metrics Guide (`docs/operations/metrics.md`)** | FR-001 – FR-013 (Telemetry support), FR-004 (Install metrics), FR-007 (Rollback metrics) | NFR-PERF-001 (Install ≤ 2min), NFR-PERF-005 (Rollback < 1s), NFR-REL-002 (Rollback success), CRIT-010 (Telemetry), CRIT-021 (CI budget), Architecture §3.11, §3.16 | Telemetry catalog with structured logging, Prometheus metrics, KPI ownership table (5 KPIs with owners, alert thresholds, review cadence), PromQL alert queries, KPI review process (monthly/quarterly), metric-by-metric owner assignments, and Section 6 verification alignment guidance. Task I4.T4 deliverable. |
+| **Postmortem Template (`docs/operations/postmortem-template.md`)** | FR-001 – FR-013 (Incident analysis), FR-007 (Rollback incidents), FR-009 (Publish incidents) | NFR-REL-002 (Rollback recovery), NFR-MAINT-002 (CI incident review), Architecture §3.16 | Incident investigation workflow template with metadata, timeline, impact assessment, root cause analysis (5 Whys), KPI impact tracking, remediation steps, action items with requirement traceability, lessons learned, and prevention measures. References Architecture §3.16 KPI review cadence and Section 6 verification requirements for evidence closure. Task I4.T4 deliverable. |
+| **CHANGELOG (`CHANGELOG.md`)** | FR-001 – FR-013 (All functional requirements), FR-011 (Release Automation) | NFR-MAINT-004 (Documentation coverage), CRIT-021 (Traceability enforcement), Section 4 (Directives) | Historical release notes following Keep a Changelog format with semantic versioning. Each release documents Added/Changed/Fixed/Removed sections, feature flag states with FR/NFR references, performance metrics vs. targets, requirements traceability (FR/NFR/CRIT identifiers), architecture changes with ADR citations, and known limitations. Version headings format (`## [X.Y.Z] - YYYY-MM-DD`) enables automated extraction by `.github/workflows/publish-release.yml`. Backfilled v1.0.0 and v1.1.0 releases with complete traceability. Task I4.T5 deliverable. |
+| **Release Checklist (`docs/operations/release-checklist.md`)** | FR-011 (Release Automation), FR-009 (Simple Publishing), FR-001 – FR-013 (Validation requirements) | NFR-PERF-001 (Install ≤ 2min), NFR-PERF-003 (Publish ≤ 10min), NFR-PERF-005 (Rollback < 1s), NFR-MAINT-002 (CI < 60s), Section 4 (Directives), Architecture §3.7 | Comprehensive gated sign-off document with 7 sections: (1) Preflight Checks (repo status, environment, credentials, version consistency), (2) Automated Validation (`pnpm release:check`, CI dry-run, artifact capture), (3) Manual Smoke Tests (macOS/Linux/WSL matrix covering install/update/publish/rollback/uninstall with performance validation), (4) Documentation Updates (CHANGELOG, README, feature flags, traceability matrix, API docs), (5) Release Preparation (tag creation, workflow trigger, monitoring, artifact verification), (6) Post-Release Validation (GitHub Release verification, artifact testing, npm publication, announcements), (7) Final Sign-Off (metadata, approvals, known issues). Includes 3 appendices: Section 4 Directives Reference, Troubleshooting Guide, Rollback Procedure. Each section requires reviewer sign-off with timestamp. Task I4.T5 deliverable. |
+| **Release Workflow Runbook (`.github/releases.md`)** | FR-011 (Release Automation), FR-009 (Simple Publishing) | NFR-PERF-003 (Publish ≤ 10min), NFR-MAINT-001 (≤ 2 manual publish steps), Architecture §3.7 (Operational processes) | Operational runbook documenting tag naming conventions (semantic versioning with v prefix, pre-release identifiers), workflow architecture (5-job pipeline: validate-release, build-artifacts, publish-release, publish-npm, notify), release types (stable/pre-release/manual dispatch), artifact details (tarball, SBOM, checksums, release notes), operational procedures (creating releases, monitoring, downloading artifacts, verifying integrity, re-running failed releases, emergency rollback), troubleshooting (workflow triggers, version mismatches, test failures, npm publish issues, changelog extraction), security considerations (secret management, artifact integrity, supply chain), performance targets (10-15 min total workflow), metrics collection (release duration, validation success rate, artifact size, dependency count), and continuous improvement suggestions. Cross-references release checklist, CHANGELOG, CI docs, metrics guide, and postmortem template. Task I4.T5 deliverable. |
+| **README Release Section** | FR-001 – FR-013 (User-facing feature summary), FR-011 (Release Automation) | NFR-MAINT-004 (Documentation coverage), Section 4 (Feature flag governance) | Updated README.md with comprehensive Release Process section documenting: release prerequisites (git status, CI checks, auth), 5-step release creation workflow (prepare, validate, checklist, tag/push, monitor), release artifacts (GitHub Release, tarball, SBOM, dependencies.txt, checksums, npm packages), release types (stable/pre-release/manual dispatch), release documentation references (checklist, runbook, CHANGELOG, workflow), and feature flags table. Feature flags table includes 7 flags with current state (enabled/disabled emoji indicators), related FR/NFR references, descriptions, and release decision rationale. Documents `pnpm release:check` command for comprehensive validation. Task I4.T5 deliverable. |
+| **Release Check Script (`package.json: release:check`)** | FR-011 (Release Automation), FR-001 (Marketplace validation), FR-002 (Plugin validation) | NFR-MAINT-002 (CI < 60s validation target), Section 4 (Validation budgets) | Orchestration script executing comprehensive pre-release validation: `pnpm validate:schemas` (marketplace + plugin schema rules), `pnpm lint` (ESLint with zero warnings), `pnpm typecheck` (TypeScript compilation across workspace), `pnpm test` (unit + integration tests), `pnpm docs:lint` (doctoc + markdownlint). Sequential execution with fail-fast semantics. Referenced throughout release checklist and README. Target: < 60s execution median per Section 4 performance budget. Task I4.T5 deliverable. |
+
+---
+
+## Matrix 6: CLI Documentation Coverage for FR-001..FR-010
+
+| FR ID | Requirement Name | Documentation Evidence | Status |
+|-------|------------------|------------------------|--------|
+| **FR-001** | Marketplace Index Validation | `docs/cli/browse.md#caching-performance` documents cache TTLs, stale warnings, and offline enforcement | ✅ Covered |
+| **FR-002** | Plugin Manifest Validation | `docs/contracts/cli-contracts.md#2-common-structures` defines shared schema fields and AJV expectations | ✅ Covered |
+| **FR-003** | Plugin Detail View | `docs/operations/onboarding.md#3-1-discovery` walks through `plugin info` output and metadata expectations | ✅ Covered |
+| **FR-004** | One-Command Install | `docs/operations/onboarding.md#3-2-installation` highlights the single install command plus lifecycle consent flow | ✅ Covered |
+| **FR-005** | Compatibility Enforcement | `docs/cli/update.md#breaking-change-detection` showcases compatibility gates, error messaging, and remediation links | ✅ Covered |
+| **FR-006** | Version Pinning | `docs/cli/update.md#pin-awareness` (and `docs/cli/pin.md`) describe pin detection, force overrides, and guidance | ✅ Covered |
+| **FR-007** | Rollback Capability | `docs/operations/onboarding.md#9-3-walkthrough-rollback-recovery` demonstrates cached rollback flows end-to-end | ✅ Covered |
+| **FR-008** | Update Notifications | `docs/cli/update.md#changelog-awareness` details grouped advisories, changelog statuses, and next steps | ✅ Covered |
+| **FR-009** | Simple Publishing | `docs/operations/onboarding.md#8-next-steps` directs users to publish workflow references and CI automation | ✅ Covered |
+| **FR-010** | Semantic Versioning | `docs/contracts/cli-contracts.md#install-contract` enforces semver regex for every request/response payload | ✅ Covered |
 
 ---
 

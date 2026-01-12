@@ -1,0 +1,343 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'          # Semantic versioning: v1.0.0
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'         # Pre-release: v1.0.0-beta.1
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8.15.0'
+
+jobs:
+  # ============================================================================
+  # VALIDATE RELEASE CANDIDATE
+  # ============================================================================
+  validate-release:
+    name: Validate Release Candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version information
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            # Check if version contains pre-release identifiers
+            if [[ "$VERSION" == *-* ]]; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION (prerelease: $IS_PRERELEASE)"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js with cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate version consistency
+        run: |
+          echo "::group::Checking package.json version"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          RELEASE_VERSION="${{ steps.version.outputs.version }}"
+
+          if [ "$PKG_VERSION" != "$RELEASE_VERSION" ]; then
+            echo "::error::Version mismatch: package.json ($PKG_VERSION) != release ($RELEASE_VERSION)"
+            exit 1
+          fi
+
+          echo "✅ Version consistency validated: $PKG_VERSION"
+          echo "::endgroup::"
+
+      - name: Run full validation suite
+        run: |
+          echo "::group::Schema validation"
+          pnpm validate:schemas
+          echo "::endgroup::"
+
+          echo "::group::Linting"
+          pnpm lint
+          echo "::endgroup::"
+
+          echo "::group::Type checking"
+          pnpm typecheck
+          echo "::endgroup::"
+
+      - name: Run tests
+        run: |
+          echo "::group::Unit tests"
+          pnpm test:unit
+          echo "::endgroup::"
+
+          echo "::group::Integration tests"
+          pnpm test:integration
+          echo "::endgroup::"
+
+      - name: Validation summary
+        run: |
+          echo "::notice::✅ Release candidate validated successfully"
+          echo "::notice::Version: ${{ steps.version.outputs.version }}"
+          echo "::notice::Pre-release: ${{ steps.version.outputs.is_prerelease }}"
+
+  # ============================================================================
+  # BUILD RELEASE ARTIFACTS
+  # ============================================================================
+  build-artifacts:
+    name: Build Release Artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [validate-release]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js with cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: |
+          echo "::group::Building workspace packages"
+          pnpm build
+          echo "::endgroup::"
+
+      - name: Generate changelog excerpt
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          echo "::group::Extracting changelog for v$VERSION"
+
+          # Extract changelog section for this version
+          if [ -f CHANGELOG.md ]; then
+            # Extract content between version headers
+            awk "/## \[?$VERSION\]?/,/## \[?[0-9]/" CHANGELOG.md | head -n -1 > release-notes.md
+            echo "Changelog excerpt:"
+            cat release-notes.md
+          else
+            echo "# Release v$VERSION" > release-notes.md
+            echo "No changelog file found." >> release-notes.md
+          fi
+
+          echo "::endgroup::"
+
+      - name: Create tarball archive
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          echo "::group::Creating release tarball"
+
+          mkdir -p dist-release
+          tar -czf "dist-release/yellow-plugins-v${VERSION}.tar.gz" \
+            --exclude=node_modules \
+            --exclude=.git \
+            --exclude=dist-release \
+            --exclude=.ci-metrics \
+            .
+
+          echo "Archive created: yellow-plugins-v${VERSION}.tar.gz"
+          ls -lh dist-release/
+          echo "::endgroup::"
+
+      - name: Generate SBOM (Software Bill of Materials)
+        run: |
+          echo "::group::Generating SBOM"
+          mkdir -p dist-release
+
+          # Export dependency tree as JSON
+          pnpm list --json --recursive > dist-release/sbom.json
+
+          # Generate human-readable dependency list
+          pnpm list --recursive --depth=0 > dist-release/dependencies.txt
+
+          echo "SBOM files generated"
+          echo "::endgroup::"
+
+      - name: Compute artifact checksums
+        run: |
+          echo "::group::Computing SHA256 checksums"
+          cd dist-release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "::endgroup::"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-v${{ needs.validate-release.outputs.version }}
+          path: |
+            dist-release/
+            release-notes.md
+          retention-days: 90
+
+  # ============================================================================
+  # PUBLISH GITHUB RELEASE
+  # ============================================================================
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [validate-release, build-artifacts]
+    permissions:
+      contents: write  # Required for creating releases
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts-v${{ needs.validate-release.outputs.version }}
+          path: release-artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate-release.outputs.version }}
+          name: Release v${{ needs.validate-release.outputs.version }}
+          body_path: release-artifacts/release-notes.md
+          prerelease: ${{ needs.validate-release.outputs.is_prerelease == 'true' }}
+          draft: false
+          files: |
+            release-artifacts/dist-release/*
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+
+      - name: Release summary
+        run: |
+          echo "::notice::✅ Release published successfully"
+          echo "::notice::Version: v${{ needs.validate-release.outputs.version }}"
+          echo "::notice::Pre-release: ${{ needs.validate-release.outputs.is_prerelease }}"
+          echo "::notice::Release URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.validate-release.outputs.version }}"
+
+  # ============================================================================
+  # PUBLISH TO NPM (Optional - requires NPM_TOKEN secret)
+  # ============================================================================
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [validate-release, build-artifacts]
+    if: needs.validate-release.outputs.is_prerelease != 'true' && github.repository == 'kinginyellow/yellow-plugins'
+    # Only run for non-prerelease versions and on main repository
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js with NPM registry
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Publish to NPM
+        run: |
+          echo "::group::Publishing packages to NPM"
+
+          # Check if NPM_TOKEN is configured
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "::warning::NPM_TOKEN secret not configured, skipping NPM publish"
+            exit 0
+          fi
+
+          # Publish each package in the workspace
+          pnpm -r publish --access public --no-git-checks
+
+          echo "::endgroup::"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: NPM publish summary
+        if: success()
+        run: |
+          echo "::notice::✅ Packages published to NPM"
+          echo "::notice::Version: ${{ needs.validate-release.outputs.version }}"
+
+  # ============================================================================
+  # POST-RELEASE NOTIFICATIONS
+  # ============================================================================
+  notify:
+    name: Post-Release Notifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [validate-release, publish-release]
+    if: always()
+
+    steps:
+      - name: Release status summary
+        run: |
+          echo "::group::Release Status Summary"
+          echo "Version: v${{ needs.validate-release.outputs.version }}"
+          echo "Pre-release: ${{ needs.validate-release.outputs.is_prerelease }}"
+          echo "Validation: ${{ needs.validate-release.result }}"
+          echo "GitHub Release: ${{ needs.publish-release.result }}"
+          echo "::endgroup::"
+
+          if [ "${{ needs.publish-release.result }}" == "success" ]; then
+            echo "::notice::🎉 Release v${{ needs.validate-release.outputs.version }} published successfully!"
+          else
+            echo "::error::❌ Release publishing failed"
+            exit 1
+          fi

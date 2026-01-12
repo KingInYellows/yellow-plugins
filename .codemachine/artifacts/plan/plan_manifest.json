@@ -1,0 +1,226 @@
+{
+  "locations": [
+    {
+      "key": "project-plan-title",
+      "file": "01_Plan_Overview_and_Setup.md",
+      "start_anchor": "<!-- anchor: project-plan-title -->",
+      "description": "Plan title block with metadata (version, date, generator)."
+    },
+    {
+      "key": "project-overview",
+      "file": "01_Plan_Overview_and_Setup.md",
+      "start_anchor": "<!-- anchor: project-overview -->",
+      "description": "Section 1 goal, high-level requirements, and assumptions."
+    },
+    {
+      "key": "core-architecture",
+      "file": "01_Plan_Overview_and_Setup.md",
+      "start_anchor": "<!-- anchor: core-architecture -->",
+      "description": "Section 2 architectural style, tech stack, components, data, and communication patterns."
+    },
+    {
+      "key": "key-artifacts",
+      "file": "01_Plan_Overview_and_Setup.md",
+      "start_anchor": "<!-- anchor: key-artifacts-planned -->",
+      "description": "Section 2.1 artifact inventory with planned iteration references."
+    },
+    {
+      "key": "directory-structure",
+      "file": "01_Plan_Overview_and_Setup.md",
+      "start_anchor": "<!-- anchor: directory-structure -->",
+      "description": "Section 3 proposed filesystem tree for code, docs, schemas, and artifacts."
+    },
+    {
+      "key": "directives-and-process",
+      "file": "01_Plan_Overview_and_Setup.md",
+      "start_anchor": "<!-- anchor: directives-and-process -->",
+      "description": "Section 4 directives covering command discipline, flags, atomic persistence, and docs."
+    },
+    {
+      "key": "iteration-plan-overview",
+      "file": "02_Iteration_I1.md",
+      "start_anchor": "<!-- anchor: iteration-plan -->",
+      "description": "Section 5 summary of total iterations and dependency chain."
+    },
+    {
+      "key": "iteration-1-plan",
+      "file": "02_Iteration_I1.md",
+      "start_anchor": "<!-- anchor: iteration-1-plan -->",
+      "description": "Iteration 1 overview: workspace, config/flags, validation toolkit, CLI scaffolding."
+    },
+    {
+      "key": "task-i1-t1",
+      "file": "02_Iteration_I1.md",
+      "start_anchor": "<!-- anchor: task-i1-t1 -->",
+      "description": "Task I1.T1 workspace bootstrap for pnpm, tsconfig, lint/test scripts."
+    },
+    {
+      "key": "task-i1-t2",
+      "file": "02_Iteration_I1.md",
+      "start_anchor": "<!-- anchor: task-i1-t2 -->",
+      "description": "Task I1.T2 config + feature flag modules with precedence logic."
+    },
+    {
+      "key": "task-i1-t3",
+      "file": "02_Iteration_I1.md",
+      "start_anchor": "<!-- anchor: task-i1-t3 -->",
+      "description": "Task I1.T3 validation toolkit plus component/ERD diagram creation."
+    },
+    {
+      "key": "task-i1-t4",
+      "file": "02_Iteration_I1.md",
+      "start_anchor": "<!-- anchor: task-i1-t4 -->",
+      "description": "Task I1.T4 CLI command manifest, logging, and help scaffolding."
+    },
+    {
+      "key": "task-i1-t5",
+      "file": "02_Iteration_I1.md",
+      "start_anchor": "<!-- anchor: task-i1-t5 -->",
+      "description": "Task I1.T5 documentation tooling (typedoc, doctoc, traceability templates)."
+    },
+    {
+      "key": "iteration-1-validation",
+      "file": "02_Iteration_I1.md",
+      "start_anchor": "<!-- anchor: iteration-1-validation -->",
+      "description": "Iteration 1 validation focus, exit criteria, risks, metrics, and follow-ups."
+    },
+    {
+      "key": "iteration-2-plan",
+      "file": "02_Iteration_I2.md",
+      "start_anchor": "<!-- anchor: iteration-2-plan -->",
+      "description": "Iteration 2 overview for compatibility, cache, and transaction core."
+    },
+    {
+      "key": "task-i2-t1",
+      "file": "02_Iteration_I2.md",
+      "start_anchor": "<!-- anchor: task-i2-t1 -->",
+      "description": "Task I2.T1 compatibility & policy engine implementation."
+    },
+    {
+      "key": "task-i2-t2",
+      "file": "02_Iteration_I2.md",
+      "start_anchor": "<!-- anchor: task-i2-t2 -->",
+      "description": "Task I2.T2 cache manager + registry persistence with schema."
+    },
+    {
+      "key": "task-i2-t3",
+      "file": "02_Iteration_I2.md",
+      "start_anchor": "<!-- anchor: task-i2-t3 -->",
+      "description": "Task I2.T3 install transaction orchestrator, lifecycle sandbox, sequence diagram."
+    },
+    {
+      "key": "task-i2-t4",
+      "file": "02_Iteration_I2.md",
+      "start_anchor": "<!-- anchor: task-i2-t4 -->",
+      "description": "Task I2.T4 CLI contract catalog + JSON schema definitions."
+    },
+    {
+      "key": "task-i2-t5",
+      "file": "02_Iteration_I2.md",
+      "start_anchor": "<!-- anchor: task-i2-t5 -->",
+      "description": "Task I2.T5 telemetry and metrics instrumentation rollout."
+    },
+    {
+      "key": "iteration-2-validation",
+      "file": "02_Iteration_I2.md",
+      "start_anchor": "<!-- anchor: iteration-2-validation -->",
+      "description": "Iteration 2 validation/exit criteria, risks, metrics, and tooling follow-ups."
+    },
+    {
+      "key": "iteration-3-plan",
+      "file": "02_Iteration_I3.md",
+      "start_anchor": "<!-- anchor: iteration-3-plan -->",
+      "description": "Iteration 3 overview for discovery, update intelligence, and lifecycle UX."
+    },
+    {
+      "key": "task-i3-t1",
+      "file": "02_Iteration_I3.md",
+      "start_anchor": "<!-- anchor: task-i3-t1 -->",
+      "description": "Task I3.T1 marketplace ingestion, browse/search/info commands."
+    },
+    {
+      "key": "task-i3-t2",
+      "file": "02_Iteration_I3.md",
+      "start_anchor": "<!-- anchor: task-i3-t2 -->",
+      "description": "Task I3.T2 changelog-aware update + check-updates pipeline."
+    },
+    {
+      "key": "task-i3-t3",
+      "file": "02_Iteration_I3.md",
+      "start_anchor": "<!-- anchor: task-i3-t3 -->",
+      "description": "Task I3.T3 pin management services and CLI support."
+    },
+    {
+      "key": "task-i3-t4",
+      "file": "02_Iteration_I3.md",
+      "start_anchor": "<!-- anchor: task-i3-t4 -->",
+      "description": "Task I3.T4 uninstall enhancements, lifecycle hooks, documentation."
+    },
+    {
+      "key": "task-i3-t5",
+      "file": "02_Iteration_I3.md",
+      "start_anchor": "<!-- anchor: task-i3-t5 -->",
+      "description": "Task I3.T5 CLI UX/style guide & doc polish."
+    },
+    {
+      "key": "iteration-3-validation",
+      "file": "02_Iteration_I3.md",
+      "start_anchor": "<!-- anchor: iteration-3-validation -->",
+      "description": "Iteration 3 validation focus, exit criteria, risks, metrics, and readiness checklist."
+    },
+    {
+      "key": "iteration-4-plan",
+      "file": "02_Iteration_I4.md",
+      "start_anchor": "<!-- anchor: iteration-4-plan -->",
+      "description": "Iteration 4 overview for publish workflow, CI/CD hardening, release prep."
+    },
+    {
+      "key": "task-i4-t1",
+      "file": "02_Iteration_I4.md",
+      "start_anchor": "<!-- anchor: task-i4-t1 -->",
+      "description": "Task I4.T1 publish command implementation + auth docs."
+    },
+    {
+      "key": "task-i4-t2",
+      "file": "02_Iteration_I4.md",
+      "start_anchor": "<!-- anchor: task-i4-t2 -->",
+      "description": "Task I4.T2 GitHub Actions expansion and Docker pinning."
+    },
+    {
+      "key": "task-i4-t3",
+      "file": "02_Iteration_I4.md",
+      "start_anchor": "<!-- anchor: task-i4-t3 -->",
+      "description": "Task I4.T3 CI validation pipeline spec + runbook updates."
+    },
+    {
+      "key": "task-i4-t4",
+      "file": "02_Iteration_I4.md",
+      "start_anchor": "<!-- anchor: task-i4-t4 -->",
+      "description": "Task I4.T4 operational runbooks, metrics, and KPI specs."
+    },
+    {
+      "key": "task-i4-t5",
+      "file": "02_Iteration_I4.md",
+      "start_anchor": "<!-- anchor: task-i4-t5 -->",
+      "description": "Task I4.T5 release packaging, checklist, and smoke validation."
+    },
+    {
+      "key": "iteration-4-validation",
+      "file": "02_Iteration_I4.md",
+      "start_anchor": "<!-- anchor: iteration-4-validation -->",
+      "description": "Iteration 4 validation focus, exit criteria, risks, metrics, and readiness checklist."
+    },
+    {
+      "key": "verification-strategy",
+      "file": "03_Verification_and_Glossary.md",
+      "start_anchor": "<!-- anchor: verification-and-integration-strategy -->",
+      "description": "Section 6 verification, integration, CI/CD, quality gates, and artifact validation strategy."
+    },
+    {
+      "key": "glossary",
+      "file": "03_Verification_and_Glossary.md",
+      "start_anchor": "<!-- anchor: glossary -->",
+      "description": "Section 7 glossary definitions for plan-specific terminology."
+    }
+  ]
+}

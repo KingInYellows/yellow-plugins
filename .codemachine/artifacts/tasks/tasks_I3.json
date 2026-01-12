@@ -1,0 +1,140 @@
+[
+  {
+    "task_id": "I3.T1",
+    "iteration_id": "I3",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "description": "Implement marketplace ingestion & caching (git fetch, signature verification, stale index warnings), plus browse/search/info commands with deterministic ranking (category \u279c name \u279c version) and documentation anchors.",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 data models, assumption 1 (deterministic ranking), CLI scaffolding from `I1`.",
+    "target_files": [
+      "packages/domain/src/marketplace/indexService.ts",
+      "packages/cli/src/commands/browse.ts",
+      "packages/cli/src/commands/search.ts",
+      "packages/cli/src/commands/info.ts",
+      "docs/contracts/marketplace-queries.md"
+    ],
+    "input_files": [
+      "docs/SPECIFICATION.md",
+      "docs/diagrams/component-overview.mmd",
+      ".claude-plugin/marketplace.json",
+      "packages/cli/src/commands/browse.ts"
+    ],
+    "deliverables": "Marketplace service with cache validation, CLI browse/search/info commands, contract doc describing filters + sorting.",
+    "acceptance_criteria": "Commands render results offline using cached index; stale index warnings include remediation; documentation references FR-001/002; tests cover signature mismatch + stale hash paths.",
+    "dependencies": [
+      "I2.T3",
+      "I2.T4"
+    ],
+    "parallelizable": true,
+    "done": true
+  },
+  {
+    "task_id": "I3.T2",
+    "iteration_id": "I3",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "description": "Build changelog-aware update/check-updates pipeline (parallelizable fetch with timeout fallback, changelog metadata cache) and integrate warnings per CRIT-008; extend CLI contract catalog with update payloads.",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 communication patterns, Section 2.1 artifact references, Task `I2.T3` instrumentation.",
+    "target_files": [
+      "packages/domain/src/update/updateService.ts",
+      "packages/cli/src/commands/check-updates.ts",
+      "packages/domain/src/changelog/changelogService.ts",
+      "api/cli-contracts/update.json"
+    ],
+    "input_files": [
+      "packages/cli/src/commands/update.ts",
+      "packages/domain/src/install/installService.ts",
+      "docs/contracts/cli-contracts.md",
+      ".claude-plugin/audit/"
+    ],
+    "deliverables": "Update service with fallback logic, CLI command for `check-updates`, CLI contract update schema revision, docs summarizing fallback statuses.",
+    "acceptance_criteria": "Update command displays changelog status, continues on fetch failures, logs metadata; tests simulate timeout/404; CLI contract updated accordingly.",
+    "dependencies": [
+      "I3.T1",
+      "I2.T5"
+    ],
+    "parallelizable": false,
+    "done": true
+  },
+  {
+    "task_id": "I3.T3",
+    "iteration_id": "I3",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "description": "Implement pin management (pin/unpin commands, pinned priority ordering, registry persistence) and ensure cache eviction respects pins; add docs describing workflows + CLI usage.",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 data model, Section 4 directives, registry schema from `I2.T2`.",
+    "target_files": [
+      "packages/cli/src/commands/pin.ts",
+      "packages/domain/src/pins/pinService.ts",
+      "packages/domain/src/cache/cacheService.ts",
+      "docs/cli/pin.md"
+    ],
+    "input_files": [
+      "packages/domain/src/registry/registryService.ts",
+      "docs/contracts/registry-format.md",
+      ".claude-plugin/registry.json"
+    ],
+    "deliverables": "Pin service, CLI command, cache guard integration, documentation.",
+    "acceptance_criteria": "Pins survive eviction; CLI lists pin states; docs tie flows to FR-007; tests cover priority + expiry logic.",
+    "dependencies": [
+      "I2.T2"
+    ],
+    "parallelizable": true,
+    "done": true
+  },
+  {
+    "task_id": "I3.T4",
+    "iteration_id": "I3",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "description": "Enhance uninstall experience (lifecycle uninstall scripts, cache retention options, telemetry updates, uninstall documentation) and ensure rollback/resolution instructions align with 23 error scenarios.",
+    "agent_type_hint": "BackendAgent",
+    "inputs": "Section 2 components, Section 4 security directive, error catalog from `I1.T3`.",
+    "target_files": [
+      "packages/domain/src/install/uninstallService.ts",
+      "packages/cli/src/commands/uninstall.ts",
+      "docs/operations/uninstall.md",
+      ".claude-plugin/audit/README.md"
+    ],
+    "input_files": [
+      "packages/domain/src/install/installService.ts",
+      "packages/cli/src/commands/uninstall.ts",
+      "docs/contracts/error-codes.md"
+    ],
+    "deliverables": "Uninstall service with lifecycle sandbox + cache retention controls, CLI command, documentation cross-linking error codes.",
+    "acceptance_criteria": "Uninstall runs lifecycle hooks with consent checks, removes symlink atomically, optionally purges cache per flag; docs map flows to CRIT-011 + FR-010.",
+    "dependencies": [
+      "I2.T3"
+    ],
+    "parallelizable": false,
+    "done": true
+  },
+  {
+    "task_id": "I3.T5",
+    "iteration_id": "I3",
+    "iteration_goal": "Deliver browse/search/info experiences, changelog-aware update flows, pin management, and uninstall enhancements\u2014leveraging the transaction core to satisfy the ten user journeys and extended error catalog.",
+    "description": "Polish CLI UX + docs (ANSI palettes, help examples, onboarding walkthroughs), update CLI contract catalog with discovery/update/uninstall payloads, and ensure docs/traceability entries tracked for FR-001..FR-010 coverage.",
+    "agent_type_hint": "DocumentationAgent",
+    "inputs": "Section 2 API style, Section 6 accessibility notes, tasks `I3.T1`\u2013`I3.T4` outputs.",
+    "target_files": [
+      "docs/cli/browse.md",
+      "docs/cli/update.md",
+      "docs/cli/uninstall.md",
+      "docs/ui/style-guide.md",
+      "packages/cli/src/lib/ui.ts"
+    ],
+    "input_files": [
+      "docs/cli/help-baseline.md",
+      "docs/contracts/cli-contracts.md",
+      "docs/operations/onboarding.md",
+      "packages/cli/src/lib/ui.ts"
+    ],
+    "deliverables": "Updated CLI help pages, UI style guide, contract expansions, accessible color/voice guidelines.",
+    "acceptance_criteria": "Help output matches docs; ANSI fallback documented; contract files validated; glossary references updated; doc linting passes.",
+    "dependencies": [
+      "I3.T1",
+      "I3.T4"
+    ],
+    "parallelizable": false,
+    "done": true
+  }
+]

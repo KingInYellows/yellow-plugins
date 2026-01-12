@@ -1,0 +1,162 @@
+%% Component Overview Diagram
+%% Claude Code Plugin Marketplace - Layered Architecture
+%%
+%% This diagram shows the three-layer architecture (CLI, Domain, Infrastructure)
+%% with strict dependency rules: CLI -> Domain -> Infrastructure (no backward deps)
+%%
+%% Generated for: I1.T3 - Validation toolkit and baseline diagrams
+%% Date: 2026-01-11
+%% Spec Reference: Section 2.0 "The Standard Kit"
+
+%%{init: {"theme": "neutral", "themeVariables": {"fontSize": "14px"}}}%%
+
+graph TB
+    %% User/External Layer
+    User[("User<br/>(Developer)")]
+    Git[("Git Repository<br/>(Marketplace Data)")]
+    GitHub[("GitHub<br/>(Remote)")]
+
+    %% CLI Layer (Command Interface)
+    subgraph CLI["CLI Layer (packages/cli)"]
+        direction TB
+        Commands["Command Router<br/>(yargs)"]
+        InstallCmd["Install Command"]
+        UpdateCmd["Update Command"]
+        ListCmd["List Command"]
+        InfoCmd["Info Command"]
+        PublishCmd["Publish Command"]
+        UninstallCmd["Uninstall Command"]
+
+        Commands --> InstallCmd
+        Commands --> UpdateCmd
+        Commands --> ListCmd
+        Commands --> InfoCmd
+        Commands --> PublishCmd
+        Commands --> UninstallCmd
+    end
+
+    %% Domain Layer (Business Logic)
+    subgraph Domain["Domain Layer (packages/domain)"]
+        direction TB
+
+        subgraph DomainServices["Domain Services"]
+            PluginService["Plugin Service"]
+            MarketplaceService["Marketplace Service"]
+            ValidationService["Validation Service<br/>(IValidator Interface)"]
+        end
+
+        subgraph DomainModels["Domain Models"]
+            MarketplaceIndex["MarketplaceIndex"]
+            PluginEntry["PluginEntry"]
+            PluginManifest["PluginManifest"]
+            InstalledRegistry["InstalledPluginRegistry"]
+            LifecycleRecord["LifecycleScriptRecord"]
+        end
+
+        subgraph DomainValidation["Validation Contracts"]
+            ErrorCatalog["Error Catalog<br/>(ERROR_CODES)"]
+            ValidationTypes["Validation Types<br/>(DomainValidationResult)"]
+            ErrorFactory["ValidationErrorFactory"]
+        end
+
+        PluginService --> MarketplaceIndex
+        PluginService --> PluginManifest
+        PluginService --> ValidationService
+        MarketplaceService --> MarketplaceIndex
+        MarketplaceService --> PluginEntry
+        ValidationService --> ErrorCatalog
+        ValidationService --> ValidationTypes
+        ErrorFactory --> ErrorCatalog
+    end
+
+    %% Infrastructure Layer (External Adapters)
+    subgraph Infrastructure["Infrastructure Layer (packages/infrastructure)"]
+        direction TB
+
+        subgraph InfraValidation["Validation Implementation"]
+            AjvFactory["AJV Factory<br/>(Schema Compiler)"]
+            SchemaValidator["Schema Validator<br/>(implements IValidator)"]
+            SchemaLoader["Schema Loader"]
+        end
+
+        subgraph InfraAdapters["Storage Adapters"]
+            FileSystem["File System Adapter<br/>(JSON Read/Write)"]
+            GitAdapter["Git Adapter<br/>(zx-style helpers)"]
+            CacheManager["Cache Manager"]
+        end
+
+        SchemaValidator --> AjvFactory
+        SchemaValidator --> SchemaLoader
+        SchemaLoader --> FileSystem
+        GitAdapter --> FileSystem
+        CacheManager --> FileSystem
+    end
+
+    %% External Resources
+    subgraph Schemas["JSON Schemas (schemas/)"]
+        MarketplaceSchema["marketplace.schema.json<br/>(Draft-07)"]
+        PluginSchema["plugin.schema.json<br/>(Draft-07)"]
+    end
+
+    subgraph DataStorage["Data Storage (.claude-plugin/)"]
+        MarketplaceJSON["marketplace.json"]
+        PluginJSON["plugin.json"]
+        InstalledJSON["installed.json"]
+        CacheDir["cache/"]
+    end
+
+    %% User Interactions
+    User -->|CLI Commands| Commands
+
+    %% CLI -> Domain (Clean Architecture)
+    InstallCmd --> PluginService
+    UpdateCmd --> PluginService
+    ListCmd --> MarketplaceService
+    InfoCmd --> PluginService
+    PublishCmd --> MarketplaceService
+    UninstallCmd --> PluginService
+
+    %% Domain -> Infrastructure (Dependency Injection)
+    PluginService --> SchemaValidator
+    MarketplaceService --> SchemaValidator
+    PluginService --> FileSystem
+    PluginService --> GitAdapter
+    PluginService --> CacheManager
+    MarketplaceService --> FileSystem
+    MarketplaceService --> GitAdapter
+
+    %% Infrastructure -> External Resources
+    SchemaLoader --> MarketplaceSchema
+    SchemaLoader --> PluginSchema
+    FileSystem --> MarketplaceJSON
+    FileSystem --> PluginJSON
+    FileSystem --> InstalledJSON
+    CacheManager --> CacheDir
+    GitAdapter --> Git
+    GitAdapter --> GitHub
+
+    %% Styling
+    classDef cliLayer fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef domainLayer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef infraLayer fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef externalLayer fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef dataLayer fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    class Commands,InstallCmd,UpdateCmd,ListCmd,InfoCmd,PublishCmd,UninstallCmd cliLayer
+    class PluginService,MarketplaceService,ValidationService,MarketplaceIndex,PluginEntry,PluginManifest,InstalledRegistry,LifecycleRecord,ErrorCatalog,ValidationTypes,ErrorFactory domainLayer
+    class AjvFactory,SchemaValidator,SchemaLoader,FileSystem,GitAdapter,CacheManager infraLayer
+    class User,Git,GitHub,MarketplaceSchema,PluginSchema externalLayer
+    class MarketplaceJSON,PluginJSON,InstalledJSON,CacheDir dataLayer
+
+    %% Legend
+    subgraph Legend
+        L1["CLI Layer: User-facing commands"]
+        L2["Domain Layer: Business logic & entities"]
+        L3["Infrastructure Layer: External adapters"]
+        L4["External: Schemas & data storage"]
+    end
+
+    class L1 cliLayer
+    class L2 domainLayer
+    class L3 infraLayer
+    class L4 externalLayer

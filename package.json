@@ -1,0 +1,67 @@
+{
+  "name": "yellow-plugins-root",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Git-native, schema-validated plugin marketplace for Claude Code",
+  "author": "KingInYellows",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0 <=24.x",
+    "pnpm": ">=8.0.0"
+  },
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "cli": "pnpm --filter @yellow-plugins/cli exec tsx src/index.ts",
+    "build": "pnpm -r run build",
+    "clean": "pnpm -r run clean && rm -rf node_modules",
+    "test": "pnpm -r run test",
+    "test:unit": "pnpm -r run test:unit",
+    "test:integration": "pnpm -r run test:integration",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0",
+    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
+    "typecheck": "tsc --noEmit",
+    "validate": "pnpm run lint && pnpm run typecheck",
+    "validate:schemas": "node scripts/validate-marketplace.js && node scripts/validate-plugin.js",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "docs:build": "typedoc",
+    "docs:lint:toc": "doctoc --notitle docs/traceability-matrix.md docs/plans",
+    "docs:lint:md": "markdownlint \"CONTRIBUTING.md\" \"docs/plans/**/*.md\"",
+    "docs:lint": "pnpm run docs:lint:toc && pnpm run docs:lint:md",
+    "release:check": "pnpm run validate:schemas && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run docs:lint",
+    "prepare": "husky install || true"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
+    "doctoc": "^2.2.1",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "markdownlint-cli": "^0.39.0",
+    "prettier": "^3.2.4",
+    "typedoc": "^0.28.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinginyellow/yellow-plugins.git"
+  },
+  "keywords": [
+    "claude-code",
+    "plugin",
+    "marketplace",
+    "cli",
+    "git-native",
+    "schema-validation"
+  ],
+  "dependencies": {
+    "@types/yargs": "^17.0.35",
+    "yargs": "^18.0.0"
+  }
+}

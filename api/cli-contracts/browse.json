@@ -1,0 +1,413 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://yellow-plugins.dev/schemas/cli-contracts/browse/v1.json",
+  "title": "Browse Command Contract",
+  "description": "JSON envelope for browse command request and response payloads",
+  "version": "1.0.0",
+  "definitions": {
+    "TelemetryContext": {
+      "type": "object",
+      "description": "Observability metadata for structured logging",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "User session identifier",
+          "examples": ["sess-12345"]
+        },
+        "gitCommit": {
+          "type": "string",
+          "description": "Git commit hash",
+          "pattern": "^[a-f0-9]{7,40}$",
+          "examples": ["abc123def456"]
+        },
+        "tags": {
+          "type": "object",
+          "description": "Custom tags for categorization",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "FlagEvaluations": {
+      "type": "object",
+      "description": "Feature flags evaluated during execution",
+      "properties": {
+        "flags": {
+          "type": "object",
+          "description": "Flag key to boolean value mapping",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of flag values",
+          "enum": ["config", "override", "default"]
+        },
+        "appliedFlags": {
+          "type": "array",
+          "description": "Flags that influenced command behavior",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["flags", "source", "appliedFlags"],
+      "additionalProperties": false
+    },
+    "ErrorDetails": {
+      "type": "object",
+      "description": "Structured error information",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Error code from error catalog",
+          "pattern": "^ERR(OR)?-[A-Z]+-\\d{3}$",
+          "examples": ["ERR-BROWSE-001", "ERR-BROWSE-002"]
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["ERROR", "WARNING"]
+        },
+        "category": {
+          "type": "string",
+          "description": "Error category"
+        },
+        "specReference": {
+          "type": "string",
+          "description": "Specification requirement references"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Suggested resolution steps"
+        },
+        "context": {
+          "type": "object",
+          "description": "Additional error context",
+          "additionalProperties": true
+        }
+      },
+      "required": ["code", "message", "severity", "category"],
+      "additionalProperties": false
+    },
+    "TelemetryMetrics": {
+      "type": "object",
+      "description": "Command execution metrics",
+      "properties": {
+        "durationMs": {
+          "type": "number",
+          "description": "Command execution duration in milliseconds",
+          "minimum": 0
+        },
+        "cacheStatus": {
+          "type": "string",
+          "enum": ["hit", "miss", "stale"]
+        },
+        "cacheAgeMs": {
+          "type": "number",
+          "description": "Cache age in milliseconds",
+          "minimum": 0
+        },
+        "resultsReturned": {
+          "type": "number",
+          "description": "Number of plugins included in response",
+          "minimum": 0
+        },
+        "bytesDownloaded": {
+          "type": "number",
+          "description": "Marketplace index download size (if refreshed)",
+          "minimum": 0
+        }
+      },
+      "required": ["durationMs"],
+      "additionalProperties": false
+    },
+    "BrowsePlugin": {
+      "type": "object",
+      "description": "Plugin metadata for browse results",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Plugin identifier",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "description": "Latest available version (semver)",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "description": {
+          "type": "string",
+          "description": "Short description",
+          "minLength": 1,
+          "maxLength": 280
+        },
+        "author": {
+          "type": "string",
+          "description": "Plugin author or organization",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "description": "Marketplace category",
+          "minLength": 1
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags describing plugin capabilities",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "downloads": {
+          "type": "number",
+          "description": "Download count",
+          "minimum": 0
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last updated timestamp"
+        },
+        "repository": {
+          "type": "string",
+          "format": "uri",
+          "description": "Repository URL"
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri",
+          "description": "Plugin homepage URL"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "version",
+        "description",
+        "author",
+        "category",
+        "tags",
+        "downloads",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "BrowseRequest": {
+      "type": "object",
+      "description": "Browse command request payload",
+      "properties": {
+        "category": {
+          "type": "string",
+          "description": "Filter by category",
+          "minLength": 1
+        },
+        "tags": {
+          "type": "array",
+          "description": "Filter by tags (match all)",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum number of results",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 50
+        },
+        "offset": {
+          "type": "number",
+          "description": "Result offset for pagination",
+          "minimum": 0,
+          "default": 0
+        },
+        "sort": {
+          "type": "string",
+          "description": "Sort field",
+          "enum": ["relevance", "downloads", "updated", "name"],
+          "default": "relevance"
+        },
+        "order": {
+          "type": "string",
+          "description": "Sort direction",
+          "enum": ["asc", "desc"],
+          "default": "desc"
+        },
+        "offline": {
+          "type": "boolean",
+          "description": "Use cached marketplace index only",
+          "default": false
+        },
+        "verbose": {
+          "type": "boolean",
+          "description": "Include verbose plugin details",
+          "default": false
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Request correlation identifier",
+          "minLength": 1
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Dry-run mode (no network writes)",
+          "default": false
+        },
+        "flagOverrides": {
+          "type": "object",
+          "description": "Feature flag overrides for this request",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "telemetryContext": {
+          "$ref": "#/definitions/TelemetryContext"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BrowseResponseData": {
+      "type": "object",
+      "description": "Browse command response data",
+      "properties": {
+        "plugins": {
+          "type": "array",
+          "description": "Plugins matching filters",
+          "items": {
+            "$ref": "#/definitions/BrowsePlugin"
+          }
+        },
+        "total": {
+          "type": "number",
+          "description": "Total matching plugins (before pagination)",
+          "minimum": 0
+        },
+        "filters": {
+          "type": "object",
+          "description": "Applied filters",
+          "properties": {
+            "category": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "pagination": {
+          "type": "object",
+          "description": "Pagination information",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "minimum": 1
+            },
+            "offset": {
+              "type": "number",
+              "minimum": 0
+            },
+            "hasMore": {
+              "type": "boolean"
+            }
+          },
+          "required": ["limit", "offset", "hasMore"],
+          "additionalProperties": false
+        },
+        "cacheStatus": {
+          "type": "string",
+          "enum": ["hit", "miss", "stale"],
+          "description": "Marketplace cache status"
+        },
+        "cacheAge": {
+          "type": "string",
+          "description": "Human-readable cache age (e.g., \"2h 15m\")"
+        },
+        "flagEvaluations": {
+          "$ref": "#/definitions/FlagEvaluations"
+        }
+      },
+      "required": ["plugins", "total", "pagination", "cacheStatus"],
+      "additionalProperties": false
+    },
+    "BrowseResponse": {
+      "type": "object",
+      "description": "Browse command response payload",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Success indicator"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "partial"],
+          "description": "Command execution status"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable result message",
+          "minLength": 1
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "Transaction identifier (if applicable)"
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID echoed from request",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Command execution timestamp (ISO 8601)"
+        },
+        "cliVersion": {
+          "type": "string",
+          "description": "CLI version that executed the command",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "data": {
+          "$ref": "#/definitions/BrowseResponseData"
+        },
+        "error": {
+          "$ref": "#/definitions/ErrorDetails"
+        },
+        "telemetry": {
+          "$ref": "#/definitions/TelemetryMetrics"
+        }
+      },
+      "required": ["success", "status", "message", "correlationId", "timestamp", "cliVersion"],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Browse Request Schema",
+      "$ref": "#/definitions/BrowseRequest"
+    },
+    {
+      "title": "Browse Response Schema",
+      "$ref": "#/definitions/BrowseResponse"
+    }
+  ]
+}

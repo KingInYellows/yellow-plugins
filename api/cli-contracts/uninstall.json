@@ -1,0 +1,377 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://yellow-plugins.dev/schemas/cli-contracts/uninstall/v1.json",
+  "title": "Uninstall Command Contract",
+  "description": "JSON envelope for uninstall command request and response payloads",
+  "version": "1.0.0",
+  "definitions": {
+    "TelemetryContext": {
+      "type": "object",
+      "description": "Observability metadata for structured logging",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "User session identifier",
+          "examples": ["sess-12345"]
+        },
+        "gitCommit": {
+          "type": "string",
+          "description": "Git commit hash",
+          "pattern": "^[a-f0-9]{7,40}$",
+          "examples": ["abc123def456"]
+        },
+        "tags": {
+          "type": "object",
+          "description": "Custom tags for categorization",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "FlagEvaluations": {
+      "type": "object",
+      "description": "Feature flags evaluated during execution",
+      "properties": {
+        "flags": {
+          "type": "object",
+          "description": "Flag key to boolean value mapping",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of flag values",
+          "enum": ["config", "override", "default"]
+        },
+        "appliedFlags": {
+          "type": "array",
+          "description": "Flags that influenced command behavior",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["flags", "source", "appliedFlags"],
+      "additionalProperties": false
+    },
+    "LifecycleConsent": {
+      "type": "object",
+      "description": "User consent record for lifecycle script execution",
+      "properties": {
+        "scriptType": {
+          "type": "string",
+          "description": "Lifecycle script type",
+          "enum": ["preUninstall", "uninstall", "postUninstall"]
+        },
+        "digest": {
+          "type": "string",
+          "description": "SHA-256 digest of script content",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "consentedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Consent timestamp (ISO 8601)"
+        }
+      },
+      "required": ["scriptType", "digest", "consentedAt"],
+      "additionalProperties": false
+    },
+    "LifecycleScriptResult": {
+      "type": "object",
+      "description": "Lifecycle script execution details",
+      "properties": {
+        "scriptType": {
+          "type": "string",
+          "enum": ["preUninstall", "uninstall", "postUninstall"]
+        },
+        "exitCode": {
+          "type": "number",
+          "description": "Process exit code"
+        },
+        "durationMs": {
+          "type": "number",
+          "description": "Execution duration in milliseconds",
+          "minimum": 0
+        },
+        "digest": {
+          "type": "string",
+          "description": "SHA-256 digest of script content",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "output": {
+          "type": "string",
+          "description": "Captured stdout/stderr (if available)"
+        }
+      },
+      "required": ["scriptType", "exitCode", "durationMs", "digest"],
+      "additionalProperties": false
+    },
+    "ErrorDetails": {
+      "type": "object",
+      "description": "Structured error information",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Error code from error catalog",
+          "pattern": "^ERR(OR)?-[A-Z]+-\\d{3}$",
+          "examples": ["ERR-UNINSTALL-001", "ERR-UNINSTALL-003"]
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["ERROR", "WARNING"]
+        },
+        "category": {
+          "type": "string",
+          "description": "Error category"
+        },
+        "specReference": {
+          "type": "string",
+          "description": "Specification requirement references"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Suggested resolution steps"
+        },
+        "context": {
+          "type": "object",
+          "description": "Additional error context",
+          "additionalProperties": true
+        }
+      },
+      "required": ["code", "message", "severity", "category"],
+      "additionalProperties": false
+    },
+    "TelemetryMetrics": {
+      "type": "object",
+      "description": "Command execution metrics",
+      "properties": {
+        "durationMs": {
+          "type": "number",
+          "description": "Command execution duration in milliseconds",
+          "minimum": 0
+        },
+        "bytesFreed": {
+          "type": "number",
+          "description": "Disk bytes freed from plugin files",
+          "minimum": 0
+        },
+        "cacheBytesFreed": {
+          "type": "number",
+          "description": "Cache bytes freed (if cache cleared)",
+          "minimum": 0
+        },
+        "lifecycleScriptsRun": {
+          "type": "number",
+          "description": "Number of lifecycle scripts executed",
+          "minimum": 0
+        },
+        "registryMutations": {
+          "type": "number",
+          "description": "Number of registry entries mutated",
+          "minimum": 0
+        }
+      },
+      "required": ["durationMs"],
+      "additionalProperties": false
+    },
+    "UninstallRequest": {
+      "type": "object",
+      "description": "Uninstall command request payload",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "minLength": 1,
+          "examples": ["example-plugin"]
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Skip confirmation prompts",
+          "default": false
+        },
+        "keepCache": {
+          "type": "boolean",
+          "description": "Retain cached versions",
+          "default": false
+        },
+        "skipLifecycle": {
+          "type": "boolean",
+          "description": "Skip lifecycle script execution",
+          "default": false
+        },
+        "lifecycleConsent": {
+          "type": "array",
+          "description": "Lifecycle script consent tokens",
+          "items": {
+            "$ref": "#/definitions/LifecycleConsent"
+          }
+        },
+        "confirmationToken": {
+          "type": "string",
+          "description": "Typed confirmation token (e.g., 'uninstall')",
+          "minLength": 1
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Request correlation identifier",
+          "minLength": 1
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Dry-run mode (no side effects)",
+          "default": false
+        },
+        "flagOverrides": {
+          "type": "object",
+          "description": "Feature flag overrides for this request",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "telemetryContext": {
+          "$ref": "#/definitions/TelemetryContext"
+        }
+      },
+      "required": ["pluginId"],
+      "additionalProperties": false
+    },
+    "UninstallResponseData": {
+      "type": "object",
+      "description": "Uninstall command response data",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier"
+        },
+        "version": {
+          "type": "string",
+          "description": "Uninstalled version",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "filesRemoved": {
+          "type": "number",
+          "description": "Total files removed",
+          "minimum": 0
+        },
+        "bytesFreed": {
+          "type": "number",
+          "description": "Disk bytes freed",
+          "minimum": 0
+        },
+        "cacheCleared": {
+          "type": "boolean",
+          "description": "Whether cache entries were removed"
+        },
+        "cachedVersionsRemoved": {
+          "type": "number",
+          "description": "Number of cached versions removed",
+          "minimum": 0
+        },
+        "cacheBytesFreed": {
+          "type": "number",
+          "description": "Cache bytes freed (if cache cleared)",
+          "minimum": 0
+        },
+        "lifecycleScripts": {
+          "type": "array",
+          "description": "Lifecycle script execution results",
+          "items": {
+            "$ref": "#/definitions/LifecycleScriptResult"
+          }
+        },
+        "registryDelta": {
+          "type": "object",
+          "description": "Registry mutations",
+          "properties": {
+            "removed": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "auditLogPath": {
+          "type": "string",
+          "description": "Path to audit log entry"
+        },
+        "flagEvaluations": {
+          "$ref": "#/definitions/FlagEvaluations"
+        }
+      },
+      "required": ["pluginId", "version", "filesRemoved", "bytesFreed", "cacheCleared"],
+      "additionalProperties": false
+    },
+    "UninstallResponse": {
+      "type": "object",
+      "description": "Uninstall command response payload",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Success indicator"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "partial"],
+          "description": "Command execution status"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable result message",
+          "minLength": 1
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "Transaction identifier"
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID echoed from request",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Command execution timestamp (ISO 8601)"
+        },
+        "cliVersion": {
+          "type": "string",
+          "description": "CLI version that executed the command",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "data": {
+          "$ref": "#/definitions/UninstallResponseData"
+        },
+        "error": {
+          "$ref": "#/definitions/ErrorDetails"
+        },
+        "telemetry": {
+          "$ref": "#/definitions/TelemetryMetrics"
+        }
+      },
+      "required": ["success", "status", "message", "correlationId", "timestamp", "cliVersion"],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Uninstall Request Schema",
+      "$ref": "#/definitions/UninstallRequest"
+    },
+    {
+      "title": "Uninstall Response Schema",
+      "$ref": "#/definitions/UninstallResponse"
+    }
+  ]
+}

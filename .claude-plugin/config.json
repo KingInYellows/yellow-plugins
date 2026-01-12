@@ -1,0 +1,8 @@
+{
+  "$schema": "../schemas/config.schema.json",
+  "pluginDir": ".claude-plugin",
+  "installDir": ".claude/plugins",
+  "maxCacheSizeMb": 500,
+  "telemetryEnabled": false,
+  "lifecycleTimeoutMs": 30000
+}

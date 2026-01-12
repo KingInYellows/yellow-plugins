@@ -1,0 +1,10 @@
+{
+  "$schema": "../schemas/flags.schema.json",
+  "enableBrowse": false,
+  "enablePublish": false,
+  "enableRollback": false,
+  "enableVariants": false,
+  "enableLifecycleHooks": false,
+  "enableCompatibilityChecks": true,
+  "enableCiValidation": false
+}

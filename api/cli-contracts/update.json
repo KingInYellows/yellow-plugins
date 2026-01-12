@@ -1,0 +1,475 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://yellow-plugins.dev/schemas/cli-contracts/update/v1.json",
+  "title": "Update Command Contract",
+  "description": "JSON envelope for update command request and response payloads (includes CRIT-008 changelog fields)",
+  "version": "1.1.0",
+  "changelog": [
+    {
+      "version": "1.1.0",
+      "date": "2024-01-01",
+      "description": "Added CRIT-008 changelog-related fields and extended observability/telemetry metadata for the update command contract.",
+      "changes": [
+        "Introduced additional changelog fields in request/response envelopes.",
+        "Expanded TelemetryContext and feature flag evaluation metadata.",
+        "Clarified compatibility intent semantics for update requests."
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2023-12-01",
+      "description": "Initial version of the update command contract schema.",
+      "changes": [
+        "Defined base request and response envelopes for the update command.",
+        "Specified compatibility intent and core execution parameters.",
+        "Established error reporting structure for update failures."
+      ]
+    }
+  ],
+  "definitions": {
+    "CompatibilityIntent": {
+      "type": "object",
+      "description": "Platform and environment fingerprint for compatibility validation",
+      "properties": {
+        "nodeVersion": {
+          "type": "string",
+          "description": "Node.js version (semver)",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "examples": ["20.10.0", "18.19.0"]
+        },
+        "os": {
+          "type": "string",
+          "description": "Operating system (process.platform)",
+          "enum": ["linux", "darwin", "win32"],
+          "examples": ["linux", "darwin"]
+        },
+        "arch": {
+          "type": "string",
+          "description": "CPU architecture (process.arch)",
+          "enum": ["x64", "arm64"],
+          "examples": ["x64", "arm64"]
+        },
+        "claudeVersion": {
+          "type": "string",
+          "description": "Claude Code version (semver, optional)",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "examples": ["2.5.0"]
+        }
+      },
+      "required": ["nodeVersion", "os", "arch"],
+      "additionalProperties": false
+    },
+    "TelemetryContext": {
+      "type": "object",
+      "description": "Observability metadata for structured logging",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "User session identifier",
+          "examples": ["sess-12345"]
+        },
+        "gitCommit": {
+          "type": "string",
+          "description": "Git commit hash",
+          "pattern": "^[a-f0-9]{7,40}$",
+          "examples": ["abc123def456"]
+        },
+        "tags": {
+          "type": "object",
+          "description": "Custom tags for categorization",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "FlagEvaluations": {
+      "type": "object",
+      "description": "Feature flags evaluated during execution",
+      "properties": {
+        "flags": {
+          "type": "object",
+          "description": "Flag key to boolean value mapping",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "source": {
+          "type": "string",
+          "description": "Source of flag values",
+          "enum": ["config", "override", "default"]
+        },
+        "appliedFlags": {
+          "type": "array",
+          "description": "Flags that influenced command behavior",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["flags", "source", "appliedFlags"],
+      "additionalProperties": false
+    },
+    "ErrorDetails": {
+      "type": "object",
+      "description": "Structured error information",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Error code from error catalog",
+          "pattern": "^ERR(OR)?-[A-Z]+-\\d{3}$",
+          "examples": ["ERR-UPDATE-001", "ERROR-COMPAT-003"]
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable error message",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["ERROR", "WARNING"]
+        },
+        "category": {
+          "type": "string",
+          "description": "Error category"
+        },
+        "specReference": {
+          "type": "string",
+          "description": "Specification requirement references"
+        },
+        "resolution": {
+          "type": "string",
+          "description": "Suggested resolution steps"
+        },
+        "context": {
+          "type": "object",
+          "description": "Additional error context",
+          "additionalProperties": true
+        }
+      },
+      "required": ["code", "message", "severity", "category"],
+      "additionalProperties": false
+    },
+    "TelemetryMetrics": {
+      "type": "object",
+      "description": "Command execution metrics",
+      "properties": {
+        "durationMs": {
+          "type": "number",
+          "description": "Command execution duration in milliseconds",
+          "minimum": 0
+        },
+        "cacheStatus": {
+          "type": "string",
+          "enum": ["hit", "miss", "partial"]
+        },
+        "bytesDownloaded": {
+          "type": "number",
+          "description": "Total bytes downloaded",
+          "minimum": 0
+        },
+        "lifecycleScriptsRun": {
+          "type": "number",
+          "description": "Number of lifecycle scripts executed",
+          "minimum": 0
+        },
+        "registryMutations": {
+          "type": "number",
+          "description": "Number of registry mutations",
+          "minimum": 0
+        },
+        "changelogsFetched": {
+          "type": "number",
+          "description": "Number of changelogs fetched (CRIT-008)",
+          "minimum": 0
+        },
+        "changelogCacheHits": {
+          "type": "number",
+          "description": "Number of changelog cache hits (CRIT-008)",
+          "minimum": 0
+        }
+      },
+      "required": ["durationMs"],
+      "additionalProperties": false
+    },
+    "UpdateRequest": {
+      "type": "object",
+      "description": "Update command request payload",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier to update (omit for --all mode)",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "minLength": 1,
+          "maxLength": 64,
+          "examples": ["example-plugin"]
+        },
+        "all": {
+          "type": "boolean",
+          "description": "Update all installed plugins",
+          "default": false
+        },
+        "compatibilityIntent": {
+          "$ref": "#/definitions/CompatibilityIntent"
+        },
+        "versionConstraint": {
+          "type": "string",
+          "description": "Target version constraint (semver range)",
+          "examples": ["^1.0.0", ">=1.2.0 <2.0.0", "latest"]
+        },
+        "skipLifecycle": {
+          "type": "boolean",
+          "description": "Skip lifecycle script execution",
+          "default": false
+        },
+        "checkOnly": {
+          "type": "boolean",
+          "description": "Check for updates without installing",
+          "default": false
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Request correlation identifier",
+          "minLength": 1,
+          "examples": ["req-update-20260111-002"]
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Dry-run mode (no side effects)",
+          "default": false
+        },
+        "flagOverrides": {
+          "type": "object",
+          "description": "Feature flag overrides for this request",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "telemetryContext": {
+          "$ref": "#/definitions/TelemetryContext"
+        }
+      },
+      "required": ["compatibilityIntent"],
+      "oneOf": [
+        {
+          "required": ["pluginId"]
+        },
+        {
+          "required": ["all"],
+          "properties": {
+            "all": {
+              "const": true
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "UpdatedPlugin": {
+      "type": "object",
+      "description": "Single plugin update result",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier"
+        },
+        "fromVersion": {
+          "type": "string",
+          "description": "Version before update"
+        },
+        "toVersion": {
+          "type": "string",
+          "description": "Version after update"
+        },
+        "installState": {
+          "type": "string",
+          "enum": ["active", "staged", "failed"],
+          "description": "Installation state after update"
+        }
+      },
+      "required": ["pluginId", "fromVersion", "toVersion", "installState"],
+      "additionalProperties": false
+    },
+    "SkippedPlugin": {
+      "type": "object",
+      "description": "Plugin skipped during update",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Reason for skipping",
+          "minLength": 1
+        },
+        "errorCode": {
+          "type": "string",
+          "description": "Associated error code (if applicable)",
+          "pattern": "^ERR(OR)?-[A-Z]+-\\d{3}$"
+        }
+      },
+      "required": ["pluginId", "reason"],
+      "additionalProperties": false
+    },
+    "AvailableUpdate": {
+      "type": "object",
+      "description": "Available update information (checkOnly mode)",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "description": "Plugin identifier"
+        },
+        "currentVersion": {
+          "type": "string",
+          "description": "Currently installed version"
+        },
+        "latestVersion": {
+          "type": "string",
+          "description": "Latest available version"
+        },
+        "changelogUrl": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to changelog (optional)"
+        },
+        "changelogStatus": {
+          "type": "string",
+          "enum": ["success", "cached", "not-provided", "timeout", "not-found", "server-error", "network-error"],
+          "description": "Changelog fetch status per CRIT-008"
+        },
+        "changelogMessage": {
+          "type": "string",
+          "description": "Changelog content or fallback message (up to 1000 chars)"
+        },
+        "changelogFetchDurationMs": {
+          "type": "number",
+          "description": "Changelog fetch duration in milliseconds",
+          "minimum": 0
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "Whether plugin is pinned to current version"
+        }
+      },
+      "required": ["pluginId", "currentVersion", "latestVersion"],
+      "additionalProperties": false
+    },
+    "UpdateResponseData": {
+      "type": "object",
+      "description": "Update command response data payload",
+      "properties": {
+        "updated": {
+          "type": "array",
+          "description": "Plugins successfully updated",
+          "items": {
+            "$ref": "#/definitions/UpdatedPlugin"
+          }
+        },
+        "upToDate": {
+          "type": "array",
+          "description": "Plugin IDs already up-to-date",
+          "items": {
+            "type": "string"
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "description": "Plugins skipped (compatibility/errors)",
+          "items": {
+            "$ref": "#/definitions/SkippedPlugin"
+          }
+        },
+        "availableUpdates": {
+          "type": "array",
+          "description": "Available updates (checkOnly mode)",
+          "items": {
+            "$ref": "#/definitions/AvailableUpdate"
+          }
+        },
+        "registryDelta": {
+          "type": "object",
+          "description": "Registry mutations",
+          "properties": {
+            "modified": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Plugin IDs modified in registry"
+            }
+          },
+          "required": ["modified"],
+          "additionalProperties": false
+        },
+        "flagEvaluations": {
+          "$ref": "#/definitions/FlagEvaluations"
+        }
+      },
+      "required": ["updated", "upToDate", "skipped"],
+      "additionalProperties": false
+    },
+    "UpdateResponse": {
+      "type": "object",
+      "description": "Update command response payload",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Success indicator"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error", "dry-run", "partial"],
+          "description": "Command execution status"
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable result message",
+          "minLength": 1
+        },
+        "transactionId": {
+          "type": "string",
+          "description": "Transaction identifier for atomicity tracking",
+          "minLength": 1
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID echoed from request",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Command execution timestamp (ISO 8601)"
+        },
+        "cliVersion": {
+          "type": "string",
+          "description": "CLI version that executed the command",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "data": {
+          "$ref": "#/definitions/UpdateResponseData"
+        },
+        "error": {
+          "$ref": "#/definitions/ErrorDetails"
+        },
+        "telemetry": {
+          "$ref": "#/definitions/TelemetryMetrics"
+        }
+      },
+      "required": ["success", "status", "message", "correlationId", "timestamp", "cliVersion"],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "title": "Update Request Schema",
+      "$ref": "#/definitions/UpdateRequest"
+    },
+    {
+      "title": "Update Response Schema",
+      "$ref": "#/definitions/UpdateResponse"
+    }
+  ]
+}

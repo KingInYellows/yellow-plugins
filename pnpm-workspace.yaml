@@ -1,0 +1,12 @@
+# pnpm workspace configuration for yellow-plugins
+# Defines the package structure for the plugin marketplace
+# Part of Task I1.T1: Bootstrap pnpm workspace
+
+packages:
+  # Core packages following layered architecture
+  - 'packages/cli'
+  - 'packages/domain'
+  - 'packages/infrastructure'
+
+  # Validation scripts package
+  - 'scripts'
