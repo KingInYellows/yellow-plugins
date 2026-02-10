@@ -12,11 +12,11 @@
   },
   "plugins": [
     {
-      "name": "yellow-starter",
-      "description": "Starter plugin demonstrating the yellow-plugins marketplace structure",
+      "name": "gt-workflow",
+      "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
       "version": "1.0.0",
       "author": { "name": "KingInYellows" },
-      "source": "./plugins/yellow-starter",
+      "source": "./plugins/gt-workflow",
       "category": "development"
     }
   ]
