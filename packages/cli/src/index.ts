@@ -22,15 +22,14 @@ async function main(): Promise<void> {
 
   if (!['validate', 'validate:marketplace', 'validate:plugins'].includes(command)) {
     console.error(`Unknown command: ${command}`);
-    console.error('Usage: validate | validate:marketplace | validate:plugins');
+    console.error('Usage: pnpm cli validate | pnpm cli validate:marketplace | pnpm cli validate:plugins');
     process.exit(1);
   }
 
 
   try {
-    const validator = await createValidator();
-
     if (command === 'validate' || command === 'validate:marketplace') {
+      const validator = await createValidator();
       const { readFileSync } = await import('fs');
       const { resolve } = await import('path');
 
@@ -42,8 +41,10 @@ async function main(): Promise<void> {
       if (result.errors.length > 0) {
         result.errors.forEach(e => console.error(`  [${e.code}] ${e.path}: ${e.message}`));
         process.exitCode = 1;
+      }
+        process.exitCode = 1;
     }
-
+      }
     if (command === 'validate' || command === 'validate:plugins') {
       console.log('\nPlugin validation delegated to: node scripts/validate-plugin.js');
     }

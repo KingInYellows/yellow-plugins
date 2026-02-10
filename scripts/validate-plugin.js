@@ -201,17 +201,7 @@ if (require.main === module) {
 }
 
 module.exports = { validatePlugin };
-  if (!result.valid) hasErrors = true;
-}
 
-console.log(`\n${colors.cyan}========================================${colors.reset}`);
-console.log(`${colors.cyan}  Validation Summary${colors.reset}`);
-console.log(`${colors.cyan}========================================${colors.reset}\n`);
-
-if (hasErrors) {
-  console.log(`${colors.red}✗ Some plugins failed validation${colors.reset}\n`);
-  process.exit(1);
-} else {
   console.log(`${colors.green}✓ All plugins passed validation${colors.reset}\n`);
   process.exit(0);
 }

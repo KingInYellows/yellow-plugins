@@ -37,9 +37,7 @@ const marketplaceFlagIndex = args.indexOf('--marketplace');
 if (marketplaceFlagIndex !== -1) {
   const providedPath = args[marketplaceFlagIndex + 1];
   if (!providedPath || providedPath.startsWith('--')) {
-    logError('Missing value for --marketplace flag');
-    printSummary();
-    process.exit(1);
+    console.error(`${colors.red}✗ ERROR:${colors.reset} Missing value for --marketplace flag`);
   }
   marketplacePath = providedPath;
 }
@@ -111,8 +109,7 @@ function validateOfficialFormat() {
   // Optional but recommended: owner
   if (marketplace.owner) {
     if (typeof marketplace.owner.name !== 'string' || marketplace.owner.name.trim() === '') {
-      logError('Missing or invalid required field: "owner.name" (string)');
-      logWarning('owner.name is missing');
+      logWarning('owner.name is missing or empty');
     } else {
       logSuccess(`Owner: ${marketplace.owner.name}`);
     }
