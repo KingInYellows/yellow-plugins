@@ -119,8 +119,7 @@ yellow-plugins/
 │       ├── commands/          # 3 workflow commands
 │       └── skills/            # 2 skills
 ├── schemas/                   # Schema references
-├── examples/                  # Example JSON files
-└── plans/                     # Feature plans
+└── examples/                  # Example JSON files
 ```
 
 ## Official Format Reference

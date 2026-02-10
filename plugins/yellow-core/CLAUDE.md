@@ -43,4 +43,4 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ### MCP Servers (1)
 
-- `context7` — up-to-date library documentation
+- `context7` — up-to-date library documentation via [context7.com](https://context7.com). Third-party HTTP service; all agents work without it (used only for fetching live docs). No credentials are sent.

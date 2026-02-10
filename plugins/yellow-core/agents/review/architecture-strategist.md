@@ -1,6 +1,6 @@
 ---
 name: architecture-strategist
-description: "Architectural compliance reviewer evaluating SOLID principles, component boundaries, coupling/cohesion, dependency direction, and API contract stability. Assesses system design quality and long-term maintainability across codebases."
+description: "Architectural compliance reviewer evaluating SOLID principles, component boundaries, coupling/cohesion, dependency direction, and API contract stability. Use when reviewing architectural decisions or assessing design quality of new features."
 model: inherit
 ---
 

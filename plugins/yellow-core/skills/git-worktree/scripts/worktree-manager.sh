@@ -15,22 +15,44 @@ NC='\033[0m' # No Color
 WORKTREE_DIR=".worktrees"
 DEFAULT_BASE_BRANCH="main"
 
+# Validate a branch/worktree name to prevent path traversal and injection
+validate_name() {
+    name="$1"
+    label="${2:-Name}"
+
+    if [ -z "$name" ]; then
+        return 0  # Empty check handled by callers
+    fi
+
+    # Reject path traversal
+    case "$name" in
+        *..* | /* | *~*)
+            error "${label} contains forbidden characters: ${name}"
+            ;;
+    esac
+
+    # Only allow alphanumeric, hyphens, underscores, slashes, and dots (no leading dot/dash)
+    if ! printf '%s' "$name" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9._/-]*$'; then
+        error "${label} must start with alphanumeric and contain only [a-zA-Z0-9._/-]: ${name}"
+    fi
+}
+
 # Helper functions
 error() {
-    printf "${RED}Error: %s${NC}\n" "$1" >&2
+    printf '%sError: %s%s\n' "$RED" "$1" "$NC" >&2
     exit 1
 }
 
 warning() {
-    printf "${YELLOW}Warning: %s${NC}\n" "$1" >&2
+    printf '%sWarning: %s%s\n' "$YELLOW" "$1" "$NC" >&2
 }
 
 success() {
-    printf "${GREEN}%s${NC}\n" "$1"
+    printf '%s%s%s\n' "$GREEN" "$1" "$NC"
 }
 
 info() {
-    printf "${BLUE}%s${NC}\n" "$1"
+    printf '%s%s%s\n' "$BLUE" "$1" "$NC"
 }
 
 # Get repository root
@@ -66,17 +88,19 @@ ensure_gitignore() {
     fi
 }
 
-# Copy .env files from main repo to worktree
+# Copy .env files from main repo to worktree (skip symlinks)
 copy_env_files() {
     repo_root="$1"
     target_path="$2"
 
-    # Find all .env* files in repo root
+    # Find all .env* files in repo root, skip symlinks to prevent leaking external files
     for env_file in "${repo_root}"/.env*; do
-        if [ -f "$env_file" ]; then
+        if [ -f "$env_file" ] && [ ! -L "$env_file" ]; then
             filename=$(basename "$env_file")
-            cp "$env_file" "${target_path}/${filename}"
+            cp -- "$env_file" "${target_path}/${filename}"
             info "Copied ${filename}"
+        elif [ -L "$env_file" ]; then
+            warning "Skipping symlink: $(basename "$env_file")"
         fi
     done
 }
@@ -89,6 +113,9 @@ cmd_create() {
     if [ -z "$branch_name" ]; then
         error "Branch name required: worktree-manager.sh create <branch-name> [from-branch]"
     fi
+
+    validate_name "$branch_name" "Branch name"
+    validate_name "$from_branch" "Base branch"
 
     repo_root=$(get_repo_root)
     worktree_path="${repo_root}/${WORKTREE_DIR}/${branch_name}"
@@ -103,7 +130,7 @@ cmd_create() {
 
     # Create worktree
     info "Creating worktree: ${branch_name} from ${from_branch}"
-    git worktree add -b "$branch_name" "$worktree_path" "$from_branch" || error "Failed to create worktree"
+    git worktree add -b "$branch_name" "$worktree_path" -- "$from_branch" || error "Failed to create worktree"
 
     # Copy .env files
     copy_env_files "$repo_root" "$worktree_path"
@@ -125,9 +152,9 @@ cmd_list() {
 
         # Highlight current worktree
         if echo "$path" | grep -q "$(pwd)"; then
-            printf "  ${GREEN}* %s${NC}\t%s %s\n" "$branch" "$path" "${status:+($status)}"
+            printf '  %s* %s%s\t%s %s\n' "$GREEN" "$branch" "$NC" "$path" "${status:+($status)}"
         else
-            printf "    %s\t%s %s\n" "$branch" "$path" "${status:+($status)}"
+            printf '    %s\t%s %s\n' "$branch" "$path" "${status:+($status)}"
         fi
     done
 }
@@ -139,6 +166,8 @@ cmd_switch() {
     if [ -z "$name" ]; then
         error "Worktree name required: worktree-manager.sh switch <name>"
     fi
+
+    validate_name "$name" "Worktree name"
 
     repo_root=$(get_repo_root)
 
@@ -169,6 +198,8 @@ cmd_copy_env() {
         error "Worktree name required: worktree-manager.sh copy-env <name>"
     fi
 
+    validate_name "$name" "Worktree name"
+
     repo_root=$(get_repo_root)
     worktree_path="${repo_root}/${WORKTREE_DIR}/${name}"
 
@@ -188,7 +219,7 @@ cmd_cleanup() {
     info "Current worktrees:"
     git worktree list
 
-    printf "\n${YELLOW}Remove all inactive worktrees? (y/N): ${NC}"
+    printf '\n%sRemove all inactive worktrees? (y/N): %s' "$YELLOW" "$NC"
     read -r response
 
     if [ "$response" != "y" ] && [ "$response" != "Y" ]; then

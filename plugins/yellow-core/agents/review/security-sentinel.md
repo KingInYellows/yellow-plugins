@@ -1,6 +1,6 @@
 ---
 name: security-sentinel
-description: "Security audit specialist scanning for OWASP top 10 vulnerabilities, input validation issues, authentication/authorization flaws, hardcoded secrets, injection attacks, and XSS. Provides severity-based reporting with remediation guidance."
+description: "Security audit specialist scanning for OWASP top 10 vulnerabilities, input validation issues, authentication/authorization flaws, hardcoded secrets, injection attacks, and XSS. Use when auditing code for security issues or reviewing changes that touch auth, input handling, or data access."
 model: inherit
 ---
 
