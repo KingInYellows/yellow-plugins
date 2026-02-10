@@ -94,8 +94,8 @@ worktree-manager.sh go <name>
 # Use with eval or source
 eval "$(worktree-manager.sh switch feature-auth)"
 
-# Or create shell alias
-alias wtgo='eval "$(worktree-manager.sh go $1)"'
+# Or create shell function
+wtgo() { eval "$(worktree-manager.sh go "$1")"; }
 ```
 
 ### copy-env

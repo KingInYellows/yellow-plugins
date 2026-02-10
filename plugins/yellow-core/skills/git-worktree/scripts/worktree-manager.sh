@@ -82,7 +82,7 @@ ensure_gitignore() {
         return
     fi
 
-    if ! grep -q "^${WORKTREE_DIR}/" "$gitignore"; then
+    if ! grep -qF "${WORKTREE_DIR}/" "$gitignore"; then
         echo "${WORKTREE_DIR}/" >> "$gitignore"
         success "Added ${WORKTREE_DIR}/ to .gitignore"
     fi
