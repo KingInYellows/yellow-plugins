@@ -7,6 +7,7 @@ allowed-tools:
   - Read
   - Glob
   - Grep
+  - Write
   - Task
   - AskUserQuestion
 ---

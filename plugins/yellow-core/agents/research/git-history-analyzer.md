@@ -267,7 +267,7 @@ Always structure your analysis as:
 
 This agent works across:
 - **TypeScript/JavaScript:** Trace npm dependency upgrades, webpack config changes
-- **Python:** Track requirement.txt changes, migration script evolution
+- **Python:** Track requirements.txt changes, migration script evolution
 - **Rust:** Follow Cargo.toml updates, API surface changes
 - **Go:** Monitor go.mod updates, package refactoring
 

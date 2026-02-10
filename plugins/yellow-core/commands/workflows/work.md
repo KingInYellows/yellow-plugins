@@ -28,8 +28,8 @@ Execute structured plans with proper branch management, testing, and quality ass
 
 1. Read the plan document completely:
    ```bash
-   # Plan path from #$ARGUMENTS
-   cat /path/to/plan.md
+   # Plan path from argument
+   cat "#$ARGUMENTS"
    ```
 
 2. Parse plan sections:

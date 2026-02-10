@@ -36,7 +36,7 @@ ${CLAUDE_PLUGIN_ROOT}/skills/git-worktree/scripts/worktree-manager.sh
 
 Replace `${CLAUDE_PLUGIN_ROOT}` with the actual plugin installation path.
 
-## Commands
+## Usage
 
 ### create
 

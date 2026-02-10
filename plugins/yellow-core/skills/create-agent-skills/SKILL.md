@@ -262,7 +262,7 @@ Before submitting a skill:
 - [ ] SKILL.md under 500 lines
 - [ ] Reference files one level deep (if any)
 - [ ] `$ARGUMENTS` used correctly (if applicable)
-- [ ] Shell commands use `!`command`` syntax (if applicable)
+- [ ] Shell commands use `!command` syntax (if applicable)
 - [ ] Invocation control matches intent
 - [ ] Tested with actual invocation
 

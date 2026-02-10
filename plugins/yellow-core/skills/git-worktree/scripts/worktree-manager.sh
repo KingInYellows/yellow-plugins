@@ -130,7 +130,10 @@ cmd_create() {
 
     # Create worktree
     info "Creating worktree: ${branch_name} from ${from_branch}"
-    git worktree add -b "$branch_name" "$worktree_path" -- "$from_branch" || error "Failed to create worktree"
+    # Try creating with new branch (-b), fall back to existing branch
+    if ! git worktree add -b "$branch_name" "$worktree_path" -- "$from_branch" 2>/dev/null; then
+        git worktree add "$worktree_path" "$branch_name" || error "Failed to create worktree"
+    fi
 
     # Copy .env files
     copy_env_files "$repo_root" "$worktree_path"
@@ -150,8 +153,8 @@ cmd_list() {
         branch=$(echo "$line" | grep -o '\[.*\]' | tr -d '[]')
         status=$(echo "$line" | grep -o '([^)]*)' | tr -d '()')
 
-        # Highlight current worktree
-        if echo "$path" | grep -q "$(pwd)"; then
+        # Highlight current worktree (exact match, not substring)
+        if [ "$path" = "$(pwd)" ]; then
             printf '  %s* %s%s\t%s %s\n' "$GREEN" "$branch" "$NC" "$path" "${status:+($status)}"
         else
             printf '    %s\t%s %s\n' "$branch" "$path" "${status:+($status)}"
@@ -180,8 +183,11 @@ cmd_switch() {
         return
     fi
 
-    # Try to find by branch name
-    target_path=$(git worktree list | grep "\[${name}\]" | awk '{print $1}')
+    # Try to find by branch name (use porcelain for robust parsing)
+    target_path=$(git worktree list --porcelain | awk -v branch="refs/heads/${name}" '
+        /^worktree /{ path = substr($0, 10) }
+        /^branch / && $2 == branch { print path }
+    ')
 
     if [ -z "$target_path" ]; then
         error "Worktree not found: ${name}"
@@ -228,7 +234,7 @@ cmd_cleanup() {
     fi
 
     # Get list of worktrees (skip main repo)
-    git worktree list --porcelain | grep "^worktree " | cut -d' ' -f2 | while IFS= read -r path; do
+    git worktree list --porcelain | grep "^worktree " | sed 's/^worktree //' | while IFS= read -r path; do
         # Skip if it's the current directory
         if [ "$path" = "$current_path" ]; then
             warning "Skipping current worktree: ${path}"
