@@ -11,25 +11,15 @@
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "cli": "pnpm --filter @yellow-plugins/cli exec tsx src/index.ts",
     "build": "pnpm -r run build",
     "clean": "pnpm -r run clean && rm -rf node_modules",
-    "test": "pnpm -r run test",
-    "test:unit": "pnpm -r run test:unit",
-    "test:integration": "pnpm -r run test:integration",
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0",
-    "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "typecheck": "tsc --noEmit",
-    "validate": "pnpm run lint && pnpm run typecheck",
     "validate:schemas": "node scripts/validate-marketplace.js && node scripts/validate-plugin.js",
+    "validate:marketplace": "node scripts/validate-marketplace.js",
+    "validate:plugins": "node scripts/validate-plugin.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
-    "docs:build": "typedoc",
-    "docs:lint:toc": "doctoc --notitle docs/traceability-matrix.md docs/plans",
-    "docs:lint:md": "markdownlint \"CONTRIBUTING.md\" \"docs/plans/**/*.md\"",
-    "docs:lint": "pnpm run docs:lint:toc && pnpm run docs:lint:md",
-    "release:check": "pnpm run validate:schemas && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run docs:lint",
-    "prepare": "husky install || true"
+    "release:check": "pnpm run validate:marketplace && pnpm run validate:plugins && pnpm run typecheck"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
@@ -60,8 +50,5 @@
     "git-native",
     "schema-validation"
   ],
-  "dependencies": {
-    "@types/yargs": "^17.0.35",
-    "yargs": "^18.0.0"
-  }
+  "dependencies": {}
 }

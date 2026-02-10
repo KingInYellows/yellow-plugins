@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kingin-yellows.dev/schemas/marketplace.schema.json",
-  "title": "Claude Code Plugin Marketplace Schema",
-  "description": "Schema for .claude-plugin/marketplace.json defining available plugins in a personal marketplace",
+  "title": "Claude Code Plugin Marketplace Schema (Extended/Custom)",
+  "description": "Extended/custom schema for marketplace validation tooling. This is not the official Claude Code marketplace format; the official schema (see schemas/official-marketplace.schema.json) uses flat top-level 'name'/'owner'/'plugins' fields, while this custom schema uses nested 'schemaVersion'/'marketplace'/'plugins' with stricter validation.",
   "type": "object",
   "required": ["schemaVersion", "marketplace", "plugins"],
   "additionalProperties": false,

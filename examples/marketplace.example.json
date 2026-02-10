@@ -1,80 +1,39 @@
 {
-  "schemaVersion": "1.0.0",
-  "marketplace": {
-    "name": "KingInYellows Plugin Marketplace",
-    "author": "kinginyellow",
-    "description": "Personal curated collection of Claude Code plugins for development productivity and code quality",
-    "url": "https://github.com/kinginyellow/yellow-plugins",
-    "updatedAt": "2026-01-11T10:00:00Z"
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "example-marketplace",
+  "description": "Example marketplace showing the official Claude Code marketplace format",
+  "owner": {
+    "name": "Your Name",
+    "url": "https://github.com/your-username"
+  },
+  "metadata": {
+    "description": "A personal plugin marketplace",
+    "version": "1.0.0"
   },
   "plugins": [
     {
-      "id": "hookify",
-      "name": "Hookify",
-      "version": "1.0.0",
-      "author": "kinginyellow",
-      "description": "Create hooks to prevent unwanted AI behaviors through conversation analysis or explicit instructions",
-      "source": "plugins/hookify",
-      "category": "productivity",
-      "tags": ["hooks", "behavior", "safety", "ai-control"],
-      "featured": true,
-      "verified": true,
-      "updatedAt": "2026-01-10T15:30:00Z"
+      "name": "hookify",
+      "description": "Create hooks to prevent unwanted AI behaviors through conversation analysis",
+      "version": "1.2.3",
+      "author": { "name": "Your Name" },
+      "source": "./plugins/hookify",
+      "category": "productivity"
     },
     {
-      "id": "pr-review-toolkit",
-      "name": "PR Review Toolkit",
+      "name": "pr-review-toolkit",
+      "description": "Comprehensive PR review with specialized agents for code quality and tests",
       "version": "2.1.0",
-      "author": "kinginyellow",
-      "description": "Comprehensive PR review with specialized agents for code quality, tests, types, and documentation",
-      "source": "plugins/pr-review-toolkit",
-      "category": "development",
-      "tags": ["code-review", "quality", "testing", "ci-cd"],
-      "featured": true,
-      "verified": true,
-      "downloads": 42,
-      "updatedAt": "2026-01-09T12:00:00Z"
+      "author": { "name": "Your Name" },
+      "source": "./plugins/pr-review-toolkit",
+      "category": "development"
     },
     {
-      "id": "doc-generator",
-      "name": "Documentation Generator",
-      "version": "0.5.0",
-      "author": "kinginyellow",
-      "description": "Auto-generate API documentation and README files from code comments and type signatures",
-      "source": "plugins/doc-generator",
-      "category": "productivity",
-      "tags": ["documentation", "readme", "api-docs"],
-      "featured": false,
-      "verified": false,
-      "updatedAt": "2026-01-08T09:15:00Z"
-    },
-    {
-      "id": "test-coverage-analyzer",
-      "name": "Test Coverage Analyzer",
-      "version": "1.3.2",
-      "author": "kinginyellow",
-      "description": "Analyze test coverage and suggest missing test cases for critical code paths",
-      "source": "plugins/test-coverage-analyzer",
-      "category": "testing",
-      "tags": ["testing", "coverage", "quality-assurance"],
-      "featured": true,
-      "verified": true,
-      "downloads": 28,
-      "updatedAt": "2026-01-07T14:45:00Z"
-    },
-    {
-      "id": "security-scanner",
-      "name": "Security Scanner",
-      "version": "2.0.0",
-      "author": "kinginyellow",
-      "description": "Scan code for common security vulnerabilities and dependency issues",
-      "source": "plugins/security-scanner",
-      "category": "security",
-      "tags": ["security", "vulnerabilities", "dependencies"],
-      "featured": true,
-      "verified": true,
-      "downloads": 35,
-      "updatedAt": "2026-01-06T11:30:00Z"
+      "name": "remote-plugin",
+      "description": "Example of a plugin sourced from a remote URL",
+      "version": "1.0.0",
+      "author": { "name": "External Author" },
+      "source": { "source": "url", "url": "https://github.com/user/remote-plugin.git" },
+      "category": "productivity"
     }
   ]
 }

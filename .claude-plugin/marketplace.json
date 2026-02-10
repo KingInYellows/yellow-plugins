@@ -1,0 +1,23 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "yellow-plugins",
+  "description": "Personal curated collection of Claude Code plugins for development productivity and code quality",
+  "owner": {
+    "name": "KingInYellows",
+    "url": "https://github.com/kinginyellow"
+  },
+  "metadata": {
+    "description": "Git-native, schema-validated plugin marketplace for Claude Code",
+    "version": "1.1.0"
+  },
+  "plugins": [
+    {
+      "name": "yellow-starter",
+      "description": "Starter plugin demonstrating the yellow-plugins marketplace structure",
+      "version": "1.0.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-starter",
+      "category": "development"
+    }
+  ]
+}

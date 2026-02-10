@@ -3,8 +3,8 @@
 /**
  * Marketplace Schema Validator
  *
- * Validates .claude-plugin/marketplace.json against marketplace.schema.json
- * and enforces additional business rules not expressible in JSON Schema.
+ * Validates .claude-plugin/marketplace.json against the official Claude Code
+ * marketplace format and enforces additional business rules.
  *
  * Usage:
  *   node scripts/validate-marketplace.js
@@ -13,18 +13,14 @@
  * Exit codes:
  *   0 - Validation passed
  *   1 - Validation failed
- *
- * Requirements: NFR-REL-004 (100% validation coverage)
  */
 
 const fs = require('fs');
 const path = require('path');
 
-// Configuration
 const DEFAULT_MARKETPLACE_PATH = '.claude-plugin/marketplace.json';
 const PROJECT_ROOT = process.cwd();
 
-// Colors for terminal output
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
@@ -34,20 +30,23 @@ const colors = {
   cyan: '\x1b[36m',
 };
 
-// Parse command line arguments
 const args = process.argv.slice(2);
-const marketplacePath = args.includes('--marketplace')
-  ? args[args.indexOf('--marketplace') + 1]
-  : DEFAULT_MARKETPLACE_PATH;
+let marketplacePath = DEFAULT_MARKETPLACE_PATH;
 
-// Validation results
+const marketplaceFlagIndex = args.indexOf('--marketplace');
+if (marketplaceFlagIndex !== -1) {
+  const providedPath = args[marketplaceFlagIndex + 1];
+  if (!providedPath || providedPath.startsWith('--')) {
+    console.error(`${colors.red}✗ ERROR:${colors.reset} Missing value for --marketplace flag`);
+    process.exit(1);
+  }
+  marketplacePath = providedPath;
+}
+
 const errors = [];
 const warnings = [];
 let marketplace = null;
 
-/**
- * Log helpers
- */
 function logError(message) {
   errors.push(message);
   console.error(`${colors.red}✗ ERROR:${colors.reset} ${message}`);
@@ -67,7 +66,7 @@ function logSuccess(message) {
 }
 
 /**
- * VALIDATION RULE 1: Load and parse marketplace.json
+ * RULE 1: Load and parse marketplace.json
  */
 function validateFileExists() {
   const fullPath = path.join(PROJECT_ROOT, marketplacePath);
@@ -89,112 +88,96 @@ function validateFileExists() {
 }
 
 /**
- * VALIDATION RULE 2: JSON Schema compliance
- *
- * Note: This is a simplified validator. For production, use ajv or similar.
- * For now, we validate structure manually.
+ * RULE 2: Official schema compliance (flat format)
  */
-function validateSchemaCompliance() {
-  logInfo('Validating JSON Schema compliance...');
+function validateOfficialFormat() {
+  logInfo('Validating official Claude Code marketplace format...');
 
-  // Check required root fields
-  const requiredRootFields = ['schemaVersion', 'marketplace', 'plugins'];
-  for (const field of requiredRootFields) {
-    if (!(field in marketplace)) {
-      logError(`Missing required field: ${field}`);
-    }
-  }
-
-  // Validate schemaVersion format (semver)
-  if (marketplace.schemaVersion) {
-    const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
-    if (!semverPattern.test(marketplace.schemaVersion)) {
-      logError(`Invalid schemaVersion format: ${marketplace.schemaVersion} (must be semver like 1.0.0)`);
-    } else {
-      logSuccess(`Schema version: ${marketplace.schemaVersion}`);
-    }
-  }
-
-  // Validate marketplace object
-  if (marketplace.marketplace) {
-    const requiredMarketplaceFields = ['name', 'author', 'updatedAt'];
-    for (const field of requiredMarketplaceFields) {
-      if (!marketplace.marketplace[field]) {
-        logError(`Missing required marketplace.${field}`);
-      }
-    }
-
-    // Validate updatedAt timestamp
-    if (marketplace.marketplace.updatedAt) {
-      const timestamp = marketplace.marketplace.updatedAt;
-      if (isNaN(Date.parse(timestamp))) {
-        logError(`Invalid marketplace.updatedAt timestamp: ${timestamp} (must be ISO 8601)`);
-      } else {
-        logSuccess(`Marketplace updated: ${timestamp}`);
-      }
-    }
-  }
-
-  // Validate plugins array
-  if (!Array.isArray(marketplace.plugins)) {
-    logError('Field "plugins" must be an array');
+  // Required: name
+  if (!marketplace.name || typeof marketplace.name !== 'string') {
+    logError('Missing or invalid required field: "name" (string)');
   } else {
-    logSuccess(`Found ${marketplace.plugins.length} plugin(s) in marketplace`);
+    logSuccess(`Marketplace name: ${marketplace.name}`);
+  }
+
+  // Required: plugins array
+  if (!Array.isArray(marketplace.plugins)) {
+    logError('Missing or invalid required field: "plugins" (array)');
+  } else {
+    logSuccess(`Found ${marketplace.plugins.length} plugin(s)`);
+  }
+
+  // Optional but recommended: owner
+  if (marketplace.owner) {
+    if (typeof marketplace.owner.name !== 'string' || marketplace.owner.name.trim() === '') {
+      logWarning('owner.name is missing or empty');
+    } else {
+      logSuccess(`Owner: ${marketplace.owner.name}`);
+    }
+  }
+
+  // Optional: metadata
+  if (marketplace.metadata && marketplace.metadata.version) {
+    const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
+    if (!semverPattern.test(marketplace.metadata.version)) {
+      logError(`Invalid metadata.version format: ${marketplace.metadata.version} (must be semver)`);
+    }
+  }
+
+  // Warn if using old custom format
+  if (marketplace.schemaVersion || marketplace.marketplace) {
+    logWarning('Detected old custom format fields (schemaVersion, marketplace). The official format uses flat top-level fields: name, owner, plugins.');
   }
 }
 
 /**
- * VALIDATION RULE 3: Plugin ID uniqueness
+ * RULE 3: Plugin name uniqueness
  */
-function validatePluginIdUniqueness() {
+function validatePluginNameUniqueness() {
   if (!Array.isArray(marketplace.plugins)) return;
 
-  logInfo('Validating plugin ID uniqueness...');
+  logInfo('Validating plugin name uniqueness...');
 
-  const ids = marketplace.plugins.map(p => p.id);
-  const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
+  const names = marketplace.plugins.map(p => p.name);
+  const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
 
   if (duplicates.length > 0) {
-    const uniqueDuplicates = [...new Set(duplicates)];
-    logError(`Duplicate plugin IDs found: ${uniqueDuplicates.join(', ')}`);
+    logError(`Duplicate plugin names: ${[...new Set(duplicates)].join(', ')}`);
   } else {
-    logSuccess('All plugin IDs are unique');
+    logSuccess('All plugin names are unique');
   }
 }
 
 /**
- * VALIDATION RULE 4: Plugin ID format (kebab-case)
+ * RULE 4: Required plugin fields (name + source per official format)
  */
-function validatePluginIdFormat() {
+function validateRequiredPluginFields() {
   if (!Array.isArray(marketplace.plugins)) return;
 
-  logInfo('Validating plugin ID format...');
+  logInfo('Validating required plugin fields...');
 
-  const kebabCasePattern = /^[a-z0-9-]+$/;
   let allValid = true;
 
   for (const plugin of marketplace.plugins) {
-    if (!plugin.id) {
-      logError(`Plugin missing ID: ${JSON.stringify(plugin)}`);
+    if (!plugin.name) {
+      logError(`Plugin missing required field "name": ${JSON.stringify(plugin)}`);
       allValid = false;
-      continue;
     }
-
-    if (!kebabCasePattern.test(plugin.id)) {
-      logError(`Invalid plugin ID format: "${plugin.id}" (must be kebab-case: lowercase, numbers, hyphens only)`);
+    if (!plugin.source) {
+      logError(`Plugin "${plugin.name || '(unnamed)'}" missing required field "source"`);
       allValid = false;
     }
   }
 
-  if (allValid) {
-    logSuccess('All plugin IDs use valid kebab-case format');
+  if (allValid && marketplace.plugins.length > 0) {
+    logSuccess('All plugins have required fields (name, source)');
   }
 }
 
 /**
- * VALIDATION RULE 5: Source path existence
+ * RULE 5: Source path existence (for local sources)
  */
-function validateSourcePathsExist() {
+function validateSourcePaths() {
   if (!Array.isArray(marketplace.plugins)) return;
 
   logInfo('Validating plugin source paths...');
@@ -202,33 +185,36 @@ function validateSourcePathsExist() {
   let allExist = true;
 
   for (const plugin of marketplace.plugins) {
-    if (!plugin.source) {
-      logError(`Plugin "${plugin.id}" missing source path`);
-      allExist = false;
+    if (!plugin.source) continue;
+
+    // Skip remote sources (object format with url)
+    if (typeof plugin.source === 'object') {
+      logSuccess(`Plugin "${plugin.name}" uses remote source: ${plugin.source.url || '(url)'}`);
       continue;
     }
 
-    const pluginDir = path.join(PROJECT_ROOT, plugin.source);
-    const manifestPath = path.join(pluginDir, 'plugin.json');
+    const sourcePath = plugin.source.replace(/^\.\//, '');
+    const pluginDir = path.join(PROJECT_ROOT, sourcePath);
+    const manifestPath = path.join(pluginDir, '.claude-plugin', 'plugin.json');
 
     if (!fs.existsSync(pluginDir)) {
-      logError(`Plugin "${plugin.id}" source directory not found: ${plugin.source}`);
+      logError(`Plugin "${plugin.name}" source directory not found: ${sourcePath}`);
       allExist = false;
     } else if (!fs.existsSync(manifestPath)) {
-      logError(`Plugin "${plugin.id}" missing plugin.json at: ${plugin.source}/plugin.json`);
+      logError(`Plugin "${plugin.name}" missing .claude-plugin/plugin.json at: ${sourcePath}`);
       allExist = false;
     } else {
-      logSuccess(`Plugin "${plugin.id}" source verified: ${plugin.source}`);
+      logSuccess(`Plugin "${plugin.name}" source verified: ${sourcePath}`);
     }
   }
 
   if (allExist && marketplace.plugins.length > 0) {
-    logSuccess('All plugin source paths exist');
+    logSuccess('All local plugin source paths exist');
   }
 }
 
 /**
- * VALIDATION RULE 6: Version consistency (marketplace vs plugin.json)
+ * RULE 6: Version consistency (marketplace entry vs plugin.json)
  */
 function validateVersionConsistency() {
   if (!Array.isArray(marketplace.plugins)) return;
@@ -236,222 +222,54 @@ function validateVersionConsistency() {
   logInfo('Validating version consistency...');
 
   const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
-  let allConsistent = true;
 
   for (const plugin of marketplace.plugins) {
-    if (!plugin.version) {
-      logError(`Plugin "${plugin.id}" missing version`);
-      allConsistent = false;
-      continue;
-    }
+    if (!plugin.version) continue;
 
-    // Validate semver format
     if (!semverPattern.test(plugin.version)) {
-      logError(`Plugin "${plugin.id}" has invalid version format: ${plugin.version} (must be semver like 1.2.3)`);
-      allConsistent = false;
+      logError(`Plugin "${plugin.name}" invalid version format: ${plugin.version}`);
       continue;
     }
 
-    // Check against plugin.json if it exists
-    if (!plugin.source) continue;
+    if (!plugin.source || typeof plugin.source === 'object') continue;
 
-    const manifestPath = path.join(PROJECT_ROOT, plugin.source, 'plugin.json');
+    const sourcePath = plugin.source.replace(/^\.\//, '');
+    const manifestPath = path.join(PROJECT_ROOT, sourcePath, '.claude-plugin', 'plugin.json');
 
     if (fs.existsSync(manifestPath)) {
       try {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-
         if (manifest.version && manifest.version !== plugin.version) {
           logError(
-            `Version mismatch for "${plugin.id}": ` +
-            `marketplace=${plugin.version}, plugin.json=${manifest.version}`
+            `Version mismatch for "${plugin.name}": marketplace=${plugin.version}, plugin.json=${manifest.version}`
           );
-          allConsistent = false;
-        } else {
-          logSuccess(`Plugin "${plugin.id}" version matches: ${plugin.version}`);
+        } else if (manifest.version) {
+          logSuccess(`Plugin "${plugin.name}" version matches: ${plugin.version}`);
         }
       } catch (err) {
-        logWarning(`Could not validate version for "${plugin.id}": ${err.message}`);
+        logWarning(`Could not validate version for "${plugin.name}": ${err.message}`);
       }
     }
   }
-
-  if (allConsistent && marketplace.plugins.length > 0) {
-    logSuccess('All plugin versions are consistent');
-  }
 }
 
 /**
- * VALIDATION RULE 7: Category validation
- */
-function validateCategories() {
-  if (!Array.isArray(marketplace.plugins)) return;
-
-  logInfo('Validating plugin categories...');
-
-  const validCategories = [
-    'development',
-    'productivity',
-    'security',
-    'learning',
-    'testing',
-    'design',
-    'database',
-    'deployment',
-    'monitoring'
-  ];
-
-  let allValid = true;
-
-  for (const plugin of marketplace.plugins) {
-    if (!plugin.category) {
-      logError(`Plugin "${plugin.id}" missing category`);
-      allValid = false;
-      continue;
-    }
-
-    if (!validCategories.includes(plugin.category)) {
-      logError(
-        `Plugin "${plugin.id}" has invalid category: "${plugin.category}". ` +
-        `Valid categories: ${validCategories.join(', ')}`
-      );
-      allValid = false;
-    }
-  }
-
-  if (allValid && marketplace.plugins.length > 0) {
-    logSuccess('All plugin categories are valid');
-  }
-}
-
-/**
- * VALIDATION RULE 8: Tag format validation
- */
-function validateTagFormat() {
-  if (!Array.isArray(marketplace.plugins)) return;
-
-  logInfo('Validating plugin tags...');
-
-  const kebabCasePattern = /^[a-z0-9-]+$/;
-  let allValid = true;
-
-  for (const plugin of marketplace.plugins) {
-    if (!plugin.tags) continue; // Tags are optional
-
-    if (!Array.isArray(plugin.tags)) {
-      logError(`Plugin "${plugin.id}" tags must be an array`);
-      allValid = false;
-      continue;
-    }
-
-    if (plugin.tags.length > 10) {
-      logError(`Plugin "${plugin.id}" has too many tags (${plugin.tags.length}), max is 10`);
-      allValid = false;
-    }
-
-    for (const tag of plugin.tags) {
-      if (!kebabCasePattern.test(tag)) {
-        logError(`Plugin "${plugin.id}" has invalid tag format: "${tag}" (must be kebab-case)`);
-        allValid = false;
-      }
-    }
-  }
-
-  if (allValid) {
-    logSuccess('All plugin tags use valid format');
-  }
-}
-
-/**
- * VALIDATION RULE 9: Required plugin fields
- */
-function validateRequiredPluginFields() {
-  if (!Array.isArray(marketplace.plugins)) return;
-
-  logInfo('Validating required plugin fields...');
-
-  const requiredFields = ['id', 'name', 'version', 'source', 'category'];
-  let allValid = true;
-
-  for (const plugin of marketplace.plugins) {
-    for (const field of requiredFields) {
-      if (!plugin[field]) {
-        logError(`Plugin missing required field "${field}": ${plugin.id || '(no id)'}`);
-        allValid = false;
-      }
-    }
-  }
-
-  if (allValid && marketplace.plugins.length > 0) {
-    logSuccess('All plugins have required fields');
-  }
-}
-
-/**
- * VALIDATION RULE 10: Performance check (file size)
- *
- * Per NFR-PERF-003, marketplace should parse quickly.
- * Warn if file is unusually large.
+ * RULE 7: Performance check
  */
 function validatePerformance() {
-  logInfo('Checking performance characteristics...');
+  logInfo('Checking file size...');
 
   const fullPath = path.join(PROJECT_ROOT, marketplacePath);
   const stats = fs.statSync(fullPath);
   const sizeKB = (stats.size / 1024).toFixed(2);
 
-  if (stats.size > 100 * 1024) { // > 100KB
-    logWarning(`Marketplace file is large (${sizeKB} KB). Consider splitting or optimizing.`);
+  if (stats.size > 100 * 1024) {
+    logWarning(`Marketplace file is large (${sizeKB} KB). Consider optimizing.`);
   } else {
-    logSuccess(`Marketplace file size: ${sizeKB} KB (optimal for fast parsing)`);
-  }
-
-  // Estimate parse time (rough heuristic)
-  if (marketplace.plugins && marketplace.plugins.length > 100) {
-    logWarning(`Large number of plugins (${marketplace.plugins.length}). Consider pagination for UI.`);
+    logSuccess(`File size: ${sizeKB} KB`);
   }
 }
 
-/**
- * Main validation runner
- */
-function runValidation() {
-  console.log(`\n${colors.cyan}========================================${colors.reset}`);
-  console.log(`${colors.cyan}  Marketplace Schema Validator${colors.reset}`);
-  console.log(`${colors.cyan}========================================${colors.reset}\n`);
-
-  logInfo(`Validating: ${marketplacePath}`);
-  logInfo(`Project root: ${PROJECT_ROOT}\n`);
-
-  // Run all validation rules
-  if (!validateFileExists()) {
-    printSummary();
-    process.exit(1);
-  }
-
-  validateSchemaCompliance();
-  validatePluginIdUniqueness();
-  validatePluginIdFormat();
-  validateSourcePathsExist();
-  validateVersionConsistency();
-  validateCategories();
-  validateTagFormat();
-  validateRequiredPluginFields();
-  validatePerformance();
-
-  printSummary();
-
-  // Exit with appropriate code
-  if (errors.length > 0) {
-    process.exit(1);
-  } else {
-    process.exit(0);
-  }
-}
-
-/**
- * Print validation summary
- */
 function printSummary() {
   console.log(`\n${colors.cyan}========================================${colors.reset}`);
   console.log(`${colors.cyan}  Validation Summary${colors.reset}`);
@@ -468,14 +286,30 @@ function printSummary() {
     }
     console.log('');
   }
-
-  // NFR-REL-004 compliance statement
-  if (errors.length === 0) {
-    console.log(`${colors.green}NFR-REL-004: ✓ 100% validation coverage achieved${colors.reset}\n`);
-  } else {
-    console.log(`${colors.red}NFR-REL-004: ✗ Validation failed - fix errors above${colors.reset}\n`);
-  }
 }
 
-// Run the validator
+function runValidation() {
+  console.log(`\n${colors.cyan}========================================${colors.reset}`);
+  console.log(`${colors.cyan}  Marketplace Validator (Official Format)${colors.reset}`);
+  console.log(`${colors.cyan}========================================${colors.reset}\n`);
+
+  logInfo(`Validating: ${marketplacePath}`);
+  logInfo(`Project root: ${PROJECT_ROOT}\n`);
+
+  if (!validateFileExists()) {
+    printSummary();
+    process.exit(1);
+  }
+
+  validateOfficialFormat();
+  validatePluginNameUniqueness();
+  validateRequiredPluginFields();
+  validateSourcePaths();
+  validateVersionConsistency();
+  validatePerformance();
+
+  printSummary();
+  process.exit(errors.length > 0 ? 1 : 0);
+}
+
 runValidation();

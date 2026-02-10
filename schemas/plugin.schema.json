@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kingin-yellows.dev/schemas/plugin.schema.json",
-  "title": "Claude Code Plugin Manifest Schema",
-  "description": "Schema for .claude-plugin/plugin.json defining individual plugin metadata, entrypoints, permissions, and compatibility requirements",
+  "title": "Claude Code Plugin Manifest Schema (Extended/Custom)",
+  "description": "Extended schema for Claude Code plugin.json used by this project's marketplace/validation tooling. The official Claude Code format only requires 'name', 'description', and 'author', but this schema additionally requires fields like 'entrypoints', 'compatibility', and 'permissions' for publishing/validation. The minimal official format (which does not validate against this extended schema) is shown in examples/plugin-minimal.example.json.",
   "type": "object",
   "required": ["name", "version", "description", "author", "entrypoints", "compatibility", "permissions"],
   "additionalProperties": false,
