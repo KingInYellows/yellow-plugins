@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "title": "Official Claude Code Marketplace Schema",
+  "description": "Schema for .claude-plugin/marketplace.json as expected by Claude Code. This mirrors the official Anthropic format discovered from anthropics/claude-plugins-official, EveryInc/every-marketplace, and obra/superpowers-marketplace.",
+  "type": "object",
+  "required": ["name", "plugins"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://anthropic.com/claude-code/marketplace.schema.json"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Marketplace identifier (e.g., 'yellow-plugins')"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable marketplace description"
+    },
+    "owner": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Owner display name"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        }
+      }
+    },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PluginEntry"
+      }
+    }
+  },
+  "definitions": {
+    "PluginEntry": {
+      "type": "object",
+      "required": ["name", "source"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Plugin name (serves as ID)"
+        },
+        "description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "author": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "email": { "type": "string", "format": "email" },
+            "url": { "type": "string", "format": "uri" }
+          }
+        },
+        "source": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Relative path to plugin directory (e.g., './plugins/hookify')"
+            },
+            {
+              "type": "object",
+              "required": ["source", "url"],
+              "properties": {
+                "source": { "type": "string", "const": "url" },
+                "url": { "type": "string", "format": "uri" }
+              },
+              "description": "Remote plugin source (e.g., {source: 'url', url: 'https://...'})"
+            }
+          ]
+        },
+        "category": {
+          "type": "string",
+          "description": "Plugin category (loose string, not enforced by Claude Code)"
+        }
+      }
+    }
+  }
+}

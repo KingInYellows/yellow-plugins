@@ -1,27 +1,12 @@
 /**
  * @yellow-plugins/infrastructure
  *
- * Infrastructure layer - External dependencies, adapters, and technical implementations
- * for the plugin marketplace. This package contains schema validators, file system
- * operations, git operations, and other infrastructure concerns.
- *
- * Enhanced in Task I1.T2: Configuration provider implementation
- * Enhanced in Task I1.T3: Validation toolkit exports
+ * Infrastructure layer - Schema validation using AJV.
+ * Stripped down to validation-only: cache adapters, filesystem operations,
+ * telemetry, and fingerprinting are no longer needed (Claude Code handles them).
  */
 
-// Configuration provider and utilities
-export {
-  ConfigProvider,
-  getConfigProvider,
-  resetConfigProvider,
-} from './config/configProvider.js';
-
-export type {
-  CliFlags,
-  ConfigProviderOptions,
-} from './config/configProvider.js';
-
-// Validation toolkit exports (I1.T3)
+// Validation toolkit
 export {
   AjvValidatorFactory,
   sharedValidatorFactory,
@@ -34,24 +19,4 @@ export {
   createValidator,
 } from './validation/validator.js';
 
-// System fingerprint provider (I2.T1)
-export {
-  HostFingerprintProvider,
-  createFingerprintProvider,
-} from './system/fingerprint.js';
-
-// Cache filesystem adapter (I2.T2)
-export {
-  CacheAdapter,
-  getCacheAdapter,
-  resetCacheAdapter,
-} from './fs/cacheAdapter.js';
-
-// Telemetry & Metrics (I2.T5)
-export {
-  PrometheusExporter,
-  globalPrometheusExporter,
-} from './telemetry/prometheus.js';
-
-// Package version
-export const version = '1.2.0';
+export const version = '2.0.0';

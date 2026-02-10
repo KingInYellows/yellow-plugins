@@ -1,7 +1,7 @@
 {
   "name": "@yellow-plugins/infrastructure",
-  "version": "1.1.0",
-  "description": "Infrastructure layer - external dependencies and adapters for plugin marketplace",
+  "version": "2.0.0",
+  "description": "Infrastructure layer - AJV schema validation for plugin marketplace",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -15,10 +15,6 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "rm -rf dist",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:unit": "vitest run --config vitest.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -30,8 +26,7 @@
   "devDependencies": {
     "@types/node": "^18.19.0",
     "@types/semver": "^7.7.1",
-    "typescript": "^5.3.3",
-    "vitest": "^1.2.0"
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=18.0.0 <=24.x"
