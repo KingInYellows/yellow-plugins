@@ -135,7 +135,7 @@ Review the file list. Exclude any files that look like:
 
 Stage the appropriate files by name:
 ```bash
-git add <file1> <file2> ...
+git add -- "<file1>" "<file2>"
 ```
 
 ### 2. Generate Conventional Commit Message
@@ -161,31 +161,28 @@ The message should be concise (under 72 chars for the subject line). Include a b
 
 **If on trunk** (creating new branch):
 ```bash
-gt create <branch-name> -m "<conventional commit message>"
-```
-The branch name should be derived from the commit type and a short slug (e.g., `feat/add-user-auth`, `fix/null-pointer-crash`).
+    gt create -- "<branch-name>" -m "<conventional commit message>"
+    ```
+    The branch name should be derived from the commit type and a short slug (e.g., `feat/add-user-auth`, `fix/null-pointer-crash`).
 
-**If on feature branch** (adding to existing):
-```bash
-gt commit create -m "<conventional commit message>"
-```
+    **If on feature branch** (adding to existing):
+    ```bash
+    gt commit create -m "<conventional commit message>"
+    ```
 
-**If `--amend`** (modifying current branch):
-```bash
-gt commit amend -m "<conventional commit message>"
+    **If `--amend`** (modifying current branch):
+    ```bash
+    gt commit amend -m "<conventional commit message>"
 ```
 
 ## Phase 4: Submit
 
 ### 1. Push to GitHub
 
+If `--dry-run` was provided, skip this step and do not run `gt submit`; instead, only simulate the submission and proceed to the result summary without making any remote changes.
+
 ```bash
 gt submit --no-interactive
-```
-
-### 2. Show Results
-
-After submission, show the stack state and PR link:
 
 ```bash
 gt log short
@@ -208,5 +205,5 @@ Output a summary:
 - No critical issues committed
 - Files staged individually (no blanket `git add .`)
 - Conventional commit message generated from diff analysis
-- Graphite stack created/updated and submitted
+- Graphite stack created/updated and submitted (or a dry-run summary produced when `--dry-run` is used)
 - User provided with PR link and stack context

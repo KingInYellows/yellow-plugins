@@ -33,7 +33,7 @@ gt log
 echo "Current branch: $(git branch --show-current)"
 ```
 
-### 3. Show PR Status (if `--pr` or by default)
+### 3. Show PR Status (if `--pr` is provided)
 
 ```bash
 gt pr
@@ -45,13 +45,13 @@ If `--top` was passed:
 ```bash
 gt top
 echo "Jumped to top: $(git branch --show-current)"
-```
+gt log short
 Then show the stack and exit.
 
 If `--bottom` was passed:
 ```bash
 gt bottom
-echo "Jumped to bottom: $(git branch --show-current)"
+gt log short
 ```
 Then show the stack and exit.
 
@@ -95,7 +95,7 @@ gt bottom
 
 **Specific branch (from "Other" input):**
 ```bash
-gt checkout <branch-name>
+gt checkout -- "<branch-name>"
 ```
 
 ### Show New Position

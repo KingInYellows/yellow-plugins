@@ -12,8 +12,8 @@ One-command repo sync: pull latest from trunk, restack your branches, and clean 
 ## Input
 
 Optional arguments:
-- `--no-delete` — Skip deleting merged branches
-- `--force` — Force restack even if there are conflicts (will stop at conflicts for manual resolution)
+- `--no-delete` — Skip deleting merged branches by passing `--no-delete` through to `gt repo sync` so it does not prompt for deletions
+- `--force` — Restack even if the stack appears clean (still stopping at conflicts for manual resolution) instead of skipping Phase 2 when there are no divergence markers
 
 #$ARGUMENTS
 
@@ -27,7 +27,9 @@ Record the starting point so we can report what changed:
 echo "=== Current branch ==="
 git branch --show-current
 
-echo "=== Stack state ==="
+echo "=== Trunk branch ==="
+gt trunk
+
 gt log short
 
 echo "=== Local branches ==="
@@ -56,7 +58,7 @@ This will:
 gt log short
 ```
 
-If the stack looks clean (no divergence markers), skip to Phase 3.
+If the stack looks clean (no divergence markers) and `--force` was not passed, skip to Phase 3; otherwise, continue to the restacking step in Phase 2.
 
 ### 3. Restack if Needed
 

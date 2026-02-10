@@ -20,7 +20,7 @@ Provide a feature description:
 
 #$ARGUMENTS
 
-If no arguments provided, use AskUserQuestion to ask: "What feature do you want to plan a stack for?"
+If no arguments are provided, use `AskUserQuestion` to ask: "What feature do you want to plan a stack for?"
 
 ## Phase 1: Understand the Feature
 
@@ -120,7 +120,7 @@ Use AskUserQuestion to ask the user:
 For each PR in the plan, starting from the bottom of the stack:
 
 ```bash
-gt create <branch-name> -m "<commit-type>: scaffold for <description>"
+gt create -- "<branch-name>" -m "<commit-type>: scaffold for <description>"
 ```
 
 **After each `gt create`**, verify it succeeded before proceeding to the next branch. If a branch creation fails, stop immediately and report:

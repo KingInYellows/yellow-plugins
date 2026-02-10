@@ -4,9 +4,9 @@
   "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
   "author": {
     "name": "KingInYellows",
-    "url": "https://github.com/kinginyellow"
+"url": "https://github.com/kinginyellows"
   },
   "repository": "https://github.com/kinginyellow/yellow-plugins",
   "license": "MIT",
   "keywords": ["graphite", "git", "stacked-prs", "workflow", "conventional-commits"]
-}
+"keywords": ["graphite", "graphite-cli", "gt", "git", "stacked-prs", "workflow", "smart-commits", "sync", "conventional-commits"]
