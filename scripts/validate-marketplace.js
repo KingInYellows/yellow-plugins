@@ -38,6 +38,7 @@ if (marketplaceFlagIndex !== -1) {
   const providedPath = args[marketplaceFlagIndex + 1];
   if (!providedPath || providedPath.startsWith('--')) {
     console.error(`${colors.red}✗ ERROR:${colors.reset} Missing value for --marketplace flag`);
+    process.exit(1);
   }
   marketplacePath = providedPath;
 }

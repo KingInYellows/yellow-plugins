@@ -26,7 +26,6 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-
   try {
     if (command === 'validate' || command === 'validate:marketplace') {
       const validator = await createValidator();
@@ -42,9 +41,7 @@ async function main(): Promise<void> {
         result.errors.forEach(e => console.error(`  [${e.code}] ${e.path}: ${e.message}`));
         process.exitCode = 1;
       }
-        process.exitCode = 1;
     }
-      }
     if (command === 'validate' || command === 'validate:plugins') {
       console.log('\nPlugin validation delegated to: node scripts/validate-plugin.js');
     }

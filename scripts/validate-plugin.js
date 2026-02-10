@@ -201,7 +201,3 @@ if (require.main === module) {
 }
 
 module.exports = { validatePlugin };
-
-  console.log(`${colors.green}✓ All plugins passed validation${colors.reset}\n`);
-  process.exit(0);
-}
