@@ -13,14 +13,57 @@ Personal Claude Code plugin marketplace.
 After adding the marketplace, install plugins from it:
 
 ```
-/plugin install yellow-starter
+/plugin install gt-workflow
+/plugin install yellow-core
 ```
 
 ## Available Plugins
 
-| Plugin | Description |
-|--------|-------------|
-| `yellow-starter` | Starter plugin with a `/yellow-hello` test command |
+| Plugin | Description | Components |
+|--------|-------------|------------|
+| `gt-workflow` | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation | 4 commands |
+| `yellow-core` | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go | 10 agents, 3 commands, 2 skills, 1 MCP server |
+
+### gt-workflow
+
+Graphite (`gt`) integration for stacked PR workflows:
+
+- `/smart-submit` — Audit + commit + submit in one flow
+- `/gt-stack-plan` — Plan stacked PRs for a feature
+- `/gt-sync` — Sync repo, restack, clean up
+- `/gt-nav` — Visualize and navigate the stack
+
+### yellow-core
+
+Comprehensive dev toolkit:
+
+**Review Agents** (run in parallel via `/workflows:review`):
+- `code-simplicity-reviewer` — YAGNI enforcement, simplification
+- `security-sentinel` — Security audit, OWASP, secrets scanning
+- `performance-oracle` — Bottlenecks, algorithmic complexity
+- `architecture-strategist` — Architectural compliance, design patterns
+- `polyglot-reviewer` — Language-idiomatic review for TS/Py/Rust/Go
+- `test-coverage-analyst` — Test quality, coverage gaps
+
+**Research Agents**:
+- `repo-research-analyst` — Repository structure, conventions
+- `best-practices-researcher` — External docs, community standards
+- `git-history-analyzer` — Git archaeology, change history
+
+**Workflow Agent**:
+- `spec-flow-analyzer` — User flow analysis, gap identification
+
+**Workflow Commands**:
+- `/workflows:plan` — Transform feature descriptions into structured plans
+- `/workflows:work` — Execute work plans systematically
+- `/workflows:review` — Multi-agent comprehensive code review
+
+**Skills**:
+- `create-agent-skills` — Guidance for creating skills and agents
+- `git-worktree` — Git worktree management for parallel development
+
+**MCP Servers**:
+- `context7` — Up-to-date library documentation
 
 ## Create a New Plugin
 
@@ -45,7 +88,7 @@ plugins/my-plugin/
 }
 ```
 
-3. Add this entry to the `plugins` array in `.claude-plugin/marketplace.json`:
+3. Add an entry to the `plugins` array in `.claude-plugin/marketplace.json`:
 
 ```json
 {
@@ -58,12 +101,6 @@ plugins/my-plugin/
 }
 ```
 
-4. Validate:
-
-```bash
-pnpm validate:schemas
-```
-
 ## Project Structure
 
 ```
@@ -71,44 +108,19 @@ yellow-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json       # The catalog Claude Code reads
 ├── plugins/
-│   └── yellow-starter/        # Starter plugin
-│       ├── .claude-plugin/
-│       │   └── plugin.json
-│       ├── commands/
-│       │   └── yellow-hello.md
-│       └── CLAUDE.md
-├── schemas/
-│   ├── official-marketplace.schema.json   # Official format reference
-│   ├── marketplace.schema.json            # Extended validation schema
-│   └── plugin.schema.json                 # Extended plugin schema
-├── scripts/
-│   ├── validate-marketplace.js            # Validates marketplace.json
-│   └── validate-plugin.js                 # Validates plugin manifests
-├── examples/
-│   ├── marketplace.example.json
-│   ├── plugin.example.json
-│   └── plugin-minimal.example.json
-├── packages/                              # TypeScript validation toolkit
-│   ├── domain/                            # Validation types & error catalog
-│   ├── infrastructure/                    # AJV schema validators
-│   └── cli/                               # Validation CLI wrapper
-└── docs/                                  # Specifications & design docs
-```
-
-## Validation
-
-```bash
-# Install dependencies
-pnpm install
-
-# Validate marketplace.json and all plugin manifests
-pnpm validate:schemas
-
-# Validate only the marketplace catalog
-pnpm validate:marketplace
-
-# Validate only plugin manifests
-pnpm validate:plugins
+│   ├── gt-workflow/           # Graphite workflow commands
+│   │   ├── .claude-plugin/plugin.json
+│   │   ├── CLAUDE.md
+│   │   └── commands/          # 4 commands
+│   └── yellow-core/           # Dev toolkit
+│       ├── .claude-plugin/plugin.json
+│       ├── CLAUDE.md
+│       ├── agents/            # 10 agents (review/, research/, workflow/)
+│       ├── commands/          # 3 workflow commands
+│       └── skills/            # 2 skills
+├── schemas/                   # Schema references
+├── examples/                  # Example JSON files
+└── plans/                     # Feature plans
 ```
 
 ## Official Format Reference
@@ -117,27 +129,6 @@ The marketplace follows the official Claude Code format used by:
 - [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)
 - [EveryInc/every-marketplace](https://github.com/EveryInc/every-marketplace)
 - [obra/superpowers-marketplace](https://github.com/obra/superpowers-marketplace)
-
-Key fields in `.claude-plugin/marketplace.json`:
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Marketplace identifier |
-| `plugins` | Yes | Array of plugin entries |
-| `owner` | No | Owner name and URL |
-| `description` | No | Marketplace description |
-| `metadata.version` | No | Marketplace version (semver) |
-
-Key fields in each plugin entry:
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Plugin name (used as ID) |
-| `source` | Yes | Path to plugin dir (e.g., `./plugins/my-plugin`) |
-| `description` | No | Short description |
-| `version` | No | Semver version |
-| `author` | No | Author object with `name` |
-| `category` | No | Category string |
 
 ## License
 
