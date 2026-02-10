@@ -6,7 +6,7 @@ This is a Claude Code plugin marketplace repository. It provides plugins that ca
 
 ## Key Files
 
-- `.claude-plugin/marketplace.json` — The catalog file Claude Code reads to discover plugins. Uses the official Anthropic marketplace format.
+- `.claude-plugin/marketplace.json` — The catalog file Claude Code reads to discover plugins (create this file in the repository root if it does not yet exist). Uses the official Anthropic marketplace format.
 - `plugins/*/` — Individual plugin directories. Each contains `.claude-plugin/plugin.json`.
 - `schemas/` — JSON schemas for validation (official + extended custom schemas).
 - `scripts/validate-marketplace.js` — Validates the marketplace catalog.

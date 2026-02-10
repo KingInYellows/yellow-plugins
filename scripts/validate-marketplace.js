@@ -31,9 +31,18 @@ const colors = {
 };
 
 const args = process.argv.slice(2);
-const marketplacePath = args.includes('--marketplace')
-  ? args[args.indexOf('--marketplace') + 1]
-  : DEFAULT_MARKETPLACE_PATH;
+let marketplacePath = DEFAULT_MARKETPLACE_PATH;
+
+const marketplaceFlagIndex = args.indexOf('--marketplace');
+if (marketplaceFlagIndex !== -1) {
+  const providedPath = args[marketplaceFlagIndex + 1];
+  if (!providedPath || providedPath.startsWith('--')) {
+    logError('Missing value for --marketplace flag');
+    printSummary();
+    process.exit(1);
+  }
+  marketplacePath = providedPath;
+}
 
 const errors = [];
 const warnings = [];
@@ -101,7 +110,8 @@ function validateOfficialFormat() {
 
   // Optional but recommended: owner
   if (marketplace.owner) {
-    if (!marketplace.owner.name) {
+    if (typeof marketplace.owner.name !== 'string' || marketplace.owner.name.trim() === '') {
+      logError('Missing or invalid required field: "owner.name" (string)');
       logWarning('owner.name is missing');
     } else {
       logSuccess(`Owner: ${marketplace.owner.name}`);

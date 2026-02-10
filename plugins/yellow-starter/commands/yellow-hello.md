@@ -1,5 +1,5 @@
 ---
-name: yellow-hello
+
 description: Test command from the yellow-plugins marketplace
 allowed-tools: []
 ---

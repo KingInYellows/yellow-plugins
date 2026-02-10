@@ -155,34 +155,52 @@ function discoverPlugins() {
 }
 
 // CLI entry point
-const pluginArg = process.argv[2];
-let pluginDirs;
+if (require.main === module) {
+  const pluginArg = process.argv[2];
+  let pluginDirs;
 
-if (pluginArg) {
-  const fullPath = path.isAbsolute(pluginArg) ? pluginArg : path.join(PROJECT_ROOT, pluginArg);
-  if (!fs.existsSync(fullPath)) {
-    logError(`Plugin directory not found: ${pluginArg}`);
-    process.exit(2);
+  if (pluginArg) {
+    const fullPath = path.isAbsolute(pluginArg) ? pluginArg : path.join(PROJECT_ROOT, pluginArg);
+    if (!fs.existsSync(fullPath)) {
+      logError(`Plugin directory not found: ${pluginArg}`);
+      process.exit(2);
+    }
+    pluginDirs = [fullPath];
+  } else {
+    pluginDirs = discoverPlugins();
   }
-  pluginDirs = [fullPath];
-} else {
-  pluginDirs = discoverPlugins();
+
+  if (pluginDirs.length === 0) {
+    logInfo('No plugins found to validate.');
+    process.exit(0);
+  }
+
+  console.log(`\n${colors.cyan}========================================${colors.reset}`);
+  console.log(`${colors.cyan}  Plugin Validator (Official Format)${colors.reset}`);
+  console.log(`${colors.cyan}========================================${colors.reset}`);
+  logInfo(`Validating ${pluginDirs.length} plugin(s)\n`);
+
+  let hasErrors = false;
+
+  for (const dir of pluginDirs) {
+    const result = validatePlugin(dir);
+    if (!result.valid) hasErrors = true;
+  }
+
+  console.log(`\n${colors.cyan}========================================${colors.reset}`);
+  console.log(`${colors.cyan}  Validation Summary${colors.reset}`);
+  console.log(`${colors.cyan}========================================${colors.reset}\n`);
+
+  if (hasErrors) {
+    console.log(`${colors.red}✗ Some plugins failed validation${colors.reset}\n`);
+    process.exit(1);
+  } else {
+    console.log(`${colors.green}✓ All plugins passed validation${colors.reset}\n`);
+    process.exit(0);
+  }
 }
 
-if (pluginDirs.length === 0) {
-  logInfo('No plugins found to validate.');
-  process.exit(0);
-}
-
-console.log(`\n${colors.cyan}========================================${colors.reset}`);
-console.log(`${colors.cyan}  Plugin Validator (Official Format)${colors.reset}`);
-console.log(`${colors.cyan}========================================${colors.reset}`);
-logInfo(`Validating ${pluginDirs.length} plugin(s)\n`);
-
-let hasErrors = false;
-
-for (const dir of pluginDirs) {
-  const result = validatePlugin(dir);
+module.exports = { validatePlugin };
   if (!result.valid) hasErrors = true;
 }
 

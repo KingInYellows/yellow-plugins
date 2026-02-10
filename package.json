@@ -19,7 +19,7 @@
     "validate:plugins": "node scripts/validate-plugin.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
-    "release:check": "pnpm run validate:schemas && pnpm run typecheck"
+    "release:check": "pnpm run validate:marketplace && pnpm run validate:plugins && pnpm run typecheck"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",

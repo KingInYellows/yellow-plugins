@@ -45,7 +45,7 @@ plugins/my-plugin/
 }
 ```
 
-3. Register it in `.claude-plugin/marketplace.json`:
+3. Add this entry to the `plugins` array in `.claude-plugin/marketplace.json`:
 
 ```json
 {

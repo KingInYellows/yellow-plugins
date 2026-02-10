@@ -8,9 +8,9 @@
  * as Claude Code handles those natively.
  *
  * Usage:
- *   pnpm cli validate          # Validate marketplace.json and all plugins
+ *   pnpm cli validate              # Validate .claude-plugin/marketplace.json
  *   pnpm cli validate:marketplace  # Validate only marketplace.json
- *   pnpm cli validate:plugins      # Validate only plugin manifests
+ *   pnpm cli validate:plugins      # Show how to run the plugin manifest validator script
  */
 
 import { createValidator } from '@yellow-plugins/infrastructure';
@@ -20,7 +20,12 @@ export const version = '2.0.0';
 async function main(): Promise<void> {
   const command = process.argv[2] || 'validate';
 
-  console.log(`yellow-plugins validator v${version}\n`);
+  if (!['validate', 'validate:marketplace', 'validate:plugins'].includes(command)) {
+    console.error(`Unknown command: ${command}`);
+    console.error('Usage: validate | validate:marketplace | validate:plugins');
+    process.exit(1);
+  }
+
 
   try {
     const validator = await createValidator();
@@ -36,7 +41,7 @@ async function main(): Promise<void> {
       console.log(`Marketplace: ${result.status}`);
       if (result.errors.length > 0) {
         result.errors.forEach(e => console.error(`  [${e.code}] ${e.path}: ${e.message}`));
-      }
+        process.exitCode = 1;
     }
 
     if (command === 'validate' || command === 'validate:plugins') {
