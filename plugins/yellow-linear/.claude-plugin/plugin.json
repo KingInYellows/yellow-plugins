@@ -1,0 +1,19 @@
+{
+  "name": "yellow-linear",
+  "version": "1.0.0",
+  "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/kinginyellow"
+  },
+  "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-linear",
+  "repository": "https://github.com/kinginyellow/yellow-plugins",
+  "license": "MIT",
+  "keywords": ["linear", "project-management", "issues", "workflow", "productivity", "pm"],
+  "mcpServers": {
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    }
+  }
+}

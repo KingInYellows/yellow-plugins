@@ -26,6 +26,14 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-core",
       "category": "development"
+    },
+    {
+      "name": "yellow-linear",
+      "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
+      "version": "1.0.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-linear",
+      "category": "productivity"
     }
   ]
 }
