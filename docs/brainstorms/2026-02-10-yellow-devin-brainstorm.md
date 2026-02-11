@@ -95,6 +95,8 @@ plugins/yellow-devin/
 | `devin-reviewer` | workflow | Reviews Devin's session output (PRs, code changes) for quality, security, and correctness. Generates structured feedback that can be sent back to Devin. |
 | `deepwiki-explorer` | research | Deep research agent for understanding external codebases. Queries DeepWiki for architecture, patterns, and implementation details. |
 
+For v1 of the plugin, only the `devin-orchestrator` agent will be implemented; `devin-reviewer` and `deepwiki-explorer` are planned for later iterations.
+
 ### 4. Skills (1)
 
 | Skill | Purpose |

@@ -39,13 +39,15 @@ If the user is in a git repository, gather context to include:
 - Current branch name: `git branch --show-current`
 - Repository remote URL: `git remote get-url origin 2>/dev/null`
 
-Prepend context to prompt if available:
+Prepend context to prompt if available, and then re-validate that the combined `PROMPT` (including this context) stays within the 8000-character limit, reporting the actual character count vs the maximum on overflow:
 ```
 Repository: {remote_url}
 Branch: {branch_name}
 
 Task: {user_prompt}
 ```
+
+After prepending, validate the final `PROMPT` length. If it exceeds 8000 characters, report: "ERROR: Prompt too long ({actual_count} characters, maximum 8000)" and exit without creating the session.
 
 ### Step 4: Create Session
 

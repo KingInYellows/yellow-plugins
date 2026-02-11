@@ -14,6 +14,7 @@ Devin.AI integration for multi-agent workflows — delegate tasks, research code
 - **API calls:** All session management via `curl` to `api.devin.ai/v1/`. Auth via `DEVIN_API_TOKEN` env var (Bearer token).
 - **JSON construction:** Always use `jq` — never interpolate user input into JSON strings.
 - **Shell quoting:** Always quote variables: `"$VAR"` not `$VAR`.
+- **Git workflow:** Use Graphite (`gt`) for all branch management and PR creation — never raw `git push` or `gh pr create`.
 - **Input validation:**
   - Token format: `^apk_(user_)?[a-zA-Z0-9_-]{20,128}$`
   - Session ID: `^ses_[a-zA-Z0-9]{20,64}$`

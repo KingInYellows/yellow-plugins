@@ -20,6 +20,12 @@ Terminate a running Devin session after user confirmation.
 
 Validate `DEVIN_API_TOKEN` is set and matches format. See `devin-workflows` skill.
 
+Check `jq` is available:
+
+```bash
+command -v jq >/dev/null || { echo "ERROR: jq required. Install: https://jqlang.github.io/jq/download/"; exit 1; }
+```
+
 ### Step 2: Get Session ID
 
 Parse `$ARGUMENTS` for a session ID. If empty, ask user via AskUserQuestion.
@@ -64,8 +70,6 @@ curl -s --connect-timeout 5 --max-time 30 \
   -X POST "https://api.devin.ai/v1/sessions/$SESSION_ID/cancel" \
   -H "Authorization: Bearer $DEVIN_API_TOKEN"
 ```
-
-**Note:** If `POST .../cancel` returns 404 or 405, try `DELETE /v1/sessions/{id}` as fallback — the correct endpoint needs verification during implementation.
 
 Check curl exit code, HTTP status.
 

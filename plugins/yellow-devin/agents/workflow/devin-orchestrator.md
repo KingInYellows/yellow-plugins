@@ -80,7 +80,7 @@ Polling strategy:
 - On "blocked": notify user, offer /devin:message or /devin:cancel
 ```
 
-Poll via `GET /v1/sessions/{id}` with `--max-time 10`.
+Poll via `GET /v1/sessions/{id}` with `--max-time 10`, always validating `id` with `validate_session_id` from the `devin-workflows` skill before each request.
 
 ### Step 4: Review Output (Inline)
 
@@ -114,7 +114,7 @@ If iteration count >= 3:
 
 **On failure with context preservation:**
 
-Sanitize context before dumping (strip any token-like strings):
+Sanitize context before dumping using the same sed-based redaction pattern as `devin-workflows` (replace anything matching `apk_[a-zA-Z0-9_-]*` with a placeholder before display):
 
 ```
 ORCHESTRATION CONTEXT (for manual recovery):
@@ -138,6 +138,7 @@ For tasks with independent subtasks:
 ## Guidelines
 
 - **Hard limit: 3 review-fix cycles** — prevents infinite loops and runaway costs
+- **Time-box orchestrations** — track total elapsed time and abort the workflow once it exceeds a safe cap (e.g., 15 minutes) including all polling and iterations
 - **Always preserve context on failure** — user needs enough info for manual recovery
 - **Sanitize context dumps** — strip anything matching `apk_[a-zA-Z0-9_-]*` before display
 - **Announce state transitions** — tell user when polling starts, when review begins, when iterating

@@ -9,26 +9,26 @@ Check immediately after every curl call:
 ```bash
 response=$(curl -s --connect-timeout 5 --max-time 60 -w "\n%{http_code}" ...)
 curl_exit=$?
-if [ $curl_exit -ne 0 ]; then
+if [ "$curl_exit" -ne 0 ]; then
   printf 'ERROR: Network failure connecting to Devin API\n'
   printf 'curl exit code: %d\n' "$curl_exit"
-  case $curl_exit in
+  case "$curl_exit" in
     6)  printf 'Could not resolve api.devin.ai — check DNS/internet\n' ;;
     7)  printf 'Could not connect — Devin API may be down\n' ;;
     28) printf 'Request timed out — try again or check network\n' ;;
     *)  printf 'Unexpected network error\n' ;;
   esac
   # Retry transient failures (exit 6, 7, 28)
-  if [ $curl_exit -eq 6 ] || [ $curl_exit -eq 7 ] || [ $curl_exit -eq 28 ]; then
+  if [ "$curl_exit" -eq 6 ] || [ "$curl_exit" -eq 7 ] || [ "$curl_exit" -eq 28 ]; then
     for retry in 1 2 3; do
       delay=$((retry * 5))
       printf 'Retrying in %ds (attempt %d/3)...\n' "$delay" "$retry"
       sleep "$delay"
       response=$(curl -s --connect-timeout 5 --max-time 60 -w "\n%{http_code}" ...)
       curl_exit=$?
-      [ $curl_exit -eq 0 ] && break
+      [ "$curl_exit" -eq 0 ] && break
     done
-    if [ $curl_exit -ne 0 ]; then
+    if [ "$curl_exit" -ne 0 ]; then
       printf 'ERROR: Network failure persisted after 3 retries\n'
       exit 1
     fi
@@ -62,14 +62,14 @@ case "$http_code" in
     printf 'Session or resource does not exist.\n'
     exit 1 ;;
   429)
-    retry_after=$(printf '%s' "$body" | jq -r '.retry_after // 60' 2>/dev/null)
+    retry_after=$(printf '%s' "$body" | jq -r '.retry_after // 60' 2>/dev/null || printf '60')
     if [ "$retry_after" -gt 300 ] 2>/dev/null; then
       printf 'ERROR: Rate limited — API asks for %ss wait (too long)\n' "$retry_after"
       exit 1
     fi
     printf 'Rate limited. Waiting %ss...\n' "$retry_after"
     sleep "$retry_after"
-    # Retry once after rate limit wait
+    # This pattern must be wrapped in a retry loop that retries the request after the sleep.
     ;;
   5[0-9][0-9])
     printf 'ERROR: Devin API server error (%s)\n' "$http_code"

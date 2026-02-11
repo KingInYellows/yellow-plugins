@@ -19,7 +19,7 @@ Send a follow-up message to provide additional context, instructions, or course 
 
 ### Step 1: Validate Prerequisites
 
-Validate `DEVIN_API_TOKEN` is set and matches format. See `devin-workflows` skill.
+Validate `DEVIN_API_TOKEN` is set and matches format, and ensure `jq` is installed using the standard `command -v jq` pattern from the `devin-workflows` skill.
 
 ### Step 2: Parse Arguments
 
@@ -39,10 +39,11 @@ If session ID or message is missing, prompt via AskUserQuestion.
 Fetch session status to confirm it's in a messageable state:
 
 ```bash
-curl -s --connect-timeout 5 --max-time 10 \
+response=$(curl -s --connect-timeout 5 --max-time 10 \
   -w "\n%{http_code}" \
   -X GET "https://api.devin.ai/v1/sessions/$SESSION_ID" \
-  -H "Authorization: Bearer $DEVIN_API_TOKEN"
+  -H "Authorization: Bearer $DEVIN_API_TOKEN")
+curl_exit=$?
 ```
 
 The session must be `running` or `blocked` to accept messages. If terminal (`finished`, `stopped`, `failed`):
@@ -54,13 +55,14 @@ The session must be `running` or `blocked` to accept messages. If terminal (`fin
 Construct JSON via `jq` and POST:
 
 ```bash
-jq -n --arg msg "$MESSAGE" '{message: $msg}' | \
+response=$(jq -n --arg msg "$MESSAGE" '{message: $msg}' | \
   curl -s --connect-timeout 5 --max-time 30 \
     -w "\n%{http_code}" \
     -X POST "https://api.devin.ai/v1/sessions/$SESSION_ID/messages" \
     -H "Authorization: Bearer $DEVIN_API_TOKEN" \
     -H "Content-Type: application/json" \
-    -d @-
+    -d @-)
+curl_exit=$?
 ```
 
 Check curl exit code, HTTP status, jq parse.

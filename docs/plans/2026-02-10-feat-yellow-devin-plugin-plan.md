@@ -884,26 +884,26 @@ Every command must implement these patterns:
 ```bash
 response=$(curl -s --connect-timeout 5 --max-time 60 -w "\n%{http_code}" ...)
 curl_exit=$?
-if [ $curl_exit -ne 0 ]; then
+if [ "$curl_exit" -ne 0 ]; then
   echo "ERROR: Network failure connecting to Devin API"
   echo "curl exit code: $curl_exit"
-  case $curl_exit in
+  case "$curl_exit" in
     6)  echo "Could not resolve api.devin.ai — check DNS/internet" ;;
     7)  echo "Could not connect — Devin API may be down" ;;
     28) echo "Request timed out — try again or check network" ;;
     *)  echo "Unexpected network error" ;;
   esac
   # Retry transient network failures (exit 6, 7, 28) with exponential backoff
-  if [ $curl_exit -eq 6 ] || [ $curl_exit -eq 7 ] || [ $curl_exit -eq 28 ]; then
+  if [ "$curl_exit" -eq 6 ] || [ "$curl_exit" -eq 7 ] || [ "$curl_exit" -eq 28 ]; then
     for retry in 1 2 3; do
       delay=$((retry * 5))
       echo "Retrying in ${delay}s (attempt $retry/3)..."
       sleep "$delay"
       response=$(curl -s --connect-timeout 5 --max-time 60 -w "\n%{http_code}" ...)
       curl_exit=$?
-      [ $curl_exit -eq 0 ] && break
+      [ "$curl_exit" -eq 0 ] && break
     done
-    [ $curl_exit -ne 0 ] && { echo "ERROR: Network failure persisted after 3 retries"; exit 1; }
+    [ "$curl_exit" -ne 0 ] && { echo "ERROR: Network failure persisted after 3 retries"; exit 1; }
   else
     exit 1
   fi
@@ -931,15 +931,29 @@ case "$http_code" in
     echo "Session or resource does not exist."
     exit 1 ;;
   429)
-    # Rate limit handling with backoff
-    retry_after=$(echo "$body" | jq -r '.retry_after // 60')
-    if [ "$retry_after" -gt 300 ]; then
-      echo "ERROR: Rate limit — API asks for ${retry_after}s wait (too long)"
+    # Rate limit handling with retry loop
+    for retry_attempt in 1 2 3; do
+      retry_after=$(echo "$body" | jq -r '.retry_after // 60')
+      if [ "$retry_after" -gt 300 ]; then
+        echo "ERROR: Rate limit — API asks for ${retry_after}s wait (too long)"
+        exit 1
+      fi
+      echo "Rate limited. Waiting ${retry_after}s (attempt $retry_attempt/3)..."
+      sleep "$retry_after"
+      # Retry the request
+      response=$(curl -s --connect-timeout 5 --max-time 60 -w "\n%{http_code}" ...)
+      curl_exit=$?
+      [ "$curl_exit" -ne 0 ] && { echo "ERROR: Network failure during retry"; exit 1; }
+      http_code=$(echo "$response" | tail -n1)
+      body=$(echo "$response" | sed '$d')
+      # If no longer rate limited, break out
+      [ "$http_code" != "429" ] && break
+    done
+    # If still 429 after retries, exit
+    if [ "$http_code" = "429" ]; then
+      echo "ERROR: Rate limit persisted after 3 retry attempts"
       exit 1
     fi
-    echo "Rate limited. Waiting ${retry_after}s..."
-    sleep "$retry_after"
-    # Retry once...
     ;;
   5[0-9][0-9])
     echo "ERROR: Devin API server error ($http_code)"

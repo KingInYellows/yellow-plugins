@@ -61,7 +61,7 @@
     {
       "scope": "shell",
       "reason": "Runs curl for Devin API calls, jq for JSON construction, and git for context detection",
-      "commands": ["curl", "jq", "git"]
+      "commands": ["curl", "jq", "git", "gh"]
     }
   ]
 }

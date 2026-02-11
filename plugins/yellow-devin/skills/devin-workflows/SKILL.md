@@ -77,7 +77,7 @@ jq -n --arg prompt "$USER_INPUT" '{prompt: $prompt, idempotent: true}' | \
 
 Every command should verify `jq` is available:
 ```bash
-command -v jq >/dev/null || {
+command -v jq >/dev/null 2>&1 || {
   printf 'ERROR: jq required. Install: https://jqlang.github.io/jq/download/\n'
   exit 1
 }
@@ -95,6 +95,8 @@ response=$(curl -s --connect-timeout 5 --max-time 60 \
   -H "Content-Type: application/json" \
   -d @-)
 curl_exit=$?
+http_status=${response##*$'\n'}
+body=${response%$'\n'*}
 ```
 
 **Timeouts by operation:**
@@ -162,7 +164,7 @@ Operations that terminate sessions or consume significant resources require expl
 ### Context Dump Sanitization
 Before dumping orchestrator context on failure, strip secrets:
 ```bash
-context=$(printf '%s' "$context" | sed 's/apk_[a-zA-Z0-9_-]*/***REDACTED***/g')
+context=$(printf '%s' "$context" | sed -E 's/apk_(user_)?[a-zA-Z0-9_-]{20,128}/***REDACTED***/g')
 ```
 
 ## Reference

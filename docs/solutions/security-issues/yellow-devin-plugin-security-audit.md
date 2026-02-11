@@ -114,7 +114,7 @@ response=$(curl ... 2>&1) || {
 
 ---
 
-#### **H6: No Validation that DEVIN_API_TOKEN is Non-Empty** (HIGH)
+#### **H6: No Validation that DEVIN_API_TOKEN Format Is Correct** (HIGH)
 
 **Finding:** Commands check `[ -z "$DEVIN_API_TOKEN" ]` but don't validate format (e.g., starts with `sk_devin_`).
 

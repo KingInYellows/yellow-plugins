@@ -4,7 +4,7 @@ description: >
   Query DeepWiki or Devin Wiki about a repository. Use when user asks
   "how does X work in repo Y", "explain the architecture of Z", "search
   docs for", or wants to understand an external codebase.
-argument-hint: "<question> [--repo owner/name]"
+argument-hint: "<question> [--repo owner/repo]"
 allowed-tools:
   - Bash
   - Skill
@@ -27,7 +27,7 @@ Search DeepWiki or Devin Wiki for documentation about a repository's architectur
 
 Parse `$ARGUMENTS` for:
 - **Question:** The main query text
-- **`--repo owner/name`:** Optional repository override
+- **`--repo owner/repo`:** Optional repository override
 
 If no question provided, ask the user what they want to know.
 
@@ -36,7 +36,7 @@ If no question provided, ask the user what they want to know.
 - If `--repo` flag provided, use that repository
 - Otherwise, detect from current git remote:
   ```bash
-  git remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]||' | sed 's|\.git$||'
+  git remote get-url origin 2>/dev/null | sed -E 's#^.*(://|@)[^/:]+[:/]##; s#\.git$##'
   ```
 - If no repository can be determined, ask the user
 

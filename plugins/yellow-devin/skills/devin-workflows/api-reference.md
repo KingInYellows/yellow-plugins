@@ -4,6 +4,8 @@ Base URL: `https://api.devin.ai/v1/`
 
 Authentication: `Authorization: Bearer $DEVIN_API_TOKEN`
 
+Headers: `Content-Type: application/json` for all POST requests.
+
 ## Sessions
 
 ### Create Session

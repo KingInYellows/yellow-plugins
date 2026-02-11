@@ -19,10 +19,19 @@ Show status and progress for a specific session or list recent sessions.
 
 Validate `DEVIN_API_TOKEN` is set and matches format. See `devin-workflows` skill for validation.
 
+Check `jq` is available (see `devin-workflows` skill for details), for example:
+
+```bash
+command -v jq >/dev/null || {
+  printf 'ERROR: jq required. Install: https://jqlang.github.io/jq/download/\n'
+  exit 1
+}
+```
+
 ### Step 2: Determine Mode
 
 Parse `$ARGUMENTS`:
-- **If a session ID is provided:** Validate format `^ses_[a-zA-Z0-9]{20,64}$`, then fetch that specific session.
+- **If a session ID is provided:** Use the `validate_session_id` helper from the `devin-workflows` skill to validate the session ID before fetching that specific session.
 - **If empty:** List recent sessions.
 
 ### Step 3a: Single Session Status
