@@ -71,9 +71,9 @@ The plan's use of `jq` for JSON construction is exemplary and eliminates the pri
 **Attack Vector:**
 ```bash
 # If LLM adds -v for debugging:
-curl -v -H "Authorization: Bearer sk_devin_abc123..." https://api.devin.ai/v1/sessions
+curl -v -H "Authorization: Bearer apk_abc123..." https://api.devin.ai/v1/sessions
 # Output includes:
-# > Authorization: Bearer sk_devin_abc123...
+# > Authorization: Bearer apk_abc123...
 ```
 
 **Impact:** Token appears in Claude Code's tool output logs, visible to user and potentially saved in session history.
@@ -116,7 +116,7 @@ response=$(curl ... 2>&1) || {
 
 #### **H6: No Validation that DEVIN_API_TOKEN Format Is Correct** (HIGH)
 
-**Finding:** Commands check `[ -z "$DEVIN_API_TOKEN" ]` but don't validate format (e.g., starts with `sk_devin_`).
+**Finding:** Commands check `[ -z "$DEVIN_API_TOKEN" ]` but don't validate format (e.g., starts with `apk_` or `apk_user_`).
 
 **Attack Vector:**
 ```bash
@@ -135,8 +135,8 @@ if [ -z "$DEVIN_API_TOKEN" ] || [ "$DEVIN_API_TOKEN" = "" ]; then
     error "DEVIN_API_TOKEN not set or empty. Get token at https://app.devin.ai/settings/api"
 fi
 # Optional: validate format
-if ! printf '%s' "$DEVIN_API_TOKEN" | grep -qE '^sk_devin_[a-zA-Z0-9_-]+$'; then
-    error "DEVIN_API_TOKEN format invalid (expected: sk_devin_...)"
+if ! printf '%s' "$DEVIN_API_TOKEN" | grep -qE '^apk_(user_)?[a-zA-Z0-9_-]{20,128}$'; then
+    error "DEVIN_API_TOKEN format invalid (expected: apk_... or apk_user_...)"
 fi
 ```
 
@@ -678,11 +678,11 @@ Add to CLAUDE.md:
 ```bash
 # Devin API returns:
 {
-    "session_url": "https://app.devin.ai/session/abc123?token=sk_devin_xyz&user=admin"
+    "session_url": "https://app.devin.ai/session/abc123?token=apk_xyz&user=admin"
 }
 
 # Command displays:
-echo "View session: https://app.devin.ai/session/abc123?token=sk_devin_xyz&user=admin"
+echo "View session: https://app.devin.ai/session/abc123?token=apk_xyz&user=admin"
 
 # User copies URL to Slack/email, leaking token
 ```
@@ -931,7 +931,7 @@ During implementation:
 - [ ] Check if Devin API enforces session ownership (impacts M5)
 - [ ] Verify MCP server response schemas (impacts H8 validation)
 - [ ] Test rate limit behavior, measure `Retry-After` header format
-- [ ] Verify token format (starts with `sk_devin_`?)
+- [ ] Verify token format (starts with `apk_` or `apk_user_`?)
 
 Before Phase 3 (orchestrator):
 

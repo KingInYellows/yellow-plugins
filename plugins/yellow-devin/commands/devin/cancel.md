@@ -77,7 +77,7 @@ If session is now in a terminal state (`finished`, `stopped`, `failed`):
 - Report "Session already {status} — no cancellation needed."
 - Exit cleanly without calling cancel API.
 
-If still `running` or `blocked`, proceed to cancellation.
+If still in any non-terminal state (`queued`, `started`, `running`, or `blocked`), proceed to cancellation.
 
 ### Step 5: Cancel Session
 
