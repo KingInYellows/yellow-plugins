@@ -65,7 +65,7 @@ gh pr view --json url,title,state 2>/dev/null
 
 Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 
-- **If PR exists:** Add PR URL to the Linear issue as a comment via `mcp__plugin_linear_linear__create_comment`:
+- **If PR exists:** Check the comments fetched in Step 3 for an existing PR link comment matching this PR URL. If already linked, skip. Otherwise, add via `mcp__plugin_linear_linear__create_comment`:
   ```
   PR linked: [PR Title](PR URL) — State: open/merged
   ```

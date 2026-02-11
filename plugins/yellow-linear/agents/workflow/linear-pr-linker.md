@@ -14,6 +14,7 @@ allowed-tools:
   - mcp__plugin_linear_linear__get_issue
   - mcp__plugin_linear_linear__update_issue
   - mcp__plugin_linear_linear__create_comment
+  - mcp__plugin_linear_linear__list_comments
   - mcp__plugin_linear_linear__list_issue_statuses
 ---
 
@@ -75,7 +76,9 @@ If no PR exists:
 
 ### Step 4: Link PR to Issue
 
-Add a comment to the Linear issue via `create_comment`:
+First, fetch existing comments via `list_comments` and check if a PR link comment already exists for this PR URL. If a matching comment is found, skip adding a duplicate.
+
+If no existing PR link comment, add one via `create_comment`:
 ```
 PR linked: [PR Title](PR URL) — State: open/merged
 ```
@@ -100,7 +103,7 @@ Report what was done:
 
 ## Guidelines
 
-- **Never modify issue status without user confirmation** (security M3)
+- **Never modify issue status without user confirmation** (security M3 — narrowed for this agent to status changes only; PR link comments are low-risk writes that proceed without confirmation)
 - Use `gh pr view` for reading PR state (works with Graphite-created PRs)
 - Never use `gh pr create` — PRs are created via `gt submit`
 - Keep comments concise — just the PR link and state
