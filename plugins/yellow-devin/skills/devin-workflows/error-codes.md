@@ -62,6 +62,8 @@ case "$http_code" in
     printf 'Session or resource does not exist.\n'
     exit 1 ;;
   429)
+    # Note: Extracts retry_after from JSON body (not HTTP Retry-After header) since
+    # our curl pattern only captures status code. Falls back to 60s if field absent.
     retry_after=$(printf '%s' "$body" | jq -r '.retry_after // 60' 2>/dev/null || printf '60')
     if [ "$retry_after" -gt 300 ] 2>/dev/null; then
       printf 'ERROR: Rate limited — API asks for %ss wait (too long)\n' "$retry_after"
