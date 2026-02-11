@@ -12,6 +12,7 @@
   },
   "plugins": [
     {
+      "id": "gt-workflow",
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
       "version": "1.0.0",
@@ -20,12 +21,22 @@
       "category": "development"
     },
     {
+      "id": "yellow-core",
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
       "version": "1.0.0",
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-core",
       "category": "development"
+    },
+    {
+      "id": "yellow-linear",
+      "name": "yellow-linear",
+      "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
+      "version": "1.0.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-linear",
+      "category": "productivity"
     }
   ]
 }
