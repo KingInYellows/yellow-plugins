@@ -10,6 +10,12 @@
   "repository": { "type": "git", "url": "https://github.com/kinginyellow/yellow-plugins" },
   "license": "MIT",
   "keywords": ["linear", "project-management", "issues", "workflow", "productivity", "pm"],
+  "mcpServers": {
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    }
+  },
   "entrypoints": {
     "commands": [
       "commands/linear/create.md",
@@ -25,9 +31,6 @@
     ],
     "skills": [
       "skills/linear-workflows/SKILL.md"
-    ],
-    "mcpServers": [
-      "config/linear.mcp.json"
     ]
   },
   "compatibility": {

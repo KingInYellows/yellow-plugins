@@ -4,6 +4,7 @@ description: >
   Generate project and initiative health report. Use when user asks "project status",
   "how are we tracking", "what's blocked", or "sprint health".
 allowed-tools:
+  - Bash
   - AskUserQuestion
   - ToolSearch
   - mcp__plugin_linear_linear__list_projects
