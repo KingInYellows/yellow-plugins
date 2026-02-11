@@ -59,7 +59,7 @@ If no issue ID found, ask user for the issue ID.
 
 ### Step 2: Validate Issue
 
-**Security (C1):** Call `get_issue` to verify the issue exists in the user's workspace before any operations.
+**Security (C1):** Call `get_issue` with the extracted `issueId` to verify the issue exists in the user's workspace before any operations; if the issue is not found or the call fails, report this to the user and stop without calling `create_comment` or `update_issue`.
 
 ### Step 3: Check PR Status
 

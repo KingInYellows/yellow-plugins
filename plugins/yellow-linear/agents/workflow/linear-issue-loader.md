@@ -52,7 +52,7 @@ git branch --show-current
 
 Extract the first match of pattern `[A-Z]{2,5}-[0-9]{1,6}` (case-sensitive) from the branch name.
 
-If no issue ID found:
+If no issue ID found or the branch name cannot be determined (for example, in a detached HEAD state or when git metadata is unavailable):
 - Report "No Linear issue ID found in branch name"
 - Suggest: "Use `/linear:sync ENG-123` with an explicit issue ID"
 - Stop
@@ -83,7 +83,7 @@ Display the issue in a clean summary:
 ### Description
 [Full issue description text]
 
-### Recent Comments (3)
+### Recent Comments (up to 5)
 - @alice (2 days ago): Comment text...
 - @bob (5 days ago): Comment text...
 - @carol (1 week ago): Comment text...

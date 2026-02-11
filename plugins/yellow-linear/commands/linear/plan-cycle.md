@@ -4,8 +4,8 @@ description: >
   Plan sprint cycle by selecting backlog issues. Use when user says "plan the sprint",
   "fill the cycle", "what should we work on next", or "sprint planning".
 argument-hint: "[cycle name]"
-disable-model-invocation: true
 allowed-tools:
+  - Bash
   - AskUserQuestion
   - ToolSearch
   - mcp__plugin_linear_linear__list_cycles

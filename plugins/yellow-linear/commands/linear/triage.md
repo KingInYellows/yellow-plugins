@@ -5,6 +5,7 @@ description: >
   "assign incoming tickets", "what needs triage", or "review new issues".
 argument-hint: "[filter query]"
 allowed-tools:
+  - Bash
   - AskUserQuestion
   - ToolSearch
   - mcp__plugin_linear_linear__list_issues

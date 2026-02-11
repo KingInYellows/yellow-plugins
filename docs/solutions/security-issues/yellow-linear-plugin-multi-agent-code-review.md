@@ -121,7 +121,7 @@ Changed from `[A-Z]+-[0-9]+` (case-insensitive) to `[A-Z]{2,5}-[0-9]{1,6}` (case
 
 ### 6. Agent Accessibility
 
-**Removed `disable-model-invocation: true`** from triage, create, and status commands. Added "Use when..." trigger clauses to all 5 commands and 3 agents.
+**Removed `disable-model-invocation: true`** from all 5 commands (triage, create, status, sync, and plan-cycle). Added "Use when..." trigger clauses to all 5 commands and 3 agents.
 
 **Added `allowed-tools` frontmatter** to all 3 agents with least-privilege lists:
 - `linear-issue-loader`: `Bash`, `ToolSearch`, `get_issue`, `list_comments`, `list_teams`

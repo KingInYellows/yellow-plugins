@@ -8,7 +8,13 @@ user-invocable: false
 
 # Linear Workflow Patterns
 
+## What It Does
+
 Reference patterns and conventions for Linear PM workflows. Loaded by commands and agents for consistent behavior.
+
+## When to Use
+
+Use when yellow-linear plugin commands or agents need shared Linear workflow context, including issue-writing guidance, branch naming conventions, or workflow state definitions.
 
 ## Usage
 

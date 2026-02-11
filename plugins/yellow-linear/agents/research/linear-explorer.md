@@ -89,6 +89,7 @@ Process and organize findings:
 
 Structure output as clear markdown:
 - Lead with the direct answer to the user's question
+- Explicitly state when no relevant issues are found
 - Support with data (issue counts, lists, patterns)
 - Suggest next actions when appropriate
 
@@ -111,7 +112,7 @@ Found 2 potentially related issues:
 
 ## Guidelines
 
-- Read-only — never modify issues, projects, or any Linear state
+- Read-only — only use query/list operations; never create, update, or delete issues, projects, or any Linear state
 - Keep searches scoped (top 30 results) to stay within rate limits
 - Always lead with the answer, then supporting data
 - Suggest concrete next steps (create issue, add comment, assign)

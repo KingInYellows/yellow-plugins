@@ -43,11 +43,11 @@ Present as a table:
 
 ### Step 2: Fetch Initiative Health
 
-Query active initiatives via `list_initiatives`.
+Query active initiatives via `mcp__plugin_linear_linear__list_initiatives`.
 
 For each initiative:
-- Fetch details via `get_initiative`
-- Fetch recent updates via `list_initiative_updates`
+- Fetch details via `mcp__plugin_linear_linear__get_initiative`
+- Fetch recent updates via `mcp__plugin_linear_linear__list_initiative_updates`
 - Show: name, status, last update date, health indicator
 
 ### Step 3: Surface Blockers and Risks
@@ -76,13 +76,13 @@ Compile all sections into a structured markdown report:
 
 ### Step 5: Offer Initiative Update
 
-Use AskUserQuestion to ask:
+Use `AskUserQuestion` to ask:
 - "Would you like to post this report as an initiative update to Linear?"
 
 If yes:
-- Select which initiative to update via AskUserQuestion
-- **Validate access (C1):** Call `get_initiative` with the selected initiative ID to verify it exists and belongs to the user's workspace. If validation fails, report the error and stop.
-- Post via `create_initiative_update` with the report content
+- Select which initiative to update via `AskUserQuestion`
+- **Validate access (C1):** Call `mcp__plugin_linear_linear__get_initiative` with the selected initiative ID to verify it exists and belongs to the user's workspace. If validation fails, report the error and stop.
+- Post via `mcp__plugin_linear_linear__create_initiative_update` with the report content
 
 ## Error Handling
 

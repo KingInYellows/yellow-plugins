@@ -4,7 +4,6 @@ description: >
   Sync current branch with its Linear issue — load context, link PR, update status.
   Use when user says "sync with linear", "link my branch", or "update issue status".
 argument-hint: "[issue-id]"
-disable-model-invocation: true
 allowed-tools:
   - Bash
   - Read
@@ -38,7 +37,7 @@ If no issue ID found, ask user via AskUserQuestion.
 
 ### Step 2: Validate Issue Exists
 
-**Security requirement (C1):** Before any operations, call `get_issue` with the extracted ID to verify:
+**Security requirement (C1):** Before any operations, call `mcp__plugin_linear_linear__get_issue` with the extracted ID to verify:
 - The issue exists
 - It belongs to the user's workspace
 
@@ -54,7 +53,7 @@ Present the issue context:
 - **Assignee**
 - **Description** (full text for coding reference)
 
-Fetch recent comments (up to 5) via `list_comments` and display them for context.
+Fetch recent comments (up to 5) via `mcp__plugin_linear_linear__list_comments` and display them for context.
 
 ### Step 4: Check for PR
 
@@ -66,7 +65,7 @@ gh pr view --json url,title,state 2>/dev/null
 
 Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 
-- **If PR exists:** Add PR URL to the Linear issue as a comment via `create_comment`:
+- **If PR exists:** Add PR URL to the Linear issue as a comment via `mcp__plugin_linear_linear__create_comment`:
   ```
   PR linked: [PR Title](PR URL) — State: open/merged
   ```
@@ -74,7 +73,7 @@ Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 
 ### Step 5: Update Issue Status
 
-Query valid workflow statuses via `list_issue_statuses` for the issue's team.
+Query valid workflow statuses via `mcp__plugin_linear_linear__list_issue_statuses` for the issue's team.
 
 Determine the appropriate status transition:
 - If PR exists and is **open** → suggest "In Review" status
