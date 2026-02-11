@@ -15,6 +15,7 @@ allowed-tools:
   - mcp__plugin_linear_linear__list_initiative_updates
   - mcp__plugin_linear_linear__create_initiative_update
   - mcp__plugin_linear_linear__list_teams
+  - mcp__plugin_linear_linear__list_issue_statuses
 ---
 
 # Project & Initiative Status Report

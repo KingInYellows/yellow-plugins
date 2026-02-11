@@ -31,6 +31,9 @@
     ],
     "skills": [
       "skills/linear-workflows/SKILL.md"
+    ],
+    "mcpServers": [
+      "config/linear.mcp.json"
     ]
   },
   "compatibility": {
