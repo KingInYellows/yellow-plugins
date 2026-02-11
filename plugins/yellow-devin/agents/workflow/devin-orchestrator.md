@@ -75,7 +75,7 @@ Polling strategy:
 - Base interval: 30 seconds
 - Backoff: 1.5x after 10 polls (45s, 67s, 100s, ...)
 - Max interval: 5 minutes
-- Max polls: 120 (~1 hour effective max)
+- Max wall-clock: 15 minutes (see Guidelines)
 - Terminal states: finished, stopped, failed
 - On "blocked": notify user, offer /devin:message or /devin:cancel
 ```
@@ -138,7 +138,7 @@ For tasks with independent subtasks:
 ## Guidelines
 
 - **Hard limit: 3 review-fix cycles** — prevents infinite loops and runaway costs
-- **Time-box orchestrations** — track total elapsed time and abort the workflow once it exceeds a safe cap (e.g., 15 minutes) including all polling and iterations
+- **Time-box orchestrations** — track total elapsed time and abort the workflow once it exceeds 15 minutes, including all polling and iterations
 - **Always preserve context on failure** — user needs enough info for manual recovery
 - **Sanitize context dumps** — strip anything matching `apk_[a-zA-Z0-9_-]*` before display
 - **Announce state transitions** — tell user when polling starts, when review begins, when iterating

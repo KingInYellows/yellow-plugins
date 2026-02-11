@@ -46,8 +46,14 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
 curl_exit=$?
 ```
 
-The session must be `running` or `blocked` to accept messages. If terminal (`finished`, `stopped`, `failed`):
+The session must be `running` or `blocked` to accept messages. If not in a messageable state, determine the appropriate error message:
+
+**Terminal states** (`finished`, `stopped`, `failed`):
 - Report "Session is {status} — cannot send messages to a completed session."
+- Stop.
+
+**Not-yet-running states** (`queued`, `started`):
+- Report "Session is {status} — waiting to start. Try again shortly or use /devin:status to monitor."
 - Stop.
 
 ### Step 5: Send Message

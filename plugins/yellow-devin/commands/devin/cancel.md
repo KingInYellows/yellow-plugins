@@ -62,6 +62,23 @@ Ask user to confirm cancellation via AskUserQuestion:
 
 If user declines, stop without cancelling.
 
+### Step 4.5: Re-validate Before Cancellation (TOCTOU Protection)
+
+Re-fetch session status to prevent race conditions:
+
+```bash
+curl -s --connect-timeout 5 --max-time 10 \
+  -w "\n%{http_code}" \
+  -X GET "https://api.devin.ai/v1/sessions/$SESSION_ID" \
+  -H "Authorization: Bearer $DEVIN_API_TOKEN"
+```
+
+If session is now in a terminal state (`finished`, `stopped`, `failed`):
+- Report "Session already {status} — no cancellation needed."
+- Exit cleanly without calling cancel API.
+
+If still `running` or `blocked`, proceed to cancellation.
+
 ### Step 5: Cancel Session
 
 ```bash
