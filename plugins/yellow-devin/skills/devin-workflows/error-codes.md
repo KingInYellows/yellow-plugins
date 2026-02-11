@@ -69,8 +69,8 @@ case "$http_code" in
     fi
     printf 'Rate limited. Waiting %ss...\n' "$retry_after"
     sleep "$retry_after"
-    # This pattern must be wrapped in a retry loop that retries the request after the sleep.
-    ;;
+    printf 'ERROR: Rate limited (429). Retry the request after waiting.\n'
+    exit 1 ;;
   5[0-9][0-9])
     printf 'ERROR: Devin API server error (%s)\n' "$http_code"
     printf 'Try again in a few minutes.\n'
