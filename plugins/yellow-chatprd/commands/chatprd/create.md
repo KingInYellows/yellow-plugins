@@ -27,7 +27,7 @@ Create a new document in ChatPRD from a description, with template selection and
 
 Check `$ARGUMENTS` for a document description:
 - **If provided:** Validate per `chatprd-conventions` skill input validation rules (max 500 chars, reject path traversal, trim whitespace, strip HTML).
-- **If empty:** Ask via AskUserQuestion: "What document would you like to create? (e.g., PRD for auth feature, API doc for payments)"
+- **If empty:** Ask via AskUserQuestion: "What document would you like to create? Please provide a concise (<= 500 characters) description including product, surface area, and goal (e.g., PRD for auth feature, API doc for payments)."
 
 ### Step 2: Dedup Check (Read-Before-Write)
 

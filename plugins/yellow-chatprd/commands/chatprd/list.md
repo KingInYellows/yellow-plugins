@@ -21,7 +21,7 @@ Browse documents in the ChatPRD workspace, optionally filtered by project.
 ### Step 1: Parse Input
 
 Check `$ARGUMENTS` for an optional project filter:
-- **If provided:** Validate per `chatprd-conventions` skill input validation rules (max 500 chars, reject path traversal, trim whitespace).
+- **If provided:** Validate per `chatprd-conventions` skill input validation rules (max 500 chars, reject path traversal, trim whitespace, strip HTML).
 - **If empty:** Proceed without filter.
 
 ### Step 2: Fetch Documents

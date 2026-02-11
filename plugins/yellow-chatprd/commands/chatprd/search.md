@@ -44,4 +44,4 @@ If user wants details on a specific result, call `get_document` to retrieve and 
 
 ## Error Handling
 
-See `chatprd-conventions` skill for error mapping (auth, rate limiting, server unavailable).
+See `chatprd-conventions` skill for full error mapping (authentication, subscription, document not found, rate limiting, network timeouts, and MCP tool availability).

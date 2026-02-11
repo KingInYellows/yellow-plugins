@@ -56,13 +56,14 @@ ChatPRD exposes three tools via MCP:
 
 ### 3. Plugin Components
 
-#### Commands (4)
+#### Commands (5)
 
 | Command | Description | Key Behavior |
 |---------|-------------|-------------|
 | `/chatprd:create` | Create a new document in ChatPRD | Takes description + optional template hint. Uses Create Document MCP tool. Suggests templates based on context. |
 | `/chatprd:search` | Search ChatPRD workspace | Takes search query. Returns matching documents with summaries. |
 | `/chatprd:update` | Update an existing ChatPRD document | Takes document reference + changes. Uses Update Document MCP tool. |
+| `/chatprd:list` | List documents in ChatPRD workspace | Browses documents, optionally filtered by project, using ChatPRD listing tools. |
 | `/chatprd:link-linear` | Bridge a ChatPRD doc to Linear issues | Searches ChatPRD for a doc, extracts requirements, creates/links Linear issues via yellow-linear MCP tools. |
 
 #### Agents (2)

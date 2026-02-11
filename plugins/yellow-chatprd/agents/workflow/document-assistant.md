@@ -68,7 +68,7 @@ Auto-detect the user's intent from their message:
 1. Search existing docs for duplicates via `search_documents` — warn if similar document found
 2. Suggest template via `list_templates` (fall back to static guide in `chatprd-conventions`)
 3. Optionally select project via `list_projects`
-4. **M3 confirmation:** Present summary and confirm before calling `create_document`
+4. **M3 confirmation:** Present summary and confirm via AskUserQuestion before calling `create_document`
 5. Report created document title and URL
 
 ### Read/Search Flow

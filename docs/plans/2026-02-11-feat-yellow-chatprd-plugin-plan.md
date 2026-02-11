@@ -49,7 +49,7 @@ A plugin following the yellow-linear pattern with:
 
 - **5 commands**: create, search, update, list, link-linear
 - **2 agents**: document-assistant (ChatPRD-only interactions), linear-prd-bridge (ChatPRD→Linear bridging)
-- **1 internal skill**: chatprd-conventions (templates, project structure, best practices)
+- **1 internal skill**: chatprd-conventions (error mapping, template guide, input validation, and security patterns)
 - **MCP server**: Remote hosted at `https://app.chatprd.ai/mcp` with Clerk OAuth via `mcp-remote`
 
 ## Technical Approach
@@ -94,7 +94,7 @@ A plugin following the yellow-linear pattern with:
 | `search_documents` | `mcp__plugin_chatprd_chatprd__search_documents` | search command, both agents |
 | `list_documents` | `mcp__plugin_chatprd_chatprd__list_documents` | list command, document-assistant agent |
 | `get_document` | `mcp__plugin_chatprd_chatprd__get_document` | update/link-linear commands, both agents |
-| `list_templates` | `mcp__plugin_chatprd_chatprd__list_templates` | create command, conventions skill |
+| `list_templates` | `mcp__plugin_chatprd_chatprd__list_templates` | create command, document-assistant agent |
 | `list_projects` | `mcp__plugin_chatprd_chatprd__list_projects` | create command (project selection) |
 | `list_user_organizations` | `mcp__plugin_chatprd_chatprd__list_user_organizations` | conventions skill (org context) |
 | `get_user_profile` | `mcp__plugin_chatprd_chatprd__get_user_profile` | auth verification |
@@ -306,7 +306,7 @@ user-invocable: false
 
 #### Research Insights — Skill Design
 
-**Pattern (from create-agent-skills):** Skills referenced by agents must be listed in the agent's `allowed-tools`. However, internal skills loaded via `entrypoints.skills` are auto-available — no explicit tool listing needed. Verify this during Phase 6 validation.
+**Pattern (from create-agent-skills):** Historically, skills referenced by agents were listed in the agent's `allowed-tools`, but internal skills loaded via `entrypoints.skills` are now auto-available — no explicit skill listing is needed. Verify this behavior during Phase 6 validation.
 
 **YAGNI applied:** The original ~100-line budget included PRD best practices and project organization sections. These duplicate ChatPRD's own AI capabilities and docs — removed to prevent staleness.
 
@@ -514,7 +514,7 @@ assistant: "That involves Linear integration. Use /chatprd:link-linear or the li
 - **Handoff pattern:** When Linear is mentioned, explicitly suggest linear-prd-bridge or `/chatprd:link-linear` instead of attempting to bridge
 - **TOCTOU:** Re-fetch with `get_document` immediately before `update_document`
 
-**Line budget:** ~100-120 lines (under 200 limit)
+**Line budget:** ~100-120 lines (maximum 120-line budget)
 
 #### Research Insights — Agent Design
 
@@ -588,7 +588,7 @@ assistant: "I'll check for existing Linear issues related to this spec first to 
 - **One-way, one-time operation** — no continuous sync, no link persistence
 - **M3 safety:** Always confirms issue list before creating
 
-**Line budget:** ~100-120 lines (under 200 limit)
+**Line budget:** ~100-120 lines (maximum 120-line budget)
 
 **Cross-plugin dependency detection:**
 ```markdown
@@ -696,7 +696,7 @@ allowed-tools:
 - [x] All commands confirm before write operations (M3 safety)
 - [x] All commands validate document existence before updates (C1 validation)
 - [x] create command checks for duplicates before creating (read-before-write)
-- [x] Agent files are under 200 lines each
+- [x] Agent files are under 120 lines each
 - [x] All MCP tool references use full prefixed names
 
 ## Dependencies & Risks

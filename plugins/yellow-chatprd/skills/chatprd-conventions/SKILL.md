@@ -18,7 +18,7 @@ Use when yellow-chatprd plugin commands or agents need shared context for ChatPR
 
 ## Usage
 
-This skill is not user-invocable. It provides shared context for the yellow-chatprd plugin's commands and agents.
+This skill is not user-invocable. It provides shared context for the yellow-chatprd plugin's commands and agents, and all such commands and agents must follow these conventions.
 
 ## Error Mapping
 
@@ -29,7 +29,7 @@ Map MCP errors to user-friendly messages. Always handle these cases:
 | Authentication required / token expired | "ChatPRD authentication required. A browser window will open for login." | MCP client handles re-auth automatically |
 | No team subscription | "ChatPRD Team plan required for MCP access." | Stop — cannot proceed without subscription |
 | Document not found (404) | "Document not found. Use `/chatprd:search` to find it." | Suggest search command |
-| Rate limited (429) | "ChatPRD rate limit hit. Retrying..." | Exponential backoff: 1s, 2s, 4s. Max 3 retries. Never fall through. |
+| Rate limited (429) | "ChatPRD rate limit hit. Retrying..." | Exponential backoff: 1s, 2s, 4s. Max 3 retries. Abort if all retries fail. |
 | Network timeout | "ChatPRD server unavailable. Retry in a moment." | Retry once, then report failure |
 | MCP tool not found | "ChatPRD MCP tools unavailable. Check plugin installation." | Verify MCP server connection |
 
