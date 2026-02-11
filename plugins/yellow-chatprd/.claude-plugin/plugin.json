@@ -1,0 +1,56 @@
+{
+  "name": "yellow-chatprd",
+  "version": "1.0.0",
+  "description": "ChatPRD MCP integration with document management workflows and Linear bridging for Claude Code",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/kinginyellow"
+  },
+  "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-chatprd",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinginyellow/yellow-plugins"
+  },
+  "license": "MIT",
+  "keywords": ["chatprd", "prd", "product-management", "documentation", "linear"],
+  "mcpServers": {
+    "chatprd": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://app.chatprd.ai/mcp"]
+    }
+  },
+  "entrypoints": {
+    "commands": [
+      "commands/chatprd/create.md",
+      "commands/chatprd/search.md",
+      "commands/chatprd/update.md",
+      "commands/chatprd/list.md",
+      "commands/chatprd/link-linear.md"
+    ],
+    "agents": [
+      "agents/workflow/document-assistant.md",
+      "agents/workflow/linear-prd-bridge.md"
+    ],
+    "skills": [
+      "skills/chatprd-conventions/SKILL.md"
+    ],
+    "mcpServers": [
+      "config/chatprd.mcp.json"
+    ]
+  },
+  "compatibility": {
+    "claudeCodeMin": "2.0.0"
+  },
+  "permissions": [
+    {
+      "scope": "network",
+      "reason": "Connects to ChatPRD MCP server for document management",
+      "domains": ["app.chatprd.ai"]
+    },
+    {
+      "scope": "shell",
+      "reason": "Runs git commands for branch context detection",
+      "commands": ["git"]
+    }
+  ]
+}
