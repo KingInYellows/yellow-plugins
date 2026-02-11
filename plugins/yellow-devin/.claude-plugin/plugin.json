@@ -1,0 +1,67 @@
+{
+  "name": "yellow-devin",
+  "version": "1.0.0",
+  "description": "Devin.AI integration for multi-agent workflows — delegate tasks, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/kinginyellow"
+  },
+  "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-devin",
+  "repository": { "type": "git", "url": "https://github.com/kinginyellow/yellow-plugins" },
+  "license": "MIT",
+  "keywords": ["devin", "deepwiki", "multi-agent", "delegation", "orchestration", "ai-collaboration"],
+  "mcpServers": {
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    "devin": {
+      "type": "http",
+      "url": "https://mcp.devin.ai/mcp"
+    }
+  },
+  "entrypoints": {
+    "commands": [
+      "commands/devin/delegate.md",
+      "commands/devin/status.md",
+      "commands/devin/message.md",
+      "commands/devin/cancel.md",
+      "commands/devin/wiki.md"
+    ],
+    "agents": [
+      "agents/workflow/devin-orchestrator.md"
+    ],
+    "skills": [
+      "skills/devin-workflows/SKILL.md"
+    ],
+    "mcpServers": [
+      "config/deepwiki.mcp.json",
+      "config/devin.mcp.json"
+    ]
+  },
+  "compatibility": {
+    "claudeCodeMin": "2.0.0"
+  },
+  "permissions": [
+    {
+      "scope": "network",
+      "reason": "Queries DeepWiki MCP for public repository documentation and code analysis",
+      "domains": ["mcp.deepwiki.com"]
+    },
+    {
+      "scope": "network",
+      "reason": "Queries Devin MCP for private repository documentation and code analysis",
+      "domains": ["mcp.devin.ai"]
+    },
+    {
+      "scope": "network",
+      "reason": "Manages Devin sessions, messages, and playbooks via REST API",
+      "domains": ["api.devin.ai"]
+    },
+    {
+      "scope": "shell",
+      "reason": "Runs curl for Devin API calls, jq for JSON construction, and git for context detection",
+      "commands": ["curl", "jq", "git", "gh"]
+    }
+  ]
+}
