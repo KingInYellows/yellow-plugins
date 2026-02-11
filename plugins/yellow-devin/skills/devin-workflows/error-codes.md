@@ -71,8 +71,8 @@ case "$http_code" in
     fi
     printf 'Rate limited. Waiting %ss...\n' "$retry_after"
     sleep "$retry_after"
-    printf 'ERROR: Rate limited (429). Retry the request after waiting.\n'
-    exit 1 ;;
+    # Retry the Devin API request once after the wait, then re-run this status check.
+    ;;
   5[0-9][0-9])
     printf 'ERROR: Devin API server error (%s)\n' "$http_code"
     printf 'Try again in a few minutes.\n'

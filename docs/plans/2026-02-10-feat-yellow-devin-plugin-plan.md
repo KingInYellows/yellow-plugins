@@ -934,6 +934,12 @@ case "$http_code" in
     # Rate limit handling with retry loop
     for retry_attempt in 1 2 3; do
       retry_after=$(echo "$body" | jq -r '.retry_after // 60')
+      jq_exit=$?
+      if [ "$jq_exit" -ne 0 ]; then
+        echo "ERROR: Failed to parse rate limit response"
+        echo "Response preview: ${body:0:200}"
+        exit 1
+      fi
       if [ "$retry_after" -gt 300 ]; then
         echo "ERROR: Rate limit — API asks for ${retry_after}s wait (too long)"
         exit 1

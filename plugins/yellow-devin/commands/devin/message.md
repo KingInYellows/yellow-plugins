@@ -44,6 +44,8 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
   -X GET "https://api.devin.ai/v1/sessions/$SESSION_ID" \
   -H "Authorization: Bearer $DEVIN_API_TOKEN")
 curl_exit=$?
+http_status=${response##*$'\n'}
+body=${response%$'\n'*}
 ```
 
 The session must be `running` or `blocked` to accept messages. If not in a messageable state, determine the appropriate error message:
@@ -69,6 +71,8 @@ response=$(jq -n --arg msg "$MESSAGE" '{message: $msg}' | \
     -H "Content-Type: application/json" \
     -d @-)
 curl_exit=$?
+http_status=${response##*$'\n'}
+body=${response%$'\n'*}
 ```
 
 Check curl exit code, HTTP status, jq parse.

@@ -23,7 +23,7 @@ Validate `DEVIN_API_TOKEN` is set and matches format. See `devin-workflows` skil
 Check `jq` is available:
 
 ```bash
-command -v jq >/dev/null || { echo "ERROR: jq required. Install: https://jqlang.github.io/jq/download/"; exit 1; }
+command -v jq >/dev/null || { echo "ERROR: jq required. Install: https://jqlang.github.io/jq/download/" >&2; exit 1; }
 ```
 
 ### Step 2: Get Session ID
@@ -72,6 +72,8 @@ curl -s --connect-timeout 5 --max-time 10 \
   -X GET "https://api.devin.ai/v1/sessions/$SESSION_ID" \
   -H "Authorization: Bearer $DEVIN_API_TOKEN"
 ```
+
+Check curl exit code, HTTP status, jq parse.
 
 If session is now in a terminal state (`finished`, `stopped`, `failed`):
 - Report "Session already {status} — no cancellation needed."
