@@ -10,9 +10,9 @@ This plugin integrates ChatPRD's remote MCP server into Claude Code, providing o
 
 ## Authentication
 
-- **Method:** Clerk OAuth via `mcp-remote`
+- **Method:** Native MCP HTTP OAuth (Clerk-backed)
 - **Flow:** Browser popup on first connection, automatic token management thereafter
-- **Requirement:** ChatPRD Team plan subscription
+- **Requirement:** ChatPRD account (no API key needed)
 - **Note:** Requires browser access — will not work in headless SSH sessions
 
 ## Components

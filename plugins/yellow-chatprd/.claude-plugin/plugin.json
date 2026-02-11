@@ -15,8 +15,8 @@
   "keywords": ["chatprd", "prd", "product-management", "documentation", "linear"],
   "mcpServers": {
     "chatprd": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://app.chatprd.ai/mcp"]
+      "type": "http",
+      "url": "https://app.chatprd.ai/mcp"
     }
   },
   "entrypoints": {

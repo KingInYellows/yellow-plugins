@@ -26,7 +26,7 @@ Map MCP errors to user-friendly messages. Always handle these cases:
 
 | Error | User Message | Action |
 |-------|-------------|--------|
-| Authentication required / token expired | "ChatPRD authentication required. A browser window will open for login." | `mcp-remote` handles re-auth automatically |
+| Authentication required / token expired | "ChatPRD authentication required. A browser window will open for login." | MCP client handles re-auth automatically |
 | No team subscription | "ChatPRD Team plan required for MCP access." | Stop — cannot proceed without subscription |
 | Document not found (404) | "Document not found. Use `/chatprd:search` to find it." | Suggest search command |
 | Rate limited (429) | "ChatPRD rate limit hit. Retrying..." | Exponential backoff: 1s, 2s, 4s. Max 3 retries. Never fall through. |
