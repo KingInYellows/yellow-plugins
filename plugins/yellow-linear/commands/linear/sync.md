@@ -1,6 +1,8 @@
 ---
 name: linear:sync
-description: Sync current branch with its Linear issue — load context, link PR, update status
+description: >
+  Sync current branch with its Linear issue — load context, link PR, update status.
+  Use when user says "sync with linear", "link my branch", or "update issue status".
 argument-hint: "[issue-id]"
 disable-model-invocation: true
 allowed-tools:
@@ -25,12 +27,12 @@ Load issue context, link PRs, and update status for the current branch's Linear 
 
 Determine the issue ID to sync:
 
-1. **If `$ARGUMENTS` provided:** Use it directly as the issue ID
+1. **If `$ARGUMENTS` provided:** Validate format matches `[A-Z]{2,5}-[0-9]{1,6}` exactly. If invalid, report format error and stop.
 2. **Otherwise:** Extract from current branch name:
    ```bash
    git branch --show-current
    ```
-   Match pattern `[A-Z]+-[0-9]+` (case-insensitive) anywhere in the branch name. Use first match.
+   Match pattern `[A-Z]{2,5}-[0-9]{1,6}` (case-sensitive) anywhere in the branch name. Use first match.
 
 If no issue ID found, ask user via AskUserQuestion.
 
@@ -91,7 +93,6 @@ Display sync summary:
 
 ## Error Handling
 
-- **Issue not found:** Verify the issue ID exists in your Linear workspace
-- **Authentication required:** Re-run command to trigger OAuth re-authentication
 - **No branch detected:** Must be in a git repository on a named branch
-- **Rate limited:** Wait 1 minute and retry
+
+See `linear-workflows` skill for common error handling patterns (authentication, rate limiting, issue resolution).

@@ -1,8 +1,9 @@
 ---
 name: linear:create
-description: Create a Linear issue from current context
+description: >
+  Create a Linear issue from current context. Use when user describes a bug,
+  requests a feature, says "file an issue", "track this", or "create ticket for X".
 argument-hint: "[title]"
-disable-model-invocation: true
 allowed-tools:
   - Read
   - Bash
@@ -25,18 +26,12 @@ Create a Linear issue from current context, optionally with a quick title via ar
 
 ### Step 1: Resolve Team Context
 
-Auto-detect the Linear team from the git remote:
+Auto-detect team from git remote repo name. Match against `list_teams` (see "Team Context" in `linear-workflows` skill). If no match or multiple matches, prompt via AskUserQuestion.
 
-```bash
-git remote get-url origin 2>/dev/null | sed 's|.*/||' | sed 's|\.git$||'
-```
-
-Match the extracted repo name against Linear teams using `list_teams`. If no match, ask the user to select a team via AskUserQuestion.
-
-### Step 2: Parse Input
+### Step 2: Parse and Validate Input
 
 Check `$ARGUMENTS` for a quick title:
-- **If provided:** Use as issue title, skip to Step 3
+- **If provided:** Validate: max 500 characters, strip any HTML tags. Use as issue title, skip to Step 3.
 - **If empty:** Launch interactive flow — ask via AskUserQuestion:
   - Issue title (required)
   - Brief description (optional, 1-2 sentences)
@@ -77,6 +72,4 @@ Display the created issue:
 
 ## Error Handling
 
-- **Authentication required:** Re-run command to trigger OAuth re-authentication
-- **Rate limited:** Wait 1 minute and retry, or reduce batch size
-- **Team not found:** Verify git remote matches a Linear team name, or select manually
+See `linear-workflows` skill for common error handling patterns (authentication, rate limiting, team resolution).

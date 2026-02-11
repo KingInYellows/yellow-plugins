@@ -10,11 +10,12 @@ Linear MCP integration with PM workflows for issues, projects, initiatives, cycl
 
 ## Conventions
 
-- **Team context:** Linear team names match GitHub repo names. Auto-detected from `git remote get-url origin`.
+- **Team context:** Auto-detected from `git remote get-url origin` → matched against `list_teams`. If multiple teams match the same repo name, prompt user to disambiguate. Case-sensitive exact match.
 - **Branch naming:** `<type>/<TEAM-ID>-<description>` (e.g., `feat/ENG-123-auth-flow`)
-- **Issue ID pattern:** `[A-Z]+-\d+` extracted from branch name (first match wins)
+- **Issue ID pattern:** `[A-Z]{2,5}-[0-9]{1,6}` extracted from branch name (case-sensitive, first match wins)
 - **PR creation:** Use Graphite (`gt submit`), not `gh pr create`. Use `gh pr view` / `gh api` for reading PR state only.
 - **Status transitions:** Read valid statuses from `list_issue_statuses`, never hardcode status names.
+- **Input validation:** All `$ARGUMENTS` values must be validated before use. See `linear-workflows` skill for format rules.
 
 ## Plugin Components
 
@@ -38,6 +39,17 @@ Linear MCP integration with PM workflows for issues, projects, initiatives, cycl
 ### Skills (1)
 
 - `linear-workflows` — Reference patterns and conventions for Linear workflows
+
+## When to Use What
+
+Commands and agents overlap intentionally to serve different invocation patterns:
+
+- **`/linear:sync`** — Manual, comprehensive sync: loads context + links PR + updates status in one shot. Use when you want full branch-to-issue synchronization.
+- **`linear-issue-loader` agent** — Auto-triggers on branch checkout or "what's this issue?" questions. Read-only context loading.
+- **`linear-pr-linker` agent** — Auto-triggers after `gt submit` or "link to linear" requests. Focused on PR linking + status suggestion.
+- **`linear-explorer` agent** — Auto-triggers on "search linear", "is this a duplicate?" queries. Read-only backlog search.
+
+For advanced workflows, agents can call Linear MCP tools directly (e.g., `get_issue`, `list_issues`) without going through commands.
 
 ## Known Limitations
 

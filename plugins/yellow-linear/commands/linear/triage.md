@@ -1,12 +1,14 @@
 ---
 name: linear:triage
-description: Review and assign incoming Linear issues
+description: >
+  Review and assign incoming Linear issues. Use when user says "triage issues",
+  "assign incoming tickets", "what needs triage", or "review new issues".
 argument-hint: "[filter query]"
-disable-model-invocation: true
 allowed-tools:
   - AskUserQuestion
   - ToolSearch
   - mcp__plugin_linear_linear__list_issues
+  - mcp__plugin_linear_linear__get_issue
   - mcp__plugin_linear_linear__update_issue
   - mcp__plugin_linear_linear__list_teams
   - mcp__plugin_linear_linear__get_team
@@ -23,13 +25,7 @@ Review unassigned and untriaged Linear issues, then assign, prioritize, and cate
 
 ### Step 1: Resolve Team Context
 
-Auto-detect team from git remote:
-
-```bash
-git remote get-url origin 2>/dev/null | sed 's|.*/||' | sed 's|\.git$||'
-```
-
-Match repo name against `list_teams`. If no match, ask user to select via AskUserQuestion.
+Auto-detect team from git remote repo name. Match against `list_teams` (see "Team Context" in `linear-workflows` skill). If no match or multiple matches, prompt via AskUserQuestion.
 
 ### Step 2: Fetch Untriaged Issues
 
@@ -37,7 +33,7 @@ Query issues needing triage using `list_issues` for the team:
 - Filter: unassigned OR in early workflow states (Triage, Backlog)
 - Fetch statuses via `list_issue_statuses` to identify early-state IDs
 - Limit: top 30 results
-- If `$ARGUMENTS` provided, use as additional filter (search within titles/descriptions)
+- If `$ARGUMENTS` provided, validate: max 200 characters, strip HTML tags. Use as additional filter (search within titles/descriptions).
 
 ### Step 3: Present Issues
 
@@ -67,9 +63,18 @@ If more than 3 issues selected for changes:
 - Present summary of all planned changes
 - Require explicit confirmation via AskUserQuestion before applying
 
-**TOCTOU mitigation (H1):** Before applying bulk changes, re-fetch each issue's current state and compare. If an issue has changed since review (different assignee, status, or deleted), warn the user and skip that issue.
+**Validate and apply (C1 + H1):** Before each `update_issue` call:
 
-Apply changes via `update_issue` for each confirmed issue.
+1. **Validate ownership (C1):** Call `get_issue` to verify the issue exists and belongs to the user's workspace. If not found or access denied, skip and warn.
+2. **Detect concurrent changes (H1):** Compare the re-fetched state (assignee, status, priority, labels) against what the user saw in Step 3. If any field being modified has changed since review, present the conflict:
+   ```
+   Issue ENG-123 changed since review:
+   - Assignee was unassigned, now @alice
+   Your change: Assign to @bob
+   [Skip] [Override] [Cancel All]
+   ```
+3. **Apply:** Call `update_issue` only for validated, non-conflicting issues.
+4. **Rate limit:** Add a brief delay between writes for batches >5 issues.
 
 ### Step 7: Summary
 
@@ -80,5 +85,5 @@ Display triage results:
 ## Error Handling
 
 - **No untriaged issues:** Report and stop gracefully
-- **Authentication required:** Re-run to trigger OAuth re-authentication
-- **Rate limited:** Wait 1 minute and retry, or reduce batch size
+
+See `linear-workflows` skill for common error handling patterns (authentication, rate limiting, bulk operation failures).

@@ -1,7 +1,8 @@
 ---
 name: linear:status
-description: Generate project and initiative health report
-disable-model-invocation: true
+description: >
+  Generate project and initiative health report. Use when user asks "project status",
+  "how are we tracking", "what's blocked", or "sprint health".
 allowed-tools:
   - AskUserQuestion
   - ToolSearch
@@ -12,24 +13,25 @@ allowed-tools:
   - mcp__plugin_linear_linear__get_initiative
   - mcp__plugin_linear_linear__list_initiative_updates
   - mcp__plugin_linear_linear__create_initiative_update
-  - mcp__plugin_linear_linear__list_milestones
+  - mcp__plugin_linear_linear__list_teams
 ---
 
 # Project & Initiative Status Report
 
-Generate a health report across projects, initiatives, and milestones.
+Generate a health report across projects and initiatives.
 
 ## Workflow
 
 ### Step 1: Fetch Project Health
 
-Query active projects via `list_projects`.
+Query active projects via `list_projects` (limit: 50).
 
-For each project (up to 10):
-- Fetch project details via `get_project`
-- Query issues via `list_issues` filtered by project
+Show the first 5 projects immediately. For each project:
+- Fetch project details via `get_project` and issues via `list_issues` filtered by project — fetch these in parallel where possible.
 - Calculate: total issues, completed, in-progress, blocked count
 - Determine completion percentage
+
+If more than 5 projects, ask via AskUserQuestion: "Showing top 5 projects. Load all N projects?"
 
 Present as a table:
 ```
@@ -57,39 +59,33 @@ Identify issues that need attention:
 
 Present as an attention list:
 ```
-⚠ Blocked:
+Blocked:
   - ENG-123: Auth token refresh fails (blocked 3 days)
 
-⚠ Stale (no activity >7 days):
+Stale (no activity >7 days):
   - ENG-456: Update API docs (last touched 12 days ago)
 ```
 
-### Step 4: Milestone Progress
-
-Fetch milestones via `list_milestones` (if any exist):
-- Show: name, target date, completion percentage
-- Flag milestones at risk (>50% time elapsed, <50% complete)
-
-### Step 5: Generate Report
+### Step 4: Generate Report
 
 Compile all sections into a structured markdown report:
 - Project health table
 - Initiative status
 - Blockers and risks
-- Milestone progress
 - Date generated
 
-### Step 6: Offer Initiative Update
+### Step 5: Offer Initiative Update
 
 Use AskUserQuestion to ask:
 - "Would you like to post this report as an initiative update to Linear?"
 
 If yes:
 - Select which initiative to update via AskUserQuestion
+- **Validate access (C1):** Call `get_initiative` with the selected initiative ID to verify it exists and belongs to the user's workspace. If validation fails, report the error and stop.
 - Post via `create_initiative_update` with the report content
 
 ## Error Handling
 
 - **No projects/initiatives found:** Report empty state and stop
-- **Authentication required:** Re-run to trigger OAuth re-authentication
-- **Rate limited:** Wait 1 minute and retry, or reduce batch size
+
+See `linear-workflows` skill for common error handling patterns (authentication, rate limiting).

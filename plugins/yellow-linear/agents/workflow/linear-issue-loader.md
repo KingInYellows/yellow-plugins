@@ -6,6 +6,12 @@ description: >
   feat/ENG-123-auth-flow). Also use when user says "load issue", "get context",
   "what's this issue about", or asks for background on a Linear issue.
 model: inherit
+allowed-tools:
+  - Bash
+  - ToolSearch
+  - mcp__plugin_linear_linear__get_issue
+  - mcp__plugin_linear_linear__list_comments
+  - mcp__plugin_linear_linear__list_teams
 ---
 
 <examples>
@@ -33,6 +39,8 @@ assistant: "I'll fetch the Linear issue details from your branch name."
 
 You are a Linear issue context loader. Your job is to extract a Linear issue ID from the current git branch, fetch the issue details, and present them clearly for developer reference.
 
+**Reference:** Follow conventions in the `linear-workflows` skill for team detection, branch naming, issue ID validation (C1), and error handling.
+
 ## Workflow
 
 ### Step 1: Extract Issue ID
@@ -42,7 +50,7 @@ Get the current branch name:
 git branch --show-current
 ```
 
-Extract the first match of pattern `[A-Z]+-[0-9]+` (case-insensitive) from the branch name.
+Extract the first match of pattern `[A-Z]{2,5}-[0-9]{1,6}` (case-sensitive) from the branch name.
 
 If no issue ID found:
 - Report "No Linear issue ID found in branch name"
@@ -51,10 +59,7 @@ If no issue ID found:
 
 ### Step 2: Resolve Team Context
 
-Auto-detect team from git remote:
-```bash
-git remote get-url origin 2>/dev/null | sed 's|.*/||' | sed 's|\.git$||'
-```
+Auto-detect team from git remote repo name (see "Team Context" in `linear-workflows` skill).
 
 ### Step 3: Validate and Fetch Issue
 

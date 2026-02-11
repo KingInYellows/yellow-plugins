@@ -22,9 +22,10 @@ Linear team names match GitHub repository names exactly. Auto-detected from git 
 git remote get-url origin 2>/dev/null | sed 's|.*/||' | sed 's|\.git$||'
 ```
 
-The extracted repo name is matched against `list_teams` results. This means:
+The extracted repo name is matched against `list_teams` results (case-sensitive exact match). This means:
 - No manual team selection needed in most cases
 - Works across multiple repos/teams automatically
+- If multiple teams match the same name, prompt user to disambiguate via AskUserQuestion
 - Falls back to AskUserQuestion if no match found
 
 ## Branch Naming Convention
@@ -36,7 +37,7 @@ Examples:
 - `fix/ENG-456-login-redirect`
 - `refactor/ENG-789-api-cleanup`
 
-Issue ID extraction pattern: `[A-Z]+-[0-9]+` (case-insensitive, first match wins).
+Issue ID extraction pattern: `[A-Z]{2,5}-[0-9]{1,6}` (case-sensitive, first match wins). Always validate the extracted ID via `get_issue` before use.
 
 ## Issue Writing Tips
 
@@ -115,6 +116,17 @@ Do NOT hardcode status names. Always fetch valid statuses from `list_issue_statu
 | Done          | Completed and verified |
 | Canceled      | Won't do |
 
+## Input Validation
+
+All `$ARGUMENTS` values are user input and must be validated before use:
+
+- **Issue IDs:** Must match `^[A-Z]{2,5}-[0-9]{1,6}$` exactly. Reject anything else.
+- **Titles/descriptions:** Max 500 characters. Strip HTML tags before passing to API.
+- **Cycle/filter names:** Alphanumeric, spaces, and hyphens only. Max 100 characters.
+- **General rule:** Never interpolate `$ARGUMENTS` into shell commands. Pass to MCP tools as API parameters only.
+
+If validation fails, report the format error and prompt the user to correct it.
+
 ## Security Patterns
 
 ### C1: Issue ID Validation
@@ -142,6 +154,15 @@ Agents that modify Linear state (e.g., `linear-pr-linker`) must request explicit
 | Error | Action |
 |-------|--------|
 | Authentication required | Re-run command to trigger OAuth re-authentication |
-| Rate limited | Wait 1 minute and retry, or reduce batch size |
+| Rate limited (429) | Exponential backoff: wait 1s, 2s, 4s. Max 3 retries. |
 | Issue not found | Verify issue ID exists in your Linear workspace |
 | Team not found | Check git remote matches a Linear team name |
+| Partial batch failure | Report which items succeeded/failed. Offer to retry failed items. |
+
+### Bulk Operation Rate Limiting
+
+For commands that issue multiple writes (triage, plan-cycle):
+- Add a brief delay between each `update_issue` call for batches >5 items
+- If a 429 rate limit response occurs, pause and retry with exponential backoff
+- On partial failure, report results so far and offer to retry remaining items
+- Never leave the user guessing about state after a partial failure
