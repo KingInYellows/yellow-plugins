@@ -37,6 +37,15 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-linear",
       "category": "productivity"
+    },
+    {
+      "id": "yellow-devin",
+      "name": "yellow-devin",
+      "description": "Devin.AI integration for multi-agent workflows — delegate tasks, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+      "version": "1.0.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-devin",
+      "category": "development"
     }
   ]
 }
