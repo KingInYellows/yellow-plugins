@@ -55,6 +55,15 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-chatprd",
       "category": "productivity"
+    },
+    {
+      "id": "yellow-review",
+      "name": "yellow-review",
+      "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
+      "version": "1.0.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-review",
+      "category": "development"
     }
   ]
 }

@@ -1,0 +1,46 @@
+{
+  "name": "yellow-review",
+  "version": "1.0.0",
+  "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/kinginyellow"
+  },
+  "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-review",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinginyellow/yellow-plugins"
+  },
+  "license": "MIT",
+  "keywords": ["review", "pr", "code-review", "graphite", "multi-agent"],
+  "entrypoints": {
+    "commands": [
+      "commands/review/review-pr.md",
+      "commands/review/resolve-pr.md",
+      "commands/review/review-all.md"
+    ],
+    "agents": [
+      "agents/review/code-reviewer.md",
+      "agents/review/pr-test-analyzer.md",
+      "agents/review/comment-analyzer.md",
+      "agents/review/code-simplifier.md",
+      "agents/review/type-design-analyzer.md",
+      "agents/review/silent-failure-hunter.md",
+      "agents/workflow/pr-comment-resolver.md",
+      "agents/workflow/learning-compounder.md"
+    ],
+    "skills": [
+      "skills/pr-review-workflow/SKILL.md"
+    ]
+  },
+  "compatibility": {
+    "claudeCodeMin": "2.0.0"
+  },
+  "permissions": [
+    {
+      "scope": "shell",
+      "reason": "Git operations via Graphite (gt), GitHub CLI (gh), and GraphQL scripts for comment resolution",
+      "commands": ["gt", "gh", "git", "jq"]
+    }
+  ]
+}
