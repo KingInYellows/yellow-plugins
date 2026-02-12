@@ -91,4 +91,4 @@ See `ruvector-conventions` skill for error catalog (MCP server down, disk full, 
 
 - **No files to index:** "No indexable files found. Check your path or .ruvectorignore."
 - **Large repo (>5000 files):** Use AskUserQuestion to confirm before proceeding. Suggest indexing a subdirectory first.
-- **Interrupted:** Report progress so far. Re-running indexes only new/changed files.
+- **Interrupted:** Report progress so far. Re-running re-indexes all files (ruvector deduplicates by file_path in the `code` namespace, replacing existing entries).

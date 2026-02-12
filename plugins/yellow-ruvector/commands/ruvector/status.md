@@ -33,11 +33,23 @@ du -sh .ruvector/ 2>/dev/null
 
 Report: directory exists/missing, total disk usage.
 
-### Step 3: MCP Server Status
+### Step 3: MCP Server Health Check
 
-Use ToolSearch to discover ruvector MCP tools. If tools are discoverable, MCP server is available.
+Use ToolSearch to discover ruvector MCP tools. Attempt a lightweight call (e.g., `vector_db_stats`) to verify the server responds.
 
-If unavailable, report: "MCP server not running. It starts automatically on first tool call."
+**Healthy:** "MCP server: connected (responded in Xms)"
+
+**Unhealthy or unavailable:**
+```
+MCP server: not responding
+
+Recovery options:
+1. Restart the session (MCP server starts automatically on session start)
+2. Check manually: npx ruvector mcp-server
+3. Re-install: /ruvector:setup
+```
+
+This makes MCP health agent-detectable — agents can call `/ruvector:status` and parse the output to decide whether to fall back to Grep.
 
 ### Step 4: Database Statistics
 

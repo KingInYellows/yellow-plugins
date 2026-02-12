@@ -102,7 +102,7 @@ fi
 # Try global install first; fall back to --prefix if no permissions
 npm_output=""
 if npm_output=$(npm "${install_args[@]}" 2>&1); then
-  : # success
+  true
 elif npm_output=$(npm "${install_args[@]}" --prefix "${HOME:?HOME not set}/.local" 2>&1); then
   warning "Installed to ~/.local — ensure ~/.local/bin is in your PATH"
   if ! printf '%s' "$PATH" | grep -q "$HOME/.local/bin"; then

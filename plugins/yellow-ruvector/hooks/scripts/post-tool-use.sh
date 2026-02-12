@@ -1,7 +1,8 @@
 #!/bin/bash
 # post-tool-use.sh — Append file changes and bash outcomes to pending-updates queue
-# Receives hook input as JSON on stdin. Must complete within 1 second.
+# Receives hook input as JSON on stdin. Budget: <50ms (append-only, no MCP calls).
 # Append-only, non-blocking — NO MCP calls, NO embedding, just file append.
+# shellcheck disable=SC2154 # Variables (TOOL, file_path, command_text, exit_code) assigned via eval
 set -eu
 
 # Resolve script directory and source shared validation
@@ -22,8 +23,18 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   exit 0
 fi
 
-# Extract tool name — all stdin fields are untrusted
-TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""')
+# Parse all fields in a single jq invocation (avoid 3 separate jq spawns per call)
+# All stdin fields are untrusted; variables populated by eval from jq @sh output
+eval "$(printf '%s' "$INPUT" | jq -r '
+  @sh "TOOL=\(.tool_name // "")",
+  @sh "file_path=\(.tool_input.file_path // "")",
+  @sh "command_text=\(.tool_input.command // "" | .[0:200])",
+  @sh "exit_code=\(.tool_result.exit_code // 0)"
+')" 2>/dev/null || {
+  # jq parse failure — input is not valid JSON
+  printf '{"continue": true}\n'
+  exit 0
+}
 
 # Append a JSON entry to the queue file with error logging
 append_to_queue() {
@@ -40,21 +51,18 @@ append_to_queue() {
 
 case "$TOOL" in
   Edit|Write)
-    # Extract file_path from tool_input
-    file_path=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // ""')
-
     # Validate path using shared validation library
     if ! validate_file_path "$file_path" "$PROJECT_DIR"; then
       printf '{"continue": true}\n'
       exit 0
     fi
 
-    # Construct JSON safely, then append
+    # Construct JSON safely with schema version, then append
     json_entry=$(jq -n \
       --arg type "file_change" \
       --arg path "$file_path" \
       --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-      '{type: $type, file_path: $path, timestamp: $ts}') || {
+      '{schema: "1", type: $type, file_path: $path, timestamp: $ts}') || {
       printf '[ruvector] jq failed to construct file_change JSON\n' >&2
       printf '{"continue": true}\n'
       exit 0
@@ -63,22 +71,18 @@ case "$TOOL" in
     ;;
 
   Bash)
-    # Extract command (first 200 bytes) and exit code
-    command_text=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' | head -c 200)
-    exit_code=$(printf '%s' "$INPUT" | jq -r '.tool_result.exit_code // 0')
-
     # Validate exit_code is numeric
     case "$exit_code" in
       ''|*[!0-9]*) exit_code=0 ;;
     esac
 
-    # Construct JSON safely, then append
+    # Construct JSON safely with schema version, then append
     json_entry=$(jq -n \
       --arg type "bash_result" \
       --arg cmd "$command_text" \
       --argjson exit "$exit_code" \
       --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-      '{type: $type, command: $cmd, exit_code: $exit, timestamp: $ts}') || {
+      '{schema: "1", type: $type, command: $cmd, exit_code: $exit, timestamp: $ts}') || {
       printf '[ruvector] jq failed to construct bash_result JSON\n' >&2
       printf '{"continue": true}\n'
       exit 0

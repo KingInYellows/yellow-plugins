@@ -54,7 +54,8 @@ if "$has_queue"; then
     esac
   fi
 
-  # Cap at 20 entries to stay within budget
+  # Cap at 20 entries per session start to stay within the 3s total budget
+  # (~100ms per ruvector insert via CLI, 20 * 100ms = 2s leaves 1s for learnings)
   if [ "$queue_lines" -gt 0 ]; then
     # Use flock to prevent concurrent flush
     if command -v flock >/dev/null 2>&1; then
@@ -76,6 +77,7 @@ if "$has_queue"; then
             printf '[ruvector] Skipping malformed queue entry\n' >&2
             continue
           fi
+          # Schema-aware parsing: entries may or may not have "schema" field
           entry_type=$(printf '%s' "$line" | jq -r '.type // ""')
           if [ "$entry_type" = "file_change" ]; then
             file_path=$(printf '%s' "$line" | jq -r '.file_path // ""')
@@ -110,7 +112,7 @@ if "$has_queue"; then
   fi
 fi
 
-# Check budget after flush
+# Budget split: 1500ms for queue flush, remaining 1500ms for learning retrieval
 if [ "$(elapsed_ms)" -gt 1500 ]; then
   printf '[ruvector] Budget exceeded after queue flush (%sms), skipping learnings\n' "$(elapsed_ms)" >&2
   printf '{"continue": true}\n'

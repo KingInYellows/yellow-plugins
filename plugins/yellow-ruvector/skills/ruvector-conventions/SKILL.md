@@ -126,6 +126,7 @@ File: `.ruvector/pending-updates.jsonl` — append-only JSONL.
 ```
 
 **Rules:**
+- All entries include `"schema": "1"` for forward compatibility. Consumers must handle entries without a `schema` field (pre-v1 format).
 - Append-only writes with `>>` (atomic O_APPEND for multi-session safety)
 - No dedup at write time — dedup happens at flush time only
 - Flush processes latest entry per `file_path`, discards older duplicates

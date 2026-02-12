@@ -44,8 +44,8 @@ Persistent vector memory and semantic code search for Claude Code agents via ruv
 
 ### Hooks (3)
 
-- `session-start.sh` — Flush stale queue and load top learnings on session start (<3s budget)
-- `post-tool-use.sh` — Append file changes and bash outcomes to queue (append-only, <50ms)
+- `session-start.sh` — Flush stale queue and load top learnings on session start (3s budget: 1.5s flush + 1.5s learnings)
+- `post-tool-use.sh` — Append file changes and bash outcomes to queue (append-only, single jq parse, <50ms)
 - `stop.sh` — Delegate queue flushing to memory-manager agent via systemMessage
 
 ### Scripts (1)
