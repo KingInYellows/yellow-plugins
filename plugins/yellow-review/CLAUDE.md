@@ -11,6 +11,7 @@ Multi-agent PR review with adaptive agent selection, parallel comment resolution
 - All shell scripts follow POSIX security patterns (quoted variables, input validation, `set -eu`)
 - Working directory must be clean before running any review command
 - Commit messages: `fix: address review findings from <agents>` or `fix: resolve PR #<num> review comments`
+- Always confirm with user via `AskUserQuestion` before pushing changes — never auto-push without human approval
 
 ## Plugin Components
 

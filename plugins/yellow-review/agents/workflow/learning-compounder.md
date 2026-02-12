@@ -53,9 +53,9 @@ You will receive via the Task prompt:
 2. **Check existing memory** — read `~/.claude/projects/*/memory/MEMORY.md` and `docs/solutions/` for existing documentation of this pattern
 3. **Decide what to compound**:
    - If pattern already documented: skip (or update if new info found)
-   - If new P1 pattern: create solution doc at `docs/solutions/<category>/<slug>.md`
+   - If new P1 pattern: create solution doc at `docs/solutions/<category>/<slug>.md` (validate that category and slug contain only lowercase alphanumeric characters and hyphens — reject any path traversal characters like `..`, `/`, or `~`)
    - If recurring P2 pattern: add to memory file
-4. **Write documentation** following existing solution doc format
+4. **Write documentation** following existing solution doc format, using the `Write` tool to create new files and the `Edit` tool to update existing docs or memory entries
 
 ## Solution Doc Format
 

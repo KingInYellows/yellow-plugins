@@ -34,7 +34,7 @@ Validate the PR exists and is open:
 ```bash
 gh pr view <PR#> --json state -q .state
 ```
-If not "OPEN", report and stop.
+If the command fails or the state is not "OPEN", report the error and stop.
 
 ### Step 2: Check Working Directory
 
@@ -88,10 +88,14 @@ Launch `code-simplifier` agent on the now-modified code to review applied fixes 
 ### Step 8: Commit and Push
 
 If any changes were made:
+1. Show `git diff --stat` summary to the user
+2. Use `AskUserQuestion` to confirm: "Push these review fixes for PR #X?"
+3. On approval:
 ```bash
 gt modify -c -m "fix: address review findings from <comma-separated-agent-names>"
 gt submit --no-interactive
 ```
+4. If rejected: report changes remain uncommitted for manual review
 
 ### Step 9: Report
 

@@ -56,21 +56,25 @@ For each unresolved comment thread, spawn a `pr-comment-resolver` agent via Task
 - File path and line number
 - PR context (title, description)
 
-Launch all resolvers in parallel. Wait for completion.
+Launch all resolvers in parallel to generate proposed changes, then apply fixes sequentially to avoid conflicts.
 
 ### Step 5: Review Changes
 
 Collect all changes from resolver agents. Check for conflicts:
-- If multiple agents modified the same file region, review and reconcile manually
+- If multiple agents proposed changes to the same file region, review and reconcile manually
 - Use `git diff` to inspect all changes before committing
 
 ### Step 6: Commit and Push
 
 If changes were made:
+1. Show `git diff --stat` summary to the user
+2. Use `AskUserQuestion` to confirm: "Push these changes to resolve PR #X comments?"
+3. On approval:
 ```bash
 gt modify -c -m "fix: resolve PR #<PR#> review comments"
 gt submit --no-interactive
 ```
+4. If rejected: report changes remain uncommitted for manual review
 
 ### Step 7: Mark Threads Resolved
 

@@ -14,7 +14,7 @@ Reference patterns and conventions for PR review workflows. Loaded by commands a
 
 ## When to Use
 
-Use when yellow-review plugin commands or agents need shared context for adaptive agent selection, finding output format, error handling, or Graphite integration.
+Use when yellow-review plugin commands or agents need shared context for adaptive agent selection, output format, error handling, or Graphite integration.
 
 ## Usage
 

@@ -39,7 +39,7 @@
   "permissions": [
     {
       "scope": "shell",
-      "reason": "Git operations via Graphite (gt), GitHub CLI (gh), and GraphQL scripts for comment resolution",
+      "reason": "Git operations via Graphite (gt), GitHub CLI (gh), GraphQL scripts for comment resolution, and jq for JSON processing",
       "commands": ["gt", "gh", "git", "jq"]
     }
   ]

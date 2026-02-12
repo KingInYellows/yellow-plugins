@@ -81,11 +81,17 @@ RESPONSE=$(gh api graphql \
         *"401"*|*"Bad credentials"*|*"authentication"*)
             printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
             ;;
+        *"403"*|*"Forbidden"*|*"permission"*|*"insufficient permissions"*)
+            printf 'Error: Insufficient permissions for this repo.\n' >&2
+            ;;
         *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
             printf 'Error: Repository or PR not found: %s #%s\n' "$REPO" "$PR_NUMBER" >&2
             ;;
         *"rate limit"*|*"429"*)
             printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
+            ;;
+        *"5xx"*|*"5XX"*|*"Server Error"*|*"server error"*|*"500"*|*"502"*|*"503"*)
+            printf 'Error: GitHub server error. Retry in a few minutes.\n' >&2
             ;;
         *)
             printf 'Error: GraphQL query failed: %s\n' "$RESPONSE" >&2
@@ -115,7 +121,7 @@ fi
 # --- Filter and transform ---
 OUTPUT=$(printf '%s' "$RESPONSE" | jq '
   [
-    .data.repository.pullRequest.reviewThreads.nodes[]
+    (.data.repository.pullRequest.reviewThreads.nodes // [])[]
     | select(.isResolved == false and .isOutdated == false)
     | {
         threadId: .id,
@@ -123,7 +129,7 @@ OUTPUT=$(printf '%s' "$RESPONSE" | jq '
         line: .line,
         startLine: .startLine,
         comments: [
-          .comments.nodes[]
+          (.comments.nodes // [])[]
           | { author: (.author.login // "ghost"), body: .body }
         ]
       }

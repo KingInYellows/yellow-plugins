@@ -78,7 +78,7 @@ Severity definitions:
 ## Instructions
 
 1. Read the PR diff and changed files
-2. Load CLAUDE.md from project root for conventions
+2. Load CLAUDE.md from project root for conventions; if missing, fall back to general best practices and any available plugin-level CLAUDE.md
 3. Analyze each file for issues using the checklist above
 4. Report findings sorted by severity (P1 first)
 5. Include a summary count: "Found X P1, Y P2, Z P3 issues"
