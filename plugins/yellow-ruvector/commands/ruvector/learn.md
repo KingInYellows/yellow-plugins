@@ -20,7 +20,12 @@ Store a structured learning entry (reflexion, skill, or causal observation) for 
 
 ### Step 1: Gather Learning Context
 
-If `$ARGUMENTS` is provided, use it as the learning description.
+If `$ARGUMENTS` is provided, sanitize it first:
+- Strip HTML tags (replace `<[^>]+>` with empty string)
+- Truncate to 2000 characters maximum
+- Reject if empty after sanitization
+
+Use the sanitized text as the learning description.
 
 If empty, use AskUserQuestion to gather:
 - **What happened?** (the situation or trigger)

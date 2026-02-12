@@ -22,7 +22,10 @@ Search the indexed codebase by meaning using vector similarity.
 
 `$ARGUMENTS` must contain a search query. If empty, report: "Please provide a search query, e.g., `/ruvector:search authentication logic`"
 
-Strip HTML tags. Max 1000 characters.
+Sanitize:
+- Strip HTML tags (replace `<[^>]+>` with empty string)
+- Truncate to 1000 characters maximum
+- Reject if empty after sanitization
 
 ### Step 2: Check Database
 

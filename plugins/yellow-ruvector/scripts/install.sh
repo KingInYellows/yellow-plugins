@@ -9,6 +9,7 @@ readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
 readonly NC='\033[0m'
 
+RUVECTOR_DEFAULT_VERSION="latest"
 RUVECTOR_VERSION=""
 
 error() {
@@ -72,10 +73,14 @@ check_dependency "npm" "https://nodejs.org/"
 check_dependency "jq" "https://jqlang.github.io/jq/"
 
 # --- Verify Node.js version >= 18 ---
-node_version=$(node --version 2>/dev/null | sed 's/^v//')
+node_version=$(node --version 2>/dev/null | sed 's/^v//') || true
 node_major="${node_version%%.*}"
-if [ -z "$node_major" ] || [ "$node_major" -lt 18 ]; then
-  error "Node.js 18+ required. Found: v${node_version:-none}. Update from: https://nodejs.org/"
+# Validate node_major is numeric before arithmetic comparison
+case "$node_major" in
+  ''|*[!0-9]*) error "Could not parse Node.js version. Found: '${node_version:-none}'. Update from: https://nodejs.org/" ;;
+esac
+if [ "$node_major" -lt 18 ]; then
+  error "Node.js 18+ required. Found: v${node_version}. Update from: https://nodejs.org/"
 fi
 
 # --- Detect OS/arch ---
@@ -86,22 +91,25 @@ printf 'Platform: %s/%s, Node: v%s\n' "$os" "$arch" "$node_version"
 # --- Install ruvector ---
 printf 'Installing ruvector...\n'
 
+install_version="${RUVECTOR_VERSION:-$RUVECTOR_DEFAULT_VERSION}"
 install_args=("install" "-g" "--ignore-scripts")
-if [ -n "$RUVECTOR_VERSION" ]; then
-  install_args+=("ruvector@${RUVECTOR_VERSION}")
+if [ "$install_version" != "latest" ]; then
+  install_args+=("ruvector@${install_version}")
 else
   install_args+=("ruvector")
 fi
 
 # Try global install first; fall back to --prefix if no permissions
-if npm "${install_args[@]}" 2>/dev/null; then
+npm_output=""
+if npm_output=$(npm "${install_args[@]}" 2>&1); then
   : # success
-elif npm "${install_args[@]}" --prefix "$HOME/.local" 2>/dev/null; then
+elif npm_output=$(npm "${install_args[@]}" --prefix "${HOME:?HOME not set}/.local" 2>&1); then
   warning "Installed to ~/.local — ensure ~/.local/bin is in your PATH"
   if ! printf '%s' "$PATH" | grep -q "$HOME/.local/bin"; then
     warning "Add to your shell profile: export PATH=\"\$HOME/.local/bin:\$PATH\""
   fi
 else
+  printf '%s\n' "$npm_output" >&2
   error "npm install failed. Try: npm install -g ruvector --ignore-scripts"
 fi
 

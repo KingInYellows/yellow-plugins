@@ -24,7 +24,11 @@ From `$ARGUMENTS`, extract:
 - **Namespace filter:** If first word matches a known namespace (`reflexion`, `skills`, `causal`, `code`, `sessions`), filter to that namespace. Otherwise search all.
 - **Text filter:** Remaining text used as search query.
 
-Validate namespace names per `ruvector-conventions` skill.
+Sanitize all input:
+- Strip HTML tags (replace `<[^>]+>` with empty string)
+- Namespace names must match `[a-z0-9-]` only, 1-64 chars, no leading/trailing hyphens. Reject `..`, `/`, `~`.
+- Text filter: truncate to 1000 characters maximum
+- Reject any input that is empty after sanitization
 
 ### Step 2: Query Entries
 

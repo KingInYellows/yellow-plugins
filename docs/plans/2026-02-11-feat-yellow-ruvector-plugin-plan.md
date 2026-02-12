@@ -721,7 +721,7 @@ Add passive learning capture and automatic session management.
   }
   ```
 
-- [ ] Create `plugins/yellow-ruvector/hooks/scripts/session-start.sh`
+- [x] Create `plugins/yellow-ruvector/hooks/scripts/session-start.sh`
   - `set -eu` (not pipefail — we want partial success)
   - Read hook input from stdin: `INPUT=$(cat)`
   - Extract `cwd` from JSON: `CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // ""')`
@@ -734,7 +734,7 @@ Add passive learning capture and automatic session management.
   - Return learnings as `systemMessage` JSON on stdout
   - Log skipped work to stderr (visible in `claude --debug`)
 
-- [ ] Create `plugins/yellow-ruvector/hooks/scripts/post-tool-use.sh`
+- [x] Create `plugins/yellow-ruvector/hooks/scripts/post-tool-use.sh`
   - `set -eu`
   - Read hook input from stdin: `INPUT=$(cat)`
   - Extract tool_name: `TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""')`
@@ -765,7 +765,7 @@ Add passive learning capture and automatic session management.
   - On error: exit 0 silently (don't block user's work)
   - Output: `printf '{"continue": true}\n'`
 
-- [ ] Create `plugins/yellow-ruvector/hooks/scripts/stop.sh`
+- [x] Create `plugins/yellow-ruvector/hooks/scripts/stop.sh`
   - `set -eu`
   - Read hook input from stdin
   - Check if queue file exists and is non-empty
@@ -775,7 +775,7 @@ Add passive learning capture and automatic session management.
   - On failure: leave queue intact for next SessionStart recovery
   - **Delegation failure mode (P2):** This pattern is non-deterministic — Claude may ignore the systemMessage (user Ctrl+C, model decides not to follow). Document in CLAUDE.md that SessionStart always recovers stale queues, so no data is lost — only delayed to next session. If agent doesn't respond within 10s of stop, warn but don't block exit.
 
-- [ ] **Run `shellcheck -s bash hooks/scripts/*.sh` — zero warnings required** (don't defer to Phase 5)
+- [x] **Run `shellcheck -s bash hooks/scripts/*.sh` — zero warnings required** (don't defer to Phase 5)
   - Disable SC2016 on separate line above heredocs containing `$` (ShellCheck false positive for JSON templates)
 
 **Acceptance criteria:**
