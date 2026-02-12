@@ -15,7 +15,7 @@ INPUT=$(cat)
 PROJECT_DIR="$(canonicalize_project_dir "${CLAUDE_PROJECT_DIR:-${PWD}}")"
 RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 QUEUE_FILE="${RUVECTOR_DIR}/pending-updates.jsonl"
-LOCK_FILE="${RUVECTOR_DIR}/queue.lock"
+LOCK_FILE="${RUVECTOR_DIR}/flush.lock"
 
 # Exit silently if ruvector is not initialized
 if [ ! -d "$RUVECTOR_DIR" ]; then
@@ -93,7 +93,7 @@ esac
 
 # Queue rotation: if queue exceeds 10MB, rotate atomically with flock
 if [ -f "$QUEUE_FILE" ] && [ ! -L "$QUEUE_FILE" ]; then
-  queue_size=$(stat -c %s "$QUEUE_FILE" 2>/dev/null || echo 0)
+  queue_size=$(wc -c < "$QUEUE_FILE" 2>/dev/null || echo 0)
   # Validate queue_size is numeric
   case "$queue_size" in
     ''|*[!0-9]*) queue_size=0 ;;
@@ -104,7 +104,7 @@ if [ -f "$QUEUE_FILE" ] && [ ! -L "$QUEUE_FILE" ]; then
       (
         flock -n 9 || { printf '[ruvector] Rotation skipped: lock held\n' >&2; exit 0; }
         # Only truncate if mv succeeds (prevents data loss)
-        if mv -- "$QUEUE_FILE" "${QUEUE_FILE}.1" 2>&1; then
+        if mv -- "$QUEUE_FILE" "${QUEUE_FILE}.1" 2>/dev/null; then
           : > "$QUEUE_FILE"
           printf '[ruvector] Queue rotated at %s bytes\n' "$queue_size" >&2
         else
@@ -113,7 +113,7 @@ if [ -f "$QUEUE_FILE" ] && [ ! -L "$QUEUE_FILE" ]; then
       ) 9>"$LOCK_FILE"
     else
       # No flock available — attempt rotation without lock (best effort)
-      if mv -- "$QUEUE_FILE" "${QUEUE_FILE}.1" 2>&1; then
+      if mv -- "$QUEUE_FILE" "${QUEUE_FILE}.1" 2>/dev/null; then
         : > "$QUEUE_FILE"
         printf '[ruvector] Queue rotated at %s bytes (no flock)\n' "$queue_size" >&2
       else

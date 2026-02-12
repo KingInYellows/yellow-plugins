@@ -39,9 +39,6 @@
     "skills": [
       "skills/ruvector-conventions/SKILL.md",
       "skills/agent-learning/SKILL.md"
-    ],
-    "mcpServers": [
-      "config/ruvector.mcp.json"
     ]
   },
   "compatibility": {
