@@ -46,6 +46,15 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-devin",
       "category": "development"
+    },
+    {
+      "id": "yellow-chatprd",
+      "name": "yellow-chatprd",
+      "description": "ChatPRD MCP integration with document management and Linear bridging",
+      "version": "1.0.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-chatprd",
+      "category": "productivity"
     }
   ]
 }
