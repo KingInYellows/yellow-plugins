@@ -1,0 +1,123 @@
+#!/bin/sh
+# Fetch unresolved, non-outdated PR review threads via GitHub GraphQL API.
+# Usage: get-pr-comments <owner/repo> <pr-number>
+# Output: JSON array of thread objects to stdout.
+# Errors: Exit 1 with message to stderr.
+
+set -eu
+
+# --- Dependency checks ---
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found. Install from https://cli.github.com\n' >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found. Install from https://jqlang.github.io/jq\n' >&2; exit 1; }
+
+# --- Input validation ---
+if [ $# -lt 2 ]; then
+    printf 'Usage: get-pr-comments <owner/repo> <pr-number>\n' >&2
+    exit 1
+fi
+
+REPO="$1"
+PR_NUMBER="$2"
+
+# Validate owner/repo format
+case "$REPO" in
+    */*)
+        OWNER="${REPO%%/*}"
+        NAME="${REPO#*/}"
+        if [ -z "$OWNER" ] || [ -z "$NAME" ]; then
+            printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2
+            exit 1
+        fi
+        ;;
+    *)
+        printf 'Error: Invalid repo format. Expected owner/repo, got: %s\n' "$REPO" >&2
+        exit 1
+        ;;
+esac
+
+# Validate PR number is numeric
+case "$PR_NUMBER" in
+    ''|*[!0-9]*)
+        printf 'Error: PR number must be numeric, got: %s\n' "$PR_NUMBER" >&2
+        exit 1
+        ;;
+esac
+
+# --- GraphQL query ---
+# shellcheck disable=SC2016
+QUERY='
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          isOutdated
+          path
+          line
+          startLine
+          comments(first: 50) {
+            nodes {
+              author { login }
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+
+# --- Execute query ---
+RESPONSE=$(gh api graphql \
+    -F owner="$OWNER" \
+    -F name="$NAME" \
+    -F "number=$PR_NUMBER" \
+    -f query="$QUERY" 2>&1) || {
+    # Parse error category from response
+    case "$RESPONSE" in
+        *"401"*|*"Bad credentials"*|*"authentication"*)
+            printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
+            ;;
+        *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
+            printf 'Error: Repository or PR not found: %s #%s\n' "$REPO" "$PR_NUMBER" >&2
+            ;;
+        *"rate limit"*|*"429"*)
+            printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
+            ;;
+        *)
+            printf 'Error: GraphQL query failed: %s\n' "$RESPONSE" >&2
+            ;;
+    esac
+    exit 1
+}
+
+# --- Validate response shape ---
+if ! printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest.reviewThreads' >/dev/null 2>&1; then
+    # Check for GraphQL-level errors
+    ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null)
+    if [ -n "$ERRORS" ]; then
+        printf 'Error: GraphQL error: %s\n' "$ERRORS" >&2
+    else
+        printf 'Error: Unexpected response shape from GitHub API.\n' >&2
+    fi
+    exit 1
+fi
+
+# --- Filter and transform ---
+printf '%s' "$RESPONSE" | jq '
+  [
+    .data.repository.pullRequest.reviewThreads.nodes[]
+    | select(.isResolved == false and .isOutdated == false)
+    | {
+        threadId: .id,
+        path: .path,
+        line: .line,
+        startLine: .startLine,
+        comments: [
+          .comments.nodes[]
+          | { author: .author.login, body: .body }
+        ]
+      }
+  ]'

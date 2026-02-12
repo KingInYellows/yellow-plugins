@@ -1,0 +1,91 @@
+#!/bin/sh
+# Resolve a single PR review thread via GitHub GraphQL API.
+# Usage: resolve-pr-thread <thread-node-id>
+# Output: JSON to stdout: {"resolved": true, "threadId": "PRRT_..."}
+# Errors: Exit 1 with message to stderr.
+
+set -eu
+
+# --- Dependency checks ---
+command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found. Install from https://cli.github.com\n' >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { printf 'Error: jq not found. Install from https://jqlang.github.io/jq\n' >&2; exit 1; }
+
+# --- Input validation ---
+if [ $# -lt 1 ]; then
+    printf 'Usage: resolve-pr-thread <thread-node-id>\n' >&2
+    exit 1
+fi
+
+THREAD_ID="$1"
+
+# Validate thread ID format (must start with PRRT_)
+case "$THREAD_ID" in
+    PRRT_*)
+        # Valid prefix
+        ;;
+    *)
+        printf 'Error: Invalid thread ID format. Expected PRRT_ prefix, got: %s\n' "$THREAD_ID" >&2
+        exit 1
+        ;;
+esac
+
+# --- GraphQL mutation ---
+# shellcheck disable=SC2016
+MUTATION='
+mutation($threadId: ID!) {
+  resolveReviewThread(input: { threadId: $threadId }) {
+    thread {
+      id
+      isResolved
+    }
+  }
+}'
+
+# --- Execute mutation ---
+RESPONSE=$(gh api graphql \
+    -F threadId="$THREAD_ID" \
+    -f query="$MUTATION" 2>&1) || {
+    case "$RESPONSE" in
+        *"401"*|*"Bad credentials"*|*"authentication"*)
+            printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
+            ;;
+        *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
+            printf 'Error: Thread not found: %s\n' "$THREAD_ID" >&2
+            ;;
+        *"rate limit"*|*"429"*)
+            printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
+            ;;
+        *"already resolved"*|*"ALREADY_RESOLVED"*)
+            # Idempotent — treat as success
+            printf '{"resolved": true, "threadId": "%s"}\n' "$THREAD_ID"
+            exit 0
+            ;;
+        *)
+            printf 'Error: GraphQL mutation failed: %s\n' "$RESPONSE" >&2
+            ;;
+    esac
+    exit 1
+}
+
+# --- Validate response ---
+IS_RESOLVED=$(printf '%s' "$RESPONSE" | jq -r '.data.resolveReviewThread.thread.isResolved // empty' 2>/dev/null)
+
+if [ "$IS_RESOLVED" = "true" ]; then
+    printf '{"resolved": true, "threadId": "%s"}\n' "$THREAD_ID"
+else
+    # Check for GraphQL-level errors
+    ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null)
+    if [ -n "$ERRORS" ]; then
+        # Check for already-resolved in error message (idempotent)
+        case "$ERRORS" in
+            *"already"*|*"resolved"*)
+                printf '{"resolved": true, "threadId": "%s"}\n' "$THREAD_ID"
+                exit 0
+                ;;
+        esac
+        printf 'Error: %s\n' "$ERRORS" >&2
+    else
+        printf 'Error: Thread resolution returned unexpected state.\n' >&2
+    fi
+    exit 1
+fi
