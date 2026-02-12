@@ -48,11 +48,15 @@ Ask user to describe the desired changes via AskUserQuestion:
 
 **Critical:** Re-fetch the document with `get_document` immediately before writing. The content may have changed during the user interaction in Step 4. Do NOT rely on the content fetched in Step 3.
 
-### Step 6: Update
+### Step 6: Confirm Changes (M3)
+
+Present the proposed changes to the user. If the document content changed since Step 3, highlight the differences. Ask user to confirm via AskUserQuestion before applying.
+
+### Step 7: Update
 
 Call `update_document` with the changes applied to the freshly-fetched content.
 
-### Step 7: Report
+### Step 8: Report
 
 Display confirmation:
 - Document title

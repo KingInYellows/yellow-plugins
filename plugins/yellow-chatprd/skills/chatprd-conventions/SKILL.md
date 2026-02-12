@@ -53,7 +53,7 @@ When `list_templates` is available, fetch the live list and match against the us
 All `$ARGUMENTS` values are user input and must be validated before use:
 
 - **Max length:** 500 characters. Reject longer inputs with a clear error.
-- **Path traversal:** Reject inputs containing `..`, `/`, or `~`.
+- **Path traversal:** Reject inputs containing `..` or `~`. Reject inputs that look like filesystem paths (e.g., starting with `/` or `./`).
 - **Whitespace:** Trim leading/trailing whitespace before processing.
 - **HTML:** Strip HTML tags from titles and descriptions before passing to MCP tools.
 - **General rule:** Never interpolate `$ARGUMENTS` into shell commands. Pass to MCP tools as API parameters only.
