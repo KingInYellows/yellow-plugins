@@ -72,8 +72,8 @@ query($owner: String!, $name: String!, $number: Int!) {
 
 # --- Execute query ---
 RESPONSE=$(gh api graphql \
-    -F owner="$OWNER" \
-    -F name="$NAME" \
+    -f owner="$OWNER" \
+    -f name="$NAME" \
     -F "number=$PR_NUMBER" \
     -f query="$QUERY" 2>&1) || {
     # Parse error category from response

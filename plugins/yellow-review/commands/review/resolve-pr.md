@@ -56,7 +56,7 @@ For each unresolved comment thread, spawn a `pr-comment-resolver` agent via Task
 - File path and line number
 - PR context (title, description)
 
-Launch all resolvers in parallel to generate proposed changes, then apply fixes sequentially to avoid conflicts.
+Launch all resolvers in parallel. Each agent reads context and edits files directly. Claude Code serializes concurrent Edit calls, but if multiple agents target overlapping file regions, later edits may fail. Review the aggregate diff in Step 5.
 
 ### Step 5: Review Changes
 
@@ -77,6 +77,8 @@ gt submit --no-interactive
 4. If rejected: report changes remain uncommitted for manual review
 
 ### Step 7: Mark Threads Resolved
+
+**Only if the user approved the push in Step 6.** If push was rejected, skip this step.
 
 For each comment thread that was addressed, run:
 ```bash
