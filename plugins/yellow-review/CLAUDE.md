@@ -52,7 +52,7 @@ Multi-agent PR review with adaptive agent selection, parallel comment resolution
 
 ## Cross-Plugin Agent References
 
-When conditions warrant, commands spawn these yellow-core agents via Task tool:
+When conditions warrant, commands spawn these agents via Task tool (using `compound-engineering:review:<name>` subagent_type):
 - `security-sentinel` — for auth, crypto, and shell script changes
 - `architecture-strategist` — for large (10+ file) cross-module changes
 - `performance-oracle` — for query-heavy or high-line-count PRs
@@ -60,12 +60,12 @@ When conditions warrant, commands spawn these yellow-core agents via Task tool:
 - `agent-native-reviewer` — for agent/command/skill file changes
 - `code-simplicity-reviewer` — additional simplification pass for large PRs
 
-**Requirement**: yellow-core plugin must be installed for cross-plugin agents to work.
+These agents are available via the Compound Engineering plugin's Task subagent types.
 
 ## Known Limitations
 
 - GraphQL scripts require `gh` and `jq` to be installed
-- Cross-plugin agents require yellow-core plugin installation
+- Cross-plugin agents require Compound Engineering plugin to be installed
 - Very large PRs (1000+ lines) may cause agent context overflow — consider splitting
 - Draft PRs are excluded from `/review:all scope=all` by default
 - `gt track` may fail on non-Graphite PRs — falls back to raw git (degraded mode)

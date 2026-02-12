@@ -61,7 +61,7 @@ Apply selection rules from `pr-review-workflow` skill:
 - Analyze `git diff --stat` and `git diff` output against trigger heuristics
 - Always include: `code-reviewer`
 - Conditionally include: `pr-test-analyzer`, `comment-analyzer`, `type-design-analyzer`, `silent-failure-hunter`
-- Cross-plugin (yellow-core) when conditions match: `security-sentinel`, `architecture-strategist`, `performance-oracle`, `pattern-recognition-specialist`, `agent-native-reviewer`
+- Cross-plugin (via Task tool) when conditions match: `security-sentinel`, `architecture-strategist`, `performance-oracle`, `pattern-recognition-specialist`, `agent-native-reviewer`
 
 ### Step 5: Pass 1 — Parallel Agent Review
 

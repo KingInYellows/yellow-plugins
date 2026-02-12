@@ -57,7 +57,7 @@ RESPONSE=$(gh api graphql \
             ;;
         *"already resolved"*|*"ALREADY_RESOLVED"*)
             # Idempotent — treat as success
-            printf '{"resolved": true, "threadId": "%s"}\n' "$THREAD_ID"
+            jq -n --arg id "$THREAD_ID" '{"resolved": true, "threadId": $id}'
             exit 0
             ;;
         *)
@@ -71,15 +71,15 @@ RESPONSE=$(gh api graphql \
 IS_RESOLVED=$(printf '%s' "$RESPONSE" | jq -r '.data.resolveReviewThread.thread.isResolved // empty' 2>/dev/null)
 
 if [ "$IS_RESOLVED" = "true" ]; then
-    printf '{"resolved": true, "threadId": "%s"}\n' "$THREAD_ID"
+    jq -n --arg id "$THREAD_ID" '{"resolved": true, "threadId": $id}'
 else
     # Check for GraphQL-level errors
     ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null)
     if [ -n "$ERRORS" ]; then
         # Check for already-resolved in error message (idempotent)
         case "$ERRORS" in
-            *"already"*|*"resolved"*)
-                printf '{"resolved": true, "threadId": "%s"}\n' "$THREAD_ID"
+            *"already resolved"*)
+                jq -n --arg id "$THREAD_ID" '{"resolved": true, "threadId": $id}'
                 exit 0
                 ;;
         esac

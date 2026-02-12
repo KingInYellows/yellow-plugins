@@ -50,6 +50,7 @@ query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
       reviewThreads(first: 100) {
+        pageInfo { hasNextPage }
         nodes {
           id
           isResolved
@@ -105,8 +106,14 @@ if ! printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest.reviewThreads
     exit 1
 fi
 
+# --- Warn about pagination limits ---
+HAS_MORE=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false' 2>/dev/null)
+if [ "$HAS_MORE" = "true" ]; then
+    printf 'Warning: PR has more than 100 review threads. Results are truncated.\n' >&2
+fi
+
 # --- Filter and transform ---
-printf '%s' "$RESPONSE" | jq '
+OUTPUT=$(printf '%s' "$RESPONSE" | jq '
   [
     .data.repository.pullRequest.reviewThreads.nodes[]
     | select(.isResolved == false and .isOutdated == false)
@@ -117,7 +124,12 @@ printf '%s' "$RESPONSE" | jq '
         startLine: .startLine,
         comments: [
           .comments.nodes[]
-          | { author: .author.login, body: .body }
+          | { author: (.author.login // "ghost"), body: .body }
         ]
       }
-  ]'
+  ]') || {
+    printf 'Error: Failed to transform GraphQL response.\n' >&2
+    exit 1
+}
+
+printf '%s\n' "$OUTPUT"

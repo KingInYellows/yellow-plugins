@@ -148,7 +148,7 @@ All commits via `gt modify -c -m "<message>"`. Push via `gt submit --no-interact
 ## Graphite Integration
 
 ### Standard Operations
-- **Commit**: `gt modify -c -m "fix: ..."` (never `gt commit create`)
+- **Commit**: `gt modify -c -m "fix: ..."`
 - **Push**: `gt submit --no-interactive`
 - **Restack**: `gt upstack restack` (abort on conflict, report to user)
 - **Checkout**: `gt checkout <branch>`
@@ -161,14 +161,14 @@ All commits via `gt modify -c -m "<message>"`. Push via `gt submit --no-interact
 
 ## Cross-Plugin Agent References
 
-To spawn yellow-core agents from yellow-review commands, use the Task tool:
+To spawn cross-plugin agents from yellow-review commands, use the Task tool:
 
 ```
 Task(subagent_type="compound-engineering:review:security-sentinel",
      prompt="Review these files for security issues: <file-list>")
 ```
 
-Agent type names follow the pattern: `compound-engineering:review:<agent-name>` for yellow-core review agents.
+Agent type names follow the pattern: `compound-engineering:review:<agent-name>`.
 
 ## GraphQL Scripts
 
