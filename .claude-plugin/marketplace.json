@@ -73,6 +73,15 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-ruvector",
       "category": "development"
+    },
+    {
+      "id": "yellow-browser-test",
+      "name": "yellow-browser-test",
+      "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
+      "version": "0.1.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-browser-test",
+      "category": "testing"
     }
   ]
 }
