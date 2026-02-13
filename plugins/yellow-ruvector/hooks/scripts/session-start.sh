@@ -43,14 +43,14 @@ if [ -f "$ROTATED_FILE" ] && [ ! -L "$ROTATED_FILE" ] && [ -s "$ROTATED_FILE" ];
 if [ "$has_queue" = "true" ]; then
   queue_lines=0
   if [ -s "$QUEUE_FILE" ]; then
-    queue_lines=$(wc -l < "$QUEUE_FILE" 2>/dev/null || echo 0)
+    queue_lines=$(wc -l < "$QUEUE_FILE" 2>/dev/null | tr -d ' ' || echo 0)
     # Validate numeric
     case "$queue_lines" in
       ''|*[!0-9]*) queue_lines=0 ;;
     esac
   fi
 
-  # Cap at 20 entries per session start to stay within the 3s total budget
+  # Cap at 20 entries total per session start to stay within the 3s budget
   # (~100ms per ruvector insert via CLI, 20 * 100ms = 2s leaves 1s for learnings)
   if [ "$queue_lines" -gt 0 ]; then
     # Use flock to prevent concurrent flush
@@ -60,57 +60,57 @@ if [ "$has_queue" = "true" ]; then
 
         # Clean stale flush.lock (if flock held by dead process, -n already fails above)
         # Re-read queue_lines inside lock (TOCTOU: file may have changed)
-        queue_lines=$(wc -l < "$QUEUE_FILE" 2>/dev/null || echo 0)
+        queue_lines=$(wc -l < "$QUEUE_FILE" 2>/dev/null | tr -d ' ' || echo 0)
         case "$queue_lines" in
           ''|*[!0-9]*) queue_lines=0 ;;
         esac
         if [ "$queue_lines" -eq 0 ]; then exit 0; fi
 
-        # Process rotated file first (if exists, it predates current queue)
-        if [ -f "$ROTATED_FILE" ] && [ ! -L "$ROTATED_FILE" ] && [ -s "$ROTATED_FILE" ]; then
-          head -n 10 "$ROTATED_FILE" | while IFS= read -r line; do
-            if ! printf '%s' "$line" | jq -e '.' >/dev/null 2>&1; then
-              printf '[ruvector] Skipping malformed rotated entry\n' >&2
-              continue
-            fi
-            entry_type=$(printf '%s' "$line" | jq -r '.type // ""')
-            if [ "$entry_type" = "file_change" ]; then
-              file_path=$(printf '%s' "$line" | jq -r '.file_path // ""')
-              if validate_file_path "$file_path" "$PROJECT_DIR" && [ -f "${PROJECT_DIR}/${file_path}" ]; then
-                npx ruvector insert --namespace code --file "${PROJECT_DIR}/${file_path}" 2>/dev/null || {
-                  printf '[ruvector] Insert failed for %s (rotated)\n' "$file_path" >&2
-                }
-              fi
-            fi
-          done
-          # Remove rotated file after processing (best-effort; truncation is acceptable)
-          rm -f -- "$ROTATED_FILE"
-        fi
-
-        # Process queue via ruvector CLI (NOT MCP)
-        head -n 20 "$QUEUE_FILE" | while IFS= read -r line; do
-          # Validate JSON before processing
+        # Shared helper: process a single queue entry (file_change only)
+        # bash_result entries are consumed by memory-manager agent, not CLI flush.
+        process_entry() {
+          local line="$1" label="$2"
           if ! printf '%s' "$line" | jq -e '.' >/dev/null 2>&1; then
-            printf '[ruvector] Skipping malformed queue entry\n' >&2
-            continue
+            printf '[ruvector] Skipping malformed %s entry\n' "$label" >&2
+            return
           fi
-          # Schema-aware parsing: entries may or may not have "schema" field
           entry_type=$(printf '%s' "$line" | jq -r '.type // ""')
           if [ "$entry_type" = "file_change" ]; then
             file_path=$(printf '%s' "$line" | jq -r '.file_path // ""')
-            # Validate file_path from queue (untrusted data)
             if validate_file_path "$file_path" "$PROJECT_DIR" && [ -f "${PROJECT_DIR}/${file_path}" ]; then
               npx ruvector insert --namespace code --file "${PROJECT_DIR}/${file_path}" 2>/dev/null || {
-                printf '[ruvector] Insert failed for %s\n' "$file_path" >&2
+                printf '[ruvector] Insert failed for %s (%s)\n' "$file_path" "$label" >&2
               }
             fi
           fi
-          # Note: bash_result entries are consumed by memory-manager agent, not CLI flush.
-          # They remain in the queue until flushed by the Stop hook or next session's truncation.
-        done
+        }
+
+        # Fixed caps: 5 rotated + 15 main = 20 total (stays within ~2s at ~100ms/insert)
+        # SECONDS builtin tracks elapsed time for per-insert budget checks
+        SECONDS=0
+        ROTATED_CAP=5
+        MAIN_CAP=15
+
+        # Process rotated file first (if exists, it predates current queue)
+        if [ -f "$ROTATED_FILE" ] && [ ! -L "$ROTATED_FILE" ] && [ -s "$ROTATED_FILE" ]; then
+          head -n "$ROTATED_CAP" "$ROTATED_FILE" | while IFS= read -r line; do
+            [ "$SECONDS" -ge 2 ] && { printf '[ruvector] Budget exceeded during rotated flush\n' >&2; break; }
+            process_entry "$line" "rotated"
+          done
+          # Remove rotated file after processing (best-effort)
+          rm -f -- "$ROTATED_FILE"
+        fi
+
+        # Process main queue (skip if budget already exceeded)
+        if [ "$SECONDS" -lt 2 ]; then
+          head -n "$MAIN_CAP" "$QUEUE_FILE" | while IFS= read -r line; do
+            [ "$SECONDS" -ge 2 ] && { printf '[ruvector] Budget exceeded during queue flush\n' >&2; break; }
+            process_entry "$line" "queue"
+          done
+        fi
 
         # Remove only the lines we actually processed (prevents losing concurrently-appended entries)
-        processed_count=$((queue_lines < 20 ? queue_lines : 20))
+        processed_count=$((queue_lines < MAIN_CAP ? queue_lines : MAIN_CAP))
         tail -n +"$((processed_count + 1))" "$QUEUE_FILE" > "${QUEUE_FILE}.tmp" && mv -- "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
       ) 9>"$FLUSH_LOCK"
     else

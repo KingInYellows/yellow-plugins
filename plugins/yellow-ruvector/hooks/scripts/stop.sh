@@ -30,7 +30,7 @@ if [ ! -f "$QUEUE_FILE" ] || [ -L "$QUEUE_FILE" ] || [ ! -s "$QUEUE_FILE" ]; the
 fi
 
 # Count pending entries
-count=$(wc -l < "$QUEUE_FILE" 2>/dev/null || echo 0)
+count=$(wc -l < "$QUEUE_FILE" 2>/dev/null | tr -d ' ' || echo 0)
 # Validate numeric
 case "$count" in
   ''|*[!0-9]*) count=0 ;;

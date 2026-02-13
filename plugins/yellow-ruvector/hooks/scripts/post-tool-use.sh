@@ -43,7 +43,7 @@ append_to_queue() {
     printf '[ruvector] jq produced empty output, skipping append\n' >&2
     return 1
   fi
-  if ! printf '%s\n' "$json_output" >> "$QUEUE_FILE" 2>&1; then
+  if ! printf '%s\n' "$json_output" >> "$QUEUE_FILE" 2>/dev/null; then
     printf '[ruvector] Failed to append to queue (disk full or permission denied?)\n' >&2
     return 1
   fi
@@ -93,7 +93,7 @@ esac
 
 # Queue rotation: if queue exceeds 10MB, rotate atomically with flock
 if [ -f "$QUEUE_FILE" ] && [ ! -L "$QUEUE_FILE" ]; then
-  queue_size=$(wc -c < "$QUEUE_FILE" 2>/dev/null || echo 0)
+  queue_size=$(wc -c < "$QUEUE_FILE" 2>/dev/null | tr -d ' ' || echo 0)
   # Validate queue_size is numeric
   case "$queue_size" in
     ''|*[!0-9]*) queue_size=0 ;;

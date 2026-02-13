@@ -61,12 +61,14 @@ teardown() {
 }
 
 @test "validate_file_path rejects path with newline" {
-  run validate_file_path $'src/file\n.txt' "$PROJECT_ROOT"
+  bad_path=$'src/file\n.txt'
+  run validate_file_path "$bad_path" "$PROJECT_ROOT"
   [ "$status" -eq 1 ]
 }
 
 @test "validate_file_path rejects path with carriage return" {
-  run validate_file_path $'src/file\r.txt' "$PROJECT_ROOT"
+  bad_path=$'src/file\r.txt'
+  run validate_file_path "$bad_path" "$PROJECT_ROOT"
   [ "$status" -eq 1 ]
 }
 
