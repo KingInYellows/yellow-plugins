@@ -25,25 +25,11 @@ This skill is not user-invocable. It provides shared context for the yellow-brow
 
 agent-browser uses `@e1`, `@e2` refs instead of CSS selectors. Always follow this cycle:
 
-```bash
-# 1. Navigate to page
-agent-browser open "$BASE_URL/dashboard"
-
-# 2. Take interactive snapshot to get element refs
-agent-browser snapshot -i
-# Output: button "Login" [ref=@e1], input "Email" [ref=@e2], input "Password" [ref=@e3]
-
-# 3. Interact using refs
-agent-browser fill @e2 "user@example.com"
-agent-browser fill @e3 "password123"
-agent-browser click @e1
-
-# 4. Wait for navigation/network
-agent-browser wait --load networkidle
-
-# 5. Re-snapshot after DOM changes (refs may change)
-agent-browser snapshot -i
-```
+1. Navigate to page: `agent-browser open "$BASE_URL/dashboard"`
+2. Take interactive snapshot to get element refs: `agent-browser snapshot -i`
+3. Interact using refs: `agent-browser fill @e2 "user@example.com"`
+4. Wait for navigation/network: `agent-browser wait --load networkidle`
+5. Re-snapshot after DOM changes (refs may change): `agent-browser snapshot -i`
 
 **Key rule:** Always re-snapshot after any action that changes the DOM. Refs are ephemeral — they only apply to the current snapshot.
 
@@ -65,61 +51,12 @@ State includes cookies, localStorage, sessionStorage, and IndexedDB. The state f
 
 When refs are unavailable or DOM changes frequently, use semantic locators:
 
-```bash
-# By visible text
-agent-browser find text "Submit Order" click
-
-# By label
-agent-browser find label "Email Address" fill "test@example.com"
-
-# By ARIA role
-agent-browser find role button click --name "Continue"
-
-# By test ID
-agent-browser find testid "submit-btn" click
-```
+- By visible text: `agent-browser find text "Submit Order" click`
+- By label: `agent-browser find label "Email Address" fill "test@example.com"`
+- By ARIA role: `agent-browser find role button click --name "Continue"`
+- By test ID: `agent-browser find testid "submit-btn" click`
 
 Use semantic locators as fallback when `snapshot -i` refs don't match expected elements.
-
-## Parallel Sessions
-
-Run isolated browser instances for concurrent testing:
-
-```bash
-# Create named sessions
-agent-browser --session checkout open https://shop.com/checkout
-agent-browser --session browse open https://shop.com/products
-
-# Each session has independent state
-agent-browser --session checkout snapshot -i
-agent-browser --session browse snapshot -i
-
-# List active sessions
-agent-browser session list
-```
-
-## Screenshots
-
-```bash
-# Current viewport
-agent-browser screenshot test-reports/screenshots/dashboard.png
-
-# Full page
-agent-browser screenshot --full test-reports/screenshots/dashboard-full.png
-```
-
-## Waiting
-
-```bash
-# Wait for element to appear
-agent-browser wait @e1
-
-# Wait for network idle
-agent-browser wait --load networkidle
-
-# Wait for URL pattern
-agent-browser wait --url "**/dashboard"
-```
 
 ## Safety Rules
 

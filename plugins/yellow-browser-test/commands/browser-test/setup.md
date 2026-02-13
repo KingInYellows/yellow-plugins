@@ -91,7 +91,17 @@ printenv TEST_USER_PASSWORD 2>/dev/null
 
 If missing, report which env vars need to be set.
 
-### Step 8: Suggest Next Steps
+### Step 8: Validate Written Config
+
+Read back the written config file and verify:
+
+1. Extract YAML frontmatter (between `---` delimiters)
+2. Check that `schema`, `devServer.command`, and `devServer.baseURL` fields exist
+3. If validation fails: report error with `printf '[browser-test] Config validation failed: missing required fields\n' >&2` and suggest re-running setup
+
+Use basic pattern matching — no need for YAML parser. Check for lines matching `schema:`, `command:`, `baseURL:`.
+
+### Step 9: Suggest Next Steps
 
 Report setup complete and suggest:
 - Run `/browser-test:test` to run the structured test suite

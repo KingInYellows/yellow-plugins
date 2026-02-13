@@ -61,7 +61,9 @@ Output a concise summary to the conversation:
 
 If there are failures with severity >= major:
 
-Use AskUserQuestion: "Found {N} failures (severity >= major). Create GitHub issues?"
+Check prerequisites: `command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1` — if either fails, log "[test-reporter] gh CLI not found/authenticated" and write issue templates to `test-reports/issues.md` instead.
+
+If gh CLI is ready, use AskUserQuestion: "Found {N} failures (severity >= major). Create GitHub issues?"
 - "Yes, create issues for all major/critical findings"
 - "No, report only"
 - "Let me review the report first"
@@ -69,6 +71,8 @@ Use AskUserQuestion: "Found {N} failures (severity >= major). Create GitHub issu
 **IMPORTANT:** ALWAYS ask before creating issues. Never auto-create.
 
 ### Step 5: Create GitHub Issues (if approved)
+
+Sanitize issue body: strip HTML tags (`sed 's/<[^>]*>//g'`), wrap user content in code blocks, remove GitHub Actions sequences (`::set-output`, `::add-mask`), and show complete body via AskUserQuestion for final confirmation.
 
 For each failure with severity >= major:
 
@@ -107,5 +111,6 @@ Report created issue URLs when done.
 ## Constraints
 
 - NEVER create GitHub issues without user confirmation via AskUserQuestion
+- Classify errors by severity per test-conventions skill (critical/high/medium/low)
 - Warn about PII in screenshots before creating public issues
-- If `gh` CLI is not available, report: "Install gh CLI to create issues: https://cli.github.com/"
+- If `gh` CLI is not available, write issue templates to `test-reports/issues.md`

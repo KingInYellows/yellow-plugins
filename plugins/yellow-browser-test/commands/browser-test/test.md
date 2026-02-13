@@ -37,14 +37,45 @@ Read `.claude/yellow-browser-test.local.md` for dev server command, base URL, au
 
 If not found: "No config found. Run `/browser-test:setup` to discover app configuration."
 
-If `$ARGUMENTS` is provided, use it as a route filter — only test routes matching the filter pattern. Validate: must start with `/`, only `[a-zA-Z0-9/_\-]` characters.
+Validate config after reading:
+
+```bash
+if [ ! -f .claude/yellow-browser-test.local.md ]; then
+  printf '[browser-test] Error: Config not found.\n' >&2
+  printf '[browser-test] Run /browser-test:setup to discover app configuration.\n' >&2
+  exit 1
+fi
+
+# Check YAML is parseable and required fields exist
+if ! grep -q 'devServer:' .claude/yellow-browser-test.local.md || \
+   ! grep -q 'baseURL:' .claude/yellow-browser-test.local.md || \
+   ! grep -q 'command:' .claude/yellow-browser-test.local.md; then
+  printf '[browser-test] Error: Config malformed.\n' >&2
+  printf '[browser-test] Re-run /browser-test:setup to regenerate.\n' >&2
+  exit 1
+fi
+```
+
+If `$ARGUMENTS` is provided, use it as a route filter — only test routes matching the filter pattern. Validate route filter:
+
+```bash
+if [ -n "$ARGUMENTS" ]; then
+  if ! printf '%s' "$ARGUMENTS" | grep -qE '^/[a-zA-Z0-9/_-]*$'; then
+    printf '[browser-test] Error: Invalid route filter format.\n' >&2
+    printf '[browser-test] Use: /path/to/route (alphanumeric, /, -, _ only)\n' >&2
+    exit 1
+  fi
+fi
+```
 
 ### Step 3: Manage Dev Server
 
 Check if the server is already running:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}" "$BASE_URL" 2>/dev/null
+CURL_ERROR=$(mktemp)
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL" 2>"$CURL_ERROR")
+CURL_EXIT=$?
 ```
 
 **If running (HTTP 200-399):** Use existing server. Do NOT stop it when tests finish.
@@ -59,7 +90,35 @@ echo $! > .claude/browser-test-server.pid
 Poll for readiness every 2 seconds up to `readyTimeout`:
 
 ```bash
-curl -s -o /dev/null "$BASE_URL$READY_PATH"
+MAX_ATTEMPTS=$((READY_TIMEOUT / 2))
+ATTEMPT=0
+LAST_CURL_ERROR=""
+
+while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
+  ATTEMPT=$((ATTEMPT + 1))
+  printf '[browser-test] Waiting for dev server (%d/%d)...\n' "$ATTEMPT" "$MAX_ATTEMPTS" >&2
+  
+  CURL_ERROR=$(mktemp)
+  if curl -s -o /dev/null "$BASE_URL$READY_PATH" 2>"$CURL_ERROR"; then
+    rm -f "$CURL_ERROR"
+    break
+  fi
+  LAST_CURL_ERROR=$(cat "$CURL_ERROR")
+  rm -f "$CURL_ERROR"
+  
+  if [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; then
+    sleep 2
+  fi
+done
+
+if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
+  printf '[browser-test] Error: Server timeout after %d seconds.\n' "$READY_TIMEOUT" >&2
+  if [ -n "$LAST_CURL_ERROR" ]; then
+    printf '[browser-test] Last curl error: %s\n' "$LAST_CURL_ERROR" >&2
+  fi
+  tail -20 .claude/browser-test-server.log >&2
+  exit 1
+fi
 ```
 
 If timeout: show last 20 lines of `.claude/browser-test-server.log` and report error.
@@ -68,11 +127,20 @@ If timeout: show last 20 lines of `.claude/browser-test-server.log` and report e
 
 ```bash
 mkdir -p test-reports/screenshots
+
+# Cleanup old screenshots (older than 7 days)
+find test-reports/screenshots -name '*.png' -mtime +7 -delete 2>/dev/null || true
 ```
 
 ### Step 5: Run Tests
 
-Spawn the `test-runner` agent in structured mode:
+Ask user for confirmation before spawning test-runner:
+
+```
+AskUserQuestion: "About to test {N} routes at {baseURL}. Proceed?"
+```
+
+If user confirms, spawn the `test-runner` agent in structured mode:
 
 ```
 Task(test-runner): "Run structured browser tests. Config at .claude/yellow-browser-test.local.md. Write results to test-reports/results.json. Test mode: structured."
@@ -91,8 +159,13 @@ Task(test-reporter): "Generate report from test-reports/results.json. Write repo
 If this command started the dev server (PID file exists at `.claude/browser-test-server.pid`):
 
 ```bash
-kill "$(cat .claude/browser-test-server.pid)" 2>/dev/null || true
-rm -f .claude/browser-test-server.pid
+if [ -f .claude/browser-test-server.pid ]; then
+  PID=$(cat .claude/browser-test-server.pid)
+  if printf '%s' "$PID" | grep -qE '^[0-9]+$' && kill -0 "$PID" 2>/dev/null; then
+    kill "$PID" || printf '[browser-test] Warning: Failed to stop server\n' >&2
+  fi
+  rm -f .claude/browser-test-server.pid
+fi
 ```
 
 Display inline summary of test results.

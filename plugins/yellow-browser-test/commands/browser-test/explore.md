@@ -29,13 +29,44 @@ If not found: "Run `/browser-test:setup` first."
 
 ### Step 2: Read Config and Manage Dev Server
 
-Read `.claude/yellow-browser-test.local.md`. Start dev server if not already running (same logic as `/browser-test:test`).
+Read `.claude/yellow-browser-test.local.md`. 
+
+Validate config after reading:
+
+```bash
+if [ ! -f .claude/yellow-browser-test.local.md ]; then
+  printf '[browser-test] Error: Config not found.\n' >&2
+  printf '[browser-test] Run /browser-test:setup to discover app configuration.\n' >&2
+  exit 1
+fi
+
+# Check YAML is parseable and required fields exist
+if ! grep -q 'devServer:' .claude/yellow-browser-test.local.md || \
+   ! grep -q 'baseURL:' .claude/yellow-browser-test.local.md || \
+   ! grep -q 'command:' .claude/yellow-browser-test.local.md; then
+  printf '[browser-test] Error: Config malformed.\n' >&2
+  printf '[browser-test] Re-run /browser-test:setup to regenerate.\n' >&2
+  exit 1
+fi
+```
+
+Start dev server if not already running (same logic as `/browser-test:test`).
 
 ### Step 3: Determine Starting Point
 
-If `$ARGUMENTS` provides a starting route:
-- Validate: must start with `/`, only `[a-zA-Z0-9/_\-]` characters
-- Use as the exploration starting point
+If `$ARGUMENTS` provides a starting route, validate it:
+
+```bash
+if [ -n "$ARGUMENTS" ]; then
+  if ! printf '%s' "$ARGUMENTS" | grep -qE '^/[a-zA-Z0-9/_-]*$'; then
+    printf '[browser-test] Error: Invalid route filter format.\n' >&2
+    printf '[browser-test] Use: /path/to/route (alphanumeric, /, -, _ only)\n' >&2
+    exit 1
+  fi
+fi
+```
+
+Use validated argument as the exploration starting point.
 
 If no argument: start from the first authenticated route in config (usually `/dashboard` or `/`).
 
@@ -43,11 +74,20 @@ If no argument: start from the first authenticated route in config (usually `/da
 
 ```bash
 mkdir -p test-reports/screenshots
+
+# Cleanup old screenshots (older than 7 days)
+find test-reports/screenshots -name '*.png' -mtime +7 -delete 2>/dev/null || true
 ```
 
 ### Step 5: Run Exploration
 
-Spawn the `test-runner` agent in exploratory mode:
+Ask user for confirmation before spawning test-runner:
+
+```
+AskUserQuestion: "About to explore app starting from {starting_route} at {baseURL}. Proceed?"
+```
+
+If user confirms, spawn the `test-runner` agent in exploratory mode:
 
 ```
 Task(test-runner): "Run exploratory browser tests. Config at .claude/yellow-browser-test.local.md. Write results to test-reports/results.json. Test mode: exploratory. Starting route: {route}."
@@ -72,7 +112,19 @@ Task(test-reporter): "Generate report from test-reports/results.json. Write repo
 
 ### Step 7: Cleanup
 
-If this command started the dev server, stop it via PID file. Display inline summary.
+If this command started the dev server, stop it via PID file:
+
+```bash
+if [ -f .claude/browser-test-server.pid ]; then
+  PID=$(cat .claude/browser-test-server.pid)
+  if printf '%s' "$PID" | grep -qE '^[0-9]+$' && kill -0 "$PID" 2>/dev/null; then
+    kill "$PID" || printf '[browser-test] Warning: Failed to stop server\n' >&2
+  fi
+  rm -f .claude/browser-test-server.pid
+fi
+```
+
+Display inline summary.
 
 ## Error Handling
 
