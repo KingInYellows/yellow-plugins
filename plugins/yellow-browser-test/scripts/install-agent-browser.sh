@@ -45,8 +45,8 @@ else
   rm -f "$NPM_ERRLOG"
 fi
 
-# Install Chromium
-printf '[browser-test] Installing Chromium browser...\n'
+# Ensure Chromium is installed (agent-browser install is idempotent)
+printf '[browser-test] Ensuring Chromium browser is installed...\n'
 CHROMIUM_EXIT=0
 CHROMIUM_ERRLOG=$(mktemp)
 agent-browser install 2>"$CHROMIUM_ERRLOG" || CHROMIUM_EXIT=$?

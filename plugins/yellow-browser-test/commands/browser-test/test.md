@@ -76,6 +76,7 @@ Check if the server is already running:
 CURL_ERROR=$(mktemp)
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL" 2>"$CURL_ERROR")
 CURL_EXIT=$?
+rm -f "$CURL_ERROR"
 ```
 
 **If running (HTTP 200-399):** Use existing server. Do NOT stop it when tests finish.
@@ -167,6 +168,8 @@ if [ -f .claude/browser-test-server.pid ]; then
     case "$PROC_CMD" in
       node|npm|npx|sh|bash)
         kill "$PID" || printf '[browser-test] Warning: Failed to stop server\n' >&2
+        # Also kill child processes (e.g., node spawned by npm run dev)
+        pkill -P "$PID" 2>/dev/null || true
         ;;
       *)
         printf '[browser-test] Warning: PID %s is not a dev server process (%s), skipping kill\n' "$PID" "$PROC_CMD" >&2

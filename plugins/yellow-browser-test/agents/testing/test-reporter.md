@@ -61,7 +61,7 @@ Sanitize issue body: strip HTML tags (`sed 's/<[^>]*>//g'`), wrap user content i
 
 For each failure with severity >= major:
 
-```bash
+````bash
 # Write title to variable with proper quoting
 ISSUE_TITLE="[browser-test] ${ROUTE} — ${FINDING_TITLE}"
 
@@ -97,7 +97,7 @@ gh issue create \
 
 # Clean up
 rm -f "$BODY_FILE"
-```
+````
 
 Warn user if screenshots may contain sensitive data before attaching to public issues.
 
