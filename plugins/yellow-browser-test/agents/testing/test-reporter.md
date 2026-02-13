@@ -77,10 +77,12 @@ Sanitize issue body: strip HTML tags (`sed 's/<[^>]*>//g'`), wrap user content i
 For each failure with severity >= major:
 
 ```bash
-gh issue create \
-  --title "[browser-test] {route} — {finding title}" \
-  --label "bug,browser-test" \
-  --body "$(cat <<'EOF'
+# Write title to variable with proper quoting
+ISSUE_TITLE="[browser-test] ${ROUTE} — ${FINDING_TITLE}"
+
+# Write body to temp file (prevents heredoc injection)
+BODY_FILE=$(mktemp)
+cat > "$BODY_FILE" <<'EOF'
 ## Browser Test Finding
 
 **Severity:** {severity}
@@ -101,7 +103,15 @@ gh issue create \
 
 {numbered repro steps}
 EOF
-)"
+
+# Create issue using temp file (safe from command injection)
+gh issue create \
+  --title "$ISSUE_TITLE" \
+  --label "bug,browser-test" \
+  --body-file "$BODY_FILE"
+
+# Clean up
+rm -f "$BODY_FILE"
 ```
 
 Warn user if screenshots may contain sensitive data before attaching to public issues.

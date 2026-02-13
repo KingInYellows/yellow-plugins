@@ -36,8 +36,8 @@
   "permissions": [
     {
       "scope": "shell",
-      "reason": "Run agent-browser CLI for browser automation, npm for installation, process management for dev servers",
-      "commands": ["agent-browser", "npm", "npx", "kill", "lsof", "curl"]
+      "reason": "Run agent-browser CLI for browser automation, npm for installation, process management for dev servers, gh for GitHub issue creation",
+      "commands": ["agent-browser", "npm", "npx", "kill", "lsof", "curl", "gh"]
     },
     {
       "scope": "filesystem",
