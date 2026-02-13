@@ -1,0 +1,59 @@
+{
+  "name": "yellow-ruvector",
+  "version": "0.1.0",
+  "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/kinginyellow"
+  },
+  "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-ruvector",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinginyellow/yellow-plugins"
+  },
+  "license": "MIT",
+  "keywords": ["vector-search", "agent-memory", "semantic-search", "embeddings", "self-learning"],
+  "mcpServers": {
+    "ruvector": {
+      "command": "npx",
+      "args": ["ruvector", "mcp-server"],
+      "env": {
+        "RUVECTOR_STORAGE_PATH": "${PWD}/.ruvector/"
+      }
+    }
+  },
+  "hooks": "./hooks/hooks.json",
+  "entrypoints": {
+    "commands": [
+      "commands/ruvector/setup.md",
+      "commands/ruvector/index.md",
+      "commands/ruvector/search.md",
+      "commands/ruvector/memory.md",
+      "commands/ruvector/learn.md",
+      "commands/ruvector/status.md"
+    ],
+    "agents": [
+      "agents/ruvector/semantic-search.md",
+      "agents/ruvector/memory-manager.md"
+    ],
+    "skills": [
+      "skills/ruvector-conventions/SKILL.md",
+      "skills/agent-learning/SKILL.md"
+    ]
+  },
+  "compatibility": {
+    "claudeCodeMin": "2.0.0"
+  },
+  "permissions": [
+    {
+      "scope": "filesystem",
+      "reason": "Read/write .ruvector/ directory for vector storage and queue files",
+      "paths": [".ruvector/"]
+    },
+    {
+      "scope": "shell",
+      "reason": "Run ruvector CLI, npm, and hook scripts for vector operations and installation",
+      "commands": ["ruvector", "npx", "npm", "jq", "git"]
+    }
+  ]
+}

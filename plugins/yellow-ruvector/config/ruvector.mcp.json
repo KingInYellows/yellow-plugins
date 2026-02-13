@@ -1,0 +1,9 @@
+{
+  "ruvector": {
+    "command": "npx",
+    "args": ["ruvector", "mcp-server"],
+    "env": {
+      "RUVECTOR_STORAGE_PATH": "${PWD}/.ruvector/"
+    }
+  }
+}

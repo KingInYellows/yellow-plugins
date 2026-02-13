@@ -64,6 +64,15 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-review",
       "category": "development"
+    },
+    {
+      "id": "yellow-ruvector",
+      "name": "yellow-ruvector",
+      "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
+      "version": "0.1.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-ruvector",
+      "category": "development"
     }
   ]
 }
