@@ -118,7 +118,16 @@ If this command started the dev server, stop it via PID file:
 if [ -f .claude/browser-test-server.pid ]; then
   PID=$(cat .claude/browser-test-server.pid)
   if printf '%s' "$PID" | grep -qE '^[0-9]+$' && kill -0 "$PID" 2>/dev/null; then
-    kill "$PID" || printf '[browser-test] Warning: Failed to stop server\n' >&2
+    # Verify this PID is actually a node/npm process before killing
+    PROC_CMD=$(ps -p "$PID" -o comm= 2>/dev/null || true)
+    case "$PROC_CMD" in
+      node|npm|npx|sh|bash)
+        kill "$PID" || printf '[browser-test] Warning: Failed to stop server\n' >&2
+        ;;
+      *)
+        printf '[browser-test] Warning: PID %s is not a dev server process (%s), skipping kill\n' "$PID" "$PROC_CMD" >&2
+        ;;
+    esac
   fi
   rm -f .claude/browser-test-server.pid
 fi

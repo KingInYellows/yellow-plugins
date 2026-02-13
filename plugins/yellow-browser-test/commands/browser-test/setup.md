@@ -85,8 +85,8 @@ Write the confirmed config to `.claude/yellow-browser-test.local.md`.
 If auth is enabled, check that required env vars are accessible:
 
 ```bash
-printenv TEST_USER_EMAIL 2>/dev/null
-printenv TEST_USER_PASSWORD 2>/dev/null
+printenv BROWSER_TEST_EMAIL 2>/dev/null
+printenv BROWSER_TEST_PASSWORD 2>/dev/null
 ```
 
 If missing, report which env vars need to be set.

@@ -14,17 +14,10 @@ allowed-tools:
 
 <examples>
 <example>
-Context: Structured tests completed with 2 failures.
-user: "Generate a report from the test results."
-assistant: "I'll read results.json, write a markdown report with failure details and screenshots, then ask if you want GitHub issues created for the 2 failures."
-<commentary>Reporter formats results and gates issue creation behind user confirmation.</commentary>
-</example>
-
-<example>
-Context: Exploratory tests found console errors on 3 pages.
-user: "Create a report and file bugs for the critical findings."
-assistant: "I'll generate the report and then ask you to confirm before creating GitHub issues for each finding with severity >= major."
-<commentary>Reporter always asks before creating issues — never auto-creates.</commentary>
+Context: Tests completed with failures.
+user: "Generate a report and file bugs for critical findings."
+assistant: "I'll read results.json, write a markdown report with failure details and screenshots, then ask you to confirm before creating GitHub issues for findings with severity >= major."
+<commentary>Reporter formats results and always gates issue creation behind user confirmation.</commentary>
 </example>
 </examples>
 
@@ -47,15 +40,10 @@ Include:
 - Summary table
 - **Failures section** — each failure with description, screenshot, and repro steps
 - **Warnings section** — skipped routes, non-critical observations
-- **Passed routes** — collapsed in a `<details>` block
 
 ### Step 3: Present Inline Summary
 
-Output a concise summary to the conversation:
-- Total routes tested
-- Pass/fail/skip counts
-- Top findings by severity
-- Report file path
+Output total routes tested, pass/fail/skip counts, top findings by severity, and report file path.
 
 ### Step 4: Offer GitHub Issue Creation
 
@@ -63,10 +51,7 @@ If there are failures with severity >= major:
 
 Check prerequisites: `command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1` — if either fails, log "[test-reporter] gh CLI not found/authenticated" and write issue templates to `test-reports/issues.md` instead.
 
-If gh CLI is ready, use AskUserQuestion: "Found {N} failures (severity >= major). Create GitHub issues?"
-- "Yes, create issues for all major/critical findings"
-- "No, report only"
-- "Let me review the report first"
+If gh CLI is ready, use AskUserQuestion: "Found {N} failures (severity >= major). Create GitHub issues?" Options: "Yes, create issues for all major/critical findings" / "No, report only" / "Let me review the report first"
 
 **IMPORTANT:** ALWAYS ask before creating issues. Never auto-create.
 
@@ -121,6 +106,6 @@ Report created issue URLs when done.
 ## Constraints
 
 - NEVER create GitHub issues without user confirmation via AskUserQuestion
-- Classify errors by severity per test-conventions skill (critical/high/medium/low)
+- Classify errors by severity per test-conventions skill (critical/major/minor/cosmetic)
 - Warn about PII in screenshots before creating public issues
 - If `gh` CLI is not available, write issue templates to `test-reports/issues.md`

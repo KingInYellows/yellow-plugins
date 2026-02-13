@@ -39,8 +39,8 @@ auth:
   type: "email-password"
   loginPath: "/login"
   credentials:
-    email: "$TEST_USER_EMAIL"
-    password: "$TEST_USER_PASSWORD"
+    email: "$BROWSER_TEST_EMAIL"
+    password: "$BROWSER_TEST_PASSWORD"
   formFields:
     email: "email"
     password: "password"
@@ -64,7 +64,7 @@ routes:
 
 ## Credential Handling Rules
 
-1. **Never store actual credentials** — config references env var NAMES only (`$TEST_USER_EMAIL`)
+1. **Never store actual credentials** — config references env var NAMES only (`$BROWSER_TEST_EMAIL`)
 2. **Auth state file** — `.claude/browser-test-auth.json` must be gitignored
 3. **Missing vars** — If env vars are not set, error with: "Set {VAR_NAME} in your environment or .env.local"
 4. **PID file** — `.claude/browser-test-server.pid` must be gitignored
