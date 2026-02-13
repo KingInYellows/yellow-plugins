@@ -25,13 +25,13 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   exit 0
 fi
 
-# Track elapsed time for budget enforcement (macOS-portable)
+# Track elapsed time for budget enforcement (macOS-portable, second granularity)
 start_time=$(date +%s)
 
-elapsed_ms() {
+elapsed_s() {
   local now
   now=$(date +%s)
-  echo $(( (now - start_time) * 1000 ))
+  echo $(( now - start_time ))
 }
 
 learnings=""
@@ -109,12 +109,9 @@ if [ "$has_queue" = "true" ]; then
           # They remain in the queue until flushed by the Stop hook or next session's truncation.
         done
 
-        # Atomically remove processed lines inside the lock (prevents TOCTOU race)
-        if [ "$queue_lines" -le 20 ]; then
-          : > "$QUEUE_FILE"
-        else
-          tail -n +"21" "$QUEUE_FILE" > "${QUEUE_FILE}.tmp" && mv -- "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
-        fi
+        # Remove only the lines we actually processed (prevents losing concurrently-appended entries)
+        processed_count=$((queue_lines < 20 ? queue_lines : 20))
+        tail -n +"$((processed_count + 1))" "$QUEUE_FILE" > "${QUEUE_FILE}.tmp" && mv -- "${QUEUE_FILE}.tmp" "$QUEUE_FILE"
       ) 9>"$FLUSH_LOCK"
     else
       printf '[ruvector] flock not available, skipping queue flush\n' >&2
@@ -131,9 +128,9 @@ if [ "$has_queue" = "true" ]; then
   fi
 fi
 
-# Budget split: 1500ms for queue flush, remaining 1500ms for learning retrieval
-if [ "$(elapsed_ms)" -gt 1500 ]; then
-  printf '[ruvector] Budget exceeded after queue flush (%sms), skipping learnings\n' "$(elapsed_ms)" >&2
+# Budget split: ~1s for queue flush, remaining ~2s for learning retrieval
+if [ "$(elapsed_s)" -gt 1 ]; then
+  printf '[ruvector] Budget exceeded after queue flush (%ss), skipping learnings\n' "$(elapsed_s)" >&2
   printf '{"continue": true}\n'
   exit 0
 fi

@@ -8,11 +8,12 @@ set -eu
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "${SCRIPT_DIR}/lib/validate.sh"
 
-# Consume stdin (hook contract requires reading it)
-cat > /dev/null
+# Read hook input from stdin (extract .cwd for project directory resolution)
+INPUT=$(cat)
+CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // ""' 2>/dev/null) || CWD=""
 
-# Canonicalize project directory
-PROJECT_DIR="$(canonicalize_project_dir "${CLAUDE_PROJECT_DIR:-${PWD}}")"
+# Canonicalize project directory (consistent with session-start.sh)
+PROJECT_DIR="$(canonicalize_project_dir "${CWD:-${CLAUDE_PROJECT_DIR:-${PWD}}}")"
 RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 QUEUE_FILE="${RUVECTOR_DIR}/pending-updates.jsonl"
 

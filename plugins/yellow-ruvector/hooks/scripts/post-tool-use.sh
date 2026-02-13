@@ -103,9 +103,8 @@ if [ -f "$QUEUE_FILE" ] && [ ! -L "$QUEUE_FILE" ]; then
     if command -v flock >/dev/null 2>&1; then
       (
         flock -n 9 || { printf '[ruvector] Rotation skipped: lock held\n' >&2; exit 0; }
-        # Only truncate if mv succeeds (prevents data loss)
+        # mv already removes the old file; next >> append creates a fresh one automatically
         if mv -- "$QUEUE_FILE" "${QUEUE_FILE}.1" 2>/dev/null; then
-          : > "$QUEUE_FILE"
           printf '[ruvector] Queue rotated at %s bytes\n' "$queue_size" >&2
         else
           printf '[ruvector] Queue rotation failed (mv error)\n' >&2
@@ -114,7 +113,6 @@ if [ -f "$QUEUE_FILE" ] && [ ! -L "$QUEUE_FILE" ]; then
     else
       # No flock available — attempt rotation without lock (best effort)
       if mv -- "$QUEUE_FILE" "${QUEUE_FILE}.1" 2>/dev/null; then
-        : > "$QUEUE_FILE"
         printf '[ruvector] Queue rotated at %s bytes (no flock)\n' "$queue_size" >&2
       else
         printf '[ruvector] Queue rotation failed\n' >&2
