@@ -61,25 +61,16 @@ printf '[sync] Checking Linear MCP availability...\n' >&2
 CONFIG_FILE=".debt/linear-config.json"
 CONFIG_CREATED=false
 
-if [ ! -f "$CONFIG_FILE" ] || [ -n "$TEAM_OVERRIDE" ] || [ -n "$PROJECT_OVERRIDE" ]; then
-  # First sync or override - get team/project selection
-
-  printf '[sync] Linear configuration needed.\n' >&2
-
-  # Use AskUserQuestion to select team and project
-  # In actual implementation:
-  # 1. List available teams via Linear MCP
-  # 2. Ask user to select team
-  # 3. List projects in selected team
-  # 4. Ask user to select project
-  # 5. Store in config file
+# Case 1: No config file exists - create placeholder and exit
+if [ ! -f "$CONFIG_FILE" ]; then
+  printf '[sync] No Linear configuration found. Creating placeholder...\n' >&2
 
   printf '\nTo configure Linear sync:\n'
   printf '  1. Use AskUserQuestion to select Linear team\n'
   printf '  2. Use AskUserQuestion to select Linear project\n'
   printf '  3. Store config in %s\n' "$CONFIG_FILE"
 
-  # Placeholder config structure:
+  # Create placeholder config structure
   cat > "$CONFIG_FILE" <<EOF
 {
   "team_id": "TEAM_UUID",
@@ -89,41 +80,6 @@ if [ ! -f "$CONFIG_FILE" ] || [ -n "$TEAM_OVERRIDE" ] || [ -n "$PROJECT_OVERRIDE
 }
 EOF
 
-  CONFIG_CREATED=true
-  printf '\nConfig file created at: %s\n' "$CONFIG_FILE"
-fi
-
-# Load config
-TEAM_ID=$(jq -r '.team_id' "$CONFIG_FILE")
-TEAM_NAME=$(jq -r '.team_name' "$CONFIG_FILE")
-PROJECT_ID=$(jq -r '.project_id' "$CONFIG_FILE")
-PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
-
-# Only validate if config was pre-existing (not just created as placeholder)
-if [ "$CONFIG_CREATED" = false ]; then
-  # Validate UUID formats (prevent injection)
-  if ! [[ "$TEAM_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-    printf 'ERROR: Invalid team_id format in config (expected UUID)\n' >&2
-    exit 1
-  fi
-
-  if ! [[ "$PROJECT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-    printf 'ERROR: Invalid project_id format in config (expected UUID)\n' >&2
-    exit 1
-  fi
-
-  # Validate name formats (alphanumeric, spaces, hyphens only, max 100 chars)
-  if ! [[ "$TEAM_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
-    printf 'ERROR: Invalid team_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
-    exit 1
-  fi
-
-  if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
-    printf 'ERROR: Invalid project_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
-    exit 1
-  fi
-else
-  # Placeholder config created - instruct user to configure
   printf '\n⚠️  Placeholder config created. Please configure Linear integration:\n' >&2
   printf '   1. Edit %s\n' "$CONFIG_FILE" >&2
   printf '   2. Replace TEAM_UUID with actual team UUID from Linear\n' >&2
@@ -131,6 +87,72 @@ else
   printf '   4. Update team_name and project_name as needed\n' >&2
   printf '\nRun this command again after configuration.\n' >&2
   exit 0
+fi
+
+# Case 2: Config exists and override flags are passed - update specified fields
+if [ -n "$TEAM_OVERRIDE" ] || [ -n "$PROJECT_OVERRIDE" ]; then
+  printf '[sync] Override flags detected. Updating existing config...\n' >&2
+
+  # Load existing config
+  TEAM_ID=$(jq -r '.team_id' "$CONFIG_FILE")
+  TEAM_NAME=$(jq -r '.team_name' "$CONFIG_FILE")
+  PROJECT_ID=$(jq -r '.project_id' "$CONFIG_FILE")
+  PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
+
+  # Update team if override provided
+  if [ -n "$TEAM_OVERRIDE" ]; then
+    # In actual implementation:
+    # 1. Use Linear MCP to resolve team name to UUID
+    # 2. Update TEAM_ID and TEAM_NAME
+    printf '[sync] Would update team to: %s (not implemented)\n' "$TEAM_OVERRIDE" >&2
+  fi
+
+  # Update project if override provided
+  if [ -n "$PROJECT_OVERRIDE" ]; then
+    # In actual implementation:
+    # 1. Use Linear MCP to resolve project name to UUID (within selected team)
+    # 2. Update PROJECT_ID and PROJECT_NAME
+    printf '[sync] Would update project to: %s (not implemented)\n' "$PROJECT_OVERRIDE" >&2
+  fi
+
+  # Write updated config back
+  jq -n \
+    --arg team_id "$TEAM_ID" \
+    --arg team_name "$TEAM_NAME" \
+    --arg project_id "$PROJECT_ID" \
+    --arg project_name "$PROJECT_NAME" \
+    '{team_id: $team_id, team_name: $team_name, project_id: $project_id, project_name: $project_name}' \
+    > "$CONFIG_FILE"
+
+  printf '[sync] Config updated at: %s\n' "$CONFIG_FILE" >&2
+fi
+
+# Case 3: Config exists - load and validate
+TEAM_ID=$(jq -r '.team_id' "$CONFIG_FILE")
+TEAM_NAME=$(jq -r '.team_name' "$CONFIG_FILE")
+PROJECT_ID=$(jq -r '.project_id' "$CONFIG_FILE")
+PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
+
+# Validate UUID formats (prevent injection)
+if ! [[ "$TEAM_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  printf 'ERROR: Invalid team_id format in config (expected UUID)\n' >&2
+  exit 1
+fi
+
+if ! [[ "$PROJECT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  printf 'ERROR: Invalid project_id format in config (expected UUID)\n' >&2
+  exit 1
+fi
+
+# Validate name formats (alphanumeric, spaces, hyphens only, max 100 chars)
+if ! [[ "$TEAM_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
+  printf 'ERROR: Invalid team_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
+  exit 1
+fi
+
+if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
+  printf 'ERROR: Invalid project_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
+  exit 1
 fi
 
 printf '[sync] Syncing to Linear: %s / %s\n' "$TEAM_NAME" "$PROJECT_NAME" >&2

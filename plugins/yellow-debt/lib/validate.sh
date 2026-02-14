@@ -10,6 +10,8 @@ extract_frontmatter() {
   local file="$1"
   [ -f "$file" ] || return 1
   # Extract content between first and second '---' markers
+  # awk logic: ++c increments counter on each '---' match; c==1 prints lines between first and second delimiter
+  # The first '---' is included in output (yq handles the YAML document separator)
   awk '/^---$/{if(++c==2) exit} c==1' "$file"
 }
 
@@ -28,7 +30,7 @@ update_frontmatter() {
 
   # Extract frontmatter and update field
   local updated_frontmatter
-  updated_frontmatter=$(extract_frontmatter "$file" | yq -y "$field = \"$value\"" 2>/dev/null) || return 1
+  updated_frontmatter=$(extract_frontmatter "$file" | yq -y --arg val "$value" "$field = \$val" 2>/dev/null) || return 1
 
   # Extract body (everything after second ---)
   local body
@@ -124,7 +126,7 @@ transition_todo_state() {
 
   # Update frontmatter (extract YAML, update, reconstruct markdown)
   local updated_frontmatter body
-  updated_frontmatter=$(extract_frontmatter "$todo_file" | yq -y ".status = \"$new_state\"" 2>/dev/null) || return 1
+  updated_frontmatter=$(extract_frontmatter "$todo_file" | yq -y --arg val "$new_state" '.status = $val' 2>/dev/null) || return 1
   body=$(awk '/^---$/{if(++c==2) {p=1; next}} p' "$todo_file")
 
   # Write updated content to temp file
