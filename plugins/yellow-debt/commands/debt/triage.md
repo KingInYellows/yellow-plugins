@@ -23,11 +23,9 @@ Interactively review pending technical debt findings and decide to accept (ready
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Source validation library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# Source shared validation library for extract_frontmatter and transition helpers
 # shellcheck source=../../lib/validate.sh
-source "${PLUGIN_ROOT}/lib/validate.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
 
 # Parse arguments
 CATEGORY_FILTER=""
@@ -80,8 +78,8 @@ for todo_path in "${TODO_FILES[@]}"; do
   fi
 
   # Extract frontmatter
-  CATEGORY=$(yq '.category' "$todo_path" 2>/dev/null || echo "")
-  PRIORITY=$(yq '.priority' "$todo_path" 2>/dev/null || echo "")
+  CATEGORY=$(extract_frontmatter "$todo_path" | yq '.category' 2>/dev/null || echo "")
+  PRIORITY=$(extract_frontmatter "$todo_path" | yq '.priority' 2>/dev/null || echo "")
 
   # Apply category filter
   if [ -n "$CATEGORY_FILTER" ] && [ "$CATEGORY" != "$CATEGORY_FILTER" ]; then
@@ -127,11 +125,11 @@ DEFERRED_COUNT=0
 
 for todo_path in "${FILTERED_FILES[@]}"; do
   # Extract metadata
-  TITLE=$(yq -r '.title // "Untitled"' "$todo_path" 2>/dev/null)
-  CATEGORY=$(yq -r '.category' "$todo_path" 2>/dev/null)
-  SEVERITY=$(yq -r '.severity' "$todo_path" 2>/dev/null)
-  EFFORT=$(yq -r '.effort' "$todo_path" 2>/dev/null)
-  AFFECTED_FILES=$(yq -r '.affected_files[]' "$todo_path" 2>/dev/null | head -1)
+  TITLE=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"' 2>/dev/null)
+  CATEGORY=$(extract_frontmatter "$todo_path" | yq -r '.category' 2>/dev/null)
+  SEVERITY=$(extract_frontmatter "$todo_path" | yq -r '.severity' 2>/dev/null)
+  EFFORT=$(extract_frontmatter "$todo_path" | yq -r '.effort' 2>/dev/null)
+  AFFECTED_FILES=$(extract_frontmatter "$todo_path" | yq -r '.affected_files[]' 2>/dev/null | head -1)
 
   # Display finding
   printf '═════════════════════════════════════════════════════════════\n'

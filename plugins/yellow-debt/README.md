@@ -164,6 +164,8 @@ All state transitions are atomic and TOCTOU-safe via `flock`.
 - **Required**: git, jq, yq, realpath, flock, Graphite CLI (gt)
 - **Optional**: yellow-linear plugin (for `/debt:sync`)
 
+**Note on yq**: This plugin is compatible with kislyuk/yq (Python-based YAML processor). Todo files are markdown with YAML frontmatter, which requires special handling via the `extract_frontmatter()` and `update_frontmatter()` helpers in `lib/validate.sh`. These functions extract the YAML section before passing to yq, ensuring compatibility across different yq implementations.
+
 ## Installation
 
 ```bash

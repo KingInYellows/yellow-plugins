@@ -20,6 +20,10 @@ Display a dashboard of current technical debt levels aggregated by status, categ
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Source shared validation library for extract_frontmatter helper
+# shellcheck source=../../lib/validate.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
+
 # Parse arguments
 JSON_OUTPUT=false
 
@@ -43,7 +47,7 @@ declare -A by_severity
 declare -A by_effort
 
 # Initialize counters
-for status in pending ready in-progress deferred complete; do
+for status in pending ready in-progress deferred complete deleted; do
   by_status["$status"]=0
 done
 
@@ -72,11 +76,14 @@ if [ -d todos/debt ]; then
       continue
     fi
 
-    # Extract metadata using yq
-    STATUS=$(yq -r '.status // "unknown"' "$todo_file" 2>/dev/null)
-    CATEGORY=$(yq -r '.category // "unknown"' "$todo_file" 2>/dev/null)
-    SEVERITY=$(yq -r '.severity // "unknown"' "$todo_file" 2>/dev/null)
-    EFFORT=$(yq -r '.effort // "unknown"' "$todo_file" 2>/dev/null)
+    # Extract metadata using yq on YAML frontmatter only
+    # NOTE: Todo files are markdown with YAML frontmatter. extract_frontmatter()
+    #       extracts only the YAML section for yq compatibility (kislyuk/yq cannot
+    #       parse mixed markdown+YAML format).
+    STATUS=$(extract_frontmatter "$todo_file" | yq -r '.status // "unknown"' 2>/dev/null)
+    CATEGORY=$(extract_frontmatter "$todo_file" | yq -r '.category // "unknown"' 2>/dev/null)
+    SEVERITY=$(extract_frontmatter "$todo_file" | yq -r '.severity // "unknown"' 2>/dev/null)
+    EFFORT=$(extract_frontmatter "$todo_file" | yq -r '.effort // "unknown"' 2>/dev/null)
 
     # Validate and increment status counter
     case "$STATUS" in
@@ -156,7 +163,8 @@ if [ "$JSON_OUTPUT" = true ]; then
     "ready": ${by_status[ready]},
     "in_progress": ${by_status[in-progress]},
     "deferred": ${by_status[deferred]},
-    "complete": ${by_status[complete]}
+    "complete": ${by_status[complete]},
+    "deleted": ${by_status[deleted]}
   },
   "by_category": {
     "ai_patterns": ${by_category[ai-patterns]},
@@ -186,6 +194,7 @@ By Status:
   In Progress: ${by_status[in-progress]} finding
   Deferred:    ${by_status[deferred]} findings
   Complete:    ${by_status[complete]} findings (resolved)
+  Deleted:     ${by_status[deleted]} findings (removed)
 
 By Category:
   Complexity:    ${by_category[complexity]}

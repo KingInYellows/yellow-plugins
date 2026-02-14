@@ -78,8 +78,12 @@ Read(file_path="src/services/user-service.ts")
 **First, validate file scope** (MANDATORY - must run before showing diff):
 
 ```bash
+# Source shared validation library for extract_frontmatter
+# shellcheck source=../../lib/validate.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
+
 # Extract affected files from todo
-AFFECTED_FILES=$(yq -r '.affected_files[]' "$TODO_PATH" 2>/dev/null | cut -d: -f1)
+AFFECTED_FILES=$(extract_frontmatter "$TODO_PATH" | yq -r '.affected_files[]' 2>/dev/null | cut -d: -f1)
 
 # Get list of modified files
 MODIFIED_FILES=$(git diff --name-only)

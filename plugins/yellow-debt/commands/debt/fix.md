@@ -22,13 +22,16 @@ Agent-driven remediation of a specific technical debt finding with mandatory hum
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Source validation library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# Source shared validation library for extract_frontmatter and transition_todo_state
 # shellcheck source=../../lib/validate.sh
-source "${PLUGIN_ROOT}/lib/validate.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
 
 # Parse arguments
+if [ $# -ne 1 ]; then
+  printf 'Usage: /debt:fix <todo-id>\n' >&2
+  exit 1
+fi
+
 TODO_PATH="${1:-}"
 
 if [ -z "$TODO_PATH" ]; then
@@ -60,7 +63,7 @@ if [ ! -f "$TODO_PATH" ]; then
 fi
 
 # Read todo metadata
-STATUS=$(yq -r '.status' "$TODO_PATH" 2>/dev/null)
+STATUS=$(extract_frontmatter "$TODO_PATH" | yq -r '.status' 2>/dev/null)
 
 # Verify status is ready
 if [ "$STATUS" != "ready" ]; then
@@ -81,10 +84,10 @@ transition_todo_state "$TODO_PATH" "in-progress" || {
 NEW_TODO_PATH=$(printf '%s' "$TODO_PATH" | sed 's/-ready-/-in-progress-/')
 
 # Extract finding details
-TITLE=$(yq -r '.title // "Untitled"' "$NEW_TODO_PATH" 2>/dev/null)
-CATEGORY=$(yq -r '.category' "$NEW_TODO_PATH" 2>/dev/null)
-SEVERITY=$(yq -r '.severity' "$NEW_TODO_PATH" 2>/dev/null)
-TODO_ID=$(yq -r '.id' "$NEW_TODO_PATH" 2>/dev/null)
+TITLE=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.title // "Untitled"' 2>/dev/null)
+CATEGORY=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.category' 2>/dev/null)
+SEVERITY=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.severity' 2>/dev/null)
+TODO_ID=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.id' 2>/dev/null)
 
 printf '[fix] Launching debt-fixer agent for: %s\n' "$TITLE" >&2
 printf '[fix] Category: %s | Severity: %s | ID: %s\n' "$CATEGORY" "$SEVERITY" "$TODO_ID" >&2

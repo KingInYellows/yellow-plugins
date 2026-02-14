@@ -28,6 +28,10 @@ Push accepted technical debt findings to Linear as issues with idempotent sync a
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Source shared validation library for extract_frontmatter helper
+# shellcheck source=../../lib/validate.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
+
 # Parse arguments
 TEAM_OVERRIDE=""
 PROJECT_OVERRIDE=""
@@ -55,6 +59,7 @@ printf '[sync] Checking Linear MCP availability...\n' >&2
 
 # Load or create config
 CONFIG_FILE=".debt/linear-config.json"
+CONFIG_CREATED=false
 
 if [ ! -f "$CONFIG_FILE" ] || [ -n "$TEAM_OVERRIDE" ] || [ -n "$PROJECT_OVERRIDE" ]; then
   # First sync or override - get team/project selection
@@ -84,6 +89,7 @@ if [ ! -f "$CONFIG_FILE" ] || [ -n "$TEAM_OVERRIDE" ] || [ -n "$PROJECT_OVERRIDE
 }
 EOF
 
+  CONFIG_CREATED=true
   printf '\nConfig file created at: %s\n' "$CONFIG_FILE"
 fi
 
@@ -93,26 +99,38 @@ TEAM_NAME=$(jq -r '.team_name' "$CONFIG_FILE")
 PROJECT_ID=$(jq -r '.project_id' "$CONFIG_FILE")
 PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
 
-# Validate UUID formats (prevent injection)
-if ! [[ "$TEAM_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  printf 'ERROR: Invalid team_id format in config (expected UUID)\n' >&2
-  exit 1
-fi
+# Only validate if config was pre-existing (not just created as placeholder)
+if [ "$CONFIG_CREATED" = false ]; then
+  # Validate UUID formats (prevent injection)
+  if ! [[ "$TEAM_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+    printf 'ERROR: Invalid team_id format in config (expected UUID)\n' >&2
+    exit 1
+  fi
 
-if ! [[ "$PROJECT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  printf 'ERROR: Invalid project_id format in config (expected UUID)\n' >&2
-  exit 1
-fi
+  if ! [[ "$PROJECT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+    printf 'ERROR: Invalid project_id format in config (expected UUID)\n' >&2
+    exit 1
+  fi
 
-# Validate name formats (alphanumeric, spaces, hyphens only, max 100 chars)
-if ! [[ "$TEAM_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
-  printf 'ERROR: Invalid team_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
-  exit 1
-fi
+  # Validate name formats (alphanumeric, spaces, hyphens only, max 100 chars)
+  if ! [[ "$TEAM_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
+    printf 'ERROR: Invalid team_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
+    exit 1
+  fi
 
-if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
-  printf 'ERROR: Invalid project_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
-  exit 1
+  if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
+    printf 'ERROR: Invalid project_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
+    exit 1
+  fi
+else
+  # Placeholder config created - instruct user to configure
+  printf '\n⚠️  Placeholder config created. Please configure Linear integration:\n' >&2
+  printf '   1. Edit %s\n' "$CONFIG_FILE" >&2
+  printf '   2. Replace TEAM_UUID with actual team UUID from Linear\n' >&2
+  printf '   3. Replace PROJECT_UUID with actual project UUID from Linear\n' >&2
+  printf '   4. Update team_name and project_name as needed\n' >&2
+  printf '\nRun this command again after configuration.\n' >&2
+  exit 0
 fi
 
 printf '[sync] Syncing to Linear: %s / %s\n' "$TEAM_NAME" "$PROJECT_NAME" >&2
@@ -120,7 +138,7 @@ printf '[sync] Syncing to Linear: %s / %s\n' "$TEAM_NAME" "$PROJECT_NAME" >&2
 # Load all ready todos without linear_issue_id
 TODOS_TO_SYNC=()
 while IFS= read -r -d '' todo_file; do
-  if [[ $(yq -r '.linear_issue_id // "null"' "$todo_file") == "null" ]]; then
+  if [[ $(extract_frontmatter "$todo_file" | yq -r '.linear_issue_id // "null"') == "null" ]]; then
     TODOS_TO_SYNC+=("$todo_file")
   fi
 done < <(find todos/debt -name '*-ready-*.md' -print0 2>/dev/null)
@@ -140,11 +158,11 @@ SYNCED_COUNT=0
 ERROR_COUNT=0
 
 for todo_path in "${TODOS_TO_SYNC[@]}"; do
-  TODO_ID=$(yq -r '.id' "$todo_path" 2>/dev/null)
-  TITLE=$(yq -r '.title // "Untitled"' "$todo_path" 2>/dev/null)
-  CATEGORY=$(yq -r '.category' "$todo_path" 2>/dev/null)
-  SEVERITY=$(yq -r '.severity' "$todo_path" 2>/dev/null)
-  DESCRIPTION=$(yq -r '.description // ""' "$todo_path" 2>/dev/null)
+  TODO_ID=$(extract_frontmatter "$todo_path" | yq -r '.id' 2>/dev/null)
+  TITLE=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"' 2>/dev/null)
+  CATEGORY=$(extract_frontmatter "$todo_path" | yq -r '.category' 2>/dev/null)
+  SEVERITY=$(extract_frontmatter "$todo_path" | yq -r '.severity' 2>/dev/null)
+  DESCRIPTION=$(extract_frontmatter "$todo_path" | yq -r '.description // ""' 2>/dev/null)
 
   printf '[sync] Processing: %s (ID: %s)\n' "$TITLE" "$TODO_ID" >&2
 
@@ -159,8 +177,8 @@ for todo_path in "${TODOS_TO_SYNC[@]}"; do
     printf '[sync] Issue already exists, linking: %s\n' "$EXISTING_ISSUE" >&2
 
     # Link existing issue to todo
-    yq -i '.linear_issue_id = $val' --arg val "$EXISTING_ISSUE" "$todo_path" || {
-      printf '[sync] ERROR: Failed to update todo with existing issue ID\n' >&2
+    update_frontmatter "$todo_path" '.linear_issue_id' "$EXISTING_ISSUE" || {
+      printf '[sync] Failed to update linear_issue_id in %s\n' "$todo_path" >&2
       ERROR_COUNT=$((ERROR_COUNT + 1))
       continue
     }
@@ -221,11 +239,11 @@ for todo_path in "${TODOS_TO_SYNC[@]}"; do
   done
 
   # Update todo with issue ID
-  yq -i '.linear_issue_id = $val' --arg val "$ISSUE_ID" "$todo_path" || {
-    printf '[sync] ERROR: Issue %s created but todo update failed\n' "$ISSUE_ID" >&2
-    printf '[sync] Manual recovery: edit %s, add linear_issue_id: %s\n' "$todo_path" "$ISSUE_ID" >&2
+  update_frontmatter "$todo_path" '.linear_issue_id' "$ISSUE_ID" || {
+    printf '[sync] Failed to update linear_issue_id in %s\n' "$todo_path" >&2
+    SYNC_LOG+=("failed:$todo_path")
     ERROR_COUNT=$((ERROR_COUNT + 1))
-    exit 1
+    continue
   }
 
   SYNC_LOG+=("$ISSUE_ID")
