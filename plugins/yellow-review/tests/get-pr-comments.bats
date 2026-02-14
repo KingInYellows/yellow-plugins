@@ -8,6 +8,12 @@ setup() {
   # Put mock gh on PATH before real gh
   export PATH="${BATS_TEST_DIRNAME}/mocks:${PATH}"
   export BATS_FIXTURE_DIR="${BATS_TEST_DIRNAME}/fixtures"
+  export BATS_TEST_TMPDIR="${BATS_TEST_TMPDIR:-$(mktemp -d)}"
+}
+
+teardown() {
+  # Clean up pagination state files
+  rm -f "${BATS_TEST_TMPDIR}/mock_gh_pr300_page" 2>/dev/null || true
 }
 
 # --- Input validation ---
@@ -108,4 +114,36 @@ setup() {
 @test "handles not-found error" {
   run "$SCRIPT" "test/repo" "999"
   [ "$status" -eq 1 ]
+}
+
+# --- Pagination ---
+
+@test "accumulates threads across multiple pages" {
+  run "$SCRIPT" "test/repo" "300"
+  [ "$status" -eq 0 ]
+
+  # Page 1: thread1 (unresolved, not outdated) + thread2 (resolved — filtered)
+  # Page 2: thread3 (unresolved, not outdated) + thread4 (outdated — filtered)
+  # Expected: 2 unresolved non-outdated threads total
+  thread_count=$(printf '%s' "$output" | jq 'length')
+  [ "$thread_count" -eq 2 ]
+
+  # Verify threads from both pages are present
+  ids=$(printf '%s' "$output" | jq -r '.[].threadId')
+  [[ "$ids" == *"PRRT_mp_thread1"* ]]
+  [[ "$ids" == *"PRRT_mp_thread3"* ]]
+}
+
+@test "warns on null cursor with hasNextPage true" {
+  # Capture stderr separately to check for warning
+  local stderr_file="${BATS_TEST_TMPDIR}/stderr_350"
+  run bash -c "'$SCRIPT' test/repo 350 2>'$stderr_file'"
+  [ "$status" -eq 0 ]
+
+  # Should still return the available threads
+  thread_count=$(printf '%s' "$output" | jq 'length')
+  [ "$thread_count" -eq 1 ]
+
+  # Should warn about truncation on stderr
+  [[ "$(cat "$stderr_file")" == *"pagination truncated"* ]]
 }

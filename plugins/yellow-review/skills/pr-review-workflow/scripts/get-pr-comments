@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Fetch unresolved, non-outdated PR review threads via GitHub GraphQL API.
 # Usage: get-pr-comments <owner/repo> <pr-number>
 # Output: JSON array of thread objects to stdout.
@@ -75,7 +75,7 @@ query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize
 }'
 
 # --- Paginated fetch loop ---
-ALL_THREADS="[]"
+ALL_PAGES=()
 CURSOR=""
 PAGE=0
 
@@ -127,25 +127,25 @@ while true; do
     fi
 
     # --- Validate response shape ---
-    if ! printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest.reviewThreads' >/dev/null 2>&1; then
+    JQ_ERR=""
+    if ! JQ_ERR=$(printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest.reviewThreads' 2>&1 >/dev/null); then
         ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null)
         if [ -n "$ERRORS" ]; then
-            printf 'Error: GraphQL error: %s\n' "$ERRORS" >&2
+            printf '[get-pr-comments] Error: GraphQL error: %s\n' "$ERRORS" >&2
+        elif [ -n "$JQ_ERR" ]; then
+            printf '[get-pr-comments] Error: jq parse error: %s\n' "$JQ_ERR" >&2
         else
-            printf 'Error: Unexpected response shape from GitHub API.\n' >&2
+            printf '[get-pr-comments] Error: Unexpected response shape from GitHub API.\n' >&2
         fi
         exit 1
     fi
 
-    # --- Accumulate threads ---
-    PAGE_THREADS=$(printf '%s' "$RESPONSE" | jq '.data.repository.pullRequest.reviewThreads.nodes // []') || {
-        printf 'Error: Failed to extract threads from page %d.\n' "$PAGE" >&2
+    # --- Accumulate threads (O(n) — array append, merge once at end) ---
+    PAGE_THREADS=$(printf '%s' "$RESPONSE" | jq '.data.repository.pullRequest.reviewThreads.nodes // []' 2>&1) || {
+        printf '[get-pr-comments] Error: Failed to extract threads from page %d: %s\n' "$PAGE" "$PAGE_THREADS" >&2
         exit 1
     }
-    ALL_THREADS=$(printf '%s\n%s' "$ALL_THREADS" "$PAGE_THREADS" | jq -s '.[0] + .[1]') || {
-        printf 'Error: Failed to merge threads from page %d.\n' "$PAGE" >&2
-        exit 1
-    }
+    ALL_PAGES+=("$PAGE_THREADS")
 
     # --- Check pagination ---
     HAS_MORE=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
@@ -155,8 +155,18 @@ while true; do
 
     CURSOR=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
     if [ -z "$CURSOR" ]; then
+        # Inconsistent state: hasNextPage=true but no cursor to continue
+        printf '[get-pr-comments] Warning: pagination truncated — hasNextPage=true but no endCursor (page %d). Results may be incomplete.\n' "$PAGE" >&2
         break
     fi
+
+    # Validate cursor format (base64-like chars only — defense against injection)
+    case "$CURSOR" in
+        *[!a-zA-Z0-9+/=_-]*)
+            printf '[get-pr-comments] Error: Invalid cursor format from GitHub API (page %d). Aborting pagination.\n' "$PAGE" >&2
+            exit 1
+            ;;
+    esac
 
     if [ "$PAGE" -ge "$MAX_PAGES" ]; then
         TOTAL=$((PAGE * PAGE_SIZE))
@@ -164,6 +174,12 @@ while true; do
         break
     fi
 done
+
+# --- Merge all pages (single jq call — O(n) instead of O(n²)) ---
+ALL_THREADS=$(printf '%s\n' "${ALL_PAGES[@]}" | jq -s 'add // []') || {
+    printf '[get-pr-comments] Error: Failed to merge thread pages.\n' >&2
+    exit 1
+}
 
 # --- Filter and transform ---
 OUTPUT=$(printf '%s' "$ALL_THREADS" | jq '

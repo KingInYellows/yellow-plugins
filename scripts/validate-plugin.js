@@ -56,8 +56,16 @@ function validatePlugin(pluginDir) {
 
   // Check manifest exists
   if (!fs.existsSync(manifestPath)) {
-    logError(`plugin.json not found at: ${manifestPath}`);
-    return { valid: false, errors: ['manifest not found'] };
+    let reason = 'file not found';
+    try {
+      fs.lstatSync(manifestPath);
+      reason = 'broken symbolic link';
+    } catch (lstatErr) {
+      if (lstatErr.code === 'EACCES') reason = 'permission denied';
+      else if (lstatErr.code === 'ENOTDIR') reason = 'parent is not a directory';
+    }
+    logError(`plugin.json not found at: ${manifestPath} (${reason})`);
+    return { valid: false, errors: [`manifest not found: ${reason}`] };
   }
 
   // Parse JSON
@@ -65,8 +73,9 @@ function validatePlugin(pluginDir) {
   try {
     manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
   } catch (err) {
-    logError(`Invalid JSON in ${manifestPath}: ${err.message}`);
-    return { valid: false, errors: ['invalid JSON'] };
+    const detail = err.code ? ` [${err.code}]` : '';
+    logError(`Invalid JSON in ${manifestPath}: ${err.message}${detail}`);
+    return { valid: false, errors: [`invalid JSON: ${err.message}`] };
   }
 
   console.log(`\n${colors.cyan}Validating plugin: ${dirName}${colors.reset}`);
@@ -168,6 +177,11 @@ if (require.main === module) {
     const fullManifest = path.isAbsolute(manifestPath) ? manifestPath : path.join(PROJECT_ROOT, manifestPath);
     const pluginRoot = path.dirname(path.dirname(fullManifest));
     pluginArg = pluginRoot;
+    // Validate resolved path is within project root
+    if (!pluginRoot.startsWith(PROJECT_ROOT)) {
+      logError(`--plugin path escapes project root: ${manifestPath}`);
+      process.exit(2);
+    }
   }
 
   if (pluginArg) {
