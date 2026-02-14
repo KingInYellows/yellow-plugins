@@ -93,6 +93,28 @@ TEAM_NAME=$(jq -r '.team_name' "$CONFIG_FILE")
 PROJECT_ID=$(jq -r '.project_id' "$CONFIG_FILE")
 PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
 
+# Validate UUID formats (prevent injection)
+if ! [[ "$TEAM_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  printf 'ERROR: Invalid team_id format in config (expected UUID)\n' >&2
+  exit 1
+fi
+
+if ! [[ "$PROJECT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  printf 'ERROR: Invalid project_id format in config (expected UUID)\n' >&2
+  exit 1
+fi
+
+# Validate name formats (alphanumeric, spaces, hyphens only, max 100 chars)
+if ! [[ "$TEAM_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
+  printf 'ERROR: Invalid team_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
+  exit 1
+fi
+
+if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
+  printf 'ERROR: Invalid project_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
+  exit 1
+fi
+
 printf '[sync] Syncing to Linear: %s / %s\n' "$TEAM_NAME" "$PROJECT_NAME" >&2
 
 # Load all ready todos without linear_issue_id

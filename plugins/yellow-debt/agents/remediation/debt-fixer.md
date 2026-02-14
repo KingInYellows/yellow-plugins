@@ -75,6 +75,44 @@ Read(file_path="src/services/user-service.ts")
 
 ### 4. Show Diff (MANDATORY)
 
+**First, validate file scope** (MANDATORY - must run before showing diff):
+
+```bash
+# Extract affected files from todo
+AFFECTED_FILES=$(yq -r '.affected_files[]' "$TODO_PATH" 2>/dev/null | cut -d: -f1)
+
+# Get list of modified files
+MODIFIED_FILES=$(git diff --name-only)
+
+# Verify each modified file is in affected_files scope
+while IFS= read -r modified; do
+  [ -z "$modified" ] && continue  # Skip empty lines
+  
+  is_allowed=false
+  while IFS= read -r allowed; do
+    [ -z "$allowed" ] && continue
+    [ "$modified" = "$allowed" ] && is_allowed=true && break
+  done <<< "$AFFECTED_FILES"
+  
+  if [ "$is_allowed" = false ]; then
+    printf '[debt-fixer] ERROR: Modified file outside affected_files scope: %s\n' "$modified" >&2
+    printf '[debt-fixer] Reverting all changes and resetting todo to ready state...\n' >&2
+    git restore .
+    
+    # Source validation library and transition back to ready
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+    # shellcheck source=../../lib/validate.sh
+    source "${PLUGIN_ROOT}/lib/validate.sh"
+    transition_todo_state "$TODO_PATH" "ready"
+    
+    printf '\nERROR: Fix attempted to modify files outside the approved scope.\n' >&2
+    printf 'Todo has been reset to ready state. Please review the finding and try again.\n' >&2
+    exit 1
+  fi
+done <<< "$MODIFIED_FILES"
+```
+
 Use `git diff --stat` to show summary of changes:
 
 ```bash
@@ -113,24 +151,16 @@ Options:
 
 1. **Sanitize commit message** (prevent command injection):
 ```bash
-safe_title=$(printf '%s' "$finding_title" | tr -d '\n\r$`|;&<>()[]{}!' | cut -c1-72)
+safe_title=$(printf '%s' "$finding_title" | LC_ALL=C tr -cd '[:alnum:][:space:]-_.' | cut -c1-72)
 todo_path="todos/debt/042-in-progress-high-complexity.md"
 category="complexity"
 severity="high"
 ```
 
-2. **Commit using heredoc pattern**:
+2. **Commit using printf for shell-safe quoting**:
 ```bash
-gt modify -c "$(cat <<'EOF'
-fix: resolve $safe_title
-
-Resolves todo: $todo_path
-Category: $category
-Severity: $severity
-
-🤖 Generated with Claude Code
-EOF
-)"
+gt modify -c "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s\n\n🤖 Generated with Claude Code' \
+  "$safe_title" "$todo_path" "$category" "$severity")"
 ```
 
 3. **Transition todo to complete**:
@@ -245,10 +275,10 @@ You are implementing fixes based on code analysis findings. Do NOT:
 - Make changes to `.git/`, `.env`, or credential files
 
 **MANDATORY**:
+- Validate file scope (automatic check runs before showing diff)
 - Show diff before making changes permanent
 - Get explicit user approval via AskUserQuestion
 - Use heredoc pattern for commit messages (prevents injection)
-- Validate file scope (only touch affected_files)
 
 ## Large Change Detection
 
@@ -276,27 +306,6 @@ for file in "${affected_files[@]}"; do
     printf 'Commit or stash changes first.\n' >&2
     exit 1
   }
-done
-```
-
-## Post-Fix Validation
-
-After applying fix:
-```bash
-# Verify only affected files were modified
-modified_files=$(git diff --name-only)
-for modified in $modified_files; do
-  is_affected=false
-  for affected in "${affected_files[@]}"; do
-    [ "$modified" = "$affected" ] && is_affected=true
-  done
-
-  if [ "$is_affected" = false ]; then
-    printf 'ERROR: Modified file outside affected_files scope: %s\n' "$modified" >&2
-    printf 'Reverting changes...\n' >&2
-    git restore .
-    exit 1
-  fi
 done
 ```
 

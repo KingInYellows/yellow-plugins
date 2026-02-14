@@ -31,8 +31,21 @@ PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=../../lib/validate.sh
 source "${PLUGIN_ROOT}/lib/validate.sh"
 
-# Parse arguments
-PATH_FILTER="${1:-.}"
+# Parse arguments - normalize path before validation
+RAW_PATH_FILTER="${1:-.}"
+
+# Normalize path to prevent injection and handle relative paths
+if [ "$RAW_PATH_FILTER" != "." ]; then
+  PROJECT_ROOT=$(git rev-parse --show-toplevel)
+  PATH_FILTER=$(realpath -m -- "$RAW_PATH_FILTER") || {
+    printf 'ERROR: Failed to normalize path "%s"\n' "$RAW_PATH_FILTER" >&2
+    exit 1
+  }
+  PATH_FILTER=$(realpath -m --relative-to="$PROJECT_ROOT" -- "$PATH_FILTER")
+else
+  PATH_FILTER="."
+fi
+
 CATEGORY_FILTER=""
 SEVERITY_FILTER=""
 
@@ -62,11 +75,17 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# Validate path argument
+# Validate normalized path
 validate_file_path "$PATH_FILTER" || {
   printf 'ERROR: Invalid path "%s" (path traversal detected)\n' "$PATH_FILTER" >&2
   exit 1
 }
+
+# Verify path exists
+if [ "$PATH_FILTER" != "." ] && [ ! -e "$PATH_FILTER" ]; then
+  printf 'ERROR: Path "%s" does not exist\n' "$PATH_FILTER" >&2
+  exit 1
+fi
 
 # Check git status (warn if uncommitted changes, don't block)
 if ! git diff-index --quiet HEAD -- 2>/dev/null; then
@@ -79,17 +98,18 @@ mkdir -p .debt/scanner-output || {
   exit 1
 }
 
-# Determine file list using batched git operation (performance optimization)
+# Determine file list using extension-based filtering (performance optimization)
+# Filters for common source code extensions instead of using file --mime-type
 printf '[audit] Enumerating files...\n' >&2
 git ls-files -z "$PATH_FILTER" 2>/dev/null | \
-  xargs -0 file --mime-type 2>/dev/null | \
-  awk -F: '/text\// {print $1}' > .debt/file-list.txt || {
+  grep -zE '\.(ts|tsx|js|jsx|py|rs|go|rb|java|c|cpp|h|hpp|cs|php|swift|kt|scala|sh|bash|zsh|md|yaml|yml|json|toml|sql)$' | \
+  tr '\0' '\n' > .debt/file-list.txt || {
   printf '[audit] ERROR: Failed to enumerate files\n' >&2
   exit 1
 }
 
 FILE_COUNT=$(wc -l < .debt/file-list.txt)
-printf '[audit] Found %d text files to scan\n' "$FILE_COUNT" >&2
+printf '[audit] Found %d source files to scan\n' "$FILE_COUNT" >&2
 
 # Determine which scanners to run
 if [ -n "$CATEGORY_FILTER" ]; then
@@ -123,17 +143,38 @@ done
 printf '[audit] All scanner agents launched. Waiting for results...\n' >&2
 printf '[audit] This may take 1-5 minutes depending on codebase size.\n' >&2
 
-# Note: In actual implementation, we would use Task tool here to launch agents
-# For now, display instructions for user to launch manually
-printf '\nTo launch scanner agents, use:\n'
+# Output Task tool orchestration instructions for Claude
+printf '\n=== AGENT ORCHESTRATION REQUIRED ===\n'
+printf 'Launch the following scanner agents in PARALLEL:\n\n'
+
 for scanner in "${SCANNERS[@]}"; do
-  printf '  Task(subagent_type="%s-scanner"): "Scan for %s debt in files from .debt/file-list.txt"\n' "$scanner" "$scanner"
+  TASK_DESC="Scan codebase for ${scanner} technical debt patterns. Read file list from .debt/file-list.txt and write findings to .debt/scanner-output/${scanner}-scanner.json following the debt-conventions skill schema."
+  if [ -n "$SEVERITY_FILTER" ]; then
+    TASK_DESC="${TASK_DESC} Filter to ${SEVERITY_FILTER} severity or higher."
+  fi
+  
+  # Output Task tool call for Claude to execute
+  cat <<EOF
+Task(
+  subagent_type="${scanner}-scanner",
+  description="Scan for ${scanner} technical debt",
+  prompt="${TASK_DESC}"
+)
+EOF
+  printf '\n'
 done
 
-printf '\nAfter all scanners complete, launch synthesizer:\n'
-printf '  Task(subagent_type="audit-synthesizer"): "Merge scanner outputs, deduplicate, score, generate report"\n'
+printf 'After ALL scanner agents complete, launch the synthesizer:\n\n'
+cat <<EOF
+Task(
+  subagent_type="audit-synthesizer",
+  description="Synthesize scanner outputs into report",
+  prompt="Merge scanner outputs from .debt/scanner-output/, deduplicate findings using debt-conventions scoring, generate audit report at docs/audits/$(date +%Y-%m-%d)-audit-report.md and create todo files in todos/debt/ following atomic state conventions."
+)
+EOF
 
-printf '\nAudit orchestration complete. Launch agents as shown above.\n'
+printf '\n=== END ORCHESTRATION ===\n'
+printf '[audit] Setup complete. Launch agents as shown above.\n' >&2
 ```
 
 ## Example Usage

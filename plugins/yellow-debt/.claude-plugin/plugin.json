@@ -37,9 +37,7 @@
       "agents/remediation/debt-fixer.md"
     ],
     "skills": [
-      "skills/debt-conventions/SKILL.md",
-      "skills/debt-query/SKILL.md",
-      "skills/debt-audit-runner/SKILL.md"
+      "skills/debt-conventions/SKILL.md"
     ]
   },
   "compatibility": {

@@ -188,10 +188,12 @@ No configuration required. Optional Linear sync settings stored in `.debt/linear
 
 ## Performance
 
-- **File enumeration**: 10K files in <5 seconds (batched git operations)
+- **File enumeration**: 10K files in 5-10 seconds (extension-based filtering)
 - **Deduplication**: 1000 findings in <1 second (O(n log n) algorithm)
+- **Query performance**: 1000 findings in 10-15 seconds (optimized), 1-2 seconds (cached)
 - **Parallel scanners**: All 5 run concurrently
 - **Partial results**: Continues even if scanners fail (≤50% threshold)
+- **Total audit time**: 30-60 minutes for large codebases (LLM scanner latency dominates)
 
 ## Known Limitations
 

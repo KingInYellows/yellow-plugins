@@ -6,6 +6,7 @@ allowed-tools:
   - Read
   - Write
   - Bash
+  - AskUserQuestion
 ---
 
 <examples>
@@ -46,6 +47,10 @@ Read all JSON files from `.debt/scanner-output/*.json`:
 ```bash
 for scanner_file in .debt/scanner-output/*-scanner.json; do
   # Validate JSON schema
+  if ! jq -e '.schema_version == "1.0" and .status != null and .findings != null' "$scanner_file" >/dev/null; then
+    printf '[audit-synthesizer] ERROR: Invalid schema in %s\n' "$scanner_file" >&2
+    continue
+  fi
   # Extract findings array
   # Track scanner status (success/partial/error)
 done
@@ -127,9 +132,27 @@ Sort findings by score descending (highest priority first).
 
 ### 4. Simplified Reconciliation
 
-**Delete all existing `pending` todos** (not yet triaged):
+**Count existing pending todos** and confirm deletion with user:
 ```bash
-rm -f todos/debt/*-pending-*.md
+pending_count=$(find todos/debt -name '*-pending-*.md' 2>/dev/null | wc -l)
+
+if [ "$pending_count" -gt 0 ]; then
+  printf 'Found %d existing pending todo(s). New audit will replace these.\n' "$pending_count" >&2
+  
+  # Use AskUserQuestion tool:
+  # Question: "Delete $pending_count existing pending findings and proceed with new audit?"
+  # Options:
+  #   - "Yes, delete and proceed"
+  #   - "No, abort synthesis"
+  #
+  # If user selects "No, abort synthesis":
+  #   printf '[audit-synthesizer] Aborted by user. Existing pending todos preserved.\n' >&2
+  #   exit 0
+  
+  # If user selects "Yes, delete and proceed":
+  rm -f todos/debt/*-pending-*.md
+  printf 'Deleted %d pending todos. Proceeding with synthesis.\n' "$pending_count" >&2
+fi
 ```
 
 **Preserve all other states** (ready, in-progress, complete, deferred) — user has made decisions on these.
@@ -238,6 +261,51 @@ Extract guard clauses and split into:
 - `SEVERITY`: critical/high/medium/low
 - `slug`: Kebab-case title (first 40 chars)
 - `HASH`: First 8 chars of SHA256(category + file + lines)
+
+**Slug derivation** (CRITICAL SECURITY):
+```bash
+derive_slug() {
+  local title="$1"
+  local slug
+
+  # Convert to lowercase, replace spaces/special chars with hyphen
+  slug=$(printf '%s' "$title" | tr '[:upper:]' '[:lower:]' | tr -c '[:alnum:]-' '-' | sed 's/-\+/-/g' | sed 's/^-\|-$//g')
+
+  # Truncate to 40 chars
+  slug=$(printf '%s' "$slug" | cut -c1-40 | sed 's/-$//')
+
+  # CRITICAL: Validate slug contains only [a-z0-9-]
+  if ! [[ "$slug" =~ ^[a-z0-9-]+$ ]]; then
+    printf '[synthesizer] ERROR: Invalid slug derived from title: %s\n' "$title" >&2
+    return 1
+  fi
+
+  printf '%s' "$slug"
+}
+
+# Derive slug with fallback to hash if validation fails
+slug=$(derive_slug "$finding_title") || {
+  # Fallback to hash-based slug if derivation fails
+  slug=$(echo -n "$finding_title" | sha256sum | cut -c1-16)
+}
+
+todo_filename="todos/debt/${id}-pending-${severity}-${slug}-${content_hash}.md"
+
+# DEFENSE IN DEPTH: Canonicalize and verify final path
+resolved=$(realpath -m "$todo_filename")
+case "$resolved" in
+  "$(pwd)/todos/debt/"*) ;;
+  *)
+    printf '[synthesizer] ERROR: Path traversal detected in todo filename\n' >&2
+    exit 1
+    ;;
+esac
+```
+
+This prevents path traversal attacks (e.g., titles with `../../.git/hooks/`) by:
+1. **Whitelist validation**: Only `[a-z0-9-]` allowed in slug
+2. **Fallback safety**: Hash-based slug if title contains invalid chars
+3. **Defense in depth**: Final path canonicalization check ensures file stays in `todos/debt/`
 
 **Content hash calculation**:
 ```bash

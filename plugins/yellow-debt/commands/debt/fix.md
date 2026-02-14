@@ -148,21 +148,15 @@ $ARGUMENTS todos/debt/001-pending-medium-duplication.md  # ERROR: must be ready
 
 ## Commit Message Sanitization
 
-Finding titles may contain shell metacharacters. Use heredoc pattern to prevent command injection:
+Finding titles may contain shell metacharacters. Use printf for shell-safe quoting to prevent command injection:
 
 ```bash
 # Extract and sanitize title
-safe_title=$(printf '%s' "$finding_title" | tr -d '\n\r$`|;&<>()[]{}!' | cut -c1-72)
+safe_title=$(printf '%s' "$finding_title" | LC_ALL=C tr -cd '[:alnum:][:space:]-_.' | cut -c1-72)
 
-# Use heredoc (prevents injection)
-gt modify -c "$(cat <<'EOF'
-fix: resolve $safe_title
-
-Resolves todo: $todo_path
-Category: $category
-Severity: $severity
-EOF
-)"
+# Use printf (prevents injection)
+gt modify -c "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s' \
+  "$safe_title" "$todo_path" "$category" "$severity")"
 ```
 
 ## State Transitions
