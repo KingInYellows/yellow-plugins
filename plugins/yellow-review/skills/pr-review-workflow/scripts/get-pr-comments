@@ -43,14 +43,18 @@ case "$PR_NUMBER" in
         ;;
 esac
 
-# --- GraphQL query ---
+# --- Pagination constants ---
+MAX_PAGES=10
+PAGE_SIZE=100
+
+# --- GraphQL query with cursor pagination ---
 # shellcheck disable=SC2016
 QUERY='
-query($owner: String!, $name: String!, $number: Int!) {
+query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      reviewThreads(first: 100) {
-        pageInfo { hasNextPage }
+      reviewThreads(first: 100, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           id
           isResolved
@@ -70,58 +74,95 @@ query($owner: String!, $name: String!, $number: Int!) {
   }
 }'
 
-# --- Execute query ---
-RESPONSE=$(gh api graphql \
-    -f owner="$OWNER" \
-    -f name="$NAME" \
-    -F "number=$PR_NUMBER" \
-    -f query="$QUERY" 2>&1) || {
-    # Parse error category from response
-    case "$RESPONSE" in
-        *"401"*|*"Bad credentials"*|*"authentication"*)
-            printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
-            ;;
-        *"403"*|*"Forbidden"*|*"permission"*|*"insufficient permissions"*)
-            printf 'Error: Insufficient permissions for this repo.\n' >&2
-            ;;
-        *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
-            printf 'Error: Repository or PR not found: %s #%s\n' "$REPO" "$PR_NUMBER" >&2
-            ;;
-        *"rate limit"*|*"429"*)
-            printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
-            ;;
-        *"5xx"*|*"5XX"*|*"Server Error"*|*"server error"*|*"500"*|*"502"*|*"503"*)
-            printf 'Error: GitHub server error. Retry in a few minutes.\n' >&2
-            ;;
-        *)
-            printf 'Error: GraphQL query failed: %s\n' "$RESPONSE" >&2
-            ;;
-    esac
-    exit 1
-}
+# --- Paginated fetch loop ---
+ALL_THREADS="[]"
+CURSOR=""
+PAGE=0
 
-# --- Validate response shape ---
-if ! printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest.reviewThreads' >/dev/null 2>&1; then
-    # Check for GraphQL-level errors
-    ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null)
-    if [ -n "$ERRORS" ]; then
-        printf 'Error: GraphQL error: %s\n' "$ERRORS" >&2
+while true; do
+    PAGE=$((PAGE + 1))
+
+    # Build cursor argument — gh -F passes typed values (null for first page)
+    if [ -z "$CURSOR" ]; then
+        CURSOR_ARG="-F cursor=null"
     else
-        printf 'Error: Unexpected response shape from GitHub API.\n' >&2
+        CURSOR_ARG="-f cursor=$CURSOR"
     fi
-    exit 1
-fi
 
-# --- Warn about pagination limits ---
-HAS_MORE=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false' 2>/dev/null)
-if [ "$HAS_MORE" = "true" ]; then
-    printf 'Warning: PR has more than 100 review threads. Results are truncated.\n' >&2
-fi
+    # shellcheck disable=SC2086
+    RESPONSE=$(gh api graphql \
+        -f owner="$OWNER" \
+        -f name="$NAME" \
+        -F "number=$PR_NUMBER" \
+        $CURSOR_ARG \
+        -f query="$QUERY" 2>&1) || {
+        # Parse error category from response
+        case "$RESPONSE" in
+            *"401"*|*"Bad credentials"*|*"authentication"*)
+                printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
+                ;;
+            *"403"*|*"Forbidden"*|*"permission"*|*"insufficient permissions"*)
+                printf 'Error: Insufficient permissions for this repo.\n' >&2
+                ;;
+            *"Could not resolve"*|*"not found"*|*"NOT_FOUND"*)
+                printf 'Error: Repository or PR not found: %s #%s\n' "$REPO" "$PR_NUMBER" >&2
+                ;;
+            *"rate limit"*|*"429"*)
+                printf 'Error: GitHub API rate limit exceeded. Wait and retry.\n' >&2
+                ;;
+            *"5xx"*|*"5XX"*|*"Server Error"*|*"server error"*|*"500"*|*"502"*|*"503"*)
+                printf 'Error: GitHub server error. Retry in a few minutes.\n' >&2
+                ;;
+            *)
+                printf 'Error: GraphQL query failed (page %d): %s\n' "$PAGE" "$RESPONSE" >&2
+                ;;
+        esac
+        exit 1
+    }
+
+    # --- Validate response shape ---
+    if ! printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest.reviewThreads' >/dev/null 2>&1; then
+        ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null)
+        if [ -n "$ERRORS" ]; then
+            printf 'Error: GraphQL error: %s\n' "$ERRORS" >&2
+        else
+            printf 'Error: Unexpected response shape from GitHub API.\n' >&2
+        fi
+        exit 1
+    fi
+
+    # --- Accumulate threads ---
+    PAGE_THREADS=$(printf '%s' "$RESPONSE" | jq '.data.repository.pullRequest.reviewThreads.nodes // []') || {
+        printf 'Error: Failed to extract threads from page %d.\n' "$PAGE" >&2
+        exit 1
+    }
+    ALL_THREADS=$(printf '%s\n%s' "$ALL_THREADS" "$PAGE_THREADS" | jq -s '.[0] + .[1]') || {
+        printf 'Error: Failed to merge threads from page %d.\n' "$PAGE" >&2
+        exit 1
+    }
+
+    # --- Check pagination ---
+    HAS_MORE=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
+    if [ "$HAS_MORE" != "true" ]; then
+        break
+    fi
+
+    CURSOR=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor // empty')
+    if [ -z "$CURSOR" ]; then
+        break
+    fi
+
+    if [ "$PAGE" -ge "$MAX_PAGES" ]; then
+        TOTAL=$((PAGE * PAGE_SIZE))
+        printf 'Warning: Reached pagination limit (%d pages, ~%d threads). Results may be truncated.\n' "$MAX_PAGES" "$TOTAL" >&2
+        break
+    fi
+done
 
 # --- Filter and transform ---
-OUTPUT=$(printf '%s' "$RESPONSE" | jq '
+OUTPUT=$(printf '%s' "$ALL_THREADS" | jq '
   [
-    (.data.repository.pullRequest.reviewThreads.nodes // [])[]
+    .[]
     | select(.isResolved == false and .isOutdated == false)
     | {
         threadId: .id,
