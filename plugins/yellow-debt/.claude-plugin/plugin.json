@@ -18,36 +18,5 @@
     "code-quality",
     "remediation",
     "scanner"
-  ],
-  "entrypoints": {
-    "commands": [
-      "commands/debt/audit.md",
-      "commands/debt/triage.md",
-      "commands/debt/fix.md",
-      "commands/debt/status.md",
-      "commands/debt/sync.md"
-    ],
-    "agents": [
-      "agents/scanners/ai-pattern-scanner.md",
-      "agents/scanners/complexity-scanner.md",
-      "agents/scanners/duplication-scanner.md",
-      "agents/scanners/architecture-scanner.md",
-      "agents/scanners/security-debt-scanner.md",
-      "agents/synthesis/audit-synthesizer.md",
-      "agents/remediation/debt-fixer.md"
-    ],
-    "skills": [
-      "skills/debt-conventions/SKILL.md"
-    ]
-  },
-  "compatibility": {
-    "claudeCodeMin": "2.0.0"
-  },
-  "permissions": [
-    {
-      "scope": "shell",
-      "reason": "Git operations for codebase analysis, path validation, and commit generation",
-      "commands": ["git", "gt", "jq", "realpath", "sha256sum", "yq"]
-    }
   ]
 }
