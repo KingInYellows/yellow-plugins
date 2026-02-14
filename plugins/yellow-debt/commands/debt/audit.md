@@ -103,10 +103,12 @@ mkdir -p .debt/scanner-output || {
 printf '[audit] Enumerating files...\n' >&2
 git ls-files -z "$PATH_FILTER" 2>/dev/null | \
   grep -zE '\.(ts|tsx|js|jsx|py|rs|go|rb|java|c|cpp|h|hpp|cs|php|swift|kt|scala|sh|bash|zsh|md|yaml|yml|json|toml|sql)$' | \
-  tr '\0' '\n' > .debt/file-list.txt || {
-  printf '[audit] ERROR: Failed to enumerate files\n' >&2
-  exit 1
-}
+  tr '\0' '\n' > .debt/file-list.txt || true
+
+if [ ! -s .debt/file-list.txt ]; then
+  printf '[audit] Warning: No source files found in %s\n' "$PATH_FILTER" >&2
+  exit 0
+fi
 
 FILE_COUNT=$(wc -l < .debt/file-list.txt)
 printf '[audit] Found %d source files to scan\n' "$FILE_COUNT" >&2
