@@ -118,10 +118,12 @@ fi
 printf '[sync] Syncing to Linear: %s / %s\n' "$TEAM_NAME" "$PROJECT_NAME" >&2
 
 # Load all ready todos without linear_issue_id
-mapfile -t TODOS_TO_SYNC < <(
-  find todos/debt -name '*-ready-*.md' -print0 2>/dev/null | \
-  xargs -0 grep -L 'linear_issue_id: [^n]' 2>/dev/null || true
-)
+TODOS_TO_SYNC=()
+while IFS= read -r -d '' todo_file; do
+  if [[ $(yq -r '.linear_issue_id // "null"' "$todo_file") == "null" ]]; then
+    TODOS_TO_SYNC+=("$todo_file")
+  fi
+done < <(find todos/debt -name '*-ready-*.md' -print0 2>/dev/null)
 
 if [ ${#TODOS_TO_SYNC[@]} -eq 0 ]; then
   printf 'No findings to sync (all ready findings already synced).\n'
@@ -157,7 +159,7 @@ for todo_path in "${TODOS_TO_SYNC[@]}"; do
     printf '[sync] Issue already exists, linking: %s\n' "$EXISTING_ISSUE" >&2
 
     # Link existing issue to todo
-    yq -i ".linear_issue_id = \"$EXISTING_ISSUE\"" "$todo_path" || {
+    yq -i '.linear_issue_id = $val' --arg val "$EXISTING_ISSUE" "$todo_path" || {
       printf '[sync] ERROR: Failed to update todo with existing issue ID\n' >&2
       ERROR_COUNT=$((ERROR_COUNT + 1))
       continue
@@ -219,7 +221,7 @@ for todo_path in "${TODOS_TO_SYNC[@]}"; do
   done
 
   # Update todo with issue ID
-  yq -i ".linear_issue_id = \"$ISSUE_ID\"" "$todo_path" || {
+  yq -i '.linear_issue_id = $val' --arg val "$ISSUE_ID" "$todo_path" || {
     printf '[sync] ERROR: Issue %s created but todo update failed\n' "$ISSUE_ID" >&2
     printf '[sync] Manual recovery: edit %s, add linear_issue_id: %s\n' "$todo_path" "$ISSUE_ID" >&2
     ERROR_COUNT=$((ERROR_COUNT + 1))

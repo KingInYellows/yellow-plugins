@@ -146,12 +146,20 @@ for todo_path in "${FILTERED_FILES[@]}"; do
   FILE_PATH=$(echo "$AFFECTED_FILES" | cut -d: -f1)
   LINE_RANGE=$(echo "$AFFECTED_FILES" | cut -d: -f2)
   START_LINE=$(echo "$LINE_RANGE" | cut -d- -f1)
-  CONTEXT_START=$((START_LINE > 5 ? START_LINE - 5 : 1))
-
-  if [ -f "$FILE_PATH" ]; then
-    sed -n "${CONTEXT_START},$((START_LINE + 10))p" "$FILE_PATH" | head -15
+  
+  # Validate START_LINE is numeric before arithmetic expansion
+  if [[ ! "$START_LINE" =~ ^[0-9]+$ ]]; then
+    CONTEXT_START=1
+    CONTEXT_END=15
   else
-    printf '(file not found: %s)\n' "$FILE_PATH"
+    CONTEXT_START=$((START_LINE > 5 ? START_LINE - 5 : 1))
+    CONTEXT_END=$((START_LINE + 10))
+  fi
+
+  if validate_file_path "$FILE_PATH"; then
+    sed -n "${CONTEXT_START},${CONTEXT_END}p" "$FILE_PATH" | head -15
+  else
+    printf '(invalid or unauthorized file path: %s)\n' "$FILE_PATH"
   fi
 
   printf '\n'
