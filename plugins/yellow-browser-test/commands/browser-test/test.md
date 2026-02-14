@@ -167,9 +167,9 @@ if [ -f .claude/browser-test-server.pid ]; then
     PROC_CMD=$(ps -p "$PID" -o comm= 2>/dev/null || true)
     case "$PROC_CMD" in
       node|npm|npx|sh|bash)
-        kill "$PID" || printf '[browser-test] Warning: Failed to stop server\n' >&2
-        # Also kill child processes (e.g., node spawned by npm run dev)
+        # Kill child processes first (e.g., node spawned by npm run dev)
         pkill -P "$PID" 2>/dev/null || true
+        kill "$PID" || printf '[browser-test] Warning: Failed to stop server\n' >&2
         ;;
       *)
         printf '[browser-test] Warning: PID %s is not a dev server process (%s), skipping kill\n' "$PID" "$PROC_CMD" >&2
