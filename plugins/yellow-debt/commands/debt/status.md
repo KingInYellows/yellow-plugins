@@ -78,25 +78,37 @@ if [ -d todos/debt ]; then
     SEVERITY=$(yq -r '.severity // "unknown"' "$todo_file" 2>/dev/null)
     EFFORT=$(yq -r '.effort // "unknown"' "$todo_file" 2>/dev/null)
 
-    # Increment counters
-    by_status["$STATUS"]=$((${by_status[$STATUS]:-0} + 1))
-    by_category["$CATEGORY"]=$((${by_category[$CATEGORY]:-0} + 1))
-    by_severity["$SEVERITY"]=$((${by_severity[$SEVERITY]:-0} + 1))
-    by_effort["$EFFORT"]=$((${by_effort[$EFFORT]:-0} + 1))
+    # Increment counters (safe from arithmetic expansion injection)
+    val_status=${by_status["$STATUS"]:-0}
+    by_status["$STATUS"]=$((val_status + 1))
+    val_category=${by_category["$CATEGORY"]:-0}
+    by_category["$CATEGORY"]=$((val_category + 1))
+    val_severity=${by_severity["$SEVERITY"]:-0}
+    by_severity["$SEVERITY"]=$((val_severity + 1))
+    val_effort=${by_effort["$EFFORT"]:-0}
+    by_effort["$EFFORT"]=$((val_effort + 1))
 
     TODO_COUNT=$((TODO_COUNT + 1))
   done < <(find todos/debt -name '*.md' -print0 2>/dev/null)
 fi
 
 # Calculate estimated remaining effort
-EFFORT_HOURS=0
 # Quick: 0.5hr avg, Small: 1hr avg, Medium: 5hr avg, Large: 20hr avg
-EFFORT_HOURS=$((
-  ${by_effort[quick]:-0} * 0 +
-  ${by_effort[small]:-0} * 1 +
-  ${by_effort[medium]:-0} * 5 +
-  ${by_effort[large]:-0} * 20
-))
+if command -v bc >/dev/null 2>&1; then
+  # Use bc for precise floating-point calculation
+  EFFORT_HOURS=$(echo "(${by_effort[quick]:-0} * 0.5) + \
+    (${by_effort[small]:-0} * 1) + \
+    (${by_effort[medium]:-0} * 5) + \
+    (${by_effort[large]:-0} * 20)" | bc)
+else
+  # Fallback: integer calculation that ignores quick fixes
+  printf '[status] WARNING: bc not available, quick fixes ignored in effort calculation\n' >&2
+  EFFORT_HOURS=$((
+    ${by_effort[small]:-0} * 1 +
+    ${by_effort[medium]:-0} * 5 +
+    ${by_effort[large]:-0} * 20
+  ))
+fi
 
 if [ "$JSON_OUTPUT" = true ]; then
   # Machine-readable JSON output
@@ -141,7 +153,7 @@ By Status:
   Complete:    ${by_status[complete]} findings (resolved)
 
 By Category:
-  Complexity:    ${by_category[complexity]} (${by_severity[critical]} critical, ${by_severity[high]} high)
+  Complexity:    ${by_category[complexity]}
   Duplication:   ${by_category[duplication]}
   AI Patterns:   ${by_category[ai-patterns]}
   Architecture:  ${by_category[architecture]}
