@@ -1,0 +1,42 @@
+#!/bin/sh
+# Mock gh CLI for bats tests
+# Serves fixture JSON based on PR number or thread ID in arguments
+set -eu
+
+FIXTURE_DIR="${BATS_FIXTURE_DIR:-$(dirname "$0")/../fixtures}"
+
+# Extract PR number or thread ID from arguments
+ALL_ARGS="$*"
+
+case "$ALL_ARGS" in
+  *"number=123"*)
+    cat "$FIXTURE_DIR/single-page-response.json"
+    ;;
+  *"number=200"*)
+    cat "$FIXTURE_DIR/empty-threads-response.json"
+    ;;
+  *"number=999"*)
+    # Simulate GraphQL error
+    cat "$FIXTURE_DIR/graphql-error-response.json" >&2
+    exit 1
+    ;;
+  *"number=401"*)
+    printf 'Bad credentials' >&2
+    exit 1
+    ;;
+  *"PRRT_valid"*)
+    cat "$FIXTURE_DIR/resolve-success-response.json"
+    ;;
+  *"PRRT_notfound"*)
+    printf 'Could not resolve to a node' >&2
+    exit 1
+    ;;
+  *"PRRT_resolved"*)
+    printf 'already resolved' >&2
+    exit 1
+    ;;
+  *)
+    printf 'Mock gh: unhandled arguments: %s\n' "$ALL_ARGS" >&2
+    exit 1
+    ;;
+esac
