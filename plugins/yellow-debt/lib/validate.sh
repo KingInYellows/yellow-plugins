@@ -49,43 +49,59 @@ transition_todo_state() {
   local todo_file="$1"
   local new_state="$2"
   local temp_file="${todo_file}.tmp"
+  local lock_file="${todo_file}.lock"
+
+  # Ensure cleanup on all exit paths
+  trap 'rm -f "$lock_file" "$temp_file"; flock -u 200 2>/dev/null || true' RETURN EXIT INT TERM
 
   # Acquire exclusive lock
-  exec 200>"${todo_file}.lock"
+  exec 200>"$lock_file"
   flock -x 200 || { printf '[debt] Failed to acquire lock\n' >&2; return 1; }
+
+  # INSIDE LOCK: Verify file exists (TOCTOU prevention)
+  if [ ! -f "$todo_file" ]; then
+    printf '[debt] File not found inside lock\n' >&2
+    return 1
+  fi
 
   # Re-read current state inside lock (TOCTOU prevention)
   local current_state
-  current_state=$(yq '.status' "$todo_file" 2>/dev/null) || {
-    flock -u 200
-    return 1
-  }
+  current_state=$(yq '.status' "$todo_file" 2>/dev/null) || return 1
 
   # Validate transition
   validate_transition "$current_state" "$new_state" || {
-    flock -u 200
     printf '[debt] Invalid transition %s→%s\n' "$current_state" "$new_state" >&2
     return 1
   }
 
-  # Update frontmatter + compute new filename
-  yq ".status = \"$new_state\"" "$todo_file" > "$temp_file" || {
-    flock -u 200
-    return 1
-  }
+  # Update frontmatter
+  yq ".status = \"$new_state\"" "$todo_file" > "$temp_file" || return 1
 
-  local new_filename
-  new_filename=$(printf '%s' "$todo_file" | sed "s/-${current_state}-/-${new_state}-/")
+  # INSIDE LOCK: Parse current filename and derive new name from actual file state
+  local base_name new_filename id severity slug hash
+  base_name=$(basename "$todo_file")
+  
+  if [[ "$base_name" =~ ^([0-9]+)-[^-]+-([^-]+)-(.+)-([^-]+)\.md$ ]]; then
+    id="${BASH_REMATCH[1]}"
+    severity="${BASH_REMATCH[2]}"
+    slug="${BASH_REMATCH[3]}"
+    hash="${BASH_REMATCH[4]}"
+    new_filename="$(dirname "$todo_file")/${id}-${new_state}-${severity}-${slug}-${hash}.md"
+  else
+    # Fallback: use sed-based rename if regex doesn't match
+    new_filename=$(printf '%s' "$todo_file" | sed "s/-${current_state}-/-${new_state}-/")
+  fi
+
+  # Check for collision
+  if [ -e "$new_filename" ]; then
+    printf '[debt] Target file already exists: %s\n' "$new_filename" >&2
+    return 1
+  fi
 
   # Atomic rename
-  mv "$temp_file" "$new_filename" || {
-    rm -f "$temp_file"
-    flock -u 200
-    return 1
-  }
+  mv "$temp_file" "$new_filename" || return 1
 
   rm -f "$todo_file"
-  flock -u 200
   return 0
 }
 
