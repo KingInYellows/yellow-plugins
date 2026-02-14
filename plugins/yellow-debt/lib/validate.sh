@@ -6,6 +6,9 @@ validate_file_path() {
   local raw_path="$1"
   local project_root="${2:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
+  # Reject empty paths
+  [ -z "$raw_path" ] && return 1
+
   # Newline detection (command substitution strips trailing newlines)
   local path_len=${#raw_path}
   local oneline
@@ -80,12 +83,12 @@ transition_todo_state() {
   # INSIDE LOCK: Parse current filename and derive new name from actual file state
   local base_name new_filename id severity slug hash
   base_name=$(basename "$todo_file")
-  
-  if [[ "$base_name" =~ ^([0-9]+)-[^-]+-([^-]+)-(.+)-([^-]+)\.md$ ]]; then
+
+  if [[ "$base_name" =~ ^([0-9]+)-(pending|ready|in-progress|deferred|complete|deleted)-([^-]+)-(.+)-([^-]+)\.md$ ]]; then
     id="${BASH_REMATCH[1]}"
-    severity="${BASH_REMATCH[2]}"
-    slug="${BASH_REMATCH[3]}"
-    hash="${BASH_REMATCH[4]}"
+    severity="${BASH_REMATCH[3]}"
+    slug="${BASH_REMATCH[4]}"
+    hash="${BASH_REMATCH[5]}"
     new_filename="$(dirname "$todo_file")/${id}-${new_state}-${severity}-${slug}-${hash}.md"
   else
     # Fallback: use sed-based rename if regex doesn't match
