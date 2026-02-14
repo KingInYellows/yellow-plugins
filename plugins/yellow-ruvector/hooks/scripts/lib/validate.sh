@@ -3,9 +3,12 @@
 # Source this file from hook scripts: . "${SCRIPT_DIR}/lib/validate.sh"
 
 # Canonicalize PROJECT_DIR to absolute path (prevents symlink/relative path bypass)
+# Portable: uses cd+pwd (POSIX), no GNU realpath dependency
 canonicalize_project_dir() {
   local raw_dir="$1"
-  if command -v realpath >/dev/null 2>&1; then
+  if [ -d "$raw_dir" ]; then
+    (cd -- "$raw_dir" 2>/dev/null && pwd -P) || printf '%s' "$raw_dir"
+  elif command -v realpath >/dev/null 2>&1; then
     realpath -- "$raw_dir" 2>/dev/null || printf '%s' "$raw_dir"
   else
     printf '%s' "$raw_dir"
@@ -37,27 +40,34 @@ validate_file_path() {
     return 1
   fi
 
-  # Normalize and resolve to absolute path
+  # Normalize and resolve to absolute path (portable — no GNU realpath -m)
   local resolved
-  if ! command -v realpath >/dev/null 2>&1; then
-    # Fallback: basic prefix check without normalization
-    resolved="${project_root}/${raw_path}"
-    case "$resolved" in
-      "${project_root}/"*) return 0 ;;
-      *) return 1 ;;
-    esac
-  fi
+  local full_path="${project_root}/${raw_path}"
 
-  resolved="$(realpath -m -- "${project_root}/${raw_path}" 2>/dev/null)" || return 1
-
-  # Reject symlinks outside project root
-  if [ -L "${project_root}/${raw_path}" ]; then
+  # Reject symlinks outside project root (check before resolving)
+  if [ -L "$full_path" ]; then
     local target
-    target="$(realpath -- "${project_root}/${raw_path}" 2>/dev/null)" || return 1
+    if command -v realpath >/dev/null 2>&1; then
+      target="$(realpath -- "$full_path" 2>/dev/null)" || return 1
+    elif [ -e "$full_path" ]; then
+      target="$(cd -- "$(dirname "$full_path")" 2>/dev/null && pwd -P)/$(basename "$full_path")"
+    else
+      return 1
+    fi
     case "$target" in
       "${project_root}/"*) ;; # OK: symlink points inside project
       *) return 1 ;; # Reject: symlink escapes project root
     esac
+  fi
+
+  # Resolve path: prefer realpath (any version), fall back to cd+pwd
+  if [ -e "$full_path" ] && [ -d "$(dirname "$full_path")" ]; then
+    resolved="$(cd -- "$(dirname "$full_path")" 2>/dev/null && pwd -P)/$(basename "$full_path")"
+  elif command -v realpath >/dev/null 2>&1; then
+    # realpath without -m: works on most systems including macOS (coreutils)
+    resolved="$(realpath -- "$full_path" 2>/dev/null)" || resolved="$full_path"
+  else
+    resolved="$full_path"
   fi
 
   # Verify resolved path is under project root
