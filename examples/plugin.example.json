@@ -12,42 +12,6 @@
     "type": "git",
     "url": "https://github.com/kinginyellow/yellow-plugins.git"
   },
-  "entrypoints": {
-    "skills": [
-      "skills/hookify.md",
-      "skills/hookify-configure.md"
-    ],
-    "commands": [
-      "commands/hookify-list.md",
-      "commands/hookify-create.md"
-    ],
-    "agents": [
-      "agents/conversation-analyzer.md"
-    ]
-  },
-  "compatibility": {
-    "claudeCodeMin": "2.0.12",
-    "nodeMin": "18",
-    "os": ["linux", "macos"],
-    "arch": ["x64", "arm64"]
-  },
-  "permissions": [
-    {
-      "scope": "filesystem",
-      "reason": "Read conversation history to analyze unwanted behaviors and patterns",
-      "paths": [".claude/conversations/"]
-    },
-    {
-      "scope": "filesystem",
-      "reason": "Write hook configuration files to prevent future unwanted behaviors",
-      "paths": [".claude/hooks/"]
-    },
-    {
-      "scope": "shell",
-      "reason": "Execute git commands to track hook changes in version control",
-      "commands": ["git"]
-    }
-  ],
   "license": "MIT",
   "keywords": ["hooks", "behavior", "safety", "ai-control", "conversation-analysis"]
 }

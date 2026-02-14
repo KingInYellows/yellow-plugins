@@ -156,8 +156,19 @@ function discoverPlugins() {
 
 // CLI entry point
 if (require.main === module) {
-  const pluginArg = process.argv[2];
+  // Support: node validate-plugin.js [pluginDir]
+  //          node validate-plugin.js --plugin <manifest-path>
+  let pluginArg = process.argv[2];
   let pluginDirs;
+
+  if (pluginArg === '--plugin' && process.argv[3]) {
+    // CI passes --plugin <manifest-path> (e.g., plugins/yellow-linear/.claude-plugin/plugin.json)
+    // Resolve to the plugin root directory (two levels up from plugin.json)
+    const manifestPath = process.argv[3];
+    const fullManifest = path.isAbsolute(manifestPath) ? manifestPath : path.join(PROJECT_ROOT, manifestPath);
+    const pluginRoot = path.dirname(path.dirname(fullManifest));
+    pluginArg = pluginRoot;
+  }
 
   if (pluginArg) {
     const fullPath = path.isAbsolute(pluginArg) ? pluginArg : path.join(PROJECT_ROOT, pluginArg);
