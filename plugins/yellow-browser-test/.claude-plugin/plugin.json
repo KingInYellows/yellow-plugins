@@ -1,0 +1,48 @@
+{
+  "name": "yellow-browser-test",
+  "version": "0.1.0",
+  "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, exploratory testing, and bug reporting",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/kinginyellow"
+  },
+  "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-browser-test",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinginyellow/yellow-plugins"
+  },
+  "license": "MIT",
+  "keywords": ["testing", "browser", "e2e", "agent-browser", "autonomous-qa"],
+  "entrypoints": {
+    "commands": [
+      "commands/browser-test/setup.md",
+      "commands/browser-test/test.md",
+      "commands/browser-test/explore.md",
+      "commands/browser-test/report.md"
+    ],
+    "agents": [
+      "agents/testing/app-discoverer.md",
+      "agents/testing/test-runner.md",
+      "agents/testing/test-reporter.md"
+    ],
+    "skills": [
+      "skills/agent-browser-patterns/SKILL.md",
+      "skills/test-conventions/SKILL.md"
+    ]
+  },
+  "compatibility": {
+    "claudeCodeMin": "2.0.0"
+  },
+  "permissions": [
+    {
+      "scope": "shell",
+      "reason": "Run agent-browser CLI for browser automation, npm for installation, process management for dev servers, gh for GitHub issue creation",
+      "commands": ["agent-browser", "npm", "npx", "kill", "lsof", "curl", "gh"]
+    },
+    {
+      "scope": "filesystem",
+      "reason": "Read codebase for discovery, write test reports and screenshots, manage plugin config",
+      "paths": [".claude/", "test-reports/"]
+    }
+  ]
+}
