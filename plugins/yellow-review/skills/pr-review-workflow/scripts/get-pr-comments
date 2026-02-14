@@ -86,7 +86,7 @@ while true; do
     if [ -z "$CURSOR" ]; then
         CURSOR_ARG="-F cursor=null"
     else
-        CURSOR_ARG="-f cursor=$CURSOR"
+        CURSOR_ARG="-f cursor=\"$CURSOR\""
     fi
 
     # shellcheck disable=SC2086
