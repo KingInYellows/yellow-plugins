@@ -48,11 +48,9 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 **Remediation:**
 - `debt-fixer` — Implements fixes for specific findings with human approval
 
-### Skills (3)
+### Skills (1)
 
-- `debt-conventions` — Scoring framework, category definitions, severity rubrics, effort estimates, JSON schemas
-- `debt-query` — Programmatic API for agents to query current debt state
-- `debt-audit-runner` — Programmatic API for agents to trigger audits
+- `debt-conventions` — Shared scanning heuristics, fix patterns, severity levels, state machine
 
 ## When to Use What
 
