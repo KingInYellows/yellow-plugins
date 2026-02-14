@@ -78,15 +78,50 @@ if [ -d todos/debt ]; then
     SEVERITY=$(yq -r '.severity // "unknown"' "$todo_file" 2>/dev/null)
     EFFORT=$(yq -r '.effort // "unknown"' "$todo_file" 2>/dev/null)
 
-    # Increment counters (safe from arithmetic expansion injection)
-    val_status=${by_status["$STATUS"]:-0}
-    by_status["$STATUS"]=$((val_status + 1))
-    val_category=${by_category["$CATEGORY"]:-0}
-    by_category["$CATEGORY"]=$((val_category + 1))
-    val_severity=${by_severity["$SEVERITY"]:-0}
-    by_severity["$SEVERITY"]=$((val_severity + 1))
-    val_effort=${by_effort["$EFFORT"]:-0}
-    by_effort["$EFFORT"]=$((val_effort + 1))
+    # Validate and increment status counter
+    case "$STATUS" in
+      pending|ready|in-progress|complete|deferred)
+        val_status=${by_status["$STATUS"]:-0}
+        by_status["$STATUS"]=$((val_status + 1))
+        ;;
+      *)
+        printf '[status] WARNING: Unknown status "%s" in %s\n' "$STATUS" "$todo_file" >&2
+        ERROR_COUNT=$((ERROR_COUNT + 1))
+        ;;
+    esac
+
+    # Validate and increment category counter
+    case "$CATEGORY" in
+      ai-patterns|complexity|duplication|architecture|security)
+        val_category=${by_category["$CATEGORY"]:-0}
+        by_category["$CATEGORY"]=$((val_category + 1))
+        ;;
+      *)
+        printf '[status] WARNING: Unknown category "%s" in %s\n' "$CATEGORY" "$todo_file" >&2
+        ;;
+    esac
+
+    # Validate and increment severity counter
+    case "$SEVERITY" in
+      critical|high|medium|low)
+        val_severity=${by_severity["$SEVERITY"]:-0}
+        by_severity["$SEVERITY"]=$((val_severity + 1))
+        ;;
+      *)
+        printf '[status] WARNING: Unknown severity "%s" in %s\n' "$SEVERITY" "$todo_file" >&2
+        ;;
+    esac
+
+    # Validate and increment effort counter
+    case "$EFFORT" in
+      quick|small|medium|large)
+        val_effort=${by_effort["$EFFORT"]:-0}
+        by_effort["$EFFORT"]=$((val_effort + 1))
+        ;;
+      *)
+        printf '[status] WARNING: Unknown effort "%s" in %s\n' "$EFFORT" "$todo_file" >&2
+        ;;
+    esac
 
     TODO_COUNT=$((TODO_COUNT + 1))
   done < <(find todos/debt -name '*.md' -print0 2>/dev/null)
