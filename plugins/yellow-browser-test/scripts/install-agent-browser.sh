@@ -17,7 +17,9 @@ else
   # Check Node.js version (requires 18+)
   if command -v node >/dev/null 2>&1; then
     NODE_VERSION=$(node --version 2>/dev/null | sed 's/^v//' | cut -d. -f1)
-    if [ "$NODE_VERSION" -lt 18 ]; then
+    if [ -z "$NODE_VERSION" ] || ! printf '%s' "$NODE_VERSION" | grep -qE '^[0-9]+$'; then
+      printf '[browser-test] Warning: Could not parse Node.js version. Requires 18+.\n' >&2
+    elif [ "$NODE_VERSION" -lt 18 ]; then
       printf '[browser-test] Error: Node.js 18+ required (found v%s). Update at https://nodejs.org/\n' "$NODE_VERSION" >&2
       exit 1
     fi
