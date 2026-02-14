@@ -1,0 +1,4 @@
+scanner-output/
+synthesis-state.json
+linear-config.json
+*.lock

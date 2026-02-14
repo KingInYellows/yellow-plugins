@@ -82,6 +82,15 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-browser-test",
       "category": "testing"
+    },
+    {
+      "id": "yellow-debt",
+      "name": "yellow-debt",
+      "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
+      "version": "0.1.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-debt",
+      "category": "development"
     }
   ]
 }

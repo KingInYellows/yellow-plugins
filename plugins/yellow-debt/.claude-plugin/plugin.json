@@ -1,0 +1,53 @@
+{
+  "name": "yellow-debt",
+  "version": "0.1.0",
+  "description": "Technical debt audit and remediation with parallel scanner agents. Use when you need to assess codebase health, identify AI-generated debt patterns, prioritize findings, and systematically remediate technical debt.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/kinginyellow"
+  },
+  "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-debt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kinginyellow/yellow-plugins"
+  },
+  "license": "MIT",
+  "keywords": [
+    "technical-debt",
+    "audit",
+    "code-quality",
+    "remediation",
+    "scanner"
+  ],
+  "entrypoints": {
+    "commands": [
+      "commands/debt/audit.md",
+      "commands/debt/triage.md",
+      "commands/debt/fix.md",
+      "commands/debt/status.md",
+      "commands/debt/sync.md"
+    ],
+    "agents": [
+      "agents/scanners/ai-pattern-scanner.md",
+      "agents/scanners/complexity-scanner.md",
+      "agents/scanners/duplication-scanner.md",
+      "agents/scanners/architecture-scanner.md",
+      "agents/scanners/security-debt-scanner.md",
+      "agents/synthesis/audit-synthesizer.md",
+      "agents/remediation/debt-fixer.md"
+    ],
+    "skills": [
+      "skills/debt-conventions/SKILL.md"
+    ]
+  },
+  "compatibility": {
+    "claudeCodeMin": "2.0.0"
+  },
+  "permissions": [
+    {
+      "scope": "shell",
+      "reason": "Git operations for codebase analysis, path validation, and commit generation",
+      "commands": ["git", "gt", "jq", "realpath", "sha256sum", "yq"]
+    }
+  ]
+}
