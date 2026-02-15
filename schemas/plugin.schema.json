@@ -4,7 +4,7 @@
   "title": "Claude Code Plugin Manifest Schema",
   "description": "Schema for Claude Code plugin.json files. Requires official fields (name, description, author) and allows optional metadata fields.",
   "type": "object",
-  "required": ["name", "description", "author"],
+  "required": ["name", "version", "description", "author"],
   "properties": {
     "name": {
       "type": "string",
