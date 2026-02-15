@@ -227,22 +227,21 @@ Todo files must use one of the following status values:
 - `pending` — Finding identified, awaiting triage
 - `ready` — Approved for remediation
 - `in-progress` — Fix work has started
-- `blocked` — Cannot proceed due to dependency
-- `resolved` — Fix completed
+- `complete` — Fix completed
 - `deferred` — Postponed to future sprint
-- `cancelled` — No longer relevant
+- `deleted` — Rejected or no longer relevant
 
 **Remediation**: Run `validate-debt-todo.sh` to check status field against allowed values.
 
 ### Invalid Priority Values
-Priority must be one of: `p0` (critical), `p1` (high), `p2` (medium), `p3` (low).
+Priority must be one of: `p1` (critical), `p2` (high), `p3` (medium), `p4` (low).
 
 **Remediation**: Check priority field in todo frontmatter.
 
 ### Missing Required Frontmatter
 All todo files MUST include:
 - `status`: Current lifecycle state
-- `priority`: Urgency level (p0-p3)
+- `priority`: Urgency level (p1-p4)
 - `issue_id`: Unique identifier
 - `tags`: Array of lowercase, hyphen-separated tags
 

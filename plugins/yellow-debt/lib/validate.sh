@@ -74,15 +74,23 @@ validate_file_path() {
   esac
 
   # Canonicalize and verify containment
-  local resolved
-  if command -v realpath >/dev/null 2>&1; then
-    resolved=$(realpath -- "${project_root}/${raw_path}" 2>/dev/null) || resolved="${project_root}/${raw_path}"
+  local canonical_root candidate resolved parent_dir
+  canonical_root=$(cd -- "$project_root" 2>/dev/null && pwd -P) || return 1
+  candidate="${canonical_root}/${raw_path}"
+
+  # Prefer GNU realpath -m when available (handles non-existent targets safely).
+  if command -v realpath >/dev/null 2>&1 && realpath -m / >/dev/null 2>&1; then
+    resolved=$(realpath -m -- "$candidate") || return 1
+  elif [ -e "$candidate" ]; then
+    parent_dir=$(cd -- "$(dirname "$candidate")" 2>/dev/null && pwd -P) || return 1
+    resolved="${parent_dir}/$(basename "$candidate")"
   else
-    resolved=$(cd -- "$(dirname "${project_root}/${raw_path}")" 2>/dev/null && pwd -P)/$(basename "${project_root}/${raw_path}") || resolved="${project_root}/${raw_path}"
+    # Without realpath -m, we cannot safely canonicalize non-existent paths.
+    return 1
   fi
 
   case "$resolved" in
-    "${project_root}/"*|"${project_root}") return 0 ;;
+    "${canonical_root}/"*|"${canonical_root}") return 0 ;;
     *) return 1 ;;
   esac
 }

@@ -22,13 +22,14 @@ on:
 
 # Cancel stale workflow runs
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '8.15.0'
   CI_UPLOAD_ARTIFACTS: 'false'
+  PNPM_INSTALL_FLAGS: '--frozen-lockfile --prefer-offline --fetch-retries=5 --fetch-retry-factor=2 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000 --network-concurrency=16'
 
 jobs:
   # ============================================================================
@@ -65,7 +66,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --prefer-offline
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Install AJV CLI
         run: npm install -g ajv-cli@5.0.0 ajv-formats@3.0.1
@@ -85,7 +86,7 @@ jobs:
               marketplace)
                 echo "::group::Schema validation"
                 ajv validate \
-                  -s schemas/marketplace.schema.json \
+                  -s schemas/official-marketplace.schema.json \
                   -d .claude-plugin/marketplace.json \
                   -c ajv-formats \
                   --strict=true \
@@ -149,7 +150,7 @@ jobs:
                 echo "::group::Marketplace examples"
                 if [ -f examples/marketplace.example.json ]; then
                   ajv validate \
-                    -s schemas/marketplace.schema.json \
+                    -s schemas/official-marketplace.schema.json \
                     -d examples/marketplace.example.json \
                     -c ajv-formats \
                     --strict=true \
@@ -232,7 +233,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Start lint and typecheck timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -303,7 +304,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Start unit test timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -370,7 +371,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Start integration test timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -439,7 +440,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Install AJV CLI
         run: npm install -g ajv-cli@5.0.0 ajv-formats@3.0.1
@@ -557,7 +558,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Start security audit timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -644,7 +645,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Start build timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV

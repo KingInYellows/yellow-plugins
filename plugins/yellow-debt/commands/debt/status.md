@@ -88,7 +88,7 @@ if [ -d todos/debt ]; then
 
     # Validate and increment status counter
     case "$STATUS" in
-      pending|ready|in-progress|complete|deferred)
+      pending|ready|in-progress|complete|deferred|deleted)
         val_status=${by_status["$STATUS"]:-0}
         by_status["$STATUS"]=$((val_status + 1))
         ;;

@@ -187,7 +187,7 @@ Use AskUserQuestion to confirm submission:
 
 If user selects "Review changes first", run:
 ```bash
-git diff --cached --stat
+git log -1 --stat
 ```
 and ask again.
 
