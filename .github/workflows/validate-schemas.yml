@@ -87,6 +87,7 @@ jobs:
                 ajv validate \
                   -s schemas/marketplace.schema.json \
                   -d .claude-plugin/marketplace.json \
+                  -c ajv-formats \
                   --strict=true \
                   --all-errors
                 echo "::endgroup::"
@@ -114,6 +115,7 @@ jobs:
                   ajv validate \
                     -s schemas/plugin.schema.json \
                     -d "$manifest" \
+                    -c ajv-formats \
                     --strict=true \
                     --all-errors
                 done
@@ -149,6 +151,7 @@ jobs:
                   ajv validate \
                     -s schemas/marketplace.schema.json \
                     -d examples/marketplace.example.json \
+                    -c ajv-formats \
                     --strict=true \
                     --all-errors
                 fi
@@ -160,6 +163,7 @@ jobs:
                   ajv validate \
                     -s schemas/plugin.schema.json \
                     -d "$example" \
+                    -c ajv-formats \
                     --strict=true \
                     --all-errors
                 done
@@ -486,7 +490,7 @@ jobs:
                   for request in examples/requests/${base}*.json; do
                     [ -e "$request" ] || continue
                     echo "Validating request example $request with $contract"
-                    ajv validate -s "$contract" -d "$request"
+                    ajv validate -s "$contract" -d "$request" -c ajv-formats
                   done
                 fi
 
@@ -494,7 +498,7 @@ jobs:
                   for response in examples/responses/${base}*.json; do
                     [ -e "$response" ] || continue
                     echo "Validating response example $response with $contract"
-                    ajv validate -s "$contract" -d "$response"
+                    ajv validate -s "$contract" -d "$response" -c ajv-formats
                   done
                 fi
               done
