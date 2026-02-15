@@ -7,10 +7,11 @@
 canonicalize_project_dir() {
   local raw_dir="$1"
   if [ -d "$raw_dir" ]; then
-    (cd -- "$raw_dir" 2>/dev/null && pwd -P) || printf '%s' "$raw_dir"
+    (cd -- "$raw_dir" 2>/dev/null && pwd -P) || { printf '[validate] Warning: cd+pwd canonicalization failed, using raw path\n' >&2; printf '%s' "$raw_dir"; }
   elif command -v realpath >/dev/null 2>&1; then
-    realpath -- "$raw_dir" 2>/dev/null || printf '%s' "$raw_dir"
+    realpath -- "$raw_dir" 2>/dev/null || { printf '[validate] Warning: realpath canonicalization failed, using raw path\n' >&2; printf '%s' "$raw_dir"; }
   else
+    printf '[validate] Warning: No realpath available, using raw path\n' >&2
     printf '%s' "$raw_dir"
   fi
 }
@@ -71,8 +72,9 @@ validate_file_path() {
     resolved="$(cd -- "$(dirname "$full_path")" 2>/dev/null && pwd -P)/$(basename "$full_path")"
   elif command -v realpath >/dev/null 2>&1; then
     # realpath without -m: works on most systems including macOS (coreutils)
-    resolved="$(realpath -- "$full_path" 2>/dev/null)" || resolved="$full_path"
+    resolved="$(realpath -- "$full_path" 2>/dev/null)" || { printf '[validate] Warning: realpath failed for path, using literal path\n' >&2; resolved="$full_path"; }
   else
+    printf '[validate] Warning: No realpath available, using literal path\n' >&2
     resolved="$full_path"
   fi
 
