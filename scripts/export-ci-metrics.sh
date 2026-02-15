@@ -42,6 +42,11 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+# Validate required arguments
+if [ "$STAGE" = "unknown" ] || [ "$STATUS" = "unknown" ]; then
+  printf '[ci-metrics] Warning: Missing required arguments (stage=%s, status=%s). Metrics may be incomplete.\n' "$STAGE" "$STATUS" >&2
+fi
+
 # Build label string
 LABELS="stage=\"${STAGE}\",status=\"${STATUS}\""
 for label in "${ADDITIONAL_LABELS[@]}"; do
@@ -77,6 +82,11 @@ ${METRIC_PREFIX}_validations_total{${LABELS}} 1
 ${METRIC_PREFIX}_timestamp_seconds{${LABELS}} ${TIMESTAMP}
 EOF
 
+<<<<<<< HEAD
+=======
+printf '[ci-metrics] Exported metrics for stage=%s status=%s\n' "$STAGE" "$STATUS" >&2
+
+>>>>>>> 13123fa (fix: resolve 9 code review findings from multi-agent review)
 # Optional: Include resource usage if available
 if command -v time &> /dev/null; then
   # CPU and memory stats not easily available in GitHub Actions without custom tooling

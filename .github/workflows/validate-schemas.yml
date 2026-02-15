@@ -28,6 +28,7 @@ concurrency:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '8.15.0'
+  CI_UPLOAD_ARTIFACTS: 'false'
 
 jobs:
   # ============================================================================
@@ -35,7 +36,7 @@ jobs:
   # ============================================================================
   validate-schemas:
     name: Validate Schemas (${{ matrix.target }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 2  # NFR-MAINT-002: Critical path budget
 
     strategy:
@@ -62,8 +63,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
+          
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
@@ -180,13 +180,7 @@ jobs:
         if: always()
         id: validation-status
         run: |
-          if ${{ success() }}; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          elif ${{ failure() }}; then
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=cancelled" >> $GITHUB_OUTPUT
-          fi
+          echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
 
       - name: Export validation metrics
         if: always()
@@ -195,7 +189,7 @@ jobs:
           ./scripts/export-ci-metrics.sh schema_validation "${{ steps.validation-status.outputs.status }}" target="${{ matrix.target }}" > ".ci-metrics/validate-${{ matrix.target }}.prom"
 
       - name: Upload validation metrics
-        if: always()
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: metrics-validate-${{ matrix.target }}
@@ -203,7 +197,7 @@ jobs:
           retention-days: 7
 
       - name: Upload validation logs
-        if: always()
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: logs-validate-${{ matrix.target }}
@@ -216,7 +210,7 @@ jobs:
   # ============================================================================
   lint-and-typecheck:
     name: Lint & TypeCheck
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 3
 
     steps:
@@ -232,8 +226,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
+          
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -264,13 +257,7 @@ jobs:
         if: always()
         id: lint-status
         run: |
-          if ${{ success() }}; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          elif ${{ failure() }}; then
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=cancelled" >> $GITHUB_OUTPUT
-          fi
+          echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
 
       - name: Export lint metrics
         if: always()
@@ -279,7 +266,7 @@ jobs:
           ./scripts/export-ci-metrics.sh lint "${{ steps.lint-status.outputs.status }}" > .ci-metrics/lint-typecheck.prom
 
       - name: Upload lint artifacts
-        if: always()
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: metrics-lint
@@ -293,7 +280,7 @@ jobs:
   # ============================================================================
   unit-tests:
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 5
     needs: [lint-and-typecheck]
 
@@ -310,8 +297,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
+          
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -338,13 +324,7 @@ jobs:
         if: always()
         id: unit-status
         run: |
-          if ${{ success() }}; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          elif ${{ failure() }}; then
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=cancelled" >> $GITHUB_OUTPUT
-          fi
+          echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
 
       - name: Export unit test metrics
         if: always()
@@ -353,7 +333,7 @@ jobs:
           ./scripts/export-ci-metrics.sh unit_test "${{ steps.unit-status.outputs.status }}" > .ci-metrics/unit-tests.prom
 
       - name: Upload unit test artifacts
-        if: always()
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: metrics-unit-tests
@@ -367,7 +347,7 @@ jobs:
   # ============================================================================
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 8
     needs: [unit-tests]
 
@@ -384,8 +364,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
+          
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -412,13 +391,7 @@ jobs:
         if: always()
         id: integration-status
         run: |
-          if ${{ success() }}; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          elif ${{ failure() }}; then
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=cancelled" >> $GITHUB_OUTPUT
-          fi
+          echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
 
       - name: Export integration test metrics
         if: always()
@@ -427,7 +400,7 @@ jobs:
           ./scripts/export-ci-metrics.sh integration_test "${{ steps.integration-status.outputs.status }}" > .ci-metrics/integration-tests.prom
 
       - name: Upload integration test artifacts
-        if: always()
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: metrics-integration-tests
@@ -441,7 +414,7 @@ jobs:
   # ============================================================================
   contract-drift:
     name: Contract Drift Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 3
     needs: [validate-schemas]
 
@@ -460,8 +433,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
+          
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -540,13 +512,7 @@ jobs:
         if: always()
         id: contract-status
         run: |
-          if ${{ success() }}; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          elif ${{ failure() }}; then
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=cancelled" >> $GITHUB_OUTPUT
-          fi
+          echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
 
       - name: Export contract drift metrics
         if: always()
@@ -555,7 +521,7 @@ jobs:
           ./scripts/export-ci-metrics.sh contract_drift "${{ steps.contract-status.outputs.status }}" > .ci-metrics/contract-drift.prom
 
       - name: Upload contract drift artifacts
-        if: always()
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: metrics-contract-drift
@@ -569,7 +535,7 @@ jobs:
   # ============================================================================
   security-audit:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 5
 
     steps:
@@ -585,8 +551,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
+          
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -632,13 +597,7 @@ jobs:
         if: always()
         id: security-status
         run: |
-          if ${{ success() }}; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          elif ${{ failure() }}; then
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=cancelled" >> $GITHUB_OUTPUT
-          fi
+          echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
 
       - name: Export security audit metrics
         if: always()
@@ -647,7 +606,7 @@ jobs:
           ./scripts/export-ci-metrics.sh security_audit "${{ steps.security-status.outputs.status }}" > .ci-metrics/security-audit.prom
 
       - name: Upload security artifacts
-        if: always()
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: metrics-security-audit
@@ -661,7 +620,7 @@ jobs:
   # ============================================================================
   build:
     name: Build Verification
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     timeout-minutes: 5
     if: github.ref == 'refs/heads/main'
     needs: [validate-schemas, lint-and-typecheck, unit-tests]
@@ -679,8 +638,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
+          
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -707,13 +665,7 @@ jobs:
         if: always()
         id: build-status
         run: |
-          if ${{ success() }}; then
-            echo "status=success" >> $GITHUB_OUTPUT
-          elif ${{ failure() }}; then
-            echo "status=failure" >> $GITHUB_OUTPUT
-          else
-            echo "status=cancelled" >> $GITHUB_OUTPUT
-          fi
+          echo "status=${{ job.status }}" >> $GITHUB_OUTPUT
 
       - name: Export build metrics
         if: always()
@@ -722,7 +674,7 @@ jobs:
           ./scripts/export-ci-metrics.sh build "${{ steps.build-status.outputs.status }}" > .ci-metrics/build.prom
 
       - name: Upload build artifacts
-        if: always()
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: metrics-build
@@ -736,18 +688,18 @@ jobs:
   # ============================================================================
   report-metrics:
     name: Aggregate CI Metrics
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     if: always()
     needs: [validate-schemas, lint-and-typecheck, unit-tests, integration-tests, contract-drift, security-audit, build]
 
     steps:
       - name: Download all metrics artifacts
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/download-artifact@v4
         with:
           pattern: metrics-*
           path: all-metrics/
           merge-multiple: true
-          if-no-files-found: ignore
 
       - name: Aggregate metrics
         run: |
@@ -766,6 +718,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Upload aggregated metrics
+        if: env.CI_UPLOAD_ARTIFACTS == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ci-metrics-aggregated
@@ -777,36 +730,36 @@ jobs:
           echo "::group::SLO Compliance Check"
           echo "Target: Schema validation jobs < 60 seconds"
           python <<'PY'
-import sys, pathlib
-path = pathlib.Path("aggregated-metrics/ci-metrics.prom")
-if not path.exists():
-    print("::warning::Aggregated metrics file missing")
-    sys.exit(0)
-violations = []
-for line in path.read_text().splitlines():
-    if not line.startswith("yellow_plugins_ci_duration_seconds{"):
-        continue
-    labels_raw, value_raw = line[len("yellow_plugins_ci_duration_seconds{"):].split("} ")
-    labels = {}
-    for pair in labels_raw.split(","):
-        if "=" not in pair:
-            continue
-        key, val = pair.split("=", 1)
-        labels[key] = val.strip('"')
-    try:
-        value = float(value_raw.strip())
-    except ValueError:
-        continue
-    if labels.get("stage") == "schema_validation" and value > 60:
-        violations.append((labels.get("target", "unknown"), value))
+          import sys, pathlib
+          path = pathlib.Path("aggregated-metrics/ci-metrics.prom")
+          if not path.exists():
+              print("::warning::Aggregated metrics file missing")
+              sys.exit(0)
+          violations = []
+          for line in path.read_text().splitlines():
+              if not line.startswith("yellow_plugins_ci_duration_seconds{"):
+                  continue
+              labels_raw, value_raw = line[len("yellow_plugins_ci_duration_seconds{"):].split("} ")
+              labels = {}
+              for pair in labels_raw.split(","):
+                  if "=" not in pair:
+                      continue
+                  key, val = pair.split("=", 1)
+                  labels[key] = val.strip('"')
+              try:
+                  value = float(value_raw.strip())
+              except ValueError:
+                  continue
+              if labels.get("stage") == "schema_validation" and value > 60:
+                  violations.append((labels.get("target", "unknown"), value))
 
-if violations:
-    for target, duration in violations:
-        print(f"::error::Schema validation target '{target}' exceeded 60s budget ({duration:.2f}s)")
-    sys.exit(1)
+          if violations:
+              for target, duration in violations:
+                  print(f"::error::Schema validation target '{target}' exceeded 60s budget ({duration:.2f}s)")
+              sys.exit(1)
 
-print("All schema validation metrics within 60s budget.")
-PY
+          print("All schema validation metrics within 60s budget.")
+          PY
           echo "::endgroup::"
 
   # ============================================================================
@@ -814,7 +767,7 @@ PY
   # ============================================================================
   ci-status:
     name: CI Status Summary
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     if: always()
     needs: [validate-schemas, lint-and-typecheck, unit-tests, integration-tests, contract-drift, security-audit, build]
 

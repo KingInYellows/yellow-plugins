@@ -1,234 +1,91 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kingin-yellows.dev/schemas/plugin.schema.json",
-  "title": "Claude Code Plugin Manifest Schema (Extended/Custom)",
-  "description": "Extended schema for Claude Code plugin.json used by this project's marketplace/validation tooling. The official Claude Code format only requires 'name', 'description', and 'author', but this schema additionally requires fields like 'entrypoints', 'compatibility', and 'permissions' for publishing/validation. The minimal official format (which does not validate against this extended schema) is shown in examples/plugin-minimal.example.json.",
+  "title": "Claude Code Plugin Manifest Schema",
+  "description": "Schema for Claude Code plugin.json files. Requires official fields (name, description, author) and allows optional metadata fields.",
   "type": "object",
-  "required": ["name", "version", "description", "author", "entrypoints", "compatibility", "permissions"],
-  "additionalProperties": false,
+  "required": ["name", "version", "description", "author"],
   "properties": {
     "name": {
       "type": "string",
       "pattern": "^[a-z0-9-]+$",
       "minLength": 1,
       "maxLength": 64,
-      "description": "Plugin identifier in kebab-case (e.g., 'hookify', 'pr-review-toolkit'). Must match marketplace ID. Used in CLI commands like '/plugin install <name>'."
+      "description": "Plugin identifier in kebab-case. Must match directory name."
     },
     "version": {
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-      "description": "Plugin version using semantic versioning (MAJOR.MINOR.PATCH, e.g., '1.2.3'). MUST match version declared in marketplace.json."
+      "description": "Semantic version (MAJOR.MINOR.PATCH)."
     },
     "description": {
       "type": "string",
       "minLength": 10,
       "maxLength": 280,
-      "description": "Brief plugin description (10-280 characters, tweet-length). Displayed during install/list. No XML tags or markdown formatting."
+      "description": "Brief plugin description (10-280 characters)."
     },
     "author": {
-      "type": "object",
-      "required": ["name"],
-      "additionalProperties": false,
-      "properties": {
-        "name": {
+      "oneOf": [
+        {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 100,
-          "description": "Author's full name or GitHub username"
+          "minLength": 1
         },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "Contact email (optional but recommended for support)"
-        },
-        "url": {
-          "type": "string",
-          "format": "uri",
-          "description": "Author's website or GitHub profile URL (optional)"
+        {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "additionalProperties": false
         }
-      },
-      "description": "Plugin author information for attribution and contact"
+      ],
+      "description": "Author name (string) or object with name, email, url."
     },
-    "entrypoints": {
-      "type": "object",
-      "minProperties": 1,
-      "additionalProperties": false,
-      "properties": {
-        "commands": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^commands/.+\\.md$"
-          },
-          "uniqueItems": true,
-          "description": "Slash commands (relative paths from plugin root, e.g., ['commands/hookify.md']). Each file defines a user-invocable command with YAML frontmatter."
-        },
-        "skills": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^skills/.+\\.md$"
-          },
-          "uniqueItems": true,
-          "description": "Skills (relative paths from plugin root, e.g., ['skills/code-review.md']). AI-invocable capabilities with descriptions and allowed tools."
-        },
-        "agents": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^agents/.+\\.md$"
-          },
-          "uniqueItems": true,
-          "description": "Custom agent personas (relative paths, e.g., ['agents/security-analyst.md']). Defines specialized AI behaviors and system prompts."
-        },
-        "mcpServers": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^.+\\.mcp\\.json$"
-          },
-          "uniqueItems": true,
-          "description": "MCP server configurations (relative paths, e.g., ['config/database.mcp.json']). External tool integrations via Model Context Protocol."
-        }
-      },
-      "description": "Plugin extension points. At least ONE category required (commands, skills, agents, or mcpServers). Paths are relative to plugin root directory."
+    "license": {
+      "type": "string",
+      "maxLength": 50,
+      "description": "SPDX license identifier."
     },
-    "compatibility": {
-      "type": "object",
-      "required": ["claudeCodeMin"],
-      "additionalProperties": false,
-      "properties": {
-        "claudeCodeMin": {
-          "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-          "description": "Minimum Claude Code version required (semver, e.g., '2.0.12'). Installation blocked if user's Claude Code version is lower."
-        },
-        "claudeCodeMax": {
-          "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
-          "description": "Maximum Claude Code version supported (optional). Use when plugin uses deprecated APIs. Blocks install on newer Claude Code versions."
-        },
-        "nodeMin": {
-          "type": "string",
-          "pattern": "^[0-9]+$",
-          "description": "Minimum Node.js major version (e.g., '18' for Node.js 18.x). Required if plugin has npm dependencies. Valid range: 18-24 (NOT 25+)."
-        },
-        "os": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["linux", "macos", "windows"]
-          },
-          "uniqueItems": true,
-          "minItems": 1,
-          "description": "Supported operating systems. Omit to support all platforms. Installation blocked on unsupported OS."
-        },
-        "arch": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": ["x64", "arm64"]
-          },
-          "uniqueItems": true,
-          "minItems": 1,
-          "description": "Supported CPU architectures. Omit to support all architectures. Installation blocked on unsupported arch."
-        },
-        "pluginDependencies": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-z0-9-]+$"
-          },
-          "uniqueItems": true,
-          "description": "Required plugin IDs that must be installed first (e.g., ['base-tools', 'git-integration']). Installation will prompt to install dependencies."
-        }
-      },
-      "description": "Compatibility requirements for Claude Code version, platform, architecture, and plugin dependencies. Enforced during installation."
-    },
-    "permissions": {
-      "type": "array",
-      "minItems": 0,
-      "items": {
-        "$ref": "#/definitions/PermissionDeclaration"
-      },
-      "description": "Declared permissions required by plugin. Displayed during installation for user consent. Empty array if plugin requires no special permissions."
-    },
-    "docs": {
-      "type": "object",
-      "required": ["readme"],
-      "additionalProperties": false,
-      "properties": {
-        "readme": {
-          "type": "string",
-          "format": "uri",
-          "description": "Plugin README URL (required). Typically points to GitHub repository README. Displayed in detail view."
-        },
-        "changelog": {
-          "type": "string",
-          "format": "uri",
-          "description": "Changelog URL (optional but recommended). Shows version history and breaking changes. Useful for update decisions."
-        },
-        "examples": {
-          "type": "string",
-          "format": "uri",
-          "description": "Examples/tutorials URL (optional). Quick-start guides and usage patterns."
-        },
-        "api": {
-          "type": "string",
-          "format": "uri",
-          "description": "API documentation URL (optional). For plugins exposing programmatic interfaces."
-        }
-      },
-      "description": "Documentation URLs. README is required, others recommended for better discoverability and adoption."
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "Plugin homepage URL."
     },
     "repository": {
-      "type": "object",
-      "required": ["type", "url"],
-      "additionalProperties": false,
-      "properties": {
-        "type": {
+      "oneOf": [
+        {
           "type": "string",
-          "enum": ["git"],
-          "description": "Repository type. Currently only 'git' supported."
+          "format": "uri"
         },
-        "url": {
-          "type": "string",
-          "format": "uri",
-          "description": "Repository URL (e.g., 'https://github.com/user/repo.git'). Used for source verification and issue reporting."
+        {
+          "type": "object",
+          "required": ["type", "url"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["git"]
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "additionalProperties": false
         }
-      },
-      "description": "Source repository information (optional but recommended for trust/transparency)"
-    },
-    "lifecycle": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "install": {
-          "type": "string",
-          "pattern": "^scripts/.+\\.(sh|js)$",
-          "description": "Relative path to custom install script (e.g., 'scripts/install.sh'). Executed after npm install. Timeout: 5 minutes. Exit code 0 = success."
-        },
-        "uninstall": {
-          "type": "string",
-          "pattern": "^scripts/.+\\.(sh|js)$",
-          "description": "Relative path to custom uninstall script (e.g., 'scripts/uninstall.sh'). Executed before plugin removal. Timeout: 5 minutes."
-        },
-        "preInstall": {
-          "type": "string",
-          "pattern": "^scripts/.+\\.(sh|js)$",
-          "description": "Relative path to pre-install validation script (optional). Runs before npm install. Use to check system requirements. Exit code 0 = proceed, non-zero = abort."
-        }
-      },
-      "description": "Lifecycle hooks for custom setup/teardown logic. Scripts run in shell with plugin directory as cwd. Security: Scripts timeout after 5 minutes."
-    },
-    "dependencies": {
-      "type": "object",
-      "patternProperties": {
-        "^[a-zA-Z0-9@/_-]+$": {
-          "type": "string"
-        }
-      },
-      "description": "npm dependencies (from package.json if present). Standard npm dependency format (e.g., {'axios': '^1.6.0'}). Automatically installed during plugin installation."
+      ],
+      "description": "Source repository (string URL or object with type and url)."
     },
     "keywords": {
       "type": "array",
@@ -240,73 +97,16 @@
       },
       "maxItems": 10,
       "uniqueItems": true,
-      "description": "Searchable keywords in kebab-case (e.g., ['code-review', 'testing', 'ci-cd']). Used for plugin discovery. Max 10 keywords."
+      "description": "Searchable keywords in kebab-case."
     },
-    "license": {
-      "type": "string",
-      "maxLength": 50,
-      "description": "SPDX license identifier (e.g., 'MIT', 'Apache-2.0', 'GPL-3.0'). Optional but recommended for open-source plugins."
+    "mcpServers": {
+      "type": "object",
+      "description": "MCP server configurations keyed by server name."
     },
-    "homepage": {
+    "hooks": {
       "type": "string",
-      "format": "uri",
-      "description": "Plugin homepage URL (optional). Can differ from repository URL. Typically points to documentation site."
+      "description": "Path to hooks configuration file."
     }
   },
-  "definitions": {
-    "PermissionDeclaration": {
-      "type": "object",
-      "required": ["scope", "reason"],
-      "additionalProperties": false,
-      "properties": {
-        "scope": {
-          "type": "string",
-          "enum": ["filesystem", "network", "shell", "env", "claude-api"],
-          "description": "Permission scope category. filesystem=read/write files, network=HTTP requests, shell=execute commands, env=access environment variables, claude-api=use Claude API"
-        },
-        "reason": {
-          "type": "string",
-          "minLength": 10,
-          "maxLength": 200,
-          "description": "Human-readable justification for permission request (10-200 characters). Displayed during installation. Be specific about what data is accessed."
-        },
-        "paths": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[^*?]+$"
-          },
-          "uniqueItems": true,
-          "description": "Specific filesystem paths for 'filesystem' scope (e.g., ['.claude/conversations/', 'package.json']). Wildcards not allowed. Omit for unrestricted access."
-        },
-        "domains": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "format": "hostname"
-          },
-          "uniqueItems": true,
-          "description": "Specific network domains for 'network' scope (e.g., ['api.github.com', 'registry.npmjs.org']). Omit for unrestricted network access."
-        },
-        "commands": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[a-zA-Z0-9_-]+$"
-          },
-          "uniqueItems": true,
-          "description": "Specific shell commands for 'shell' scope (e.g., ['git', 'npm', 'docker']). Omit for unrestricted shell access."
-        },
-        "envVars": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^[A-Z0-9_]+$"
-          },
-          "uniqueItems": true,
-          "description": "Specific environment variables for 'env' scope (e.g., ['GITHUB_TOKEN', 'NODE_ENV']). Omit for unrestricted env access."
-        }
-      }
-    }
-  }
+  "additionalProperties": false
 }

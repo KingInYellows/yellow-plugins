@@ -15,40 +15,5 @@
       "type": "http",
       "url": "https://mcp.linear.app/mcp"
     }
-  },
-  "entrypoints": {
-    "commands": [
-      "commands/linear/create.md",
-      "commands/linear/sync.md",
-      "commands/linear/triage.md",
-      "commands/linear/plan-cycle.md",
-      "commands/linear/status.md"
-    ],
-    "agents": [
-      "agents/workflow/linear-issue-loader.md",
-      "agents/workflow/linear-pr-linker.md",
-      "agents/research/linear-explorer.md"
-    ],
-    "skills": [
-      "skills/linear-workflows/SKILL.md"
-    ],
-    "mcpServers": [
-      "config/linear.mcp.json"
-    ]
-  },
-  "compatibility": {
-    "claudeCodeMin": "2.0.0"
-  },
-  "permissions": [
-    {
-      "scope": "network",
-      "reason": "Connects to Linear MCP server for issue management and project tracking",
-      "domains": ["mcp.linear.app"]
-    },
-    {
-      "scope": "shell",
-      "reason": "Runs git commands for branch detection and team context resolution",
-      "commands": ["git", "gh"]
-    }
-  ]
+  }
 }
