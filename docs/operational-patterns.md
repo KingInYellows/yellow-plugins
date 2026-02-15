@@ -38,8 +38,8 @@ realpath -- "$path"           # correct — handles paths starting with -
 ### Git Output Parsing
 
 ```bash
-# Use --porcelain + awk, never human-readable format
-git status --porcelain | awk '{print $2}'
+# Use --porcelain + cut, never human-readable format (handles paths with spaces)
+git status --porcelain | cut -c4-
 
 # Use sed for paths (handles spaces)
 git diff --name-only | sed 's/^prefix //'   # correct

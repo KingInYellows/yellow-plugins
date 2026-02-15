@@ -29,9 +29,11 @@ fi
 
 # 4. Warn if on main branch
 current_branch=$(git branch --show-current)
-if [ "$current_branch" = "main" ] || [ "$current_branch" = "master" ]; then
-  printf 'Warning: Currently on %s branch\n' "$current_branch" >&2
-fi
+case "$current_branch" in
+  main|master)
+    printf 'Warning: Currently on %s branch\n' "$current_branch" >&2
+    ;;
+esac
 
 # === END PREFLIGHT ===
 ```
