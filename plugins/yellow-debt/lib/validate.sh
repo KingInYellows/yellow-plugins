@@ -36,7 +36,7 @@ update_frontmatter() {
 
   # Extract frontmatter and update field
   local updated_frontmatter
-  updated_frontmatter=$(extract_frontmatter "$file" | yq -y --arg val "$value" "$field = \$val" 2>/dev/null) || return 1
+  updated_frontmatter=$(extract_frontmatter "$file" | yq -y --arg val "$value" "$field = \$val") || { printf '[validate] yq failed updating %s in %s\n' "$field" "$file" >&2; return 1; }
 
   # Extract body (everything after second ---)
   local body
@@ -76,9 +76,9 @@ validate_file_path() {
   # Canonicalize and verify containment
   local resolved
   if command -v realpath >/dev/null 2>&1; then
-    resolved="$(realpath -- "${project_root}/${raw_path}" 2>/dev/null)" || return 1
+    resolved=$(realpath -- "${project_root}/${raw_path}" 2>/dev/null) || resolved="${project_root}/${raw_path}"
   else
-    resolved="$(cd -- "$(dirname "${project_root}/${raw_path}")" 2>/dev/null && pwd -P)/$(basename "${project_root}/${raw_path}")"
+    resolved=$(cd -- "$(dirname "${project_root}/${raw_path}")" 2>/dev/null && pwd -P)/$(basename "${project_root}/${raw_path}") || resolved="${project_root}/${raw_path}"
   fi
 
   case "$resolved" in
