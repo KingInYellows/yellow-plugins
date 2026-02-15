@@ -1,0 +1,26 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "pageInfo": { "hasNextPage": true, "endCursor": null },
+          "nodes": [
+            {
+              "id": "PRRT_nc_thread1",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "src/truncated.ts",
+              "line": 1,
+              "startLine": null,
+              "comments": {
+                "nodes": [
+                  { "author": { "login": "reviewer1" }, "body": "Truncated results" }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

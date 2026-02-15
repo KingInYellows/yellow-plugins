@@ -1,0 +1,39 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "pageInfo": { "hasNextPage": false, "endCursor": null },
+          "nodes": [
+            {
+              "id": "PRRT_mp_thread3",
+              "isResolved": false,
+              "isOutdated": false,
+              "path": "src/page2.ts",
+              "line": 55,
+              "startLine": 50,
+              "comments": {
+                "nodes": [
+                  { "author": { "login": "reviewer2" }, "body": "Fix this on page 2" }
+                ]
+              }
+            },
+            {
+              "id": "PRRT_mp_thread4",
+              "isResolved": false,
+              "isOutdated": true,
+              "path": "src/page2.ts",
+              "line": 99,
+              "startLine": null,
+              "comments": {
+                "nodes": [
+                  { "author": { "login": "reviewer2" }, "body": "Outdated comment" }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

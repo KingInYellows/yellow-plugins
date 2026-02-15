@@ -1,0 +1,69 @@
+#!/bin/sh
+# Mock gh CLI for bats tests
+# Serves fixture JSON based on PR number or thread ID in arguments
+set -eu
+
+FIXTURE_DIR="${BATS_FIXTURE_DIR:-$(dirname "$0")/../fixtures}"
+
+# Extract PR number or thread ID from arguments
+ALL_ARGS="$*"
+
+# State file for multi-page pagination (tracks call count per PR)
+PAGE_STATE_DIR="${BATS_TEST_TMPDIR:-/tmp}"
+
+case "$ALL_ARGS" in
+  *"number=123"*)
+    cat "$FIXTURE_DIR/single-page-response.json"
+    ;;
+  *"number=200"*)
+    cat "$FIXTURE_DIR/empty-threads-response.json"
+    ;;
+  *"number=300"*)
+    # Multi-page: serve page1 on first call, page2 on subsequent calls
+    PAGE_FILE="${PAGE_STATE_DIR}/mock_gh_pr300_page"
+    if [ -f "$PAGE_FILE" ]; then
+      cat "$FIXTURE_DIR/multi-page-response-page2.json"
+    else
+      printf '1' > "$PAGE_FILE"
+      cat "$FIXTURE_DIR/multi-page-response-page1.json"
+    fi
+    ;;
+  *"number=350"*)
+    # Null cursor: hasNextPage=true but endCursor=null
+    cat "$FIXTURE_DIR/null-cursor-response.json"
+    ;;
+  *"number=999"*)
+    # Simulate GraphQL error
+    cat "$FIXTURE_DIR/graphql-error-response.json" >&2
+    exit 1
+    ;;
+  *"number=401"*)
+    printf 'Bad credentials' >&2
+    exit 1
+    ;;
+  *"PRRT_valid"*)
+    cat "$FIXTURE_DIR/resolve-success-response.json"
+    ;;
+  *"PRRT_notfound"*)
+    printf 'Could not resolve to a node' >&2
+    exit 1
+    ;;
+  *"PRRT_resolved"*)
+    printf 'already resolved' >&2
+    exit 1
+    ;;
+  *)
+    printf 'Mock gh: unhandled arguments: %s\n' "$ALL_ARGS" >&2
+    printf 'Available mock patterns:\n' >&2
+    printf '  number=123  → single-page-response.json\n' >&2
+    printf '  number=200  → empty-threads-response.json\n' >&2
+    printf '  number=300  → multi-page-response (page1 then page2)\n' >&2
+    printf '  number=350  → null-cursor-response.json\n' >&2
+    printf '  number=999  → graphql-error-response.json\n' >&2
+    printf '  number=401  → auth failure\n' >&2
+    printf '  PRRT_valid  → resolve-success-response.json\n' >&2
+    printf '  PRRT_notfound → not found error\n' >&2
+    printf '  PRRT_resolved → already resolved error\n' >&2
+    exit 1
+    ;;
+esac
