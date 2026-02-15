@@ -147,5 +147,5 @@ npm install -g agent-browser
 If you discover a security vulnerability in any plugin:
 
 1. **Do not** open a public GitHub issue
-2. Create a [private security advisory](https://github.com/KingInYellows/yellow-plugins/security/advisories/new) on the repository
+2. Create a [private security advisory](https://github.com/kinginyellow/yellow-plugins/security/advisories/new) on the repository
 3. Include: affected plugin, vulnerability description, reproduction steps

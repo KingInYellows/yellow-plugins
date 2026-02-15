@@ -49,9 +49,15 @@ validate_file_path() {
     local target
     if command -v realpath >/dev/null 2>&1; then
       target="$(realpath -- "$full_path" 2>/dev/null)" || return 1
-    elif [ -e "$full_path" ]; then
-      target="$(cd -- "$(dirname "$full_path")" 2>/dev/null && pwd -P)/$(basename "$full_path")"
+    elif command -v readlink >/dev/null 2>&1; then
+      local link_content
+      link_content=$(readlink -- "$full_path" 2>/dev/null) || return 1
+      case "$link_content" in
+        /*) target="$link_content" ;;
+        *)  target="$(cd -- "$(dirname "$full_path")" 2>/dev/null && cd -- "$(dirname "$link_content")" 2>/dev/null && pwd -P)/$(basename "$link_content")" || return 1 ;;
+      esac
     else
+      # Cannot safely resolve symlink target — reject
       return 1
     fi
     case "$target" in

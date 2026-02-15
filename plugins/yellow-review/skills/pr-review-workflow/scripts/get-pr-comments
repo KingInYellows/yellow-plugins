@@ -50,10 +50,10 @@ PAGE_SIZE=100
 # --- GraphQL query with cursor pagination ---
 # shellcheck disable=SC2016
 QUERY='
-query($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+query($owner: String!, $name: String!, $number: Int!, $cursor: String, $pageSize: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      reviewThreads(first: 100, after: $cursor) {
+      reviewThreads(first: $pageSize, after: $cursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
           id
@@ -82,20 +82,26 @@ PAGE=0
 while true; do
     PAGE=$((PAGE + 1))
 
-    # Build cursor argument — gh -F passes typed values (null for first page)
+    # Execute query — use -F cursor=null for first page, -f cursor=VALUE for subsequent
     if [ -z "$CURSOR" ]; then
-        CURSOR_ARG="-F cursor=null"
+        RESPONSE=$(gh api graphql \
+            -f owner="$OWNER" \
+            -f name="$NAME" \
+            -F "number=$PR_NUMBER" \
+            -F cursor=null \
+            -F "pageSize=$PAGE_SIZE" \
+            -f query="$QUERY" 2>&1)
     else
-        CURSOR_ARG="-f cursor=\"$CURSOR\""
+        RESPONSE=$(gh api graphql \
+            -f owner="$OWNER" \
+            -f name="$NAME" \
+            -F "number=$PR_NUMBER" \
+            -f cursor="$CURSOR" \
+            -F "pageSize=$PAGE_SIZE" \
+            -f query="$QUERY" 2>&1)
     fi
-
-    # shellcheck disable=SC2086
-    RESPONSE=$(gh api graphql \
-        -f owner="$OWNER" \
-        -f name="$NAME" \
-        -F "number=$PR_NUMBER" \
-        $CURSOR_ARG \
-        -f query="$QUERY" 2>&1) || {
+    # shellcheck disable=SC2181
+    if [ $? -ne 0 ]; then
         # Parse error category from response
         case "$RESPONSE" in
             *"401"*|*"Bad credentials"*|*"authentication"*)
@@ -118,7 +124,7 @@ while true; do
                 ;;
         esac
         exit 1
-    }
+    fi
 
     # --- Validate response shape ---
     if ! printf '%s' "$RESPONSE" | jq -e '.data.repository.pullRequest.reviewThreads' >/dev/null 2>&1; then
