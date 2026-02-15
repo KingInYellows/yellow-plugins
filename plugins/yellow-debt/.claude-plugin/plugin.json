@@ -13,10 +13,7 @@
   },
   "license": "MIT",
   "keywords": [
-    "technical-debt",
-    "audit",
     "code-quality",
-    "remediation",
     "scanner"
   ]
 }

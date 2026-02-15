@@ -1,6 +1,7 @@
 ---
 name: debt:status
 description: "Dashboard of current technical debt levels. Use when you want to check debt status, see aggregated metrics, or export debt data."
+argument-hint: "[--json]"
 allowed-tools:
   - Bash
   - Read

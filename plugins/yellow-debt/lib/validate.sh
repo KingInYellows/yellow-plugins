@@ -28,6 +28,12 @@ update_frontmatter() {
 
   [ -f "$file" ] || return 1
 
+  # Validate field is a simple property accessor
+  case "$field" in
+    .[a-z_]*) ;;  # OK: starts with . followed by lowercase/underscore
+    *) printf '[validate] Invalid field name: %s\n' "$field" >&2; return 1 ;;
+  esac
+
   # Extract frontmatter and update field
   local updated_frontmatter
   updated_frontmatter=$(extract_frontmatter "$file" | yq -y --arg val "$value" "$field = \$val" 2>/dev/null) || return 1
@@ -64,14 +70,16 @@ validate_file_path() {
 
   # Reject path traversal patterns
   case "$raw_path" in
-    *../*|*/..|../*|..) return 1 ;;
-    /*) return 1 ;;  # Absolute paths
-    ~*) return 1 ;;  # Tilde expansion
+    *..*|/*|~*) return 1 ;;
   esac
 
   # Canonicalize and verify containment
   local resolved
-  resolved=$(realpath -m -- "${project_root}/${raw_path}" 2>/dev/null) || return 1
+  if command -v realpath >/dev/null 2>&1; then
+    resolved="$(realpath -- "${project_root}/${raw_path}" 2>/dev/null)" || return 1
+  else
+    resolved="$(cd -- "$(dirname "${project_root}/${raw_path}")" 2>/dev/null && pwd -P)/$(basename "${project_root}/${raw_path}")"
+  fi
 
   case "$resolved" in
     "${project_root}/"*|"${project_root}") return 0 ;;

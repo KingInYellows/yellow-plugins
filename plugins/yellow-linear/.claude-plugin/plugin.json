@@ -9,7 +9,7 @@
   "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-linear",
   "repository": { "type": "git", "url": "https://github.com/kinginyellow/yellow-plugins" },
   "license": "MIT",
-  "keywords": ["linear", "project-management", "issues", "workflow", "productivity", "pm"],
+  "keywords": ["linear", "project-management", "issues", "productivity", "pm"],
   "mcpServers": {
     "linear": {
       "type": "http",

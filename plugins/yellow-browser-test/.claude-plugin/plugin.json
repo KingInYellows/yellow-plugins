@@ -12,5 +12,5 @@
     "url": "https://github.com/kinginyellow/yellow-plugins"
   },
   "license": "MIT",
-  "keywords": ["testing", "browser", "e2e", "agent-browser", "autonomous-qa"]
+  "keywords": ["browser", "e2e", "agent-browser", "autonomous-qa"]
 }

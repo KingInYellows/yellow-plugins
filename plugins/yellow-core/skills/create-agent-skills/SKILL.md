@@ -314,3 +314,37 @@ EOF
 ```bash
 /my-skill arg1 arg2
 ```
+
+## Plugin Settings Pattern
+
+Plugins can read user-specific configuration from `.claude/<plugin-name>.local.md`:
+
+**File Location:** `.claude/<plugin-name>.local.md`
+
+**Format:** YAML frontmatter + optional markdown notes
+
+**Security:** Never store credentials — reference env var names only (e.g., `$MY_TOKEN`)
+
+**Example:**
+```yaml
+---
+schema: 1
+devServer:
+  command: "npm run dev"
+  port: 3000
+auth:
+  credentials:
+    email: "$BROWSER_TEST_EMAIL"
+    password: "$BROWSER_TEST_PASSWORD"
+---
+# Notes
+Optional markdown content for user reference.
+```
+
+**Best Practices:**
+- Provide sensible defaults if settings file is missing
+- Document supported settings in plugin's CLAUDE.md
+- Use `schema: 1` for future versioning support
+- Settings files are gitignored by `.local.md` convention
+
+**Reference:** See `yellow-browser-test` plugin for working example.

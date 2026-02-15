@@ -4,6 +4,7 @@ description: >
   Generate a test report from the most recent results. Use when user says
   "generate report", "show test results", "create test report", or wants
   to view or share the results of a previous test run.
+argument-hint: ""
 allowed-tools:
   - Bash
   - Read

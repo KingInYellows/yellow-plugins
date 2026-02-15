@@ -75,6 +75,7 @@ These are spawned via Task tool when conditions match:
 Gross changes = additions + deletions from `git diff --stat | tail -1`.
 
 ```bash
+# awk field references ($1, $2) don't need shell quoting
 git diff --numstat origin/main...HEAD | awk '
   $1 != "-" { add += $1; del += $2 }
   END { print add + del }

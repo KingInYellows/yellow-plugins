@@ -1,6 +1,7 @@
 ---
 name: debt:fix
 description: "Agent-driven remediation of specific debt findings with human approval. Use when you want to fix a specific technical debt item."
+argument-hint: "<todo-path>"
 allowed-tools:
   - Bash
   - Read

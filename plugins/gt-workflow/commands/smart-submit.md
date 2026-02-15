@@ -1,6 +1,7 @@
 ---
 name: smart-submit
 description: "Stage, audit, commit, and submit changes via Graphite with parallel code review agents"
+argument-hint: "[--amend | --dry-run | --no-verify]"
 allowed-tools:
   - Bash
   - Read
@@ -177,12 +178,28 @@ The message should be concise (under 72 chars for the subject line). Include a b
 
 ## Phase 4: Submit
 
-### 1. Push to GitHub
+### 1. Confirm Submission
+
+Use AskUserQuestion to confirm submission:
+- "Submit to GitHub" (Recommended) — proceed with gt submit
+- "Review changes first" — show diff summary and pause
+- "Cancel" — abort without submitting
+
+If user selects "Review changes first", run:
+```bash
+git diff --cached --stat
+```
+and ask again.
+
+If user selects "Cancel", stop without submitting.
+
+### 2. Push to GitHub
 
 If `--dry-run` was provided, skip this step and do not run `gt submit`; instead, only simulate the submission and proceed to the result summary without making any remote changes.
 
 ```bash
 gt submit --no-interactive
+```
 
 ```bash
 gt log short

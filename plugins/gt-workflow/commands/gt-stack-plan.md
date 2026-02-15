@@ -1,6 +1,7 @@
 ---
 name: gt-stack-plan
 description: "Plan a series of stacked PRs for a feature, ordered by dependency"
+argument-hint: "[feature-description]"
 allowed-tools:
   - Bash
   - Read

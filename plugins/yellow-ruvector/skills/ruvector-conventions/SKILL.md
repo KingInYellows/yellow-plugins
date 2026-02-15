@@ -156,6 +156,27 @@ Hook scripts source `hooks/scripts/lib/validate.sh` which provides:
 - `validate_file_path "$path" "$project_root"` — Reject traversal, symlink escape, newlines
 - `validate_namespace "$name"` — Enforce `[a-z0-9-]` pattern, 1-64 chars, no leading/trailing hyphens
 
+### Shell Patterns
+
+Always quote variables and use validation functions:
+
+```bash
+# Source shared validation library
+source "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh"
+
+# Validate namespace before use
+validate_namespace "$INPUT" || {
+  printf '[ruvector] Invalid namespace: "%s"\n' "$INPUT" >&2
+  exit 1
+}
+
+# Validate file path (reject traversal, symlink escape)
+validate_file_path "$PATH" "$PROJECT_ROOT" || {
+  printf '[ruvector] Invalid path: "%s"\n' "$PATH" >&2
+  exit 1
+}
+```
+
 ### Prompt Injection Mitigation
 
 Stored learnings loaded via SessionStart hook are wrapped in fenced delimiters:

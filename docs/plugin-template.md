@@ -20,13 +20,20 @@ plugins/my-plugin/
 │   ├── install.sh
 │   └── uninstall.sh
 ├── package.json              ← npm deps (optional)
-└── README.md                 ← Documentation (required)
+├── CLAUDE.md                 ← Claude context (required)
+└── README.md                 ← GitHub docs (optional, recommended)
 ```
 
 **Minimum Requirements**:
 - `.claude-plugin/plugin.json` (manifest)
 - At least one entrypoint (command/skill/agent/MCP)
-- `README.md` (hosted on GitHub or similar)
+- `CLAUDE.md` (Claude's context file)
+
+**Optional but Recommended**:
+- `README.md` — GitHub-facing documentation with installation, quick start, troubleshooting
+  - Include for: Complex plugins, plugins with setup requirements, external-facing tools
+  - Omit for: Simple/internal plugins where CLAUDE.md suffices
+  - Focus: Installation, quick start, examples (avoid duplicating CLAUDE.md conventions)
 
 ---
 
@@ -106,9 +113,11 @@ This command does something useful.
 
 ---
 
-## Step 4: Create README
+## Step 4: Create README (Optional)
 
 **File**: `README.md`
+
+**Note**: README.md is optional but recommended for complex plugins or those with setup requirements. CLAUDE.md is required for all plugins and provides Claude's context. README.md targets GitHub visitors with installation and quick-start guides.
 
 ```markdown
 # My Plugin
@@ -503,8 +512,8 @@ Before publishing:
 
 - [ ] Validate manifest: `node scripts/validate-plugin.js plugins/my-plugin`
 - [ ] Test installation locally
-- [ ] Create README.md with usage examples
-- [ ] Add CHANGELOG.md for version history
+- [ ] Create README.md with usage examples (optional but recommended)
+- [ ] Add CHANGELOG.md for version history (optional)
 - [ ] Ensure lifecycle scripts are executable
 - [ ] Test permissions work as expected
 - [ ] Update marketplace.json with plugin entry
@@ -540,7 +549,7 @@ cp -r plugins/my-plugin ~/.claude/plugins/
 1. **Customize manifest** with your plugin details
 2. **Create entrypoints** (commands, skills, agents)
 3. **Add permissions** if needed
-4. **Write documentation** (README, examples)
+4. **Write documentation** (CLAUDE.md required, README.md optional)
 5. **Validate** with `validate-plugin.js`
 6. **Test locally** before publishing
 7. **Add to marketplace** and commit
