@@ -68,7 +68,7 @@ jobs:
         run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Install AJV CLI
-        run: npm install -g ajv-cli@5.0.0
+        run: npm install -g ajv-cli@5.0.0 ajv-formats@3.0.1
 
       - name: Start schema validation timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -438,7 +438,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install AJV CLI
-        run: npm install -g ajv-cli@5.0.0
+        run: npm install -g ajv-cli@5.0.0 ajv-formats@3.0.1
 
       - name: Start contract drift timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -729,7 +729,7 @@ jobs:
         run: |
           echo "::group::SLO Compliance Check"
           echo "Target: Schema validation jobs < 60 seconds"
-          python <<'PY'
+          python3 <<'PY'
           import sys, pathlib
           path = pathlib.Path("aggregated-metrics/ci-metrics.prom")
           if not path.exists():

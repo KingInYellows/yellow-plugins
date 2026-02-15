@@ -82,11 +82,7 @@ ${METRIC_PREFIX}_validations_total{${LABELS}} 1
 ${METRIC_PREFIX}_timestamp_seconds{${LABELS}} ${TIMESTAMP}
 EOF
 
-<<<<<<< HEAD
-=======
 printf '[ci-metrics] Exported metrics for stage=%s status=%s\n' "$STAGE" "$STATUS" >&2
-
->>>>>>> 13123fa (fix: resolve 9 code review findings from multi-agent review)
 # Optional: Include resource usage if available
 if command -v time &> /dev/null; then
   # CPU and memory stats not easily available in GitHub Actions without custom tooling
