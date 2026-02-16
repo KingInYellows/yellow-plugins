@@ -3,24 +3,14 @@
 # validate.sh — Shared validation functions for yellow-ci hooks and commands
 # Source this file: . "${SCRIPT_DIR}/lib/validate.sh"
 
-# Canonicalize directory to absolute path (prevents symlink/relative path bypass)
-# Portable: uses cd+pwd (POSIX), no GNU realpath dependency
-canonicalize_project_dir() {
-  local raw_dir="$1"
-  if [ -d "$raw_dir" ]; then
-    (cd -- "$raw_dir" 2>/dev/null && pwd -P) || {
-      printf '[yellow-ci] Warning: cd+pwd canonicalization failed, using raw path\n' >&2
-      printf '%s' "$raw_dir"
-    }
-  elif command -v realpath >/dev/null 2>&1; then
-    realpath -- "$raw_dir" 2>/dev/null || {
-      printf '[yellow-ci] Warning: realpath canonicalization failed, using raw path\n' >&2
-      printf '%s' "$raw_dir"
-    }
-  else
-    printf '[yellow-ci] Warning: No realpath available, using raw path\n' >&2
-    printf '%s' "$raw_dir"
-  fi
+# Check if string contains newlines or carriage returns
+# Returns 0 (true) if newlines found, 1 (false) if clean
+has_newline() {
+  local raw="$1"
+  local raw_len=${#raw}
+  local oneline
+  oneline=$(printf '%s' "$raw" | tr -d '\n\r')
+  [ ${#oneline} -ne "$raw_len" ]
 }
 
 # Validate file_path is within project root (path traversal mitigation)
@@ -40,11 +30,7 @@ validate_file_path() {
   fi
 
   # Reject newlines and carriage returns
-  # Note: cannot use $(printf '\n') in case pattern — command substitution strips trailing newlines
-  local path_len=${#raw_path}
-  local oneline
-  oneline=$(printf '%s' "$raw_path" | tr -d '\n\r')
-  if [ ${#oneline} -ne "$path_len" ]; then
+  if has_newline "$raw_path"; then
     return 1
   fi
 
@@ -103,10 +89,7 @@ validate_runner_name() {
   fi
 
   # Reject newlines
-  local name_len=${#name}
-  local oneline
-  oneline=$(printf '%s' "$name" | tr -d '\n\r')
-  if [ ${#oneline} -ne "$name_len" ]; then
+  if has_newline "$name"; then
     return 1
   fi
 
@@ -135,10 +118,7 @@ validate_run_id() {
   fi
 
   # Reject newlines
-  local id_len=${#id}
-  local oneline
-  oneline=$(printf '%s' "$id" | tr -d '\n\r')
-  if [ ${#oneline} -ne "$id_len" ]; then
+  if has_newline "$id"; then
     return 1
   fi
 
@@ -157,7 +137,7 @@ validate_run_id() {
   esac
 
   # Max JavaScript safe integer: 9007199254740991 (2^53 - 1)
-  if [ ${#id} -eq 16 ] && [ "$id" -gt 9007199254740991 ] 2>/dev/null; then
+  if [ ${#id} -eq 16 ] && [ "$id" \> "9007199254740991" ]; then
     return 1
   fi
   if [ ${#id} -gt 16 ]; then
@@ -177,10 +157,7 @@ validate_repo_slug() {
   fi
 
   # Reject newlines
-  local slug_len=${#slug}
-  local oneline
-  oneline=$(printf '%s' "$slug" | tr -d '\n\r')
-  if [ ${#oneline} -ne "$slug_len" ]; then
+  if has_newline "$slug"; then
     return 1
   fi
 
@@ -202,7 +179,7 @@ validate_repo_slug() {
   case "$owner" in
     *[!a-zA-Z0-9_-]*) return 1 ;;
     -*) return 1 ;;
-    *-) ;;  # GitHub allows trailing hyphen in org names
+    *-) return 1 ;;  # GitHub rejects trailing hyphen in org names
   esac
 
   # Repo: 1-100 chars, alphanumeric + hyphens + dots + underscores
@@ -233,10 +210,7 @@ validate_ssh_host() {
   fi
 
   # Reject newlines
-  local host_len=${#host}
-  local oneline
-  oneline=$(printf '%s' "$host" | tr -d '\n\r')
-  if [ ${#oneline} -ne "$host_len" ]; then
+  if has_newline "$host"; then
     return 1
   fi
 
@@ -295,10 +269,7 @@ validate_ssh_user() {
   fi
 
   # Reject newlines
-  local user_len=${#user}
-  local oneline
-  oneline=$(printf '%s' "$user" | tr -d '\n\r')
-  if [ ${#oneline} -ne "$user_len" ]; then
+  if has_newline "$user"; then
     return 1
   fi
 
@@ -364,9 +335,6 @@ validate_numeric_range() {
   esac
 
   # Numeric comparison
-  if [ "$value" -lt "$min" ] 2>/dev/null && [ "$value" -gt "$max" ] 2>/dev/null; then
-    return 1
-  fi
   if ! [ "$value" -ge "$min" ] 2>/dev/null; then
     return 1
   fi
@@ -387,10 +355,7 @@ validate_ssh_command() {
   fi
 
   # Strip to single line
-  local cmd_len=${#cmd}
-  local oneline
-  oneline=$(printf '%s' "$cmd" | tr -d '\n\r')
-  if [ ${#oneline} -ne "$cmd_len" ]; then
+  if has_newline "$cmd"; then
     return 1
   fi
 

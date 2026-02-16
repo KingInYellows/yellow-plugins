@@ -65,7 +65,12 @@ fi
 failure_count=0
 if [ -n "$failed_json" ] && [ "$failed_json" != "[]" ] && [ "$failed_json" != "null" ]; then
   if command -v jq >/dev/null 2>&1; then
-    failure_count=$(printf '%s' "$failed_json" | jq -r 'length' 2>/dev/null) || failure_count=0
+    if printf '%s' "$failed_json" | jq -e 'type == "array"' >/dev/null 2>&1; then
+      failure_count=$(printf '%s' "$failed_json" | jq -r 'length' 2>/dev/null) || failure_count=0
+    else
+      printf '[yellow-ci] Warning: Unexpected GitHub API response format\n' >&2
+      failure_count=0
+    fi
   fi
 fi
 
@@ -88,7 +93,12 @@ fi
 
 # Write to cache (atomic via tmp + mv)
 if printf '%s' "$output" > "${cache_file}.tmp" 2>/dev/null; then
-  mv "${cache_file}.tmp" "$cache_file" 2>/dev/null || true
+  if ! mv "${cache_file}.tmp" "$cache_file" 2>/dev/null; then
+    printf '[yellow-ci] Warning: Cache write failed for %s\n' "$cache_file" >&2
+    rm -f "${cache_file}.tmp" 2>/dev/null
+  fi
+else
+  printf '[yellow-ci] Warning: Cannot write cache to %s\n' "${cache_file}.tmp" >&2
 fi
 
 # Output result

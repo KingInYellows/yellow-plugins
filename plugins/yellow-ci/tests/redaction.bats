@@ -32,6 +32,12 @@ setup() {
   [[ "$result" == *"[REDACTED:aws-access-key]"* ]]
 }
 
+@test "redact: AWS secret key 41+ chars" {
+  result=$(echo "aws_secret_access_key=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY12345" | redact_secrets)
+  [[ "$result" == *"[REDACTED:aws-secret]"* ]]
+  [[ "$result" != *"wJalrXUtnFEMI"* ]]
+}
+
 # --- Bearer tokens ---
 
 @test "redact: Bearer token" {
@@ -65,6 +71,19 @@ setup() {
 @test "redact: JWT token" {
   result=$(echo "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U" | redact_secrets)
   [[ "$result" == *"[REDACTED:jwt]"* ]]
+}
+
+# --- SSH private keys ---
+
+@test "redact: SSH private key block" {
+  input="log line
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAtest
+-----END RSA PRIVATE KEY-----
+more log"
+  result=$(echo "$input" | redact_secrets)
+  [[ "$result" == *"[REDACTED:ssh-key]"* ]]
+  [[ "$result" != *"MIIEpAIBAAKCAQEA"* ]]
 }
 
 # --- URL params ---

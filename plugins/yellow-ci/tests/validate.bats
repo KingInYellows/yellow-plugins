@@ -386,3 +386,73 @@ setup() {
   run validate_ssh_command $'df -h\nrm -rf /'
   [ "$status" -eq 1 ]
 }
+
+# --- validate_file_path ---
+
+@test "file_path: valid relative path" {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/src"
+  touch "$tmpdir/src/main.sh"
+  run validate_file_path "src/main.sh" "$tmpdir"
+  [ "$status" -eq 0 ]
+  rm -rf "$tmpdir"
+}
+
+@test "file_path: reject path traversal with .." {
+  run validate_file_path "../etc/passwd" "/home/user/project"
+  [ "$status" -eq 1 ]
+}
+
+@test "file_path: reject absolute path" {
+  run validate_file_path "/etc/passwd" "/home/user/project"
+  [ "$status" -eq 1 ]
+}
+
+@test "file_path: reject tilde path" {
+  run validate_file_path "~/.ssh/id_rsa" "/home/user/project"
+  [ "$status" -eq 1 ]
+}
+
+@test "file_path: reject empty path" {
+  run validate_file_path "" "/home/user/project"
+  [ "$status" -eq 1 ]
+}
+
+@test "file_path: reject newline injection" {
+  local path_with_newline
+  path_with_newline=$(printf 'safe\n../etc/passwd')
+  run validate_file_path "$path_with_newline" "/home/user/project"
+  [ "$status" -eq 1 ]
+}
+
+@test "file_path: reject carriage return injection" {
+  local path_with_cr
+  path_with_cr=$(printf 'safe\r../etc/passwd')
+  run validate_file_path "$path_with_cr" "/home/user/project"
+  [ "$status" -eq 1 ]
+}
+
+@test "file_path: valid nested path" {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  mkdir -p "$tmpdir/a/b/c"
+  touch "$tmpdir/a/b/c/file.txt"
+  run validate_file_path "a/b/c/file.txt" "$tmpdir"
+  [ "$status" -eq 0 ]
+  rm -rf "$tmpdir"
+}
+
+@test "file_path: reject double-dot in middle" {
+  run validate_file_path "src/../../../etc/passwd" "/home/user/project"
+  [ "$status" -eq 1 ]
+}
+
+@test "file_path: valid file in root" {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  touch "$tmpdir/README.md"
+  run validate_file_path "README.md" "$tmpdir"
+  [ "$status" -eq 0 ]
+  rm -rf "$tmpdir"
+}

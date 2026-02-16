@@ -11,20 +11,28 @@
 # Redact secrets from stdin, write to stdout
 # 13+ patterns covering common CI secret formats
 redact_secrets() {
-  sed \
+  local output
+  output=$(sed \
     -e 's/ghp_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/[REDACTED:github-pat]/g' \
     -e 's/AKIA[0-9A-Z]\{16\}/[REDACTED:aws-access-key]/g' \
-    -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40\}/\1=[REDACTED:aws-secret]/gI' \
+    -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=[REDACTED:aws-secret]/gI' \
     -e 's/Bearer[[:space:]]\+[A-Za-z0-9._-]\{20,\}/Bearer [REDACTED]/g' \
     -e 's/dckr_pat_[A-Za-z0-9_-]\{32,\}/[REDACTED:docker-token]/g' \
     -e 's/npm_[A-Za-z0-9]\{36\}/[REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/[REDACTED:pypi-token]/g' \
-    -e 's/eyJ[A-Za-z0-9_-]\{10,\}\.eyJ[A-Za-z0-9_-]\{10,\}\.[A-Za-z0-9_-]\{10,\}/[REDACTED:jwt]/g' \
+    -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/[REDACTED:jwt]/g' \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
-    -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\[[:space:]]\{8,\}/\1=[REDACTED]/gI'
+    -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
+    -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\[[:space:]]\{8,\}/\1=[REDACTED]/gI' \
+  ) || {
+    printf '[yellow-ci] ERROR: Secret redaction failed, suppressing output\n' >&2
+    printf '[REDACTED: sanitization failed]\n'
+    return 1
+  }
+  printf '%s\n' "$output"
 }
 
 # Escape fence markers in log content to prevent prompt injection
@@ -38,7 +46,13 @@ escape_fence_markers() {
 # Full sanitization pipeline: redact secrets + escape fences
 # Usage: echo "$raw_log" | sanitize_log_content
 sanitize_log_content() {
-  redact_secrets | escape_fence_markers
+  (
+    set -o pipefail
+    redact_secrets | escape_fence_markers
+  ) || {
+    printf '[yellow-ci] ERROR: Log sanitization pipeline failed\n' >&2
+    return 1
+  }
 }
 
 # Wrap sanitized content in prompt injection fence
