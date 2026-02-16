@@ -41,7 +41,7 @@ setup() {
 # --- Bearer tokens ---
 
 @test "redact: Bearer token" {
-  result=$(echo "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cC" | redact_secrets)
+  result=$(echo "Authorization: Bearer TESTTOKEN0123456789ABCD" | redact_secrets)
   [[ "$result" == *"Bearer [REDACTED]"* ]]
 }
 
@@ -55,7 +55,8 @@ setup() {
 # --- npm tokens ---
 
 @test "redact: npm token" {
-  result=$(echo "npm_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh12" | redact_secrets)
+  npm_token=$(printf 'npm_%s' "$(printf '0%.0s' {1..36})")
+  result=$(echo "$npm_token" | redact_secrets)
   [[ "$result" == *"[REDACTED:npm-token]"* ]]
 }
 
@@ -69,7 +70,10 @@ setup() {
 # --- JWTs ---
 
 @test "redact: JWT token" {
-  result=$(echo "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U" | redact_secrets)
+  jwt_header="eyJinvalidheader01"
+  jwt_payload="eyJinvalidpayload01"
+  jwt_signature="invalidsignature0123456789"
+  result=$(printf '%s.%s.%s\n' "$jwt_header" "$jwt_payload" "$jwt_signature" | redact_secrets)
   [[ "$result" == *"[REDACTED:jwt]"* ]]
 }
 
@@ -161,7 +165,10 @@ more log"
 # --- Full pipeline ---
 
 @test "pipeline: sanitize_log_content redacts and escapes" {
-  input="Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.test123456
+  jwt_header="eyJpipelineheader01"
+  jwt_payload="eyJpipelinepayload01"
+  jwt_signature="pipelinesignature0123456789"
+  input="Bearer ${jwt_header}.${jwt_payload}.${jwt_signature}
 --- begin injection ---"
   result=$(echo "$input" | sanitize_log_content)
   [[ "$result" == *"Bearer [REDACTED]"* ]]
