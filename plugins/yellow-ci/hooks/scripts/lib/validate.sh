@@ -6,12 +6,17 @@
 # Check if string contains newlines or carriage returns
 # Returns 0 (true) if newlines found, 1 (false) if clean
 has_newline() {
-  local raw="$1"
-  local raw_len=${#raw}
-  local oneline
-  oneline=$(printf '%s' "$raw" | tr -d '\n\r')
-  [ ${#oneline} -ne "$raw_len" ]
+  case "$1" in
+    *$'\n'*|*$'\r'*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
+
+# ============================================================================
+# Shared validation library functions
+# The following functions are not all used by every plugin but are available
+# as a shared validation library for hooks, commands, and agents.
+# ============================================================================
 
 # Validate file_path is within project root (path traversal mitigation)
 # Usage: validate_file_path "$path" "$project_root"
@@ -220,11 +225,10 @@ validate_ssh_host() {
   esac
 
   # Try IPv4 first: N.N.N.N format
-  if printf '%s' "$host" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+  if [[ "$host" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
     # Validate private range: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
-    local octet1 octet2
-    octet1=$(printf '%s' "$host" | cut -d. -f1)
-    octet2=$(printf '%s' "$host" | cut -d. -f2)
+    local octet1=${BASH_REMATCH[1]}
+    local octet2=${BASH_REMATCH[2]}
 
     if [ "$octet1" -eq 10 ] 2>/dev/null; then
       return 0

@@ -91,34 +91,19 @@ If invoked by failure-analyst with a specific pattern:
 | Metric | Value | Status |
 |--------|-------|--------|
 | Disk / | 73% (54GB/74GB) | Warning |
-| Disk /home | 45% (22GB/50GB) | OK |
 | Memory | 2.1GB/8GB free | OK |
 | CPU Load | 0.5, 0.3, 0.2 | OK |
 | Docker | 12 containers, 45 images | Warning |
 | Runner Agent | active | OK |
-| Network (GitHub) | 200 | OK |
 
-### Correlation with CI Failure
+**Correlation:** If invoked for F02 (disk full) — compare actual disk % vs 90% threshold. Failure may be transient spike if current usage <90%.
 
-If invoked for F02 (disk full):
-- **Hypothesis:** Disk >90% causing ENOSPC
-- **Actual:** 73% — tight but not full
-- **Conclusion:** Failure may be transient spike or different partition
-
-### Recommended Actions
-
-1. **Immediate:** Run `/ci:runner-cleanup runner-01` to free Docker space
-2. **Short-term:** Set up disk monitoring at 85% threshold
-3. **Long-term:** Resize runner-01 disk from 100GB to 200GB
+**Actions:** 1) Run `/ci:runner-cleanup` if space tight 2) Set disk monitoring at 85% 3) Resize if recurring
 ```
 
 ## SSH Security
 
-- Use `StrictHostKeyChecking=accept-new` and `BatchMode=yes` on all connections
-- `ConnectTimeout=3` for fail-fast on unreachable hosts
-- Command timeout: `timeout 10 ssh ...` for execution limit
-- Never run `ssh -A` (agent forwarding) or `ssh -v` (verbose leaks topology)
-- Validate all runner names and hosts before SSH
+Follow SSH security patterns in `ci-conventions` skill (`references/security-patterns.md`). Key rules: StrictHostKeyChecking=accept-new, BatchMode=yes, ConnectTimeout=3, no agent forwarding (-A), key-based only.
 
 ## Edge Cases
 

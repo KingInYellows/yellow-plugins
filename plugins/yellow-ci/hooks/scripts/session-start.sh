@@ -29,7 +29,10 @@ fi
 # --- Cache check (60s TTL) ---
 
 cache_dir="${HOME}/.cache/yellow-ci"
-mkdir -p "$cache_dir" 2>/dev/null || exit 0
+if ! mkdir -p "$cache_dir" 2>/dev/null; then
+  printf '[yellow-ci] Warning: Cannot create cache directory %s\n' "$cache_dir" >&2
+  exit 0
+fi
 
 # Create cache key from current directory
 cache_key=$(printf '%s' "$PWD" | tr '/' '_')
@@ -66,7 +69,10 @@ failure_count=0
 if [ -n "$failed_json" ] && [ "$failed_json" != "[]" ] && [ "$failed_json" != "null" ]; then
   if command -v jq >/dev/null 2>&1; then
     if printf '%s' "$failed_json" | jq -e 'type == "array"' >/dev/null 2>&1; then
-      failure_count=$(printf '%s' "$failed_json" | jq -r 'length' 2>/dev/null) || failure_count=0
+      failure_count=$(printf '%s' "$failed_json" | jq -r 'length') || {
+        printf '[yellow-ci] Warning: Failed to parse CI failure count\n' >&2
+        failure_count=0
+      }
     else
       printf '[yellow-ci] Warning: Unexpected GitHub API response format\n' >&2
       failure_count=0
@@ -81,7 +87,7 @@ if [ "$failure_count" -gt 0 ] 2>/dev/null; then
   # Extract branch info for context
   branches=""
   if command -v jq >/dev/null 2>&1; then
-    branches=$(printf '%s' "$failed_json" | jq -r '[.[].headBranch] | unique | join(", ")' 2>/dev/null) || branches=""
+    branches=$(printf '%s' "$failed_json" | jq -r '[.[].headBranch] | unique | join(", ")') || branches=""
   fi
 
   if [ -n "$branches" ]; then
