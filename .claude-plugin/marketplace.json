@@ -91,6 +91,15 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-debt",
       "category": "development"
+    },
+    {
+      "id": "yellow-ci",
+      "name": "yellow-ci",
+      "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
+      "version": "0.1.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-ci",
+      "category": "development"
     }
   ]
 }
