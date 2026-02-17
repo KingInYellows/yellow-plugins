@@ -142,6 +142,9 @@ validate_run_id() {
   esac
 
   # Max JavaScript safe integer: 9007199254740991 (2^53 - 1)
+  # String comparison is intentional: both operands are same-length (16 chars) strings,
+  # so lexicographic order equals numeric order, and avoids 32-bit -gt overflow.
+  # shellcheck disable=SC2071
   if [ ${#id} -eq 16 ] && [ "$id" \> "9007199254740991" ]; then
     return 1
   fi

@@ -26,7 +26,7 @@ redact_secrets() {
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
-    -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\[[:space:]]\{8,\}/\1=[REDACTED]/gI' \
+    -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^[:space:]]\{8,\}/\1=[REDACTED]/gI' \
   ) || {
     printf '[yellow-ci] ERROR: Secret redaction failed, suppressing output\n' >&2
     printf '[REDACTED: sanitization failed]\n'

@@ -6,7 +6,7 @@ Detailed catalog of self-hosted runner failure patterns for the failure-analyst 
 
 Grouped by urgency:
 - **Immediate** (auto-recovery unlikely): F01, F02, F09, F12
-- **Fixable** (clear remediation): F03, F04, F06, F10, F11, F13
+- **Fixable** (clear remediation): F03, F04, F06, F10, F11, F12
 - **Investigative** (root cause analysis needed): F05, F07, F08
 
 ## F01: Out of Memory (OOM)

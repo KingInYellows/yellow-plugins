@@ -28,7 +28,9 @@ Requires: .github/workflows/ directory with YAML files
 ## Step 1: Find Workflows
 
 If `$ARGUMENTS` specifies a file:
-- Verify file exists
+- **Validate the path** — reject if it contains `..`, starts with `/` or `~`, or contains characters outside `[a-zA-Z0-9._/-]`. Respond: "Invalid file path: must be a relative path within the repository."
+- Verify the resolved path is within `.github/workflows/`. Respond: "Path must point to a file inside `.github/workflows/`."
+- Verify file exists; respond: "File not found: `<path>`" if missing
 - Lint that file only
 
 Otherwise:

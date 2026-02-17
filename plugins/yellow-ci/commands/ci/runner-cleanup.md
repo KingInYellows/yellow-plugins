@@ -61,7 +61,6 @@ Gather what would be cleaned:
 ssh "$user@$host" << 'PREVIEW'
 echo "=== DOCKER CONTAINERS (stopped) ==="
 docker ps -a --filter status=exited --format '{{.Names}}' 2>/dev/null | wc -l
-docker ps -a --filter status=exited --format '{{.Size}}' 2>/dev/null
 
 echo "=== DOCKER IMAGES (dangling) ==="
 docker images --filter dangling=true -q 2>/dev/null | wc -l
@@ -116,20 +115,20 @@ fi
 
 # Execute cleanup in order: containers → images → volumes (most destructive last)
 echo "Cleaning containers..."
-docker container prune -f 2>/dev/null
+docker container prune -f || { echo "ERROR: docker container prune failed (exit $?)"; exit 1; }
 
 echo "Cleaning images..."
-docker image prune -af --filter "until=168h" 2>/dev/null
+docker image prune -af --filter "until=168h" || { echo "ERROR: docker image prune failed (exit $?)"; exit 1; }
 
 # Only if user confirmed volume cleanup:
 # echo "Cleaning volumes..."
-# docker volume prune -f 2>/dev/null
+# docker volume prune -f || { echo "ERROR: docker volume prune failed (exit $?)"; exit 1; }
 
 echo "Cleaning runner logs..."
-find /home/runner/_diag -name "*.log" -mtime +14 -delete 2>/dev/null
+find /home/runner/_diag -name "*.log" -mtime +14 -delete || echo "WARN: Some log files could not be deleted"
 
 echo "Cleaning temp files..."
-find /tmp -name "actions-*" -mtime +7 -delete 2>/dev/null
+find /tmp -name "actions-*" -mtime +7 -delete || echo "WARN: Some temp files could not be deleted"
 
 echo "=== POST DISK ==="
 df -h / | tail -1
