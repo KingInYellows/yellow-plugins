@@ -31,7 +31,6 @@ related:
   - docs/solutions/security-issues/yellow-linear-plugin-multi-agent-code-review.md
   - docs/solutions/code-quality/plugin-authoring-review-patterns.md
   - docs/solutions/security-issues/agent-workflow-security-patterns.md
-  - docs/solutions/code-quality/github-graphql-shell-script-patterns.md
 ---
 
 # Parallel Multi-Agent Code Review and Resolution Pipeline
