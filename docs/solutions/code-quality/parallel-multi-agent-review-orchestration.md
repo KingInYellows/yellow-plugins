@@ -250,8 +250,9 @@ fi
 Detect `hasNextPage=true` with empty `endCursor` — GitHub API edge case that silently truncates results.
 
 ```bash
+HAS_NEXT=$(printf '%s' "$RESPONSE" | jq -r '...pageInfo.hasNextPage')
 CURSOR=$(printf '%s' "$RESPONSE" | jq -r '...pageInfo.endCursor // empty')
-if [ -z "$CURSOR" ]; then
+if [ "$HAS_NEXT" = "true" ] && [ -z "$CURSOR" ]; then
     printf '[get-pr-comments] Warning: pagination truncated — hasNextPage=true but no endCursor (page %d).\n' "$PAGE" >&2
     break
 fi
@@ -264,7 +265,7 @@ All fallback code paths in validation functions must log warnings, not silently 
 ```bash
 if [ -L "$path" ]; then
     printf '[validate] Warning: symlink skipped: %s\n' "$path" >&2
-    printf '%s' "$path"  # Use raw path as fallback
+    return 1  # Reject symlinks — do not fall back to raw path
 fi
 ```
 
