@@ -28,8 +28,9 @@ update_frontmatter() {
 
   [ -f "$file" ] || return 1
 
-  # Validate field is a simple property accessor
+  # Validate field is a simple property accessor (only dots, lowercase letters, underscores)
   case "$field" in
+    *[!.a-z_]*) printf '[validate] Invalid field name: %s\n' "$field" >&2; return 1 ;;
     .[a-z_]*) ;;  # OK: starts with . followed by lowercase/underscore
     *) printf '[validate] Invalid field name: %s\n' "$field" >&2; return 1 ;;
   esac
@@ -81,12 +82,16 @@ validate_file_path() {
   # Prefer GNU realpath -m when available (handles non-existent targets safely).
   if command -v realpath >/dev/null 2>&1 && realpath -m / >/dev/null 2>&1; then
     resolved=$(realpath -m -- "$candidate") || return 1
-  elif [ -e "$candidate" ]; then
-    parent_dir=$(cd -- "$(dirname "$candidate")" 2>/dev/null && pwd -P) || return 1
-    resolved="${parent_dir}/$(basename "$candidate")"
   else
-    # Without realpath -m, we cannot safely canonicalize non-existent paths.
-    return 1
+    # Portable fallback: resolve the nearest existing ancestor, then append remaining path.
+    # This preserves the ability to validate paths for files not yet created.
+    local dir="$candidate" remainder=""
+    while [ -n "$dir" ] && [ "$dir" != "/" ] && ! [ -e "$dir" ]; do
+      remainder="$(basename -- "$dir")${remainder:+/$remainder}"
+      dir="$(dirname -- "$dir")"
+    done
+    parent_dir=$(cd -- "$dir" 2>/dev/null && pwd -P) || return 1
+    resolved="${parent_dir}${remainder:+/$remainder}"
   fi
 
   case "$resolved" in

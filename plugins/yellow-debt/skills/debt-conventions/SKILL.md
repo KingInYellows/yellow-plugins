@@ -231,7 +231,7 @@ Todo files must use one of the following status values:
 - `deferred` — Postponed to future sprint
 - `deleted` — Rejected or no longer relevant
 
-**Remediation**: Run `validate-debt-todo.sh` to check status field against allowed values.
+**Remediation**: Run `lib/validate.sh` validation functions to check status field against allowed values.
 
 ### Invalid Priority Values
 Priority must be one of: `p1` (critical), `p2` (high), `p3` (medium), `p4` (low).
@@ -245,7 +245,7 @@ All todo files MUST include:
 - `issue_id`: Unique identifier
 - `tags`: Array of lowercase, hyphen-separated tags
 
-**Remediation**: Add missing fields to YAML frontmatter. See `hooks/scripts/validate-debt-todo.sh` for validation logic.
+**Remediation**: Add missing fields to YAML frontmatter. See `lib/validate.sh` for validation logic.
 
 ### Invalid Tag Format
 Tags must be lowercase with hyphens only. No underscores, spaces, or uppercase.
@@ -285,6 +285,5 @@ Every finding MUST include at least one entry in `affected_files` array with `pa
 **Remediation**: Ensure scanner agents populate this field with actual file locations.
 
 ### Validation References
-- Shell validation: `plugins/yellow-debt/hooks/scripts/validate-debt-todo.sh`
-- Shared library: `plugins/yellow-debt/hooks/scripts/lib/validate.sh`
-- Test fixtures: `plugins/yellow-debt/tests/*.bats` (42 test cases)
+- Shared library: `plugins/yellow-debt/lib/validate.sh`
+- Test fixtures: `plugins/yellow-debt/tests/*.bats` (37 test cases)

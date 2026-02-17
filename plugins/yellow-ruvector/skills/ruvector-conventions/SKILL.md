@@ -171,8 +171,8 @@ validate_namespace "$INPUT" || {
 }
 
 # Validate file path (reject traversal, symlink escape)
-validate_file_path "$PATH" "$PROJECT_ROOT" || {
-  printf '[ruvector] Invalid path: "%s"\n' "$PATH" >&2
+validate_file_path "$FILE_PATH" "$PROJECT_ROOT" || {
+  printf '[ruvector] Invalid path: "%s"\n' "$FILE_PATH" >&2
   exit 1
 }
 ```
