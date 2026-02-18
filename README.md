@@ -27,6 +27,82 @@ Add the marketplace, then install individual plugins:
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 8 agents, 3 commands, 1 skill                  |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 2 skills, 3 hooks, 1 MCP |
 
+## MCP Servers & Authentication
+
+Five plugins connect to external MCP servers. All work without authentication,
+but some offer enhanced access with an API key or account.
+
+| Plugin            | MCP Server | Free Tier                  | Authenticated Tier                          |
+| ----------------- | ---------- | -------------------------- | ------------------------------------------- |
+| `yellow-core`     | Context7   | Works immediately (lower rate limits) | Free API key for higher limits |
+| `yellow-devin`    | DeepWiki   | Public repos only          | Private repos via Devin API key             |
+| `yellow-devin`    | Devin      | —                          | Requires `DEVIN_API_TOKEN`                  |
+| `yellow-linear`   | Linear     | —                          | OAuth (browser popup on first use)          |
+| `yellow-chatprd`  | ChatPRD    | —                          | OAuth (browser popup on first use)          |
+| `yellow-ruvector` | ruvector   | Local stdio — no auth      | —                                           |
+
+### Context7 (yellow-core)
+
+Provides up-to-date library documentation for LLMs. Works without an API key
+but with lower rate limits.
+
+**Free (no key):** Works out of the box. The plugin connects to
+`https://mcp.context7.com/mcp` with no configuration needed.
+
+**Free API key (higher rate limits):** Create an account at
+[context7.com/dashboard](https://context7.com/dashboard) and generate an API
+key (format: `ctx7sk_...`). Then configure it in your Claude Code settings:
+
+```bash
+# Option 1: Add API key header to the MCP server config
+# In Claude Code, run /mcp → select context7 → edit config → add header:
+#   "headers": { "CONTEXT7_API_KEY": "ctx7sk_your_key_here" }
+
+# Option 2: OAuth (if your MCP client supports it)
+# Use the endpoint https://mcp.context7.com/mcp/oauth instead of /mcp
+```
+
+### DeepWiki (yellow-devin)
+
+Provides AI-powered documentation for any GitHub repository.
+
+**Free (public repos):** Works out of the box at `https://mcp.deepwiki.com/mcp`.
+No authentication needed for public repositories.
+
+**Private repos (requires Devin account):** Private repository access uses the
+Devin MCP server (`https://mcp.devin.ai/mcp`) with a Devin API key. This is the
+same `DEVIN_API_TOKEN` used by the Devin plugin — see below.
+
+### Devin (yellow-devin)
+
+Requires a Devin account and API token for all operations.
+
+```bash
+# Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
+export DEVIN_API_TOKEN="apk_your_token_here"
+
+# Get your token: https://devin.ai/settings/api
+```
+
+Never commit tokens to version control.
+
+### Linear & ChatPRD (OAuth)
+
+On first MCP tool call, Claude Code opens a browser popup to authenticate with
+your Linear or ChatPRD account. Tokens are stored in your system keychain and
+refresh automatically.
+
+To re-authenticate or revoke access: run `/mcp` in Claude Code, select the
+server, and choose "Clear authentication".
+
+These plugins require browser access and **will not work in headless SSH
+sessions**.
+
+### ruvector (yellow-ruvector)
+
+Runs locally as a stdio MCP server via `npx`. No external services or API keys
+required. Run `/ruvector:setup` on first use to install.
+
 ## Usage
 
 After installing, use `/plugin install <name>@yellow-plugins` to activate
