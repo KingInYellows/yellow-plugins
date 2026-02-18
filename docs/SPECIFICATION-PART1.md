@@ -337,9 +337,9 @@ Dependencies:
   - None
 
 Documentation:
-  README: https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/README.md
-  Changelog: https://github.com/kinginyellow/yellow-plugins/blob/main/plugins/hookify/CHANGELOG.md
-  Examples: https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/examples
+  README: https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/hookify/README.md
+  Changelog: https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/hookify/CHANGELOG.md
+  Examples: https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/hookify/examples
 
 Install: /plugin install hookify
 ```
@@ -489,7 +489,7 @@ Install: /plugin install hookify
     "name": "KingInYellows Plugin Marketplace",
     "author": "kinginyellow",
     "description": "Personal curated Claude Code plugin collection",
-    "url": "https://github.com/kinginyellow/yellow-plugins",
+    "url": "https://github.com/KingInYellows/yellow-plugins",
     "updatedAt": "2026-01-11T10:00:00Z"
   },
   "plugins": [
@@ -660,13 +660,13 @@ Install: /plugin install hookify
     }
   ],
   "docs": {
-    "readme": "https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/README.md",
-    "changelog": "https://github.com/kinginyellow/yellow-plugins/blob/main/plugins/hookify/CHANGELOG.md",
-    "examples": "https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/examples"
+    "readme": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/hookify/README.md",
+    "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/hookify/CHANGELOG.md",
+    "examples": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/hookify/examples"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/kinginyellow/yellow-plugins.git"
+    "url": "https://github.com/KingInYellows/yellow-plugins.git"
   },
   "lifecycle": {
     "install": "scripts/install.sh",
@@ -722,7 +722,7 @@ Install: /plugin install hookify
       "installedAt": "2026-01-11T10:30:00Z",
       "lastUpdated": "2026-01-11T10:30:00Z",
       "previousVersions": ["1.0.0", "1.1.0"],
-      "marketplace": "https://github.com/kinginyellow/yellow-plugins"
+      "marketplace": "https://github.com/KingInYellows/yellow-plugins"
     }
   },
   "settings": {
@@ -801,7 +801,7 @@ All errors **MUST** follow the structure:
 [FIX]: Check internet connection and try again:
   /plugin install hookify
   OR download manually:
-  git clone https://github.com/kinginyellow/yellow-plugins
+  git clone https://github.com/KingInYellows/yellow-plugins
   cd yellow-plugins/plugins/hookify
 ```
 
@@ -833,7 +833,7 @@ All errors **MUST** follow the structure:
 [FIX]: Check script output:
   cat ~/.claude/plugins/logs/hookify-install.log
   OR contact plugin author:
-  https://github.com/kinginyellow/yellow-plugins/issues
+  https://github.com/KingInYellows/yellow-plugins/issues
 ```
 
 ---
@@ -895,7 +895,7 @@ All errors **MUST** follow the structure:
 [REASON]: hookify supports linux, macos. You are running windows.
 [FIX]: This plugin cannot run on your system.
   Contact plugin author for Windows support:
-  https://github.com/kinginyellow/yellow-plugins/issues
+  https://github.com/KingInYellows/yellow-plugins/issues
 ```
 
 ---
@@ -1074,7 +1074,7 @@ All errors **MUST** follow the structure:
   Verify source path in marketplace.json
   Ensure repository is public or credentials configured
   Try manual clone:
-  git clone https://github.com/kinginyellow/yellow-plugins
+  git clone https://github.com/KingInYellows/yellow-plugins
 ```
 
 ---
@@ -1125,7 +1125,7 @@ All errors **MUST** follow the structure:
   - Infinite loops
   - Network operations without timeouts
   Contact plugin author:
-  https://github.com/kinginyellow/yellow-plugins/issues
+  https://github.com/KingInYellows/yellow-plugins/issues
 ```
 
 ---

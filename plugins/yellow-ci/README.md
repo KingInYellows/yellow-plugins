@@ -5,7 +5,7 @@ CI failure diagnosis, workflow linting, and runner health management for self-ho
 ## Installation
 
 ```bash
-/plugin marketplace add kinginyellow/yellow-plugins --plugin yellow-ci
+/plugin marketplace add KingInYellows/yellow-plugins --plugin yellow-ci
 ```
 
 ### Prerequisites

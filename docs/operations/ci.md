@@ -210,7 +210,7 @@ Created via `softprops/action-gh-release@v1`:
 Requires configuration:
 1. Add `NPM_TOKEN` secret to repository
 2. Only runs for non-prerelease versions
-3. Only runs on main repository (`kinginyellow/yellow-plugins`)
+3. Only runs on main repository (`KingInYellows/yellow-plugins`)
 4. Publishes all workspace packages with `--access public`
 
 ---
@@ -742,7 +742,7 @@ gh run watch <run-id>
 
 #### Via GitHub UI
 
-1. Navigate to: `https://github.com/kinginyellow/yellow-plugins/actions`
+1. Navigate to: `https://github.com/KingInYellows/yellow-plugins/actions`
 2. Select workflow from left sidebar
 3. Click "Run workflow" button
 4. Fill in inputs (if any)
@@ -830,6 +830,6 @@ Add to workflow (temporary debugging only):
 
 For questions or issues related to CI/CD infrastructure:
 
-- **GitHub Issues:** https://github.com/kinginyellow/yellow-plugins/issues
+- **GitHub Issues:** https://github.com/KingInYellows/yellow-plugins/issues
 - **Maintainer:** Platform Team
 - **Escalation:** Create issue with `ci-cd` label

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is a Claude Code plugin marketplace repository. It provides plugins that can be installed via `/plugin marketplace add kinginyellow/yellow-plugins`.
+This is a Claude Code plugin marketplace repository. It provides plugins that can be installed via `/plugin marketplace add KingInYellows/yellow-plugins`.
 
 ## Key Files
 

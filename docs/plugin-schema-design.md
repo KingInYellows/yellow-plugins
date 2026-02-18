@@ -979,13 +979,13 @@ plugins/hookify/
     }
   ],
   "docs": {
-    "readme": "https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/README.md",
-    "changelog": "https://github.com/kinginyellow/yellow-plugins/blob/main/plugins/hookify/CHANGELOG.md",
-    "examples": "https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/examples"
+    "readme": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/hookify/README.md",
+    "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/hookify/CHANGELOG.md",
+    "examples": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/hookify/examples"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/kinginyellow/yellow-plugins.git"
+    "url": "https://github.com/KingInYellows/yellow-plugins.git"
   },
   "lifecycle": {
     "preInstall": "scripts/check-system.sh",

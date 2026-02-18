@@ -54,7 +54,7 @@ You are a ChatPRD-to-Linear bridge agent. Your job is to extract requirements fr
 
 Attempt to call `mcp__plugin_linear_linear__list_teams`:
 - If successful: Linear MCP is available, proceed with bridging flow
-- If error "tool not found": report "yellow-linear plugin not installed. Install it with `/plugin marketplace add kinginyellow/yellow-plugins yellow-linear`" and stop
+- If error "tool not found": report "yellow-linear plugin not installed. Install it with `/plugin marketplace add KingInYellows/yellow-plugins yellow-linear`" and stop
 
 ### Step 2: Find ChatPRD Document
 

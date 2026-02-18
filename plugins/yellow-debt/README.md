@@ -170,7 +170,7 @@ All state transitions are atomic and TOCTOU-safe via `flock`.
 
 ```bash
 # Install from marketplace
-/plugin marketplace add kinginyellow/yellow-plugins
+/plugin marketplace add KingInYellows/yellow-plugins
 
 # Enable yellow-debt
 /plugin enable yellow-debt

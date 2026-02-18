@@ -7,7 +7,7 @@ Personal Claude Code plugin marketplace — 10 plugins for Git workflows, code r
 Add the marketplace, then install individual plugins:
 
 ```
-/plugin marketplace add kinginyellow/yellow-plugins
+/plugin marketplace add KingInYellows/yellow-plugins
 /plugin install gt-workflow@yellow-plugins
 ```
 
@@ -45,14 +45,15 @@ Run `/plugin` to browse all available plugins in the Discover tab.
 Clone the repo and add it as a local marketplace:
 
 ```bash
-git clone https://github.com/kinginyellow/yellow-plugins.git
+git clone https://github.com/KingInYellows/yellow-plugins.git
 cd yellow-plugins
 pnpm install
+```
 
-# Add as local marketplace
+Then in Claude Code:
+
+```
 /plugin marketplace add ./
-
-# Install a plugin from local
 /plugin install gt-workflow@yellow-plugins
 ```
 
@@ -82,7 +83,17 @@ plugins/my-plugin/
 }
 ```
 
-3. Add an entry to the `plugins` array in `.claude-plugin/marketplace.json`.
+3. Register in `.claude-plugin/marketplace.json`:
+
+```json
+{
+  "name": "my-plugin",
+  "description": "What the plugin does",
+  "version": "1.0.0",
+  "author": { "name": "Your Name" },
+  "source": "./plugins/my-plugin"
+}
+```
 
 4. Validate:
 
@@ -111,7 +122,7 @@ yellow-plugins/
 │   └── yellow-ruvector/       # Vector memory (2 agents, 6 commands, 2 skills, 3 hooks, 1 MCP)
 ├── packages/                  # Validation tooling (domain, infrastructure, cli)
 ├── schemas/                   # JSON schemas
-└── docs/                      # Documentation and solutions
+└── docs/                      # Brainstorms, plans, and solutions
 ```
 
 ## License

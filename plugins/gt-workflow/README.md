@@ -86,7 +86,7 @@ The plugin installs a **PreToolUse** hook that intercepts any Bash call containi
 Add this marketplace to Claude Code:
 
 ```
-claude mcp add-marketplace yellow-plugins https://github.com/kinginyellow/yellow-plugins
+claude mcp add-marketplace yellow-plugins https://github.com/KingInYellows/yellow-plugins
 ```
 
 Or install the plugin directly from a local clone:
