@@ -79,7 +79,7 @@ ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \
   -w "\n%{http_code}" \
-  -X GET "${ENTERPRISE_URL}/sessions?first=5&$(printf 'org_ids=%s' "$DEVIN_ORG_ID")" \
+  -X GET "${ENTERPRISE_URL}/sessions?first=5&$(jq -nr --arg org "$DEVIN_ORG_ID" '@uri "org_ids=\($org)"')" \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
 

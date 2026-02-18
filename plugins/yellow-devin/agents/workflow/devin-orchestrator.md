@@ -83,21 +83,9 @@ before each request. Polling strategy:
 | `exit` | Success — proceed to review |
 | `error` | Failure — report and exit |
 
-**Suspended auto-resume:** V3 pauses idle sessions for cost savings. The
-orchestrator sends a message to auto-resume:
-
-```bash
-ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
-jq -n --arg msg "continue" '{message: $msg}' | \
-  curl -s --connect-timeout 5 --max-time 30 \
-    -w "\n%{http_code}" \
-    -X POST "${ENTERPRISE_URL}/sessions/${SESSION_ID}/messages" \
-    -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d @-
-```
-
-Then poll until `running` or 60s elapses.
+**Suspended auto-resume:** V3 pauses idle sessions for cost savings. Send a
+"continue" message via the enterprise message endpoint (see `devin-workflows`
+skill for curl pattern). Then poll until `running` or 60s elapses.
 
 ### Step 4: Review Output
 
@@ -105,17 +93,9 @@ When session reaches terminal state, validate:
 
 1. **Session status:** If `error`, report and skip to Step 6
 2. **Artifact check:** Session must have `pull_requests` entries
-3. **Multi-PR review:** Iterate `pull_requests` array, review each PR:
-
-```bash
-for pr_url in $(printf '%s' "$body" | jq -r '.pull_requests[].pr_url'); do
-  pr_ref=$(printf '%s' "$pr_url" | sed -E 's|.*/([^/]+/[^/]+)/pull/([0-9]+)|\1 \2|')
-  repo=$(printf '%s' "$pr_ref" | awk '{print $1}')
-  number=$(printf '%s' "$pr_ref" | awk '{print $2}')
-  gh pr diff "$number" -R "$repo"
-done
-```
-
+3. **Multi-PR review:** Extract `pr_url` and `pr_state` from each entry in the
+   `pull_requests` array. For each open PR, run `gh pr diff NUMBER -R REPO` to
+   get the diff for review.
 4. **Diff review:** Assess code quality, correctness, test coverage
 
 If any check fails, mark iteration as FAILED.

@@ -5,6 +5,7 @@ argument-hint: '<session-id>'
 allowed-tools:
   - Bash
   - Skill
+  - AskUserQuestion
 ---
 
 # Archive Devin Session
@@ -21,8 +22,9 @@ available. See `devin-workflows` skill for validation functions.
 
 ### Step 2: Get Session ID
 
-Parse `$ARGUMENTS` for a session ID. Validate with `validate_session_id` from
-`devin-workflows` skill.
+Parse `$ARGUMENTS` for a session ID. If empty, ask user via AskUserQuestion.
+
+Validate with `validate_session_id` from `devin-workflows` skill.
 
 ### Step 3: Verify Session Exists (C1 Validation)
 
