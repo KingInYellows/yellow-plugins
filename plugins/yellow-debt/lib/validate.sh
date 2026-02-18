@@ -28,9 +28,16 @@ update_frontmatter() {
 
   [ -f "$file" ] || return 1
 
+  # Validate field is a simple property accessor (only dots, lowercase letters, underscores)
+  case "$field" in
+    *[!.a-z_]*) printf '[validate] Invalid field name: %s\n' "$field" >&2; return 1 ;;
+    .[a-z_]*) ;;  # OK: starts with . followed by lowercase/underscore
+    *) printf '[validate] Invalid field name: %s\n' "$field" >&2; return 1 ;;
+  esac
+
   # Extract frontmatter and update field
   local updated_frontmatter
-  updated_frontmatter=$(extract_frontmatter "$file" | yq -y --arg val "$value" "$field = \$val" 2>/dev/null) || return 1
+  updated_frontmatter=$(extract_frontmatter "$file" | yq -y --arg val "$value" "$field = \$val") || { printf '[validate] yq failed updating %s in %s\n' "$field" "$file" >&2; return 1; }
 
   # Extract body (everything after second ---)
   local body
@@ -64,17 +71,31 @@ validate_file_path() {
 
   # Reject path traversal patterns
   case "$raw_path" in
-    *../*|*/..|../*|..) return 1 ;;
-    /*) return 1 ;;  # Absolute paths
-    ~*) return 1 ;;  # Tilde expansion
+    *..*|/*|~*) return 1 ;;
   esac
 
   # Canonicalize and verify containment
-  local resolved
-  resolved=$(realpath -m -- "${project_root}/${raw_path}" 2>/dev/null) || return 1
+  local canonical_root candidate resolved parent_dir
+  canonical_root=$(cd -- "$project_root" 2>/dev/null && pwd -P) || return 1
+  candidate="${canonical_root}/${raw_path}"
+
+  # Prefer GNU realpath -m when available (handles non-existent targets safely).
+  if command -v realpath >/dev/null 2>&1 && realpath -m / >/dev/null 2>&1; then
+    resolved=$(realpath -m -- "$candidate") || return 1
+  else
+    # Portable fallback: resolve the nearest existing ancestor, then append remaining path.
+    # This preserves the ability to validate paths for files not yet created.
+    local dir="$candidate" remainder=""
+    while [ -n "$dir" ] && [ "$dir" != "/" ] && ! [ -e "$dir" ]; do
+      remainder="$(basename -- "$dir")${remainder:+/$remainder}"
+      dir="$(dirname -- "$dir")"
+    done
+    parent_dir=$(cd -- "$dir" 2>/dev/null && pwd -P) || return 1
+    resolved="${parent_dir}${remainder:+/$remainder}"
+  fi
 
   case "$resolved" in
-    "${project_root}/"*|"${project_root}") return 0 ;;
+    "${canonical_root}/"*|"${canonical_root}") return 0 ;;
     *) return 1 ;;
   esac
 }

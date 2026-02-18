@@ -3,6 +3,7 @@ name: linear:status
 description: >
   Generate project and initiative health report. Use when user asks "project status",
   "how are we tracking", "what's blocked", or "sprint health".
+argument-hint: ""
 allowed-tools:
   - Bash
   - AskUserQuestion

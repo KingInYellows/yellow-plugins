@@ -1,3 +1,11 @@
+---
+name: debt-conventions
+description: >
+  Technical debt scoring framework and scanner patterns. Use when scanner agents
+  need scoring rubrics, category definitions, safety rules, or output schemas.
+user-invocable: false
+---
+
 # Technical Debt Conventions
 
 ## What It Does
@@ -211,3 +219,71 @@ You are a <category> detection specialist. Reference the `debt-conventions` skil
 Return top 50 findings max, ranked by severity × confidence.
 Write results to `.debt/scanner-output/<category>-scanner.json` per schema above.
 ```
+
+## Error Handling
+
+### Invalid Status Values
+Todo files must use one of the following status values:
+- `pending` — Finding identified, awaiting triage
+- `ready` — Approved for remediation
+- `in-progress` — Fix work has started
+- `complete` — Fix completed
+- `deferred` — Postponed to future sprint
+- `deleted` — Rejected or no longer relevant
+
+**Remediation**: Run `lib/validate.sh` validation functions to check status field against allowed values.
+
+### Invalid Priority Values
+Priority must be one of: `p1` (critical), `p2` (high), `p3` (medium), `p4` (low).
+
+**Remediation**: Check priority field in todo frontmatter.
+
+### Missing Required Frontmatter
+All todo files MUST include:
+- `status`: Current lifecycle state
+- `priority`: Urgency level (p1-p4)
+- `issue_id`: Unique identifier
+- `tags`: Array of lowercase, hyphen-separated tags
+
+**Remediation**: Add missing fields to YAML frontmatter. See `lib/validate.sh` for validation logic.
+
+### Invalid Tag Format
+Tags must be lowercase with hyphens only. No underscores, spaces, or uppercase.
+
+**Example**: `code-review`, `security`, `ai-patterns`
+
+**Remediation**: Convert tags to lowercase and replace spaces/underscores with hyphens.
+
+### Path Traversal Attempts
+Scanner agents and hooks reject paths containing:
+- `..` (parent directory traversal)
+- Leading `/` (absolute paths outside project)
+- Leading `~` (home directory expansion)
+
+**Remediation**: Use project-relative paths only. See `lib/validate.sh` for `validate_file_path()` function.
+
+### Line Ending Issues
+All shell scripts must use LF (Unix) line endings, not CRLF (Windows).
+
+**Detection**: `file script.sh` shows "CRLF line terminators"
+
+**Remediation**: Run `sed -i 's/\r$//' script.sh` to convert CRLF → LF.
+
+### Schema Version Mismatch
+Scanner output must use `"schema_version": "1.0"` for forward compatibility.
+
+**Remediation**: Update scanner agent to use current schema version from this skill.
+
+### Confidence Out of Range
+`confidence` field must be a float between 0.0 and 1.0.
+
+**Remediation**: Clamp values: `confidence = Math.max(0, Math.min(1, value))`
+
+### Missing Affected Files
+Every finding MUST include at least one entry in `affected_files` array with `path` and `lines` fields.
+
+**Remediation**: Ensure scanner agents populate this field with actual file locations.
+
+### Validation References
+- Shared library: `plugins/yellow-debt/lib/validate.sh`
+- Test fixtures: `plugins/yellow-debt/tests/*.bats` (37 test cases)

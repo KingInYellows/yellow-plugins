@@ -155,6 +155,25 @@ Agents that modify Linear state (e.g., `linear-pr-linker`) must request explicit
 - Never use `gh pr create` for PR creation
 - Link issues to PRs by adding a comment with the PR URL
 
+## Shell Patterns
+
+Always quote variables when handling Linear-derived data:
+
+```bash
+# Extract issue ID from branch name
+branch_name="$(git branch --show-current)"
+issue_id="$(printf '%s' "$branch_name" | grep -oE '[A-Z]{2,5}-[0-9]{1,6}' | head -n1)"
+
+# Validate before use
+if [ -z "$issue_id" ]; then
+  printf '[linear] No issue ID found in branch name "%s"\n' "$branch_name" >&2
+  exit 1
+fi
+
+# Call MCP tool (never interpolate $ARGUMENTS into shell commands)
+# Pass as API parameters only
+```
+
 ## Error Handling Guidance
 
 | Error | Action |

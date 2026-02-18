@@ -4,6 +4,7 @@ description: >
   Install ruvector and initialize vector storage. Use when user says "set up
   ruvector", "install vector search", "enable semantic search", "initialize
   ruvector", or wants persistent agent memory for a project.
+argument-hint: ""
 allowed-tools:
   - Bash
   - Read

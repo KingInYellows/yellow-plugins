@@ -1,6 +1,7 @@
 ---
 name: debt:sync
 description: "Push accepted debt findings to Linear as issues. Use when you want to track technical debt in Linear."
+argument-hint: "[--team <name>] [--project <name>]"
 allowed-tools:
   - Bash
   - Read

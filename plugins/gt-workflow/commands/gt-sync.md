@@ -1,6 +1,7 @@
 ---
 name: gt-sync
 description: "Sync repo with trunk, restack branches, and clean up merged PRs"
+argument-hint: "[--no-delete | --force]"
 allowed-tools:
   - Bash
 ---

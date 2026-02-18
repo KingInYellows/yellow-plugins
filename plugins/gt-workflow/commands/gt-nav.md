@@ -1,6 +1,7 @@
 ---
 name: gt-nav
 description: "Visualize your Graphite stack and navigate between branches"
+argument-hint: "[--pr | --top | --bottom]"
 allowed-tools:
   - Bash
   - AskUserQuestion

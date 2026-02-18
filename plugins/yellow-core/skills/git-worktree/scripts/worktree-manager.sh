@@ -149,9 +149,9 @@ cmd_list() {
     info "Worktrees:"
     git worktree list | while IFS= read -r line; do
         # Extract path and branch
-        path=$(echo "$line" | awk '{print $1}')
-        branch=$(echo "$line" | grep -o '\[.*\]' | tr -d '[]')
-        status=$(echo "$line" | grep -o '([^)]*)' | tr -d '()')
+        path=$(printf '%s' "$line" | awk '{print $1}')
+        branch=$(printf '%s' "$line" | grep -o '\[.*\]' | tr -d '[]')
+        status=$(printf '%s' "$line" | grep -o '([^)]*)' | tr -d '()')
 
         # Highlight current worktree (exact match, not substring)
         if [ "$path" = "$(pwd)" ]; then

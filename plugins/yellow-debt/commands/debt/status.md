@@ -1,6 +1,7 @@
 ---
 name: debt:status
 description: "Dashboard of current technical debt levels. Use when you want to check debt status, see aggregated metrics, or export debt data."
+argument-hint: "[--json]"
 allowed-tools:
   - Bash
   - Read
@@ -87,7 +88,7 @@ if [ -d todos/debt ]; then
 
     # Validate and increment status counter
     case "$STATUS" in
-      pending|ready|in-progress|complete|deferred)
+      pending|ready|in-progress|complete|deferred|deleted)
         val_status=${by_status["$STATUS"]:-0}
         by_status["$STATUS"]=$((val_status + 1))
         ;;

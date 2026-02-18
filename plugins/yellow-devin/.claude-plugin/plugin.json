@@ -9,7 +9,7 @@
   "homepage": "https://github.com/kinginyellow/yellow-plugins#yellow-devin",
   "repository": { "type": "git", "url": "https://github.com/kinginyellow/yellow-plugins" },
   "license": "MIT",
-  "keywords": ["devin", "deepwiki", "multi-agent", "delegation", "orchestration", "ai-collaboration"],
+  "keywords": ["devin", "deepwiki", "delegation", "orchestration", "ai-collaboration"],
   "mcpServers": {
     "deepwiki": {
       "type": "http",

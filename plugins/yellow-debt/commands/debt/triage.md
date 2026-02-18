@@ -1,6 +1,7 @@
 ---
 name: debt:triage
 description: "Interactive review and prioritization of pending debt findings. Use when you need to accept, reject, or defer findings from an audit."
+argument-hint: "[--category <name>] [--priority <level>]"
 allowed-tools:
   - Bash
   - Read
