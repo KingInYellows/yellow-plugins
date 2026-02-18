@@ -1,10 +1,7 @@
 ---
 name: devin:delegate
-description: >
-  Create a Devin session with a task prompt. Use when user wants to delegate
-  work to Devin, says "have Devin do X", "send this to Devin", or "delegate to
-  Devin".
-argument-hint: '<task description>'
+description: Create a Devin session with a task prompt. Use when user wants to delegate work to Devin, says "have Devin do X", "send this to Devin", or "delegate to Devin".
+argument-hint: '<task description> [--tags t1,t2] [--max-acu N]'
 allowed-tools:
   - Bash
   - Read
@@ -14,7 +11,7 @@ allowed-tools:
 
 # Delegate Task to Devin
 
-Create a new Devin session with the provided task description.
+Create a new Devin V3 session with the provided task description.
 
 ## Workflow
 
@@ -23,31 +20,45 @@ Create a new Devin session with the provided task description.
 Check `jq` is available:
 
 ```bash
-command -v jq >/dev/null || { echo "ERROR: jq required. Install: https://jqlang.github.io/jq/download/"; exit 1; }
+command -v jq >/dev/null 2>&1 || {
+  printf 'ERROR: jq required. Install: https://jqlang.github.io/jq/download/\n' >&2
+  exit 1
+}
 ```
 
-Validate `DEVIN_API_TOKEN` is set and matches format
-`^apk_(user_)?[a-zA-Z0-9_-]{20,128}$`. See `devin-workflows` skill for the
-validation function. If invalid, show setup instructions with link to
-`https://devin.ai/settings/api`.
+Validate `DEVIN_SERVICE_USER_TOKEN` is set and matches `cog_` prefix format. If
+it starts with `apk_`, show migration message directing user to create a service
+user. See `devin-workflows` skill for the `validate_token` function.
 
-### Step 2: Get Task Description
+Validate `DEVIN_ORG_ID` is set and matches format. See `devin-workflows` skill
+for the `validate_org_id` function.
 
-If `$ARGUMENTS` is empty, ask user for the task description via AskUserQuestion.
+### Step 2: Parse Arguments
 
-Validate prompt length: max 8000 characters. On overflow, report actual
-character count and the maximum — never silently truncate.
+Parse `$ARGUMENTS` for:
 
-### Step 3: Enrich Context (Optional)
+- **Task description:** All text not matching flags below
+- **`--tags t1,t2`:** Optional comma-separated tags (max 10, each max 32 chars,
+  alphanumeric + dashes)
+- **`--max-acu N`:** Optional integer ACU limit
 
-If the user is in a git repository, gather context to include:
+If task description is empty after parsing, ask user via AskUserQuestion.
 
-- Current branch name: `git branch --show-current`
-- Repository remote URL: `git remote get-url origin 2>/dev/null`
+Validate prompt length: max 8000 characters. On overflow, report actual count vs
+maximum — never silently truncate.
 
-Prepend context to prompt if available, and then re-validate that the combined
-`PROMPT` (including this context) stays within the 8000-character limit,
-reporting the actual character count vs the maximum on overflow:
+### Step 3: Enrich Context
+
+Generate a title from the first ~80 characters of the prompt (truncate at word
+boundary).
+
+If in a git repository, gather:
+
+- Repository remote: `git remote get-url origin 2>/dev/null`
+- Current branch: `git branch --show-current 2>/dev/null`
+
+Extract `owner/repo` from remote URL for the `repos` field. Prepend context to
+the prompt:
 
 ```
 Repository: {remote_url}
@@ -56,47 +67,85 @@ Branch: {branch_name}
 Task: {user_prompt}
 ```
 
-After prepending, validate the final `PROMPT` length. If it exceeds 8000
-characters, report: "ERROR: Prompt too long ({actual_count} characters, maximum
-8000)" and exit without creating the session.
+Re-validate combined prompt length stays within 8000 characters.
 
-### Step 4: Create Session
+### Step 4: Dedup Check (No idempotent Field in V3)
 
-Construct JSON payload via `jq` and POST to Devin API:
+Before creating, search recent sessions for a matching title in active states:
 
 ```bash
-jq -n --arg prompt "$PROMPT" '{prompt: $prompt, idempotent: true}' | \
+DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
+
+response=$(curl -s --connect-timeout 5 --max-time 10 \
+  -w "\n%{http_code}" \
+  -X GET "${ENTERPRISE_URL}/sessions?first=5&$(printf 'org_ids=%s' "$DEVIN_ORG_ID")" \
+  -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
+```
+
+Check for active sessions (status `new`, `claimed`, or `running`) with a
+matching title. If found, ask via AskUserQuestion:
+
+- "Similar session already active: {title} ({status}). Create a new one anyway?"
+- Options: "Yes, create new" / "No, show existing"
+
+If user declines, display the existing session details and stop.
+
+### Step 5: Create Session
+
+Construct JSON payload via `jq` and POST to V3 org-scoped endpoint:
+
+```bash
+ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
+
+# Build payload — only include optional fields if present
+payload=$(jq -n \
+  --arg prompt "$PROMPT" \
+  --arg title "$TITLE" \
+  --argjson tags "$TAGS_JSON" \
+  --argjson repos "$REPOS_JSON" \
+  '{prompt: $prompt, title: $title, tags: $tags, repos: $repos}')
+
+# Add max_acu_limit if specified
+if [ -n "$MAX_ACU" ]; then
+  payload=$(printf '%s' "$payload" | jq --argjson acu "$MAX_ACU" '. + {max_acu_limit: $acu}')
+fi
+
+printf '%s' "$payload" | \
   curl -s --connect-timeout 5 --max-time 60 \
     -w "\n%{http_code}" \
-    -X POST "https://api.devin.ai/v1/sessions" \
-    -H "Authorization: Bearer $DEVIN_API_TOKEN" \
+    -X POST "${ORG_URL}/sessions" \
+    -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN" \
     -H "Content-Type: application/json" \
     -d @-
 ```
 
-### Step 5: Handle Response
+### Step 6: Handle Response
 
-1. Check curl exit code — retry transient network failures (exit 6, 7, 28) up to
-   3 times
-2. Extract HTTP status code from `-w` output
+1. Check curl exit code — retry transient failures (exit 6, 7, 28) up to 3
+   times with backoff
+2. Extract HTTP status from `-w` output
 3. Parse response body with `jq` — check jq exit code
-4. Extract `session_id`, `status`, `url`, `is_new_session`
+4. Extract `session_id`, `status`, `url`, `title`
 
-See `devin-workflows` skill for complete error handling patterns.
+See `devin-workflows` skill for complete error handling patterns (all three
+layers).
 
-### Step 6: Report
+### Step 7: Report
 
 Display:
 
-- Session ID
-- Devin web URL (clickable link)
-- Initial status
-- If `is_new_session` is false, note that an existing session was returned
-  (idempotent)
+- **Session ID**
+- **Title**
+- **Devin URL** (clickable link)
+- **Status** (initial status, likely `new`)
+- **ACUs:** 0.00 (initial)
+- **Tags** (if any were set)
 
 Suggest: "Use `/devin:status {session_id}` to check progress."
 
 ## Error Handling
 
-See `devin-workflows` skill for common error handling patterns (token
-validation, curl errors, HTTP status codes, jq parse errors).
+See `devin-workflows` skill for error handling patterns (token validation, curl
+errors, HTTP status codes, jq parse errors). All error output must sanitize
+tokens: `sed 's/cog_[a-zA-Z0-9_-]*/***REDACTED***/g'`.
