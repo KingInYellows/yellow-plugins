@@ -2,7 +2,7 @@
 name: create-agent-skills
 description: Expert guidance for creating Claude Code skills and agents. Use when working with SKILL.md files, authoring new skills, creating slash commands, or designing agent workflows.
 argument-hint: "[skill-name|agent-name]"
-user-invocable: true
+user-invokable: true
 ---
 
 # Create Agent Skills
@@ -62,7 +62,7 @@ Additional details, links.
 | `description` | Yes | WHAT it does + WHEN to use it (see below) |
 | `argument-hint` | No | UI hint for arguments, e.g. `"[branch-name]"` |
 | `disable-model-invocation` | No | If `true`, prints markdown only (no LLM call) |
-| `user-invocable` | No | If `false`, skill is internal-only (callable by other skills) |
+| `user-invokable` | No | If `false`, skill is internal-only (callable by other skills) |
 | `allowed-tools` | No | Array of tool names to restrict access |
 | `model` | No | Override default model (e.g. `claude-opus-4-6`) |
 | `context` | No | `fork` creates isolated subagent context |
@@ -74,7 +74,7 @@ Additional details, links.
 |--------|---------------|--------------|----------|
 | Default | Yes | Yes | Standard skill |
 | `disable-model-invocation: true` | Yes | No | Static reference docs |
-| `user-invocable: false` | No | Yes | Internal helper skill |
+| `user-invokable: false` | No | Yes | Internal helper skill |
 | Both set | No | No | Private reference docs |
 
 ## Dynamic Features
@@ -273,7 +273,7 @@ Before submitting a skill:
 1. **XML tags in body** — Use markdown only
 2. **Vague descriptions** — "Helps with git" is not specific
 3. **Deep nesting** — Max one level of reference files
-4. **Missing invocation control** — Set `user-invocable: false` for internal skills
+4. **Missing invocation control** — Set `user-invokable: false` for internal skills
 5. **Too many options** — Skills should be opinionated, not swiss-army knives
 6. **Embedding large data** — Use reference files for API schemas, long examples
 7. **Dynamic descriptions** — Description is static, body can be dynamic

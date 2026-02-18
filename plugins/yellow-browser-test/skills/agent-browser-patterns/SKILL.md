@@ -1,10 +1,7 @@
 ---
 name: agent-browser-patterns
-description: >
-  agent-browser usage patterns and conventions reference. Use when agents or
-  commands need agent-browser context, ref-based workflow, session persistence,
-  semantic locator fallbacks, or error handling patterns.
-user-invocable: false
+description: agent-browser usage patterns and conventions reference. Use when agents or commands need agent-browser context, ref-based workflow, session persistence, semantic locator fallbacks, or error handling patterns.
+user-invokable: false
 ---
 
 # agent-browser Patterns
@@ -19,7 +16,7 @@ Use when yellow-browser-test plugin commands or agents need shared context for r
 
 ## Usage
 
-This skill is not user-invocable. It provides shared context for the yellow-browser-test plugin's commands and agents.
+This skill is not user-invokable. It provides shared context for the yellow-browser-test plugin's commands and agents.
 
 ## Ref-Based Element Workflow
 

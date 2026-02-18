@@ -1,10 +1,7 @@
 ---
 name: ruvector-conventions
-description: >
-  ruvector workflow patterns and conventions reference. Use when commands or
-  agents need ruvector context, namespace definitions, memory schema, MCP tool
-  naming, or error handling patterns.
-user-invocable: false
+description: ruvector workflow patterns and conventions reference. Use when commands or agents need ruvector context, namespace definitions, memory schema, MCP tool naming, or error handling patterns.
+user-invokable: false
 ---
 
 # ruvector Conventions
@@ -19,7 +16,7 @@ Use when yellow-ruvector plugin commands or agents need shared context for names
 
 ## Usage
 
-This skill is not user-invocable. It provides shared context for the yellow-ruvector plugin's commands and agents.
+This skill is not user-invokable. It provides shared context for the yellow-ruvector plugin's commands and agents.
 
 ## MCP Tool Naming
 
