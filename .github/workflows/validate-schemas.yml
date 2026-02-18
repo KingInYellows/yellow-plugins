@@ -1,3 +1,5 @@
+# CI runs on self-hosted runners. External contributors can validate locally:
+#   pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck
 name: Validate Marketplace and CI Suite
 
 on:
