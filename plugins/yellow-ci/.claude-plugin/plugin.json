@@ -7,11 +7,21 @@
     "url": "https://github.com/KingInYellows"
   },
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-ci",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/KingInYellows/yellow-plugins"
-  },
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
   "keywords": ["ci", "github-actions", "self-hosted", "runner", "diagnosis"],
-  "hooks": "./hooks/hooks.json"
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3000
+          }
+        ]
+      }
+    ]
+  }
 }

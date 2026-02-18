@@ -7,10 +7,7 @@
     "url": "https://github.com/KingInYellows"
   },
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-core",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/KingInYellows/yellow-plugins"
-  },
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
   "keywords": ["code-review", "research", "typescript", "python", "rust", "go"],
   "mcpServers": {

@@ -7,10 +7,7 @@
     "url": "https://github.com/KingInYellows"
   },
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-ruvector",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/KingInYellows/yellow-plugins"
-  },
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
   "keywords": ["vector-search", "agent-memory", "semantic-search", "embeddings", "self-learning"],
   "mcpServers": {
@@ -22,5 +19,42 @@
       }
     }
   },
-  "hooks": "./hooks/hooks.json"
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-use.sh",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }

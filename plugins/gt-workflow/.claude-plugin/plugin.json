@@ -7,10 +7,7 @@
     "url": "https://github.com/KingInYellows"
   },
   "homepage": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/gt-workflow",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/KingInYellows/yellow-plugins.git"
-  },
+  "repository": "https://github.com/KingInYellows/yellow-plugins.git",
   "license": "MIT",
   "keywords": [
     "graphite",
@@ -24,5 +21,17 @@
     "workflow",
     "pull-requests"
   ],
-  "hooks": "hooks/hooks.json"
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-git-push.sh"
+          }
+        ]
+      }
+    ]
+  }
 }
