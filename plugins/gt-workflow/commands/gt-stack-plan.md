@@ -110,8 +110,21 @@ Current position: <current branch>
 Use AskUserQuestion to ask the user:
 - "Create these branches now (Recommended)" — scaffold all branches with empty commits
 - "Adjust the plan" — let the user modify before creating
-- "Save plan only" — output the plan but don't create branches
+- "Save plan only" — write the plan to `.gt-stack-plan.md` in the repo root and display the path
 - "Cancel"
+
+### If "Save plan only"
+
+Write the formatted stack plan (the output from Phase 2 Step 2) to `.gt-stack-plan.md` in the repository root:
+
+```bash
+cat > .gt-stack-plan.md << 'EOF'
+<stack plan content here>
+EOF
+echo "Stack plan saved to .gt-stack-plan.md"
+```
+
+Then exit without creating any branches.
 
 ## Phase 3: Create Branches (if confirmed)
 
@@ -120,7 +133,7 @@ Use AskUserQuestion to ask the user:
 For each PR in the plan, starting from the bottom of the stack:
 
 ```bash
-gt create -- "<branch-name>" -m "<commit-type>: scaffold for <description>"
+gt create "<branch-name>" -m "<commit-type>: scaffold for <description>"
 ```
 
 **After each `gt create`**, verify it succeeded before proceeding to the next branch. If a branch creation fails, stop immediately and report:
