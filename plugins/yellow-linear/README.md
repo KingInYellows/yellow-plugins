@@ -16,6 +16,14 @@ cycles, and documents.
 - Browser access for OAuth login on first use
 - Graphite CLI (`gt`) for branch management
 
+On first MCP tool call, Claude Code opens a browser popup to authenticate with
+your Linear account. The OAuth token is stored in your system keychain and
+refreshed automatically. No API keys or `.env` files needed.
+
+Requires browser access — will not work in headless SSH sessions. To
+re-authenticate or revoke access: run `/mcp` in Claude Code, select the
+Linear server, and choose "Clear authentication".
+
 ## Commands
 
 | Command              | Description                                                                      |

@@ -585,6 +585,86 @@ claude-api)
 
 ---
 
+## Secrets & Environment Variables
+
+Best practices for handling credentials, API keys, and environment variables in
+plugins.
+
+### Prefer OAuth over API keys
+
+Claude Code handles the full OAuth lifecycle (token storage in system keychain,
+automatic refresh, revocation via `/mcp`) for HTTP MCP servers. Users don't need
+to manage any files or environment variables.
+
+Use OAuth when your MCP server supports it (see yellow-linear, yellow-chatprd
+for examples).
+
+### For env-var-based auth
+
+When a plugin requires API keys or tokens (e.g., for REST API calls via curl):
+
+1. **Document the required env var** in the plugin's `README.md` under
+   "Prerequisites" — within the first 3 lines of the section
+2. **Validate at entry points** — check the variable is set, validate its
+   format, and show the setup URL on failure:
+
+   ```bash
+   if [ -z "$MY_API_TOKEN" ]; then
+     printf 'ERROR: MY_API_TOKEN not set\n' >&2
+     printf 'Get your token: https://example.com/settings/api\n' >&2
+     printf 'Then: export MY_API_TOKEN="your_token_here"\n' >&2
+     exit 1
+   fi
+   ```
+
+3. **Never echo or log token values** in error messages or debug output
+4. **Use `env` field in plugin.json** for non-secret config (paths, feature
+   flags) — not for credentials:
+
+   ```json
+   "mcpServers": {
+     "my-server": {
+       "command": "npx",
+       "args": ["my-mcp-server"],
+       "env": {
+         "STORAGE_PATH": "${PWD}/.my-server/"
+       }
+     }
+   }
+   ```
+
+5. **Use `${VAR}` expansion** in `.mcp.json` for secrets that come from the
+   user's shell environment:
+
+   ```json
+   {
+     "my-server": {
+       "type": "http",
+       "url": "https://api.example.com/mcp",
+       "headers": {
+         "Authorization": "Bearer ${MY_API_TOKEN}"
+       }
+     }
+   }
+   ```
+
+### No `.env` file convention
+
+Plugins should NOT require users to create `.env` files. Instead:
+
+- **MCP servers**: use OAuth or `${VAR}` expansion in `.mcp.json`
+- **Shell commands**: read from the user's shell environment (`$VAR`)
+- **Rationale**: avoids the "which `.env` file?" confusion across projects and
+  worktrees
+
+### Never store secrets in plugin code
+
+- No hardcoded tokens or API keys in any plugin file
+- No `.env` files committed to the repository
+- The `.gitignore` already excludes `.env`, `.env.local`, and `.env.*.local`
+
+---
+
 ## Validation Checklist
 
 Before publishing plugin:

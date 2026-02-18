@@ -17,6 +17,21 @@ codebases via DeepWiki, orchestrate plan-implement-review chains.
 - `curl` and `jq` installed
 - Graphite CLI (`gt`) for branch management
 
+## Authentication
+
+Commands require a `DEVIN_API_TOKEN` environment variable (Bearer token for the
+Devin REST API):
+
+```bash
+# Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
+export DEVIN_API_TOKEN="apk_your_token_here"
+
+# Get your token: https://devin.ai/settings/api
+```
+
+Never commit tokens to version control. The DeepWiki MCP server requires no
+authentication.
+
 ## Commands
 
 | Command           | Description                                         |

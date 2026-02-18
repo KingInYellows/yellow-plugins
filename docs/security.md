@@ -21,6 +21,49 @@ enterprise deployment.
 - **yellow-browser-test** — Uses `agent-browser` CLI locally, no MCP
 - **yellow-debt** — Pure local analysis, no network calls
 
+## Setting Up Authentication
+
+Plugins use three authentication patterns. No `.env` files are needed — Claude
+Code handles credentials natively through OAuth and shell environment variables.
+
+### OAuth servers (yellow-linear, yellow-chatprd)
+
+These plugins use browser-based OAuth managed entirely by Claude Code:
+
+1. On first MCP tool call, Claude Code opens a browser popup for login
+2. Authenticate with your Linear or ChatPRD account
+3. Token is stored securely in your operating system's credential manager
+   (macOS Keychain, Windows Credential Manager, or libsecret on Linux)
+4. To re-authenticate or revoke access: run `/mcp` → select server → "Clear
+   authentication"
+
+No API keys or configuration files needed. Will not work in headless SSH
+sessions (browser required for OAuth flow).
+
+### API token servers (yellow-devin)
+
+yellow-devin commands require a `DEVIN_API_TOKEN` environment variable for REST
+API calls:
+
+```bash
+# Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
+export DEVIN_API_TOKEN="apk_your_token_here"
+
+# Get your token: https://devin.ai/settings/api
+```
+
+Never commit tokens to version control. The `.gitignore` already excludes
+`.env` files if you use one locally.
+
+### No-auth servers (yellow-core, yellow-ruvector, yellow-devin deepwiki)
+
+These servers require no configuration. They work immediately after plugin
+installation:
+
+- **context7** (yellow-core) — public library documentation endpoint
+- **ruvector** (yellow-ruvector) — local stdio server, no network calls
+- **deepwiki** (yellow-devin) — public repository documentation endpoint
+
 ## Enterprise Rollout Recommendations
 
 ### MCP Allowlisting

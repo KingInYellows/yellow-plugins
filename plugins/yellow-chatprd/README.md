@@ -16,6 +16,16 @@ for Claude Code.
 - Browser access for OAuth login (will not work in headless SSH sessions)
 - Optional: `yellow-linear` plugin for Linear bridging
 
+## Authentication
+
+On first MCP tool call, Claude Code opens a browser popup to authenticate with
+your ChatPRD account via Clerk OAuth. The token is stored in your system keychain
+and refreshed automatically. No API keys or `.env` files needed.
+
+Requires browser access — will not work in headless SSH sessions. To
+re-authenticate: run `/mcp` in Claude Code, select the ChatPRD server, and
+choose "Clear authentication".
+
 ## Commands
 
 | Command                | Description                                           |
