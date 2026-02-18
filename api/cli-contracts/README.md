@@ -519,5 +519,7 @@ pnpm test:contracts
 
 ---
 
-**Last Updated**: 2026-01-11 **Version**: 1.0.0 **Specification**: Task I2.T4 -
-CLI Contract Catalog
+<!-- prettier-ignore -->
+**Last Updated**: 2026-01-11
+**Version**: 1.0.0
+**Specification**: Task I2.T4 - CLI Contract Catalog

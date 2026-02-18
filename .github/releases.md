@@ -2,8 +2,10 @@
 
 <!-- anchor: release-runbook -->
 
-**Document Version**: 1.0.0 **Last Updated**: 2026-01-11 **Part of**: Task
-I4.T5 - Release Packaging & Checklist
+<!-- prettier-ignore -->
+**Document Version**: 1.0.0
+**Last Updated**: 2026-01-11
+**Part of**: Task I4.T5 - Release Packaging & Checklist
 
 ---
 
@@ -1058,5 +1060,8 @@ stack
 
 ---
 
-**Last Updated**: 2026-01-11 **Document Version**: 1.0.0 **Maintained By**:
-KingInYellows **Next Review**: 2026-04-11 (quarterly)
+<!-- prettier-ignore -->
+**Last Updated**: 2026-01-11
+**Document Version**: 1.0.0
+**Maintained By**: KingInYellows
+**Next Review**: 2026-04-11 (quarterly)

@@ -1,8 +1,10 @@
 # Audit Trail Documentation
 
-**Document Version**: 1.0.0 **Last Updated**: 2026-01-12 **Task Reference**:
-I3.T4 - Enhanced Uninstall Experience **Purpose**: Transaction audit logging for
-install, update, rollback, and uninstall operations
+<!-- prettier-ignore -->
+**Document Version**: 1.0.0
+**Last Updated**: 2026-01-12
+**Task Reference**: I3.T4 - Enhanced Uninstall Experience
+**Purpose**: Transaction audit logging for install, update, rollback, and uninstall operations
 
 ---
 
