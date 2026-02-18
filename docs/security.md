@@ -32,7 +32,8 @@ These plugins use browser-based OAuth managed entirely by Claude Code:
 
 1. On first MCP tool call, Claude Code opens a browser popup for login
 2. Authenticate with your Linear or ChatPRD account
-3. Token is stored securely in your system keychain (macOS) or credentials file
+3. Token is stored securely in your operating system's credential manager
+   (macOS Keychain, Windows Credential Manager, or libsecret on Linux)
 4. To re-authenticate or revoke access: run `/mcp` → select server → "Clear
    authentication"
 

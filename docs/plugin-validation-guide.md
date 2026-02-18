@@ -610,9 +610,9 @@ When a plugin requires API keys or tokens (e.g., for REST API calls via curl):
 
    ```bash
    if [ -z "$MY_API_TOKEN" ]; then
-     printf 'ERROR: MY_API_TOKEN not set\n'
-     printf 'Get your token: https://example.com/settings/api\n'
-     printf 'Then: export MY_API_TOKEN="your_token_here"\n'
+     printf 'ERROR: MY_API_TOKEN not set\n' >&2
+     printf 'Get your token: https://example.com/settings/api\n' >&2
+     printf 'Then: export MY_API_TOKEN="your_token_here"\n' >&2
      exit 1
    fi
    ```
