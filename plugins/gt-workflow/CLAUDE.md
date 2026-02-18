@@ -30,6 +30,11 @@ Graphite-native workflow commands for stacked PR development.
 ## Plugin Commands
 
 - `/smart-submit` — Audit + commit + submit in one flow
+- `/gt-amend` — Audit + amend current branch commit + re-submit (quick fix path)
 - `/gt-stack-plan` — Plan stacked PRs for a feature
 - `/gt-sync` — Sync repo, restack, clean up
 - `/gt-nav` — Visualize and navigate the stack
+
+## Hooks
+
+- **PreToolUse (Bash)** — Blocks any raw `git push` call; redirects to `gt submit --no-interactive`

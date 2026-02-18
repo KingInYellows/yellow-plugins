@@ -4,6 +4,22 @@ Graphite-native workflow commands for Claude Code. Manages stacked PRs, smart co
 
 ## Commands
 
+### `/gt-amend`
+
+The fastest solo-dev path: audit your current fix and fold it into the current branch commit.
+
+- Runs 3 parallel code review agents (same as `/smart-submit`)
+- Stages specific files (never `git add .`)
+- Amends the existing branch commit via `gt commit amend --no-edit`
+- Re-submits the stack to update the open PR
+- Supports `--no-verify` and `--no-submit`
+
+```
+/gt-amend
+/gt-amend --no-verify
+/gt-amend --no-submit
+```
+
 ### `/smart-submit`
 
 Stage, audit, and submit changes via Graphite in one flow.
@@ -60,6 +76,10 @@ Visualize your stack and navigate between branches.
 /gt-nav --top
 /gt-nav --pr
 ```
+
+## Hooks
+
+The plugin installs a **PreToolUse** hook that intercepts any Bash call containing `git push` and blocks it, redirecting Claude to use `gt submit --no-interactive` instead. This enforces the Graphite-first convention automatically — no rule gets silently bypassed.
 
 ## Installation
 
