@@ -98,11 +98,15 @@ find docs -name '*.md' \
   | xargs sed -i -E 's/\[([^]]+)\]\(\.\.\/SPECIFICATION\.md[^)]*\)/\1/g'
 
 # Pass 2: Strip traceability-matrix.md links
-find docs -name '*.md' ... \
+find docs -name '*.md' \
+  -not -path 'docs/plans/*' \
+  -not -path 'docs/brainstorms/*' \
   | xargs sed -i -E 's/\[([^]]+)\]\(\.\.\/traceability-matrix\.md[^)]*\)/\1/g'
 
 # Pass 3: Strip .codemachine/ links
-find docs -name '*.md' ... \
+find docs -name '*.md' \
+  -not -path 'docs/plans/*' \
+  -not -path 'docs/brainstorms/*' \
   | xargs sed -i -E 's/\[([^]]+)\]\(\.\.\/\.codemachine\/[^)]*\)/\1/g'
 ```
 
@@ -165,8 +169,7 @@ Add a CI check or pre-archive script:
 # Before archiving docs, find all references in remaining files
 for doc in SPECIFICATION.md traceability-matrix.md PRD.md; do
   echo "=== References to $doc ==="
-  grep -rn "$doc" docs/ --include='*.md' \
-    | grep -v 'plans/' | grep -v 'brainstorms/'
+  grep -rn --include='*.md' --exclude-dir='plans' --exclude-dir='brainstorms' "$doc" docs/
 done
 ```
 
