@@ -31,7 +31,7 @@ Please be respectful, constructive, and focused on technical merit in all intera
 
 ```bash
 # Clone the repository
-git clone https://github.com/kinginyellow/yellow-plugins.git
+git clone https://github.com/KingInYellows/yellow-plugins.git
 cd yellow-plugins
 
 # Install dependencies

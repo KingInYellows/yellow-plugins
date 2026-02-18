@@ -37,7 +37,7 @@ Multi-agent PR review with adaptive agent selection, parallel comment resolution
 
 ### Skills (1)
 
-- `pr-review-workflow` — Internal reference for adaptive selection, output format, error handling, and Graphite integration (not user-invocable)
+- `pr-review-workflow` — Internal reference for adaptive selection, output format, error handling, and Graphite integration (not user-invokable)
 
 ### Scripts (2)
 

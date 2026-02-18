@@ -1,9 +1,7 @@
 ---
 name: chatprd-conventions
-description: >
-  ChatPRD conventions and patterns reference. Use when commands or agents
-  need context about ChatPRD templates, project structure, or error handling.
-user-invocable: false
+description: ChatPRD conventions and patterns reference. Use when commands or agents need context about ChatPRD templates, project structure, or error handling.
+user-invokable: false
 ---
 
 # ChatPRD Conventions
@@ -18,7 +16,7 @@ Use when yellow-chatprd plugin commands or agents need shared context for ChatPR
 
 ## Usage
 
-This skill is not user-invocable. It provides shared context for the yellow-chatprd plugin's commands and agents, and all such commands and agents must follow these conventions.
+This skill is not user-invokable. It provides shared context for the yellow-chatprd plugin's commands and agents, and all such commands and agents must follow these conventions.
 
 ## Error Mapping
 

@@ -30,11 +30,11 @@ mkdir -p schemas
 
 # Copy marketplace schema
 curl -o schemas/marketplace.schema.json \
-  https://raw.githubusercontent.com/kinginyellow/yellow-plugins/main/schemas/marketplace.schema.json
+  https://raw.githubusercontent.com/KingInYellows/yellow-plugins/main/schemas/marketplace.schema.json
 
 # Copy validation script
 curl -o scripts/validate-marketplace.js \
-  https://raw.githubusercontent.com/kinginyellow/yellow-plugins/main/scripts/validate-marketplace.js
+  https://raw.githubusercontent.com/KingInYellows/yellow-plugins/main/scripts/validate-marketplace.js
 chmod +x scripts/validate-marketplace.js
 ```
 

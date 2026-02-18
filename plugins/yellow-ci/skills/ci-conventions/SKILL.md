@@ -1,3 +1,9 @@
+---
+name: ci-conventions
+description: Shared conventions for CI analysis — validation rules, failure patterns, error catalog, and security patterns. Use when agents or commands need CI-specific validation or pattern matching reference.
+user-invokable: false
+---
+
 # CI Conventions for Yellow-CI Plugin
 
 Shared knowledge for analyzing GitHub Actions CI failures on self-hosted runners.

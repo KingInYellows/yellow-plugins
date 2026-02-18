@@ -53,7 +53,7 @@ Before using this runbook, ensure you have the following tools installed:
 
 ```bash
 # Clone repository
-git clone https://github.com/kinginyellow/yellow-plugins.git
+git clone https://github.com/KingInYellows/yellow-plugins.git
 cd yellow-plugins
 
 # Install dependencies
@@ -70,7 +70,7 @@ pnpm validate
 gh auth login
 
 # Verify access
-gh repo view kinginyellow/yellow-plugins
+gh repo view KingInYellows/yellow-plugins
 ```
 
 ---
@@ -1480,7 +1480,7 @@ docker inspect node:20-slim | jq '.[0].Id'
 # Edit Dockerfile and update @sha256:... to latest digest
 
 # Review artifact retention policies
-gh api /repos/kinginyellow/yellow-plugins/actions/artifacts | jq '.artifacts[] | {name, expired}'
+gh api /repos/KingInYellows/yellow-plugins/actions/artifacts | jq '.artifacts[] | {name, expired}'
 
 # Audit security vulnerabilities
 pnpm audit

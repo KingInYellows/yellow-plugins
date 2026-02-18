@@ -1,9 +1,7 @@
 ---
 name: devin-workflows
-description: >
-  Devin workflow patterns and conventions reference. Use when commands or agents
-  need Devin API context, session management patterns, or error handling guidance.
-user-invocable: false
+description: Devin workflow patterns and conventions reference. Use when commands or agents need Devin API context, session management patterns, or error handling guidance.
+user-invokable: false
 ---
 
 # Devin Workflow Patterns
@@ -18,7 +16,7 @@ Use when yellow-devin plugin commands or agents need shared Devin workflow conte
 
 ## Usage
 
-This skill is not user-invocable. It provides shared context for the yellow-devin plugin's commands and agents.
+This skill is not user-invokable. It provides shared context for the yellow-devin plugin's commands and agents.
 
 ## API Base
 

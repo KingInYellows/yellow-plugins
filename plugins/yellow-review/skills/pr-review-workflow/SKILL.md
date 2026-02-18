@@ -1,9 +1,7 @@
 ---
 name: pr-review-workflow
-description: >
-  Internal reference for PR review workflow patterns. Use when agents or commands
-  need shared conventions for adaptive selection, output format, or error handling.
-user-invocable: false
+description: Internal reference for PR review workflow patterns. Use when agents or commands need shared conventions for adaptive selection, output format, or error handling.
+user-invokable: false
 ---
 
 # PR Review Workflow Patterns
@@ -18,7 +16,7 @@ Use when yellow-review plugin commands or agents need shared context for adaptiv
 
 ## Usage
 
-This skill is not user-invocable. It provides shared context for the yellow-review plugin's commands and agents.
+This skill is not user-invokable. It provides shared context for the yellow-review plugin's commands and agents.
 
 ## Adaptive Agent Selection
 

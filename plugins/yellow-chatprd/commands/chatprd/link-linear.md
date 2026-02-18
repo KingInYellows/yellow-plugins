@@ -31,7 +31,7 @@ Create Linear issues from a ChatPRD document with duplicate checking, team selec
 
 Call `mcp__plugin_linear_linear__list_teams` to verify the yellow-linear plugin is available:
 - **If successful:** Store the teams list for Step 6.
-- **If tool not found:** Report "yellow-linear plugin not installed. Install it with `/plugin marketplace add kinginyellow/yellow-plugins yellow-linear`" and stop.
+- **If tool not found:** Report "yellow-linear plugin not installed. Install it with `/plugin marketplace add KingInYellows/yellow-plugins yellow-linear`" and stop.
 
 ### Step 2: Parse and Validate Input
 

@@ -1,10 +1,7 @@
 ---
 name: agent-learning
-description: >
-  Agent learning patterns and quality guidelines. Use when commands or agents
-  need to determine when and how to record learnings, apply quality gates,
-  or retrieve past knowledge using ranked retrieval.
-user-invocable: false
+description: Agent learning patterns and quality guidelines. Use when commands or agents need to determine when and how to record learnings, apply quality gates, or retrieve past knowledge using ranked retrieval.
+user-invokable: false
 ---
 
 # Agent Learning Patterns
@@ -19,7 +16,7 @@ Use when yellow-ruvector plugin commands or agents need guidance on learning tri
 
 ## Usage
 
-This skill is not user-invocable. It provides shared context for the yellow-ruvector plugin's learning workflows.
+This skill is not user-invokable. It provides shared context for the yellow-ruvector plugin's learning workflows.
 
 ## Learning Triggers
 

@@ -514,8 +514,8 @@ npm install --save-dev ajv@8.12.0 semver@7.5.3
 | **CI/CD Pipeline** | GitHub Actions | Validation workflow on PR, auto-tag on merge | GitHub-hosted runners |
 
 **Marketplace URL Patterns**:
-- Raw file: `https://raw.githubusercontent.com/kinginyellow/yellow-plugins/main/.claude-plugin/marketplace.json`
-- Clone: `git clone https://github.com/kinginyellow/yellow-plugins.git`
+- Raw file: `https://raw.githubusercontent.com/KingInYellows/yellow-plugins/main/.claude-plugin/marketplace.json`
+- Clone: `git clone https://github.com/KingInYellows/yellow-plugins.git`
 - GitHub Pages: `https://kinginyellow.github.io/yellow-plugins/marketplace.json`
 
 ---

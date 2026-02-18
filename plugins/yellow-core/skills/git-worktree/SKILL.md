@@ -2,7 +2,7 @@
 name: git-worktree
 description: Git worktree management for isolated parallel development. Use when reviewing PRs in isolation, working on multiple features simultaneously, or when workflows offer worktree option.
 argument-hint: "[create|list|switch|cleanup] <name>"
-user-invocable: true
+user-invokable: true
 ---
 
 # Git Worktree Manager

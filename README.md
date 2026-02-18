@@ -1,69 +1,63 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace.
+Personal Claude Code plugin marketplace — 10 plugins for Git workflows, code review, CI, testing, and more.
 
-## Install the Marketplace
+## Install
 
-```
-/plugin marketplace add kinginyellow/yellow-plugins
-```
-
-## Install a Plugin
-
-After adding the marketplace, install plugins from it:
+Add the marketplace, then install individual plugins:
 
 ```
-/plugin install gt-workflow
-/plugin install yellow-core
+/plugin marketplace add KingInYellows/yellow-plugins
+/plugin install gt-workflow@yellow-plugins
 ```
 
-## Available Plugins
+## Plugins
 
 | Plugin | Description | Components |
 |--------|-------------|------------|
-| `gt-workflow` | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation | 4 commands |
-| `yellow-core` | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go | 10 agents, 3 commands, 2 skills, 1 MCP server |
+| `gt-workflow` | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation | 5 commands, 1 hook |
+| `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting | 3 agents, 4 commands, 2 skills |
+| `yellow-chatprd` | ChatPRD MCP integration with document management and Linear bridging | 2 agents, 5 commands, 1 skill, 1 MCP |
+| `yellow-ci` | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 3 agents, 5 commands, 2 skills, 1 hook |
+| `yellow-core` | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go | 10 agents, 3 commands, 2 skills, 1 MCP |
+| `yellow-debt` | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns | 7 agents, 5 commands, 1 skill |
+| `yellow-devin` | Devin.AI integration for multi-agent workflows — delegate tasks, research codebases via DeepWiki | 1 agent, 5 commands, 1 skill, 2 MCP |
+| `yellow-linear` | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents | 3 agents, 5 commands, 1 skill, 1 MCP |
+| `yellow-review` | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review | 8 agents, 3 commands, 1 skill |
+| `yellow-ruvector` | Persistent vector memory and semantic code search for Claude Code agents via ruvector | 2 agents, 6 commands, 2 skills, 3 hooks, 1 MCP |
 
-### gt-workflow
+## Usage
 
-Graphite (`gt`) integration for stacked PR workflows:
+After installing, use `/plugin install <name>@yellow-plugins` to activate individual plugins. Each plugin's commands are namespaced (e.g., `/ci:diagnose`, `/linear:create`, `/devin:delegate`).
 
-- `/smart-submit` — Audit + commit + submit in one flow
-- `/gt-stack-plan` — Plan stacked PRs for a feature
-- `/gt-sync` — Sync repo, restack, clean up
-- `/gt-nav` — Visualize and navigate the stack
+Run `/plugin` to browse all available plugins in the Discover tab.
 
-### yellow-core
+## Update, Disable, Remove
 
-Comprehensive dev toolkit:
+```
+/plugin marketplace update yellow-plugins
+/plugin disable <plugin-name>@yellow-plugins
+/plugin uninstall <plugin-name>@yellow-plugins
+```
 
-**Review Agents** (run in parallel via `/workflows:review`):
-- `code-simplicity-reviewer` — YAGNI enforcement, simplification
-- `security-sentinel` — Security audit, OWASP, secrets scanning
-- `performance-oracle` — Bottlenecks, algorithmic complexity
-- `architecture-strategist` — Architectural compliance, design patterns
-- `polyglot-reviewer` — Language-idiomatic review for TS/Py/Rust/Go
-- `test-coverage-analyst` — Test quality, coverage gaps
+## Local Install (Development)
 
-**Research Agents**:
-- `repo-research-analyst` — Repository structure, conventions
-- `best-practices-researcher` — External docs, community standards
-- `git-history-analyzer` — Git archaeology, change history
+Clone the repo and add it as a local marketplace:
 
-**Workflow Agent**:
-- `spec-flow-analyzer` — User flow analysis, gap identification
+```bash
+git clone https://github.com/KingInYellows/yellow-plugins.git
+cd yellow-plugins
+pnpm install
+```
 
-**Workflow Commands**:
-- `/workflows:plan` — Transform feature descriptions into structured plans
-- `/workflows:work` — Execute work plans systematically
-- `/workflows:review` — Multi-agent comprehensive code review
+Then in Claude Code:
 
-**Skills**:
-- `create-agent-skills` — Guidance for creating skills and agents
-- `git-worktree` — Git worktree management for parallel development
+```
+/plugin marketplace add ./
+/plugin install gt-workflow@yellow-plugins
+```
 
-**MCP Servers**:
-- `context7` — Up-to-date library documentation
+Verify `${CLAUDE_PLUGIN_ROOT}` resolves correctly after local install — local installs copy plugins to `~/.claude/plugins/cache/`.
 
 ## Create a New Plugin
 
@@ -84,11 +78,12 @@ plugins/my-plugin/
 {
   "name": "my-plugin",
   "description": "What the plugin does",
+  "version": "1.0.0",
   "author": { "name": "Your Name" }
 }
 ```
 
-3. Add an entry to the `plugins` array in `.claude-plugin/marketplace.json`:
+3. Register in `.claude-plugin/marketplace.json`:
 
 ```json
 {
@@ -96,38 +91,39 @@ plugins/my-plugin/
   "description": "What the plugin does",
   "version": "1.0.0",
   "author": { "name": "Your Name" },
-  "source": "./plugins/my-plugin",
-  "category": "development"
+  "source": "./plugins/my-plugin"
 }
 ```
+
+4. Validate:
+
+```bash
+pnpm validate:schemas
+```
+
+See each plugin's `CLAUDE.md` for conventions, component details, and usage guides.
 
 ## Project Structure
 
 ```
 yellow-plugins/
 ├── .claude-plugin/
-│   └── marketplace.json       # The catalog Claude Code reads
+│   └── marketplace.json       # Plugin catalog
 ├── plugins/
-│   ├── gt-workflow/           # Graphite workflow commands
-│   │   ├── .claude-plugin/plugin.json
-│   │   ├── CLAUDE.md
-│   │   └── commands/          # 4 commands
-│   └── yellow-core/           # Dev toolkit
-│       ├── .claude-plugin/plugin.json
-│       ├── CLAUDE.md
-│       ├── agents/            # 10 agents (review/, research/, workflow/)
-│       ├── commands/          # 3 workflow commands
-│       └── skills/            # 2 skills
-├── schemas/                   # Schema references
-└── examples/                  # Example JSON files
+│   ├── gt-workflow/           # Graphite workflow (5 commands, 1 hook)
+│   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
+│   ├── yellow-chatprd/        # ChatPRD integration (2 agents, 5 commands, 1 skill, 1 MCP)
+│   ├── yellow-ci/             # CI toolkit (3 agents, 5 commands, 2 skills, 1 hook)
+│   ├── yellow-core/           # Dev toolkit (10 agents, 3 commands, 2 skills, 1 MCP)
+│   ├── yellow-debt/           # Debt audit (7 agents, 5 commands, 1 skill)
+│   ├── yellow-devin/          # Devin.AI (1 agent, 5 commands, 1 skill, 2 MCP)
+│   ├── yellow-linear/         # Linear PM (3 agents, 5 commands, 1 skill, 1 MCP)
+│   ├── yellow-review/         # PR review (8 agents, 3 commands, 1 skill)
+│   └── yellow-ruvector/       # Vector memory (2 agents, 6 commands, 2 skills, 3 hooks, 1 MCP)
+├── packages/                  # Validation tooling (domain, infrastructure, cli)
+├── schemas/                   # JSON schemas
+└── docs/                      # Brainstorms, plans, and solutions
 ```
-
-## Official Format Reference
-
-The marketplace follows the official Claude Code format used by:
-- [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)
-- [EveryInc/every-marketplace](https://github.com/EveryInc/every-marketplace)
-- [obra/superpowers-marketplace](https://github.com/obra/superpowers-marketplace)
 
 ## License
 
