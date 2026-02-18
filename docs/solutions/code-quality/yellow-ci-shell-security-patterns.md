@@ -698,9 +698,9 @@ Use this checklist when writing new shell scripts:
 
 ## References
 
-- **Source:** `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-ci/`
-- **Review:** `docs/reviews/yellow-ci-shell-security-review.md`
-- **Action plan:** `docs/reviews/yellow-ci-shell-fixes-action-plan.md`
+- **Source:** `plugins/yellow-ci/`
+- **Review:** (archived to development branch)
+- **Action plan:** (archived to development branch)
 - **Related patterns:**
   - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md`
     (bash hook patterns)
@@ -709,8 +709,7 @@ Use this checklist when writing new shell scripts:
 
 ## Project Memory Integration
 
-Key patterns added to
-`/home/kinginyellow/.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md`:
+Key patterns added to project memory:
 
 - Newline detection: `has_newline()` pattern replaces unreliable
   `$(printf '\n')` check

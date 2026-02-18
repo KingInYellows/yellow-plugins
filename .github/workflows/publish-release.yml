@@ -27,7 +27,7 @@ jobs:
   # ============================================================================
   validate-release:
     name: Validate Release Candidate
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     outputs:
@@ -122,7 +122,7 @@ jobs:
   # ============================================================================
   build-artifacts:
     name: Build Release Artifacts
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [validate-release]
 
@@ -221,7 +221,7 @@ jobs:
   # ============================================================================
   publish-release:
     name: Publish GitHub Release
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [validate-release, build-artifacts]
     permissions:
@@ -262,7 +262,7 @@ jobs:
   # ============================================================================
   publish-npm:
     name: Publish to NPM
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [validate-release, build-artifacts]
     if: needs.validate-release.outputs.is_prerelease != 'true' && github.repository == 'kinginyellow/yellow-plugins'
@@ -317,7 +317,7 @@ jobs:
   # ============================================================================
   notify:
     name: Post-Release Notifications
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     needs: [validate-release, publish-release]
     if: always()

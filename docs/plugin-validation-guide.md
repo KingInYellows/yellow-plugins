@@ -558,7 +558,7 @@ echo "✅ All plugin manifests valid"
 
 // ✅ Valid
 "author": {
-  "email": "dev@kingin-yellows.dev"
+  "email": "dev@example.com"
 }
 ```
 

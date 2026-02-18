@@ -1,5 +1,4 @@
-# CI runs on self-hosted runners. External contributors can validate locally:
-#   pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck
+# Validate locally: pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck
 name: Validate Marketplace and CI Suite
 
 on:
@@ -39,7 +38,7 @@ jobs:
   # ============================================================================
   validate-schemas:
     name: Validate Schemas (${{ matrix.target }})
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 2 # NFR-MAINT-002: Critical path budget
 
     strategy:
@@ -217,7 +216,7 @@ jobs:
   # ============================================================================
   lint-and-typecheck:
     name: Lint & TypeCheck
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 3
 
     steps:
@@ -287,7 +286,7 @@ jobs:
   # ============================================================================
   unit-tests:
     name: Unit Tests
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [lint-and-typecheck]
 
@@ -354,7 +353,7 @@ jobs:
   # ============================================================================
   integration-tests:
     name: Integration Tests
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 8
     needs: [unit-tests]
 
@@ -421,7 +420,7 @@ jobs:
   # ============================================================================
   contract-drift:
     name: Contract Drift Check
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 3
     needs: [validate-schemas]
 
@@ -542,7 +541,7 @@ jobs:
   # ============================================================================
   security-audit:
     name: Security Audit
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
@@ -627,7 +626,7 @@ jobs:
   # ============================================================================
   build:
     name: Build Verification
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     if: github.ref == 'refs/heads/main'
     needs: [validate-schemas, lint-and-typecheck, unit-tests]
@@ -695,7 +694,7 @@ jobs:
   # ============================================================================
   report-metrics:
     name: Aggregate CI Metrics
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     if: always()
     needs:
       [
@@ -783,7 +782,7 @@ jobs:
   # ============================================================================
   ci-status:
     name: CI Status Summary
-    runs-on: [self-hosted, linux]
+    runs-on: ubuntu-latest
     if: always()
     needs:
       [
