@@ -37,8 +37,8 @@
     },
     {
       "name": "yellow-devin",
-      "description": "Devin.AI integration for multi-agent workflows — delegate tasks, research codebases via DeepWiki, orchestrate plan-implement-review chains",
-      "version": "1.0.0",
+      "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+      "version": "2.0.0",
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-devin",
       "category": "development"
