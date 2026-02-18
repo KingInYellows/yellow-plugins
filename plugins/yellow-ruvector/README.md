@@ -5,10 +5,9 @@ Persistent vector memory and semantic code search for Claude Code agents via
 
 ## Installation
 
-```bash
-/plugin marketplace add kinginyellow/yellow-plugins
-/plugin install yellow-ruvector
-/ruvector:setup
+```
+/plugin marketplace add KingInYellows/yellow-plugins
+/plugin install yellow-ruvector@yellow-plugins
 ```
 
 ## Quick Start

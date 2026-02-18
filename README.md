@@ -127,7 +127,7 @@ yellow-plugins/
 │   └── yellow-ruvector/       # Vector memory (2 agents, 6 commands, 2 skills, 3 hooks, 1 MCP)
 ├── packages/                  # Validation tooling (domain, infrastructure, cli)
 ├── schemas/                   # JSON schemas
-└── docs/                      # Brainstorms, plans, and solutions
+└── docs/                      # Validation guides, operational docs, and solutions
 ```
 
 ## License

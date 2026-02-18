@@ -188,12 +188,9 @@ passing to yq, ensuring compatibility across different yq implementations.
 
 ## Installation
 
-```bash
-# Install from marketplace
+```
 /plugin marketplace add KingInYellows/yellow-plugins
-
-# Enable yellow-debt
-/plugin enable yellow-debt
+/plugin install yellow-debt@yellow-plugins
 ```
 
 ## Configuration

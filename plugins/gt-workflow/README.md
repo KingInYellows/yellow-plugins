@@ -89,16 +89,9 @@ convention automatically — no rule gets silently bypassed.
 
 ## Installation
 
-Add this marketplace to Claude Code:
-
 ```
 /plugin marketplace add KingInYellows/yellow-plugins
-```
-
-Or install the plugin directly from a local clone:
-
-```
-claude plugin add ./plugins/gt-workflow
+/plugin install gt-workflow@yellow-plugins
 ```
 
 ## Requirements

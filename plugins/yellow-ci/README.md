@@ -1,12 +1,13 @@
 # yellow-ci
 
 CI failure diagnosis, workflow linting, and runner health management for
-self-hosted GitHub Actions runners on Proxmox homelab infrastructure.
+self-hosted GitHub Actions runners.
 
 ## Installation
 
-```bash
-/plugin marketplace add KingInYellows/yellow-plugins --plugin yellow-ci
+```
+/plugin marketplace add KingInYellows/yellow-plugins
+/plugin install yellow-ci@yellow-plugins
 ```
 
 ### Prerequisites
