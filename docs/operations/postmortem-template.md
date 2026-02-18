@@ -24,11 +24,6 @@ Integration Strategy (test gating plus documentation deliverables).
 
 - [Operational Runbook](./runbook.md) - Incident response procedures
 - [Metrics Guide](./metrics.md) - KPI definitions and alert thresholds
-- [Operational Architecture](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) -
-  Section 3.16 KPI review cadence
-- [Verification & Integration Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy) -
-  Defines evidence required for closure
-
 ---
 
 ## Postmortem Metadata
@@ -381,15 +376,6 @@ Attach or reference metrics files from `.ci-metrics/` or telemetry exports:
 - [Operational Runbook](./runbook.md) - Incident response procedures
 - [Metrics Guide](./metrics.md) - KPI definitions and alert thresholds
 - [CI Pipeline Spec](./ci-pipeline.md) - CI validation procedures
-- [Traceability Matrix](../traceability-matrix.md) - Requirements coverage
-
-### Architecture Documents
-
-- [04_Operational_Architecture.md](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) -
-  Section 3.7, 3.16
-- [03_Verification_and_Glossary.md](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md) -
-  Section 6 verification strategy
-
 ### Requirement References
 
 - **CRIT-018:** Atomic operations validation

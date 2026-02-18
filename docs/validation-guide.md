@@ -495,4 +495,3 @@ node scripts/validate-marketplace.js
 - Schema Definition: `/schemas/marketplace.schema.json`
 - Example Marketplace: `/examples/marketplace.example.json`
 - Validation Script: `/scripts/validate-marketplace.js`
-- PRD Requirements: `PRD.md` (REQ-MKT-001, REQ-MKT-002)

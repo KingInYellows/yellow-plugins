@@ -13,7 +13,6 @@ procedures.
 
 **Architecture References:**
 
-- Appendix D: CI/CD Workflows (docs/SPECIFICATION.md)
 - Section 8.4.3: CI/CD Workflow Specification
   (docs/technology-stack-complete.md)
 - Section 6: Automation & CI/CD Integration (docs/contracts/cli-contracts.md)
@@ -880,7 +879,7 @@ Add to workflow (temporary debugging only):
 
 ### Internal Documentation
 
-- [Appendix D: CI/CD Workflows](../SPECIFICATION.md#appendix-d-cicd-workflows)
+- Appendix D: CI/CD Workflows
 - [Technology Stack: CI/CD Specification](../technology-stack-complete.md#843-cicd-workflow-specification)
 - [CLI Contracts: Automation Integration](../contracts/cli-contracts.md#6-automation--cicd-integration)
 - [Metrics Guide](./metrics.md)

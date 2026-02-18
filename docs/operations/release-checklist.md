@@ -698,11 +698,7 @@ Section 4 traceability enforcement.
 - [ ] Run doctoc to update table of contents
   ```bash
   pnpm docs:lint:toc
-  # Expected: TOC updated in traceability-matrix.md
   ```
-
-**Reference**: `docs/traceability-matrix.md`, Section 4 traceability
-enforcement, CRIT-006.
 
 ---
 
@@ -1050,9 +1046,6 @@ This checklist enforces the following Section 4 directives:
    (Section 4.6)
 6. **Documentation Synchronization**: typedoc/doctoc/markdownlint run in CI
    (Section 4.7)
-
-**Full Reference**: `.codemachine/planning/01_Plan_Overview_and_Setup.md`
-Section 4
 
 ---
 

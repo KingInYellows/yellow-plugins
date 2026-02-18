@@ -421,7 +421,7 @@ Use `--skip-changelog` to bypass changelog fetching:
 - **Use Cases**: CI/CD automation, bulk updates, known-safe updates
 - **Trade-off**: Miss important breaking change notices
 
-**Specification References**: [FR-002](../SPECIFICATION.md#fr-002),
+**Specification References**: FR-002,
 [Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation),
 [Iteration 3 Risks & Mitigations](../plan/02_Iteration_I3.md#iteration-3-validation)
 
@@ -469,8 +469,8 @@ After force update, plugin is no longer pinned. Re-pin with:
 plugin pin important-plugin
 ```
 
-**Specification References**: [FR-008](../SPECIFICATION.md#fr-008),
-[CRIT-008](../SPECIFICATION.md#crit-008),
+**Specification References**: FR-008,
+CRIT-008,
 [Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
@@ -584,7 +584,7 @@ Configure in `.claude-plugin/flags.json`:
 
 **Specification Reference**:
 [Feature Flag Governance](../operations/feature-flags.md),
-[CRIT-004](../SPECIFICATION.md#crit-004)
+CRIT-004
 
 ---
 
@@ -624,7 +624,7 @@ See: https://yellow-plugins.dev/docs/errors#err-update-003
 ```
 
 **Cross-Reference**: [Error Codes Reference](../errors.md),
-[CRIT-007](../SPECIFICATION.md#crit-007)
+CRIT-007
 
 ---
 
@@ -634,13 +634,13 @@ See: https://yellow-plugins.dev/docs/errors#err-update-003
 
 This command implements the following specification requirements:
 
-- **[FR-002](../SPECIFICATION.md#fr-002)**: Update installed plugins to latest
+- **FR-002**: Update installed plugins to latest
   versions
-- **[FR-008](../SPECIFICATION.md#fr-008)**: Pin management integration
-- **[FR-009](../SPECIFICATION.md#fr-009)**: Check for available updates
-- **[CRIT-002](../SPECIFICATION.md#crit-002)**: Compatibility validation during
+- **FR-008**: Pin management integration
+- **FR-009**: Check for available updates
+- **CRIT-002**: Compatibility validation during
   updates
-- **[CRIT-008](../SPECIFICATION.md#crit-008)**: Pin awareness and override
+- **CRIT-008**: Pin awareness and override
   behavior
 - **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**:
   CLI interaction patterns

@@ -426,10 +426,10 @@ File: `.claude-plugin/flags.json`
 
 ## Specification References
 
-**FR-008**: [Update Notifications](../SPECIFICATION.md#fr-008) - Publish
+**FR-008**: Update Notifications - Publish
 integration with update workflows
 
-**CRIT-005**: [Publish Workflow](../SPECIFICATION.md#crit-005) - Validation and
+**CRIT-005**: Publish Workflow - Validation and
 consent requirements
 
 **Section 3.0**:

@@ -904,5 +904,4 @@ interface DomainValidationError {
 ---
 
 **For Updates**: This document is generated from
-`packages/domain/src/validation/errorCatalog.ts`. **Spec Reference**:
-docs/SPECIFICATION.md (Section 4.0, Appendix F)
+`packages/domain/src/validation/errorCatalog.ts`.

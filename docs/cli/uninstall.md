@@ -387,8 +387,8 @@ To proceed, type exactly: I TRUST THIS SCRIPT
 >
 ```
 
-**Specification Reference**: [CRIT-004](../SPECIFICATION.md#crit-004),
-[CRIT-010](../SPECIFICATION.md#crit-010)
+**Specification Reference**: CRIT-004,
+CRIT-010
 
 ---
 
@@ -550,7 +550,7 @@ plugin audit export --format json --output audit-report.json
 - **Rotation**: Old logs archived after 90 days
 - **Privacy**: PII redacted according to privacy policy
 
-**Specification Reference**: [CRIT-010](../SPECIFICATION.md#crit-010),
+**Specification Reference**: CRIT-010,
 [Section 4 Security & Observability](../architecture/04_Operational_Architecture.md)
 
 ---
@@ -653,7 +653,7 @@ Configure in `.claude-plugin/flags.json`:
 
 **Specification Reference**:
 [Feature Flag Governance](../operations/feature-flags.md),
-[CRIT-004](../SPECIFICATION.md#crit-004)
+CRIT-004
 
 ---
 
@@ -696,7 +696,7 @@ See: https://yellow-plugins.dev/docs/errors#err-uninstall-003
 ```
 
 **Cross-Reference**: [Error Codes Reference](../errors.md),
-[CRIT-007](../SPECIFICATION.md#crit-007)
+CRIT-007
 
 ---
 
@@ -706,11 +706,11 @@ See: https://yellow-plugins.dev/docs/errors#err-uninstall-003
 
 This command implements the following specification requirements:
 
-- **[FR-004](../SPECIFICATION.md#fr-004)**: Uninstall plugins with lifecycle
+- **FR-004**: Uninstall plugins with lifecycle
   hook execution
-- **[CRIT-004](../SPECIFICATION.md#crit-004)**: Lifecycle script consent and
+- **CRIT-004**: Lifecycle script consent and
   security
-- **[CRIT-010](../SPECIFICATION.md#crit-010)**: Audit logging and observability
+- **CRIT-010**: Audit logging and observability
 - **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**:
   CLI interaction patterns
 - **[6-2-input-patterns](../architecture/06_UI_UX_Architecture.md#6-2-input-patterns)**:

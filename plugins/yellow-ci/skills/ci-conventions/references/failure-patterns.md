@@ -29,7 +29,7 @@ Grouped by urgency:
 1. Reduce parallelism (`--max-workers`, `-j` flags)
 2. Add swap:
    `sudo fallocate -l 4G /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`
-3. Increase VM memory in Proxmox
+3. Increase VM memory in the hypervisor
 4. For Node.js: `NODE_OPTIONS=--max-old-space-size=4096`
 
 **Correlation:** Check runner memory with `/ci:runner-health` — if memory <90%,
@@ -49,7 +49,7 @@ failure was transient spike.
 **Suggested Fixes:**
 
 1. Run `/ci:runner-cleanup <runner>` to free Docker/cache space
-2. Resize disk in Proxmox
+2. Resize disk in the hypervisor
 3. Add `actions/cache/save` with size limits
 4. Configure Docker log rotation
 
@@ -112,7 +112,7 @@ recommended.
 1. Check DNS resolution on runner
 2. Verify network connectivity to GitHub
 3. Add retry with exponential backoff
-4. Check firewall rules on Proxmox host
+4. Check firewall rules on the VM host
 
 ## F06: Stale State
 

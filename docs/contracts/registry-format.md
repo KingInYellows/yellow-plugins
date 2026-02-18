@@ -348,9 +348,6 @@ When registry schema evolves (e.g., `1.0` → `1.1`):
 
 ## References
 
-- **Specification:** `docs/SPECIFICATION.md` (Section 3.4: Data Persistence)
-- **Architecture:**
-  `.codemachine/artifacts/architecture/04_Operational_Architecture.md`
 - **ERD:** `docs/diagrams/data-erd.puml` (InstalledPluginRegistry entity)
 - **Schema:** `.claude-plugin/registry.schema.json`
 - **Functional Requirements:**

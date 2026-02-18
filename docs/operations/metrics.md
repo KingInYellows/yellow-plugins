@@ -17,9 +17,6 @@ requirements defined in the architecture.
 - Section 3.5: Observability Fabric - Logging, metrics, and tracing
   implementation
 - Section 3.11: Operational Metrics Catalog - KPI definitions and targets
-- Section 6:
-  [Verification & Integration Strategy](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy) -
-  Telemetry hooks required for CI gating
 - CRIT-004: Lifecycle script consent logging
 - CRIT-008: Telemetry correlation IDs
 - CRIT-010: Telemetry instrumentation points
@@ -878,9 +875,7 @@ adjust SLO **CRIT Mitigation:** CRIT-021 (CI runtime budget enforcement)
 - Postmortems from P0/P1 incidents
 
 **Reference:**
-[Operational Architecture §3.16](../.codemachine/artifacts/architecture/04_Operational_Architecture.md#3-16-operational-kpis),
-[Operational Runbook KPI Escalation](./runbook.md#kpi-escalation-paths),
-[Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+[Operational Runbook KPI Escalation](./runbook.md#kpi-escalation-paths)
 
 ---
 
@@ -894,9 +889,8 @@ adjust SLO **CRIT Mitigation:** CRIT-021 (CI runtime budget enforcement)
 - **Telemetry Export Hooks:** The telemetry export runbook steps reference
   `.claude-plugin/audit/*.jsonl` and `.ci-metrics/*.prom`, matching the evidence
   lists enumerated in Section 6 for release readiness sign-off.
-- **Traceability Updates:** Updates to KPI owners or alert thresholds must link
-  to Section 6 in PR descriptions; `docs/traceability-matrix.md` records these
-  ties so CI scripts can verify FR/NFR coverage automatically.
+- **Traceability Updates:** Updates to KPI owners or alert thresholds should be
+  documented in PR descriptions for coverage tracking.
 
 Refer to the
 [Operational Runbook](./runbook.md#telemetry-export-and-audit-review) for the
@@ -910,8 +904,6 @@ reporting.
 
 - [Architecture Blueprint](../architecture/01_Blueprint_Foundation.md) - Section
   3.0 Observability Rulebook
-- [Operational Architecture](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) -
-  Section 3.5, 3.11, 3.16
 - [Verification Strategy](../plan/03_Verification_and_Glossary.md) - Section 6
   CI/CD validation
 - [Postmortem Template](./postmortem-template.md) - Incident investigation

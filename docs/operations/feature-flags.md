@@ -337,9 +337,6 @@ resetConfigProvider();
 
 ## Related Documents
 
-- **Specification**: `docs/SPECIFICATION.md` - Full project specification
-- **Architecture**: `.codemachine/planning/01_Blueprint_Foundation.md` -
-  Configuration strategy
 - **Schema**: `schemas/config.schema.json`, `schemas/flags.schema.json` (to be
   implemented in future tasks)
 - **ADRs**: Future ADRs will document decisions to enable specific feature flags

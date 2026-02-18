@@ -90,7 +90,7 @@ runners:
   - name: runner-02
     host: 192.168.1.51
     user: runner
-    ssh_key: ~/.ssh/homelab
+    ssh_key: ~/.ssh/runner-key
 defaults:
   ssh_timeout: 3
   max_parallel_ssh: 5

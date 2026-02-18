@@ -523,8 +523,5 @@ ls -la .claude-plugin/
 ## References
 
 - **Contracts:** `docs/contracts/registry-format.md` (activePins semantics)
-- **Architecture:**
-  `.codemachine/artifacts/architecture/04_Operational_Architecture.md` (Section
-  3.4)
 - **API Schema:** `api/cli-contracts/pin.json` (JSON schema)
 - **Error Catalog:** `docs/error-catalog.md` (ERR-PIN-\* codes)

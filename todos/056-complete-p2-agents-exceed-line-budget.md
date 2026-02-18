@@ -1,5 +1,5 @@
 ---
-status: ready
+status: complete
 priority: p2
 issue_id: '056'
 tags: [code-review, quality, refactoring]
@@ -87,3 +87,10 @@ Decision needed:
 - Issue approved during code review triage
 - Status changed from pending → ready
 - Ready to be picked up and worked on
+
+### 2026-02-18 - Resolved: Accepted Exceedance
+
+**Decision:** Solution 3 — Accept exceedance as justified complexity. Both agents
+(debt-fixer at 313 lines, audit-synthesizer at 289 lines) are complex
+orchestration agents that warrant >120 lines. The 120-line budget is a guideline,
+not a hard limit.

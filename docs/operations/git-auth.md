@@ -447,10 +447,10 @@ publish:
 
 ## Traceability
 
-- **[FR-008 – Update Notifications](../SPECIFICATION.md#fr-008)**: Documents
+- **FR-008 – Update Notifications**: Documents
   publish prerequisites (PAT/SSH) and remote push recovery steps so release
   automation can rely on git-native workflows.
-- **[Assumption 2 – Git Authentication](../SPECIFICATION.md#6-0-safety-net)**:
+- **Assumption 2 – Git Authentication**:
   Reinforces that existing developer credentials (SSH keys or PATs) power all
   publish operations—no additional secrets are stored by the CLI.
 

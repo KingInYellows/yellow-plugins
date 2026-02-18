@@ -163,8 +163,8 @@ lifecycle scripts.
 
 **Reset Code**: `\x1b[0m` (always append after colored text)
 
-**Specification References**: [FR-001](../SPECIFICATION.md#fr-001),
-[CRIT-006](../SPECIFICATION.md#crit-006),
+**Specification References**: FR-001,
+CRIT-006,
 [6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback)
 
 ---
@@ -359,7 +359,7 @@ Warning: Script found. Continue? (y/n)
 
 **Specification References**:
 [1-5-voice-and-tone](../architecture/06_UI_UX_Architecture.md#1-5-voice-and-tone),
-[CRIT-004](../SPECIFICATION.md#crit-004)
+CRIT-004
 
 ---
 
@@ -412,7 +412,7 @@ All color combinations MUST meet WCAG 2.1 AA standards:
 **Specification References**:
 [1-6-accessibility-design-system](../architecture/06_UI_UX_Architecture.md#1-6-accessibility-design-system),
 [6-5-accessibility-checklist](../architecture/06_UI_UX_Architecture.md#6-5-accessibility-checklist),
-[CRIT-006](../SPECIFICATION.md#crit-006)
+CRIT-006
 
 ---
 
@@ -457,7 +457,7 @@ Use consistent admonition syntax across docs:
 
 #### Cross-References
 
-- **Specification**: `[FR-001](../SPECIFICATION.md#fr-001)`
+- **Specification**: `FR-001`
 - **Architecture**:
   `[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)`
 - **Contracts**:
@@ -554,7 +554,7 @@ Next steps:
 
 **Specification References**:
 [6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback),
-[FR-001](../SPECIFICATION.md#fr-001), [CRIT-010](../SPECIFICATION.md#crit-010)
+FR-001, CRIT-010
 
 ---
 
@@ -646,7 +646,7 @@ See https://yellow-plugins.dev/docs/cli/automation
 
 **Specification References**:
 [6-2-input-patterns](../architecture/06_UI_UX_Architecture.md#6-2-input-patterns),
-[CRIT-004](../SPECIFICATION.md#crit-004),
+CRIT-004,
 [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 
 ---
@@ -724,7 +724,7 @@ Subsequent runs only remind when config changes.
 
 **Specification References**:
 [6-3-notification-patterns](../architecture/06_UI_UX_Architecture.md#6-3-notification-patterns),
-[CRIT-010](../SPECIFICATION.md#crit-010), [FR-009](../SPECIFICATION.md#fr-009)
+CRIT-010, FR-009
 
 ---
 
@@ -875,7 +875,7 @@ After UI changes:
 
 **Specification References**:
 [1-7-documentation-patterns](../architecture/06_UI_UX_Architecture.md#1-7-documentation-patterns),
-[FR-001](../SPECIFICATION.md#fr-001)
+FR-001
 
 ---
 

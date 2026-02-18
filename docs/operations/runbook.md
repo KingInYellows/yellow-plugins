@@ -38,9 +38,6 @@ artifacts.
 - [CI Validation Pipeline Spec](./ci-pipeline.md) - Technical pipeline
   specification
 - [Metrics Guide](./metrics.md) - Telemetry and monitoring
-- [Section 6 Verification Strategy](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy) -
-  Defines verification hooks and documentation gates
-
 ---
 
 ## Prerequisites
@@ -704,8 +701,7 @@ du -sh ~/.claude/plugins/cache/
 ```
 
 **Reference:**
-[Metrics Guide: Cache Performance](./metrics.md#cache-performance-metrics),
-[Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+[Metrics Guide: Cache Performance](./metrics.md#cache-performance-metrics)
 
 ---
 
@@ -1231,8 +1227,7 @@ Reproduction steps: [describe]"
 ```
 
 **Reference:**
-[Metrics Guide: Lifecycle Consent Tracking](./metrics.md#yellow_plugins_lifecycle_prompt_declines_total),
-[Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+[Metrics Guide: Lifecycle Consent Tracking](./metrics.md#yellow_plugins_lifecycle_prompt_declines_total)
 
 ---
 
@@ -1361,8 +1356,7 @@ cp docs/operations/postmortem-template.md docs/operations/postmortem-2026-001.md
 ```
 
 **Reference:** [CI Pipeline Spec: Publishing Workflow](./ci-pipeline.md),
-[Metrics Guide: CI Validation](./metrics.md#yellow_plugins_ci_validations_total),
-[Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+[Metrics Guide: CI Validation](./metrics.md#yellow_plugins_ci_validations_total)
 
 ---
 
@@ -1498,9 +1492,7 @@ EVICTIONS=$(grep 'cache_evictions_total' metrics-snapshot.prom | awk '{print $2}
 echo "Cache Evictions: $EVICTIONS (Monitor for spikes)"
 ```
 
-**Reference:** [Metrics Guide](./metrics.md),
-[Operational Architecture §3.16](../.codemachine/artifacts/architecture/04_Operational_Architecture.md#3-16-operational-kpis),
-[Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+**Reference:** [Metrics Guide](./metrics.md)
 
 ---
 
@@ -1638,16 +1630,6 @@ jq 'select(.eventType == "lifecycle_consent" and .consentGranted == false)' \
 - [Metrics Guide](./metrics.md) - Telemetry catalog and monitoring
 - [Postmortem Template](./postmortem-template.md) - Incident investigation
   workflow
-- [Traceability Matrix](../traceability-matrix.md) - Requirements coverage
-- [SPECIFICATION.md](../SPECIFICATION.md) - Complete technical specification
-
-### Architecture Documents
-
-- [04_Operational_Architecture.md](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) -
-  Section 3.7, 3.11, 3.16
-- [03_Verification_and_Glossary.md](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md) -
-  Section 6 verification strategy
-
 ### External Resources
 
 - [GitHub Actions Troubleshooting](https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows)

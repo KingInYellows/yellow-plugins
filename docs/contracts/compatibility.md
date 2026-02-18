@@ -630,7 +630,6 @@ interface CompatibilityCheck {
 
 **Related Documentation:**
 
-- [SPECIFICATION.md](../SPECIFICATION.md) - Full system specification
 - [Error Catalog](../../packages/domain/src/validation/errorCatalog.ts) - Error
   code definitions
 - [Validation Contracts](../../packages/domain/src/validation/types.ts) - Shared

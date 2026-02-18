@@ -1125,7 +1125,7 @@ requirements:
 - **FR/NFR/CRIT:** CRIT-021, NFR-MAINT-002, FR-001, FR-002, FR-009, FR-011
 - **Status:** Traceability 100%, implementation complete
 
-**Reference:** [Traceability Matrix](../traceability-matrix.md)
+**Reference:** Traceability Matrix
 
 ---
 
@@ -1208,9 +1208,6 @@ This specification is versioned alongside the workflow file:
   spec)
 - [Metrics Guide](./metrics.md) - Telemetry catalog and Prometheus queries
 - [Operational Runbook](./runbook.md) - Incident response and diagnostics
-- [Traceability Matrix](../traceability-matrix.md) - Requirements coverage
-  verification
-- [SPECIFICATION.md](../SPECIFICATION.md) - Complete technical specification
 
 ### Architecture Documents
 

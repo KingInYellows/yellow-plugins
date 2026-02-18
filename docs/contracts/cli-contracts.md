@@ -122,9 +122,9 @@ All CLI commands support dual modes of operation:
 2. **Automated Mode**: JSON input via `--input` flag, JSON output via `--output`
    flag
 
-**Specification References**: [FR-001](../SPECIFICATION.md#fr-001),
-[FR-002](../SPECIFICATION.md#fr-002), [CRIT-001](../SPECIFICATION.md#crit-001),
-[CRIT-004](../SPECIFICATION.md#crit-004)
+**Specification References**: FR-001,
+FR-002, CRIT-001,
+CRIT-004
 
 ### 1.3 Schema Locations
 
@@ -220,8 +220,8 @@ interface CompatibilityIntent {
 }
 ```
 
-**Specification Reference**: [CRIT-002b](../SPECIFICATION.md#crit-002b),
-[CRIT-005](../SPECIFICATION.md#crit-005)
+**Specification Reference**: CRIT-002b,
+CRIT-005
 
 ### 2.4 Feature Flag Evaluations
 
@@ -314,7 +314,7 @@ interface TelemetryMetrics {
 }
 ```
 
-**Specification Reference**: [CRIT-010](../SPECIFICATION.md#crit-010), Section 4
+**Specification Reference**: CRIT-010, Section 4
 Security & Observability
 
 ---
@@ -329,8 +329,8 @@ Security & Observability
 - **Aliases**: `i`, `add`
 - **Schema**:
   [`api/cli-contracts/install.json`](../../api/cli-contracts/install.json)
-- **Specification Anchors**: [FR-001](../SPECIFICATION.md#fr-001),
-  [CRIT-001](../SPECIFICATION.md#crit-001),
+- **Specification Anchors**: FR-001,
+  CRIT-001,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-INSTALL-001`, `ERR-INSTALL-002`, `ERR-COMPAT-001`
 
@@ -522,8 +522,8 @@ cat install-request.json | pnpm cli install --input - --output -
 - **Aliases**: `up`, `upgrade`
 - **Schema**:
   [`api/cli-contracts/update.json`](../../api/cli-contracts/update.json)
-- **Specification Anchors**: [FR-002](../SPECIFICATION.md#fr-002),
-  [CRIT-002](../SPECIFICATION.md#crit-002),
+- **Specification Anchors**: FR-002,
+  CRIT-002,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-UPDATE-001`, `ERR-UPDATE-002`, `ERR-COMPAT-001`
 
@@ -700,8 +700,8 @@ pnpm cli update --all --check-only
 - **Aliases**: `rb`, `revert`
 - **Schema**:
   [`api/cli-contracts/rollback.json`](../../api/cli-contracts/rollback.json)
-- **Specification Anchors**: [FR-003](../SPECIFICATION.md#fr-003),
-  [CRIT-018](../SPECIFICATION.md#crit-018),
+- **Specification Anchors**: FR-003,
+  CRIT-018,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-ROLLBACK-001`, `ERR-ROLLBACK-002`, `ERR-CACHE-001`
 - **Required Feature Flag**: `enableRollback`
@@ -1184,7 +1184,7 @@ Install/update requests requiring lifecycle scripts MUST include consent tokens:
 }
 ```
 
-**Specification Reference**: [CRIT-010](../SPECIFICATION.md#crit-010)
+**Specification Reference**: CRIT-010
 
 ### 10.3 Sensitive Data Redaction
 
@@ -1265,9 +1265,9 @@ All schemas use JSON Schema Draft-07:
 ### 12.2 Related Documentation
 
 - [Error Codes Reference](./error-codes.md)
-- [Specification](../SPECIFICATION.md)
+- Specification
 - [Operational Architecture](../architecture/04_Operational_Architecture.md)
-- [Traceability Matrix](../traceability-matrix.md)
+- Traceability Matrix
 
 ### 12.3 Version History
 
@@ -1287,8 +1287,8 @@ All schemas use JSON Schema Draft-07:
 - **Aliases**: `list`, `ls`
 - **Schema**:
   [`api/cli-contracts/browse.json`](../../api/cli-contracts/browse.json)
-- **Specification Anchors**: [FR-006](../SPECIFICATION.md#fr-006),
-  [CRIT-006](../SPECIFICATION.md#crit-006),
+- **Specification Anchors**: FR-006,
+  CRIT-006,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-BROWSE-001`, `ERR-BROWSE-002`, `ERR-BROWSE-003`,
   `ERR-BROWSE-004`, `ERR-BROWSE-005`
@@ -1386,8 +1386,8 @@ See [Browse Command Documentation](../cli/browse.md) for detailed examples.
 - **Aliases**: `find`
 - **Schema**:
   [`api/cli-contracts/search.json`](../../api/cli-contracts/search.json)
-- **Specification Anchors**: [FR-007](../SPECIFICATION.md#fr-007),
-  [CRIT-007](../SPECIFICATION.md#crit-007),
+- **Specification Anchors**: FR-007,
+  CRIT-007,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-SEARCH-001`, `ERR-SEARCH-002`
 
@@ -1458,7 +1458,7 @@ interface SearchResponse extends BaseResponse {
 - **Command**: `info`
 - **Aliases**: `show`, `details`
 - **Schema**: [`api/cli-contracts/info.json`](../../api/cli-contracts/info.json)
-- **Specification Anchors**: [FR-006](../SPECIFICATION.md#fr-006),
+- **Specification Anchors**: FR-006,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-INFO-001`, `ERR-INFO-002`
 
@@ -1542,9 +1542,9 @@ interface InfoResponse extends BaseResponse {
 - **Aliases**: `rm`, `remove`
 - **Schema**:
   [`api/cli-contracts/uninstall.json`](../../api/cli-contracts/uninstall.json)
-- **Specification Anchors**: [FR-004](../SPECIFICATION.md#fr-004),
-  [CRIT-004](../SPECIFICATION.md#crit-004),
-  [CRIT-010](../SPECIFICATION.md#crit-010),
+- **Specification Anchors**: FR-004,
+  CRIT-004,
+  CRIT-010,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-UNINSTALL-001`, `ERR-UNINSTALL-002`,
   `ERR-UNINSTALL-003`, `ERR-UNINSTALL-004`, `ERR-UNINSTALL-005`,

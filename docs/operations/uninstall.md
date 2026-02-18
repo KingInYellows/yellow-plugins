@@ -695,8 +695,6 @@ plugin cache rebuild-index
 - **Cache Management:** `docs/operations/cache.md`
 - **Audit Logs:** `.claude-plugin/audit/README.md`
 - **Architecture:** `docs/ARCHITECTURE.md` (Section 3.10, 6.3)
-- **Specification:** `docs/SPECIFICATION.md` (FR-010, FR-013, CRIT-004,
-  CRIT-011)
 
 ---
 

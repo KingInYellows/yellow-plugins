@@ -303,7 +303,6 @@ You'll achieve these by following this structure and validation workflow.
 - Schema definition: `/schemas/marketplace.schema.json`
 - Validation guide: `/docs/validation-guide.md`
 - Example marketplace: `/examples/marketplace.example.json`
-- PRD reference: `PRD.md`
 
 ## Quick Reference
 

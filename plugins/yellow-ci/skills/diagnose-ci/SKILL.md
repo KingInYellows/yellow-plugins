@@ -10,7 +10,7 @@ user-invokable: true
 # Diagnosing CI Failures on Self-Hosted Runners
 
 Understanding and resolving GitHub Actions workflow failures on self-hosted
-Proxmox runners.
+self-hosted runners.
 
 ## When to Use
 

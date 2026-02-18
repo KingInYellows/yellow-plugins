@@ -340,8 +340,8 @@ When `--sort name`:
 - Primary: Plugin ID (case-insensitive alphabetical)
 - Order controlled by `--order asc|desc`
 
-**Specification References**: [FR-006](../SPECIFICATION.md#fr-006),
-[CRIT-006](../SPECIFICATION.md#crit-006),
+**Specification References**: FR-006,
+CRIT-006,
 [Iteration 3 Validation](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
@@ -429,7 +429,7 @@ Configure in `.claude-plugin/flags.json`:
 
 **Specification Reference**:
 [Feature Flag Governance](../operations/feature-flags.md),
-[CRIT-004](../SPECIFICATION.md#crit-004)
+CRIT-004
 
 ---
 
@@ -462,7 +462,7 @@ See: https://yellow-plugins.dev/docs/errors#err-browse-001
 ```
 
 **Cross-Reference**: [Error Codes Reference](../errors.md),
-[CRIT-007](../SPECIFICATION.md#crit-007)
+CRIT-007
 
 ---
 
@@ -472,9 +472,9 @@ See: https://yellow-plugins.dev/docs/errors#err-browse-001
 
 This command implements the following specification requirements:
 
-- **[FR-006](../SPECIFICATION.md#fr-006)**: Plugin Discovery - Browse
+- **FR-006**: Plugin Discovery - Browse
   marketplace and list available plugins
-- **[CRIT-006](../SPECIFICATION.md#crit-006)**: Browse UX - Deterministic
+- **CRIT-006**: Browse UX - Deterministic
   ranking with offline support
 - **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**:
   CLI interaction patterns and workflow control
