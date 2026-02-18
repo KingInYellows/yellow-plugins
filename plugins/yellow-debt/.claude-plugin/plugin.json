@@ -12,8 +12,5 @@
     "url": "https://github.com/KingInYellows/yellow-plugins"
   },
   "license": "MIT",
-  "keywords": [
-    "code-quality",
-    "scanner"
-  ]
+  "keywords": ["code-quality", "scanner"]
 }

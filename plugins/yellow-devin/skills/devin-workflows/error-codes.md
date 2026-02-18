@@ -106,15 +106,15 @@ fi
 
 ## Error Summary Table
 
-| Error | Code | Action |
-|-------|------|--------|
-| Token not set | — | Show setup instructions with URL |
-| Token invalid format | — | Show expected format |
-| Network failure | curl 6/7/28 | Retry 3 times with backoff, then fail |
-| Auth rejected | HTTP 401 | Suggest regenerating token |
-| Permission denied | HTTP 403 | Suggest checking token scopes |
-| Not found | HTTP 404 | Session or resource doesn't exist |
-| Rate limited | HTTP 429 | Wait Retry-After (max 300s), retry once |
-| Server error | HTTP 5xx | Suggest trying again later |
-| Parse failure | jq non-zero | Show response preview, suggest API change |
-| Missing field | empty value | Show full response, suggest checking docs |
+| Error                | Code        | Action                                    |
+| -------------------- | ----------- | ----------------------------------------- |
+| Token not set        | —           | Show setup instructions with URL          |
+| Token invalid format | —           | Show expected format                      |
+| Network failure      | curl 6/7/28 | Retry 3 times with backoff, then fail     |
+| Auth rejected        | HTTP 401    | Suggest regenerating token                |
+| Permission denied    | HTTP 403    | Suggest checking token scopes             |
+| Not found            | HTTP 404    | Session or resource doesn't exist         |
+| Rate limited         | HTTP 429    | Wait Retry-After (max 300s), retry once   |
+| Server error         | HTTP 5xx    | Suggest trying again later                |
+| Parse failure        | jq non-zero | Show response preview, suggest API change |
+| Missing field        | empty value | Show full response, suggest checking docs |

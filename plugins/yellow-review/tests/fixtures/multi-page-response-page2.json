@@ -13,9 +13,7 @@
               "line": 55,
               "startLine": 50,
               "comments": {
-                "nodes": [
-                  { "author": { "login": "reviewer2" }, "body": "Fix this on page 2" }
-                ]
+                "nodes": [{ "author": { "login": "reviewer2" }, "body": "Fix this on page 2" }]
               }
             },
             {
@@ -26,9 +24,7 @@
               "line": 99,
               "startLine": null,
               "comments": {
-                "nodes": [
-                  { "author": { "login": "reviewer2" }, "body": "Outdated comment" }
-                ]
+                "nodes": [{ "author": { "login": "reviewer2" }, "body": "Outdated comment" }]
               }
             }
           ]

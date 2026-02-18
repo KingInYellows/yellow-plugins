@@ -1,6 +1,7 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 10 plugins for Git workflows, code review, CI, testing, and more.
+Personal Claude Code plugin marketplace — 10 plugins for Git workflows, code
+review, CI, testing, and more.
 
 ## Install
 
@@ -13,22 +14,24 @@ Add the marketplace, then install individual plugins:
 
 ## Plugins
 
-| Plugin | Description | Components |
-|--------|-------------|------------|
-| `gt-workflow` | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation | 5 commands, 1 hook |
-| `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting | 3 agents, 4 commands, 2 skills |
-| `yellow-chatprd` | ChatPRD MCP integration with document management and Linear bridging | 2 agents, 5 commands, 1 skill, 1 MCP |
-| `yellow-ci` | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 3 agents, 5 commands, 2 skills, 1 hook |
-| `yellow-core` | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go | 10 agents, 3 commands, 2 skills, 1 MCP |
-| `yellow-debt` | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns | 7 agents, 5 commands, 1 skill |
-| `yellow-devin` | Devin.AI integration for multi-agent workflows — delegate tasks, research codebases via DeepWiki | 1 agent, 5 commands, 1 skill, 2 MCP |
-| `yellow-linear` | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents | 3 agents, 5 commands, 1 skill, 1 MCP |
-| `yellow-review` | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review | 8 agents, 3 commands, 1 skill |
-| `yellow-ruvector` | Persistent vector memory and semantic code search for Claude Code agents via ruvector | 2 agents, 6 commands, 2 skills, 3 hooks, 1 MCP |
+| Plugin                | Description                                                                                                 | Components                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                | 5 commands, 1 hook                             |
+| `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
+| `yellow-chatprd`      | ChatPRD MCP integration with document management and Linear bridging                                        | 2 agents, 5 commands, 1 skill, 1 MCP           |
+| `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 3 agents, 5 commands, 2 skills, 1 hook         |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 10 agents, 3 commands, 2 skills, 1 MCP         |
+| `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 5 commands, 1 skill                  |
+| `yellow-devin`        | Devin.AI integration for multi-agent workflows — delegate tasks, research codebases via DeepWiki            | 1 agent, 5 commands, 1 skill, 2 MCP            |
+| `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 5 commands, 1 skill, 1 MCP           |
+| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 8 agents, 3 commands, 1 skill                  |
+| `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 2 skills, 3 hooks, 1 MCP |
 
 ## Usage
 
-After installing, use `/plugin install <name>@yellow-plugins` to activate individual plugins. Each plugin's commands are namespaced (e.g., `/ci:diagnose`, `/linear:create`, `/devin:delegate`).
+After installing, use `/plugin install <name>@yellow-plugins` to activate
+individual plugins. Each plugin's commands are namespaced (e.g., `/ci:diagnose`,
+`/linear:create`, `/devin:delegate`).
 
 Run `/plugin` to browse all available plugins in the Discover tab.
 
@@ -57,7 +60,8 @@ Then in Claude Code:
 /plugin install gt-workflow@yellow-plugins
 ```
 
-Verify `${CLAUDE_PLUGIN_ROOT}` resolves correctly after local install — local installs copy plugins to `~/.claude/plugins/cache/`.
+Verify `${CLAUDE_PLUGIN_ROOT}` resolves correctly after local install — local
+installs copy plugins to `~/.claude/plugins/cache/`.
 
 ## Create a New Plugin
 
@@ -101,7 +105,8 @@ plugins/my-plugin/
 pnpm validate:schemas
 ```
 
-See each plugin's `CLAUDE.md` for conventions, component details, and usage guides.
+See each plugin's `CLAUDE.md` for conventions, component details, and usage
+guides.
 
 ## Project Structure
 

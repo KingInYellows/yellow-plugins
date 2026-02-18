@@ -15,6 +15,7 @@ POST /v1/sessions
 ```
 
 Request body (construct via jq):
+
 ```json
 {
   "prompt": "Task description",
@@ -25,6 +26,7 @@ Request body (construct via jq):
 ```
 
 Response:
+
 ```json
 {
   "session_id": "ses_...",
@@ -35,6 +37,7 @@ Response:
 ```
 
 Notes:
+
 - Use `idempotent: true` to prevent duplicate sessions on retry
 - `is_new_session` distinguishes new vs existing sessions
 
@@ -45,6 +48,7 @@ GET /v1/sessions/{session_id}
 ```
 
 Response:
+
 ```json
 {
   "session_id": "ses_...",
@@ -70,7 +74,8 @@ Response: Array of session objects.
 POST /v1/sessions/{session_id}/cancel
 ```
 
-**Note:** Verify this endpoint during implementation. API may use `DELETE /v1/sessions/{session_id}` instead.
+**Note:** Verify this endpoint during implementation. API may use
+`DELETE /v1/sessions/{session_id}` instead.
 
 ### Send Message
 
@@ -79,6 +84,7 @@ POST /v1/sessions/{session_id}/messages
 ```
 
 Request body:
+
 ```json
 {
   "message": "Follow-up text here"
@@ -92,6 +98,7 @@ POST /v1/sessions/{session_id}/secrets
 ```
 
 Request body:
+
 ```json
 {
   "secrets": {
@@ -100,7 +107,8 @@ Request body:
 }
 ```
 
-**Security:** Never echo secrets. Construct via jq. Validate format. See SKILL.md for details.
+**Security:** Never echo secrets. Construct via jq. Validate format. See
+SKILL.md for details.
 
 ## Playbooks (v2)
 

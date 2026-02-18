@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p1
-issue_id: "021"
+issue_id: '021'
 tags: [code-review, security, implementation-gap]
 dependencies: []
 ---
@@ -10,11 +10,15 @@ dependencies: []
 
 ## Problem Statement
 
-The browser-test command describes route filter validation in prose ("validate the filter") but provides no actual validation code. This is only an instruction to the LLM, which may skip or misinterpret it. The validation must be concrete code, not a suggestion.
+The browser-test command describes route filter validation in prose ("validate
+the filter") but provides no actual validation code. This is only an instruction
+to the LLM, which may skip or misinterpret it. The validation must be concrete
+code, not a suggestion.
 
 ## Findings
 
-**File:** `plugins/yellow-browser-test/commands/browser-test/test.md` (lines ~25-30)
+**File:** `plugins/yellow-browser-test/commands/browser-test/test.md` (lines
+~25-30)
 
 **Issue:** The command contains prose instruction for validation:
 
@@ -24,12 +28,14 @@ The browser-test command describes route filter validation in prose ("validate t
 ```
 
 This is NOT executable code — it's a suggestion to the LLM. The LLM might:
+
 - Skip validation entirely
 - Implement incomplete validation
 - Misunderstand what "safe" means
 - Forget validation on subsequent invocations
 
 **Difference from issue #018:**
+
 - **#018** (path traversal validation): Defines WHAT patterns to reject
 - **#021** (this issue): The validation isn't enforced in CODE
 
@@ -41,7 +47,7 @@ Both must be fixed, but they're distinct problems.
 
 Replace prose instruction with concrete code block:
 
-```markdown
+````markdown
 ## Validation
 
 Execute this validation before testing:
@@ -69,7 +75,9 @@ fi
 
 printf 'Route filter validated: %s\n' "$ARGUMENTS"
 ```
-```
+````
+
+````
 
 **Pros:**
 - Validation is guaranteed to run
@@ -90,14 +98,16 @@ Create `skills/route-filter-validation/` with validation logic, source it:
 
 # Validate route filter
 validate_route_filter "$ARGUMENTS" || exit 1
-```
+````
 
 **Pros:**
+
 - Reusable across commands
 - Centralized validation logic
 - Matches yellow-ruvector lib/validate.sh pattern
 
 **Cons:**
+
 - More complex for simple validation
 - Need to create new skill structure
 
@@ -115,24 +125,29 @@ Implement **Option A** for immediate fix, with the following steps:
 ## Technical Details
 
 **Current code location:**
+
 - `plugins/yellow-browser-test/commands/browser-test/test.md` (lines ~25-30)
-- `plugins/yellow-browser-test/commands/browser-test/explore.md` (similar pattern)
+- `plugins/yellow-browser-test/commands/browser-test/explore.md` (similar
+  pattern)
 
 **Validation requirements:**
+
 - Non-empty filter
 - No path traversal: `..`, `%`, `//`
 - Valid path format: `^/[a-zA-Z0-9/_-]*$`
 - Clear error messages for each failure case
 
-**Command file precedent:**
-From `plugins/yellow-core/commands/git-worktree/create.md`:
+**Command file precedent:** From
+`plugins/yellow-core/commands/git-worktree/create.md`:
+
 ```bash
 # Commands can contain bash code blocks
 validate_name "$BRANCH_NAME" || exit 1
 ```
 
-**Shared validation precedent:**
-From `plugins/yellow-ruvector/hooks/scripts/lib/validate.sh`:
+**Shared validation precedent:** From
+`plugins/yellow-ruvector/hooks/scripts/lib/validate.sh`:
+
 ```bash
 validate_namespace() {
   # Concrete validation implementation
@@ -153,14 +168,16 @@ validate_namespace() {
 
 ## Work Log
 
-| Date | Action | Learnings |
-|------|--------|-----------|
+| Date       | Action                          | Learnings                                                                               |
+| ---------- | ------------------------------- | --------------------------------------------------------------------------------------- |
 | 2026-02-13 | Created from PR #11 code review | Security validation must be concrete executable code, not prose instructions to the LLM |
 
 ## Resources
 
 - PR: #11 (yellow-browser-test plugin code review)
 - File: `plugins/yellow-browser-test/commands/browser-test/test.md`
-- Precedent: `plugins/yellow-ruvector/hooks/scripts/lib/validate.sh` (shared validation)
-- Precedent: `plugins/yellow-core/commands/git-worktree/create.md` (bash in commands)
+- Precedent: `plugins/yellow-ruvector/hooks/scripts/lib/validate.sh` (shared
+  validation)
+- Precedent: `plugins/yellow-core/commands/git-worktree/create.md` (bash in
+  commands)
 - Related: Issue #018 (defines what patterns to reject)

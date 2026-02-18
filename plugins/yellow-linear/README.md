@@ -1,6 +1,7 @@
 # yellow-linear
 
-Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents.
+Linear MCP integration with PM workflows for issues, projects, initiatives,
+cycles, and documents.
 
 ## Install
 
@@ -17,32 +18,32 @@ Linear MCP integration with PM workflows for issues, projects, initiatives, cycl
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/linear:create` | Create a Linear issue from current context |
-| `/linear:sync` | Sync current branch with its Linear issue (load context, link PR, update status) |
-| `/linear:triage` | Review and assign incoming Linear issues |
-| `/linear:plan-cycle` | Plan sprint cycle by selecting backlog issues |
-| `/linear:status` | Generate project and initiative health report |
+| Command              | Description                                                                      |
+| -------------------- | -------------------------------------------------------------------------------- |
+| `/linear:create`     | Create a Linear issue from current context                                       |
+| `/linear:sync`       | Sync current branch with its Linear issue (load context, link PR, update status) |
+| `/linear:triage`     | Review and assign incoming Linear issues                                         |
+| `/linear:plan-cycle` | Plan sprint cycle by selecting backlog issues                                    |
+| `/linear:status`     | Generate project and initiative health report                                    |
 
 ## Agents
 
-| Agent | Description |
-|-------|-------------|
+| Agent                 | Description                                     |
+| --------------------- | ----------------------------------------------- |
 | `linear-issue-loader` | Auto-load Linear issue context from branch name |
-| `linear-pr-linker` | Link PRs to Linear issues and sync status |
-| `linear-explorer` | Deep search and analysis of Linear backlog |
+| `linear-pr-linker`    | Link PRs to Linear issues and sync status       |
+| `linear-explorer`     | Deep search and analysis of Linear backlog      |
 
 ## Skills
 
-| Skill | Description |
-|-------|-------------|
+| Skill              | Description                                             |
+| ------------------ | ------------------------------------------------------- |
 | `linear-workflows` | Reference patterns and conventions for Linear workflows |
 
 ## MCP Servers
 
-| Server | URL | Auth |
-|--------|-----|------|
+| Server | URL                          | Auth                  |
+| ------ | ---------------------------- | --------------------- |
 | Linear | `https://mcp.linear.app/mcp` | OAuth (browser popup) |
 
 ## Limitations

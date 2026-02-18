@@ -1,9 +1,9 @@
 ---
 name: devin:cancel
 description: >
-  Terminate a running Devin session. Use when user wants to stop a session,
-  says "cancel Devin", "stop the session", or "kill that task".
-argument-hint: "<session-id>"
+  Terminate a running Devin session. Use when user wants to stop a session, says
+  "cancel Devin", "stop the session", or "kill that task".
+argument-hint: '<session-id>'
 allowed-tools:
   - Bash
   - Skill
@@ -18,7 +18,8 @@ Terminate a running Devin session after user confirmation.
 
 ### Step 1: Validate Prerequisites
 
-Validate `DEVIN_API_TOKEN` is set and matches format. See `devin-workflows` skill.
+Validate `DEVIN_API_TOKEN` is set and matches format. See `devin-workflows`
+skill.
 
 Check `jq` is available:
 
@@ -46,18 +47,22 @@ curl -s --connect-timeout 5 --max-time 10 \
 Check curl exit code, HTTP status, jq parse.
 
 If session is already in a terminal state (`finished`, `stopped`, `failed`):
+
 - Report "Session is already {status} — nothing to cancel."
 - Stop.
 
 ### Step 4: Confirm Cancellation (M3 — Destructive Operation)
 
 Display session summary:
+
 - Session ID
 - Current status
 - How long it has been running
 
 Ask user to confirm cancellation via AskUserQuestion:
-- "Cancel session {id}? This will terminate the session and any work in progress."
+
+- "Cancel session {id}? This will terminate the session and any work in
+  progress."
 - Options: "Yes, cancel" / "No, keep running"
 
 If user declines, stop without cancelling.
@@ -76,10 +81,12 @@ curl -s --connect-timeout 5 --max-time 10 \
 Check curl exit code, HTTP status, jq parse.
 
 If session is now in a terminal state (`finished`, `stopped`, `failed`):
+
 - Report "Session already {status} — no cancellation needed."
 - Exit cleanly without calling cancel API.
 
-If still in any non-terminal state (`queued`, `started`, `running`, or `blocked`), proceed to cancellation.
+If still in any non-terminal state (`queued`, `started`, `running`, or
+`blocked`), proceed to cancellation.
 
 ### Step 5: Cancel Session
 
@@ -94,7 +101,8 @@ Check curl exit code, HTTP status.
 
 ### Step 6: Report
 
-Display cancellation confirmation or error. If successful, show final session status.
+Display cancellation confirmation or error. If successful, show final session
+status.
 
 ## Error Handling
 

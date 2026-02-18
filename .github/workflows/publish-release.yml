@@ -3,8 +3,8 @@ name: Publish Release
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'          # Semantic versioning: v1.0.0
-      - 'v[0-9]+.[0-9]+.[0-9]+-*'         # Pre-release: v1.0.0-beta.1
+      - 'v[0-9]+.[0-9]+.[0-9]+' # Semantic versioning: v1.0.0
+      - 'v[0-9]+.[0-9]+.[0-9]+-*' # Pre-release: v1.0.0-beta.1
   workflow_dispatch:
     inputs:
       version:
@@ -69,7 +69,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -139,7 +139,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -225,7 +225,7 @@ jobs:
     timeout-minutes: 5
     needs: [validate-release, build-artifacts]
     permissions:
-      contents: write  # Required for creating releases
+      contents: write # Required for creating releases
 
     steps:
       - name: Checkout repository
@@ -282,7 +282,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: 'https://registry.npmjs.org'
-          
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

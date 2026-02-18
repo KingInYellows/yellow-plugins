@@ -12,6 +12,17 @@
     "url": "https://github.com/KingInYellows/yellow-plugins.git"
   },
   "license": "MIT",
-  "keywords": ["graphite", "graphite-cli", "gt", "git", "stacked-prs", "smart-commits", "sync", "conventional-commits", "workflow", "pull-requests"],
+  "keywords": [
+    "graphite",
+    "graphite-cli",
+    "gt",
+    "git",
+    "stacked-prs",
+    "smart-commits",
+    "sync",
+    "conventional-commits",
+    "workflow",
+    "pull-requests"
+  ],
   "hooks": "hooks/hooks.json"
 }

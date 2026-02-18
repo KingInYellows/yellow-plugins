@@ -25,15 +25,20 @@ plugins/my-plugin/
 ```
 
 **Minimum Requirements**:
+
 - `.claude-plugin/plugin.json` (manifest)
 - At least one entrypoint (command/skill/agent/MCP)
 - `CLAUDE.md` (Claude's context file)
 
 **Optional but Recommended**:
-- `README.md` — GitHub-facing documentation with installation, quick start, troubleshooting
-  - Include for: Complex plugins, plugins with setup requirements, external-facing tools
+
+- `README.md` — GitHub-facing documentation with installation, quick start,
+  troubleshooting
+  - Include for: Complex plugins, plugins with setup requirements,
+    external-facing tools
   - Omit for: Simple/internal plugins where CLAUDE.md suffices
-  - Focus: Installation, quick start, examples (avoid duplicating CLAUDE.md conventions)
+  - Focus: Installation, quick start, examples (avoid duplicating CLAUDE.md
+    conventions)
 
 ---
 
@@ -73,6 +78,7 @@ cd plugins/my-plugin
 ```
 
 **Validation**:
+
 ```bash
 node ../../scripts/validate-plugin.js .
 ```
@@ -83,7 +89,7 @@ node ../../scripts/validate-plugin.js .
 
 **File**: `commands/my-command.md`
 
-```markdown
+````markdown
 ---
 name: my-command
 description: Brief command description
@@ -99,6 +105,7 @@ This command does something useful.
 ```bash
 /my-command [options]
 ```
+````
 
 ## Examples
 
@@ -109,7 +116,8 @@ This command does something useful.
 ## Implementation
 
 [Command implementation details here]
-```
+
+````
 
 ---
 
@@ -128,7 +136,7 @@ Brief description of what the plugin does.
 
 ```bash
 /plugin install my-plugin@kingin-yellows
-```
+````
 
 ## Usage
 
@@ -147,7 +155,8 @@ Brief description of what the plugin does.
 ## License
 
 MIT
-```
+
+````
 
 ---
 
@@ -174,7 +183,7 @@ MIT
     }
   ]
 }
-```
+````
 
 ---
 
@@ -193,16 +202,9 @@ MIT
     "url": "https://github.com/username"
   },
   "entrypoints": {
-    "commands": [
-      "commands/my-command.md",
-      "commands/my-other-command.md"
-    ],
-    "skills": [
-      "skills/my-skill.md"
-    ],
-    "agents": [
-      "agents/my-agent.md"
-    ]
+    "commands": ["commands/my-command.md", "commands/my-other-command.md"],
+    "skills": ["skills/my-skill.md"],
+    "agents": ["agents/my-agent.md"]
   },
   "compatibility": {
     "claudeCodeMin": "2.0.12",
@@ -243,11 +245,7 @@ MIT
   "dependencies": {
     "ajv": "^8.12.0"
   },
-  "keywords": [
-    "development",
-    "productivity",
-    "automation"
-  ],
+  "keywords": ["development", "productivity", "automation"],
   "license": "MIT",
   "homepage": "https://example.com/my-plugin"
 }
@@ -273,6 +271,7 @@ This skill provides [functionality description].
 ## When to Use
 
 Claude should invoke this skill when:
+
 - [Trigger condition 1]
 - [Trigger condition 2]
 
@@ -285,19 +284,21 @@ Claude should invoke this skill when:
 ## Examples
 
 ### Example 1
-[Description]
 
+[Description]
 ```
-Input: [example input]
-Output: [example output]
+
+Input: [example input] Output: [example output]
+
 ```
 
 ### Example 2
 [Description]
 
 ```
-Input: [example input]
-Output: [example output]
+
+Input: [example input] Output: [example output]
+
 ```
 
 ## Implementation Notes
@@ -326,7 +327,8 @@ expertise: [domain1, domain2]
 
 # My Agent
 
-You are a specialized agent for [domain]. Your role is to [primary responsibility].
+You are a specialized agent for [domain]. Your role is to [primary
+responsibility].
 
 ## Expertise
 
@@ -359,12 +361,12 @@ You are a specialized agent for [domain]. Your role is to [primary responsibilit
 ## Example Interactions
 
 ### Scenario 1
-**User**: [user input]
-**Agent**: [expected response]
+
+**User**: [user input] **Agent**: [expected response]
 
 ### Scenario 2
-**User**: [user input]
-**Agent**: [expected response]
+
+**User**: [user input] **Agent**: [expected response]
 ```
 
 ---
@@ -418,6 +420,7 @@ echo "✅ my-plugin uninstalled successfully"
 ```
 
 **Make executable**:
+
 ```bash
 chmod +x scripts/install.sh scripts/uninstall.sh
 ```
@@ -499,7 +502,7 @@ chmod +x scripts/install.sh scripts/uninstall.sh
     }
   ],
   "compatibility": {
-    "os": ["linux", "macos"]  // Windows may not have git/npm
+    "os": ["linux", "macos"] // Windows may not have git/npm
   }
 }
 ```
@@ -555,6 +558,7 @@ cp -r plugins/my-plugin ~/.claude/plugins/
 7. **Add to marketplace** and commit
 
 **Resources**:
+
 - Plugin Schema: `/schemas/plugin.schema.json`
 - Validation Script: `/scripts/validate-plugin.js`
 - Example Plugin: `/examples/plugin.example.json`

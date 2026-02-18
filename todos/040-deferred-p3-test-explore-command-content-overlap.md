@@ -1,7 +1,7 @@
 ---
 status: pending
 priority: p3
-issue_id: "040"
+issue_id: '040'
 tags: [code-review, quality, maintainability]
 dependencies: []
 ---
@@ -9,9 +9,14 @@ dependencies: []
 # Test/Explore Command Content Overlap
 
 ## Problem Statement
-~70% content overlap between browser-test/test.md and browser-test/explore.md commands. Both manage dev server lifecycle, spawn agents, handle cleanup. DRY violation creates maintenance burden - bug fixes and improvements must be applied to both files.
+
+~70% content overlap between browser-test/test.md and browser-test/explore.md
+commands. Both manage dev server lifecycle, spawn agents, handle cleanup. DRY
+violation creates maintenance burden - bug fixes and improvements must be
+applied to both files.
 
 ## Findings
+
 - Files: commands/browser-test/test.md, commands/browser-test/explore.md
 - Shared logic:
   - Config loading from `.claude/yellow-browser-test.local.md`
@@ -28,7 +33,9 @@ dependencies: []
 - Risk of behavior divergence if one file is updated and other is missed
 
 ## Proposed Solutions
+
 ### Option A: Extract Shared Logic to a Skill (Recommended)
+
 - Create new skill: `browser-test-runner` or similar
 - Skill contains:
   - Dev server lifecycle management
@@ -40,6 +47,7 @@ dependencies: []
 - Easier to maintain and test
 
 ### Option B: Accept Duplication for Clarity
+
 - Treat commands as independent entry points
 - Each command is self-contained and readable in isolation
 - User can understand full command flow without referencing other files
@@ -48,20 +56,30 @@ dependencies: []
 - Ensure both commands have comprehensive tests
 
 ## Recommended Action
-Implement Option A. Create a `browser-test-lifecycle` skill that handles dev server management, config loading, and cleanup. Commands call the skill with agent-specific parameters. This reduces duplication from 70% to <20% and makes bug fixes easier to apply consistently.
+
+Implement Option A. Create a `browser-test-lifecycle` skill that handles dev
+server management, config loading, and cleanup. Commands call the skill with
+agent-specific parameters. This reduces duplication from 70% to <20% and makes
+bug fixes easier to apply consistently.
 
 ## Technical Details
+
 ```markdown
 # New skill: skills/browser-test-lifecycle/SKILL.md
+
 ## Use when
-User needs to run browser tests or interactive testing. Handles dev server lifecycle, config loading, agent spawn, and cleanup.
+
+User needs to run browser tests or interactive testing. Handles dev server
+lifecycle, config loading, agent spawn, and cleanup.
 
 ## Parameters
+
 - agent_type: test-runner or interactive-tester
 - agent_params: JSON with agent-specific parameters
 - cleanup_on_exit: boolean
 
 ## Steps
+
 1. Load config from .claude/yellow-browser-test.local.md
 2. Check agent-browser is installed
 3. Start dev server if configured
@@ -70,18 +88,24 @@ User needs to run browser tests or interactive testing. Handles dev server lifec
 6. On exit: stop dev server if we started it
 
 # Updated commands reference the skill:
+
 # test.md:
+
 Use browser-test-lifecycle skill with:
+
 - agent_type: test-runner
 - agent_params: {testFiles: [...], config: {...}}
 
 # explore.md:
+
 Use browser-test-lifecycle skill with:
+
 - agent_type: interactive-tester
 - agent_params: {goals: [...], config: {...}}
 ```
 
 ## Acceptance Criteria
+
 - [ ] Create browser-test-lifecycle skill
 - [ ] Extract shared dev server logic to skill
 - [ ] Extract shared config loading to skill
@@ -92,10 +116,12 @@ Use browser-test-lifecycle skill with:
 - [ ] Update plugin.json to include new skill
 
 ## Work Log
-| Date | Action | Learnings |
-|------|--------|-----------|
+
+| Date       | Action                          | Learnings                                                   |
+| ---------- | ------------------------------- | ----------------------------------------------------------- |
 | 2026-02-13 | Created from PR #11 code review | P3 quality finding - 70% duplication violates DRY principle |
 
 ## Resources
+
 - PR: #11 (yellow-browser-test plugin code review)
 - Related files: commands/browser-test/test.md, commands/browser-test/explore.md

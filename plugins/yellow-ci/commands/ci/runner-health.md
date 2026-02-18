@@ -4,7 +4,7 @@ description: >
   Check self-hosted runner health via SSH. Use when user asks "runner status",
   "is runner healthy", "check runner", or wants to verify infrastructure before
   diagnosing CI failures.
-argument-hint: "[runner-name]"
+argument-hint: '[runner-name]'
 allowed-tools:
   - Bash
   - Read
@@ -24,20 +24,24 @@ Requires: SSH key-based access to runner VMs, .claude/yellow-ci.local.md config
 
 ## Step 1: Load Configuration
 
-Read `.claude/yellow-ci.local.md` and parse runner details from YAML frontmatter.
+Read `.claude/yellow-ci.local.md` and parse runner details from YAML
+frontmatter.
 
 If config not found:
-> Runner config not found. Create `.claude/yellow-ci.local.md` with runner SSH details.
-> See plugin README for configuration format.
+
+> Runner config not found. Create `.claude/yellow-ci.local.md` with runner SSH
+> details. See plugin README for configuration format.
 
 ## Step 2: Determine Targets
 
 If `$ARGUMENTS` specifies a runner name:
+
 - Validate name: must match `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`
 - Find matching runner in config
 - If not found: "Runner '$name' not in config. Available: runner-01, runner-02"
 
-Otherwise: check all configured runners with `enabled: true` (or all if no enabled flag).
+Otherwise: check all configured runners with `enabled: true` (or all if no
+enabled flag).
 
 ## Step 3: Check Each Runner
 
@@ -66,6 +70,7 @@ HEALTHCHECK
 ```
 
 Use adaptive parallelism for multiple runners:
+
 - 1-3 runners: all at once
 - 4-10 runners: max 5 concurrent
 - 10+: batch of runner_count/2
@@ -75,6 +80,7 @@ Connection timeout: 3s. Command timeout: 10s (via `timeout 10 ssh ...`).
 ## Step 4: Categorize Results
 
 For SSH failures, categorize:
+
 - **Timeout:** Runner may be powered off or network issue
 - **Auth failed:** SSH key not configured for this runner
 - **Refused:** Runner VM is up but SSH not running
@@ -82,6 +88,7 @@ For SSH failures, categorize:
 ## Step 5: Generate Report
 
 Present as a table per runner with health indicators:
+
 - Disk >90%: Critical
 - Disk >80%: Warning
 - Memory <500MB free: Warning
@@ -92,5 +99,6 @@ Present as a table per runner with health indicators:
 Summary line: "Successfully checked N/M runners (X timeout, Y auth failed)"
 
 If any runner is degraded or critical, suggest:
+
 - `/ci:runner-cleanup runner-name` for disk/Docker issues
 - Manual SSH for agent restart

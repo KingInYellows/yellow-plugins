@@ -4,7 +4,7 @@ description: >
   Install ruvector and initialize vector storage. Use when user says "set up
   ruvector", "install vector search", "enable semantic search", "initialize
   ruvector", or wants persistent agent memory for a project.
-argument-hint: ""
+argument-hint: ''
 allowed-tools:
   - Bash
   - Read
@@ -14,7 +14,8 @@ allowed-tools:
 
 # Set Up ruvector
 
-Install the ruvector CLI and initialize the `.ruvector/` vector storage directory for the current project.
+Install the ruvector CLI and initialize the `.ruvector/` vector storage
+directory for the current project.
 
 ## Workflow
 
@@ -29,6 +30,7 @@ jq --version
 ```
 
 If any are missing, report which ones and provide install URLs:
+
 - Node.js: https://nodejs.org/
 - jq: https://jqlang.github.io/jq/
 
@@ -51,8 +53,10 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/install.sh"
 ```
 
 If install fails, report the error and suggest manual installation:
+
 - `npm install -g ruvector --ignore-scripts`
-- If permission denied: `npm install -g ruvector --ignore-scripts --prefix "$HOME/.local"`
+- If permission denied:
+  `npm install -g ruvector --ignore-scripts --prefix "$HOME/.local"`
 
 ### Step 4: Initialize .ruvector/ Directory
 
@@ -92,11 +96,13 @@ Test that the MCP server can start:
 timeout 5 npx ruvector mcp-server </dev/null 2>&1 || true
 ```
 
-If it starts without errors, report success. If it fails, report the error and suggest checking the installation.
+If it starts without errors, report success. If it fails, report the error and
+suggest checking the installation.
 
 ### Step 7: Offer Next Steps
 
 Report setup complete and suggest:
+
 - Run `/ruvector:index` to index the codebase for semantic search
 - Run `/ruvector:status` to verify everything is working
 
@@ -104,11 +110,11 @@ Use AskUserQuestion to ask if they want to index now.
 
 ## Error Handling
 
-| Error | Action |
-|-------|--------|
-| Node.js not found | Report and provide install URL |
-| Node.js < 18 | Report version and suggest upgrade |
-| npm install failed | Suggest manual install with `--prefix` |
-| ruvector init failed | Check disk space, permissions |
-| MCP server won't start | Verify `npx ruvector mcp-server` manually |
-| .gitignore not writable | Report and suggest manual edit |
+| Error                   | Action                                    |
+| ----------------------- | ----------------------------------------- |
+| Node.js not found       | Report and provide install URL            |
+| Node.js < 18            | Report version and suggest upgrade        |
+| npm install failed      | Suggest manual install with `--prefix`    |
+| ruvector init failed    | Check disk space, permissions             |
+| MCP server won't start  | Verify `npx ruvector mcp-server` manually |
+| .gitignore not writable | Report and suggest manual edit            |

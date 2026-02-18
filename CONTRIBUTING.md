@@ -15,8 +15,8 @@ This document provides guidelines and processes for contributing to the project.
 
 ## Code of Conduct
 
-This project adheres to professional standards of collaboration.
-Please be respectful, constructive, and focused on technical merit in all interactions.
+This project adheres to professional standards of collaboration. Please be
+respectful, constructive, and focused on technical merit in all interactions.
 
 ## Getting Started
 
@@ -87,7 +87,8 @@ See `docs/plugin-validation-guide.md` for detailed validation rules.
 
 - SKILL.md `description:` must be single-line (no YAML folded scalars)
 - SKILL.md frontmatter uses `user-invokable` (with k)
-- Agent `.md` files should focus on project-specific rules, not generic LLM knowledge
+- Agent `.md` files should focus on project-specific rules, not generic LLM
+  knowledge
 - Commands must list all tools used in `allowed-tools`
 - Commands use `$ARGUMENTS` placeholder, never hardcoded values
 - All files must use LF line endings

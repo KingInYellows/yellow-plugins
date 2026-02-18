@@ -1,6 +1,7 @@
 # yellow-chatprd
 
-ChatPRD MCP integration with document management workflows and Linear bridging for Claude Code.
+ChatPRD MCP integration with document management workflows and Linear bridging
+for Claude Code.
 
 ## Install
 
@@ -17,31 +18,31 @@ ChatPRD MCP integration with document management workflows and Linear bridging f
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/chatprd:create` | Create a new document (PRD, spec, one-pager, API doc) |
-| `/chatprd:search` | Search ChatPRD workspace for documents |
-| `/chatprd:update` | Update an existing ChatPRD document |
-| `/chatprd:list` | List documents in ChatPRD workspace |
-| `/chatprd:link-linear` | Create Linear issues from a ChatPRD document |
+| Command                | Description                                           |
+| ---------------------- | ----------------------------------------------------- |
+| `/chatprd:create`      | Create a new document (PRD, spec, one-pager, API doc) |
+| `/chatprd:search`      | Search ChatPRD workspace for documents                |
+| `/chatprd:update`      | Update an existing ChatPRD document                   |
+| `/chatprd:list`        | List documents in ChatPRD workspace                   |
+| `/chatprd:link-linear` | Create Linear issues from a ChatPRD document          |
 
 ## Agents
 
-| Agent | Description |
-|-------|-------------|
+| Agent                | Description                                                |
+| -------------------- | ---------------------------------------------------------- |
 | `document-assistant` | ChatPRD document management (create, read, update, search) |
-| `linear-prd-bridge` | Bridge ChatPRD documents to Linear issues |
+| `linear-prd-bridge`  | Bridge ChatPRD documents to Linear issues                  |
 
 ## Skills
 
-| Skill | Description |
-|-------|-------------|
+| Skill                 | Description                                                   |
+| --------------------- | ------------------------------------------------------------- |
 | `chatprd-conventions` | Error mapping, template guide, and input validation reference |
 
 ## MCP Servers
 
-| Server | URL | Auth |
-|--------|-----|------|
+| Server  | URL                          | Auth                  |
+| ------- | ---------------------------- | --------------------- |
 | ChatPRD | `https://app.chatprd.ai/mcp` | OAuth (browser popup) |
 
 ## License

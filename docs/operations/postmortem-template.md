@@ -1,51 +1,57 @@
 # Incident Postmortem Template
 
-**Status:** Active
-**Last Updated:** 2026-01-12
-**Maintainer:** Platform Team
+**Status:** Active **Last Updated:** 2026-01-12 **Maintainer:** Platform Team
 **Document Type:** Incident Analysis Template
 
 ---
 
 ## Overview
 
-This template guides incident investigation and documentation for Yellow Plugins operational failures. It provides structured sections for capturing timelines, root causes, contributing factors, and action items referenced in Architecture §3.16 (Operational KPIs & Review Cadence) and Section 6 of the Verification & Integration Strategy (test gating plus documentation deliverables).
+This template guides incident investigation and documentation for Yellow Plugins
+operational failures. It provides structured sections for capturing timelines,
+root causes, contributing factors, and action items referenced in Architecture
+§3.16 (Operational KPIs & Review Cadence) and Section 6 of the Verification &
+Integration Strategy (test gating plus documentation deliverables).
 
 **Purpose:**
+
 - Standardize incident analysis across operational teams
 - Ensure complete documentation for knowledge retention
 - Drive continuous improvement through systematic review
 - Link incidents back to metrics, KPIs, and verification requirements
 
 **Related Documents:**
+
 - [Operational Runbook](./runbook.md) - Incident response procedures
 - [Metrics Guide](./metrics.md) - KPI definitions and alert thresholds
-- [Operational Architecture](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) - Section 3.16 KPI review cadence
-- [Verification & Integration Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy) - Defines evidence required for closure
+- [Operational Architecture](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) -
+  Section 3.16 KPI review cadence
+- [Verification & Integration Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy) -
+  Defines evidence required for closure
 
 ---
 
 ## Postmortem Metadata
 
-| Field | Value |
-|-------|-------|
-| **Incident ID** | [e.g., INC-2026-001] |
-| **Incident Date** | [YYYY-MM-DD HH:MM UTC] |
-| **Severity** | [P0 / P1 / P2 / P3] |
+| Field                 | Value                                                |
+| --------------------- | ---------------------------------------------------- |
+| **Incident ID**       | [e.g., INC-2026-001]                                 |
+| **Incident Date**     | [YYYY-MM-DD HH:MM UTC]                               |
+| **Severity**          | [P0 / P1 / P2 / P3]                                  |
 | **Services Affected** | [e.g., CLI install, publish workflow, CI validation] |
-| **Duration** | [Total time from detection to resolution] |
-| **Author** | [Name/Team conducting postmortem] |
-| **Review Date** | [Date postmortem was reviewed] |
-| **Reviewers** | [Names of reviewers] |
+| **Duration**          | [Total time from detection to resolution]            |
+| **Author**            | [Name/Team conducting postmortem]                    |
+| **Review Date**       | [Date postmortem was reviewed]                       |
+| **Reviewers**         | [Names of reviewers]                                 |
 
 ### Severity Definitions
 
-| Level | Impact | Examples |
-|-------|--------|----------|
-| **P0** | Production down / complete service outage | Marketplace unavailable, all installs failing |
+| Level  | Impact                                     | Examples                                          |
+| ------ | ------------------------------------------ | ------------------------------------------------- |
+| **P0** | Production down / complete service outage  | Marketplace unavailable, all installs failing     |
 | **P1** | Significant degradation, workaround exists | CI blocked, installs failing for specific plugins |
-| **P2** | Degraded performance or limited scope | Cache evictions frequent, rollback slow |
-| **P3** | Minor issue or cosmetic | Documentation outdated, metrics export slow |
+| **P2** | Degraded performance or limited scope      | Cache evictions frequent, rollback slow           |
+| **P3** | Minor issue or cosmetic                    | Documentation outdated, metrics export slow       |
 
 ---
 
@@ -53,28 +59,32 @@ This template guides incident investigation and documentation for Yellow Plugins
 
 **In 2-3 sentences, describe the incident, impact, and resolution:**
 
-[Example: On 2026-01-10, registry corruption caused 100% of plugin installs to fail for 2 hours. The incident was resolved by restoring from backup (registry.json.backup) and implementing atomic write verification. All users were notified and no data was lost.]
+[Example: On 2026-01-10, registry corruption caused 100% of plugin installs to
+fail for 2 hours. The incident was resolved by restoring from backup
+(registry.json.backup) and implementing atomic write verification. All users
+were notified and no data was lost.]
 
 ---
 
 ## Timeline
 
-Document key events in chronological order. Include all detection, investigation, and remediation steps.
+Document key events in chronological order. Include all detection,
+investigation, and remediation steps.
 
-| Time (UTC) | Event | Notes |
-|------------|-------|-------|
-| **Detection** |
-| [HH:MM] | Incident detected | [How was it detected? Alert, user report, monitoring?] |
-| [HH:MM] | Initial investigation started | [Who started investigating?] |
+| Time (UTC)        | Event                         | Notes                                                  |
+| ----------------- | ----------------------------- | ------------------------------------------------------ |
+| **Detection**     |
+| [HH:MM]           | Incident detected             | [How was it detected? Alert, user report, monitoring?] |
+| [HH:MM]           | Initial investigation started | [Who started investigating?]                           |
 | **Investigation** |
-| [HH:MM] | Root cause identified | [What analysis led to identification?] |
-| [HH:MM] | Remediation plan decided | [What options were considered?] |
-| **Resolution** |
-| [HH:MM] | Fix implemented | [What fix was applied?] |
-| [HH:MM] | Verification completed | [How was fix verified?] |
-| [HH:MM] | Incident closed | [When was service restored?] |
-| **Follow-up** |
-| [HH:MM] | Postmortem published | [When was this document completed?] |
+| [HH:MM]           | Root cause identified         | [What analysis led to identification?]                 |
+| [HH:MM]           | Remediation plan decided      | [What options were considered?]                        |
+| **Resolution**    |
+| [HH:MM]           | Fix implemented               | [What fix was applied?]                                |
+| [HH:MM]           | Verification completed        | [How was fix verified?]                                |
+| [HH:MM]           | Incident closed               | [When was service restored?]                           |
+| **Follow-up**     |
+| [HH:MM]           | Postmortem published          | [When was this document completed?]                    |
 
 ---
 
@@ -82,14 +92,16 @@ Document key events in chronological order. Include all detection, investigation
 
 ### KPI Impact
 
-Reference metrics from the [Metrics Guide](./metrics.md), Architecture §3.16 KPIs, and Section 6 verification hooks (CI reports, telemetry exports, cache audits).
+Reference metrics from the [Metrics Guide](./metrics.md), Architecture §3.16
+KPIs, and Section 6 verification hooks (CI reports, telemetry exports, cache
+audits).
 
-| KPI | Target | Actual During Incident | Deviation | Status |
-|-----|--------|------------------------|-----------|--------|
-| **Install Success Rate** | ≥ 99% | [%] | [+/- %] | ❌/✅ |
-| **Rollback Duration** | < 60s | [seconds] | [+/- seconds] | ❌/✅ |
-| **Cache Eviction Frequency** | [baseline] | [incidents/hour] | [spike %] | ❌/✅ |
-| **Doc Update Latency** | ≤ 2 days | [days] | [+/- days] | ❌/✅ |
+| KPI                          | Target     | Actual During Incident | Deviation     | Status |
+| ---------------------------- | ---------- | ---------------------- | ------------- | ------ |
+| **Install Success Rate**     | ≥ 99%      | [%]                    | [+/- %]       | ❌/✅  |
+| **Rollback Duration**        | < 60s      | [seconds]              | [+/- seconds] | ❌/✅  |
+| **Cache Eviction Frequency** | [baseline] | [incidents/hour]       | [spike %]     | ❌/✅  |
+| **Doc Update Latency**       | ≤ 2 days   | [days]                 | [+/- days]    | ❌/✅  |
 
 ### User Impact
 
@@ -117,19 +129,26 @@ yellow_plugins_install_total{command="install",status="success"} 0
 
 ### Primary Root Cause
 
-[Describe the fundamental technical or process failure that caused the incident. Be specific.]
+[Describe the fundamental technical or process failure that caused the incident.
+Be specific.]
 
-**Example:**
-Registry file (`.claude-plugin/registry.json`) was corrupted due to non-atomic write operation during concurrent install commands. The write operation was interrupted by system crash, leaving partial JSON that failed validation.
+**Example:** Registry file (`.claude-plugin/registry.json`) was corrupted due to
+non-atomic write operation during concurrent install commands. The write
+operation was interrupted by system crash, leaving partial JSON that failed
+validation.
 
 ### Contributing Factors
 
-List all factors that contributed to the incident occurring or being worse than it could have been:
+List all factors that contributed to the incident occurring or being worse than
+it could have been:
 
-1. **Technical Factor 1:** [e.g., Lack of atomic write implementation using temp file + rename]
+1. **Technical Factor 1:** [e.g., Lack of atomic write implementation using temp
+   file + rename]
 2. **Process Factor 2:** [e.g., No automated registry backup validation in CI]
-3. **Monitoring Gap 3:** [e.g., `yellow_plugins_registry_corruption_incidents_total` metric not monitored]
-4. **Documentation Gap 4:** [e.g., Recovery procedures not documented in runbook]
+3. **Monitoring Gap 3:** [e.g.,
+   `yellow_plugins_registry_corruption_incidents_total` metric not monitored]
+4. **Documentation Gap 4:** [e.g., Recovery procedures not documented in
+   runbook]
 
 ### Why It Happened (5 Whys)
 
@@ -178,11 +197,11 @@ Document areas for improvement:
 
 ### Immediate Fixes (Applied During Incident)
 
-| Action | Time Applied | Result | Owner |
-|--------|--------------|--------|-------|
-| Restored registry from backup | [HH:MM] | ✅ Service restored | [Name] |
-| Verified backup integrity | [HH:MM] | ✅ No data loss | [Name] |
-| Restarted affected workflows | [HH:MM] | ✅ Installs resumed | [Name] |
+| Action                        | Time Applied | Result              | Owner  |
+| ----------------------------- | ------------ | ------------------- | ------ |
+| Restored registry from backup | [HH:MM]      | ✅ Service restored | [Name] |
+| Verified backup integrity     | [HH:MM]      | ✅ No data loss     | [Name] |
+| Restarted affected workflows  | [HH:MM]      | ✅ Installs resumed | [Name] |
 
 ### Temporary Workarounds
 
@@ -194,31 +213,32 @@ Document areas for improvement:
 
 ## Action Items
 
-All action items reference requirement IDs (FR/NFR/CRIT) and Architecture sections for traceability.
+All action items reference requirement IDs (FR/NFR/CRIT) and Architecture
+sections for traceability.
 
 ### Short-Term Actions (1-2 weeks)
 
-| Action | Owner | Due Date | Requirement | Status |
-|--------|-------|----------|-------------|--------|
+| Action                                           | Owner  | Due Date     | Requirement           | Status              |
+| ------------------------------------------------ | ------ | ------------ | --------------------- | ------------------- |
 | Implement atomic write semantics (temp + rename) | [Name] | [YYYY-MM-DD] | CRIT-018, NFR-REL-002 | [ ] Open / [x] Done |
-| Add registry corruption recovery to runbook | [Name] | [YYYY-MM-DD] | Architecture §3.7 | [ ] Open / [x] Done |
-| Configure alerts for registry corruption metric | [Name] | [YYYY-MM-DD] | Architecture §3.16 | [ ] Open / [x] Done |
-| Add automated backup validation to CI | [Name] | [YYYY-MM-DD] | NFR-REL-004 | [ ] Open / [x] Done |
+| Add registry corruption recovery to runbook      | [Name] | [YYYY-MM-DD] | Architecture §3.7     | [ ] Open / [x] Done |
+| Configure alerts for registry corruption metric  | [Name] | [YYYY-MM-DD] | Architecture §3.16    | [ ] Open / [x] Done |
+| Add automated backup validation to CI            | [Name] | [YYYY-MM-DD] | NFR-REL-004           | [ ] Open / [x] Done |
 
 ### Medium-Term Actions (1-3 months)
 
-| Action | Owner | Due Date | Requirement | Status |
-|--------|-------|----------|-------------|--------|
-| Implement registry schema versioning | [Name] | [YYYY-MM-DD] | NFR-MAINT-003 | [ ] Open / [x] Done |
-| Add concurrent install queue manager | [Name] | [YYYY-MM-DD] | Architecture §3.13 | [ ] Open / [x] Done |
+| Action                                                   | Owner  | Due Date     | Requirement        | Status              |
+| -------------------------------------------------------- | ------ | ------------ | ------------------ | ------------------- |
+| Implement registry schema versioning                     | [Name] | [YYYY-MM-DD] | NFR-MAINT-003      | [ ] Open / [x] Done |
+| Add concurrent install queue manager                     | [Name] | [YYYY-MM-DD] | Architecture §3.13 | [ ] Open / [x] Done |
 | Update incident response runbook with postmortem process | [Name] | [YYYY-MM-DD] | Architecture §3.16 | [ ] Open / [x] Done |
 
 ### Long-Term Actions (3+ months)
 
-| Action | Owner | Due Date | Requirement | Status |
-|--------|-------|----------|-------------|--------|
+| Action                                               | Owner  | Due Date     | Requirement        | Status              |
+| ---------------------------------------------------- | ------ | ------------ | ------------------ | ------------------- |
 | Explore distributed locking for multi-user scenarios | [Name] | [YYYY-MM-DD] | Architecture §3.13 | [ ] Open / [x] Done |
-| Implement telemetry alerting dashboard | [Name] | [YYYY-MM-DD] | Architecture §3.5 | [ ] Open / [x] Done |
+| Implement telemetry alerting dashboard               | [Name] | [YYYY-MM-DD] | Architecture §3.5  | [ ] Open / [x] Done |
 
 ---
 
@@ -250,7 +270,8 @@ All action items reference requirement IDs (FR/NFR/CRIT) and Architecture sectio
 
 ### Knowledge Sharing
 
-- [How will these lessons be shared? Team meeting, documentation update, training?]
+- [How will these lessons be shared? Team meeting, documentation update,
+  training?]
 - [What updates are needed to onboarding materials?]
 - [Which specification sections need amendment?]
 
@@ -272,13 +293,15 @@ All action items reference requirement IDs (FR/NFR/CRIT) and Architecture sectio
 
 ### Monitoring Enhancements
 
-- **New metric:** `yellow_plugins_registry_backup_age_seconds` to track backup freshness
+- **New metric:** `yellow_plugins_registry_backup_age_seconds` to track backup
+  freshness
 - **New alert:** Fire when backup age > 86400 seconds (24 hours)
 - **Dashboard update:** Add registry health panel to operational dashboard
 
 ### Documentation Updates
 
-- **Runbook:** Add "Registry Corruption Recovery" section referencing this postmortem
+- **Runbook:** Add "Registry Corruption Recovery" section referencing this
+  postmortem
 - **Metrics Guide:** Document KPI alert thresholds for registry operations
 - **Onboarding:** Add registry integrity checks to developer setup checklist
 
@@ -288,15 +311,19 @@ All action items reference requirement IDs (FR/NFR/CRIT) and Architecture sectio
 
 ### How Was the Fix Validated?
 
-- [✅ Integration test: Simulate system crash during registry write, verify recovery]
+- [✅ Integration test: Simulate system crash during registry write, verify
+  recovery]
 - [✅ Manual test: Interrupt install command, confirm automatic recovery]
 - [✅ CI validation: Run backup verification in GitHub Actions workflow]
-- [✅ Metrics validation: Confirm `registry_corruption_incidents_total` remains 0 post-fix]
+- [✅ Metrics validation: Confirm `registry_corruption_incidents_total` remains
+  0 post-fix]
 
 ### Acceptance Criteria (Reference I4.T4 Task)
 
-- [ ] All KPIs enumerated with owners + review cadence (see `docs/operations/metrics.md`)
-- [ ] Runbook covers lifecycle script incidents, cache recovery, publish rollback (see `docs/operations/runbook.md`)
+- [ ] All KPIs enumerated with owners + review cadence (see
+      `docs/operations/metrics.md`)
+- [ ] Runbook covers lifecycle script incidents, cache recovery, publish
+      rollback (see `docs/operations/runbook.md`)
 - [ ] Postmortem template linked from runbook escalation section
 - [ ] Documentation cross-links Section 6 verification requirements
 
@@ -326,7 +353,8 @@ All action items reference requirement IDs (FR/NFR/CRIT) and Architecture sectio
 Attach or reference metrics files from `.ci-metrics/` or telemetry exports:
 
 - **Metrics snapshot:** [link to .ci-metrics/incident-2026-001.prom]
-- **Telemetry export:** [link to .claude-plugin/audit/telemetry-2026-01-10.jsonl]
+- **Telemetry export:** [link to
+  .claude-plugin/audit/telemetry-2026-01-10.jsonl]
 
 ### Related Issues
 
@@ -338,27 +366,32 @@ Attach or reference metrics files from `.ci-metrics/` or telemetry exports:
 
 ## Review Sign-off
 
-| Reviewer | Role | Sign-off Date | Comments |
-|----------|------|---------------|----------|
-| [Name] | Platform Team Lead | [YYYY-MM-DD] | [Approved / Requested changes] |
-| [Name] | Operational Architect | [YYYY-MM-DD] | [Approved / Requested changes] |
-| [Name] | Security Reviewer | [YYYY-MM-DD] | [Approved / Requested changes] |
+| Reviewer | Role                  | Sign-off Date | Comments                       |
+| -------- | --------------------- | ------------- | ------------------------------ |
+| [Name]   | Platform Team Lead    | [YYYY-MM-DD]  | [Approved / Requested changes] |
+| [Name]   | Operational Architect | [YYYY-MM-DD]  | [Approved / Requested changes] |
+| [Name]   | Security Reviewer     | [YYYY-MM-DD]  | [Approved / Requested changes] |
 
 ---
 
 ## References
 
 ### Internal Documentation
+
 - [Operational Runbook](./runbook.md) - Incident response procedures
 - [Metrics Guide](./metrics.md) - KPI definitions and alert thresholds
 - [CI Pipeline Spec](./ci-pipeline.md) - CI validation procedures
 - [Traceability Matrix](../traceability-matrix.md) - Requirements coverage
 
 ### Architecture Documents
-- [04_Operational_Architecture.md](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) - Section 3.7, 3.16
-- [03_Verification_and_Glossary.md](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md) - Section 6 verification strategy
+
+- [04_Operational_Architecture.md](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) -
+  Section 3.7, 3.16
+- [03_Verification_and_Glossary.md](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md) -
+  Section 6 verification strategy
 
 ### Requirement References
+
 - **CRIT-018:** Atomic operations validation
 - **NFR-REL-002:** 100% rollback success rate
 - **NFR-REL-004:** 100% schema validation coverage
@@ -366,8 +399,8 @@ Attach or reference metrics files from `.ci-metrics/` or telemetry exports:
 
 ---
 
-**Document Status:** Production-Ready Template
-**Next Review:** Quarterly (alongside KPI review cadence per Architecture §3.16)
+**Document Status:** Production-Ready Template **Next Review:** Quarterly
+(alongside KPI review cadence per Architecture §3.16)
 
 ---
 

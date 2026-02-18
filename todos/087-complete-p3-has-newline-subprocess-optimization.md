@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "087"
+issue_id: '087'
 tags: [code-review, yellow-ci, performance]
 dependencies: []
 ---
@@ -10,7 +10,8 @@ dependencies: []
 
 ## Problem Statement
 
-`has_newline()` spawns a `tr` subprocess on every call. It's called from 8 validation functions, adding ~2.5ms per validation call unnecessarily.
+`has_newline()` spawns a `tr` subprocess on every call. It's called from 8
+validation functions, adding ~2.5ms per validation call unnecessarily.
 
 ## Findings
 
@@ -20,6 +21,7 @@ dependencies: []
 - **Cost**: ~2.5ms per call vs ~0.001ms with case pattern
 
 **Current implementation:**
+
 ```bash
 has_newline() {
   local raw="$1"
@@ -33,6 +35,7 @@ has_newline() {
 ## Proposed Solutions
 
 **Option 1 (Recommended): Bash case pattern matching**
+
 ```bash
 has_newline() {
   case "$1" in
@@ -41,6 +44,7 @@ has_newline() {
   esac
 }
 ```
+
 - **Pros**: 2500x faster, simpler, no subprocess
 - **Cons**: Uses bash ANSI-C quoting ($'\n') — scripts are already bash
 - **Effort**: Small

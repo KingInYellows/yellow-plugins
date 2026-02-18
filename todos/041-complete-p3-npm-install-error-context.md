@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "041"
+issue_id: '041'
 tags: [code-review, user-experience]
 dependencies: []
 ---
@@ -9,9 +9,13 @@ dependencies: []
 # NPM Install Error Context
 
 ## Problem Statement
-If npm install fails in install-agent-browser.sh, only the npm error output is shown. No guidance about common failures (permission issues, network, node version). Users may not know how to troubleshoot or what to check next.
+
+If npm install fails in install-agent-browser.sh, only the npm error output is
+shown. No guidance about common failures (permission issues, network, node
+version). Users may not know how to troubleshoot or what to check next.
 
 ## Findings
+
 - File: scripts/install-agent-browser.sh
 - Current behavior on npm install failure:
   - Script exits with npm error output
@@ -26,7 +30,9 @@ If npm install fails in install-agent-browser.sh, only the npm error output is s
   - Corrupt npm cache
 
 ## Proposed Solutions
+
 ### Option A: Add Error Handler with Common Failure Troubleshooting (Recommended)
+
 - Wrap npm install in error handler
 - On failure, show:
   - What failed (npm install agent-browser)
@@ -36,6 +42,7 @@ If npm install fails in install-agent-browser.sh, only the npm error output is s
 - Provide contextual help based on error type
 
 ### Option B: Add Prerequisite Checks
+
 - Check node version before npm install
 - Check npm version
 - Check disk space
@@ -44,9 +51,13 @@ If npm install fails in install-agent-browser.sh, only the npm error output is s
 - Prevent npm install from running if environment is wrong
 
 ## Recommended Action
-Implement both Option A and Option B. Add prerequisite checks for node/npm version. Wrap npm install in error handler that provides troubleshooting context. Show common failure modes and remediation steps.
+
+Implement both Option A and Option B. Add prerequisite checks for node/npm
+version. Wrap npm install in error handler that provides troubleshooting
+context. Show common failure modes and remediation steps.
 
 ## Technical Details
+
 ```bash
 # Add prerequisite checks
 node_version=$(node --version | cut -d'v' -f2 | cut -d'.' -f1)
@@ -72,6 +83,7 @@ fi
 ```
 
 ## Acceptance Criteria
+
 - [ ] Add node version check (requires 18+)
 - [ ] Add npm version check (requires recent npm)
 - [ ] Wrap npm install in error handler
@@ -81,10 +93,12 @@ fi
 - [ ] Test with old node version (should fail with clear message)
 
 ## Work Log
-| Date | Action | Learnings |
-|------|--------|-----------|
+
+| Date       | Action                          | Learnings                                           |
+| ---------- | ------------------------------- | --------------------------------------------------- |
 | 2026-02-13 | Created from PR #11 code review | P3 UX finding - improves troubleshooting experience |
 
 ## Resources
+
 - PR: #11 (yellow-browser-test plugin code review)
 - Related files: scripts/install-agent-browser.sh

@@ -37,7 +37,9 @@ const marketplaceFlagIndex = args.indexOf('--marketplace');
 if (marketplaceFlagIndex !== -1) {
   const providedPath = args[marketplaceFlagIndex + 1];
   if (!providedPath || providedPath.startsWith('--')) {
-    console.error(`${colors.red}✗ ERROR:${colors.reset} Missing value for --marketplace flag`);
+    console.error(
+      `${colors.red}✗ ERROR:${colors.reset} Missing value for --marketplace flag`
+    );
     process.exit(1);
   }
   marketplacePath = providedPath;
@@ -109,7 +111,10 @@ function validateOfficialFormat() {
 
   // Optional but recommended: owner
   if (marketplace.owner) {
-    if (typeof marketplace.owner.name !== 'string' || marketplace.owner.name.trim() === '') {
+    if (
+      typeof marketplace.owner.name !== 'string' ||
+      marketplace.owner.name.trim() === ''
+    ) {
       logWarning('owner.name is missing or empty');
     } else {
       logSuccess(`Owner: ${marketplace.owner.name}`);
@@ -120,13 +125,17 @@ function validateOfficialFormat() {
   if (marketplace.metadata && marketplace.metadata.version) {
     const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
     if (!semverPattern.test(marketplace.metadata.version)) {
-      logError(`Invalid metadata.version format: ${marketplace.metadata.version} (must be semver)`);
+      logError(
+        `Invalid metadata.version format: ${marketplace.metadata.version} (must be semver)`
+      );
     }
   }
 
   // Warn if using old custom format
   if (marketplace.schemaVersion || marketplace.marketplace) {
-    logWarning('Detected old custom format fields (schemaVersion, marketplace). The official format uses flat top-level fields: name, owner, plugins.');
+    logWarning(
+      'Detected old custom format fields (schemaVersion, marketplace). The official format uses flat top-level fields: name, owner, plugins.'
+    );
   }
 }
 
@@ -138,8 +147,10 @@ function validatePluginNameUniqueness() {
 
   logInfo('Validating plugin name uniqueness...');
 
-  const names = marketplace.plugins.map(p => p.name);
-  const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
+  const names = marketplace.plugins.map((p) => p.name);
+  const duplicates = names.filter(
+    (name, index) => names.indexOf(name) !== index
+  );
 
   if (duplicates.length > 0) {
     logError(`Duplicate plugin names: ${[...new Set(duplicates)].join(', ')}`);
@@ -160,11 +171,15 @@ function validateRequiredPluginFields() {
 
   for (const plugin of marketplace.plugins) {
     if (!plugin.name) {
-      logError(`Plugin missing required field "name": ${JSON.stringify(plugin)}`);
+      logError(
+        `Plugin missing required field "name": ${JSON.stringify(plugin)}`
+      );
       allValid = false;
     }
     if (!plugin.source) {
-      logError(`Plugin "${plugin.name || '(unnamed)'}" missing required field "source"`);
+      logError(
+        `Plugin "${plugin.name || '(unnamed)'}" missing required field "source"`
+      );
       allValid = false;
     }
   }
@@ -189,7 +204,9 @@ function validateSourcePaths() {
 
     // Skip remote sources (object format with url)
     if (typeof plugin.source === 'object') {
-      logSuccess(`Plugin "${plugin.name}" uses remote source: ${plugin.source.url || '(url)'}`);
+      logSuccess(
+        `Plugin "${plugin.name}" uses remote source: ${plugin.source.url || '(url)'}`
+      );
       continue;
     }
 
@@ -198,10 +215,14 @@ function validateSourcePaths() {
     const manifestPath = path.join(pluginDir, '.claude-plugin', 'plugin.json');
 
     if (!fs.existsSync(pluginDir)) {
-      logError(`Plugin "${plugin.name}" source directory not found: ${sourcePath}`);
+      logError(
+        `Plugin "${plugin.name}" source directory not found: ${sourcePath}`
+      );
       allExist = false;
     } else if (!fs.existsSync(manifestPath)) {
-      logError(`Plugin "${plugin.name}" missing .claude-plugin/plugin.json at: ${sourcePath}`);
+      logError(
+        `Plugin "${plugin.name}" missing .claude-plugin/plugin.json at: ${sourcePath}`
+      );
       allExist = false;
     } else {
       logSuccess(`Plugin "${plugin.name}" source verified: ${sourcePath}`);
@@ -227,14 +248,21 @@ function validateVersionConsistency() {
     if (!plugin.version) continue;
 
     if (!semverPattern.test(plugin.version)) {
-      logError(`Plugin "${plugin.name}" invalid version format: ${plugin.version}`);
+      logError(
+        `Plugin "${plugin.name}" invalid version format: ${plugin.version}`
+      );
       continue;
     }
 
     if (!plugin.source || typeof plugin.source === 'object') continue;
 
     const sourcePath = plugin.source.replace(/^\.\//, '');
-    const manifestPath = path.join(PROJECT_ROOT, sourcePath, '.claude-plugin', 'plugin.json');
+    const manifestPath = path.join(
+      PROJECT_ROOT,
+      sourcePath,
+      '.claude-plugin',
+      'plugin.json'
+    );
 
     if (fs.existsSync(manifestPath)) {
       try {
@@ -244,10 +272,14 @@ function validateVersionConsistency() {
             `Version mismatch for "${plugin.name}": marketplace=${plugin.version}, plugin.json=${manifest.version}`
           );
         } else if (manifest.version) {
-          logSuccess(`Plugin "${plugin.name}" version matches: ${plugin.version}`);
+          logSuccess(
+            `Plugin "${plugin.name}" version matches: ${plugin.version}`
+          );
         }
       } catch (err) {
-        logWarning(`Could not validate version for "${plugin.name}": ${err.message}`);
+        logWarning(
+          `Could not validate version for "${plugin.name}": ${err.message}`
+        );
       }
     }
   }
@@ -264,34 +296,52 @@ function validatePerformance() {
   const sizeKB = (stats.size / 1024).toFixed(2);
 
   if (stats.size > 100 * 1024) {
-    logWarning(`Marketplace file is large (${sizeKB} KB). Consider optimizing.`);
+    logWarning(
+      `Marketplace file is large (${sizeKB} KB). Consider optimizing.`
+    );
   } else {
     logSuccess(`File size: ${sizeKB} KB`);
   }
 }
 
 function printSummary() {
-  console.log(`\n${colors.cyan}========================================${colors.reset}`);
+  console.log(
+    `\n${colors.cyan}========================================${colors.reset}`
+  );
   console.log(`${colors.cyan}  Validation Summary${colors.reset}`);
-  console.log(`${colors.cyan}========================================${colors.reset}\n`);
+  console.log(
+    `${colors.cyan}========================================${colors.reset}\n`
+  );
 
   if (errors.length === 0 && warnings.length === 0) {
-    console.log(`${colors.green}✓ All validation checks passed!${colors.reset}\n`);
+    console.log(
+      `${colors.green}✓ All validation checks passed!${colors.reset}\n`
+    );
   } else {
     if (errors.length > 0) {
-      console.log(`${colors.red}✗ ${errors.length} error(s) found${colors.reset}`);
+      console.log(
+        `${colors.red}✗ ${errors.length} error(s) found${colors.reset}`
+      );
     }
     if (warnings.length > 0) {
-      console.log(`${colors.yellow}⚠ ${warnings.length} warning(s) found${colors.reset}`);
+      console.log(
+        `${colors.yellow}⚠ ${warnings.length} warning(s) found${colors.reset}`
+      );
     }
     console.log('');
   }
 }
 
 function runValidation() {
-  console.log(`\n${colors.cyan}========================================${colors.reset}`);
-  console.log(`${colors.cyan}  Marketplace Validator (Official Format)${colors.reset}`);
-  console.log(`${colors.cyan}========================================${colors.reset}\n`);
+  console.log(
+    `\n${colors.cyan}========================================${colors.reset}`
+  );
+  console.log(
+    `${colors.cyan}  Marketplace Validator (Official Format)${colors.reset}`
+  );
+  console.log(
+    `${colors.cyan}========================================${colors.reset}\n`
+  );
 
   logInfo(`Validating: ${marketplacePath}`);
   logInfo(`Project root: ${PROJECT_ROOT}\n`);

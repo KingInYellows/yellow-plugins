@@ -4,11 +4,16 @@ Technical debt audit and remediation plugin for Claude Code.
 
 ## Overview
 
-The `yellow-debt` plugin runs comprehensive technical debt audits using 5 parallel specialized scanner agents, produces prioritized markdown reports with actionable todo files, and provides remediation workflows including interactive triage, agent-driven fixes, and Linear issue sync.
+The `yellow-debt` plugin runs comprehensive technical debt audits using 5
+parallel specialized scanner agents, produces prioritized markdown reports with
+actionable todo files, and provides remediation workflows including interactive
+triage, agent-driven fixes, and Linear issue sync.
 
 ## Problem
 
-AI coding tools generate functional code that accumulates technical debt through patterns invisible to traditional linting:
+AI coding tools generate functional code that accumulates technical debt through
+patterns invisible to traditional linting:
+
 - **Excessive commenting** that inflates cognitive load
 - **By-the-book implementations** ignoring domain-specific context
 - **Refactoring avoidance** — no method extraction or consolidation
@@ -17,13 +22,18 @@ AI coding tools generate functional code that accumulates technical debt through
 
 ## Solution
 
-**Scanner Fleet Architecture** — 5 parallel specialized agents that analyze your codebase:
+**Scanner Fleet Architecture** — 5 parallel specialized agents that analyze your
+codebase:
 
-1. **AI Pattern Scanner** — Detects AI-specific anti-patterns (excessive comments, boilerplate, over-specification)
-2. **Complexity Scanner** — Finds high cyclomatic/cognitive complexity, deep nesting, god functions
+1. **AI Pattern Scanner** — Detects AI-specific anti-patterns (excessive
+   comments, boilerplate, over-specification)
+2. **Complexity Scanner** — Finds high cyclomatic/cognitive complexity, deep
+   nesting, god functions
 3. **Duplication Scanner** — Identifies code duplication and near-duplicates
-4. **Architecture Scanner** — Detects circular dependencies, boundary violations, god modules
-5. **Security Debt Scanner** — Finds security-related technical debt (not active vulnerabilities)
+4. **Architecture Scanner** — Detects circular dependencies, boundary
+   violations, god modules
+5. **Security Debt Scanner** — Finds security-related technical debt (not active
+   vulnerabilities)
 
 ## Commands
 
@@ -46,6 +56,7 @@ Run a comprehensive or targeted technical debt audit.
 ```
 
 **Output:**
+
 - Audit report at `docs/audits/YYYY-MM-DD-audit-report.md`
 - Todo files at `todos/debt/NNN-pending-SEVERITY-slug.md`
 
@@ -64,7 +75,8 @@ Interactively review and prioritize pending findings.
 /debt:triage --priority p1
 ```
 
-**Actions:** Accept (→ ready), Reject (→ deleted), Defer (→ deferred with reason)
+**Actions:** Accept (→ ready), Reject (→ deleted), Defer (→ deferred with
+reason)
 
 ### `/debt:fix <path>`
 
@@ -117,34 +129,38 @@ Each finding becomes a todo file with:
 
 ```markdown
 ---
-id: "042"
+id: '042'
 status: pending
 priority: p2
 category: complexity
 severity: high
 effort: small
 scanner: complexity-scanner
-audit_date: "2026-02-13"
+audit_date: '2026-02-13'
 affected_files:
   - src/services/user-service.ts:45-89
 linear_issue_id: null
 deferred_until: null
 deferred_reason: null
-content_hash: "a3f2b1c4"
+content_hash: 'a3f2b1c4'
 ---
 
 # High Cyclomatic Complexity in UserService
 
 ## Finding
+
 [Description of the issue]
 
 ## Context
+
 [Code snippet]
 
 ## Suggested Remediation
+
 [How to fix it]
 
 ## Effort Estimate
+
 **Small** (30min-2hr): Extract 2-3 methods, flatten nesting.
 ```
 
@@ -164,7 +180,11 @@ All state transitions are atomic and TOCTOU-safe via `flock`.
 - **Required**: git, jq, yq, realpath, flock, Graphite CLI (gt)
 - **Optional**: yellow-linear plugin (for `/debt:sync`)
 
-**Note on yq**: This plugin is compatible with kislyuk/yq (Python-based YAML processor). Todo files are markdown with YAML frontmatter, which requires special handling via the `extract_frontmatter()` and `update_frontmatter()` helpers in `lib/validate.sh`. These functions extract the YAML section before passing to yq, ensuring compatibility across different yq implementations.
+**Note on yq**: This plugin is compatible with kislyuk/yq (Python-based YAML
+processor). Todo files are markdown with YAML frontmatter, which requires
+special handling via the `extract_frontmatter()` and `update_frontmatter()`
+helpers in `lib/validate.sh`. These functions extract the YAML section before
+passing to yq, ensuring compatibility across different yq implementations.
 
 ## Installation
 
@@ -178,7 +198,8 @@ All state transitions are atomic and TOCTOU-safe via `flock`.
 
 ## Configuration
 
-No configuration required. Optional Linear sync settings stored in `.debt/linear-config.json`.
+No configuration required. Optional Linear sync settings stored in
+`.debt/linear-config.json`.
 
 ## Security
 
@@ -192,10 +213,12 @@ No configuration required. Optional Linear sync settings stored in `.debt/linear
 
 - **File enumeration**: 10K files in 5-10 seconds (extension-based filtering)
 - **Deduplication**: 1000 findings in <1 second (O(n log n) algorithm)
-- **Query performance**: 1000 findings in 10-15 seconds (optimized), 1-2 seconds (cached)
+- **Query performance**: 1000 findings in 10-15 seconds (optimized), 1-2 seconds
+  (cached)
 - **Parallel scanners**: All 5 run concurrently
 - **Partial results**: Continues even if scanners fail (≤50% threshold)
-- **Total audit time**: 30-60 minutes for large codebases (LLM scanner latency dominates)
+- **Total audit time**: 30-60 minutes for large codebases (LLM scanner latency
+  dominates)
 
 ## Known Limitations
 
@@ -207,11 +230,13 @@ No configuration required. Optional Linear sync settings stored in `.debt/linear
 ## Error Recovery
 
 If a scanner fails:
+
 1. Check `.debt/scanner-output/<scanner>.json` for error details
 2. Re-run with `--category <name>` to retry that scanner
 3. Partial results still available from successful scanners
 
 If synthesis fails:
+
 1. Scanner outputs preserved in `.debt/scanner-output/`
 2. Re-run `/debt:audit` to retry synthesis
 3. Check logs for specific error messages

@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "088"
+issue_id: '088'
 tags: [code-review, yellow-ci, quality]
 dependencies: []
 ---
@@ -10,7 +10,8 @@ dependencies: []
 
 ## Problem Statement
 
-Project convention requires agent `.md` files to stay under 120 lines. `runner-diagnostics.md` is at 128 lines (8 over limit).
+Project convention requires agent `.md` files to stay under 120 lines.
+`runner-diagnostics.md` is at 128 lines (8 over limit).
 
 ## Findings
 
@@ -18,11 +19,13 @@ Project convention requires agent `.md` files to stay under 120 lines. `runner-d
 - **Current length**: 128 lines
 - **Over limit by**: 8 lines
 
-The SSH security section duplicates patterns documented in `ci-conventions` skill `references/security-patterns.md`.
+The SSH security section duplicates patterns documented in `ci-conventions`
+skill `references/security-patterns.md`.
 
 ## Proposed Solutions
 
 **Option 1 (Recommended): Reference ci-conventions skill**
+
 - Replace inline SSH security rules with reference to ci-conventions skill
 - Keep trigger clauses and agent-specific instructions
 - Target: ≤ 118 lines

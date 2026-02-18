@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "083"
+issue_id: '083'
 tags: [code-review, yellow-ci, performance]
 dependencies: []
 ---
@@ -10,7 +10,9 @@ dependencies: []
 
 ## Problem Statement
 
-Log fetching in `failure-analyst.md` uses `head -n 500` to limit line count but lacks byte-level protection. Extremely long lines (such as base64-encoded artifacts in CI logs) could consume excessive memory.
+Log fetching in `failure-analyst.md` uses `head -n 500` to limit line count but
+lacks byte-level protection. Extremely long lines (such as base64-encoded
+artifacts in CI logs) could consume excessive memory.
 
 ## Findings
 
@@ -20,15 +22,18 @@ Log fetching in `failure-analyst.md` uses `head -n 500` to limit line count but 
 - **Risk**: 500 lines × 1MB/line = up to 500MB memory consumption
 
 Example scenario:
+
 ```bash
 gh run view "$RUN_ID" --log-failed 2>/dev/null | head -n 500
 ```
 
-If a single line contains a large base64 blob or binary artifact dump, the 500-line limit won't protect against memory exhaustion.
+If a single line contains a large base64 blob or binary artifact dump, the
+500-line limit won't protect against memory exhaustion.
 
 ## Proposed Solutions
 
 Add byte-level limit after line limit:
+
 ```bash
 gh run view "$RUN_ID" --log-failed 2>/dev/null | head -n 500 | head -c 5242880
 ```
@@ -40,6 +45,7 @@ gh run view "$RUN_ID" --log-failed 2>/dev/null | head -n 500 | head -c 5242880
 ## Technical Details
 
 The 5MB limit is reasonable because:
+
 - Typical CI failure logs are <100KB
 - 5MB allows for verbose output while preventing abuse
 - LLM context windows handle 5MB of text comfortably

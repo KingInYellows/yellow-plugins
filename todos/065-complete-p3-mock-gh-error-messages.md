@@ -1,7 +1,7 @@
 ---
 status: pending
 priority: p3
-issue_id: "065"
+issue_id: '065'
 tags: [code-review, testing, yellow-review]
 dependencies: []
 ---
@@ -10,7 +10,9 @@ dependencies: []
 
 ## Problem Statement
 
-The mock `gh` script in tests falls through to a generic error for unmatched argument patterns. It should list available fixtures/patterns to aid debugging test failures.
+The mock `gh` script in tests falls through to a generic error for unmatched
+argument patterns. It should list available fixtures/patterns to aid debugging
+test failures.
 
 ## Findings
 
@@ -20,7 +22,9 @@ The mock `gh` script in tests falls through to a generic error for unmatched arg
 ## Proposed Solutions
 
 ### Option A: Add fixture listing to error output
-- In the default/fallback case, print available patterns and received args to stderr
+
+- In the default/fallback case, print available patterns and received args to
+  stderr
 - **Effort:** Small (5 min)
 - **Risk:** Low
 
@@ -39,9 +43,9 @@ Option A.
 
 ## Work Log
 
-| Date | Action | Learnings |
-|------|--------|-----------|
-| 2026-02-14 | Created from code review | |
+| Date       | Action                   | Learnings |
+| ---------- | ------------------------ | --------- |
+| 2026-02-14 | Created from code review |           |
 
 ## Resources
 

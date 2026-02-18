@@ -1,9 +1,8 @@
 # CLI Contract Catalog
 
-**Document Version**: 1.0.0
-**Last Updated**: 2026-01-11
-**Specification Reference**: Section 2 API Style, Section 4 Documentation Directive
-**Status**: Active
+**Document Version**: 1.0.0 **Last Updated**: 2026-01-11 **Specification
+Reference**: Section 2 API Style, Section 4 Documentation Directive **Status**:
+Active
 
 <!-- anchor: cli-contracts-catalog -->
 
@@ -105,7 +104,8 @@
 
 ### 1.1 Purpose
 
-This document defines the canonical JSON envelope contracts for CLI commands in the Claude Code Plugin Marketplace. These contracts enable:
+This document defines the canonical JSON envelope contracts for CLI commands in
+the Claude Code Plugin Marketplace. These contracts enable:
 
 - **Automation**: Programmatic command invocation via JSON payloads
 - **Determinism**: Reproducible operations for CI/CD pipelines
@@ -119,9 +119,12 @@ This document defines the canonical JSON envelope contracts for CLI commands in 
 All CLI commands support dual modes of operation:
 
 1. **Interactive Mode**: Standard CLI arguments and flags
-2. **Automated Mode**: JSON input via `--input` flag, JSON output via `--output` flag
+2. **Automated Mode**: JSON input via `--input` flag, JSON output via `--output`
+   flag
 
-**Specification References**: [FR-001](../SPECIFICATION.md#fr-001), [FR-002](../SPECIFICATION.md#fr-002), [CRIT-001](../SPECIFICATION.md#crit-001), [CRIT-004](../SPECIFICATION.md#crit-004)
+**Specification References**: [FR-001](../SPECIFICATION.md#fr-001),
+[FR-002](../SPECIFICATION.md#fr-002), [CRIT-001](../SPECIFICATION.md#crit-001),
+[CRIT-004](../SPECIFICATION.md#crit-004)
 
 ### 1.3 Schema Locations
 
@@ -131,7 +134,8 @@ All contract schemas are located in the `api/cli-contracts/` directory:
 - `api/cli-contracts/update.json` - Update command contract
 - `api/cli-contracts/rollback.json` - Rollback command contract
 
-Each schema file defines both **request** (input) and **response** (output) envelopes using JSON Schema Draft-07.
+Each schema file defines both **request** (input) and **response** (output)
+envelopes using JSON Schema Draft-07.
 
 ---
 
@@ -216,7 +220,8 @@ interface CompatibilityIntent {
 }
 ```
 
-**Specification Reference**: [CRIT-002b](../SPECIFICATION.md#crit-002b), [CRIT-005](../SPECIFICATION.md#crit-005)
+**Specification Reference**: [CRIT-002b](../SPECIFICATION.md#crit-002b),
+[CRIT-005](../SPECIFICATION.md#crit-005)
 
 ### 2.4 Feature Flag Evaluations
 
@@ -237,7 +242,8 @@ interface FlagEvaluations {
 }
 ```
 
-**Specification Reference**: Section 4 Directives & Process (Feature-Flag Governance)
+**Specification Reference**: Section 4 Directives & Process (Feature-Flag
+Governance)
 
 ### 2.5 Error Details
 
@@ -308,7 +314,8 @@ interface TelemetryMetrics {
 }
 ```
 
-**Specification Reference**: [CRIT-010](../SPECIFICATION.md#crit-010), Section 4 Security & Observability
+**Specification Reference**: [CRIT-010](../SPECIFICATION.md#crit-010), Section 4
+Security & Observability
 
 ---
 
@@ -320,8 +327,11 @@ interface TelemetryMetrics {
 
 - **Command**: `install`
 - **Aliases**: `i`, `add`
-- **Schema**: [`api/cli-contracts/install.json`](../../api/cli-contracts/install.json)
-- **Specification Anchors**: [FR-001](../SPECIFICATION.md#fr-001), [CRIT-001](../SPECIFICATION.md#crit-001), [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
+- **Schema**:
+  [`api/cli-contracts/install.json`](../../api/cli-contracts/install.json)
+- **Specification Anchors**: [FR-001](../SPECIFICATION.md#fr-001),
+  [CRIT-001](../SPECIFICATION.md#crit-001),
+  [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-INSTALL-001`, `ERR-INSTALL-002`, `ERR-COMPAT-001`
 
 ### 3.2 Request Schema
@@ -510,8 +520,11 @@ cat install-request.json | pnpm cli install --input - --output -
 
 - **Command**: `update`
 - **Aliases**: `up`, `upgrade`
-- **Schema**: [`api/cli-contracts/update.json`](../../api/cli-contracts/update.json)
-- **Specification Anchors**: [FR-002](../SPECIFICATION.md#fr-002), [CRIT-002](../SPECIFICATION.md#crit-002), [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
+- **Schema**:
+  [`api/cli-contracts/update.json`](../../api/cli-contracts/update.json)
+- **Specification Anchors**: [FR-002](../SPECIFICATION.md#fr-002),
+  [CRIT-002](../SPECIFICATION.md#crit-002),
+  [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-UPDATE-001`, `ERR-UPDATE-002`, `ERR-COMPAT-001`
 
 ### 4.2 Request Schema
@@ -685,8 +698,11 @@ pnpm cli update --all --check-only
 
 - **Command**: `rollback`
 - **Aliases**: `rb`, `revert`
-- **Schema**: [`api/cli-contracts/rollback.json`](../../api/cli-contracts/rollback.json)
-- **Specification Anchors**: [FR-003](../SPECIFICATION.md#fr-003), [CRIT-018](../SPECIFICATION.md#crit-018), [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
+- **Schema**:
+  [`api/cli-contracts/rollback.json`](../../api/cli-contracts/rollback.json)
+- **Specification Anchors**: [FR-003](../SPECIFICATION.md#fr-003),
+  [CRIT-018](../SPECIFICATION.md#crit-018),
+  [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-ROLLBACK-001`, `ERR-ROLLBACK-002`, `ERR-CACHE-001`
 - **Required Feature Flag**: `enableRollback`
 
@@ -909,14 +925,16 @@ jobs:
           EOF
 
       - name: Validate Request
-        run: ajv validate -s api/cli-contracts/install.json -d install-request.json
+        run:
+          ajv validate -s api/cli-contracts/install.json -d install-request.json
 
       - name: Install Plugin
         run: |
           pnpm cli install --input install-request.json --output install-result.json
 
       - name: Validate Response
-        run: ajv validate -s api/cli-contracts/install.json -d install-result.json
+        run:
+          ajv validate -s api/cli-contracts/install.json -d install-result.json
 
       - name: Upload Results
         uses: actions/upload-artifact@v4
@@ -983,9 +1001,10 @@ pnpm cli install example-plugin --dry-run
 cat request.json | pnpm cli install --input - --dry-run --output result.json
 ```
 
-Dry-run responses include `status: "dry-run"` and omit transactionId/registry mutations.
-They still emit synthetic `transactionId` values for correlation, but the `telemetry.registryMutations`
-field remains zero and downstream services treat them as non-persistent simulations.
+Dry-run responses include `status: "dry-run"` and omit transactionId/registry
+mutations. They still emit synthetic `transactionId` values for correlation, but
+the `telemetry.registryMutations` field remains zero and downstream services
+treat them as non-persistent simulations.
 
 ---
 
@@ -995,30 +1014,30 @@ field remains zero and downstream services treat them as non-persistent simulati
 
 ### 7.1 Functional Requirements Coverage
 
-| Contract | FR Reference | Description |
-|----------|--------------|-------------|
-| Install | FR-001 | Schema-driven plugin installation |
-| Update | FR-002 | Update installed plugins |
-| Rollback | FR-003 | Rollback to previous versions |
-| All | FR-006 | Manifest-driven command routing |
+| Contract | FR Reference | Description                       |
+| -------- | ------------ | --------------------------------- |
+| Install  | FR-001       | Schema-driven plugin installation |
+| Update   | FR-002       | Update installed plugins          |
+| Rollback | FR-003       | Rollback to previous versions     |
+| All      | FR-006       | Manifest-driven command routing   |
 
 ### 7.2 Critical Fixes Coverage
 
-| Contract Section | CRIT Reference | Correction Applied |
-|------------------|----------------|-------------------|
-| Compatibility Intent | CRIT-002b, CRIT-005 | Platform/version validation |
-| Error Details | CRIT-007 | Installation error handling |
-| Telemetry Context | CRIT-010 | Lifecycle script observability |
-| Feature Flags | CRIT-004 | Flag governance |
-| Rollback Cache | CRIT-018 | 100% cached rollback success |
+| Contract Section     | CRIT Reference      | Correction Applied             |
+| -------------------- | ------------------- | ------------------------------ |
+| Compatibility Intent | CRIT-002b, CRIT-005 | Platform/version validation    |
+| Error Details        | CRIT-007            | Installation error handling    |
+| Telemetry Context    | CRIT-010            | Lifecycle script observability |
+| Feature Flags        | CRIT-004            | Flag governance                |
+| Rollback Cache       | CRIT-018            | 100% cached rollback success   |
 
 ### 7.3 Non-Functional Requirements
 
-| Contract Feature | NFR Reference | Implementation |
-|------------------|---------------|----------------|
-| Schema Validation | NFR-MAINT-002 | AJV validation with strict mode |
-| Atomic Persistence | Section 4 Directives | transactionId tracking |
-| Observability | Section 4 Security | Structured telemetry metrics |
+| Contract Feature   | NFR Reference        | Implementation                  |
+| ------------------ | -------------------- | ------------------------------- |
+| Schema Validation  | NFR-MAINT-002        | AJV validation with strict mode |
+| Atomic Persistence | Section 4 Directives | transactionId tracking          |
+| Observability      | Section 4 Security   | Structured telemetry metrics    |
 
 ---
 
@@ -1034,14 +1053,16 @@ Contract schemas follow semantic versioning:
 - **Minor**: Backward-compatible additions (new optional fields)
 - **Patch**: Fixes and clarifications (documentation, examples)
 
-Schema `$id` includes version: `https://yellow-plugins.dev/schemas/cli-contracts/install/v1.json`
+Schema `$id` includes version:
+`https://yellow-plugins.dev/schemas/cli-contracts/install/v1.json`
 
 ### 8.2 Migration Path
 
 When schemas evolve:
 
 1. Publish new schema version in `api/cli-contracts/`
-2. Update CLI to accept both old and new versions (grace period: 2 minor versions)
+2. Update CLI to accept both old and new versions (grace period: 2 minor
+   versions)
 3. Update traceability matrix with migration notes
 4. Deprecate old version with sunset date in changelog
 
@@ -1087,7 +1108,8 @@ Invalid JSON input triggers immediate failure with detailed error:
 
 ### 9.2 Partial Success
 
-Commands that operate on multiple items (e.g., `update --all`) return `status: "partial"` when some operations fail:
+Commands that operate on multiple items (e.g., `update --all`) return
+`status: "partial"` when some operations fail:
 
 ```json
 {
@@ -1185,9 +1207,12 @@ Location: `packages/cli/src/lib/io.ts`
 
 Provides:
 
-- `loadRequest<T>(options: BaseCommandOptions): Promise<T>` - Load JSON from `--input` or build from CLI args
-- `writeResponse<T>(response: T, options: BaseCommandOptions): Promise<void>` - Write JSON to `--output` or stdout
-- `validateSchema(data: unknown, schemaPath: string): Result<void>` - AJV validation wrapper
+- `loadRequest<T>(options: BaseCommandOptions): Promise<T>` - Load JSON from
+  `--input` or build from CLI args
+- `writeResponse<T>(response: T, options: BaseCommandOptions): Promise<void>` -
+  Write JSON to `--output` or stdout
+- `validateSchema(data: unknown, schemaPath: string): Result<void>` - AJV
+  validation wrapper
 
 ### 11.2 Command Integration Pattern
 
@@ -1195,7 +1220,10 @@ Provides:
 import { loadRequest, writeResponse } from '../lib/io.js';
 import type { InstallRequest, InstallResponse } from '@yellow-plugins/domain';
 
-const installHandler: CommandHandler<InstallOptions> = async (options, context) => {
+const installHandler: CommandHandler<InstallOptions> = async (
+  options,
+  context
+) => {
   // Load request from JSON or CLI args
   const request = await loadRequest<InstallRequest>(options, {
     pluginId: options.plugin,
@@ -1243,9 +1271,9 @@ All schemas use JSON Schema Draft-07:
 
 ### 12.3 Version History
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-01-11 | Initial CLI contract catalog (I2.T4 deliverable) |
+| Version | Date       | Changes                                          |
+| ------- | ---------- | ------------------------------------------------ |
+| 1.0.0   | 2026-01-11 | Initial CLI contract catalog (I2.T4 deliverable) |
 
 ---
 
@@ -1257,9 +1285,13 @@ All schemas use JSON Schema Draft-07:
 
 - **Command**: `browse`
 - **Aliases**: `list`, `ls`
-- **Schema**: [`api/cli-contracts/browse.json`](../../api/cli-contracts/browse.json)
-- **Specification Anchors**: [FR-006](../SPECIFICATION.md#fr-006), [CRIT-006](../SPECIFICATION.md#crit-006), [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
-- **Error Codes**: `ERR-BROWSE-001`, `ERR-BROWSE-002`, `ERR-BROWSE-003`, `ERR-BROWSE-004`, `ERR-BROWSE-005`
+- **Schema**:
+  [`api/cli-contracts/browse.json`](../../api/cli-contracts/browse.json)
+- **Specification Anchors**: [FR-006](../SPECIFICATION.md#fr-006),
+  [CRIT-006](../SPECIFICATION.md#crit-006),
+  [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
+- **Error Codes**: `ERR-BROWSE-001`, `ERR-BROWSE-002`, `ERR-BROWSE-003`,
+  `ERR-BROWSE-004`, `ERR-BROWSE-005`
 - **Required Feature Flag**: `enableBrowse`
 
 ### 13.2 Request Schema
@@ -1352,8 +1384,11 @@ See [Browse Command Documentation](../cli/browse.md) for detailed examples.
 
 - **Command**: `search`
 - **Aliases**: `find`
-- **Schema**: [`api/cli-contracts/search.json`](../../api/cli-contracts/search.json)
-- **Specification Anchors**: [FR-007](../SPECIFICATION.md#fr-007), [CRIT-007](../SPECIFICATION.md#crit-007), [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
+- **Schema**:
+  [`api/cli-contracts/search.json`](../../api/cli-contracts/search.json)
+- **Specification Anchors**: [FR-007](../SPECIFICATION.md#fr-007),
+  [CRIT-007](../SPECIFICATION.md#crit-007),
+  [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-SEARCH-001`, `ERR-SEARCH-002`
 
 ### 14.2 Request Schema
@@ -1423,7 +1458,8 @@ interface SearchResponse extends BaseResponse {
 - **Command**: `info`
 - **Aliases**: `show`, `details`
 - **Schema**: [`api/cli-contracts/info.json`](../../api/cli-contracts/info.json)
-- **Specification Anchors**: [FR-006](../SPECIFICATION.md#fr-006), [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
+- **Specification Anchors**: [FR-006](../SPECIFICATION.md#fr-006),
+  [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-INFO-001`, `ERR-INFO-002`
 
 ### 15.2 Request Schema
@@ -1504,9 +1540,15 @@ interface InfoResponse extends BaseResponse {
 
 - **Command**: `uninstall`
 - **Aliases**: `rm`, `remove`
-- **Schema**: [`api/cli-contracts/uninstall.json`](../../api/cli-contracts/uninstall.json)
-- **Specification Anchors**: [FR-004](../SPECIFICATION.md#fr-004), [CRIT-004](../SPECIFICATION.md#crit-004), [CRIT-010](../SPECIFICATION.md#crit-010), [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
-- **Error Codes**: `ERR-UNINSTALL-001`, `ERR-UNINSTALL-002`, `ERR-UNINSTALL-003`, `ERR-UNINSTALL-004`, `ERR-UNINSTALL-005`, `ERR-UNINSTALL-006`, `ERR-UNINSTALL-007`
+- **Schema**:
+  [`api/cli-contracts/uninstall.json`](../../api/cli-contracts/uninstall.json)
+- **Specification Anchors**: [FR-004](../SPECIFICATION.md#fr-004),
+  [CRIT-004](../SPECIFICATION.md#crit-004),
+  [CRIT-010](../SPECIFICATION.md#crit-010),
+  [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
+- **Error Codes**: `ERR-UNINSTALL-001`, `ERR-UNINSTALL-002`,
+  `ERR-UNINSTALL-003`, `ERR-UNINSTALL-004`, `ERR-UNINSTALL-005`,
+  `ERR-UNINSTALL-006`, `ERR-UNINSTALL-007`
 
 ### 16.2 Request Schema
 
@@ -1588,7 +1630,8 @@ interface UninstallResponse extends BaseResponse {
 
 ### 16.4 Usage Examples
 
-See [Uninstall Command Documentation](../cli/uninstall.md) for detailed examples.
+See [Uninstall Command Documentation](../cli/uninstall.md) for detailed
+examples.
 
 ---
 
@@ -1598,33 +1641,33 @@ See [Uninstall Command Documentation](../cli/uninstall.md) for detailed examples
 
 ### 17.1 Functional Requirements Coverage (Extended)
 
-| Contract | FR Reference | Description |
-|----------|--------------|-------------|
-| Install | FR-001 | Schema-driven plugin installation |
-| Update | FR-002 | Update installed plugins |
-| Rollback | FR-003 | Rollback to previous versions |
-| Uninstall | FR-004 | Uninstall with lifecycle hooks |
-| Publish | FR-005 | Publish plugins to marketplace |
-| Browse | FR-006 | Browse marketplace plugins |
-| Search | FR-007 | Search for plugins |
-| Pin | FR-008 | Pin plugin versions |
-| Check-Updates | FR-009 | Check for available updates |
-| Info | FR-010 | View plugin information |
+| Contract      | FR Reference | Description                       |
+| ------------- | ------------ | --------------------------------- |
+| Install       | FR-001       | Schema-driven plugin installation |
+| Update        | FR-002       | Update installed plugins          |
+| Rollback      | FR-003       | Rollback to previous versions     |
+| Uninstall     | FR-004       | Uninstall with lifecycle hooks    |
+| Publish       | FR-005       | Publish plugins to marketplace    |
+| Browse        | FR-006       | Browse marketplace plugins        |
+| Search        | FR-007       | Search for plugins                |
+| Pin           | FR-008       | Pin plugin versions               |
+| Check-Updates | FR-009       | Check for available updates       |
+| Info          | FR-010       | View plugin information           |
 
 ### 17.2 Critical Fixes Coverage (Extended)
 
-| Contract Section | CRIT Reference | Correction Applied |
-|------------------|----------------|-------------------|
-| Compatibility Intent | CRIT-002b, CRIT-005 | Platform/version validation |
-| Error Details | CRIT-007 | Installation error handling |
-| Telemetry Context | CRIT-010 | Lifecycle script observability |
-| Feature Flags | CRIT-004 | Flag governance |
-| Rollback Cache | CRIT-018 | 100% cached rollback success |
-| Browse Ranking | CRIT-006 | Deterministic sorting |
-| Uninstall Audit | CRIT-010 | Audit logging for compliance |
+| Contract Section     | CRIT Reference      | Correction Applied             |
+| -------------------- | ------------------- | ------------------------------ |
+| Compatibility Intent | CRIT-002b, CRIT-005 | Platform/version validation    |
+| Error Details        | CRIT-007            | Installation error handling    |
+| Telemetry Context    | CRIT-010            | Lifecycle script observability |
+| Feature Flags        | CRIT-004            | Flag governance                |
+| Rollback Cache       | CRIT-018            | 100% cached rollback success   |
+| Browse Ranking       | CRIT-006            | Deterministic sorting          |
+| Uninstall Audit      | CRIT-010            | Audit logging for compliance   |
 
 ---
 
-**Maintained by**: Claude Code Plugin Marketplace Team
-**Contact**: See repository README for contribution guidelines
-**License**: See LICENSE file in repository root
+**Maintained by**: Claude Code Plugin Marketplace Team **Contact**: See
+repository README for contribution guidelines **License**: See LICENSE file in
+repository root

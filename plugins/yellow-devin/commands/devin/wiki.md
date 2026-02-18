@@ -1,10 +1,10 @@
 ---
 name: devin:wiki
 description: >
-  Query DeepWiki or Devin Wiki about a repository. Use when user asks
-  "how does X work in repo Y", "explain the architecture of Z", "search
-  docs for", or wants to understand an external codebase.
-argument-hint: "<question> [--repo owner/repo]"
+  Query DeepWiki or Devin Wiki about a repository. Use when user asks "how does
+  X work in repo Y", "explain the architecture of Z", "search docs for", or
+  wants to understand an external codebase.
+argument-hint: '<question> [--repo owner/repo]'
 allowed-tools:
   - Bash
   - Skill
@@ -19,13 +19,15 @@ allowed-tools:
 
 # Query Repository Documentation
 
-Search DeepWiki or Devin Wiki for documentation about a repository's architecture, patterns, and implementation details.
+Search DeepWiki or Devin Wiki for documentation about a repository's
+architecture, patterns, and implementation details.
 
 ## Workflow
 
 ### Step 1: Parse Arguments
 
 Parse `$ARGUMENTS` for:
+
 - **Question:** The main query text
 - **`--repo owner/repo`:** Optional repository override
 
@@ -45,6 +47,7 @@ If no question provided, ask the user what they want to know.
 **Primary: Try Devin MCP first** (supports both public and private repos):
 
 Use ToolSearch to discover available Devin MCP tools, then call:
+
 - `ask_question` with the repository and question for AI-powered answers
 - `read_wiki_structure` to browse the wiki page tree if more context is needed
 - `read_wiki_contents` for specific page details
@@ -53,22 +56,29 @@ Use ToolSearch to discover available Devin MCP tools, then call:
 
 "Devin Wiki unavailable — falling back to DeepWiki (public repos only)."
 
-- If repo is private: report "Cannot query private repos via DeepWiki. Check that Devin MCP is configured correctly."
-- If repo is public: use DeepWiki MCP tools (`ask_question`, `read_wiki_structure`, `read_wiki_contents`)
+- If repo is private: report "Cannot query private repos via DeepWiki. Check
+  that Devin MCP is configured correctly."
+- If repo is public: use DeepWiki MCP tools (`ask_question`,
+  `read_wiki_structure`, `read_wiki_contents`)
 
-**Important:** The MCP tool names above follow the expected pattern `mcp__plugin_<server_key>_<server_key>__<tool>`. Verify exact names via ToolSearch during first use — the actual registered names may differ.
+**Important:** The MCP tool names above follow the expected pattern
+`mcp__plugin_<server_key>_<server_key>__<tool>`. Verify exact names via
+ToolSearch during first use — the actual registered names may differ.
 
 ### Step 4: Present Results
 
 Display the wiki response:
+
 - Architecture overview (if applicable)
 - Relevant code patterns
 - Key files and their purposes
 - Source links for further reading
 
-Keep results focused and actionable — summarize rather than dumping raw wiki content.
+Keep results focused and actionable — summarize rather than dumping raw wiki
+content.
 
 ## Error Handling
 
-- If both Devin MCP and DeepWiki MCP fail, report the error and suggest checking network connectivity
+- If both Devin MCP and DeepWiki MCP fail, report the error and suggest checking
+  network connectivity
 - Never silently fall back — always announce which data source is being used

@@ -1,16 +1,22 @@
 ---
 name: diagnose-ci
-description: CI debugging workflow guide for self-hosted runners. Use when learning CI debugging workflows, understanding failure patterns (F01-F12), or troubleshooting GitHub Actions on self-hosted runners.
+description:
+  CI debugging workflow guide for self-hosted runners. Use when learning CI
+  debugging workflows, understanding failure patterns (F01-F12), or
+  troubleshooting GitHub Actions on self-hosted runners.
 user-invokable: true
 ---
 
 # Diagnosing CI Failures on Self-Hosted Runners
 
-Understanding and resolving GitHub Actions workflow failures on self-hosted Proxmox runners.
+Understanding and resolving GitHub Actions workflow failures on self-hosted
+Proxmox runners.
 
 ## When to Use
 
-Use when learning CI debugging workflows, understanding failure patterns, or need guidance on troubleshooting self-hosted runner issues. This skill provides contextual knowledge that agents and commands reference during CI analysis.
+Use when learning CI debugging workflows, understanding failure patterns, or
+need guidance on troubleshooting self-hosted runner issues. This skill provides
+contextual knowledge that agents and commands reference during CI analysis.
 
 ## Usage
 
@@ -27,6 +33,7 @@ Use when learning CI debugging workflows, understanding failure patterns, or nee
 Symptoms: Exit code 137, `Killed`, `No space left on device`
 
 Workflow:
+
 1. Run `/ci:diagnose` to confirm pattern
 2. Run `/ci:runner-health` to check current resource state
 3. If disk full: `/ci:runner-cleanup` to free space
@@ -38,6 +45,7 @@ Workflow:
 Symptoms: `command not found`, tests pass locally but fail in CI
 
 Workflow:
+
 1. Run `/ci:diagnose` to identify missing tool or stale state
 2. Check workflow setup steps — pin tool versions
 3. Add `clean: true` to checkout step
@@ -48,6 +56,7 @@ Workflow:
 Symptoms: `Cannot connect to Docker daemon`, rate limiting
 
 Workflow:
+
 1. Run `/ci:diagnose` to confirm Docker pattern
 2. Check runner: `/ci:runner-health` — verify Docker status
 3. If rate limited: configure Docker Hub mirror or authenticate
@@ -58,6 +67,7 @@ Workflow:
 Symptoms: Intermittent failures, passes on re-run
 
 Workflow:
+
 1. Run `/ci:diagnose` on last 3-5 failures to identify pattern
 2. Look for timing-dependent assertions
 3. Add retry annotation or increase timeouts
@@ -68,6 +78,7 @@ Workflow:
 Symptoms: Runner offline, heartbeat timeout, `Runner.Listener` crash
 
 Workflow:
+
 1. Check runner status: `/ci:runner-health runner-name`
 2. If offline: SSH and restart service
 3. If version mismatch: update runner binary
@@ -75,8 +86,11 @@ Workflow:
 
 ## Failure Pattern Reference
 
-12 categories cover self-hosted runner issues (F01-F12). The `ci-conventions` skill contains the full pattern library with log signals, severity levels, and detailed fix suggestions.
+12 categories cover self-hosted runner issues (F01-F12). The `ci-conventions`
+skill contains the full pattern library with log signals, severity levels, and
+detailed fix suggestions.
 
 ## Prevention
 
-Run `/ci:lint-workflows` before pushing workflow changes to catch common self-hosted pitfalls (14 rules, W01-W14).
+Run `/ci:lint-workflows` before pushing workflow changes to catch common
+self-hosted pitfalls (14 rules, W01-W14).

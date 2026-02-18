@@ -1,16 +1,19 @@
 # Git Authentication for Publishing
 
-**Document Version**: 1.0.0
-**Last Updated**: 2026-01-12
-**Part of**: Task I4.T1 - Publish Service and CLI Command
+**Document Version**: 1.0.0 **Last Updated**: 2026-01-12 **Part of**: Task
+I4.T1 - Publish Service and CLI Command
 
 ---
 
 ## Overview
 
-The Yellow Plugins marketplace publish command relies on your existing git credentials for authentication when pushing changes to remote repositories. The system does not store any credentials; all authentication is handled by git itself using your configured SSH keys or Personal Access Tokens (PATs).
+The Yellow Plugins marketplace publish command relies on your existing git
+credentials for authentication when pushing changes to remote repositories. The
+system does not store any credentials; all authentication is handled by git
+itself using your configured SSH keys or Personal Access Tokens (PATs).
 
-This document explains the git authentication prerequisites, setup procedures, and troubleshooting steps for publishing plugins.
+This document explains the git authentication prerequisites, setup procedures,
+and troubleshooting steps for publishing plugins.
 
 ---
 
@@ -50,10 +53,13 @@ This document explains the git authentication prerequisites, setup procedures, a
 
 The Yellow Plugins publish command supports two git authentication methods:
 
-1. **SSH Keys** (Recommended) - More secure, no password/token needed after setup
-2. **Personal Access Tokens (PAT)** - Required for HTTPS remotes, useful for CI/CD
+1. **SSH Keys** (Recommended) - More secure, no password/token needed after
+   setup
+2. **Personal Access Tokens (PAT)** - Required for HTTPS remotes, useful for
+   CI/CD
 
-**Important**: The system does NOT store credentials. You must configure authentication at the git level before using the publish command.
+**Important**: The system does NOT store credentials. You must configure
+authentication at the git level before using the publish command.
 
 ---
 
@@ -68,6 +74,7 @@ ls -la ~/.ssh
 ```
 
 Look for files named:
+
 - `id_rsa` and `id_rsa.pub` (RSA keys)
 - `id_ed25519` and `id_ed25519.pub` (Ed25519 keys, recommended)
 
@@ -86,6 +93,7 @@ ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 ```
 
 When prompted:
+
 1. Accept the default file location (press Enter)
 2. Enter a secure passphrase (optional but recommended)
 
@@ -116,6 +124,7 @@ ssh -T git@github.com
 ```
 
 Expected output:
+
 ```
 Hi username! You've successfully authenticated, but GitHub does not provide shell access.
 ```
@@ -180,6 +189,7 @@ git push origin main
 ```
 
 If successful, you should see:
+
 ```
 Enumerating objects: 5, done.
 Counting objects: 100% (5/5), done.
@@ -195,6 +205,7 @@ To https://github.com/username/repo.git
 ### SSH Authentication Failed
 
 **Error**:
+
 ```
 Permission denied (publickey).
 fatal: Could not read from remote repository.
@@ -203,26 +214,31 @@ fatal: Could not read from remote repository.
 **Resolution**:
 
 1. Verify SSH key is added to ssh-agent:
+
 ```bash
 ssh-add -l
 ```
 
 2. If empty, add your key:
+
 ```bash
 ssh-add ~/.ssh/id_ed25519
 ```
 
 3. Test connection again:
+
 ```bash
 ssh -T git@github.com
 ```
 
 4. If still failing, check your SSH config:
+
 ```bash
 cat ~/.ssh/config
 ```
 
 Add if missing:
+
 ```
 Host github.com
   HostName github.com
@@ -233,6 +249,7 @@ Host github.com
 ### HTTPS Authentication Failed
 
 **Error**:
+
 ```
 Authentication failed for 'https://github.com/username/repo.git'
 ```
@@ -242,6 +259,7 @@ Authentication failed for 'https://github.com/username/repo.git'
 1. Verify your PAT is valid (not expired)
 2. Verify PAT has `repo` scope
 3. Clear cached credentials:
+
 ```bash
 git config --global --unset credential.helper
 git config --global credential.helper store
@@ -252,6 +270,7 @@ git config --global credential.helper store
 ### Permission Denied
 
 **Error**:
+
 ```
 ERROR: Permission to username/repo.git denied to user.
 fatal: Could not read from remote repository.
@@ -264,11 +283,13 @@ fatal: Could not read from remote repository.
    - Ensure your account has Write or Admin access
 
 2. Verify remote URL is correct:
+
 ```bash
 git remote -v
 ```
 
 3. If using SSH, verify you're using the correct GitHub account:
+
 ```bash
 ssh -T git@github.com
 ```
@@ -282,26 +303,31 @@ ssh -T git@github.com
 If the publish command committed changes locally but failed to push:
 
 **Check local commit status**:
+
 ```bash
 git log -1
 git status
 ```
 
 **Option A: Retry Push Manually**
+
 ```bash
 git push origin main
 ```
 
 **Option B: Undo Commit (Keep Changes)**
+
 ```bash
 git reset --soft HEAD~1
 ```
 
 This keeps your changes staged. You can now:
+
 - Fix authentication issues
 - Re-run the publish command
 
 **Option C: Undo Commit and Changes**
+
 ```bash
 git reset --hard HEAD~1
 ```
@@ -313,12 +339,14 @@ git reset --hard HEAD~1
 If tags were created but not pushed:
 
 **Check tag status**:
+
 ```bash
 git tag -l
 git ls-remote --tags origin
 ```
 
 **Push tags manually**:
+
 ```bash
 git push origin --tags
 ```
@@ -328,12 +356,14 @@ git push origin --tags
 If push failed due to network issues:
 
 **Check repository status**:
+
 ```bash
 git status
 git log origin/main..HEAD
 ```
 
 **Retry after network recovery**:
+
 ```bash
 git push origin main
 ```
@@ -344,10 +374,12 @@ The commit is safe locally. You can retry the push at any time.
 
 ## Security Best Practices
 
-1. **Never commit credentials**: Do not add PATs or private keys to git repositories
+1. **Never commit credentials**: Do not add PATs or private keys to git
+   repositories
 2. **Use SSH keys with passphrases**: Adds an extra layer of security
 3. **Rotate PATs regularly**: Set expiration dates and regenerate tokens
-4. **Use fine-grained PATs**: GitHub offers fine-grained tokens with repository-specific access
+4. **Use fine-grained PATs**: GitHub offers fine-grained tokens with
+   repository-specific access
 5. **Store credentials securely**:
    - Use system keychains (macOS Keychain, Windows Credential Manager)
    - Avoid plaintext storage in `.git-credentials`
@@ -391,6 +423,7 @@ jobs:
 ```
 
 **Security Notes**:
+
 - Use GitHub's built-in `GITHUB_TOKEN` for authentication
 - Token is automatically provided and scoped to the repository
 - No need to create or store personal PATs
@@ -405,7 +438,8 @@ publish:
   script:
     - git config user.name "GitLab CI"
     - git config user.email "ci@gitlab.com"
-    - git remote set-url origin https://oauth2:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git
+    - git remote set-url origin
+      https://oauth2:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git
     - npm run plugin:publish -- --push --tag $CI_COMMIT_TAG
 ```
 
@@ -413,14 +447,21 @@ publish:
 
 ## Traceability
 
-- **[FR-008 – Update Notifications](../SPECIFICATION.md#fr-008)**: Documents publish prerequisites (PAT/SSH) and remote push recovery steps so release automation can rely on git-native workflows.
-- **[Assumption 2 – Git Authentication](../SPECIFICATION.md#6-0-safety-net)**: Reinforces that existing developer credentials (SSH keys or PATs) power all publish operations—no additional secrets are stored by the CLI.
+- **[FR-008 – Update Notifications](../SPECIFICATION.md#fr-008)**: Documents
+  publish prerequisites (PAT/SSH) and remote push recovery steps so release
+  automation can rely on git-native workflows.
+- **[Assumption 2 – Git Authentication](../SPECIFICATION.md#6-0-safety-net)**:
+  Reinforces that existing developer credentials (SSH keys or PATs) power all
+  publish operations—no additional secrets are stored by the CLI.
 
 ---
 
 ## See Also
 
 - [Publish Command Documentation](../cli/publish.md) - Complete publish workflow
-- [Feature Flags Documentation](./feature-flags.md) - Enabling publish functionality
-- [GitHub SSH Key Documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh) - Official GitHub guide
-- [GitHub PAT Documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) - Official GitHub guide
+- [Feature Flags Documentation](./feature-flags.md) - Enabling publish
+  functionality
+- [GitHub SSH Key Documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh) -
+  Official GitHub guide
+- [GitHub PAT Documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) -
+  Official GitHub guide

@@ -1,23 +1,29 @@
 ---
 name: create-agent-skills
-description: Expert guidance for creating Claude Code skills and agents. Use when working with SKILL.md files, authoring new skills, creating slash commands, or designing agent workflows.
-argument-hint: "[skill-name|agent-name]"
+description:
+  Expert guidance for creating Claude Code skills and agents. Use when working
+  with SKILL.md files, authoring new skills, creating slash commands, or
+  designing agent workflows.
+argument-hint: '[skill-name|agent-name]'
 user-invokable: true
 ---
 
 # Create Agent Skills
 
-Expert guidance for creating Claude Code skills and agents with proper structure, frontmatter, and best practices.
+Expert guidance for creating Claude Code skills and agents with proper
+structure, frontmatter, and best practices.
 
 ## Commands vs Skills
 
 **Commands** (`.claude/commands/name.md`):
+
 - Single-file workflows
 - Simple, focused tasks
 - No supporting files needed
 - Examples: `/commit`, `/search`, `/explain`
 
 **Skills** (`.claude/skills/name/SKILL.md`):
+
 - Complex workflows requiring multiple files
 - Reference documentation, scripts, templates
 - Supporting files in same directory
@@ -36,46 +42,50 @@ Every skill/command file has two parts:
 ---
 name: skill-name
 description: What it does and when to use it. Use when [trigger conditions].
-argument-hint: "[optional-args]"
+argument-hint: '[optional-args]'
 ---
 
 # Skill Title
 
 ## What It Does
+
 Clear explanation of functionality.
 
 ## When to Use
+
 Specific trigger conditions.
 
 ## Usage
+
 Command syntax and examples.
 
 ## Reference
+
 Additional details, links.
 ```
 
 ## Frontmatter Reference
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Kebab-case identifier matching filename |
-| `description` | Yes | WHAT it does + WHEN to use it (see below) |
-| `argument-hint` | No | UI hint for arguments, e.g. `"[branch-name]"` |
-| `disable-model-invocation` | No | If `true`, prints markdown only (no LLM call) |
-| `user-invokable` | No | If `false`, skill is internal-only (callable by other skills) |
-| `allowed-tools` | No | Array of tool names to restrict access |
-| `model` | No | Override default model (e.g. `claude-opus-4-6`) |
-| `context` | No | `fork` creates isolated subagent context |
-| `agent` | No | Agent name to use instead of default |
+| Field                      | Required | Description                                                   |
+| -------------------------- | -------- | ------------------------------------------------------------- |
+| `name`                     | Yes      | Kebab-case identifier matching filename                       |
+| `description`              | Yes      | WHAT it does + WHEN to use it (see below)                     |
+| `argument-hint`            | No       | UI hint for arguments, e.g. `"[branch-name]"`                 |
+| `disable-model-invocation` | No       | If `true`, prints markdown only (no LLM call)                 |
+| `user-invokable`           | No       | If `false`, skill is internal-only (callable by other skills) |
+| `allowed-tools`            | No       | Array of tool names to restrict access                        |
+| `model`                    | No       | Override default model (e.g. `claude-opus-4-6`)               |
+| `context`                  | No       | `fork` creates isolated subagent context                      |
+| `agent`                    | No       | Agent name to use instead of default                          |
 
 ### Invocation Control Matrix
 
-| Config | User can call? | LLM invoked? | Use case |
-|--------|---------------|--------------|----------|
-| Default | Yes | Yes | Standard skill |
-| `disable-model-invocation: true` | Yes | No | Static reference docs |
-| `user-invokable: false` | No | Yes | Internal helper skill |
-| Both set | No | No | Private reference docs |
+| Config                           | User can call? | LLM invoked? | Use case               |
+| -------------------------------- | -------------- | ------------ | ---------------------- |
+| Default                          | Yes            | Yes          | Standard skill         |
+| `disable-model-invocation: true` | Yes            | No           | Static reference docs  |
+| `user-invokable: false`          | No             | Yes          | Internal helper skill  |
+| Both set                         | No             | No           | Private reference docs |
 
 ## Dynamic Features
 
@@ -86,21 +96,22 @@ Use `$ARGUMENTS` in the skill body to inject user-provided arguments:
 ```markdown
 ---
 name: explain
-argument-hint: "[file-or-concept]"
+argument-hint: '[file-or-concept]'
 ---
 
 Explain $ARGUMENTS in detail, including purpose and key patterns.
 ```
 
-Invocation: `/explain authentication.ts` replaces `$ARGUMENTS` with "authentication.ts"
+Invocation: `/explain authentication.ts` replaces `$ARGUMENTS` with
+"authentication.ts"
 
 ### Shell Command Injection
 
 Use backticks with `!` prefix to inject shell output:
 
 ```markdown
-Current branch: `!git branch --show-current`
-Repository root: `!git rev-parse --show-toplevel`
+Current branch: `!git branch --show-current` Repository root:
+`!git rev-parse --show-toplevel`
 ```
 
 Commands execute during skill load, output injected directly into prompt.
@@ -142,10 +153,12 @@ See [API Reference](./api-reference.md) for full method documentation.
 ## Effective Descriptions
 
 Description MUST include:
+
 1. **WHAT** the skill does (functionality)
 2. **WHEN** to use it (trigger conditions)
 
 **Good Examples:**
+
 ```yaml
 description: Create isolated git worktrees for parallel development. Use when reviewing PRs, working on multiple features, or when workflows offer worktree option.
 
@@ -153,6 +166,7 @@ description: Generate conventional commits with semantic analysis. Use when crea
 ```
 
 **Bad Examples:**
+
 ```yaml
 description: Manages worktrees  # Missing WHEN
 description: Use for git stuff   # Vague WHAT
@@ -179,11 +193,13 @@ Provide 2-3 concrete examples of when to use this agent.
 You are an expert in [domain]. Your role is to [specific task].
 
 **Key Behaviors:**
+
 - Behavior 1
 - Behavior 2
 - Behavior 3
 
 **Constraints:**
+
 - Constraint 1
 - Constraint 2
 ```
@@ -200,11 +216,13 @@ Categories: `workflow`, `analysis`, `generation`, `review`, `automation`
 ### Step 2: Create File Structure
 
 Command:
+
 ```bash
 touch .claude/commands/my-command.md
 ```
 
 Skill:
+
 ```bash
 mkdir -p .claude/skills/my-skill
 touch .claude/skills/my-skill/SKILL.md
@@ -226,6 +244,7 @@ Add optional fields only if needed.
 ### Step 4: Write Body
 
 Use standard headings:
+
 1. **What It Does** — Clear functionality statement
 2. **When to Use** — Specific triggers
 3. **Usage** — Command syntax, examples
@@ -234,6 +253,7 @@ Use standard headings:
 ### Step 5: Add Reference Files
 
 If SKILL.md approaches 500 lines, extract:
+
 - Detailed examples → `examples.md`
 - API docs → `api-reference.md`
 - Troubleshooting → `troubleshooting.md`
@@ -241,11 +261,13 @@ If SKILL.md approaches 500 lines, extract:
 ### Step 6: Test
 
 Test with real usage:
+
 ```bash
 /my-skill [args]
 ```
 
 Verify:
+
 - Arguments inject correctly
 - Shell commands execute
 - Description is discoverable
@@ -273,15 +295,18 @@ Before submitting a skill:
 1. **XML tags in body** — Use markdown only
 2. **Vague descriptions** — "Helps with git" is not specific
 3. **Deep nesting** — Max one level of reference files
-4. **Missing invocation control** — Set `user-invokable: false` for internal skills
+4. **Missing invocation control** — Set `user-invokable: false` for internal
+   skills
 5. **Too many options** — Skills should be opinionated, not swiss-army knives
 6. **Embedding large data** — Use reference files for API schemas, long examples
 7. **Dynamic descriptions** — Description is static, body can be dynamic
-8. **Over-abstraction** — Prefer specific, focused skills over generic frameworks
+8. **Over-abstraction** — Prefer specific, focused skills over generic
+   frameworks
 
 ## Quick Reference
 
 **Create command:**
+
 ```bash
 cat > .claude/commands/my-cmd.md << 'EOF'
 ---
@@ -296,6 +321,7 @@ EOF
 ```
 
 **Create skill:**
+
 ```bash
 mkdir -p .claude/skills/my-skill
 cat > .claude/skills/my-skill/SKILL.md << 'EOF'
@@ -311,37 +337,42 @@ EOF
 ```
 
 **Test invocation:**
+
 ```bash
 /my-skill arg1 arg2
 ```
 
 ## Plugin Settings Pattern
 
-Plugins can read user-specific configuration from `.claude/<plugin-name>.local.md`:
+Plugins can read user-specific configuration from
+`.claude/<plugin-name>.local.md`:
 
 **File Location:** `.claude/<plugin-name>.local.md`
 
 **Format:** YAML frontmatter + optional markdown notes
 
-**Security:** Never store credentials — reference env var names only (e.g., `$MY_TOKEN`)
+**Security:** Never store credentials — reference env var names only (e.g.,
+`$MY_TOKEN`)
 
 **Example:**
+
 ```yaml
 ---
 schema: 1
 devServer:
-  command: "npm run dev"
+  command: 'npm run dev'
   port: 3000
 auth:
   credentials:
-    email: "$BROWSER_TEST_EMAIL"
-    password: "$BROWSER_TEST_PASSWORD"
+    email: '$BROWSER_TEST_EMAIL'
+    password: '$BROWSER_TEST_PASSWORD'
 ---
 # Notes
 Optional markdown content for user reference.
 ```
 
 **Best Practices:**
+
 - Provide sensible defaults if settings file is missing
 - Document supported settings in plugin's CLAUDE.md
 - Use `schema: 1` for future versioning support

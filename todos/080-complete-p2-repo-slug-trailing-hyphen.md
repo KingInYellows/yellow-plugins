@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p2
-issue_id: "080"
+issue_id: '080'
 tags: [code-review, yellow-ci, validation]
 dependencies: []
 ---
@@ -10,13 +10,17 @@ dependencies: []
 
 ## Problem Statement
 
-The `validate_repo_slug()` function has an incorrect comment claiming "GitHub allows trailing hyphen in org names" and the validation logic allows trailing hyphens by falling through the `*-)` case. However, GitHub actually rejects trailing hyphens in organization names, making this validation too permissive.
+The `validate_repo_slug()` function has an incorrect comment claiming "GitHub
+allows trailing hyphen in org names" and the validation logic allows trailing
+hyphens by falling through the `*-)` case. However, GitHub actually rejects
+trailing hyphens in organization names, making this validation too permissive.
 
 ## Findings
 
 **File:** `plugins/yellow-ci/hooks/scripts/lib/validate.sh`
 
 **Line 205:**
+
 ```bash
 case "$slug" in
     # GitHub allows trailing hyphen in org names, but not leading
@@ -29,6 +33,7 @@ esac
 **GitHub Organization Name Rules:**
 
 According to GitHub documentation:
+
 - Must start and end with alphanumeric character
 - May contain hyphens in the middle
 - Cannot start or end with hyphen
@@ -36,18 +41,21 @@ According to GitHub documentation:
 - Example invalid: `my-org-`, `-my-org`, `-`
 
 **Current Behavior:**
+
 - Rejects leading hyphen: `"-myorg/repo"` → fails ✓
 - **Allows trailing hyphen:** `"myorg-/repo"` → passes ✗
 - Comment is incorrect
 
 **Impact:**
+
 - Accepts invalid repository slugs
 - False positives in validation
 - Could cause API errors when using validated slugs
 
 ## Proposed Solutions
 
-Fix both the validation logic and the comment to correctly reject trailing hyphens.
+Fix both the validation logic and the comment to correctly reject trailing
+hyphens.
 
 **Implementation:**
 
@@ -104,12 +112,14 @@ validate_repo_slug "-owner-/-repo-"
 **Additional Validation:**
 
 The function should validate both the org name and repo name:
+
 - Split on `/` delimiter
 - Check each component for leading/trailing hyphens
 - Ensure neither component is empty
 
-**Current Implementation Gap:**
-The current case statement only checks the entire slug, not the individual components. A slug like `"valid-org/repo-"` would not be caught.
+**Current Implementation Gap:** The current case statement only checks the
+entire slug, not the individual components. A slug like `"valid-org/repo-"`
+would not be caught.
 
 **Enhanced Solution:**
 

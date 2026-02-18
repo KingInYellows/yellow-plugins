@@ -1,12 +1,12 @@
 # Validation Module
 
-**Task**: I1.T3 - Create marketplace/plugin validation toolkit
-**Status**: ✅ Implemented
-**Date**: 2026-01-11
+**Task**: I1.T3 - Create marketplace/plugin validation toolkit **Status**: ✅
+Implemented **Date**: 2026-01-11
 
 ## Overview
 
-This module provides JSON Schema validation for marketplace and plugin manifests using AJV (Draft-07) with domain-aligned error reporting.
+This module provides JSON Schema validation for marketplace and plugin manifests
+using AJV (Draft-07) with domain-aligned error reporting.
 
 ## Architecture
 
@@ -42,23 +42,28 @@ This module provides JSON Schema validation for marketplace and plugin manifests
 Central AJV configuration and schema compilation.
 
 **Features**:
+
 - Strict mode validation (no type coercion)
 - Format validation (uri, email, date-time, hostname)
 - Schema caching for performance
 - Detailed error reporting with JSON paths
 
 **API**:
+
 ```typescript
 const factory = new AjvValidatorFactory();
 
 // Load schemas
-await factory.loadSchemaFromFile('marketplace', './schemas/marketplace.schema.json');
+await factory.loadSchemaFromFile(
+  'marketplace',
+  './schemas/marketplace.schema.json'
+);
 await factory.loadSchemaFromFile('plugin', './schemas/plugin.schema.json');
 
 // Validate data
 const result = factory.validate('marketplace', data);
 if (!result.valid) {
-  result.errors.forEach(err => {
+  result.errors.forEach((err) => {
     console.error(`${err.path}: ${err.message}`);
   });
 }
@@ -69,12 +74,14 @@ if (!result.valid) {
 Domain-level validator implementing `IValidator` interface.
 
 **Features**:
+
 - Maps AJV errors to domain error codes (ERROR-SCHEMA-001, etc.)
-- Provides specification traceability (CRIT-*, FR-* references)
+- Provides specification traceability (CRIT-_, FR-_ references)
 - Includes resolution guidance for each error
 - Validates compatibility constraints (Claude Code version, Node.js, OS, arch)
 
 **API**:
+
 ```typescript
 const validator = await createValidator();
 
@@ -95,14 +102,14 @@ const result = validator.validateCompatibility(
 
 **ERROR_CODES** - Centralized error codes aligned with specification:
 
-| Category | Codes | Spec Reference |
-|----------|-------|----------------|
-| SCHEMA | ERROR-SCHEMA-001 to 007 | FR-001, FR-002 |
-| COMPAT | ERROR-COMPAT-001 to 006 | CRIT-002b, CRIT-005 |
-| INST | ERROR-INST-001 to 007 | CRIT-007, CRIT-010 |
-| DISC | ERROR-DISC-001 to 004 | CRIT-008 |
-| PERM | ERROR-PERM-001 to 003 | CRIT-012 |
-| NET | ERROR-NET-001 to 003 | CRIT-011 |
+| Category | Codes                   | Spec Reference      |
+| -------- | ----------------------- | ------------------- |
+| SCHEMA   | ERROR-SCHEMA-001 to 007 | FR-001, FR-002      |
+| COMPAT   | ERROR-COMPAT-001 to 006 | CRIT-002b, CRIT-005 |
+| INST     | ERROR-INST-001 to 007   | CRIT-007, CRIT-010  |
+| DISC     | ERROR-DISC-001 to 004   | CRIT-008            |
+| PERM     | ERROR-PERM-001 to 003   | CRIT-012            |
+| NET      | ERROR-NET-001 to 003    | CRIT-011            |
 
 See `docs/contracts/error-codes.md` for complete catalog.
 
@@ -148,7 +155,7 @@ const pluginData = {
   author: { name: 'Author' },
   entrypoints: { commands: ['commands/example.md'] },
   compatibility: { claudeCodeMin: '2.0.0' },
-  permissions: []
+  permissions: [],
 };
 
 const result = validator.validatePluginManifest(pluginData, 'my-plugin');
@@ -172,7 +179,7 @@ const compatibility = {
   claudeCodeMin: '2.1.0',
   nodeMin: '20',
   os: ['linux', 'macos'],
-  arch: ['x64']
+  arch: ['x64'],
 };
 
 const environment = {
@@ -180,7 +187,7 @@ const environment = {
   nodeVersion: '18.19.0', // Too low!
   platform: 'linux',
   arch: 'x64',
-  installedPlugins: []
+  installedPlugins: [],
 };
 
 const result = validator.validateCompatibility(compatibility, environment);
@@ -239,7 +246,7 @@ console.log('Plugin:', result2.status); // Should be SUCCESS
 
 2. ✅ **Error catalog cross-references Section 4 rulebook codes**
    - ERROR_CODES maps to specification error scenarios
-   - Each error includes specReference (CRIT-*, FR-*)
+   - Each error includes specReference (CRIT-_, FR-_)
    - ValidationErrorFactory generates spec-aligned errors
    - See `docs/contracts/error-codes.md` for full traceability
 
@@ -278,6 +285,7 @@ console.log('Plugin:', result2.status); // Should be SUCCESS
 ## Next Steps
 
 **For I1.T4+** (future tasks):
+
 - CLI integration: Use validator in install/publish commands
 - Pre-commit hooks: Validate marketplace.json before commit
 - CI/CD integration: Add validation step to GitHub Actions

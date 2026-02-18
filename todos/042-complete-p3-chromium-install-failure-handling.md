@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "042"
+issue_id: '042'
 tags: [code-review, user-experience]
 dependencies: []
 ---
@@ -9,9 +9,13 @@ dependencies: []
 # Chromium Install Failure Handling
 
 ## Problem Statement
-`npx agent-browser install-chromium` failure is not explicitly handled. Script has `set -e` so it would exit, but error message would be raw npx output with no context. User may not understand what failed or why.
+
+`npx agent-browser install-chromium` failure is not explicitly handled. Script
+has `set -e` so it would exit, but error message would be raw npx output with no
+context. User may not understand what failed or why.
 
 ## Findings
+
 - File: scripts/install-agent-browser.sh
 - Current behavior:
   - `npx agent-browser install-chromium` runs with no error handler
@@ -26,7 +30,9 @@ dependencies: []
   - Download mirror blocked by firewall
 
 ## Proposed Solutions
+
 ### Option A: Add Trap with User-Friendly Error Message (Recommended)
+
 - Wrap chromium install in error handler
 - On failure, show:
   - What failed (chromium download)
@@ -36,6 +42,7 @@ dependencies: []
 - Provide context about disk space and network requirements
 
 ### Option B: Check Disk Space Before Chromium Download
+
 - Check available disk space before download
 - Warn if less than 500MB available
 - Show clear error if insufficient space
@@ -43,9 +50,13 @@ dependencies: []
 - More proactive but requires platform-specific disk check
 
 ## Recommended Action
-Implement both Option A and Option B. Check disk space before download. Wrap chromium install in error handler with user-friendly message. Show troubleshooting steps on failure.
+
+Implement both Option A and Option B. Check disk space before download. Wrap
+chromium install in error handler with user-friendly message. Show
+troubleshooting steps on failure.
 
 ## Technical Details
+
 ```bash
 # Add disk space check (Linux/macOS)
 cache_dir="${HOME}/.cache/agent-browser"
@@ -71,6 +82,7 @@ printf '[install] Chromium installed successfully\n'
 ```
 
 ## Acceptance Criteria
+
 - [ ] Add disk space check before chromium download
 - [ ] Warn if disk space is low (<500MB)
 - [ ] Wrap install-chromium in error handler
@@ -81,10 +93,12 @@ printf '[install] Chromium installed successfully\n'
 - [ ] Test with insufficient disk space (should show clear error)
 
 ## Work Log
-| Date | Action | Learnings |
-|------|--------|-----------|
+
+| Date       | Action                          | Learnings                                                 |
+| ---------- | ------------------------------- | --------------------------------------------------------- |
 | 2026-02-13 | Created from PR #11 code review | P3 UX finding - chromium download is common failure point |
 
 ## Resources
+
 - PR: #11 (yellow-browser-test plugin code review)
 - Related files: scripts/install-agent-browser.sh

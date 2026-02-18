@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p2
-issue_id: "008"
+issue_id: '008'
 tags: [code-review, performance, optimization]
 dependencies: []
 ---
@@ -10,19 +10,26 @@ dependencies: []
 
 ## Problem Statement
 
-SessionStart spawns up to 20 `npx ruvector insert` subprocesses (each 150-500ms) plus 2 `npx ruvector search` calls (200-800ms). At scale, this exceeds the 3s budget causing timeout kills or persistent user-facing latency.
+SessionStart spawns up to 20 `npx ruvector insert` subprocesses (each 150-500ms)
+plus 2 `npx ruvector search` calls (200-800ms). At scale, this exceeds the 3s
+budget causing timeout kills or persistent user-facing latency.
 
-**Why it matters:** Users experience 1.5-3s delay on every session start. Heavy users with large queues hit timeout repeatedly.
+**Why it matters:** Users experience 1.5-3s delay on every session start. Heavy
+users with large queues hit timeout repeatedly.
 
 ## Findings
 
-- **Performance Oracle (#1):** 20 entries x ~500ms = 10s worst case, exceeds 3s timeout
-- **Performance Oracle (#2):** Two sequential npx search calls add 200-800ms blocking latency
-- **Performance Oracle (#6):** Date mode check runs on every elapsed_ms() call (3x overhead)
+- **Performance Oracle (#1):** 20 entries x ~500ms = 10s worst case, exceeds 3s
+  timeout
+- **Performance Oracle (#2):** Two sequential npx search calls add 200-800ms
+  blocking latency
+- **Performance Oracle (#6):** Date mode check runs on every elapsed_ms() call
+  (3x overhead)
 
 ## Proposed Solutions
 
 ### Option A: Batch queue processing + cache learnings (Recommended)
+
 - Batch all entries into single npx call (60x faster)
 - Cache learning retrieval with DB-mtime invalidation
 - Parallelize the two search calls
@@ -32,6 +39,7 @@ SessionStart spawns up to 20 `npx ruvector insert` subprocesses (each 150-500ms)
 - **Risk:** Low
 
 ### Option B: Move flush to background
+
 - Spawn non-blocking background job for queue processing
 - Return immediately with cached learnings
 - **Pros:** O(1) SessionStart regardless of queue size
@@ -42,7 +50,8 @@ SessionStart spawns up to 20 `npx ruvector insert` subprocesses (each 150-500ms)
 ## Technical Details
 
 - **Affected file:** `plugins/yellow-ruvector/hooks/scripts/session-start.sh`
-- Issues: lines 51-79 (queue processing), 99-113 (learning retrieval), 24-36 (date precision)
+- Issues: lines 51-79 (queue processing), 99-113 (learning retrieval), 24-36
+  (date precision)
 
 ## Acceptance Criteria
 
@@ -52,8 +61,8 @@ SessionStart spawns up to 20 `npx ruvector insert` subprocesses (each 150-500ms)
 
 ## Work Log
 
-| Date | Action | Learnings |
-|------|--------|-----------|
+| Date       | Action                          | Learnings                   |
+| ---------- | ------------------------------- | --------------------------- |
 | 2026-02-12 | Created from PR #10 code review | Performance-oracle #1,#2,#6 |
 
 ## Resources

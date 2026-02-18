@@ -1,7 +1,8 @@
 ---
 name: workflows:work
-description: Execute implementation plans systematically with testing and quality checks
-argument-hint: "[plan file path]"
+description:
+  Execute implementation plans systematically with testing and quality checks
+argument-hint: '[plan file path]'
 allowed-tools:
   - Bash
   - Read
@@ -18,7 +19,8 @@ allowed-tools:
 
 # Implementation Workflow
 
-Execute structured plans with proper branch management, testing, and quality assurance.
+Execute structured plans with proper branch management, testing, and quality
+assurance.
 
 ## Phase 1: Quick Start
 
@@ -27,6 +29,7 @@ Execute structured plans with proper branch management, testing, and quality ass
 **Steps:**
 
 1. Read the plan document completely:
+
    ```bash
    # Plan path from argument
    cat "#$ARGUMENTS"
@@ -45,19 +48,22 @@ Execute structured plans with proper branch management, testing, and quality ass
    - Dependency questions
 
 4. Check current branch status:
+
    ```bash
    gt log short --steps 3
    git branch --show-current
    ```
 
 5. Branch decision:
-   - **If on feature branch:** Ask user: "Continue on this branch or create new one?"
+   - **If on feature branch:** Ask user: "Continue on this branch or create new
+     one?"
    - **If on trunk (main/master):** Create new feature branch:
      ```bash
      gt create feature-name-from-plan
      ```
 
 6. Create structured task list:
+
    ```
    Use TaskCreate for each major implementation step:
 
@@ -93,64 +99,71 @@ Execute structured plans with proper branch management, testing, and quality ass
 1. **Task Execution Loop** - For each task:
 
    a. Mark task as in_progress:
-      ```
-      TaskUpdate: {taskId: "X", status: "in_progress"}
-      ```
+
+   ```
+   TaskUpdate: {taskId: "X", status: "in_progress"}
+   ```
 
    b. Read referenced files to understand context:
-      ```bash
-      bat path/to/file.ts
-      ```
+
+   ```bash
+   bat path/to/file.ts
+   ```
 
    c. Look for similar patterns in codebase:
-      ```bash
-      rg "similar_pattern" --type ts -C 3
-      fd "similar.*component" src/
-      ```
+
+   ```bash
+   rg "similar_pattern" --type ts -C 3
+   fd "similar.*component" src/
+   ```
 
    d. Implement following project conventions:
-      - Match existing code style
-      - Follow naming patterns
-      - Use established error handling
-      - Respect architectural boundaries
-      - Add TypeScript types properly
+   - Match existing code style
+   - Follow naming patterns
+   - Use established error handling
+   - Respect architectural boundaries
+   - Add TypeScript types properly
 
    e. Write implementation using Edit or Write tool.
 
    f. Write tests immediately after implementation:
-      ```bash
-      # Run tests to ensure they work
-      npm test -- path/to/feature.test.ts
-      # or
-      pytest path/to/test_feature.py
-      # or
-      cargo test feature_name
-      # or
-      go test ./pkg/feature/...
-      ```
+
+   ```bash
+   # Run tests to ensure they work
+   npm test -- path/to/feature.test.ts
+   # or
+   pytest path/to/test_feature.py
+   # or
+   cargo test feature_name
+   # or
+   go test ./pkg/feature/...
+   ```
 
    g. Verify tests pass:
-      ```bash
-      # Run full test suite or relevant subset
-      npm test
-      pytest
-      cargo test
-      go test ./...
-      ```
+
+   ```bash
+   # Run full test suite or relevant subset
+   npm test
+   pytest
+   cargo test
+   go test ./...
+   ```
 
    h. Make incremental commit using Graphite:
-      ```bash
-      gt commit create -m "feat(scope): implement X component
 
-      - Add core functionality
-      - Include error handling
-      - Add unit tests"
-      ```
+   ```bash
+   gt commit create -m "feat(scope): implement X component
+
+   - Add core functionality
+   - Include error handling
+   - Add unit tests"
+   ```
 
    i. Mark task completed:
-      ```
-      TaskUpdate: {taskId: "X", status: "completed"}
-      ```
+
+   ```
+   TaskUpdate: {taskId: "X", status: "completed"}
+   ```
 
 2. **Follow Existing Patterns:**
    - Grep for similar implementations
@@ -189,6 +202,7 @@ Execute structured plans with proper branch management, testing, and quality ass
 **Steps:**
 
 1. Run full test suite:
+
    ```bash
    # TypeScript/JavaScript
    npm test
@@ -245,6 +259,7 @@ Execute structured plans with proper branch management, testing, and quality ass
    - Document P3 issues for future work
 
 6. Make final quality commit if changes needed:
+
    ```bash
    gt commit create -m "refactor: address code review feedback
 
@@ -260,6 +275,7 @@ Execute structured plans with proper branch management, testing, and quality ass
 **Steps:**
 
 1. Review all changes:
+
    ```bash
    gt log short
    git diff main...HEAD
@@ -271,6 +287,7 @@ Execute structured plans with proper branch management, testing, and quality ass
    - Document reasons for changes
 
 3. Create final summary commit if needed (combining context):
+
    ```bash
    gt commit create -m "feat(scope): implement feature X
 
@@ -286,6 +303,7 @@ Execute structured plans with proper branch management, testing, and quality ass
    ```
 
 4. Push and create PR using Graphite:
+
    ```bash
    gt stack submit
    ```
@@ -294,25 +312,30 @@ Execute structured plans with proper branch management, testing, and quality ass
 
    ```markdown
    ## Summary
+
    Brief description of what this PR does and why.
 
    Implements feature X as described in [plan](link-to-plan).
 
    ## Changes
+
    - Added: List new features/files
    - Modified: List changed components
    - Fixed: List bugs resolved
 
    ## Testing
+
    - [ ] Unit tests pass (X% coverage)
    - [ ] Integration tests pass
    - [ ] Manual testing completed
    - [ ] Edge cases verified
 
    ## Screenshots
+
    (If applicable - UI changes, CLI output, etc.)
 
    ## Checklist
+
    - [ ] Follows project conventions
    - [ ] Tests included and passing
    - [ ] Documentation updated
@@ -321,6 +344,7 @@ Execute structured plans with proper branch management, testing, and quality ass
    ```
 
 6. After PR created, Graphite will output PR URL. Copy and present to user:
+
    ```
    PR created: https://github.com/org/repo/pull/123
 

@@ -1,7 +1,9 @@
 ---
 name: debt:fix
-description: "Agent-driven remediation of specific debt findings with human approval. Use when you want to fix a specific technical debt item."
-argument-hint: "<todo-path>"
+description:
+  'Agent-driven remediation of specific debt findings with human approval. Use
+  when you want to fix a specific technical debt item.'
+argument-hint: '<todo-path>'
 allowed-tools:
   - Bash
   - Read
@@ -11,7 +13,8 @@ allowed-tools:
 
 # Technical Debt Fix Command
 
-Agent-driven remediation of a specific technical debt finding with mandatory human approval before committing changes.
+Agent-driven remediation of a specific technical debt finding with mandatory
+human approval before committing changes.
 
 ## Arguments
 
@@ -134,10 +137,13 @@ $ARGUMENTS todos/debt/001-pending-medium-duplication.md  # ERROR: must be ready
 
 ## Human-in-the-Loop Security
 
-**CRITICAL**: The debt-fixer agent processes code analysis findings that may have been influenced by malicious code patterns (indirect prompt injection). Therefore:
+**CRITICAL**: The debt-fixer agent processes code analysis findings that may
+have been influenced by malicious code patterns (indirect prompt injection).
+Therefore:
 
 1. Agent implements fix and shows `git diff --stat`
 2. **MANDATORY**: Use `AskUserQuestion` with prompt:
+
    ```
    Review the diff above. Apply this fix and commit?
 
@@ -145,6 +151,7 @@ $ARGUMENTS todos/debt/001-pending-medium-duplication.md  # ERROR: must be ready
    - Yes: Apply fix and commit changes
    - No: Discard changes and keep todo in 'ready' state
    ```
+
 3. On "Yes": commit via `gt modify -c "fix: resolve <finding-title>"`
 4. On "No": revert changes via `git restore`, reset todo to `ready`
 
@@ -152,7 +159,8 @@ $ARGUMENTS todos/debt/001-pending-medium-duplication.md  # ERROR: must be ready
 
 ## Commit Message Sanitization
 
-Finding titles may contain shell metacharacters. Use printf for shell-safe quoting to prevent command injection:
+Finding titles may contain shell metacharacters. Use printf for shell-safe
+quoting to prevent command injection:
 
 ```bash
 # Extract and sanitize title
@@ -165,19 +173,21 @@ gt modify -c "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeve
 
 ## State Transitions
 
-**Success path**: `ready` → `in-progress` → `complete`
-**Failure/rejection path**: `ready` → `in-progress` → `ready` (retry)
+**Success path**: `ready` → `in-progress` → `complete` **Failure/rejection
+path**: `ready` → `in-progress` → `ready` (retry)
 
 All transitions use atomic `transition_todo_state()` function.
 
 ## Error Recovery
 
 If fix agent fails:
+
 - Todo remains in `in-progress` state
 - Run `/debt:fix` again to retry (will fail - need to manually reset to ready)
 - Or manually transition back to ready: `transition_todo_state "<path>" ready`
 
 If git changes need to be reverted:
+
 ```bash
 git restore .
 ```

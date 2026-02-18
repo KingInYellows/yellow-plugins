@@ -2,7 +2,8 @@
 
 > Auto-generated from command metadata. Do not edit manually.
 
-This document provides comprehensive help for all CLI commands in the Yellow Plugins marketplace.
+This document provides comprehensive help for all CLI commands in the Yellow
+Plugins marketplace.
 
 ## Table of Contents
 
@@ -372,59 +373,60 @@ Publish with a custom commit message
 
 The following options are available for all commands:
 
-| Option | Description | Type | Alias |
-|--------|-------------|------|-------|
-| `--config` | Path to config file | string | - |
-| `--flags` | Path to feature flags file | string | - |
-| `--input` | Input file or data | string | `-i` |
-| `--output` | Output file or destination | string | `-o` |
-| `--verbose` | Enable verbose output | boolean | - |
-| `--dry-run` | Simulate without making changes | boolean | - |
-| `--help` | Show help | - | `-h` |
-| `--version` | Show version | - | `-v` |
+| Option      | Description                     | Type    | Alias |
+| ----------- | ------------------------------- | ------- | ----- |
+| `--config`  | Path to config file             | string  | -     |
+| `--flags`   | Path to feature flags file      | string  | -     |
+| `--input`   | Input file or data              | string  | `-i`  |
+| `--output`  | Output file or destination      | string  | `-o`  |
+| `--verbose` | Enable verbose output           | boolean | -     |
+| `--dry-run` | Simulate without making changes | boolean | -     |
+| `--help`    | Show help                       | -       | `-h`  |
+| `--version` | Show version                    | -       | `-v`  |
 
 ## Feature Flags
 
-Some commands require specific feature flags to be enabled. Configure these in `.claude-plugin/flags.json`:
+Some commands require specific feature flags to be enabled. Configure these in
+`.claude-plugin/flags.json`:
 
-| Command | Required Flag | Description |
-|---------|---------------|-------------|
-| `browse` | `enableBrowse` | Enable browse functionality |
+| Command    | Required Flag    | Description                   |
+| ---------- | ---------------- | ----------------------------- |
+| `browse`   | `enableBrowse`   | Enable browse functionality   |
 | `rollback` | `enableRollback` | Enable rollback functionality |
-| `publish` | `enablePublish` | Enable publish functionality |
+| `publish`  | `enablePublish`  | Enable publish functionality  |
 
 ## Error Codes
 
 Commands may emit structured error codes for troubleshooting:
 
-| Command | Error Codes | Description |
-|---------|-------------|-------------|
-| `install` | `ERR-INSTALL-001`, `ERR-INSTALL-002`, `ERR-COMPAT-001` | See specification for details |
-| `update` | `ERR-UPDATE-001`, `ERR-UPDATE-002`, `ERR-COMPAT-001` | See specification for details |
-| `uninstall` | `ERR-UNINSTALL-001`, `ERR-UNINSTALL-002` | See specification for details |
-| `browse` | `ERR-BROWSE-001`, `ERR-BROWSE-002` | See specification for details |
-| `search` | `ERR-SEARCH-001`, `ERR-SEARCH-002` | See specification for details |
-| `rollback` | `ERR-ROLLBACK-001`, `ERR-ROLLBACK-002`, `ERR-CACHE-001` | See specification for details |
-| `pin` | `ERR-PIN-001`, `ERR-PIN-002` | See specification for details |
-| `check-updates` | `ERR-CHECK-001`, `ERR-CHECK-002` | See specification for details |
-| `publish` | `ERR-PUBLISH-001`, `ERR-PUBLISH-002`, `ERR-SCHEMA-001` | See specification for details |
+| Command         | Error Codes                                             | Description                   |
+| --------------- | ------------------------------------------------------- | ----------------------------- |
+| `install`       | `ERR-INSTALL-001`, `ERR-INSTALL-002`, `ERR-COMPAT-001`  | See specification for details |
+| `update`        | `ERR-UPDATE-001`, `ERR-UPDATE-002`, `ERR-COMPAT-001`    | See specification for details |
+| `uninstall`     | `ERR-UNINSTALL-001`, `ERR-UNINSTALL-002`                | See specification for details |
+| `browse`        | `ERR-BROWSE-001`, `ERR-BROWSE-002`                      | See specification for details |
+| `search`        | `ERR-SEARCH-001`, `ERR-SEARCH-002`                      | See specification for details |
+| `rollback`      | `ERR-ROLLBACK-001`, `ERR-ROLLBACK-002`, `ERR-CACHE-001` | See specification for details |
+| `pin`           | `ERR-PIN-001`, `ERR-PIN-002`                            | See specification for details |
+| `check-updates` | `ERR-CHECK-001`, `ERR-CHECK-002`                        | See specification for details |
+| `publish`       | `ERR-PUBLISH-001`, `ERR-PUBLISH-002`, `ERR-SCHEMA-001`  | See specification for details |
 
 ## Specification References
 
 Commands reference specific sections of the technical specification:
 
-| Command | Spec Anchors |
-|---------|--------------|
-| `install` | `FR-001`, `CRIT-001`, `3-3-cli-workflow-control` |
-| `update` | `FR-002`, `CRIT-002`, `3-3-cli-workflow-control` |
-| `uninstall` | `FR-004`, `CRIT-004`, `3-3-cli-workflow-control` |
-| `browse` | `FR-006`, `CRIT-006`, `3-3-cli-workflow-control` |
-| `search` | `FR-007`, `CRIT-007`, `3-3-cli-workflow-control` |
-| `rollback` | `FR-003`, `CRIT-018`, `3-3-cli-workflow-control` |
-| `pin` | `FR-008`, `CRIT-008`, `3-3-cli-workflow-control` |
+| Command         | Spec Anchors                                     |
+| --------------- | ------------------------------------------------ |
+| `install`       | `FR-001`, `CRIT-001`, `3-3-cli-workflow-control` |
+| `update`        | `FR-002`, `CRIT-002`, `3-3-cli-workflow-control` |
+| `uninstall`     | `FR-004`, `CRIT-004`, `3-3-cli-workflow-control` |
+| `browse`        | `FR-006`, `CRIT-006`, `3-3-cli-workflow-control` |
+| `search`        | `FR-007`, `CRIT-007`, `3-3-cli-workflow-control` |
+| `rollback`      | `FR-003`, `CRIT-018`, `3-3-cli-workflow-control` |
+| `pin`           | `FR-008`, `CRIT-008`, `3-3-cli-workflow-control` |
 | `check-updates` | `FR-009`, `CRIT-009`, `3-3-cli-workflow-control` |
-| `publish` | `FR-005`, `CRIT-005`, `3-3-cli-workflow-control` |
+| `publish`       | `FR-005`, `CRIT-005`, `3-3-cli-workflow-control` |
 
 ---
 
-*Generated by Yellow Plugins CLI*
+_Generated by Yellow Plugins CLI_

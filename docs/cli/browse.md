@@ -1,8 +1,7 @@
 # Browse Command
 
-**Command**: `browse`
-**Aliases**: `list`, `ls`
-**Description**: Browse available plugins in the marketplace
+**Command**: `browse` **Aliases**: `list`, `ls` **Description**: Browse
+available plugins in the marketplace
 
 ---
 
@@ -49,23 +48,24 @@
 plugin browse [options]
 ```
 
-Browse and discover plugins in the Yellow Plugins marketplace with support for filtering by category, tags, and offline operation.
+Browse and discover plugins in the Yellow Plugins marketplace with support for
+filtering by category, tags, and offline operation.
 
 ---
 
 ## Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `--category <cat>` | string | - | Filter plugins by category |
-| `--tag <tag>` | string | - | Filter plugins by tag (can be specified multiple times) |
-| `--limit <n>` | number | `50` | Limit number of results |
-| `--offset <n>` | number | `0` | Skip first N results (pagination) |
-| `--sort <field>` | string | `relevance` | Sort by: `relevance`, `downloads`, `updated`, `name` |
-| `--order <dir>` | string | `desc` | Sort order: `asc`, `desc` |
-| `--offline` | boolean | `false` | Use cached marketplace index only (no network fetch) |
-| `--json` | boolean | `false` | Output results in JSON format |
-| `--verbose` | boolean | `false` | Show detailed plugin information |
+| Option             | Type    | Default     | Description                                             |
+| ------------------ | ------- | ----------- | ------------------------------------------------------- |
+| `--category <cat>` | string  | -           | Filter plugins by category                              |
+| `--tag <tag>`      | string  | -           | Filter plugins by tag (can be specified multiple times) |
+| `--limit <n>`      | number  | `50`        | Limit number of results                                 |
+| `--offset <n>`     | number  | `0`         | Skip first N results (pagination)                       |
+| `--sort <field>`   | string  | `relevance` | Sort by: `relevance`, `downloads`, `updated`, `name`    |
+| `--order <dir>`    | string  | `desc`      | Sort order: `asc`, `desc`                               |
+| `--offline`        | boolean | `false`     | Use cached marketplace index only (no network fetch)    |
+| `--json`           | boolean | `false`     | Output results in JSON format                           |
+| `--verbose`        | boolean | `false`     | Show detailed plugin information                        |
 
 ---
 
@@ -80,6 +80,7 @@ plugin browse
 ```
 
 **Output**:
+
 ```
 ⠋ Fetching marketplace index... (cached 2h ago)
 ✔ Found 147 plugins
@@ -110,6 +111,7 @@ plugin browse --category productivity
 ```
 
 **Output**:
+
 ```
 ✔ Found 12 plugins in category 'productivity'
 
@@ -135,6 +137,7 @@ plugin browse --tag ai --limit 10
 ```
 
 **Output**:
+
 ```
 ✔ Found 23 plugins tagged 'ai' (showing 10)
 
@@ -168,6 +171,7 @@ plugin browse --offline
 ```
 
 **Output**:
+
 ```
 ℹ Using cached marketplace index (age: 2h 15m)
   Run without --offline to refresh from remote
@@ -178,9 +182,10 @@ plugin browse --offline
 ```
 
 Useful for:
-* Working without internet connection
-* Faster browsing when cache is fresh
-* CI/CD pipelines with pre-populated cache
+
+- Working without internet connection
+- Faster browsing when cache is fresh
+- CI/CD pipelines with pre-populated cache
 
 ### Sort by Downloads
 
@@ -191,6 +196,7 @@ plugin browse --sort downloads --limit 10
 ```
 
 **Output**:
+
 ```
 ✔ Top 10 most downloaded plugins
 
@@ -209,6 +215,7 @@ plugin browse --sort updated --limit 10
 ```
 
 **Output**:
+
 ```
 ✔ 10 most recently updated plugins
 
@@ -226,6 +233,7 @@ plugin browse --category productivity --json
 ```
 
 **Output**:
+
 ```json
 {
   "success": true,
@@ -268,6 +276,7 @@ plugin browse --verbose --limit 5
 ```
 
 **Output**:
+
 ```
 Plugin: example-plugin (v1.2.3)
 Description: Code formatter with automatic style detection
@@ -293,43 +302,47 @@ Plugin: another-productivity-tool (v2.1.0)
 
 <!-- anchor: ranking-logic -->
 
-The `browse` command uses deterministic ranking algorithms to ensure consistent, reproducible results.
+The `browse` command uses deterministic ranking algorithms to ensure consistent,
+reproducible results.
 
 ### Default Relevance Ranking
 
 When `--sort relevance` (default), plugins are ranked by:
 
-1. **Category Match** (if `--category` specified): Exact category matches ranked higher
+1. **Category Match** (if `--category` specified): Exact category matches ranked
+   higher
 2. **Tag Match Score** (if `--tag` specified): Number of matching tags
 3. **Popularity Score**: Weighted combination of:
-   * Downloads (40%)
-   * Stars/favorites (30%)
-   * Recent update activity (20%)
-   * Install success rate (10%)
+   - Downloads (40%)
+   - Stars/favorites (30%)
+   - Recent update activity (20%)
+   - Install success rate (10%)
 4. **Alphabetical Tiebreaker**: Plugin ID (case-insensitive)
 
 ### Download-Based Sorting
 
 When `--sort downloads`:
 
-* Primary: Total download count (descending)
-* Tiebreaker: Plugin ID (alphabetical)
+- Primary: Total download count (descending)
+- Tiebreaker: Plugin ID (alphabetical)
 
 ### Update-Based Sorting
 
 When `--sort updated`:
 
-* Primary: Last updated timestamp (most recent first)
-* Tiebreaker: Plugin ID (alphabetical)
+- Primary: Last updated timestamp (most recent first)
+- Tiebreaker: Plugin ID (alphabetical)
 
 ### Name-Based Sorting
 
 When `--sort name`:
 
-* Primary: Plugin ID (case-insensitive alphabetical)
-* Order controlled by `--order asc|desc`
+- Primary: Plugin ID (case-insensitive alphabetical)
+- Order controlled by `--order asc|desc`
 
-**Specification References**: [FR-006](../SPECIFICATION.md#fr-006), [CRIT-006](../SPECIFICATION.md#crit-006), [Iteration 3 Validation](../plan/02_Iteration_I3.md#iteration-3-validation)
+**Specification References**: [FR-006](../SPECIFICATION.md#fr-006),
+[CRIT-006](../SPECIFICATION.md#crit-006),
+[Iteration 3 Validation](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
 
@@ -337,20 +350,21 @@ When `--sort name`:
 
 <!-- anchor: caching-performance -->
 
-The `browse` command leverages marketplace index caching for optimal performance:
+The `browse` command leverages marketplace index caching for optimal
+performance:
 
 ### Cache Behavior
 
-* **Cache Location**: `.claude-plugin/cache/marketplace-index.json`
-* **Cache TTL**: 3 hours (configurable via `MARKETPLACE_CACHE_TTL_HOURS`)
-* **Automatic Refresh**: Index refreshed if cache older than TTL
-* **Manual Refresh**: Use `plugin cache clear marketplace` to force refresh
+- **Cache Location**: `.claude-plugin/cache/marketplace-index.json`
+- **Cache TTL**: 3 hours (configurable via `MARKETPLACE_CACHE_TTL_HOURS`)
+- **Automatic Refresh**: Index refreshed if cache older than TTL
+- **Manual Refresh**: Use `plugin cache clear marketplace` to force refresh
 
 ### Performance Targets
 
-* **With cached index**: < 3 seconds (target from Iteration 3)
-* **With network fetch**: < 15 seconds (includes index download + parsing)
-* **Offline mode**: < 1 second (pure cache read)
+- **With cached index**: < 3 seconds (target from Iteration 3)
+- **With network fetch**: < 15 seconds (includes index download + parsing)
+- **Offline mode**: < 1 second (pure cache read)
 
 ### Cache Status Indicators
 
@@ -372,6 +386,7 @@ plugin cache status
 ```
 
 **Output**:
+
 ```
 Marketplace Cache
   Status: FRESH
@@ -386,7 +401,9 @@ Plugin Cache
   Oldest Entry: example-plugin@1.0.0 (30 days ago)
 ```
 
-**Specification References**: [Iteration 3 Metrics Targets](../plan/02_Iteration_I3.md#iteration-3-validation), [Iteration 3 Tooling Follow-Ups](../plan/02_Iteration_I3.md#iteration-3-validation)
+**Specification References**:
+[Iteration 3 Metrics Targets](../plan/02_Iteration_I3.md#iteration-3-validation),
+[Iteration 3 Tooling Follow-Ups](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
 
@@ -394,11 +411,11 @@ Plugin Cache
 
 <!-- anchor: feature-flags -->
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `enableBrowse` | boolean | `true` | Enable browse functionality |
-| `enableOfflineMode` | boolean | `true` | Allow `--offline` flag |
-| `enableMarketplaceCache` | boolean | `true` | Enable index caching |
+| Flag                     | Type    | Default | Description                 |
+| ------------------------ | ------- | ------- | --------------------------- |
+| `enableBrowse`           | boolean | `true`  | Enable browse functionality |
+| `enableOfflineMode`      | boolean | `true`  | Allow `--offline` flag      |
+| `enableMarketplaceCache` | boolean | `true`  | Enable index caching        |
 
 Configure in `.claude-plugin/flags.json`:
 
@@ -410,7 +427,9 @@ Configure in `.claude-plugin/flags.json`:
 }
 ```
 
-**Specification Reference**: [Feature Flag Governance](../operations/feature-flags.md), [CRIT-004](../SPECIFICATION.md#crit-004)
+**Specification Reference**:
+[Feature Flag Governance](../operations/feature-flags.md),
+[CRIT-004](../SPECIFICATION.md#crit-004)
 
 ---
 
@@ -418,13 +437,13 @@ Configure in `.claude-plugin/flags.json`:
 
 <!-- anchor: error-codes -->
 
-| Code | Severity | Description | Resolution |
-|------|----------|-------------|------------|
-| `ERR-BROWSE-001` | ERROR | Marketplace index fetch failed | Check network connection; try `--offline` flag |
-| `ERR-BROWSE-002` | ERROR | Invalid filter parameters | Verify category/tag values match marketplace schema |
-| `ERR-BROWSE-003` | WARNING | Cache stale but offline mode active | Use without `--offline` to refresh cache |
-| `ERR-BROWSE-004` | ERROR | Cache corrupted or unreadable | Run `plugin cache clear marketplace` |
-| `ERR-BROWSE-005` | ERROR | Invalid sort/order parameters | Use valid values: sort=(relevance\|downloads\|updated\|name), order=(asc\|desc) |
+| Code             | Severity | Description                         | Resolution                                                                      |
+| ---------------- | -------- | ----------------------------------- | ------------------------------------------------------------------------------- |
+| `ERR-BROWSE-001` | ERROR    | Marketplace index fetch failed      | Check network connection; try `--offline` flag                                  |
+| `ERR-BROWSE-002` | ERROR    | Invalid filter parameters           | Verify category/tag values match marketplace schema                             |
+| `ERR-BROWSE-003` | WARNING  | Cache stale but offline mode active | Use without `--offline` to refresh cache                                        |
+| `ERR-BROWSE-004` | ERROR    | Cache corrupted or unreadable       | Run `plugin cache clear marketplace`                                            |
+| `ERR-BROWSE-005` | ERROR    | Invalid sort/order parameters       | Use valid values: sort=(relevance\|downloads\|updated\|name), order=(asc\|desc) |
 
 **Example Error Output**:
 
@@ -442,7 +461,8 @@ Resolution:
 See: https://yellow-plugins.dev/docs/errors#err-browse-001
 ```
 
-**Cross-Reference**: [Error Codes Reference](../errors.md), [CRIT-007](../SPECIFICATION.md#crit-007)
+**Cross-Reference**: [Error Codes Reference](../errors.md),
+[CRIT-007](../SPECIFICATION.md#crit-007)
 
 ---
 
@@ -452,11 +472,16 @@ See: https://yellow-plugins.dev/docs/errors#err-browse-001
 
 This command implements the following specification requirements:
 
-* **[FR-006](../SPECIFICATION.md#fr-006)**: Plugin Discovery - Browse marketplace and list available plugins
-* **[CRIT-006](../SPECIFICATION.md#crit-006)**: Browse UX - Deterministic ranking with offline support
-* **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**: CLI interaction patterns and workflow control
-* **[6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback)**: Progress indicators and status messaging
-* **[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)**: Browse command executable end-to-end with caching
+- **[FR-006](../SPECIFICATION.md#fr-006)**: Plugin Discovery - Browse
+  marketplace and list available plugins
+- **[CRIT-006](../SPECIFICATION.md#crit-006)**: Browse UX - Deterministic
+  ranking with offline support
+- **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**:
+  CLI interaction patterns and workflow control
+- **[6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback)**:
+  Progress indicators and status messaging
+- **[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)**:
+  Browse command executable end-to-end with caching
 
 ---
 
@@ -464,26 +489,30 @@ This command implements the following specification requirements:
 
 <!-- anchor: accessibility -->
 
-* **Screen Readers**: Plugin lists include textual descriptions, not just visual formatting
-* **Color Independence**: Status indicators (`✔ ✖ ⚠ ℹ`) paired with textual prefixes (`SUCCESS`, `ERROR`, `WARNING`, `INFO`)
-* **ANSI Fallback**: Icons degrade to `[OK]/[WARN]` with high-contrast colors per [UI Style Guide §3](../ui/style-guide.md#3-ansi-fallback)
-* **Keyboard Navigation**: Fully keyboard-accessible; no mouse required
-* **Non-Interactive Mode**: Use `--json` output for programmatic access in automation
-* **Contrast**: All color combinations meet WCAG 2.1 AA standards (see [UI Style Guide](../ui/style-guide.md#1-6-accessibility-design-system))
+- **Screen Readers**: Plugin lists include textual descriptions, not just visual
+  formatting
+- **Color Independence**: Status indicators (`✔ ✖ ⚠ ℹ`) paired with textual
+  prefixes (`SUCCESS`, `ERROR`, `WARNING`, `INFO`)
+- **ANSI Fallback**: Icons degrade to `[OK]/[WARN]` with high-contrast colors
+  per [UI Style Guide §3](../ui/style-guide.md#3-ansi-fallback)
+- **Keyboard Navigation**: Fully keyboard-accessible; no mouse required
+- **Non-Interactive Mode**: Use `--json` output for programmatic access in
+  automation
+- **Contrast**: All color combinations meet WCAG 2.1 AA standards (see
+  [UI Style Guide](../ui/style-guide.md#1-6-accessibility-design-system))
 
 ---
 
 ## See Also
 
-* [`search`](./search.md) - Search for plugins by query
-* [`info`](./info.md) - View detailed plugin information
-* [`install`](./install.md) - Install a plugin
-* [`cache`](./cache.md) - Manage marketplace and plugin cache
-* [CLI Contracts - Browse](../contracts/cli-contracts.md#browse-contract)
-* [UI Style Guide](../ui/style-guide.md)
+- [`search`](./search.md) - Search for plugins by query
+- [`info`](./info.md) - View detailed plugin information
+- [`install`](./install.md) - Install a plugin
+- [`cache`](./cache.md) - Manage marketplace and plugin cache
+- [CLI Contracts - Browse](../contracts/cli-contracts.md#browse-contract)
+- [UI Style Guide](../ui/style-guide.md)
 
 ---
 
-**Last Updated**: 2026-01-12
-**Version**: 1.0.0
-**Maintained by**: Claude Code Plugin Marketplace Team
+**Last Updated**: 2026-01-12 **Version**: 1.0.0 **Maintained by**: Claude Code
+Plugin Marketplace Team

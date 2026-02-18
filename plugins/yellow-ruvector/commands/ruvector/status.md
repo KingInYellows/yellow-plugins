@@ -1,10 +1,10 @@
 ---
 name: ruvector:status
 description: >
-  Show ruvector health, DB stats, and queue status. Use when user says
-  "ruvector status", "check vector DB", "how many vectors", "is ruvector
-  working", or wants to verify the installation.
-argument-hint: ""
+  Show ruvector health, DB stats, and queue status. Use when user says "ruvector
+  status", "check vector DB", "how many vectors", "is ruvector working", or
+  wants to verify the installation.
+argument-hint: ''
 allowed-tools:
   - Bash
   - ToolSearch
@@ -36,11 +36,13 @@ Report: directory exists/missing, total disk usage.
 
 ### Step 3: MCP Server Health Check
 
-Use ToolSearch to discover ruvector MCP tools. Attempt a lightweight call (e.g., `vector_db_stats`) to verify the server responds.
+Use ToolSearch to discover ruvector MCP tools. Attempt a lightweight call (e.g.,
+`vector_db_stats`) to verify the server responds.
 
 **Healthy:** "MCP server: connected (responded in Xms)"
 
 **Unhealthy or unavailable:**
+
 ```
 MCP server: not responding
 
@@ -50,12 +52,16 @@ Recovery options:
 3. Re-install: /ruvector:setup
 ```
 
-This makes MCP health agent-detectable — agents can call `/ruvector:status` and parse the output to decide whether to fall back to Grep.
+This makes MCP health agent-detectable — agents can call `/ruvector:status` and
+parse the output to decide whether to fall back to Grep.
 
 ### Step 4: Database Statistics
 
-If MCP is available, call `vector_db_stats` (or equivalent via ToolSearch) to get:
-- Vector count per namespace (`code`, `reflexion`, `skills`, `causal`, `sessions`)
+If MCP is available, call `vector_db_stats` (or equivalent via ToolSearch) to
+get:
+
+- Vector count per namespace (`code`, `reflexion`, `skills`, `causal`,
+  `sessions`)
 - Approximate total size
 
 ### Step 5: Queue Health
@@ -70,6 +76,7 @@ fi
 ```
 
 Report:
+
 - Pending entries count
 - Queue file size
 - Age of oldest entry
@@ -108,5 +115,6 @@ Warn if queue > 5MB or > 1000 entries.
 ## Error Handling
 
 - **Not installed:** "ruvector not found. Run `/ruvector:setup` to install."
-- **No .ruvector/ directory:** "Not initialized. Run `/ruvector:setup` to set up."
+- **No .ruvector/ directory:** "Not initialized. Run `/ruvector:setup` to set
+  up."
 - **MCP unavailable:** Show CLI info only, note MCP status as unavailable.

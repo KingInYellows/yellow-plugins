@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "089"
+issue_id: '089'
 tags: [code-review, yellow-ci, simplicity]
 dependencies: []
 ---
@@ -10,7 +10,8 @@ dependencies: []
 
 ## Problem Statement
 
-4 validation functions in `validate.sh` are defined but never called by any yellow-ci component, adding ~150 lines of maintenance burden.
+4 validation functions in `validate.sh` are defined but never called by any
+yellow-ci component, adding ~150 lines of maintenance burden.
 
 ## Findings
 
@@ -22,19 +23,23 @@ dependencies: []
   - `validate_ssh_command()` (~21 lines) — 0 callers
 - **Total**: ~137 lines (37% of validate.sh)
 
-These were copied from yellow-ruvector template but are not needed for yellow-ci's current functionality.
+These were copied from yellow-ruvector template but are not needed for
+yellow-ci's current functionality.
 
 ## Proposed Solutions
 
 **Option 1: Keep as shared library (Recommended)**
+
 - These functions provide a safety net for future commands/hooks
 - validate_file_path has 10 dedicated tests (added in previous review round)
 - Removing and re-adding later is more churn than keeping
-- Add comment block marking them as "shared library — not all functions used by every plugin"
+- Add comment block marking them as "shared library — not all functions used by
+  every plugin"
 - **Effort**: Small
 - **Risk**: None
 
 **Option 2: Remove unused functions**
+
 - Delete 4 functions and their tests
 - -137 LOC in validate.sh, -40 LOC in validate.bats
 - **Effort**: Small
@@ -42,6 +47,7 @@ These were copied from yellow-ruvector template but are not needed for yellow-ci
 
 ## Acceptance Criteria
 
-- [ ] Either add "shared library" comment (Option 1) or remove functions (Option 2)
+- [ ] Either add "shared library" comment (Option 1) or remove functions
+      (Option 2)
 - [ ] If removing, update validate.bats to remove corresponding tests
 - [ ] All remaining tests pass

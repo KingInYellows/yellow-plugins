@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "084"
+issue_id: '084'
 tags: [code-review, yellow-ci, simplicity]
 dependencies: []
 ---
@@ -10,7 +10,10 @@ dependencies: []
 
 ## Problem Statement
 
-The `canonicalize_project_dir()` function in `plugins/yellow-ci/hooks/scripts/lib/validate.sh` is defined but never called by any yellow-ci component. This violates YAGNI (You Aren't Gonna Need It) principles.
+The `canonicalize_project_dir()` function in
+`plugins/yellow-ci/hooks/scripts/lib/validate.sh` is defined but never called by
+any yellow-ci component. This violates YAGNI (You Aren't Gonna Need It)
+principles.
 
 ## Findings
 
@@ -19,18 +22,19 @@ The `canonicalize_project_dir()` function in `plugins/yellow-ci/hooks/scripts/li
 - **Function**: `canonicalize_project_dir()`
 - **Usage**: No callers in yellow-ci plugin
 
-The function was likely included from the yellow-ruvector template (which does use it) but isn't needed for yellow-ci's simpler validation needs.
+The function was likely included from the yellow-ruvector template (which does
+use it) but isn't needed for yellow-ci's simpler validation needs.
 
 ## Proposed Solutions
 
-**Option 1 (Preferred - YAGNI):**
-Remove the unused function entirely:
+**Option 1 (Preferred - YAGNI):** Remove the unused function entirely:
+
 - Reduces code surface area
 - Eliminates maintenance burden
 - Follows "delete unused code" principle
 
-**Option 2 (Alternative):**
-Add a comment marking it as shared library function:
+**Option 2 (Alternative):** Add a comment marking it as shared library function:
+
 ```bash
 # canonicalize_project_dir() - Shared library function
 # Not currently used by yellow-ci, but available for future hooks
@@ -44,11 +48,14 @@ Prefer Option 1 unless there's a near-term plan to use this function.
 ## Technical Details
 
 The function provides:
+
 - PWD-based canonicalization
 - Git root detection
 - Fallback path handling
 
-Yellow-ci currently has no code paths that need this level of path normalization. All current hooks operate on fixed relative paths from the plugin root.
+Yellow-ci currently has no code paths that need this level of path
+normalization. All current hooks operate on fixed relative paths from the plugin
+root.
 
 ## Acceptance Criteria
 

@@ -13,9 +13,7 @@
               "line": 1,
               "startLine": null,
               "comments": {
-                "nodes": [
-                  { "author": { "login": "reviewer1" }, "body": "Truncated results" }
-                ]
+                "nodes": [{ "author": { "login": "reviewer1" }, "body": "Truncated results" }]
               }
             }
           ]

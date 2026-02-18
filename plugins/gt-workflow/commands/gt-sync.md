@@ -1,20 +1,25 @@
 ---
 name: gt-sync
-description: "Sync repo with trunk, restack branches, and clean up merged PRs"
-argument-hint: "[--no-delete | --force]"
+description: 'Sync repo with trunk, restack branches, and clean up merged PRs'
+argument-hint: '[--no-delete | --force]'
 allowed-tools:
   - Bash
 ---
 
 # Graphite Sync
 
-One-command repo sync: pull latest from trunk, restack your branches, and clean up merged PRs.
+One-command repo sync: pull latest from trunk, restack your branches, and clean
+up merged PRs.
 
 ## Input
 
 Optional arguments:
-- `--no-delete` — Skip deleting merged branches by passing `--no-delete` through to `gt repo sync` so it does not prompt for deletions
-- `--force` — Restack even if the stack appears clean (still stopping at conflicts for manual resolution) instead of skipping Phase 2 when there are no divergence markers
+
+- `--no-delete` — Skip deleting merged branches by passing `--no-delete` through
+  to `gt repo sync` so it does not prompt for deletions
+- `--force` — Restack even if the stack appears clean (still stopping at
+  conflicts for manual resolution) instead of skipping Phase 2 when there are no
+  divergence markers
 
 #$ARGUMENTS
 
@@ -44,20 +49,25 @@ git branch --list
 Run Graphite repo sync to pull the latest trunk and identify merged branches.
 
 If `--no-delete` was passed:
+
 ```bash
 gt repo sync --no-delete
 ```
 
 Otherwise:
+
 ```bash
 gt repo sync
 ```
 
-If `gt repo sync` fails (network error, authentication issue, etc.), report the error to the user and stop. Do not proceed to restacking with stale state.
+If `gt repo sync` fails (network error, authentication issue, etc.), report the
+error to the user and stop. Do not proceed to restacking with stale state.
 
 This will:
+
 - Fetch and fast-forward trunk
-- Detect merged branches and prompt for deletion (when `--no-delete` is not passed)
+- Detect merged branches and prompt for deletion (when `--no-delete` is not
+  passed)
 
 ### 2. Check Post-Sync Stack State
 
@@ -65,11 +75,16 @@ This will:
 gt log short
 ```
 
-Inspect the output for divergence markers. Graphite indicates a branch needs restacking when it shows `(needs restack)` next to a branch name, or when a branch is shown with `◯` instead of `◉` (indicating it is no longer based on its parent's current tip). If none of these markers appear and `--force` was not passed, skip to Phase 3; otherwise continue to the restacking step in Phase 2.
+Inspect the output for divergence markers. Graphite indicates a branch needs
+restacking when it shows `(needs restack)` next to a branch name, or when a
+branch is shown with `◯` instead of `◉` (indicating it is no longer based on its
+parent's current tip). If none of these markers appear and `--force` was not
+passed, skip to Phase 3; otherwise continue to the restacking step in Phase 2.
 
 ### 3. Restack if Needed
 
-If branches need restacking (they've diverged from their parents after trunk moved):
+If branches need restacking (they've diverged from their parents after trunk
+moved):
 
 ```bash
 gt stack restack
@@ -78,6 +93,7 @@ gt stack restack
 If the restack fails, check whether it's due to conflicts or another error:
 
 **If conflicts:**
+
 1. Report which branch has conflicts
 2. Report which files are conflicted
 3. Tell the user to resolve conflicts manually, then run:
@@ -92,6 +108,7 @@ If the restack fails, check whether it's due to conflicts or another error:
 5. Stop execution — don't try to auto-resolve conflicts
 
 **If non-conflict failure** (network, auth, corrupted state):
+
 1. Report the error output from `gt stack restack`
 2. Suggest running `git status` and `gt log short` to diagnose
 3. Stop execution

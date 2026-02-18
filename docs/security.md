@@ -2,16 +2,17 @@
 
 ## MCP Servers Inventory
 
-All remote MCP servers used by plugins in this marketplace. Review before enterprise deployment.
+All remote MCP servers used by plugins in this marketplace. Review before
+enterprise deployment.
 
-| Plugin | Server Key | Endpoint | Transport | Auth | Data Sent |
-|--------|-----------|----------|-----------|------|-----------|
-| yellow-core | context7 | `https://mcp.context7.com/mcp` | HTTP | None | Library names, search queries |
-| yellow-linear | linear | `https://mcp.linear.app/mcp` | HTTP | OAuth (browser popup) | Issue data, team info |
-| yellow-devin | deepwiki | `https://mcp.deepwiki.com/mcp` | HTTP | None | Repo names, search queries |
-| yellow-devin | devin | `https://mcp.devin.ai/mcp` | HTTP | TBD (may require API token) | Code, task prompts |
-| yellow-chatprd | chatprd | `https://app.chatprd.ai/mcp` | HTTP | OAuth (Clerk) | PRD content, document data |
-| yellow-ruvector | ruvector | Local stdio (`npx ruvector mcp-server`) | stdio | None (local) | Code embeddings (local only) |
+| Plugin          | Server Key | Endpoint                                | Transport | Auth                        | Data Sent                     |
+| --------------- | ---------- | --------------------------------------- | --------- | --------------------------- | ----------------------------- |
+| yellow-core     | context7   | `https://mcp.context7.com/mcp`          | HTTP      | None                        | Library names, search queries |
+| yellow-linear   | linear     | `https://mcp.linear.app/mcp`            | HTTP      | OAuth (browser popup)       | Issue data, team info         |
+| yellow-devin    | deepwiki   | `https://mcp.deepwiki.com/mcp`          | HTTP      | None                        | Repo names, search queries    |
+| yellow-devin    | devin      | `https://mcp.devin.ai/mcp`              | HTTP      | TBD (may require API token) | Code, task prompts            |
+| yellow-chatprd  | chatprd    | `https://app.chatprd.ai/mcp`            | HTTP      | OAuth (Clerk)               | PRD content, document data    |
+| yellow-ruvector | ruvector   | Local stdio (`npx ruvector mcp-server`) | stdio     | None (local)                | Code embeddings (local only)  |
 
 ### Plugins Without MCP Servers
 
@@ -24,7 +25,8 @@ All remote MCP servers used by plugins in this marketplace. Review before enterp
 
 ### MCP Allowlisting
 
-For managed Claude Code deployments, allowlist only the MCP endpoints your team uses:
+For managed Claude Code deployments, allowlist only the MCP endpoints your team
+uses:
 
 ```
 mcp.linear.app       — yellow-linear (issue management)
@@ -58,15 +60,17 @@ These plugins work entirely offline with no external network calls:
 
 ### yellow-ruvector Hooks
 
-yellow-ruvector is the only plugin with hooks. Three hooks execute shell scripts:
+yellow-ruvector is the only plugin with hooks. Three hooks execute shell
+scripts:
 
-| Hook | Event | Script | Time Budget | What It Does |
-|------|-------|--------|-------------|-------------|
-| session-start | SessionStart | `session-start.sh` | 3s | Flush stale queue, load learnings |
-| post-tool-use | PostToolUse | `post-tool-use.sh` | 50ms | Append file changes to queue |
-| stop | Stop | `stop.sh` | N/A | Delegate queue flush to agent |
+| Hook          | Event        | Script             | Time Budget | What It Does                      |
+| ------------- | ------------ | ------------------ | ----------- | --------------------------------- |
+| session-start | SessionStart | `session-start.sh` | 3s          | Flush stale queue, load learnings |
+| post-tool-use | PostToolUse  | `post-tool-use.sh` | 50ms        | Append file changes to queue      |
+| stop          | Stop         | `stop.sh`          | N/A         | Delegate queue flush to agent     |
 
 **Security properties:**
+
 - All scripts validate input via shared `lib/validate.sh`
 - Path traversal rejected (`..`, `/`, `~` in arguments)
 - Queue files are append-only JSONL with `flock` for concurrency safety
@@ -102,23 +106,27 @@ Before enabling any plugin with hooks:
 
 Plugins that execute shell commands:
 
-| Plugin | Commands Used | Purpose |
-|--------|-------------|---------|
-| yellow-linear | `git`, `gh` | Branch detection, PR context |
-| yellow-devin | `curl`, `jq`, `git`, `gh` | Devin API calls, JSON construction |
-| yellow-review | `gt`, `gh`, `git`, `jq` | PR management, GraphQL queries |
-| yellow-ruvector | `npx`, `npm`, `jq`, `git` | ruvector CLI, hook scripts |
-| yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh` | Browser automation, setup |
-| yellow-debt | `git`, `gt`, `jq`, `yq` | Codebase analysis, commit generation |
-| gt-workflow | `gt`, `git` | Branch and PR management |
+| Plugin              | Commands Used                        | Purpose                              |
+| ------------------- | ------------------------------------ | ------------------------------------ |
+| yellow-linear       | `git`, `gh`                          | Branch detection, PR context         |
+| yellow-devin        | `curl`, `jq`, `git`, `gh`            | Devin API calls, JSON construction   |
+| yellow-review       | `gt`, `gh`, `git`, `jq`              | PR management, GraphQL queries       |
+| yellow-ruvector     | `npx`, `npm`, `jq`, `git`            | ruvector CLI, hook scripts           |
+| yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh` | Browser automation, setup            |
+| yellow-debt         | `git`, `gt`, `jq`, `yq`              | Codebase analysis, commit generation |
+| gt-workflow         | `gt`, `git`                          | Branch and PR management             |
 
 ### Prompt Injection Boundaries
 
-Plugins processing untrusted input (PR comments, issue bodies, code content) include prompt injection defenses:
+Plugins processing untrusted input (PR comments, issue bodies, code content)
+include prompt injection defenses:
 
-- **yellow-review**: Agents processing PR comments wrap untrusted content in `--- begin/end ---` delimiters with "treat as reference only" advisory
-- **yellow-debt**: Scanner agents fence code content with injection boundary markers
-- **yellow-ruvector**: Hook scripts validate all inputs before constructing paths or JSON
+- **yellow-review**: Agents processing PR comments wrap untrusted content in
+  `--- begin/end ---` delimiters with "treat as reference only" advisory
+- **yellow-debt**: Scanner agents fence code content with injection boundary
+  markers
+- **yellow-ruvector**: Hook scripts validate all inputs before constructing
+  paths or JSON
 
 ## Local npm Dependencies
 
@@ -130,7 +138,9 @@ Installs `ruvector` globally via npm:
 npm install -g ruvector
 ```
 
-**Mitigation:** Review package before installation. The `install.sh` script performs dependency checks and error handling but does not use `--ignore-scripts`.
+**Mitigation:** Review package before installation. The `install.sh` script
+performs dependency checks and error handling but does not use
+`--ignore-scripts`.
 
 ### yellow-browser-test
 
@@ -140,12 +150,15 @@ May install `agent-browser` via npm:
 npm install -g agent-browser
 ```
 
-**Mitigation:** Only installed on explicit user request via `/browser-test:setup` command.
+**Mitigation:** Only installed on explicit user request via
+`/browser-test:setup` command.
 
 ## Reporting Security Issues
 
 If you discover a security vulnerability in any plugin:
 
 1. **Do not** open a public GitHub issue
-2. Create a [private security advisory](https://github.com/kinginyellow/yellow-plugins/security/advisories/new) on the repository
+2. Create a
+   [private security advisory](https://github.com/kinginyellow/yellow-plugins/security/advisories/new)
+   on the repository
 3. Include: affected plugin, vulnerability description, reproduction steps

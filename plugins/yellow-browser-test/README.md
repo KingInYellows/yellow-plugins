@@ -1,6 +1,7 @@
 # yellow-browser-test
 
-Autonomous web app testing with agent-browser — auto-discovery, structured flows, exploratory testing, and bug reporting.
+Autonomous web app testing with agent-browser — auto-discovery, structured
+flows, exploratory testing, and bug reporting.
 
 ## Install
 
@@ -11,33 +12,34 @@ Autonomous web app testing with agent-browser — auto-discovery, structured flo
 
 ## Prerequisites
 
-- [agent-browser](https://github.com/ArcadeLabsInc/agent-browser) CLI installed (`npm install -g agent-browser`)
+- [agent-browser](https://github.com/ArcadeLabsInc/agent-browser) CLI installed
+  (`npm install -g agent-browser`)
 - Chromium-based browser available
 - Dev server for your app (auto-detected during setup)
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `/browser-test:setup` | Install agent-browser and run app discovery |
-| `/browser-test:test` | Run structured test suite against all discovered routes |
-| `/browser-test:explore` | Autonomous exploratory testing |
-| `/browser-test:report` | Generate report from most recent test results |
+| Command                 | Description                                             |
+| ----------------------- | ------------------------------------------------------- |
+| `/browser-test:setup`   | Install agent-browser and run app discovery             |
+| `/browser-test:test`    | Run structured test suite against all discovered routes |
+| `/browser-test:explore` | Autonomous exploratory testing                          |
+| `/browser-test:report`  | Generate report from most recent test results           |
 
 ## Agents
 
-| Agent | Description |
-|-------|-------------|
+| Agent            | Description                                                       |
+| ---------------- | ----------------------------------------------------------------- |
 | `app-discoverer` | Reads codebase, detects dev server command, routes, and auth flow |
-| `test-runner` | Executes browser tests using agent-browser |
-| `test-reporter` | Formats results, writes report, creates GitHub issues |
+| `test-runner`    | Executes browser tests using agent-browser                        |
+| `test-reporter`  | Formats results, writes report, creates GitHub issues             |
 
 ## Skills
 
-| Skill | Description |
-|-------|-------------|
+| Skill                    | Description                                       |
+| ------------------------ | ------------------------------------------------- |
 | `agent-browser-patterns` | Ref workflow, session persistence, error recovery |
-| `test-conventions` | Report format, severity levels, config schema |
+| `test-conventions`       | Report format, severity levels, config schema     |
 
 ## Limitations
 

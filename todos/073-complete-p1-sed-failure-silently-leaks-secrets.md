@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p1
-issue_id: "073"
+issue_id: '073'
 tags: [code-review, yellow-ci, security]
 dependencies: []
 ---
@@ -10,19 +10,25 @@ dependencies: []
 
 ## Problem Statement
 
-The `redact_secrets()` function in `plugins/yellow-ci/hooks/scripts/lib/redact.sh` is implemented as a single sed pipeline with no error checking. If sed fails for any reason (invalid locale, binary data, out of memory, corrupted input), the function either:
+The `redact_secrets()` function in
+`plugins/yellow-ci/hooks/scripts/lib/redact.sh` is implemented as a single sed
+pipeline with no error checking. If sed fails for any reason (invalid locale,
+binary data, out of memory, corrupted input), the function either:
 
 1. Returns the raw unredacted input (worst case)
 2. Returns empty output (silent failure)
 3. Returns partial output with some secrets unredacted
 
-Additionally, `sanitize_log_content()` uses a pipe without `set -o pipefail`, meaning sed failures propagate through the pipeline silently. This is a critical security vulnerability because failure modes can leak secrets.
+Additionally, `sanitize_log_content()` uses a pipe without `set -o pipefail`,
+meaning sed failures propagate through the pipeline silently. This is a critical
+security vulnerability because failure modes can leak secrets.
 
 ## Findings
 
 **Location:** `plugins/yellow-ci/hooks/scripts/lib/redact.sh:13-28`
 
 **Current Code:**
+
 ```bash
 redact_secrets() {
     local content="$1"
@@ -62,18 +68,23 @@ sanitize_log_content() {
    - SIGPIPE if downstream consumer closes (unlikely but possible)
 
 **Impact:**
+
 - If sed fails and returns raw input, secrets leak
 - If sed fails silently (no output), CI job fails but reason is unclear
 - No error handling means no fallback to safe redaction
 
 **Related Issue:**
+
 - `sanitize_log_content()` lacks `set -o pipefail`
-- Pipe failures don't propagate: `redact_secrets "$content" | other_command` would hide sed errors
+- Pipe failures don't propagate: `redact_secrets "$content" | other_command`
+  would hide sed errors
 
 ## Proposed Solutions
 
 ### Option 1: Capture Exit Code + Fallback to Full Redaction (Recommended)
+
 **Replace `redact_secrets()` with:**
+
 ```bash
 redact_secrets() {
     local content="$1"
@@ -99,6 +110,7 @@ redact_secrets() {
 ```
 
 **Update `sanitize_log_content()`:**
+
 ```bash
 sanitize_log_content() {
     local content="$1"
@@ -115,17 +127,21 @@ sanitize_log_content() {
 ```
 
 **Pros:**
+
 - Safe failure mode: if redaction fails, output is completely suppressed
 - Explicit error logging to stderr
 - No secrets leak on failure
 - Maintains defense-in-depth principle
 
 **Cons:**
+
 - On failure, loses all log content (but this is safer than leaking secrets)
 - Slightly more complex than current implementation
 
 ### Option 2: Try-Catch with LC_ALL=C Fallback
+
 **Retry with safe locale on failure:**
+
 ```bash
 redact_secrets() {
     local content="$1"
@@ -150,15 +166,19 @@ redact_secrets() {
 ```
 
 **Pros:**
+
 - More resilient: tries to salvage logs with locale fallback
 - Better user experience (more logs retained)
 
 **Cons:**
+
 - More complex
 - Still might fail on binary data or OOM
 
 ### Option 3: Add Input Validation Before Redaction
+
 **Pre-flight checks:**
+
 ```bash
 redact_secrets() {
     local content="$1"
@@ -184,25 +204,28 @@ redact_secrets() {
 ```
 
 **Pros:**
+
 - Prevents common failure scenarios proactively
 - Clear error messages for different failure modes
 
 **Cons:**
+
 - More overhead (grep for null bytes on every log)
 - Might reject legitimate logs
 
 ## Technical Details
 
-**File:** `plugins/yellow-ci/hooks/scripts/lib/redact.sh`
-**Functions:** `redact_secrets()`, `sanitize_log_content()`
-**Lines:** 13-28
+**File:** `plugins/yellow-ci/hooks/scripts/lib/redact.sh` **Functions:**
+`redact_secrets()`, `sanitize_log_content()` **Lines:** 13-28
 
 **sed Exit Codes:**
+
 - 0: Success
 - 1: Generic error (regex error, I/O error)
 - 2: Usage error (invalid command syntax)
 
 **Bash Pipe Failure Handling:**
+
 ```bash
 # Without pipefail (current behavior):
 false | true  # Exit code: 0 (only last command matters)
@@ -213,11 +236,15 @@ false | true  # Exit code: 1 (first failure propagates)
 ```
 
 **Security Principle:**
-- **Fail-closed:** On error, suppress output entirely rather than risk leaking secrets
-- **Explicit errors:** Log failures to stderr so they're visible in CI system logs
+
+- **Fail-closed:** On error, suppress output entirely rather than risk leaking
+  secrets
+- **Explicit errors:** Log failures to stderr so they're visible in CI system
+  logs
 - **Defense in depth:** Assume sed can fail; design for graceful degradation
 
 **Testing Failure Modes:**
+
 ```bash
 # Test 1: Binary data (null byte)
 printf 'secret\x00data' | sed -e 's/secret/[REDACTED]/g'
@@ -239,7 +266,8 @@ printf 'data' | sed -e 's/./X/g' | head -c 0
 ## Acceptance Criteria
 
 - [ ] `redact_secrets()` captures sed exit code and handles failures
-- [ ] On sed failure, function returns `[REDACTED: sanitization failed]` to stderr
+- [ ] On sed failure, function returns `[REDACTED: sanitization failed]` to
+      stderr
 - [ ] On sed failure, function returns exit code 1 (not 0)
 - [ ] No raw unredacted content is returned on failure
 - [ ] `sanitize_log_content()` uses `set -o pipefail` in subshell

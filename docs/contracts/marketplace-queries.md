@@ -1,9 +1,7 @@
 # Marketplace Query Contracts
 
-**Document Version**: 1.0.0
-**Status**: Implementation Complete
-**Created**: 2026-01-12
-**Part of**: Task I3.T1 - Marketplace ingestion & caching
+**Document Version**: 1.0.0 **Status**: Implementation Complete **Created**:
+2026-01-12 **Part of**: Task I3.T1 - Marketplace ingestion & caching
 
 ---
 
@@ -21,9 +19,12 @@
 
 ## Overview
 
-This document specifies the command contracts for marketplace discovery operations (browse, search, info). These commands enable offline-first plugin discovery with deterministic ranking and cache validation.
+This document specifies the command contracts for marketplace discovery
+operations (browse, search, info). These commands enable offline-first plugin
+discovery with deterministic ranking and cache validation.
 
 **Key Features**:
+
 - Offline-first: Commands work from cached marketplace index
 - Deterministic ranking: category → name → version (descending)
 - Stale index warnings: Alerts when index needs refresh
@@ -31,6 +32,7 @@ This document specifies the command contracts for marketplace discovery operatio
 - JSON I/O support: Automation-friendly via `--input`/`--output`
 
 **Specification References**:
+
 - FR-001: Plugin discovery and browsing
 - FR-002: Search and filtering
 - Section 1.4: Key assumptions (deterministic ranking)
@@ -50,27 +52,27 @@ plugin browse [options]
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `--category, -c` | string | - | Filter by plugin category |
-| `--tag, -t` | string | - | Filter by plugin tag |
-| `--featured` | boolean | false | Show only featured plugins |
-| `--verified` | boolean | false | Show only verified plugins |
-| `--limit, -l` | number | 50 | Maximum results to return |
-| `--input` | string | - | Load request from JSON file or stdin (`-`) |
-| `--output` | string | - | Write response to JSON file or stdout (`-`) |
+| Option           | Type    | Default | Description                                 |
+| ---------------- | ------- | ------- | ------------------------------------------- |
+| `--category, -c` | string  | -       | Filter by plugin category                   |
+| `--tag, -t`      | string  | -       | Filter by plugin tag                        |
+| `--featured`     | boolean | false   | Show only featured plugins                  |
+| `--verified`     | boolean | false   | Show only verified plugins                  |
+| `--limit, -l`    | number  | 50      | Maximum results to return                   |
+| `--input`        | string  | -       | Load request from JSON file or stdin (`-`)  |
+| `--output`       | string  | -       | Write response to JSON file or stdout (`-`) |
 
 ### Request Schema (JSON)
 
 ```typescript
 interface BrowseRequest {
-  category?: string;           // Filter by category
-  tag?: string;                // Filter by tag
-  featured?: boolean;          // Show only featured
-  verified?: boolean;          // Show only verified
-  limit?: number;              // Max results (default: 50)
-  offset?: number;             // Pagination offset (default: 0)
-  correlationId?: string;      // Optional correlation ID for tracking
+  category?: string; // Filter by category
+  tag?: string; // Filter by tag
+  featured?: boolean; // Show only featured
+  verified?: boolean; // Show only verified
+  limit?: number; // Max results (default: 50)
+  offset?: number; // Pagination offset (default: 0)
+  correlationId?: string; // Optional correlation ID for tracking
 }
 ```
 
@@ -83,12 +85,12 @@ interface BrowseResponse {
   message: string;
   transactionId: string;
   correlationId: string;
-  timestamp: string;           // ISO 8601
+  timestamp: string; // ISO 8601
   cliVersion: string;
 
   data?: {
-    plugins: PluginEntry[];    // Sorted by category → name → version
-    totalCount: number;        // Total matches before pagination
+    plugins: PluginEntry[]; // Sorted by category → name → version
+    totalCount: number; // Total matches before pagination
     query: {
       category?: string;
       tag?: string;
@@ -99,10 +101,10 @@ interface BrowseResponse {
     };
   };
 
-  warnings?: string[];         // Stale index, integrity issues
+  warnings?: string[]; // Stale index, integrity issues
 
   error?: {
-    code: string;              // ERR-BROWSE-*, ERR-DISC-*
+    code: string; // ERR-BROWSE-*, ERR-DISC-*
     message: string;
     severity: 'ERROR' | 'WARNING';
     category: string;
@@ -112,18 +114,18 @@ interface BrowseResponse {
 }
 
 interface PluginEntry {
-  id: string;                  // Unique plugin identifier
-  name: string;                // Display name
-  version: string;             // Semantic version
-  author?: string;             // Plugin author
-  description?: string;        // Short description
-  source: string;              // Relative path to plugin directory
-  category: string;            // Primary category
-  tags?: string[];             // Searchable tags
-  featured?: boolean;          // Featured status
-  verified?: boolean;          // Verified status
-  downloads?: number;          // Optional download count
-  updatedAt?: string;          // ISO 8601 timestamp
+  id: string; // Unique plugin identifier
+  name: string; // Display name
+  version: string; // Semantic version
+  author?: string; // Plugin author
+  description?: string; // Short description
+  source: string; // Relative path to plugin directory
+  category: string; // Primary category
+  tags?: string[]; // Searchable tags
+  featured?: boolean; // Featured status
+  verified?: boolean; // Verified status
+  downloads?: number; // Optional download count
+  updatedAt?: string; // ISO 8601 timestamp
 }
 ```
 
@@ -135,21 +137,25 @@ All browse results are sorted using a three-level comparator:
 2. **Secondary**: Plugin name (case-insensitive, ascending)
 3. **Tertiary**: Semantic version (descending, latest first)
 
-This ordering is deterministic and logged for transparency (per architecture guidance).
+This ordering is deterministic and logged for transparency (per architecture
+guidance).
 
 ### Example Usage
 
 **CLI - Browse all plugins:**
+
 ```bash
 plugin browse
 ```
 
 **CLI - Browse by category:**
+
 ```bash
 plugin browse --category development --limit 10
 ```
 
 **Automation - JSON I/O:**
+
 ```bash
 echo '{"category":"security","featured":true}' | plugin browse --input - --output -
 ```
@@ -168,32 +174,32 @@ plugin search <query> [options]
 
 ### Positional Arguments
 
-| Argument | Type | Required | Description |
-|----------|------|----------|-------------|
-| `query` | string | Yes | Search query string |
+| Argument | Type   | Required | Description         |
+| -------- | ------ | -------- | ------------------- |
+| `query`  | string | Yes      | Search query string |
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `--exact` | boolean | false | Exact match only (no fuzzy search) |
-| `--category, -c` | string | - | Filter by plugin category |
-| `--tag, -t` | string | - | Filter by plugin tag |
-| `--limit, -l` | number | 50 | Maximum results to return |
-| `--input` | string | - | Load request from JSON file or stdin (`-`) |
-| `--output` | string | - | Write response to JSON file or stdout (`-`) |
+| Option           | Type    | Default | Description                                 |
+| ---------------- | ------- | ------- | ------------------------------------------- |
+| `--exact`        | boolean | false   | Exact match only (no fuzzy search)          |
+| `--category, -c` | string  | -       | Filter by plugin category                   |
+| `--tag, -t`      | string  | -       | Filter by plugin tag                        |
+| `--limit, -l`    | number  | 50      | Maximum results to return                   |
+| `--input`        | string  | -       | Load request from JSON file or stdin (`-`)  |
+| `--output`       | string  | -       | Write response to JSON file or stdout (`-`) |
 
 ### Request Schema (JSON)
 
 ```typescript
 interface SearchRequest {
-  query: string;               // Required search query
-  exact?: boolean;             // Exact match only (default: false)
-  category?: string;           // Filter by category
-  tag?: string;                // Filter by tag
-  limit?: number;              // Max results (default: 50)
-  offset?: number;             // Pagination offset (default: 0)
-  correlationId?: string;      // Optional correlation ID
+  query: string; // Required search query
+  exact?: boolean; // Exact match only (default: false)
+  category?: string; // Filter by category
+  tag?: string; // Filter by tag
+  limit?: number; // Max results (default: 50)
+  offset?: number; // Pagination offset (default: 0)
+  correlationId?: string; // Optional correlation ID
 }
 ```
 
@@ -201,13 +207,15 @@ interface SearchRequest {
 
 Same structure as `BrowseResponse`, with search-specific behavior:
 
-- **Fuzzy matching** (default): Searches across `id`, `name`, `description`, and `tags` using substring matching
+- **Fuzzy matching** (default): Searches across `id`, `name`, `description`, and
+  `tags` using substring matching
 - **Exact matching** (`--exact`): Requires complete match in at least one field
 - Results are sorted using the same deterministic comparator as browse
 
 ### Search Fields
 
 The search query matches against:
+
 - Plugin ID
 - Plugin name
 - Description text
@@ -218,16 +226,19 @@ All comparisons are case-insensitive.
 ### Example Usage
 
 **CLI - Fuzzy search:**
+
 ```bash
 plugin search "code review"
 ```
 
 **CLI - Exact search with filters:**
+
 ```bash
 plugin search linter --exact --category development
 ```
 
 **Automation - JSON I/O:**
+
 ```bash
 echo '{"query":"security","category":"security","exact":false}' | plugin search --input - --output -
 ```
@@ -246,23 +257,23 @@ plugin info <plugin-id>
 
 ### Positional Arguments
 
-| Argument | Type | Required | Description |
-|----------|------|----------|-------------|
-| `plugin-id` | string | Yes | Unique plugin identifier |
+| Argument    | Type   | Required | Description              |
+| ----------- | ------ | -------- | ------------------------ |
+| `plugin-id` | string | Yes      | Unique plugin identifier |
 
 ### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `--input` | string | Load request from JSON file or stdin (`-`) |
+| Option     | Type   | Description                                 |
+| ---------- | ------ | ------------------------------------------- |
+| `--input`  | string | Load request from JSON file or stdin (`-`)  |
 | `--output` | string | Write response to JSON file or stdout (`-`) |
 
 ### Request Schema (JSON)
 
 ```typescript
 interface InfoRequest {
-  pluginId: string;            // Required plugin identifier
-  correlationId?: string;      // Optional correlation ID
+  pluginId: string; // Required plugin identifier
+  correlationId?: string; // Optional correlation ID
 }
 ```
 
@@ -279,13 +290,13 @@ interface InfoResponse {
   cliVersion: string;
 
   data?: {
-    plugin: PluginEntry;       // Full plugin metadata
+    plugin: PluginEntry; // Full plugin metadata
   };
 
-  warnings?: string[];         // Stale index, integrity issues
+  warnings?: string[]; // Stale index, integrity issues
 
   error?: {
-    code: string;              // ERR-INFO-*, ERR-DISC-*
+    code: string; // ERR-INFO-*, ERR-DISC-*
     message: string;
     severity: 'ERROR' | 'WARNING';
     category: string;
@@ -298,11 +309,13 @@ interface InfoResponse {
 ### Example Usage
 
 **CLI - Show plugin info:**
+
 ```bash
 plugin info hookify
 ```
 
 **Automation - JSON I/O:**
+
 ```bash
 echo '{"pluginId":"pr-review-toolkit"}' | plugin info --input - --output -
 ```
@@ -316,15 +329,18 @@ echo '{"pluginId":"pr-review-toolkit"}' | plugin info --input - --output -
 All marketplace commands support automation via JSON I/O:
 
 **Input sources** (priority order):
+
 1. `--input <file>` - Read JSON from file
 2. `--input -` - Read JSON from stdin
 3. CLI arguments - Construct request from flags
 
 **Output destinations** (when `--output` provided):
+
 1. `--output <file>` - Write JSON to file (atomic write)
 2. `--output -` - Write JSON to stdout
 
 **Example automation workflow:**
+
 ```bash
 # Generate request
 echo '{"category":"security","limit":5}' > browse-request.json
@@ -348,11 +364,13 @@ Commands emit warnings when the marketplace index is stale (>24 hours old):
 }
 ```
 
-**Resolution**: Run the marketplace generator to refresh the index from the git repository.
+**Resolution**: Run the marketplace generator to refresh the index from the git
+repository.
 
 ### Integrity Validation
 
-Commands validate the cached marketplace using both the published content hash and optional signature:
+Commands validate the cached marketplace using both the published content hash
+and optional signature:
 
 ```json
 {
@@ -363,41 +381,43 @@ Commands validate the cached marketplace using both the published content hash a
 }
 ```
 
-**Resolution**: Regenerate the marketplace index (or re-run the publish/generator flow) to refresh the hash and signature, or fetch the latest signed copy from the trusted git remote.
+**Resolution**: Regenerate the marketplace index (or re-run the
+publish/generator flow) to refresh the hash and signature, or fetch the latest
+signed copy from the trusted git remote.
 
 ---
 
 ## Error Codes
 
-### Discovery Errors (ERR-DISC-*)
+### Discovery Errors (ERR-DISC-\*)
 
-| Code | Description | Resolution |
-|------|-------------|------------|
+| Code           | Description                               | Resolution                                |
+| -------------- | ----------------------------------------- | ----------------------------------------- |
 | `ERR-DISC-001` | Marketplace index not found or unreadable | Run marketplace generator to create index |
 
-### Browse Errors (ERR-BROWSE-*)
+### Browse Errors (ERR-BROWSE-\*)
 
-| Code | Description | Resolution |
-|------|-------------|------------|
+| Code             | Description               | Resolution                          |
+| ---------------- | ------------------------- | ----------------------------------- |
 | `ERR-BROWSE-001` | Invalid browse parameters | Check filter values (category, tag) |
-| `ERR-BROWSE-002` | Browse operation failed | Check logs for details |
-| `ERR-BROWSE-999` | Unexpected browse error | Check error message and logs |
+| `ERR-BROWSE-002` | Browse operation failed   | Check logs for details              |
+| `ERR-BROWSE-999` | Unexpected browse error   | Check error message and logs        |
 
-### Search Errors (ERR-SEARCH-*)
+### Search Errors (ERR-SEARCH-\*)
 
-| Code | Description | Resolution |
-|------|-------------|------------|
-| `ERR-SEARCH-001` | Search query is required | Provide a search query string |
+| Code             | Description               | Resolution                    |
+| ---------------- | ------------------------- | ----------------------------- |
+| `ERR-SEARCH-001` | Search query is required  | Provide a search query string |
 | `ERR-SEARCH-002` | Invalid search parameters | Check query and filter values |
-| `ERR-SEARCH-999` | Unexpected search error | Check error message and logs |
+| `ERR-SEARCH-999` | Unexpected search error   | Check error message and logs  |
 
-### Info Errors (ERR-INFO-*)
+### Info Errors (ERR-INFO-\*)
 
-| Code | Description | Resolution |
-|------|-------------|------------|
-| `ERR-INFO-001` | Plugin ID is required | Provide a valid plugin ID |
-| `ERR-INFO-002` | Plugin not found | Check plugin ID, run "plugin browse" to see available plugins |
-| `ERR-INFO-999` | Unexpected info error | Check error message and logs |
+| Code           | Description           | Resolution                                                    |
+| -------------- | --------------------- | ------------------------------------------------------------- |
+| `ERR-INFO-001` | Plugin ID is required | Provide a valid plugin ID                                     |
+| `ERR-INFO-002` | Plugin not found      | Check plugin ID, run "plugin browse" to see available plugins |
+| `ERR-INFO-999` | Unexpected info error | Check error message and logs                                  |
 
 ---
 
@@ -406,11 +426,13 @@ Commands validate the cached marketplace using both the published content hash a
 ### Example 1: Browse All Plugins
 
 **Command:**
+
 ```bash
 plugin browse --output -
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -447,11 +469,13 @@ plugin browse --output -
 ### Example 2: Search with Filters
 
 **Command:**
+
 ```bash
 plugin search review --category development --output -
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -492,11 +516,13 @@ plugin search review --category development --output -
 ### Example 3: Get Plugin Info
 
 **Command:**
+
 ```bash
 plugin info hookify --output -
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -527,11 +553,13 @@ plugin info hookify --output -
 ### Example 4: Error Response
 
 **Command:**
+
 ```bash
 plugin info nonexistent-plugin --output -
 ```
 
 **Response:**
+
 ```json
 {
   "success": false,
@@ -567,6 +595,7 @@ plugin info nonexistent-plugin --output -
 ---
 
 **References**:
+
 - FR-001: Plugin discovery and browsing
 - FR-002: Plugin search and information
 - CRIT-006: CLI workflow control

@@ -16,15 +16,7 @@
   "MD026": { "punctuation": ".,;:!" },
   "MD029": { "style": "ordered" },
   "MD033": {
-    "allowed_elements": [
-      "details",
-      "summary",
-      "br",
-      "sub",
-      "sup",
-      "img",
-      "kbd"
-    ]
+    "allowed_elements": ["details", "summary", "br", "sub", "sup", "img", "kbd"]
   },
   "MD034": true,
   "MD036": true,

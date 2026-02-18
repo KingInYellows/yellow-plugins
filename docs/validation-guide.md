@@ -1,12 +1,12 @@
 # Marketplace Validation Guide
 
-**Version**: 1.0.0
-**Created**: 2026-01-11
-**Compliance**: NFR-REL-004 (100% validation coverage)
+**Version**: 1.0.0 **Created**: 2026-01-11 **Compliance**: NFR-REL-004 (100%
+validation coverage)
 
 ## Overview
 
-The marketplace validation system ensures that `.claude-plugin/marketplace.json` meets all schema and business rule requirements before publication.
+The marketplace validation system ensures that `.claude-plugin/marketplace.json`
+meets all schema and business rule requirements before publication.
 
 ## Quick Start
 
@@ -57,6 +57,7 @@ The validation script enforces 10 critical rules:
 **Rule**: Marketplace file must exist and be valid JSON.
 
 **Error Example**:
+
 ```
 ✗ ERROR: Marketplace file not found: .claude-plugin/marketplace.json
 ✗ ERROR: Failed to parse marketplace.json: Unexpected token
@@ -66,15 +67,18 @@ The validation script enforces 10 critical rules:
 
 ### 2. JSON Schema Compliance
 
-**Rule**: Marketplace must have required root fields: `schemaVersion`, `marketplace`, `plugins`.
+**Rule**: Marketplace must have required root fields: `schemaVersion`,
+`marketplace`, `plugins`.
 
 **Error Example**:
+
 ```
 ✗ ERROR: Missing required field: schemaVersion
 ✗ ERROR: Missing required field: marketplace
 ```
 
 **Fix**: Add missing fields per schema:
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -88,14 +92,16 @@ The validation script enforces 10 critical rules:
 **Rule**: `schemaVersion` must be valid semver (MAJOR.MINOR.PATCH).
 
 **Error Example**:
+
 ```
 ✗ ERROR: Invalid schemaVersion format: 1.0 (must be semver like 1.0.0)
 ```
 
 **Fix**: Use three-part semver:
+
 ```json
 {
-  "schemaVersion": "1.0.0"  // ✓ Correct
+  "schemaVersion": "1.0.0" // ✓ Correct
 }
 ```
 
@@ -104,18 +110,20 @@ The validation script enforces 10 critical rules:
 **Rule**: Marketplace object must have `name`, `author`, `updatedAt`.
 
 **Error Example**:
+
 ```
 ✗ ERROR: Missing required marketplace.name
 ✗ ERROR: Invalid marketplace.updatedAt timestamp: 2026-01-11
 ```
 
 **Fix**: Provide all required fields with correct format:
+
 ```json
 {
   "marketplace": {
     "name": "My Plugin Marketplace",
     "author": "username",
-    "updatedAt": "2026-01-11T10:00:00Z"  // ISO 8601 format
+    "updatedAt": "2026-01-11T10:00:00Z" // ISO 8601 format
   }
 }
 ```
@@ -125,11 +133,13 @@ The validation script enforces 10 critical rules:
 **Rule**: All plugin IDs must be unique within marketplace.
 
 **Error Example**:
+
 ```
 ✗ ERROR: Duplicate plugin IDs found: my-plugin
 ```
 
 **Fix**: Ensure each plugin has a unique ID:
+
 ```json
 {
   "plugins": [
@@ -144,12 +154,14 @@ The validation script enforces 10 critical rules:
 **Rule**: Plugin IDs must be kebab-case (lowercase, numbers, hyphens only).
 
 **Error Example**:
+
 ```
 ✗ ERROR: Invalid plugin ID format: "MyPlugin" (must be kebab-case)
 ✗ ERROR: Invalid plugin ID format: "my_plugin" (must be kebab-case)
 ```
 
 **Fix**: Use kebab-case:
+
 ```json
 {
   "id": "my-plugin"        // ✓ Correct
@@ -164,12 +176,14 @@ The validation script enforces 10 critical rules:
 **Rule**: Each plugin's `source` directory must exist and contain `plugin.json`.
 
 **Error Example**:
+
 ```
 ✗ ERROR: Plugin "my-plugin" source directory not found: plugins/my-plugin
 ✗ ERROR: Plugin "my-plugin" missing plugin.json at: plugins/my-plugin/plugin.json
 ```
 
 **Fix**: Create plugin directory with manifest:
+
 ```bash
 mkdir -p plugins/my-plugin
 echo '{"version":"1.0.0"}' > plugins/my-plugin/plugin.json
@@ -177,14 +191,17 @@ echo '{"version":"1.0.0"}' > plugins/my-plugin/plugin.json
 
 ### 8. Version Consistency
 
-**Rule**: Marketplace version must match `plugin.json` version (if plugin.json exists).
+**Rule**: Marketplace version must match `plugin.json` version (if plugin.json
+exists).
 
 **Error Example**:
+
 ```
 ✗ ERROR: Version mismatch for "my-plugin": marketplace=1.0.0, plugin.json=1.1.0
 ```
 
 **Fix**: Synchronize versions:
+
 ```json
 // marketplace.json
 {
@@ -204,6 +221,7 @@ echo '{"version":"1.0.0"}' > plugins/my-plugin/plugin.json
 **Rule**: Plugin category must be one of 9 official categories.
 
 **Valid Categories**:
+
 - `development`
 - `productivity`
 - `security`
@@ -215,11 +233,13 @@ echo '{"version":"1.0.0"}' > plugins/my-plugin/plugin.json
 - `monitoring`
 
 **Error Example**:
+
 ```
 ✗ ERROR: Plugin "my-plugin" has invalid category: "tools"
 ```
 
 **Fix**: Use valid category:
+
 ```json
 {
   "category": "productivity"  // ✓ Correct
@@ -232,12 +252,14 @@ echo '{"version":"1.0.0"}' > plugins/my-plugin/plugin.json
 **Rule**: Tags must be kebab-case, max 10 per plugin.
 
 **Error Example**:
+
 ```
 ✗ ERROR: Plugin "my-plugin" has invalid tag format: "Code_Review"
 ✗ ERROR: Plugin "my-plugin" has too many tags (12), max is 10
 ```
 
 **Fix**: Use kebab-case tags, limit to 10:
+
 ```json
 {
   "tags": ["code-review", "quality", "testing"]  // ✓ Correct
@@ -252,11 +274,13 @@ echo '{"version":"1.0.0"}' > plugins/my-plugin/plugin.json
 **Rule**: Marketplace file should be under 100KB for fast parsing.
 
 **Warning Example**:
+
 ```
 ⚠ WARNING: Marketplace file is large (150.23 KB). Consider splitting or optimizing.
 ```
 
 **Fix**: If marketplace grows large:
+
 1. Remove unnecessary optional fields
 2. Split into multiple marketplace files (if tool supports it)
 3. Consider pagination in UI layer
@@ -266,6 +290,7 @@ echo '{"version":"1.0.0"}' > plugins/my-plugin/plugin.json
 **Rule**: Large plugin counts (>100) may need pagination.
 
 **Warning Example**:
+
 ```
 ⚠ WARNING: Large number of plugins (150). Consider pagination for UI.
 ```
@@ -280,6 +305,7 @@ The validation script uses standard exit codes for CI integration:
 - `1` - Validation failed (errors found)
 
 **CI Usage**:
+
 ```bash
 if node scripts/validate-marketplace.js; then
   echo "Validation passed!"
@@ -385,6 +411,7 @@ The validation script ensures:
 ### NFR-REL-004: 100% Validation Coverage
 
 All 10 validation rules are enforced:
+
 - ✓ File existence and parsing
 - ✓ JSON Schema compliance
 - ✓ Schema version format
@@ -401,6 +428,7 @@ All 10 validation rules are enforced:
 ### NFR-PERF-003: Performance
 
 Validation completes in < 1s for typical marketplaces:
+
 - Example marketplace (5 plugins): ~50ms
 - 100 plugins: ~200ms (estimated)
 
@@ -421,13 +449,15 @@ Validation completes in < 1s for typical marketplaces:
 
 **Problem**: Missing Node.js modules.
 
-**Fix**: Validation script uses only built-in modules (fs, path). No npm install needed.
+**Fix**: Validation script uses only built-in modules (fs, path). No npm install
+needed.
 
 ### "Permission denied" Error
 
 **Problem**: Script not executable.
 
 **Fix**:
+
 ```bash
 chmod +x scripts/validate-marketplace.js
 ```
@@ -437,6 +467,7 @@ chmod +x scripts/validate-marketplace.js
 **Problem**: Syntax error in marketplace.json.
 
 **Fix**: Use JSON linter:
+
 ```bash
 cat .claude-plugin/marketplace.json | jq .
 ```
@@ -446,6 +477,7 @@ cat .claude-plugin/marketplace.json | jq .
 **Problem**: Different working directory in CI.
 
 **Fix**: Run from project root:
+
 ```bash
 cd /path/to/project
 node scripts/validate-marketplace.js

@@ -1,10 +1,10 @@
 ---
 name: browser-test:test
 description: >
-  Run structured browser test suite. Use when user says "test the app",
-  "run browser tests", "check if the UI works", "verify routes", or
-  wants to run the full structured test suite against discovered routes.
-argument-hint: "[route-filter]"
+  Run structured browser test suite. Use when user says "test the app", "run
+  browser tests", "check if the UI works", "verify routes", or wants to run the
+  full structured test suite against discovered routes.
+argument-hint: '[route-filter]'
 allowed-tools:
   - Bash
   - Read
@@ -17,7 +17,8 @@ allowed-tools:
 
 # Run Browser Test Suite
 
-Start the dev server (if needed), run structured tests against all discovered routes, and generate a report.
+Start the dev server (if needed), run structured tests against all discovered
+routes, and generate a report.
 
 ## Workflow
 
@@ -33,9 +34,11 @@ If not found: "agent-browser not installed. Run `/browser-test:setup` first."
 
 ### Step 2: Read Config
 
-Read `.claude/yellow-browser-test.local.md` for dev server command, base URL, auth settings, and routes.
+Read `.claude/yellow-browser-test.local.md` for dev server command, base URL,
+auth settings, and routes.
 
-If not found: "No config found. Run `/browser-test:setup` to discover app configuration."
+If not found: "No config found. Run `/browser-test:setup` to discover app
+configuration."
 
 Validate config after reading:
 
@@ -56,7 +59,8 @@ if ! grep -q 'devServer:' .claude/yellow-browser-test.local.md || \
 fi
 ```
 
-If `$ARGUMENTS` is provided, use it as a route filter — only test routes matching the filter pattern. Validate route filter:
+If `$ARGUMENTS` is provided, use it as a route filter — only test routes
+matching the filter pattern. Validate route filter:
 
 ```bash
 if [ -n "$ARGUMENTS" ]; then
@@ -79,7 +83,8 @@ CURL_EXIT=$?
 rm -f "$CURL_ERROR"
 ```
 
-**If running (HTTP 200-399):** Use existing server. Do NOT stop it when tests finish.
+**If running (HTTP 200-399):** Use existing server. Do NOT stop it when tests
+finish.
 
 **If not running:** Start it:
 
@@ -98,7 +103,7 @@ LAST_CURL_ERROR=""
 while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
   ATTEMPT=$((ATTEMPT + 1))
   printf '[browser-test] Waiting for dev server (%d/%d)...\n' "$ATTEMPT" "$MAX_ATTEMPTS" >&2
-  
+
   CURL_ERROR=$(mktemp)
   if curl -s -o /dev/null "$BASE_URL$READY_PATH" 2>"$CURL_ERROR"; then
     rm -f "$CURL_ERROR"
@@ -106,7 +111,7 @@ while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
   fi
   LAST_CURL_ERROR=$(cat "$CURL_ERROR")
   rm -f "$CURL_ERROR"
-  
+
   if [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; then
     sleep 2
   fi
@@ -122,7 +127,8 @@ if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
 fi
 ```
 
-If timeout: show last 20 lines of `.claude/browser-test-server.log` and report error.
+If timeout: show last 20 lines of `.claude/browser-test-server.log` and report
+error.
 
 ### Step 4: Prepare Output Directories
 
@@ -157,7 +163,8 @@ Task(test-reporter): "Generate report from test-reports/results.json. Write repo
 
 ### Step 7: Cleanup
 
-If this command started the dev server (PID file exists at `.claude/browser-test-server.pid`):
+If this command started the dev server (PID file exists at
+`.claude/browser-test-server.pid`):
 
 ```bash
 if [ -f .claude/browser-test-server.pid ]; then
@@ -184,13 +191,13 @@ Display inline summary of test results.
 
 ## Error Handling
 
-| Error | Action |
-|-------|--------|
-| agent-browser not found | "Run `/browser-test:setup` to install agent-browser" |
-| Config not found | "Run `/browser-test:setup` to discover app configuration" |
-| Dev server start fails | Show last 20 lines of `.claude/browser-test-server.log` |
-| Dev server timeout | "Server didn't respond within {timeout}s. Check: `{command}`" |
-| Port in use (server down) | "Port {port} occupied. Stop the process or change port in config" |
-| Auth env vars missing | "Set {VAR_NAME} in your environment or .env.local" |
-| All tests fail | "All routes failed. Is the base URL correct? Try: `curl {baseURL}`" |
-| Route filter matches nothing | "No routes match filter '{filter}'. Available: {route list}" |
+| Error                        | Action                                                              |
+| ---------------------------- | ------------------------------------------------------------------- |
+| agent-browser not found      | "Run `/browser-test:setup` to install agent-browser"                |
+| Config not found             | "Run `/browser-test:setup` to discover app configuration"           |
+| Dev server start fails       | Show last 20 lines of `.claude/browser-test-server.log`             |
+| Dev server timeout           | "Server didn't respond within {timeout}s. Check: `{command}`"       |
+| Port in use (server down)    | "Port {port} occupied. Stop the process or change port in config"   |
+| Auth env vars missing        | "Set {VAR_NAME} in your environment or .env.local"                  |
+| All tests fail               | "All routes failed. Is the base URL correct? Try: `curl {baseURL}`" |
+| Route filter matches nothing | "No routes match filter '{filter}'. Available: {route list}"        |

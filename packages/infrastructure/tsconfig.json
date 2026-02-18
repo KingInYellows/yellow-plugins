@@ -6,9 +6,7 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "references": [
-    { "path": "../domain" }
-  ],
+  "references": [{ "path": "../domain" }],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
 }

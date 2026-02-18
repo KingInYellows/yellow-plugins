@@ -10,7 +10,11 @@
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 
-import Ajv, { type ErrorObject, type Options as AjvOptions, type ValidateFunction } from 'ajv';
+import Ajv, {
+  type ErrorObject,
+  type Options as AjvOptions,
+  type ValidateFunction,
+} from 'ajv';
 import addFormats from 'ajv-formats';
 
 type AjvInstance = import('ajv').default;
@@ -18,10 +22,12 @@ type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 type AddFormatsFn = (ajv: AjvInstance) => AjvInstance;
 
 const AjvCtor: AjvConstructor =
-  (Ajv as unknown as { default?: AjvConstructor }).default ?? (Ajv as unknown as AjvConstructor);
+  (Ajv as unknown as { default?: AjvConstructor }).default ??
+  (Ajv as unknown as AjvConstructor);
 
 const applyFormats: AddFormatsFn =
-  (addFormats as unknown as { default?: AddFormatsFn }).default ?? (addFormats as unknown as AddFormatsFn);
+  (addFormats as unknown as { default?: AddFormatsFn }).default ??
+  (addFormats as unknown as AddFormatsFn);
 
 /**
  * Validation result containing success status and typed errors
@@ -77,12 +83,12 @@ export class AjvValidatorFactory {
   constructor() {
     // Initialize AJV with strict configuration
     this.ajv = new AjvCtor({
-      strict: true,              // Strict schema validation
-      allErrors: true,           // Collect all errors (not just first)
-      verbose: true,             // Include schema and data in errors
-      discriminator: true,       // Support discriminator keyword
-      allowUnionTypes: true,     // Allow union types in schemas
-      $data: true,              // Support $data references
+      strict: true, // Strict schema validation
+      allErrors: true, // Collect all errors (not just first)
+      verbose: true, // Include schema and data in errors
+      discriminator: true, // Support discriminator keyword
+      allowUnionTypes: true, // Allow union types in schemas
+      $data: true, // Support $data references
     });
 
     // Add format validators (uri, email, date-time, etc.)
@@ -103,7 +109,10 @@ export class AjvValidatorFactory {
    * await factory.loadSchemaFromFile('marketplace', './schemas/marketplace.schema.json');
    * ```
    */
-  async loadSchemaFromFile(schemaName: string, filePath: string): Promise<void> {
+  async loadSchemaFromFile(
+    schemaName: string,
+    filePath: string
+  ): Promise<void> {
     try {
       const absolutePath = resolve(process.cwd(), filePath);
       const schemaContent = await readFile(absolutePath, 'utf-8');
@@ -201,7 +210,7 @@ export class AjvValidatorFactory {
    * @returns Structured validation errors with enhanced context
    */
   private transformErrors(ajvErrors: ErrorObject[]): ValidationError[] {
-    return ajvErrors.map(error => ({
+    return ajvErrors.map((error) => ({
       path: error.instancePath || '/',
       message: error.message || 'Validation failed',
       keyword: error.keyword,
@@ -249,11 +258,13 @@ export class AjvValidatorFactory {
   } {
     return {
       size: this.validatorCache.size,
-      schemas: Array.from(this.validatorCache.entries()).map(([name, cached]) => ({
-        name,
-        id: cached.schemaId,
-        compiledAt: cached.compiledAt,
-      })),
+      schemas: Array.from(this.validatorCache.entries()).map(
+        ([name, cached]) => ({
+          name,
+          id: cached.schemaId,
+          compiledAt: cached.compiledAt,
+        })
+      ),
     };
   }
 }

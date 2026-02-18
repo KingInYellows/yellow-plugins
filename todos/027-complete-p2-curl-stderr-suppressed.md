@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p2
-issue_id: "027"
+issue_id: '027'
 tags: [code-review, error-handling, observability]
 dependencies: []
 ---
@@ -9,18 +9,26 @@ dependencies: []
 # curl stderr suppressed
 
 ## Problem Statement
-The dev server readiness check in browser-test command likely uses curl but suppresses stderr, making network errors invisible. Per project conventions from PR #10, errors should be logged with component prefix rather than silently suppressed with `2>/dev/null`.
+
+The dev server readiness check in browser-test command likely uses curl but
+suppresses stderr, making network errors invisible. Per project conventions from
+PR #10, errors should be logged with component prefix rather than silently
+suppressed with `2>/dev/null`.
 
 ## Findings
+
 - **File affected**: `commands/browser-test/test.md` (readiness polling)
 - **Current behavior**: Stderr likely suppressed during polling loop
-- **Impact**: Network errors (DNS failures, connection refused, timeouts) are invisible
+- **Impact**: Network errors (DNS failures, connection refused, timeouts) are
+  invisible
 - **Violation**: Project convention requires error logging with component prefix
 
 ## Proposed Solutions
 
 ### Option A: Log curl failures with `[browser-test]` prefix (Recommended)
+
 Replace stderr suppression with error capture and logging:
+
 ```bash
 ERROR=$(curl -s -f "http://localhost:$PORT" 2>&1 >/dev/null)
 if [ $? -ne 0 ]; then
@@ -29,10 +37,13 @@ if [ $? -ne 0 ]; then
     continue
 fi
 ```
+
 Follows project conventions and aids debugging.
 
 ### Option B: Capture and display last curl error on polling timeout
+
 Only log errors if all retries exhausted:
+
 ```bash
 # In polling loop
 LAST_ERROR=$(curl -s -f "http://localhost:$PORT" 2>&1 >/dev/null)
@@ -43,12 +54,17 @@ if [ "$READY" = "false" ]; then
     exit 1
 fi
 ```
+
 Less verbose but still provides diagnostic info.
 
 ## Recommended Action
-Implement Option A for better observability during polling. Users can see progress and diagnose issues earlier. On timeout, provide summary with final error state.
+
+Implement Option A for better observability during polling. Users can see
+progress and diagnose issues earlier. On timeout, provide summary with final
+error state.
 
 Combined approach:
+
 ```bash
 ATTEMPT=0
 MAX_ATTEMPTS=30
@@ -70,12 +86,15 @@ fi
 ```
 
 ## Technical Details
-- **Location to modify**: `commands/browser-test/test.md` (readiness polling section)
+
+- **Location to modify**: `commands/browser-test/test.md` (readiness polling
+  section)
 - **Component prefix**: `[browser-test]` per project conventions
 - **Error capture**: Use `2>&1 >/dev/null` to capture only stderr
 - **curl flags**: `-s` (silent), `-f` (fail on HTTP errors)
 
 ## Acceptance Criteria
+
 - [ ] Stderr suppression (`2>/dev/null`) removed from readiness check
 - [ ] Error messages logged with `[browser-test]` component prefix
 - [ ] Progress messages show attempt count
@@ -84,11 +103,13 @@ fi
 - [ ] Manual test: start with DNS failure, verify error logged
 
 ## Work Log
-| Date | Action | Learnings |
-|------|--------|-----------|
+
+| Date       | Action                          | Learnings                                                                                  |
+| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------ |
 | 2026-02-13 | Created from PR #11 code review | Project conventions require component-prefixed error logging instead of stderr suppression |
 
 ## Resources
+
 - PR: #11 (yellow-browser-test code review)
 - Related: PR #10 error logging patterns (`|| true` → component prefix)
 - Convention: Always log errors with component prefix for debuggability

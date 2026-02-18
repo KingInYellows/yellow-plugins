@@ -1,7 +1,9 @@
 ---
 name: debt:status
-description: "Dashboard of current technical debt levels. Use when you want to check debt status, see aggregated metrics, or export debt data."
-argument-hint: "[--json]"
+description:
+  'Dashboard of current technical debt levels. Use when you want to check debt
+  status, see aggregated metrics, or export debt data.'
+argument-hint: '[--json]'
 allowed-tools:
   - Bash
   - Read
@@ -9,7 +11,8 @@ allowed-tools:
 
 # Technical Debt Status Command
 
-Display a dashboard of current technical debt levels aggregated by status, category, severity, and effort.
+Display a dashboard of current technical debt levels aggregated by status,
+category, severity, and effort.
 
 ## Arguments
 
@@ -312,13 +315,12 @@ Next Steps:
 
 ## Error Handling
 
-**Corrupted todo files**: Skipped with warning, counted in error total
-**Missing todos/debt/ directory**: Shows zeros for all metrics
-**Malformed YAML frontmatter**: File skipped, error logged
+**Corrupted todo files**: Skipped with warning, counted in error total **Missing
+todos/debt/ directory**: Shows zeros for all metrics **Malformed YAML
+frontmatter**: File skipped, error logged
 
 ## Use Cases
 
-**Team dashboards**: Export as JSON and visualize in monitoring tools
-**Progress tracking**: Compare status over time
-**Prioritization**: See high-severity items at a glance
-**Effort planning**: Use estimated hours for sprint planning
+**Team dashboards**: Export as JSON and visualize in monitoring tools **Progress
+tracking**: Compare status over time **Prioritization**: See high-severity items
+at a glance **Effort planning**: Use estimated hours for sprint planning
