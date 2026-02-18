@@ -1,7 +1,7 @@
 {
   "name": "yellow-ci",
-  "version": "0.1.0",
-  "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners on Proxmox homelab infrastructure",
+  "version": "1.0.0",
+  "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
@@ -12,6 +12,6 @@
     "url": "https://github.com/KingInYellows/yellow-plugins"
   },
   "license": "MIT",
-  "keywords": ["ci", "github-actions", "self-hosted", "runner", "diagnosis", "proxmox", "homelab"],
+  "keywords": ["ci", "github-actions", "self-hosted", "runner", "diagnosis"],
   "hooks": "./hooks/hooks.json"
 }

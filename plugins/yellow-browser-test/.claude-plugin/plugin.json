@@ -1,6 +1,6 @@
 {
   "name": "yellow-browser-test",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, exploratory testing, and bug reporting",
   "author": {
     "name": "KingInYellows",

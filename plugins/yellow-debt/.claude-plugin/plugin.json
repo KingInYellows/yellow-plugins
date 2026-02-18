@@ -1,6 +1,6 @@
 {
   "name": "yellow-debt",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Technical debt audit and remediation with parallel scanner agents. Use when you need to assess codebase health, identify AI-generated debt patterns, prioritize findings, and systematically remediate technical debt.",
   "author": {
     "name": "KingInYellows",
