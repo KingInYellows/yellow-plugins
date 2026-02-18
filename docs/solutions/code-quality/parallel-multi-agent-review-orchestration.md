@@ -1,23 +1,31 @@
 ---
 title: "Parallel Multi-Agent Code Review and Resolution Pipeline"
 category: code-quality
-date: 2026-02-13
+date: 2026-02-14
 tags:
   - multi-agent-workflow
   - parallel-execution
   - code-review
   - conflict-resolution
   - file-ownership-grouping
+  - shell-script-security
+  - performance-optimization
+  - test-coverage
 problem_type: workflow-scalability
 components:
   - yellow-browser-test plugin
+  - yellow-review plugin
   - multi-agent review pipeline
   - parallel todo resolution system
-severity:
-  critical: 5
-  important: 13
-  nice_to_have: 10
-  total: 28
+sessions:
+  - date: 2026-02-13
+    pr: 11
+    findings: 28
+    resolved: 27
+  - date: 2026-02-14
+    pr: 15
+    findings: 9
+    resolved: 9
 related:
   - docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md
   - docs/solutions/security-issues/yellow-linear-plugin-multi-agent-code-review.md
@@ -162,3 +170,180 @@ gh auth status >/dev/null 2>&1 || { printf '[test-reporter] Error: not authentic
 - [Plugin Authoring Review Patterns](./plugin-authoring-review-patterns.md) — consistency rules for plugin reviews
 - [Agent Workflow Security Patterns](../security-issues/agent-workflow-security-patterns.md) — HITL, prompt injection boundaries
 - PR: https://github.com/KingInYellows/yellow-plugins/pull/11
+
+---
+
+# Session 2: Modernization PRs Multi-Agent Review (2026-02-14)
+
+## Context
+
+Graphite stack of 3 modernization PRs (#13-#15) spanning 31 files with +1129/-704 lines across critical components: shell script security hardening, GraphQL pagination, performance optimizations, and validation tooling. Six specialized review agents launched in parallel produced 9 deduplicated findings (todos 060-068).
+
+## File-Ownership Grouping Applied
+
+| Group | Strategy | Todo IDs | Target Files |
+|-------|----------|----------|-------------|
+| Sequential (lead) | 4 todos on same file | 060, 061, 063, 064 | `get-pr-comments` |
+| Parallel agent 1 | Independent file | 062 | `lib/validate.sh` |
+| Parallel agent 2 | Independent file | 065 | `tests/mocks/gh` |
+| Parallel agent 3 | Independent file | 066 | `scripts/validate-plugin.js` |
+| Parallel agent 4 | Independent file | 067 | `scripts/export-ci-metrics.sh` |
+| Dependent (last) | Needs all fixes landed | 068 | `tests/get-pr-comments.bats`, fixtures |
+| Deferred | Overlaps multiple files | 040 | Browser test DRY refactor |
+
+**Result:** 9/9 resolved, 62 bats tests passing, 9 plugins validated.
+
+## Technical Fix Patterns
+
+### 1. Cursor Injection Validation (Security)
+
+GraphQL pagination cursors from API responses used directly in shell without format validation.
+
+```bash
+# Validate cursor format (base64-like chars only — defense against injection)
+case "$CURSOR" in
+    *[!a-zA-Z0-9+/=_-]*)
+        printf '[get-pr-comments] Error: Invalid cursor format (page %d).\n' "$PAGE" >&2
+        exit 1
+        ;;
+esac
+```
+
+### 2. O(n²) → O(n) JSON Accumulation (Performance)
+
+Per-page `jq -s '.[0] + .[1]'` replaced with bash array accumulation and single final merge.
+
+```bash
+#!/bin/bash  # Must change shebang from #!/bin/sh for array support
+ALL_PAGES=()
+while true; do
+    PAGE_THREADS=$(printf '%s' "$RESPONSE" | jq '.data...nodes // []')
+    ALL_PAGES+=("$PAGE_THREADS")
+    # ... pagination logic ...
+done
+# Single merge at end — O(n) instead of O(n²)
+ALL_THREADS=$(printf '%s\n' "${ALL_PAGES[@]}" | jq -s 'add // []')
+```
+
+**Shebang rule:** When switching from POSIX constructs to bash arrays (`+=`), change `#!/bin/sh` to `#!/bin/bash`.
+
+### 3. jq Error Context Capture (Diagnostics)
+
+Capture jq stderr separately to surface parse errors in structured error messages.
+
+```bash
+JQ_ERR=""
+if ! JQ_ERR=$(printf '%s' "$RESPONSE" | jq -e '.data..reviewThreads' 2>&1 >/dev/null); then
+    ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null)
+    if [ -n "$ERRORS" ]; then
+        printf '[get-pr-comments] Error: GraphQL error: %s\n' "$ERRORS" >&2
+    elif [ -n "$JQ_ERR" ]; then
+        printf '[get-pr-comments] Error: jq parse error: %s\n' "$JQ_ERR" >&2
+    fi
+    exit 1
+fi
+```
+
+### 4. Null Cursor Warning (Data Quality)
+
+Detect `hasNextPage=true` with empty `endCursor` — GitHub API edge case that silently truncates results.
+
+```bash
+HAS_NEXT=$(printf '%s' "$RESPONSE" | jq -r '...pageInfo.hasNextPage')
+CURSOR=$(printf '%s' "$RESPONSE" | jq -r '...pageInfo.endCursor // empty')
+if [ "$HAS_NEXT" = "true" ] && [ -z "$CURSOR" ]; then
+    printf '[get-pr-comments] Warning: pagination truncated — hasNextPage=true but no endCursor (page %d).\n' "$PAGE" >&2
+    break
+fi
+```
+
+### 5. Symlink Traversal Logging (Security)
+
+All fallback code paths in validation functions must log warnings, not silently continue.
+
+```bash
+if [ -L "$path" ]; then
+    printf '[validate] Warning: symlink skipped: %s\n' "$path" >&2
+    return 1  # Reject symlinks — do not fall back to raw path
+fi
+```
+
+### 6. Filesystem Error Codes (Diagnostics)
+
+Use `lstatSync()` to distinguish broken symlinks from missing files. Include `err.code` in messages.
+
+```javascript
+try {
+    const lstat = fs.lstatSync(fullPath);
+    if (lstat.isSymbolicLink()) {
+        try { fs.statSync(fullPath); }
+        catch { errors.push(`Broken symlink: ${fullPath}`); continue; }
+    }
+} catch (err) {
+    errors.push(`File not found: ${fullPath} (${err.code})`);
+}
+```
+
+### 7. Mock State File Pattern (Testing)
+
+Track multi-call pagination in mocks using a state file in `$BATS_TEST_TMPDIR`.
+
+```bash
+# In mock gh:
+PAGE_FILE="${BATS_TEST_TMPDIR}/mock_gh_pr300_page"
+if [ -f "$PAGE_FILE" ]; then
+    cat "$FIXTURE_DIR/multi-page-response-page2.json"
+else
+    printf '1' > "$PAGE_FILE"
+    cat "$FIXTURE_DIR/multi-page-response-page1.json"
+fi
+```
+
+### 8. Bats Stderr Separation (Testing)
+
+Bats `run` captures both stdout and stderr in `$output`. To test stderr warnings separately from JSON stdout:
+
+```bash
+@test "warns on null cursor with hasNextPage true" {
+    local stderr_file="${BATS_TEST_TMPDIR}/stderr_350"
+    run bash -c "'$SCRIPT' test/repo 350 2>'$stderr_file'"
+    [ "$status" -eq 0 ]
+    thread_count=$(printf '%s' "$output" | jq 'length')
+    [ "$thread_count" -eq 1 ]
+    [[ "$(cat "$stderr_file")" == *"pagination truncated"* ]]
+}
+```
+
+## Prevention Strategies
+
+### External Data Validation
+- **Pattern:** Validate all API-sourced values (cursors, tokens, IDs) against expected format before shell use
+- **Review check:** Every `jq -r` extraction followed by format validation
+- **Automated:** `rg 'jq -r.*cursor' -A 3 | rg -v 'validate|case'` to find unvalidated cursors
+
+### Pipeline Error Handling
+- **Pattern:** Capture jq stderr via `JQ_ERR=$(... 2>&1 >/dev/null)`, never bare `2>/dev/null`
+- **Review check:** Every `jq` call has `|| { error; exit 1; }` with component-prefixed message
+- **Automated:** `rg '\$\(.*jq' | rg -v '\|\|'` to find unguarded jq calls
+
+### Algorithmic Correctness
+- **Pattern:** Accumulate in arrays, merge once — never iterative `jq -s add` in loops
+- **Review check:** Any `jq -s` inside a `while` loop is suspect
+- **Automated:** ShellCheck + manual review of pagination loops
+
+### Test Coverage
+- **Pattern:** Every pagination path needs multi-page fixture + null-cursor fixture
+- **Review check:** New pagination code requires corresponding bats test with state-file mock
+- **Automated:** CI check that scripts with `hasNextPage` have corresponding `.bats` coverage
+
+## Metrics
+
+- **Review agents:** 6 (silent-failure-hunter, architecture-strategist, security-sentinel, performance-oracle, pattern-recognition-specialist, code-simplicity-reviewer)
+- **Total findings:** 9 (2 P1, 3 P2, 4 P3)
+- **Resolved:** 9/9 (100%)
+- **Parallel agents:** 4 (independent files)
+- **Sequential:** 4 todos on `get-pr-comments` + 1 dependent todo
+- **Deferred:** 1 (browser test DRY refactor → separate PR)
+- **Tests passing:** 62 bats (20 yellow-review + 42 yellow-ruvector)
+- **Plugins validated:** 9/9
+- **PR:** https://github.com/KingInYellows/yellow-plugins/pull/15
