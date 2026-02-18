@@ -47,6 +47,7 @@ If `--top` was passed:
 gt top
 echo "Jumped to top: $(git branch --show-current)"
 gt log short
+```
 Then show the stack and exit.
 
 If `--bottom` was passed:

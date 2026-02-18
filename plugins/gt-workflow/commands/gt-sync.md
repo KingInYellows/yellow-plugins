@@ -41,8 +41,14 @@ git branch --list
 
 ### 1. Sync with Trunk
 
-Run Graphite repo sync to pull the latest trunk and identify merged branches:
+Run Graphite repo sync to pull the latest trunk and identify merged branches.
 
+If `--no-delete` was passed:
+```bash
+gt repo sync --no-delete
+```
+
+Otherwise:
 ```bash
 gt repo sync
 ```
@@ -51,7 +57,7 @@ If `gt repo sync` fails (network error, authentication issue, etc.), report the 
 
 This will:
 - Fetch and fast-forward trunk
-- Detect merged branches and prompt for deletion (unless `--no-delete`)
+- Detect merged branches and prompt for deletion (when `--no-delete` is not passed)
 
 ### 2. Check Post-Sync Stack State
 
@@ -59,7 +65,7 @@ This will:
 gt log short
 ```
 
-If the stack looks clean (no divergence markers) and `--force` was not passed, skip to Phase 3; otherwise, continue to the restacking step in Phase 2.
+Inspect the output for divergence markers. Graphite indicates a branch needs restacking when it shows `(needs restack)` next to a branch name, or when a branch is shown with `◯` instead of `◉` (indicating it is no longer based on its parent's current tip). If none of these markers appear and `--force` was not passed, skip to Phase 3; otherwise continue to the restacking step in Phase 2.
 
 ### 3. Restack if Needed
 

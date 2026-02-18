@@ -1,7 +1,6 @@
 ---
 name: smart-submit
 description: "Stage, audit, commit, and submit changes via Graphite with parallel code review agents"
-argument-hint: "[--amend | --dry-run | --no-verify]"
 allowed-tools:
   - Bash
   - Read
@@ -64,34 +63,59 @@ echo "current=$current trunk=$trunk"
 
 ## Phase 2: Audit (skip if `--no-verify`)
 
+### 0. Capture the Diff Once
+
+Before spawning auditors, capture the full diff so all three agents can use it without redundant calls:
+
+```bash
+git diff
+```
+
+Store this output as `$DIFF_OUTPUT` (pass it as context to each agent below).
+
 ### 1. Spawn Parallel Auditors
 
-Use the Task tool to launch all three agents in parallel in a **single message**:
+Use the Task tool to launch all three agents in parallel in a **single message**, passing `$DIFF_OUTPUT` as context to each:
 
 **code-reviewer** (subagent_type: `general-purpose`):
-> Analyze the uncommitted changes by running `git diff`. Look for:
+> Analyze the following uncommitted diff for:
 > 1. Mock/stub code in production paths
 > 2. Placeholder or TODO implementations that shouldn't be committed
 > 3. Commented-out code blocks
 > 4. Obvious logic errors
 >
+> Diff:
+> ```
+> $DIFF_OUTPUT
+> ```
+>
 > Report findings as a list with file:line references. If nothing found, say "CLEAN".
 
 **security-sentinel** (subagent_type: `general-purpose`):
-> Scan uncommitted changes by running `git diff` for:
+> Scan the following uncommitted diff for:
 > 1. Hardcoded credentials, API keys, tokens, or secrets
 > 2. Private keys or certificates
 > 3. PII exposure (emails, passwords in plaintext)
 > 4. .env files or sensitive config being committed
 >
+> Diff:
+> ```
+> $DIFF_OUTPUT
+> ```
+>
 > Be extremely strict. Report findings with file:line references. If nothing found, say "CLEAN".
 
 **silent-failure-hunter** (subagent_type: `general-purpose`):
-> Analyze uncommitted changes by running `git diff` for:
+> Analyze the following uncommitted diff for:
 > 1. Empty catch/except blocks
 > 2. Swallowed errors (caught but not logged or re-thrown)
 > 3. Fallback values without logging
 > 4. Missing error boundaries or error handling
+>
+> Diff:
+> ```
+> $DIFF_OUTPUT
+> ```
 >
 > Report findings with file:line references. If nothing found, say "CLEAN".
 
@@ -162,44 +186,31 @@ The message should be concise (under 72 chars for the subject line). Include a b
 
 **If on trunk** (creating new branch):
 ```bash
-    gt create -- "<branch-name>" -m "<conventional commit message>"
-    ```
-    The branch name should be derived from the commit type and a short slug (e.g., `feat/add-user-auth`, `fix/null-pointer-crash`).
+gt create "<branch-name>" -m "<conventional commit message>"
+```
+The branch name should be derived from the commit type and a short slug (e.g., `feat/add-user-auth`, `fix/null-pointer-crash`).
 
-    **If on feature branch** (adding to existing):
-    ```bash
-    gt commit create -m "<conventional commit message>"
-    ```
+**If on feature branch** (adding to existing):
+```bash
+gt commit create -m "<conventional commit message>"
+```
 
-    **If `--amend`** (modifying current branch):
-    ```bash
-    gt commit amend -m "<conventional commit message>"
+**If `--amend`** (modifying current branch):
+```bash
+gt commit amend -m "<conventional commit message>"
 ```
 
 ## Phase 4: Submit
 
-### 1. Confirm Submission
-
-Use AskUserQuestion to confirm submission:
-- "Submit to GitHub" (Recommended) — proceed with gt submit
-- "Review changes first" — show diff summary and pause
-- "Cancel" — abort without submitting
-
-If user selects "Review changes first", run:
-```bash
-git log -1 --stat
-```
-and ask again.
-
-If user selects "Cancel", stop without submitting.
-
-### 2. Push to GitHub
+### 1. Push to GitHub
 
 If `--dry-run` was provided, skip this step and do not run `gt submit`; instead, only simulate the submission and proceed to the result summary without making any remote changes.
 
 ```bash
 gt submit --no-interactive
 ```
+
+After submitting, confirm the new stack state:
 
 ```bash
 gt log short

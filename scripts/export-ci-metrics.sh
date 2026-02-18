@@ -83,6 +83,7 @@ ${METRIC_PREFIX}_timestamp_seconds{${LABELS}} ${TIMESTAMP}
 EOF
 
 printf '[ci-metrics] Exported metrics for stage=%s status=%s\n' "$STAGE" "$STATUS" >&2
+
 # Optional: Include resource usage if available
 if command -v time &> /dev/null; then
   # CPU and memory stats not easily available in GitHub Actions without custom tooling
