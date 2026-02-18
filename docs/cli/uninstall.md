@@ -1,8 +1,7 @@
 # Uninstall Command
 
-**Command**: `uninstall`
-**Aliases**: `rm`, `remove`
-**Description**: Uninstall a plugin with lifecycle hook execution and cache management
+**Command**: `uninstall` **Aliases**: `rm`, `remove` **Description**: Uninstall
+a plugin with lifecycle hook execution and cache management
 
 ---
 
@@ -56,21 +55,22 @@
 plugin uninstall <plugin-id> [options]
 ```
 
-Remove an installed plugin from the system, with support for lifecycle scripts, cache retention, and audit logging.
+Remove an installed plugin from the system, with support for lifecycle scripts,
+cache retention, and audit logging.
 
 ---
 
 ## Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `<plugin-id>` | string | **required** | Plugin identifier to uninstall |
-| `--force` | boolean | `false` | Skip confirmation prompts |
-| `--keep-cache` | boolean | `false` | Retain cached versions for rollback |
-| `--skip-lifecycle` | boolean | `false` | Skip lifecycle scripts (preUninstall, uninstall, postUninstall) |
-| `--dry-run` | boolean | `false` | Simulate uninstall without making changes |
-| `--json` | boolean | `false` | Output results in JSON format |
-| `--non-interactive` | boolean | `false` | No prompts; read from environment/flags |
+| Option              | Type    | Default      | Description                                                     |
+| ------------------- | ------- | ------------ | --------------------------------------------------------------- |
+| `<plugin-id>`       | string  | **required** | Plugin identifier to uninstall                                  |
+| `--force`           | boolean | `false`      | Skip confirmation prompts                                       |
+| `--keep-cache`      | boolean | `false`      | Retain cached versions for rollback                             |
+| `--skip-lifecycle`  | boolean | `false`      | Skip lifecycle scripts (preUninstall, uninstall, postUninstall) |
+| `--dry-run`         | boolean | `false`      | Simulate uninstall without making changes                       |
+| `--json`            | boolean | `false`      | Output results in JSON format                                   |
+| `--non-interactive` | boolean | `false`      | No prompts; read from environment/flags                         |
 
 ---
 
@@ -85,6 +85,7 @@ plugin uninstall example-plugin
 ```
 
 **Output**:
+
 ```
 ⠋ Loading plugin metadata for example-plugin...
 ✔ Found example-plugin@1.2.3 (installed)
@@ -147,6 +148,7 @@ plugin uninstall example-plugin --keep-cache
 ```
 
 **Output**:
+
 ```
 ...
 
@@ -173,6 +175,7 @@ plugin uninstall example-plugin --force
 ```
 
 **Output**:
+
 ```
 ℹ Force mode: skipping confirmation prompts
 
@@ -180,7 +183,8 @@ plugin uninstall example-plugin --force
 ✔ Successfully uninstalled example-plugin@1.2.3 (3.1s)
 ```
 
-**Warning**: Use `--force` with caution. Lifecycle scripts still run unless `--skip-lifecycle` also specified.
+**Warning**: Use `--force` with caution. Lifecycle scripts still run unless
+`--skip-lifecycle` also specified.
 
 ### Skip Lifecycle Scripts
 
@@ -191,6 +195,7 @@ plugin uninstall example-plugin --skip-lifecycle
 ```
 
 **Output**:
+
 ```
 ⚠ Skipping lifecycle scripts (--skip-lifecycle flag)
 
@@ -226,6 +231,7 @@ plugin uninstall example-plugin --dry-run
 ```
 
 **Output**:
+
 ```
 ⠋ Dry run: Simulating uninstall (no changes will be made)
 
@@ -257,6 +263,7 @@ plugin uninstall example-plugin --force --json
 ```
 
 **Output**:
+
 ```json
 {
   "success": true,
@@ -309,11 +316,11 @@ plugin uninstall example-plugin --non-interactive
 
 **Environment Variables**:
 
-| Variable | Type | Description |
-|----------|------|-------------|
+| Variable            | Type        | Description              |
+| ------------------- | ----------- | ------------------------ |
 | `UNINSTALL_CONFIRM` | `yes`\|`no` | Confirm uninstall action |
-| `SKIP_LIFECYCLE` | `yes`\|`no` | Skip lifecycle scripts |
-| `KEEP_CACHE` | `yes`\|`no` | Retain cached versions |
+| `SKIP_LIFECYCLE`    | `yes`\|`no` | Skip lifecycle scripts   |
+| `KEEP_CACHE`        | `yes`\|`no` | Retain cached versions   |
 
 ---
 
@@ -321,24 +328,25 @@ plugin uninstall example-plugin --non-interactive
 
 <!-- anchor: lifecycle-hooks -->
 
-The `uninstall` command executes up to three lifecycle scripts during the uninstall process:
+The `uninstall` command executes up to three lifecycle scripts during the
+uninstall process:
 
 ### Hook Execution Order
 
 1. **preUninstall**: Runs before any file removal
-   * **Purpose**: Backup user data, prepare for uninstallation
-   * **Working Directory**: Current plugin directory
-   * **Failure Behavior**: Aborts uninstall; prompts for `--skip-lifecycle`
+   - **Purpose**: Backup user data, prepare for uninstallation
+   - **Working Directory**: Current plugin directory
+   - **Failure Behavior**: Aborts uninstall; prompts for `--skip-lifecycle`
 
 2. **uninstall**: Runs during file removal
-   * **Purpose**: Custom uninstallation logic (e.g., database cleanup)
-   * **Working Directory**: Current plugin directory
-   * **Failure Behavior**: Warns but continues; logs failure
+   - **Purpose**: Custom uninstallation logic (e.g., database cleanup)
+   - **Working Directory**: Current plugin directory
+   - **Failure Behavior**: Warns but continues; logs failure
 
 3. **postUninstall**: Runs after file removal
-   * **Purpose**: Final cleanup, remove integration hooks
-   * **Working Directory**: Plugin cache directory (if `--keep-cache`)
-   * **Failure Behavior**: Warns; uninstall considered successful
+   - **Purpose**: Final cleanup, remove integration hooks
+   - **Working Directory**: Plugin cache directory (if `--keep-cache`)
+   - **Failure Behavior**: Warns; uninstall considered successful
 
 ### Script Detection
 
@@ -355,10 +363,12 @@ lifecycle:
 
 ### Script Permissions & Security
 
-* **Explicit Consent**: On first uninstall, user must review and consent to script execution
-* **Script Digest**: Scripts identified by SHA-256 hash for integrity verification
-* **Audit Logging**: All script executions logged with exit codes and duration
-* **Timeout**: Scripts terminated after 120 seconds
+- **Explicit Consent**: On first uninstall, user must review and consent to
+  script execution
+- **Script Digest**: Scripts identified by SHA-256 hash for integrity
+  verification
+- **Audit Logging**: All script executions logged with exit codes and duration
+- **Timeout**: Scripts terminated after 120 seconds
 
 ### Consent Flow
 
@@ -377,7 +387,8 @@ To proceed, type exactly: I TRUST THIS SCRIPT
 >
 ```
 
-**Specification Reference**: [CRIT-004](../SPECIFICATION.md#crit-004), [CRIT-010](../SPECIFICATION.md#crit-010)
+**Specification Reference**: CRIT-004,
+CRIT-010
 
 ---
 
@@ -409,13 +420,15 @@ plugin uninstall example-plugin --keep-cache
 ```
 
 **Benefits**:
-* **Fast Reinstall**: No network download required
-* **Rollback Capability**: Can install specific previous versions
-* **Offline Access**: Works without internet connection
+
+- **Fast Reinstall**: No network download required
+- **Rollback Capability**: Can install specific previous versions
+- **Offline Access**: Works without internet connection
 
 **Trade-offs**:
-* **Disk Usage**: Cached versions consume space
-* **Cache Staleness**: Old versions may accumulate
+
+- **Disk Usage**: Cached versions consume space
+- **Cache Staleness**: Old versions may accumulate
 
 ### Manual Cache Cleanup
 
@@ -436,11 +449,13 @@ plugin cache clean --stale
 
 After uninstall with `--keep-cache`:
 
-* **Retention Period**: Indefinite (until manual cleanup or cache eviction)
-* **Cache Limit**: Subject to global cache size limit (default: 500 MB)
-* **Eviction**: Oldest uninstalled plugins evicted first when cache full
+- **Retention Period**: Indefinite (until manual cleanup or cache eviction)
+- **Cache Limit**: Subject to global cache size limit (default: 500 MB)
+- **Eviction**: Oldest uninstalled plugins evicted first when cache full
 
-**Specification Reference**: [Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation), [Uninstall Cache Retention](../operations/uninstall.md)
+**Specification Reference**:
+[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation),
+[Uninstall Cache Retention](../operations/uninstall.md)
 
 ---
 
@@ -531,11 +546,12 @@ plugin audit export --format json --output audit-report.json
 
 ### Audit Log Retention
 
-* **Retention Period**: 90 days (configurable)
-* **Rotation**: Old logs archived after 90 days
-* **Privacy**: PII redacted according to privacy policy
+- **Retention Period**: 90 days (configurable)
+- **Rotation**: Old logs archived after 90 days
+- **Privacy**: PII redacted according to privacy policy
 
-**Specification Reference**: [CRIT-010](../SPECIFICATION.md#crit-010), [Section 4 Security & Observability](../architecture/04_Operational_Architecture.md)
+**Specification Reference**: CRIT-010,
+[Section 4 Security & Observability](../architecture/04_Operational_Architecture.md)
 
 ---
 
@@ -580,21 +596,25 @@ See: https://yellow-plugins.dev/docs/errors#err-uninstall-003
 If automated uninstall fails, manual cleanup steps:
 
 1. **Remove plugin directory**:
+
    ```bash
    rm -rf .claude-plugin/plugins/example-plugin
    ```
 
 2. **Remove symlink**:
+
    ```bash
    rm -f .claude-plugin/plugins/example-plugin
    ```
 
 3. **Update registry manually**:
+
    ```bash
    plugin registry remove example-plugin
    ```
 
 4. **Clear cache** (optional):
+
    ```bash
    plugin cache clean example-plugin
    ```
@@ -604,7 +624,8 @@ If automated uninstall fails, manual cleanup steps:
    plugin list  # Should not show example-plugin
    ```
 
-**Specification Reference**: [Uninstall Runbook](../operations/uninstall.md), [Iteration 3 Readiness Review](../plan/02_Iteration_I3.md#iteration-3-validation)
+**Specification Reference**: [Uninstall Runbook](../operations/uninstall.md),
+[Iteration 3 Readiness Review](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
 
@@ -612,12 +633,12 @@ If automated uninstall fails, manual cleanup steps:
 
 <!-- anchor: feature-flags -->
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `enableUninstall` | boolean | `true` | Enable uninstall functionality |
-| `requireUninstallConsent` | boolean | `true` | Require typed confirmation for uninstall |
-| `lifecycleScriptConsent` | boolean | `true` | Require consent for lifecycle scripts |
-| `auditUninstall` | boolean | `true` | Log uninstall operations to audit log |
+| Flag                      | Type    | Default | Description                              |
+| ------------------------- | ------- | ------- | ---------------------------------------- |
+| `enableUninstall`         | boolean | `true`  | Enable uninstall functionality           |
+| `requireUninstallConsent` | boolean | `true`  | Require typed confirmation for uninstall |
+| `lifecycleScriptConsent`  | boolean | `true`  | Require consent for lifecycle scripts    |
+| `auditUninstall`          | boolean | `true`  | Log uninstall operations to audit log    |
 
 Configure in `.claude-plugin/flags.json`:
 
@@ -630,7 +651,9 @@ Configure in `.claude-plugin/flags.json`:
 }
 ```
 
-**Specification Reference**: [Feature Flag Governance](../operations/feature-flags.md), [CRIT-004](../SPECIFICATION.md#crit-004)
+**Specification Reference**:
+[Feature Flag Governance](../operations/feature-flags.md),
+CRIT-004
 
 ---
 
@@ -638,15 +661,15 @@ Configure in `.claude-plugin/flags.json`:
 
 <!-- anchor: error-codes -->
 
-| Code | Severity | Description | Resolution |
-|------|----------|-------------|------------|
-| `ERR-UNINSTALL-001` | ERROR | Plugin not installed | Verify plugin ID: `plugin list` |
-| `ERR-UNINSTALL-002` | ERROR | Plugin not found in registry | Registry may be corrupted; run `plugin registry repair` |
-| `ERR-UNINSTALL-003` | ERROR | Lifecycle script failed | Review script output; retry with `--skip-lifecycle` |
-| `ERR-UNINSTALL-004` | ERROR | Permission denied removing files | Run with elevated permissions or check file ownership |
-| `ERR-UNINSTALL-005` | ERROR | Registry update failed | Transaction rolled back; check registry lock |
-| `ERR-UNINSTALL-006` | WARNING | Cache cleanup failed | Uninstall succeeded; manually clean cache |
-| `ERR-UNINSTALL-007` | ERROR | Audit log write failed | Uninstall succeeded but not logged; check audit directory permissions |
+| Code                | Severity | Description                      | Resolution                                                            |
+| ------------------- | -------- | -------------------------------- | --------------------------------------------------------------------- |
+| `ERR-UNINSTALL-001` | ERROR    | Plugin not installed             | Verify plugin ID: `plugin list`                                       |
+| `ERR-UNINSTALL-002` | ERROR    | Plugin not found in registry     | Registry may be corrupted; run `plugin registry repair`               |
+| `ERR-UNINSTALL-003` | ERROR    | Lifecycle script failed          | Review script output; retry with `--skip-lifecycle`                   |
+| `ERR-UNINSTALL-004` | ERROR    | Permission denied removing files | Run with elevated permissions or check file ownership                 |
+| `ERR-UNINSTALL-005` | ERROR    | Registry update failed           | Transaction rolled back; check registry lock                          |
+| `ERR-UNINSTALL-006` | WARNING  | Cache cleanup failed             | Uninstall succeeded; manually clean cache                             |
+| `ERR-UNINSTALL-007` | ERROR    | Audit log write failed           | Uninstall succeeded but not logged; check audit directory permissions |
 
 **Example Error Output**:
 
@@ -672,7 +695,8 @@ Warning: Skipping lifecycle scripts may leave residual files.
 See: https://yellow-plugins.dev/docs/errors#err-uninstall-003
 ```
 
-**Cross-Reference**: [Error Codes Reference](../errors.md), [CRIT-007](../SPECIFICATION.md#crit-007)
+**Cross-Reference**: [Error Codes Reference](../errors.md),
+CRIT-007
 
 ---
 
@@ -682,12 +706,17 @@ See: https://yellow-plugins.dev/docs/errors#err-uninstall-003
 
 This command implements the following specification requirements:
 
-* **[FR-004](../SPECIFICATION.md#fr-004)**: Uninstall plugins with lifecycle hook execution
-* **[CRIT-004](../SPECIFICATION.md#crit-004)**: Lifecycle script consent and security
-* **[CRIT-010](../SPECIFICATION.md#crit-010)**: Audit logging and observability
-* **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**: CLI interaction patterns
-* **[6-2-input-patterns](../architecture/06_UI_UX_Architecture.md#6-2-input-patterns)**: Typed phrase confirmation
-* **[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)**: Uninstall lifecycle consent and telemetry
+- **FR-004**: Uninstall plugins with lifecycle
+  hook execution
+- **CRIT-004**: Lifecycle script consent and
+  security
+- **CRIT-010**: Audit logging and observability
+- **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**:
+  CLI interaction patterns
+- **[6-2-input-patterns](../architecture/06_UI_UX_Architecture.md#6-2-input-patterns)**:
+  Typed phrase confirmation
+- **[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)**:
+  Uninstall lifecycle consent and telemetry
 
 ---
 
@@ -695,28 +724,33 @@ This command implements the following specification requirements:
 
 <!-- anchor: accessibility -->
 
-* **Screen Readers**: Progress messages include textual step descriptions
-* **Color Independence**: Status indicators (`✔ ✖ ⚠ ℹ`) paired with textual prefixes
-* **ANSI Fallback**: Text degrades to `[OK]/[WARN]/[ERR]` prefixes with monochrome safety per [UI Style Guide §3](../ui/style-guide.md#3-ansi-fallback)
-* **Keyboard Navigation**: Fully keyboard-accessible; no mouse required
-* **Non-Interactive Mode**: Use `--non-interactive` for automation without prompts
-* **Typed Confirmation**: Prevents accidental uninstalls; accommodates deliberate user input
-* **Contrast**: All color combinations meet WCAG 2.1 AA standards (see [UI Style Guide](../ui/style-guide.md#1-6-accessibility-design-system))
+- **Screen Readers**: Progress messages include textual step descriptions
+- **Color Independence**: Status indicators (`✔ ✖ ⚠ ℹ`) paired with textual
+  prefixes
+- **ANSI Fallback**: Text degrades to `[OK]/[WARN]/[ERR]` prefixes with
+  monochrome safety per
+  [UI Style Guide §3](../ui/style-guide.md#3-ansi-fallback)
+- **Keyboard Navigation**: Fully keyboard-accessible; no mouse required
+- **Non-Interactive Mode**: Use `--non-interactive` for automation without
+  prompts
+- **Typed Confirmation**: Prevents accidental uninstalls; accommodates
+  deliberate user input
+- **Contrast**: All color combinations meet WCAG 2.1 AA standards (see
+  [UI Style Guide](../ui/style-guide.md#1-6-accessibility-design-system))
 
 ---
 
 ## See Also
 
-* [`install`](./install.md) - Install plugins
-* [`rollback`](./rollback.md) - Rollback to previous versions
-* [`cache`](./cache.md) - Manage plugin cache
-* [`audit`](./audit.md) - View audit logs
-* [CLI Contracts - Uninstall](../contracts/cli-contracts.md#uninstall-contract)
-* [Uninstall Operations Guide](../operations/uninstall.md)
-* [UI Style Guide](../ui/style-guide.md)
+- [`install`](./install.md) - Install plugins
+- [`rollback`](./rollback.md) - Rollback to previous versions
+- [`cache`](./cache.md) - Manage plugin cache
+- [`audit`](./audit.md) - View audit logs
+- [CLI Contracts - Uninstall](../contracts/cli-contracts.md#uninstall-contract)
+- [Uninstall Operations Guide](../operations/uninstall.md)
+- [UI Style Guide](../ui/style-guide.md)
 
 ---
 
-**Last Updated**: 2026-01-12
-**Version**: 1.0.0
-**Maintained by**: Claude Code Plugin Marketplace Team
+**Last Updated**: 2026-01-12 **Version**: 1.0.0 **Maintained by**: Claude Code
+Plugin Marketplace Team

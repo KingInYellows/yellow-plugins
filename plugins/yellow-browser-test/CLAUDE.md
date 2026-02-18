@@ -1,10 +1,12 @@
 # yellow-browser-test Plugin
 
-Autonomous web app testing with agent-browser. Auto-discovers dev server, routes, and auth flows. Runs structured and exploratory browser tests.
+Autonomous web app testing with agent-browser. Auto-discovers dev server,
+routes, and auth flows. Runs structured and exploratory browser tests.
 
 ## Conventions
 
-- agent-browser is the ONLY browser tool — never fall back to Playwright or puppeteer
+- agent-browser is the ONLY browser tool — never fall back to Playwright or
+  puppeteer
 - Reference env var names for credentials — never store actual passwords
 - Always check `command -v agent-browser` before first use in any command
 - Use ref-based elements (@e1, @e2) from `agent-browser snapshot -i`
@@ -36,7 +38,8 @@ Autonomous web app testing with agent-browser. Auto-discovers dev server, routes
 
 - **`/browser-test:setup`** — First time, or when project structure changes
 - **`/browser-test:test`** — Verify all routes work after code changes
-- **`/browser-test:explore`** — Find unexpected bugs through freeform exploration
+- **`/browser-test:explore`** — Find unexpected bugs through freeform
+  exploration
 - **`/browser-test:report`** — Regenerate report from cached test results
 
 ## Known Limitations

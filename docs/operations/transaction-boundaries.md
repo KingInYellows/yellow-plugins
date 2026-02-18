@@ -1,41 +1,50 @@
 # Transaction Boundaries and Operational Guide
 
-**Generated for:** Task I2.T3 - Install Transaction Orchestrator
-**Date:** 2026-01-11
-**Spec References:** Section 3.10 (Install Transaction Lifecycle), CRIT-001, CRIT-002, CRIT-018
-**Diagram Reference:** [install-sequence.puml](../diagrams/install-sequence.puml)
+**Generated for:** Task I2.T3 - Install Transaction Orchestrator **Date:**
+2026-01-11 **Spec References:** Section 3.10 (Install Transaction Lifecycle),
+CRIT-001, CRIT-002, CRIT-018 **Diagram Reference:**
+[install-sequence.puml](../diagrams/install-sequence.puml)
 
 ---
 
 ## Overview
 
-This document defines transaction boundaries, atomic operations, and rollback procedures for plugin install/update/rollback operations. Every operation generates a unique `transactionId` that threads through logs, registry entries, telemetry snapshots, and audit trails, enabling deterministic postmortem analysis.
+This document defines transaction boundaries, atomic operations, and rollback
+procedures for plugin install/update/rollback operations. Every operation
+generates a unique `transactionId` that threads through logs, registry entries,
+telemetry snapshots, and audit trails, enabling deterministic postmortem
+analysis.
 
 ---
 
 ## Transaction Lifecycle (7 Steps)
 
 ### Step 1: VALIDATE
-**Boundary:** Pre-mutation validation phase
-**Duration:** < 5 seconds
+
+**Boundary:** Pre-mutation validation phase **Duration:** < 5 seconds
 **Atomic:** No (read-only)
 
 **Operations:**
+
 - Validate marketplace index freshness
 - Check plugin existence and version availability
 - Run compatibility checks (OS, arch, Node version, Claude Code version)
 - Verify feature flags (`enableRollback` for rollback operations)
 
 **File Paths:**
+
 - **Read:** `.claude-plugin/marketplace.json`
 - **Read:** `.claude-plugin/registry.json`
 - **Read:** `.claude-plugin/flags.json`
 
 **Failure Handling:**
+
 - Abort immediately, no cleanup required
-- Error codes: `ERR-INSTALL-001` (already installed), `ERR-COMPAT-001` (incompatible)
+- Error codes: `ERR-INSTALL-001` (already installed), `ERR-COMPAT-001`
+  (incompatible)
 
 **Log Sample:**
+
 ```json
 {
   "level": "info",
@@ -54,6 +63,7 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ```
 
 **Decision Tree:**
+
 ```
 ┌─ Plugin already installed?
 │  ├─ YES + force=false → ERROR: ERR-INSTALL-001
@@ -67,23 +77,27 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ---
 
 ### Step 2: STAGE
-**Boundary:** Temporary workspace provisioning
-**Duration:** < 1 second
+
+**Boundary:** Temporary workspace provisioning **Duration:** < 1 second
 **Atomic:** No (directory creation, fails gracefully)
 
 **Operations:**
+
 - Generate `transactionId` if not provided
 - Create `.claude-plugin/tmp/<transactionId>` directory
 - Return staging path to orchestrator
 
 **File Paths:**
+
 - **Write:** `.claude-plugin/tmp/<transactionId>/` (directory)
 
 **Failure Handling:**
+
 - If mkdir fails, abort with `ERR-INSTALL-002`
 - No cleanup required (directory doesn't exist yet)
 
 **Log Sample:**
+
 ```json
 {
   "level": "info",
@@ -97,11 +111,12 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ---
 
 ### Step 3: DOWNLOAD & EXTRACT
-**Boundary:** Artifact retrieval and manifest validation
-**Duration:** < 120 seconds (NFR: install under 2 minutes)
-**Atomic:** No (network I/O, multi-step)
+
+**Boundary:** Artifact retrieval and manifest validation **Duration:** < 120
+seconds (NFR: install under 2 minutes) **Atomic:** No (network I/O, multi-step)
 
 **Operations:**
+
 - Download plugin archive from marketplace or source URI
 - Extract to staging directory
 - Read and parse `plugin.json` manifest
@@ -109,16 +124,19 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 - Verify checksums and signatures (if present)
 
 **File Paths:**
+
 - **Download:** Marketplace artifact URL → staging directory
 - **Read:** `<stagingPath>/plugin.json`
 - **Write:** `<stagingPath>/*` (extracted files)
 
 **Failure Handling:**
+
 - Cleanup staging directory on validation failure
 - Trigger rollback plan if download/extraction fails
 - Error codes: `ERROR-CACHE-001` (corrupted cache), validation errors from AJV
 
 **Log Sample:**
+
 ```json
 {
   "level": "info",
@@ -135,6 +153,7 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ```
 
 **Decision Tree:**
+
 ```
 ├─ Download successful?
 │  ├─ NO → ERROR: Network failure, cleanup staging
@@ -148,27 +167,33 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ---
 
 ### Step 4: LIFECYCLE_PRE (Pre-Install Script)
-**Boundary:** Sandboxed lifecycle script execution with consent
-**Duration:** < 5 minutes (timeout enforced)
-**Atomic:** No (external process execution)
+
+**Boundary:** Sandboxed lifecycle script execution with consent **Duration:** <
+5 minutes (timeout enforced) **Atomic:** No (external process execution)
 
 **Operations:**
-- Display lifecycle script contents to user (if `manifest.lifecycle.preInstall` exists)
+
+- Display lifecycle script contents to user (if `manifest.lifecycle.preInstall`
+  exists)
 - Record script digest (SHA-256)
 - Obtain typed consent from user
 - Execute script in sandbox (CPU/memory/timeout limits)
 - Capture exit code and duration
 
 **File Paths:**
+
 - **Read:** `<stagingPath>/lifecycle/pre-install.sh` (or as defined in manifest)
 - **Execute:** Sandboxed shell process
 
 **Failure Handling:**
+
 - If consent denied: cleanup staging, abort with user-friendly message
-- If script fails (exit code ≠ 0): cleanup staging, abort with `ERR-LIFECYCLE-001`
+- If script fails (exit code ≠ 0): cleanup staging, abort with
+  `ERR-LIFECYCLE-001`
 - Timeout after 5 minutes: kill process, cleanup staging
 
 **Log Sample:**
+
 ```json
 {
   "level": "info",
@@ -185,6 +210,7 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ```
 
 **Decision Tree:**
+
 ```
 ├─ Lifecycle script declared?
 │  ├─ NO → Skip to PROMOTE
@@ -200,6 +226,7 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ```
 
 **CRIT-004 Compliance:**
+
 - Scripts **must** be displayed before execution
 - Consent **must** be explicitly granted (typed confirmation)
 - Script digest **must** be recorded in registry for audit
@@ -207,11 +234,12 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ---
 
 ### Step 5: PROMOTE
-**Boundary:** Atomic cache promotion and eviction
-**Duration:** < 10 seconds
+
+**Boundary:** Atomic cache promotion and eviction **Duration:** < 10 seconds
 **Atomic:** **YES** (fs.rename within same filesystem)
 
 **Operations:**
+
 - Calculate checksum and size of staging directory
 - Execute atomic `fs.rename(stagingPath, cachePath)`
   - Source: `.claude-plugin/tmp/<transactionId>`
@@ -221,15 +249,19 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 - Trigger global eviction if cache exceeds 500 MB
 
 **File Paths:**
-- **Move (Atomic):** `.claude-plugin/tmp/<txId>` → `.claude-plugin/cache/<pluginId>/<version>`
+
+- **Move (Atomic):** `.claude-plugin/tmp/<txId>` →
+  `.claude-plugin/cache/<pluginId>/<version>`
 - **Write (Atomic):** `.claude-plugin/cache/index.json.tmp` → `index.json`
 
 **Failure Handling:**
+
 - If rename fails: staging directory remains, cleanup and abort
 - If eviction fails: log warning but continue (non-blocking)
 - Error code: `ERR-INSTALL-003`
 
 **Log Sample:**
+
 ```json
 {
   "level": "info",
@@ -248,6 +280,7 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ```
 
 **Decision Tree:**
+
 ```
 ├─ Cache promotion successful?
 │  ├─ NO → ERROR: ERR-INSTALL-003, cleanup staging
@@ -263,19 +296,22 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ```
 
 **CRIT-002 Compliance:**
+
 - **500 MB global limit:** Enforced via LRU eviction
 - **Last 3 versions per plugin:** Enforced during promotion
 - **Pin protection:** Pinned versions never evicted
-- **Minimum rollback set:** Always keep at least 2 versions per plugin if available
+- **Minimum rollback set:** Always keep at least 2 versions per plugin if
+  available
 
 ---
 
 ### Step 6: ACTIVATE
-**Boundary:** Atomic registry update and symlink activation
-**Duration:** < 2 seconds
-**Atomic:** **YES** (registry write via temp-rename pattern)
+
+**Boundary:** Atomic registry update and symlink activation **Duration:** < 2
+seconds **Atomic:** **YES** (registry write via temp-rename pattern)
 
 **Operations:**
+
 - Create `InstalledPlugin` record with transaction ID
 - Write registry to temp file: `.claude-plugin/registry.json.tmp`
 - Execute atomic `fs.rename(registry.json.tmp, registry.json)`
@@ -283,15 +319,20 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 - Record telemetry snapshot in registry
 
 **File Paths:**
-- **Write (Atomic):** `.claude-plugin/registry.json.tmp` → `.claude-plugin/registry.json`
-- **Symlink:** `<installDir>/<pluginId>` → `.claude-plugin/cache/<pluginId>/<version>`
+
+- **Write (Atomic):** `.claude-plugin/registry.json.tmp` →
+  `.claude-plugin/registry.json`
+- **Symlink:** `<installDir>/<pluginId>` →
+  `.claude-plugin/cache/<pluginId>/<version>`
 
 **Failure Handling:**
+
 - If registry write fails: rollback cache promotion (remove cache directory)
 - If symlink fails: log warning but continue (symlink is idempotent)
 - Error code: `ERR-INSTALL-004`
 
 **Log Sample:**
+
 ```json
 {
   "level": "info",
@@ -305,6 +346,7 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ```
 
 **Decision Tree:**
+
 ```
 ├─ Registry update successful?
 │  ├─ NO → ERROR: ERR-INSTALL-004, rollback cache
@@ -316,18 +358,21 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ```
 
 **CRIT-001 & CRIT-018 Compliance:**
+
 - **Transaction tracking:** `transactionId` embedded in registry entry
 - **Atomic operations:** Temp-rename pattern prevents partial writes
-- **Backup creation:** Registry backup created before mutation (optional, controlled by flag)
+- **Backup creation:** Registry backup created before mutation (optional,
+  controlled by flag)
 
 ---
 
 ### Step 7: TELEMETRY & CLEANUP
+
 **Boundary:** Post-install lifecycle script and observability capture
-**Duration:** < 5 seconds
-**Atomic:** No (fire-and-forget telemetry)
+**Duration:** < 5 seconds **Atomic:** No (fire-and-forget telemetry)
 
 **Operations:**
+
 - Execute post-install lifecycle script (if declared)
 - Emit structured JSON logs with correlation ID
 - Generate Prometheus metrics snapshot
@@ -335,15 +380,19 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 - Cleanup orphaned temp directories (>24 hours old)
 
 **File Paths:**
+
 - **Read:** `<cachePath>/lifecycle/post-install.sh` (if exists)
 - **Write:** Stdout (structured logs), metrics endpoint, trace backend
 
 **Failure Handling:**
-- Post-install script failure: log warning but don't rollback (plugin already activated)
+
+- Post-install script failure: log warning but don't rollback (plugin already
+  activated)
 - Telemetry failure: log error but don't fail operation
 - Cleanup failure: log warning but don't fail operation
 
 **Log Sample:**
+
 ```json
 {
   "level": "info",
@@ -369,6 +418,7 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ## Rollback Transaction Flow
 
 ### Rollback-Specific Steps
+
 **Phases:** VALIDATE → RETRIEVE → LIFECYCLE_UNINSTALL → ACTIVATE → TELEMETRY
 
 1. **VALIDATE:**
@@ -395,6 +445,7 @@ This document defines transaction boundaries, atomic operations, and rollback pr
    - Log target version and reason
 
 **Log Sample (Rollback):**
+
 ```json
 {
   "level": "info",
@@ -415,9 +466,12 @@ This document defines transaction boundaries, atomic operations, and rollback pr
 ## Update Transaction Flow
 
 ### Update = Install with Force
-Update operations reuse the install lifecycle with `force=true` to allow "reinstalling" over an existing installation.
+
+Update operations reuse the install lifecycle with `force=true` to allow
+"reinstalling" over an existing installation.
 
 **Key Differences:**
+
 - Validation step checks for version difference (skip if current == target)
 - Registry delta reports `updated` instead of `added`
 - Telemetry includes `fromVersion` and `toVersion` fields
@@ -426,39 +480,42 @@ Update operations reuse the install lifecycle with `force=true` to allow "reinst
 
 ## Atomic Operations Summary
 
-| Operation | File Path | Atomicity | Rollback Strategy |
-|-----------|-----------|-----------|-------------------|
-| **Registry Write** | `.claude-plugin/registry.json` | **YES** (temp-rename) | Restore from backup (`.claude-plugin/backups/`) |
-| **Cache Promotion** | `.claude-plugin/cache/<plugin>/<ver>` | **YES** (fs.rename) | Remove cache directory on failure |
-| **Cache Index** | `.claude-plugin/cache/index.json` | **YES** (temp-rename) | Rebuild from filesystem (recoverable) |
-| **Symlink** | `<installDir>/<pluginId>` | **YES** (atomic symlink) | Idempotent re-creation |
-| **Temp Cleanup** | `.claude-plugin/tmp/<txId>` | **NO** (best-effort) | Orphaned cleanup on next operation |
-| **Lifecycle Scripts** | External process | **NO** (external) | Abort on failure, cleanup staging |
+| Operation             | File Path                             | Atomicity                | Rollback Strategy                               |
+| --------------------- | ------------------------------------- | ------------------------ | ----------------------------------------------- |
+| **Registry Write**    | `.claude-plugin/registry.json`        | **YES** (temp-rename)    | Restore from backup (`.claude-plugin/backups/`) |
+| **Cache Promotion**   | `.claude-plugin/cache/<plugin>/<ver>` | **YES** (fs.rename)      | Remove cache directory on failure               |
+| **Cache Index**       | `.claude-plugin/cache/index.json`     | **YES** (temp-rename)    | Rebuild from filesystem (recoverable)           |
+| **Symlink**           | `<installDir>/<pluginId>`             | **YES** (atomic symlink) | Idempotent re-creation                          |
+| **Temp Cleanup**      | `.claude-plugin/tmp/<txId>`           | **NO** (best-effort)     | Orphaned cleanup on next operation              |
+| **Lifecycle Scripts** | External process                      | **NO** (external)        | Abort on failure, cleanup staging               |
 
 ---
 
 ## Error Codes & Failure Scenarios
 
 ### Install Errors
-| Code | Message | Phase | Rollback Action |
-|------|---------|-------|-----------------|
-| `ERR-INSTALL-001` | Already installed (use --force) | VALIDATE | None (abort early) |
-| `ERR-INSTALL-002` | Failed to stage artifacts | STAGE | None (mkdir failed) |
-| `ERR-INSTALL-003` | Failed to promote artifacts | PROMOTE | Cleanup staging directory |
-| `ERR-INSTALL-004` | Failed to update registry | ACTIVATE | Remove cache directory, restore registry backup |
-| `ERR-INSTALL-999` | Unexpected error | ANY | Full rollback plan execution |
+
+| Code              | Message                         | Phase    | Rollback Action                                 |
+| ----------------- | ------------------------------- | -------- | ----------------------------------------------- |
+| `ERR-INSTALL-001` | Already installed (use --force) | VALIDATE | None (abort early)                              |
+| `ERR-INSTALL-002` | Failed to stage artifacts       | STAGE    | None (mkdir failed)                             |
+| `ERR-INSTALL-003` | Failed to promote artifacts     | PROMOTE  | Cleanup staging directory                       |
+| `ERR-INSTALL-004` | Failed to update registry       | ACTIVATE | Remove cache directory, restore registry backup |
+| `ERR-INSTALL-999` | Unexpected error                | ANY      | Full rollback plan execution                    |
 
 ### Rollback Errors
-| Code | Message | Phase | Recovery |
-|------|---------|-------|----------|
-| `ERR-ROLLBACK-001` | Plugin not installed | VALIDATE | None (inform user) |
-| `ERR-ROLLBACK-002` | No cached version available | VALIDATE | None (inform user, suggest re-install) |
-| `ERR-ROLLBACK-003` | Failed to update registry | ACTIVATE | Restore registry backup |
-| `ERR-CACHE-001` | Cache missing or corrupted | RETRIEVE | Invalidate cache entry, suggest re-download |
+
+| Code               | Message                     | Phase    | Recovery                                    |
+| ------------------ | --------------------------- | -------- | ------------------------------------------- |
+| `ERR-ROLLBACK-001` | Plugin not installed        | VALIDATE | None (inform user)                          |
+| `ERR-ROLLBACK-002` | No cached version available | VALIDATE | None (inform user, suggest re-install)      |
+| `ERR-ROLLBACK-003` | Failed to update registry   | ACTIVATE | Restore registry backup                     |
+| `ERR-CACHE-001`    | Cache missing or corrupted  | RETRIEVE | Invalidate cache entry, suggest re-download |
 
 ### Compatibility Errors
-| Code | Message | Phase | Action |
-|------|---------|-------|--------|
+
+| Code             | Message                       | Phase    | Action                                    |
+| ---------------- | ----------------------------- | -------- | ----------------------------------------- |
 | `ERR-COMPAT-001` | Incompatible host environment | VALIDATE | Abort, display compatibility requirements |
 
 ---
@@ -466,6 +523,7 @@ Update operations reuse the install lifecycle with `force=true` to allow "reinst
 ## CLI Command Examples
 
 ### Install
+
 ```bash
 # Install latest version
 plugin install example-plugin
@@ -481,6 +539,7 @@ plugin install example-plugin --dry-run
 ```
 
 ### Rollback
+
 ```bash
 # Interactive rollback (list cached versions)
 plugin rollback example-plugin
@@ -493,6 +552,7 @@ plugin rollback example-plugin --dry-run
 ```
 
 ### Update
+
 ```bash
 # Update to latest
 plugin update example-plugin
@@ -506,7 +566,9 @@ plugin update example-plugin --version 1.3.0
 ## Observability & Audit
 
 ### Structured Logging
+
 All operations emit JSON logs with:
+
 - `transactionId`: Unique transaction identifier
 - `correlationId`: User session correlation ID
 - `phase`: Current transaction phase
@@ -514,7 +576,9 @@ All operations emit JSON logs with:
 - `success`: Boolean success indicator
 
 ### Telemetry Snapshots
+
 Stored in `.claude-plugin/registry.json` under `telemetry` map:
+
 ```json
 {
   "telemetry": {
@@ -531,12 +595,14 @@ Stored in `.claude-plugin/registry.json` under `telemetry` map:
 ```
 
 ### Prometheus Metrics
+
 - `plugin_installs_total{status="success|failure"}`
 - `plugin_install_duration_seconds{phase="validate|stage|promote|activate"}`
 - `cache_evictions_total{reason="size_limit|version_limit"}`
 - `cache_size_bytes`
 
 ### OpenTelemetry Traces
+
 - Span name: `plugin.install` / `plugin.rollback` / `plugin.update`
 - Attributes: `plugin.id`, `plugin.version`, `transaction.id`, `correlation.id`
 
@@ -545,6 +611,7 @@ Stored in `.claude-plugin/registry.json` under `telemetry` map:
 ## Decision Trees
 
 ### Should I Rollback or Re-Install?
+
 ```
 ┌─ Target version in cache?
 │  ├─ YES → Use rollback (faster, no download)
@@ -560,6 +627,7 @@ Stored in `.claude-plugin/registry.json` under `telemetry` map:
 ```
 
 ### When Does Eviction Trigger?
+
 ```
 ┌─ Cache size > 500 MB?
 │  ├─ YES → LRU eviction starts
@@ -577,26 +645,30 @@ Stored in `.claude-plugin/registry.json` under `telemetry` map:
 
 ## FR/NFR Mapping
 
-| Requirement | ID | Implementation |
-|-------------|-------|----------------|
-| **Install Plugin** | FR-001 | Full 7-step transaction lifecycle |
-| **Update Plugin** | FR-002 | Install with force flag, version diff telemetry |
-| **Rollback Plugin** | FR-003 | Cache-based rollback with feature flag gating |
-| **Install Duration** | NFR | < 2 minutes (enforced via timeout) |
-| **Rollback Success** | CRIT-002 | 100% for cached versions (atomic operations) |
-| **Transaction Tracking** | CRIT-001 | `transactionId` in logs, registry, telemetry |
-| **Lifecycle Consent** | CRIT-004 | Script display + typed consent before execution |
-| **Telemetry** | CRIT-010 | Structured JSON, Prometheus, OpenTelemetry |
-| **Atomic Operations** | CRIT-018 | Temp-rename pattern for registry & cache |
+| Requirement              | ID       | Implementation                                  |
+| ------------------------ | -------- | ----------------------------------------------- |
+| **Install Plugin**       | FR-001   | Full 7-step transaction lifecycle               |
+| **Update Plugin**        | FR-002   | Install with force flag, version diff telemetry |
+| **Rollback Plugin**      | FR-003   | Cache-based rollback with feature flag gating   |
+| **Install Duration**     | NFR      | < 2 minutes (enforced via timeout)              |
+| **Rollback Success**     | CRIT-002 | 100% for cached versions (atomic operations)    |
+| **Transaction Tracking** | CRIT-001 | `transactionId` in logs, registry, telemetry    |
+| **Lifecycle Consent**    | CRIT-004 | Script display + typed consent before execution |
+| **Telemetry**            | CRIT-010 | Structured JSON, Prometheus, OpenTelemetry      |
+| **Atomic Operations**    | CRIT-018 | Temp-rename pattern for registry & cache        |
 
 ---
 
 ## Iteration 2 Knowledge Transfer Note
 
 This document satisfies the I2 knowledge transfer requirement:
-> Update `docs/operations/transaction-boundaries.md` with annotated log samples, CLI snippets, and decision trees so discovery-focused agents in `I3` can reuse orchestrators without reverse engineering internals.
+
+> Update `docs/operations/transaction-boundaries.md` with annotated log samples,
+> CLI snippets, and decision trees so discovery-focused agents in `I3` can reuse
+> orchestrators without reverse engineering internals.
 
 Future agents should reference this document for:
+
 - Understanding transaction phases and boundaries
 - Implementing discovery UI that surfaces telemetry snapshots
 - Debugging failed installations via transaction IDs

@@ -1,7 +1,9 @@
 ---
 name: debt:sync
-description: "Push accepted debt findings to Linear as issues. Use when you want to track technical debt in Linear."
-argument-hint: "[--team <name>] [--project <name>]"
+description:
+  'Push accepted debt findings to Linear as issues. Use when you want to track
+  technical debt in Linear.'
+argument-hint: '[--team <name>] [--project <name>]'
 allowed-tools:
   - Bash
   - Read
@@ -11,7 +13,8 @@ allowed-tools:
 
 # Technical Debt Linear Sync Command
 
-Push accepted technical debt findings to Linear as issues with idempotent sync and rollback support.
+Push accepted technical debt findings to Linear as issues with idempotent sync
+and rollback support.
 
 ## Requirements
 
@@ -320,17 +323,16 @@ Re-running sync won't create duplicates.
 
 Each synced Linear issue includes:
 
-**Title**: Finding title from todo
-**Description**: Full finding description with code context
-**Labels**:
+**Title**: Finding title from todo **Description**: Full finding description
+with code context **Labels**:
+
 - `debt` — All technical debt issues
 - `debt-<id>` — Unique ID for idempotency
 - `<category>` — Category (complexity, duplication, etc.)
 - `<severity>` — Severity level
 
 **Priority**: Mapped from severity (critical → urgent, high → high, etc.)
-**Project**: Configured project
-**Team**: Configured team
+**Project**: Configured project **Team**: Configured team
 
 ## Rollback Support
 
@@ -341,15 +343,16 @@ If sync fails partway through:
 3. On Yes: Delete created issues via Linear MCP
 4. On No: Keep created issues, user can manually clean up
 
-**Recovery**: Todo files have `linear_issue_id` only for successfully synced items.
+**Recovery**: Todo files have `linear_issue_id` only for successfully synced
+items.
 
 ## Error Scenarios
 
 **Linear MCP not available**: Exit with error, instruct to install yellow-linear
-**Network failure**: Retry 3x with exponential backoff
-**Rate limit (429)**: Exit with error, instruct to wait and retry
-**Invalid credentials**: Exit with error, check Linear API token
-**Partial sync failure**: Offer rollback of created issues
+**Network failure**: Retry 3x with exponential backoff **Rate limit (429)**:
+Exit with error, instruct to wait and retry **Invalid credentials**: Exit with
+error, check Linear API token **Partial sync failure**: Offer rollback of
+created issues
 
 ## Configuration
 
@@ -369,14 +372,17 @@ Override per-run with `--team` and `--project` flags.
 ## Recovery Procedures
 
 **If todo update fails after issue creation**:
+
 - Issue exists in Linear
 - Todo missing `linear_issue_id`
 - Manual fix: Edit todo, add `linear_issue_id: <uuid>`
 
 **If sync is interrupted**:
+
 - Todos with `linear_issue_id` won't be re-synced (idempotency)
 - Re-run sync to complete
 
 **If need to re-sync all findings**:
+
 - Clear `linear_issue_id` from todos
 - Issues will be detected by label and linked (no duplicates)

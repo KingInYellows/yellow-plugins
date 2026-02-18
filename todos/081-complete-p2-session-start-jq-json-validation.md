@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p2
-issue_id: "081"
+issue_id: '081'
 tags: [code-review, yellow-ci, error-handling]
 dependencies: []
 ---
@@ -10,13 +10,18 @@ dependencies: []
 
 ## Problem Statement
 
-The session-start.sh script parses GitHub API responses with jq without validating the JSON structure. If the API returns an error object instead of the expected array, `jq 'length'` fails, but `|| failure_count=0` masks the error. Users see "0 failures" instead of an API error message, and rate limit responses go undetected.
+The session-start.sh script parses GitHub API responses with jq without
+validating the JSON structure. If the API returns an error object instead of the
+expected array, `jq 'length'` fails, but `|| failure_count=0` masks the error.
+Users see "0 failures" instead of an API error message, and rate limit responses
+go undetected.
 
 ## Findings
 
 **File:** `plugins/yellow-ci/hooks/scripts/session-start.sh`
 
 **Lines 67-69:**
+
 ```bash
 # Parse failure count (defaults to 0 if parsing fails)
 failure_count=$(printf '%s' "$workflow_runs_json" | \
@@ -107,6 +112,7 @@ fi
 **GitHub API Error Responses:**
 
 1. **Rate Limit (HTTP 429):**
+
    ```json
    {
      "message": "API rate limit exceeded for ...",
@@ -115,6 +121,7 @@ fi
    ```
 
 2. **Not Found (HTTP 404):**
+
    ```json
    {
      "message": "Not Found",
@@ -131,6 +138,7 @@ fi
    ```
 
 **Expected Success Response:**
+
 ```json
 {
   "total_count": 42,
@@ -145,6 +153,7 @@ fi
 ```
 
 **jq Flags:**
+
 - `-e` / `--exit-status`: Exit with status 1 if output is false/null
 - Enables distinguishing between "value is 0" and "parsing failed"
 
@@ -156,6 +165,7 @@ fi
 - [ ] API error messages extracted and displayed
 - [ ] Component prefix `[yellow-ci]` used in all error messages
 - [ ] No false positives ("0 failures" when API failed)
-- [ ] Script exits or handles error gracefully (doesn't display misleading counts)
+- [ ] Script exits or handles error gracefully (doesn't display misleading
+      counts)
 - [ ] Manual testing with mocked API error responses
 - [ ] Existing functionality preserved for valid responses

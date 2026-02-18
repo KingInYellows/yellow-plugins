@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p2
-issue_id: "050"
+issue_id: '050'
 tags: [code-review, security, human-in-loop]
 dependencies: []
 pr_number: 12
@@ -11,11 +11,14 @@ pr_number: 12
 
 ## Problem Statement
 
-The audit-synthesizer automatically deletes ALL existing pending todos without user confirmation. If user manually reviewed/annotated pendings or audit is run by mistake, review work is lost.
+The audit-synthesizer automatically deletes ALL existing pending todos without
+user confirmation. If user manually reviewed/annotated pendings or audit is run
+by mistake, review work is lost.
 
 ## Findings
 
-**Location**: `plugins/yellow-debt/agents/synthesis/audit-synthesizer.md:128-134`
+**Location**:
+`plugins/yellow-debt/agents/synthesis/audit-synthesizer.md:128-134`
 
 **Current**: `rm -f todos/debt/*-pending-*.md` with no confirmation
 
@@ -59,11 +62,13 @@ Add confirmation prompt.
 
 ## Resources
 
-- Security audit: `docs/solutions/security-issues/yellow-debt-plugin-security-audit.md:556-634`
+- Security audit:
+  `docs/solutions/security-issues/yellow-debt-plugin-security-audit.md:556-634`
 
 ### 2026-02-13 - Resolved
-**By:** pr-comment-resolver agent
-**Actions:**
+
+**By:** pr-comment-resolver agent **Actions:**
+
 - Added confirmation logic with pending count in audit-synthesizer.md
 - Added AskUserQuestion to allowed-tools list
 - User can now abort synthesis to preserve manually reviewed pending todos

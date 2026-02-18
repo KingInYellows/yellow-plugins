@@ -1,17 +1,21 @@
 # Compatibility & Policy Engine - Contract Documentation
 
-**Module:** `@yellow-plugins/domain/compatibility`
-**Task:** I2.T1
-**Status:** Implemented
-**Specification References:** FR-004, FR-005, CRIT-002b, CRIT-005, CRIT-019
+**Module:** `@yellow-plugins/domain/compatibility` **Task:** I2.T1 **Status:**
+Implemented **Specification References:** FR-004, FR-005, CRIT-002b, CRIT-005,
+CRIT-019
 
 ---
 
 ## Overview
 
-The Compatibility & Policy Engine evaluates plugin compatibility requirements against the host system environment, producing deterministic verdicts with structured evidence payloads. This engine enforces compatibility policies for Claude Code runtime, Node.js versions, OS platforms, CPU architectures, and plugin dependencies.
+The Compatibility & Policy Engine evaluates plugin compatibility requirements
+against the host system environment, producing deterministic verdicts with
+structured evidence payloads. This engine enforces compatibility policies for
+Claude Code runtime, Node.js versions, OS platforms, CPU architectures, and
+plugin dependencies.
 
 The engine supports:
+
 - **Deterministic evaluation** of compatibility requirements
 - **Structured evidence** with error codes and specification references
 - **Policy overrides** via flags and configuration
@@ -24,15 +28,19 @@ The engine supports:
 
 ### Compatibility Verdict
 
-A **compatibility verdict** is the result of evaluating a plugin's requirements against the current system environment. Verdicts have three possible statuses:
+A **compatibility verdict** is the result of evaluating a plugin's requirements
+against the current system environment. Verdicts have three possible statuses:
 
 1. **`compatible`** - Plugin meets all requirements and can be installed
-2. **`warn`** - Plugin has warnings but can proceed (e.g., conflict overrides active)
-3. **`block`** - Plugin fails critical compatibility checks and cannot be installed
+2. **`warn`** - Plugin has warnings but can proceed (e.g., conflict overrides
+   active)
+3. **`block`** - Plugin fails critical compatibility checks and cannot be
+   installed
 
 ### Evidence Payload
 
 Each verdict includes an **evidence payload** containing:
+
 - Individual compatibility checks performed
 - Required vs actual values for each check
 - Validation errors with specification references
@@ -41,7 +49,9 @@ Each verdict includes an **evidence payload** containing:
 
 ### Policy Overrides
 
-Administrators can override compatibility checks via configuration or feature flags:
+Administrators can override compatibility checks via configuration or feature
+flags:
+
 - `skipClaudeCheck` - Skip Claude Code version validation
 - `skipNodeCheck` - Skip Node.js version validation
 - `skipPlatformCheck` - Skip OS/arch validation
@@ -69,6 +79,7 @@ interface ICompatibilityService {
 ```
 
 **Parameters:**
+
 - `pluginId` - Plugin identifier (e.g., `'hookify'`)
 - `version` - Plugin version (e.g., `'1.2.3'`)
 - `compatibility` - Compatibility requirements from plugin manifest
@@ -99,8 +110,8 @@ const verdict = service.evaluateCompatibility(
 if (verdict.status === 'block') {
   console.error(verdict.summary);
   verdict.checks
-    .filter(c => !c.passed)
-    .forEach(c => console.error(c.error?.code, c.message));
+    .filter((c) => !c.passed)
+    .forEach((c) => console.error(c.error?.code, c.message));
 }
 ```
 
@@ -120,9 +131,12 @@ interface IHostFingerprintProvider {
 }
 ```
 
-**Implementation:** `HostFingerprintProvider` in `@yellow-plugins/infrastructure`
+**Implementation:** `HostFingerprintProvider` in
+`@yellow-plugins/infrastructure`
 
-**Caching:** Environment snapshots are cached on first access to support offline-first workflows and consistent results within a single command execution.
+**Caching:** Environment snapshots are cached on first access to support
+offline-first workflows and consistent results within a single command
+execution.
 
 **Example:**
 
@@ -147,14 +161,15 @@ const environment = provider.getEnvironment();
 
 ### 1. Claude Code Runtime Version
 
-**Check IDs:** `claude-min`, `claude-max`
-**Type:** `claude-runtime`
-**Specification:** CRIT-002b, FR-004
-**Error Codes:** `ERROR-COMPAT-001`, `ERROR-COMPAT-002`
+**Check IDs:** `claude-min`, `claude-max` **Type:** `claude-runtime`
+**Specification:** CRIT-002b, FR-004 **Error Codes:** `ERROR-COMPAT-001`,
+`ERROR-COMPAT-002`
 
-Validates that the current Claude Code runtime version falls within the plugin's required range.
+Validates that the current Claude Code runtime version falls within the plugin's
+required range.
 
 **Manifest Fields:**
+
 - `claudeCodeMin` - Minimum Claude Code version (required)
 - `claudeCodeMax` - Maximum Claude Code version (optional)
 
@@ -195,14 +210,15 @@ Validates that the current Claude Code runtime version falls within the plugin's
 
 ### 2. Node.js Version
 
-**Check IDs:** `node-min`, `node-max`
-**Type:** `node-version`
-**Specification:** CRIT-005, CRIT-019, FR-004
-**Error Codes:** `ERROR-COMPAT-003` (min), `ERROR-COMPAT-007` (max)
+**Check IDs:** `node-min`, `node-max` **Type:** `node-version`
+**Specification:** CRIT-005, CRIT-019, FR-004 **Error Codes:**
+`ERROR-COMPAT-003` (min), `ERROR-COMPAT-007` (max)
 
-Validates that the current Node.js version is within the range supported by the plugin.
+Validates that the current Node.js version is within the range supported by the
+plugin.
 
 **Manifest Fields:**
+
 - `nodeMin` - Minimum Node.js version (optional)
 - `nodeMax` - Maximum Node.js version (optional, CRIT-019)
 
@@ -218,25 +234,27 @@ Validates that the current Node.js version is within the range supported by the 
 ```
 
 **Notes:**
+
 - Node.js version is extracted from `process.version` with `v` prefix removed
-- Follows semantic versioning comparison rules for both minimum and maximum bounds
+- Follows semantic versioning comparison rules for both minimum and maximum
+  bounds
 - Omitting `nodeMax` keeps Node.js unbounded above the minimum
 
 ---
 
 ### 3. Operating System Platform
 
-**Check ID:** `os-platform`
-**Type:** `os`
-**Specification:** CRIT-005, FR-005
+**Check ID:** `os-platform` **Type:** `os` **Specification:** CRIT-005, FR-005
 **Error Code:** `ERROR-COMPAT-004`
 
 Validates that the current OS platform is in the plugin's supported list.
 
 **Manifest Fields:**
+
 - `os` - Array of supported OS platforms (optional)
 
 **Supported Values:**
+
 - `'darwin'` - macOS
 - `'linux'` - Linux distributions
 - `'win32'` - Windows
@@ -252,6 +270,7 @@ Validates that the current OS platform is in the plugin's supported list.
 ```
 
 **Notes:**
+
 - Empty or missing `os` array means no OS restriction
 - Platform value comes from `os.platform()`
 
@@ -259,17 +278,17 @@ Validates that the current OS platform is in the plugin's supported list.
 
 ### 4. CPU Architecture
 
-**Check ID:** `cpu-arch`
-**Type:** `arch`
-**Specification:** CRIT-005, FR-005
+**Check ID:** `cpu-arch` **Type:** `arch` **Specification:** CRIT-005, FR-005
 **Error Code:** `ERROR-COMPAT-005`
 
 Validates that the current CPU architecture is in the plugin's supported list.
 
 **Manifest Fields:**
+
 - `arch` - Array of supported CPU architectures (optional)
 
 **Supported Values:**
+
 - `'x64'` - 64-bit Intel/AMD
 - `'arm64'` - 64-bit ARM (Apple Silicon, ARM servers)
 - `'ia32'` - 32-bit Intel/AMD
@@ -288,14 +307,14 @@ Validates that the current CPU architecture is in the plugin's supported list.
 
 ### 5. Plugin Dependencies
 
-**Check IDs:** `dependency-{pluginId}`, `conflict-{pluginId}`
-**Type:** `plugin-conflict`
-**Specification:** CRIT-005, CRIT-019
-**Error Code:** `ERROR-COMPAT-006`
+**Check IDs:** `dependency-{pluginId}`, `conflict-{pluginId}` **Type:**
+`plugin-conflict` **Specification:** CRIT-005, CRIT-019 **Error Code:**
+`ERROR-COMPAT-006`
 
 Validates that required plugin dependencies are installed in the registry.
 
 **Manifest Fields:**
+
 - `pluginDependencies` - Array of required plugin IDs (optional)
 
 **Example:**
@@ -309,7 +328,9 @@ Validates that required plugin dependencies are installed in the registry.
 ```
 
 **Policy Override:**
-- When `allowConflicts` override is active, missing dependencies produce `warn` status instead of `block`
+
+- When `allowConflicts` override is active, missing dependencies produce `warn`
+  status instead of `block`
 - Check ID changes from `dependency-{id}` to `conflict-{id}` when overridden
 - Message includes "(conflict override active)" suffix
 
@@ -317,11 +338,13 @@ Validates that required plugin dependencies are installed in the registry.
 
 ## Policy Overrides
 
-Policy overrides allow selective bypass of compatibility checks for advanced use cases or development environments.
+Policy overrides allow selective bypass of compatibility checks for advanced use
+cases or development environments.
 
 ### Configuration Sources
 
 Overrides can be provided via:
+
 1. **CLI flags** - `--skip-claude-check`, `--allow-conflicts`, etc.
 2. **Feature flags** - `featureFlags.skipCompatibilityChecks`
 3. **Config file** - `.claude-plugin/config.json` compatibility section
@@ -330,10 +353,10 @@ Overrides can be provided via:
 
 ```typescript
 interface CompatibilityPolicyOverrides {
-  skipClaudeCheck?: boolean;    // Skip Claude Code version checks
-  skipNodeCheck?: boolean;      // Skip Node.js version checks
-  skipPlatformCheck?: boolean;  // Skip OS/arch checks
-  allowConflicts?: boolean;     // Allow plugin conflicts (warn instead of block)
+  skipClaudeCheck?: boolean; // Skip Claude Code version checks
+  skipNodeCheck?: boolean; // Skip Node.js version checks
+  skipPlatformCheck?: boolean; // Skip OS/arch checks
+  allowConflicts?: boolean; // Allow plugin conflicts (warn instead of block)
 }
 ```
 
@@ -341,23 +364,25 @@ interface CompatibilityPolicyOverrides {
 
 - **Skip checks** - Check is not performed, does not appear in verdict
 - **Allow conflicts** - Failed dependency checks pass with warning message
-- **Status impact** - Overridden conflicts produce `warn` status, not `compatible`
+- **Status impact** - Overridden conflicts produce `warn` status, not
+  `compatible`
 
 ---
 
 ## Error Codes & Specification References
 
-| Error Code | Category | Check Type | Specification | Description |
-|------------|----------|------------|---------------|-------------|
-| `ERROR-COMPAT-001` | COMPATIBILITY | Claude Min | CRIT-002b | Claude Code version below minimum |
-| `ERROR-COMPAT-002` | COMPATIBILITY | Claude Max | CRIT-002b | Claude Code version exceeds maximum |
-| `ERROR-COMPAT-003` | COMPATIBILITY | Node Min | CRIT-005 | Node.js version below minimum |
-| `ERROR-COMPAT-007` | COMPATIBILITY | Node Max | CRIT-019 | Node.js version exceeds maximum |
-| `ERROR-COMPAT-004` | COMPATIBILITY | OS Platform | CRIT-005 | OS platform not supported |
-| `ERROR-COMPAT-005` | COMPATIBILITY | CPU Arch | CRIT-005 | CPU architecture not supported |
-| `ERROR-COMPAT-006` | COMPATIBILITY | Plugin Dependency | CRIT-005 | Required plugin dependency missing |
+| Error Code         | Category      | Check Type        | Specification | Description                         |
+| ------------------ | ------------- | ----------------- | ------------- | ----------------------------------- |
+| `ERROR-COMPAT-001` | COMPATIBILITY | Claude Min        | CRIT-002b     | Claude Code version below minimum   |
+| `ERROR-COMPAT-002` | COMPATIBILITY | Claude Max        | CRIT-002b     | Claude Code version exceeds maximum |
+| `ERROR-COMPAT-003` | COMPATIBILITY | Node Min          | CRIT-005      | Node.js version below minimum       |
+| `ERROR-COMPAT-007` | COMPATIBILITY | Node Max          | CRIT-019      | Node.js version exceeds maximum     |
+| `ERROR-COMPAT-004` | COMPATIBILITY | OS Platform       | CRIT-005      | OS platform not supported           |
+| `ERROR-COMPAT-005` | COMPATIBILITY | CPU Arch          | CRIT-005      | CPU architecture not supported      |
+| `ERROR-COMPAT-006` | COMPATIBILITY | Plugin Dependency | CRIT-005      | Required plugin dependency missing  |
 
 All errors include:
+
 - **Error code** from specification Section 4
 - **Specification reference** (CRIT/FR anchor)
 - **Suggested resolution** text
@@ -369,7 +394,9 @@ All errors include:
 
 ### CompatCommandBridge
 
-The `CompatCommandBridge` integrates the compatibility service with CLI commands, providing:
+The `CompatCommandBridge` integrates the compatibility service with CLI
+commands, providing:
+
 - **Options parsing** from CLI arguments
 - **Context extraction** from command metadata
 - **Verdict logging** with structured evidence
@@ -432,10 +459,11 @@ The bridge logs detailed evidence for each check:
 
 ### Unit Tests
 
-**Package:** `@yellow-plugins/domain`
-**Location:** `src/compatibility/__tests__/compatibilityService.test.ts`
+**Package:** `@yellow-plugins/domain` **Location:**
+`src/compatibility/__tests__/compatibilityService.test.ts`
 
 **Coverage:**
+
 - ✅ Claude Code min/max version checks
 - ✅ Node.js minimum version checks
 - ✅ OS platform validation
@@ -446,10 +474,11 @@ The bridge logs detailed evidence for each check:
 - ✅ Edge cases (exact versions, empty requirements)
 - ✅ Error codes and specification references
 
-**Package:** `@yellow-plugins/infrastructure`
-**Location:** `src/system/__tests__/fingerprint.test.ts`
+**Package:** `@yellow-plugins/infrastructure` **Location:**
+`src/system/__tests__/fingerprint.test.ts`
 
 **Coverage:**
+
 - ✅ Environment fingerprinting
 - ✅ Caching behavior
 - ✅ Plugin provider integration
@@ -518,8 +547,8 @@ function canInstallPlugin(manifest) {
 
   if (verdict.status === 'block') {
     const errors = verdict.checks
-      .filter(c => !c.passed)
-      .map(c => c.error?.code);
+      .filter((c) => !c.passed)
+      .map((c) => c.error?.code);
 
     throw new InstallationError(
       `Cannot install ${manifest.id}: ${errors.join(', ')}`,
@@ -593,13 +622,15 @@ interface CompatibilityCheck {
 
 ## Revision History
 
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0.0 | 2026-01-11 | Task I2.T1 | Initial compatibility engine implementation |
+| Version | Date       | Author     | Changes                                     |
+| ------- | ---------- | ---------- | ------------------------------------------- |
+| 1.0.0   | 2026-01-11 | Task I2.T1 | Initial compatibility engine implementation |
 
 ---
 
 **Related Documentation:**
-- [SPECIFICATION.md](../SPECIFICATION.md) - Full system specification
-- [Error Catalog](../../packages/domain/src/validation/errorCatalog.ts) - Error code definitions
-- [Validation Contracts](../../packages/domain/src/validation/types.ts) - Shared validation types
+
+- [Error Catalog](../../packages/domain/src/validation/errorCatalog.ts) - Error
+  code definitions
+- [Validation Contracts](../../packages/domain/src/validation/types.ts) - Shared
+  validation types

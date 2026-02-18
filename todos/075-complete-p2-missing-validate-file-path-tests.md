@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p2
-issue_id: "075"
+issue_id: '075'
 tags: [code-review, yellow-ci, testing]
 dependencies: []
 ---
@@ -10,14 +10,19 @@ dependencies: []
 
 ## Problem Statement
 
-The `validate_file_path()` function has zero test coverage in validate.bats. It's the most complex validation function in the library (handling symlink resolution, path traversal, newline rejection) and needs comprehensive test coverage.
+The `validate_file_path()` function has zero test coverage in validate.bats.
+It's the most complex validation function in the library (handling symlink
+resolution, path traversal, newline rejection) and needs comprehensive test
+coverage.
 
 ## Findings
 
 **File:** `plugins/yellow-ci/tests/validate.bats`
 
 **Current State:**
-- validate.bats contains tests for validate_runner_name, validate_run_id, validate_repo_slug, validate_ssh_host, validate_ssh_user, validate_ssh_command
+
+- validate.bats contains tests for validate_runner_name, validate_run_id,
+  validate_repo_slug, validate_ssh_host, validate_ssh_user, validate_ssh_command
 - validate_file_path() has NO tests
 - The function is complex, handling:
   - Path traversal prevention (..)
@@ -26,12 +31,13 @@ The `validate_file_path()` function has zero test coverage in validate.bats. It'
   - Symlink resolution
   - Project root boundary enforcement
 
-**Risk:**
-Without tests, changes to validate_file_path() could introduce security vulnerabilities or break existing behavior without detection.
+**Risk:** Without tests, changes to validate_file_path() could introduce
+security vulnerabilities or break existing behavior without detection.
 
 ## Proposed Solutions
 
-Add comprehensive test coverage for validate_file_path() covering all validation branches and edge cases.
+Add comprehensive test coverage for validate_file_path() covering all validation
+branches and edge cases.
 
 **Test Categories:**
 
@@ -115,7 +121,8 @@ Add comprehensive test coverage for validate_file_path() covering all validation
 ## Acceptance Criteria
 
 - [ ] At least 10 tests for validate_file_path() added to validate.bats
-- [ ] All validation branches covered (path traversal, absolute path, newline, symlink)
+- [ ] All validation branches covered (path traversal, absolute path, newline,
+      symlink)
 - [ ] Edge cases tested (empty path, whitespace, special characters)
 - [ ] Symlink tests verify both inside and outside project root scenarios
 - [ ] All tests pass: `bats plugins/yellow-ci/tests/validate.bats`

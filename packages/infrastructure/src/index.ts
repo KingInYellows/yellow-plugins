@@ -14,9 +14,6 @@ export {
   type ValidationResult,
 } from './validation/ajvFactory.js';
 
-export {
-  SchemaValidator,
-  createValidator,
-} from './validation/validator.js';
+export { SchemaValidator, createValidator } from './validation/validator.js';
 
 export const version = '2.0.0';

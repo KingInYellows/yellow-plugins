@@ -1,12 +1,15 @@
 # gt-workflow
 
-Graphite-native workflow commands for Claude Code. Manages stacked PRs, smart commits with code auditing, repo sync, and stack navigation — all through the `gt` CLI.
+Graphite-native workflow commands for Claude Code. Manages stacked PRs, smart
+commits with code auditing, repo sync, and stack navigation — all through the
+`gt` CLI.
 
 ## Commands
 
 ### `/gt-amend`
 
-The fastest solo-dev path: audit your current fix and fold it into the current branch commit.
+The fastest solo-dev path: audit your current fix and fold it into the current
+branch commit.
 
 - Runs 3 parallel code review agents (same as `/smart-submit`)
 - Stages specific files (never `git add .`)
@@ -79,27 +82,25 @@ Visualize your stack and navigate between branches.
 
 ## Hooks
 
-The plugin installs a **PreToolUse** hook that intercepts any Bash call containing `git push` and blocks it, redirecting Claude to use `gt submit --no-interactive` instead. This enforces the Graphite-first convention automatically — no rule gets silently bypassed.
+The plugin installs a **PreToolUse** hook that intercepts any Bash call
+containing `git push` and blocks it, redirecting Claude to use
+`gt submit --no-interactive` instead. This enforces the Graphite-first
+convention automatically — no rule gets silently bypassed.
 
 ## Installation
 
-Add this marketplace to Claude Code:
-
 ```
 /plugin marketplace add KingInYellows/yellow-plugins
-```
-
-Or install the plugin directly from a local clone:
-
-```
-claude plugin add ./plugins/gt-workflow
+/plugin install gt-workflow@yellow-plugins
 ```
 
 ## Requirements
 
-- [Graphite CLI](https://graphite.dev/docs/graphite-cli) (`gt`) installed and authenticated
+- [Graphite CLI](https://graphite.dev/docs/graphite-cli) (`gt`) installed and
+  authenticated
 - Git repository initialized with Graphite (`gt init`)
-- [`jq`](https://jqlang.github.io/jq/) installed (used by the `git push` guard hook)
+- [`jq`](https://jqlang.github.io/jq/) installed (used by the `git push` guard
+  hook)
 
 ## License
 

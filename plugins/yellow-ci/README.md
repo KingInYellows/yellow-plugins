@@ -1,17 +1,21 @@
 # yellow-ci
 
-CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners on Proxmox homelab infrastructure.
+CI failure diagnosis, workflow linting, and runner health management for
+self-hosted GitHub Actions runners.
 
 ## Installation
 
-```bash
-/plugin marketplace add KingInYellows/yellow-plugins --plugin yellow-ci
+```
+/plugin marketplace add KingInYellows/yellow-plugins
+/plugin install yellow-ci@yellow-plugins
 ```
 
 ### Prerequisites
 
-- [GitHub CLI](https://cli.github.com/) installed and authenticated (`gh auth login`)
-- SSH client with key-based access to runner VMs (for runner health/cleanup commands)
+- [GitHub CLI](https://cli.github.com/) installed and authenticated
+  (`gh auth login`)
+- SSH client with key-based access to runner VMs (for runner health/cleanup
+  commands)
 - `jq` for JSON parsing
 
 ## Commands
@@ -25,7 +29,10 @@ Diagnose CI failures and get actionable fix suggestions.
 /ci:diagnose 123456789        # Analyze specific run
 ```
 
-The failure analyst identifies root causes across 12 failure categories (OOM, disk full, missing deps, Docker issues, network failures, stale state, flaky tests, permissions, runner agent crashes, stale cache, job timeout, environment leakage).
+The failure analyst identifies root causes across 12 failure categories (OOM,
+disk full, missing deps, Docker issues, network failures, stale state, flaky
+tests, permissions, runner agent crashes, stale cache, job timeout, environment
+leakage).
 
 ### `/ci:status`
 
@@ -44,7 +51,8 @@ Lint GitHub Actions workflow files for self-hosted runner pitfalls.
 /ci:lint-workflows .github/workflows/ci.yml # Lint specific file
 ```
 
-Checks 14 rules (W01-W14) including missing timeouts, no caching, hardcoded paths, outdated actions, and more.
+Checks 14 rules (W01-W14) including missing timeouts, no caching, hardcoded
+paths, outdated actions, and more.
 
 ### `/ci:runner-health [runner-name]`
 
@@ -69,7 +77,8 @@ Always shows a dry-run preview and requires confirmation before executing.
 
 ## Configuration
 
-For runner health and cleanup commands, create `.claude/yellow-ci.local.md` in your project:
+For runner health and cleanup commands, create `.claude/yellow-ci.local.md` in
+your project:
 
 ```yaml
 ---
@@ -81,7 +90,7 @@ runners:
   - name: runner-02
     host: 192.168.1.51
     user: runner
-    ssh_key: ~/.ssh/homelab
+    ssh_key: ~/.ssh/runner-key
 defaults:
   ssh_timeout: 3
   max_parallel_ssh: 5
@@ -90,7 +99,6 @@ defaults:
   log_retention_days: 14
   docker_prune_age: 168h
 ---
-
 ## Runner Notes
 
 Additional context about your runner setup.

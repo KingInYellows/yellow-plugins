@@ -1,5 +1,6 @@
 # Audit Trail Documentation
 
+<!-- prettier-ignore -->
 **Document Version**: 1.0.0
 **Last Updated**: 2026-01-12
 **Task Reference**: I3.T4 - Enhanced Uninstall Experience
@@ -9,7 +10,9 @@
 
 ## Overview
 
-The `.claude-plugin/audit/` directory contains immutable transaction logs for all plugin lifecycle operations. These logs provide complete traceability for debugging, compliance, security audits, and postmortem analysis.
+The `.claude-plugin/audit/` directory contains immutable transaction logs for
+all plugin lifecycle operations. These logs provide complete traceability for
+debugging, compliance, security audits, and postmortem analysis.
 
 ### Design Principles
 
@@ -18,7 +21,8 @@ The `.claude-plugin/audit/` directory contains immutable transaction logs for al
 3. **Complete**: Captures all transaction phases, timing, and outcomes
 4. **Traceable**: Every operation has a unique transaction ID
 5. **Forensic**: Includes consent digests, error details, and retry history
-6. **Cross-Referenced**: Each entry can be correlated with `docs/contracts/error-codes.md` (CRIT-011, FR-010 scenarios)
+6. **Cross-Referenced**: Each entry can be correlated with
+   `docs/contracts/error-codes.md` (CRIT-011, FR-010 scenarios)
 
 ---
 
@@ -248,7 +252,7 @@ The `.claude-plugin/audit/` directory contains immutable transaction logs for al
   "timestamp": "2026-01-12T10:35:00.000Z",
   "completedAt": "2026-01-12T10:35:00.095Z",
   "durationMs": 95,
-  "success": true,  // Note: Uninstall succeeds despite lifecycle failure
+  "success": true, // Note: Uninstall succeeds despite lifecycle failure
 
   "steps": [
     {
@@ -258,7 +262,7 @@ The `.claude-plugin/audit/` directory contains immutable transaction logs for al
     },
     {
       "phase": "LIFECYCLE",
-      "status": "failed",  // Lifecycle script failed
+      "status": "failed", // Lifecycle script failed
       "durationMs": 58,
       "details": {
         "scriptPath": "scripts/uninstall.sh",
@@ -613,12 +617,14 @@ find .claude-plugin/audit -name "*.json" -mtime +30 \
 ### Sensitive Data Handling
 
 Audit logs **DO NOT** contain:
+
 - User credentials
 - API keys or tokens
 - Personal identifiable information (PII)
 - File contents from plugins
 
 Audit logs **DO** contain:
+
 - Plugin identifiers
 - Transaction metadata
 - Timing information
@@ -629,6 +635,7 @@ Audit logs **DO** contain:
 ### Access Control
 
 Audit logs should be:
+
 - Readable only by the user who executed operations
 - Protected with appropriate file permissions (600 or 640)
 - Excluded from version control (add to `.gitignore`)
@@ -639,13 +646,13 @@ Audit logs should be:
 
 ### Uninstall Error Codes
 
-| Code | Description | Documentation |
-|------|-------------|---------------|
-| ERR-UNINSTALL-001 | Plugin not installed | `docs/operations/uninstall.md` |
-| ERR-UNINSTALL-002 | Registry update failed | `docs/operations/uninstall.md` |
-| ERR-UNINSTALL-999 | Unexpected error | `docs/contracts/error-codes.md` |
-| CRIT-011 | Lifecycle script failure | `docs/contracts/error-codes.md` - ERROR-INST-006 |
-| FR-010 | Cache purge errors | `docs/operations/uninstall.md` |
+| Code              | Description              | Documentation                                    |
+| ----------------- | ------------------------ | ------------------------------------------------ |
+| ERR-UNINSTALL-001 | Plugin not installed     | `docs/operations/uninstall.md`                   |
+| ERR-UNINSTALL-002 | Registry update failed   | `docs/operations/uninstall.md`                   |
+| ERR-UNINSTALL-999 | Unexpected error         | `docs/contracts/error-codes.md`                  |
+| CRIT-011          | Lifecycle script failure | `docs/contracts/error-codes.md` - ERROR-INST-006 |
+| FR-010            | Cache purge errors       | `docs/operations/uninstall.md`                   |
 
 ---
 
@@ -653,13 +660,13 @@ Audit logs should be:
 
 Audit logs complement telemetry but serve different purposes:
 
-| Feature | Audit Logs | Telemetry |
-|---------|------------|-----------|
-| **Purpose** | Forensic analysis, compliance | Performance monitoring, metrics |
-| **Format** | JSON files | JSONL stream |
-| **Retention** | Long-term (90 days) | Short-term (30 days) |
-| **Scope** | Per-transaction detail | Aggregate statistics |
-| **Audience** | Developers, support | Monitoring systems |
+| Feature       | Audit Logs                    | Telemetry                       |
+| ------------- | ----------------------------- | ------------------------------- |
+| **Purpose**   | Forensic analysis, compliance | Performance monitoring, metrics |
+| **Format**    | JSON files                    | JSONL stream                    |
+| **Retention** | Long-term (90 days)           | Short-term (30 days)            |
+| **Scope**     | Per-transaction detail        | Aggregate statistics            |
+| **Audience**  | Developers, support           | Monitoring systems              |
 
 See `.claude-plugin/telemetry/README.md` for telemetry documentation.
 
@@ -672,6 +679,7 @@ See `.claude-plugin/telemetry/README.md` for telemetry documentation.
 **Cause:** Operation failed before audit log creation.
 
 **Check:**
+
 ```bash
 # Verify audit directory exists
 ls -la .claude-plugin/audit
@@ -685,6 +693,7 @@ ls -la /tmp/plugin-staging-*
 **Cause:** Disk full, power loss during write.
 
 **Fix:**
+
 ```bash
 # Validate JSON syntax
 jq . .claude-plugin/audit/<file>.json
@@ -698,6 +707,7 @@ jq . .claude-plugin/audit/<file>.json
 **Cause:** Many operations without cleanup.
 
 **Fix:**
+
 ```bash
 # Check current size
 du -sh .claude-plugin/audit
@@ -720,9 +730,9 @@ plugin audit cleanup --days=90
 
 ## Version History
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-01-12 | Initial audit trail documentation (I3.T4) |
+| Version | Date       | Changes                                   |
+| ------- | ---------- | ----------------------------------------- |
+| 1.0.0   | 2026-01-12 | Initial audit trail documentation (I3.T4) |
 
 ---
 

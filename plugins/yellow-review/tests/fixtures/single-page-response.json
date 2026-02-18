@@ -26,9 +26,7 @@
               "line": 10,
               "startLine": null,
               "comments": {
-                "nodes": [
-                  { "author": { "login": "reviewer1" }, "body": "LGTM" }
-                ]
+                "nodes": [{ "author": { "login": "reviewer1" }, "body": "LGTM" }]
               }
             },
             {
@@ -39,9 +37,7 @@
               "line": 5,
               "startLine": null,
               "comments": {
-                "nodes": [
-                  { "author": { "login": "reviewer2" }, "body": "Outdated comment" }
-                ]
+                "nodes": [{ "author": { "login": "reviewer2" }, "body": "Outdated comment" }]
               }
             },
             {

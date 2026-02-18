@@ -1,8 +1,8 @@
 # Publish Command
 
-**Command**: `publish`
-**Aliases**: `pub`
-**Description**: Publish a plugin to the marketplace with manifest validation, git status checks, and optional push/tag actions
+**Command**: `publish` **Aliases**: `pub` **Description**: Publish a plugin to
+the marketplace with manifest validation, git status checks, and optional
+push/tag actions
 
 ---
 
@@ -46,7 +46,8 @@
 plugin publish [options]
 ```
 
-Publish a plugin to the marketplace by validating manifests, checking git status, and optionally committing and pushing changes to the remote repository.
+Publish a plugin to the marketplace by validating manifests, checking git
+status, and optionally committing and pushing changes to the remote repository.
 
 ---
 
@@ -54,37 +55,45 @@ Publish a plugin to the marketplace by validating manifests, checking git status
 
 Before publishing, ensure you have:
 
-1. **Git Repository**: The plugin must be in a git repository with a configured remote
-2. **Git Authentication**: SSH keys or PAT (Personal Access Token) configured for push access (see [Git Authentication](#git-authentication))
-3. **Valid Manifest**: `.claude-plugin/plugin.json` must validate against `schemas/plugin.schema.json`
-4. **Marketplace Entry**: `marketplace.json` must include an entry for your plugin
-5. **Feature Flag**: The `enablePublish` feature flag must be enabled in `.claude-plugin/flags.json`
+1. **Git Repository**: The plugin must be in a git repository with a configured
+   remote
+2. **Git Authentication**: SSH keys or PAT (Personal Access Token) configured
+   for push access (see [Git Authentication](#git-authentication))
+3. **Valid Manifest**: `.claude-plugin/plugin.json` must validate against
+   `schemas/plugin.schema.json`
+4. **Marketplace Entry**: `marketplace.json` must include an entry for your
+   plugin
+5. **Feature Flag**: The `enablePublish` feature flag must be enabled in
+   `.claude-plugin/flags.json`
 
 ---
 
 ## Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `--push` | boolean | `false` | Commit and push changes to remote repository (requires typed `PUSH` confirmation or `PUBLISH_PUSH_CONFIRM=yes`) |
-| `--message`, `-m` | string | auto-generated | Custom commit message for the publish operation |
-| `--tag`, `-t` | string | - | Create and push a git tag (requires `--push`) |
-| `--dry-run` | boolean | `false` | Validate manifests and check git status without making changes |
-| `--json` | boolean | `false` | Output results in JSON format |
-| `--non-interactive` | boolean | `false` | No prompts; set `PUBLISH_PUSH_CONFIRM` and `LIFECYCLE_CONSENT_DIGEST` env vars |
+| Option              | Type    | Default        | Description                                                                                                     |
+| ------------------- | ------- | -------------- | --------------------------------------------------------------------------------------------------------------- |
+| `--push`            | boolean | `false`        | Commit and push changes to remote repository (requires typed `PUSH` confirmation or `PUBLISH_PUSH_CONFIRM=yes`) |
+| `--message`, `-m`   | string  | auto-generated | Custom commit message for the publish operation                                                                 |
+| `--tag`, `-t`       | string  | -              | Create and push a git tag (requires `--push`)                                                                   |
+| `--dry-run`         | boolean | `false`        | Validate manifests and check git status without making changes                                                  |
+| `--json`            | boolean | `false`        | Output results in JSON format                                                                                   |
+| `--non-interactive` | boolean | `false`        | No prompts; set `PUBLISH_PUSH_CONFIRM` and `LIFECYCLE_CONSENT_DIGEST` env vars                                  |
 
 ---
 
 ## Non-Interactive Mode
 
-Use `--non-interactive` when running inside CI/CD or scripts where prompts are not allowed. The command reads confirmations from environment variables:
+Use `--non-interactive` when running inside CI/CD or scripts where prompts are
+not allowed. The command reads confirmations from environment variables:
 
-| Variable | Required When | Description |
-|----------|---------------|-------------|
-| `PUBLISH_PUSH_CONFIRM` | `--push` without `--dry-run` | Set to `yes`, `true`, or `1` to allow git pushes |
+| Variable                   | Required When                                                                             | Description                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `PUBLISH_PUSH_CONFIRM`     | `--push` without `--dry-run`                                                              | Set to `yes`, `true`, or `1` to allow git pushes                            |
 | `LIFECYCLE_CONSENT_DIGEST` | Lifecycle publish script detected (see [Lifecycle Hooks](#4-lifecycle-hooks-pre-publish)) | SHA-256 digest shown in the consent prompt, proving you reviewed the script |
 
-If these variables are missing, the command fails with actionable errors referencing this section. Set them per invocation to avoid leaking secrets in shared shells.
+If these variables are missing, the command fails with actionable errors
+referencing this section. Set them per invocation to avoid leaking secrets in
+shared shells.
 
 ---
 
@@ -99,6 +108,7 @@ plugin publish --dry-run
 ```
 
 **Output**:
+
 ```
 ℹ Starting publish operation for example-plugin
 ✔ Feature flag 'enablePublish' is enabled
@@ -125,6 +135,7 @@ plugin publish --push
 ```
 
 **Output**:
+
 ```
 ℹ Starting publish operation for example-plugin
 ✔ Feature flag 'enablePublish' is enabled
@@ -159,6 +170,7 @@ plugin publish --push --tag v1.2.3
 ```
 
 **Output**:
+
 ```
 ✔ Committing changes
   - Commit SHA: a1b2c3d4
@@ -179,6 +191,7 @@ plugin publish --dry-run --json
 ```
 
 **Output**:
+
 ```json
 {
   "success": true,
@@ -248,15 +261,18 @@ The publish command executes the following steps in sequence:
 - Executes pre-publish lifecycle hooks if `enableLifecycleHooks` flag is enabled
 - Displays script contents and requires typed consent: `"I TRUST THIS SCRIPT"`
 - Records consent, exit codes, and execution duration
-- Non-interactive mode: set `LIFECYCLE_CONSENT_DIGEST` to the shown SHA-256 digest to bypass prompts
-- **Note**: Lifecycle hooks are optional and only run if configured in the plugin manifest
+- Non-interactive mode: set `LIFECYCLE_CONSENT_DIGEST` to the shown SHA-256
+  digest to bypass prompts
+- **Note**: Lifecycle hooks are optional and only run if configured in the
+  plugin manifest
 
 ### 5. Commit and Push
 
 - Stages manifest files (`.claude-plugin/plugin.json`, `marketplace.json`)
 - Creates commit with custom or auto-generated message
 - Optionally creates git tag
-- Pushes changes and tags to remote after typed `PUSH` confirmation (or `PUBLISH_PUSH_CONFIRM=yes`)
+- Pushes changes and tags to remote after typed `PUSH` confirmation (or
+  `PUBLISH_PUSH_CONFIRM=yes`)
 - **Note**: Only executes if `--push` flag is provided
 
 ### 6. Lifecycle Hooks (Post-Publish)
@@ -268,7 +284,8 @@ The publish command executes the following steps in sequence:
 
 ## Git Authentication
 
-The publish command relies on your existing git credentials for authentication. No credentials are stored by the system.
+The publish command relies on your existing git credentials for authentication.
+No credentials are stored by the system.
 
 ### SSH Authentication
 
@@ -282,7 +299,8 @@ ssh -T git@github.com
 Hi username! You've successfully authenticated...
 ```
 
-If not configured, see [Git Authentication Guide](../operations/git-auth.md#ssh-keys).
+If not configured, see
+[Git Authentication Guide](../operations/git-auth.md#ssh-keys).
 
 ### HTTPS with Personal Access Token (PAT)
 
@@ -296,7 +314,8 @@ git config --global credential.helper store
 git push origin main
 ```
 
-See [Git Authentication Guide](../operations/git-auth.md#personal-access-tokens) for detailed PAT setup.
+See [Git Authentication Guide](../operations/git-auth.md#personal-access-tokens)
+for detailed PAT setup.
 
 ### Authentication Errors
 
@@ -324,7 +343,8 @@ The publish command validates two manifest files:
 ### Plugin Manifest (`.claude-plugin/plugin.json`)
 
 - Must conform to `schemas/plugin.schema.json` (Draft-07)
-- Required fields: `name`, `version`, `description`, `author`, `entrypoints`, `compatibility`, `permissions`
+- Required fields: `name`, `version`, `description`, `author`, `entrypoints`,
+  `compatibility`, `permissions`
 - Semantic version format: `MAJOR.MINOR.PATCH`
 - Permission declarations must include `reason` strings
 
@@ -349,7 +369,8 @@ If push fails after commit:
 
 1. **Local Commit Exists**: Your changes are committed locally but not pushed
 2. **Manual Retry**: Use `git push origin <branch>` to retry manually
-3. **Rollback**: Use `git reset --soft HEAD~1` to undo the commit (preserves changes)
+3. **Rollback**: Use `git reset --soft HEAD~1` to undo the commit (preserves
+   changes)
 
 ### Audit Trail
 
@@ -361,7 +382,9 @@ Every publish operation is logged with:
 - Validation results
 - Lifecycle script execution records
 
-Audit logs are stored per transaction at `.claude-plugin/audit/publish-<transactionId>.json`, capturing consent evidence and git provenance for FR-008 audits.
+Audit logs are stored per transaction at
+`.claude-plugin/audit/publish-<transactionId>.json`, capturing consent evidence
+and git provenance for FR-008 audits.
 
 ---
 
@@ -369,9 +392,9 @@ Audit logs are stored per transaction at `.claude-plugin/audit/publish-<transact
 
 The publish command requires the following feature flag:
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `enablePublish` | `false` | Enable the publish command |
+| Flag                   | Default | Description                             |
+| ---------------------- | ------- | --------------------------------------- |
+| `enablePublish`        | `false` | Enable the publish command              |
 | `enableLifecycleHooks` | `false` | Enable pre/post-publish lifecycle hooks |
 
 To enable:
@@ -389,33 +412,41 @@ File: `.claude-plugin/flags.json`
 
 ## Error Codes
 
-| Code | Description | Resolution |
-|------|-------------|------------|
-| `ERR-PUBLISH-001` | Feature flag disabled | Enable `enablePublish` in `.claude-plugin/flags.json` |
-| `ERR-PUBLISH-002` | Git operation failed | Check git authentication and remote access |
-| `ERR-PUBLISH-003` | Lifecycle publish script missing/inaccessible | Verify `lifecycle.prePublish` path exists inside the repo |
-| `ERR-SCHEMA-001` | Manifest validation failed | Fix validation errors in manifest files |
-| `ERR-PUBLISH-CONSENT` | Lifecycle consent missing or digest mismatch | Review script contents and type `"I TRUST THIS SCRIPT"` (or set `LIFECYCLE_CONSENT_DIGEST`) |
-| `ERR-PUBLISH-999` | Unexpected error | Check logs for details; report if persistent |
-| `ERR-PUBLISH-CLI` | CLI wrapper failure | Inspect CLI logs/output; rerun with `--verbose` |
+| Code                  | Description                                   | Resolution                                                                                  |
+| --------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `ERR-PUBLISH-001`     | Feature flag disabled                         | Enable `enablePublish` in `.claude-plugin/flags.json`                                       |
+| `ERR-PUBLISH-002`     | Git operation failed                          | Check git authentication and remote access                                                  |
+| `ERR-PUBLISH-003`     | Lifecycle publish script missing/inaccessible | Verify `lifecycle.prePublish` path exists inside the repo                                   |
+| `ERR-SCHEMA-001`      | Manifest validation failed                    | Fix validation errors in manifest files                                                     |
+| `ERR-PUBLISH-CONSENT` | Lifecycle consent missing or digest mismatch  | Review script contents and type `"I TRUST THIS SCRIPT"` (or set `LIFECYCLE_CONSENT_DIGEST`) |
+| `ERR-PUBLISH-999`     | Unexpected error                              | Check logs for details; report if persistent                                                |
+| `ERR-PUBLISH-CLI`     | CLI wrapper failure                           | Inspect CLI logs/output; rerun with `--verbose`                                             |
 
 ---
 
 ## Specification References
 
-**FR-008**: [Update Notifications](../SPECIFICATION.md#fr-008) - Publish integration with update workflows
+**FR-008**: Update Notifications - Publish
+integration with update workflows
 
-**CRIT-005**: [Publish Workflow](../SPECIFICATION.md#crit-005) - Validation and consent requirements
+**CRIT-005**: Publish Workflow - Validation and
+consent requirements
 
-**Section 3.0**: [API Design & Communication](../plan/03_Behavior_and_Communication.md#3-0-proposed-architecture-behavioral-view) - Git-native publish workflow
+**Section 3.0**:
+[API Design & Communication](../plan/03_Behavior_and_Communication.md#3-0-proposed-architecture-behavioral-view) -
+Git-native publish workflow
 
-**Assumption 2**: [Git Authentication](../plan/01_Plan_Overview_and_Setup.md#6-0-safety-net) - Developer credentials assumption
+**Assumption 2**:
+[Git Authentication](../plan/01_Plan_Overview_and_Setup.md#6-0-safety-net) -
+Developer credentials assumption
 
 ---
 
 ## See Also
 
-- [Git Authentication Guide](../operations/git-auth.md) - Detailed PAT and SSH setup
-- [Feature Flags Documentation](../operations/feature-flags.md) - Flag configuration
+- [Git Authentication Guide](../operations/git-auth.md) - Detailed PAT and SSH
+  setup
+- [Feature Flags Documentation](../operations/feature-flags.md) - Flag
+  configuration
 - [Schema Validation](../operations/validation.md) - Manifest schema details
 - [Update Command](./update.md) - Updating installed plugins

@@ -69,7 +69,7 @@
       "id": "yellow-ruvector",
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-ruvector",
       "category": "development"
@@ -78,7 +78,7 @@
       "id": "yellow-browser-test",
       "name": "yellow-browser-test",
       "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-browser-test",
       "category": "testing"
@@ -87,7 +87,7 @@
       "id": "yellow-debt",
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-debt",
       "category": "development"
@@ -96,7 +96,7 @@
       "id": "yellow-ci",
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-ci",
       "category": "development"

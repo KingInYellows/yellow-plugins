@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p1
-issue_id: "006"
+issue_id: '006'
 tags: [code-review, security, validation]
 dependencies: []
 ---
@@ -10,19 +10,26 @@ dependencies: []
 
 ## Problem Statement
 
-The `ruvector-conventions` skill documents that namespace names must match `[a-z0-9-]` only, rejecting `..`, `/`, `~`. However, no shell function or agent validation actually enforces this. Commands say "validate per conventions skill" without implementation.
+The `ruvector-conventions` skill documents that namespace names must match
+`[a-z0-9-]` only, rejecting `..`, `/`, `~`. However, no shell function or agent
+validation actually enforces this. Commands say "validate per conventions skill"
+without implementation.
 
-**Why it matters:** If namespace names are used in file paths or MCP tool calls, path traversal via namespace like `../../etc` could escape the `.ruvector/` directory.
+**Why it matters:** If namespace names are used in file paths or MCP tool calls,
+path traversal via namespace like `../../etc` could escape the `.ruvector/`
+directory.
 
 ## Findings
 
 - **Security Sentinel (H1):** Commands reference validation but don't enforce it
 - **Test Coverage Analyzer (#5):** Zero tests for namespace validation
-- **Data Integrity Guardian (Namespace section):** Validation "only documented, not enforced in code"
+- **Data Integrity Guardian (Namespace section):** Validation "only documented,
+  not enforced in code"
 
 ## Proposed Solutions
 
 ### Option A: Add validate_namespace() to shared utility + enforce in all entry points (Recommended)
+
 - Create shared validation function
 - Enforce in learn.md, memory.md, memory-manager agent
 - **Pros:** Single source of truth, all paths validated
@@ -33,7 +40,8 @@ The `ruvector-conventions` skill documents that namespace names must match `[a-z
 ## Technical Details
 
 - **Affected files:**
-  - `plugins/yellow-ruvector/skills/ruvector-conventions/SKILL.md` (add function)
+  - `plugins/yellow-ruvector/skills/ruvector-conventions/SKILL.md` (add
+    function)
   - `plugins/yellow-ruvector/commands/ruvector/learn.md` (enforce)
   - `plugins/yellow-ruvector/commands/ruvector/memory.md` (enforce)
   - `plugins/yellow-ruvector/agents/ruvector/memory-manager.md` (enforce)
@@ -47,8 +55,8 @@ The `ruvector-conventions` skill documents that namespace names must match `[a-z
 
 ## Work Log
 
-| Date | Action | Learnings |
-|------|--------|-----------|
+| Date       | Action                          | Learnings                                               |
+| ---------- | ------------------------------- | ------------------------------------------------------- |
 | 2026-02-12 | Created from PR #10 code review | Security H1, test-coverage #5, data-integrity namespace |
 
 ## Resources

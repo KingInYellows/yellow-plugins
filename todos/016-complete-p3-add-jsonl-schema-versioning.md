@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "016"
+issue_id: '016'
 tags: [code-review, data-integrity, forward-compatibility]
 dependencies: []
 ---
@@ -10,15 +10,19 @@ dependencies: []
 
 ## Problem Statement
 
-Queue entries have no schema version. Future format changes (e.g., adding `git_hash` field) could break older queue entries if the new version requires fields that don't exist.
+Queue entries have no schema version. Future format changes (e.g., adding
+`git_hash` field) could break older queue entries if the new version requires
+fields that don't exist.
 
 ## Findings
 
-- **Data Integrity Guardian (Schema Migration):** No migration strategy documented
+- **Data Integrity Guardian (Schema Migration):** No migration strategy
+  documented
 
 ## Proposed Solutions
 
-Add `"schema": "1"` field to all queue entries. Process entries by schema version in session-start.sh.
+Add `"schema": "1"` field to all queue entries. Process entries by schema
+version in session-start.sh.
 
 **Effort:** Small (30 min) | **Risk:** None
 
@@ -29,8 +33,8 @@ Add `"schema": "1"` field to all queue entries. Process entries by schema versio
 
 ## Work Log
 
-| Date | Action | Learnings |
-|------|--------|-----------|
+| Date       | Action                          | Learnings                       |
+| ---------- | ------------------------------- | ------------------------------- |
 | 2026-02-12 | Created from PR #10 code review | Data-integrity schema migration |
 
 ## Resources

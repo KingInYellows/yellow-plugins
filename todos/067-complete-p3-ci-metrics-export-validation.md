@@ -1,7 +1,7 @@
 ---
 status: pending
 priority: p3
-issue_id: "067"
+issue_id: '067'
 tags: [code-review, silent-failure, ci]
 dependencies: []
 ---
@@ -10,7 +10,8 @@ dependencies: []
 
 ## Problem Statement
 
-The CI `export-ci-metrics.sh` script's failure is not validated — if metric export fails, the pipeline continues silently without diagnostics.
+The CI `export-ci-metrics.sh` script's failure is not validated — if metric
+export fails, the pipeline continues silently without diagnostics.
 
 ## Findings
 
@@ -20,6 +21,7 @@ The CI `export-ci-metrics.sh` script's failure is not validated — if metric ex
 ## Proposed Solutions
 
 ### Option A: Add exit code checks + stderr logging
+
 - Check exit codes of metric export commands
 - Log failures with `[ci-metrics] Error:` prefix
 - Don't fail the pipeline, but make failures visible
@@ -41,9 +43,9 @@ Option A.
 
 ## Work Log
 
-| Date | Action | Learnings |
-|------|--------|-----------|
-| 2026-02-14 | Created from code review | |
+| Date       | Action                   | Learnings |
+| ---------- | ------------------------ | --------- |
+| 2026-02-14 | Created from code review |           |
 
 ## Resources
 

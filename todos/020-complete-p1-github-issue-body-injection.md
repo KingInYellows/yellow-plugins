@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p1
-issue_id: "020"
+issue_id: '020'
 tags: [code-review, security, injection]
 dependencies: []
 ---
@@ -10,13 +10,18 @@ dependencies: []
 
 ## Problem Statement
 
-The test-reporter agent creates GitHub issues with content derived from test results, which contain web page content (error messages, page text). This web content could include markdown injection (`[link](javascript:...)`) or GitHub Actions command injection (`::set-output`) that executes when the issue is viewed or processed.
+The test-reporter agent creates GitHub issues with content derived from test
+results, which contain web page content (error messages, page text). This web
+content could include markdown injection (`[link](javascript:...)`) or GitHub
+Actions command injection (`::set-output`) that executes when the issue is
+viewed or processed.
 
 ## Findings
 
 **File:** `plugins/yellow-browser-test/agents/testing/test-reporter.md`
 
-**Issue:** Test results contain untrusted web content that flows into GitHub issue bodies without sanitization:
+**Issue:** Test results contain untrusted web content that flows into GitHub
+issue bodies without sanitization:
 
 ```
 Test Result → Error Message (from web page) → GitHub Issue Body
@@ -25,16 +30,19 @@ Test Result → Error Message (from web page) → GitHub Issue Body
 **Attack vectors:**
 
 1. **Markdown injection:**
+
    ```markdown
-   Error: Test failed [click here](javascript:alert('XSS'))
+   Error: Test failed [click here](<javascript:alert('XSS')>)
    ```
 
 2. **GitHub Actions command injection:**
+
    ```
    Error: ::set-output name=token::ghp_malicious_token
    ```
 
 3. **HTML injection (if markdown allows):**
+
    ```markdown
    <img src=x onerror="alert('XSS')">
    ```
@@ -45,6 +53,7 @@ Test Result → Error Message (from web page) → GitHub Issue Body
    ```
 
 When developers view the issue, malicious content could:
+
 - Execute JavaScript (if markdown renderer is vulnerable)
 - Inject GitHub Actions commands (if issue is processed by CI)
 - Phish credentials via fake links
@@ -68,21 +77,26 @@ Before creating GitHub issues:
    - Replace `<` with `&lt;`
    - Replace `>` with `&gt;`
 3. **Wrap user-derived content in code blocks** to prevent interpretation:
-   ```
-   Error message:
-   ```
-   [untrusted error text here]
-   ```
-   ```
+```
+
+Error message:
+
+```
+[untrusted error text here]
+```
+
+```
 4. **Remove GitHub Actions command sequences** (`::set-output`, `::add-mask`, etc.)
 ```
 
 **Pros:**
+
 - Mechanically prevents injection
 - Preserves error message content for debugging
 - Defense in depth
 
 **Cons:**
+
 - May over-sanitize legitimate content
 - Requires careful implementation
 
@@ -94,6 +108,7 @@ Show complete issue body to user for review:
 ## Before Issue Creation
 
 Use AskUserQuestion to show:
+
 - Full issue title
 - Complete issue body (rendered markdown)
 - Warning: "Review for malicious content before approval"
@@ -102,10 +117,12 @@ Only create issue after user approval.
 ```
 
 **Pros:**
+
 - Human review catches sophisticated attacks
 - Already partially implemented
 
 **Cons:**
+
 - Relies on user vigilance
 - User may not recognize all injection patterns
 - Adds friction to workflow
@@ -122,9 +139,11 @@ Implement **both Option A and enhanced Option B** for defense in depth:
 ## Technical Details
 
 **Current code location:**
+
 - `plugins/yellow-browser-test/agents/testing/test-reporter.md`
 
 **Content flow:**
+
 ```
 Web Page → agent-browser → Test Results → test-reporter → GitHub Issue
               ↑                                                    ↑
@@ -132,6 +151,7 @@ Web Page → agent-browser → Test Results → test-reporter → GitHub Issue
 ```
 
 **Injection points:**
+
 - Test error messages (from page assertions)
 - Page text content (from accessibility checks)
 - Console errors (from browser console)
@@ -139,8 +159,10 @@ Web Page → agent-browser → Test Results → test-reporter → GitHub Issue
 - Stack traces (could contain malicious strings)
 
 **GitHub markdown security:**
+
 - GitHub sanitizes HTML in markdown (but has had bypasses)
-- JavaScript URLs in links (`javascript:`) are blocked (but check current status)
+- JavaScript URLs in links (`javascript:`) are blocked (but check current
+  status)
 - GitHub Actions commands in issue bodies CAN be processed by workflows
 
 ## Acceptance Criteria
@@ -157,8 +179,8 @@ Web Page → agent-browser → Test Results → test-reporter → GitHub Issue
 
 ## Work Log
 
-| Date | Action | Learnings |
-|------|--------|-----------|
+| Date       | Action                          | Learnings                                                                                             |
+| ---------- | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | 2026-02-13 | Created from PR #11 code review | Test results containing web content are untrusted and must be sanitized before creating GitHub issues |
 
 ## Resources

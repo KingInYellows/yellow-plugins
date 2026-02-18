@@ -2,9 +2,9 @@
 name: ci:runner-cleanup
 description: >
   Clean Docker images/containers, old logs, and caches on self-hosted runner.
-  Destructive operation with dry-run preview and confirmation. Use when runner disk
-  is full, Docker space needs freeing, or old CI logs need pruning.
-argument-hint: "[runner-name]"
+  Destructive operation with dry-run preview and confirmation. Use when runner
+  disk is full, Docker space needs freeing, or old CI logs need pruning.
+argument-hint: '[runner-name]'
 allowed-tools:
   - Bash
   - Read
@@ -35,6 +35,7 @@ Read `.claude/yellow-ci.local.md` and parse runner details.
 If no config: report error with setup instructions.
 
 If `$ARGUMENTS` specifies runner name:
+
 - Validate name: `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`
 - Find in config
 
@@ -50,6 +51,7 @@ ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=3 \
 ```
 
 If ACTIVE: block cleanup.
+
 > Runner $name is executing a job. Cleanup blocked to prevent data corruption.
 > Wait for the job to complete and try again.
 
@@ -80,6 +82,7 @@ PREVIEW
 ```
 
 Present preview with timestamp:
+
 ```
 Cleanup Preview for runner-01 (generated at 2026-02-16 14:32:01 UTC)
 
@@ -96,6 +99,7 @@ Current disk: 73%
 ## Step 4: User Confirmation
 
 Use AskUserQuestion with options:
+
 - "Proceed with cleanup"
 - "Skip Docker volumes" (safer — volumes may contain data)
 - "Dry-run only" (show preview, don't execute)
@@ -138,6 +142,7 @@ CLEANUP
 ## Step 6: Post-Cleanup Report
 
 Show actual freed space and new disk usage:
+
 ```
 Cleanup Complete for runner-01
 
@@ -150,6 +155,7 @@ Cleanup Complete for runner-01
 ## Step 7: Audit Log
 
 Append operation to audit log:
+
 ```bash
 mkdir -p ~/.claude/plugins/yellow-ci
 printf '{"ts":"%s","op":"cleanup","runner":"%s","status":"completed","disk_after":"%s"}\n' \
@@ -160,6 +166,8 @@ printf '{"ts":"%s","op":"cleanup","runner":"%s","status":"completed","disk_after
 ## Error Handling
 
 - **SSH connection failure:** Report which runner is unreachable and why
-- **Partial failure:** Continue remaining operations, report summary ("3/4 succeeded")
+- **Partial failure:** Continue remaining operations, report summary ("3/4
+  succeeded")
 - **Timeout (>120s):** Abort and report partial results
-- **Cleanup operation timeout:** Wrap in `timeout 120` to prevent indefinite hang
+- **Cleanup operation timeout:** Wrap in `timeout 120` to prevent indefinite
+  hang

@@ -55,11 +55,5 @@
       "@schemas/*": ["schemas/*"]
     }
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.spec.ts",
-    "**/*.test.ts",
-    "serena"
-  ]
+  "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts", "serena"]
 }

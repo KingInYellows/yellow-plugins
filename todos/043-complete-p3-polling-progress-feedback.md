@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "043"
+issue_id: '043'
 tags: [code-review, user-experience]
 dependencies: []
 ---
@@ -9,9 +9,13 @@ dependencies: []
 # Polling Progress Feedback
 
 ## Problem Statement
-Dev server readiness polling gives no progress feedback to user. Long startup times appear as the command hanging. User may think the command is frozen and interrupt it, when it's actually waiting for the dev server to start.
+
+Dev server readiness polling gives no progress feedback to user. Long startup
+times appear as the command hanging. User may think the command is frozen and
+interrupt it, when it's actually waiting for the dev server to start.
 
 ## Findings
+
 - File: commands/browser-test/test.md
 - Current behavior:
   - Command polls dev server URL in loop
@@ -26,7 +30,9 @@ Dev server readiness polling gives no progress feedback to user. Long startup ti
   - No feedback on timeout approaching
 
 ## Proposed Solutions
+
 ### Option A: Add Progress Dots or Status Messages During Polling (Recommended)
+
 - Print a dot or message each polling attempt
 - Example: "Waiting for dev server..." followed by dots every 2 seconds
 - Shows command is actively working
@@ -34,6 +40,7 @@ Dev server readiness polling gives no progress feedback to user. Long startup ti
 - Clear visual feedback
 
 ### Option B: Show Timeout Countdown
+
 - Show remaining time until timeout
 - Example: "Waiting for dev server (58s remaining)..."
 - Update countdown each poll attempt
@@ -41,9 +48,14 @@ Dev server readiness polling gives no progress feedback to user. Long startup ti
 - May create anxiety if countdown is too visible
 
 ## Recommended Action
-Implement Option A with enhancement from Option B. Show "Waiting for dev server..." message before polling starts. Print a dot every 2 seconds during polling. After timeout/2, show remaining time. This balances simplicity with informativeness.
+
+Implement Option A with enhancement from Option B. Show "Waiting for dev
+server..." message before polling starts. Print a dot every 2 seconds during
+polling. After timeout/2, show remaining time. This balances simplicity with
+informativeness.
 
 ## Technical Details
+
 ```bash
 # In test.md/explore.md polling loop
 printf '[browser-test] Waiting for dev server at %s' "$base_url"
@@ -72,6 +84,7 @@ printf ' ready!\n'
 ```
 
 Alternative simple version:
+
 ```bash
 printf '[browser-test] Waiting for dev server'
 while ! curl -sf "$base_url" >/dev/null 2>&1; do
@@ -82,6 +95,7 @@ printf ' ready!\n'
 ```
 
 ## Acceptance Criteria
+
 - [ ] Add "Waiting for dev server..." message before polling
 - [ ] Print progress dot every 2 seconds during polling
 - [ ] Show "ready!" message when server is up
@@ -91,10 +105,12 @@ printf ' ready!\n'
 - [ ] Update both test.md and explore.md commands
 
 ## Work Log
-| Date | Action | Learnings |
-|------|--------|-----------|
+
+| Date       | Action                          | Learnings                                                    |
+| ---------- | ------------------------------- | ------------------------------------------------------------ |
 | 2026-02-13 | Created from PR #11 code review | P3 UX finding - silent polling creates perception of hanging |
 
 ## Resources
+
 - PR: #11 (yellow-browser-test plugin code review)
 - Related files: commands/browser-test/test.md, commands/browser-test/explore.md

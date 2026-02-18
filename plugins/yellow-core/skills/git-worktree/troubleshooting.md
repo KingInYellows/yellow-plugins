@@ -5,6 +5,7 @@
 **Cause:** Worktree directory or branch name already in use.
 
 **Solution:**
+
 ```bash
 # List existing worktrees
 worktree-manager.sh list
@@ -21,6 +22,7 @@ worktree-manager.sh cleanup
 **Cause:** Trying to remove the worktree you're currently in.
 
 **Solution:**
+
 ```bash
 # Switch to main repo or different worktree first
 cd /path/to/main/repo
@@ -34,6 +36,7 @@ worktree-manager.sh cleanup
 **Symptom:** Not sure which worktree you're in.
 
 **Solution:**
+
 ```bash
 # Check current branch
 git branch --show-current
@@ -50,6 +53,7 @@ pwd | grep -q ".worktrees" && echo "In worktree" || echo "In main repo"
 **Cause:** .env files not copied to worktree.
 
 **Solution:**
+
 ```bash
 # Copy .env files manually
 worktree-manager.sh copy-env <worktree-name>

@@ -1,37 +1,49 @@
 ---
 status: complete
 priority: p1
-issue_id: "046"
+issue_id: '046'
 tags: [code-review, security, path-traversal, rce]
 dependencies: []
 pr_number: 12
-completed_date: "2026-02-13"
+completed_date: '2026-02-13'
 ---
 
 # 🔴 P1: Path Traversal in Synthesizer via Unconstrained Slug Generation
 
 ## Problem Statement
 
-The audit-synthesizer generates todo filenames using slugs derived from finding titles, but slug generation logic is NOT IMPLEMENTED with proper validation. A malicious scanner could craft a title with path traversal sequences, causing files to be written outside `todos/debt/` directory - potentially to `.git/hooks/` for RCE.
+The audit-synthesizer generates todo filenames using slugs derived from finding
+titles, but slug generation logic is NOT IMPLEMENTED with proper validation. A
+malicious scanner could craft a title with path traversal sequences, causing
+files to be written outside `todos/debt/` directory - potentially to
+`.git/hooks/` for RCE.
 
-**Why this matters**: Arbitrary file write vulnerability leading to git hook injection enables remote code execution on every commit. This is CRITICAL and BLOCKS merge.
+**Why this matters**: Arbitrary file write vulnerability leading to git hook
+injection enables remote code execution on every commit. This is CRITICAL and
+BLOCKS merge.
 
 ## Findings
 
-**Location**: `plugins/yellow-debt/agents/synthesis/audit-synthesizer.md:237-240`
+**Location**:
+`plugins/yellow-debt/agents/synthesis/audit-synthesizer.md:237-240`
 
 **Current documentation**:
+
 ```markdown
 **Filename format**: `NNN-pending-SEVERITY-slug-HASH.md`
+
 - `slug`: Kebab-case title (first 40 chars)
 ```
 
-**The problem**: "Kebab-case title (first 40 chars)" has NO implementation. If implemented as:
+**The problem**: "Kebab-case title (first 40 chars)" has NO implementation. If
+implemented as:
+
 ```bash
 slug=$(echo "$title" | head -c 40 | tr ' ' '-')
 ```
 
 Then attack vector exists:
+
 ```bash
 Finding title: "../../.git/hooks/pre-commit-malicious-payload"
 Resulting file: "todos/debt/001-pending-high-../../.git/hooks/pre-commit-malicious-payload.md"
@@ -47,17 +59,19 @@ Actual path: ".git/hooks/pre-commit-malicious-payload.md"
 ### Solution 1: Strict Slug Validation with [a-z0-9-] Regex (Recommended)
 
 **Pros:**
+
 - Whitelist approach (most secure)
 - Simple regex validation
 - Follows MEMORY.md "derived path validation" pattern
 
 **Cons:**
+
 - Loses some title information (special chars removed)
 
-**Effort**: Small (1 hour)
-**Risk**: Very Low
+**Effort**: Small (1 hour) **Risk**: Very Low
 
 **Implementation**:
+
 ```bash
 derive_slug() {
   local title="$1"
@@ -99,17 +113,19 @@ esac
 ### Solution 2: Hash-Only Slug (Simpler, Less Readable)
 
 **Pros:**
+
 - No validation needed (hash is always safe)
 - Shorter code
 
 **Cons:**
+
 - Filenames not human-readable
 - Harder to identify findings by name
 
-**Effort**: Quick (15 min)
-**Risk**: Very Low
+**Effort**: Quick (15 min) **Risk**: Very Low
 
 **Implementation**:
+
 ```bash
 slug=$(echo -n "$finding_title" | sha256sum | cut -c1-16)
 todo_filename="todos/debt/${id}-pending-${severity}-${slug}.md"
@@ -122,16 +138,19 @@ todo_filename="todos/debt/${id}-pending-${severity}-${slug}.md"
 ## Technical Details
 
 **Affected Components**:
+
 - audit-synthesizer agent (agents/synthesis/audit-synthesizer.md)
 
 **Attack Surface**: Scanner agents with malicious title output
 
 **Severity Justification**:
+
 - Exploitability: Medium (requires malicious scanner or compromised dependency)
 - Impact: Critical (RCE via git hooks)
 - OWASP: A01 Broken Access Control, A08 Software/Data Integrity
 
-**MEMORY.md Pattern**: "Derived path validation: validate category/slug contain only [a-z0-9-] before constructing file paths"
+**MEMORY.md Pattern**: "Derived path validation: validate category/slug contain
+only [a-z0-9-] before constructing file paths"
 
 ## Acceptance Criteria
 
@@ -144,30 +163,36 @@ todo_filename="todos/debt/${id}-pending-${severity}-${slug}.md"
 
 ## Work Log
 
-**2026-02-13**: Finding identified by Security Sentinel during comprehensive PR review. Classified as critical RCE vector.
+**2026-02-13**: Finding identified by Security Sentinel during comprehensive PR
+review. Classified as critical RCE vector.
 
 ## Resources
 
-- Security audit: `docs/solutions/security-issues/yellow-debt-plugin-security-audit.md:116-201`
+- Security audit:
+  `docs/solutions/security-issues/yellow-debt-plugin-security-audit.md:116-201`
 - PR: https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/12
 - MEMORY.md: "Derived path validation" pattern
-- Agent workflow security: `docs/solutions/security-issues/agent-workflow-security-patterns.md`
+- Agent workflow security:
+  `docs/solutions/security-issues/agent-workflow-security-patterns.md`
 
 ### 2026-02-13 - Approved for Work
-**By:** Triage Session
-**Actions:**
+
+**By:** Triage Session **Actions:**
+
 - Issue approved during code review triage
 - Status changed from pending → ready
 - Ready to be picked up and worked on
 
 ### 2026-02-13 - Resolved
-**By:** pr-comment-resolver agent
-**Implementation:**
+
+**By:** pr-comment-resolver agent **Implementation:**
+
 - Added derive_slug() function with strict [a-z0-9-] validation
-- Implemented whitelist approach: tr -c '[:alnum:]-' replaces all non-alphanumeric chars
+- Implemented whitelist approach: tr -c '[:alnum:]-' replaces all
+  non-alphanumeric chars
 - Added regex validation: `[[ "$slug" =~ ^[a-z0-9-]+$ ]]`
 - Fallback to SHA256-based slug if title contains invalid characters
 - Defense-in-depth: realpath canonicalization + case pattern match verification
-- Added security documentation explaining attack prevention
-**Location:** plugins/yellow-debt/agents/synthesis/audit-synthesizer.md:242-285
-**Status:** All acceptance criteria met, path traversal vulnerability eliminated
+- Added security documentation explaining attack prevention **Location:**
+  plugins/yellow-debt/agents/synthesis/audit-synthesizer.md:242-285 **Status:**
+  All acceptance criteria met, path traversal vulnerability eliminated

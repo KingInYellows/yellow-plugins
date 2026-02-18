@@ -1,8 +1,6 @@
 # Operational Runbook
 
-**Status:** Active
-**Last Updated:** 2026-01-12
-**Maintainer:** Platform Team
+**Status:** Active **Last Updated:** 2026-01-12 **Maintainer:** Platform Team
 **Document Type:** Operational Procedures
 
 ---
@@ -12,26 +10,34 @@
 
 ## Overview
 
-This runbook provides step-by-step procedures for diagnosing and remediating operational issues in the Yellow Plugins system. It covers incident response workflows, diagnostics commands, failure recovery procedures, and escalation paths referenced in Architecture §3.7. Dedicated sections document lifecycle script incidents, cache recovery, publish rollback, telemetry export, and KPI escalation steps that Section 6 of the verification strategy treats as gating artifacts.
+This runbook provides step-by-step procedures for diagnosing and remediating
+operational issues in the Yellow Plugins system. It covers incident response
+workflows, diagnostics commands, failure recovery procedures, and escalation
+paths referenced in Architecture §3.7. Dedicated sections document lifecycle
+script incidents, cache recovery, publish rollback, telemetry export, and KPI
+escalation steps that Section 6 of the verification strategy treats as gating
+artifacts.
 
 **Purpose:**
+
 - Guide operators through incident response and system recovery
 - Provide concrete commands for common failure scenarios
 - Define escalation paths for complex issues
 - Document remediation procedures linked to CI failures
 
 **Audience:**
+
 - Platform engineers responding to incidents
 - Contributors troubleshooting local development issues
 - CI/CD maintainers debugging workflow failures
 - Operations teams recovering from system corruption
 
 **Related Documents:**
-- [CI/CD Operations Guide](./ci.md) - CI workflow procedural guidance
-- [CI Validation Pipeline Spec](./ci-pipeline.md) - Technical pipeline specification
-- [Metrics Guide](./metrics.md) - Telemetry and monitoring
-- [Section 6 Verification Strategy](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy) - Defines verification hooks and documentation gates
 
+- [CI/CD Operations Guide](./ci.md) - CI workflow procedural guidance
+- [CI Validation Pipeline Spec](./ci-pipeline.md) - Technical pipeline
+  specification
+- [Metrics Guide](./metrics.md) - Telemetry and monitoring
 ---
 
 ## Prerequisites
@@ -40,14 +46,14 @@ Before using this runbook, ensure you have the following tools installed:
 
 ### Required Tools
 
-| Tool | Version | Installation | Verification |
-|------|---------|--------------|--------------|
-| **pnpm** | 8.15.0 | `npm install -g pnpm@8.15.0` | `pnpm --version` |
-| **Node.js** | 20 LTS | https://nodejs.org | `node --version` |
-| **Git** | ≥2.30 | https://git-scm.com | `git --version` |
-| **GitHub CLI** | Latest | `brew install gh` / https://cli.github.com | `gh --version` |
-| **jq** | Latest | `brew install jq` / `apt install jq` | `jq --version` |
-| **Docker** (optional) | Latest | https://docker.com | `docker --version` |
+| Tool                  | Version | Installation                               | Verification       |
+| --------------------- | ------- | ------------------------------------------ | ------------------ |
+| **pnpm**              | 8.15.0  | `npm install -g pnpm@8.15.0`               | `pnpm --version`   |
+| **Node.js**           | 20 LTS  | https://nodejs.org                         | `node --version`   |
+| **Git**               | ≥2.30   | https://git-scm.com                        | `git --version`    |
+| **GitHub CLI**        | Latest  | `brew install gh` / https://cli.github.com | `gh --version`     |
+| **jq**                | Latest  | `brew install jq` / `apt install jq`       | `jq --version`     |
+| **Docker** (optional) | Latest  | https://docker.com                         | `docker --version` |
 
 ### Repository Access
 
@@ -79,17 +85,17 @@ gh repo view KingInYellows/yellow-plugins
 
 ### Quick Reference
 
-| Incident Type | First Command | Diagnostic Tool | Remediation Section |
-|---------------|---------------|-----------------|---------------------|
-| CI Validation Failure | `gh run view <run-id>` | GitHub Actions logs | [CI Failures](#ci-validation-failures) |
-| Schema Validation Error | `pnpm validate:schemas` | AJV validation output | [Schema Failures](#schema-validation-failures) |
-| Registry Corruption | `cat .claude-plugin/registry.json` | JSON validation | [Registry Recovery](#registry-corruption-recovery) |
-| Cache Issues | `ls -lh ~/.claude/plugins/cache/` | Directory inspection | [Cache Recovery](#cache-recovery) |
-| Dependency Vulnerabilities | `pnpm audit` | npm audit report | [Security Incidents](#security-audit-failures) |
-| Lifecycle Script Failure | `grep lifecycle_consent .claude-plugin/audit/*.jsonl` | Audit logs | [Lifecycle Script Incidents](#lifecycle-script-incidents) |
-| Publish Rollback | `git log .claude-plugin/marketplace.json` | Git history | [Publish Rollback](#publish-rollback) |
-| Telemetry Export | `pnpm metrics` | Metrics export | [Telemetry Export](#telemetry-export-and-audit-review) |
-| KPI Threshold Breach | Review quarterly metrics | KPI reports | [KPI Escalation](#kpi-escalation-paths) |
+| Incident Type              | First Command                                         | Diagnostic Tool       | Remediation Section                                       |
+| -------------------------- | ----------------------------------------------------- | --------------------- | --------------------------------------------------------- |
+| CI Validation Failure      | `gh run view <run-id>`                                | GitHub Actions logs   | [CI Failures](#ci-validation-failures)                    |
+| Schema Validation Error    | `pnpm validate:schemas`                               | AJV validation output | [Schema Failures](#schema-validation-failures)            |
+| Registry Corruption        | `cat .claude-plugin/registry.json`                    | JSON validation       | [Registry Recovery](#registry-corruption-recovery)        |
+| Cache Issues               | `ls -lh ~/.claude/plugins/cache/`                     | Directory inspection  | [Cache Recovery](#cache-recovery)                         |
+| Dependency Vulnerabilities | `pnpm audit`                                          | npm audit report      | [Security Incidents](#security-audit-failures)            |
+| Lifecycle Script Failure   | `grep lifecycle_consent .claude-plugin/audit/*.jsonl` | Audit logs            | [Lifecycle Script Incidents](#lifecycle-script-incidents) |
+| Publish Rollback           | `git log .claude-plugin/marketplace.json`             | Git history           | [Publish Rollback](#publish-rollback)                     |
+| Telemetry Export           | `pnpm metrics`                                        | Metrics export        | [Telemetry Export](#telemetry-export-and-audit-review)    |
+| KPI Threshold Breach       | Review quarterly metrics                              | KPI reports           | [KPI Escalation](#kpi-escalation-paths)                   |
 
 ### Incident Response Steps
 
@@ -112,7 +118,8 @@ gh repo view KingInYellows/yellow-plugins
    - Create GitHub issue with full context
    - Tag platform team for review
    - Consider rollback if production-impacting
-   - Create postmortem using [template](./postmortem-template.md) for all P0/P1 incidents
+   - Create postmortem using [template](./postmortem-template.md) for all P0/P1
+     incidents
 
 ---
 
@@ -162,10 +169,12 @@ gh run view <run-id> --log | grep -A 20 "Schema validation"
 #### 1. Schema Validation Failure
 
 **Symptoms:**
+
 - `validate-schemas` job fails
 - Log shows AJV validation errors
 
 **Diagnosis:**
+
 ```bash
 # Run validation locally
 pnpm validate:schemas
@@ -178,6 +187,7 @@ node scripts/validate-plugin.js --plugin plugins/example/.claude-plugin/plugin.j
 **Remediation:**
 
 **For Marketplace Validation Errors:**
+
 ```bash
 # Check marketplace.json syntax
 jq '.' .claude-plugin/marketplace.json
@@ -193,6 +203,7 @@ ajv validate -s schemas/marketplace.schema.json -d .claude-plugin/marketplace.js
 ```
 
 **For Plugin Validation Errors:**
+
 ```bash
 # Check plugin.json syntax
 jq '.' plugins/example/.claude-plugin/plugin.json
@@ -207,6 +218,7 @@ node scripts/validate-plugin.js --plugin plugins/example/.claude-plugin/plugin.j
 ```
 
 **Fix and Re-run:**
+
 ```bash
 # After fixing validation errors
 git add .claude-plugin/marketplace.json plugins/
@@ -216,15 +228,18 @@ git push
 # CI will automatically re-run
 ```
 
-**Reference:** [CI Pipeline Spec: validate-schemas job](./ci-pipeline.md#job-validate-schemas-matrix)
+**Reference:**
+[CI Pipeline Spec: validate-schemas job](./ci-pipeline.md#job-validate-schemas-matrix)
 
 #### 2. Lint/TypeCheck Failure
 
 **Symptoms:**
+
 - `lint-and-typecheck` job fails
 - ESLint or TypeScript compiler errors
 
 **Diagnosis:**
+
 ```bash
 # Run linter locally
 pnpm lint
@@ -237,6 +252,7 @@ pnpm validate
 ```
 
 **Remediation:**
+
 ```bash
 # Auto-fix linting issues
 pnpm lint:fix
@@ -251,21 +267,25 @@ pnpm typecheck --pretty
 ```
 
 **Fix and Re-run:**
+
 ```bash
 git add .
 git commit -m "fix: resolve lint and type errors"
 git push
 ```
 
-**Reference:** [CI Pipeline Spec: lint-and-typecheck job](./ci-pipeline.md#job-lint-and-typecheck)
+**Reference:**
+[CI Pipeline Spec: lint-and-typecheck job](./ci-pipeline.md#job-lint-and-typecheck)
 
 #### 3. Test Failures
 
 **Symptoms:**
+
 - `unit-tests` or `integration-tests` job fails
 - Test assertions fail
 
 **Diagnosis:**
+
 ```bash
 # Run unit tests locally with verbose output
 pnpm test:unit --reporter=verbose
@@ -280,6 +300,7 @@ pnpm test:integration --reporter=verbose
 **Remediation:**
 
 **For Flaky Tests:**
+
 ```bash
 # Increase timeouts in test files
 # Edit test file and add timeout option:
@@ -290,6 +311,7 @@ pnpm test:unit --retry=2
 ```
 
 **For Regression Bugs:**
+
 ```bash
 # Fix failing assertions
 # Add regression test to prevent recurrence
@@ -299,21 +321,25 @@ pnpm test
 ```
 
 **Fix and Re-run:**
+
 ```bash
 git add tests/
 git commit -m "fix: resolve test failures"
 git push
 ```
 
-**Reference:** [CI Pipeline Spec: unit-tests, integration-tests](./ci-pipeline.md#job-unit-tests)
+**Reference:**
+[CI Pipeline Spec: unit-tests, integration-tests](./ci-pipeline.md#job-unit-tests)
 
 #### 4. SLO Budget Exceeded
 
 **Symptoms:**
+
 - `report-metrics` job fails
 - Error: "Schema validation target exceeded 60s budget"
 
 **Diagnosis:**
+
 ```bash
 # Download aggregated metrics
 gh run download <run-id> --name ci-metrics-aggregated
@@ -328,13 +354,15 @@ grep 'schema_validation' aggregated-metrics/ci-metrics.prom
 **Remediation:**
 
 **Short-term Fix (Increase Timeout):**
+
 ```yaml
 # Edit .github/workflows/validate-schemas.yml
 validate-schemas:
-  timeout-minutes: 3  # Increase from 2 to 3 minutes
+  timeout-minutes: 3 # Increase from 2 to 3 minutes
 ```
 
 **Long-term Fix (Optimize Validation):**
+
 ```bash
 # Profile validation script
 time node scripts/validate-plugin.js --plugin plugins/example/.claude-plugin/plugin.json
@@ -345,14 +373,15 @@ time node scripts/validate-plugin.js --plugin plugins/example/.claude-plugin/plu
 # - Reduce file I/O operations
 ```
 
-**Escalation:**
-If performance degradation persists, create a GitHub issue:
+**Escalation:** If performance degradation persists, create a GitHub issue:
+
 ```bash
 gh issue create --title "CI validation exceeds SLO budget" \
   --body "Schema validation target 'plugins' consistently exceeds 60s budget. Current duration: 73.2s. Optimization needed."
 ```
 
-**Reference:** [CI Pipeline Spec: SLO Enforcement](./ci-pipeline.md#runtime-budgets-and-slo-enforcement)
+**Reference:**
+[CI Pipeline Spec: SLO Enforcement](./ci-pipeline.md#runtime-budgets-and-slo-enforcement)
 
 ---
 
@@ -361,10 +390,12 @@ gh issue create --title "CI validation exceeds SLO budget" \
 ### Invalid JSON Syntax
 
 **Symptoms:**
+
 - Parse error: "Unexpected token" or "Trailing comma"
 - AJV validation fails with syntax error
 
 **Diagnosis:**
+
 ```bash
 # Validate JSON syntax
 jq '.' .claude-plugin/marketplace.json
@@ -373,6 +404,7 @@ jq '.' .claude-plugin/marketplace.json
 ```
 
 **Remediation:**
+
 ```bash
 # Common JSON syntax errors:
 # 1. Trailing commas (not allowed in JSON)
@@ -391,10 +423,13 @@ pnpm validate:schemas
 ### Schema Constraint Violations
 
 **Symptoms:**
-- AJV validation error: "should have required property" or "should match pattern"
+
+- AJV validation error: "should have required property" or "should match
+  pattern"
 - Workflow log shows specific field violations
 
 **Diagnosis:**
+
 ```bash
 # Run validation with all errors
 ajv validate -s schemas/marketplace.schema.json -d .claude-plugin/marketplace.json --all-errors
@@ -406,6 +441,7 @@ cat schemas/marketplace.schema.json | jq '.required'
 **Remediation:**
 
 **Missing Required Fields:**
+
 ```bash
 # Check marketplace.json has all required fields:
 # - schemaVersion, marketplaceName, marketplaceVersion, lastUpdated, plugins
@@ -417,6 +453,7 @@ jq '.plugins[0] += {"description": "Plugin description"}' .claude-plugin/marketp
 ```
 
 **Invalid Enum Values:**
+
 ```bash
 # Check allowed categories
 cat schemas/plugin.schema.json | jq '.properties.category.enum'
@@ -430,6 +467,7 @@ jq '.plugins[] | select(.category == "invalid") | .category = "other"' \
 ```
 
 **Invalid Semver:**
+
 ```bash
 # Check version format (must be X.Y.Z)
 jq '.plugins[].version' .claude-plugin/marketplace.json | grep -v '^"[0-9]\+\.[0-9]\+\.[0-9]\+"$'
@@ -441,6 +479,7 @@ jq '.plugins[].version' .claude-plugin/marketplace.json | grep -v '^"[0-9]\+\.[0
 ```
 
 **Verification:**
+
 ```bash
 # After fixing, verify all validations pass
 pnpm validate
@@ -461,6 +500,7 @@ pnpm validate
 ### Diagnosis
 
 **Step 1: Check Registry File**
+
 ```bash
 # Verify registry.json exists
 ls -l .claude-plugin/registry.json
@@ -472,6 +512,7 @@ jq '.' .claude-plugin/registry.json
 ```
 
 **Step 2: Check Backup Availability**
+
 ```bash
 # Check for registry backup
 ls -l .claude-plugin/registry.json.backup
@@ -481,6 +522,7 @@ stat .claude-plugin/registry.json.backup
 ```
 
 **Step 3: Review Logs**
+
 ```bash
 # Check for interrupted write operations
 grep -r "registry" .ci-logs/ | grep -i "error\|interrupt\|corrupt"
@@ -555,7 +597,8 @@ gh issue create --title "Registry corruption incident" \
   --body "Registry file was corrupted. Restored from backup. Investigate root cause."
 ```
 
-**Reference:** [Metrics Guide: Registry Corruption](./metrics.md#yellow_plugins_registry_corruption_incidents_total)
+**Reference:**
+[Metrics Guide: Registry Corruption](./metrics.md#yellow_plugins_registry_corruption_incidents_total)
 
 ---
 
@@ -571,6 +614,7 @@ gh issue create --title "Registry corruption incident" \
 ### Diagnosis
 
 **Step 1: Check Cache Size**
+
 ```bash
 # Inspect cache directory
 du -sh ~/.claude/plugins/cache/
@@ -583,6 +627,7 @@ grep "cache_size_bytes" .ci-metrics/*.prom
 ```
 
 **Step 2: Check Eviction Frequency**
+
 ```bash
 # Check eviction metrics
 grep "cache_evictions_total" .ci-metrics/*.prom
@@ -595,6 +640,7 @@ find ~/.claude/plugins/cache/ -name 'plugin.json' | wc -l
 ```
 
 **Step 3: Identify Cache Misses**
+
 ```bash
 # Check cache hit ratio
 grep "cache_hit_ratio" .ci-metrics/*.prom
@@ -654,7 +700,8 @@ pnpm plugin install text-analyzer@1.5.0
 du -sh ~/.claude/plugins/cache/
 ```
 
-**Reference:** [Metrics Guide: Cache Performance](./metrics.md#cache-performance-metrics), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+**Reference:**
+[Metrics Guide: Cache Performance](./metrics.md#cache-performance-metrics)
 
 ---
 
@@ -663,10 +710,12 @@ du -sh ~/.claude/plugins/cache/
 ### Dependency Vulnerabilities
 
 **Symptoms:**
+
 - `security-audit` job fails or emits warnings
 - `pnpm audit` reports CVEs
 
 **Diagnosis:**
+
 ```bash
 # Run dependency audit locally
 pnpm audit
@@ -681,6 +730,7 @@ pnpm outdated
 **Remediation:**
 
 **Update Vulnerable Dependencies:**
+
 ```bash
 # Update specific package
 pnpm update <package-name>
@@ -696,14 +746,15 @@ pnpm test
 ```
 
 **Fix and Re-run:**
+
 ```bash
 git add pnpm-lock.yaml
 git commit -m "fix(deps): update dependencies to resolve CVEs"
 git push
 ```
 
-**Escalation:**
-If vulnerabilities cannot be resolved (no patch available):
+**Escalation:** If vulnerabilities cannot be resolved (no patch available):
+
 ```bash
 # Document exception
 echo "CVE-2023-XXXX: No patch available. Mitigation: ..." > .security-exceptions.md
@@ -714,10 +765,12 @@ echo "CVE-2023-XXXX: No patch available. Mitigation: ..." > .security-exceptions
 ### Secret Detection
 
 **Symptoms:**
+
 - `security-audit` job fails with "Sensitive data found"
 - Workflow blocks merge
 
 **Diagnosis:**
+
 ```bash
 # Run secret scan locally
 grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --include="*.json" | grep -v '"permissionScopes"'
@@ -729,6 +782,7 @@ grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --includ
 **Remediation:**
 
 **Remove Hardcoded Secrets:**
+
 ```bash
 # Edit files to remove secrets
 # Replace with environment variables or placeholders
@@ -744,6 +798,7 @@ grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --includ
 ```
 
 **Rotate Compromised Credentials:**
+
 ```bash
 # If secrets were committed to git history:
 # 1. Rotate credentials immediately (new API keys, passwords)
@@ -752,6 +807,7 @@ grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --includ
 ```
 
 **Update .gitignore:**
+
 ```bash
 # Add patterns to prevent future commits
 echo ".env" >> .gitignore
@@ -762,7 +818,8 @@ git add .gitignore
 git commit -m "chore: update gitignore to prevent secret commits"
 ```
 
-**Reference:** [CI Pipeline Spec: security-audit job](./ci-pipeline.md#job-security-audit)
+**Reference:**
+[CI Pipeline Spec: security-audit job](./ci-pipeline.md#job-security-audit)
 
 ---
 
@@ -800,12 +857,14 @@ done
 #### Review Breaking Changes
 
 **Check for backward-incompatible changes:**
+
 - Removed required fields
 - Changed field types (string → number)
 - Renamed fields
 - Modified enum values
 
 **Example:**
+
 ```bash
 # BEFORE (v1.0):
 {
@@ -825,6 +884,7 @@ done
 ```
 
 **Remediation:**
+
 1. **Revert breaking change:** Restore original field name
 2. **Add compatibility shim:** Support both old and new field names
 3. **Version contract:** Create `install-v2.json` alongside `install.json`
@@ -868,7 +928,8 @@ git add CHANGELOG.md api/cli-contracts/ examples/
 git commit -m "feat(contracts): update install contract to v1.1"
 ```
 
-**Reference:** [CI Pipeline Spec: contract-drift job](./ci-pipeline.md#job-contract-drift)
+**Reference:**
+[CI Pipeline Spec: contract-drift job](./ci-pipeline.md#job-contract-drift)
 
 ---
 
@@ -877,10 +938,12 @@ git commit -m "feat(contracts): update install contract to v1.1"
 ### pnpm Install Failures
 
 **Symptoms:**
+
 - `pnpm install` fails with lockfile errors
 - Dependencies don't match expected versions
 
 **Diagnosis:**
+
 ```bash
 # Check pnpm version
 pnpm --version  # Should be 8.15.0
@@ -893,6 +956,7 @@ git status pnpm-lock.yaml
 ```
 
 **Remediation:**
+
 ```bash
 # Update pnpm to locked version
 npm install -g pnpm@8.15.0
@@ -912,10 +976,12 @@ git commit -m "chore: regenerate pnpm lockfile"
 ### TypeScript Compilation Errors
 
 **Symptoms:**
+
 - `pnpm build` fails
 - TypeScript compiler errors
 
 **Diagnosis:**
+
 ```bash
 # Run type checker
 pnpm typecheck
@@ -928,6 +994,7 @@ jq '.' tsconfig.json
 ```
 
 **Remediation:**
+
 ```bash
 # Clean build artifacts
 rm -rf dist/ packages/*/dist/
@@ -945,10 +1012,12 @@ pnpm build --verbose
 ### Git Workflow Issues
 
 **Symptoms:**
+
 - Unable to push commits
 - PR checks not running
 
 **Diagnosis:**
+
 ```bash
 # Check git remote
 git remote -v
@@ -962,6 +1031,7 @@ git log HEAD..upstream/main --oneline
 ```
 
 **Remediation:**
+
 ```bash
 # Sync fork with upstream
 git fetch upstream
@@ -982,6 +1052,7 @@ git push --force-with-lease
 ### When to Escalate
 
 Escalate to platform team if:
+
 - Issue persists >4 hours without resolution
 - Remediation steps in this runbook fail
 - Issue impacts production or blocks releases
@@ -1016,16 +1087,17 @@ Consider splitting plugin validation into multiple matrix jobs or parallelizing 
 
 ### Internal Escalation
 
-| Severity | Response Time | Contact |
-|----------|---------------|---------|
-| **P0 (Production Down)** | <1 hour | Maintainer direct contact |
-| **P1 (CI Blocked)** | <4 hours | GitHub issue + team mention |
-| **P2 (Degraded Performance)** | <24 hours | GitHub issue |
-| **P3 (Enhancement/Optimization)** | <1 week | GitHub discussion |
+| Severity                          | Response Time | Contact                     |
+| --------------------------------- | ------------- | --------------------------- |
+| **P0 (Production Down)**          | <1 hour       | Maintainer direct contact   |
+| **P1 (CI Blocked)**               | <4 hours      | GitHub issue + team mention |
+| **P2 (Degraded Performance)**     | <24 hours     | GitHub issue                |
+| **P3 (Enhancement/Optimization)** | <1 week       | GitHub discussion           |
 
 ### External Escalation
 
 For issues with external dependencies:
+
 - **GitHub Actions:** https://github.com/contact/support
 - **pnpm:** https://github.com/pnpm/pnpm/issues
 - **Node.js:** https://github.com/nodejs/node/issues
@@ -1044,6 +1116,7 @@ For issues with external dependencies:
 ### Diagnosis
 
 **Step 1: Check Audit Logs**
+
 ```bash
 # Review lifecycle consent events
 grep 'lifecycle_consent' .claude-plugin/audit/*.jsonl
@@ -1056,6 +1129,7 @@ grep 'lifecycle_execution' .claude-plugin/audit/*.jsonl
 ```
 
 **Step 2: Review Script Digest**
+
 ```bash
 # Verify script contents match expected digest
 cat .claude-plugin/cache/text-analyzer/2.0.0/lifecycle/install.sh | sha256sum
@@ -1064,6 +1138,7 @@ cat .claude-plugin/cache/text-analyzer/2.0.0/lifecycle/install.sh | sha256sum
 ```
 
 **Step 3: Check Sandbox Logs**
+
 ```bash
 # Review sandbox execution logs
 cat .ci-logs/lifecycle-execution-*.log
@@ -1078,6 +1153,7 @@ cat .ci-logs/lifecycle-execution-*.log
 **Symptoms:** User typed incorrect confirmation or declined consent
 
 **Remediation:**
+
 ```bash
 # Re-attempt install with explicit consent
 plugin install text-analyzer@2.0.0
@@ -1094,6 +1170,7 @@ plugin install text-analyzer@2.0.0 --skip-lifecycle
 **Symptoms:** Script ran but exited with non-zero code
 
 **Diagnosis:**
+
 ```bash
 # Check script exit code from audit log
 grep 'exitCode' .claude-plugin/audit/*.jsonl | grep 'text-analyzer'
@@ -1103,6 +1180,7 @@ cat .claude-plugin/cache/text-analyzer/2.0.0/lifecycle/install.log
 ```
 
 **Remediation:**
+
 ```bash
 # Fix script dependencies or permissions
 # Contact plugin author if script is malformed
@@ -1116,6 +1194,7 @@ plugin install text-analyzer@1.9.0
 **Symptoms:** Script exceeded execution time limit
 
 **Diagnosis:**
+
 ```bash
 # Check execution duration from audit log
 grep 'executionDurationMs' .claude-plugin/audit/*.jsonl | grep 'text-analyzer'
@@ -1124,6 +1203,7 @@ grep 'executionDurationMs' .claude-plugin/audit/*.jsonl | grep 'text-analyzer'
 ```
 
 **Remediation:**
+
 ```bash
 # Increase timeout via config (if script legitimately needs more time)
 jq '.lifecycle.timeout = 120000' .claude-plugin/config.json > config.tmp
@@ -1146,7 +1226,8 @@ Reproduction steps: [describe]"
 # If script is malicious, report to plugin author and remove from marketplace
 ```
 
-**Reference:** [Metrics Guide: Lifecycle Consent Tracking](./metrics.md#yellow_plugins_lifecycle_prompt_declines_total), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+**Reference:**
+[Metrics Guide: Lifecycle Consent Tracking](./metrics.md#yellow_plugins_lifecycle_prompt_declines_total)
 
 ---
 
@@ -1162,6 +1243,7 @@ Reproduction steps: [describe]"
 ### Diagnosis
 
 **Step 1: Identify Problematic Commit**
+
 ```bash
 # Check recent marketplace.json changes
 git log -p --follow .claude-plugin/marketplace.json | head -100
@@ -1171,6 +1253,7 @@ git blame .claude-plugin/marketplace.json
 ```
 
 **Step 2: Verify Schema Validation**
+
 ```bash
 # Run schema validation locally
 pnpm validate:schemas
@@ -1180,6 +1263,7 @@ jq '.plugins[] | select(.id == "text-analyzer")' .claude-plugin/marketplace.json
 ```
 
 **Step 3: Check CI Workflow Status**
+
 ```bash
 # Review failed CI run
 gh run list --workflow=validate-schemas.yml --limit 5
@@ -1195,6 +1279,7 @@ gh run download <failed-run-id>
 **Symptoms:** Last publish commit broke validation
 
 **Remediation:**
+
 ```bash
 # Revert the problematic commit
 git revert <commit-sha>
@@ -1215,6 +1300,7 @@ git push origin :refs/tags/v2.0.0
 **Symptoms:** Specific plugin entry is malformed
 
 **Remediation:**
+
 ```bash
 # Edit marketplace.json to fix entry
 jq '.plugins |= map(if .id == "text-analyzer" then .version = "1.3.1" else . end)' \
@@ -1235,6 +1321,7 @@ git push origin main
 **Symptoms:** Marketplace.json severely corrupted
 
 **Remediation:**
+
 ```bash
 # Restore from git history
 git checkout HEAD~1 -- .claude-plugin/marketplace.json
@@ -1268,7 +1355,8 @@ cp docs/operations/postmortem-template.md docs/operations/postmortem-2026-001.md
 # Fill out postmortem details
 ```
 
-**Reference:** [CI Pipeline Spec: Publishing Workflow](./ci-pipeline.md), [Metrics Guide: CI Validation](./metrics.md#yellow_plugins_ci_validations_total), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+**Reference:** [CI Pipeline Spec: Publishing Workflow](./ci-pipeline.md),
+[Metrics Guide: CI Validation](./metrics.md#yellow_plugins_ci_validations_total)
 
 ---
 
@@ -1284,6 +1372,7 @@ cp docs/operations/postmortem-template.md docs/operations/postmortem-2026-001.md
 ### Exporting Telemetry Artifacts
 
 **Step 1: Collect Audit Logs**
+
 ```bash
 # Export lifecycle consent logs
 grep 'lifecycle_consent' .claude-plugin/audit/*.jsonl > audit-lifecycle-$(date +%Y%m%d).jsonl
@@ -1296,6 +1385,7 @@ tar -czf audit-export-jan10-12.tar.gz audit-export-jan10-12.jsonl
 ```
 
 **Step 2: Export Metrics Snapshots**
+
 ```bash
 # Export Prometheus metrics
 pnpm metrics > metrics-snapshot-$(date +%Y%m%d).prom
@@ -1308,6 +1398,7 @@ tar -czf metrics-snapshot-$(date +%Y%m%d).tar.gz metrics-snapshot-*.{prom,json}
 ```
 
 **Step 3: Export Structured Logs**
+
 ```bash
 # Collect structured JSON logs from .claude-plugin/logs/
 tar -czf logs-export-$(date +%Y%m%d).tar.gz .claude-plugin/logs/*.jsonl
@@ -1318,6 +1409,7 @@ jq 'select(.correlationId == "a3f2c9d8-1b4e-4a5c-9d7f-8e3c2a1b4d5e")' \
 ```
 
 **Step 4: Upload to GitHub (CI Context)**
+
 ```yaml
 # In GitHub Actions workflow
 - name: Collect Telemetry Artifacts
@@ -1339,6 +1431,7 @@ jq 'select(.correlationId == "a3f2c9d8-1b4e-4a5c-9d7f-8e3c2a1b4d5e")' \
 ### Audit Log Review
 
 **Review Lifecycle Script Consent Events**
+
 ```bash
 # List all consent events with outcomes
 jq 'select(.eventType == "lifecycle_consent") |
@@ -1351,6 +1444,7 @@ jq -r 'select(.eventType == "lifecycle_consent" and .consentGranted == false) | 
 ```
 
 **Review Command Execution Patterns**
+
 ```bash
 # Summarize commands by type
 jq -r '.command' .claude-plugin/logs/*.jsonl | sort | uniq -c | sort -rn
@@ -1361,6 +1455,7 @@ jq 'select(.level == "error") | {command: .command, error: .errorCode, time: .ti
 ```
 
 **Trace Correlation ID Across Artifacts**
+
 ```bash
 # Given a correlation ID, trace across logs, metrics, and audit
 CORRELATION_ID="a3f2c9d8-1b4e-4a5c-9d7f-8e3c2a1b4d5e"
@@ -1379,6 +1474,7 @@ jq -r "select(.correlationId == \"$CORRELATION_ID\") | .data.transactionId" \
 ### KPI Reporting from Telemetry
 
 **Generate KPI Report for Quarterly Review**
+
 ```bash
 # Install success rate (Architecture §3.16)
 TOTAL_INSTALLS=$(jq -r 'select(.command == "install") | .command' .claude-plugin/logs/*.jsonl | wc -l)
@@ -1396,19 +1492,21 @@ EVICTIONS=$(grep 'cache_evictions_total' metrics-snapshot.prom | awk '{print $2}
 echo "Cache Evictions: $EVICTIONS (Monitor for spikes)"
 ```
 
-**Reference:** [Metrics Guide](./metrics.md), [Operational Architecture §3.16](../.codemachine/artifacts/architecture/04_Operational_Architecture.md#3-16-operational-kpis), [Verification Strategy §6](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md#6-verification-and-integration-strategy)
+**Reference:** [Metrics Guide](./metrics.md)
 
 ---
 
 ## KPI Escalation Paths
 
-When KPIs fall outside target thresholds (Architecture §3.16) or Section 6 verification hooks detect missing telemetry, follow these escalation procedures:
+When KPIs fall outside target thresholds (Architecture §3.16) or Section 6
+verification hooks detect missing telemetry, follow these escalation procedures:
 
 ### Install Success Rate < 99%
 
 **Severity:** P1 (Significant degradation)
 
 **Escalation Steps:**
+
 1. Create incident tracking issue immediately
 2. Run diagnostics: `pnpm validate:schemas`, check CI logs, review error codes
 3. Identify pattern: schema failures, cache issues, network problems
@@ -1420,8 +1518,10 @@ When KPIs fall outside target thresholds (Architecture §3.16) or Section 6 veri
 **Severity:** P2 (Degraded performance)
 
 **Escalation Steps:**
+
 1. Review cache integrity: verify symlink state, check cache size
-2. Profile rollback operation: identify slow steps (symlink swap, registry write)
+2. Profile rollback operation: identify slow steps (symlink swap, registry
+   write)
 3. Document findings in GitHub issue
 4. Optimize within 1 week or adjust SLO target (requires architecture approval)
 
@@ -1430,6 +1530,7 @@ When KPIs fall outside target thresholds (Architecture §3.16) or Section 6 veri
 **Severity:** P2 (Degraded performance)
 
 **Escalation Steps:**
+
 1. Calculate baseline eviction rate from historical metrics
 2. Identify cause: large plugin packages, cache size threshold too low
 3. Adjust cache policies or recommend pinning frequently-used plugins
@@ -1440,12 +1541,14 @@ When KPIs fall outside target thresholds (Architecture §3.16) or Section 6 veri
 **Severity:** P3 (Process issue)
 
 **Escalation Steps:**
+
 1. Identify stale documentation via git log comparison
 2. Assign documentation update to code author
 3. Add documentation checklist to PR template
 4. Review quarterly to ensure compliance
 
-**Reference:** [Escalation Paths](#escalation-paths), [Postmortem Template](./postmortem-template.md)
+**Reference:** [Escalation Paths](#escalation-paths),
+[Postmortem Template](./postmortem-template.md)
 
 ---
 
@@ -1520,18 +1623,15 @@ jq 'select(.eventType == "lifecycle_consent" and .consentGranted == false)' \
 ## References
 
 ### Internal Documentation
-- [CI Validation Pipeline Spec](./ci-pipeline.md) - Technical pipeline specification
+
+- [CI Validation Pipeline Spec](./ci-pipeline.md) - Technical pipeline
+  specification
 - [CI/CD Operations Guide](./ci.md) - CI workflow procedural guidance
 - [Metrics Guide](./metrics.md) - Telemetry catalog and monitoring
-- [Postmortem Template](./postmortem-template.md) - Incident investigation workflow
-- [Traceability Matrix](../traceability-matrix.md) - Requirements coverage
-- [SPECIFICATION.md](../SPECIFICATION.md) - Complete technical specification
-
-### Architecture Documents
-- [04_Operational_Architecture.md](../.codemachine/artifacts/architecture/04_Operational_Architecture.md) - Section 3.7, 3.11, 3.16
-- [03_Verification_and_Glossary.md](../.codemachine/artifacts/plan/03_Verification_and_Glossary.md) - Section 6 verification strategy
-
+- [Postmortem Template](./postmortem-template.md) - Incident investigation
+  workflow
 ### External Resources
+
 - [GitHub Actions Troubleshooting](https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows)
 - [pnpm Troubleshooting](https://pnpm.io/errors)
 - [JSON Schema Validation](https://json-schema.org/understanding-json-schema/)
@@ -1540,16 +1640,15 @@ jq 'select(.eventType == "lifecycle_consent" and .consentGranted == false)' \
 
 ## Changelog
 
-| Date | Version | Changes |
-|------|---------|---------|
-| 2026-01-12 | 1.1.0 | Extended with lifecycle script incidents, publish rollback, telemetry export, and KPI escalation paths (I4.T4 deliverable) |
-| 2026-01-12 | 1.0.0 | Initial operational runbook (I4.T3 deliverable) |
+| Date       | Version | Changes                                                                                                                    |
+| ---------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| 2026-01-12 | 1.1.0   | Extended with lifecycle script incidents, publish rollback, telemetry export, and KPI escalation paths (I4.T4 deliverable) |
+| 2026-01-12 | 1.0.0   | Initial operational runbook (I4.T3 deliverable)                                                                            |
 
 ---
 
-**Document Status:** Production-Ready
-**Approval Status:** Active (I4.T4 acceptance criteria met)
-**Next Review:** 2026-02-12
+**Document Status:** Production-Ready **Approval Status:** Active (I4.T4
+acceptance criteria met) **Next Review:** 2026-02-12
 
 ---
 

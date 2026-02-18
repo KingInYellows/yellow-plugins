@@ -336,7 +336,15 @@
         },
         "changelogStatus": {
           "type": "string",
-          "enum": ["success", "cached", "not-provided", "timeout", "not-found", "server-error", "network-error"],
+          "enum": [
+            "success",
+            "cached",
+            "not-provided",
+            "timeout",
+            "not-found",
+            "server-error",
+            "network-error"
+          ],
           "description": "Changelog fetch status per CRIT-008"
         },
         "changelogMessage": {

@@ -2,9 +2,9 @@
 name: browser-test:report
 description: >
   Generate a test report from the most recent results. Use when user says
-  "generate report", "show test results", "create test report", or wants
-  to view or share the results of a previous test run.
-argument-hint: ""
+  "generate report", "show test results", "create test report", or wants to view
+  or share the results of a previous test run.
+argument-hint: ''
 allowed-tools:
   - Bash
   - Read
@@ -23,7 +23,8 @@ Create a formatted markdown report from the most recent browser test results.
 
 Check for `test-reports/results.json`.
 
-If not found: "No test results found. Run `/browser-test:test` or `/browser-test:explore` first."
+If not found: "No test results found. Run `/browser-test:test` or
+`/browser-test:explore` first."
 
 ### Step 2: Generate Report
 
@@ -39,8 +40,8 @@ Show the report file path and a brief summary of results.
 
 ## Error Handling
 
-| Error | Action |
-|-------|--------|
-| No results.json found | "No test results. Run `/browser-test:test` or `/browser-test:explore` first" |
-| results.json is malformed | "Results file is corrupted. Re-run tests with `/browser-test:test`" |
-| gh CLI not available | "Install gh CLI for issue creation: https://cli.github.com/" |
+| Error                     | Action                                                                       |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| No results.json found     | "No test results. Run `/browser-test:test` or `/browser-test:explore` first" |
+| results.json is malformed | "Results file is corrupted. Re-run tests with `/browser-test:test`"          |
+| gh CLI not available      | "Install gh CLI for issue creation: https://cli.github.com/"                 |

@@ -1,15 +1,16 @@
 # Pin Command Documentation
 
-**Command:** `plugin pin`
-**Aliases:** `plugin lock`
-**Task Reference:** I3.T3 - Pin management implementation
-**Functional Requirements:** FR-007 (Pin management), CRIT-002 (Cache eviction protection)
+**Command:** `plugin pin` **Aliases:** `plugin lock` **Task Reference:** I3.T3 -
+Pin management implementation **Functional Requirements:** FR-007 (Pin
+management), CRIT-002 (Cache eviction protection)
 
 ---
 
 ## Overview
 
-The `pin` command allows you to pin installed plugins to protect them from cache eviction. Pinned plugins are prioritized during cache management operations and will not be automatically removed even when cache limits are exceeded.
+The `pin` command allows you to pin installed plugins to protect them from cache
+eviction. Pinned plugins are prioritized during cache management operations and
+will not be automatically removed even when cache limits are exceeded.
 
 ### Key Features
 
@@ -103,16 +104,16 @@ plugin pin --list
 
 ## Command Options
 
-| Option | Alias | Type | Description |
-|--------|-------|------|-------------|
-| `<plugin-id>` | - | positional | Plugin identifier to pin (required for pin/unpin) |
-| `--version` | `-v` | string | Specific version to pin (defaults to installed version) |
-| `--unpin` | - | boolean | Remove pin protection |
-| `--list` | `-l` | boolean | List all pinned plugins |
-| `--input` | - | string | JSON input file path |
-| `--output` | - | string | JSON output file path |
-| `--verbose` | - | boolean | Enable verbose logging |
-| `--dry-run` | - | boolean | Preview changes without executing |
+| Option        | Alias | Type       | Description                                             |
+| ------------- | ----- | ---------- | ------------------------------------------------------- |
+| `<plugin-id>` | -     | positional | Plugin identifier to pin (required for pin/unpin)       |
+| `--version`   | `-v`  | string     | Specific version to pin (defaults to installed version) |
+| `--unpin`     | -     | boolean    | Remove pin protection                                   |
+| `--list`      | `-l`  | boolean    | List all pinned plugins                                 |
+| `--input`     | -     | string     | JSON input file path                                    |
+| `--output`    | -     | string     | JSON output file path                                   |
+| `--verbose`   | -     | boolean    | Enable verbose logging                                  |
+| `--dry-run`   | -     | boolean    | Preview changes without executing                       |
 
 ---
 
@@ -176,7 +177,8 @@ plugin install hookify
 plugin pin hookify
 ```
 
-**When to use:** When you have plugins you use frequently and want to ensure they remain cached.
+**When to use:** When you have plugins you use frequently and want to ensure
+they remain cached.
 
 ### Workflow 2: Pin Specific Version
 
@@ -186,7 +188,8 @@ plugin install hookify --version 1.2.3
 plugin pin hookify --version 1.2.3
 ```
 
-**When to use:** When you need to maintain a specific version for compatibility or testing.
+**When to use:** When you need to maintain a specific version for compatibility
+or testing.
 
 ### Workflow 3: Unpin for Updates
 
@@ -197,7 +200,8 @@ plugin update hookify
 plugin pin hookify
 ```
 
-**When to use:** When you want to update a pinned plugin and then re-pin the new version.
+**When to use:** When you want to update a pinned plugin and then re-pin the new
+version.
 
 ### Workflow 4: Audit Pinned Plugins
 
@@ -220,9 +224,11 @@ plugin pin old-plugin --unpin
 The cache manager enforces the following rules:
 
 1. **Pinned Plugins Are Protected:** Pinned plugin versions are never evicted
-2. **Version Retention:** Last 3 versions per plugin are retained (including pins)
+2. **Version Retention:** Last 3 versions per plugin are retained (including
+   pins)
 3. **Size Limit:** 500 MB total cache size (pinned plugins count toward this)
-4. **LRU Eviction:** Unpinned versions are evicted using Least Recently Used policy
+4. **LRU Eviction:** Unpinned versions are evicted using Least Recently Used
+   policy
 
 ### Eviction Priority (Lowest to Highest)
 
@@ -289,7 +295,8 @@ plugin pin hookify --version 1.2.3
 
 **Message:** "Pin command failed: {error details}"
 
-**Resolution:** Check logs and file permissions, ensure `.claude-plugin/` directory is writable
+**Resolution:** Check logs and file permissions, ensure `.claude-plugin/`
+directory is writable
 
 ---
 
@@ -297,7 +304,8 @@ plugin pin hookify --version 1.2.3
 
 ### Registry Changes
 
-When you pin a plugin, the following changes occur in `.claude-plugin/registry.json`:
+When you pin a plugin, the following changes occur in
+`.claude-plugin/registry.json`:
 
 1. Plugin ID is added to `activePins` array
 2. Plugin record's `pinned` field is set to `true`
@@ -325,7 +333,8 @@ When you pin a plugin, the following changes occur in `.claude-plugin/registry.j
 
 ### Cache Changes
 
-When you pin a plugin, the cache index (`.claude-plugin/cache/index.json`) is updated:
+When you pin a plugin, the cache index (`.claude-plugin/cache/index.json`) is
+updated:
 
 1. Cache entry's `pinned` field is set to `true`
 2. Entry is protected from eviction algorithms
@@ -381,7 +390,8 @@ This command implements the following requirements:
 1. **Regular Audits:** Use `plugin pin --list` to review pinned plugins monthly
 2. **Unpin Unused:** Remove pins from plugins you no longer use actively
 3. **Version Management:** Unpin before updating, then re-pin new version
-4. **Cache Monitoring:** Check cache stats with `plugin cache stats` to ensure pins don't exhaust cache
+4. **Cache Monitoring:** Check cache stats with `plugin cache stats` to ensure
+   pins don't exhaust cache
 
 ---
 
@@ -481,7 +491,8 @@ cat .claude-plugin/cache/index.json | jq '.entries.hookify[] | select(.pinned ==
 cat .claude-plugin/cache/index.json | jq '.evictionLog | .[] | select(.wasPinned == true)'
 ```
 
-**Fix:** This should never happen. Report as a bug if eviction log shows `wasPinned: true`
+**Fix:** This should never happen. Report as a bug if eviction log shows
+`wasPinned: true`
 
 ### Pin Command Fails with Permission Error
 
@@ -512,6 +523,5 @@ ls -la .claude-plugin/
 ## References
 
 - **Contracts:** `docs/contracts/registry-format.md` (activePins semantics)
-- **Architecture:** `.codemachine/artifacts/architecture/04_Operational_Architecture.md` (Section 3.4)
 - **API Schema:** `api/cli-contracts/pin.json` (JSON schema)
-- **Error Catalog:** `docs/error-catalog.md` (ERR-PIN-* codes)
+- **Error Catalog:** `docs/error-catalog.md` (ERR-PIN-\* codes)

@@ -1,6 +1,7 @@
 # Operational Patterns for Yellow Plugins
 
-Consolidated reference for patterns and conventions used across yellow-plugins. Apply to new code; don't retrofit existing code unless it's being modified.
+Consolidated reference for patterns and conventions used across yellow-plugins.
+Apply to new code; don't retrofit existing code unless it's being modified.
 
 ## 1. Shell Script Safety
 
@@ -64,11 +65,11 @@ some_command 2>/dev/null       # hides error output
 
 ### Time Budgets
 
-| Event | Budget | Example |
-|-------|--------|---------|
-| SessionStart | 3s max | Flush stale queue, load context |
-| PostToolUse | 50ms–1s max | Append to queue, quick validation |
-| Stop | 10s max | Flush pending work, cleanup |
+| Event        | Budget      | Example                           |
+| ------------ | ----------- | --------------------------------- |
+| SessionStart | 3s max      | Flush stale queue, load context   |
+| PostToolUse  | 50ms–1s max | Append to queue, quick validation |
+| Stop         | 10s max     | Flush pending work, cleanup       |
 
 ### Concurrency Safety
 
@@ -114,7 +115,8 @@ Do not create separate `config/*.mcp.json` files.
 
 ### Tool Naming
 
-Claude Code names MCP tools: `mcp__plugin_<plugin-name>_<server-key>__<tool-name>`
+Claude Code names MCP tools:
+`mcp__plugin_<plugin-name>_<server-key>__<tool-name>`
 
 Example: plugin `yellow-linear` with server key `linear` and tool `get_issue`:
 `mcp__plugin_yellow-linear_linear__get_issue`
@@ -132,13 +134,15 @@ Example: plugin `yellow-linear` with server key `linear` and tool `get_issue`:
 
 Required fields: `name`, `description`, `author`
 
-Optional: `version`, `keywords`, `license`, `homepage`, `repository`, `mcpServers`, `hooks`
+Optional: `version`, `keywords`, `license`, `homepage`, `repository`,
+`mcpServers`, `hooks`
 
 Run `pnpm validate:schemas` to verify all manifests.
 
 ### Shared Validation Library
 
-For plugins with shell scripts, extract common validation into a sourced library:
+For plugins with shell scripts, extract common validation into a sourced
+library:
 
 ```bash
 # lib/validate.sh — source from hook scripts
@@ -189,7 +193,8 @@ oneline=$(printf '%s' "$input" | tr -d '\n\r')
 
 ### CRLF on WSL2
 
-Files created via Claude Code's Write tool get CRLF line endings. Fix after creating shell scripts:
+Files created via Claude Code's Write tool get CRLF line endings. Fix after
+creating shell scripts:
 
 ```bash
 sed -i 's/\r$//' script.sh

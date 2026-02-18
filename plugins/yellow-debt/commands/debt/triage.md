@@ -1,7 +1,9 @@
 ---
 name: debt:triage
-description: "Interactive review and prioritization of pending debt findings. Use when you need to accept, reject, or defer findings from an audit."
-argument-hint: "[--category <name>] [--priority <level>]"
+description:
+  'Interactive review and prioritization of pending debt findings. Use when you
+  need to accept, reject, or defer findings from an audit.'
+argument-hint: '[--category <name>] [--priority <level>]'
 allowed-tools:
   - Bash
   - Read
@@ -11,11 +13,13 @@ allowed-tools:
 
 # Technical Debt Triage Command
 
-Interactively review pending technical debt findings and decide to accept (ready), reject (deleted), or defer (deferred) each one.
+Interactively review pending technical debt findings and decide to accept
+(ready), reject (deleted), or defer (deferred) each one.
 
 ## Arguments
 
-- `--category <name>` — Filter to specific category: ai-patterns, complexity, duplication, architecture, security
+- `--category <name>` — Filter to specific category: ai-patterns, complexity,
+  duplication, architecture, security
 - `--priority <level>` — Filter to minimum priority: p1, p2, p3, p4
 
 ## Implementation
@@ -145,7 +149,7 @@ for todo_path in "${FILTERED_FILES[@]}"; do
   FILE_PATH=$(echo "$AFFECTED_FILES" | cut -d: -f1)
   LINE_RANGE=$(echo "$AFFECTED_FILES" | cut -d: -f2)
   START_LINE=$(echo "$LINE_RANGE" | cut -d- -f1)
-  
+
   # Validate START_LINE is numeric before arithmetic expansion
   if [[ ! "$START_LINE" =~ ^[0-9]+$ ]]; then
     CONTEXT_START=1
@@ -221,23 +225,28 @@ $ARGUMENTS --priority p2
 ## Triage Decisions
 
 **Accept** → Transitions to `ready` state
+
 - Finding is valid and should be fixed
 - Will appear in `/debt:fix` workflow
 - Can be synced to Linear via `/debt:sync`
 
 **Reject** → Transitions to `deleted` state
+
 - Finding is false positive
 - File will be removed from todos/debt/
 - Can be recovered from git history if needed
 
 **Defer** → Transitions to `deferred` state
+
 - Valid finding but not addressing now
 - Requires reason and optional date
 - Will be re-evaluated in next audit
 
 ## Atomic Transitions
 
-All state changes use the `transition_todo_state()` function from `lib/validate.sh` which provides:
+All state changes use the `transition_todo_state()` function from
+`lib/validate.sh` which provides:
+
 - TOCTOU protection via `flock`
 - Transition validation (only legal state changes allowed)
 - Atomic rename (filename prefix updated atomically with frontmatter)
@@ -245,6 +254,7 @@ All state changes use the `transition_todo_state()` function from `lib/validate.
 ## Error Recovery
 
 If triage is interrupted:
+
 - All decisions made so far are persisted
 - Re-run `/debt:triage` to continue from remaining pending findings
 - Previously triaged items won't be shown again

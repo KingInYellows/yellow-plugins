@@ -1,7 +1,9 @@
 ---
 name: workflows:review
-description: Multi-agent comprehensive code review with security, performance, and architecture analysis
-argument-hint: "[PR number/URL/branch/latest]"
+description:
+  Multi-agent comprehensive code review with security, performance, and
+  architecture analysis
+argument-hint: '[PR number/URL/branch/latest]'
 allowed-tools:
   - Bash
   - Read
@@ -13,7 +15,8 @@ allowed-tools:
 
 # Comprehensive Code Review Workflow
 
-Execute multi-agent code review with parallel analysis from security, performance, architecture, and code quality perspectives.
+Execute multi-agent code review with parallel analysis from security,
+performance, architecture, and code quality perspectives.
 
 ## Phase 1: Determine Review Target
 
@@ -27,17 +30,20 @@ Execute multi-agent code review with parallel analysis from security, performanc
    - **Empty/none:** Review current working changes
 
 2. Check current branch and status:
+
    ```bash
    git branch --show-current
    git status --short
    ```
 
 3. Fetch PR metadata if reviewing a PR:
+
    ```bash
    gh pr view <number> --json number,title,body,headRefName,baseRefName,author,additions,deletions,files
    ```
 
 4. Get file changes:
+
    ```bash
    # For PR
    gh pr diff <number>
@@ -48,11 +54,13 @@ Execute multi-agent code review with parallel analysis from security, performanc
    ```
 
 5. Get list of changed files:
+
    ```bash
    gh pr view <number> --json files --jq '.files[].path'
    ```
 
-6. If not on target branch, offer worktree or read-only review via AskUserQuestion.
+6. If not on target branch, offer worktree or read-only review via
+   AskUserQuestion.
 
 7. Read each changed file into context.
 
@@ -62,13 +70,16 @@ Launch ALL reviewer agents in parallel using Task tool:
 
 - **polyglot-reviewer** — Language-specific best practices, idioms, type safety
 - **code-simplicity-reviewer** — Complexity, simplifications, readability
-- **security-sentinel** — Security vulnerabilities, unsafe patterns, injection risks
+- **security-sentinel** — Security vulnerabilities, unsafe patterns, injection
+  risks
 - **performance-oracle** — Performance issues, inefficiencies, scaling concerns
-- **architecture-strategist** — Architectural fit, coupling, cohesion, design patterns
+- **architecture-strategist** — Architectural fit, coupling, cohesion, design
+  patterns
 - **test-coverage-analyst** — Test coverage, quality, edge cases, brittleness
 - **git-history-analyzer** — Commit structure, messages, atomic changes
 
-Wait for all agents to complete. Collect findings by agent with severity levels and file locations.
+Wait for all agents to complete. Collect findings by agent with severity levels
+and file locations.
 
 ## Phase 3: Deep Analysis
 
@@ -90,17 +101,23 @@ Apply additional analysis beyond what agents cover:
 ## Phase 4: Synthesis
 
 1. **Categorize findings by severity:**
-   - **P1 CRITICAL:** Blocks merge (security vulnerabilities, data corruption, breaking changes, critical bugs)
-   - **P2 IMPORTANT:** Should fix (performance issues, test gaps, design violations, poor error handling)
-   - **P3 NICE-TO-HAVE:** Can address later (minor optimizations, style, docs, refactoring)
+   - **P1 CRITICAL:** Blocks merge (security vulnerabilities, data corruption,
+     breaking changes, critical bugs)
+   - **P2 IMPORTANT:** Should fix (performance issues, test gaps, design
+     violations, poor error handling)
+   - **P3 NICE-TO-HAVE:** Can address later (minor optimizations, style, docs,
+     refactoring)
 
-2. **Deduplicate** findings from multiple agents. Keep most detailed explanation.
+2. **Deduplicate** findings from multiple agents. Keep most detailed
+   explanation.
 
-3. **Estimate effort** for each finding: Quick (<30 min), Medium (30 min–2 hr), Large (>2 hr).
+3. **Estimate effort** for each finding: Quick (<30 min), Medium (30 min–2 hr),
+   Large (>2 hr).
 
 4. **Present summary** with:
    - Overview table (total findings, P1/P2/P3 counts)
-   - Each finding: severity, type, file:line, agent source, issue description, suggested fix, effort
+   - Each finding: severity, type, file:line, agent source, issue description,
+     suggested fix, effort
    - Architecture observations and testing assessment
    - What went well (balance criticism with recognition)
 

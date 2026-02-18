@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p1
-issue_id: "005"
+issue_id: '005'
 tags: [code-review, security, prompt-injection]
 dependencies: []
 ---
@@ -10,29 +10,40 @@ dependencies: []
 
 ## Problem Statement
 
-SessionStart hook loads learnings from the vector DB and injects them directly into the `systemMessage`. If an attacker stores malicious content via `/ruvector:learn`, it gets loaded into every future session's system context, enabling persistent prompt injection.
+SessionStart hook loads learnings from the vector DB and injects them directly
+into the `systemMessage`. If an attacker stores malicious content via
+`/ruvector:learn`, it gets loaded into every future session's system context,
+enabling persistent prompt injection.
 
-**Why it matters:** An attacker can manipulate agent behavior across all future sessions by storing a single malicious learning.
+**Why it matters:** An attacker can manipulate agent behavior across all future
+sessions by storing a single malicious learning.
 
 ## Findings
 
-- **Security Sentinel (H3):** Stored learnings injected into systemMessage without sanitization
-- **Comment Analyzer:** Noted no HTML stripping implementation despite command docs mentioning it
-- **Security Sentinel (C3):** learn/search commands reference "Strip HTML tags" but provide no implementation
+- **Security Sentinel (H3):** Stored learnings injected into systemMessage
+  without sanitization
+- **Comment Analyzer:** Noted no HTML stripping implementation despite command
+  docs mentioning it
+- **Security Sentinel (C3):** learn/search commands reference "Strip HTML tags"
+  but provide no implementation
 
 ## Proposed Solutions
 
 ### Option A: Wrap learnings in code fence + sanitize content (Recommended)
-- Wrap loaded learnings in triple backtick code fence to prevent instruction parsing
+
+- Wrap loaded learnings in triple backtick code fence to prevent instruction
+  parsing
 - Strip HTML tags from content before storage
 - Reject known prompt injection patterns ("IGNORE PREVIOUS", "SYSTEM:")
 - Limit learning content to 10 lines
 - **Pros:** Defense-in-depth, prevents both injection and XSS
-- **Cons:** May slightly reduce learning utility if legitimate content is stripped
+- **Cons:** May slightly reduce learning utility if legitimate content is
+  stripped
 - **Effort:** Small (1-2 hours)
 - **Risk:** Low
 
 ### Option B: Content-security policy for learnings
+
 - Define blocklist of dangerous patterns
 - Validate at storage time AND retrieval time
 - **Pros:** Thorough protection
@@ -43,7 +54,8 @@ SessionStart hook loads learnings from the vector DB and injects them directly i
 ## Technical Details
 
 - **Affected files:**
-  - `plugins/yellow-ruvector/hooks/scripts/session-start.sh` (lines 99-130, learning injection)
+  - `plugins/yellow-ruvector/hooks/scripts/session-start.sh` (lines 99-130,
+    learning injection)
   - `plugins/yellow-ruvector/commands/ruvector/learn.md` (input validation)
   - `plugins/yellow-ruvector/agents/ruvector/memory-manager.md` (storage step)
 
@@ -57,11 +69,12 @@ SessionStart hook loads learnings from the vector DB and injects them directly i
 
 ## Work Log
 
-| Date | Action | Learnings |
-|------|--------|-----------|
+| Date       | Action                          | Learnings                                     |
+| ---------- | ------------------------------- | --------------------------------------------- |
 | 2026-02-12 | Created from PR #10 code review | Security H3, C3; comment-analyzer observation |
 
 ## Resources
 
 - PR: #10
-- Agent workflow security patterns: `docs/solutions/security-issues/agent-workflow-security-patterns.md`
+- Agent workflow security patterns:
+  `docs/solutions/security-issues/agent-workflow-security-patterns.md`

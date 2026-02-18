@@ -1,6 +1,8 @@
 # Command Preflight Template
 
-Add these checks to commands that modify state (create branches, commits, PRs, etc.). Only include checks relevant to your command — don't add unnecessary validation.
+Add these checks to commands that modify state (create branches, commits, PRs,
+etc.). Only include checks relevant to your command — don't add unnecessary
+validation.
 
 ## Template
 
@@ -40,13 +42,13 @@ esac
 
 ## Which Checks to Include
 
-| Command Type | Git Repo | Commands | Clean Tree | Branch Check |
-|-------------|----------|----------|-----------|-------------|
-| Read-only (status, search) | Yes | Minimal | No | No |
-| Creates branches/commits | Yes | git, gt | Yes | Yes |
-| Creates PRs | Yes | git, gt, gh | Yes | Yes |
-| API calls (curl) | No | curl, jq | No | No |
-| MCP operations | No | None | No | No |
+| Command Type               | Git Repo | Commands    | Clean Tree | Branch Check |
+| -------------------------- | -------- | ----------- | ---------- | ------------ |
+| Read-only (status, search) | Yes      | Minimal     | No         | No           |
+| Creates branches/commits   | Yes      | git, gt     | Yes        | Yes          |
+| Creates PRs                | Yes      | git, gt, gh | Yes        | Yes          |
+| API calls (curl)           | No       | curl, jq    | No         | No           |
+| MCP operations             | No       | None        | No         | No           |
 
 ## Guidelines
 

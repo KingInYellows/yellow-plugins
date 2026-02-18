@@ -1,17 +1,23 @@
 ---
 name: git-worktree
-description: Git worktree management for isolated parallel development. Use when reviewing PRs in isolation, working on multiple features simultaneously, or when workflows offer worktree option.
-argument-hint: "[create|list|switch|cleanup] <name>"
+description:
+  Git worktree management for isolated parallel development. Use when reviewing
+  PRs in isolation, working on multiple features simultaneously, or when
+  workflows offer worktree option.
+argument-hint: '[create|list|switch|cleanup] <name>'
 user-invokable: true
 ---
 
 # Git Worktree Manager
 
-Manage git worktrees for isolated parallel development with a simple, safe interface.
+Manage git worktrees for isolated parallel development with a simple, safe
+interface.
 
 ## What It Does
 
-Creates and manages git worktrees — separate working directories from the same repository that allow you to:
+Creates and manages git worktrees — separate working directories from the same
+repository that allow you to:
+
 - Work on multiple branches simultaneously without stashing
 - Review PRs in complete isolation from your current work
 - Test features without switching branches in your main working directory
@@ -22,6 +28,7 @@ Creates and manages git worktrees — separate working directories from the same
 **ALWAYS use the manager script. NEVER use raw `git worktree add` directly.**
 
 The manager script provides:
+
 - Automatic .env file copying
 - .gitignore management
 - Safety validations
@@ -47,6 +54,7 @@ worktree-manager.sh create <branch-name> [from-branch]
 ```
 
 **Behavior:**
+
 - Creates worktree in `.worktrees/<branch-name>/`
 - Branches from `main` by default (or specify `from-branch`)
 - Copies all `.env*` files from main repo
@@ -54,6 +62,7 @@ worktree-manager.sh create <branch-name> [from-branch]
 - Fails safely if worktree already exists
 
 **Examples:**
+
 ```bash
 # Create worktree for feature branch
 worktree-manager.sh create feature-auth
@@ -72,6 +81,7 @@ worktree-manager.sh ls
 ```
 
 **Output:**
+
 ```
 Worktrees:
   main            /home/user/repo (clean)
@@ -106,7 +116,8 @@ Copy .env files to a worktree:
 worktree-manager.sh copy-env <name>
 ```
 
-Copies all `.env*` files from main repo to specified worktree. Useful if you've updated environment configuration and need to sync.
+Copies all `.env*` files from main repo to specified worktree. Useful if you've
+updated environment configuration and need to sync.
 
 ### cleanup / clean
 
@@ -118,6 +129,7 @@ worktree-manager.sh clean
 ```
 
 **Behavior:**
+
 - Lists all worktrees
 - Prompts for confirmation
 - Removes worktrees one by one
@@ -272,11 +284,13 @@ See [troubleshooting.md](troubleshooting.md) for common issues and solutions.
 ## Reference
 
 **Git worktree documentation:**
+
 ```bash
 man git-worktree
 ```
 
 **Common git worktree commands:**
+
 ```bash
 git worktree list                    # List worktrees
 git worktree remove <path>           # Remove specific worktree

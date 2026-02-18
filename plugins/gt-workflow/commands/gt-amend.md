@@ -1,6 +1,8 @@
 ---
 name: gt-amend
-description: "Amend the current branch commit: audit changes, update the commit, and re-submit via Graphite"
+description:
+  'Amend the current branch commit: audit changes, update the commit, and
+  re-submit via Graphite'
 allowed-tools:
   - Bash
   - Read
@@ -12,11 +14,13 @@ allowed-tools:
 
 # Quick Amend
 
-A fast path for the most common solo-dev operation: auditing your latest fix and folding it into the current branch commit via `gt commit amend`.
+A fast path for the most common solo-dev operation: auditing your latest fix and
+folding it into the current branch commit via `gt commit amend`.
 
 ## Input
 
 Optional arguments:
+
 - `--no-verify` — Skip the audit and amend directly (use with caution)
 - `--no-submit` — Amend the commit locally but do not push to GitHub
 
@@ -24,7 +28,8 @@ Optional arguments:
 
 ## Phase 1: Understand Current State
 
-Run these commands to confirm there are changes to amend and that we are on a feature branch:
+Run these commands to confirm there are changes to amend and that we are on a
+feature branch:
 
 ```bash
 git status --short
@@ -35,8 +40,11 @@ gt log short
 ```
 
 **Guard checks:**
-- If there are **no uncommitted changes**, tell the user and exit — there is nothing to amend.
-- If the current branch **equals trunk**, warn the user: amending trunk is dangerous. Use `AskUserQuestion` to confirm before proceeding.
+
+- If there are **no uncommitted changes**, tell the user and exit — there is
+  nothing to amend.
+- If the current branch **equals trunk**, warn the user: amending trunk is
+  dangerous. Use `AskUserQuestion` to confirm before proceeding.
 
 ## Phase 2: Audit (skip if `--no-verify`)
 
@@ -50,12 +58,16 @@ Store this output as `$DIFF_OUTPUT` and pass it to each audit agent below.
 
 ### 1. Spawn Parallel Auditors
 
-Use the Task tool to launch all three agents in parallel in a **single message**:
+Use the Task tool to launch all three agents in parallel in a **single
+message**:
 
 **code-reviewer** (subagent_type: `general-purpose`):
-> Analyze the following diff for mock/stub code, unfinished TODOs, commented-out blocks, or obvious logic errors.
+
+> Analyze the following diff for mock/stub code, unfinished TODOs, commented-out
+> blocks, or obvious logic errors.
 >
 > Diff:
+>
 > ```
 > $DIFF_OUTPUT
 > ```
@@ -63,9 +75,12 @@ Use the Task tool to launch all three agents in parallel in a **single message**
 > Report file:line findings. If nothing found, say "CLEAN".
 
 **security-sentinel** (subagent_type: `general-purpose`):
-> Scan the following diff for hardcoded credentials, API keys, tokens, private keys, PII, or sensitive config files.
+
+> Scan the following diff for hardcoded credentials, API keys, tokens, private
+> keys, PII, or sensitive config files.
 >
 > Diff:
+>
 > ```
 > $DIFF_OUTPUT
 > ```
@@ -73,9 +88,12 @@ Use the Task tool to launch all three agents in parallel in a **single message**
 > Be extremely strict. Report file:line findings. If nothing found, say "CLEAN".
 
 **silent-failure-hunter** (subagent_type: `general-purpose`):
-> Analyze the following diff for empty catch blocks, swallowed errors, fallback values without logging, or missing error boundaries.
+
+> Analyze the following diff for empty catch blocks, swallowed errors, fallback
+> values without logging, or missing error boundaries.
 >
 > Diff:
+>
 > ```
 > $DIFF_OUTPUT
 > ```
@@ -87,6 +105,7 @@ Use the Task tool to launch all three agents in parallel in a **single message**
 Synthesize findings.
 
 **IF CRITICAL ISSUES**: Show them and ask via `AskUserQuestion`:
+
 - "Fix issues first (Recommended)"
 - "Amend anyway"
 - "Abort"
@@ -120,7 +139,8 @@ By default, keep the existing commit message (amend silently):
 gt commit amend --no-edit
 ```
 
-If the user wants to update the commit message too, ask via `AskUserQuestion`: "Update the commit message? (leave blank to keep current)". If they provide one:
+If the user wants to update the commit message too, ask via `AskUserQuestion`:
+"Update the commit message? (leave blank to keep current)". If they provide one:
 
 ```bash
 gt commit amend -m "<new message>"
@@ -142,6 +162,7 @@ gt pr
 ```
 
 Output a summary:
+
 - Branch amended
 - PR link (updated)
 - Stack visualization

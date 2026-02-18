@@ -1,16 +1,17 @@
 # Plugin Validation Guide
 
-**Version**: 1.0.0
-**Last Updated**: 2026-01-11
-**Schema Version**: plugin.schema.json v1.0.0
+**Version**: 1.0.0 **Last Updated**: 2026-01-11 **Schema Version**:
+plugin.schema.json v1.0.0
 
 ---
 
 ## Overview
 
-This guide explains how to validate Claude Code plugin manifests using the `validate-plugin.js` script and JSON Schema validation.
+This guide explains how to validate Claude Code plugin manifests using the
+`validate-plugin.js` script and JSON Schema validation.
 
 **Validation Ensures**:
+
 - Manifest complies with plugin.schema.json
 - All declared files actually exist
 - Lifecycle scripts are executable
@@ -49,6 +50,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 ### Expected Output
 
 **✅ Success**:
+
 ```
 🔍 Validating plugin: hookify
 
@@ -59,6 +61,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 ```
 
 **❌ Failure**:
+
 ```
 🔍 Validating plugin: broken-plugin
 
@@ -83,6 +86,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 **Check**: Manifest validates against plugin.schema.json
 
 **Required Fields**:
+
 - `name` (kebab-case, max 64 chars)
 - `version` (semver: MAJOR.MINOR.PATCH)
 - `description` (10-280 chars)
@@ -93,6 +97,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 - `docs.readme` (valid URI)
 
 **Example Error**:
+
 ```json
 {
   "rule": "SCHEMA_COMPLIANCE",
@@ -102,6 +107,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 ```
 
 **Fix**:
+
 ```json
 // ❌ Invalid
 "version": "1.2"
@@ -117,6 +123,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 **Check**: Plugin name must match directory name
 
 **Example Error**:
+
 ```json
 {
   "rule": "NAME_CONSISTENCY",
@@ -126,6 +133,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 ```
 
 **Fix**:
+
 ```bash
 # Option 1: Rename directory
 mv plugins/hookify-old plugins/hookify
@@ -141,6 +149,7 @@ mv plugins/hookify-old plugins/hookify
 **Check**: All declared entrypoint files must exist
 
 **Example Error**:
+
 ```json
 {
   "rule": "ENTRYPOINT_EXISTS",
@@ -150,6 +159,7 @@ mv plugins/hookify-old plugins/hookify
 ```
 
 **Fix**:
+
 ```bash
 # Option 1: Create missing file
 mkdir -p plugins/hookify/commands
@@ -166,6 +176,7 @@ touch plugins/hookify/commands/missing.md
 **Check**: All lifecycle scripts must exist and be executable
 
 **Example Error**:
+
 ```json
 {
   "rule": "LIFECYCLE_SCRIPT_NOT_EXECUTABLE",
@@ -175,6 +186,7 @@ touch plugins/hookify/commands/missing.md
 ```
 
 **Fix**:
+
 ```bash
 # Make script executable
 chmod +x plugins/hookify/scripts/install.sh
@@ -191,6 +203,7 @@ ls -la plugins/hookify/scripts/install.sh
 **Check**: Permissions should specify paths/domains/commands for transparency
 
 **Example Warning**:
+
 ```
 ⚠️  Permission Transparency Warnings:
    - Filesystem permission should specify paths for transparency (or omit for unrestricted)
@@ -198,6 +211,7 @@ ls -la plugins/hookify/scripts/install.sh
 ```
 
 **Fix (Optional)**:
+
 ```json
 // ❌ Unrestricted (works but less transparent)
 {
@@ -220,6 +234,7 @@ ls -la plugins/hookify/scripts/install.sh
 **Check**: nodeMin must be 18-24 (Claude Code does NOT support Node.js 25+)
 
 **Example Error**:
+
 ```json
 {
   "rule": "NODE_VERSION_RANGE",
@@ -229,6 +244,7 @@ ls -la plugins/hookify/scripts/install.sh
 ```
 
 **Fix**:
+
 ```json
 // ❌ Invalid
 "compatibility": {
@@ -248,6 +264,7 @@ ls -la plugins/hookify/scripts/install.sh
 **Check**: Display required plugin dependencies
 
 **Example Info**:
+
 ```
 ℹ️  Plugin Dependencies: base-tools, git-integration
    These plugins must be installed first. Installation will prompt if missing.
@@ -259,9 +276,11 @@ ls -la plugins/hookify/scripts/install.sh
 
 ### Rule 8: Description Quality
 
-**Check**: Description should be informative (not just plugin name, min 20 chars)
+**Check**: Description should be informative (not just plugin name, min 20
+chars)
 
 **Example Error**:
+
 ```json
 {
   "rule": "DESCRIPTION_QUALITY",
@@ -271,6 +290,7 @@ ls -la plugins/hookify/scripts/install.sh
 ```
 
 **Fix**:
+
 ```json
 // ❌ Invalid
 "description": "Hookify plugin"  // Too short, repeats name
@@ -286,6 +306,7 @@ ls -la plugins/hookify/scripts/install.sh
 **Check**: README URL returns 200 OK (network check, skippable)
 
 **Example Error**:
+
 ```json
 {
   "rule": "DOCUMENTATION_REACHABILITY",
@@ -295,6 +316,7 @@ ls -la plugins/hookify/scripts/install.sh
 ```
 
 **Fix**:
+
 ```bash
 # Verify URL in browser
 curl -I https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/README.md
@@ -303,6 +325,7 @@ curl -I https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify
 ```
 
 **Skip in CI**:
+
 ```bash
 node scripts/validate-plugin.js plugins/hookify --skip-network
 ```
@@ -314,6 +337,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 **Check**: Version must be valid semver (MAJOR.MINOR.PATCH)
 
 **Example Error**:
+
 ```json
 {
   "rule": "SEMANTIC_VERSION",
@@ -323,6 +347,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 ```
 
 **Fix**:
+
 ```json
 // ❌ Invalid
 "version": "1.2.x"
@@ -342,11 +367,13 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 **Check**: Repository and homepage should be on same domain
 
 **Example Warning**:
+
 ```
 ⚠️  Repository and homepage on different domains: github.com vs kingin-yellows.dev
 ```
 
 **Fix (Optional)**:
+
 ```json
 // Better: Both on same domain
 "repository": {
@@ -365,11 +392,13 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 **Check**: Keywords should not duplicate words from name/description
 
 **Example Warning**:
+
 ```
 ⚠️  Redundant keywords (already in name/description): hookify, unwanted
 ```
 
 **Fix (Optional)**:
+
 ```json
 // ❌ Redundant
 "name": "hookify",
@@ -450,10 +479,11 @@ echo "✅ All plugin manifests valid"
 **Cause**: Missing required field
 
 **Solution**:
+
 ```json
 {
-  "name": "my-plugin",  // Add this
-  "version": "1.0.0",
+  "name": "my-plugin", // Add this
+  "version": "1.0.0"
   // ...
 }
 ```
@@ -465,6 +495,7 @@ echo "✅ All plugin manifests valid"
 **Cause**: Plugin name contains uppercase, spaces, or special chars
 
 **Solution**:
+
 ```json
 // ❌ Invalid
 "name": "My Plugin!"
@@ -484,6 +515,7 @@ echo "✅ All plugin manifests valid"
 **Cause**: Entrypoints object is empty
 
 **Solution**:
+
 ```json
 // ❌ Invalid
 "entrypoints": {}
@@ -501,6 +533,7 @@ echo "✅ All plugin manifests valid"
 **Cause**: Description too short
 
 **Solution**:
+
 ```json
 // ❌ Invalid
 "description": "Plugin"  // Only 6 chars
@@ -516,6 +549,7 @@ echo "✅ All plugin manifests valid"
 **Cause**: Invalid email address
 
 **Solution**:
+
 ```json
 // ❌ Invalid
 "author": {
@@ -532,9 +566,11 @@ echo "✅ All plugin manifests valid"
 
 ### Error: "must be equal to one of the allowed values"
 
-**Cause**: Permission scope not in enum (filesystem, network, shell, env, claude-api)
+**Cause**: Permission scope not in enum (filesystem, network, shell, env,
+claude-api)
 
 **Solution**:
+
 ```json
 // ❌ Invalid
 {
@@ -590,7 +626,9 @@ async function customValidation(pluginDir) {
 
   // Example: Check changelog for version
   if (manifest.docs.changelog) {
-    const changelog = await fetch(manifest.docs.changelog).then(r => r.text());
+    const changelog = await fetch(manifest.docs.changelog).then((r) =>
+      r.text()
+    );
     if (!changelog.includes(manifest.version)) {
       console.warn(`⚠️  Changelog missing version ${manifest.version}`);
     }
@@ -607,7 +645,7 @@ const { validatePlugin } = require('./scripts/validate-plugin');
 
 // Validate in Node.js
 const result = await validatePlugin('plugins/hookify', {
-  skipNetwork: true  // Skip README URL check
+  skipNetwork: true, // Skip README URL check
 });
 
 if (result.valid) {
@@ -625,6 +663,7 @@ if (result.valid) {
 ### "Cannot find module 'ajv'"
 
 **Solution**:
+
 ```bash
 npm install -g ajv ajv-formats
 # Or in plugin directory
@@ -637,6 +676,7 @@ npm install --save-dev ajv ajv-formats
 ### "EACCES: permission denied"
 
 **Solution**:
+
 ```bash
 # Make validation script executable
 chmod +x scripts/validate-plugin.js
@@ -650,6 +690,7 @@ node scripts/validate-plugin.js plugins/hookify
 ### "plugin.json not found"
 
 **Solution**:
+
 ```bash
 # Check manifest location
 ls -la plugins/hookify/.claude-plugin/plugin.json
@@ -663,6 +704,7 @@ mkdir -p plugins/hookify/.claude-plugin
 ### Network timeout on README check
 
 **Solution**:
+
 ```bash
 # Skip network checks
 node scripts/validate-plugin.js plugins/hookify --skip-network
@@ -676,13 +718,14 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 
 ## Exit Codes
 
-| Code | Meaning | Description |
-|------|---------|-------------|
-| 0 | Success | Plugin manifest is valid |
-| 1 | Invalid | Validation errors (schema, business rules) |
-| 2 | Not Found | Manifest file not found or unreadable |
+| Code | Meaning   | Description                                |
+| ---- | --------- | ------------------------------------------ |
+| 0    | Success   | Plugin manifest is valid                   |
+| 1    | Invalid   | Validation errors (schema, business rules) |
+| 2    | Not Found | Manifest file not found or unreadable      |
 
 **Usage in Scripts**:
+
 ```bash
 node scripts/validate-plugin.js plugins/hookify
 if [ $? -eq 0 ]; then

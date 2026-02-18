@@ -1,24 +1,25 @@
 # Registry Format Specification
 
-**Version:** 1.0
-**Last Updated:** 2026-01-11
-**Task Reference:** I2.T2 - Cache manager + registry persistence
-**Schema:** `.claude-plugin/registry.schema.json`
+**Version:** 1.0 **Last Updated:** 2026-01-11 **Task Reference:** I2.T2 - Cache
+manager + registry persistence **Schema:** `.claude-plugin/registry.schema.json`
 
 ---
 
 ## Overview
 
-The plugin registry (``.claude-plugin/registry.json``) is the **single source of truth** for tracking locally installed plugins. It records installation state, cache locations, transaction IDs, telemetry snapshots, and lifecycle consent references.
+The plugin registry (`.claude-plugin/registry.json`) is the **single source of
+truth** for tracking locally installed plugins. It records installation state,
+cache locations, transaction IDs, telemetry snapshots, and lifecycle consent
+references.
 
-The registry supports atomic updates, transaction tracing, rollback capabilities, and observability through structured telemetry.
+The registry supports atomic updates, transaction tracing, rollback
+capabilities, and observability through structured telemetry.
 
 ---
 
 ## File Location & Structure
 
-**Path:** `.claude-plugin/registry.json`
-**Format:** JSON (UTF-8 encoded)
+**Path:** `.claude-plugin/registry.json` **Format:** JSON (UTF-8 encoded)
 **Schema Version:** 1.0 (see `.claude-plugin/registry.schema.json`)
 
 ### Root Structure
@@ -40,15 +41,16 @@ The registry supports atomic updates, transaction tracing, rollback capabilities
 
 Registry metadata for versioning, integrity validation, and migration support.
 
-| Field | Type | Required | Description | Constraints |
-|-------|------|----------|-------------|-------------|
-| `registryVersion` | string | ✓ | Schema version for migration | Pattern: `^\d+\.\d+$` (e.g., "1.0") |
-| `lastUpdated` | string | ✓ | ISO 8601 timestamp of last modification | Format: `date-time` |
-| `modifiedBy` | string | | CLI version that last modified registry | Pattern: `^\d+\.\d+\.\d+$` (semver) |
-| `totalInstallations` | integer | ✓ | Total plugin count (matches `plugins.length`) | Min: 0 |
-| `checksum` | string | | SHA-256 checksum of registry file | Pattern: `^[a-f0-9]{64}$` |
+| Field                | Type    | Required | Description                                   | Constraints                         |
+| -------------------- | ------- | -------- | --------------------------------------------- | ----------------------------------- |
+| `registryVersion`    | string  | ✓        | Schema version for migration                  | Pattern: `^\d+\.\d+$` (e.g., "1.0") |
+| `lastUpdated`        | string  | ✓        | ISO 8601 timestamp of last modification       | Format: `date-time`                 |
+| `modifiedBy`         | string  |          | CLI version that last modified registry       | Pattern: `^\d+\.\d+\.\d+$` (semver) |
+| `totalInstallations` | integer | ✓        | Total plugin count (matches `plugins.length`) | Min: 0                              |
+| `checksum`           | string  |          | SHA-256 checksum of registry file             | Pattern: `^[a-f0-9]{64}$`           |
 
 **Example:**
+
 ```json
 {
   "metadata": {
@@ -65,23 +67,24 @@ Registry metadata for versioning, integrity validation, and migration support.
 
 ### 2. `plugins` (Required)
 
-Array of installed plugin records. Each entry tracks installation state, cache location, and metadata.
+Array of installed plugin records. Each entry tracks installation state, cache
+location, and metadata.
 
-| Field | Type | Required | Description | Constraints |
-|-------|------|----------|-------------|-------------|
-| `pluginId` | string | ✓ | Unique plugin identifier | Pattern: `^[a-z0-9-]+$`, Max: 64 chars |
-| `version` | string | ✓ | Installed semantic version | Pattern: `^\d+\.\d+\.\d+$` |
-| `source` | string | ✓ | Source URI/path | Max: 500 chars |
-| `installState` | enum | ✓ | Current state | Values: `STAGING`, `INSTALLED`, `FAILED`, `UNINSTALLING`, `DISABLED` |
-| `installedAt` | string | ✓ | Installation timestamp | Format: `date-time` (ISO 8601) |
-| `cachePath` | string | ✓ | Absolute path to cached artifacts | Max: 500 chars |
-| `symlinkTarget` | string | | Symlink target for active installation | Max: 500 chars |
-| `lastValidatedAt` | string | | Last integrity check timestamp | Format: `date-time` |
-| `transactionId` | string | ✓ | Transaction ID for tracing | Pattern: `^tx-`, Max: 64 chars |
-| `pinned` | boolean | | Whether version is pinned | Defaults to `false` |
-| `telemetryRef` | string | | Reference to telemetry snapshot | Pattern: `^tel-` |
-| `lifecycleConsentRefs` | string[] | | Array of consented script digests | Each: SHA-256 hex (64 chars) |
-| `errorDetails` | object | | Error details if installation failed | See below |
+| Field                  | Type     | Required | Description                            | Constraints                                                          |
+| ---------------------- | -------- | -------- | -------------------------------------- | -------------------------------------------------------------------- |
+| `pluginId`             | string   | ✓        | Unique plugin identifier               | Pattern: `^[a-z0-9-]+$`, Max: 64 chars                               |
+| `version`              | string   | ✓        | Installed semantic version             | Pattern: `^\d+\.\d+\.\d+$`                                           |
+| `source`               | string   | ✓        | Source URI/path                        | Max: 500 chars                                                       |
+| `installState`         | enum     | ✓        | Current state                          | Values: `STAGING`, `INSTALLED`, `FAILED`, `UNINSTALLING`, `DISABLED` |
+| `installedAt`          | string   | ✓        | Installation timestamp                 | Format: `date-time` (ISO 8601)                                       |
+| `cachePath`            | string   | ✓        | Absolute path to cached artifacts      | Max: 500 chars                                                       |
+| `symlinkTarget`        | string   |          | Symlink target for active installation | Max: 500 chars                                                       |
+| `lastValidatedAt`      | string   |          | Last integrity check timestamp         | Format: `date-time`                                                  |
+| `transactionId`        | string   | ✓        | Transaction ID for tracing             | Pattern: `^tx-`, Max: 64 chars                                       |
+| `pinned`               | boolean  |          | Whether version is pinned              | Defaults to `false`                                                  |
+| `telemetryRef`         | string   |          | Reference to telemetry snapshot        | Pattern: `^tel-`                                                     |
+| `lifecycleConsentRefs` | string[] |          | Array of consented script digests      | Each: SHA-256 hex (64 chars)                                         |
+| `errorDetails`         | object   |          | Error details if installation failed   | See below                                                            |
 
 #### `installState` Values
 
@@ -93,13 +96,14 @@ Array of installed plugin records. Each entry tracks installation state, cache l
 
 #### `errorDetails` (Optional, only when `installState` is `FAILED`)
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `code` | string | ✓ | Error code (e.g., `DOWNLOAD_FAILED`) |
-| `message` | string | ✓ | Human-readable error message |
-| `failedAt` | string | ✓ | ISO 8601 timestamp of failure |
+| Field      | Type   | Required | Description                          |
+| ---------- | ------ | -------- | ------------------------------------ |
+| `code`     | string | ✓        | Error code (e.g., `DOWNLOAD_FAILED`) |
+| `message`  | string | ✓        | Human-readable error message         |
+| `failedAt` | string | ✓        | ISO 8601 timestamp of failure        |
 
 **Example Plugin Entry:**
+
 ```json
 {
   "pluginId": "hookify",
@@ -123,15 +127,17 @@ Array of installed plugin records. Each entry tracks installation state, cache l
 
 ### 3. `activePins` (Required)
 
-Array of plugin IDs that are pinned (protected from cache eviction). Pinned plugins have higher priority during eviction decisions.
+Array of plugin IDs that are pinned (protected from cache eviction). Pinned
+plugins have higher priority during eviction decisions.
 
-**Type:** `string[]`
-**Constraints:**
+**Type:** `string[]` **Constraints:**
+
 - Each string must match pattern: `^[a-z0-9-]+$`
 - Must reference existing `plugins[].pluginId`
 - No duplicates (enforced by schema `uniqueItems`)
 
 **Example:**
+
 ```json
 {
   "activePins": ["hookify", "pr-review-toolkit"]
@@ -142,24 +148,26 @@ Array of plugin IDs that are pinned (protected from cache eviction). Pinned plug
 
 ### 4. `telemetry` (Optional)
 
-Object containing telemetry snapshots keyed by telemetry ID. Captures operation metrics for observability.
+Object containing telemetry snapshots keyed by telemetry ID. Captures operation
+metrics for observability.
 
 **Structure:** `Record<string, TelemetrySnapshot>`
 
 #### `TelemetrySnapshot` Fields
 
-| Field | Type | Required | Description | Constraints |
-|-------|------|----------|-------------|-------------|
-| `id` | string | ✓ | Unique telemetry ID | Pattern: `^tel-`, Max: 64 chars |
-| `transactionId` | string | ✓ | Associated transaction ID | Pattern: `^tx-` |
-| `commandType` | enum | ✓ | CLI command type | Values: `install`, `uninstall`, `update`, `rollback`, `validate`, `list`, `search`, `pin`, `unpin` |
-| `durationMs` | integer | ✓ | Operation duration | Min: 0 |
-| `success` | boolean | ✓ | Whether operation succeeded | |
-| `errorCode` | string | | Error code if failed | Max: 50 chars |
-| `capturedAt` | string | ✓ | Snapshot timestamp | Format: `date-time` |
-| `context` | object | | Additional metadata | Free-form object |
+| Field           | Type    | Required | Description                 | Constraints                                                                                        |
+| --------------- | ------- | -------- | --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `id`            | string  | ✓        | Unique telemetry ID         | Pattern: `^tel-`, Max: 64 chars                                                                    |
+| `transactionId` | string  | ✓        | Associated transaction ID   | Pattern: `^tx-`                                                                                    |
+| `commandType`   | enum    | ✓        | CLI command type            | Values: `install`, `uninstall`, `update`, `rollback`, `validate`, `list`, `search`, `pin`, `unpin` |
+| `durationMs`    | integer | ✓        | Operation duration          | Min: 0                                                                                             |
+| `success`       | boolean | ✓        | Whether operation succeeded |                                                                                                    |
+| `errorCode`     | string  |          | Error code if failed        | Max: 50 chars                                                                                      |
+| `capturedAt`    | string  | ✓        | Snapshot timestamp          | Format: `date-time`                                                                                |
+| `context`       | object  |          | Additional metadata         | Free-form object                                                                                   |
 
 **Example:**
+
 ```json
 {
   "telemetry": {
@@ -184,7 +192,8 @@ Object containing telemetry snapshots keyed by telemetry ID. Captures operation 
 
 ## Atomic Write Semantics
 
-The registry **MUST** be updated atomically to prevent corruption from crashes or interrupts.
+The registry **MUST** be updated atomically to prevent corruption from crashes
+or interrupts.
 
 ### Atomic Write Protocol
 
@@ -198,9 +207,11 @@ The registry **MUST** be updated atomically to prevent corruption from crashes o
 
 - **Corrupted registry detected:** Restore from most recent backup in `backups/`
 - **Missing registry:** Rebuild from cache directory scan
-- **Validation errors:** Log warnings, attempt partial recovery, or fail gracefully
+- **Validation errors:** Log warnings, attempt partial recovery, or fail
+  gracefully
 
-**Architecture Reference:** [Section 3.4: Data Persistence & Cache Layout](#references)
+**Architecture Reference:**
+[Section 3.4: Data Persistence & Cache Layout](#references)
 
 ---
 
@@ -208,20 +219,26 @@ The registry **MUST** be updated atomically to prevent corruption from crashes o
 
 ### Cache Eviction Rules
 
-1. **Pinned protection:** Plugins in `activePins` are **never evicted** from cache
+1. **Pinned protection:** Plugins in `activePins` are **never evicted** from
+   cache
 2. **Current version protection:** The active installed version is protected
 3. **Version retention:** Keep last **3 versions** per plugin (configurable)
-4. **LRU eviction:** When cache exceeds 500 MB, evict oldest-accessed non-protected versions
-5. **Eviction logging:** Record all evictions in cache index for rollback guidance
+4. **LRU eviction:** When cache exceeds 500 MB, evict oldest-accessed
+   non-protected versions
+5. **Eviction logging:** Record all evictions in cache index for rollback
+   guidance
 
 ### Rollback Support
 
-- **Transaction IDs:** Enable tracing and linking registry changes to cache operations
+- **Transaction IDs:** Enable tracing and linking registry changes to cache
+  operations
 - **Symlink preservation:** Before updates, record previous symlink target
 - **Backup registry:** Create timestamped backup before destructive operations
-- **Recovery guidance:** If evicted version needed, instruct user to re-fetch from git
+- **Recovery guidance:** If evicted version needed, instruct user to re-fetch
+  from git
 
-**Functional Requirements:** CRIT-002 (eviction policy), CRIT-004 (rollback), CRIT-018 (atomic persistence)
+**Functional Requirements:** CRIT-002 (eviction policy), CRIT-004 (rollback),
+CRIT-018 (atomic persistence)
 
 ---
 
@@ -229,12 +246,14 @@ The registry **MUST** be updated atomically to prevent corruption from crashes o
 
 ### Schema Validation
 
-All registry updates **MUST** be validated against `.claude-plugin/registry.schema.json` using AJV (JSON Schema Draft-07).
+All registry updates **MUST** be validated against
+`.claude-plugin/registry.schema.json` using AJV (JSON Schema Draft-07).
 
 ### Integrity Checks
 
 1. **Checksum validation:** Compare `metadata.checksum` with computed SHA-256
-2. **Cache path existence:** Verify `plugins[].cachePath` exists for `INSTALLED` state
+2. **Cache path existence:** Verify `plugins[].cachePath` exists for `INSTALLED`
+   state
 3. **Pin consistency:** Ensure `activePins` references exist in `plugins[]`
 4. **Transaction ID format:** Validate `tx-` prefix and uniqueness
 5. **Date ordering:** `installedAt` should be ≤ `lastValidatedAt`
@@ -249,14 +268,14 @@ All registry updates **MUST** be validated against `.claude-plugin/registry.sche
 
 ## Size Limits & Constraints
 
-| Resource | Limit | Rationale |
-|----------|-------|-----------|
-| Registry file size | 10 MB (soft limit) | >1000 plugins would exceed, trigger warning |
-| Plugin ID length | 64 chars | Matches marketplace schema |
-| Source URI length | 500 chars | Accommodate long git URLs |
-| Cache path length | 500 chars | Filesystem path limits |
-| Error message length | 500 chars | Balance detail vs bloat |
-| Telemetry snapshots | 100 (rolling) | Keep recent history, prevent unbounded growth |
+| Resource             | Limit              | Rationale                                     |
+| -------------------- | ------------------ | --------------------------------------------- |
+| Registry file size   | 10 MB (soft limit) | >1000 plugins would exceed, trigger warning   |
+| Plugin ID length     | 64 chars           | Matches marketplace schema                    |
+| Source URI length    | 500 chars          | Accommodate long git URLs                     |
+| Cache path length    | 500 chars          | Filesystem path limits                        |
+| Error message length | 500 chars          | Balance detail vs bloat                       |
+| Telemetry snapshots  | 100 (rolling)      | Keep recent history, prevent unbounded growth |
 
 ---
 
@@ -264,13 +283,15 @@ All registry updates **MUST** be validated against `.claude-plugin/registry.sche
 
 When registry schema evolves (e.g., `1.0` → `1.1`):
 
-1. **Detect version mismatch:** Compare file `registryVersion` to expected schema
+1. **Detect version mismatch:** Compare file `registryVersion` to expected
+   schema
 2. **Run migration script:** Transform old format to new format
 3. **Update metadata:** Set `registryVersion` to new version
 4. **Log migration:** Record in telemetry for auditing
 5. **Keep backup:** Preserve pre-migration registry in `backups/`
 
 **Migration triggers:**
+
 - CLI detects lower `registryVersion` on load
 - User runs explicit `claude-plugin migrate` command (future)
 
@@ -327,8 +348,6 @@ When registry schema evolves (e.g., `1.0` → `1.1`):
 
 ## References
 
-- **Specification:** `docs/SPECIFICATION.md` (Section 3.4: Data Persistence)
-- **Architecture:** `.codemachine/artifacts/architecture/04_Operational_Architecture.md`
 - **ERD:** `docs/diagrams/data-erd.puml` (InstalledPluginRegistry entity)
 - **Schema:** `.claude-plugin/registry.schema.json`
 - **Functional Requirements:**

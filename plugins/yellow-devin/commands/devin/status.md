@@ -1,9 +1,9 @@
 ---
 name: devin:status
 description: >
-  Check status of Devin sessions. Use when user asks "how's Devin doing",
-  "check Devin status", "is my task done", or "what's the progress".
-argument-hint: "[session-id]"
+  Check status of Devin sessions. Use when user asks "how's Devin doing", "check
+  Devin status", "is my task done", or "what's the progress".
+argument-hint: '[session-id]'
 allowed-tools:
   - Bash
   - Skill
@@ -17,7 +17,8 @@ Show status and progress for a specific session or list recent sessions.
 
 ### Step 1: Validate Prerequisites
 
-Validate `DEVIN_API_TOKEN` is set and matches format. See `devin-workflows` skill for validation.
+Validate `DEVIN_API_TOKEN` is set and matches format. See `devin-workflows`
+skill for validation.
 
 Check `jq` is available (see `devin-workflows` skill for details), for example:
 
@@ -31,7 +32,10 @@ command -v jq >/dev/null || {
 ### Step 2: Determine Mode
 
 Parse `$ARGUMENTS`:
-- **If a session ID is provided:** Use the `validate_session_id` helper from the `devin-workflows` skill to validate the session ID before fetching that specific session.
+
+- **If a session ID is provided:** Use the `validate_session_id` helper from the
+  `devin-workflows` skill to validate the session ID before fetching that
+  specific session.
 - **If empty:** List recent sessions.
 
 ### Step 3a: Single Session Status
@@ -46,6 +50,7 @@ curl -s --connect-timeout 5 --max-time 10 \
 Check curl exit code, HTTP status, jq parse — see `devin-workflows` skill.
 
 Display:
+
 - **Session ID**
 - **Status** (with human-readable meaning from session status table in skill)
 - **Devin URL** (clickable link)
@@ -54,7 +59,9 @@ Display:
 - **Structured output** (if `structured_output` is present, format as JSON)
 
 Special handling:
-- If status is `blocked` — highlight and suggest `/devin:message {id}` to unblock
+
+- If status is `blocked` — highlight and suggest `/devin:message {id}` to
+  unblock
 - If status is `failed` — show error info and suggest remediation
 - If status is `finished` — show completion summary and any artifacts
 
@@ -70,6 +77,7 @@ curl -s --connect-timeout 5 --max-time 10 \
 Check curl exit code, HTTP status, jq parse.
 
 Display a compact table:
+
 ```
 Session ID    | Status   | Created         | PR
 ses_abc123... | running  | 2 hours ago     | —

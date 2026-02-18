@@ -20,7 +20,7 @@ export enum ValidationStatus {
  * Error severity levels
  */
 export enum ErrorSeverity {
-  ERROR = 'ERROR',     // Blocking validation error
+  ERROR = 'ERROR', // Blocking validation error
   WARNING = 'WARNING', // Non-blocking warning
 }
 
@@ -107,7 +107,10 @@ export interface IValidator {
    * @param pluginId - Optional plugin ID for enhanced error messages
    * @returns Validation result with detailed errors
    */
-  validatePluginManifest(data: unknown, pluginId?: string): DomainValidationResult;
+  validatePluginManifest(
+    data: unknown,
+    pluginId?: string
+  ): DomainValidationResult;
 
   /**
    * Validate plugin compatibility with current environment

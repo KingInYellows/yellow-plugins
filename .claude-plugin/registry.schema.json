@@ -183,14 +183,7 @@
     },
     "TelemetrySnapshot": {
       "type": "object",
-      "required": [
-        "id",
-        "transactionId",
-        "commandType",
-        "durationMs",
-        "success",
-        "capturedAt"
-      ],
+      "required": ["id", "transactionId", "commandType", "durationMs", "success", "capturedAt"],
       "additionalProperties": false,
       "properties": {
         "id": {

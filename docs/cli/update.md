@@ -1,8 +1,7 @@
 # Update Command
 
-**Command**: `update`
-**Aliases**: `up`, `upgrade`
-**Description**: Update installed plugins to latest versions
+**Command**: `update` **Aliases**: `up`, `upgrade` **Description**: Update
+installed plugins to latest versions
 
 ---
 
@@ -57,22 +56,23 @@
 plugin update [plugin-id] [options]
 ```
 
-Update one or all installed plugins to their latest compatible versions, with changelog awareness and pin management.
+Update one or all installed plugins to their latest compatible versions, with
+changelog awareness and pin management.
 
 ---
 
 ## Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `[plugin-id]` | string | - | Specific plugin to update (omit for `--all` mode) |
-| `--all` | boolean | `false` | Update all installed plugins |
-| `--check-only` | boolean | `false` | Check for updates without installing |
-| `--skip-changelog` | boolean | `false` | Skip fetching changelogs (faster updates) |
-| `--force` | boolean | `false` | Force update even if pinned |
-| `--dry-run` | boolean | `false` | Simulate update without making changes |
-| `--json` | boolean | `false` | Output results in JSON format |
-| `--non-interactive` | boolean | `false` | No prompts; read from environment/flags |
+| Option              | Type    | Default | Description                                       |
+| ------------------- | ------- | ------- | ------------------------------------------------- |
+| `[plugin-id]`       | string  | -       | Specific plugin to update (omit for `--all` mode) |
+| `--all`             | boolean | `false` | Update all installed plugins                      |
+| `--check-only`      | boolean | `false` | Check for updates without installing              |
+| `--skip-changelog`  | boolean | `false` | Skip fetching changelogs (faster updates)         |
+| `--force`           | boolean | `false` | Force update even if pinned                       |
+| `--dry-run`         | boolean | `false` | Simulate update without making changes            |
+| `--json`            | boolean | `false` | Output results in JSON format                     |
+| `--non-interactive` | boolean | `false` | No prompts; read from environment/flags           |
 
 ---
 
@@ -87,6 +87,7 @@ plugin update example-plugin
 ```
 
 **Output**:
+
 ```
 ⠋ Checking for updates to example-plugin...
 ℹ Current version: 1.2.3
@@ -137,6 +138,7 @@ plugin update --all
 ```
 
 **Output**:
+
 ```
 ⠋ Checking for updates to 5 installed plugins...
 
@@ -189,6 +191,7 @@ plugin update --all --check-only
 ```
 
 **Output**:
+
 ```
 ⠋ Checking for updates to 5 installed plugins...
 ✔ Check complete (1.2s)
@@ -224,6 +227,7 @@ plugin update pinned-plugin
 ```
 
 **Output**:
+
 ```
 ✖ Cannot update pinned-plugin: Plugin is pinned to version 1.0.0
 
@@ -245,6 +249,7 @@ plugin update pinned-plugin --force
 ```
 
 **Output**:
+
 ```
 ⚠ WARNING: Forcing update of pinned plugin
 
@@ -271,6 +276,7 @@ plugin update example-plugin --skip-changelog
 ```
 
 **Output**:
+
 ```
 ⠋ Checking for updates to example-plugin...
 ℹ Current version: 1.2.3
@@ -294,6 +300,7 @@ plugin update --all --dry-run
 ```
 
 **Output**:
+
 ```
 ⠋ Dry run: Simulating update (no changes will be made)
 
@@ -318,6 +325,7 @@ plugin update --all --check-only --json
 ```
 
 **Output**:
+
 ```json
 {
   "success": true,
@@ -360,7 +368,8 @@ plugin update --all --check-only --json
 
 <!-- anchor: changelog-awareness -->
 
-The `update` command fetches and displays changelogs to help you make informed update decisions.
+The `update` command fetches and displays changelogs to help you make informed
+update decisions.
 
 ### Changelog Fetch Process
 
@@ -371,23 +380,23 @@ The `update` command fetches and displays changelogs to help you make informed u
 
 ### Changelog Status Indicators
 
-| Status | Description | Output |
-|--------|-------------|--------|
-| `success` | Changelog fetched and parsed | ✔ Changelog retrieved |
-| `cached` | Using previously fetched changelog | ✔ Changelog (cached) |
-| `not-provided` | Plugin manifest doesn't specify changelog | ℹ No changelog available |
-| `timeout` | Fetch exceeded 15-second timeout | ⚠ Changelog fetch timed out |
-| `not-found` | Changelog URL returned 404 | ⚠ Changelog not found |
-| `server-error` | Remote server error (5xx) | ⚠ Changelog server error |
-| `network-error` | Network connectivity issue | ⚠ Network error fetching changelog |
+| Status          | Description                               | Output                             |
+| --------------- | ----------------------------------------- | ---------------------------------- |
+| `success`       | Changelog fetched and parsed              | ✔ Changelog retrieved              |
+| `cached`        | Using previously fetched changelog        | ✔ Changelog (cached)               |
+| `not-provided`  | Plugin manifest doesn't specify changelog | ℹ No changelog available           |
+| `timeout`       | Fetch exceeded 15-second timeout          | ⚠ Changelog fetch timed out        |
+| `not-found`     | Changelog URL returned 404                | ⚠ Changelog not found              |
+| `server-error`  | Remote server error (5xx)                 | ⚠ Changelog server error           |
+| `network-error` | Network connectivity issue                | ⚠ Network error fetching changelog |
 
 ### Changelog Caching
 
 Fetched changelogs are cached to improve performance:
 
-* **Cache Location**: `.claude-plugin/cache/changelogs/<plugin-id>-<version>.md`
-* **Cache TTL**: 7 days
-* **Cache Key**: `${pluginId}@${fromVersion}→${toVersion}`
+- **Cache Location**: `.claude-plugin/cache/changelogs/<plugin-id>-<version>.md`
+- **Cache TTL**: 7 days
+- **Cache Key**: `${pluginId}@${fromVersion}→${toVersion}`
 
 ### Changelog Fallback Behavior
 
@@ -408,11 +417,13 @@ Continue with update? [yes/no]:
 
 Use `--skip-changelog` to bypass changelog fetching:
 
-* **Performance**: Reduces update time by ~1-2 seconds per plugin
-* **Use Cases**: CI/CD automation, bulk updates, known-safe updates
-* **Trade-off**: Miss important breaking change notices
+- **Performance**: Reduces update time by ~1-2 seconds per plugin
+- **Use Cases**: CI/CD automation, bulk updates, known-safe updates
+- **Trade-off**: Miss important breaking change notices
 
-**Specification References**: [FR-002](../SPECIFICATION.md#fr-002), [Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation), [Iteration 3 Risks & Mitigations](../plan/02_Iteration_I3.md#iteration-3-validation)
+**Specification References**: FR-002,
+[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation),
+[Iteration 3 Risks & Mitigations](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
 
@@ -424,9 +435,9 @@ The `update` command respects plugin pins to prevent unintended updates.
 
 ### Pin Behavior
 
-* **Pinned plugins skipped**: Update commands skip pinned plugins by default
-* **Explicit notification**: CLI notifies when plugins are skipped due to pins
-* **Force override**: Use `--force` to update pinned plugins (removes pin)
+- **Pinned plugins skipped**: Update commands skip pinned plugins by default
+- **Explicit notification**: CLI notifies when plugins are skipped due to pins
+- **Force override**: Use `--force` to update pinned plugins (removes pin)
 
 ### Pin Status in Output
 
@@ -441,6 +452,7 @@ Pinned (Skipped):
 To update a pinned plugin:
 
 1. **Unpin first** (recommended):
+
    ```bash
    plugin pin important-plugin --unpin
    plugin update important-plugin
@@ -452,11 +464,14 @@ To update a pinned plugin:
    ```
 
 After force update, plugin is no longer pinned. Re-pin with:
+
 ```bash
 plugin pin important-plugin
 ```
 
-**Specification References**: [FR-008](../SPECIFICATION.md#fr-008), [CRIT-008](../SPECIFICATION.md#crit-008), [Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)
+**Specification References**: FR-008,
+CRIT-008,
+[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
 
@@ -464,7 +479,8 @@ plugin pin important-plugin
 
 <!-- anchor: breaking-changes -->
 
-The CLI automatically detects major version updates and warns about potential breaking changes.
+The CLI automatically detects major version updates and warns about potential
+breaking changes.
 
 ### Major Version Detection
 
@@ -488,9 +504,9 @@ Continue with update? [yes/no]:
 
 Plugins following best practices include migration guides:
 
-* `BREAKING.md`: Breaking changes by version
-* `MIGRATION.md`: Step-by-step migration instructions
-* `CHANGELOG.md`: Detailed version history
+- `BREAKING.md`: Breaking changes by version
+- `MIGRATION.md`: Step-by-step migration instructions
+- `CHANGELOG.md`: Detailed version history
 
 The CLI attempts to extract and display relevant migration guidance.
 
@@ -512,17 +528,17 @@ See [`rollback` command documentation](./rollback.md) for details.
 
 ### Performance Targets
 
-* **Single plugin update**: < 10 seconds (including changelog fetch)
-* **`--all` with 10 plugins**: < 30 seconds (parallel where possible)
-* **`--check-only`**: < 5 seconds per 10 plugins
+- **Single plugin update**: < 10 seconds (including changelog fetch)
+- **`--all` with 10 plugins**: < 30 seconds (parallel where possible)
+- **`--check-only`**: < 5 seconds per 10 plugins
 
 ### Timeout Settings
 
-| Operation | Timeout | Behavior on Timeout |
-|-----------|---------|---------------------|
-| Changelog fetch | 15 seconds | Continue update with warning |
-| Metadata fetch | 10 seconds | Fail with error |
-| Download | 60 seconds | Fail with error, suggest retry |
+| Operation        | Timeout     | Behavior on Timeout             |
+| ---------------- | ----------- | ------------------------------- |
+| Changelog fetch  | 15 seconds  | Continue update with warning    |
+| Metadata fetch   | 10 seconds  | Fail with error                 |
+| Download         | 60 seconds  | Fail with error, suggest retry  |
 | Lifecycle script | 120 seconds | Fail with error, offer rollback |
 
 ### Exponential Backoff
@@ -538,9 +554,9 @@ Network failures trigger exponential backoff retry:
 
 `update --all` processes plugins in parallel where possible:
 
-* **Max concurrent updates**: 3 plugins
-* **Lifecycle scripts**: Run sequentially per plugin
-* **Changelog fetches**: Run in parallel (separate pool)
+- **Max concurrent updates**: 3 plugins
+- **Lifecycle scripts**: Run sequentially per plugin
+- **Changelog fetches**: Run in parallel (separate pool)
 
 ---
 
@@ -548,12 +564,12 @@ Network failures trigger exponential backoff retry:
 
 <!-- anchor: feature-flags -->
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `enableUpdate` | boolean | `true` | Enable update functionality |
-| `enableChangelogFetch` | boolean | `true` | Allow changelog fetching |
-| `strictCompatibility` | boolean | `true` | Enforce compatibility checks |
-| `parallelUpdates` | boolean | `true` | Process multiple updates concurrently |
+| Flag                   | Type    | Default | Description                           |
+| ---------------------- | ------- | ------- | ------------------------------------- |
+| `enableUpdate`         | boolean | `true`  | Enable update functionality           |
+| `enableChangelogFetch` | boolean | `true`  | Allow changelog fetching              |
+| `strictCompatibility`  | boolean | `true`  | Enforce compatibility checks          |
+| `parallelUpdates`      | boolean | `true`  | Process multiple updates concurrently |
 
 Configure in `.claude-plugin/flags.json`:
 
@@ -566,7 +582,9 @@ Configure in `.claude-plugin/flags.json`:
 }
 ```
 
-**Specification Reference**: [Feature Flag Governance](../operations/feature-flags.md), [CRIT-004](../SPECIFICATION.md#crit-004)
+**Specification Reference**:
+[Feature Flag Governance](../operations/feature-flags.md),
+CRIT-004
 
 ---
 
@@ -574,16 +592,16 @@ Configure in `.claude-plugin/flags.json`:
 
 <!-- anchor: error-codes -->
 
-| Code | Severity | Description | Resolution |
-|------|----------|-------------|------------|
-| `ERR-UPDATE-001` | ERROR | Plugin not installed | Install plugin first: `plugin install <plugin-id>` |
-| `ERR-UPDATE-002` | ERROR | No update available | Plugin already at latest version |
-| `ERR-UPDATE-003` | ERROR | Compatibility check failed | Review compatibility requirements in error message |
-| `ERR-UPDATE-004` | ERROR | Download failed | Check network; retry with `plugin update <plugin-id>` |
-| `ERR-UPDATE-005` | ERROR | Lifecycle script failed | Review script output; consider `--skip-lifecycle` or rollback |
-| `ERR-UPDATE-006` | WARNING | Plugin pinned | Unpin with `plugin pin <plugin-id> --unpin` or use `--force` |
-| `ERR-UPDATE-007` | WARNING | Changelog fetch failed | Update proceeds; view changelog manually |
-| `ERR-UPDATE-008` | ERROR | Metadata fetch failed | Check network; verify plugin exists in marketplace |
+| Code             | Severity | Description                | Resolution                                                    |
+| ---------------- | -------- | -------------------------- | ------------------------------------------------------------- |
+| `ERR-UPDATE-001` | ERROR    | Plugin not installed       | Install plugin first: `plugin install <plugin-id>`            |
+| `ERR-UPDATE-002` | ERROR    | No update available        | Plugin already at latest version                              |
+| `ERR-UPDATE-003` | ERROR    | Compatibility check failed | Review compatibility requirements in error message            |
+| `ERR-UPDATE-004` | ERROR    | Download failed            | Check network; retry with `plugin update <plugin-id>`         |
+| `ERR-UPDATE-005` | ERROR    | Lifecycle script failed    | Review script output; consider `--skip-lifecycle` or rollback |
+| `ERR-UPDATE-006` | WARNING  | Plugin pinned              | Unpin with `plugin pin <plugin-id> --unpin` or use `--force`  |
+| `ERR-UPDATE-007` | WARNING  | Changelog fetch failed     | Update proceeds; view changelog manually                      |
+| `ERR-UPDATE-008` | ERROR    | Metadata fetch failed      | Check network; verify plugin exists in marketplace            |
 
 **Example Error Output**:
 
@@ -605,7 +623,8 @@ Compatibility details:
 See: https://yellow-plugins.dev/docs/errors#err-update-003
 ```
 
-**Cross-Reference**: [Error Codes Reference](../errors.md), [CRIT-007](../SPECIFICATION.md#crit-007)
+**Cross-Reference**: [Error Codes Reference](../errors.md),
+CRIT-007
 
 ---
 
@@ -615,14 +634,20 @@ See: https://yellow-plugins.dev/docs/errors#err-update-003
 
 This command implements the following specification requirements:
 
-* **[FR-002](../SPECIFICATION.md#fr-002)**: Update installed plugins to latest versions
-* **[FR-008](../SPECIFICATION.md#fr-008)**: Pin management integration
-* **[FR-009](../SPECIFICATION.md#fr-009)**: Check for available updates
-* **[CRIT-002](../SPECIFICATION.md#crit-002)**: Compatibility validation during updates
-* **[CRIT-008](../SPECIFICATION.md#crit-008)**: Pin awareness and override behavior
-* **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**: CLI interaction patterns
-* **[6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback)**: Progress indicators and status messaging
-* **[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)**: Changelog-aware update flow
+- **FR-002**: Update installed plugins to latest
+  versions
+- **FR-008**: Pin management integration
+- **FR-009**: Check for available updates
+- **CRIT-002**: Compatibility validation during
+  updates
+- **CRIT-008**: Pin awareness and override
+  behavior
+- **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**:
+  CLI interaction patterns
+- **[6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback)**:
+  Progress indicators and status messaging
+- **[Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)**:
+  Changelog-aware update flow
 
 ---
 
@@ -630,26 +655,29 @@ This command implements the following specification requirements:
 
 <!-- anchor: accessibility -->
 
-* **Screen Readers**: Changelogs include structured headings for navigation
-* **Color Independence**: Status indicators (`✔ ✖ ⚠ ℹ`) paired with textual prefixes
-* **ANSI Fallback**: Color accents degrade to `[OK]/[WARN]` prefixes per [UI Style Guide §3](../ui/style-guide.md#3-ansi-fallback)
-* **Keyboard Navigation**: Fully keyboard-accessible; no mouse required
-* **Non-Interactive Mode**: Use `--non-interactive` for automation without prompts
-* **Contrast**: All color combinations meet WCAG 2.1 AA standards (see [UI Style Guide](../ui/style-guide.md#1-6-accessibility-design-system))
+- **Screen Readers**: Changelogs include structured headings for navigation
+- **Color Independence**: Status indicators (`✔ ✖ ⚠ ℹ`) paired with textual
+  prefixes
+- **ANSI Fallback**: Color accents degrade to `[OK]/[WARN]` prefixes per
+  [UI Style Guide §3](../ui/style-guide.md#3-ansi-fallback)
+- **Keyboard Navigation**: Fully keyboard-accessible; no mouse required
+- **Non-Interactive Mode**: Use `--non-interactive` for automation without
+  prompts
+- **Contrast**: All color combinations meet WCAG 2.1 AA standards (see
+  [UI Style Guide](../ui/style-guide.md#1-6-accessibility-design-system))
 
 ---
 
 ## See Also
 
-* [`install`](./install.md) - Install plugins
-* [`pin`](./pin.md) - Pin plugins to specific versions
-* [`rollback`](./rollback.md) - Rollback to previous versions
-* [`check-updates`](./check-updates.md) - Check for available updates
-* [CLI Contracts - Update](../contracts/cli-contracts.md#update-contract)
-* [UI Style Guide](../ui/style-guide.md)
+- [`install`](./install.md) - Install plugins
+- [`pin`](./pin.md) - Pin plugins to specific versions
+- [`rollback`](./rollback.md) - Rollback to previous versions
+- [`check-updates`](./check-updates.md) - Check for available updates
+- [CLI Contracts - Update](../contracts/cli-contracts.md#update-contract)
+- [UI Style Guide](../ui/style-guide.md)
 
 ---
 
-**Last Updated**: 2026-01-12
-**Version**: 1.0.0
-**Maintained by**: Claude Code Plugin Marketplace Team
+**Last Updated**: 2026-01-12 **Version**: 1.0.0 **Maintained by**: Claude Code
+Plugin Marketplace Team

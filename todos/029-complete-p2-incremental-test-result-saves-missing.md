@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p2
-issue_id: "029"
+issue_id: '029'
 tags: [code-review, reliability, data-loss]
 dependencies: []
 ---
@@ -9,30 +9,42 @@ dependencies: []
 # incremental test result saves missing
 
 ## Problem Statement
-The test-runner agent writes results only at the end of the test run. If the agent crashes mid-run, all results are lost. For long test runs, this means significant work can be lost without any artifacts to show what was tested.
+
+The test-runner agent writes results only at the end of the test run. If the
+agent crashes mid-run, all results are lost. For long test runs, this means
+significant work can be lost without any artifacts to show what was tested.
 
 ## Findings
+
 - **File affected**: `agents/testing/test-runner.md`
-- **Current behavior**: Results accumulated in memory and written once at completion
+- **Current behavior**: Results accumulated in memory and written once at
+  completion
 - **Failure mode**: Agent crash → all results lost, no indication of progress
-- **Impact**: Work loss on long test runs, difficult to debug intermittent failures
+- **Impact**: Work loss on long test runs, difficult to debug intermittent
+  failures
 
 ## Proposed Solutions
 
 ### Option A: Write results after each route tested (Recommended)
+
 Append results incrementally to file:
-```markdown
+
+````markdown
 After completing each route test:
+
 1. Append result to `.claude/browser-test-results.jsonl` (JSONL format)
 2. Each line is a complete test result JSON object
 3. On completion, consolidate JSONL into final summary JSON
 4. If crash occurs, partial results still available in JSONL file
 
 Format:
+
 ```jsonl
 {"route":"/","status":"PASSED","timestamp":"2026-02-13T10:00:00Z","assertions":5}
 {"route":"/about","status":"FAILED","timestamp":"2026-02-13T10:00:15Z","error":"404 Not Found"}
 ```
+````
+
 ```
 
 ### Option B: Use append-mode to results file
@@ -69,3 +81,4 @@ Implement Option A. JSONL format provides both incremental saving and structured
 - PR: #11 (yellow-browser-test code review)
 - Related: yellow-ruvector JSONL queue pattern (similar incremental append pattern)
 - Pattern: Append-mode for crash-resistant data collection
+```

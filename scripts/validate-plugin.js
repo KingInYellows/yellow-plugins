@@ -62,7 +62,8 @@ function validatePlugin(pluginDir) {
       reason = 'broken symbolic link';
     } catch (lstatErr) {
       if (lstatErr.code === 'EACCES') reason = 'permission denied';
-      else if (lstatErr.code === 'ENOTDIR') reason = 'parent is not a directory';
+      else if (lstatErr.code === 'ENOTDIR')
+        reason = 'parent is not a directory';
     }
     logError(`plugin.json not found at: ${manifestPath} (${reason})`);
     return { valid: false, errors: [`manifest not found: ${reason}`] };
@@ -101,8 +102,12 @@ function validatePlugin(pluginDir) {
 
   // RULE 2: Name matches directory
   if (manifest.name && manifest.name !== dirName) {
-    errors.push(`Plugin name "${manifest.name}" does not match directory name "${dirName}"`);
-    logError(`Plugin name "${manifest.name}" does not match directory name "${dirName}"`);
+    errors.push(
+      `Plugin name "${manifest.name}" does not match directory name "${dirName}"`
+    );
+    logError(
+      `Plugin name "${manifest.name}" does not match directory name "${dirName}"`
+    );
   }
 
   // RULE 3: Version format (if present)
@@ -110,7 +115,9 @@ function validatePlugin(pluginDir) {
     const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
     if (!semverPattern.test(manifest.version)) {
       errors.push(`Invalid version format: ${manifest.version}`);
-      logError(`Invalid version format: ${manifest.version} (must be MAJOR.MINOR.PATCH)`);
+      logError(
+        `Invalid version format: ${manifest.version} (must be MAJOR.MINOR.PATCH)`
+      );
     } else {
       logSuccess(`Version: ${manifest.version}`);
     }
@@ -118,7 +125,9 @@ function validatePlugin(pluginDir) {
 
   // RULE 4: Description quality
   if (manifest.description && manifest.description.length < 10) {
-    logWarning('Description is very short (< 10 chars). Consider being more descriptive.');
+    logWarning(
+      'Description is very short (< 10 chars). Consider being more descriptive.'
+    );
   }
 
   // RULE 5: Keywords format (if present)
@@ -127,7 +136,9 @@ function validatePlugin(pluginDir) {
       errors.push('keywords must be an array');
       logError('keywords must be an array');
     } else {
-      const invalidKeywords = manifest.keywords.filter(kw => typeof kw !== 'string');
+      const invalidKeywords = manifest.keywords.filter(
+        (kw) => typeof kw !== 'string'
+      );
       if (invalidKeywords.length > 0) {
         errors.push('All keywords must be strings');
         logError('All keywords must be strings');
@@ -139,7 +150,10 @@ function validatePlugin(pluginDir) {
   if (errors.length === 0) {
     logSuccess(`Plugin "${manifest.name}" is valid`);
     if (manifest.version) logInfo(`  Version: ${manifest.version}`);
-    if (manifest.author) logInfo(`  Author: ${typeof manifest.author === 'object' ? manifest.author.name : manifest.author}`);
+    if (manifest.author)
+      logInfo(
+        `  Author: ${typeof manifest.author === 'object' ? manifest.author.name : manifest.author}`
+      );
     return { valid: true };
   }
 
@@ -159,8 +173,8 @@ function discoverPlugins() {
 
   const entries = fs.readdirSync(pluginsDir, { withFileTypes: true });
   return entries
-    .filter(e => e.isDirectory())
-    .map(e => path.join(pluginsDir, e.name));
+    .filter((e) => e.isDirectory())
+    .map((e) => path.join(pluginsDir, e.name));
 }
 
 // CLI entry point
@@ -174,7 +188,9 @@ if (require.main === module) {
     // CI passes --plugin <manifest-path> (e.g., plugins/yellow-linear/.claude-plugin/plugin.json)
     // Resolve to the plugin root directory (two levels up from plugin.json)
     const manifestPath = process.argv[3];
-    const fullManifest = path.isAbsolute(manifestPath) ? manifestPath : path.join(PROJECT_ROOT, manifestPath);
+    const fullManifest = path.isAbsolute(manifestPath)
+      ? manifestPath
+      : path.join(PROJECT_ROOT, manifestPath);
     const pluginRoot = path.dirname(path.dirname(fullManifest));
     pluginArg = pluginRoot;
     // Validate resolved path is within project root
@@ -185,7 +201,9 @@ if (require.main === module) {
   }
 
   if (pluginArg) {
-    const fullPath = path.isAbsolute(pluginArg) ? pluginArg : path.join(PROJECT_ROOT, pluginArg);
+    const fullPath = path.isAbsolute(pluginArg)
+      ? pluginArg
+      : path.join(PROJECT_ROOT, pluginArg);
     if (!fs.existsSync(fullPath)) {
       logError(`Plugin directory not found: ${pluginArg}`);
       process.exit(2);
@@ -200,9 +218,15 @@ if (require.main === module) {
     process.exit(0);
   }
 
-  console.log(`\n${colors.cyan}========================================${colors.reset}`);
-  console.log(`${colors.cyan}  Plugin Validator (Official Format)${colors.reset}`);
-  console.log(`${colors.cyan}========================================${colors.reset}`);
+  console.log(
+    `\n${colors.cyan}========================================${colors.reset}`
+  );
+  console.log(
+    `${colors.cyan}  Plugin Validator (Official Format)${colors.reset}`
+  );
+  console.log(
+    `${colors.cyan}========================================${colors.reset}`
+  );
   logInfo(`Validating ${pluginDirs.length} plugin(s)\n`);
 
   let hasErrors = false;
@@ -212,15 +236,23 @@ if (require.main === module) {
     if (!result.valid) hasErrors = true;
   }
 
-  console.log(`\n${colors.cyan}========================================${colors.reset}`);
+  console.log(
+    `\n${colors.cyan}========================================${colors.reset}`
+  );
   console.log(`${colors.cyan}  Validation Summary${colors.reset}`);
-  console.log(`${colors.cyan}========================================${colors.reset}\n`);
+  console.log(
+    `${colors.cyan}========================================${colors.reset}\n`
+  );
 
   if (hasErrors) {
-    console.log(`${colors.red}✗ Some plugins failed validation${colors.reset}\n`);
+    console.log(
+      `${colors.red}✗ Some plugins failed validation${colors.reset}\n`
+    );
     process.exit(1);
   } else {
-    console.log(`${colors.green}✓ All plugins passed validation${colors.reset}\n`);
+    console.log(
+      `${colors.green}✓ All plugins passed validation${colors.reset}\n`
+    );
     process.exit(0);
   }
 }

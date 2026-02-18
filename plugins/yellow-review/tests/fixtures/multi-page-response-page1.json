@@ -13,9 +13,7 @@
               "line": 10,
               "startLine": null,
               "comments": {
-                "nodes": [
-                  { "author": { "login": "reviewer1" }, "body": "Fix this on page 1" }
-                ]
+                "nodes": [{ "author": { "login": "reviewer1" }, "body": "Fix this on page 1" }]
               }
             },
             {
@@ -26,9 +24,7 @@
               "line": 20,
               "startLine": null,
               "comments": {
-                "nodes": [
-                  { "author": { "login": "reviewer1" }, "body": "Already resolved" }
-                ]
+                "nodes": [{ "author": { "login": "reviewer1" }, "body": "Already resolved" }]
               }
             }
           ]

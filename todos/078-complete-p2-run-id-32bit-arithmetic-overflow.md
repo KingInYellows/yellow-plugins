@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p2
-issue_id: "078"
+issue_id: '078'
 tags: [code-review, yellow-ci, portability]
 dependencies: []
 ---
@@ -10,13 +10,18 @@ dependencies: []
 
 ## Problem Statement
 
-The `validate_run_id()` function uses arithmetic comparison to validate that run IDs don't exceed JavaScript's MAX_SAFE_INTEGER (9007199254740991). On 32-bit shells, this comparison overflows (max 2^31-1 = 2147483647), and the `2>/dev/null` suppresses the error, causing the validation to be silently skipped.
+The `validate_run_id()` function uses arithmetic comparison to validate that run
+IDs don't exceed JavaScript's MAX_SAFE_INTEGER (9007199254740991). On 32-bit
+shells, this comparison overflows (max 2^31-1 = 2147483647), and the
+`2>/dev/null` suppresses the error, causing the validation to be silently
+skipped.
 
 ## Findings
 
 **File:** `plugins/yellow-ci/hooks/scripts/lib/validate.sh`
 
 **Lines 160-161:**
+
 ```bash
 # Prevent values exceeding JavaScript MAX_SAFE_INTEGER
 if [ "$id" -gt 9007199254740991 ] 2>/dev/null; then
@@ -42,6 +47,7 @@ fi
    - Length check alone is sufficient to reject values > MAX_SAFE_INTEGER
 
 **Impact:**
+
 - Portability issue on 32-bit systems
 - Validation check ineffective but redundant
 - Could allow IDs with 16 digits > MAX_SAFE_INTEGER (e.g., 9999999999999999)
@@ -50,7 +56,8 @@ fi
 
 **Option 1: String Comparison (Recommended)**
 
-Use lexicographic comparison for equal-length digit strings. For 16-digit numbers, string comparison is equivalent to numeric comparison.
+Use lexicographic comparison for equal-length digit strings. For 16-digit
+numbers, string comparison is equivalent to numeric comparison.
 
 ```bash
 # Prevent values exceeding JavaScript MAX_SAFE_INTEGER (2^53 - 1)
@@ -74,19 +81,23 @@ if [ "${#id}" -gt 16 ]; then
 fi
 ```
 
-**Rationale:** Any 17+ digit positive integer exceeds MAX_SAFE_INTEGER. For 16-digit numbers, only values > 9007199254740991 exceed it, but these are extremely rare in practice.
+**Rationale:** Any 17+ digit positive integer exceeds MAX_SAFE_INTEGER. For
+16-digit numbers, only values > 9007199254740991 exceed it, but these are
+extremely rare in practice.
 
 ## Technical Details
 
 **File:** `plugins/yellow-ci/hooks/scripts/lib/validate.sh:160-163`
 
 **String Comparison Details:**
+
 - Bash `\>` operator performs lexicographic comparison
 - For equal-length digit strings, lexicographic == numeric order
 - `"9999999999999999" \> "9007199254740991"` correctly returns true
 - `"1234567890123456" \> "9007199254740991"` correctly returns false
 
 **Test Cases:**
+
 ```bash
 # Valid: exactly MAX_SAFE_INTEGER
 validate_run_id "9007199254740991"  # should pass

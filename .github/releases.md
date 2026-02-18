@@ -2,6 +2,7 @@
 
 <!-- anchor: release-runbook -->
 
+<!-- prettier-ignore -->
 **Document Version**: 1.0.0
 **Last Updated**: 2026-01-11
 **Part of**: Task I4.T5 - Release Packaging & Checklist
@@ -10,12 +11,16 @@
 
 ## Overview
 
-This runbook documents the Yellow Plugins release workflow, including tagging conventions, GitHub Actions automation, artifact expectations, and operational procedures.
+This runbook documents the Yellow Plugins release workflow, including tagging
+conventions, GitHub Actions automation, artifact expectations, and operational
+procedures.
 
 **Audience**: Release managers, DevOps engineers, maintainers
 
 **Prerequisites**:
-- Read `docs/operations/release-checklist.md` for complete pre-release validation steps
+
+- Read `docs/operations/release-checklist.md` for complete pre-release
+  validation steps
 - Understand Section 4 directives from project planning documents
 - Have `contents: write` permissions on the repository
 
@@ -23,15 +28,15 @@ This runbook documents the Yellow Plugins release workflow, including tagging co
 
 ## Quick Reference
 
-| Topic | Command/Link |
-|-------|--------------|
-| **Trigger Release** | `git push origin v1.2.3` (tag push) |
-| **Manual Trigger** | `gh workflow run publish-release.yml --field version=1.2.3` |
-| **Monitor Release** | `gh run watch` |
-| **View Artifacts** | `gh release view v1.2.3` |
-| **Download Artifacts** | `gh release download v1.2.3` |
-| **Release Checklist** | `docs/operations/release-checklist.md` |
-| **Workflow File** | `.github/workflows/publish-release.yml` |
+| Topic                  | Command/Link                                                |
+| ---------------------- | ----------------------------------------------------------- |
+| **Trigger Release**    | `git push origin v1.2.3` (tag push)                         |
+| **Manual Trigger**     | `gh workflow run publish-release.yml --field version=1.2.3` |
+| **Monitor Release**    | `gh run watch`                                              |
+| **View Artifacts**     | `gh release view v1.2.3`                                    |
+| **Download Artifacts** | `gh release download v1.2.3`                                |
+| **Release Checklist**  | `docs/operations/release-checklist.md`                      |
+| **Workflow File**      | `.github/workflows/publish-release.yml`                     |
 
 ---
 
@@ -61,8 +66,10 @@ graph LR
 **Total Duration**: ~5-15 minutes (depending on test suite size)
 
 **Jobs**:
+
 1. **validate-release** (5-10 min): Validates code, tests, schemas
-2. **build-artifacts** (2-5 min): Creates tarball, SBOM, checksums, release notes
+2. **build-artifacts** (2-5 min): Creates tarball, SBOM, checksums, release
+   notes
 3. **publish-release** (1-2 min): Creates GitHub Release with assets
 4. **publish-npm** (1-3 min): Publishes packages to npm (conditional)
 5. **notify** (< 1 min): Sends notifications and status summary
@@ -76,12 +83,14 @@ graph LR
 **Tag Format**: `v1.2.3` (semantic version without pre-release identifier)
 
 **Trigger**:
+
 ```bash
 git tag -a v1.2.3 -m "Release v1.2.3"
 git push origin v1.2.3
 ```
 
 **Behavior**:
+
 - Full validation suite runs
 - GitHub Release created (NOT marked as pre-release)
 - NPM publication enabled (if `NPM_TOKEN` configured and on main repository)
@@ -96,12 +105,14 @@ git push origin v1.2.3
 **Tag Format**: `v1.2.3-beta.1`, `v1.2.3-rc.2`, `v1.2.3-alpha.0`
 
 **Trigger**:
+
 ```bash
 git tag -a v1.2.3-beta.1 -m "Release v1.2.3-beta.1"
 git push origin v1.2.3-beta.1
 ```
 
 **Behavior**:
+
 - Full validation suite runs
 - GitHub Release created (MARKED as pre-release)
 - NPM publication **disabled** (pre-releases don't auto-publish to npm)
@@ -115,6 +126,7 @@ git push origin v1.2.3-beta.1
 ### Manual Dispatch
 
 **Trigger**:
+
 ```bash
 gh workflow run publish-release.yml \
   --field version="1.2.3" \
@@ -122,13 +134,15 @@ gh workflow run publish-release.yml \
 ```
 
 **Behavior**:
+
 - Same as tag-triggered workflow
 - Useful for republishing or testing without creating tags
 - Requires workflow_dispatch inputs:
   - `version` (required): Version number without 'v' prefix (e.g., "1.2.3")
   - `prerelease` (optional): Boolean flag, defaults to false
 
-**Use Cases**: Re-running failed releases, testing workflow changes, emergency patches
+**Use Cases**: Re-running failed releases, testing workflow changes, emergency
+patches
 
 ---
 
@@ -145,6 +159,7 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/):
 ### Tag Format Requirements
 
 ✅ **Valid Tags**:
+
 - `v1.0.0` - Stable release
 - `v1.2.3` - Stable release
 - `v2.0.0-alpha.1` - Pre-release with identifier
@@ -152,6 +167,7 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/):
 - `v1.0.0-rc.1` - Release candidate
 
 ❌ **Invalid Tags** (will NOT trigger workflow):
+
 - `1.0.0` - Missing 'v' prefix
 - `v1.0` - Missing patch version
 - `release-1.0.0` - Wrong prefix
@@ -160,6 +176,7 @@ Follow [Semantic Versioning 2.0.0](https://semver.org/):
 ### Pre-Release Identifiers
 
 Common identifiers (in order of maturity):
+
 1. **alpha** - Early development, unstable
 2. **beta** - Feature-complete, testing phase
 3. **rc** (release candidate) - Stable, final testing before release
@@ -172,10 +189,11 @@ Common identifiers (in order of maturity):
 
 ### Job 1: validate-release
 
-**Duration**: 5-10 minutes
-**Purpose**: Ensure release candidate meets quality standards
+**Duration**: 5-10 minutes **Purpose**: Ensure release candidate meets quality
+standards
 
 **Steps**:
+
 1. **Extract version information**
    - From git tag (tag push) or workflow inputs (manual dispatch)
    - Detect pre-release flag from version string (contains `-`)
@@ -194,6 +212,7 @@ Common identifiers (in order of maturity):
    - Integration tests (`pnpm test:integration`)
 
 **Outputs**:
+
 - `version`: Extracted release version (e.g., "1.2.3")
 - `is_prerelease`: Boolean flag ("true" or "false")
 
@@ -203,12 +222,13 @@ Common identifiers (in order of maturity):
 
 ### Job 2: build-artifacts
 
-**Duration**: 2-5 minutes
-**Purpose**: Generate release artifacts for distribution and audit
+**Duration**: 2-5 minutes **Purpose**: Generate release artifacts for
+distribution and audit
 
 **Dependencies**: Requires `validate-release` success
 
 **Steps**:
+
 1. **Build packages**
    - Run `pnpm build` to compile TypeScript
    - Generate dist/ directories for all workspace packages
@@ -218,7 +238,8 @@ Common identifiers (in order of maturity):
    - Save to `release-notes.md`
    - Falls back to generic message if `CHANGELOG.md` missing
 3. **Create tarball**
-   - Archive entire repository (excluding node_modules, .git, dist-release, .ci-metrics)
+   - Archive entire repository (excluding node_modules, .git, dist-release,
+     .ci-metrics)
    - Filename: `yellow-plugins-v$VERSION.tar.gz`
    - Saved to `dist-release/` directory
 4. **Generate SBOM** (Software Bill of Materials)
@@ -230,6 +251,7 @@ Common identifiers (in order of maturity):
    - Saved to `SHA256SUMS.txt`
 
 **Artifacts Created**:
+
 - `dist-release/yellow-plugins-v$VERSION.tar.gz` (source archive)
 - `dist-release/sbom.json` (dependency tree, JSON format)
 - `dist-release/dependencies.txt` (dependency list, human-readable)
@@ -242,14 +264,15 @@ Common identifiers (in order of maturity):
 
 ### Job 3: publish-release
 
-**Duration**: 1-2 minutes
-**Purpose**: Create public GitHub Release with attached assets
+**Duration**: 1-2 minutes **Purpose**: Create public GitHub Release with
+attached assets
 
 **Dependencies**: Requires `validate-release` and `build-artifacts` success
 
 **Permissions**: `contents: write` (creates releases and uploads assets)
 
 **Steps**:
+
 1. **Download artifacts**
    - Retrieve artifacts from `build-artifacts` job
    - Place in `release-artifacts/` directory
@@ -265,6 +288,7 @@ Common identifiers (in order of maturity):
    - Appended below changelog excerpt
 
 **GitHub Release Contents**:
+
 - Title: "Release v1.2.3"
 - Tag: v1.2.3
 - Release notes: Extracted from CHANGELOG.md
@@ -274,16 +298,18 @@ Common identifiers (in order of maturity):
   - `dependencies.txt`
   - `SHA256SUMS.txt`
 
-**Failure Handling**: Workflow continues, but release not published (notify job reports failure)
+**Failure Handling**: Workflow continues, but release not published (notify job
+reports failure)
 
 ---
 
 ### Job 4: publish-npm (Conditional)
 
-**Duration**: 1-3 minutes
-**Purpose**: Publish workspace packages to npm registry
+**Duration**: 1-3 minutes **Purpose**: Publish workspace packages to npm
+registry
 
 **Condition**: Runs ONLY if:
+
 - Release is NOT a pre-release (`is_prerelease != 'true'`)
 - Repository is main fork (`github.repository == 'kinginyellow/yellow-plugins'`)
 - Prevents accidental publishing from forks or pre-releases
@@ -291,6 +317,7 @@ Common identifiers (in order of maturity):
 **Dependencies**: Requires `validate-release` and `build-artifacts` success
 
 **Steps**:
+
 1. **Setup npm authentication**
    - Configure Node.js with npm registry URL
    - Use `NPM_TOKEN` secret for authentication
@@ -303,11 +330,13 @@ Common identifiers (in order of maturity):
    - Skips git checks (assumes validation already done)
 
 **Published Packages**:
+
 - `@yellow-plugins/cli@$VERSION`
 - `@yellow-plugins/domain@$VERSION`
 - `@yellow-plugins/infrastructure@$VERSION`
 
 **Secret Configuration**:
+
 ```bash
 # Repository Settings → Secrets → Actions → New repository secret
 # Name: NPM_TOKEN
@@ -315,6 +344,7 @@ Common identifiers (in order of maturity):
 ```
 
 **Failure Handling**:
+
 - If `NPM_TOKEN` not configured: Logs warning, exits gracefully
 - If publish fails: Workflow marked as failed, manual intervention required
 
@@ -322,14 +352,15 @@ Common identifiers (in order of maturity):
 
 ### Job 5: notify
 
-**Duration**: < 1 minute
-**Purpose**: Summarize release status and report success/failure
+**Duration**: < 1 minute **Purpose**: Summarize release status and report
+success/failure
 
 **Dependencies**: Runs after ALL jobs complete (even if some fail)
 
 **Condition**: `if: always()` (always executes)
 
 **Steps**:
+
 1. **Generate status summary**
    - Display version, pre-release flag, validation result, release result
 2. **Success message**
@@ -348,6 +379,7 @@ Common identifiers (in order of maturity):
 **Type**: Gzipped tarball (source archive)
 
 **Contents**: Complete repository snapshot excluding:
+
 - `node_modules/` - Dependencies (reinstall via pnpm)
 - `.git/` - Git history (cloneable from GitHub)
 - `dist-release/` - Avoids recursive packaging
@@ -356,6 +388,7 @@ Common identifiers (in order of maturity):
 **Size**: ~500KB - 5MB (depending on code size)
 
 **Usage**:
+
 ```bash
 # Download
 gh release download v1.2.3 --pattern "yellow-plugins-v1.2.3.tar.gz"
@@ -379,6 +412,7 @@ pnpm build
 **Contents**: Complete dependency tree from `pnpm list --json --recursive`
 
 **Structure**:
+
 ```json
 [
   {
@@ -403,9 +437,11 @@ pnpm build
 
 **Type**: Plain text
 
-**Contents**: Human-readable dependency list from `pnpm list --recursive --depth=0`
+**Contents**: Human-readable dependency list from
+`pnpm list --recursive --depth=0`
 
 **Format**:
+
 ```
 @yellow-plugins/cli 1.2.3
 ├── yargs 18.0.0
@@ -432,6 +468,7 @@ pnpm build
 **Contents**: SHA256 hashes for all artifacts
 
 **Format**:
+
 ```
 a1b2c3d4... yellow-plugins-v1.2.3.tar.gz
 e5f6g7h8... sbom.json
@@ -439,6 +476,7 @@ i9j0k1l2... dependencies.txt
 ```
 
 **Usage**:
+
 ```bash
 # Verify integrity after download
 sha256sum -c SHA256SUMS.txt
@@ -458,18 +496,22 @@ sha256sum -c SHA256SUMS.txt
 **Contents**: Section from `CHANGELOG.md` for current release version
 
 **Extraction Pattern**:
+
 ```bash
 awk "/## \[?$VERSION\]?/,/## \[?[0-9]/" CHANGELOG.md | head -n -1
 ```
 
 **Usage**:
+
 - Injected as GitHub Release body
 - Provides user-facing release notes
 - Includes FR/NFR traceability, feature flags, known limitations
 
 **Fallback**: If `CHANGELOG.md` missing, uses generic message:
+
 ```markdown
 # Release v1.2.3
+
 No changelog file found.
 ```
 
@@ -479,10 +521,13 @@ No changelog file found.
 
 ### Creating a New Release
 
-**Prerequisites**: Complete `docs/operations/release-checklist.md` before proceeding
+**Prerequisites**: Complete `docs/operations/release-checklist.md` before
+proceeding
 
 **Steps**:
+
 1. **Ensure main branch is clean and up-to-date**
+
    ```bash
    git checkout main
    git pull origin main
@@ -490,6 +535,7 @@ No changelog file found.
    ```
 
 2. **Verify version consistency**
+
    ```bash
    # package.json version should match intended release
    node -p "require('./package.json').version"
@@ -499,6 +545,7 @@ No changelog file found.
    ```
 
 3. **Create annotated tag**
+
    ```bash
    VERSION=$(node -p "require('./package.json').version")
    git tag -a "v$VERSION" -m "Release v$VERSION
@@ -508,11 +555,13 @@ No changelog file found.
    ```
 
 4. **Push tag to trigger workflow**
+
    ```bash
    git push origin "v$VERSION"
    ```
 
 5. **Monitor workflow execution**
+
    ```bash
    gh run watch
    # Wait for completion (~5-15 minutes)
@@ -530,16 +579,19 @@ No changelog file found.
 ### Monitoring Active Release
 
 **Real-time monitoring**:
+
 ```bash
 gh run watch
 ```
 
 **View logs**:
+
 ```bash
 gh run view --log
 ```
 
 **Check specific job**:
+
 ```bash
 gh run view --job=validate-release --log
 gh run view --job=build-artifacts --log
@@ -547,6 +599,7 @@ gh run view --job=publish-release --log
 ```
 
 **List recent runs**:
+
 ```bash
 gh run list --workflow=publish-release.yml --limit 10
 ```
@@ -556,6 +609,7 @@ gh run list --workflow=publish-release.yml --limit 10
 ### Downloading Release Artifacts
 
 **From GitHub Release**:
+
 ```bash
 # All artifacts
 gh release download v1.2.3
@@ -565,6 +619,7 @@ gh release download v1.2.3 --pattern "yellow-plugins-v1.2.3.tar.gz"
 ```
 
 **From Workflow Artifacts** (90-day retention):
+
 ```bash
 # Find run ID
 gh run list --workflow=publish-release.yml --limit 1 --json databaseId -q '.[0].databaseId'
@@ -578,6 +633,7 @@ gh run download <RUN_ID>
 ### Verifying Release Integrity
 
 **1. Verify checksums**:
+
 ```bash
 gh release download v1.2.3 --pattern "SHA256SUMS.txt"
 gh release download v1.2.3
@@ -585,6 +641,7 @@ sha256sum -c SHA256SUMS.txt
 ```
 
 **2. Inspect SBOM**:
+
 ```bash
 gh release download v1.2.3 --pattern "sbom.json"
 jq '.[].name' sbom.json  # List package names
@@ -592,6 +649,7 @@ jq '.[].dependencies | keys' sbom.json | head  # Show dependencies
 ```
 
 **3. Test tarball**:
+
 ```bash
 gh release download v1.2.3 --pattern "yellow-plugins-v1.2.3.tar.gz"
 tar -tzf yellow-plugins-v1.2.3.tar.gz | head -20  # List contents
@@ -602,6 +660,7 @@ tar -tzf yellow-plugins-v1.2.3.tar.gz | head -20  # List contents
 ### Re-Running Failed Release
 
 **Option 1: Fix and create new version** (recommended)
+
 ```bash
 # Fix issues in code
 # Increment version in package.json (e.g., 1.2.3 → 1.2.4)
@@ -612,6 +671,7 @@ git push origin v1.2.4
 ```
 
 **Option 2: Delete tag and re-release same version** (use cautiously)
+
 ```bash
 # Delete remote tag
 git push origin :refs/tags/v1.2.3
@@ -628,13 +688,15 @@ git push origin v1.2.3
 ```
 
 **Option 3: Manual dispatch** (testing only)
+
 ```bash
 gh workflow run publish-release.yml \
   --field version="1.2.3" \
   --field prerelease="false"
 ```
 
-**Caution**: Option 2 may confuse users who already downloaded v1.2.3. Prefer Option 1 for production.
+**Caution**: Option 2 may confuse users who already downloaded v1.2.3. Prefer
+Option 1 for production.
 
 ---
 
@@ -643,22 +705,26 @@ gh workflow run publish-release.yml \
 **If a release is published but found to be broken:**
 
 1. **Mark release as draft** (hides from users)
+
    ```bash
    gh release edit v1.2.3 --draft
    ```
 
 2. **Add warning to release notes**
+
    ```bash
    gh release edit v1.2.3 --notes "⚠️ WARNING: This release has been yanked due to [issue]. Please use v1.2.4 instead."
    ```
 
 3. **Delete tags** (prevents re-installation)
+
    ```bash
    git tag -d v1.2.3
    git push origin :refs/tags/v1.2.3
    ```
 
 4. **Unpublish from npm** (if published, within 72 hours)
+
    ```bash
    npm unpublish @yellow-plugins/cli@1.2.3
    npm unpublish @yellow-plugins/domain@1.2.3
@@ -684,7 +750,9 @@ gh workflow run publish-release.yml \
 **Symptom**: Tag pushed, but workflow not running
 
 **Causes & Solutions**:
+
 1. **Tag format invalid**
+
    ```bash
    # Check tag format (must match v[0-9]+.[0-9]+.[0-9]+)
    git tag -l | grep "v1.2.3"
@@ -695,6 +763,7 @@ gh workflow run publish-release.yml \
    ```
 
 2. **Workflow file syntax error**
+
    ```bash
    # Validate YAML syntax
    yamllint .github/workflows/publish-release.yml
@@ -713,6 +782,7 @@ gh workflow run publish-release.yml \
 **Error Message**: `Version mismatch: package.json (1.2.2) != release (1.2.3)`
 
 **Solution**:
+
 ```bash
 # Update package.json version
 npm version 1.2.3 --no-git-tag-version
@@ -736,18 +806,22 @@ git push origin v1.2.3
 **Symptom**: `validate-release` job fails on tests
 
 **Solution**:
+
 1. **Reproduce locally**
+
    ```bash
    pnpm test:unit
    pnpm test:integration
    ```
 
 2. **Review test logs**
+
    ```bash
    gh run view --job=validate-release --log | grep "FAIL"
    ```
 
 3. **Fix tests and push**
+
    ```bash
    # Fix broken tests
    git add .
@@ -767,6 +841,7 @@ git push origin v1.2.3
 **Symptom**: `publish-npm` job fails
 
 **Common Causes**:
+
 1. **Missing NPM_TOKEN**
    - Add secret: Repository Settings → Secrets → Actions → New secret
    - Name: `NPM_TOKEN`
@@ -788,10 +863,13 @@ git push origin v1.2.3
 
 ### Artifact Upload Fails
 
-**Symptom**: `build-artifacts` uploads artifacts but `publish-release` can't find them
+**Symptom**: `build-artifacts` uploads artifacts but `publish-release` can't
+find them
 
 **Solution**:
+
 1. **Check artifact retention**
+
    ```bash
    gh run view <RUN_ID> --log | grep "artifact"
    ```
@@ -814,24 +892,30 @@ git push origin v1.2.3
 **Cause**: `CHANGELOG.md` format doesn't match awk pattern
 
 **Solution**:
+
 1. **Verify changelog format**
+
    ```bash
    # Headings must be: ## [X.Y.Z] - YYYY-MM-DD
    grep "## \[" CHANGELOG.md
    ```
 
 2. **Test extraction locally**
+
    ```bash
    VERSION="1.2.3"
    awk "/## \[?$VERSION\]?/,/## \[?[0-9]/" CHANGELOG.md | head -n -1
    ```
 
 3. **Fix format and re-release**
+
    ```markdown
    <!-- Correct format -->
+
    ## [1.2.3] - 2026-01-11
 
    ### Added
+
    - Feature description
 
    ## [1.2.2] - 2026-01-10
@@ -844,12 +928,14 @@ git push origin v1.2.3
 ### Secret Management
 
 **NPM_TOKEN**:
+
 - **Type**: Automation token (recommended)
 - **Scope**: Publish-only access
 - **Rotation**: Rotate every 90 days
 - **Storage**: GitHub repository secrets (encrypted at rest)
 
 **GitHub Token**:
+
 - **Type**: `GITHUB_TOKEN` (auto-provided by Actions)
 - **Permissions**: `contents: write` (declared in workflow)
 - **Scope**: Limited to workflow execution
@@ -878,15 +964,16 @@ git push origin v1.2.3
 
 ## Performance Targets
 
-| Stage | Target | Typical | Notes |
-|-------|--------|---------|-------|
-| validate-release | < 10 min | 5-8 min | Depends on test suite size |
-| build-artifacts | < 5 min | 2-3 min | Tarball compression is main bottleneck |
-| publish-release | < 2 min | 1 min | Network-dependent (upload artifacts) |
-| publish-npm | < 5 min | 2-3 min | Network-dependent (npm registry) |
-| **Total** | **< 20 min** | **10-15 min** | End-to-end workflow |
+| Stage            | Target       | Typical       | Notes                                  |
+| ---------------- | ------------ | ------------- | -------------------------------------- |
+| validate-release | < 10 min     | 5-8 min       | Depends on test suite size             |
+| build-artifacts  | < 5 min      | 2-3 min       | Tarball compression is main bottleneck |
+| publish-release  | < 2 min      | 1 min         | Network-dependent (upload artifacts)   |
+| publish-npm      | < 5 min      | 2-3 min       | Network-dependent (npm registry)       |
+| **Total**        | **< 20 min** | **10-15 min** | End-to-end workflow                    |
 
-**Reference**: Section 4 performance budgets, NFR-PERF-003 (publish ≤ 10 minutes end-to-end)
+**Reference**: Section 4 performance budgets, NFR-PERF-003 (publish ≤ 10 minutes
+end-to-end)
 
 ---
 
@@ -899,11 +986,13 @@ Track these metrics for each release:
 - **Release Duration**: Time from tag push to published release
 - **Validation Success Rate**: % of releases passing validation on first attempt
 - **Artifact Size**: Tarball size over time (indicates code bloat)
-- **Dependency Count**: Number of dependencies in SBOM (security/maintenance burden)
+- **Dependency Count**: Number of dependencies in SBOM (security/maintenance
+  burden)
 
 ### Metrics Collection
 
 **Manual Collection**:
+
 ```bash
 # Release duration
 gh run list --workflow=publish-release.yml --json conclusion,startedAt,completedAt
@@ -916,7 +1005,8 @@ gh release download v1.2.3 --pattern "sbom.json"
 jq '[.. | .dependencies? // empty | keys] | add | unique | length' sbom.json
 ```
 
-**Future Automation**: Integrate with `docs/operations/metrics.md` telemetry stack
+**Future Automation**: Integrate with `docs/operations/metrics.md` telemetry
+stack
 
 ---
 
@@ -948,12 +1038,15 @@ jq '[.. | .dependencies? // empty | keys] | add | unique | length' sbom.json
 
 ## Related Documents
 
-- **Release Checklist**: `docs/operations/release-checklist.md` (gated validation steps)
+- **Release Checklist**: `docs/operations/release-checklist.md` (gated
+  validation steps)
 - **CHANGELOG**: `CHANGELOG.md` (historical release notes)
-- **Workflow Definition**: `.github/workflows/publish-release.yml` (GitHub Actions YAML)
+- **Workflow Definition**: `.github/workflows/publish-release.yml` (GitHub
+  Actions YAML)
 - **CI Documentation**: `docs/operations/ci.md` (CI architecture)
 - **Metrics Guide**: `docs/operations/metrics.md` (KPI definitions)
-- **Postmortem Template**: `docs/operations/postmortem-template.md` (incident analysis)
+- **Postmortem Template**: `docs/operations/postmortem-template.md` (incident
+  analysis)
 
 ---
 
@@ -967,6 +1060,7 @@ jq '[.. | .dependencies? // empty | keys] | add | unique | length' sbom.json
 
 ---
 
+<!-- prettier-ignore -->
 **Last Updated**: 2026-01-11
 **Document Version**: 1.0.0
 **Maintained By**: KingInYellows

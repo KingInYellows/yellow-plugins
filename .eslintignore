@@ -21,9 +21,6 @@ serena/
 # Generated documentation
 docs/api/
 
-# Code Machine artifacts
-.codemachine/
-
 # Git
 .git/
 

@@ -1,6 +1,7 @@
 # CLI Contracts - Automation Guide
 
-This directory contains JSON Schema definitions for CLI command contracts, enabling deterministic automation and testing.
+This directory contains JSON Schema definitions for CLI command contracts,
+enabling deterministic automation and testing.
 
 ## Quick Start
 
@@ -309,13 +310,17 @@ jobs:
           EOF
 
       - name: Validate Request Schema
-        run: ajv validate -s api/cli-contracts/install.json -d install-request.json
+        run:
+          ajv validate -s api/cli-contracts/install.json -d install-request.json
 
       - name: Install Plugin
-        run: pnpm cli install --input install-request.json --output install-result.json
+        run:
+          pnpm cli install --input install-request.json --output
+          install-result.json
 
       - name: Validate Response Schema
-        run: ajv validate -s api/cli-contracts/install.json -d install-result.json
+        run:
+          ajv validate -s api/cli-contracts/install.json -d install-result.json
 
       - name: Check Installation Success
         run: |
@@ -347,8 +352,8 @@ install-plugin:
   stage: install
   image: node:20
   variables:
-    PLUGIN_ID: "example-plugin"
-    VERSION: "latest"
+    PLUGIN_ID: 'example-plugin'
+    VERSION: 'latest'
   before_script:
     - npm install -g pnpm ajv-cli
     - pnpm install
@@ -514,6 +519,7 @@ pnpm test:contracts
 
 ---
 
+<!-- prettier-ignore -->
 **Last Updated**: 2026-01-11
 **Version**: 1.0.0
 **Specification**: Task I2.T4 - CLI Contract Catalog

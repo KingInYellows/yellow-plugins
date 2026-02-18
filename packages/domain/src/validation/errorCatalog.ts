@@ -8,7 +8,11 @@
  * @module domain/validation/errorCatalog
  */
 
-import { ErrorCategory, ErrorSeverity, type DomainValidationError } from './types.js';
+import {
+  ErrorCategory,
+  ErrorSeverity,
+  type DomainValidationError,
+} from './types.js';
 
 /**
  * Error code registry aligned with specification Section 4
@@ -222,7 +226,8 @@ export class ValidationErrorFactory {
       category: ErrorCategory.DISCOVERY,
       context,
       specReference: 'CRIT-008',
-      resolution: 'Verify marketplace configuration and plugin references are valid',
+      resolution:
+        'Verify marketplace configuration and plugin references are valid',
     };
   }
 
@@ -232,16 +237,22 @@ export class ValidationErrorFactory {
   private static getSchemaErrorResolution(keyword: string): string {
     const resolutionMap: Record<string, string> = {
       required: 'Add the required field to your manifest file',
-      pattern: 'Ensure the field value matches the expected pattern (e.g., kebab-case, semver)',
+      pattern:
+        'Ensure the field value matches the expected pattern (e.g., kebab-case, semver)',
       format: 'Verify the field format (e.g., valid URI, email, or date-time)',
       type: 'Correct the field type (e.g., string, number, array, object)',
       enum: 'Use one of the allowed values from the enumeration',
-      minLength: 'Increase the field value length to meet the minimum requirement',
+      minLength:
+        'Increase the field value length to meet the minimum requirement',
       maxLength: 'Reduce the field value length to meet the maximum limit',
-      additionalProperties: 'Remove unexpected fields not defined in the schema',
+      additionalProperties:
+        'Remove unexpected fields not defined in the schema',
     };
 
-    return resolutionMap[keyword] || 'Review the schema documentation and correct the field value';
+    return (
+      resolutionMap[keyword] ||
+      'Review the schema documentation and correct the field value'
+    );
   }
 
   /**
@@ -265,7 +276,9 @@ export class ValidationErrorFactory {
         'Contact plugin maintainer to fix the manifest file',
     };
 
-    return resolutionMap[code] || 'Review installation logs and retry the operation';
+    return (
+      resolutionMap[code] || 'Review installation logs and retry the operation'
+    );
   }
 }
 

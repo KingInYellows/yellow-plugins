@@ -2,9 +2,8 @@
 
 <!-- anchor: release-checklist -->
 
-**Document Version**: 1.0.0
-**Last Updated**: 2026-01-11
-**Part of**: Task I4.T5 - Release Packaging & Checklist
+**Document Version**: 1.0.0 **Last Updated**: 2026-01-11 **Part of**: Task
+I4.T5 - Release Packaging & Checklist
 
 ---
 
@@ -69,13 +68,18 @@
 
 ## Overview
 
-This checklist ensures all Yellow Plugins releases meet quality, security, and documentation standards defined in Section 4 directives and Iteration 4 exit criteria.
+This checklist ensures all Yellow Plugins releases meet quality, security, and
+documentation standards defined in Section 4 directives and Iteration 4 exit
+criteria.
 
-**Purpose**: Gate releases with structured validation steps, capturing evidence and sign-offs at each stage.
+**Purpose**: Gate releases with structured validation steps, capturing evidence
+and sign-offs at each stage.
 
-**Scope**: Covers all release types (stable, pre-release, patch) and includes mandatory smoke tests across macOS, Linux, and WSL platforms.
+**Scope**: Covers all release types (stable, pre-release, patch) and includes
+mandatory smoke tests across macOS, Linux, and WSL platforms.
 
-**Authority**: No release may proceed without completing all sections and obtaining final sign-off.
+**Authority**: No release may proceed without completing all sections and
+obtaining final sign-off.
 
 ---
 
@@ -108,17 +112,20 @@ graph TD
 **Objective**: Ensure clean working state and correct branch.
 
 - [ ] Working directory is clean (no uncommitted changes)
+
   ```bash
   git status
   # Expected: "nothing to commit, working tree clean"
   ```
 
 - [ ] Current branch is `main` or designated release branch
+
   ```bash
   git branch --show-current
   ```
 
 - [ ] Local branch is up-to-date with remote
+
   ```bash
   git fetch origin
   git status
@@ -131,7 +138,8 @@ graph TD
   # Expected: "completed" status with "success" conclusion
   ```
 
-**Reference**: Section 4 directive - Repository state must be clean before tagging.
+**Reference**: Section 4 directive - Repository state must be clean before
+tagging.
 
 ---
 
@@ -140,18 +148,21 @@ graph TD
 **Objective**: Verify tooling versions match project requirements.
 
 - [ ] Node.js version: 18-24 LTS
+
   ```bash
   node --version
   # Expected: v18.x.x, v20.x.x, or v22.x.x
   ```
 
 - [ ] pnpm version: 8.15.0 or higher
+
   ```bash
   pnpm --version
   # Expected: 8.15.0 or higher
   ```
 
 - [ ] Git version: 2.30 or higher
+
   ```bash
   git --version
   # Expected: git version 2.30+
@@ -163,7 +174,8 @@ graph TD
   # Expected: "Logged in to github.com as <username>"
   ```
 
-**Reference**: `package.json` engines field, `.github/workflows/publish-release.yml` env vars.
+**Reference**: `package.json` engines field,
+`.github/workflows/publish-release.yml` env vars.
 
 ---
 
@@ -175,6 +187,7 @@ graph TD
   - Check repository settings → Actions → General → Workflow permissions
 
 - [ ] NPM_TOKEN secret is configured (if publishing to npm)
+
   ```bash
   gh secret list | grep NPM_TOKEN
   # Optional: Only required for npm publishing
@@ -186,7 +199,8 @@ graph TD
   # Expected: "Hi <username>! You've successfully authenticated..."
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` permissions block, Section 4 security directives.
+**Reference**: `.github/workflows/publish-release.yml` permissions block,
+Section 4 security directives.
 
 ---
 
@@ -195,18 +209,21 @@ graph TD
 **Objective**: Ensure version numbers are consistent across all artifacts.
 
 - [ ] `package.json` version matches intended release version
+
   ```bash
   node -p "require('./package.json').version"
   # Expected: X.Y.Z matching intended release
   ```
 
 - [ ] `CHANGELOG.md` contains entry for this version with today's date
+
   ```bash
   grep -A 1 "## \[$(node -p "require('./package.json').version")\]" CHANGELOG.md
   # Expected: ## [X.Y.Z] - YYYY-MM-DD
   ```
 
 - [ ] `README.md` version badge matches intended release (if present)
+
   ```bash
   grep "Version" README.md | head -1
   # Expected: **Version**: X.Y.Z
@@ -218,15 +235,15 @@ graph TD
   # Verify all @yellow-plugins/* packages show correct version
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` version validation step, Section 4 traceability enforcement.
+**Reference**: `.github/workflows/publish-release.yml` version validation step,
+Section 4 traceability enforcement.
 
 ---
 
 ### Preflight Sign-Off
 
-**Reviewer**: ___________________
-**Date**: ___________________
-**Notes**: ___________________
+**Reviewer**: **\*\*\*\***\_\_\_**\*\*\*\*** **Date**:
+**\*\*\*\***\_\_\_**\*\*\*\*** **Notes**: **\*\*\*\***\_\_\_**\*\*\*\***
 
 ---
 
@@ -237,6 +254,7 @@ graph TD
 **Objective**: Execute comprehensive validation via `pnpm release:check`.
 
 - [ ] Run release check command
+
   ```bash
   pnpm release:check
   # Expected: All checks pass with exit code 0
@@ -266,7 +284,8 @@ graph TD
   - Command: `pnpm docs:lint`
   - Expected: ✅ doctoc + markdownlint report no errors
 
-**Reference**: Section 4 directive - Validation job must complete in < 60 seconds median.
+**Reference**: Section 4 directive - Validation job must complete in < 60
+seconds median.
 
 ---
 
@@ -275,6 +294,7 @@ graph TD
 **Objective**: Simulate release workflow without actually publishing.
 
 - [ ] Trigger workflow dry-run using workflow_dispatch
+
   ```bash
   gh workflow run publish-release.yml \
     --field version="$(node -p "require('./package.json').version")" \
@@ -282,6 +302,7 @@ graph TD
   ```
 
 - [ ] Monitor workflow execution
+
   ```bash
   gh run watch
   # Wait for completion, verify all jobs succeed
@@ -293,7 +314,8 @@ graph TD
   # Confirm validation, build, artifact generation steps all green
   ```
 
-**Reference**: `.github/workflows/publish-release.yml`, Iteration 4 validation focus.
+**Reference**: `.github/workflows/publish-release.yml`, Iteration 4 validation
+focus.
 
 ---
 
@@ -302,17 +324,20 @@ graph TD
 **Objective**: Archive validation outputs for audit trail.
 
 - [ ] Save release:check output
+
   ```bash
   pnpm release:check > release-validation-$(date +%Y%m%d-%H%M%S).log 2>&1
   ```
 
 - [ ] Export test coverage report
+
   ```bash
   pnpm test:unit --coverage
   # Save coverage/ directory to artifacts
   ```
 
 - [ ] Export metrics snapshot (if telemetry enabled)
+
   ```bash
   # Future: pnpm metrics:export --format=json > release-metrics.json
   echo "Metrics export not yet implemented" > release-metrics.json
@@ -324,16 +349,16 @@ graph TD
   mv release-*.log .ci-artifacts/releases/v$(node -p "require('./package.json').version")/
   ```
 
-**Reference**: Section 4 directive - CI artifacts must be archived, Section 6 metrics/observability.
+**Reference**: Section 4 directive - CI artifacts must be archived, Section 6
+metrics/observability.
 
 ---
 
 ### Automated Validation Sign-Off
 
-**Reviewer**: ___________________
-**Date**: ___________________
-**Artifact Path**: `.ci-artifacts/releases/vX.Y.Z/`
-**Notes**: ___________________
+**Reviewer**: **\*\*\*\***\_\_\_**\*\*\*\*** **Date**:
+**\*\*\*\***\_\_\_**\*\*\*\*** **Artifact Path**:
+`.ci-artifacts/releases/vX.Y.Z/` **Notes**: **\*\*\*\***\_\_\_**\*\*\*\***
 
 ---
 
@@ -343,29 +368,31 @@ graph TD
 
 **Objective**: Define platforms and configurations for smoke testing.
 
-Test on **all** of the following platforms (macOS + Linux + WSL) to comply with Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
+Test on **all** of the following platforms (macOS + Linux + WSL) to comply with
+Iteration 4 acceptance criteria and FR-011/NFR-PERF guardrails:
 
 - [ ] **macOS** (Darwin arm64 or x64)
-  - Node.js version: ___________________
+  - Node.js version: **\*\*\*\***\_\_\_**\*\*\*\***
   - Shell: zsh/bash
 
 - [ ] **Linux** (Ubuntu 20.04+ or Debian-based)
-  - Node.js version: ___________________
+  - Node.js version: **\*\*\*\***\_\_\_**\*\*\*\***
   - Shell: bash
 
 - [ ] **WSL** (Windows Subsystem for Linux)
-  - Node.js version: ___________________
-  - Distribution: ___________________
+  - Node.js version: **\*\*\*\***\_\_\_**\*\*\*\***
+  - Distribution: **\*\*\*\***\_\_\_**\*\*\*\***
 
 **Smoke Test Report Template**
 
-| Platform | Install | Update | Publish | Rollback | Uninstall | Evidence Path | Notes |
-|----------|---------|--------|---------|----------|-----------|---------------|-------|
-| macOS    | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | ___________________ | ___________________ |
-| Linux    | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | ___________________ | ___________________ |
-| WSL      | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | ___________________ | ___________________ |
+| Platform | Install     | Update      | Publish     | Rollback    | Uninstall   | Evidence Path                  | Notes                          |
+| -------- | ----------- | ----------- | ----------- | ----------- | ----------- | ------------------------------ | ------------------------------ |
+| macOS    | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | **\*\*\*\***\_\_\_**\*\*\*\*** | **\*\*\*\***\_\_\_**\*\*\*\*** |
+| Linux    | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | **\*\*\*\***\_\_\_**\*\*\*\*** | **\*\*\*\***\_\_\_**\*\*\*\*** |
+| WSL      | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | PASS / FAIL | **\*\*\*\***\_\_\_**\*\*\*\*** | **\*\*\*\***\_\_\_**\*\*\*\*** |
 
-**Reference**: Iteration 4 acceptance criteria - Smoke tests per matrix (macOS/Linux/WSL).
+**Reference**: Iteration 4 acceptance criteria - Smoke tests per matrix
+(macOS/Linux/WSL).
 
 ---
 
@@ -376,6 +403,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Prerequisites**: Sample plugin repository or test fixture available.
 
 - [ ] Run install command
+
   ```bash
   pnpm cli install <sample-plugin-id>
   ```
@@ -384,30 +412,34 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   - Expected: "✓ Plugin <id> installed successfully"
 
 - [ ] Confirm plugin appears in installed list
+
   ```bash
   pnpm cli list
   # Expected: <sample-plugin-id> listed with version
   ```
 
 - [ ] Verify `.claude-plugin/cache/` contains downloaded artifacts
+
   ```bash
   ls -lh .claude-plugin/cache/
   ```
 
 - [ ] Check registry entries created
+
   ```bash
   cat .claude-plugin/registry.json
   # Expected: Entry for <sample-plugin-id> with metadata
   ```
 
 - [ ] Verify symlink created in install directory
+
   ```bash
   ls -l .claude/plugins/<sample-plugin-id>
   # Expected: Symlink pointing to cache
   ```
 
 - [ ] Check install duration (must be ≤ 2 minutes)
-  - Recorded duration: ___________________
+  - Recorded duration: **\*\*\*\***\_\_\_**\*\*\*\***
 
 **Reference**: FR-004, NFR-PERF-001 (PSM), Section 2.2.1 install journey.
 
@@ -420,6 +452,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Prerequisites**: Plugin installed from previous test, newer version available.
 
 - [ ] Run update command
+
   ```bash
   pnpm cli update <sample-plugin-id>
   ```
@@ -431,6 +464,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   - Expected: "✓ Plugin <id> updated to vX.Y.Z"
 
 - [ ] Verify registry updated with new version
+
   ```bash
   cat .claude-plugin/registry.json | jq '.plugins[] | select(.id=="<sample-plugin-id>")'
   ```
@@ -452,6 +486,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Prerequisites**: Test plugin repository with valid `plugin.json`.
 
 - [ ] Run publish command in dry-run mode
+
   ```bash
   pnpm cli publish --dry-run
   # Expected: Validation passes, no actual git operations
@@ -466,7 +501,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   - Expected: "Would create tag vX.Y.Z", "Would push to remote", etc.
 
 - [ ] Check publish duration estimate (target: ≤ 10 minutes)
-  - Estimated duration: ___________________
+  - Estimated duration: **\*\*\*\***\_\_\_**\*\*\*\***
 
 **Reference**: FR-009, FR-011, NFR-PERF-003, Section 2.2.7 publish journey.
 
@@ -479,11 +514,13 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Prerequisites**: Plugin with multiple versions installed (from update test).
 
 - [ ] Note current plugin version
+
   ```bash
   pnpm cli list | grep <sample-plugin-id>
   ```
 
 - [ ] Run rollback command
+
   ```bash
   pnpm cli rollback <sample-plugin-id>
   ```
@@ -492,17 +529,19 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   - Expected: "✓ Plugin <id> rolled back to vX.Y.Z"
 
 - [ ] Confirm registry reflects previous version
+
   ```bash
   cat .claude-plugin/registry.json | jq '.plugins[] | select(.id=="<sample-plugin-id>") | .version'
   ```
 
 - [ ] Check rollback duration (must be < 1 second)
-  - Recorded duration: ___________________
+  - Recorded duration: **\*\*\*\***\_\_\_**\*\*\*\***
 
 - [ ] Verify no manual cleanup required
   - Expected: All state changes handled by CLI
 
-**Reference**: FR-007, NFR-PERF-005, SSM-1 (100% rollback success), Section 2.2.3 rollback journey.
+**Reference**: FR-007, NFR-PERF-005, SSM-1 (100% rollback success), Section
+2.2.3 rollback journey.
 
 ---
 
@@ -513,6 +552,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Prerequisites**: Plugin installed (from previous tests).
 
 - [ ] Run uninstall command
+
   ```bash
   pnpm cli uninstall <sample-plugin-id>
   ```
@@ -521,12 +561,14 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   - Expected: "✓ Plugin <id> uninstalled successfully"
 
 - [ ] Confirm plugin removed from registry
+
   ```bash
   cat .claude-plugin/registry.json | jq '.plugins[] | select(.id=="<sample-plugin-id>")'
   # Expected: No output (entry removed)
   ```
 
 - [ ] Verify symlink removed from install directory
+
   ```bash
   ls .claude/plugins/<sample-plugin-id>
   # Expected: No such file or directory
@@ -538,7 +580,8 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   # Expected: Cached versions still present
   ```
 
-**Reference**: FR-012, Section 2.2.10 uninstall journey, docs/operations/uninstall.md.
+**Reference**: FR-012, Section 2.2.10 uninstall journey,
+docs/operations/uninstall.md.
 
 ---
 
@@ -547,34 +590,35 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Objective**: Confirm performance metrics meet NFR targets.
 
 - [ ] **Install Duration**: Average ≤ 2 minutes (p95)
-  - Recorded samples: ___________________
-  - Average: ___________________
-  - p95: ___________________
+  - Recorded samples: **\*\*\*\***\_\_\_**\*\*\*\***
+  - Average: **\*\*\*\***\_\_\_**\*\*\*\***
+  - p95: **\*\*\*\***\_\_\_**\*\*\*\***
 
 - [ ] **Rollback Duration**: < 1 second
-  - Recorded samples: ___________________
-  - Max: ___________________
+  - Recorded samples: **\*\*\*\***\_\_\_**\*\*\*\***
+  - Max: **\*\*\*\***\_\_\_**\*\*\*\***
 
 - [ ] **Cache Size**: Monitor eviction at 500MB threshold
+
   ```bash
   du -sh .claude-plugin/cache/
   # Expected: Size managed within configured limit
   ```
 
 - [ ] **CI Validation Job**: < 60 seconds (from automated validation)
-  - Recorded duration: ___________________
+  - Recorded duration: **\*\*\*\***\_\_\_**\*\*\*\***
 
-**Reference**: NFR-PERF-001, NFR-PERF-002, NFR-PERF-005, Iteration 4 metrics targets.
+**Reference**: NFR-PERF-001, NFR-PERF-002, NFR-PERF-005, Iteration 4 metrics
+targets.
 
 ---
 
 ### Smoke Test Sign-Off
 
-**Reviewer**: ___________________
-**Date**: ___________________
-**Platforms Tested**: ☐ macOS  ☐ Linux  ☐ WSL
-**Test Evidence Path**: `.ci-artifacts/releases/vX.Y.Z/smoke-tests/`
-**Notes**: ___________________
+**Reviewer**: **\*\*\*\***\_\_\_**\*\*\*\*** **Date**:
+**\*\*\*\***\_\_\_**\*\*\*\*** **Platforms Tested**: ☐ macOS ☐ Linux ☐ WSL
+**Test Evidence Path**: `.ci-artifacts/releases/vX.Y.Z/smoke-tests/` **Notes**:
+**\*\*\*\***\_\_\_**\*\*\*\***
 
 ---
 
@@ -597,7 +641,8 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   # Expected: Clean extraction of release notes
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` changelog extraction, Section 4 traceability enforcement.
+**Reference**: `.github/workflows/publish-release.yml` changelog extraction,
+Section 4 traceability enforcement.
 
 ---
 
@@ -635,7 +680,8 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   - CHANGELOG.md under relevant version
   - Corresponding ADR (if architectural impact)
 
-**Reference**: Section 4 feature flag governance, `docs/operations/feature-flags.md`.
+**Reference**: Section 4 feature flag governance,
+`docs/operations/feature-flags.md`.
 
 ---
 
@@ -652,10 +698,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 - [ ] Run doctoc to update table of contents
   ```bash
   pnpm docs:lint:toc
-  # Expected: TOC updated in traceability-matrix.md
   ```
-
-**Reference**: `docs/traceability-matrix.md`, Section 4 traceability enforcement, CRIT-006.
 
 ---
 
@@ -664,6 +707,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Objective**: Regenerate API docs if code changes occurred.
 
 - [ ] Run typedoc to regenerate API documentation
+
   ```bash
   pnpm docs:build
   # Expected: typedoc generates updated API docs
@@ -681,10 +725,9 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 
 ### Documentation Updates Sign-Off
 
-**Reviewer**: ___________________
-**Date**: ___________________
-**Doctoc Run**: ☐ Yes  ☐ No (not needed)
-**Notes**: ___________________
+**Reviewer**: **\*\*\*\***\_\_\_**\*\*\*\*** **Date**:
+**\*\*\*\***\_\_\_**\*\*\*\*** **Doctoc Run**: ☐ Yes ☐ No (not needed)
+**Notes**: **\*\*\*\***\_\_\_**\*\*\*\***
 
 ---
 
@@ -695,11 +738,13 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Objective**: Tag the release commit following semantic versioning.
 
 - [ ] Verify current commit is the intended release commit
+
   ```bash
   git log --oneline -1
   ```
 
 - [ ] Create annotated tag with release notes
+
   ```bash
   VERSION=$(node -p "require('./package.json').version")
   git tag -a "v$VERSION" -m "Release v$VERSION
@@ -715,7 +760,8 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   git tag -l | grep "v$VERSION"
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` tag trigger pattern, Section 4 git tagging conventions.
+**Reference**: `.github/workflows/publish-release.yml` tag trigger pattern,
+Section 4 git tagging conventions.
 
 ---
 
@@ -724,6 +770,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Objective**: Push tag to GitHub to trigger automated release workflow.
 
 - [ ] Push tag to remote
+
   ```bash
   git push origin "v$(node -p "require('./package.json').version")"
   ```
@@ -742,6 +789,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Objective**: Watch automated workflow and intervene if failures occur.
 
 - [ ] Monitor workflow run in real-time
+
   ```bash
   gh run watch
   ```
@@ -758,7 +806,8 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   gh run view --log
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` job dependencies and outputs.
+**Reference**: `.github/workflows/publish-release.yml` job dependencies and
+outputs.
 
 ---
 
@@ -767,6 +816,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Objective**: Confirm all expected artifacts were generated and uploaded.
 
 - [ ] Download release artifacts
+
   ```bash
   VERSION=$(node -p "require('./package.json').version")
   gh run download $(gh run list --workflow=publish-release.yml --limit 1 --json databaseId -q '.[0].databaseId')
@@ -786,17 +836,17 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   # Expected: All files OK
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` build-artifacts job, Section 4 audit requirements.
+**Reference**: `.github/workflows/publish-release.yml` build-artifacts job,
+Section 4 audit requirements.
 
 ---
 
 ### Release Preparation Sign-Off
 
-**Reviewer**: ___________________
-**Date**: ___________________
-**Tag**: v___________________
-**Workflow Run ID**: ___________________
-**Notes**: ___________________
+**Reviewer**: **\*\*\*\***\_\_\_**\*\*\*\*** **Date**:
+**\*\*\*\***\_\_\_**\*\*\*\*** **Tag**: v**\*\*\*\***\_\_\_**\*\*\*\***
+**Workflow Run ID**: **\*\*\*\***\_\_\_**\*\*\*\*** **Notes**:
+**\*\*\*\***\_\_\_**\*\*\*\***
 
 ---
 
@@ -807,6 +857,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Objective**: Confirm GitHub Release was created with correct metadata.
 
 - [ ] Navigate to GitHub Releases page
+
   ```bash
   VERSION=$(node -p "require('./package.json').version")
   gh release view "v$VERSION"
@@ -824,7 +875,8 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   gh release view "v$VERSION" --json url -q '.url'
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` publish-release job, softprops/action-gh-release.
+**Reference**: `.github/workflows/publish-release.yml` publish-release job,
+softprops/action-gh-release.
 
 ---
 
@@ -833,12 +885,14 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 **Objective**: Download and verify release artifacts work as expected.
 
 - [ ] Download tarball from GitHub Release
+
   ```bash
   VERSION=$(node -p "require('./package.json').version")
   gh release download "v$VERSION" --pattern "yellow-plugins-v$VERSION.tar.gz"
   ```
 
 - [ ] Extract and verify contents
+
   ```bash
   tar -tzf "yellow-plugins-v$VERSION.tar.gz" | head -20
   # Expected: Project files excluding node_modules, .git, etc.
@@ -857,11 +911,14 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 
 ### 6.3 NPM Publication Verification (if applicable)
 
-**Objective**: Confirm packages published to npm registry (stable releases only).
+**Objective**: Confirm packages published to npm registry (stable releases
+only).
 
-**Note**: Skip this section if NPM_TOKEN is not configured or release is a pre-release.
+**Note**: Skip this section if NPM_TOKEN is not configured or release is a
+pre-release.
 
 - [ ] Check npm registry for published packages
+
   ```bash
   npm view @yellow-plugins/cli version
   npm view @yellow-plugins/domain version
@@ -870,6 +927,7 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   ```
 
 - [ ] Verify package metadata
+
   ```bash
   npm view @yellow-plugins/cli
   # Expected: Correct description, repository, keywords
@@ -881,7 +939,8 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
   # Expected: Successful installation
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` publish-npm job, package.json repository field.
+**Reference**: `.github/workflows/publish-release.yml` publish-npm job,
+package.json repository field.
 
 ---
 
@@ -903,11 +962,9 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 
 ### Post-Release Validation Sign-Off
 
-**Reviewer**: ___________________
-**Date**: ___________________
-**Release URL**: ___________________
-**NPM Published**: ☐ Yes  ☐ No  ☐ N/A
-**Notes**: ___________________
+**Reviewer**: **\*\*\*\***\_\_\_**\*\*\*\*** **Date**:
+**\*\*\*\***\_\_\_**\*\*\*\*** **Release URL**: **\*\*\*\***\_\_\_**\*\*\*\***
+**NPM Published**: ☐ Yes ☐ No ☐ N/A **Notes**: **\*\*\*\***\_\_\_**\*\*\*\***
 
 ---
 
@@ -915,15 +972,15 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 
 ### Release Metadata
 
-| Field | Value |
-|-------|-------|
-| **Release Version** | v___________________ |
-| **Release Date** | ___________________ |
-| **Git Commit SHA** | ___________________ |
-| **Git Tag** | v___________________ |
-| **GitHub Release URL** | ___________________ |
-| **Workflow Run ID** | ___________________ |
-| **NPM Published** | ☐ Yes  ☐ No  ☐ N/A |
+| Field                  | Value                           |
+| ---------------------- | ------------------------------- |
+| **Release Version**    | v**\*\*\*\***\_\_\_**\*\*\*\*** |
+| **Release Date**       | **\*\*\*\***\_\_\_**\*\*\*\***  |
+| **Git Commit SHA**     | **\*\*\*\***\_\_\_**\*\*\*\***  |
+| **Git Tag**            | v**\*\*\*\***\_\_\_**\*\*\*\*** |
+| **GitHub Release URL** | **\*\*\*\***\_\_\_**\*\*\*\***  |
+| **Workflow Run ID**    | **\*\*\*\***\_\_\_**\*\*\*\***  |
+| **NPM Published**      | ☐ Yes ☐ No ☐ N/A                |
 
 ---
 
@@ -931,12 +988,18 @@ Test on **all** of the following platforms (macOS + Linux + WSL) to comply with 
 
 All sections completed and signed off:
 
-- [ ] **Section 1: Preflight Checks** - Signed by: ___________________ on ___________________
-- [ ] **Section 2: Automated Validation** - Signed by: ___________________ on ___________________
-- [ ] **Section 3: Manual Smoke Tests** - Signed by: ___________________ on ___________________
-- [ ] **Section 4: Documentation Updates** - Signed by: ___________________ on ___________________
-- [ ] **Section 5: Release Preparation** - Signed by: ___________________ on ___________________
-- [ ] **Section 6: Post-Release Validation** - Signed by: ___________________ on ___________________
+- [ ] **Section 1: Preflight Checks** - Signed by:
+      **\*\*\*\***\_\_\_**\*\*\*\*** on **\*\*\*\***\_\_\_**\*\*\*\***
+- [ ] **Section 2: Automated Validation** - Signed by:
+      **\*\*\*\***\_\_\_**\*\*\*\*** on **\*\*\*\***\_\_\_**\*\*\*\***
+- [ ] **Section 3: Manual Smoke Tests** - Signed by:
+      **\*\*\*\***\_\_\_**\*\*\*\*** on **\*\*\*\***\_\_\_**\*\*\*\***
+- [ ] **Section 4: Documentation Updates** - Signed by:
+      **\*\*\*\***\_\_\_**\*\*\*\*** on **\*\*\*\***\_\_\_**\*\*\*\***
+- [ ] **Section 5: Release Preparation** - Signed by:
+      **\*\*\*\***\_\_\_**\*\*\*\*** on **\*\*\*\***\_\_\_**\*\*\*\***
+- [ ] **Section 6: Post-Release Validation** - Signed by:
+      **\*\*\*\***\_\_\_**\*\*\*\*** on **\*\*\*\***\_\_\_**\*\*\*\***
 
 ---
 
@@ -945,23 +1008,25 @@ All sections completed and signed off:
 Document any issues discovered during release or deferred to next version:
 
 | Issue ID | Description | Severity | Workaround | Planned Fix Version |
-|----------|-------------|----------|------------|---------------------|
-| ___ | ___ | ___ | ___ | ___ |
+| -------- | ----------- | -------- | ---------- | ------------------- |
+| \_\_\_   | \_\_\_      | \_\_\_   | \_\_\_     | \_\_\_              |
 
 ---
 
 **Final Release Approval**:
 
-**Release Manager**: ___________________
-**Date**: ___________________
-**Signature**: ___________________
+**Release Manager**: **\*\*\*\***\_\_\_**\*\*\*\*** **Date**:
+**\*\*\*\***\_\_\_**\*\*\*\*** **Signature**: **\*\*\*\***\_\_\_**\*\*\*\***
 
-**Status**: ☐ APPROVED  ☐ REJECTED
+**Status**: ☐ APPROVED ☐ REJECTED
 
 **Notes**:
-___________________
-___________________
-___________________
+
+---
+
+---
+
+---
 
 ---
 
@@ -969,14 +1034,18 @@ ___________________
 
 This checklist enforces the following Section 4 directives:
 
-1. **Feature-Flag Governance**: Flags documented with ownership, defaults verified (Section 4.2)
-2. **Traceability Enforcement**: All changes reference FR/NFR/CRIT IDs (Section 4.3)
-3. **Atomic Persistence**: Registry/cache writes use transaction IDs (Section 4.4)
-4. **Security & Observability**: Lifecycle scripts require consent, logs structured (Section 4.5)
-5. **Performance Budgets**: Install ≤ 2min, publish ≤ 10min, CI validation < 60s (Section 4.6)
-6. **Documentation Synchronization**: typedoc/doctoc/markdownlint run in CI (Section 4.7)
-
-**Full Reference**: `.codemachine/planning/01_Plan_Overview_and_Setup.md` Section 4
+1. **Feature-Flag Governance**: Flags documented with ownership, defaults
+   verified (Section 4.2)
+2. **Traceability Enforcement**: All changes reference FR/NFR/CRIT IDs (Section
+   4.3)
+3. **Atomic Persistence**: Registry/cache writes use transaction IDs (Section
+   4.4)
+4. **Security & Observability**: Lifecycle scripts require consent, logs
+   structured (Section 4.5)
+5. **Performance Budgets**: Install ≤ 2min, publish ≤ 10min, CI validation < 60s
+   (Section 4.6)
+6. **Documentation Synchronization**: typedoc/doctoc/markdownlint run in CI
+   (Section 4.7)
 
 ---
 
@@ -987,6 +1056,7 @@ This checklist enforces the following Section 4 directives:
 **Problem**: `pnpm release:check` fails
 
 **Solutions**:
+
 1. Review specific failing step (lint/typecheck/test/docs)
 2. Run individual commands to isolate issue
 3. Check `.eslintrc.cjs`, `tsconfig.json`, test configs for misconfigurations
@@ -995,6 +1065,7 @@ This checklist enforces the following Section 4 directives:
 **Problem**: Schema validation fails
 
 **Solutions**:
+
 1. Validate example files against schemas manually
    ```bash
    node scripts/validate-marketplace.js
@@ -1010,6 +1081,7 @@ This checklist enforces the following Section 4 directives:
 **Problem**: GitHub Actions workflow fails on validate-release job
 
 **Solutions**:
+
 1. Check workflow logs for specific error
    ```bash
    gh run view --log
@@ -1021,6 +1093,7 @@ This checklist enforces the following Section 4 directives:
 **Problem**: Tarball creation fails
 
 **Solutions**:
+
 1. Check disk space on runner
 2. Verify exclude patterns in tar command
 3. Ensure no circular symlinks in project
@@ -1032,6 +1105,7 @@ This checklist enforces the following Section 4 directives:
 **Problem**: Release artifacts not uploaded
 
 **Solutions**:
+
 1. Check artifact retention policy (90 days default)
 2. Verify workflow permissions (contents: write)
 3. Review upload-artifact action logs
@@ -1039,6 +1113,7 @@ This checklist enforces the following Section 4 directives:
 **Problem**: Checksum verification fails
 
 **Solutions**:
+
 1. Re-download artifacts
 2. Check for network corruption during download
 3. Regenerate checksums and compare manually
@@ -1050,17 +1125,20 @@ This checklist enforces the following Section 4 directives:
 **If a release must be rolled back post-publication:**
 
 1. **Mark release as draft** (hides from users)
+
    ```bash
    gh release edit vX.Y.Z --draft
    ```
 
 2. **Delete tag** (prevents confusion)
+
    ```bash
    git tag -d vX.Y.Z
    git push origin :refs/tags/vX.Y.Z
    ```
 
 3. **Unpublish from npm** (if published, within 72 hours only)
+
    ```bash
    npm unpublish @yellow-plugins/cli@X.Y.Z
    npm unpublish @yellow-plugins/domain@X.Y.Z
@@ -1077,17 +1155,20 @@ This checklist enforces the following Section 4 directives:
    - Increment version (X.Y.Z+1)
    - Run full checklist again
 
-**Reference**: `docs/operations/postmortem-template.md`, Section 4 incident response.
+**Reference**: `docs/operations/postmortem-template.md`, Section 4 incident
+response.
 
 ---
 
 **End of Release Checklist**
 
-**Document Maintenance**: This checklist should be updated whenever release procedures change. Increment document version and update Last Updated date.
+**Document Maintenance**: This checklist should be updated whenever release
+procedures change. Increment document version and update Last Updated date.
 
 **Feedback**: Submit improvements via GitHub Issues or pull requests.
 
 **Related Documents**:
+
 - `.github/releases.md` - Release workflow runbook
 - `CHANGELOG.md` - Historical release notes
 - `docs/operations/runbook.md` - Operational procedures
@@ -1095,6 +1176,5 @@ This checklist enforces the following Section 4 directives:
 
 ---
 
-**Last Updated**: 2026-01-11
-**Document Version**: 1.0.0
-**Maintained By**: KingInYellows
+**Last Updated**: 2026-01-11 **Document Version**: 1.0.0 **Maintained By**:
+KingInYellows

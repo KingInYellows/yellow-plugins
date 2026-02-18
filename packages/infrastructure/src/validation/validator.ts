@@ -99,8 +99,13 @@ export class SchemaValidator implements IValidator {
 
     return {
       status: result.valid ? ValidationStatus.SUCCESS : ValidationStatus.ERROR,
-      errors: result.errors.map(err =>
-        ValidationErrorFactory.schemaError(err.path, err.message, err.keyword, err.params)
+      errors: result.errors.map((err) =>
+        ValidationErrorFactory.schemaError(
+          err.path,
+          err.message,
+          err.keyword,
+          err.params
+        )
       ),
       warnings: [],
       entityName: 'marketplace',
@@ -116,7 +121,10 @@ export class SchemaValidator implements IValidator {
    * @returns Validation result with detailed errors
    * @throws Error if validator not initialized
    */
-  validatePluginManifest(data: unknown, pluginId?: string): DomainValidationResult {
+  validatePluginManifest(
+    data: unknown,
+    pluginId?: string
+  ): DomainValidationResult {
     this.ensureInitialized();
 
     const result = this.factory.validate('plugin', data);
@@ -125,7 +133,7 @@ export class SchemaValidator implements IValidator {
 
     return {
       status: result.valid ? ValidationStatus.SUCCESS : ValidationStatus.ERROR,
-      errors: result.errors.map(err =>
+      errors: result.errors.map((err) =>
         ValidationErrorFactory.schemaError(err.path, err.message, err.keyword, {
           ...err.params,
           pluginId,
@@ -160,7 +168,9 @@ export class SchemaValidator implements IValidator {
 
     // Validate Claude Code version
     if (compatibility.claudeCodeMin) {
-      if (semver.lt(environment.claudeCodeVersion, compatibility.claudeCodeMin)) {
+      if (
+        semver.lt(environment.claudeCodeVersion, compatibility.claudeCodeMin)
+      ) {
         errors.push(
           ValidationErrorFactory.compatibilityError(
             'claudeCodeMin',
@@ -172,7 +182,9 @@ export class SchemaValidator implements IValidator {
     }
 
     if (compatibility.claudeCodeMax) {
-      if (semver.gt(environment.claudeCodeVersion, compatibility.claudeCodeMax)) {
+      if (
+        semver.gt(environment.claudeCodeVersion, compatibility.claudeCodeMax)
+      ) {
         errors.push(
           ValidationErrorFactory.compatibilityError(
             'claudeCodeMax',
@@ -226,7 +238,10 @@ export class SchemaValidator implements IValidator {
     }
 
     // Validate plugin dependencies
-    if (compatibility.pluginDependencies && compatibility.pluginDependencies.length > 0) {
+    if (
+      compatibility.pluginDependencies &&
+      compatibility.pluginDependencies.length > 0
+    ) {
       const missing = compatibility.pluginDependencies.filter(
         (dep: string) => !environment.installedPlugins.includes(dep)
       );
@@ -243,7 +258,8 @@ export class SchemaValidator implements IValidator {
     }
 
     return {
-      status: errors.length > 0 ? ValidationStatus.ERROR : ValidationStatus.SUCCESS,
+      status:
+        errors.length > 0 ? ValidationStatus.ERROR : ValidationStatus.SUCCESS,
       errors,
       warnings,
       entityName: 'compatibility',
@@ -289,7 +305,9 @@ export class SchemaValidator implements IValidator {
  * const result = validator.validateMarketplace(data);
  * ```
  */
-export async function createValidator(schemaDir?: string): Promise<SchemaValidator> {
+export async function createValidator(
+  schemaDir?: string
+): Promise<SchemaValidator> {
   const validator = new SchemaValidator();
   await validator.initialize(schemaDir);
   return validator;

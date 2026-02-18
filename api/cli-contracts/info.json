@@ -307,11 +307,7 @@
           "$ref": "#/definitions/FlagEvaluations"
         }
       },
-      "required": [
-        "plugin",
-        "installStatus",
-        "availableVersions"
-      ],
+      "required": ["plugin", "installStatus", "availableVersions"],
       "additionalProperties": false
     },
     "InfoResponse": {

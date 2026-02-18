@@ -1,7 +1,7 @@
 ---
 status: complete
 priority: p3
-issue_id: "044"
+issue_id: '044'
 tags: [code-review, reliability, error-handling]
 dependencies: []
 ---
@@ -9,9 +9,14 @@ dependencies: []
 # Config Malformation Resilience
 
 ## Problem Statement
-Commands read config from `.claude/yellow-browser-test.local.md` but don't handle case where file exists but has malformed YAML or missing required fields. Commands fail with cryptic yq/jq parse errors instead of actionable error messages.
+
+Commands read config from `.claude/yellow-browser-test.local.md` but don't
+handle case where file exists but has malformed YAML or missing required fields.
+Commands fail with cryptic yq/jq parse errors instead of actionable error
+messages.
 
 ## Findings
+
 - Files: commands/browser-test/test.md, explore.md
 - Current behavior:
   - Commands assume config file is well-formed if it exists
@@ -27,7 +32,9 @@ Commands read config from `.claude/yellow-browser-test.local.md` but don't handl
 - Related to TODO 039 (setup validation) but this is runtime resilience
 
 ## Proposed Solutions
+
 ### Option A: Add YAML Parsing with Field Validation (Recommended)
+
 - Before using config, validate it's well-formed YAML
 - Check all required fields are present
 - Validate field values (e.g., baseURL format)
@@ -35,6 +42,7 @@ Commands read config from `.claude/yellow-browser-test.local.md` but don't handl
 - Suggest re-running setup if config is malformed
 
 ### Option B: Re-run Setup if Config is Malformed
+
 - Detect malformed config automatically
 - Prompt user: "Config is invalid, re-run setup? [y/n]"
 - If yes, run setup command inline
@@ -42,9 +50,14 @@ Commands read config from `.claude/yellow-browser-test.local.md` but don't handl
 - More user-friendly but requires command composition
 
 ## Recommended Action
-Implement Option A with Option B as fallback. Validate config at start of test/explore commands. Show clear error if malformed. Suggest running `yellow-browser-test setup` to recreate config. Optional: add `--force-setup` flag to automatically re-run setup on invalid config.
+
+Implement Option A with Option B as fallback. Validate config at start of
+test/explore commands. Show clear error if malformed. Suggest running
+`yellow-browser-test setup` to recreate config. Optional: add `--force-setup`
+flag to automatically re-run setup on invalid config.
 
 ## Technical Details
+
 ```bash
 # Add to test.md and explore.md before using config
 config_file="${project_dir}/.claude/yellow-browser-test.local.md"
@@ -88,6 +101,7 @@ printf '[browser-test] Config validated\n'
 ```
 
 ## Acceptance Criteria
+
 - [ ] Add config validation to test.md command
 - [ ] Add config validation to explore.md command
 - [ ] Check YAML is well-formed with yq
@@ -99,11 +113,13 @@ printf '[browser-test] Config validated\n'
 - [ ] Test with missing required field (should show clear error)
 
 ## Work Log
-| Date | Action | Learnings |
-|------|--------|-----------|
+
+| Date       | Action                          | Learnings                                                        |
+| ---------- | ------------------------------- | ---------------------------------------------------------------- |
 | 2026-02-13 | Created from PR #11 code review | P3 reliability finding - prevents cryptic errors from bad config |
 
 ## Resources
+
 - PR: #11 (yellow-browser-test plugin code review)
 - Related files: commands/browser-test/test.md, explore.md
 - Related TODO: 039 (setup validation)

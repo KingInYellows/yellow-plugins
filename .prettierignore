@@ -17,9 +17,6 @@ coverage/
 # Serena Python project
 serena/
 
-# Code Machine artifacts
-.codemachine/
-
 # Git
 .git/
 

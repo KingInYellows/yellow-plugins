@@ -1,3 +1,5 @@
+# CI runs on self-hosted runners. External contributors can validate locally:
+#   pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck
 name: Validate Marketplace and CI Suite
 
 on:
@@ -38,7 +40,7 @@ jobs:
   validate-schemas:
     name: Validate Schemas (${{ matrix.target }})
     runs-on: [self-hosted, linux]
-    timeout-minutes: 2  # NFR-MAINT-002: Critical path budget
+    timeout-minutes: 2 # NFR-MAINT-002: Critical path budget
 
     strategy:
       fail-fast: false
@@ -64,7 +66,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
@@ -231,7 +233,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
@@ -302,7 +304,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
@@ -369,7 +371,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
@@ -427,7 +429,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need history for drift detection
+          fetch-depth: 0 # Need history for drift detection
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -438,7 +440,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
@@ -556,7 +558,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
@@ -643,7 +645,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          
+
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
@@ -695,7 +697,16 @@ jobs:
     name: Aggregate CI Metrics
     runs-on: [self-hosted, linux]
     if: always()
-    needs: [validate-schemas, lint-and-typecheck, unit-tests, integration-tests, contract-drift, security-audit, build]
+    needs:
+      [
+        validate-schemas,
+        lint-and-typecheck,
+        unit-tests,
+        integration-tests,
+        contract-drift,
+        security-audit,
+        build,
+      ]
 
     steps:
       - name: Download all metrics artifacts
@@ -774,7 +785,16 @@ jobs:
     name: CI Status Summary
     runs-on: [self-hosted, linux]
     if: always()
-    needs: [validate-schemas, lint-and-typecheck, unit-tests, integration-tests, contract-drift, security-audit, build]
+    needs:
+      [
+        validate-schemas,
+        lint-and-typecheck,
+        unit-tests,
+        integration-tests,
+        contract-drift,
+        security-audit,
+        build,
+      ]
 
     steps:
       - name: Check validation results

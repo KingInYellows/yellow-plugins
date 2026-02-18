@@ -1,12 +1,12 @@
 # Marketplace Quickstart Guide
 
-**For**: Solo developers creating personal plugin marketplaces
-**Time**: 10 minutes to first working marketplace
-**Version**: 1.0.0
+**For**: Solo developers creating personal plugin marketplaces **Time**: 10
+minutes to first working marketplace **Version**: 1.0.0
 
 ## What You'll Build
 
 A personal Claude Code plugin marketplace that lets you:
+
 - Install plugins with one command: `/plugin install my-plugin@kingin-yellows`
 - Update plugins safely with version pinning
 - Browse available plugins with descriptions and categories
@@ -226,6 +226,7 @@ chmod +x .git/hooks/pre-commit
 **Problem**: Plugin directory doesn't exist at specified path.
 
 **Fix**: Check that path in marketplace.json matches actual directory:
+
 ```bash
 ls -la plugins/my-plugin  # Should exist
 ```
@@ -235,6 +236,7 @@ ls -la plugins/my-plugin  # Should exist
 **Problem**: Version in marketplace.json doesn't match plugin.json.
 
 **Fix**: Synchronize versions:
+
 ```bash
 # Check plugin.json version
 cat plugins/my-plugin/plugin.json | grep version
@@ -247,6 +249,7 @@ cat plugins/my-plugin/plugin.json | grep version
 **Problem**: Category isn't one of 9 official categories.
 
 **Fix**: Use valid category from this list:
+
 - development, productivity, security, learning, testing
 - design, database, deployment, monitoring
 
@@ -300,7 +303,6 @@ You'll achieve these by following this structure and validation workflow.
 - Schema definition: `/schemas/marketplace.schema.json`
 - Validation guide: `/docs/validation-guide.md`
 - Example marketplace: `/examples/marketplace.example.json`
-- PRD reference: `PRD.md`
 
 ## Quick Reference
 
@@ -348,4 +350,5 @@ node scripts/validate-marketplace.js
 
 ---
 
-**Congratulations!** You now have a working personal plugin marketplace. Start adding your plugins and enjoy easy cross-machine installation.
+**Congratulations!** You now have a working personal plugin marketplace. Start
+adding your plugins and enjoy easy cross-machine installation.

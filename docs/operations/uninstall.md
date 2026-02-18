@@ -1,20 +1,22 @@
 # Uninstall Operations Guide
 
-**Document Version**: 1.0.0
-**Last Updated**: 2026-01-12
-**Task Reference**: I3.T4 - Enhanced Uninstall Experience
-**Specification Reference**: FR-010, FR-013, CRIT-004, CRIT-011, Section 6.3
+**Document Version**: 1.0.0 **Last Updated**: 2026-01-12 **Task Reference**:
+I3.T4 - Enhanced Uninstall Experience **Specification Reference**: FR-010,
+FR-013, CRIT-004, CRIT-011, Section 6.3
 
 ---
 
 ## Overview
 
-This guide covers plugin uninstallation operations in the Claude Code Plugin Marketplace, including lifecycle hook execution, cache retention policies, atomic symlink removal, and error recovery procedures.
+This guide covers plugin uninstallation operations in the Claude Code Plugin
+Marketplace, including lifecycle hook execution, cache retention policies,
+atomic symlink removal, and error recovery procedures.
 
 ### Key Features
 
 - **Lifecycle Hooks**: Executes uninstall scripts with user consent
-- **Cache Retention**: Configurable policies for keeping or purging cached versions
+- **Cache Retention**: Configurable policies for keeping or purging cached
+  versions
 - **Atomic Operations**: Symlink removal and registry updates are atomic
 - **Telemetry**: Full observability with transaction tracking
 - **Error Recovery**: Detailed error codes with resolution guidance
@@ -32,11 +34,13 @@ plugin uninstall <plugin-id>
 ```
 
 **Example:**
+
 ```bash
 plugin uninstall git-helper
 ```
 
 This will:
+
 1. Validate the plugin is installed
 2. Display lifecycle uninstall scripts (if present)
 3. Prompt for confirmation
@@ -52,11 +56,11 @@ This will:
 
 ### Policy Types
 
-| Policy | Flag | Description | Use Case |
-|--------|------|-------------|----------|
-| `keep-last-n` | (default) | Keep N most recent cached versions | Balanced cleanup with rollback safety |
-| `keep-all` | `--keep-cache` | Preserve all cached versions | Maximum rollback flexibility |
-| `purge-all` | `--purge-cache` | Remove all cached versions | Free up maximum disk space |
+| Policy        | Flag            | Description                        | Use Case                              |
+| ------------- | --------------- | ---------------------------------- | ------------------------------------- |
+| `keep-last-n` | (default)       | Keep N most recent cached versions | Balanced cleanup with rollback safety |
+| `keep-all`    | `--keep-cache`  | Preserve all cached versions       | Maximum rollback flexibility          |
+| `purge-all`   | `--purge-cache` | Remove all cached versions         | Free up maximum disk space            |
 
 ### Keep Last N Versions (Default)
 
@@ -69,11 +73,13 @@ plugin uninstall <plugin-id> --keep-last-n=5
 ```
 
 **When to use:**
+
 - Standard uninstall scenario
 - Want to free up some space while maintaining rollback capability
 - Balancing disk usage with safety
 
 **Result:**
+
 - Registry entry removed
 - Symlink removed
 - Oldest cached versions purged (beyond N)
@@ -87,12 +93,14 @@ plugin uninstall <plugin-id> --keep-cache
 ```
 
 **When to use:**
+
 - Temporary removal (planning to reinstall soon)
 - Want maximum rollback flexibility
 - Disk space is not a concern
 - Preserving all versions for forensics/debugging
 
 **Result:**
+
 - Registry entry removed
 - Symlink removed
 - All cached versions retained
@@ -106,12 +114,14 @@ plugin uninstall <plugin-id> --purge-cache
 ```
 
 **When to use:**
+
 - Permanent removal with no intent to reinstall
 - Need to free maximum disk space
 - Security concern (remove all traces)
 - Corrupted cache requiring full cleanup
 
 **Result:**
+
 - Registry entry removed
 - Symlink removed
 - All cached versions deleted
@@ -139,7 +149,8 @@ Plugins may declare lifecycle uninstall scripts in their manifest:
 1. **Discovery**: CLI loads uninstall script from cached plugin directory
 2. **Display**: Script contents displayed to user with syntax highlighting
 3. **Consent**: User must explicitly confirm script execution
-4. **Sandbox**: Script executes in sandboxed environment with limited permissions
+4. **Sandbox**: Script executes in sandboxed environment with limited
+   permissions
 5. **Capture**: Exit code, stdout, stderr captured for audit log
 6. **Continue**: Uninstall continues even if script fails (non-blocking)
 
@@ -178,11 +189,13 @@ plugin uninstall <plugin-id> --force
 ```
 
 **Warning:** Use with caution. Skips:
+
 - Lifecycle script review
 - Confirmation prompts
 - Interactive consent checks
 
 **When to use:**
+
 - Automation/CI scripts
 - Known-safe plugins
 - Batch uninstall operations
@@ -190,12 +203,17 @@ plugin uninstall <plugin-id> --force
 
 ### Lifecycle Consent Workflow
 
-1. CLI reads uninstall script from cache, computes SHA-256 digest, and displays a preview.
-2. User must type `yes` to consent; digest is passed to the domain service as `scriptReviewDigest`.
-3. If script changes, uninstall aborts with `ERROR-INST-008` (see `docs/contracts/error-codes.md#ERROR-INST-008`).
-4. `--force` bypasses the prompt but should only be used when scripts have already been reviewed in automation.
+1. CLI reads uninstall script from cache, computes SHA-256 digest, and displays
+   a preview.
+2. User must type `yes` to consent; digest is passed to the domain service as
+   `scriptReviewDigest`.
+3. If script changes, uninstall aborts with `ERROR-INST-008` (see
+   `docs/contracts/error-codes.md#ERROR-INST-008`).
+4. `--force` bypasses the prompt but should only be used when scripts have
+   already been reviewed in automation.
 
-**Tip:** Consent prompts satisfy CRIT-004 requirements and provide traceability across audit logs.
+**Tip:** Consent prompts satisfy CRIT-004 requirements and provide traceability
+across audit logs.
 
 ---
 
@@ -214,6 +232,7 @@ After:
 ```
 
 **Guarantees:**
+
 - No partial symlink states
 - No dangling references
 - Registry and filesystem stay in sync
@@ -228,6 +247,7 @@ Registry modifications use atomic temp-rename pattern:
 4. Backup previous: `installed.json.backup`
 
 **Benefits:**
+
 - Crash-safe updates
 - Rollback capability
 - No corruption on failure
@@ -241,6 +261,7 @@ Registry modifications use atomic temp-rename pattern:
 **Cause:** Attempting to uninstall a plugin that is not in the registry.
 
 **Resolution:**
+
 ```bash
 # Verify installed plugins
 plugin list
@@ -250,28 +271,33 @@ plugin info <plugin-id>
 ```
 
 **Related Error Codes:**
+
 - See `docs/contracts/error-codes.md` - ERROR-INST-001
 
 ---
 
 ### ERR-UNINSTALL-002: Registry Update Failed
 
-**Cause:** Failed to remove plugin entry from registry (file permissions, corruption, disk full).
+**Cause:** Failed to remove plugin entry from registry (file permissions,
+corruption, disk full).
 
 **Resolution:**
 
 1. **Check disk space:**
+
    ```bash
    df -h ~/.config/claude-code
    ```
 
 2. **Check file permissions:**
+
    ```bash
    ls -la ~/.config/claude-code/registry/installed.json
    chmod 644 ~/.config/claude-code/registry/installed.json
    ```
 
 3. **Validate registry:**
+
    ```bash
    plugin validate-registry
    ```
@@ -283,6 +309,7 @@ plugin info <plugin-id>
    ```
 
 **Related Error Codes:**
+
 - See `docs/contracts/error-codes.md` - FR-010
 
 ---
@@ -292,6 +319,7 @@ plugin info <plugin-id>
 **Cause:** Uninstall script exited with non-zero code.
 
 **Behavior:**
+
 - Uninstall continues (non-blocking)
 - Failure logged to audit trail
 - Warning displayed to user
@@ -299,11 +327,13 @@ plugin info <plugin-id>
 **Resolution:**
 
 1. **Review audit log:**
+
    ```bash
    cat .claude-plugin/audit/uninstall-<transaction-id>.json
    ```
 
 2. **Check script output:**
+
    ```json
    {
      "lifecycle": {
@@ -326,6 +356,7 @@ plugin info <plugin-id>
    - Describe environment (OS, permissions)
 
 **Related Error Codes:**
+
 - `docs/contracts/error-codes.md#ERROR-INST-006`
 - `docs/contracts/error-codes.md#ERROR-INST-008`
 
@@ -336,6 +367,7 @@ plugin info <plugin-id>
 **Cause:** Failed to remove cached artifacts (permissions, disk I/O errors).
 
 **Behavior:**
+
 - Registry update succeeds (plugin considered uninstalled)
 - Cache cleanup partially fails
 - Orphaned cache directories may remain
@@ -343,16 +375,19 @@ plugin info <plugin-id>
 **Resolution:**
 
 1. **Manual cache cleanup:**
+
    ```bash
    rm -rf ~/.config/claude-code/cache/<plugin-id>
    ```
 
 2. **Rebuild cache index:**
+
    ```bash
    plugin cache rebuild-index
    ```
 
 3. **Run cache validation:**
+
    ```bash
    plugin cache validate
    ```
@@ -363,11 +398,13 @@ plugin info <plugin-id>
    ```
 
 **Prevention:**
+
 - Ensure sufficient permissions: `chmod -R u+w ~/.config/claude-code/cache`
 - Monitor disk space before uninstall
 - Run periodic cache validation
 
 **Related Error Codes:**
+
 - `docs/contracts/error-codes.md#ERROR-INST-009`
 
 ---
@@ -383,6 +420,7 @@ plugin uninstall <plugin-id> --dry-run
 ```
 
 **Output:**
+
 - Transaction plan
 - Files to be removed
 - Cache retention simulation
@@ -419,6 +457,7 @@ Every uninstall generates a transaction log in `.claude-plugin/audit/`:
 **File:** `.claude-plugin/audit/uninstall-<transaction-id>.json`
 
 **Contents:**
+
 ```json
 {
   "transactionId": "tx-uninstall-1736704200000-abc123",
@@ -485,6 +524,7 @@ Uninstall operations emit structured telemetry:
 **Event:** `plugin.uninstall.completed`
 
 **Metadata:**
+
 - Transaction ID
 - Plugin ID
 - Duration
@@ -501,6 +541,7 @@ See `.claude-plugin/telemetry/` for event logs.
 ### Pre-Uninstall Checklist
 
 1. **Verify plugin identity:**
+
    ```bash
    plugin info <plugin-id>
    ```
@@ -522,18 +563,21 @@ See `.claude-plugin/telemetry/` for event logs.
 ### Post-Uninstall Verification
 
 1. **Confirm removal:**
+
    ```bash
    plugin list | grep <plugin-id>
    # (should return nothing)
    ```
 
 2. **Check symlink removed:**
+
    ```bash
    ls -la ~/.config/claude-code/plugins/<plugin-id>
    # (should not exist)
    ```
 
 3. **Verify cache state:**
+
    ```bash
    plugin cache list <plugin-id>
    # (shows retained versions based on policy)
@@ -594,6 +638,7 @@ plugin install <plugin-id>@<version>
 **Speed:** Near-instant (no download required)
 
 **Limitations:**
+
 - Only works if cache was retained during uninstall
 - If cache was purged, must download from marketplace
 
@@ -606,6 +651,7 @@ plugin install <plugin-id>@<version>
 **Cause:** Insufficient permissions to modify registry or cache.
 
 **Fix:**
+
 ```bash
 # Check ownership
 ls -la ~/.config/claude-code
@@ -620,6 +666,7 @@ chmod -R u+w ~/.config/claude-code/cache
 **Cause:** Script waiting for input or has infinite loop.
 
 **Fix:**
+
 - Use `--force` to skip lifecycle scripts
 - Contact plugin maintainer to fix script
 - Manual cleanup may be required
@@ -629,6 +676,7 @@ chmod -R u+w ~/.config/claude-code/cache
 **Cause:** Partial cache removal failure (non-critical).
 
 **Fix:**
+
 ```bash
 # Manual cache cleanup
 rm -rf ~/.config/claude-code/cache/<plugin-id>/<version>
@@ -647,16 +695,16 @@ plugin cache rebuild-index
 - **Cache Management:** `docs/operations/cache.md`
 - **Audit Logs:** `.claude-plugin/audit/README.md`
 - **Architecture:** `docs/ARCHITECTURE.md` (Section 3.10, 6.3)
-- **Specification:** `docs/SPECIFICATION.md` (FR-010, FR-013, CRIT-004, CRIT-011)
 
 ---
 
 ## Version History
 
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2026-01-12 | Initial uninstall documentation (I3.T4) |
+| Version | Date       | Changes                                 |
+| ------- | ---------- | --------------------------------------- |
+| 1.0.0   | 2026-01-12 | Initial uninstall documentation (I3.T4) |
 
 ---
 
-**For Support:** File issues at the plugin marketplace repository or consult the plugin maintainer's documentation.
+**For Support:** File issues at the plugin marketplace repository or consult the
+plugin maintainer's documentation.
