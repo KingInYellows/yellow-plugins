@@ -12,8 +12,8 @@ allowed-tools:
   - Read
   - Write
   - Bash
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_insert
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_search
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
 <examples>
@@ -54,7 +54,7 @@ When asked to record a learning:
 2. Construct entry per schema in `ruvector-conventions` skill
 3. Quality gate: content must be >= 20 words with context + insight + action
 4. Dedup check: search for similar entries (cosine > 0.85 = likely duplicate)
-5. Use ToolSearch to discover MCP tools, then insert via `vector_db_insert`
+5. Use ToolSearch to discover MCP tools, then insert via `hooks_remember`
 
 Validate namespace names: `[a-z0-9-]` only, reject `..`, `/`, `~`.
 

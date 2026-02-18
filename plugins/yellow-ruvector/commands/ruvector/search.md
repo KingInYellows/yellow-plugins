@@ -9,7 +9,7 @@ allowed-tools:
   - ToolSearch
   - Read
   - Grep
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_search
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
 # Semantic Code Search
@@ -41,7 +41,7 @@ If the MCP tool is unavailable or DB is empty, fall back:
 
 ### Step 3: Execute Vector Search
 
-Call `vector_db_search` (or equivalent discovered via ToolSearch) with:
+Call `hooks_recall` (discovered via ToolSearch) with:
 
 - Query text from `$ARGUMENTS`
 - Namespace: `code`

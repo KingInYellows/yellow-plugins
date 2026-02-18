@@ -8,8 +8,8 @@ argument-hint: '[namespace] [filter]'
 allowed-tools:
   - ToolSearch
   - AskUserQuestion
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_search
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_stats
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_stats
 ---
 
 # Browse Memories
@@ -41,13 +41,13 @@ Use ToolSearch to discover ruvector MCP tools.
 
 If a text filter is provided:
 
-- Call `vector_db_search` with the filter text in the target namespace(s)
+- Call `hooks_recall` with the filter text in the target namespace(s)
 - Return top 10 results ranked by similarity
 
 If no text filter:
 
-- Call `vector_db_stats` to show counts per namespace
-- Call `vector_db_search` with a broad query to show recent entries
+- Call `hooks_stats` to show counts per namespace
+- Call `hooks_recall` with a broad query to show recent entries
 
 ### Step 3: Display Results
 

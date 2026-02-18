@@ -13,7 +13,7 @@
   "mcpServers": {
     "ruvector": {
       "command": "npx",
-      "args": ["ruvector", "mcp-server"],
+      "args": ["ruvector", "mcp", "start"],
       "env": {
         "RUVECTOR_STORAGE_PATH": "${PWD}/.ruvector/"
       }

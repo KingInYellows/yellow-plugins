@@ -10,7 +10,7 @@ allowed-tools:
   - ToolSearch
   - Grep
   - Read
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_search
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
 <examples>

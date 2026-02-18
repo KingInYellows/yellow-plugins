@@ -32,10 +32,14 @@ All ruvector MCP tools follow the pattern:
 
 Use ToolSearch to discover available tools before first use. Common tools:
 
-- `vector_db_search` — Search vectors by similarity
-- `vector_db_insert` — Insert new vectors
-- `vector_db_create` — Create a new namespace/collection
-- `vector_db_stats` — Get database statistics
+- `hooks_recall` — Search vector memory by similarity
+- `hooks_remember` — Store context in vector memory
+- `hooks_stats` — Get intelligence statistics
+- `hooks_pretrain` — Pretrain from repository (bulk indexing)
+- `rvf_create` — Create a new .rvf vector store
+- `rvf_ingest` — Insert vectors into store (low-level)
+- `rvf_query` — Query nearest neighbors (low-level)
+- `rvf_status` — Get store status
 
 ## Namespaces
 

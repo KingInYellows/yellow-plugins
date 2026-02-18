@@ -5,13 +5,13 @@ ruvector.
 
 ## MCP Server
 
-- **ruvector** — Stdio transport via `npx ruvector mcp-server`
+- **ruvector** — Stdio transport via `npx ruvector mcp start`
 - Storage: `.ruvector/intelligence/memory.rvdb` (rvlite format) in project root
 - Embedding model: all-MiniLM-L6-v2 (384 dimensions, ONNX WASM runtime)
 - Lifecycle: starts on first MCP tool call (lazy init by Claude Code), shuts
   down on session end
 - If crashed mid-session: surface error and suggest running
-  `npx ruvector mcp-server` to verify
+  `npx ruvector mcp start` to verify
 - First call after session start may be slow (300-1500ms cold start)
 
 ## Conventions
@@ -20,7 +20,7 @@ ruvector.
   `causal`, `sessions`. Reject path traversal characters (`..`, `/`, `~`).
 - **MCP tool naming:** All tools referenced as
   `mcp__plugin_yellow-ruvector_ruvector__*` (e.g.,
-  `mcp__plugin_yellow-ruvector_ruvector__vector_db_search`)
+  `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`)
 - **Queue format:** `.ruvector/pending-updates.jsonl` — append-only JSONL with
   `type`, `file_path`, `timestamp` fields. Dedup at flush time, not write time.
 - **Queue rotation:** At 10MB rename to `.jsonl.1`, create new queue. Max 1

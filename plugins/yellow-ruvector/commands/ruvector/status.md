@@ -8,7 +8,7 @@ argument-hint: ''
 allowed-tools:
   - Bash
   - ToolSearch
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_stats
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_stats
 ---
 
 # ruvector Status
@@ -37,7 +37,7 @@ Report: directory exists/missing, total disk usage.
 ### Step 3: MCP Server Health Check
 
 Use ToolSearch to discover ruvector MCP tools. Attempt a lightweight call (e.g.,
-`vector_db_stats`) to verify the server responds.
+`hooks_stats`) to verify the server responds.
 
 **Healthy:** "MCP server: connected (responded in Xms)"
 
@@ -48,7 +48,7 @@ MCP server: not responding
 
 Recovery options:
 1. Restart the session (MCP server starts automatically on session start)
-2. Check manually: npx ruvector mcp-server
+2. Check manually: npx ruvector mcp start
 3. Re-install: /ruvector:setup
 ```
 
@@ -57,7 +57,7 @@ parse the output to decide whether to fall back to Grep.
 
 ### Step 4: Database Statistics
 
-If MCP is available, call `vector_db_stats` (or equivalent via ToolSearch) to
+If MCP is available, call `hooks_stats` (or equivalent via ToolSearch) to
 get:
 
 - Vector count per namespace (`code`, `reflexion`, `skills`, `causal`,

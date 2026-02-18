@@ -11,8 +11,8 @@ allowed-tools:
   - Glob
   - ToolSearch
   - AskUserQuestion
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_insert
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_create
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
 
 # Index Codebase
@@ -69,11 +69,15 @@ For each file:
 
 ### Step 5: Index via MCP
 
-Use ToolSearch to discover ruvector MCP insert tools, then for each chunk:
+Use ToolSearch to discover ruvector MCP tools. Two approaches:
 
-1. Call `vector_db_insert` (or equivalent) with content and metadata
-2. Use the `code` namespace
-3. Process in batches of 100 files for large repos
+**Preferred — Use `hooks_pretrain`:** This is ruvector's built-in bulk indexing
+tool. Call `hooks_pretrain` which analyzes the repository and indexes code
+automatically. This is faster and handles chunking internally.
+
+**Manual — Use `hooks_remember`:** For each chunk, call `hooks_remember` with
+the content and metadata in the `code` namespace. Process in batches of 100
+files for large repos.
 
 Show progress: "Indexing 142/350 files..."
 

@@ -17,6 +17,20 @@ allowed-tools:
 Install the ruvector CLI and initialize the `.ruvector/` vector storage
 directory for the current project.
 
+## CLI Reference
+
+These are the actual ruvector CLI commands (verified against v0.1.96+):
+
+- `npx ruvector hooks init` — Initialize `.ruvector/` directory and hooks
+- `npx ruvector mcp start` — Start the MCP server (stdio transport)
+- `npx ruvector hooks verify` — Verify hooks are working
+- `npx ruvector hooks doctor` — Diagnose setup issues
+- `npx ruvector info` — Show ruvector system information
+- `npx ruvector doctor` — System health check
+
+**Commands that do NOT exist:** `ruvector init`, `ruvector mcp-server`,
+`ruvector server` (HTTP/gRPC only, not MCP stdio).
+
 ## Workflow
 
 ### Step 1: Check Prerequisites
@@ -26,7 +40,7 @@ Verify required tools are available:
 ```bash
 node --version  # Must be >= 18
 npm --version
-jq --version
+command -v jq >/dev/null 2>&1 && jq --version
 ```
 
 If any are missing, report which ones and provide install URLs:
@@ -66,13 +80,21 @@ Check if `.ruvector/` already exists in the project root:
 ls -la .ruvector/ 2>/dev/null
 ```
 
-If it doesn't exist, initialize:
+If it doesn't exist, initialize using `hooks init` with flags to skip
+configurations the plugin already manages:
 
 ```bash
-npx ruvector init
+npx ruvector hooks init --minimal --no-claude-md --no-permissions --no-env --no-mcp --no-statusline
 ```
 
-Verify the directory was created successfully.
+This creates the `.ruvector/` directory and basic hook configuration. The plugin
+already configures MCP, hooks, and CLAUDE.md — `--no-*` flags prevent conflicts.
+
+Verify the directory was created:
+
+```bash
+ls -la .ruvector/
+```
 
 ### Step 5: Update .gitignore
 
@@ -88,16 +110,16 @@ If not present, append it:
 printf '\n# ruvector vector storage (per-developer)\n.ruvector/\n' >> .gitignore
 ```
 
-### Step 6: Verify MCP Server
+### Step 6: Verify Installation
 
-Test that the MCP server can start:
+Run the built-in doctor and verify commands:
 
 ```bash
-timeout 5 npx ruvector mcp-server </dev/null 2>&1 || true
+npx ruvector doctor 2>&1
+npx ruvector hooks verify 2>&1
 ```
 
-If it starts without errors, report success. If it fails, report the error and
-suggest checking the installation.
+Report any warnings or failures. If everything passes, setup is complete.
 
 ### Step 7: Offer Next Steps
 
@@ -105,16 +127,17 @@ Report setup complete and suggest:
 
 - Run `/ruvector:index` to index the codebase for semantic search
 - Run `/ruvector:status` to verify everything is working
+- Run `npx ruvector hooks pretrain` to bootstrap intelligence from the repo
 
 Use AskUserQuestion to ask if they want to index now.
 
 ## Error Handling
 
-| Error                   | Action                                    |
-| ----------------------- | ----------------------------------------- |
-| Node.js not found       | Report and provide install URL            |
-| Node.js < 18            | Report version and suggest upgrade        |
-| npm install failed      | Suggest manual install with `--prefix`    |
-| ruvector init failed    | Check disk space, permissions             |
-| MCP server won't start  | Verify `npx ruvector mcp-server` manually |
-| .gitignore not writable | Report and suggest manual edit            |
+| Error                   | Action                                          |
+| ----------------------- | ----------------------------------------------- |
+| Node.js not found       | Report and provide install URL                  |
+| Node.js < 18            | Report version and suggest upgrade              |
+| npm install failed      | Suggest manual install with `--prefix`          |
+| hooks init failed       | Check disk space, permissions, try `--force`    |
+| MCP server won't start  | Run `npx ruvector hooks doctor` to diagnose     |
+| .gitignore not writable | Report and suggest manual edit                  |

@@ -8,8 +8,8 @@ argument-hint: '[learning description]'
 allowed-tools:
   - ToolSearch
   - AskUserQuestion
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_insert
-  - mcp__plugin_yellow-ruvector_ruvector__vector_db_search
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
 # Record a Learning
@@ -72,7 +72,7 @@ If a match with score > 0.85 is found:
 
 ### Step 5: Store Entry
 
-Call `vector_db_insert` (via ToolSearch discovery) with the constructed entry in
+Call `hooks_remember` (via ToolSearch discovery) with the constructed entry in
 the appropriate namespace.
 
 ### Step 6: Confirm

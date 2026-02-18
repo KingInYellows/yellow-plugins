@@ -12,7 +12,7 @@ enterprise deployment.
 | yellow-devin    | deepwiki   | `https://mcp.deepwiki.com/mcp`          | HTTP      | None                        | Repo names, search queries    |
 | yellow-devin    | devin      | `https://mcp.devin.ai/mcp`              | HTTP      | TBD (may require API token) | Code, task prompts            |
 | yellow-chatprd  | chatprd    | `https://app.chatprd.ai/mcp`            | HTTP      | OAuth (Clerk)               | PRD content, document data    |
-| yellow-ruvector | ruvector   | Local stdio (`npx ruvector mcp-server`) | stdio     | None (local)                | Code embeddings (local only)  |
+| yellow-ruvector | ruvector   | Local stdio (`npx ruvector mcp start`)  | stdio     | None (local)                | Code embeddings (local only)  |
 
 ### Plugins Without MCP Servers
 
