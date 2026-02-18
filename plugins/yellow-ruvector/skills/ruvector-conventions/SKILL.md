@@ -120,39 +120,18 @@ Use ToolSearch to discover available tools before first use. Common tools:
 }
 ```
 
-## Queue Format
+## Hook Architecture
 
-File: `.ruvector/pending-updates.jsonl` — append-only JSONL.
+Hooks delegate to ruvector's built-in CLI hooks — no manual queue management:
 
-### File Change Entry
+- **session-start.sh** → `npx ruvector hooks session-start --resume` +
+  `npx ruvector hooks recall --top-k N "query"`
+- **post-tool-use.sh** → `npx ruvector hooks post-edit --success <path>` /
+  `npx ruvector hooks post-command --success|--error <cmd>`
+- **stop.sh** → `npx ruvector hooks session-end`
 
-```json
-{
-  "type": "file_change",
-  "file_path": "src/auth.ts",
-  "timestamp": "2026-02-11T10:30:00Z"
-}
-```
-
-### Bash Result Entry
-
-```json
-{
-  "type": "bash_result",
-  "command": "npm test",
-  "exit_code": 0,
-  "timestamp": "2026-02-11T10:30:00Z"
-}
-```
-
-**Rules:**
-
-- All entries include `"schema": "1"` for forward compatibility. Consumers must
-  handle entries without a `schema` field (pre-v1 format).
-- Append-only writes with `>>` (atomic O_APPEND for multi-session safety)
-- No dedup at write time — dedup happens at flush time only
-- Flush processes latest entry per `file_path`, discards older duplicates
-- Queue uses flock for flush operations to prevent double-processing
+ruvector manages its own internal queue and dedup. Plugin hooks are thin
+wrappers that parse Claude Code hook input JSON and call the right CLI command.
 
 ## .ruvectorignore
 
@@ -183,7 +162,7 @@ All `$ARGUMENTS` values are user input and must be validated:
 
 ### Shared Validation Library
 
-Hook scripts source `hooks/scripts/lib/validate.sh` which provides:
+`hooks/scripts/lib/validate.sh` provides reusable validation functions:
 
 - `canonicalize_project_dir "$dir"` — Resolve to absolute path via realpath
   (fallback to raw path)

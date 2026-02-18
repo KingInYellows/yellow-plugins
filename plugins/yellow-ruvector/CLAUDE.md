@@ -21,11 +21,9 @@ ruvector.
 - **MCP tool naming:** All tools referenced as
   `mcp__plugin_yellow-ruvector_ruvector__*` (e.g.,
   `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`)
-- **Queue format:** `.ruvector/pending-updates.jsonl` — append-only JSONL with
-  `type`, `file_path`, `timestamp` fields. Dedup at flush time, not write time.
-- **Queue rotation:** At 10MB rename to `.jsonl.1`, create new queue. Max 1
-  rotated file (~20MB cap). Stale `.jsonl.1` older than 7 days cleaned on
-  SessionStart.
+- **Hook architecture:** All hooks delegate to ruvector's built-in CLI hooks
+  (`hooks session-start`, `hooks session-end`, `hooks post-edit`,
+  `hooks post-command`, `hooks recall`). No manual queue management.
 - **Input validation:** All `$ARGUMENTS` values validated before use. See
   `ruvector-conventions` skill.
 - **Graceful degradation:** All agents and commands must work without ruvector —
@@ -57,11 +55,11 @@ ruvector.
 
 ### Hooks (3)
 
-- `session-start.sh` — Flush stale queue and load top learnings on session start
-  (3s budget: 1.5s flush + 1.5s learnings)
-- `post-tool-use.sh` — Append file changes and bash outcomes to queue
-  (append-only, single jq parse, <50ms)
-- `stop.sh` — Delegate queue flushing to memory-manager agent via systemMessage
+- `session-start.sh` — Run ruvector's session-start hook and load top learnings
+  via `hooks recall` (3s budget)
+- `post-tool-use.sh` — Record file edits and bash outcomes via ruvector's
+  `hooks post-edit` and `hooks post-command` (<50ms)
+- `stop.sh` — Run ruvector's session-end hook for cleanup and metrics export
 
 ### Scripts (1)
 
@@ -78,7 +76,7 @@ ruvector.
 - **`/ruvector:learn`** — Manually record a learning. Use when you want to save
   a mistake, pattern, or insight.
 - **`ruvector-memory-manager` agent** — Auto-triggers for storing/retrieving
-  learnings. Also flushes the pending-updates queue when called via Stop hook.
+  learnings. Handles bulk memory operations and memory curation.
 - **`/ruvector:memory`** — Browse and manage all stored memories. Use for
   viewing, filtering, or deleting entries.
 - **`/ruvector:index`** — Manual full or incremental index. Use after major code
@@ -89,15 +87,11 @@ ruvector.
 ## Known Limitations
 
 - First stdio MCP server in this repo — less battle-tested than HTTP pattern
-- Hooks cannot call MCP tools — SessionStart uses CLI, Stop delegates to agent
-  via systemMessage
-- Stop hook delegation is non-deterministic — Claude may not follow the
-  systemMessage (Ctrl+C, model decides otherwise). SessionStart always recovers
-  stale queues on next session, so no data is lost — only delayed.
+- Hooks use ruvector CLI directly (not MCP tools) — if `npx` or ruvector is
+  unavailable, hooks exit silently without error
 - No offline MCP fallback — if ruvector MCP is down, search and memory
   operations fail gracefully
-- `.ruvector/` is shared across git worktrees — queue flushing is safe (flock),
-  but concurrent indexing may race
+- `.ruvector/` is shared across git worktrees — concurrent indexing may race
 - MCP cold start adds 300-1500ms on first tool call after session start
 
 ## Maintenance
