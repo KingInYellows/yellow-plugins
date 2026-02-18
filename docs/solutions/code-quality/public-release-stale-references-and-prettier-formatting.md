@@ -169,7 +169,7 @@ Add a CI check or pre-archive script:
 # Before archiving docs, find all references in remaining files
 for doc in SPECIFICATION.md traceability-matrix.md PRD.md; do
   echo "=== References to $doc ==="
-  grep -rn --include='*.md' --exclude-dir='plans' --exclude-dir='brainstorms' "$doc" docs/
+  grep -rn --include='*.md' --exclude-dir='plans' --exclude-dir='brainstorms' --exclude-dir='solutions' "$doc" docs/
 done
 ```
 
