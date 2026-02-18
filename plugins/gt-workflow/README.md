@@ -99,6 +99,7 @@ claude plugin add ./plugins/gt-workflow
 
 - [Graphite CLI](https://graphite.dev/docs/graphite-cli) (`gt`) installed and authenticated
 - Git repository initialized with Graphite (`gt init`)
+- [`jq`](https://jqlang.github.io/jq/) installed (used by the `git push` guard hook)
 
 ## License
 
