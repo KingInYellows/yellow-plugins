@@ -233,39 +233,39 @@ pnpm validate:schemas
 For each of the 10 plugins, verify:
 
 **Agent files (`agents/**/*.md`):**
-- [ ] Each agent `.md` file is < 120 lines
-- [ ] Each agent description includes a "Use when..." trigger clause
-- [ ] Agent model and tool declarations are accurate
-- [ ] File naming uses kebab-case (e.g., `code-reviewer.md`, not `codeReviewer.md`)
-- [ ] No duplicate content that exists in a skill file (reference skills instead of duplicating)
+- [x] Each agent `.md` file is < 120 lines — all pass
+- [x] Each agent description includes a "Use when..." trigger clause — all pass
+- [x] Agent model and tool declarations are accurate
+- [x] File naming uses kebab-case — all pass
+- [x] No duplicate content that exists in a skill file
 
 **Skill files (`skills/**/SKILL.md`):**
-- [ ] Uses `## Usage` heading (not `## Commands`)
-- [ ] Description includes a "Use when..." trigger clause
-- [ ] No embedded LLM training data that duplicates SDK/framework docs
+- [x] Uses `## Usage` heading (not `## Commands`) — `## Commands vs Skills` in create-agent-skills is a section title, not misuse
+- [x] Description includes a "Use when..." trigger clause — FIXED: added frontmatter to diagnose-ci and ci-conventions
+- [x] No embedded LLM training data that duplicates SDK/framework docs
 
 **Command files (`commands/**/*.md`):**
-- [ ] `allowed-tools` in frontmatter lists every tool used in the command body
-- [ ] `$ARGUMENTS` placeholder used (no hardcoded values)
-- [ ] Command name in frontmatter matches file name
+- [x] `allowed-tools` in frontmatter lists every tool used in the command body — all present
+- [x] `$ARGUMENTS` placeholder used (no hardcoded values) — commands without args correctly have `argument-hint: ""`
+- [x] Command name in frontmatter matches file name — namespaced convention (e.g., `ruvector:search` for `search.md`) is correct
 
 **Hook files (`hooks/hooks.json` and hook scripts):**
-- [ ] All hook scripts referenced in `hooks.json` actually exist at the specified path
-- [ ] Hook scripts use `${CLAUDE_PLUGIN_ROOT}` for all intra-plugin path references (no hardcoded paths)
-- [ ] Hook scripts follow shell security patterns: multi-layer input validation, no printf with variable format strings, error logging (not suppression)
-- [ ] No secrets or env var values hardcoded in hook scripts or `hooks.json`
+- [x] All hook scripts referenced in `hooks.json` actually exist at the specified path — all 5 resolve
+- [x] Hook scripts use `${CLAUDE_PLUGIN_ROOT}` for all intra-plugin path references
+- [x] Hook scripts follow shell security patterns — TOCTOU re-read inside flock, component-prefixed error logging
+- [x] No secrets or env var values hardcoded in hook scripts or `hooks.json`
 
-**MCP configs (`.mcp.json`):**
-- [ ] All MCP server commands reference paths via `${CLAUDE_PLUGIN_ROOT}` (not absolute paths)
-- [ ] API keys referenced as `${ENV_VAR}` (not hardcoded values)
-- [ ] MCP server names use kebab-case
+**MCP configs (in `plugin.json` `mcpServers`):**
+- [x] MCP server commands use appropriate references (npx for npm packages, `${CLAUDE_PLUGIN_ROOT}` for local)
+- [x] API keys referenced as `${ENV_VAR}` (not hardcoded values)
+- [x] MCP server names use kebab-case
 
 **General:**
-- [ ] All files use LF line endings (not CRLF)
-- [ ] `plugin.json` passes `pnpm validate:plugins`
-- [ ] `CLAUDE.md` component counts match actual directory contents
-- [ ] No dead references (files listed in `plugin.json`/`hooks.json`/`.mcp.json` that don't exist)
-- [ ] All directories use kebab-case naming
+- [x] All files use LF line endings (not CRLF)
+- [x] `plugin.json` passes `pnpm validate:plugins` — all 10 pass
+- [x] `CLAUDE.md` component counts match actual directory contents — verified in Phase 1
+- [x] No dead references — all hook script paths and MCP command paths resolve
+- [x] All directories use kebab-case naming
 
 ### Research Insights
 
@@ -414,16 +414,16 @@ pnpm validate:schemas
 - [x] Repository can be made public (all hard gates passed)
 
 ### Phase 2
-- [ ] All agent `.md` files < 120 lines
-- [ ] All agent/skill descriptions include "Use when..." trigger clause
-- [ ] All command `allowed-tools` are complete
-- [ ] All hook scripts use `${CLAUDE_PLUGIN_ROOT}` (no hardcoded paths)
-- [ ] All MCP configs use env var references (no hardcoded API keys)
-- [ ] All files use LF line endings
-- [ ] All `plugin.json` manifests pass validation
-- [ ] All `CLAUDE.md` component counts match reality
-- [ ] All hook script paths and MCP command paths resolve to existing files
-- [ ] `pnpm validate:schemas` passes
+- [x] All agent `.md` files < 120 lines — all pass
+- [x] All agent/skill descriptions include "Use when..." trigger clause — fixed 2 CI skills (added frontmatter)
+- [x] All command `allowed-tools` are complete — all present
+- [x] All hook scripts use `${CLAUDE_PLUGIN_ROOT}` (no hardcoded paths) — all 5 scripts
+- [x] All MCP configs use env var references (no hardcoded API keys)
+- [x] All files use LF line endings — no CRLF found
+- [x] All `plugin.json` manifests pass validation — all 10 pass
+- [x] All `CLAUDE.md` component counts match reality — verified in Phase 1
+- [x] All hook script paths and MCP command paths resolve to existing files
+- [x] `pnpm validate:schemas` passes
 
 ## Success Metrics
 
