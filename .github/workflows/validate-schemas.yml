@@ -68,7 +68,7 @@ jobs:
         run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Install AJV CLI
-        run: npm install -g ajv-cli@5.0.0
+        run: npm install -g ajv-cli@5.0.0 ajv-formats
 
       - name: Start schema validation timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -87,6 +87,7 @@ jobs:
                 ajv validate \
                   -s schemas/marketplace.schema.json \
                   -d .claude-plugin/marketplace.json \
+                  -c ajv-formats \
                   --strict=true \
                   --all-errors
                 echo "::endgroup::"
@@ -114,6 +115,7 @@ jobs:
                   ajv validate \
                     -s schemas/plugin.schema.json \
                     -d "$manifest" \
+                    -c ajv-formats \
                     --strict=true \
                     --all-errors
                 done
@@ -149,6 +151,7 @@ jobs:
                   ajv validate \
                     -s schemas/marketplace.schema.json \
                     -d examples/marketplace.example.json \
+                    -c ajv-formats \
                     --strict=true \
                     --all-errors
                 fi
@@ -160,6 +163,7 @@ jobs:
                   ajv validate \
                     -s schemas/plugin.schema.json \
                     -d "$example" \
+                    -c ajv-formats \
                     --strict=true \
                     --all-errors
                 done
@@ -438,7 +442,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install AJV CLI
-        run: npm install -g ajv-cli@5.0.0
+        run: npm install -g ajv-cli@5.0.0 ajv-formats
 
       - name: Start contract drift timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
