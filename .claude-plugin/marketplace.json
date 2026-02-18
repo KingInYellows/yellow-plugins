@@ -12,7 +12,6 @@
   },
   "plugins": [
     {
-      "id": "gt-workflow",
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
       "version": "1.0.0",
@@ -21,7 +20,6 @@
       "category": "development"
     },
     {
-      "id": "yellow-core",
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
       "version": "1.0.0",
@@ -30,7 +28,6 @@
       "category": "development"
     },
     {
-      "id": "yellow-linear",
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
       "version": "1.0.0",
@@ -39,7 +36,6 @@
       "category": "productivity"
     },
     {
-      "id": "yellow-devin",
       "name": "yellow-devin",
       "description": "Devin.AI integration for multi-agent workflows — delegate tasks, research codebases via DeepWiki, orchestrate plan-implement-review chains",
       "version": "1.0.0",
@@ -48,7 +44,6 @@
       "category": "development"
     },
     {
-      "id": "yellow-chatprd",
       "name": "yellow-chatprd",
       "description": "ChatPRD MCP integration with document management and Linear bridging",
       "version": "1.0.0",
@@ -57,7 +52,6 @@
       "category": "productivity"
     },
     {
-      "id": "yellow-review",
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
       "version": "1.0.0",
@@ -66,7 +60,6 @@
       "category": "development"
     },
     {
-      "id": "yellow-ruvector",
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
       "version": "1.0.0",
@@ -75,7 +68,6 @@
       "category": "development"
     },
     {
-      "id": "yellow-browser-test",
       "name": "yellow-browser-test",
       "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
       "version": "1.0.0",
@@ -84,7 +76,6 @@
       "category": "testing"
     },
     {
-      "id": "yellow-debt",
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
       "version": "1.0.0",
@@ -93,7 +84,6 @@
       "category": "development"
     },
     {
-      "id": "yellow-ci",
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
       "version": "1.0.0",
