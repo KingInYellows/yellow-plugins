@@ -1,0 +1,44 @@
+{
+  "name": "yellow-research",
+  "version": "1.0.0",
+  "description": "Deep research plugin with Perplexity, Tavily, EXA, and Parallel Task MCP servers. Code research inline; deep research saved to docs/research/.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-research",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": ["research", "deep-research", "perplexity", "exa", "tavily", "mcp"],
+  "mcpServers": {
+    "perplexity": {
+      "command": "npx",
+      "args": ["-y", "@perplexity-ai/mcp-server"],
+      "env": {
+        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}",
+        "PERPLEXITY_TIMEOUT_MS": "${PERPLEXITY_TIMEOUT_MS:-600000}"
+      }
+    },
+    "tavily": {
+      "command": "npx",
+      "args": ["-y", "tavily-mcp"],
+      "env": {
+        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      }
+    },
+    "exa": {
+      "command": "npx",
+      "args": ["-y", "exa-mcp-server"],
+      "env": {
+        "EXA_API_KEY": "${EXA_API_KEY}"
+      }
+    },
+    "parallel": {
+      "type": "http",
+      "url": "https://task-mcp.parallel.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PARALLEL_API_KEY}"
+      }
+    }
+  }
+}

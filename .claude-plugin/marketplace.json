@@ -90,6 +90,14 @@
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-ci",
       "category": "development"
+    },
+    {
+      "name": "yellow-research",
+      "description": "Deep research plugin with Perplexity, Tavily, EXA, and Parallel Task MCP servers. Code research inline; deep research saved to docs/research/.",
+      "version": "1.0.0",
+      "author": { "name": "KingInYellows" },
+      "source": "./plugins/yellow-research",
+      "category": "productivity"
     }
   ]
 }
