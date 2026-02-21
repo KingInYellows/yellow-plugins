@@ -98,12 +98,10 @@ older ones.
 
 ### Step 3b: List Recent Sessions
 
-Fetch from V3 enterprise endpoint with cursor pagination:
+Fetch from the org-scoped endpoint (inherently filtered to this org):
 
 ```bash
-ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
-url="${ENTERPRISE_URL}/sessions?first=10"
-url="${url}&$(jq -nr --arg org "$DEVIN_ORG_ID" '@uri "org_ids=\($org)"')"
+url="${ORG_URL}/sessions?first=10"
 ```
 
 Apply filters if provided:

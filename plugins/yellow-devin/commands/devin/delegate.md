@@ -75,11 +75,11 @@ Before creating, search recent sessions for a matching title in active states:
 
 ```bash
 DEVIN_API_BASE="https://api.devin.ai/v3beta1"
-ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
+ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \
   -w "\n%{http_code}" \
-  -X GET "${ENTERPRISE_URL}/sessions?first=5&$(jq -nr --arg org "$DEVIN_ORG_ID" '@uri "org_ids=\($org)"')" \
+  -X GET "${ORG_URL}/sessions?first=5" \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
 

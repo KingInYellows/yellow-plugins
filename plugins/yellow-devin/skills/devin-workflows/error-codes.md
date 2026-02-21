@@ -120,7 +120,7 @@ For operations that may hit rate limits repeatedly:
 api_call_with_backoff() {
   local max_retries=5
   local backoff=1
-  local retry=0
+  local retry=1
 
   while [ $retry -le $max_retries ]; do
     # ... make curl call ...

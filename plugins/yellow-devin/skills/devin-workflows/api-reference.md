@@ -82,6 +82,24 @@ Permission: `ViewOrgSessions`
 
 Response: Same `SessionResponse` schema as create.
 
+### List Sessions (Org-Scoped)
+
+```
+GET /v3beta1/organizations/{org_id}/sessions
+```
+
+Permission: `ViewOrgSessions`
+
+Query parameters: same pagination (`first`, `after`) and filtering (`session_ids`,
+`tags`, `origins`, `playbook_id`, `schedule_id`, date ranges) as the enterprise
+list endpoint — but inherently scoped to this org, no `org_ids` parameter needed.
+
+Use this endpoint when listing or searching within a single org. The enterprise
+`GET /v3beta1/enterprise/sessions` endpoint is only needed when querying across
+multiple orgs.
+
+Response: same `{ items, has_next_page, end_cursor, total }` shape as enterprise.
+
 ### Terminate Session
 
 ```
