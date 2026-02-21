@@ -11,6 +11,14 @@
   "license": "MIT",
   "keywords": ["research", "deep-research", "perplexity", "exa", "tavily", "mcp"],
   "mcpServers": {
+    "perplexity": {
+      "command": "npx",
+      "args": ["-y", "@perplexity-ai/mcp-server@0.8.2"],
+      "env": {
+        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}",
+        "PERPLEXITY_TIMEOUT_MS": "${PERPLEXITY_TIMEOUT_MS:-600000}"
+      }
+    },
     "tavily": {
       "command": "npx",
       "args": ["-y", "tavily-mcp@0.2.17"],

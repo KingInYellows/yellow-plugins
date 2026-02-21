@@ -14,7 +14,7 @@ allowed-tools:
   - mcp__plugin_compound-engineering_context7__resolve-library-id
   - mcp__plugin_compound-engineering_context7__query-docs
   - mcp__grep__searchGitHub
-  - mcp__plugin_perplexity_perplexity__perplexity_search
+  - mcp__plugin_yellow-research_perplexity__perplexity_search
 ---
 
 # Code Research

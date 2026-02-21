@@ -13,7 +13,7 @@ allowed-tools:
   - mcp__plugin_compound-engineering_context7__resolve-library-id
   - mcp__plugin_compound-engineering_context7__query-docs
   - mcp__grep__searchGitHub
-  - mcp__plugin_perplexity_perplexity__perplexity_search
+  - mcp__plugin_yellow-research_perplexity__perplexity_search
 ---
 
 You are a code research assistant. Your job is to find accurate, concise answers
@@ -32,7 +32,7 @@ Choose the best source based on query type:
 | General web | `web_search_exa` |
 
 **Start with Context7** for any named library — it has official, up-to-date docs.
-Fall back to EXA if Context7 doesn't have the library.
+Fall back to EXA if Context7 is unavailable (not installed) or doesn't have the library.
 
 ## Workflow
 

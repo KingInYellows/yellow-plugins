@@ -20,9 +20,9 @@ allowed-tools:
   - mcp__plugin_yellow-research_tavily__tavily_crawl
   - mcp__plugin_yellow-research_parallel__create_deep_research_task
   - mcp__plugin_yellow-research_parallel__get_result
-  - mcp__plugin_perplexity_perplexity__perplexity_ask
-  - mcp__plugin_perplexity_perplexity__perplexity_research
-  - mcp__plugin_perplexity_perplexity__perplexity_reason
+  - mcp__plugin_yellow-research_perplexity__perplexity_ask
+  - mcp__plugin_yellow-research_perplexity__perplexity_research
+  - mcp__plugin_yellow-research_perplexity__perplexity_reason
   - mcp__grep__searchGitHub
 ---
 

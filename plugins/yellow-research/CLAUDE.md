@@ -1,23 +1,20 @@
 # yellow-research Plugin
 
-Deep research plugin with 3 bundled MCP servers (Tavily, EXA, Parallel Task) plus
-Perplexity via the global Perplexity plugin. Two workflows: `/research:code`
+Deep research plugin with 4 bundled MCP servers. Two workflows: `/research:code`
 (inline, fast) and `/research:deep` (multi-source, saved to `docs/research/`).
 
 ## MCP Servers
 
-Bundled servers follow `mcp__plugin_yellow-research_<server>__<tool>`.
-Perplexity tools come from the separately installed Perplexity plugin:
-`mcp__plugin_perplexity_perplexity__<tool>`.
+All tool names follow `mcp__plugin_yellow-research_<server>__<tool>`.
 
-### perplexity — `PERPLEXITY_API_KEY` (global plugin, not bundled)
+### perplexity — `PERPLEXITY_API_KEY`
 
 - `perplexity_ask` — Quick factual answers
 - `perplexity_search` — Web-grounded search
 - `perplexity_research` — Deep multi-source research
 - `perplexity_reason` — Step-by-step reasoning
 
-### tavily — `TAVILY_API_KEY` (bundled)
+### tavily — `TAVILY_API_KEY`
 
 - `tavily_search` — Real-time web search
 - `tavily_extract` — Extract content from URLs
@@ -25,7 +22,7 @@ Perplexity tools come from the separately installed Perplexity plugin:
 - `tavily_map` — Structured site map
 - `tavily_research` — Deep research mode
 
-### exa — `EXA_API_KEY` (bundled)
+### exa — `EXA_API_KEY`
 
 Default-on tools:
 - `web_search_exa` — General neural web search
@@ -38,7 +35,7 @@ Off-by-default tools (enable via Smithery if needed):
 - `deep_researcher_start` — Start async EXA deep research report
 - `deep_researcher_check` — Poll async research status
 
-### parallel — `PARALLEL_API_KEY` (bundled, HTTP Bearer auth)
+### parallel — `PARALLEL_API_KEY` (HTTP Bearer auth)
 
 - `create_deep_research_task` — Launch async research; returns task ID
 - `create_task_group` — Parallel enrichment for multiple items
@@ -76,12 +73,6 @@ Off-by-default tools (enable via Smithery if needed):
 - `research-patterns` — Reference: slug naming, source selection, API key
   setup, graceful degradation, when to compound findings.
 
-## Prerequisites
-
-The Perplexity plugin must be installed separately — it is not bundled with
-yellow-research. Install it from the Claude Code plugin marketplace and ensure
-`PERPLEXITY_API_KEY` is set in your shell.
-
 ## API Key Setup
 
 Add to `~/.zshrc`:
@@ -89,7 +80,7 @@ Add to `~/.zshrc`:
 ```sh
 export EXA_API_KEY="..."
 export TAVILY_API_KEY="..."
-export PERPLEXITY_API_KEY="..."   # used by Perplexity global plugin
+export PERPLEXITY_API_KEY="..."
 export PARALLEL_API_KEY="..."
 ```
 

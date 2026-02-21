@@ -14,8 +14,8 @@ Parallel Task MCP servers with two workflows:
 
 Then enable `yellow-research` from the plugin list.
 
-**Prerequisite:** The Perplexity plugin must also be installed separately — the
-research conductor uses Perplexity for synthesis and reasoning.
+**Optional:** Install the `compound-engineering` plugin for Context7 library docs
+support in `/research:code`. If absent, the code-researcher falls back to EXA.
 
 ## API Key Setup
 
