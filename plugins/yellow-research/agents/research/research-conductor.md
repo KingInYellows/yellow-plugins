@@ -11,14 +11,12 @@ allowed-tools:
   - mcp__plugin_yellow-research_exa__deep_researcher_check
   - mcp__plugin_yellow-research_tavily__tavily_search
   - mcp__plugin_yellow-research_tavily__tavily_research
-  - mcp__plugin_yellow-research_tavily__tavily_crawl
   - mcp__plugin_yellow-research_parallel__create_deep_research_task
   - mcp__plugin_yellow-research_parallel__create_task_group
   - mcp__plugin_yellow-research_parallel__get_result
   - mcp__plugin_perplexity_perplexity__perplexity_ask
   - mcp__plugin_perplexity_perplexity__perplexity_research
   - mcp__plugin_perplexity_perplexity__perplexity_reason
-  - mcp__grep__searchGitHub
 ---
 
 You are a research conductor. Your job is to triage a research topic, decide how
