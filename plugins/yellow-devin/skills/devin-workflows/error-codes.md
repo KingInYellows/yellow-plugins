@@ -73,6 +73,7 @@ case "$http_code" in
     exit 1 ;;
   429)
     retry_after=$(printf '%s' "$body" | jq -r '.retry_after // 60' 2>/dev/null || printf '60')
+    retry_after="${retry_after:-60}"
     if [ "$retry_after" -gt 300 ] 2>/dev/null; then
       printf 'ERROR: Rate limited — API asks for %ss wait (too long)\n' "$retry_after" >&2
       exit 1
@@ -128,6 +129,7 @@ api_call_with_backoff() {
     if [ "$http_code" = "429" ]; then
       local wait_time
       wait_time=$(printf '%s' "$body" | jq -r '.retry_after // 0' 2>/dev/null || printf '0')
+      wait_time="${wait_time:-0}"
       if [ "$wait_time" -eq 0 ] 2>/dev/null; then
         wait_time=$backoff
       fi
