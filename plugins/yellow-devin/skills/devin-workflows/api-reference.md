@@ -250,13 +250,21 @@ V3 returns Unix timestamps (integers). Format for display:
 ```bash
 format_timestamp() {
   local ts="$1"
+  if [ -z "$ts" ] || ! printf '%s' "$ts" | grep -qE '^[0-9]+$'; then
+    printf 'unknown'
+    return
+  fi
   local now
   now=$(date +%s)
   local diff=$((now - ts))
-  if [ "$diff" -lt 3600 ]; then
-    printf '%d minutes ago' $((diff / 60))
+  if [ "$diff" -lt 60 ]; then
+    printf 'just now'
+  elif [ "$diff" -lt 3600 ]; then
+    local mins=$((diff / 60))
+    if [ "$mins" -eq 1 ]; then printf '1 minute ago'; else printf '%d minutes ago' "$mins"; fi
   elif [ "$diff" -lt 86400 ]; then
-    printf '%d hours ago' $((diff / 3600))
+    local hrs=$((diff / 3600))
+    if [ "$hrs" -eq 1 ]; then printf '1 hour ago'; else printf '%d hours ago' "$hrs"; fi
   else
     date -d "@$ts" '+%Y-%m-%d %H:%M' 2>/dev/null || \
       date -r "$ts" '+%Y-%m-%d %H:%M' 2>/dev/null || \

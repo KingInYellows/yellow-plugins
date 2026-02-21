@@ -64,12 +64,11 @@ case "$http_code" in
     exit 1 ;;
   422)
     printf 'ERROR: Request validation failed (422)\n' >&2
-    local detail
     detail=$(printf '%s' "$body" | jq -r '.detail[]? | "\(.loc | join(".")): \(.msg)"' 2>/dev/null)
     if [ -n "$detail" ]; then
-      printf 'Details:\n%s\n' "$detail" >&2
+      printf 'Details:\n%s\n' "$detail" | sed 's/cog_[a-zA-Z0-9_-]*/***REDACTED***/g' >&2
     else
-      printf 'Response: %.200s\n' "$body" >&2
+      printf 'Response: %.200s\n' "$body" | sed 's/cog_[a-zA-Z0-9_-]*/***REDACTED***/g' >&2
     fi
     exit 1 ;;
   429)
@@ -80,8 +79,8 @@ case "$http_code" in
     fi
     printf 'Rate limited. Waiting %ss...\n' "$retry_after" >&2
     sleep "$retry_after"
-    # Retry once after wait
-    ;;
+    printf 'ERROR: Rate limited — retry the command or use api_call_with_backoff() for automatic retries\n' >&2
+    exit 1 ;;
   5[0-9][0-9])
     printf 'ERROR: Devin API server error (%s)\n' "$http_code" >&2
     printf 'Try again in a few minutes.\n' >&2

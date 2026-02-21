@@ -39,69 +39,23 @@ ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
 
 ## Token Validation
 
-Validate before every API call:
+Validate before every API call. Call `validate_token "$DEVIN_SERVICE_USER_TOKEN"`:
 
-```bash
-validate_token() {
-  local token="$1"
-  if [ -z "$token" ]; then
-    printf 'ERROR: DEVIN_SERVICE_USER_TOKEN not set\n' >&2
-    printf 'Create a service user: Enterprise Settings > Service Users\n' >&2
-    printf 'Then: export DEVIN_SERVICE_USER_TOKEN='\''cog_...'\''\n' >&2
-    return 1
-  fi
-  if printf '%s' "$token" | grep -qE '^apk_'; then
-    printf 'ERROR: V1 API key detected (apk_ prefix)\n' >&2
-    printf 'V3 requires a service user token (cog_ prefix)\n' >&2
-    printf 'Create one: Enterprise Settings > Service Users\n' >&2
-    printf 'Docs: https://docs.devin.ai/api-reference/v3/overview\n' >&2
-    return 1
-  fi
-  if ! printf '%s' "$token" | grep -qE '^cog_[a-zA-Z0-9_-]{20,128}$'; then
-    printf 'ERROR: DEVIN_SERVICE_USER_TOKEN has invalid format\n' >&2
-    printf 'Expected: cog_... (service user credential)\n' >&2
-    return 1
-  fi
-}
-```
+- Rejects empty (not set), `apk_` prefix (V1 key), or non-`cog_` format
+- Format: `^cog_[a-zA-Z0-9_-]{20,128}$`
+- On `apk_` detection: show migration message pointing to Enterprise Settings > Service Users
 
 ## Org ID Validation
 
-Validate before every API call:
+Validate before every API call. Call `validate_org_id "$DEVIN_ORG_ID"`:
 
-```bash
-validate_org_id() {
-  local org_id="$1"
-  if [ -z "$org_id" ]; then
-    printf 'ERROR: DEVIN_ORG_ID not set\n' >&2
-    printf 'Find your org ID: Enterprise Settings > Organizations\n' >&2
-    printf 'Then: export DEVIN_ORG_ID='\''your-org-id'\''\n' >&2
-    return 1
-  fi
-  if ! printf '%s' "$org_id" | grep -qE '^[a-zA-Z0-9_-]{4,64}$'; then
-    printf 'ERROR: DEVIN_ORG_ID has invalid format\n' >&2
-    return 1
-  fi
-}
-```
+- Format: `^[a-zA-Z0-9_-]{4,64}$`
 
 ## Session ID Validation
 
-Validate before use in URL paths:
+Validate before use in URL paths. Call `validate_session_id "$SESSION_ID"`:
 
-```bash
-validate_session_id() {
-  local sid="$1"
-  if [ -z "$sid" ]; then
-    printf 'ERROR: Session ID required\n' >&2
-    return 1
-  fi
-  if ! printf '%s' "$sid" | grep -qE '^[a-zA-Z0-9_-]{8,64}$'; then
-    printf 'ERROR: Invalid session ID format: %s\n' "$sid" >&2
-    return 1
-  fi
-}
-```
+- Format: `^[a-zA-Z0-9_-]{8,64}$`
 
 ## JSON Construction (Shell Injection Prevention)
 

@@ -83,6 +83,10 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
 
+If the dedup check request fails (network error, non-2xx response, or jq parse
+failure), log a warning and proceed with session creation — dedup is a
+best-effort safeguard, not a hard requirement.
+
 Check for active sessions (status `new`, `claimed`, or `running`) with a
 matching title. If found, ask via AskUserQuestion:
 

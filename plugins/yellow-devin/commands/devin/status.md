@@ -103,7 +103,7 @@ Fetch from V3 enterprise endpoint with cursor pagination:
 ```bash
 ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
 url="${ENTERPRISE_URL}/sessions?first=10"
-url="${url}&$(printf 'org_ids=%s' "$DEVIN_ORG_ID")"
+url="${url}&$(jq -nr --arg org "$DEVIN_ORG_ID" '@uri "org_ids=\($org)"')"
 ```
 
 Apply filters if provided:

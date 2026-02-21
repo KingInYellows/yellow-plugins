@@ -72,16 +72,7 @@ before each request. Polling strategy:
 - Initial delay: 30s, base interval: 30s, backoff: 1.5x after 10 polls
 - Max interval: 5 minutes, max wall-clock: 15 minutes
 
-**V3 status handling in poll loop:**
-
-| Status | Action |
-|---|---|
-| `new`, `claimed` | Wait (normal startup) |
-| `running` | Wait (working) |
-| `suspended` | Auto-resume: send "continue" message, poll for `running` (60s timeout) |
-| `resuming` | Wait (max 60s, then escalate to user) |
-| `exit` | Success — proceed to review |
-| `error` | Failure — report and exit |
+**V3 status handling in poll loop** (see `devin-workflows` skill for status values):
 
 **Suspended auto-resume:** V3 pauses idle sessions for cost savings. Send a
 "continue" message via the enterprise message endpoint (see `devin-workflows`
