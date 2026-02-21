@@ -159,9 +159,12 @@ Response:
 
 Notes:
 
-- Always filter by `org_ids` to prevent cross-org data access
+- Always filter by `org_ids` to prevent cross-org data access — omitting it
+  returns sessions from all orgs in the enterprise account
 - `total` is optional and may be null
 - Use `first=10` for interactive listing, `first=100` for bulk operations
+- Single-session lookups should use the org-scoped `GET /organizations/{org_id}/sessions/{id}`
+  endpoint — it requires no `org_ids` filter and avoids cross-org ambiguity
 
 ### Send Message
 

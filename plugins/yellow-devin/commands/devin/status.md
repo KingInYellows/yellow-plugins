@@ -60,7 +60,7 @@ Check curl exit code, HTTP status, jq parse — see `devin-workflows` skill.
 
 **Display format:**
 
-```
+```text
 Session: {session_id}
 Title:   {title}
 Status:  {status}
@@ -75,7 +75,7 @@ If `is_archived` is true, show `[ARCHIVED]` badge after status.
 
 **PRs table** (if `pull_requests` array is non-empty):
 
-```
+```text
 PRs:
   #  | State  | URL
   1  | open   | github.com/org/repo/pull/42
@@ -110,6 +110,8 @@ Apply filters if provided:
 
 - `--tag TAG` → append `&tags=TAG`
 - `--status STATUS` → not a direct API filter; filter client-side from response
+  (note: filters the fetched page only — sessions with that status may exist on
+  subsequent pages)
 - `--archived` → include archived sessions in display (by default, hide
   `is_archived: true` sessions)
 
@@ -117,7 +119,7 @@ Check curl exit code, HTTP status, jq parse.
 
 **Display as table:**
 
-```
+```text
 Session ID     | Status    | Title          | ACUs  | PRs | Created
 abc123def4...  | running   | Auth feature   | 2.50  | 1   | 2h ago
 def456ghi7...  | exit      | Bug fix #42    | 1.20  | 1   | 5h ago

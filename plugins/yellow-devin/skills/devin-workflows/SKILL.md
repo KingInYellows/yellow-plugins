@@ -152,7 +152,7 @@ Never silently truncate.
 | Create session | Medium | Proceed (costs money but user explicitly asked) |
 | Send message | Low | Proceed without confirmation |
 | Cancel/Terminate | High | Confirm before executing (M3) |
-| Archive session | Low | Proceed (soft operation, reversible) |
+| Archive session | Low | Proceed (soft hide — no unarchive endpoint; data preserved) |
 | Tag update | Low | Proceed without confirmation |
 | Orchestrator auto-retry | Guarded | Max 3 iterations, then escalate |
 

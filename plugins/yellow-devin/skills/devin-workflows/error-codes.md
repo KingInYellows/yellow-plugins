@@ -107,8 +107,7 @@ if [ $jq_exit -ne 0 ]; then
 fi
 if [ -z "$session_id" ]; then
   printf 'ERROR: Response missing expected field '\''session_id'\''\n' >&2
-  printf '%s' "$body" | jq . 2>/dev/null | sed 's/cog_[a-zA-Z0-9_-]*/***REDACTED***/g' || \
-    printf '%s\n' "$body" | sed 's/cog_[a-zA-Z0-9_-]*/***REDACTED***/g'
+  { printf '%s' "$body" | jq . 2>/dev/null || printf '%s\n' "$body"; } | sed 's/cog_[a-zA-Z0-9_-]*/***REDACTED***/g' >&2
   exit 1
 fi
 ```
@@ -170,7 +169,7 @@ printf '%s' "$body" | sanitize_output >&2
 | Error | Code | Action |
 |---------------------|-------------|-------------------------------------------|
 | Token not set | — | Show setup instructions with service user URL |
-| V1 token detected | — | Show migration message (apk_ → cog_) |
+| V1 token detected | — | Show migration message (`apk_` → `cog_`) |
 | Token invalid format | — | Show expected format (cog_...) |
 | Network failure | curl 6/7/28 | Retry 3 times with backoff, then fail |
 | Auth rejected | HTTP 401 | Suggest creating new service user |

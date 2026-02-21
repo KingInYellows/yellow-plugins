@@ -53,6 +53,7 @@ Validate `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`. Construct prompt using
 ```bash
 DEVIN_API_BASE="https://api.devin.ai/v3beta1"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
+ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
 ```
 
 POST to `${ORG_URL}/sessions` with:
@@ -110,7 +111,7 @@ intervention.
 
 **On success:**
 
-```
+```text
 ORCHESTRATION COMPLETE:
   Session: {id}
   Title:   {title}
@@ -125,7 +126,7 @@ Present each PR URL and a summary of changes.
 
 **On failure:** Sanitize context before display — redact `cog_` tokens:
 
-```
+```text
 ORCHESTRATION CONTEXT (for manual recovery):
   Session ID: {id}
   Session URL: {url}

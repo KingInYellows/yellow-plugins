@@ -60,7 +60,7 @@ If in a git repository, gather:
 Extract `owner/repo` from remote URL for the `repos` field. Prepend context to
 the prompt:
 
-```
+```text
 Repository: {remote_url}
 Branch: {branch_name}
 
@@ -87,8 +87,8 @@ If the dedup check request fails (network error, non-2xx response, or jq parse
 failure), log a warning and proceed with session creation — dedup is a
 best-effort safeguard, not a hard requirement.
 
-Check for active sessions (status `new`, `claimed`, or `running`) with a
-matching title. If found, ask via AskUserQuestion:
+Check for active sessions (status `new`, `claimed`, `running`, `suspended`, or
+`resuming`) with a matching title. If found, ask via AskUserQuestion:
 
 - "Similar session already active: {title} ({status}). Create a new one anyway?"
 - Options: "Yes, create new" / "No, show existing"
@@ -102,7 +102,10 @@ Construct JSON payload via `jq` and POST to V3 org-scoped endpoint:
 ```bash
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
-# Build payload — only include optional fields if present
+# Default empty JSON arrays if not provided
+TAGS_JSON="${TAGS_JSON:-[]}"
+REPOS_JSON="${REPOS_JSON:-[]}"
+
 payload=$(jq -n \
   --arg prompt "$PROMPT" \
   --arg title "$TITLE" \
