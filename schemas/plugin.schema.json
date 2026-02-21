@@ -104,8 +104,17 @@
       "description": "MCP server configurations keyed by server name."
     },
     "hooks": {
-      "type": "string",
-      "description": "Path to hooks configuration file."
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Path to hooks configuration file (legacy)."
+        },
+        {
+          "type": "object",
+          "description": "Inline hooks configuration keyed by event name (PreToolUse, PostToolUse, Stop, etc.)."
+        }
+      ],
+      "description": "Hooks configuration — inline object (preferred) or path to hooks file (string)."
     }
   },
   "additionalProperties": false

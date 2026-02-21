@@ -1,14 +1,12 @@
 ---
 name: devin:wiki
-description: >
-  Query DeepWiki or Devin Wiki about a repository. Use when user asks "how does
-  X work in repo Y", "explain the architecture of Z", "search docs for", or
-  wants to understand an external codebase.
+description: Query DeepWiki or Devin Wiki about a repository. Use when user asks "how does X work in repo Y", "explain the architecture of Z", "search docs for", or wants to understand an external codebase.
 argument-hint: '<question> [--repo owner/repo]'
 allowed-tools:
   - Bash
   - Skill
   - ToolSearch
+  - AskUserQuestion
   - mcp__plugin_deepwiki_deepwiki__ask_question
   - mcp__plugin_deepwiki_deepwiki__read_wiki_structure
   - mcp__plugin_deepwiki_deepwiki__read_wiki_contents
@@ -52,6 +50,10 @@ Use ToolSearch to discover available Devin MCP tools, then call:
 - `read_wiki_structure` to browse the wiki page tree if more context is needed
 - `read_wiki_contents` for specific page details
 
+**Note on V3 auth:** The Devin MCP server at `mcp.devin.ai` may use
+`DEVIN_SERVICE_USER_TOKEN` (`cog_` prefix) or a separate auth mechanism. If MCP
+calls fail with auth errors, announce the fallback to DeepWiki.
+
 **Fallback: If Devin MCP fails**, announce the fallback explicitly:
 
 "Devin Wiki unavailable — falling back to DeepWiki (public repos only)."
@@ -61,7 +63,7 @@ Use ToolSearch to discover available Devin MCP tools, then call:
 - If repo is public: use DeepWiki MCP tools (`ask_question`,
   `read_wiki_structure`, `read_wiki_contents`)
 
-**Important:** The MCP tool names above follow the expected pattern
+**Important:** MCP tool names follow the pattern
 `mcp__plugin_<server_key>_<server_key>__<tool>`. Verify exact names via
 ToolSearch during first use — the actual registered names may differ.
 
