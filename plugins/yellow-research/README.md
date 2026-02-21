@@ -14,6 +14,9 @@ Parallel Task MCP servers with two workflows:
 
 Then enable `yellow-research` from the plugin list.
 
+**Prerequisite:** The Perplexity plugin must also be installed separately — the
+research conductor uses Perplexity for synthesis and reasoning.
+
 ## API Key Setup
 
 Add to your shell config (`~/.zshrc` or `~/.bashrc`):

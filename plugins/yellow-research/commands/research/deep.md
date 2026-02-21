@@ -19,7 +19,6 @@ allowed-tools:
   - mcp__plugin_yellow-research_tavily__tavily_research
   - mcp__plugin_yellow-research_tavily__tavily_crawl
   - mcp__plugin_yellow-research_parallel__create_deep_research_task
-  - mcp__plugin_yellow-research_parallel__create_task_group
   - mcp__plugin_yellow-research_parallel__get_result
   - mcp__plugin_perplexity_perplexity__perplexity_ask
   - mcp__plugin_perplexity_perplexity__perplexity_research
@@ -42,17 +41,25 @@ Check `$ARGUMENTS`:
 
 ### Step 2: Generate Slug
 
-Convert topic to a slug:
-- Lowercase, hyphens only: `[a-z0-9-]`
-- Max 40 characters
-- Example: "React Server Components 2026" → `react-server-components-2026`
+Generate a safe slug using Bash:
 
-Check for collisions:
 ```bash
-if [ -f "docs/research/<slug>.md" ]; then
-  # Try slug-2, slug-3, etc.
-fi
+SLUG=$(echo "$ARGUMENTS" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | tr -s '-' | sed 's/^-//;s/-$//' | cut -c1-40)
+echo "$SLUG" | grep -qE '^[a-z0-9][a-z0-9-]{0,39}$' || SLUG="research-$(date +%Y%m%d%H%M%S | cut -c1-14)"
 ```
+
+Check for collisions and increment suffix if needed:
+
+```bash
+TARGET="docs/research/${SLUG}.md"
+N=2
+while [ -f "$TARGET" ]; do
+  TARGET="docs/research/${SLUG}-${N}.md"
+  N=$((N + 1))
+done
+```
+
+Use `$TARGET` as the output path.
 
 ### Step 3: Prepare Output Directory
 

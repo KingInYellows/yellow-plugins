@@ -13,6 +13,7 @@ allowed-tools:
   - mcp__plugin_yellow-research_tavily__tavily_research
   - mcp__plugin_yellow-research_tavily__tavily_crawl
   - mcp__plugin_yellow-research_parallel__create_deep_research_task
+  - mcp__plugin_yellow-research_parallel__create_task_group
   - mcp__plugin_yellow-research_parallel__get_result
   - mcp__plugin_perplexity_perplexity__perplexity_ask
   - mcp__plugin_perplexity_perplexity__perplexity_research
@@ -41,6 +42,8 @@ Classify the topic into one of three tiers:
   2. `tavily_research` — additional web coverage
   3. `deep_researcher_start` — async EXA deep research
   4. `create_deep_research_task` — async Parallel Task report
+  5. `create_task_group` — use instead of (4) when topic decomposes into N parallel
+     sub-items (e.g., "compare Redis, Valkey, and DragonflyDB" → 3 sub-tasks)
 - While async tasks run, do synchronous queries
 - Poll async results with `deep_researcher_check` and `get_result`
 
