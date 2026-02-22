@@ -75,8 +75,8 @@ Parse `$ARGUMENTS`:
 ### Step 4: Resolve Team
 
 Use the `list_teams` response from Step 1. Auto-detect from git remote repo name
-(match case-insensitively against team names). If ambiguous or no match, prompt
-via `AskUserQuestion`.
+(case-sensitive exact match against team names). If no match, prompt via
+`AskUserQuestion`.
 
 ### Step 5: Diagnose via failure-analyst Agent
 
@@ -114,10 +114,22 @@ if [ "$WORKFLOW_NAME" = "unknown-workflow" ] && [ "$F_CODE" = "F00" ] && \
 fi
 ```
 
-### Step 6: Check for Existing Issue (Dedup)
+### Step 6: Resolve "ci-failure" Label
 
-Now that the workflow name is known from Step 5, call `list_issues` for the
-resolved team. Filter by open status. Search for any issue whose title contains
+Call `list_issue_labels` for the team. Search for a label named `ci-failure`.
+
+- **If found**: store its `id` as `CI_LABEL_ID`.
+- **If not found**: use `AskUserQuestion` — "No 'ci-failure' label in Linear.
+  [Create it / Skip label]"
+  - **Create it**: Call `create_issue_label` with `name: "ci-failure"`,
+    `color: "#EF4444"`, `teamId: TEAM_ID`. Store the returned `id`.
+  - **Skip label**: Set `CI_LABEL_ID=""`.
+
+### Step 7: Check for Existing Issue (Dedup)
+
+Now that the workflow name is known from Step 5 and `CI_LABEL_ID` is resolved,
+call `list_issues` for the resolved team. Filter by open status and
+`labelIds: [CI_LABEL_ID]` (if set). Search for any issue whose title contains
 `WORKFLOW_NAME`.
 
 If a duplicate is found: display the existing issue identifier and URL, then stop:
@@ -129,17 +141,6 @@ An open ci-failure issue already exists for this workflow:
 
 To file a new issue anyway, re-run with the run ID explicitly.
 ```
-
-### Step 7: Resolve "ci-failure" Label
-
-Call `list_issue_labels` for the team. Search for a label named `ci-failure`.
-
-- **If found**: store its `id` as `CI_LABEL_ID`.
-- **If not found**: use `AskUserQuestion` — "No 'ci-failure' label in Linear.
-  [Create it / Skip label]"
-  - **Create it**: Call `create_issue_label` with `name: "ci-failure"`,
-    `color: "#EF4444"`, `teamId: TEAM_ID`. Store the returned `id`.
-  - **Skip label**: Set `CI_LABEL_ID=""`.
 
 ### Step 8: Propose Issue to User (M3)
 

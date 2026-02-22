@@ -78,8 +78,8 @@ reject values with leading or trailing spaces, or multiple consecutive spaces
 
 Use the `list_teams` response from Step 1.
 
-- If `--team` was provided: match case-insensitively. If no match, show available
-  team names via `AskUserQuestion` and let the user select one.
+- If `--team` was provided: match by case-sensitive exact match. If no match,
+  show available team names via `AskUserQuestion` and let the user select one.
 - If `--team` not provided: check `.debt/linear-config.json` for a stored
   `team_id` and `team_name`. If found and valid, use it. If not found, show teams
   via `AskUserQuestion`.

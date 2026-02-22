@@ -59,7 +59,7 @@ fi
 
 Validate token format:
 ```bash
-if ! printf '%s' "$DEVIN_SERVICE_USER_TOKEN" | grep -qE '^cog_[A-Za-z0-9]{20,}$'; then
+if ! printf '%s' "$DEVIN_SERVICE_USER_TOKEN" | grep -qE '^cog_[a-zA-Z0-9_-]{20,128}$'; then
   printf 'ERROR: DEVIN_SERVICE_USER_TOKEN format invalid (expected cog_...)\n' >&2
   exit 1
 fi
@@ -145,28 +145,36 @@ Example: feat/eng-123-add-user-auth
 
 Get the full description from the `get_issue` response (already fetched in Step 2).
 
-Validate and truncate combined prompt length:
+Validate combined prompt length before truncating:
 ```bash
-if [ ${#PROMPT} -gt 8000 ]; then
-  PROMPT="${PROMPT:0:8000}"
-  printf '[delegate] Prompt truncated to 8000 chars\n' >&2
+PROMPT_LEN=${#PROMPT}
+if [ "$PROMPT_LEN" -gt 8000 ]; then
+  OVERFLOW=$((PROMPT_LEN - 8000))
 fi
 ```
 
-If truncation occurred, notify the user before proceeding:
+If `OVERFLOW` is set, notify the user **before** truncating:
 ```
-⚠ Prompt truncated to 8000 characters (issue description was longer).
-Devin will have partial context. To provide full context, consider adding
-key acceptance criteria to the "additional instructions" field in Step 3,
-or share the Linear issue URL directly with Devin.
+⚠ Prompt is ${PROMPT_LEN}/8000 characters — ${OVERFLOW} chars will be
+  truncated from the issue description. Devin will have partial context.
+  To provide full context, add key acceptance criteria in the additional
+  instructions field above, or share the Linear issue URL with Devin.
 ```
 
 Use `AskUserQuestion` — "Proceed with truncated prompt? [Yes / Cancel]"
 
+Only truncate after the user confirms:
+```bash
+if [ "${OVERFLOW:-0}" -gt 0 ]; then
+  PROMPT="${PROMPT:0:8000}"
+fi
+```
+
 ### Step 5: Create Devin Session via REST API
 
 ```bash
-ORG_URL="https://api.cognition.ai/enterprise/orgs/${DEVIN_ORG_ID}"
+DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 BODY_FILE=$(mktemp)
 
 HTTP_STATUS=$(curl -s -o "$BODY_FILE" -w '%{http_code}' \

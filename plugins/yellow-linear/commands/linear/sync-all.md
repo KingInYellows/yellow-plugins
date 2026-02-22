@@ -23,7 +23,8 @@ and propose bulk status transitions to keep Linear up to date.
 ### Step 1: Resolve Team
 
 Parse `$ARGUMENTS` for `--team <name>`. If provided, call `list_teams` and match
-by name (case-insensitive). If no match, show available teams via `AskUserQuestion`.
+by name (case-sensitive exact match). If no match, show available teams via
+`AskUserQuestion`.
 
 If `--team` not provided, auto-detect team from git remote:
 ```bash
@@ -44,7 +45,7 @@ REPO=$(git remote get-url origin 2>/dev/null | \
   sed 's|.*github\.com[:/]||' | sed 's|\.git$||')
 if ! printf '%s' "$REPO" | grep -qE '^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$'; then
   printf '[sync-all] ERROR: Could not detect GitHub repo from git remote.\n' >&2
-  printf '[sync-all] Use the --repo flag or run from a GitHub-remoted directory.\n' >&2
+  printf '[sync-all] Run from a directory with a GitHub remote.\n' >&2
   exit 1
 fi
 ```
