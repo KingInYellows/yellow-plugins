@@ -4,9 +4,8 @@ description: "Push accepted debt findings to Linear as issues. Use when you want
 argument-hint: '[--team <name>] [--project <name>]'
 allowed-tools:
   - Bash
-  - Read
-  - Write
   - AskUserQuestion
+  - ToolSearch
   - mcp__plugin_linear_linear__list_teams
   - mcp__plugin_linear_linear__list_projects
   - mcp__plugin_linear_linear__list_issues
@@ -45,13 +44,26 @@ yellow-linear is not installed. Install it first:
 ### Step 2: Parse Arguments
 
 ```bash
+command -v yq >/dev/null 2>&1 || {
+  printf 'ERROR: yq is required. Install: brew install yq / pip install yq\n' >&2
+  exit 1
+}
+
 TEAM_OVERRIDE=""
 PROJECT_OVERRIDE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --team)    TEAM_OVERRIDE="$2";    shift 2 ;;
-    --project) PROJECT_OVERRIDE="$2"; shift 2 ;;
+    --team)
+      if [ -z "${2:-}" ] || printf '%s' "${2:-}" | grep -q '^--'; then
+        printf 'ERROR: --team requires a value\n' >&2; exit 1
+      fi
+      TEAM_OVERRIDE="$2"; shift 2 ;;
+    --project)
+      if [ -z "${2:-}" ] || printf '%s' "${2:-}" | grep -q '^--'; then
+        printf 'ERROR: --project requires a value\n' >&2; exit 1
+      fi
+      PROJECT_OVERRIDE="$2"; shift 2 ;;
     *) printf 'ERROR: Unknown argument "%s"\n' "$1" >&2; exit 1 ;;
   esac
 done
@@ -116,17 +128,26 @@ Call `list_issue_labels` for `TEAM_ID`. Search for a label named exactly
 ### Step 7: Find Unsynced Findings
 
 ```bash
+# shellcheck disable=SC2154
 # Source shared validation helpers
-# shellcheck source=../../lib/validate.sh
-. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+
+if [ ! -d "todos/debt" ]; then
+  printf '[sync] WARNING: todos/debt/ directory not found. Run /debt:audit first.\n' >&2
+  exit 0
+fi
 
 TODOS_TO_SYNC=()
 while IFS= read -r -d '' todo_file; do
+  validate_file_path "$todo_file" || {
+    printf '[sync] ERROR: Invalid path skipped: %s\n' "$todo_file" >&2
+    continue
+  }
   existing_id=$(extract_frontmatter "$todo_file" | yq -r '.linear_issue_id // ""')
   if [ -z "$existing_id" ]; then
     TODOS_TO_SYNC+=("$todo_file")
   fi
-done < <(find todos/debt -name '*-ready-*.md' -print0 2>/dev/null)
+done < <(find todos/debt -name '*-ready-*.md' -print0)
 
 if [ ${#TODOS_TO_SYNC[@]} -eq 0 ]; then
   printf 'No findings to sync (all ready findings already synced).\n'
@@ -136,26 +157,58 @@ fi
 printf '[sync] Found %d finding(s) to sync\n' "${#TODOS_TO_SYNC[@]}"
 ```
 
+### Step 7.5: Pre-flight Confirmation (M3)
+
+Before syncing, show the user what will be created:
+
+Use `AskUserQuestion` — "Ready to create N Linear issue(s) in TEAM_NAME:
+  [list of titles, max 5 shown, then '... and N more']
+
+[Proceed / Cancel]"
+
+If Cancel: exit without creating any issues.
+
 ### Step 8: Sync Each Finding
 
 For each file in `TODOS_TO_SYNC`:
 
-**8a. Extract frontmatter fields:**
+**8a. Extract frontmatter fields (single yq call):**
 ```bash
-TODO_ID=$(extract_frontmatter "$todo_file" | yq -r '.id // ""')
-TITLE=$(extract_frontmatter "$todo_file" | yq -r '.title // "Untitled"')
-CATEGORY=$(extract_frontmatter "$todo_file" | yq -r '.category // ""')
-SEVERITY=$(extract_frontmatter "$todo_file" | yq -r '.severity // ""')
-DESCRIPTION=$(extract_frontmatter "$todo_file" | yq -r '.description // ""')
+FRONTMATTER=$(extract_frontmatter "$todo_file") || {
+  printf '[sync] ERROR: Failed to read frontmatter from %s\n' "$todo_file" >&2
+  ERROR_COUNT=$((ERROR_COUNT + 1))
+  continue
+}
+# shellcheck disable=SC2154
+eval "$(printf '%s' "$FRONTMATTER" | yq -r '@sh "
+  TODO_ID=\(.id // \"\")
+  TITLE=\(.title // \"Untitled\")
+  CATEGORY=\(.category // \"\")
+  SEVERITY=\(.severity // \"\")
+  DESCRIPTION=\(.description // \"\")
+"')" || {
+  printf '[sync] ERROR: yq parse failed for %s\n' "$todo_file" >&2
+  ERROR_COUNT=$((ERROR_COUNT + 1))
+  continue
+}
 ```
 
 **8b. Dedup check — call `list_issues`** filtered by `DEBT_LABEL_ID` (if set) and
 `teamId: TEAM_ID`, limit 50. Scan results for an issue whose `title` exactly
 matches `TITLE`. If found:
 - Store its `id` as `ISSUE_ID`
+- Validate `ISSUE_ID` is non-empty before write-back
 - Write it back via `update_frontmatter "$todo_file" '.linear_issue_id' "$ISSUE_ID"`
 - Log as "already exists — linked"
 - Continue to next finding (skip creation)
+
+Warn if `list_issues` returns exactly 50 results (pagination limit may hide
+existing issues):
+```bash
+if [ "$ISSUE_COUNT" -ge 50 ]; then
+  printf '[sync] WARNING: Dedup search hit 50-issue limit — duplicates may exist\n' >&2
+fi
+```
 
 **8c. Map severity to priority integer:**
 ```bash
@@ -183,8 +236,14 @@ not exit).
 
 **8e. Write back to frontmatter:**
 
-Extract `id` from the `create_issue` response. Then:
+Extract `id` from the `create_issue` response, then validate before writing:
 ```bash
+ISSUE_ID=$(printf '%s' "$CREATE_RESPONSE" | jq -r '.id // empty')
+if [ -z "$ISSUE_ID" ]; then
+  printf '[sync] ERROR: create_issue returned no ID for: %s\n' "$TITLE" >&2
+  ERROR_COUNT=$((ERROR_COUNT + 1))
+  continue
+fi
 update_frontmatter "$todo_file" '.linear_issue_id' "$ISSUE_ID"
 ```
 

@@ -32,6 +32,23 @@ git remote get-url origin 2>/dev/null | sed 's|.*/||' | sed 's|\.git$||'
 Match the resulting repo name against team names from `list_teams`. If ambiguous,
 prompt via `AskUserQuestion`.
 
+### Step 1.5: Validate Prerequisites
+
+```bash
+gh auth status >/dev/null 2>&1 || {
+  printf 'ERROR: gh CLI not authenticated. Run: gh auth login\n' >&2
+  exit 1
+}
+
+REPO=$(git remote get-url origin 2>/dev/null | \
+  sed 's|.*github\.com[:/]||' | sed 's|\.git$||')
+if ! printf '%s' "$REPO" | grep -qE '^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$'; then
+  printf '[sync-all] ERROR: Could not detect GitHub repo from git remote.\n' >&2
+  printf '[sync-all] Use the --repo flag or run from a GitHub-remoted directory.\n' >&2
+  exit 1
+fi
+```
+
 ### Step 2: Fetch Active Statuses Dynamically
 
 Call `list_issue_statuses` for the resolved team. **Never hardcode status names.**
@@ -49,15 +66,41 @@ the first 50 are shown. Run again after resolving these."
 
 For each issue, derive candidate branch names from `issue.identifier`:
 - Lowercase the identifier (e.g., `ENG-123` → `eng-123`)
-- Check for PRs with that identifier in the branch name:
+- Check for PRs with that identifier in the branch name, with error capture and
+  200ms pacing between calls:
 
 ```bash
-IDENTIFIER_LOWER=$(echo "$IDENTIFIER" | tr '[:upper:]' '[:lower:]')
-gh pr list \
+IDENTIFIER_LOWER=$(printf '%s' "$IDENTIFIER" | tr '[:upper:]' '[:lower:]')
+
+# 200ms pacing between calls to avoid GitHub secondary rate limits
+sleep 0.2
+
+PR_JSON=$(gh pr list \
+  --repo "$REPO" \
   --search "head:${IDENTIFIER_LOWER}" \
   --json number,state,mergedAt,title \
-  --limit 5 2>/dev/null
+  --limit 5 2>&1) || {
+  # Detect rate limit
+  if printf '%s' "$PR_JSON" | grep -qi 'rate limit'; then
+    printf '[sync-all] Rate limited — waiting 60s\n' >&2
+    sleep 60
+    PR_JSON=$(gh pr list --repo "$REPO" --search "head:${IDENTIFIER_LOWER}" \
+      --json number,state,mergedAt,title --limit 5 2>&1) || {
+      printf '[sync-all] ERROR: gh pr list failed for %s: %s\n' \
+        "$IDENTIFIER" "$PR_JSON" >&2
+      PR_JSON=""
+    }
+  else
+    printf '[sync-all] ERROR: gh pr list failed for %s: %s\n' \
+      "$IDENTIFIER" "$PR_JSON" >&2
+    PR_JSON=""
+  fi
+}
 ```
+
+If `PR_JSON` is empty after error handling, classify the issue as `gh-error`
+and skip it from transition candidates (report in summary as "skipped — gh
+error").
 
 Classify each issue:
 - **PR merged** (`state: MERGED` or `mergedAt` present) → propose transition to the
@@ -111,6 +154,7 @@ Transitioned:  N issues
 Conflicts:     N issues (state changed before update — skipped)
 No PR found:   N issues (potentially stale — review manually)
 PR open:       N issues (no action taken)
+gh errors:     N issues (skipped — check gh auth or network)
 ```
 
 For any conflicts, list the issue identifiers and their current status so the
@@ -126,7 +170,8 @@ user can handle them manually.
 
 | Error | Action |
 |-------|--------|
-| `gh` not authenticated | Exit: "Run `gh auth login` first" |
+| `gh` not authenticated | Exit at Step 1.5: "Run `gh auth login` first" |
+| No GitHub remote found | Exit at Step 1.5 with message |
 | Team not found | Show available teams, prompt to re-run |
 | 429 rate limit | Exponential backoff (1s, 2s, 4s), max 3 retries |
 | Issue not found on re-fetch | Skip, add to conflict list |

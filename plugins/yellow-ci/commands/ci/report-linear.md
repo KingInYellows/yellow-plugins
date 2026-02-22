@@ -7,6 +7,7 @@ allowed-tools:
   - Read
   - AskUserQuestion
   - Task
+  - ToolSearch
   - mcp__plugin_linear_linear__list_teams
   - mcp__plugin_linear_linear__list_issues
   - mcp__plugin_linear_linear__list_issue_labels
@@ -54,7 +55,13 @@ Parse `$ARGUMENTS`:
 - If `--repo owner/name` is present: validate format `^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$`,
   use it. Otherwise auto-detect from git remote:
   ```bash
-  git remote get-url origin 2>/dev/null | sed 's|.*github\.com[:/]||' | sed 's|\.git$||'
+  REPO=$(git remote get-url origin 2>/dev/null | \
+    sed 's|.*github\.com[:/]||' | sed 's|\.git$||')
+  if ! printf '%s' "$REPO" | grep -qE '^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$'; then
+    printf 'ERROR: Could not detect GitHub repo from git remote.\n' >&2
+    printf 'Use: /ci:report-linear --repo owner/name\n' >&2
+    exit 1
+  fi
   ```
 - If a run ID is present in `$ARGUMENTS` (matches `^[1-9][0-9]{0,19}$`): use it.
   Otherwise, fetch the latest failed run:
@@ -71,28 +78,12 @@ Use the `list_teams` response from Step 1. Auto-detect from git remote repo name
 (match case-insensitively against team names). If ambiguous or no match, prompt
 via `AskUserQuestion`.
 
-### Step 5: Check for Existing Issue (Dedup)
-
-Call `list_issues` for the resolved team. Filter by open status. Search for any
-issue whose title contains the workflow name (extracted in Step 6 after diagnosis
-— re-apply this step after Step 6 if the workflow name is not known yet).
-
-If a duplicate is found: display the existing issue identifier and URL, then stop:
-
-```
-An open ci-failure issue already exists for this workflow:
-  ENG-456: fix(ci): deploy-prod failing — Exit code 1
-  https://linear.app/team/issue/ENG-456
-
-To file a new issue anyway, re-run with the run ID explicitly.
-```
-
-### Step 6: Diagnose via failure-analyst Agent
+### Step 5: Diagnose via failure-analyst Agent
 
 Delegate to the `failure-analyst` agent via Task:
 
 ```
-Task subagent_type: "compound-engineering" (use failure-analyst)
+Task subagent_type: "failure-analyst"
 Pass: run ID, repo, branch (from git branch --show-current)
 Receive: structured failure report including:
   - F-code (F01–F12)
@@ -103,10 +94,41 @@ Receive: structured failure report including:
   - Suggested fix
 ```
 
-Wait for the agent to complete and collect its report.
+Wait for the agent to complete and collect its report. Apply fallback defaults
+for any missing fields:
+```bash
+WORKFLOW_NAME="${WORKFLOW_NAME:-unknown-workflow}"
+STEP_NAME="${STEP_NAME:-unknown-step}"
+F_CODE="${F_CODE:-F00}"
+ROOT_CAUSE="${ROOT_CAUSE:-CI failure — investigation needed}"
+ERROR_OUTPUT="${ERROR_OUTPUT:-No error output captured}"
+```
 
-After receiving the failure report, apply the dedup check from Step 5 using the
-now-known workflow name if it was not available earlier.
+If all key fields are empty (total agent failure):
+```bash
+if [ "$WORKFLOW_NAME" = "unknown-workflow" ] && [ "$F_CODE" = "F00" ] && \
+   [ "$ROOT_CAUSE" = "CI failure — investigation needed" ]; then
+  printf 'ERROR: failure-analyst returned empty report. CI diagnosis failed.\n' >&2
+  printf 'Try: /ci:diagnose %s to manually investigate.\n' "$RUN_ID" >&2
+  exit 1
+fi
+```
+
+### Step 6: Check for Existing Issue (Dedup)
+
+Now that the workflow name is known from Step 5, call `list_issues` for the
+resolved team. Filter by open status. Search for any issue whose title contains
+`WORKFLOW_NAME`.
+
+If a duplicate is found: display the existing issue identifier and URL, then stop:
+
+```
+An open ci-failure issue already exists for this workflow:
+  ENG-456: fix(ci): deploy-prod failing — Exit code 1
+  https://linear.app/team/issue/ENG-456
+
+To file a new issue anyway, re-run with the run ID explicitly.
+```
 
 ### Step 7: Resolve "ci-failure" Label
 
