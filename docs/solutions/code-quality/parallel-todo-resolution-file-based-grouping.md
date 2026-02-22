@@ -48,7 +48,7 @@ groups run concurrently with zero write conflicts.
 
 For each todo, extract every target file it touches. Produce a table:
 
-```
+```text
 TODO  | Files touched
 ------|-------------------------------------------------------------
 T-045 | plugins/yellow-chatprd/commands/chatprd/setup.md
@@ -62,9 +62,11 @@ T-058 | commands/chatprd/setup.md          (YAGNI removal)
 T-049 | commands/chatprd/setup.md          (cascade-closed by T-058)
 ```
 
+*(Abbreviated — showing todos with non-trivial file overlap. Todos T-048, T-051–T-057 map to the same file groups and are covered by Step 2's inverted mapping.)*
+
 ### Step 2: Invert to file-to-todos mapping
 
-```
+```text
 setup.md              → [045, 046, 048, 049, 050, 051, 057, 058]
 create.md             → [052, 053, 055, 056]
 list.md               → [046, 048, 054, 055, 056]
@@ -88,7 +90,7 @@ to the closing agent with the note "close without changes."
 
 For each file group, mark sequential dependencies:
 
-```
+```text
 setup.md group ordering:
   1. T-058 (removes Step 8, renumbers Step 9 → Step 8) — do first
   2. T-049 (cascade-closed by T-058)                   — mark done, no edits
@@ -101,7 +103,7 @@ setup.md group ordering:
 
 With 7 file groups in this session, 7 agents ran concurrently — no conflicts:
 
-```
+```text
 Parallel batch:
   Agent 1 → setup.md               (8 todos, ordered per Step 4)
   Agent 2 → create.md              (4 todos)
@@ -153,7 +155,7 @@ EOF
 
 ## Decision Tree
 
-```
+```text
 N todos to resolve in parallel
           |
           v

@@ -28,16 +28,16 @@ duplicate checking.
 
 ```bash
 # Kept inline for command self-containedness — see chatprd-conventions Workspace Config section
-if [ ! -f .claude/yellow-chatprd.local.md ]; then
-  printf '[chatprd] No workspace configured.\n'
-  printf 'Run /chatprd:setup to set your default org and project.\n'
+if [ ! -f .claude/yellow-chatprd.local.md ] || \
+   ! grep -qE '^org_id: ".+"' .claude/yellow-chatprd.local.md; then
+  printf '[chatprd] No workspace configured or config malformed.\n' >&2
+  printf 'Run /chatprd:setup to set your default org and project.\n' >&2
   exit 1
 fi
 ```
 
 Read `.claude/yellow-chatprd.local.md` and parse `org_id`, `org_name`,
 `default_project_id`, `default_project_name` from the YAML frontmatter.
-If `org_id` is empty: Report "Config malformed. Re-run `/chatprd:setup`." and stop.
 
 ### Step 2: Parse and Validate Input
 

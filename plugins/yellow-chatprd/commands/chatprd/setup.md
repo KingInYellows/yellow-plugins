@@ -54,8 +54,7 @@ plugin installation." and stop.
 
 Call `list_user_organizations`.
 
-- **Error or exception (not empty list):** Check for an error object or thrown exception in the response. If present, map to error table below and stop. Do NOT treat an API error as 'no organizations'.
-- **Error or timeout:** If the call returns an error object, throws, or times out, map to error table below and stop. Only proceed to empty-list handling if the call succeeded without errors.
+- **Error, exception, or timeout:** If the response contains an error object, the call throws, or it times out, map to error table below and stop. Do NOT treat an API failure as an empty list.
 - **0 results:** Report "No organizations found on your ChatPRD account. Create
   or join a team org at app.chatprd.ai first." and stop.
 - **1 result:** Display "Using your only organization: **[org_name]**" —
@@ -154,9 +153,9 @@ Ask via AskUserQuestion: "What would you like to do next?"
 | Error                     | Message                                                                |
 | ------------------------- | ---------------------------------------------------------------------- |
 | MCP tool not found        | "[chatprd] ChatPRD MCP unavailable. Check plugin installation."        |
-| 0 organizations           | "No organizations found. Create one at app.chatprd.ai."                |
-| 0 projects                | "No projects found in [org]. Create one in ChatPRD first."             |
-| M3 cancelled              | "Setup cancelled. No changes written."                                 |
+| 0 organizations           | "No organizations found on your ChatPRD account. Create or join a team org at app.chatprd.ai first." |
+| 0 projects                | "No projects found in [org_name]. Create a project in ChatPRD first, then re-run /chatprd:setup."    |
+| M3 cancelled              | "Setup cancelled. No changes made."                                    |
 | Config validation failed  | "[chatprd] Config validation failed. Check .claude/ permissions."      |
 
 See `chatprd-conventions` skill for authentication and rate limit error codes.

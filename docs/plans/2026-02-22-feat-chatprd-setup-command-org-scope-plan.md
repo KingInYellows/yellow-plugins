@@ -28,7 +28,7 @@ Add a `/chatprd:setup` command that discovers ChatPRD organizations and projects
 
 ### Architecture
 
-```
+```text
 .claude/yellow-chatprd.local.md   ← written by /chatprd:setup
         │
         ├── read by: create.md, list.md, search.md, update.md
@@ -144,7 +144,7 @@ Add to the error mapping table:
 
 Document the exact parameter names resolved in Phase 1. Example:
 
-```
+```yaml
 list_organization_documents:
   organization_id: <value from org_id in config>
 
@@ -186,7 +186,7 @@ allowed-tools:
 
 #### Command Flow
 
-```
+```text
 Step 1: Check existing config
   - Bash: [ -f .claude/yellow-chatprd.local.md ]
   - If exists: Read it, extract current org_name + default_project_name
@@ -294,7 +294,7 @@ For each command, make these changes:
 
 Add as **Step 1** in each command, before any existing steps:
 
-```
+```text
 Step 1: Read workspace config
   - Bash: if [ ! -f .claude/yellow-chatprd.local.md ]; then
       printf '[chatprd] No workspace configured.\n'
@@ -374,7 +374,7 @@ Updated flow:
 5. In list flow: use `list_organization_documents` with org context
 
 > `list_user_organizations` is NOT added to the agent — the agent reads `org_id` from the already-written config. It has no reason to re-discover organizations.
-
+>
 > Keep agent under 120 lines — trim LLM training data, keep safety rules + trigger clauses.
 
 ---

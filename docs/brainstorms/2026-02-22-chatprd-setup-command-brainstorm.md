@@ -31,7 +31,7 @@ A `/chatprd:setup` command that:
 
 ## ChatPRD Data Model
 
-```
+```text
 Account (Clerk auth, session-scoped)
   └── Organizations (via list_user_organizations)
         └── Projects (via list_projects — "AI assistants with org scoping")
@@ -80,7 +80,7 @@ Default project: Product Q1 2026
 
 ## Setup Command Flow
 
-```
+```text
 /chatprd:setup
 
 1. Check if config already exists → if yes, ask "reconfigure?"
@@ -114,8 +114,8 @@ All commands: if no config exists, prompt "Run `/chatprd:setup` first to configu
 
 These tools exist in the ChatPRD MCP API but are not yet used anywhere:
 
-- `mcp__plugin_yellow-chatprd_chatprd__list_user_organizations`
-- `mcp__plugin_yellow-chatprd_chatprd__list_organization_documents`
+- `mcp__plugin_chatprd_chatprd__list_user_organizations`
+- `mcp__plugin_chatprd_chatprd__list_organization_documents`
 
 (Also not yet used: `list_chats`, `search_chats`, `get_user_profile` — out of scope for this feature)
 

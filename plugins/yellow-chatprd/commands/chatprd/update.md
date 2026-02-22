@@ -28,8 +28,8 @@ Find and update an existing document in ChatPRD with TOCTOU protection.
 # Kept inline for command self-containedness — see chatprd-conventions Workspace Config section
 if [ ! -f .claude/yellow-chatprd.local.md ] || \
    ! grep -qE '^org_id: ".+"' .claude/yellow-chatprd.local.md; then
-  printf '[chatprd] No workspace configured or config malformed.\n'
-  printf 'Run /chatprd:setup to set your default org and project.\n'
+  printf '[chatprd] No workspace configured or config malformed.\n' >&2
+  printf 'Run /chatprd:setup to set your default org and project.\n' >&2
   exit 1
 fi
 ```
@@ -100,7 +100,6 @@ Display confirmation:
 | Error | User Message | Action |
 |-------|-------------|--------|
 | 401/403 auth | "ChatPRD authentication required. A browser window will open." | MCP handles re-auth |
-| 429 rate limit | "ChatPRD rate limit hit. Retrying in 60s." | Wait and retry once |
 | 404 document not found | "Document no longer exists. Use `/chatprd:search` to find it." | Stop |
 | Network timeout | "ChatPRD unavailable. Check connection and retry." | Retry once, then stop |
 
