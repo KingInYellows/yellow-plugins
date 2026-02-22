@@ -182,17 +182,11 @@ FRONTMATTER=$(extract_frontmatter "$todo_file") || {
   continue
 }
 # shellcheck disable=SC2154
-eval "$(printf '%s' "$FRONTMATTER" | yq -r '@sh "
-  TODO_ID=\(.id // \"\")
-  TITLE=\(.title // \"Untitled\")
-  CATEGORY=\(.category // \"\")
-  SEVERITY=\(.severity // \"\")
-  DESCRIPTION=\(.description // \"\")
-"')" || {
-  printf '[sync] ERROR: yq parse failed for %s\n' "$todo_file" >&2
-  ERROR_COUNT=$((ERROR_COUNT + 1))
-  continue
-}
+TODO_ID=$(printf '%s' "$FRONTMATTER" | yq -r '.id // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+TITLE=$(printf '%s' "$FRONTMATTER" | yq -r '.title // "Untitled"') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+CATEGORY=$(printf '%s' "$FRONTMATTER" | yq -r '.category // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+SEVERITY=$(printf '%s' "$FRONTMATTER" | yq -r '.severity // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+DESCRIPTION=$(printf '%s' "$FRONTMATTER" | yq -r '.description // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
 ```
 
 **8b. Dedup check — call `list_issues`** filtered by `DEBT_LABEL_ID` (if set) and

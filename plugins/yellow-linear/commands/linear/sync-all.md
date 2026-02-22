@@ -78,15 +78,16 @@ sleep 0.2
 
 PR_JSON=$(gh pr list \
   --repo "$REPO" \
-  --search "head:${IDENTIFIER_LOWER}" \
-  --json number,state,mergedAt,title \
+  --search "${IDENTIFIER_LOWER} in:title" \
+  --json number,state,mergedAt,title,headRefName \
   --limit 5 2>&1) || {
   # Detect rate limit
   if printf '%s' "$PR_JSON" | grep -qi 'rate limit'; then
     printf '[sync-all] Rate limited — waiting 60s\n' >&2
     sleep 60
-    PR_JSON=$(gh pr list --repo "$REPO" --search "head:${IDENTIFIER_LOWER}" \
-      --json number,state,mergedAt,title --limit 5 2>&1) || {
+    PR_JSON=$(gh pr list --repo "$REPO" \
+      --search "${IDENTIFIER_LOWER} in:title" \
+      --json number,state,mergedAt,title,headRefName --limit 5 2>&1) || {
       printf '[sync-all] ERROR: gh pr list failed for %s: %s\n' \
         "$IDENTIFIER" "$PR_JSON" >&2
       PR_JSON=""
@@ -163,7 +164,7 @@ user can handle them manually.
 
 ## Security Patterns
 
-- **C1**: `get_issue` re-fetch before each `update_issue` (H1 TOCTOU)
+- **H1**: `get_issue` re-fetch before each `update_issue` (TOCTOU guard)
 - **M3**: Explicit `AskUserQuestion` confirmation before any writes
 - No hardcoded status names — always fetch dynamically via `list_issue_statuses`
 

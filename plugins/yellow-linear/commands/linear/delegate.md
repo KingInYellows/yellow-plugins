@@ -279,5 +279,5 @@ Next steps:
 | 401 / 403 from Devin API | Exit: "Check DEVIN_SERVICE_USER_TOKEN is valid" |
 | 429 from Devin API | Backoff and retry |
 | 5xx from Devin API | Treat as transient, backoff and retry up to 3x |
-| Session URL missing in response | Show raw response, exit |
+| Session URL missing in response | Log warning, construct fallback URL (`https://app.devin.ai/sessions/${SESSION_ID}`) |
 | Status transition conflict (H1) | Skip transition, report new current status |
