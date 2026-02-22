@@ -140,8 +140,8 @@ For each issue to update:
 2. If current status no longer matches what was displayed: skip this issue, add
    to "conflict" list
 3. **Apply** `update_issue` with the new `stateId`
-4. Delay 200ms between writes; on 429 response: exponential backoff 1s → 2s → 4s,
-   max 3 retries
+4. Delay 200ms between writes; on 429 or transient 5xx error from the Linear
+   API: exponential backoff 1s → 2s → 4s, max 3 retries
 
 ### Step 7: Report Results
 
@@ -173,6 +173,6 @@ user can handle them manually.
 | `gh` not authenticated | Exit at Step 1.5: "Run `gh auth login` first" |
 | No GitHub remote found | Exit at Step 1.5 with message |
 | Team not found | Show available teams, prompt to re-run |
-| 429 rate limit | Exponential backoff (1s, 2s, 4s), max 3 retries |
+| 429 rate limit or transient 5xx | Exponential backoff (1s, 2s, 4s), max 3 retries |
 | Issue not found on re-fetch | Skip, add to conflict list |
 | 0 active issues | Report "All issues up to date" and exit |

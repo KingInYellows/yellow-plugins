@@ -153,6 +153,16 @@ if [ ${#PROMPT} -gt 8000 ]; then
 fi
 ```
 
+If truncation occurred, notify the user before proceeding:
+```
+⚠ Prompt truncated to 8000 characters (issue description was longer).
+Devin will have partial context. To provide full context, consider adding
+key acceptance criteria to the "additional instructions" field in Step 3,
+or share the Linear issue URL directly with Devin.
+```
+
+Use `AskUserQuestion` — "Proceed with truncated prompt? [Yes / Cancel]"
+
 ### Step 5: Create Devin Session via REST API
 
 ```bash
@@ -172,8 +182,9 @@ rm -f "$BODY_FILE"
 ```
 
 **Retry on network failure** (curl exit 6/7/28): exponential backoff 1s → 2s → 4s,
-max 3 attempts. On 429: apply backoff and retry. On 4xx other than 429: stop with
-error message (do not retry — likely auth or validation issue).
+max 3 attempts. On 429: apply backoff and retry. On 5xx: treat as transient,
+apply exponential backoff and retry up to 3 times. On 4xx other than 429: stop
+with error message (do not retry — likely auth or validation issue).
 
 Extract session details:
 ```bash
@@ -259,5 +270,6 @@ Next steps:
 | Curl network error | Retry up to 3x with exponential backoff |
 | 401 / 403 from Devin API | Exit: "Check DEVIN_SERVICE_USER_TOKEN is valid" |
 | 429 from Devin API | Backoff and retry |
+| 5xx from Devin API | Treat as transient, backoff and retry up to 3x |
 | Session URL missing in response | Show raw response, exit |
 | Status transition conflict (H1) | Skip transition, report new current status |

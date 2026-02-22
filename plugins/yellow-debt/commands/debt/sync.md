@@ -70,7 +70,9 @@ done
 ```
 
 Validate that overrides contain only alphanumeric, spaces, and hyphens (max 100
-chars). Reject anything that doesn't match `^[a-zA-Z0-9 -]{1,100}$`.
+chars). Reject anything that doesn't match `^[a-zA-Z0-9 -]{1,100}$`. Also
+reject values with leading or trailing spaces, or multiple consecutive spaces
+(use `echo "$VALUE" | grep -qE '^ | $|  '` to detect).
 
 ### Step 3: Resolve Team
 
@@ -230,9 +232,9 @@ esac
 - `labelIds`: `[DEBT_LABEL_ID]` (omit if empty)
 - `priority`: `PRIORITY`
 
-On failure: retry up to 3 times with exponential backoff (1s, 2s, 4s). On 429:
-use backoff. After 3 failures, record as error and continue to next finding (do
-not exit).
+On failure: retry up to 3 times with exponential backoff (1s, 2s, 4s). On 429
+or HTTP 5xx: treat as transient and use backoff. After 3 failures, record as
+error and continue to next finding (do not exit).
 
 **8e. Write back to frontmatter:**
 
@@ -296,6 +298,6 @@ Re-running sync is safe:
 | yellow-linear not installed | Exit at Step 1 with install instructions |
 | `yq` not available | Exit: "Install yq: `brew install yq` or `pip install yq`" |
 | Team not found | Show available teams via `AskUserQuestion` |
-| 429 rate limit | Exponential backoff 1s → 2s → 4s, retry max 3 times |
+| 429 rate limit or HTTP 5xx | Exponential backoff 1s → 2s → 4s, retry max 3 times |
 | Issue creation failure | Record error, continue; offer rollback summary at end |
 | Frontmatter update failure | Log warning, issue exists in Linear but todo is not linked |
