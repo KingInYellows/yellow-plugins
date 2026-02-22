@@ -27,6 +27,7 @@ duplicate checking.
 ### Step 1: Read Workspace Config
 
 ```bash
+# Kept inline for command self-containedness — see chatprd-conventions Workspace Config section
 if [ ! -f .claude/yellow-chatprd.local.md ]; then
   printf '[chatprd] No workspace configured.\n'
   printf 'Run /chatprd:setup to set your default org and project.\n'
@@ -42,8 +43,7 @@ If `org_id` is empty: Report "Config malformed. Re-run `/chatprd:setup`." and st
 
 Check `$ARGUMENTS` for a document description:
 
-- **If provided:** Validate per `chatprd-conventions` skill input validation
-  rules (max 500 chars, reject path traversal, trim whitespace, strip HTML).
+- **If provided:** Validate per `chatprd-conventions` skill input validation rules.
 - **If empty:** Ask via AskUserQuestion: "What document would you like to
   create? Please provide a concise (<= 500 characters) description including
   product, surface area, and goal (e.g., PRD for auth feature, API doc for
@@ -72,7 +72,12 @@ Suggest the best-fit template based on the description (see
 - Project: Ask "Create in default project (**[default_project_name]**) or choose
   another?"
   - Default → use `default_project_id` from config
-  - Choose another → call `list_projects` scoped to the org and present a picker
+  - Choose another → call `list_projects` scoped to the org and present a picker.
+    If `list_projects` fails, fall back to `default_project_id` from config with a
+    user-facing notice.
+    If `list_projects` returns an error or 404 (org not found): report "Configured
+    org not found — it may have been deleted. Re-run `/chatprd:setup` to
+    reconfigure." and stop.
 
 ### Step 5: Confirm and Create
 
@@ -103,4 +108,6 @@ See `chatprd-conventions` skill for error mapping (auth, rate limiting, server
 unavailable).
 
 - If `list_templates` unavailable: skip template selection, use default
-- If `list_projects` unavailable: skip project selection, accept freeform text
+- If `list_projects` unavailable or fails: use `default_project_id` from config
+  and inform user: "Could not load project list — using default project
+  **[default_project_name]**." Do NOT accept freeform project names.

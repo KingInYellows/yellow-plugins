@@ -25,29 +25,33 @@ Find and update an existing document in ChatPRD with TOCTOU protection.
 ### Step 1: Read Workspace Config
 
 ```bash
-if [ ! -f .claude/yellow-chatprd.local.md ]; then
-  printf '[chatprd] No workspace configured.\n'
+# Kept inline for command self-containedness — see chatprd-conventions Workspace Config section
+if [ ! -f .claude/yellow-chatprd.local.md ] || \
+   ! grep -qE '^org_id: ".+"' .claude/yellow-chatprd.local.md; then
+  printf '[chatprd] No workspace configured or config malformed.\n'
   printf 'Run /chatprd:setup to set your default org and project.\n'
   exit 1
 fi
 ```
 
 Read `.claude/yellow-chatprd.local.md` and parse `org_id` and `org_name` from
-the YAML frontmatter. If `org_id` is empty: Report "Config malformed. Re-run
-`/chatprd:setup`." and stop.
+the YAML frontmatter.
 
 ### Step 2: Parse and Validate Input
 
 Check `$ARGUMENTS` for a document title, ID, or change description:
 
 - **If provided:** Validate per `chatprd-conventions` skill input validation
-  rules (max 500 chars, reject path traversal, trim whitespace, strip HTML).
+  rules.
 - **If empty:** Ask via AskUserQuestion: "Which document do you want to update?"
 
 ### Step 3: Find Document
 
 Call `search_documents` to locate the target document. Pass the `org_id` from
-config as the organization scope if the tool schema supports it.
+config as the organization scope if the tool schema supports it. If
+`search_documents` does not support org scoping, warn the user: "Note: Document
+search could not be scoped to your configured org — results may include
+documents from other organizations." Then proceed with the global search.
 
 - If multiple matches: present results and ask user to confirm which one via
   AskUserQuestion.
@@ -92,6 +96,13 @@ Display confirmation:
 - Document URL (if available)
 
 ## Error Handling
+
+| Error | User Message | Action |
+|-------|-------------|--------|
+| 401/403 auth | "ChatPRD authentication required. A browser window will open." | MCP handles re-auth |
+| 429 rate limit | "ChatPRD rate limit hit. Retrying in 60s." | Wait and retry once |
+| 404 document not found | "Document no longer exists. Use `/chatprd:search` to find it." | Stop |
+| Network timeout | "ChatPRD unavailable. Check connection and retry." | Retry once, then stop |
 
 See `chatprd-conventions` skill for error mapping (auth, rate limiting, not
 found, server unavailable).
