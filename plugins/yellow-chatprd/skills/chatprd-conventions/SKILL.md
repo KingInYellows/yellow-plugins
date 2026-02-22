@@ -75,3 +75,35 @@ All `$ARGUMENTS` values are user input and must be validated before use:
 | **H1: TOCTOU mitigation**     | Re-fetch document immediately before write — never use stale content |
 | **Read-before-write dedup**   | `search_documents` before `create_document` to avoid duplicates      |
 | **M3: Explicit confirmation** | Confirm before creating or updating documents                        |
+
+## Workspace Config
+
+Commands read the default org and project from `.claude/yellow-chatprd.local.md`.
+
+**Existence check (Bash):**
+
+```bash
+if [ ! -f .claude/yellow-chatprd.local.md ]; then
+  printf '[chatprd] No workspace configured.\n'
+  printf 'Run /chatprd:setup to set your default org and project.\n'
+  exit 1
+fi
+```
+
+**Value extraction:** Use the `Read` tool to read `.claude/yellow-chatprd.local.md` and parse
+`org_id`, `org_name`, `default_project_id`, `default_project_name` from the YAML frontmatter.
+Validate that `org_id` is non-empty — if empty, report "Config malformed. Re-run /chatprd:setup."
+
+**Config error codes:**
+
+| Error                           | Message                                                                        | Action      |
+| ------------------------------- | ------------------------------------------------------------------------------ | ----------- |
+| No config file                  | "No workspace configured. Run /chatprd:setup first."                           | Stop        |
+| Config malformed                | "Config malformed. Re-run /chatprd:setup."                                     | Stop        |
+| Org not found (404 on org call) | "Configured org '[org_name]' not found — it may have been deleted. Re-run /chatprd:setup." | Stop |
+| No organizations                | "No organizations found. Create or join a team org at app.chatprd.ai first."   | Stop setup  |
+| No projects in org              | "No projects found in [org_name]. Create a project in ChatPRD first."          | Stop setup  |
+
+**Org-scoped tools:** Pass the `org_id` from config as the organization identifier when calling
+`list_organization_documents`, `list_projects`, and `create_document`. The exact parameter name
+is determined by the tool schema at runtime — pass the value as the organization context.
