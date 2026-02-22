@@ -7,10 +7,13 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-research_exa__web_search_exa
   - mcp__plugin_yellow-research_exa__web_search_advanced_exa
+  - mcp__plugin_yellow-research_exa__crawling_exa
   - mcp__plugin_yellow-research_exa__deep_researcher_start
   - mcp__plugin_yellow-research_exa__deep_researcher_check
   - mcp__plugin_yellow-research_exa__company_research_exa
   - mcp__plugin_yellow-research_tavily__tavily_search
+  - mcp__plugin_yellow-research_tavily__tavily_extract
+  - mcp__plugin_yellow-research_tavily__tavily_crawl
   - mcp__plugin_yellow-research_tavily__tavily_research
   - mcp__plugin_yellow-research_tavily__tavily_map
   - mcp__plugin_yellow-research_parallel__create_deep_research_task

@@ -27,9 +27,9 @@ All tool names follow `mcp__plugin_yellow-research_<server>__<tool>`.
 Default-on tools (enabled by EXA by default):
 - `web_search_exa` — General neural web search
 - `get_code_context_exa` — Code examples, GitHub, Stack Overflow, docs
-- `company_research_exa` — Company/org research
 
-Off-by-default tools (enable via Smithery if needed):
+Off-by-default tools (enable by adding them to the `tools=` arg in `plugin.json`):
+- `company_research_exa` — Company/org research
 - `web_search_advanced_exa` — Full-control search with date/domain filters
 - `crawling_exa` — Full content of a specific URL
 - `deep_researcher_start` — Start async EXA deep research report

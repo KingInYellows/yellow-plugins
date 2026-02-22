@@ -12,6 +12,7 @@ allowed-tools:
   - mcp__plugin_yellow-research_exa__web_search_exa
   - mcp__plugin_yellow-research_exa__web_search_advanced_exa
   - mcp__plugin_yellow-research_exa__crawling_exa
+  - mcp__plugin_yellow-research_exa__company_research_exa
   - mcp__plugin_yellow-research_exa__deep_researcher_start
   - mcp__plugin_yellow-research_exa__deep_researcher_check
   - mcp__plugin_yellow-research_tavily__tavily_search
@@ -20,6 +21,7 @@ allowed-tools:
   - mcp__plugin_yellow-research_tavily__tavily_crawl
   - mcp__plugin_yellow-research_tavily__tavily_map
   - mcp__plugin_yellow-research_parallel__create_deep_research_task
+  - mcp__plugin_yellow-research_parallel__create_task_group
   - mcp__plugin_yellow-research_parallel__get_result
   - mcp__plugin_yellow-research_perplexity__perplexity_ask
   - mcp__plugin_yellow-research_perplexity__perplexity_research
@@ -37,15 +39,15 @@ Tavily, EXA, and Parallel Task MCP.
 ### Step 1: Get Topic
 
 Check `$ARGUMENTS`:
-- If provided, use it as the research topic
-- If empty, ask via AskUserQuestion: "What topic would you like to research?"
+- If provided, set TOPIC=$ARGUMENTS
+- If empty, ask via AskUserQuestion: "What topic would you like to research?" and set TOPIC to the response
 
 ### Step 2: Generate Slug
 
 Generate a safe slug using Bash:
 
 ```bash
-SLUG=$(echo "$ARGUMENTS" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | tr -s '-' | sed 's/^-//;s/-$//' | cut -c1-40 | sed 's/-$//')
+SLUG=$(echo "$TOPIC" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | tr -s '-' | sed 's/^-//;s/-$//' | cut -c1-40 | sed 's/-$//')
 echo "$SLUG" | grep -qE '^[a-z0-9][a-z0-9-]{0,39}$' || SLUG="research-$(date +%Y%m%d%H%M%S | cut -c1-14)"
 ```
 

@@ -123,7 +123,8 @@ plugins/yellow-research/
       code.md                        # /research:code
       deep.md                        # /research:deep
   skills/
-    research-patterns.md             # Conventions: slug naming, output format, API key setup
+    research-patterns/
+      SKILL.md                       # Conventions: slug naming, output format, API key setup
   CLAUDE.md                          # Plugin context for Claude
   README.md                          # Human-facing docs
 ```
