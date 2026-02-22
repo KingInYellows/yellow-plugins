@@ -116,7 +116,7 @@ Run `/chatprd:setup` to reconfigure.
 ```bash
 grep -qE '^org_id: ".+"' .claude/yellow-chatprd.local.md && \
 grep -qE '^default_project_id: ".+"' .claude/yellow-chatprd.local.md && \
-grep -qE '^schema: "' .claude/yellow-chatprd.local.md
+grep -qE '^schema: ".+"' .claude/yellow-chatprd.local.md
 ```
 
 If validation fails: Report "[chatprd] Config validation failed. Check `.claude/`

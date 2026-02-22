@@ -66,6 +66,8 @@ and stop. Use these values for all org-scoped tool calls.
 
 ## Behavior
 
+Route by intent: create ("write a PRD", "draft a spec") → Create Flow; find/read ("find the PRD", "what does it say") → Read/Search Flow; list ("show my docs") → List Flow; modify ("update", "revise") → Update Flow.
+
 ### Create Flow
 
 1. Search existing docs for duplicates via `search_documents` — warn if similar
