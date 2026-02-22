@@ -1,17 +1,20 @@
 ---
 name: debt:sync
-description:
-  'Push accepted debt findings to Linear as issues. Use when you want to track
-  technical debt in Linear.'
+description: "Push accepted debt findings to Linear as issues. Use when you want to track technical debt in Linear."
 argument-hint: '[--team <name>] [--project <name>]'
 allowed-tools:
   - Bash
-  - Read
-  - Write
   - AskUserQuestion
+  - ToolSearch
+  - mcp__plugin_linear_linear__list_teams
+  - mcp__plugin_linear_linear__list_projects
+  - mcp__plugin_linear_linear__list_issues
+  - mcp__plugin_linear_linear__list_issue_labels
+  - mcp__plugin_linear_linear__create_issue
+  - mcp__plugin_linear_linear__create_issue_label
 ---
 
-# Technical Debt Linear Sync Command
+# Technical Debt Linear Sync
 
 Push accepted technical debt findings to Linear as issues with idempotent sync
 and rollback support.
@@ -19,370 +22,276 @@ and rollback support.
 ## Requirements
 
 - **yellow-linear plugin** must be installed
-- Linear MCP tools must be available
+- `yq` must be available (`command -v yq`)
 
 ## Arguments
 
-- `--team <name>` — Override Linear team
-- `--project <name>` — Override Linear project
+- `--team <name>` — Override Linear team (case-insensitive name match)
+- `--project <name>` — Override Linear project (name match within the team)
 
-## Implementation
+## Workflow
+
+### Step 1: Graceful Degradation Check
+
+Call `list_teams`. If the tool is unavailable (yellow-linear not installed), stop
+immediately:
+
+```
+yellow-linear is not installed. Install it first:
+  /plugin marketplace add KingInYellows/yellow-plugins yellow-linear
+```
+
+### Step 2: Parse Arguments
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
+command -v yq >/dev/null 2>&1 || {
+  printf 'ERROR: yq is required. Install: brew install yq / pip install yq\n' >&2
+  exit 1
+}
 
-# Source shared validation library for extract_frontmatter helper
-# shellcheck source=../../lib/validate.sh
-. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
-
-# Parse arguments
 TEAM_OVERRIDE=""
 PROJECT_OVERRIDE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --team)
-      TEAM_OVERRIDE="$2"
-      shift 2
-      ;;
+      if [ -z "${2:-}" ] || printf '%s' "${2:-}" | grep -q '^--'; then
+        printf 'ERROR: --team requires a value\n' >&2; exit 1
+      fi
+      TEAM_OVERRIDE="$2"; shift 2 ;;
     --project)
-      PROJECT_OVERRIDE="$2"
-      shift 2
-      ;;
-    *)
-      printf 'ERROR: Unknown argument "%s"\n' "$1" >&2
-      exit 1
-      ;;
+      if [ -z "${2:-}" ] || printf '%s' "${2:-}" | grep -q '^--'; then
+        printf 'ERROR: --project requires a value\n' >&2; exit 1
+      fi
+      PROJECT_OVERRIDE="$2"; shift 2 ;;
+    *) printf 'ERROR: Unknown argument "%s"\n' "$1" >&2; exit 1 ;;
   esac
 done
+```
 
-# Check if Linear MCP tools are available
-# (In actual implementation, check if mcp__plugin_linear_linear__create_issue exists)
-printf '[sync] Checking Linear MCP availability...\n' >&2
+Validate that overrides contain only alphanumeric, spaces, and hyphens (max 100
+chars). Reject anything that doesn't match `^[a-zA-Z0-9 -]{1,100}$`. Also
+reject values with leading or trailing spaces, or multiple consecutive spaces
+(use `echo "$VALUE" | grep -qE '^ | $|  '` to detect).
 
-# Load or create config
+### Step 3: Resolve Team
+
+Use the `list_teams` response from Step 1.
+
+- If `--team` was provided: match by case-sensitive exact match. If no match,
+  show available team names via `AskUserQuestion` and let the user select one.
+- If `--team` not provided: check `.debt/linear-config.json` for a stored
+  `team_id` and `team_name`. If found and valid, use it. If not found, show teams
+  via `AskUserQuestion`.
+
+Extract and store `TEAM_ID` and `TEAM_NAME`.
+
+### Step 4: Resolve Project
+
+Call `list_projects` filtered by `TEAM_ID`.
+
+- If `--project` was provided: match case-insensitively. If no match, show
+  available project names via `AskUserQuestion`.
+- If `--project` not provided: check config for `project_id`/`project_name`. If
+  not found, show projects via `AskUserQuestion`. If no projects exist, proceed
+  without a project (issue will be unassigned to a project).
+
+Extract and store `PROJECT_ID` (may be empty).
+
+### Step 5: Write / Update Config
+
+```bash
 CONFIG_FILE=".debt/linear-config.json"
-CONFIG_CREATED=false
+mkdir -p .debt
 
-# Case 1: No config file exists - create placeholder and exit
-if [ ! -f "$CONFIG_FILE" ]; then
-  printf '[sync] No Linear configuration found. Creating placeholder...\n' >&2
+jq -n \
+  --arg team_id "$TEAM_ID" \
+  --arg team_name "$TEAM_NAME" \
+  --arg project_id "${PROJECT_ID:-}" \
+  --arg project_name "${PROJECT_NAME:-}" \
+  '{team_id: $team_id, team_name: $team_name, project_id: $project_id, project_name: $project_name}' \
+  > "$CONFIG_FILE"
+```
 
-  printf '\nTo configure Linear sync:\n'
-  printf '  1. Use AskUserQuestion to select Linear team\n'
-  printf '  2. Use AskUserQuestion to select Linear project\n'
-  printf '  3. Store config in %s\n' "$CONFIG_FILE"
+### Step 6: Resolve "technical-debt" Label
 
-  # Create placeholder config structure
-  cat > "$CONFIG_FILE" <<EOF
-{
-  "team_id": "TEAM_UUID",
-  "team_name": "Engineering",
-  "project_id": "PROJECT_UUID",
-  "project_name": "Tech Debt"
-}
-EOF
+Call `list_issue_labels` for `TEAM_ID`. Search for a label named exactly
+`technical-debt`.
 
-  printf '\n⚠️  Placeholder config created. Please configure Linear integration:\n' >&2
-  printf '   1. Edit %s\n' "$CONFIG_FILE" >&2
-  printf '   2. Replace TEAM_UUID with actual team UUID from Linear\n' >&2
-  printf '   3. Replace PROJECT_UUID with actual project UUID from Linear\n' >&2
-  printf '   4. Update team_name and project_name as needed\n' >&2
-  printf '\nRun this command again after configuration.\n' >&2
+- **If found**: store its `id` as `DEBT_LABEL_ID`.
+- **If not found**: use `AskUserQuestion` — "No 'technical-debt' label found in
+  Linear. [Create it / Choose existing / Skip labels]"
+  - **Create it**: Call `create_issue_label` with `name: "technical-debt"`,
+    `color: "#F59E0B"`, `teamId: TEAM_ID`. Store the new label `id`.
+  - **Choose existing**: Show available labels via `AskUserQuestion`, store
+    selected `id`.
+  - **Skip labels**: Set `DEBT_LABEL_ID=""` and continue without labelling.
+
+### Step 7: Find Unsynced Findings
+
+```bash
+# shellcheck disable=SC2154
+# Source shared validation helpers
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+
+if [ ! -d "todos/debt" ]; then
+  printf '[sync] WARNING: todos/debt/ directory not found. Run /debt:audit first.\n' >&2
   exit 0
 fi
 
-# Case 2: Config exists and override flags are passed - update specified fields
-if [ -n "$TEAM_OVERRIDE" ] || [ -n "$PROJECT_OVERRIDE" ]; then
-  printf '[sync] Override flags detected. Updating existing config...\n' >&2
-
-  # Load existing config
-  TEAM_ID=$(jq -r '.team_id' "$CONFIG_FILE")
-  TEAM_NAME=$(jq -r '.team_name' "$CONFIG_FILE")
-  PROJECT_ID=$(jq -r '.project_id' "$CONFIG_FILE")
-  PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
-
-  # Update team if override provided
-  if [ -n "$TEAM_OVERRIDE" ]; then
-    # In actual implementation:
-    # 1. Use Linear MCP to resolve team name to UUID
-    # 2. Update TEAM_ID and TEAM_NAME
-    printf '[sync] Would update team to: %s (not implemented)\n' "$TEAM_OVERRIDE" >&2
-  fi
-
-  # Update project if override provided
-  if [ -n "$PROJECT_OVERRIDE" ]; then
-    # In actual implementation:
-    # 1. Use Linear MCP to resolve project name to UUID (within selected team)
-    # 2. Update PROJECT_ID and PROJECT_NAME
-    printf '[sync] Would update project to: %s (not implemented)\n' "$PROJECT_OVERRIDE" >&2
-  fi
-
-  # Write updated config back
-  jq -n \
-    --arg team_id "$TEAM_ID" \
-    --arg team_name "$TEAM_NAME" \
-    --arg project_id "$PROJECT_ID" \
-    --arg project_name "$PROJECT_NAME" \
-    '{team_id: $team_id, team_name: $team_name, project_id: $project_id, project_name: $project_name}' \
-    > "$CONFIG_FILE"
-
-  printf '[sync] Config updated at: %s\n' "$CONFIG_FILE" >&2
-fi
-
-# Case 3: Config exists - load and validate
-TEAM_ID=$(jq -r '.team_id' "$CONFIG_FILE")
-TEAM_NAME=$(jq -r '.team_name' "$CONFIG_FILE")
-PROJECT_ID=$(jq -r '.project_id' "$CONFIG_FILE")
-PROJECT_NAME=$(jq -r '.project_name' "$CONFIG_FILE")
-
-# Validate UUID formats (prevent injection)
-if ! [[ "$TEAM_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  printf 'ERROR: Invalid team_id format in config (expected UUID)\n' >&2
-  exit 1
-fi
-
-if ! [[ "$PROJECT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  printf 'ERROR: Invalid project_id format in config (expected UUID)\n' >&2
-  exit 1
-fi
-
-# Validate name formats (alphanumeric, spaces, hyphens only, max 100 chars)
-if ! [[ "$TEAM_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
-  printf 'ERROR: Invalid team_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
-  exit 1
-fi
-
-if ! [[ "$PROJECT_NAME" =~ ^[a-zA-Z0-9 -]{1,100}$ ]]; then
-  printf 'ERROR: Invalid project_name format in config (alphanumeric, spaces, hyphens only, max 100 chars)\n' >&2
-  exit 1
-fi
-
-printf '[sync] Syncing to Linear: %s / %s\n' "$TEAM_NAME" "$PROJECT_NAME" >&2
-
-# Load all ready todos without linear_issue_id
 TODOS_TO_SYNC=()
 while IFS= read -r -d '' todo_file; do
-  if [[ $(extract_frontmatter "$todo_file" | yq -r '.linear_issue_id // "null"') == "null" ]]; then
+  validate_file_path "$todo_file" || {
+    printf '[sync] ERROR: Invalid path skipped: %s\n' "$todo_file" >&2
+    continue
+  }
+  existing_id=$(extract_frontmatter "$todo_file" | yq -r '.linear_issue_id // ""')
+  if [ -z "$existing_id" ]; then
     TODOS_TO_SYNC+=("$todo_file")
   fi
-done < <(find todos/debt -name '*-ready-*.md' -print0 2>/dev/null)
+done < <(find todos/debt -name '*-ready-*.md' -print0)
 
 if [ ${#TODOS_TO_SYNC[@]} -eq 0 ]; then
   printf 'No findings to sync (all ready findings already synced).\n'
   exit 0
 fi
 
-printf '[sync] Found %d finding(s) to sync to Linear\n' "${#TODOS_TO_SYNC[@]}" >&2
+printf '[sync] Found %d finding(s) to sync\n' "${#TODOS_TO_SYNC[@]}"
+```
 
-# Sync log for rollback support
-declare -a SYNC_LOG=()
+### Step 7.5: Pre-flight Confirmation (M3)
 
-# Sync each finding with idempotency and retries
-SYNCED_COUNT=0
-ERROR_COUNT=0
+Before syncing, show the user what will be created:
 
-for todo_path in "${TODOS_TO_SYNC[@]}"; do
-  TODO_ID=$(extract_frontmatter "$todo_path" | yq -r '.id' 2>/dev/null)
-  TITLE=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"' 2>/dev/null)
-  CATEGORY=$(extract_frontmatter "$todo_path" | yq -r '.category' 2>/dev/null)
-  SEVERITY=$(extract_frontmatter "$todo_path" | yq -r '.severity' 2>/dev/null)
-  DESCRIPTION=$(extract_frontmatter "$todo_path" | yq -r '.description // ""' 2>/dev/null)
+Use `AskUserQuestion` — "Ready to create N Linear issue(s) in TEAM_NAME:
+  [list of titles, max 5 shown, then '... and N more']
 
-  printf '[sync] Processing: %s (ID: %s)\n' "$TITLE" "$TODO_ID" >&2
+[Proceed / Cancel]"
 
-  # Idempotency: check if issue already exists with label debt-<id>
-  # In actual implementation:
-  # existing_issue=$(linear_search "label:debt-${TODO_ID}")
+If Cancel: exit without creating any issues.
 
-  # Placeholder for idempotency check:
-  EXISTING_ISSUE=""
+### Step 8: Sync Each Finding
 
-  if [ -n "$EXISTING_ISSUE" ]; then
-    printf '[sync] Issue already exists, linking: %s\n' "$EXISTING_ISSUE" >&2
+For each file in `TODOS_TO_SYNC`:
 
-    # Link existing issue to todo
-    update_frontmatter "$todo_path" '.linear_issue_id' "$EXISTING_ISSUE" || {
-      printf '[sync] Failed to update linear_issue_id in %s\n' "$todo_path" >&2
-      ERROR_COUNT=$((ERROR_COUNT + 1))
-      continue
-    }
+**8a. Extract frontmatter fields (single yq call):**
+```bash
+FRONTMATTER=$(extract_frontmatter "$todo_file") || {
+  printf '[sync] ERROR: Failed to read frontmatter from %s\n' "$todo_file" >&2
+  ERROR_COUNT=$((ERROR_COUNT + 1))
+  continue
+}
+# shellcheck disable=SC2154
+TODO_ID=$(printf '%s' "$FRONTMATTER" | yq -r '.id // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+TITLE=$(printf '%s' "$FRONTMATTER" | yq -r '.title // "Untitled"') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+CATEGORY=$(printf '%s' "$FRONTMATTER" | yq -r '.category // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+SEVERITY=$(printf '%s' "$FRONTMATTER" | yq -r '.severity // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+DESCRIPTION=$(printf '%s' "$FRONTMATTER" | yq -r '.description // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
+```
 
-    SYNCED_COUNT=$((SYNCED_COUNT + 1))
-    continue
-  fi
+**8b. Dedup check — call `list_issues`** filtered by `DEBT_LABEL_ID` (if set) and
+`teamId: TEAM_ID`, limit 50. Scan results for an issue whose `title` exactly
+matches `TITLE`. If found:
+- Store its `id` as `ISSUE_ID`
+- Validate `ISSUE_ID` is non-empty before write-back
+- Write it back via `update_frontmatter "$todo_file" '.linear_issue_id' "$ISSUE_ID"`
+- Log as "already exists — linked"
+- Continue to next finding (skip creation)
 
-  # Create Linear issue with retries
-  ISSUE_ID=""
-
-  for attempt in 1 2 3; do
-    # In actual implementation:
-    # ISSUE_ID=$(linear_create_issue \
-    #   --team "$TEAM_ID" \
-    #   --project "$PROJECT_ID" \
-    #   --title "$TITLE" \
-    #   --description "$DESCRIPTION" \
-    #   --labels "debt-${TODO_ID},debt,${CATEGORY},${SEVERITY}" \
-    #   --priority "$SEVERITY"
-    # )
-
-    # Placeholder for issue creation
-    if [ $attempt -eq 1 ]; then
-      ISSUE_ID="ISSUE_UUID_${TODO_ID}"
-      break
-    fi
-
-    if [ -z "$ISSUE_ID" ]; then
-      if [ $attempt -eq 3 ]; then
-        printf '[sync] ERROR: Failed to create Linear issue for %s after 3 attempts\n' "$TODO_ID" >&2
-
-        # Ask about rollback if we've created issues
-        if [ ${#SYNC_LOG[@]} -gt 0 ]; then
-          printf '\n⚠️  FAILURE: Failed to sync finding %s\n' "$TODO_ID" >&2
-          printf 'Created %d issue(s) so far. Rollback?\n' "${#SYNC_LOG[@]}" >&2
-
-          # Use AskUserQuestion for rollback decision
-          printf '\nUse AskUserQuestion:\n'
-          printf '  "Sync failed. Rollback %d created issues? (Yes/No)"\n' "${#SYNC_LOG[@]}"
-          printf '\nIf Yes: delete issues via Linear MCP\n'
-
-          # Placeholder for rollback
-          # for logged_issue in "${SYNC_LOG[@]}"; do
-          #   linear_delete_issue "$logged_issue" || true
-          # done
-        fi
-
-        ERROR_COUNT=$((ERROR_COUNT + 1))
-        exit 1
-      fi
-
-      # Exponential backoff
-      sleep $((attempt * 2))
-    else
-      break
-    fi
-  done
-
-  # Update todo with issue ID
-  update_frontmatter "$todo_path" '.linear_issue_id' "$ISSUE_ID" || {
-    printf '[sync] Failed to update linear_issue_id in %s\n' "$todo_path" >&2
-    SYNC_LOG+=("failed:$todo_path")
-    ERROR_COUNT=$((ERROR_COUNT + 1))
-    continue
-  }
-
-  SYNC_LOG+=("$ISSUE_ID")
-  SYNCED_COUNT=$((SYNCED_COUNT + 1))
-
-  printf '[sync] Created issue: %s\n' "$ISSUE_ID" >&2
-done
-
-# Final summary
-printf '\n═════════════════════════════════════════════════════════════\n'
-printf 'Linear Sync Complete\n'
-printf '═════════════════════════════════════════════════════════════\n'
-printf 'Synced: %d findings\n' "$SYNCED_COUNT"
-printf 'Errors: %d findings\n' "$ERROR_COUNT"
-
-if [ "$SYNCED_COUNT" -gt 0 ]; then
-  printf '\nView issues in Linear: %s / %s\n' "$TEAM_NAME" "$PROJECT_NAME"
-  printf 'Filter by label: debt\n'
-fi
-
-if [ "$ERROR_COUNT" -gt 0 ]; then
-  printf '\n⚠️  WARNING: Some findings failed to sync. Check logs above.\n'
-  exit 1
+Warn if `list_issues` returns exactly 50 results (pagination limit may hide
+existing issues):
+```bash
+if [ "$ISSUE_COUNT" -ge 50 ]; then
+  printf '[sync] WARNING: Dedup search hit 50-issue limit — duplicates may exist\n' >&2
 fi
 ```
 
-## Example Usage
-
+**8c. Map severity to priority integer:**
 ```bash
-# Sync all ready findings to Linear
-$ARGUMENTS
+case "$SEVERITY" in
+  critical) PRIORITY=1 ;;
+  high)     PRIORITY=2 ;;
+  medium)   PRIORITY=3 ;;
+  low)      PRIORITY=4 ;;
+  *)        PRIORITY=0 ;; # No priority
+esac
+```
 
-# Override team and project
-$ARGUMENTS --team Engineering --project "Tech Debt Q1"
+**8d. Create issue** — Call `create_issue` with:
+- `title`: `TITLE`
+- `description`: Full markdown description built from `DESCRIPTION` + category +
+  severity context
+- `teamId`: `TEAM_ID`
+- `projectId`: `PROJECT_ID` (omit if empty)
+- `labelIds`: `[DEBT_LABEL_ID]` (omit if empty)
+- `priority`: `PRIORITY`
 
-# Re-run to sync new ready findings (idempotent)
-$ARGUMENTS
+On failure: retry up to 3 times with exponential backoff (1s, 2s, 4s). On 429
+or HTTP 5xx: treat as transient and use backoff. After 3 failures, record as
+error and continue to next finding (do not exit).
+
+**8e. Write back to frontmatter:**
+
+Extract `id` from the `create_issue` response, then validate before writing:
+```bash
+ISSUE_ID=$(printf '%s' "$CREATE_RESPONSE" | jq -r '.id // empty')
+if [ -z "$ISSUE_ID" ]; then
+  printf '[sync] ERROR: create_issue returned no ID for: %s\n' "$TITLE" >&2
+  ERROR_COUNT=$((ERROR_COUNT + 1))
+  continue
+fi
+update_frontmatter "$todo_file" '.linear_issue_id' "$ISSUE_ID"
+```
+
+Record in `CREATED_ISSUES` array for rollback support.
+
+Log: `[sync] Created Linear issue TEAM-123: TITLE`
+
+### Step 9: Rollback on Partial Failure
+
+If `ERROR_COUNT > 0` and `CREATED_ISSUES` is non-empty, use `AskUserQuestion`:
+
+"Sync completed with errors. Created N issue(s) successfully, failed M finding(s).
+
+Note: Linear MCP does not support issue deletion. Created issues cannot be
+automatically rolled back — they must be deleted manually in the Linear UI.
+
+[View created issues / Show failed findings / Done]"
+
+- **View created issues**: List each created issue title and its Linear URL
+  (derived from `identifier`: `https://linear.app/team/issue/IDENTIFIER`)
+- **Show failed findings**: List file paths of findings that failed to sync
+
+### Step 10: Final Summary
+
+```
+═══════════════════════════════════════
+Linear Debt Sync Complete
+═══════════════════════════════════════
+Synced (new):       N findings
+Already linked:     N findings
+Failed:             N findings
+───────────────────────────────────────
+Team:     TEAM_NAME
+Project:  PROJECT_NAME (or "none")
+Label:    technical-debt (or "none")
+═══════════════════════════════════════
 ```
 
 ## Idempotency
 
-The sync command is idempotent:
+Re-running sync is safe:
+1. Findings with `linear_issue_id` in frontmatter are skipped
+2. Findings without `linear_issue_id` are dedup-checked by title via `list_issues`
+3. If a match is found, the existing issue is linked — no duplicate created
 
-1. **Check for existing issue** using label search: `label:debt-<id>`
-2. **If exists**: Link to todo, skip creation
-3. **If not exists**: Create new issue with unique label
+## Error Handling
 
-Re-running sync won't create duplicates.
-
-## Issue Format
-
-Each synced Linear issue includes:
-
-**Title**: Finding title from todo **Description**: Full finding description
-with code context **Labels**:
-
-- `debt` — All technical debt issues
-- `debt-<id>` — Unique ID for idempotency
-- `<category>` — Category (complexity, duplication, etc.)
-- `<severity>` — Severity level
-
-**Priority**: Mapped from severity (critical → urgent, high → high, etc.)
-**Project**: Configured project **Team**: Configured team
-
-## Rollback Support
-
-If sync fails partway through:
-
-1. Display number of issues created so far
-2. Ask user: "Rollback N created issues? (Yes/No)"
-3. On Yes: Delete created issues via Linear MCP
-4. On No: Keep created issues, user can manually clean up
-
-**Recovery**: Todo files have `linear_issue_id` only for successfully synced
-items.
-
-## Error Scenarios
-
-**Linear MCP not available**: Exit with error, instruct to install yellow-linear
-**Network failure**: Retry 3x with exponential backoff **Rate limit (429)**:
-Exit with error, instruct to wait and retry **Invalid credentials**: Exit with
-error, check Linear API token **Partial sync failure**: Offer rollback of
-created issues
-
-## Configuration
-
-Config stored in `.debt/linear-config.json`:
-
-```json
-{
-  "team_id": "TEAM_UUID",
-  "team_name": "Engineering",
-  "project_id": "PROJECT_UUID",
-  "project_name": "Tech Debt"
-}
-```
-
-Override per-run with `--team` and `--project` flags.
-
-## Recovery Procedures
-
-**If todo update fails after issue creation**:
-
-- Issue exists in Linear
-- Todo missing `linear_issue_id`
-- Manual fix: Edit todo, add `linear_issue_id: <uuid>`
-
-**If sync is interrupted**:
-
-- Todos with `linear_issue_id` won't be re-synced (idempotency)
-- Re-run sync to complete
-
-**If need to re-sync all findings**:
-
-- Clear `linear_issue_id` from todos
-- Issues will be detected by label and linked (no duplicates)
+| Error | Action |
+|-------|--------|
+| yellow-linear not installed | Exit at Step 1 with install instructions |
+| `yq` not available | Exit: "Install yq: `brew install yq` or `pip install yq`" |
+| Team not found | Show available teams via `AskUserQuestion` |
+| 429 rate limit or HTTP 5xx | Exponential backoff 1s → 2s → 4s, retry max 3 times |
+| Issue creation failure | Record error, continue; offer rollback summary at end |
+| Frontmatter update failure | Log warning, issue exists in Linear but todo is not linked |
