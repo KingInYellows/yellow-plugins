@@ -24,7 +24,7 @@ All tool names follow `mcp__plugin_yellow-research_<server>__<tool>`.
 
 ### exa — `EXA_API_KEY`
 
-Default-on tools:
+Default-on tools (enabled by EXA by default):
 - `web_search_exa` — General neural web search
 - `get_code_context_exa` — Code examples, GitHub, Stack Overflow, docs
 - `company_research_exa` — Company/org research
@@ -86,6 +86,23 @@ export PARALLEL_API_KEY="..."
 
 Source or restart shell after setting. Keys are passed to MCP servers at
 startup — restart Claude Code after adding new keys.
+
+## Optional Dependencies
+
+These external tools improve research quality but are not required:
+
+- **compound-engineering plugin** — provides Context7
+  (`mcp__plugin_compound-engineering_context7__resolve-library-id`,
+  `mcp__plugin_compound-engineering_context7__query-docs`) for official library
+  docs. Used by `/research:code` for library queries. Falls back to EXA if not
+  installed.
+  Install: `/plugin marketplace add every-marketplace/compound-engineering`
+- **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search.
+  Used by `/research:code` and `/research:deep`. No API key required. Configure
+  globally in Claude Code MCP settings.
+
+Without these, the plugin degrades gracefully: Context7 falls back to EXA,
+`searchGitHub` is simply skipped.
 
 ## When to Use What
 

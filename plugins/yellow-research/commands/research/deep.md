@@ -18,6 +18,7 @@ allowed-tools:
   - mcp__plugin_yellow-research_tavily__tavily_extract
   - mcp__plugin_yellow-research_tavily__tavily_research
   - mcp__plugin_yellow-research_tavily__tavily_crawl
+  - mcp__plugin_yellow-research_tavily__tavily_map
   - mcp__plugin_yellow-research_parallel__create_deep_research_task
   - mcp__plugin_yellow-research_parallel__get_result
   - mcp__plugin_yellow-research_perplexity__perplexity_ask
@@ -44,7 +45,7 @@ Check `$ARGUMENTS`:
 Generate a safe slug using Bash:
 
 ```bash
-SLUG=$(echo "$ARGUMENTS" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | tr -s '-' | sed 's/^-//;s/-$//' | cut -c1-40)
+SLUG=$(echo "$ARGUMENTS" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | tr -s '-' | sed 's/^-//;s/-$//' | cut -c1-40 | sed 's/-$//')
 echo "$SLUG" | grep -qE '^[a-z0-9][a-z0-9-]{0,39}$' || SLUG="research-$(date +%Y%m%d%H%M%S | cut -c1-14)"
 ```
 

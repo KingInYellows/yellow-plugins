@@ -87,7 +87,7 @@ Actual tool names (from live session deferred tools): `tavily_search`,
 | `create_task_group` | Parallel enrichment for multiple items |
 | `get_result` | Retrieve completed research results |
 
-#### Perplexity (`mcp__plugin_perplexity_perplexity__*`)
+#### Perplexity (`mcp__plugin_yellow-research_perplexity__*`)
 
 From live session: `perplexity_ask`, `perplexity_research`, `perplexity_search`,
 `perplexity_reason`
@@ -215,7 +215,7 @@ allowed-tools:
   - mcp__plugin_compound-engineering_context7__resolve-library-id
   - mcp__plugin_compound-engineering_context7__query-docs
   - mcp__grep__searchGitHub
-  - mcp__plugin_perplexity_perplexity__perplexity_search
+  - mcp__plugin_yellow-research_perplexity__perplexity_search
 ---
 ```
 
@@ -253,9 +253,9 @@ allowed-tools:
   - mcp__plugin_yellow-research_parallel__create_deep_research_task
   - mcp__plugin_yellow-research_parallel__create_task_group
   - mcp__plugin_yellow-research_parallel__get_result
-  - mcp__plugin_perplexity_perplexity__perplexity_ask
-  - mcp__plugin_perplexity_perplexity__perplexity_research
-  - mcp__plugin_perplexity_perplexity__perplexity_reason
+  - mcp__plugin_yellow-research_perplexity__perplexity_ask
+  - mcp__plugin_yellow-research_perplexity__perplexity_research
+  - mcp__plugin_yellow-research_perplexity__perplexity_reason
   - mcp__grep__searchGitHub
 ---
 ```
@@ -293,9 +293,9 @@ allowed-tools:
   - mcp__plugin_yellow-research_tavily__tavily_crawl
   - mcp__plugin_yellow-research_parallel__create_deep_research_task
   - mcp__plugin_yellow-research_parallel__get_result
-  - mcp__plugin_perplexity_perplexity__perplexity_ask
-  - mcp__plugin_perplexity_perplexity__perplexity_research
-  - mcp__plugin_perplexity_perplexity__perplexity_reason
+  - mcp__plugin_yellow-research_perplexity__perplexity_ask
+  - mcp__plugin_yellow-research_perplexity__perplexity_research
+  - mcp__plugin_yellow-research_perplexity__perplexity_reason
   - mcp__grep__searchGitHub
 ---
 ```
@@ -347,7 +347,7 @@ allowed-tools:
   - mcp__plugin_compound-engineering_context7__resolve-library-id
   - mcp__plugin_compound-engineering_context7__query-docs
   - mcp__grep__searchGitHub
-  - mcp__plugin_perplexity_perplexity__perplexity_search
+  - mcp__plugin_yellow-research_perplexity__perplexity_search
 ---
 ```
 
