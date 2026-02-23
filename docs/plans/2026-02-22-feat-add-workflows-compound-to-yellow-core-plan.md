@@ -125,8 +125,8 @@ Before Phase 1 runs, execute these checks:
 }
 
 # Derive MEMORY.md path at runtime from current project directory
-# Claude Code slugifies the path: slashes → hyphens, leading hyphen stripped
-PROJECT_SLUG="$(pwd | tr '/' '-' | sed 's/^-//')"
+# Claude Code slugifies the path: slashes → hyphens (leading hyphen kept)
+PROJECT_SLUG="$(pwd | tr '/' '-')"
 MEMORY_PATH="$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
 [ -f "$MEMORY_PATH" ] || {
   printf '[compound] Warning: MEMORY.md not found at %s\n' "$MEMORY_PATH" >&2
@@ -165,7 +165,8 @@ Critical constraint: **all Phase 1 subagents return text data only. No file writ
 
 **Criticality tiers** (determines abort vs. proceed on failure):
 - **Critical (abort if failed)**: Context Analyzer, Solution Extractor — their output is the primary content of what gets written
-- **Supplementary (proceed with warning if failed)**: Related Docs Finder, Prevention Strategist, Category Classifier — their output augments the primary content
+- **Supplementary (proceed with warning if failed)**: Related Docs Finder, Prevention Strategist — their output augments the primary content
+- **Semi-critical (fallback chain, then hard stop)**: Category Classifier — alias normalization (security→security-issues, etc.) may recover soft failures, but `CATEGORY_FAILED` aborts Phase 2
 
 **Partial failure protocol:**
 - If Context Analyzer or Solution Extractor fail or return empty output: STOP. Report which agent failed. Do not proceed to M3. All Phase 1 work is discarded.
@@ -625,7 +626,7 @@ head -6 plugins/yellow-core/commands/workflows/compound.md
 pnpm validate:plugins
 
 # Verify MEMORY.md path derivation formula matches actual path
-PROJECT_SLUG="$(pwd | tr '/' '-' | sed 's/^-//')"
+PROJECT_SLUG="$(pwd | tr '/' '-')"
 echo "$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
 # Should output: /home/kinginyellow/.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md
 
