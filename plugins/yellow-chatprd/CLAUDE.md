@@ -23,8 +23,9 @@ the plugin orchestrates access and connects tools.
 
 ## Components
 
-### Commands (5)
+### Commands (6)
 
+- `/chatprd:setup` — Configure default org and project for the ChatPRD workspace
 - `/chatprd:create` — Create a new document in ChatPRD (PRD, spec, one-pager,
   API doc)
 - `/chatprd:search` — Search ChatPRD workspace for documents
@@ -53,6 +54,7 @@ patterns:
 
 | Use Case                                          | Use This                   |
 | ------------------------------------------------- | -------------------------- |
+| Configure workspace org/project                   | `/chatprd:setup`           |
 | Quick document creation                           | `/chatprd:create`          |
 | Find a specific document                          | `/chatprd:search`          |
 | Modify document content                           | `/chatprd:update`          |

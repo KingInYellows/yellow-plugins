@@ -24,18 +24,32 @@ duplicate checking.
 
 ## Workflow
 
-### Step 1: Parse and Validate Input
+### Step 1: Read Workspace Config
+
+```bash
+# Kept inline for command self-containedness — see chatprd-conventions Workspace Config section
+if [ ! -f .claude/yellow-chatprd.local.md ] || \
+   ! grep -qE '^org_id: ".+"' .claude/yellow-chatprd.local.md; then
+  printf '[chatprd] No workspace configured or config malformed.\n' >&2
+  printf 'Run /chatprd:setup to set your default org and project.\n' >&2
+  exit 1
+fi
+```
+
+Read `.claude/yellow-chatprd.local.md` and parse `org_id`, `org_name`,
+`default_project_id`, `default_project_name` from the YAML frontmatter.
+
+### Step 2: Parse and Validate Input
 
 Check `$ARGUMENTS` for a document description:
 
-- **If provided:** Validate per `chatprd-conventions` skill input validation
-  rules (max 500 chars, reject path traversal, trim whitespace, strip HTML).
+- **If provided:** Validate per `chatprd-conventions` skill input validation rules.
 - **If empty:** Ask via AskUserQuestion: "What document would you like to
   create? Please provide a concise (<= 500 characters) description including
   product, surface area, and goal (e.g., PRD for auth feature, API doc for
   payments)."
 
-### Step 2: Dedup Check (Read-Before-Write)
+### Step 3: Dedup Check (Read-Before-Write)
 
 Search for existing documents with similar titles via `search_documents` using
 key terms from the description.
@@ -45,33 +59,41 @@ key terms from the description.
 - If user declines: suggest `/chatprd:update` to modify the existing document
   instead. Stop.
 
-### Step 3: Template and Project Selection
+### Step 4: Template and Project Selection
 
-Fetch templates and projects in parallel:
+Fetch templates in parallel with checking the project default:
 
 - `list_templates` — show available templates
-- `list_projects` — show available projects
 
 Suggest the best-fit template based on the description (see
-`chatprd-conventions` skill template guide). Present options via
-AskUserQuestion:
+`chatprd-conventions` skill template guide). Present options via AskUserQuestion:
 
 - Template selection (with recommended option first)
-- Project selection (or "No project")
+- Project: Ask "Create in default project (**[default_project_name]**) or choose
+  another?"
+  - Default → use `default_project_id` from config
+  - Choose another → call `list_projects` scoped to the org and present a picker.
+    If `list_projects` fails, fall back to `default_project_id` from config with a
+    user-facing notice.
+    If `list_projects` returns an error or 404 (org not found): report "Configured
+    org not found — it may have been deleted. Re-run `/chatprd:setup` to
+    reconfigure." and stop.
 
-### Step 4: Confirm and Create
+### Step 5: Confirm and Create
 
 Present the creation summary:
 
 - Document description
 - Selected template
-- Selected project (if any)
+- Organization: [org_name]
+- Project: [selected project name]
 
 Ask user to confirm via AskUserQuestion before creating.
 
-Call `create_document` with description, template, and project.
+Call `create_document` with description, template, organization (from config),
+and project.
 
-### Step 5: Report
+### Step 6: Report
 
 Display the created document:
 
@@ -86,4 +108,6 @@ See `chatprd-conventions` skill for error mapping (auth, rate limiting, server
 unavailable).
 
 - If `list_templates` unavailable: skip template selection, use default
-- If `list_projects` unavailable: skip project selection, accept freeform text
+- If `list_projects` unavailable or fails: use `default_project_id` from config
+  and inform user: "Could not load project list — using default project
+  **[default_project_name]**." Do NOT accept freeform project names.
