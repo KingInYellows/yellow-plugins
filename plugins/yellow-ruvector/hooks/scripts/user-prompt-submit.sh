@@ -34,9 +34,9 @@ fi
 
 # Resolve ruvector command: prefer direct binary (62ms) over npx (2700ms)
 if command -v ruvector >/dev/null 2>&1; then
-  RUVECTOR_CMD="ruvector"
+  RUVECTOR_CMD=(ruvector)
 elif command -v npx >/dev/null 2>&1; then
-  RUVECTOR_CMD="npx ruvector"
+  RUVECTOR_CMD=(npx ruvector)
 else
   printf '{"continue": true}\n'
   exit 0
@@ -44,7 +44,7 @@ fi
 
 # Call recall with a 0.9s internal timeout (hooks.json watchdog is 1s)
 # timeout ensures clean JSON output before the watchdog kills the process
-RECALL_OUTPUT=$(timeout --kill-after=0.1 0.9 $RUVECTOR_CMD hooks recall \
+RECALL_OUTPUT=$(timeout --kill-after=0.1 0.9 "${RUVECTOR_CMD[@]}" hooks recall \
   --top-k 3 "$PROMPT" 2>/dev/null) || {
   printf '[ruvector] recall timed out or failed\n' >&2
   RECALL_OUTPUT=""
