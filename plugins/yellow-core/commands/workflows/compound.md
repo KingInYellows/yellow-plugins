@@ -67,7 +67,7 @@ fi
 ## Phase 1: Parallel Extraction (5 Subagents — Text Only)
 
 Launch all five subagents in parallel via Task. None may write files.
-Each Phase 1 Task call must specify allowed-tools: [Read, Grep, Glob, Bash]
+Each Phase 1 Task call must specify allowed-tools: [Read, Grep, Glob]
 Do NOT include Write, Edit, or Task in Phase 1 subagent allowed-tools.
 
 If $ARGUMENTS is non-empty, treat it as a user-supplied hint. Fence it with the
@@ -371,6 +371,7 @@ Guard against unset values:
 ```bash
 [ -z "$CATEGORY" ] && { printf '[compound] Error: CATEGORY is unset entering Phase 2.\n' >&2; exit 1; }
 [ -z "$FINAL_SLUG" ] && { printf '[compound] Error: FINAL_SLUG is unset entering Phase 2.\n' >&2; exit 1; }
+[ -z "$MEMORY_UNAVAILABLE" ] && { printf '[compound] Error: MEMORY_UNAVAILABLE is unset entering Phase 2.\n' >&2; exit 1; }
 ```
 
 ### If routing is AMEND_EXISTING
@@ -385,8 +386,8 @@ case "$AMEND_TARGET" in
   *..*) printf '[compound] Error: path traversal detected in AMEND_EXISTING target: %s\n' "$AMEND_TARGET" >&2; exit 1 ;;
 esac
 AMEND_RESOLVED="${PROJECT_ROOT}/${AMEND_TARGET}"
-# Symlink check
-for _dir in "$(dirname "$AMEND_RESOLVED")"; do
+# Symlink check — walk intermediate path components as in the DOC_ONLY guard
+for _dir in "docs/solutions" "$(dirname "$AMEND_TARGET")"; do
   if [ -L "$_dir" ]; then
     printf '[compound] Error: symlink detected in amend path component: %s\n' "$_dir" >&2
     exit 1
@@ -512,3 +513,10 @@ Print a completion summary with:
 - Orchestrator routing: final route + confidence level
 - Written files: resolved paths with [ok]/[skip] status
 - What's next: 3 numbered options (continue / view doc / plan)
+
+## Phase 3 (Deferred)
+
+Optional post-write review agents (build-errors, workflow, test-coverage-analyst,
+security-sentinel, etc.) that validate the written doc and MEMORY.md entry for
+accuracy and completeness are deferred to a follow-up PR. Phase 3 is not in scope
+for this iteration.
