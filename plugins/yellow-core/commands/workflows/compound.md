@@ -357,6 +357,8 @@ Options:
 - "BOTH — write doc + update MEMORY.md (current)"
 - "Cancel (no files written)"
 
+If MEMORY_UNAVAILABLE=true: omit MEMORY_ONLY and BOTH options (same guard as Level 1).
+
 After selection, proceed directly to Phase 2 — no third dialog.
 
 ---
