@@ -129,6 +129,8 @@ workflow commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`
 
 ## Known Limitations
 
+## Known Limitations
+
 - First stdio MCP server in this repo — less battle-tested than HTTP pattern
 - Hooks use ruvector CLI directly (not MCP tools) — if `ruvector` binary and
   `npx` are both unavailable, hooks exit silently without error
