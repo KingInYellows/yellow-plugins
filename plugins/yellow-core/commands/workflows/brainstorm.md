@@ -4,14 +4,7 @@ description: Explore a feature or problem through iterative Q&A and optional res
 argument-hint: '[feature description or topic]'
 allowed-tools:
   - Bash
-  - Read
-  - Glob
-  - Grep
-  - Write
   - Task
-  - ToolSearch
-  - AskUserQuestion
-  - Skill
 ---
 
 # /workflows:brainstorm
@@ -24,6 +17,8 @@ mkdir -p docs/brainstorms || {
   exit 1
 }
 ```
+
+If the above exits non-zero, stop. Do not delegate.
 
 ## Delegate
 
