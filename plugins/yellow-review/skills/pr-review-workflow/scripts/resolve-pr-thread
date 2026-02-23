@@ -43,11 +43,11 @@ mutation($threadId: ID!) {
 
 # --- Execute mutation ---
 _STDERR_FILE=$(mktemp)
+trap 'rm -f "$_STDERR_FILE"' EXIT
 RESPONSE=$(gh api graphql \
     -F threadId="$THREAD_ID" \
-    -f query="$MUTATION" 2>"$_STDERR_FILE")
-_GH_EXIT=$?
-_GH_STDERR=$(cat "$_STDERR_FILE"); rm -f "$_STDERR_FILE"
+    -f query="$MUTATION" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
+_GH_STDERR=$(cat "$_STDERR_FILE")
 if [ "$_GH_EXIT" -ne 0 ]; then
     case "$_GH_STDERR" in
         *"401"*|*"Bad credentials"*|*"authentication"*)

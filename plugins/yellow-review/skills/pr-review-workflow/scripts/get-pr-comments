@@ -4,7 +4,7 @@
 # Output: JSON array of thread objects to stdout.
 # Errors: Exit 1 with message to stderr.
 
-set -eu
+set -euo pipefail
 
 # --- Dependency checks ---
 command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found. Install from https://cli.github.com\n' >&2; exit 1; }
@@ -79,11 +79,14 @@ ALL_PAGES=()
 CURSOR=""
 PAGE=0
 
+_STDERR_FILE=$(mktemp)
+trap 'rm -f "$_STDERR_FILE"' EXIT
+
 while true; do
     PAGE=$((PAGE + 1))
 
     # Execute query — separate stdout from stderr to avoid gh warnings poisoning JSON
-    _STDERR_FILE=$(mktemp)
+    # Use && ... || to capture exit code without triggering set -e on failure
     if [ -z "$CURSOR" ]; then
         RESPONSE=$(gh api graphql \
             -f owner="$OWNER" \
@@ -91,7 +94,7 @@ while true; do
             -F "number=$PR_NUMBER" \
             -F cursor=null \
             -F "pageSize=$PAGE_SIZE" \
-            -f query="$QUERY" 2>"$_STDERR_FILE")
+            -f query="$QUERY" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
     else
         RESPONSE=$(gh api graphql \
             -f owner="$OWNER" \
@@ -99,10 +102,9 @@ while true; do
             -F "number=$PR_NUMBER" \
             -f cursor="$CURSOR" \
             -F "pageSize=$PAGE_SIZE" \
-            -f query="$QUERY" 2>"$_STDERR_FILE")
+            -f query="$QUERY" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
     fi
-    _GH_EXIT=$?
-    _GH_STDERR=$(cat "$_STDERR_FILE"); rm -f "$_STDERR_FILE"
+    _GH_STDERR=$(cat "$_STDERR_FILE")
     if [ "$_GH_EXIT" -ne 0 ]; then
         # Parse error category from stderr
         case "$_GH_STDERR" in
