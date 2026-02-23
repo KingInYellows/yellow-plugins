@@ -35,11 +35,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 - `spec-flow-analyzer` — user flow analysis, gap identification
 
-### Commands (3)
+### Commands (4)
 
 - `/workflows:plan` — transform feature descriptions into structured plans
 - `/workflows:work` — execute work plans systematically
 - `/workflows:review` — multi-agent comprehensive code review
+- `/workflows:compound` — document a recently solved problem to compound knowledge
 
 ### Skills (2)
 
