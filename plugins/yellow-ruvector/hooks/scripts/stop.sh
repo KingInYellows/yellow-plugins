@@ -16,8 +16,18 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   exit 0
 fi
 
+# Resolve ruvector command: prefer direct binary (62ms) over npx (2700ms)
+if command -v ruvector >/dev/null 2>&1; then
+  RUVECTOR_CMD=(ruvector)
+elif command -v npx >/dev/null 2>&1; then
+  RUVECTOR_CMD=(npx --no ruvector)
+else
+  printf '{"continue": true}\n'
+  exit 0
+fi
+
 # Use ruvector's built-in session-end hook
-npx ruvector hooks session-end 2>/dev/null || {
+"${RUVECTOR_CMD[@]}" hooks session-end 2>/dev/null || {
   printf '[ruvector] hooks session-end failed\n' >&2
 }
 

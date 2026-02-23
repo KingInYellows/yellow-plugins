@@ -7,12 +7,23 @@ set -eu
 
 # Read hook input from stdin
 INPUT=$(cat)
+CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // ""' 2>/dev/null) || CWD=""
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${PWD}}"
+PROJECT_DIR="${CWD:-${CLAUDE_PROJECT_DIR:-${PWD}}}"
 RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 
 # Exit silently if ruvector is not initialized
 if [ ! -d "$RUVECTOR_DIR" ]; then
+  printf '{"continue": true}\n'
+  exit 0
+fi
+
+# Resolve ruvector command: prefer direct binary (62ms) over npx (2700ms)
+if command -v ruvector >/dev/null 2>&1; then
+  RUVECTOR_CMD=(ruvector)
+elif command -v npx >/dev/null 2>&1; then
+  RUVECTOR_CMD=(npx --no ruvector)
+else
   printf '{"continue": true}\n'
   exit 0
 fi
@@ -32,7 +43,9 @@ case "$TOOL" in
   Edit|Write)
     if [ -n "$file_path" ]; then
       # Use ruvector's built-in post-edit hook
-      npx ruvector hooks post-edit --success "$file_path" 2>/dev/null || true
+      if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success "$file_path" 2>&1); then
+        printf '[ruvector] post-edit failed for %s: %s\n' "$file_path" "$ERR" >&2
+      fi
     fi
     ;;
   Bash)
@@ -42,9 +55,13 @@ case "$TOOL" in
         ''|*[!0-9]*) exit_code=0 ;;
       esac
       if [ "$exit_code" -eq 0 ]; then
-        npx ruvector hooks post-command --success "$command_text" 2>/dev/null || true
+        if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-command --success "$command_text" 2>&1); then
+          printf '[ruvector] post-command failed: %s\n' "$ERR" >&2
+        fi
       else
-        npx ruvector hooks post-command --error "exit code $exit_code" "$command_text" 2>/dev/null || true
+        if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-command --error "exit code $exit_code" "$command_text" 2>&1); then
+          printf '[ruvector] post-command failed: %s\n' "$ERR" >&2
+        fi
       fi
     fi
     ;;
