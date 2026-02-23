@@ -7,8 +7,9 @@ set -eu
 
 # Read hook input from stdin
 INPUT=$(cat)
+CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // ""' 2>/dev/null) || CWD=""
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${PWD}}"
+PROJECT_DIR="${CWD:-${CLAUDE_PROJECT_DIR:-${PWD}}}"
 RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 
 # Exit silently if ruvector is not initialized
@@ -21,7 +22,7 @@ fi
 if command -v ruvector >/dev/null 2>&1; then
   RUVECTOR_CMD=(ruvector)
 elif command -v npx >/dev/null 2>&1; then
-  RUVECTOR_CMD=(npx ruvector)
+  RUVECTOR_CMD=(npx --no ruvector)
 else
   printf '{"continue": true}\n'
   exit 0

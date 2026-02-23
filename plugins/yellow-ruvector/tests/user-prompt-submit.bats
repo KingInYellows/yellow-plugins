@@ -47,7 +47,8 @@ run_hook_failing_ruvector() {
 
 make_input() {
   local prompt="$1"
-  printf '{"user_prompt": "%s", "cwd": "%s"}' "$prompt" "$PROJECT_ROOT"
+  jq -n --arg prompt "$prompt" --arg cwd "$PROJECT_ROOT" \
+    '{"user_prompt": $prompt, "cwd": $cwd}'
 }
 
 @test "exits silently when .ruvector does not exist" {
@@ -83,6 +84,8 @@ make_input() {
   run run_hook "$input"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true' > /dev/null
+  # Injection must have happened at exactly the threshold
+  echo "$output" | jq -e '.systemMessage != null' > /dev/null
 }
 
 @test "returns continue:true with systemMessage for valid prompt" {

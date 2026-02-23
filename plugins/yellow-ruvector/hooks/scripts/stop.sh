@@ -20,7 +20,7 @@ fi
 if command -v ruvector >/dev/null 2>&1; then
   RUVECTOR_CMD=(ruvector)
 elif command -v npx >/dev/null 2>&1; then
-  RUVECTOR_CMD=(npx ruvector)
+  RUVECTOR_CMD=(npx --no ruvector)
 else
   printf '{"continue": true}\n'
   exit 0
