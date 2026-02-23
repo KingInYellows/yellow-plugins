@@ -43,7 +43,7 @@ scoped. Apply YAGNI gate: skip questions whose answer would not change output.
 
 ## Phase 2: Research + Follow-Ups
 
-Track `RESEARCH_ROUND=0`. Increment on each research spawn. If `RESEARCH_ROUND >= 2`,
+Track `RESEARCH_ROUND=0`. Increment only on successful research (not on failure). If `RESEARCH_ROUND >= 2`,
 skip directly to Phase 3.
 
 If `RESEARCH_ROUND < 2`: offer via AskUserQuestion: `[Codebase patterns] [External research] [Skip]`
@@ -53,7 +53,7 @@ If `RESEARCH_ROUND < 2`: offer via AskUserQuestion: `[Codebase patterns] [Extern
   dialogue only." Do not synthesize. Increment `RESEARCH_ROUND` only on success.
 - **External**: `ToolSearch "research-conductor"` first. If found: `Task: research-conductor`
   — fenced topic. If fails: inform user "[brainstorm] External research failed.
-  Continuing without it." Do not increment. If not found: inform user once —
+  Continuing without it." Do not increment. Do not offer external research again this session. If not found: inform user once —
   "[brainstorm] External research unavailable — yellow-research not installed." —
   do not offer again.
 - **Skip**: proceed.
@@ -67,12 +67,13 @@ AND `RESEARCH_ROUND < 2`, offer research again (same rules above). Then proceed.
 
 Present 2-3 concrete approaches per brainstorming skill format: name,
 description (2-3 sentences), pros, cons, best-when. Lead with recommendation
-+ rationale. Ask via AskUserQuestion: "Which approach do you prefer?"
+and rationale. Ask via AskUserQuestion: "Which approach do you prefer?"
 
 ## Phase 4: Write Brainstorm Doc
 
 Derive slug from user-confirmed topic (from Phase 0/1 dialogue, not `$ARGUMENTS`):
 ```bash
+export LC_ALL=C
 TODAY=$(date +%Y-%m-%d)
 SLUG=$(printf '%s' "$TOPIC" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | tr -s '-' | sed 's/^-//;s/-$//' | cut -c1-40 | sed 's/-$//')
 printf '%s' "$SLUG" | grep -qE '^[a-z0-9][a-z0-9-]*$' || { printf '[brainstorm] Error: invalid slug\n' >&2; exit 1; }
@@ -84,23 +85,24 @@ while [ -f "$TARGET" ]; do
   TARGET="docs/brainstorms/${TODAY}-${SLUG}-${N}-brainstorm.md"
   N=$((N+1))
 done
+printf '%s\n' "$TARGET"
 ```
-If any step above exits non-zero, stop. Do not proceed.
+If any step above exits non-zero, stop. Do not proceed. Capture the printed path as `RESOLVED_TARGET`.
 
-M3 confirmation via AskUserQuestion before Write — show resolved `$TARGET`,
+M3 confirmation via AskUserQuestion before Write — show resolved `$RESOLVED_TARGET`,
 2-sentence summary, options `[Save]` / `[Cancel]`. Do not write without "Save".
 If user selects [Cancel]: print "[brainstorm] Brainstorm not saved." and stop.
 
-Write `$TARGET` with sections: `## What We're Building`, `## Why This Approach`,
+Write `$RESOLVED_TARGET` with sections: `## What We're Building`, `## Why This Approach`,
 `## Key Decisions`, `## Open Questions`.
 
 After Write:
 ```bash
-[ -f "$TARGET" ] || { printf '[brainstorm] Error: file was not created at %s. Check permissions.\n' "$TARGET" >&2; exit 1; }
+[ -f "$RESOLVED_TARGET" ] || { printf '[brainstorm] Error: file was not created at %s. Check permissions.\n' "$RESOLVED_TARGET" >&2; exit 1; }
 ```
 If this check fails, stop. Do not print Phase 5 success message.
 
 ## Phase 5: Handoff
 
-Print: `Brainstorm saved to: $TARGET` — then suggest `/workflows:plan` to turn
+Print: `Brainstorm saved to: $RESOLVED_TARGET` — then suggest `/workflows:plan` to turn
 this brainstorm into an implementation plan.
