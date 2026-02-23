@@ -42,10 +42,14 @@ mutation($threadId: ID!) {
 }'
 
 # --- Execute mutation ---
+_STDERR_FILE=$(mktemp)
+trap 'rm -f "$_STDERR_FILE"' EXIT
 RESPONSE=$(gh api graphql \
     -F threadId="$THREAD_ID" \
-    -f query="$MUTATION" 2>&1) || {
-    case "$RESPONSE" in
+    -f query="$MUTATION" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
+_GH_STDERR=$(cat "$_STDERR_FILE")
+if [ "$_GH_EXIT" -ne 0 ]; then
+    case "$_GH_STDERR" in
         *"401"*|*"Bad credentials"*|*"authentication"*)
             printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
             ;;
@@ -61,20 +65,26 @@ RESPONSE=$(gh api graphql \
             exit 0
             ;;
         *)
-            printf 'Error: GraphQL mutation failed: %s\n' "$RESPONSE" >&2
+            printf 'Error: GraphQL mutation failed: %s\n' "$_GH_STDERR" >&2
             ;;
     esac
     exit 1
-}
+fi
 
 # --- Validate response ---
-IS_RESOLVED=$(printf '%s' "$RESPONSE" | jq -r '.data.resolveReviewThread.thread.isResolved // empty' 2>/dev/null)
+IS_RESOLVED=$(printf '%s' "$RESPONSE" | jq -r '.data.resolveReviewThread.thread.isResolved // empty') || {
+    printf '[resolve-pr-thread] Error: Failed to parse mutation response.\n' >&2
+    exit 1
+}
 
 if [ "$IS_RESOLVED" = "true" ]; then
     jq -n --arg id "$THREAD_ID" '{"resolved": true, "threadId": $id}'
 else
     # Check for GraphQL-level errors
-    ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty' 2>/dev/null)
+    ERRORS=$(printf '%s' "$RESPONSE" | jq -r '.errors[0].message // empty') || {
+        printf '[resolve-pr-thread] Error: Failed to parse GraphQL error response.\n' >&2
+        exit 1
+    }
     if [ -n "$ERRORS" ]; then
         # Check for already-resolved in error message (idempotent)
         case "$ERRORS" in

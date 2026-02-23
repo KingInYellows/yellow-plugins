@@ -48,11 +48,17 @@ Determine repo from git remote:
 gh repo view --json nameWithOwner -q .nameWithOwner
 ```
 
+If this fails (not in a git repo, not authenticated, or remote is not GitHub):
+report the error and stop.
+
 Run the GraphQL script:
 
 ```bash
-plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-comments "<owner/repo>" "<PR#>"
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/get-pr-comments" "<owner/repo>" "<PR#>"
 ```
+
+If the script exits non-zero, report its stderr output verbatim and stop. Do not
+proceed to Step 4.
 
 If no unresolved comments: report "No unresolved comments found on PR #X." and
 exit successfully.
@@ -97,22 +103,35 @@ gt submit --no-interactive
 
 ### Step 7: Mark Threads Resolved
 
-**Only if the user approved the push in Step 6.** If push was rejected, skip
-this step.
+**Only if the user approved the push in Step 6 AND `gt submit` exited 0.** If
+push was rejected or failed, skip this step.
 
 For each comment thread that was addressed, run:
 
 ```bash
-plugins/yellow-review/skills/pr-review-workflow/scripts/resolve-pr-thread "<threadId>"
+"${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/resolve-pr-thread" "<threadId>"
 ```
+
+If a script exits non-zero, record the threadId as failed and continue to the
+next thread. Do not abort the loop. Include all failed threadIds with their
+stderr output in the Step 9 report.
 
 ### Step 8: Verification Loop
 
 1. Wait 2 seconds
-2. Re-fetch comments with `get-pr-comments`
+2. Re-fetch comments with `get-pr-comments`:
+   - If the re-fetch fails with a 429 (rate limit) error: wait 60 seconds and
+     retry once
+   - If the re-fetch fails with any other error: mark verification as
+     **inconclusive**, capture the stderr output, and skip to Step 9 (do not
+     attempt further `resolve-pr-thread` retries)
 3. If unresolved threads remain that we attempted to resolve, retry
-   `resolve-pr-thread` up to 3 times
-4. Report any threads that remain unresolved after retries as warnings
+   `resolve-pr-thread` up to 3 times:
+   - Check the exit code on each attempt
+   - On a 429 (rate limit) error in stderr: wait 60 seconds before next retry
+4. Threads unresolved after 3 retries due to non-zero exit are reported as
+   **Errors** (include stderr from the last failed attempt). Other unresolved
+   threads are reported as warnings.
 
 ### Step 9: Report
 
@@ -123,6 +142,7 @@ Present summary:
 - Failed/skipped count (with reasons)
 - Any remaining unresolved threads
 - Push status
+- Verification status (if inconclusive, include the error details from Step 8)
 
 ## Error Handling
 

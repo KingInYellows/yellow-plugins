@@ -4,7 +4,7 @@
 # Output: JSON array of thread objects to stdout.
 # Errors: Exit 1 with message to stderr.
 
-set -eu
+set -euo pipefail
 
 # --- Dependency checks ---
 command -v gh >/dev/null 2>&1 || { printf 'Error: gh CLI not found. Install from https://cli.github.com\n' >&2; exit 1; }
@@ -79,10 +79,14 @@ ALL_PAGES=()
 CURSOR=""
 PAGE=0
 
+_STDERR_FILE=$(mktemp)
+trap 'rm -f "$_STDERR_FILE"' EXIT
+
 while true; do
     PAGE=$((PAGE + 1))
 
-    # Execute query — use -F cursor=null for first page, -f cursor=VALUE for subsequent
+    # Execute query — separate stdout from stderr to avoid gh warnings poisoning JSON
+    # Use && ... || to capture exit code without triggering set -e on failure
     if [ -z "$CURSOR" ]; then
         RESPONSE=$(gh api graphql \
             -f owner="$OWNER" \
@@ -90,7 +94,7 @@ while true; do
             -F "number=$PR_NUMBER" \
             -F cursor=null \
             -F "pageSize=$PAGE_SIZE" \
-            -f query="$QUERY" 2>&1)
+            -f query="$QUERY" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
     else
         RESPONSE=$(gh api graphql \
             -f owner="$OWNER" \
@@ -98,12 +102,12 @@ while true; do
             -F "number=$PR_NUMBER" \
             -f cursor="$CURSOR" \
             -F "pageSize=$PAGE_SIZE" \
-            -f query="$QUERY" 2>&1)
+            -f query="$QUERY" 2>"$_STDERR_FILE") && _GH_EXIT=0 || _GH_EXIT=$?
     fi
-    # shellcheck disable=SC2181
-    if [ $? -ne 0 ]; then
-        # Parse error category from response
-        case "$RESPONSE" in
+    _GH_STDERR=$(cat "$_STDERR_FILE")
+    if [ "$_GH_EXIT" -ne 0 ]; then
+        # Parse error category from stderr
+        case "$_GH_STDERR" in
             *"401"*|*"Bad credentials"*|*"authentication"*)
                 printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
                 ;;
@@ -120,7 +124,7 @@ while true; do
                 printf 'Error: GitHub server error. Retry in a few minutes.\n' >&2
                 ;;
             *)
-                printf 'Error: GraphQL query failed (page %d): %s\n' "$PAGE" "$RESPONSE" >&2
+                printf 'Error: GraphQL query failed (page %d): %s\n' "$PAGE" "$_GH_STDERR" >&2
                 ;;
         esac
         exit 1
@@ -148,7 +152,10 @@ while true; do
     ALL_PAGES+=("$PAGE_THREADS")
 
     # --- Check pagination ---
-    HAS_MORE=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
+    HAS_MORE=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false') || {
+        printf '[get-pr-comments] Error: Failed to read pagination state on page %d. Aborting.\n' "$PAGE" >&2
+        exit 1
+    }
     if [ "$HAS_MORE" != "true" ]; then
         break
     fi

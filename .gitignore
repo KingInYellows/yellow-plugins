@@ -86,3 +86,7 @@ temp/
 # Backup files
 *.backup
 .gitignore.backup
+
+# ruvector per-developer runtime data
+.ruvector/
+**/.ruvector/
