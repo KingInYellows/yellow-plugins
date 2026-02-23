@@ -33,16 +33,17 @@ Before extracting anything, run these checks:
 
 ```bash
 # Verify docs/solutions/ exists and is writable in the current directory
-[ -d "docs/solutions" ] || {
-  printf '[compound] Error: docs/solutions/ not found. Run from the project root.\n' >&2
+[ -d "docs/solutions" ] && [ -w "docs/solutions" ] || {
+  printf '[compound] Error: docs/solutions/ not found or not writable. Run from the project root.\n' >&2
   exit 1
 }
 
-# Derive MEMORY.md absolute path from the current project directory.
-# Claude Code slugifies: /home/user/projects/foo → -home-user-projects-foo
-PROJECT_SLUG="$(pwd | tr '/' '-' | sed 's/^-//')"
+# Derive MEMORY.md absolute path from the Git root (Claude Code uses Git root for slug).
+# Claude Code slugifies: /home/user/projects/foo → -home-user-projects-foo (leading hyphen kept)
 [ -n "$HOME" ] || { printf '[compound] Error: $HOME is unset.\n' >&2; exit 1; }
-[ -n "$PROJECT_SLUG" ] || { printf '[compound] Error: Could not derive project slug from pwd. Check working directory.\n' >&2; exit 1; }
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PROJECT_SLUG="$(printf '%s' "$GIT_ROOT" | tr '/' '-')"
+[ -n "$PROJECT_SLUG" ] || { printf '[compound] Error: Could not derive project slug from Git root.\n' >&2; exit 1; }
 MEMORY_PATH="$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
 
 MEMORY_UNAVAILABLE=false
@@ -237,9 +238,10 @@ SLUG="<from Category Classifier>"
 
 # Normalize known aliases
 case "$CATEGORY" in
-  security)  CATEGORY="security-issues" ;;
-  quality)   CATEGORY="code-quality" ;;
-  build|build-error) CATEGORY="build-errors" ;;
+  security)           CATEGORY="security-issues" ;;
+  quality)            CATEGORY="code-quality" ;;
+  build|build-error)  CATEGORY="build-errors" ;;
+  workflows)          CATEGORY="workflow" ;;
 esac
 
 # Enforce exact enum (not just regex — prevents ad-hoc categories)
@@ -256,6 +258,11 @@ esac
 if [ "$SLUG" = "SLUG_FAILED" ] || ! printf '%s' "$SLUG" | grep -qE '^[a-z0-9][a-z0-9-]*$'; then
   printf '[compound] Error: could not derive a valid slug. Value was: "%s"\n' "$SLUG" >&2
   printf '[compound] Re-run with a hint: /workflows:compound [brief description]\n' >&2
+  exit 1
+fi
+if [ "${#SLUG}" -gt 50 ]; then
+  printf '[compound] Error: slug exceeds 50-character limit (%d chars): "%s"\n' "${#SLUG}" "$SLUG" >&2
+  printf '[compound] Re-run with a more concise hint.\n' >&2
   exit 1
 fi
 
@@ -373,6 +380,10 @@ If the orchestrator's routing is AMEND_EXISTING:
 2. Validate the path stays within `docs/solutions/`:
 ```bash
 PROJECT_ROOT="$(pwd)"
+# Reject path traversal in untrusted subagent-supplied path
+case "$AMEND_TARGET" in
+  *..*) printf '[compound] Error: path traversal detected in AMEND_EXISTING target: %s\n' "$AMEND_TARGET" >&2; exit 1 ;;
+esac
 AMEND_RESOLVED="${PROJECT_ROOT}/${AMEND_TARGET}"
 # Symlink check
 for _dir in "$(dirname "$AMEND_RESOLVED")"; do
@@ -467,8 +478,10 @@ for manual copy instead of attempting Edit:
 ```
 
 Otherwise: re-read MEMORY.md immediately before the Edit to get a fresh anchor
-(prevents TOCTOU with Claude Code's own auto-memory writes). Apply a single Edit
-appending the new section. Never spawn parallel agents to write MEMORY.md.
+(prevents TOCTOU with Claude Code's own auto-memory writes during the session). Apply a single Edit
+appending the new section. If the Edit fails due to an anchor mismatch (MEMORY.md changed between
+the re-read and the Edit), re-read once more and retry the Edit exactly once before failing.
+Never spawn parallel agents to write MEMORY.md.
 
 MEMORY.md entry format:
 ```markdown
