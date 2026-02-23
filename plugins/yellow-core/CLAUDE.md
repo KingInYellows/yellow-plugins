@@ -14,7 +14,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Plugin Components
 
-### Agents (10)
+### Agents (11)
 
 **Review** — parallel code review specialists:
 
@@ -34,16 +34,19 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 **Workflow** — planning and analysis:
 
 - `spec-flow-analyzer` — user flow analysis, gap identification
+- `brainstorm-orchestrator` — iterative brainstorm dialogue with research integration
 
-### Commands (4)
+### Commands (5)
 
+- `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
 - `/workflows:work` — execute work plans systematically
 - `/workflows:review` — multi-agent comprehensive code review
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 
-### Skills (2)
+### Skills (3)
 
+- `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `create-agent-skills` — guidance for creating skills and agents
 - `git-worktree` — git worktree management for parallel development
 
