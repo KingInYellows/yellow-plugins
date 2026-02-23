@@ -119,7 +119,12 @@ stderr output in the Step 9 report.
 ### Step 8: Verification Loop
 
 1. Wait 2 seconds
-2. Re-fetch comments with `get-pr-comments`
+2. Re-fetch comments with `get-pr-comments`:
+   - If the re-fetch fails with a 429 (rate limit) error: wait 60 seconds and
+     retry once
+   - If the re-fetch fails with any other error: mark verification as
+     **inconclusive**, capture the stderr output, and skip to Step 9 (do not
+     attempt further `resolve-pr-thread` retries)
 3. If unresolved threads remain that we attempted to resolve, retry
    `resolve-pr-thread` up to 3 times:
    - Check the exit code on each attempt
@@ -137,6 +142,7 @@ Present summary:
 - Failed/skipped count (with reasons)
 - Any remaining unresolved threads
 - Push status
+- Verification status (if inconclusive, include the error details from Step 8)
 
 ## Error Handling
 
