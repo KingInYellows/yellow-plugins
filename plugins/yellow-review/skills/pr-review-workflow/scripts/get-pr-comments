@@ -82,7 +82,8 @@ PAGE=0
 while true; do
     PAGE=$((PAGE + 1))
 
-    # Execute query — use -F cursor=null for first page, -f cursor=VALUE for subsequent
+    # Execute query — separate stdout from stderr to avoid gh warnings poisoning JSON
+    _STDERR_FILE=$(mktemp)
     if [ -z "$CURSOR" ]; then
         RESPONSE=$(gh api graphql \
             -f owner="$OWNER" \
@@ -90,7 +91,7 @@ while true; do
             -F "number=$PR_NUMBER" \
             -F cursor=null \
             -F "pageSize=$PAGE_SIZE" \
-            -f query="$QUERY" 2>&1)
+            -f query="$QUERY" 2>"$_STDERR_FILE")
     else
         RESPONSE=$(gh api graphql \
             -f owner="$OWNER" \
@@ -98,12 +99,13 @@ while true; do
             -F "number=$PR_NUMBER" \
             -f cursor="$CURSOR" \
             -F "pageSize=$PAGE_SIZE" \
-            -f query="$QUERY" 2>&1)
+            -f query="$QUERY" 2>"$_STDERR_FILE")
     fi
-    # shellcheck disable=SC2181
-    if [ $? -ne 0 ]; then
-        # Parse error category from response
-        case "$RESPONSE" in
+    _GH_EXIT=$?
+    _GH_STDERR=$(cat "$_STDERR_FILE"); rm -f "$_STDERR_FILE"
+    if [ "$_GH_EXIT" -ne 0 ]; then
+        # Parse error category from stderr
+        case "$_GH_STDERR" in
             *"401"*|*"Bad credentials"*|*"authentication"*)
                 printf 'Error: Authentication failed. Run "gh auth login" to re-authenticate.\n' >&2
                 ;;
@@ -120,7 +122,7 @@ while true; do
                 printf 'Error: GitHub server error. Retry in a few minutes.\n' >&2
                 ;;
             *)
-                printf 'Error: GraphQL query failed (page %d): %s\n' "$PAGE" "$RESPONSE" >&2
+                printf 'Error: GraphQL query failed (page %d): %s\n' "$PAGE" "$_GH_STDERR" >&2
                 ;;
         esac
         exit 1
@@ -148,7 +150,10 @@ while true; do
     ALL_PAGES+=("$PAGE_THREADS")
 
     # --- Check pagination ---
-    HAS_MORE=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false')
+    HAS_MORE=$(printf '%s' "$RESPONSE" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false') || {
+        printf '[get-pr-comments] Error: Failed to read pagination state on page %d. Aborting.\n' "$PAGE" >&2
+        exit 1
+    }
     if [ "$HAS_MORE" != "true" ]; then
         break
     fi
