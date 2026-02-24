@@ -235,17 +235,17 @@ function validateSourcePaths() {
 }
 
 /**
- * RULE 6: Version consistency (marketplace entry vs plugin.json)
+ * RULE 6: Version consistency (three-way: marketplace.json == plugin.json == package.json)
  */
 function validateVersionConsistency() {
   if (!Array.isArray(marketplace.plugins)) return;
 
-  logInfo('Validating version consistency...');
+  logInfo('Validating version consistency (marketplace vs plugin.json vs package.json)...');
 
   const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 
   for (const plugin of marketplace.plugins) {
-    if (!plugin.version) continue;
+    if (!plugin.version) continue; // absence handled by RULE 7
 
     if (!semverPattern.test(plugin.version)) {
       logError(
@@ -257,13 +257,11 @@ function validateVersionConsistency() {
     if (!plugin.source || typeof plugin.source === 'object') continue;
 
     const sourcePath = plugin.source.replace(/^\.\//, '');
-    const manifestPath = path.join(
-      PROJECT_ROOT,
-      sourcePath,
-      '.claude-plugin',
-      'plugin.json'
-    );
+    const pluginDir = path.join(PROJECT_ROOT, sourcePath);
+    const manifestPath = path.join(pluginDir, '.claude-plugin', 'plugin.json');
+    const pkgPath = path.join(pluginDir, 'package.json');
 
+    // Check marketplace version vs plugin.json
     if (fs.existsSync(manifestPath)) {
       try {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -273,12 +271,32 @@ function validateVersionConsistency() {
           );
         } else if (manifest.version) {
           logSuccess(
-            `Plugin "${plugin.name}" version matches: ${plugin.version}`
+            `Plugin "${plugin.name}" plugin.json version matches: ${plugin.version}`
           );
         }
       } catch (err) {
         logWarning(
-          `Could not validate version for "${plugin.name}": ${err.message}`
+          `Could not read plugin.json for "${plugin.name}": ${err.message}`
+        );
+      }
+    }
+
+    // Check marketplace version vs package.json (three-way)
+    if (fs.existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        if (pkg.version && pkg.version !== plugin.version) {
+          logError(
+            `Version mismatch for "${plugin.name}": marketplace=${plugin.version}, package.json=${pkg.version}. Run \`pnpm apply:changesets\` to sync.`
+          );
+        } else if (pkg.version) {
+          logSuccess(
+            `Plugin "${plugin.name}" package.json version matches: ${plugin.version}`
+          );
+        }
+      } catch (err) {
+        logWarning(
+          `Could not read package.json for "${plugin.name}": ${err.message}`
         );
       }
     }
@@ -286,7 +304,35 @@ function validateVersionConsistency() {
 }
 
 /**
- * RULE 7: Performance check
+ * RULE 7: Version presence (all local plugins must declare a version)
+ */
+function validateVersionPresence() {
+  if (!Array.isArray(marketplace.plugins)) return;
+
+  logInfo('Validating version presence...');
+
+  let allPresent = true;
+
+  for (const plugin of marketplace.plugins) {
+    if (plugin.version) continue;
+
+    // Only require version for local (non-remote) plugins
+    if (plugin.source && typeof plugin.source === 'object') continue;
+
+    logError(
+      `Plugin "${plugin.name}" is missing a "version" field in marketplace.json. ` +
+        'Add a version or run `pnpm apply:changesets` to populate it.'
+    );
+    allPresent = false;
+  }
+
+  if (allPresent && marketplace.plugins.length > 0) {
+    logSuccess('All local plugins have version fields');
+  }
+}
+
+/**
+ * RULE 8: Performance check
  */
 function validatePerformance() {
   logInfo('Checking file size...');
@@ -356,6 +402,7 @@ function runValidation() {
   validateRequiredPluginFields();
   validateSourcePaths();
   validateVersionConsistency();
+  validateVersionPresence();
   validatePerformance();
 
   printSummary();
