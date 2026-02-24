@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config/schema.json",
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "KingInYellows/yellow-plugins" }
+  ],
+  "commit": false,
+  "fixed": [],
+  "linked": [],
+  "access": "restricted",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [
+    "@yellow-plugins/cli",
+    "@yellow-plugins/domain",
+    "@yellow-plugins/infrastructure"
+  ],
+  "privatePackages": {
+    "version": true,
+    "tag": true
+  }
+}

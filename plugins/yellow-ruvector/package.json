@@ -1,0 +1,6 @@
+{
+  "name": "yellow-ruvector",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector"
+}

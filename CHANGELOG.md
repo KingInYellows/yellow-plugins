@@ -7,6 +7,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Note:** This file contains catalog-level release notes for the full
+> marketplace snapshot. Per-plugin changelogs live in
+> `plugins/<name>/CHANGELOG.md`.
+
+---
+
+## [1.1.0] - 2026-02-23
+
+### Added
+
+- **yellow-devin** — Migrated to Devin V3 API (v2.0.0). Breaking change: all
+  session management endpoints updated. Added orchestrator agent for
+  plan-implement-review chains.
+- **yellow-core** — Added `/workflows:brainstorm` command and
+  `brainstorm-orchestrator` agent for pre-planning requirement exploration.
+- **yellow-core** — Added `/workflows:compound` command for documenting solved
+  problems to compound team knowledge.
+- **yellow-research** — Added `yellow-research` plugin with 4 bundled MCP
+  servers (Perplexity, Tavily, EXA, Parallel Task).
+- Per-plugin versioning system via `@changesets/cli` — each plugin now has its
+  own `package.json` and `CHANGELOG.md` for independent version tracking.
+
 ---
 
 ## [1.0.0] - 2026-02-18
