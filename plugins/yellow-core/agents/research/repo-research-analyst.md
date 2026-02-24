@@ -54,6 +54,8 @@ Read core docs (ARCHITECTURE.md, README.md, CLAUDE.md, CONTRIBUTING.md, docs/),
 config files (tsconfig.json, Cargo.toml, pyproject.toml, go.mod), and tooling
 config (.eslintrc, .pylintrc, clippy.toml, .prettierrc, .rustfmt.toml, CI/CD).
 
+If none of the standard documentation files exist (ARCHITECTURE.md, README.md, CLAUDE.md, CONTRIBUTING.md, docs/) and no config files are found, explicitly note: 'No documentation files found in this repository.' Include this as a gap in the Documentation Insights output section.
+
 ### Phase 2: Structural Mapping
 
 Use Glob to map folder structure and identify patterns. Identify module

@@ -32,7 +32,7 @@ Choose the best source based on query type:
 | General web | `web_search_exa` |
 
 **Start with Context7** for any named library — it has official, up-to-date docs.
-Fall back to EXA if Context7 is unavailable (not installed) or doesn't have the library.
+If Context7 `resolve-library-id` returns no match, fall back to `get_code_context_exa` for code examples. If `get_code_context_exa` returns nothing useful, use `web_search_exa` as last resort.
 
 ## Workflow
 
@@ -43,7 +43,7 @@ Fall back to EXA if Context7 is unavailable (not installed) or doesn't have the 
 
 ## Output Format
 
-- Max 2-3 paragraphs unless the user asks for more
+- 1-3 paragraphs; shorter is fine if the question has a simple answer. Only go longer if the user explicitly asks for detail.
 - Include code snippets when they directly answer the question
 - Cite the source (library version, URL, or GitHub repo)
 - If findings are large enough to warrant saving, suggest: "This is substantial —
@@ -54,3 +54,5 @@ Fall back to EXA if Context7 is unavailable (not installed) or doesn't have the 
 - Never save to a file — inline only
 - Never use Parallel Task or Tavily tools — those are for deep research
 - If all sources return nothing useful, say so clearly
+- If both primary and secondary sources return no useful results, stop and report:
+  'No results found for [query] from [sources tried]. Try `/research:deep [topic]` for a comprehensive multi-source search.'

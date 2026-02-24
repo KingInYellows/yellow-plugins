@@ -16,9 +16,10 @@ allowed-tools:
   - mcp__plugin_yellow-research_tavily__tavily_crawl
   - mcp__plugin_yellow-research_tavily__tavily_research
   - mcp__plugin_yellow-research_tavily__tavily_map
-  - mcp__plugin_yellow-research_parallel__create_deep_research_task
-  - mcp__plugin_yellow-research_parallel__create_task_group
-  - mcp__plugin_yellow-research_parallel__get_result
+  - mcp__plugin_yellow-research_parallel__createDeepResearch
+  - mcp__plugin_yellow-research_parallel__createTaskGroup
+  - mcp__plugin_yellow-research_parallel__getResultMarkdown
+  - mcp__plugin_yellow-research_parallel__getStatus
   - mcp__plugin_yellow-research_perplexity__perplexity_ask
   - mcp__plugin_yellow-research_perplexity__perplexity_research
   - mcp__plugin_yellow-research_perplexity__perplexity_reason
@@ -33,6 +34,8 @@ results into structured markdown for the caller to save.
 
 Classify the topic into one of three tiers:
 
+Classify as **Complex** if: the topic requires comparing >2 entities OR spans >2 years of change history OR requires multiple domain expertise areas. Classify as **Simple** if: a single authoritative source can answer the complete question with no synthesis needed. Classify as **Moderate** for everything in between.
+
 **Simple** — 1 well-defined aspect, quick answer needed:
 - Single `perplexity_reason` call
 
@@ -45,11 +48,11 @@ Classify the topic into one of three tiers:
   1. `perplexity_research` — web-grounded synthesis
   2. `tavily_research` — additional web coverage
   3. `deep_researcher_start` — async EXA deep research
-  4. `create_deep_research_task` — async Parallel Task report
-  5. `create_task_group` — use instead of (4) when topic decomposes into N parallel
+  4. `createDeepResearch` — async Parallel Task report
+  5. `createTaskGroup` — use instead of (4) when topic decomposes into N parallel
      sub-items (e.g., "compare Redis, Valkey, and DragonflyDB" → 3 sub-tasks)
 - While async tasks run, do synchronous queries
-- Poll async results with `deep_researcher_check` and `get_result`
+- Poll async results with `deep_researcher_check` and `getResultMarkdown`
 
 ## Step 2: Execute
 
@@ -63,11 +66,13 @@ Launch in parallel:
 
 For async tools, start them first:
 ```
-1. create_deep_research_task (returns task_id)
+1. createDeepResearch (returns task_id)
 2. deep_researcher_start (returns job_id)
 3. Run synchronous queries while async tasks run
-4. get_result(task_id) and deep_researcher_check(job_id)
+4. getResultMarkdown(task_id) and deep_researcher_check(job_id)
 ```
+
+If `createDeepResearch` or EXA deep researcher fails to return a task_id/job_id (null or empty), skip the polling step for that task. Do not call `getResultMarkdown` or `deep_researcher_check` with a missing ID. Log: 'Async task start failed — skipping poll for this source.'
 
 Skip any source that is unavailable — never fail the whole research.
 

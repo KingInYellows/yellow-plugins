@@ -35,6 +35,8 @@ implementation begins.
 
 ## Analysis Methodology
 
+**Before starting analysis:** Check if the input describes user-facing flows or feature behavior. If the input appears to be code, a diff, test output, or infrastructure config (not a specification), respond: 'Input does not appear to be a specification or user story. Please provide a feature description, acceptance criteria, or user journey to analyze.'
+
 ### Phase 1: Deep Flow Analysis
 
 - **Primary Happy Path**: The ideal, expected user flow
