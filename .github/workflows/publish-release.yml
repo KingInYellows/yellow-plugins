@@ -93,6 +93,10 @@ jobs:
           pnpm validate:schemas
           echo "::endgroup::"
 
+          echo "::group::Version consistency (three-way check)"
+          pnpm validate:versions
+          echo "::endgroup::"
+
           echo "::group::Linting"
           pnpm lint
           echo "::endgroup::"
@@ -149,23 +153,14 @@ jobs:
           pnpm build
           echo "::endgroup::"
 
-      - name: Generate changelog excerpt
+      - name: Generate release notes
         id: changelog
         run: |
           VERSION="${{ needs.validate-release.outputs.version }}"
-          echo "::group::Extracting changelog for v$VERSION"
-
-          # Extract changelog section for this version
-          if [ -f CHANGELOG.md ]; then
-            # Extract content between version headers
-            awk "/## \[?$VERSION\]?/,/## \[?[0-9]/" CHANGELOG.md | head -n -1 > release-notes.md
-            echo "Changelog excerpt:"
-            cat release-notes.md
-          else
-            echo "# Release v$VERSION" > release-notes.md
-            echo "No changelog file found." >> release-notes.md
-          fi
-
+          echo "::group::Generating release notes for v$VERSION"
+          node scripts/generate-release-notes.js "$VERSION"
+          echo "Release notes:"
+          cat release-notes.md
           echo "::endgroup::"
 
       - name: Create tarball archive
