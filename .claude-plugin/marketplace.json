@@ -22,7 +22,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": { "name": "KingInYellows" },
       "source": "./plugins/yellow-core",
       "category": "development"

@@ -2,7 +2,7 @@
 
 <!-- anchor: release-checklist -->
 
-**Document Version**: 1.0.0 **Last Updated**: 2026-01-11 **Part of**: Task
+**Document Version**: 1.1.0 **Last Updated**: 2026-02-23 **Part of**: Task
 I4.T5 - Release Packaging & Checklist
 
 ---
@@ -118,7 +118,7 @@ gt modify -c -m "chore(release): bump catalog to vX.Y.Z"
 # 6. Run pre-flight checks
 pnpm release:check
 # 7. Tag and push
-git tag vX.Y.Z && git push --tags
+git tag vX.Y.Z && git push --tags  # Tags are not managed by Graphite — raw git push is correct here
 ```
 
 See `docs/operations/versioning.md` for the complete developer workflow and
@@ -1208,5 +1208,5 @@ procedures change. Increment document version and update Last Updated date.
 
 ---
 
-**Last Updated**: 2026-01-11 **Document Version**: 1.0.0 **Maintained By**:
+**Last Updated**: 2026-02-23 **Document Version**: 1.1.0 **Maintained By**:
 KingInYellows

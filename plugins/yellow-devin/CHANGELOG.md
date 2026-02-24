@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2026-02-23
 
+### Added
+
+- Add devin-orchestrator agent for multi-step plan-implement-review cycles.
+
 ### Changed
 
-- Migrate to Devin V3 API. Breaking change: all session management endpoints updated. Add orchestrator agent for plan-implement-review chains.
+- Migrate to Devin V3 API. Breaking change: all session management endpoints updated.
 
 ---
 

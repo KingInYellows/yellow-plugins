@@ -23,7 +23,7 @@
 
 'use strict';
 
-const { readFileSync, writeFileSync, readdirSync, renameSync, statSync, existsSync } = require('fs');
+const { readFileSync, writeFileSync, readdirSync, renameSync, unlinkSync, statSync, existsSync } = require('fs');
 const { join, resolve } = require('path');
 
 const ROOT = resolve(__dirname, '..');
@@ -35,8 +35,8 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 
 function assertWithinRoot(filePath, rootDir) {
   const canonical = resolve(filePath);
-  const rootCanonical = resolve(rootDir) + '/';
-  if (!canonical.startsWith(rootCanonical)) {
+  const rootCanonical = resolve(rootDir);
+  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + '/')) {
     throw new Error(`[sync-manifests] Path traversal detected: ${filePath}`);
   }
 }
@@ -44,7 +44,12 @@ function assertWithinRoot(filePath, rootDir) {
 function atomicWrite(filePath, content) {
   const tmp = filePath + '.tmp';
   writeFileSync(tmp, content, 'utf8');
-  renameSync(tmp, filePath); // atomic on Linux when on same filesystem
+  try {
+    renameSync(tmp, filePath); // atomic on Linux when on same filesystem
+  } catch (e) {
+    try { unlinkSync(tmp); } catch (_) {}
+    throw new Error(`[atomicWrite] rename ${tmp} -> ${filePath} failed: ${e.message}`);
+  }
 }
 
 // --- Load marketplace.json first (needed for count assertion) ---

@@ -9,6 +9,7 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-research",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
+  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-research/CHANGELOG.md",
   "keywords": ["research", "deep-research", "perplexity", "exa", "tavily", "mcp"],
   "mcpServers": {
     "perplexity": {

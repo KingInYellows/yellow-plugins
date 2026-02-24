@@ -22,7 +22,7 @@
 
 'use strict';
 
-const { readFileSync, writeFileSync, renameSync } = require('fs');
+const { readFileSync, writeFileSync, renameSync, unlinkSync } = require('fs');
 const { join } = require('path');
 
 const ROOT = join(__dirname, '..');
@@ -41,7 +41,12 @@ if (!bump || !VALID_BUMPS.has(bump)) {
 function atomicWrite(filePath, content) {
   const tmp = filePath + '.tmp';
   writeFileSync(tmp, content, 'utf8');
-  renameSync(tmp, filePath);
+  try {
+    renameSync(tmp, filePath);
+  } catch (e) {
+    try { unlinkSync(tmp); } catch (_) {}
+    throw new Error(`[atomicWrite] rename ${tmp} -> ${filePath} failed: ${e.message}`);
+  }
 }
 
 // --- Read package.json ---

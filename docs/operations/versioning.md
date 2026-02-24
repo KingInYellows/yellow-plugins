@@ -53,7 +53,7 @@ gt modify -c -m "chore(release): bump catalog to v1.x.x"
 pnpm release:check
 
 # 7. Tag and push
-git tag v1.x.x && git push --tags
+git tag v1.x.x && git push --tags  # Tags are not managed by Graphite — raw git push is correct here
 # → publish-release.yml fires and creates a GitHub Release
 ```
 
@@ -149,3 +149,14 @@ pnpm validate:versions:dry    # reports drift without failing
 ```
 
 This runs automatically in CI on every PR.
+
+## Troubleshooting
+
+### apply:changesets partial failure
+
+If `sync-manifests.js` fails after `changeset version` has already run, the changesets
+are consumed but plugin.json and marketplace.json are not synced. Recovery:
+
+1. Fix the underlying issue (e.g. malformed plugin.json, missing field)
+2. Run `node scripts/sync-manifests.js` manually to complete the sync
+3. Run `pnpm validate:versions` to confirm the manifests are now consistent

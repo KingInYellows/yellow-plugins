@@ -33,15 +33,20 @@ const MARKETPLACE_PATH = join(ROOT, '.claude-plugin', 'marketplace.json');
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const PLUGIN_FLAG_IDX = process.argv.indexOf('--plugin');
-const SINGLE_PLUGIN = PLUGIN_FLAG_IDX !== -1 ? process.argv[PLUGIN_FLAG_IDX + 1] : null;
+const rawPlugin = PLUGIN_FLAG_IDX !== -1 ? process.argv[PLUGIN_FLAG_IDX + 1] : null;
+if (PLUGIN_FLAG_IDX !== -1 && (!rawPlugin || rawPlugin.startsWith('--'))) {
+  console.error('[validate-versions] --plugin requires a plugin name (e.g. --plugin yellow-core)');
+  process.exit(1);
+}
+const SINGLE_PLUGIN = rawPlugin;
 
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
 function assertWithinRoot(filePath, rootDir) {
   const canonical = resolve(filePath);
-  const rootCanonical = resolve(rootDir) + '/';
-  if (!canonical.startsWith(rootCanonical)) {
+  const rootCanonical = resolve(rootDir);
+  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + '/')) {
     throw new Error(`[validate-versions] Path traversal detected: ${filePath}`);
   }
 }
@@ -133,11 +138,14 @@ for (const name of pluginNames) {
 
   // --- Check marketplace.json ---
   const mktVersion = marketplaceVersions[name];
+  const pluginJsonPath = join(PLUGINS_DIR, name, '.claude-plugin', 'plugin.json');
   if (mktVersion === undefined) {
-    drifts.push({
-      plugin: name,
-      issue: `no entry in marketplace.json`,
-    });
+    if (!existsSync(pluginJsonPath)) {
+      // Truly new plugin — not yet registered anywhere, skip
+      console.warn(`[validate-versions] WARN: "${name}" has package.json but no manifest yet — skipping`);
+      continue;
+    }
+    drifts.push({ plugin: name, issue: `no entry in marketplace.json` });
     continue;
   }
 

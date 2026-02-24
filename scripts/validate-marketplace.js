@@ -30,6 +30,14 @@ const colors = {
   cyan: '\x1b[36m',
 };
 
+function assertWithinRoot(filePath, rootDir) {
+  const canonical = path.resolve(filePath);
+  const rootCanonical = path.resolve(rootDir);
+  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + '/')) {
+    throw new Error(`[validate-marketplace] Path traversal detected: ${filePath}`);
+  }
+}
+
 const args = process.argv.slice(2);
 let marketplacePath = DEFAULT_MARKETPLACE_PATH;
 
@@ -43,6 +51,13 @@ if (marketplaceFlagIndex !== -1) {
     process.exit(1);
   }
   marketplacePath = providedPath;
+  const fullMarketplacePath = path.resolve(PROJECT_ROOT, marketplacePath);
+  try {
+    assertWithinRoot(fullMarketplacePath, PROJECT_ROOT);
+  } catch (err) {
+    console.error(`${colors.red}✗ ERROR:${colors.reset} ${err.message}`);
+    process.exit(1);
+  }
 }
 
 const errors = [];
@@ -235,12 +250,16 @@ function validateSourcePaths() {
 }
 
 /**
- * RULE 6: Version consistency (three-way: marketplace.json == plugin.json == package.json)
+ * RULE 6: Version format (marketplace.json versions must be valid semver)
+ *
+ * Cross-file version consistency (marketplace == plugin.json == package.json)
+ * is handled exclusively by validate-versions.js, which uses package.json as
+ * the canonical source. This rule only checks semver format.
  */
 function validateVersionConsistency() {
   if (!Array.isArray(marketplace.plugins)) return;
 
-  logInfo('Validating version consistency (marketplace vs plugin.json vs package.json)...');
+  logInfo('Validating version format (semver)...');
 
   const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 
@@ -249,62 +268,21 @@ function validateVersionConsistency() {
 
     if (!semverPattern.test(plugin.version)) {
       logError(
-        `Plugin "${plugin.name}" invalid version format: ${plugin.version}`
+        `Plugin "${plugin.name}" invalid version format: ${plugin.version} (must be semver X.Y.Z)`
       );
-      continue;
-    }
-
-    if (!plugin.source || typeof plugin.source === 'object') continue;
-
-    const sourcePath = plugin.source.replace(/^\.\//, '');
-    const pluginDir = path.join(PROJECT_ROOT, sourcePath);
-    const manifestPath = path.join(pluginDir, '.claude-plugin', 'plugin.json');
-    const pkgPath = path.join(pluginDir, 'package.json');
-
-    // Check marketplace version vs plugin.json
-    if (fs.existsSync(manifestPath)) {
-      try {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-        if (manifest.version && manifest.version !== plugin.version) {
-          logError(
-            `Version mismatch for "${plugin.name}": marketplace=${plugin.version}, plugin.json=${manifest.version}`
-          );
-        } else if (manifest.version) {
-          logSuccess(
-            `Plugin "${plugin.name}" plugin.json version matches: ${plugin.version}`
-          );
-        }
-      } catch (err) {
-        logWarning(
-          `Could not read plugin.json for "${plugin.name}": ${err.message}`
-        );
-      }
-    }
-
-    // Check marketplace version vs package.json (three-way)
-    if (fs.existsSync(pkgPath)) {
-      try {
-        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        if (pkg.version && pkg.version !== plugin.version) {
-          logError(
-            `Version mismatch for "${plugin.name}": marketplace=${plugin.version}, package.json=${pkg.version}. Run \`pnpm apply:changesets\` to sync.`
-          );
-        } else if (pkg.version) {
-          logSuccess(
-            `Plugin "${plugin.name}" package.json version matches: ${plugin.version}`
-          );
-        }
-      } catch (err) {
-        logWarning(
-          `Could not read package.json for "${plugin.name}": ${err.message}`
-        );
-      }
+    } else {
+      logSuccess(
+        `Plugin "${plugin.name}" version format valid: ${plugin.version}`
+      );
     }
   }
 }
 
 /**
- * RULE 7: Version presence (all local plugins must declare a version)
+ * RULE 7: Version presence (all local plugins must declare a version field)
+ *
+ * Only checks that the field exists. Cross-file consistency is handled by
+ * validate-versions.js.
  */
 function validateVersionPresence() {
   if (!Array.isArray(marketplace.plugins)) return;
@@ -320,8 +298,7 @@ function validateVersionPresence() {
     if (plugin.source && typeof plugin.source === 'object') continue;
 
     logError(
-      `Plugin "${plugin.name}" is missing a "version" field in marketplace.json. ` +
-        'Add a version or run `pnpm apply:changesets` to populate it.'
+      `Plugin "${plugin.name}" is missing a "version" field in marketplace.json.`
     );
     allPresent = false;
   }

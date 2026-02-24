@@ -698,24 +698,15 @@ jobs:
     name: Version Consistency Check
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    needs: [validate-schemas]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install dependencies
-        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Run version consistency check
         run: node scripts/validate-versions.js

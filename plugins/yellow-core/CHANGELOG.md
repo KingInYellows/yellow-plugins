@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-02-23
 
-### Changed
+### Added
 
 - Add /workflows:brainstorm command and brainstorm-orchestrator agent for pre-planning requirement exploration. Add /workflows:compound command for documenting solved problems.
 

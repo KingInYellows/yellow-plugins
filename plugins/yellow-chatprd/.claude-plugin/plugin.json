@@ -9,6 +9,7 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-chatprd",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
+  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-chatprd/CHANGELOG.md",
   "keywords": ["chatprd", "prd", "product-management", "documentation", "linear"],
   "mcpServers": {
     "chatprd": {

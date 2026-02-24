@@ -20,7 +20,7 @@
 
 'use strict';
 
-const { readFileSync, writeFileSync, readdirSync, statSync, existsSync } = require('fs');
+const { readFileSync, writeFileSync, renameSync, unlinkSync, readdirSync, statSync, existsSync } = require('fs');
 const { join, resolve } = require('path');
 
 const ROOT = resolve(__dirname, '..');
@@ -30,6 +30,18 @@ const OUT_PATH = join(ROOT, 'release-notes.md');
 
 const NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+
+// --- Atomic write helper ---
+function atomicWrite(filePath, content) {
+  const tmp = filePath + '.tmp';
+  writeFileSync(tmp, content, 'utf8');
+  try {
+    renameSync(tmp, filePath);
+  } catch (e) {
+    try { unlinkSync(tmp); } catch (_) {}
+    throw new Error(`[atomicWrite] rename ${tmp} -> ${filePath} failed: ${e.message}`);
+  }
+}
 
 // --- Resolve version ---
 let version = process.argv[2];
@@ -121,7 +133,7 @@ if (pluginVersions.length > 0) {
 
 // --- Write output ---
 const output = catalogSection + versionsTable + '\n';
-writeFileSync(OUT_PATH, output, 'utf8');
+atomicWrite(OUT_PATH, output);
 
 console.log(`[generate-release-notes] Written release-notes.md for v${version}`);
 console.log(`  Catalog section: ${catalogSection ? 'found' : 'placeholder'}`);

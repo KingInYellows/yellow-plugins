@@ -42,10 +42,13 @@ jobs:
 
       - name: Extract version information
         id: version
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-            IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+            VERSION="$INPUT_VERSION"
+            IS_PRERELEASE="$INPUT_PRERELEASE"
           else
             VERSION="${GITHUB_REF#refs/tags/v}"
             # Check if version contains pre-release identifiers
@@ -54,6 +57,11 @@ jobs:
             else
               IS_PRERELEASE="false"
             fi
+          fi
+
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+            echo "::error::Invalid version format: $VERSION"
+            exit 1
           fi
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
