@@ -33,7 +33,7 @@ const colors = {
 function assertWithinRoot(filePath, rootDir) {
   const canonical = path.resolve(filePath);
   const rootCanonical = path.resolve(rootDir);
-  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + '/')) {
+  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + path.sep)) {
     throw new Error(`[validate-marketplace] Path traversal detected: ${filePath}`);
   }
 }

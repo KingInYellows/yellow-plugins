@@ -38,7 +38,7 @@ function atomicWrite(filePath, content) {
   try {
     renameSync(tmp, filePath);
   } catch (e) {
-    try { unlinkSync(tmp); } catch (_) {}
+    try { unlinkSync(tmp); } catch (_) { /* ignore cleanup errors */ }
     throw new Error(`[atomicWrite] rename ${tmp} -> ${filePath} failed: ${e.message}`);
   }
 }

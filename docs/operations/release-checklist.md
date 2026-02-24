@@ -261,10 +261,12 @@ Section 4 security directives.
   ```
 
 - [ ] No version conflicts in workspace packages
+
   ```bash
   pnpm validate:versions:dry
   # Verify all plugin versions are in sync
   ```
+
 
 **Reference**: `docs/operations/versioning.md`, `.github/workflows/publish-release.yml`
 version validation step, `scripts/validate-versions.js`.

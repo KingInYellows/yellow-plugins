@@ -25,7 +25,7 @@
 'use strict';
 
 const { readFileSync, readdirSync, statSync, existsSync } = require('fs');
-const { join, resolve } = require('path');
+const { join, resolve, sep } = require('path');
 
 const ROOT = resolve(__dirname, '..');
 const PLUGINS_DIR = join(ROOT, 'plugins');
@@ -46,7 +46,7 @@ const NAME_RE = /^[a-zA-Z0-9_-]+$/;
 function assertWithinRoot(filePath, rootDir) {
   const canonical = resolve(filePath);
   const rootCanonical = resolve(rootDir);
-  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + '/')) {
+  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + sep)) {
     throw new Error(`[validate-versions] Path traversal detected: ${filePath}`);
   }
 }
@@ -128,6 +128,18 @@ for (const name of pluginNames) {
     continue;
   }
 
+  // --- Check marketplace.json ---
+  const mktVersion = marketplaceVersions[name];
+  if (mktVersion === undefined) {
+    if (!existsSync(manifestPath)) {
+      // Truly new plugin — not yet registered anywhere, skip
+      console.warn(`[validate-versions] WARN: "${name}" has package.json but no manifest yet — skipping`);
+      continue;
+    }
+    drifts.push({ plugin: name, issue: `no entry in marketplace.json` });
+    continue;
+  }
+
   // --- Read plugin.json ---
   let manifestVersion;
   try {
@@ -138,19 +150,6 @@ for (const name of pluginNames) {
       plugin: name,
       issue: `Cannot read plugin.json: ${e.message}`,
     });
-    continue;
-  }
-
-  // --- Check marketplace.json ---
-  const mktVersion = marketplaceVersions[name];
-  const pluginJsonPath = join(PLUGINS_DIR, name, '.claude-plugin', 'plugin.json');
-  if (mktVersion === undefined) {
-    if (!existsSync(pluginJsonPath)) {
-      // Truly new plugin — not yet registered anywhere, skip
-      console.warn(`[validate-versions] WARN: "${name}" has package.json but no manifest yet — skipping`);
-      continue;
-    }
-    drifts.push({ plugin: name, issue: `no entry in marketplace.json` });
     continue;
   }
 

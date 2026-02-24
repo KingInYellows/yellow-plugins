@@ -24,7 +24,7 @@
 'use strict';
 
 const { readFileSync, writeFileSync, readdirSync, renameSync, unlinkSync, statSync, existsSync } = require('fs');
-const { join, resolve } = require('path');
+const { join, resolve, sep } = require('path');
 
 const ROOT = resolve(__dirname, '..');
 const PLUGINS_DIR = join(ROOT, 'plugins');
@@ -36,7 +36,7 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 function assertWithinRoot(filePath, rootDir) {
   const canonical = resolve(filePath);
   const rootCanonical = resolve(rootDir);
-  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + '/')) {
+  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + sep)) {
     throw new Error(`[sync-manifests] Path traversal detected: ${filePath}`);
   }
 }
@@ -47,7 +47,7 @@ function atomicWrite(filePath, content) {
   try {
     renameSync(tmp, filePath); // atomic on Linux when on same filesystem
   } catch (e) {
-    try { unlinkSync(tmp); } catch (_) {}
+    try { unlinkSync(tmp); } catch (_) { /* ignore cleanup errors */ }
     throw new Error(`[atomicWrite] rename ${tmp} -> ${filePath} failed: ${e.message}`);
   }
 }
