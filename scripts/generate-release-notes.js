@@ -29,7 +29,7 @@ const PLUGINS_DIR = join(ROOT, 'plugins');
 const OUT_PATH = join(ROOT, 'release-notes.md');
 
 const NAME_RE = /^[a-zA-Z0-9_-]+$/;
-const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+const SEMVER_RE = /^\d+\.\d+\.\d+(-[a-zA-Z0-9][a-zA-Z0-9.]*)?$/;
 
 // --- Atomic write helper ---
 function atomicWrite(filePath, content) {
@@ -85,6 +85,7 @@ function extractChangelogSection(changelog, ver) {
 }
 
 let catalogSection = '';
+let usedPlaceholder = false;
 try {
   const changelog = readFileSync(CHANGELOG_PATH, 'utf8');
   catalogSection = extractChangelogSection(changelog, version);
@@ -95,6 +96,7 @@ try {
 if (!catalogSection) {
   catalogSection = `## Release v${version}\n\nSee per-plugin changelogs for details.`;
   console.warn(`[generate-release-notes] Warning: No CHANGELOG.md entry found for v${version}. Using placeholder.`);
+  usedPlaceholder = true;
 }
 
 // --- Build plugin versions table ---
@@ -136,5 +138,5 @@ const output = catalogSection + versionsTable + '\n';
 atomicWrite(OUT_PATH, output);
 
 console.log(`[generate-release-notes] Written release-notes.md for v${version}`);
-console.log(`  Catalog section: ${catalogSection ? 'found' : 'placeholder'}`);
+console.log(`  Catalog section: ${usedPlaceholder ? 'placeholder' : 'found'}`);
 console.log(`  Plugin versions: ${pluginVersions.length} plugins listed`);

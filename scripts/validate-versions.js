@@ -40,7 +40,7 @@ if (PLUGIN_FLAG_IDX !== -1 && (!rawPlugin || rawPlugin.startsWith('--'))) {
 }
 const SINGLE_PLUGIN = rawPlugin;
 
-const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+const SEMVER_RE = /^\d+\.\d+\.\d+(-[a-zA-Z0-9][a-zA-Z0-9.]*)?$/;
 const NAME_RE = /^[a-zA-Z0-9_-]+$/;
 
 function assertWithinRoot(filePath, rootDir) {
@@ -110,7 +110,12 @@ for (const name of pluginNames) {
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
     pkgVersion = typeof pkg.version === 'string' ? pkg.version : null;
   } catch (e) {
-    if (e.code === 'ENOENT') continue; // not a versioned plugin
+    if (e.code === 'ENOENT') {
+      if (SINGLE_PLUGIN) {
+        drifts.push({ plugin: name, issue: `package.json not found at ${pkgPath}` });
+      }
+      continue; // not a versioned plugin (or already added to drifts)
+    }
     console.error(`[validate-versions] Cannot read ${pkgPath}: ${e.message}`);
     process.exit(1);
   }

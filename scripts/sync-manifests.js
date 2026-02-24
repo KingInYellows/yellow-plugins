@@ -86,7 +86,11 @@ for (const name of readdirSync(PLUGINS_DIR)) {
   const pluginPath = join(PLUGINS_DIR, name);
 
   // Skip non-directories (e.g. stray files in plugins/)
-  if (!statSync(pluginPath).isDirectory()) continue;
+  try {
+    if (!statSync(pluginPath).isDirectory()) continue;
+  } catch (e) {
+    continue; // Skip non-existent or inaccessible paths
+  }
 
   const pkgPath = join(PLUGINS_DIR, name, 'package.json');
   let pkg;
@@ -120,6 +124,17 @@ if (foundCount < expectedCount) {
     `[sync-manifests] Expected ${expectedCount} plugins (from marketplace.json), ` +
       `found only ${foundCount} with package.json. ` +
       'Check for missing plugins/*/package.json files.'
+  );
+  process.exit(1);
+}
+
+// --- Reverse check: every found plugin must be in marketplace.json ---
+const marketplaceNames = new Set(marketplace.plugins.map(p => p.name));
+const extraPlugins = Object.keys(pluginVersions).filter(name => !marketplaceNames.has(name));
+if (extraPlugins.length > 0) {
+  console.error(
+    `[sync-manifests] Marketplace missing entries for: ${extraPlugins.join(', ')}. ` +
+      'Add them to marketplace.json or remove the extra plugin directories.'
   );
   process.exit(1);
 }
@@ -173,9 +188,9 @@ for (const plugin of marketplace.plugins) {
     );
     if (!DRY_RUN) {
       plugin.version = version;
-      syncedMarketplace++;
       marketplaceDirty = true;
     }
+    syncedMarketplace++;
   }
 }
 

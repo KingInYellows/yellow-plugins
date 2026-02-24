@@ -24,12 +24,12 @@
 
 const { readFileSync, writeFileSync, renameSync, unlinkSync } = require('fs');
 const { join } = require('path');
+const semver = require('semver');
 
 const ROOT = join(__dirname, '..');
 const PKG_PATH = join(ROOT, 'package.json');
 
 const VALID_BUMPS = new Set(['major', 'minor', 'patch']);
-const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 
 const bump = process.argv[2];
 
@@ -59,9 +59,8 @@ try {
 }
 
 const current = pkg.version;
-const match = SEMVER_RE.exec(current);
 
-if (!match) {
+if (!semver.valid(current)) {
   console.error(
     `[catalog-version] Invalid current version in package.json: "${current}". ` +
       'Expected a semver string (e.g. "1.0.0").'
@@ -69,20 +68,11 @@ if (!match) {
   process.exit(1);
 }
 
-let [, major, minor, patch] = match.map(Number);
-
-if (bump === 'major') {
-  major += 1;
-  minor = 0;
-  patch = 0;
-} else if (bump === 'minor') {
-  minor += 1;
-  patch = 0;
-} else {
-  patch += 1;
+const next = semver.inc(current, bump);
+if (!next) {
+  console.error(`[catalog-version] Could not increment version "${current}" with bump type "${bump}"`);
+  process.exit(1);
 }
-
-const next = `${major}.${minor}.${patch}`;
 
 pkg.version = next;
 atomicWrite(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n');

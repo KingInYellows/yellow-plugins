@@ -117,8 +117,7 @@ node scripts/catalog-version.js minor   # or patch / major
 gt modify -c -m "chore(release): bump catalog to vX.Y.Z"
 # 6. Run pre-flight checks
 pnpm release:check
-# 7. Tag and push
-git tag vX.Y.Z && git push --tags  # Tags are not managed by Graphite — raw git push is correct here
+# 7. Create and push the release tag — see Section 5 (annotated tag step)
 ```
 
 See `docs/operations/versioning.md` for the complete developer workflow and
@@ -257,7 +256,7 @@ Section 4 security directives.
 - [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's date
 
   ```bash
-  grep -A 1 "## \[$(node -p "require('./package.json').version")\]" CHANGELOG.md
+  grep -A 1 "## \[$(node -p 'require("./package.json").version')\]" CHANGELOG.md
   # Expected: ## [X.Y.Z] - YYYY-MM-DD
   ```
 
