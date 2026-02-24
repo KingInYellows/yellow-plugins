@@ -42,10 +42,17 @@ eval "$(printf '%s' "$INPUT" | jq -r '
 case "$TOOL" in
   Edit|Write)
     if [ -n "$file_path" ]; then
-      # Use ruvector's built-in post-edit hook
-      if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success "$file_path" 2>&1); then
-        printf '[ruvector] post-edit failed for %s: %s\n' "$file_path" "$ERR" >&2
-      fi
+      # Skip solution docs: indexed explicitly via reflexion namespace by
+      # learning-compounder. post-edit does not consult .ruvectorignore.
+      case "$file_path" in
+        */docs/solutions/*)
+          ;;
+        *)
+          if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success "$file_path" 2>&1); then
+            printf '[ruvector] post-edit failed for %s: %s\n' "$file_path" "$ERR" >&2
+          fi
+          ;;
+      esac
     fi
     ;;
   Bash)

@@ -9,6 +9,9 @@ allowed-tools:
   - Write
   - Edit
   - AskUserQuestion
+  - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
 <examples>
@@ -17,13 +20,6 @@ Context: After a review found repeated SQL injection patterns.
 user: "Analyze these review findings and compound any learnings."
 assistant: "I found a P1 SQL injection pattern that appeared in 2 files. I'll check existing memory for similar entries, and if none exist, create a solution doc documenting the pattern and fix."
 <commentary>The compounder identifies recurring patterns across findings and creates lasting documentation to prevent repeat issues.</commentary>
-</example>
-
-<example>
-Context: After a review with only P3 style suggestions.
-user: "Check if these findings warrant new learnings."
-assistant: "All findings are P3 style suggestions with no recurring patterns. No new memory entries or solution docs needed."
-<commentary>The agent is selective — it only compounds genuinely valuable patterns, not noise.</commentary>
 </example>
 </examples>
 
@@ -94,6 +90,23 @@ You will receive via the Task prompt:
 5. **If confirmed, write documentation** following existing solution doc format,
    using the `Write` tool to create new files and the `Edit` tool to update
    existing docs or memory entries.
+6. **Store in ruvector** (after writing any new solution doc):
+   a. ToolSearch "hooks_remember" → missing: skip to 6e, reason "ruvector not
+      available".
+   b. Content: `## Problem` first paragraph (accept `## Problem Statement`,
+      `## Issue`); strip HTML + imperative phrases (IMPORTANT:, NOTE:, Always:,
+      Never:, Do not:); append ": Fix: " + `## Fix` first paragraph (accept
+      `## Solution`). Section missing → 6e "section-not-found". < 20 words →
+      6e "too-short". Truncate to 500 chars at word boundary; re-count; < 20 → 6e.
+   c. Dedup: hooks_recall namespace="reflexion", query=content, top_k=1. Error or
+      namespace-not-found → treat as no match. Similarity > 0.82 → 6e
+      "near-duplicate: similarity=X.XX".
+   d. hooks_remember: namespace="reflexion", content, metadata={trigger: "<pattern
+      name>", insight: "<Detection section root cause, first sentence>", action:
+      "see docs/solutions/<path>", context: "<doc path>", severity: "<P1|P2>",
+      timestamp: "<ISO 8601>"}. Execution error → 6e "ruvector MCP unavailable".
+   e. Output: "Stored reflexion entry: <first 60 chars>" or "Skipped ruvector
+      storage: <reason>".
 
 ## Solution Doc Format
 
@@ -107,19 +120,15 @@ category: '<security-issues|code-quality|logic-errors|performance>'
 # <Pattern Name>
 
 ## Problem
-
 <What goes wrong and why>
 
 ## Detection
-
 <How to spot this pattern in code>
 
 ## Fix
-
 <How to resolve it with code examples>
 
 ## Prevention
-
 <How to avoid it in the future>
 ```
 
