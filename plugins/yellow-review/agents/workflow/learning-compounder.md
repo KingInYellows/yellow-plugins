@@ -50,6 +50,9 @@ You will receive via the Task prompt:
 
 - Compound only if the same pattern appears across 2+ files in this review
 - Or if this pattern appeared in a previous review (check memory)
+- Only treat a pattern as recurring if it appeared in the same repository
+  context. Cross-repository matches are informational only — note them but do
+  not count them toward the recurrence threshold.
 
 ### Never Compound (P3)
 
@@ -59,13 +62,18 @@ You will receive via the Task prompt:
 
 1. **Categorize findings** by pattern type (not individual instances)
 2. **Check existing memory** — read `~/.claude/projects/*/memory/MEMORY.md` and
-   `docs/solutions/` for existing documentation of this pattern
+   `docs/solutions/` for existing documentation of this pattern. If no MEMORY.md
+   files are found, treat the memory check as empty and proceed to solution doc
+   creation.
 3. **Decide what to compound**:
    - If pattern already documented: skip (or update if new info found)
    - If new P1 pattern: create solution doc at
      `docs/solutions/<category>/<slug>.md` (validate that category and slug
      contain only lowercase alphanumeric characters and hyphens — reject any
-     path traversal characters like `..`, `/`, or `~`)
+     path traversal characters like `..`, `/`, or `~`). Derive the slug from the
+     pattern type label (e.g., 'null-check-anti-pattern' → slug
+     'null-check-anti-pattern'), never from file paths in findings. If no clear
+     pattern type label exists, use a generic slug: `untitled-pattern-YYYY-MM-DD`.
    - If recurring P2 pattern: add to memory file
 4. **Write documentation** following existing solution doc format, using the
    `Write` tool to create new files and the `Edit` tool to update existing docs
