@@ -30,6 +30,14 @@ const colors = {
   cyan: '\x1b[36m',
 };
 
+function assertWithinRoot(filePath, rootDir) {
+  const canonical = path.resolve(filePath);
+  const rootCanonical = path.resolve(rootDir);
+  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + path.sep)) {
+    throw new Error(`[validate-marketplace] Path traversal detected: ${filePath}`);
+  }
+}
+
 const args = process.argv.slice(2);
 let marketplacePath = DEFAULT_MARKETPLACE_PATH;
 
@@ -43,6 +51,13 @@ if (marketplaceFlagIndex !== -1) {
     process.exit(1);
   }
   marketplacePath = providedPath;
+  const fullMarketplacePath = path.resolve(PROJECT_ROOT, marketplacePath);
+  try {
+    assertWithinRoot(fullMarketplacePath, PROJECT_ROOT);
+  } catch (err) {
+    console.error(`${colors.red}✗ ERROR:${colors.reset} ${err.message}`);
+    process.exit(1);
+  }
 }
 
 const errors = [];
@@ -235,58 +250,66 @@ function validateSourcePaths() {
 }
 
 /**
- * RULE 6: Version consistency (marketplace entry vs plugin.json)
+ * RULE 6: Version format (marketplace.json versions must be valid semver)
+ *
+ * Cross-file version consistency (marketplace == plugin.json == package.json)
+ * is handled exclusively by validate-versions.js, which uses package.json as
+ * the canonical source. This rule only checks semver format.
  */
 function validateVersionConsistency() {
   if (!Array.isArray(marketplace.plugins)) return;
 
-  logInfo('Validating version consistency...');
+  logInfo('Validating version format (semver)...');
 
   const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 
   for (const plugin of marketplace.plugins) {
-    if (!plugin.version) continue;
+    if (!plugin.version) continue; // absence handled by RULE 7
 
     if (!semverPattern.test(plugin.version)) {
       logError(
-        `Plugin "${plugin.name}" invalid version format: ${plugin.version}`
+        `Plugin "${plugin.name}" invalid version format: ${plugin.version} (must be semver X.Y.Z)`
       );
-      continue;
-    }
-
-    if (!plugin.source || typeof plugin.source === 'object') continue;
-
-    const sourcePath = plugin.source.replace(/^\.\//, '');
-    const manifestPath = path.join(
-      PROJECT_ROOT,
-      sourcePath,
-      '.claude-plugin',
-      'plugin.json'
-    );
-
-    if (fs.existsSync(manifestPath)) {
-      try {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-        if (manifest.version && manifest.version !== plugin.version) {
-          logError(
-            `Version mismatch for "${plugin.name}": marketplace=${plugin.version}, plugin.json=${manifest.version}`
-          );
-        } else if (manifest.version) {
-          logSuccess(
-            `Plugin "${plugin.name}" version matches: ${plugin.version}`
-          );
-        }
-      } catch (err) {
-        logWarning(
-          `Could not validate version for "${plugin.name}": ${err.message}`
-        );
-      }
+    } else {
+      logSuccess(
+        `Plugin "${plugin.name}" version format valid: ${plugin.version}`
+      );
     }
   }
 }
 
 /**
- * RULE 7: Performance check
+ * RULE 7: Version presence (all local plugins must declare a version field)
+ *
+ * Only checks that the field exists. Cross-file consistency is handled by
+ * validate-versions.js.
+ */
+function validateVersionPresence() {
+  if (!Array.isArray(marketplace.plugins)) return;
+
+  logInfo('Validating version presence...');
+
+  let allPresent = true;
+
+  for (const plugin of marketplace.plugins) {
+    if (plugin.version) continue;
+
+    // Only require version for local (non-remote) plugins
+    if (plugin.source && typeof plugin.source === 'object') continue;
+
+    logError(
+      `Plugin "${plugin.name}" is missing a "version" field in marketplace.json.`
+    );
+    allPresent = false;
+  }
+
+  if (allPresent && marketplace.plugins.length > 0) {
+    logSuccess('All local plugins have version fields');
+  }
+}
+
+/**
+ * RULE 8: Performance check
  */
 function validatePerformance() {
   logInfo('Checking file size...');
@@ -356,6 +379,7 @@ function runValidation() {
   validateRequiredPluginFields();
   validateSourcePaths();
   validateVersionConsistency();
+  validateVersionPresence();
   validatePerformance();
 
   printSummary();

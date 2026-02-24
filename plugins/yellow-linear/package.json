@@ -1,0 +1,6 @@
+{
+  "name": "yellow-linear",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents"
+}

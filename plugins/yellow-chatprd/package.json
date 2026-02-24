@@ -1,0 +1,6 @@
+{
+  "name": "yellow-chatprd",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ChatPRD MCP integration with document management and Linear bridging"
+}

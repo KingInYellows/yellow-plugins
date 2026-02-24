@@ -22,9 +22,17 @@
     "validate:plugins": "node scripts/validate-plugin.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
-    "release:check": "pnpm run validate:marketplace && pnpm run validate:plugins && pnpm run typecheck"
+    "release:check": "pnpm run validate:marketplace && pnpm run validate:plugins && pnpm run validate:versions && pnpm run typecheck",
+    "changeset": "changeset",
+    "apply:changesets": "changeset version && node scripts/sync-manifests.js",
+    "tag": "changeset tag",
+    "catalog:version": "node scripts/catalog-version.js",
+    "validate:versions": "node scripts/validate-versions.js",
+    "validate:versions:dry": "node scripts/validate-versions.js --dry-run"
   },
   "devDependencies": {
+    "@changesets/changelog-github": "^0.5.2",
+    "@changesets/cli": "^2.29.8",
     "@types/node": "^18.19.0",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
@@ -36,6 +44,7 @@
     "eslint-plugin-import": "^2.29.1",
     "markdownlint-cli": "^0.39.0",
     "prettier": "^3.2.4",
+    "semver": "^7.5.4",
     "typedoc": "^0.28.0",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0"
@@ -52,6 +61,5 @@
     "cli",
     "git-native",
     "schema-validation"
-  ],
-  "dependencies": {}
+  ]
 }

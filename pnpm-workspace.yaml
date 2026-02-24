@@ -10,3 +10,6 @@ packages:
 
   # Validation scripts package
   - 'scripts'
+
+  # Plugin packages (version tracking via Changesets — no npm publish)
+  - 'plugins/*'

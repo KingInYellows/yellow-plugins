@@ -1,0 +1,6 @@
+{
+  "name": "yellow-research",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Deep research plugin with Perplexity, Tavily, EXA, and Parallel Task MCP servers"
+}

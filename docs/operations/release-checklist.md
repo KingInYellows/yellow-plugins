@@ -2,7 +2,7 @@
 
 <!-- anchor: release-checklist -->
 
-**Document Version**: 1.0.0 **Last Updated**: 2026-01-11 **Part of**: Task
+**Document Version**: 1.1.0 **Last Updated**: 2026-02-23 **Part of**: Task
 I4.T5 - Release Packaging & Checklist
 
 ---
@@ -87,7 +87,8 @@ obtaining final sign-off.
 
 ```mermaid
 graph TD
-    A[Preflight Checks] --> B[Automated Validation]
+    P[Apply Changesets] --> A[Preflight Checks]
+    A --> B[Automated Validation]
     B --> C[Manual Smoke Tests]
     C --> D[Documentation Updates]
     D --> E[Release Preparation]
@@ -100,6 +101,27 @@ graph TD
 
     G --> I[Release Complete]
 ```
+
+**Phase 0 — Apply Changesets** (run before Preflight Checks):
+
+```sh
+# 1. Apply pending changesets (bumps plugin package.json files)
+pnpm apply:changesets
+# 2. Regenerate lockfile
+pnpm install
+# 3. Commit version bumps
+gt modify -c -m "chore(release): version packages"
+# 4. Bump catalog version
+node scripts/catalog-version.js minor   # or patch / major
+# 5. Commit catalog bump
+gt modify -c -m "chore(release): bump catalog to vX.Y.Z"
+# 6. Run pre-flight checks
+pnpm release:check
+# 7. Create and push the release tag — see Section 5 (annotated tag step)
+```
+
+See `docs/operations/versioning.md` for the complete developer workflow and
+semver bump rules.
 
 **Estimated Duration**: 2-4 hours (excluding fix cycles)
 
@@ -208,35 +230,46 @@ Section 4 security directives.
 
 **Objective**: Ensure version numbers are consistent across all artifacts.
 
-- [ ] `package.json` version matches intended release version
+- [ ] All pending changesets have been applied
 
   ```bash
+  pnpm apply:changesets
+  # Bumps plugins/*/package.json, syncs plugin.json + marketplace.json
+  # Run: pnpm install after (lockfile changes)
+  ```
+
+- [ ] Three-way version consistency check passes (package.json == plugin.json == marketplace.json)
+
+  ```bash
+  pnpm validate:versions
+  # Expected: "[validate-versions] OK: 11 plugins — all versions in sync"
+  ```
+
+- [ ] Root `package.json` catalog version updated for this release
+
+  ```bash
+  node scripts/catalog-version.js minor   # or patch / major
   node -p "require('./package.json').version"
   # Expected: X.Y.Z matching intended release
   ```
 
-- [ ] `CHANGELOG.md` contains entry for this version with today's date
+- [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's date
 
   ```bash
-  grep -A 1 "## \[$(node -p "require('./package.json').version")\]" CHANGELOG.md
+  grep -A 1 "## \[$(node -p 'require("./package.json").version')\]" CHANGELOG.md
   # Expected: ## [X.Y.Z] - YYYY-MM-DD
   ```
 
-- [ ] `README.md` version badge matches intended release (if present)
-
-  ```bash
-  grep "Version" README.md | head -1
-  # Expected: **Version**: X.Y.Z
-  ```
-
 - [ ] No version conflicts in workspace packages
+
   ```bash
-  pnpm list --depth 0
-  # Verify all @yellow-plugins/* packages show correct version
+  pnpm validate:versions:dry
+  # Verify all plugin versions are in sync
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` version validation step,
-Section 4 traceability enforcement.
+
+**Reference**: `docs/operations/versioning.md`, `.github/workflows/publish-release.yml`
+version validation step, `scripts/validate-versions.js`.
 
 ---
 
@@ -1176,5 +1209,5 @@ procedures change. Increment document version and update Last Updated date.
 
 ---
 
-**Last Updated**: 2026-01-11 **Document Version**: 1.0.0 **Maintained By**:
+**Last Updated**: 2026-02-23 **Document Version**: 1.1.0 **Maintained By**:
 KingInYellows

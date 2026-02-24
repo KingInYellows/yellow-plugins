@@ -9,6 +9,7 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-ruvector",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
+  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-ruvector/CHANGELOG.md",
   "keywords": ["vector-search", "agent-memory", "semantic-search", "embeddings", "self-learning"],
   "mcpServers": {
     "ruvector": {
