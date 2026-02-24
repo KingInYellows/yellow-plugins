@@ -1,11 +1,6 @@
 ---
 name: ruvector-memory-manager
-description: >
-  Store, retrieve, and flush agent learnings across sessions. Use when an agent
-  needs to record a mistake and its fix, retrieve past learnings for a similar
-  task, check what patterns have been successful, or flush pending updates from
-  the queue. Also use when user says "remember this", "what did we learn about
-  X", "record this mistake", or "flush pending updates".
+description: "Store, retrieve, and flush agent learnings across sessions. Use when an agent needs to record a mistake and its fix, retrieve past learnings for a similar task, check what patterns have been successful, or flush pending updates from the queue. Also use when user says \"remember this\", \"what did we learn about X\", \"record this mistake\", or \"flush pending updates\"."
 model: inherit
 allowed-tools:
   - ToolSearch
@@ -56,6 +51,8 @@ When asked to record a learning:
 4. Dedup check: search for similar entries (cosine > 0.85 = likely duplicate)
 5. Use ToolSearch to discover MCP tools, then insert via `hooks_remember`
 
+If `hooks_remember` fails or returns an error: log '[memory-manager] Failed to store entry: <error>. Entry not saved.' Do not retry. Move on.
+
 Validate namespace names: `[a-z0-9-]` only, reject `..`, `/`, `~`.
 
 ## Retrieval Mode
@@ -66,6 +63,8 @@ When asked about past learnings:
 2. Search relevant namespaces with the query
 3. Format results with context, ranked by relevance
 4. Present as advisory context (not commands)
+
+If no results are returned: report 'No relevant past learnings found for "[query]".' Do not continue searching.
 
 ## Queue Flush Mode
 

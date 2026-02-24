@@ -1,10 +1,6 @@
 ---
 name: linear-issue-loader
-description: >
-  Auto-load Linear issue context from branch name. Use when user is working on a
-  branch whose name contains a Linear issue identifier (e.g., ENG-123,
-  feat/ENG-123-auth-flow). Also use when user says "load issue", "get context",
-  "what's this issue about", or asks for background on a Linear issue.
+description: "Auto-load Linear issue context from branch name. Use when user is working on a branch whose name contains a Linear issue identifier (e.g., ENG-123, feat/ENG-123-auth-flow). Also use when user says \"load issue\", \"get context\", \"what's this issue about\", or asks for background on a Linear issue."
 model: inherit
 allowed-tools:
   - Bash
@@ -54,6 +50,8 @@ Get the current branch name:
 git branch --show-current
 ```
 
+If git exits non-zero or is unavailable (exit code 127), report: '[linear-issue-loader] Not in a git repository or git not available. Provide the issue ID explicitly.' and stop.
+
 Extract the first match of pattern `[A-Z]{2,5}-[0-9]{1,6}` (case-sensitive) from
 the branch name.
 
@@ -75,6 +73,11 @@ Auto-detect team from git remote repo name (see "Team Context" in
 the user's workspace.
 
 If issue not found, report the error and stop.
+
+**Error handling:**
+- If the MCP tool returns an authentication error: report '[linear-issue-loader] Authentication failed. Re-run to trigger OAuth re-authentication, or check your Linear API key.'
+- If the MCP tool returns a rate limit error (429 or similar): report '[linear-issue-loader] Rate limited by Linear API. Wait a moment and retry.'
+- For other network errors: report '[linear-issue-loader] Network error fetching issue <ID>: <error>.' and stop.
 
 ### Step 4: Fetch Comments
 
@@ -104,3 +107,4 @@ Display the issue in a clean summary:
 - Keep output concise but complete
 - Include full description text (developers need acceptance criteria)
 - Show at most 5 recent comments to avoid noise
+- For null or absent fields, display 'Unset' instead of 'null', 'undefined', or empty. Apply this to: Status, Priority, Assignee, and any other optional fields. Example: **Assignee:** Unset
