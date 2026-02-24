@@ -63,7 +63,8 @@ if (!SEMVER_RE.test(version)) {
 // --- Extract catalog section from CHANGELOG.md ---
 function extractChangelogSection(changelog, ver) {
   const lines = changelog.split('\n');
-  const startPattern = new RegExp(`^## \\[?${ver.replace(/\./g, '\\.')}\\]?`);
+  const escaped = ver.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const startPattern = new RegExp(`^## \\[?${escaped}\\]?`);
   const nextPattern = /^## \[?[0-9]/;
 
   let capturing = false;
@@ -125,6 +126,7 @@ if (existsSync(PLUGINS_DIR)) {
 let versionsTable = '';
 if (pluginVersions.length > 0) {
   // Only add a separator if the catalog section doesn't already end with one
+  // trimEnd() (line 84) strips only whitespace; '---' chars are preserved
   const separator = catalogSection.endsWith('---') ? '\n\n' : '\n\n---\n\n';
   versionsTable = separator + '## Plugin Versions\n\n';
   versionsTable += '| Plugin | Version |\n|--------|----------|\n';
