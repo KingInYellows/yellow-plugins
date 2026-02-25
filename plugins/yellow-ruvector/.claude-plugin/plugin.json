@@ -1,6 +1,6 @@
 {
   "name": "yellow-ruvector",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
   "author": {
     "name": "KingInYellows",
@@ -9,12 +9,21 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-ruvector",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-ruvector/CHANGELOG.md",
-  "keywords": ["vector-search", "agent-memory", "semantic-search", "embeddings", "self-learning"],
+  "keywords": [
+    "vector-search",
+    "agent-memory",
+    "semantic-search",
+    "embeddings",
+    "self-learning"
+  ],
   "mcpServers": {
     "ruvector": {
       "command": "npx",
-      "args": ["ruvector", "mcp", "start"],
+      "args": [
+        "ruvector",
+        "mcp",
+        "start"
+      ],
       "env": {
         "RUVECTOR_STORAGE_PATH": "${PWD}/.ruvector/"
       }

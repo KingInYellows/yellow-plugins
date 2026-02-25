@@ -1,6 +1,6 @@
 {
   "name": "yellow-browser-test",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, exploratory testing, and bug reporting",
   "author": {
     "name": "KingInYellows",
@@ -9,6 +9,10 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-browser-test",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-browser-test/CHANGELOG.md",
-  "keywords": ["browser", "e2e", "agent-browser", "autonomous-qa"]
+  "keywords": [
+    "browser",
+    "e2e",
+    "agent-browser",
+    "autonomous-qa"
+  ]
 }

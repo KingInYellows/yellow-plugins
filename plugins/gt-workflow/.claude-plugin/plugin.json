@@ -1,6 +1,6 @@
 {
   "name": "gt-workflow",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Graphite-native workflow commands for stacked PR development. Provides smart commit-and-submit with parallel audit agents, stack planning, sync, and navigation — all through the gt CLI.",
   "author": {
     "name": "KingInYellows",
@@ -9,7 +9,6 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/gt-workflow",
   "repository": "https://github.com/KingInYellows/yellow-plugins.git",
   "license": "MIT",
-  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/gt-workflow/CHANGELOG.md",
   "keywords": [
     "graphite",
     "graphite-cli",

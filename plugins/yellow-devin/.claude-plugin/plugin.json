@@ -1,6 +1,6 @@
 {
   "name": "yellow-devin",
-  "version": "2.0.0",
+  "version": "1.1.0",
   "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
@@ -9,8 +9,13 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-devin",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-devin/CHANGELOG.md",
-  "keywords": ["devin", "deepwiki", "delegation", "orchestration", "ai-collaboration"],
+  "keywords": [
+    "devin",
+    "deepwiki",
+    "delegation",
+    "orchestration",
+    "ai-collaboration"
+  ],
   "mcpServers": {
     "deepwiki": {
       "type": "http",

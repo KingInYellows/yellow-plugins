@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.0.0] - 2026-02-23
+## [1.1.0] - 2026-02-25
 
 ### Added
 
@@ -15,7 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Migrate to Devin V3 API. Breaking change: all session management endpoints updated.
+- Migrate to Devin V3 API: all session management endpoints updated.
+
+### Fixed
+
+- Remove unsupported `changelog` key from plugin.json that blocked installation via Claude Code's remote validator.
 
 ---
 

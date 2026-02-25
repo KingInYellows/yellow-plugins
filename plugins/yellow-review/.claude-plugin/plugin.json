@@ -1,6 +1,6 @@
 {
   "name": "yellow-review",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",
@@ -9,6 +9,9 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-review",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-review/CHANGELOG.md",
-  "keywords": ["pr", "code-review", "graphite"]
+  "keywords": [
+    "pr",
+    "code-review",
+    "graphite"
+  ]
 }
