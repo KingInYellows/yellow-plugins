@@ -51,7 +51,7 @@ When asked to record a learning:
 4. Dedup check: search for similar entries (cosine > 0.85 = likely duplicate)
 5. Use ToolSearch to discover MCP tools, then insert via `hooks_remember`
 
-If `hooks_remember` fails or returns an error: log '[memory-manager] Failed to store entry: <error>. Entry not saved.' Do not retry. Move on.
+If `hooks_remember` fails or returns an error: log '[memory-manager] Failed to store entry: <error>. Entry not saved.' Output `**Stored**: false — <error summary>` so callers can detect the failure. Do not retry.
 
 Validate namespace names: `[a-z0-9-]` only, reject `..`, `/`, `~`.
 
