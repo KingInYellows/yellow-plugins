@@ -1,5 +1,6 @@
 #!/bin/bash
 # session-start.sh — Detect CI context and check for recent failures
+# NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.
 # Budget: 3s total (filesystem 1ms, cache check 5ms, gh API 2s, parse 50ms, buffer 500ms)
 # Output: system reminder if failures detected, empty otherwise
 

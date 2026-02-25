@@ -67,6 +67,12 @@ major/critical findings" / "No, report only" / "Let me review the report first"
 
 **IMPORTANT:** ALWAYS ask before creating issues. Never auto-create.
 
+**If user selects "Let me review the report first":**
+Output the report file path and instruct: "Report saved to
+`test-reports/YYYY-MM-DD-HH-MM.md`. Review it and re-run
+`/browser-test:report` when ready to create issues." Stop here — do not
+proceed to Step 5.
+
 ### Step 5: Create GitHub Issues (if approved)
 
 Sanitize issue body: strip HTML tags (`sed 's/<[^>]*>//g'`), wrap user content
