@@ -108,13 +108,12 @@ You will receive via the Task prompt:
      "too-short"
    - f. If >= 20 words, truncate to 500 chars at word boundary; re-count words;
      if < 20 after truncation, skip to 6e with "too-short"
-   - g. Dedup check via hooks_recall with `query=content`, `top_k=1`,
-     `namespace="reflexion"`
+   - g. Dedup check via hooks_recall with `query=content`, `top_k=1`
    - h. If hooks_recall errors: skip to 6e with
      `dedup-check-failed: <error>`
    - i. If score > 0.82: skip to 6e with `near-duplicate: score=X.XX`
    - j. Store via hooks_remember with `content=<constructed content>`,
-     `namespace="reflexion"`
+     `type="reflexion"`
    - k. If hooks_remember errors: skip to 6e with "ruvector MCP unavailable"
    - l. 6e output: "Stored reflexion entry: <first 60 chars>" or
      "Skipped ruvector storage: <reason>"
