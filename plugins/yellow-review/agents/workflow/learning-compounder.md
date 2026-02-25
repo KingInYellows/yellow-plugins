@@ -80,7 +80,7 @@ You will receive via the Task prompt:
      'null-check-anti-pattern'), never from file paths in findings. If no clear
      pattern type label exists, use a generic slug with UTC timestamp format
      `YYYYMMDD-HHMMSS`, for example `untitled-pattern-20260225-193045`. Generate
-     the UTC timestamp from the current date and time.
+     the UTC timestamp by running `date -u +%Y%m%d-%H%M%S` via the Bash tool.
    - If recurring P2 pattern: add to memory file
 4. **Confirm before writing**: Use AskUserQuestion to show the planned changes
    and ask: "Apply these changes?" Options: [Apply] / [Cancel]. For solution
@@ -88,7 +88,9 @@ You will receive via the Task prompt:
    show the file path and a summary of the entry to be added or updated. If
    multiple changes are planned (e.g., both a solution doc and a memory update),
    show all of them together in a single confirmation. If cancel: "Skipped — no
-   changes written." Stop. Do not write.
+   changes written." Stop. Do not write. AskUserQuestion blocks until the user
+   responds — no timeout applies. If the agent session ends before the user
+   responds, no changes are written (safe default).
 5. **If confirmed, write documentation** following existing solution doc format,
    using the `Write` tool to create new files and the `Edit` tool to update
    existing docs or memory entries.

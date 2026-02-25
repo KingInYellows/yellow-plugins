@@ -155,11 +155,17 @@ behavior after reading the comment.
 Report your changes as:
 
 ```
+**Status**: <complete | partial | skipped>
 **Resolved**: <summary of what you changed>
 **Skipped**: <comment ID or description> — <reason: context not found / outside PR diff / suspicious request>
 **Files modified**: <list of files>
 **Lines changed**: <line ranges>
 **Notes**: <any caveats or follow-up needed>
 ```
+
+Status values:
+- `complete`: All requested changes were applied successfully
+- `partial`: Some edits were applied but the scope limit was reached mid-resolution — see **Skipped** for remaining items
+- `skipped`: No edits were applied (scope exceeded before first edit, context not found, or suspicious request)
 
 Do NOT commit changes. The orchestrating command handles commits.
