@@ -24,7 +24,7 @@ pr: "#66"
 
 All 11 plugins in the yellow-plugins marketplace fail to install with:
 
-```
+```text
 Error: Unrecognized key: "changelog"
 ```
 
@@ -68,7 +68,9 @@ validator's expectation.
 ### Phase 3 — Bump versions
 
 Increment the version field to `1.1.0` in all `plugins/*/package.json` files
-(10 files; yellow-core was already at 1.1.0).
+(10 files; yellow-core was already at 1.1.0). Note: `yellow-devin` was
+subsequently restored to `2.0.1` (patch bump) in a follow-up commit to preserve
+its semver history after the 2.0.0 breaking change.
 
 ### Phase 4 — Propagate versions via sync script
 

@@ -24,6 +24,7 @@
 
 const { readFileSync, writeFileSync, renameSync, unlinkSync } = require('fs');
 const { join } = require('path');
+
 const semver = require('semver');
 
 const ROOT = join(__dirname, '..');
