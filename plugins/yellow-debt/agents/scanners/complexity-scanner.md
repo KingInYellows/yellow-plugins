@@ -63,7 +63,7 @@ Follow all security and fencing rules from the `debt-conventions` skill.
 5. **Cognitive complexity "bumpy road" patterns** → Medium to High
 6. **God functions (>10 params or >5 return paths)** → High
 
-Skip unreadable or binary files; increment `files_scanned` counter.
+Skip unreadable or binary files without incrementing `files_scanned`.
 
 ## Output Requirements
 
