@@ -61,7 +61,7 @@ mkdir -p docs/research
 | Recent news, current events | Perplexity `perplexity_search` | Tavily `tavily_search` |
 | Competitive / company research | EXA `company_research_exa` | Perplexity |
 | Deep technical report | Perplexity `perplexity_research` | Tavily `tavily_research` |
-| Long-horizon async report | Parallel `create_deep_research_task` | EXA `deep_researcher_start` |
+| Long-horizon async report | Parallel `createDeepResearch` | EXA `deep_researcher_start` |
 | Specific URL content | EXA `crawling_exa` | Tavily `tavily_extract` |
 
 ## When to Compound Findings

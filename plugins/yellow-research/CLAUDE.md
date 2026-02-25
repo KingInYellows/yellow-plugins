@@ -37,9 +37,10 @@ Off-by-default tools (enable by adding them to the `tools=` arg in `plugin.json`
 
 ### parallel — `PARALLEL_API_KEY` (HTTP Bearer auth)
 
-- `create_deep_research_task` — Launch async research; returns task ID
-- `create_task_group` — Parallel enrichment for multiple items
-- `get_result` — Retrieve completed research (works for both task types)
+- `createDeepResearch` — Launch async research; returns task ID
+- `createTaskGroup` — Parallel enrichment for multiple items
+- `getResultMarkdown` — Retrieve completed research report
+- `getStatus` — Poll async task status before retrieving results
 
 ## Conventions
 
