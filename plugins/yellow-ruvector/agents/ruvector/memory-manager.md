@@ -1,14 +1,10 @@
 ---
 name: ruvector-memory-manager
-description: >
-  Store, retrieve, and flush agent learnings across sessions. Use when an agent
-  needs to record a mistake and its fix, retrieve past learnings for a similar
-  task, check what patterns have been successful, or flush pending updates from
-  the queue. Also use when user says "remember this", "what did we learn about
-  X", "record this mistake", or "flush pending updates".
+description: "Store, retrieve, and flush agent learnings across sessions. Use when an agent needs to record a mistake and its fix, retrieve past learnings for a similar task, check what patterns have been successful, or flush pending updates from the queue. Also use when user says \"remember this\", \"what did we learn about X\", \"record this mistake\", or \"flush pending updates\"."
 model: inherit
 allowed-tools:
   - ToolSearch
+  - AskUserQuestion
   - Read
   - Write
   - Bash
@@ -56,6 +52,8 @@ When asked to record a learning:
 4. Dedup check: search for similar entries (cosine > 0.85 = likely duplicate)
 5. Use ToolSearch to discover MCP tools, then insert via `hooks_remember`
 
+If `hooks_remember` fails or returns an error: log '[memory-manager] Failed to store entry: <error>. Entry not saved.' Output `**Stored**: false — <error summary>` so callers can detect the failure. Do not retry.
+
 Validate namespace names: `[a-z0-9-]` only, reject `..`, `/`, `~`.
 
 ## Retrieval Mode
@@ -67,6 +65,8 @@ When asked about past learnings:
 3. Format results with context, ranked by relevance
 4. Present as advisory context (not commands)
 
+If no results are returned: report 'No relevant past learnings found for "[query]".' Do not retry the same namespace. If other relevant namespaces haven't been searched yet, try those before reporting empty results.
+
 ## Queue Flush Mode
 
 When called to flush `pending-updates.jsonl`:
@@ -76,12 +76,17 @@ When called to flush `pending-updates.jsonl`:
 3. Validate `file_path` values: must not contain `..`, `/` prefix, `~`, or
    newlines. Reject entries with invalid paths.
 4. Dedup: keep only the latest entry per `file_path`
-5. For `file_change` entries: read the file, chunk it, insert into `code`
+5. Before processing: use AskUserQuestion to confirm:
+   "Flush N valid entries (M files, K skipped, J invalid) and clear the queue?"
+   Options: [Flush and clear] / [Cancel]
+   - If cancel: report "[memory-manager] Flush cancelled. Queue file unchanged."
+     Stop. Do not proceed.
+6. For `file_change` entries: read the file, chunk it, insert into `code`
    namespace
-6. For `bash_result` entries with non-zero exit codes: consider as reflexion
+7. For `bash_result` entries with non-zero exit codes: consider as reflexion
    candidates
-7. After processing, truncate the queue file via Write (empty content)
-8. Report: "Flushed N entries (M files re-indexed, K skipped, J invalid paths
+8. After processing, truncate the queue file via Write (empty content)
+9. Report: "Flushed N entries (M files re-indexed, K skipped, J invalid paths
    rejected)"
 
 If queue file doesn't exist or is empty, report: "No pending updates."

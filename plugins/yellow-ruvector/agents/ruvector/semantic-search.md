@@ -1,10 +1,6 @@
 ---
 name: ruvector-semantic-search
-description: >
-  Find code by meaning rather than keyword. Use when an agent needs to search
-  for implementations of a concept, similar patterns, or related functionality
-  across the codebase. Also use when user says "find similar code", "search by
-  concept", "where is X implemented", or "find code that does Y".
+description: "Find code by meaning rather than keyword. Use when an agent needs to search for implementations of a concept, similar patterns, or related functionality across the codebase. Also use when user says \"find similar code\", \"search by concept\", \"where is X implemented\", or \"find code that does Y\"."
 model: inherit
 allowed-tools:
   - ToolSearch
@@ -66,6 +62,8 @@ For each result, show:
 - Code snippet with relevant context
 - Chunk type and symbol names from metadata
 
+If the result set is completely empty (zero results returned), report: 'No semantically similar code found for "[query]". Try broader search terms or run `/ruvector:index` to update the index.' Then immediately proceed to Step 4 (Grep fallback), noting: "No semantic matches found — falling back to keyword search."
+
 If scores are low (all < 0.5), note: "Results have low confidence. You may want
 to try different search terms or update the index with `/ruvector:index`."
 
@@ -73,11 +71,13 @@ Read the top 2-3 files to provide fuller context if needed.
 
 ### Step 4: Fallback to Grep
 
-If ruvector MCP is unavailable:
+If ruvector MCP is unavailable or vector search returned zero results:
 
 1. Extract 2-3 key terms from the query
 2. Use Grep to search for those terms across the codebase
-3. Note: "Using keyword search — run `/ruvector:setup` for semantic search"
+3. Note: If MCP was unavailable: "Using keyword search — run `/ruvector:setup` for semantic search." If vector search returned zero results: "No semantic matches found — falling back to keyword search."
+
+Present Grep results as: `[file path]:[line number]: [matching line]` plus 1 line of surrounding context. Include a note: '(keyword match — not semantic search)'
 
 ## Guidelines
 
@@ -85,3 +85,4 @@ If ruvector MCP is unavailable:
 - Show file paths so users can navigate to results
 - Read top results for additional context when helpful
 - Keep output focused — don't dump entire files
+- Use semantic search for conceptual queries (what code does something like X, where is concept Y implemented). Prefer Grep directly for exact symbol names, known string literals, or file names.
