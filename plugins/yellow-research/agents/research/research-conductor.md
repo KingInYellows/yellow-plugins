@@ -32,8 +32,6 @@ results into structured markdown for the caller to save.
 
 ## Step 1: Triage Complexity
 
-Classify the topic into one of three tiers:
-
 Classify as **Complex** if: the topic requires comparing >2 entities OR spans >2 years of change history OR requires multiple domain expertise areas. Classify as **Simple** if: a single authoritative source can answer the complete question with no synthesis needed. Classify as **Moderate** for everything in between.
 
 **Simple** — 1 well-defined aspect, quick answer needed:
@@ -72,9 +70,9 @@ For async tools, start them first:
 4. getResultMarkdown(task_id) and deep_researcher_check(job_id)
 ```
 
-If `createDeepResearch` or EXA deep researcher fails to return a task_id/job_id (null or empty), skip the polling step for that task. Do not call `getResultMarkdown` or `deep_researcher_check` with a missing ID. Log: 'Async task start failed — skipping poll for this source.'
+If `createDeepResearch` or EXA deep researcher fails to return a task_id/job_id (null or empty), skip the polling step for that task. Do not call `getResultMarkdown` or `deep_researcher_check` with a missing ID. Log: '[research-conductor] Async task start failed — skipping poll for this source.'
 
-Skip any source that is unavailable — never fail the whole research.
+Skip any source that is unavailable — never fail the whole research. When skipping a source, annotate the result with: `[research-conductor] Source skipped: <source-name> — unavailable.` Include skipped sources in the **Sources** section of the final output as: `- <source-name> — skipped (unavailable)`.
 
 ## Step 3: Converge
 
