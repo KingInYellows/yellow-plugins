@@ -61,10 +61,17 @@ You will receive via the Task prompt:
 ## Workflow
 
 1. **Categorize findings** by pattern type (not individual instances)
-2. **Check existing memory** — read `~/.claude/projects/*/memory/MEMORY.md` and
-   `docs/solutions/` for existing documentation of this pattern. If no MEMORY.md
-   files are found, treat the memory check as empty and proceed to solution doc
-   creation.
+2. **Check existing memory** — use Glob to find `~/.claude/projects/*/memory/MEMORY.md`
+   and files under `docs/solutions/` for existing documentation of this pattern.
+   Treat Glob and Read results as follows:
+   - If Glob returns 0 files: "No existing documentation found for this pattern —
+     proceed to create new doc." Do not treat this as an error.
+   - If Glob returns files but Read fails on a matched path: "Error reading
+     existing doc at <path>. Skipping update, creating new doc instead."
+   These are distinct failure modes — do not conflate "pattern not yet
+   documented" with "failed to check existing docs."
+   If no MEMORY.md files are found, treat the memory check as empty and proceed
+   to solution doc creation.
 3. **Decide what to compound**:
    - If pattern already documented: skip (or update if new info found)
    - If new P1 pattern: create solution doc at
