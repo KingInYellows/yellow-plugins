@@ -1,10 +1,6 @@
 ---
 name: ci:setup-self-hosted
-description: >
-  Inventory available self-hosted runners and optimize workflow jobs to use the
-  best runner based on labels, OS, and live load. Use when runner assignments
-  look suboptimal, jobs are queuing on the wrong runner, or after registering
-  new self-hosted runners.
+description: 'Inventory available self-hosted runners and optimize workflow jobs to use the best runner based on labels, OS, and live load. Use when runner assignments look suboptimal, jobs are queuing on the wrong runner, or after registering new self-hosted runners.'
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -36,6 +32,8 @@ If not authenticated:
 
 > GitHub CLI not authenticated. Run: `gh auth login`
 
+Stop immediately. Do not proceed.
+
 Derive the repository owner/repo:
 
 ```bash
@@ -50,14 +48,21 @@ If no GitHub remote found or format is invalid:
 
 > Not in a Git repository with a GitHub remote. Navigate to your project root.
 
+Stop immediately. Do not proceed.
+
 ## Step 2: Fetch Runner Inventory
 
 Fetch all registered runners with pagination and assemble into a JSON array:
 
 ```bash
-RUNNERS_JSON=$(timeout 15 gh api --paginate \
+GH_OUTPUT=$(timeout 15 gh api --paginate \
   "repos/${OWNER}/${REPO}/actions/runners" \
-  --jq '.runners[]' 2>&1 | jq -s '.')
+  --jq '.runners[]' 2>&1); GH_EXIT=$?
+if [ $GH_EXIT -ne 0 ]; then
+  echo "$GH_OUTPUT"
+  exit $GH_EXIT
+fi
+RUNNERS_JSON=$(echo "$GH_OUTPUT" | jq -s '.')
 ```
 
 If this fails (non-zero exit or `jq -s` produces invalid JSON):

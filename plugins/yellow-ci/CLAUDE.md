@@ -34,7 +34,7 @@ Three-layer plugin where each layer is independently useful:
 
 ## Plugin Components
 
-### Commands (6)
+### Commands (7)
 
 - `/ci:diagnose [run-id]` — Diagnose CI failure and suggest fixes
 - `/ci:status` — Show recent CI workflow run status
@@ -42,6 +42,7 @@ Three-layer plugin where each layer is independently useful:
 - `/ci:runner-health [runner-name]` — Check self-hosted runner health via SSH
 - `/ci:runner-cleanup [runner-name]` — Clean Docker/cache/logs on runner (with
   confirmation)
+- `/ci:report-linear` — Diagnose a CI failure and create a Linear bug issue
 - `/ci:setup-self-hosted` — Inventory runners and optimize workflow `runs-on`
   assignments using GitHub API + SSH health data
 
