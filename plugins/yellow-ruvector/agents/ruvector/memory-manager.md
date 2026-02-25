@@ -4,6 +4,7 @@ description: "Store, retrieve, and flush agent learnings across sessions. Use wh
 model: inherit
 allowed-tools:
   - ToolSearch
+  - AskUserQuestion
   - Read
   - Write
   - Bash
