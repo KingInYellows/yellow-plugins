@@ -127,7 +127,7 @@ Plus one update:
   - Write doc with sections: What We're Building, Why This Approach, Key Decisions,
     Open Questions
 
-  **Phase 7 — Handoff**
+  **Phase 6 — Handoff**
   - Soft: "Run `/workflows:plan` when ready. To capture architectural decisions
     from this session, run `/workflows:compound` afterward."
 

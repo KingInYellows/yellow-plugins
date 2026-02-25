@@ -192,7 +192,11 @@ SKILL.md ≤ 500 lines (Anthropic docs); MEMORY.md truncates at 200 lines.
   know this from training data?" — if yes, cut it
 - **Agent files load JIT:** They compete only against their spawn context, not
   the full session — length affects compliance, not startup cost
-- See `docs/research/do-we-actually-need-a-120-line-maximum-o.md`
+- **120-line threshold rationale:** The 120-line threshold is an empirically
+  derived audit trigger, not an Anthropic limit. Agents under 120 lines are
+  statistically more likely to be under-specified (missing edge cases, error
+  paths, or security rules) while agents over 120 lines risk LLM training-data
+  duplication. The threshold prompts review, not rejection.
 
 ## Metrics
 

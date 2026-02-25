@@ -268,14 +268,14 @@ pass.
 
 **Agent lineup:**
 
-| Agent                                      | Scope                                                      | What it checks                                                 |
-| ------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------- | --- | ------------- |
-| `pr-review-toolkit:security-sentinel`      | All plugins                                                | OWASP, injection, auth patterns, hardcoded secrets             |
-| `pr-review-toolkit:silent-failure-hunter`  | All plugins                                                | Error suppression, missing error handling,                     |     | true patterns |
-| `pr-review-toolkit:code-reviewer`          | All plugins                                                | Style, conventions, best practices                             |
-| `pr-review-toolkit:comment-analyzer`       | All plugins                                                | Comment accuracy, TODO references, stale docs                  |
-| `plugin-dev:plugin-validator`              | All plugins                                                | plugin.json schema, SKILL.md frontmatter, component compliance |
-| `shell-scripting:bash-pro` (or ShellCheck) | Plugins with bash: yellow-ci, yellow-ruvector, gt-workflow | Shell script safety, quoting, POSIX compliance                 |
+| Agent                                      | Scope                                                      | What it checks                                                          |
+| ------------------------------------------ | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `pr-review-toolkit:security-sentinel`      | All plugins                                                | OWASP, injection, auth patterns, hardcoded secrets                      |
+| `pr-review-toolkit:silent-failure-hunter`  | All plugins                                                | Error suppression, missing error handling, `|| true` patterns           |
+| `pr-review-toolkit:code-reviewer`          | All plugins                                                | Style, conventions, best practices                                      |
+| `pr-review-toolkit:comment-analyzer`       | All plugins                                                | Comment accuracy, TODO references, stale docs                           |
+| `plugin-dev:plugin-validator`              | All plugins                                                | plugin.json schema, SKILL.md frontmatter, component compliance          |
+| `shell-scripting:bash-pro` (or ShellCheck) | Plugins with bash: yellow-ci, yellow-ruvector, gt-workflow | Shell script safety, quoting, POSIX compliance                          |
 
 **Additional checks to verify during audit:**
 

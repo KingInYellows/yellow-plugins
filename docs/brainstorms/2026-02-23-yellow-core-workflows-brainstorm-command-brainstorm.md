@@ -36,7 +36,7 @@ Research is not forced — the agent offers it as a checkpoint after gathering i
 | File | Purpose |
 |---|---|
 | `plugins/yellow-core/commands/workflows/brainstorm.md` | Thin command: load skill, delegate to agent |
-| `plugins/yellow-core/agents/brainstorm-orchestrator.md` | Runs the full cyclic dialogue loop |
+| `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md` | Runs the full cyclic dialogue loop |
 | `plugins/yellow-core/skills/brainstorming/SKILL.md` | Reusable reference: question techniques, YAGNI, approach patterns, research escalation |
 
 ### Agent dialogue cycle
@@ -49,13 +49,13 @@ Research is not forced — the agent offers it as a checkpoint after gathering i
    - Internal question → Task: repo-research-analyst
    - External/novel → Task: research-conductor (yellow-research, fans out to Perplexity/Exa/Tavily)
 5. Phase 3: Synthesize research → ask targeted follow-up questions
-6. Phase 4: Research round 2 (if needed, same checkpoint pattern) — max 3 rounds total
+6. Phase 4: Research round 2 (if needed, same checkpoint pattern) — max 2 rounds total
 7. Phase 5: Explore 2-3 approaches with pros/cons + recommendation (YAGNI-filtered)
 8. Phase 6: AskUserQuestion confirm approach → write brainstorm doc
 9. Phase 7: Soft handoff: "Run /workflows:plan when ready"
 ```
 
-**Max-rounds guard:** After 3 research rounds, force synthesis regardless. Prevents infinite loops.
+**Max-rounds guard:** After 2 research rounds, force synthesis regardless. Prevents infinite loops.
 
 ### Skill contents (4 sections)
 

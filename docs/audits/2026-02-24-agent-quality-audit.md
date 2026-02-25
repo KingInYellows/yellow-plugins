@@ -207,6 +207,13 @@ report what was searched, and suggest `/research:deep [topic]`."
 
 ### research-conductor.md — Bare tool names in body vs. qualified names in allowed-tools
 
+> **Needs Verification (downgraded from P1):** Bare tool names appear in prose
+> examples and workflow-sequence descriptions, not as literal tool call
+> identifiers. The LLM dispatches tools by `allowed-tools` name; body prose is
+> instructional context. Downgraded to P2 pending verification — bare tool names
+> appear in prose context, not as literal tool call identifiers. The PR C fix
+> should verify empirically before changing body text.
+
 **Gap:** The body references `create_deep_research_task`, `get_result`, and
 `create_task_group` as bare names; `allowed-tools` correctly uses the full
 `mcp__plugin_yellow-research_parallel__` prefix. An LLM reading bare names as
@@ -217,12 +224,6 @@ sources only without indicating that async sources were skipped.
 
 **Fix:** Use full `mcp__plugin_yellow-research_parallel__` prefix consistently
 in the body text, matching `allowed-tools`.
-
-**Note (post-audit review):** These bare names appear in prose examples and
-workflow-sequence descriptions, not as literal tool call identifiers. The LLM
-dispatches tools by `allowed-tools` name; body prose is instructional context.
-This finding may be a false positive — the PR C fix should verify empirically
-before changing body text.
 
 ---
 
@@ -624,8 +625,12 @@ collapse to a single Findings block.
 | `comment-analyzer.md` | 107 | 2 P2s |
 | `code-simplifier.md` | 106 | 3 P2s including LLM duplication |
 | `memory-manager.md` | 101 | 3 P2s; security and edge case handling are strong |
-| `audit-synthesizer.md` | 124 | Reference baseline; not audited as candidate |
-| `debt-fixer.md` | 128 | Reference baseline; not audited as candidate |
+| `pr-test-analyzer.md` | 117 | 2 P2s (summary format + keyword-based P1 triggers) |
+
+> **Reference Baselines (not audited as candidates — over 120-line threshold):**
+> `audit-synthesizer.md` (124 lines) and `debt-fixer.md` (128 lines) were used
+> as structural reference points only and were not subject to the same audit
+> rubric as the 22 candidates above.
 
 ---
 
@@ -661,7 +666,7 @@ fenced markdown.
 
 ### 5. Folded scalar descriptions in frontmatter [P2, 2 agents]
 
-`linear-issue-loader.md` and `ruvector-memory-manager.md` use `description: >`
+`linear-issue-loader.md` and `memory-manager.md` use `description: >`
 (YAML folded scalar). Per MEMORY.md: "Skill descriptions: must be single-line —
 YAML folded scalars (`description: >`) are NOT parsed by Claude Code's
 frontmatter parser." Verify if this applies to agent frontmatter too; if yes,

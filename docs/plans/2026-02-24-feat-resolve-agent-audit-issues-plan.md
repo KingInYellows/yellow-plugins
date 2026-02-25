@@ -39,8 +39,7 @@ audit: docs/audits/2026-02-24-agent-quality-audit.md
 
 ## Overview
 
-Implement all 21 P1 (wrong/unsafe output) and 39 P2 (quality improvement)
-gaps identified in the 2026-02-24 agent quality audit. The audit covered all
+Implement all 21 P1 (wrong/unsafe output) and 39 P2 (quality improvement) gaps identified in the 2026-02-24 agent quality audit. The audit covered all
 22 agent files under 120 lines using a 6-point rubric (decision logic, edge
 cases, output format spec, security/validation rules, error paths, LLM
 duplication).

@@ -313,7 +313,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   const MARKETPLACE_PATH = join(ROOT, '.claude-plugin', 'marketplace.json');
 
   const DRY_RUN = process.argv.includes('--dry-run') || process.argv.includes('--verify');
-  const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+  const SEMVER_RE = /^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/;
 
   function assertWithinRoot(filePath, rootDir) {
     const canonical = resolve(filePath);
@@ -445,7 +445,7 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
   // Usage: node scripts/catalog-version.js [patch|minor|major]
   // Bumps root package.json version + marketplace.json metadata.version
 
-  import { readFileSync } from 'fs';
+  import { readFileSync, writeFileSync, renameSync } from 'fs';
   import { fileURLToPath } from 'url';
   import { join, resolve } from 'path';
   import semver from 'semver';
@@ -480,7 +480,6 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
 
   // Write root package.json
   pkg.version = newVersion;
-  const { writeFileSync, renameSync } = await import('fs');
   const tmpPkg = pkgPath + '.tmp';
   writeFileSync(tmpPkg, JSON.stringify(pkg, null, 2) + '\n');
   renameSync(tmpPkg, pkgPath);
@@ -497,11 +496,14 @@ Adding `"changelog"` and `"version"` fields to `plugin.json` faces the documente
 
 - [ ] **Create `scripts/validate-versions.js`** — standalone three-way consistency check used by CI and pre-flight gates:
 
+  > **Note:** All scripts should use consistent ESM module syntax (`import`/`export`). The `validate-versions.js` example below uses CommonJS (`require`) for illustration — update to ESM syntax (matching `sync-manifests.js` and `catalog-version.js`) before implementation.
+
   ```js
   // scripts/validate-versions.js
   // Validates package.json ↔ plugin.json ↔ marketplace.json version consistency
   // Exit 0 = all consistent; Exit 1 = drift detected
   // Flags: --dry-run (report without failing), --plugin <path> (single plugin)
+  // NOTE: Convert to ESM (import/export) before implementation — use 'use strict' + require only for reference.
 
   'use strict';
   const fs = require('fs');
