@@ -1,9 +1,6 @@
 ---
 name: learning-compounder
-description:
-  'Captures review patterns to memory and solution docs. Use when spawned after
-  a PR review to analyze findings for recurring patterns worth documenting,
-  writing new memory entries or solution docs when warranted.'
+description: 'Captures review patterns to memory and solution docs. Use when spawned after a PR review to analyze findings for recurring patterns worth documenting, writing new memory entries or solution docs when warranted.'
 model: inherit
 allowed-tools:
   - Read
@@ -11,6 +8,7 @@ allowed-tools:
   - Glob
   - Write
   - Edit
+  - AskUserQuestion
 ---
 
 <examples>
@@ -82,7 +80,10 @@ You will receive via the Task prompt:
      'null-check-anti-pattern'), never from file paths in findings. If no clear
      pattern type label exists, use a generic slug: `untitled-pattern-YYYY-MM-DD`.
    - If recurring P2 pattern: add to memory file
-4. **Write documentation** following existing solution doc format, using the
+4. **Confirm before writing**: Use AskUserQuestion to show the planned doc title,
+   category, and slug and ask: "Create this solution doc?" Options: [Create] /
+   [Cancel]. If cancel: "Skipped — no solution doc written." Stop. Do not write.
+5. **Write documentation** following existing solution doc format, using the
    `Write` tool to create new files and the `Edit` tool to update existing docs
    or memory entries
 
