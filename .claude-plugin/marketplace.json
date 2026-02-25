@@ -14,8 +14,10 @@
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/gt-workflow",
       "category": "development"
     },
@@ -23,79 +25,99 @@
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
       "version": "1.1.0",
-      "author": { "name": "KingInYellows" },
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-core",
       "category": "development"
     },
     {
       "name": "yellow-linear",
       "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-linear",
       "category": "productivity"
     },
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki, orchestrate plan-implement-review chains",
-      "version": "2.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "2.0.1",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-devin",
       "category": "development"
     },
     {
       "name": "yellow-chatprd",
       "description": "ChatPRD MCP integration with document management and Linear bridging",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-chatprd",
       "category": "productivity"
     },
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-review",
       "category": "development"
     },
     {
       "name": "yellow-ruvector",
       "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-ruvector",
       "category": "development"
     },
     {
       "name": "yellow-browser-test",
       "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-browser-test",
       "category": "testing"
     },
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-debt",
       "category": "development"
     },
     {
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-ci",
       "category": "development"
     },
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Perplexity, Tavily, EXA, and Parallel Task MCP servers. Code research inline; deep research saved to docs/research/.",
-      "version": "1.0.0",
-      "author": { "name": "KingInYellows" },
+      "version": "1.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
       "source": "./plugins/yellow-research",
       "category": "productivity"
     }

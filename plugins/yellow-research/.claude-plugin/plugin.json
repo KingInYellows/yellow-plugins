@@ -1,6 +1,6 @@
 {
   "name": "yellow-research",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Deep research plugin with Perplexity, Tavily, EXA, and Parallel Task MCP servers. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
@@ -9,12 +9,21 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-research",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "changelog": "https://github.com/KingInYellows/yellow-plugins/blob/main/plugins/yellow-research/CHANGELOG.md",
-  "keywords": ["research", "deep-research", "perplexity", "exa", "tavily", "mcp"],
+  "keywords": [
+    "research",
+    "deep-research",
+    "perplexity",
+    "exa",
+    "tavily",
+    "mcp"
+  ],
   "mcpServers": {
     "perplexity": {
       "command": "npx",
-      "args": ["-y", "@perplexity-ai/mcp-server@0.8.2"],
+      "args": [
+        "-y",
+        "@perplexity-ai/mcp-server@0.8.2"
+      ],
       "env": {
         "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}",
         "PERPLEXITY_TIMEOUT_MS": "${PERPLEXITY_TIMEOUT_MS:-600000}"
@@ -22,14 +31,21 @@
     },
     "tavily": {
       "command": "npx",
-      "args": ["-y", "tavily-mcp@0.2.17"],
+      "args": [
+        "-y",
+        "tavily-mcp@0.2.17"
+      ],
       "env": {
         "TAVILY_API_KEY": "${TAVILY_API_KEY}"
       }
     },
     "exa": {
       "command": "npx",
-      "args": ["-y", "exa-mcp-server@3.1.8", "tools=web_search_exa,get_code_context_exa,company_research_exa,web_search_advanced_exa,crawling_exa,deep_researcher_start,deep_researcher_check"],
+      "args": [
+        "-y",
+        "exa-mcp-server@3.1.8",
+        "tools=web_search_exa,get_code_context_exa,company_research_exa,web_search_advanced_exa,crawling_exa,deep_researcher_start,deep_researcher_check"
+      ],
       "env": {
         "EXA_API_KEY": "${EXA_API_KEY}"
       }

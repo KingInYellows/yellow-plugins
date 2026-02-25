@@ -115,11 +115,6 @@
         }
       ],
       "description": "Hooks configuration — inline object (preferred) or path to hooks file (string)."
-    },
-    "changelog": {
-      "type": "string",
-      "format": "uri",
-      "description": "URL to the plugin's CHANGELOG (e.g. GitHub permalink to CHANGELOG.md)."
     }
   },
   "additionalProperties": false
