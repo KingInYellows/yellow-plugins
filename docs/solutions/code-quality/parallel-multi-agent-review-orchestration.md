@@ -175,7 +175,7 @@ SKILL.md ≤ 500 lines (Anthropic docs); MEMORY.md truncates at 200 lines.
 
 | Range | Action |
 |---|---|
-| Under 120 lines | No audit needed |
+| Under 120 lines | Audit if under-specified signals exist; otherwise no action |
 | 120–200 lines | Audit for LLM training-data duplication; accept if content is novel |
 | 200–300 lines | Accept if every section encodes content Claude cannot infer |
 | 300–500 lines | Split into two agents or move reference material to a `Read`-able file |
