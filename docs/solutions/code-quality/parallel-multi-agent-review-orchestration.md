@@ -167,13 +167,36 @@ gh auth status >/dev/null 2>&1 || { printf '[test-reporter] Error: not authentic
 - [ ] Verify deferred items remain in pending status after bulk update
 - [ ] No wildcards in batch status changes
 
-### Plugin File Size Governance (120-line budget)
+### Plugin File Size Governance (audit threshold model)
 
-- **Cut:** LLM training data duplication, example variations, verbose error
-  prose
+120 lines is an **audit threshold**, not a hard maximum. There is no
+Anthropic-sourced 120-line limit for agent files. The real limits are:
+SKILL.md ≤ 500 lines (Anthropic docs); MEMORY.md truncates at 200 lines.
+
+| Range | Action |
+|---|---|
+| Under 120 lines | Audit if under-specified signals exist; otherwise no action |
+| 120–200 lines | Audit for LLM training-data duplication; accept if content is novel |
+| 200–300 lines | Accept if every section encodes content Claude cannot infer |
+| 300–500 lines | Split into two agents or move reference material to a `Read`-able file |
+| Over 500 lines | Split unconditionally (Anthropic's SKILL.md hard limit) |
+
+- **Cut:** LLM training data duplication (what YAML is, standard GitHub Actions
+  concepts, generic "read carefully" instructions, restating the same rule
+  twice, verbose prose where a table works)
 - **Keep:** Safety rules, trigger clauses, validation patterns, workflow state
-  machines
+  machines, project-specific lookup tables, scoring algorithms, security
+  fencing, multi-branch UX flows
 - **Reference:** Point to skills for shared rules instead of duplicating
+- **Novel logic test:** Before keeping any paragraph, ask "would an LLM already
+  know this from training data?" — if yes, cut it
+- **Agent files load JIT:** They compete only against their spawn context, not
+  the full session — length affects compliance, not startup cost
+- **120-line threshold rationale:** The 120-line threshold is an empirically
+  derived audit trigger, not an Anthropic limit. Agents under 120 lines are
+  statistically more likely to be under-specified (missing edge cases, error
+  paths, or security rules) while agents over 120 lines risk LLM training-data
+  duplication. The threshold prompts review, not rejection.
 
 ## Metrics
 
