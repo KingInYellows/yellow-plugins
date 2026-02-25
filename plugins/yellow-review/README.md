@@ -38,12 +38,11 @@ resolution, and sequential stack review.
 | `type-design-analyzer`  | Type design, encapsulation, invariants               |
 | `silent-failure-hunter` | Silent failure and error handling analysis           |
 
-### Workflow (2)
+### Workflow (1)
 
-| Agent                 | Description                                          |
-| --------------------- | ---------------------------------------------------- |
-| `pr-comment-resolver` | Implements fix for a single review comment           |
-| `learning-compounder` | Captures review patterns to memory and solution docs |
+| Agent                 | Description                                 |
+| --------------------- | ------------------------------------------- |
+| `pr-comment-resolver` | Implements fix for a single review comment  |
 
 ## Skills
 

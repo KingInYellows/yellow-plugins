@@ -14,7 +14,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Plugin Components
 
-### Agents (12)
+### Agents (13)
 
 **Review** — parallel code review specialists:
 
@@ -36,6 +36,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 - `spec-flow-analyzer` — user flow analysis, gap identification
 - `brainstorm-orchestrator` — iterative brainstorm dialogue with research integration
+- `knowledge-compounder` — extract and document solved problems to docs/solutions/ and MEMORY.md
 
 ### Commands (5)
 

@@ -88,8 +88,9 @@ For each PR in order:
    gt upstack restack
    ```
    If restack conflicts: abort restack, report to user, continue to next PR
-5. **Compound**: Handled automatically by `review-pr.md` (Knowledge compounding
-   step) — no separate spawn needed here.
+5. **Compound**: Spawn `knowledge-compounder` agent (yellow-core) via Task
+   with all findings from this PR. On failure, log:
+   `[review:all] Warning: knowledge compounding failed` and continue
 
 ### Step 5: Final Summary
 
