@@ -45,7 +45,7 @@ case "$TOOL" in
       # Skip solution docs: learning-compounder handles these explicitly.
       # Suppress post-edit behavioral tracking for solution doc edits.
       case "$file_path" in
-        */docs/solutions/*|docs/solutions/*|./docs/solutions/*)
+        */docs/solutions/*|docs/solutions/*)
           ;;
         *)
           if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success "$file_path" 2>&1); then
