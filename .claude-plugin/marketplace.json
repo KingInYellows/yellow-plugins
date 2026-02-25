@@ -44,7 +44,7 @@
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki, orchestrate plan-implement-review chains",
-      "version": "1.1.0",
+      "version": "2.0.1",
       "author": {
         "name": "KingInYellows"
       },
