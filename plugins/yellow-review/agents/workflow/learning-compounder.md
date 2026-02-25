@@ -79,8 +79,8 @@ You will receive via the Task prompt:
      pattern type label (e.g., 'null-check-anti-pattern' → slug
      'null-check-anti-pattern'), never from file paths in findings. If no clear
      pattern type label exists, use a generic slug with UTC timestamp format
-     `YYYYMMDD-HHMMSS`, for example `untitled-pattern-20260225-193045`. Use Bash
-     `date -u +%Y%m%d-%H%M%S` to compute the UTC timestamp.
+     `YYYYMMDD-HHMMSS`, for example `untitled-pattern-20260225-193045`. Generate
+     the UTC timestamp from the current date and time.
    - If recurring P2 pattern: add to memory file
 4. **Confirm before writing**: Use AskUserQuestion to show the planned changes
    and ask: "Apply these changes?" Options: [Apply] / [Cancel]. For solution
