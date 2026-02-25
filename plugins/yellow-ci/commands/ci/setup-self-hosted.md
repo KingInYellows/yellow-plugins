@@ -97,7 +97,7 @@ For each remaining runner:
    `$(`, a backtick, or `..` — exclude with warning:
    `[yellow-ci] Warning: Runner '{name}' has unsafe characters — excluded`
 
-2. Validate each label in `labels[]` against `^[a-zA-Z0-9][a-zA-Z0-9-]*$`.
+2. Validate each label in `labels[]` against `^[a-zA-Z0-9][a-zA-Z0-9._-]*$`.
    If any label fails: exclude the runner with warning:
    `[yellow-ci] Warning: Runner '{name}' has invalid label '{label}' — excluded`
    This must permit mixed-case GitHub labels such as `macOS`.

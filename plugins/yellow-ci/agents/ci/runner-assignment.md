@@ -129,9 +129,11 @@ For each eligible job, evaluate each runner:
    runner".
 
 Determine `runs-on` value:
-- Use the runner name as a simple string (`runs-on: runner-01`) if the runner
-  has a unique name and that name is used as a label (i.e., `self-hosted`
-  runners include their name in the label list).
+- Use the runner name as a simple string (`runs-on: runner-01`) if the runner's
+  name appears as one of its own labels AND that name is unique across all
+  inventoried runners (i.e., no other runner shares that label). Example: if
+  `gpu-01` has labels `[self-hosted, linux, gpu, gpu-01]` and no other runner
+  has the label `gpu-01`, use `runs-on: gpu-01`.
 - Otherwise, use the minimal label set that uniquely identifies the target
   runner(s): `runs-on: [self-hosted, linux, gpu]`
 
