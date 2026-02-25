@@ -107,6 +107,6 @@ Severity:
 2. Analyze each type against the checklist
 3. Check constructors/factories for validation completeness
 4. Report findings sorted by severity
-5. Summarize: "Reviewed X types. Encapsulation: Strong (no P2/P3 leaks) / Moderate (P3 leaks only) / Weak (any P2 leak). Invariants: Strong (no P1/P2) / Moderate (P2s only) / Weak (any P1)."
+5. Summarize: "Reviewed X types. Encapsulation: Strong (no P2 encapsulation leaks) / Moderate (P3 encapsulation suggestions only) / Weak (any P2 encapsulation leak). Invariants: Strong (no P1/P2) / Moderate (P2s only) / Weak (any P1)."
 
 Do NOT edit any files. Report findings only.
