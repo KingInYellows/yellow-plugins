@@ -60,10 +60,11 @@ IMPORTANT: Always invoke the `debt-conventions` skill at the start of every scan
 
 1. **Cyclomatic complexity >20** → High severity
 2. **Cyclomatic complexity 15-20** → Medium severity
-3. **Nesting depth >3 levels** → Medium
-4. **Functions >50 lines** → Medium
-5. **Cognitive complexity "bumpy road" patterns** → Medium to High
-6. **God functions (>10 params or >5 return paths)** → High
+3. **Cyclomatic complexity 10-15** → Low severity
+4. **Nesting depth >3 levels** → Medium
+5. **Functions >50 lines** → Medium
+6. **Cognitive complexity "bumpy road" patterns** → Medium to High
+7. **God functions (>10 params or >5 return paths)** → High
 
 Skip unreadable or binary files without incrementing `files_scanned`.
 

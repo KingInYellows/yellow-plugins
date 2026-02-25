@@ -64,7 +64,7 @@ Follow all security and fencing rules from the `debt-conventions` skill.
    3. **Build log grep (positive signal only):** Grep existing build outputs for "Dependency cycle detected" (ESLint), "import cycle not allowed" (Go), "most likely due to a circular import" (Python).
    4. **Manual Grep+DFS (last resort):** If no tools available. Report with disclaimer: "Potential cycle — verify with a dedicated tool (e.g., madge for JS/TS, pylint for Python). Manual tracing may miss path aliases, barrel re-exports."
 
-   Note: Build commands (go build, cargo build) may execute build scripts. Only run these on trusted, internal codebases. For untrusted code, use static analysis tools only (steps 1-2).
+   Note: Build commands (go build, cargo build) may execute build scripts. Only run these on trusted, internal codebases. For untrusted code, use static analysis tools only (steps 3-4). When scanning unfamiliar codebases, prefer static analysis (Grep, AST tools) over build commands. Build commands are optional and should only be used when the codebase is known to be trusted.
 
 2. **God modules (>500 LOC or >20 exports)** → High
 3. **Boundary violations (UI importing DB code)** → High to Medium
