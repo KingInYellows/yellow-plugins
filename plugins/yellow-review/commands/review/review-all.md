@@ -89,8 +89,8 @@ For each PR in order:
    gt upstack restack
    ```
    If restack conflicts: abort restack, report to user, continue to next PR
-5. **Compound**: Spawn `learning-compounder` agent with all findings from this
-   PR
+5. **Compound**: Handled automatically by `review-pr.md` Step 10 — no separate
+   spawn needed here.
 
 ### Step 5: Final Summary
 

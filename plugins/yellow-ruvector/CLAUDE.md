@@ -47,7 +47,7 @@ ruvector.
 - `ruvector-memory-manager` — Store, retrieve, and flush agent learnings across
   sessions
 
-### Skills (2)
+### Skills (3)
 
 - `ruvector-conventions` — Namespace definitions, memory schema, error handling
   catalog
@@ -126,8 +126,6 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
    unless the user explicitly said to skip review before `gt stack submit` ran.
 8. If the stack has multiple PRs, invoke `/workflows:review` for each PR in
    the stack, starting from the base branch PR.
-
-## Known Limitations
 
 ## Known Limitations
 

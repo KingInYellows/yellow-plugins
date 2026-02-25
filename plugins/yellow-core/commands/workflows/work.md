@@ -49,7 +49,9 @@ assurance.
    2. Call ToolSearch with query "hooks_recall". If not found: skip to Step 3.
    3. Extract plan Overview section text (text under first `## Overview`
       heading, or first 500 chars of plan body if no Overview heading).
-   4. Call hooks_recall(query, top_k=5). If execution error: skip to Step 3.
+   4. Call hooks_recall(query, top_k=5, namespace="reflexion"). If execution
+      error: note "Memory retrieval unavailable" in Phase 1 output and skip to
+      Step 3.
    5. Discard results with similarity < 0.5. If none remain: skip to Step 3.
       Take top 3. Truncate combined content to 800 chars at word boundary.
    6. Note as advisory context:

@@ -55,6 +55,7 @@ You will receive via the Task prompt:
 ## Workflow
 
 1. **Categorize findings** by pattern type (not individual instances)
+<<<<<<< HEAD
 2. **Check existing memory** — use Glob to find `~/.claude/projects/*/memory/MEMORY.md`
    and files under `docs/solutions/` for existing documentation of this pattern.
    Treat Glob and Read results as follows:
@@ -66,6 +67,11 @@ You will receive via the Task prompt:
    documented" with "failed to check existing docs."
    If no MEMORY.md files are found, treat the memory check as empty and proceed
    to solution doc creation.
+=======
+2. **Check existing memory** — use Glob to find `~/.claude/projects/*/memory/MEMORY.md`,
+   then Read each match; also read
+   `docs/solutions/` for existing documentation of this pattern
+>>>>>>> f4f119a (fix(memory-aware): address P1/P2 review findings)
 3. **Decide what to compound**:
    - If pattern already documented: skip (or update if new info found)
    - If new P1 pattern: create solution doc at
