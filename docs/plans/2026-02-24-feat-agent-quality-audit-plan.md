@@ -1,3 +1,9 @@
+---
+title: 'Feature: Agent Quality Audit — Under-Specified Files'
+date: 2026-02-24
+category: 'code-quality'
+---
+
 # Feature: Agent Quality Audit — Under-Specified Files
 
 ## Problem Statement

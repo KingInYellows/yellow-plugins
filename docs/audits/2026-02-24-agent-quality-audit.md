@@ -1,7 +1,7 @@
 ---
 title: "Agent Quality Audit — Under-Specified Files"
 date: 2026-02-24
-scope: 22 agents under 120 lines
+scope: 22 agents under 120 lines (21 P1 findings, 39 P2 findings)
 method: category-grouped analysis (5 groups, parallel)
 ---
 
@@ -10,8 +10,8 @@ method: category-grouped analysis (5 groups, parallel)
 ## Executive Summary
 
 - **Agents audited:** 22 (all agents under 120 lines in the repo)
-- **P1 gaps found:** 22 — would cause wrong, unsafe, or undefined output
-- **P2 gaps found:** 40 — would improve quality or consistency
+- **P1 gaps found:** 21 — would cause wrong, unsafe, or undefined output
+- **P2 gaps found:** 39 — would improve quality or consistency
 - **Agents with no P1 gaps:** 13 of 22
 - **Systemic P1 across entire group:** yellow-debt scanners (Skill tool missing)
 
@@ -217,6 +217,12 @@ sources only without indicating that async sources were skipped.
 
 **Fix:** Use full `mcp__plugin_yellow-research_parallel__` prefix consistently
 in the body text, matching `allowed-tools`.
+
+**Note (post-audit review):** These bare names appear in prose examples and
+workflow-sequence descriptions, not as literal tool call identifiers. The LLM
+dispatches tools by `allowed-tools` name; body prose is instructional context.
+This finding may be a false positive — the PR C fix should verify empirically
+before changing body text.
 
 ---
 
