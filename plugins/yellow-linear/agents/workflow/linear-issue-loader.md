@@ -83,6 +83,8 @@ If issue not found, report the error and stop.
 
 Fetch recent comments (up to 5) via `list_comments` for the issue.
 
+If comments fail to load (rate limit, network error, or API error), present the issue without comments and note: '[linear-issue-loader] Comments could not be loaded: <error>. Showing issue without comments.'
+
 ### Step 5: Present Context
 
 Display the issue in a clean summary:

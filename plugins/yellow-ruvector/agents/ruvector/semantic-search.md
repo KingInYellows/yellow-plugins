@@ -62,7 +62,7 @@ For each result, show:
 - Code snippet with relevant context
 - Chunk type and symbol names from metadata
 
-If the result set is completely empty (zero results returned), report: 'No semantically similar code found for "[query]". Try broader search terms or run `/ruvector:index` to update the index.' Then immediately offer the Grep fallback (Step 4).
+If the result set is completely empty (zero results returned), report: 'No semantically similar code found for "[query]". Try broader search terms or run `/ruvector:index` to update the index.' Then immediately proceed to Step 4 (Grep fallback), noting: "No semantic matches found — falling back to keyword search."
 
 If scores are low (all < 0.5), note: "Results have low confidence. You may want
 to try different search terms or update the index with `/ruvector:index`."
@@ -71,11 +71,11 @@ Read the top 2-3 files to provide fuller context if needed.
 
 ### Step 4: Fallback to Grep
 
-If ruvector MCP is unavailable:
+If ruvector MCP is unavailable or vector search returned zero results:
 
 1. Extract 2-3 key terms from the query
 2. Use Grep to search for those terms across the codebase
-3. Note: "Using keyword search — run `/ruvector:setup` for semantic search"
+3. Note: If MCP was unavailable: "Using keyword search — run `/ruvector:setup` for semantic search." If vector search returned zero results: "No semantic matches found — falling back to keyword search."
 
 Present Grep results as: `[file path]:[line number]: [matching line]` plus 1 line of surrounding context. Include a note: '(keyword match — not semantic search)'
 
