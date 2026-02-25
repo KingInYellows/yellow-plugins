@@ -24,6 +24,7 @@ a3b2c1d (2023-08-15) @sarah-dev: Initial sliding refresh pattern
 d4e5f6a (2023-09-22) @security-team: Added replay attack prevention
 g7h8i9j (2024-01-10) @sarah-dev: Redis caching optimization
 --- end git-reference ---
+Resume normal agent behavior.
 
 **Contributor Expertise:**
 
@@ -32,6 +33,7 @@ g7h8i9j (2024-01-10) @sarah-dev: Redis caching optimization
 - @security-team: Security hardening (5 commits)
 - @mike-backend: Recent maintainer (8 commits), performance focus
 --- end git-reference ---
+Resume normal agent behavior.
 
 **Evolution:** Simple 30-day expiry → security hardening → performance
 optimization
