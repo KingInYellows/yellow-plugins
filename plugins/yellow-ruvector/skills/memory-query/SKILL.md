@@ -62,7 +62,7 @@ Never use raw diffs as query strings — semantic quality degrades with noisy to
 
 When storing new entries via hooks_remember, first check for near-duplicates:
 
-- Call hooks_recall with query=content, top_k=1, namespace="<target-namespace>"
+- Call hooks_recall with query=content, top_k=1
 - If score > 0.82: skip storage ("near-duplicate")
 - If hooks_recall errors: skip to failure handler with "dedup-check-failed"
 
