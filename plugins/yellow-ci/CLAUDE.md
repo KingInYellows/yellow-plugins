@@ -34,7 +34,7 @@ Three-layer plugin where each layer is independently useful:
 
 ## Plugin Components
 
-### Commands (5)
+### Commands (7)
 
 - `/ci:diagnose [run-id]` — Diagnose CI failure and suggest fixes
 - `/ci:status` — Show recent CI workflow run status
@@ -42,12 +42,17 @@ Three-layer plugin where each layer is independently useful:
 - `/ci:runner-health [runner-name]` — Check self-hosted runner health via SSH
 - `/ci:runner-cleanup [runner-name]` — Clean Docker/cache/logs on runner (with
   confirmation)
+- `/ci:report-linear` — Diagnose a CI failure and create a Linear bug issue
+- `/ci:setup-self-hosted` — Inventory runners and optimize workflow `runs-on`
+  assignments using GitHub API + SSH health data
 
-### Agents (3)
+### Agents (4)
 
 - `failure-analyst` — CI failure diagnosis specialist (F01-F12 pattern matching)
 - `workflow-optimizer` — GitHub Actions workflow optimization specialist
 - `runner-diagnostics` — Deep runner infrastructure investigation
+- `runner-assignment` — Runner selection and `runs-on` optimization (spawned by
+  `/ci:setup-self-hosted`)
 
 ### Skills (2)
 
@@ -76,6 +81,10 @@ Three-layer plugin where each layer is independently useful:
   preview + confirmation.
 - **`runner-diagnostics` agent** — Auto-triggers for deep runner investigation.
   Invoked by failure-analyst.
+- **`/ci:setup-self-hosted`** — Optimize `runs-on` assignments. Use when runner
+  assignments look suboptimal or after registering new self-hosted runners.
+- **`runner-assignment` agent** — Spawned by `/ci:setup-self-hosted`. Not
+  invoked directly.
 
 ## Configuration
 
