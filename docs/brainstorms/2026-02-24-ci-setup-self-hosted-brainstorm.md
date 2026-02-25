@@ -88,7 +88,7 @@ Each job-runner pair gets a composite score:
 - **Label match** (0-100): required labels covered by runner labels
 - **OS compatibility** (binary): hard filter, no score if incompatible
 - **Load score** (0-100): based on current CPU%, available memory, disk free
-  (from SSH data, or 100 if no SSH config)
+  (from SSH data, or 50 if no SSH config)
 
 Best runner = highest composite score among compatible runners.
 

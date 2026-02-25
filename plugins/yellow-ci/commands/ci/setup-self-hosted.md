@@ -142,7 +142,7 @@ timeout 10 ssh \
   -o ConnectTimeout=3 \
   -o ServerAliveInterval=60 \
   "$user@$host" << 'METRICS'
-echo "CPU=$(top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | tr -d '% ')"
+echo "CPU=$(top -bn1 | awk '/^%Cpu/ {print 100 - $8}')"
 echo "MEM_FREE=$(free -m | awk '/^Mem:/{print $7}')"
 echo "DISK_USED=$(df / | awk 'NR==2{gsub(/%/,""); print $5}')"
 METRICS
@@ -169,11 +169,17 @@ Record the load collection timestamp (UTC) for display in the agent output.
 ## Step 4: Build Fenced Inventory and Spawn Agent
 
 For each runner in the validated, health-checked list, determine its `os` field
-from labels:
-- `linux` if any label matches `linux` (case-insensitive)
-- `windows` if any label matches `windows` (case-insensitive)
-- `macos` if any label matches `macos` or `osx` (case-insensitive)
-- `unknown` if none match
+using the following priority order:
+
+1. **API `os` field (preferred):** Use the runner's top-level `os` field from
+   the GitHub API response if it is present and non-empty. The API returns this
+   as a lowercase string (`linux`, `windows`, or `macos`).
+2. **Label fallback (if `os` field absent or empty):** Infer from explicit OS
+   labels only, in priority order:
+   - `windows` if any label matches `windows` (case-insensitive)
+   - `macos` if any label matches `macos` or `osx` (case-insensitive)
+   - `linux` if any label matches `linux` (case-insensitive)
+   - `unknown` if none match
 
 Architecture labels (for example `x64`, `x86_64`, `arm64`) MUST NOT be used to
 infer OS.
@@ -181,7 +187,9 @@ infer OS.
 Assemble the runner inventory JSON:
 
 Include `status` from the GitHub API response for each runner (expected
-`"online"` after filtering).
+`"online"` after filtering). Also include an `offline_runner_names` string
+array listing the names of all registered runners whose `status != "online"`,
+so the agent can distinguish offline runners from unknown GitHub-hosted labels.
 
 ```json
 {"runners": [
@@ -194,7 +202,8 @@ Include `status` from the GitHub API response for each runner (expected
     "os": "linux",
     "busy": false
   }
-]}
+],
+"offline_runner_names": ["runner-02", "runner-03"]}
 ```
 
 Wrap with the full four-component injection fence — all four parts are required:

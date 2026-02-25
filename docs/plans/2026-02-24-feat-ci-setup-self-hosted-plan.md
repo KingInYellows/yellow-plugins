@@ -294,7 +294,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
 ### Phase 3: Plugin Integration
 
 - [ ] **3.1** Update `plugins/yellow-ci/CLAUDE.md`
-  - Add `/ci:setup-self-hosted` to the Commands section (now 6 → 7)
+  - Add `/ci:setup-self-hosted` to the Commands section (now 5 → 6)
   - Add `runner-assignment` to the Agents section (now 3 → 4)
   - Add "When to use" entry: "When runner assignments look suboptimal or after
     registering new self-hosted runners"
