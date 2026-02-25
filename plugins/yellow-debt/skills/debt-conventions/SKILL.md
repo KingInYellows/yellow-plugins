@@ -1,8 +1,6 @@
 ---
 name: debt-conventions
-description:
-  Technical debt scoring framework and scanner patterns. Use when scanner agents
-  need scoring rubrics, category definitions, safety rules, or output schemas.
+description: "Technical debt scoring framework and scanner patterns. Use when scanner agents need scoring rubrics, category definitions, safety rules, or output schemas."
 user-invokable: false
 ---
 
@@ -251,7 +249,8 @@ Todo files must use one of the following status values:
 - `ready` — Approved for remediation
 - `in-progress` — Fix work has started
 - `complete` — Fix completed
-- `deferred` — Postponed to future sprint
+- `deferred` — Postponed to future sprint (includes optional `defer_reason`
+  field in frontmatter)
 - `deleted` — Rejected or no longer relevant
 
 **Remediation**: Run `lib/validate.sh` validation functions to check status
