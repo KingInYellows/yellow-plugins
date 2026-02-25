@@ -70,7 +70,8 @@ For async tools, start them first:
 1. mcp__plugin_yellow-research_parallel__createDeepResearch (returns task_id)
 2. mcp__plugin_yellow-research_exa__deep_researcher_start (returns job_id)
 3. Run synchronous queries while async tasks run
-4. mcp__plugin_yellow-research_parallel__getResultMarkdown(task_id)
+4. mcp__plugin_yellow-research_parallel__getStatus(task_id) → when complete:
+   mcp__plugin_yellow-research_parallel__getResultMarkdown(task_id)
    and mcp__plugin_yellow-research_exa__deep_researcher_check(job_id)
 ```
 

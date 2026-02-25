@@ -38,7 +38,7 @@ If Context7 `resolve-library-id` returns no match, fall back to `get_code_contex
 
 1. Identify query type from the research topic
 2. Call the primary source tool
-3. If result is insufficient, try one secondary source
+3. If result is insufficient, try secondary sources per the fallback chain above
 4. Synthesize findings into a concise inline answer
 
 ## Output Format
@@ -53,5 +53,4 @@ If Context7 `resolve-library-id` returns no match, fall back to `get_code_contex
 
 - Never save to a file — inline only
 - Never use Parallel Task or Tavily tools — those are for deep research
-- If both primary and secondary sources return no useful results, stop and report:
-  'No results found for [query] from [sources tried]. Try `/research:deep [topic]` for a comprehensive multi-source search.'
+- If no useful results found, stop and report: 'No results found for [query] from [sources tried]. Try `/research:deep [topic]` for a comprehensive multi-source search.'
