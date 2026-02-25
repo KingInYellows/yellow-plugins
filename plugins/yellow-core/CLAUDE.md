@@ -14,7 +14,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Plugin Components
 
-### Agents (11)
+### Agents (12)
 
 **Review** — parallel code review specialists:
 
@@ -24,6 +24,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `architecture-strategist` — architectural compliance, design patterns
 - `polyglot-reviewer` — language-idiomatic review for TS/Py/Rust/Go
 - `test-coverage-analyst` — test quality, coverage gaps, edge cases
+- `pattern-recognition-specialist` — anti-patterns, duplication, naming drift
 
 **Research** — codebase and external research:
 

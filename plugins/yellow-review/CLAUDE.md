@@ -75,17 +75,19 @@ resolution, and sequential stack review. Graphite-native workflow.
 ## Cross-Plugin Agent References
 
 When conditions warrant, commands spawn these agents via Task tool (using
-`compound-engineering:review:<name>` subagent_type):
+`yellow-core:review:<name>` subagent_type):
 
 - `security-sentinel` — for auth, crypto, and shell script changes
 - `architecture-strategist` — for large (10+ file) cross-module changes
 - `performance-oracle` — for query-heavy or high-line-count PRs
-- `pattern-recognition-specialist` — for new pattern introductions
-- `agent-native-reviewer` — for agent/command/skill file changes
+- `pattern-recognition-specialist` — for new pattern introductions and plugin
+  authoring convention checks
 - `code-simplicity-reviewer` — additional simplification pass for large PRs
 
-These agents are available via the Compound Engineering plugin's Task subagent
-types.
+yellow-review requires yellow-core for full review coverage. Without it,
+cross-plugin agents (security-sentinel, architecture-strategist,
+performance-oracle, pattern-recognition-specialist) silently degrade — only
+yellow-review's own agents run.
 
 ## Known Limitations
 

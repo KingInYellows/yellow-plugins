@@ -104,7 +104,7 @@ Apply selection rules from `pr-review-workflow` skill:
   `type-design-analyzer`, `silent-failure-hunter`
 - Cross-plugin (via Task tool) when conditions match: `security-sentinel`,
   `architecture-strategist`, `performance-oracle`,
-  `pattern-recognition-specialist`, `agent-native-reviewer`
+  `pattern-recognition-specialist`
 
 ### Step 5: Pass 1 — Parallel Agent Review
 
