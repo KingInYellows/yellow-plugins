@@ -99,11 +99,22 @@ You will receive via the Task prompt:
 6. **Store in ruvector** (after writing any new solution doc):
    a. ToolSearch "hooks_remember" → missing: skip to 6e, reason "ruvector not
       available".
+<<<<<<< HEAD
    b. Content: `## Problem` first paragraph (accept `## Problem Statement`,
       `## Issue`); strip HTML + imperative phrases (IMPORTANT:, NOTE:, Always:,
       Never:, Do not:); append ": Fix: " + `## Fix` first paragraph (accept
       `## Solution`). Section missing → 6e "section-not-found". < 20 words →
       6e "too-short". Truncate to 500 chars at word boundary; re-count; < 20 → 6e.
+=======
+   b. Content: `## Problem` first paragraph (if multiple variants exist, use the
+      first matching heading in this order: `## Problem`, `## Problem
+      Statement`, `## Issue`); strip HTML + imperative phrases (IMPORTANT:,
+      NOTE:, Always:, Never:, Do not:); append ": Fix: " + `## Fix` first
+      paragraph (accept `## Solution`). Section missing → 5e
+      "section-not-found". Validate word count BEFORE truncation: if < 20 words
+      → 5e "too-short". If >= 20, truncate to 500 chars at word boundary, then
+      re-count; if truncated content drops below 20 words → 5e.
+>>>>>>> 6a185c1 (fix(memory-aware): fix docs/solutions glob pattern, add memory-query to CLAUDE.md, add hooks_remember to work.md)
    c. Dedup: hooks_recall namespace="reflexion", query=content, top_k=1. Error or
       namespace-not-found → treat as no match. Similarity > 0.82 → 6e
       "near-duplicate: similarity=X.XX".

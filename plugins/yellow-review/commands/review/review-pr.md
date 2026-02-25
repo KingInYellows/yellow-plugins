@@ -155,6 +155,9 @@ Present summary:
 - Failed agents (if any)
 - Push status
 
+Note: the final Step 9 report is emitted after Step 10 completes so compounding
+status/output can be included in the same report.
+
 ### Step 10: Knowledge compounding
 
 If P1 or P2 findings were reported:
@@ -172,10 +175,11 @@ If P1 or P2 findings were reported:
 2. Spawn `learning-compounder` via Task with
    `subagent_type: "yellow-review:workflow:learning-compounder"`, passing the
    fenced block as the prompt.
-3. If Task returns an error (unknown subagent_type, timeout, spawn failure): log
-   "learning-compounder unavailable: `<error>`" in the Step 9 report. Do not
-   retry or abort.
-4. If Task succeeds: append compounder output to Step 9 report.
+3. If Task returns an error (unknown subagent_type, timeout, spawn failure): set
+   compounding status to "learning-compounder unavailable: `<error>`" for
+   inclusion in Step 9. Do not retry or abort.
+4. If Task succeeds: set compounding status to include compounder output for
+   inclusion in Step 9.
 
 If no P1 or P2 findings: skip this step.
 

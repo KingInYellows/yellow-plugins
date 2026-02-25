@@ -45,7 +45,7 @@ case "$TOOL" in
       # Skip solution docs: indexed explicitly via reflexion namespace by
       # learning-compounder. post-edit does not consult .ruvectorignore.
       case "$file_path" in
-        */docs/solutions/*)
+        */docs/solutions/*|docs/solutions/*)
           ;;
         *)
           if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success "$file_path" 2>&1); then

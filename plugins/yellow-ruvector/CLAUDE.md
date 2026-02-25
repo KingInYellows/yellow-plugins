@@ -52,6 +52,8 @@ ruvector.
 - `ruvector-conventions` — Namespace definitions, memory schema, error handling
   catalog
 - `agent-learning` — Learning triggers, quality gates, retrieval strategy
+- `memory-query` — Standard pattern for querying ruvector institutional memory
+  before acting
 
 ### Hooks (4)
 

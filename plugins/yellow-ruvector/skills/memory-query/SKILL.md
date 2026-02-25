@@ -31,7 +31,7 @@ test -d .ruvector || skip_to_next_step
 
 ### ToolSearch Discovery
 
-```
+```text
 Call ToolSearch with query "hooks_recall".
 If no tool found: skip memory query entirely. Do not surface to user.
 ```
