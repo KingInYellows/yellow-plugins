@@ -62,7 +62,9 @@ Follow all security and fencing rules from the `debt-conventions` skill.
    1. **Native toolchain (zero install, definitive):** Go: `go build ./...` (exit 1 + "import cycle not allowed"); Rust: `cargo build` (exit 101 + "cyclic package dependency"). If build succeeds, no cycles.
    2. **Dedicated static analyzer:** TypeScript/JS: `madge --circular src/ --ts-config tsconfig.json` or `dpdm --exit-code circular:1 -T ./src/index.ts`; Python: `pylint --disable=all --enable=R0401 mypackage/`.
    3. **Build log grep (positive signal only):** Grep existing build outputs for "Dependency cycle detected" (ESLint), "import cycle not allowed" (Go), "most likely due to a circular import" (Python).
-   4. **Manual Grep+DFS (last resort):** If no tools available. Report with disclaimer: "Potential cycle — verify with `madge --circular`. Manual tracing may miss path aliases, barrel re-exports."
+   4. **Manual Grep+DFS (last resort):** If no tools available. Report with disclaimer: "Potential cycle — verify with a dedicated tool (e.g., madge for JS/TS, pylint for Python). Manual tracing may miss path aliases, barrel re-exports."
+
+   Note: Build commands (go build, cargo build) may execute build scripts. Only run these on trusted, internal codebases. For untrusted code, use static analysis tools only (steps 1-2).
 
 2. **God modules (>500 LOC or >20 exports)** → High
 3. **Boundary violations (UI importing DB code)** → High to Medium

@@ -54,6 +54,8 @@ skill for:
 
 Follow all security and fencing rules from the `debt-conventions` skill.
 
+IMPORTANT: Always invoke the `debt-conventions` skill at the start of every scan. Security and fencing rules from that skill are mandatory — do not proceed without reading them first.
+
 ## Detection Heuristics
 
 1. **Cyclomatic complexity >20** → High severity

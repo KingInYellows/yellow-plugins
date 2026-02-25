@@ -64,9 +64,9 @@ If the `debt-conventions` skill is unavailable, this rule still applies.
 
 1. **Exposed credentials or API keys** → Critical
 
-   When quoting evidence for credential findings, NEVER include the credential value. Include: (a) file path, (b) line number, (c) credential type (e.g., 'AWS Access Key ID', 'GitHub PAT', 'High-Entropy Base64 String'), (d) entropy score if computed, (e) verification status ('verified active', 'verified invalid', or 'unverified'). Format: `--- redacted [TYPE] (entropy: N.N, VERIFICATION) at [FILE]:L[N] ---`. Public format prefixes (AKIA, ghp_, sk_live_) may be shown as they are provider-defined public strings.
+   When quoting evidence for credential findings, NEVER include the credential value. Include: (a) file path, (b) line number, (c) credential type (e.g., 'AWS Access Key ID', 'GitHub PAT', 'High-Entropy Base64 String'), (d) entropy score if computed, (e) verification status ('verified active', 'verified invalid', or 'unverified'). Format: `--- redacted [TYPE] (entropy: N.N, VERIFICATION) at [FILE]:L[N] ---`. Public format prefixes (e.g., `AKIA`, `ghp_`, `sk_live_`) may be included in the type description, for example: `[AWS Access Key ID starting with AKIA]`.
 
-   Credentials in code = active security vulnerability (flag as SECURITY, not debt). Report separately from technical debt with note: 'This is an active vulnerability requiring immediate rotation, not future debt.'
+   Credentials in code are the highest priority findings. Flag with category `security`, severity `critical`, and add in description: 'IMMEDIATE ACTION REQUIRED: This finding requires credential rotation, not just code fix.'
 
 2. **Missing input validation at system boundaries** → High to Medium
 
