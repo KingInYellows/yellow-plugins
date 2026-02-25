@@ -81,7 +81,7 @@ Architecture mirrors the existing `diagnose` → `failure-analyst` pattern.
       backtick, or `..`. This prevents injection while accepting GitHub names
       with uppercase or underscores.
   - **Validate runner labels**: validate each label string against
-    `^[a-z0-9][a-z0-9-]*$`. Exclude any runner with an invalid label:
+    `^[a-zA-Z0-9][a-zA-Z0-9-]*$`. Exclude any runner with an invalid label:
     `[yellow-ci] Warning: Runner '{name}' has invalid label '{label}' — excluded
     from recommendations`
   - Handle API rate limit (429): forward `gh` error and exit
@@ -359,7 +359,7 @@ unknown load rank last in tiebreaking, not first.
 - **API-sourced runner names** (metacharacter rejection only): reject names
   containing `;`, `&`, `|`, `$(`, backtick, `..`
 - **SSH-config lookup names** (DNS-safe): `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`
-- **Runner labels**: `^[a-z0-9][a-z0-9-]*$` — any runner with invalid labels
+- **Runner labels**: `^[a-zA-Z0-9][a-zA-Z0-9-]*$` — any runner with invalid labels
   is excluded from recommendations
 - **Repo slug**: `^[a-zA-Z0-9_-]{1,39}\/[a-zA-Z0-9._-]{1,100}$`
 - **Workflow file paths**: must resolve canonically within `.github/workflows/`
@@ -421,7 +421,7 @@ violations for modified jobs.
 
 - **API-sourced runner names**: metacharacter rejection (no strict DNS pattern)
 - **SSH-config lookup names**: strict DNS-safe validation
-- **Runner labels**: validated `^[a-z0-9][a-z0-9-]*$` before use in YAML
+- **Runner labels**: validated `^[a-zA-Z0-9][a-zA-Z0-9-]*$` before use in YAML
 - **Runner inventory**: four-component injection fence before passing to agent
 - **Workflow file content**: per-file injection fence + `sanitize_log_content()`
   (redact + escape fence markers) applied to each file before agent reasoning
