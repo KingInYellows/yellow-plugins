@@ -42,10 +42,10 @@ eval "$(printf '%s' "$INPUT" | jq -r '
 case "$TOOL" in
   Edit|Write)
     if [ -n "$file_path" ]; then
-      # Skip solution docs: indexed explicitly via reflexion namespace by
-      # learning-compounder. post-edit does not consult .ruvectorignore.
+      # Skip solution docs: learning-compounder handles these explicitly.
+      # Suppress post-edit behavioral tracking for solution doc edits.
       case "$file_path" in
-        */docs/solutions/*|docs/solutions/*)
+        */docs/solutions/*|docs/solutions/*|./docs/solutions/*)
           ;;
         *)
           if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success "$file_path" 2>&1); then

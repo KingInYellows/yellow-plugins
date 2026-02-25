@@ -1,7 +1,7 @@
 # ruvectorignore — excludes files from bulk indexing (same syntax as .gitignore)
-# Note: post-edit incremental indexing does NOT consult this file (verified 2026-02-24).
-# The path guard in plugins/yellow-ruvector/hooks/scripts/post-tool-use.sh handles
-# incremental exclusion.
+# Note: post-edit hooks do not consult this file — the path guard in
+# plugins/yellow-ruvector/hooks/scripts/post-tool-use.sh handles incremental
+# exclusion for vector memory operations.
 
 # Solution docs are indexed explicitly via the reflexion namespace by
 # learning-compounder — exclude from the code namespace (bulk indexing only).

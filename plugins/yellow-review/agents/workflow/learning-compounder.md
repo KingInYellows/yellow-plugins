@@ -84,6 +84,7 @@ You will receive via the Task prompt:
      `YYYYMMDD-HHMMSS`, for example `untitled-pattern-20260225-193045`. Generate
      the UTC timestamp by running `date -u +%Y%m%d-%H%M%S` via the Bash tool.
    - If recurring P2 pattern: add to memory file
+<<<<<<< HEAD
 4. **Confirm before writing**: Use AskUserQuestion to show the planned changes
    and ask: "Apply these changes?" Options: [Apply] / [Cancel]. For solution
    docs, show the planned title, category, and slug. For memory file updates,
@@ -106,6 +107,15 @@ You will receive via the Task prompt:
       `## Solution`). Section missing → 6e "section-not-found". < 20 words →
       6e "too-short". Truncate to 500 chars at word boundary; re-count; < 20 → 6e.
 =======
+=======
+4. **Write documentation** following existing solution doc format, using the
+   `Write` tool to create new files and the `Edit` tool to update existing docs
+   or memory entries
+5. **Store in ruvector** (after writing any new solution doc):
+   a. If `.ruvector/` does not exist in the project root: skip to 5e, reason
+      "ruvector not installed". ToolSearch "hooks_remember" → missing: skip to
+      5e, reason "ruvector not available".
+>>>>>>> 42caea2 (fix: address review findings — API field names, allowed-tools, step disambiguation)
    b. Content: `## Problem` first paragraph (if multiple variants exist, use the
       first matching heading in this order: `## Problem`, `## Problem
       Statement`, `## Issue`); strip HTML + imperative phrases (IMPORTANT:,
@@ -114,6 +124,7 @@ You will receive via the Task prompt:
       "section-not-found". Validate word count BEFORE truncation: if < 20 words
       → 5e "too-short". If >= 20, truncate to 500 chars at word boundary, then
       re-count; if truncated content drops below 20 words → 5e.
+<<<<<<< HEAD
 >>>>>>> 6a185c1 (fix(memory-aware): fix docs/solutions glob pattern, add memory-query to CLAUDE.md, add hooks_remember to work.md)
    c. Dedup: hooks_recall namespace="reflexion", query=content, top_k=1. Error or
       namespace-not-found → treat as no match. Similarity > 0.82 → 6e
@@ -122,6 +133,13 @@ You will receive via the Task prompt:
       name>", insight: "<Detection section root cause, first sentence>", action:
       "see docs/solutions/<path>", context: "<doc path>", severity: "<P1|P2>",
       timestamp: "<ISO 8601>"}. Execution error → 6e "ruvector MCP unavailable".
+=======
+   c. Dedup: hooks_recall query=content, top_k=1. Error → skip to 5e with
+      reason "dedup-check-failed: <error>". Score > 0.82 → 5e
+      "near-duplicate: score=X.XX".
+   d. hooks_remember: content=<constructed content>, type="decision".
+      Execution error → 5e "ruvector MCP unavailable".
+>>>>>>> 42caea2 (fix: address review findings — API field names, allowed-tools, step disambiguation)
    e. Output: "Stored reflexion entry: <first 60 chars>" or "Skipped ruvector
       storage: <reason>".
 

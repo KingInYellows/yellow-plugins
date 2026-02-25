@@ -14,6 +14,8 @@ allowed-tools:
   - Write
   - Task
   - AskUserQuestion
+  - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
 # Review All PRs
@@ -89,8 +91,8 @@ For each PR in order:
    gt upstack restack
    ```
    If restack conflicts: abort restack, report to user, continue to next PR
-5. **Compound**: Handled automatically by `review-pr.md` Step 10 — no separate
-   spawn needed here.
+5. **Compound**: Handled automatically by `review-pr.md` (Knowledge compounding
+   step) — no separate spawn needed here.
 
 ### Step 5: Final Summary
 
