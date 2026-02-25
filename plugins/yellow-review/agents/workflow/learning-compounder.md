@@ -1,9 +1,6 @@
 ---
 name: learning-compounder
-description:
-  'Captures review patterns to memory and solution docs. Use when spawned after
-  a PR review to analyze findings for recurring patterns worth documenting,
-  writing new memory entries or solution docs when warranted.'
+description: 'Captures review patterns to memory and solution docs. Use when spawned after a PR review to analyze findings for recurring patterns worth documenting, writing new memory entries or solution docs when warranted.'
 model: inherit
 allowed-tools:
   - Read
@@ -11,6 +8,7 @@ allowed-tools:
   - Glob
   - Write
   - Edit
+  - AskUserQuestion
 ---
 
 <examples>
@@ -50,6 +48,9 @@ You will receive via the Task prompt:
 
 - Compound only if the same pattern appears across 2+ files in this review
 - Or if this pattern appeared in a previous review (check memory)
+- Only treat a pattern as recurring if it appeared in the same repository
+  context. Cross-repository matches are informational only — note them but do
+  not count them toward the recurrence threshold.
 
 ### Never Compound (P3)
 
@@ -58,18 +59,41 @@ You will receive via the Task prompt:
 ## Workflow
 
 1. **Categorize findings** by pattern type (not individual instances)
-2. **Check existing memory** — read `~/.claude/projects/*/memory/MEMORY.md` and
-   `docs/solutions/` for existing documentation of this pattern
+2. **Check existing memory** — use Glob to find `~/.claude/projects/*/memory/MEMORY.md`
+   and files under `docs/solutions/` for existing documentation of this pattern.
+   Treat Glob and Read results as follows:
+   - If Glob returns 0 files: "No existing documentation found for this pattern —
+     proceed to create new doc." Do not treat this as an error.
+   - If Glob returns files but Read fails on a matched path: "Error reading
+     existing doc at <path>. Skipping update, creating new doc instead."
+   These are distinct failure modes — do not conflate "pattern not yet
+   documented" with "failed to check existing docs."
+   If no MEMORY.md files are found, treat the memory check as empty and proceed
+   to solution doc creation.
 3. **Decide what to compound**:
    - If pattern already documented: skip (or update if new info found)
    - If new P1 pattern: create solution doc at
      `docs/solutions/<category>/<slug>.md` (validate that category and slug
      contain only lowercase alphanumeric characters and hyphens — reject any
-     path traversal characters like `..`, `/`, or `~`)
+     path traversal characters like `..`, `/`, or `~`). Derive the slug from the
+     pattern type label (e.g., 'null-check-anti-pattern' → slug
+     'null-check-anti-pattern'), never from file paths in findings. If no clear
+     pattern type label exists, use a generic slug with UTC timestamp format
+     `YYYYMMDD-HHMMSS`, for example `untitled-pattern-20260225-193045`. Generate
+     the UTC timestamp by running `date -u +%Y%m%d-%H%M%S` via the Bash tool.
    - If recurring P2 pattern: add to memory file
-4. **Write documentation** following existing solution doc format, using the
-   `Write` tool to create new files and the `Edit` tool to update existing docs
-   or memory entries
+4. **Confirm before writing**: Use AskUserQuestion to show the planned changes
+   and ask: "Apply these changes?" Options: [Apply] / [Cancel]. For solution
+   docs, show the planned title, category, and slug. For memory file updates,
+   show the file path and a summary of the entry to be added or updated. If
+   multiple changes are planned (e.g., both a solution doc and a memory update),
+   show all of them together in a single confirmation. If cancel: "Skipped — no
+   changes written." Stop. Do not write. AskUserQuestion blocks until the user
+   responds — no timeout applies. If the agent session ends before the user
+   responds, no changes are written (safe default).
+5. **If confirmed, write documentation** following existing solution doc format,
+   using the `Write` tool to create new files and the `Edit` tool to update
+   existing docs or memory entries.
 
 ## Solution Doc Format
 
