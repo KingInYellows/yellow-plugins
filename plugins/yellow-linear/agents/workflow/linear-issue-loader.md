@@ -75,7 +75,7 @@ the user's workspace.
 If issue not found, report the error and stop.
 
 **Error handling:**
-- If the MCP tool returns an authentication error: report '[linear-issue-loader] Authentication failed. Re-run to trigger OAuth re-authentication, or check your Linear API key.'
+- If the MCP tool returns an authentication error: report '[linear-issue-loader] Authentication failed. Re-run to trigger OAuth re-authentication, or check your Linear API key.' and stop.
 - If the MCP tool returns a rate limit error (429 or similar): report '[linear-issue-loader] Rate limited by Linear API. The `linear-workflows` skill handles retry with exponential backoff — stop and let the caller retry.' and stop.
 - For other network errors: report '[linear-issue-loader] Network error fetching issue <ID>: <error>.' and stop.
 

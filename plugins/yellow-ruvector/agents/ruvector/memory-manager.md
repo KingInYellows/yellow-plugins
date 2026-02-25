@@ -79,8 +79,13 @@ When called to flush `pending-updates.jsonl`:
    namespace
 6. For `bash_result` entries with non-zero exit codes: consider as reflexion
    candidates
-7. After processing, truncate the queue file via Write (empty content)
-8. Report: "Flushed N entries (M files re-indexed, K skipped, J invalid paths
+7. Before truncating: use AskUserQuestion to confirm:
+   "Flush N valid entries (M files, K skipped, J invalid) and clear the queue?"
+   Options: [Flush and clear] / [Cancel]
+   - If cancel: report "[memory-manager] Flush cancelled. Queue file unchanged."
+     Stop. Do not proceed.
+8. After confirmation, truncate the queue file via Write (empty content)
+9. Report: "Flushed N entries (M files re-indexed, K skipped, J invalid paths
    rejected)"
 
 If queue file doesn't exist or is empty, report: "No pending updates."
