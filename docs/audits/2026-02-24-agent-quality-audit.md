@@ -12,7 +12,7 @@ method: category-grouped analysis (5 groups, parallel)
 - **Agents audited:** 22 (all agents under 120 lines in the repo)
 - **P1 gaps found:** 21 — would cause wrong, unsafe, or undefined output
 - **P2 gaps found:** 39 — would improve quality or consistency
-- **Agents with no P1 gaps:** 13 of 22
+- **Agents with no P1 gaps:** 7 of 22
 - **Systemic P1 across entire group:** yellow-debt scanners (Skill tool missing)
 
 **Highest-priority fix:** All 5 yellow-debt scanner agents have `Skill` absent

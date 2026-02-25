@@ -39,7 +39,7 @@ audit: docs/audits/2026-02-24-agent-quality-audit.md
 
 ## Overview
 
-Implement all 22 P1 (wrong/unsafe output) and 40 P2 (quality improvement)
+Implement all 21 P1 (wrong/unsafe output) and 39 P2 (quality improvement)
 gaps identified in the 2026-02-24 agent quality audit. The audit covered all
 22 agent files under 120 lines using a 6-point rubric (decision logic, edge
 cases, output format spec, security/validation rules, error paths, LLM
@@ -69,9 +69,9 @@ which actively encourages quoting untrusted commit messages verbatim.
 ## Current State
 
 - **Agents affected:** 22 (all under-120 candidates audited)
-- **P1 gaps:** 22 — cause wrong, unsafe, or undefined output
-- **P2 gaps:** 40 — reduce quality or consistency
-- **Agents with no P1 gaps:** 13 of 22
+- **P1 gaps:** 21 — cause wrong, unsafe, or undefined output
+- **P2 gaps:** 39 — reduce quality or consistency
+- **Agents with no P1 gaps:** 7 of 22
 - **Audit report:** `docs/audits/2026-02-24-agent-quality-audit.md`
 - **Branch:** `feat/agent-quality-audit` (PR #51 — audit report only)
 
