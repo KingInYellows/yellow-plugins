@@ -51,7 +51,8 @@ Classify as **Complex** if: the topic requires comparing >2 entities OR spans >2
      sub-items (e.g., "compare Redis, Valkey, and DragonflyDB" → 3 sub-tasks)
 - While async tasks run, do synchronous queries
 - Poll async results: call `mcp__plugin_yellow-research_parallel__getStatus` to
-  check if a Parallel Task is complete before calling `getResultMarkdown`; call
+  check if a Parallel Task is complete before calling
+  `mcp__plugin_yellow-research_parallel__getResultMarkdown`; call
   `mcp__plugin_yellow-research_exa__deep_researcher_check` for EXA jobs
 
 ## Step 2: Execute
@@ -73,7 +74,7 @@ For async tools, start them first:
    and mcp__plugin_yellow-research_exa__deep_researcher_check(job_id)
 ```
 
-If `createDeepResearch` or EXA deep researcher fails to return a task_id/job_id (null or empty), skip the polling step for that task. Do not call `getResultMarkdown` or `deep_researcher_check` with a missing ID. Log: '[research-conductor] Async task start failed — skipping poll for this source.'
+If `createDeepResearch` or EXA deep researcher fails to return a task_id/job_id (null or empty), skip the polling step for that task. Do not call `mcp__plugin_yellow-research_parallel__getResultMarkdown` or `mcp__plugin_yellow-research_exa__deep_researcher_check` with a missing ID. Log: '[research-conductor] createDeepResearch/EXA task start failed (missing task_id/job_id) — skipping poll for this source.'
 
 Skip any source that is unavailable — never fail the whole research. When skipping a source, annotate the result with: `[research-conductor] Source skipped: <source-name> — unavailable.` Include skipped sources in the **Sources** section of the final output as: `- <source-name> — skipped (unavailable)`.
 

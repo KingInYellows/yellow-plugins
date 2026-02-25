@@ -53,6 +53,5 @@ If Context7 `resolve-library-id` returns no match, fall back to `get_code_contex
 
 - Never save to a file — inline only
 - Never use Parallel Task or Tavily tools — those are for deep research
-- If all sources return nothing useful, say so clearly
 - If both primary and secondary sources return no useful results, stop and report:
   'No results found for [query] from [sources tried]. Try `/research:deep [topic]` for a comprehensive multi-source search.'
