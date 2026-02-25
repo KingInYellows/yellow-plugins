@@ -94,9 +94,10 @@ For each remaining runner:
    `$(`, a backtick, or `..` — exclude with warning:
    `[yellow-ci] Warning: Runner '{name}' has unsafe characters — excluded`
 
-2. Validate each label in `labels[].name` against `^[a-z0-9][a-z0-9-]*$`.
+2. Validate each label in `labels[]` against `^[a-zA-Z0-9][a-zA-Z0-9-]*$`.
    If any label fails: exclude the runner with warning:
    `[yellow-ci] Warning: Runner '{name}' has invalid label '{label}' — excluded`
+   This must permit mixed-case GitHub labels such as `macOS`.
 
 If zero runners remain after filtering:
 
@@ -114,11 +115,14 @@ host/user mappings. Read `defaults.max_parallel_ssh` (default: 5).
 
 For each online runner:
 
+Normalize labels to lowercase for OS detection (`macOS` and `macos` are
+equivalent).
+
 - If name does NOT match `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`: skip SSH,
   `load_score: 50`, `load_note: "(name not DNS-safe for SSH)"`
 - If runner has no matching entry in the SSH config: `load_score: 50`,
   `load_note: "(not in SSH config)"`
-- If runner labels include `windows` or `macos` (no `linux`): skip SSH,
+- If runner labels include `windows` or `macos` (case-insensitive; no `linux`):
   `load_score: 50`, `load_note: "(non-Linux — SSH not performed)"`
 - Otherwise: perform SSH health check
 
@@ -163,17 +167,24 @@ Record the load collection timestamp (UTC) for display in the agent output.
 
 For each runner in the validated, health-checked list, determine its `os` field
 from labels:
-- `linux` if any label matches `linux`, `x64`, or `x86_64`
-- `windows` if any label matches `windows`
-- `macos` if any label matches `macos` or `osx`
+- `linux` if any label matches `linux` (case-insensitive)
+- `windows` if any label matches `windows` (case-insensitive)
+- `macos` if any label matches `macos` or `osx` (case-insensitive)
 - `unknown` if none match
 
+Architecture labels (for example `x64`, `x86_64`, `arm64`) MUST NOT be used to
+infer OS.
+
 Assemble the runner inventory JSON:
+
+Include `status` from the GitHub API response for each runner (expected
+`"online"` after filtering).
 
 ```json
 {"runners": [
   {
     "name": "runner-01",
+    "status": "online",
     "labels": ["self-hosted", "linux", "x64"],
     "load_score": 72,
     "load_note": "(CPU 28%, disk 35%)",
