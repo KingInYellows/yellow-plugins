@@ -100,8 +100,10 @@ Severity:
 
 ## Instructions
 
-1. Identify all type definitions in changed files
-1a. For each type, check for parent types or augmentations outside the changed files: search for `extends`, `implements`, `declare module`, or augmentation patterns in non-diff files. Note any external dependencies on the type.
+1. Identify all type definitions in changed files. For each type, also check
+   for parent types or augmentations outside the changed files: search for
+   `extends`, `implements`, `declare module`, or augmentation patterns in
+   non-diff files. Note any external dependencies on the type.
 2. Analyze each type against the checklist
 3. Check constructors/factories for validation completeness
 4. Report findings sorted by severity

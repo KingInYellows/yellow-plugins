@@ -98,7 +98,8 @@ Severity:
 
 ## Instructions
 
-0. Check if the PR description explicitly says it is a refactoring. If yes, raise the threshold for P1/P2 flags — new abstractions introduced during a refactoring are expected and should only be flagged if they add net complexity without a corresponding reduction elsewhere.
+**Pre-check:** Check if the PR description explicitly says it is a refactoring. If yes, raise the threshold for P1/P2 flags — new abstractions introduced during a refactoring are expected and should only be flagged if they add net complexity without a corresponding reduction elsewhere.
+
 1. Read the modified files in the PR
 2. For each abstraction/pattern, ask: "What problem does this solve right now?"
 3. Identify code that can be removed or simplified
