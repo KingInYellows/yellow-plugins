@@ -11,6 +11,7 @@ INPUT=$(head -c 65536)
 
 # Require jq for safe JSON parsing
 command -v jq >/dev/null 2>&1 || {
+  printf '[gt-workflow] Warning: jq not found, skipping commit validation\n' >&2
   printf '{"continue": true}\n'
   exit 0
 }
@@ -33,7 +34,7 @@ esac
 # Skip validation if command failed
 EXIT_CODE=$(printf '%s' "$INPUT" | jq -r '.tool_result.exit_code // 0') || {
   printf '[gt-workflow] Warning: could not parse exit_code from hook input\n' >&2
-  EXIT_CODE=0
+  EXIT_CODE=1
 }
 if [ "$EXIT_CODE" != "0" ]; then
   printf '{"continue": true}\n'

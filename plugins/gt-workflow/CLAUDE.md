@@ -16,7 +16,8 @@ Graphite-native workflow commands for stacked PR development.
 | Command                      | Purpose                                 |
 | ---------------------------- | --------------------------------------- |
 | `gt create <name> -m "msg"`  | Create a new branch (stacks on current) |
-| `gt commit create -m "msg"`  | Add a commit to current branch          |
+| `gt modify -c -m "msg"`      | Add a commit to current branch (preferred) |
+| `gt commit create -m "msg"`  | Add a commit (deprecated, use `gt modify -c`) |
 | `gt commit amend -m "msg"`   | Amend the current branch commit         |
 | `gt submit --no-interactive` | Push stack and create/update PRs        |
 | `gt repo sync`               | Fetch trunk, detect merged branches     |

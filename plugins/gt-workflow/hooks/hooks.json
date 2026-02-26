@@ -1,5 +1,5 @@
 {
-  "_comment": "REFERENCE ONLY — not loaded by Claude Code. Authoritative hook config is in .claude-plugin/plugin.json. Keep in sync manually or delete.",
+  "_comment": "REFERENCE ONLY — not loaded by Claude Code. Authoritative hook config is in .claude-plugin/plugin.json. Keep all numeric fields (e.g. timeout) in sync with plugin.json.",
   "hooks": {
     "PreToolUse": [
       {
