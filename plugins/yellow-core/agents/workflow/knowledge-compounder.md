@@ -185,24 +185,38 @@ Options: "Write [route]" / "Adjust routing" / "Cancel"
 **If user selects Cancel:** output "Knowledge compounding cancelled. No files
 were modified." and stop. Do not proceed to Phase 2.
 
+**If user selects "Adjust routing":** Use AskUserQuestion again with: "Select
+routing:" Options: "DOC_ONLY" / "MEMORY_ONLY" / "BOTH" / "Cancel". Apply the
+chosen route. If Cancel: output "Knowledge compounding cancelled." and stop.
+
 ## Phase 2: Assembly and Write
 
 After user confirmation, write files sequentially.
 
 ### Solution Doc (DOC_ONLY or BOTH)
 
-Create the category directory if needed, then write the solution doc:
+Create the category directory if needed, then resolve the final slug (handles
+collisions by appending a numeric suffix):
 ```bash
 mkdir -p "$GIT_ROOT/docs/solutions/$CATEGORY"
+FINAL_SLUG="$SLUG"
+if [ -f "$GIT_ROOT/docs/solutions/$CATEGORY/$SLUG.md" ]; then
+  SUFFIX=2
+  while [ -f "$GIT_ROOT/docs/solutions/$CATEGORY/${SLUG}-${SUFFIX}.md" ]; do
+    SUFFIX=$((SUFFIX + 1))
+    [ "$SUFFIX" -gt 10 ] && { printf '[knowledge-compounder] Error: too many slug collisions\n' >&2; exit 1; }
+  done
+  FINAL_SLUG="${SLUG}-${SUFFIX}"
+fi
 ```
 
-Write to `docs/solutions/$CATEGORY/$FINAL_SLUG.md` using standard template:
-frontmatter (title, date, category, tags, components), then sections: Problem,
-Root Cause, Fix, Prevention, Related Documentation.
+Write to `$GIT_ROOT/docs/solutions/$CATEGORY/$FINAL_SLUG.md` using standard
+template: frontmatter (title, date, category, tags, components), then sections:
+Problem, Root Cause, Fix, Prevention, Related Documentation.
 
 After Write, verify:
 ```bash
-[ -f "docs/solutions/$CATEGORY/$FINAL_SLUG.md" ] || {
+[ -f "$GIT_ROOT/docs/solutions/$CATEGORY/$FINAL_SLUG.md" ] || {
   printf '[knowledge-compounder] Error: file not created.\n' >&2
   exit 1
 }
