@@ -21,9 +21,9 @@ COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null) 
   exit 0
 }
 
-# Only check gt modify / gt commit commands
+# Only check gt modify / gt commit / gt create commands
 case "$COMMAND" in
-  *"gt modify"*|*"gt commit"*) ;;
+  *"gt modify"*|*"gt commit"*|*"gt create"*) ;;
   *)
     printf '{"continue": true}\n'
     exit 0
@@ -51,7 +51,7 @@ if [ -z "$MSG" ]; then
 fi
 
 # Check for conventional commit prefix
-if printf '%s' "$MSG" | grep -qE '^(feat|fix|refactor|docs|test|chore|perf|ci|build|revert)(\(.+\))?:'; then
+if printf '%s' "$MSG" | grep -qE '^(feat|fix|refactor|docs|test|chore|perf|ci|build|revert)(\(.+\))?!?:'; then
   printf '{"continue": true}\n'
   exit 0
 fi
