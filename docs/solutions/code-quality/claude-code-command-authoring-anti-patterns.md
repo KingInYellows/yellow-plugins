@@ -135,7 +135,7 @@ And in the command body, as the first step or graceful degradation check, the
 
 ---
 
-### 4. subagent_type Must Be the Agent's name Field
+### 4. subagent_type Must Be the Agent's name Field — Spelled Out Literally
 
 The `subagent_type` in a Task tool call must match the agent's `name` field
 from its frontmatter — not the plugin folder name.
@@ -153,6 +153,28 @@ Task subagent_type: "failure-analyst"
 
 Check the agent file's frontmatter (`plugins/<plugin>/agents/<file>.md`) for the
 exact `name:` value. Never infer it from the directory name.
+
+**Additional rule (from PR #71):** When a command says "Spawn X agent via Task"
+in prose but does not spell out the `subagent_type` string, the LLM guesses the
+value and frequently guesses wrong (e.g., uses the plugin directory name, or a
+descriptive name, rather than the exact `name:` field value).
+
+**WRONG prose:**
+```
+Step 5: Spawn the knowledge-compounder agent via Task to extract learnings.
+```
+(The LLM guesses `subagent_type: "knowledge-compounder"` — but the agent's
+`name:` field might be `"yellow-core:knowledge-compounder"` or something else.)
+
+**RIGHT prose:**
+```
+Step 5: Spawn the knowledge-compounder agent via Task:
+  subagent_type: "yellow-core:knowledge-compounder"
+  (exact name: field from plugins/yellow-core/agents/knowledge-compounder.md)
+```
+
+**Rule:** Any "spawn via Task" instruction must include the literal
+`subagent_type: "..."` string. Do not rely on the LLM to resolve the name.
 
 ---
 
@@ -320,6 +342,24 @@ If Cancel: exit without creating any issues.
 The confirmation must show enough information for a genuine decision. "Proceed?"
 alone is insufficient; "Create these 12 issues?" with a title list is correct.
 
+**No threshold — M3 is always required (from PR #74):**
+
+M3 confirmation applies regardless of N. Do NOT add a condition like "if more
+than 20 findings, show overview" — this skips the confirmation for small batches.
+The M3 pattern requires showing count and titles before ANY bulk operation,
+even a batch of 2.
+
+**WRONG:**
+```
+If more than 20 findings: show M3 overview before processing.
+```
+
+**RIGHT:**
+```
+Before processing any findings: show M3 overview with count + titles.
+If user cancels: stop.
+```
+
 ---
 
 ### 11. Prerequisites as Executable Steps, Not Prose
@@ -349,9 +389,101 @@ gh auth status >/dev/null 2>&1 || {
 Make the prerequisite check the first executable step (or Step 1.5 after
 graceful degradation). The check must exit with a clear error message.
 
+**yq variant check — `command -v yq` is insufficient (from PR #74):**
+
+Two incompatible binaries both install as `yq`: kislyuk/yq (a jq wrapper, uses
+`-y`, `--arg`, `@sh`) and mikefarah/yq (a YAML processor, incompatible flags).
+`command -v yq` succeeds for both but scripts using `-y` or `@sh` silently
+produce wrong output under mikefarah/yq.
+
+**WRONG:**
+```bash
+command -v yq >/dev/null 2>&1 || { printf 'ERROR: yq required\n' >&2; exit 1; }
+```
+
+**RIGHT:**
+```bash
+command -v yq >/dev/null 2>&1 || {
+  printf 'ERROR: yq (kislyuk) required. Install: pip install yq\n' >&2; exit 1
+}
+yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' || {
+  printf 'ERROR: wrong yq variant — need kislyuk/yq (pip install yq), not mikefarah/yq\n' >&2
+  exit 1
+}
+```
+
+Apply this two-step check whenever the script uses `-y`, `--arg`, or `@sh`
+with yq. If using mikefarah/yq's native YAML syntax instead, flip the check.
+
 ---
 
-### 12. Argument Guard for Missing Flag Values
+### 12. AskUserQuestion for Sub-Step Input — Not a "Follow-Up Question in Your Response"
+
+When a command needs user input at an intermediate step (e.g., choosing a defer
+date, confirming a target path), the instruction must explicitly use
+`AskUserQuestion`. Prose that says "ask the user as a follow-up question in your
+response" does not pause execution — the LLM continues and invents a value.
+
+**WRONG:**
+```markdown
+On Defer: Ask the user for a defer date as a follow-up question in your response.
+```
+
+**RIGHT:**
+```markdown
+On Defer: Use AskUserQuestion with prompt:
+  "Enter defer date (YYYY-MM-DD format, e.g. 2026-03-15):"
+  [date input]
+If the user cancels or provides an invalid date: stop. Do not proceed.
+```
+
+**Rule:** Every place a command needs user input mid-workflow must use
+`AskUserQuestion`, not conversational prose. The tool call pauses execution;
+prose does not. Applies equally to AskUserQuestion in agents. See PR #74.
+
+---
+
+### 13. Variables in Bash Code Blocks Don't Survive Across Subprocess Calls
+
+Prose-instruction commands (command markdown files) run bash code blocks as
+separate subprocess calls. Variables set in one bash block — or referenced by
+name in a code snippet without substitution — are NOT available in the next
+Bash call.
+
+**WRONG:**
+```markdown
+Run:
+```bash
+cat "$TODO_PATH"
+```
+```
+`$TODO_PATH` is never set in this subprocess — the string appears in a code
+example but no bash export or prior step set it in that exact subprocess.
+
+**RIGHT — Option A: resolve the path from first principles each time:**
+```markdown
+Run (replace `$TODO_PATH` with the actual absolute path of the finding file):
+```bash
+cat "/absolute/path/to/finding.md"
+```
+```
+
+**RIGHT — Option B: derive it within the same bash block:**
+```bash
+TODO_PATH=$(ls "$GIT_ROOT/todos/ready/"*.md | head -1)
+cat "$TODO_PATH"
+```
+
+**Rule:** Every bash code block in a command file is a fresh subprocess.
+Variables do not persist between blocks. Either (a) instruct the LLM to
+substitute the actual value in every code block that references it, or (b)
+derive the variable at the top of each block that needs it. Never reference
+`$VAR` in a bash code snippet that doesn't define it first in that same block.
+See PR #74.
+
+---
+
+### 14. Argument Guard for Missing Flag Values
 
 `--flag` with no value silently consumes the next positional argument as the
 flag's value.
@@ -391,6 +523,7 @@ flag's value.
 **Agent Identity**
 - [ ] `subagent_type` matches the exact `name:` field in the agent's frontmatter
 - [ ] Verified by checking `plugins/<plugin>/agents/<file>.md`, not inferred
+- [ ] The literal `subagent_type: "..."` string is spelled out in the command prose — not left for the LLM to guess from a description like "spawn the X agent"
 
 **Prompt Injection**
 - [ ] Linear issue bodies, PR comments, CI logs wrapped in `--- begin/end ---` delimiters
@@ -408,8 +541,16 @@ flag's value.
 - [ ] `$SESSION_URL` / API-returned URLs checked for emptiness
 
 **Bulk Writes**
-- [ ] `AskUserQuestion` with title list before any loop that creates N issues/files
+- [ ] `AskUserQuestion` with title list before any loop that creates N issues/files — no count threshold, always required
 - [ ] Cancel path exits without creating anything
+
+**User Input Mid-Workflow**
+- [ ] Every mid-step user input uses `AskUserQuestion`, not prose "ask as follow-up"
+- [ ] Every `AskUserQuestion` Cancel/No branch has an explicit stop instruction
+
+**Variable Scope**
+- [ ] No `$VAR` references in bash code blocks that don't define that variable in the same block
+- [ ] Any variable used in multiple bash blocks is either re-derived in each block or the LLM is instructed to substitute the actual value
 
 **Argument Parsing**
 - [ ] `--flag` handlers check `$2` is non-empty and not another flag
@@ -422,10 +563,13 @@ When reviewing command markdown files, scan for:
 2. `subagent_type:` values — does it match an actual agent `name:` field?
 3. Untrusted content — is any external body/description/comment used without fencing?
 4. Prose prerequisites ("ensure X is installed") — are they enforced with `command -v`?
-5. Bulk loops — is there an `AskUserQuestion` before the loop starts?
+5. Bulk loops — is there an `AskUserQuestion` before the loop starts with no count threshold?
 6. `$VAR=$(cmd)` — are exit codes being silently discarded?
 7. Derived values — are `REPO`, `ISSUE_ID`, `SESSION_URL` validated before use?
 8. `allowed-tools` — does it include `ToolSearch`? Are there spurious tools listed?
+9. Mid-step input — does prose say "ask as follow-up"? Must be `AskUserQuestion` instead.
+10. Bash code blocks — do they reference `$VAR` that was never set in that same block?
+11. `command -v yq` — is a yq variant check also present when `-y`/`@sh` flags are used?
 
 ---
 
