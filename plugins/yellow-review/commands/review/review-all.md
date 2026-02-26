@@ -1,6 +1,6 @@
 ---
 name: review:all
-description: "Sequential review of multiple PRs — your Graphite stack, all open PRs, or a single PR. Use when you want to review an entire stack in dependency order or batch-review all your open PRs."
+description: 'Sequential review of multiple PRs — your Graphite stack, all open PRs, or a single PR. Use when you want to review an entire stack in dependency order or batch-review all your open PRs.'
 argument-hint: '[scope: stack|all|PR#]'
 allowed-tools:
   - Bash

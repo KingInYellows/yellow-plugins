@@ -147,7 +147,9 @@ gt submit --no-interactive
 
 ### Step 9: Knowledge Compounding
 
-After push, spawn the `knowledge-compounder` agent via Task
+If no P1 or P2 findings were reported, skip this step.
+
+Otherwise, spawn the `knowledge-compounder` agent via Task
 (`subagent_type: "yellow-core:workflow:knowledge-compounder"`) with all P1/P2
 findings from this review wrapped in injection fencing:
 

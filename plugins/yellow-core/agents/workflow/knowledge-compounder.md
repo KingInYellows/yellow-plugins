@@ -1,10 +1,6 @@
 ---
 name: knowledge-compounder
-description:
-  'Extract and document recently solved engineering problems using parallel
-  subagents. Use when spawned by /workflows:compound to capture solutions, or
-  after /review:all to compound review findings into docs/solutions/ and
-  MEMORY.md.'
+description: 'Extract and document recently solved engineering problems using parallel subagents. Use when spawned by /workflows:compound to capture solutions, or after /review:pr to compound review findings into docs/solutions/ and MEMORY.md.'
 model: inherit
 allowed-tools:
   - Task
@@ -240,5 +236,5 @@ Append section in format:
 
 Print completion summary with:
 - Per-agent status ([ok]/[warning])
-- Final routing and confidence
+- Final routing decision
 - Written files with [ok]/[skip] status

@@ -55,7 +55,7 @@ resolution, and sequential stack review.
 - Very large PRs (1000+ lines) may cause agent context overflow — consider
   splitting
 - Draft PRs excluded from `/review:all scope=all` by default
-- Cross-plugin agents require the yellow-core plugin
+- Cross-plugin agents require the yellow-core plugin to be installed
 
 ## License
 

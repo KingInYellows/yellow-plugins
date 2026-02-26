@@ -36,7 +36,8 @@ If the above exits non-zero, stop. Do not proceed.
 
 ### Step 2: Delegate to Knowledge Compounder
 
-Spawn the `knowledge-compounder` agent via Task tool.
+Spawn the `knowledge-compounder` agent via Task tool
+(`subagent_type: "yellow-core:workflow:knowledge-compounder"`).
 
 Pass the following in the Task prompt:
 - If `$ARGUMENTS` is non-empty, include it as user-supplied context with
