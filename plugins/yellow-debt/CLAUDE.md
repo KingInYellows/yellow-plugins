@@ -69,6 +69,11 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 - `debt-conventions` — Shared scanning heuristics, fix patterns, severity
   levels, state machine
 
+### Hooks (1)
+
+- `session-start.sh` — Count high/critical debt findings pending triage; inject
+  a systemMessage reminder if any exist (3s budget)
+
 ## When to Use What
 
 - **`/debt:audit`** — Run a comprehensive or targeted audit to identify

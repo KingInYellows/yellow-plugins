@@ -15,7 +15,12 @@ command -v jq >/dev/null 2>&1 || {
 }
 
 # Use CLAUDE_PROJECT_DIR for portable path construction
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${PWD}}"
+if [ -z "${CLAUDE_PROJECT_DIR:-}" ]; then
+  printf '[yellow-debt] Warning: CLAUDE_PROJECT_DIR unset; falling back to PWD (%s)\n' "$PWD" >&2
+  PROJECT_DIR="$PWD"
+else
+  PROJECT_DIR="$CLAUDE_PROJECT_DIR"
+fi
 TODOS_DIR="${PROJECT_DIR}/todos/debt"
 
 # Exit silently if no todos directory
@@ -40,7 +45,10 @@ done
 # Output systemMessage if findings exist
 if [ "$count" -gt 0 ]; then
   jq -n --arg msg "[yellow-debt] ${count} high/critical debt finding(s) pending triage. Run /debt:status for details." \
-    '{"continue": true, "systemMessage": $msg}'
+    '{"continue": true, "systemMessage": $msg}' || {
+    printf '[yellow-debt] Error: jq failed to build systemMessage\n' >&2
+    printf '{"continue": true}\n'
+  }
 else
   printf '{"continue": true}\n'
 fi
