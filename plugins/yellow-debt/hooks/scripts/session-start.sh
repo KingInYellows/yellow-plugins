@@ -9,6 +9,7 @@ set -euo pipefail
 
 # Require jq for JSON output
 command -v jq >/dev/null 2>&1 || {
+  printf '[yellow-debt] Warning: jq not found; session-start hook skipped\n' >&2
   printf '{"continue": true}\n'
   exit 0
 }
