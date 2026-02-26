@@ -41,3 +41,6 @@ Graphite-native workflow commands for stacked PR development.
 
 - **PreToolUse (Bash)** — Blocks any raw `git push` call; redirects to
   `gt submit --no-interactive`
+- **PostToolUse (Bash)** — Warns when a `gt commit`, `gt modify`, or
+  `gt create` command uses a non-conventional commit message (warn-only, never
+  blocks execution)

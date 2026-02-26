@@ -31,7 +31,10 @@ case "$COMMAND" in
 esac
 
 # Skip validation if command failed
-EXIT_CODE=$(printf '%s' "$INPUT" | jq -r '.tool_result.exit_code // 0' 2>/dev/null) || EXIT_CODE=0
+EXIT_CODE=$(printf '%s' "$INPUT" | jq -r '.tool_result.exit_code // 0') || {
+  printf '[gt-workflow] Warning: could not parse exit_code from hook input\n' >&2
+  EXIT_CODE=0
+}
 if [ "$EXIT_CODE" != "0" ]; then
   printf '{"continue": true}\n'
   exit 0
