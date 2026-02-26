@@ -1,4 +1,5 @@
 {
+  "_comment": "REFERENCE ONLY — not loaded by Claude Code. Authoritative hook config is in .claude-plugin/plugin.json. Keep in sync manually or delete.",
   "hooks": {
     "SessionStart": [
       {
