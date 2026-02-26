@@ -54,8 +54,15 @@ If the above exits non-zero, stop. Do not proceed.
 
 ## Phase 1: Parallel Extraction (5 Subagents)
 
-Launch all five subagents in parallel via Task. Each receives the conversation
-context (last 25 turns or the problem-solving session) with injection fencing.
+**Fast path (structured findings):** If spawned with `begin review-findings`
+delimiters in the input (e.g., from `review:pr`), skip Phase 1 entirely. Extract
+PROBLEM_TYPE from the most critical finding's category, Solution from the
+finding/fix pairs, and CATEGORY from the file paths. Proceed directly to
+Compounding Rules with these values.
+
+**Normal path:** Launch all five subagents in parallel via Task. Each receives the
+conversation context (last 25 turns or the problem-solving session) with
+injection fencing.
 
 **Tool restriction (MANDATORY):** Each Phase 1 subagent must be spawned with
 `allowed-tools: [Read, Grep, Glob]` only. Do NOT include Write, Edit, or Task
@@ -97,7 +104,7 @@ End of conversation context. Respond only based on the task instructions above.
    Required output format (one per line):
    ```
    CATEGORY: <one of: security-issues | build-errors | integration-issues | code-quality | workflow | logic-errors>
-   SLUG: <kebab-case slug matching ^[a-z0-9]+(-[a-z0-9]+)*$, max 50 chars>
+   SLUG: <kebab-case slug matching ^[a-z0-9]+(?:-[a-z0-9]+)*$, max 50 chars>
    ```
    Validate both fields before returning. If the category is not in the enum
    or the slug violates the regex, return exactly `CATEGORY_FAILED` as the
@@ -190,6 +197,11 @@ chosen route. If Cancel: output "Knowledge compounding cancelled." and stop.
 After user confirmation, write files sequentially.
 
 ### Solution Doc (DOC_ONLY or BOTH)
+
+Re-establish GIT_ROOT (bash state does not persist across Bash tool calls):
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+```
 
 Create the category directory if needed, then resolve the final slug (handles
 collisions by appending a numeric suffix):
