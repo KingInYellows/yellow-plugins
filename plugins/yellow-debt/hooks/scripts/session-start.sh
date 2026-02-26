@@ -2,7 +2,7 @@
 # session-start.sh — Remind about high/critical debt findings pending triage
 # NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.
 # NOTE: stdin (hook JSON payload) is intentionally not read — CLAUDE_PROJECT_DIR is sufficient.
-# Budget: 3s total (filesystem 1ms, glob scan ~5ms, fallback grep ~500ms, buffer ~2.5s)
+# Budget: 3s total (filesystem 1ms, glob scan ~5ms, regex match ~1ms per file, buffer ~2.5s)
 # Output: JSON with systemMessage if high/critical findings exist, empty otherwise
 
 set -euo pipefail
@@ -23,29 +23,18 @@ if [ ! -d "$TODOS_DIR" ]; then
   exit 0
 fi
 
-# Count high/critical findings using filename pattern matching
-# Todo filenames encode status and severity: {id}-{status}-{severity}-{slug}-{hash}.md
-# Only pending/ready status: in-progress findings are already being worked on (not awaiting triage)
+# Count high/critical findings by matching structured filename format:
+# {id}-{status}-{severity}-{slug}-{hash}.md
+# Regex anchored to position — avoids double-counting files whose slugs
+# contain status/severity keywords. in-progress is excluded: already being worked on.
 count=0
-
-# Try filename pattern first (fast path)
-for f in "$TODOS_DIR"/*-pending-critical-*.md "$TODOS_DIR"/*-pending-high-*.md \
-         "$TODOS_DIR"/*-ready-critical-*.md "$TODOS_DIR"/*-ready-high-*.md; do
-  [ -f "$f" ] && count=$((count + 1))
+for f in "$TODOS_DIR"/*.md; do
+  [ -f "$f" ] || continue
+  base="$(basename "$f")"
+  if [[ "$base" =~ ^[0-9]+-(pending|ready)-(critical|high)- ]]; then
+    count=$((count + 1))
+  fi
 done
-
-# Fallback: read frontmatter once per file if no filename matches found
-if [ "$count" -eq 0 ]; then
-  for f in "$TODOS_DIR"/*.md; do
-    [ -f "$f" ] || continue
-    # Read first 10 lines once, check status and severity in frontmatter
-    snippet="$(head -10 "$f" 2>/dev/null)"
-    if printf '%s\n' "$snippet" | grep -qE '^status:\s*(pending|ready)' &&
-       printf '%s\n' "$snippet" | grep -qE '^severity:\s*(high|critical)'; then
-      count=$((count + 1))
-    fi
-  done
-fi
 
 # Output systemMessage if findings exist
 if [ "$count" -gt 0 ]; then
