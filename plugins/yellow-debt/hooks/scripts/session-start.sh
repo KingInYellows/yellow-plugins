@@ -5,7 +5,9 @@
 # Budget: 3s total (filesystem 1ms, glob scan ~5ms, regex match ~1ms per file, buffer ~2.5s)
 # Output: JSON with systemMessage if high/critical findings exist, empty otherwise
 
-set -euo pipefail
+# Intentionally omit -e: SessionStart hooks must always output {"continue": true}.
+# With -e, any unexpected command failure would exit without JSON, blocking startup.
+set -uo pipefail
 
 # Require jq for JSON output
 command -v jq >/dev/null 2>&1 || {
