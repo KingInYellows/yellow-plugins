@@ -48,7 +48,7 @@ Include:
 ### Step 3: Present Inline Summary
 
 Output total routes tested, pass/fail/skip counts, top findings by severity, and
-report file path.
+the actual report file path written in Step 2 (e.g., `test-reports/2025-01-15-14-30.md`).
 
 ### Step 4: Offer GitHub Issue Creation
 

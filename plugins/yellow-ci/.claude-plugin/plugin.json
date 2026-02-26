@@ -9,7 +9,13 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-ci",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": ["ci", "github-actions", "self-hosted", "runner", "diagnosis"],
+  "keywords": [
+    "ci",
+    "github-actions",
+    "self-hosted",
+    "runner",
+    "diagnosis"
+  ],
   "hooks": {
     "SessionStart": [
       {
