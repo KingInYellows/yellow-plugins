@@ -1,10 +1,11 @@
 #!/bin/bash
 # session-start.sh — Remind about high/critical debt findings pending triage
 # NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.
-# Budget: 2s total
+# NOTE: stdin (hook JSON payload) is intentionally not read — CLAUDE_PROJECT_DIR is sufficient.
+# Budget: 3s total (filesystem 1ms, glob scan ~5ms, fallback grep ~500ms, buffer ~2.5s)
 # Output: JSON with systemMessage if high/critical findings exist, empty otherwise
 
-set -uo pipefail
+set -euo pipefail
 
 # Require jq for JSON output
 command -v jq >/dev/null 2>&1 || {
@@ -24,6 +25,7 @@ fi
 
 # Count high/critical findings using filename pattern matching
 # Todo filenames encode status and severity: {id}-{status}-{severity}-{slug}-{hash}.md
+# Only pending/ready status: in-progress findings are already being worked on (not awaiting triage)
 count=0
 
 # Try filename pattern first (fast path)
@@ -32,15 +34,15 @@ for f in "$TODOS_DIR"/*-pending-critical-*.md "$TODOS_DIR"/*-pending-high-*.md \
   [ -f "$f" ] && count=$((count + 1))
 done
 
-# Fallback: grep frontmatter if no filename matches found
+# Fallback: read frontmatter once per file if no filename matches found
 if [ "$count" -eq 0 ]; then
   for f in "$TODOS_DIR"/*.md; do
     [ -f "$f" ] || continue
-    # Check first 10 lines for status and severity in frontmatter
-    if head -10 "$f" | grep -qE '^status:\s*(pending|ready)' 2>/dev/null; then
-      if head -10 "$f" | grep -qE '^severity:\s*(high|critical)' 2>/dev/null; then
-        count=$((count + 1))
-      fi
+    # Read first 10 lines once, check status and severity in frontmatter
+    snippet="$(head -10 "$f" 2>/dev/null)"
+    if printf '%s\n' "$snippet" | grep -qE '^status:\s*(pending|ready)' &&
+       printf '%s\n' "$snippet" | grep -qE '^severity:\s*(high|critical)'; then
+      count=$((count + 1))
     fi
   done
 fi
