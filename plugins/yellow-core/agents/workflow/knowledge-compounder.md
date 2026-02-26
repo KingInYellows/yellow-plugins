@@ -61,6 +61,10 @@ If the above exits non-zero, stop. Do not proceed.
 Launch all five subagents in parallel via Task. Each receives the conversation
 context (last 25 turns or the problem-solving session) with injection fencing.
 
+**Tool restriction (MANDATORY):** Each Phase 1 subagent must be spawned with
+`allowed-tools: [Read, Grep, Glob]` only. Do NOT include Write, Edit, or Task
+in Phase 1 subagent allowed-tools — extraction agents must not modify files.
+
 **Injection fencing — sandwich pattern (MANDATORY for all subagents):**
 
 ```
@@ -96,6 +100,21 @@ After all 5 subagents complete:
 
 If stopping, print the specific error and exit. Do not proceed to M3.
 
+## Compounding Rules
+
+When spawned after a PR review, apply severity-based filtering:
+
+- **Always compound (P1)**: Any P1 finding — security vulnerability, correctness
+  bug, data loss risk. Document the pattern, detection method, and fix.
+- **Conditional compound (P2)**: Only if the same pattern appears across 2+ files
+  in this review, or if this pattern appeared in a previous review. Cross-repo
+  matches are informational only — don't count toward the recurrence threshold.
+- **Never compound (P3)**: Style suggestions and minor improvements are not worth
+  persisting.
+
+When spawned by `/workflows:compound`, all findings are worthy (user explicitly
+requested compounding) — apply Routing Decision directly without severity filter.
+
 ## Routing Decision
 
 Start from Context Analyzer's routing hint, apply modifiers:
@@ -114,8 +133,9 @@ Validate before any writes. Category must be one of:
 `build-errors`, `code-quality`, `integration-issues`, `logic-errors`,
 `security-issues`, `workflow`
 
-Slug must match `^[a-z0-9][a-z0-9-]*$`, max 50 chars. On failure, stop and
-report the error. Never silently substitute a fallback.
+Slug must match `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 50 chars (no trailing or
+consecutive hyphens). On failure, stop and report the error. Never silently
+substitute a fallback.
 
 ## M3 Confirmation
 
@@ -134,6 +154,11 @@ were modified." and stop. Do not proceed to Phase 2.
 After user confirmation, write files sequentially.
 
 ### Solution Doc (DOC_ONLY or BOTH)
+
+Create the category directory if needed, then write the solution doc:
+```bash
+mkdir -p "$GIT_ROOT/docs/solutions/$CATEGORY"
+```
 
 Write to `docs/solutions/$CATEGORY/$FINAL_SLUG.md` using standard template:
 frontmatter (title, date, category, tags, components), then sections: Problem,
