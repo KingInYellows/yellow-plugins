@@ -9,6 +9,7 @@ allowed-tools:
   - Bash
   - Read
   - Write
+  - Skill
 ---
 
 <examples>

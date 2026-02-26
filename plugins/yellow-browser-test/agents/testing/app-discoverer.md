@@ -9,6 +9,7 @@ allowed-tools:
   - Read
   - Grep
   - Glob
+  - Skill
 ---
 
 <examples>

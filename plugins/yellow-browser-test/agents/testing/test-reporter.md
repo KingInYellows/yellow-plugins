@@ -1,12 +1,16 @@
 ---
 name: test-reporter
-description: "Generate test reports and create GitHub issues from browser test results. Use when test results exist at test-reports/results.json and a formatted report or bug issues are needed."
+description: >
+  Generate test reports and create GitHub issues from browser test results. Use
+  when test results exist at test-reports/results.json and a formatted report or
+  bug issues are needed.
 model: inherit
 allowed-tools:
   - Bash
   - Read
   - Write
   - AskUserQuestion
+  - Skill
 ---
 
 <examples>
@@ -63,12 +67,6 @@ major). Create GitHub issues?" Options: "Yes, create issues for all
 major/critical findings" / "No, report only" / "Let me review the report first"
 
 **IMPORTANT:** ALWAYS ask before creating issues. Never auto-create.
-
-**If user selects "Let me review the report first":**
-Output the actual report file path written in Step 2 and instruct: "Report
-saved to `<actual path>`. Review it and re-run `/browser-test:report` when
-ready to create issues." Stop here — do not call any further tools. End your
-turn.
 
 ### Step 5: Create GitHub Issues (if approved)
 
