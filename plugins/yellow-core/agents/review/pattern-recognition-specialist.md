@@ -6,7 +6,6 @@ description:
   reviewing PRs that introduce new patterns, new directories, new file type
   conventions, or when checking codebase consistency.'
 model: inherit
-color: yellow
 allowed-tools:
   - Read
   - Grep

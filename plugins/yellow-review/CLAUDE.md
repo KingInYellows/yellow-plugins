@@ -86,13 +86,13 @@ When conditions warrant, commands spawn these agents via Task tool (using
 
 yellow-review requires yellow-core for full review coverage. Without it,
 cross-plugin agents (security-sentinel, architecture-strategist,
-performance-oracle, pattern-recognition-specialist) silently degrade — only
-yellow-review's own agents run.
+performance-oracle, pattern-recognition-specialist, code-simplicity-reviewer)
+silently degrade — only yellow-review's own agents run.
 
 ## Known Limitations
 
 - GraphQL scripts require `gh` and `jq` to be installed
-- Cross-plugin agents require Compound Engineering plugin to be installed
+- Cross-plugin agents require the `yellow-core` plugin to be installed
 - Very large PRs (1000+ lines) may cause agent context overflow — consider
   splitting
 - Draft PRs are excluded from `/review:all scope=all` by default
