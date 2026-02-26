@@ -1,9 +1,6 @@
 ---
 name: app-discoverer
-description: >
-  Discover web app configuration from codebase. Use when setting up browser
-  testing, detecting dev server commands, mapping routes, or identifying
-  authentication flows for a web application project.
+description: "Discover web app configuration from codebase. Use when setting up browser testing, detecting dev server commands, mapping routes, or identifying authentication flows for a web application project."
 model: inherit
 allowed-tools:
   - Read

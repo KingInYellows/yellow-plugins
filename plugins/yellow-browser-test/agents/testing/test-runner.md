@@ -1,9 +1,6 @@
 ---
 name: test-runner
-description: >
-  Execute browser tests using agent-browser. Use when running structured test
-  flows against discovered routes, performing autonomous exploratory testing, or
-  verifying web app behavior after code changes.
+description: "Execute browser tests using agent-browser. Use when running structured test flows against discovered routes, performing autonomous exploratory testing, or verifying web app behavior after code changes."
 model: inherit
 allowed-tools:
   - Bash
