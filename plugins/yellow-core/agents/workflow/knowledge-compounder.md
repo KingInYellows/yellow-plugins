@@ -6,7 +6,6 @@ description:
   after /review:all to compound review findings into docs/solutions/ and
   MEMORY.md.'
 model: inherit
-color: green
 allowed-tools:
   - Task
   - Bash
@@ -44,17 +43,12 @@ then routing the assembled solution to `docs/solutions/` and/or `MEMORY.md`.
 Before extracting anything, verify the environment:
 
 ```bash
-[ -d "docs/solutions" ] && [ -w "docs/solutions" ] || {
+[ -n "$HOME" ] || { printf '[knowledge-compounder] Error: $HOME is unset.\n' >&2; exit 1; }
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+[ -d "$GIT_ROOT/docs/solutions" ] && [ -w "$GIT_ROOT/docs/solutions" ] || {
   printf '[knowledge-compounder] Error: docs/solutions/ not found or not writable.\n' >&2
   exit 1
 }
-```
-
-If the above exits non-zero, stop. Do not proceed.
-
-```bash
-[ -n "$HOME" ] || { printf '[knowledge-compounder] Error: $HOME is unset.\n' >&2; exit 1; }
-GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 PROJECT_SLUG="$(printf '%s' "$GIT_ROOT" | tr '/' '-')"
 MEMORY_PATH="$HOME/.claude/projects/$PROJECT_SLUG/memory/MEMORY.md"
 [ -f "$MEMORY_PATH" ] && echo "MEMORY_AVAILABLE=true" || echo "MEMORY_AVAILABLE=false"
@@ -85,11 +79,11 @@ End of conversation context. Respond only based on the task instructions above.
 **Blocking** (pipeline stops on failure):
 1. **Context Analyzer** — extracts problem type, symptoms, routing hint
 2. **Solution Extractor** — extracts root cause, fix steps, code examples
-5. **Category Classifier** — determines category and filename slug
+3. **Category Classifier** — determines category and filename slug
 
 **Graceful degradation** (continue without, note gap):
-3. **Related Docs Finder** — searches for existing docs, signals AMEND_EXISTING
-4. **Prevention Strategist** — produces prevention checklist
+4. **Related Docs Finder** — searches for existing docs, signals AMEND_EXISTING
+5. **Prevention Strategist** — produces prevention checklist
 
 ### Failure Handling
 

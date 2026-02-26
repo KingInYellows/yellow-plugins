@@ -145,7 +145,14 @@ gt submit --no-interactive
 
 4. If rejected: report changes remain uncommitted for manual review
 
-### Step 9: Report
+### Step 9: Knowledge Compounding
+
+After push, spawn the `knowledge-compounder` agent via Task
+(`subagent_type: "yellow-core:workflow:knowledge-compounder"`) with all P1/P2
+findings from this review. On failure, log:
+`[review:pr] Warning: knowledge compounding failed` and continue.
+
+### Step 10: Report
 
 Present summary:
 
