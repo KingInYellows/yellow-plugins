@@ -4,7 +4,7 @@
 # commit message content in output (injection surface).
 # Budget: 50ms (no network, no file I/O beyond stdin)
 
-set -uo pipefail
+set -euo pipefail
 
 # Bound stdin to 64KB to prevent memory issues
 INPUT=$(head -c 65536)
@@ -37,7 +37,11 @@ if [ "$EXIT_CODE" != "0" ]; then
   exit 0
 fi
 
-# Extract first -m flag value using grep -oE (NOT -oP — not portable)
+# Extract first non-empty -m flag value (double-quoted form only).
+# Known gaps (permissive by design — warn-only hook):
+#   - Single-quoted: -m 'message' → not matched, skips validation
+#   - Multi -m flags: -m "subject" -m "body" → only first is checked
+# These gaps cause false-negatives (no warning), never false-positives or blocks.
 MSG=$(printf '%s' "$COMMAND" | grep -oE '\-m "[^"]*"' | head -1 | sed 's/^-m "//;s/"$//') || MSG=""
 
 # If we couldn't extract the message, skip validation (permissive)
