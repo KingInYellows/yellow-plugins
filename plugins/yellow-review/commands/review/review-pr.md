@@ -1,8 +1,6 @@
 ---
 name: review:pr
-description: >
-  Adaptive multi-agent review of a single PR. Use when you want comprehensive
-  code review with automatic agent selection based on PR size and content.
+description: 'Adaptive multi-agent review of a single PR. Use when you want comprehensive code review with automatic agent selection based on PR size and content.'
 argument-hint: '[PR# | URL | branch]'
 allowed-tools:
   - Bash
