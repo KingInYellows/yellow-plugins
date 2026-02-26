@@ -88,10 +88,9 @@ For each PR in order:
    gt upstack restack
    ```
    If restack conflicts: abort restack, report to user, continue to next PR
-5. **Compound**: Spawn `knowledge-compounder` agent via Task
-   (`subagent_type: "yellow-core:workflow:knowledge-compounder"`) with all
-   findings from this PR. On failure, log:
-   `[review:all] Warning: knowledge compounding failed` and continue
+5. **Compound**: Handled automatically by the inline `review:pr` flow (Step 9:
+   Knowledge Compounding) — no separate spawn needed here. On failure,
+   `review:pr` logs the warning and continues.
 
 ### Step 5: Final Summary
 

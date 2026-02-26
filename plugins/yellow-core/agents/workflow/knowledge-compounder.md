@@ -81,11 +81,34 @@ End of conversation context. Respond only based on the task instructions above.
 ### Subagent Classification
 
 **Blocking** (pipeline stops on failure):
-1. **Context Analyzer** — extracts problem type, symptoms, routing hint
-2. **Solution Extractor** — extracts root cause, fix steps, code examples
-3. **Category Classifier** — determines category and filename slug
+
+1. **Context Analyzer** — extracts problem type, symptoms, routing hint.
+   Required output format (one per line):
+   ```
+   PROBLEM_TYPE: <short label, e.g. "shell-hook-validation">
+   SYMPTOMS: <comma-separated observable symptoms>
+   ROUTING_HINT: <DOC_ONLY | MEMORY_ONLY | BOTH>
+   ```
+   If any field is missing, treat as failed.
+
+2. **Solution Extractor** — extracts root cause, fix steps, and code examples.
+   If extraction is impossible (e.g. context is ambiguous or too sparse),
+   return exactly the sentinel string `SOLUTION_EXTRACTION_FAILED` as the
+   entire response body — the orchestrator will stop the pipeline on this
+   sentinel.
+
+3. **Category Classifier** — determines the output category and filename slug.
+   Required output format (one per line):
+   ```
+   CATEGORY: <one of: security-issues | build-errors | integration-issues | code-quality | workflow | logic-errors>
+   SLUG: <kebab-case slug matching ^[a-z0-9]+(-[a-z0-9]+)*$, max 50 chars>
+   ```
+   Validate both fields before returning. If the category is not in the enum
+   or the slug violates the regex, return exactly `CATEGORY_FAILED` as the
+   entire response body.
 
 **Graceful degradation** (continue without, note gap):
+
 4. **Related Docs Finder** — searches for existing docs, signals AMEND_EXISTING
 5. **Prevention Strategist** — produces prevention checklist
 
@@ -129,12 +152,25 @@ Start from Context Analyzer's routing hint, apply modifiers:
 
 ## Category & Slug Validation
 
-Validate before any writes. Category must be one of:
-`build-errors`, `code-quality`, `integration-issues`, `logic-errors`,
-`security-issues`, `workflow`
+Validate before any writes using the following bash block. Substitute the
+actual `$CATEGORY` and `$SLUG` values derived from the Category Classifier:
 
-Slug must match `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 50 chars (no trailing or
-consecutive hyphens). On failure, stop and report the error. Never silently
+```bash
+# Validate category — must be one of the recognized enum values
+case "$CATEGORY" in
+  security-issues|build-errors|integration-issues|code-quality|workflow|logic-errors) ;;
+  *) printf '[knowledge-compounder] Error: invalid category: %s\n' "$CATEGORY" >&2; exit 1 ;;
+esac
+# Validate slug — kebab-case, no trailing or consecutive hyphens, max 50 chars
+printf '%s' "$SLUG" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' || {
+  printf '[knowledge-compounder] Error: invalid slug: %s\n' "$SLUG" >&2; exit 1
+}
+[ "${#SLUG}" -le 50 ] || {
+  printf '[knowledge-compounder] Error: slug exceeds 50 chars: %s\n' "$SLUG" >&2; exit 1
+}
+```
+
+If the above exits non-zero, stop and report the error. Never silently
 substitute a fallback.
 
 ## M3 Confirmation
