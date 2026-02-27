@@ -43,7 +43,7 @@ eval "$(printf '%s' "$INPUT" | jq -r '
   @sh "TOOL=\(.tool_name // "")",
   @sh "file_path=\(.tool_input.file_path // "")",
   @sh "command_text=\(.tool_input.command // "" | .[0:200])",
-  @sh "exit_code=\(.tool_result.exit_code // 0)"
+  @sh "exit_code=\(.tool_result.exit_code // 1)"
 ')" 2>/dev/null || json_exit "Warning: jq parse failed; skipping post-tool-use"
 
 case "$TOOL" in
