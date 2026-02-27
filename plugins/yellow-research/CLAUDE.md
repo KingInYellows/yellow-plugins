@@ -92,12 +92,13 @@ startup — restart Claude Code after adding new keys.
 
 These external tools improve research quality but are not required:
 
-- **compound-engineering plugin** — provides Context7
-  (`mcp__plugin_compound-engineering_context7__resolve-library-id`,
-  `mcp__plugin_compound-engineering_context7__query-docs`) for official library
+- **yellow-core plugin** — provides Context7
+  (`mcp__plugin_yellow-core_context7__resolve-library-id`,
+  `mcp__plugin_yellow-core_context7__query-docs`) for official library
   docs. Used by `/research:code` for library queries. Falls back to EXA if not
   installed.
-  Install: `/plugin marketplace add every-marketplace/compound-engineering`
+  Install: `/plugin marketplace add KingInYellows/yellow-plugins` (select
+  yellow-core)
 - **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search.
   Used by `/research:code` and `/research:deep`. No API key required. Configure
   globally in Claude Code MCP settings.

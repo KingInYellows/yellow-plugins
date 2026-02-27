@@ -1,17 +1,15 @@
 ---
 name: chatprd:list
-description: >
-  List documents in ChatPRD workspace. Use when user wants to "show my PRDs",
-  "list documents", "what docs do I have", or browse their ChatPRD workspace.
+description: "List documents in ChatPRD workspace. Use when user wants to \"show my PRDs\", \"list documents\", \"what docs do I have\", or browse their ChatPRD workspace."
 argument-hint: '[optional: project name or filter]'
 allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_chatprd_chatprd__list_organization_documents
-  - mcp__plugin_chatprd_chatprd__list_projects
-  - mcp__plugin_chatprd_chatprd__get_document
+  - mcp__plugin_yellow-chatprd_chatprd__list_organization_documents
+  - mcp__plugin_yellow-chatprd_chatprd__list_projects
+  - mcp__plugin_yellow-chatprd_chatprd__get_document
 ---
 
 # List ChatPRD Documents

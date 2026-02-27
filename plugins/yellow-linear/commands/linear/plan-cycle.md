@@ -1,21 +1,18 @@
 ---
 name: linear:plan-cycle
-description: >
-  Plan sprint cycle by selecting backlog issues. Use when user says "plan the
-  sprint", "fill the cycle", "what should we work on next", or "sprint
-  planning".
+description: "Plan sprint cycle by selecting backlog issues. Use when user says \"plan the sprint\", \"fill the cycle\", \"what should we work on next\", or \"sprint planning\"."
 argument-hint: '[cycle name]'
 allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_linear_linear__list_cycles
-  - mcp__plugin_linear_linear__list_issues
-  - mcp__plugin_linear_linear__get_issue
-  - mcp__plugin_linear_linear__update_issue
-  - mcp__plugin_linear_linear__list_teams
-  - mcp__plugin_linear_linear__list_users
-  - mcp__plugin_linear_linear__list_issue_statuses
+  - mcp__plugin_yellow-linear_linear__list_cycles
+  - mcp__plugin_yellow-linear_linear__list_issues
+  - mcp__plugin_yellow-linear_linear__get_issue
+  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__list_teams
+  - mcp__plugin_yellow-linear_linear__list_users
+  - mcp__plugin_yellow-linear_linear__list_issue_statuses
 ---
 
 # Plan Sprint Cycle

@@ -11,8 +11,8 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-research_exa__get_code_context_exa
   - mcp__plugin_yellow-research_exa__web_search_exa
-  - mcp__plugin_compound-engineering_context7__resolve-library-id
-  - mcp__plugin_compound-engineering_context7__query-docs
+  - mcp__plugin_yellow-core_context7__resolve-library-id
+  - mcp__plugin_yellow-core_context7__query-docs
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-research_perplexity__perplexity_search
 ---

@@ -1,9 +1,6 @@
 ---
 name: chatprd:update
-description: >
-  Update an existing ChatPRD document. Use when user wants to "update the PRD",
-  "add requirements to", "revise the spec", or modify any existing ChatPRD
-  document.
+description: "Update an existing ChatPRD document. Use when user wants to \"update the PRD\", \"add requirements to\", \"revise the spec\", or modify any existing ChatPRD document."
 argument-hint: '[document title or description of changes]'
 allowed-tools:
   - Bash
@@ -11,9 +8,9 @@ allowed-tools:
   - Grep
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_chatprd_chatprd__search_documents
-  - mcp__plugin_chatprd_chatprd__get_document
-  - mcp__plugin_chatprd_chatprd__update_document
+  - mcp__plugin_yellow-chatprd_chatprd__search_documents
+  - mcp__plugin_yellow-chatprd_chatprd__get_document
+  - mcp__plugin_yellow-chatprd_chatprd__update_document
 ---
 
 # Update ChatPRD Document

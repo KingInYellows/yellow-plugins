@@ -1,21 +1,16 @@
 ---
 name: linear-pr-linker
-description: >
-  Suggest linking pull requests to Linear issues and syncing status. Use when
-  user creates a pull request via gt submit (Graphite) or mentions submitting a
-  PR and the branch name contains a Linear issue identifier. Also use when user
-  says "link to linear", "update issue from PR", or "sync status". IMPORTANT:
-  Always confirm with user before updating Linear issue status.
+description: "Suggest linking pull requests to Linear issues and syncing status. Use when user creates a pull request via gt submit (Graphite) or mentions submitting a PR and the branch name contains a Linear issue identifier. Also use when user says \"link to linear\", \"update issue from PR\", or \"sync status\". IMPORTANT: Always confirm with user before updating Linear issue status."
 model: inherit
 allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_linear_linear__get_issue
-  - mcp__plugin_linear_linear__update_issue
-  - mcp__plugin_linear_linear__create_comment
-  - mcp__plugin_linear_linear__list_comments
-  - mcp__plugin_linear_linear__list_issue_statuses
+  - mcp__plugin_yellow-linear_linear__get_issue
+  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__create_comment
+  - mcp__plugin_yellow-linear_linear__list_comments
+  - mcp__plugin_yellow-linear_linear__list_issue_statuses
 ---
 
 <examples>
