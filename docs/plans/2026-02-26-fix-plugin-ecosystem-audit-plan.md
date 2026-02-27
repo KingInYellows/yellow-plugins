@@ -57,9 +57,9 @@ Four PRs, each addressing one class of issue across all affected plugins. Landin
 
 For each of the 4 scripts:
 
-- [ ] Replace `set -eu` with `set -uo pipefail`
-- [ ] Add comment: `# Note: -e omitted intentionally — hook must output {"continue": true} on all paths`
-- [ ] Add `json_exit()` helper function at top (after `set` line):
+- [x] Replace `set -eu` with `set -uo pipefail`
+- [x] Add comment: `# Note: -e omitted intentionally — hook must output {"continue": true} on all paths`
+- [x] Add `json_exit()` helper function at top (after `set` line):
   ```bash
   json_exit() {
     local msg="${1:-}"
@@ -68,10 +68,10 @@ For each of the 4 scripts:
     exit 0
   }
   ```
-- [ ] Replace all bare `exit 0` / early returns with `json_exit "reason"`
-- [ ] Verify `command -v jq` check exists at top of scripts that use jq
-- [ ] Verify PostToolUse field paths: `.tool_input.command`, `.tool_result.exit_code` in `post-tool-use.sh`
-- [ ] Verify `CLAUDE_PROJECT_DIR` unset warning in `session-start.sh`
+- [x] Replace all bare `exit 0` / early returns with `json_exit "reason"`
+- [x] Verify `command -v jq` check exists at top of scripts that use jq
+- [x] Verify PostToolUse field paths: `.tool_input.command`, `.tool_result.exit_code` in `post-tool-use.sh`
+- [x] Verify `CLAUDE_PROJECT_DIR` unset warning in `session-start.sh`
 
 Files:
 - `plugins/yellow-ruvector/hooks/scripts/session-start.sh`
@@ -87,31 +87,31 @@ Shared libs are sourced, not executed directly. They must NOT:
 - Use `exit` (would terminate the sourcing script unexpectedly)
 
 Validate:
-- [ ] `plugins/yellow-ruvector/hooks/scripts/lib/validate.sh` — no `set -e`, no bare `exit`
-- [ ] `plugins/yellow-ci/hooks/scripts/lib/validate.sh` — no `set -e`, no bare `exit`
-- [ ] `plugins/yellow-ci/hooks/scripts/lib/redact.sh` — no `set -e`, no bare `exit`
+- [x] `plugins/yellow-ruvector/hooks/scripts/lib/validate.sh` — no `set -e`, no bare `exit`
+- [x] `plugins/yellow-ci/hooks/scripts/lib/validate.sh` — no `set -e`, no bare `exit`
+- [x] `plugins/yellow-ci/hooks/scripts/lib/redact.sh` — no `set -e`, no bare `exit`
 
 #### 3.3 Validate already-correct hooks (4 files)
 
 Spot-check that these maintain correct patterns:
-- [ ] `plugins/yellow-ci/hooks/scripts/session-start.sh` — confirm `json_exit()` pattern, `set -uo pipefail`
-- [ ] `plugins/yellow-debt/hooks/scripts/session-start.sh` — confirm `json_exit()` pattern, `set -uo pipefail`
-- [ ] `plugins/gt-workflow/hooks/check-commit-message.sh` — confirm `exit_ok` pattern, `set -uo pipefail`
-- [ ] `plugins/gt-workflow/hooks/check-git-push.sh` — confirm blocking exit pattern
+- [x] `plugins/yellow-ci/hooks/scripts/session-start.sh` — confirm `json_exit()` pattern, `set -uo pipefail`
+- [x] `plugins/yellow-debt/hooks/scripts/session-start.sh` — confirm `json_exit()` pattern, `set -uo pipefail`
+- [x] `plugins/gt-workflow/hooks/check-commit-message.sh` — confirm `exit_ok` pattern, `set -uo pipefail`
+- [x] `plugins/gt-workflow/hooks/check-git-push.sh` — confirm blocking exit pattern
 
 #### 3.4 Validate non-hook scripts (2 files)
 
 These are standalone scripts (not hooks) — different rules:
-- [ ] `plugins/yellow-ruvector/scripts/install.sh` — general shell safety check
-- [ ] `plugins/yellow-browser-test/scripts/install-agent-browser.sh` — general shell safety check
-- [ ] `plugins/yellow-core/skills/git-worktree/scripts/worktree-manager.sh` — general shell safety check
+- [x] `plugins/yellow-ruvector/scripts/install.sh` — general shell safety check
+- [x] `plugins/yellow-browser-test/scripts/install-agent-browser.sh` — general shell safety check
+- [x] `plugins/yellow-core/skills/git-worktree/scripts/worktree-manager.sh` — general shell safety check
 
 #### 3.5 Run existing tests
 
-- [ ] Run `plugins/yellow-ruvector/tests/` test suite
-- [ ] Run `plugins/yellow-ci/tests/` test suite
-- [ ] Run `plugins/yellow-debt/tests/` test suite (if exists)
-- [ ] Run `pnpm validate:schemas` to confirm no manifest breakage
+- [x] Run `plugins/yellow-ruvector/tests/` test suite
+- [x] Run `plugins/yellow-ci/tests/` test suite
+- [x] Run `plugins/yellow-debt/tests/` test suite (if exists)
+- [x] Run `pnpm validate:schemas` to confirm no manifest breakage
 
 ---
 
@@ -146,61 +146,61 @@ These are standalone scripts (not hooks) — different rules:
 For each file: fix MCP prefix AND convert `description: >` to single-line string.
 
 Commands (7):
-- [ ] `plugins/yellow-linear/commands/linear/create.md`
-- [ ] `plugins/yellow-linear/commands/linear/delegate.md`
-- [ ] `plugins/yellow-linear/commands/linear/plan-cycle.md`
-- [ ] `plugins/yellow-linear/commands/linear/status.md`
-- [ ] `plugins/yellow-linear/commands/linear/sync.md`
-- [ ] `plugins/yellow-linear/commands/linear/sync-all.md`
-- [ ] `plugins/yellow-linear/commands/linear/triage.md`
+- [x] `plugins/yellow-linear/commands/linear/create.md`
+- [x] `plugins/yellow-linear/commands/linear/delegate.md`
+- [x] `plugins/yellow-linear/commands/linear/plan-cycle.md`
+- [x] `plugins/yellow-linear/commands/linear/status.md`
+- [x] `plugins/yellow-linear/commands/linear/sync.md`
+- [x] `plugins/yellow-linear/commands/linear/sync-all.md`
+- [x] `plugins/yellow-linear/commands/linear/triage.md`
 
 Agents (3 — 2 need scalar fix):
-- [ ] `plugins/yellow-linear/agents/workflow/linear-issue-loader.md`
-- [ ] `plugins/yellow-linear/agents/workflow/linear-pr-linker.md` (also scalar fix)
-- [ ] `plugins/yellow-linear/agents/research/linear-explorer.md` (also scalar fix)
+- [x] `plugins/yellow-linear/agents/workflow/linear-issue-loader.md`
+- [x] `plugins/yellow-linear/agents/workflow/linear-pr-linker.md` (also scalar fix)
+- [x] `plugins/yellow-linear/agents/research/linear-explorer.md` (also scalar fix)
 
 #### 1.2 Fix yellow-chatprd (8 files — all also need scalar fix)
 
 Commands (6):
-- [ ] `plugins/yellow-chatprd/commands/chatprd/create.md`
-- [ ] `plugins/yellow-chatprd/commands/chatprd/link-linear.md` (references BOTH chatprd AND linear prefixes)
-- [ ] `plugins/yellow-chatprd/commands/chatprd/list.md`
-- [ ] `plugins/yellow-chatprd/commands/chatprd/search.md`
-- [ ] `plugins/yellow-chatprd/commands/chatprd/setup.md`
-- [ ] `plugins/yellow-chatprd/commands/chatprd/update.md`
+- [x] `plugins/yellow-chatprd/commands/chatprd/create.md`
+- [x] `plugins/yellow-chatprd/commands/chatprd/link-linear.md` (references BOTH chatprd AND linear prefixes)
+- [x] `plugins/yellow-chatprd/commands/chatprd/list.md`
+- [x] `plugins/yellow-chatprd/commands/chatprd/search.md`
+- [x] `plugins/yellow-chatprd/commands/chatprd/setup.md`
+- [x] `plugins/yellow-chatprd/commands/chatprd/update.md`
 
 Agents (2):
-- [ ] `plugins/yellow-chatprd/agents/workflow/document-assistant.md`
-- [ ] `plugins/yellow-chatprd/agents/workflow/linear-prd-bridge.md` (references BOTH chatprd AND linear prefixes)
+- [x] `plugins/yellow-chatprd/agents/workflow/document-assistant.md`
+- [x] `plugins/yellow-chatprd/agents/workflow/linear-prd-bridge.md` (references BOTH chatprd AND linear prefixes)
 
 #### 1.3 Fix yellow-devin (1 file)
 
-- [ ] `plugins/yellow-devin/commands/devin/wiki.md` — fix both `mcp__plugin_deepwiki_deepwiki__` and `mcp__plugin_devin_devin__` prefixes. Also fix the incorrect formula documentation in the command body if present.
+- [x] `plugins/yellow-devin/commands/devin/wiki.md` — fix both `mcp__plugin_deepwiki_deepwiki__` and `mcp__plugin_devin_devin__` prefixes. Also fix the incorrect formula documentation in the command body if present.
 
 #### 1.4 Fix cross-plugin Linear references (2 files)
 
-- [ ] `plugins/yellow-ci/commands/ci/report-linear.md` — `mcp__plugin_linear_linear__` → `mcp__plugin_yellow-linear_linear__`
-- [ ] `plugins/yellow-debt/commands/debt/sync.md` — `mcp__plugin_linear_linear__` → `mcp__plugin_yellow-linear_linear__`
+- [x] `plugins/yellow-ci/commands/ci/report-linear.md` — `mcp__plugin_linear_linear__` → `mcp__plugin_yellow-linear_linear__`
+- [x] `plugins/yellow-debt/commands/debt/sync.md` — `mcp__plugin_linear_linear__` → `mcp__plugin_yellow-linear_linear__`
 
 #### 1.5 Rewire yellow-research context7 (2 files)
 
-- [ ] `plugins/yellow-research/agents/research/code-researcher.md` — `mcp__plugin_compound-engineering_context7__` → `mcp__plugin_yellow-core_context7__`
-- [ ] `plugins/yellow-research/commands/research/code.md` — same prefix replacement
+- [x] `plugins/yellow-research/agents/research/code-researcher.md` — `mcp__plugin_compound-engineering_context7__` → `mcp__plugin_yellow-core_context7__`
+- [x] `plugins/yellow-research/commands/research/code.md` — same prefix replacement
 
 Also update yellow-research CLAUDE.md to note the dependency is now on yellow-core (not compound-engineering).
 
 #### 1.6 Check CLAUDE.md files for stale prefixes
 
-- [ ] `grep -r 'mcp__plugin_linear_linear\|mcp__plugin_chatprd_chatprd\|mcp__plugin_devin_devin\|mcp__plugin_deepwiki_deepwiki\|mcp__plugin_compound-engineering_context7' plugins/*/CLAUDE.md` — fix any matches
+- [x] `grep -r 'mcp__plugin_linear_linear\|mcp__plugin_chatprd_chatprd\|mcp__plugin_devin_devin\|mcp__plugin_deepwiki_deepwiki\|mcp__plugin_compound-engineering_context7' plugins/*/CLAUDE.md` — fix any matches
 
 #### 1.7 Validate
 
-- [ ] `rg 'mcp__plugin_linear_linear__' plugins/` — expect 0 matches
-- [ ] `rg 'mcp__plugin_chatprd_chatprd__' plugins/` — expect 0 matches
-- [ ] `rg 'mcp__plugin_devin_devin__' plugins/` — expect 0 matches
-- [ ] `rg 'mcp__plugin_deepwiki_deepwiki__' plugins/` — expect 0 matches
-- [ ] `rg 'mcp__plugin_compound-engineering_context7__' plugins/` — expect 0 matches
-- [ ] `pnpm validate:schemas`
+- [x] `rg 'mcp__plugin_linear_linear__' plugins/` — expect 0 matches
+- [x] `rg 'mcp__plugin_chatprd_chatprd__' plugins/` — expect 0 matches
+- [x] `rg 'mcp__plugin_devin_devin__' plugins/` — expect 0 matches
+- [x] `rg 'mcp__plugin_deepwiki_deepwiki__' plugins/` — expect 0 matches
+- [x] `rg 'mcp__plugin_compound-engineering_context7__' plugins/` — expect 0 matches
+- [x] `pnpm validate:schemas`
 
 ---
 
@@ -222,36 +222,36 @@ When converting `description: >` to single-line:
 ### Files (scalar-only — no prefix issues)
 
 #### yellow-ruvector (6 commands)
-- [ ] `plugins/yellow-ruvector/commands/ruvector/search.md`
-- [ ] `plugins/yellow-ruvector/commands/ruvector/index.md`
-- [ ] `plugins/yellow-ruvector/commands/ruvector/status.md`
-- [ ] `plugins/yellow-ruvector/commands/ruvector/learn.md`
-- [ ] `plugins/yellow-ruvector/commands/ruvector/setup.md`
-- [ ] `plugins/yellow-ruvector/commands/ruvector/memory.md`
+- [x] `plugins/yellow-ruvector/commands/ruvector/search.md`
+- [x] `plugins/yellow-ruvector/commands/ruvector/index.md`
+- [x] `plugins/yellow-ruvector/commands/ruvector/status.md`
+- [x] `plugins/yellow-ruvector/commands/ruvector/learn.md`
+- [x] `plugins/yellow-ruvector/commands/ruvector/setup.md`
+- [x] `plugins/yellow-ruvector/commands/ruvector/memory.md`
 
 #### yellow-browser-test (4 commands)
-- [ ] `plugins/yellow-browser-test/commands/browser-test/test.md`
-- [ ] `plugins/yellow-browser-test/commands/browser-test/setup.md`
-- [ ] `plugins/yellow-browser-test/commands/browser-test/report.md`
-- [ ] `plugins/yellow-browser-test/commands/browser-test/explore.md`
+- [x] `plugins/yellow-browser-test/commands/browser-test/test.md`
+- [x] `plugins/yellow-browser-test/commands/browser-test/setup.md`
+- [x] `plugins/yellow-browser-test/commands/browser-test/report.md`
+- [x] `plugins/yellow-browser-test/commands/browser-test/explore.md`
 
 #### yellow-ci (scalar-only files — report-linear already in PR 1)
-- [ ] `plugins/yellow-ci/commands/ci/runner-health.md`
-- [ ] `plugins/yellow-ci/commands/ci/diagnose.md`
-- [ ] `plugins/yellow-ci/commands/ci/status.md`
-- [ ] `plugins/yellow-ci/commands/ci/lint-workflows.md`
-- [ ] `plugins/yellow-ci/commands/ci/runner-cleanup.md`
-- [ ] `plugins/yellow-ci/agents/maintenance/runner-diagnostics.md`
-- [ ] `plugins/yellow-ci/agents/ci/failure-analyst.md`
-- [ ] `plugins/yellow-ci/agents/ci/workflow-optimizer.md`
+- [x] `plugins/yellow-ci/commands/ci/runner-health.md`
+- [x] `plugins/yellow-ci/commands/ci/diagnose.md`
+- [x] `plugins/yellow-ci/commands/ci/status.md`
+- [x] `plugins/yellow-ci/commands/ci/lint-workflows.md`
+- [x] `plugins/yellow-ci/commands/ci/runner-cleanup.md`
+- [x] `plugins/yellow-ci/agents/maintenance/runner-diagnostics.md`
+- [x] `plugins/yellow-ci/agents/ci/failure-analyst.md`
+- [x] `plugins/yellow-ci/agents/ci/workflow-optimizer.md`
 
 #### yellow-review (1 command)
-- [ ] `plugins/yellow-review/commands/review/resolve-pr.md`
+- [x] `plugins/yellow-review/commands/review/resolve-pr.md`
 
 ### Validate
 
-- [ ] `rg '^description: [>|]' plugins/` — expect 0 matches
-- [ ] `pnpm validate:schemas`
+- [x] `rg '^description: [>|]' plugins/` — expect 0 matches
+- [x] `pnpm validate:schemas`
 
 ---
 
@@ -262,15 +262,15 @@ When converting `description: >` to single-line:
 ### Tasks
 
 #### 4.1 gt-workflow consistency
-- [ ] Remove `.git` suffix from `repository` URL in `plugins/gt-workflow/.claude-plugin/plugin.json`
-- [ ] Add `"timeout": 1` to the PreToolUse hook definition in `plugins/gt-workflow/.claude-plugin/plugin.json` (matching the PostToolUse timeout of 1s)
+- [x] Remove `.git` suffix from `repository` URL in `plugins/gt-workflow/.claude-plugin/plugin.json`
+- [x] Add `"timeout": 1` to the PreToolUse hook definition in `plugins/gt-workflow/.claude-plugin/plugin.json` (matching the PostToolUse timeout of 1s)
 
 #### 4.2 yellow-ruvector hooks.json comment
-- [ ] Add `"_comment": "Reference only — Claude Code reads inline hooks from plugin.json"` to `plugins/yellow-ruvector/hooks/hooks.json`
+- [x] Add `"_comment": "Reference only — Claude Code reads inline hooks from plugin.json"` to `plugins/yellow-ruvector/hooks/hooks.json`
 
 #### 4.3 yellow-linear CLAUDE.md updates
-- [ ] Document the `delegate` command in the Commands section
-- [ ] Document the `sync-all` command in the Commands section
+- [x] Document the `delegate` command in the Commands section
+- [x] Document the `sync-all` command in the Commands section
 
 #### 4.4 Standardize cross-plugin dependency documentation
 
@@ -280,30 +280,30 @@ For each plugin that depends on another, ensure CLAUDE.md has a `## Cross-Plugin
 - Graceful degradation behavior
 
 Plugins to update:
-- [ ] `plugins/yellow-chatprd/CLAUDE.md` — verify yellow-linear dependency documented
-- [ ] `plugins/yellow-ci/CLAUDE.md` — add yellow-linear dependency for `report-linear`
-- [ ] `plugins/yellow-debt/CLAUDE.md` — verify yellow-linear dependency for `sync`
-- [ ] `plugins/yellow-research/CLAUDE.md` — update from compound-engineering to yellow-core for context7
-- [ ] `plugins/yellow-review/CLAUDE.md` — verify yellow-core dependency documented
+- [x] `plugins/yellow-chatprd/CLAUDE.md` — verify yellow-linear dependency documented
+- [x] `plugins/yellow-ci/CLAUDE.md` — add yellow-linear dependency for `report-linear`
+- [x] `plugins/yellow-debt/CLAUDE.md` — verify yellow-linear dependency for `sync`
+- [x] `plugins/yellow-research/CLAUDE.md` — update from compound-engineering to yellow-core for context7
+- [x] `plugins/yellow-review/CLAUDE.md` — verify yellow-core dependency documented
 
 #### 4.5 yellow-core context7 wiring consideration
-- [ ] Add `mcp__plugin_yellow-core_context7__resolve-library-id` and `mcp__plugin_yellow-core_context7__query-docs` to `best-practices-researcher` agent's `allowed-tools` (it currently uses WebSearch/WebFetch but context7 is available in the session)
-- [ ] Add `ToolSearch` to allowed-tools if not present
+- [x] Add `mcp__plugin_yellow-core_context7__resolve-library-id` and `mcp__plugin_yellow-core_context7__query-docs` to `best-practices-researcher` agent's `allowed-tools` (it currently uses WebSearch/WebFetch but context7 is available in the session)
+- [x] Add `ToolSearch` to allowed-tools if not present
 
 #### 4.6 Validate
-- [ ] `pnpm validate:schemas`
-- [ ] Review all modified CLAUDE.md files for accuracy
+- [x] `pnpm validate:schemas`
+- [x] Review all modified CLAUDE.md files for accuracy
 
 ---
 
 ## Acceptance Criteria
 
-- [ ] All MCP tool prefixes follow the formula `mcp__plugin_{pluginName}_{serverName}__{toolName}` — verified by `rg` returning 0 matches for old prefixes
-- [ ] No `.md` files under `plugins/` use `description: >` or `description: |` — verified by `rg '^description: [>|]' plugins/` returning 0 matches
-- [ ] All hook scripts that output JSON use `set -uo pipefail` (no `-e`) and define a `json_exit()` helper
-- [ ] `pnpm validate:schemas` passes after all 4 PRs land
-- [ ] All cross-plugin dependencies are documented in CLAUDE.md files
-- [ ] yellow-linear CLAUDE.md documents all 7 commands
+- [x] All MCP tool prefixes follow the formula `mcp__plugin_{pluginName}_{serverName}__{toolName}` — verified by `rg` returning 0 matches for old prefixes
+- [x] No `.md` files under `plugins/` use `description: >` or `description: |` — verified by `rg '^description: [>|]' plugins/` returning 0 matches
+- [x] All hook scripts that output JSON use `set -uo pipefail` (no `-e`) and define a `json_exit()` helper
+- [x] `pnpm validate:schemas` passes after all 4 PRs land
+- [x] All cross-plugin dependencies are documented in CLAUDE.md files
+- [x] yellow-linear CLAUDE.md documents all 7 commands
 
 ## References
 
