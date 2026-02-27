@@ -42,14 +42,12 @@ sessions (browser required for OAuth flow).
 
 ### API token servers (yellow-devin)
 
-yellow-devin commands require a `DEVIN_API_TOKEN` environment variable for REST
-API calls:
+yellow-devin commands require two environment variables (V3 API / service user):
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
-export DEVIN_API_TOKEN="apk_your_token_here"
-
-# Get your token: https://devin.ai/settings/api
+export DEVIN_SERVICE_USER_TOKEN="cog_your_token_here"  # Enterprise Settings > Service Users
+export DEVIN_ORG_ID="your_org_id"                      # Enterprise Settings > Organizations
 ```
 
 Never commit tokens to version control. The `.gitignore` already excludes
@@ -101,16 +99,27 @@ These plugins work entirely offline with no external network calls:
 
 ## Hook Safety
 
-### yellow-ruvector Hooks
+### Plugins with Hooks
 
-yellow-ruvector is the only plugin with hooks. Three hooks execute shell
-scripts:
+Four plugins execute shell-based hooks:
 
-| Hook          | Event        | Script             | Time Budget | What It Does                      |
-| ------------- | ------------ | ------------------ | ----------- | --------------------------------- |
-| session-start | SessionStart | `session-start.sh` | 3s          | Flush stale queue, load learnings |
-| post-tool-use | PostToolUse  | `post-tool-use.sh` | 50ms        | Append file changes to queue      |
-| stop          | Stop         | `stop.sh`          | N/A         | Delegate queue flush to agent     |
+| Plugin | Hook Events | Purpose |
+|---|---|---|
+| yellow-ruvector | SessionStart, UserPromptSubmit, PostToolUse, Stop | Memory recall, edit tracking, session lifecycle |
+| yellow-ci | SessionStart | Check for recent CI failures (cached, 3s budget) |
+| yellow-debt | SessionStart | Remind about high/critical debt findings |
+| gt-workflow | PreToolUse, PostToolUse | Block `git push`, validate commit messages |
+
+### yellow-ruvector Hooks (detailed)
+
+yellow-ruvector has the most hooks. Its shell scripts:
+
+| Hook                | Event             | Script                  | Time Budget | What It Does                      |
+| ------------------- | ----------------- | ----------------------- | ----------- | --------------------------------- |
+| session-start       | SessionStart      | `session-start.sh`      | 3s          | Flush stale queue, load learnings |
+| user-prompt-submit  | UserPromptSubmit  | `user-prompt-submit.sh` | 50ms        | Recall relevant memories          |
+| post-tool-use       | PostToolUse       | `post-tool-use.sh`      | 50ms        | Append file changes to queue      |
+| stop                | Stop              | `stop.sh`               | N/A         | Delegate queue flush to agent     |
 
 **Security properties:**
 

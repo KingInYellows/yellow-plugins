@@ -42,7 +42,7 @@ eval "$(printf '%s' "$INPUT" | jq -r '
 case "$TOOL" in
   Edit|Write)
     if [ -n "$file_path" ]; then
-      # Skip solution docs: learning-compounder handles these explicitly.
+      # Skip solution docs: knowledge-compounder writes these directly.
       # Suppress post-edit behavioral tracking for solution doc edits.
       case "$file_path" in
         */docs/solutions/*|docs/solutions/*)

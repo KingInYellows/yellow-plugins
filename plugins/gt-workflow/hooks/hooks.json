@@ -1,4 +1,5 @@
 {
+  "_comment": "REFERENCE ONLY — not loaded by Claude Code. Authoritative hook config is in .claude-plugin/plugin.json. Keep all numeric fields (e.g. timeout) in sync with plugin.json.",
   "hooks": {
     "PreToolUse": [
       {
@@ -7,6 +8,18 @@
           {
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-git-push.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-commit-message.sh",
+            "timeout": 1
           }
         ]
       }

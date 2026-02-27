@@ -1,9 +1,6 @@
 ---
 name: pr-review-workflow
-description:
-  Internal reference for PR review workflow patterns. Use when agents or
-  commands need shared conventions for adaptive selection, output format, or
-  error handling.
+description: "Internal reference for PR review workflow patterns. Use when agents or commands need shared conventions for adaptive selection, output format, or error handling."
 user-invokable: false
 ---
 
@@ -79,10 +76,8 @@ These are spawned via Task tool when conditions match:
 **pattern-recognition-specialist** — Selected when:
 
 - PR introduces new patterns (new directories, new file type conventions)
-
-**agent-native-reviewer** — Selected when:
-
-- Changes to `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`, `plugin.json`
+- OR changes to `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`,
+  `plugin.json` (plugin authoring convention checks)
 
 **code-simplicity-reviewer** (yellow-core) — Available as additional pass when:
 
@@ -195,11 +190,11 @@ All commits via `gt modify -c -m "<message>"`. Push via
 To spawn cross-plugin agents from yellow-review commands, use the Task tool:
 
 ```
-Task(subagent_type="compound-engineering:review:security-sentinel",
+Task(subagent_type="yellow-core:review:security-sentinel",
      prompt="Review these files for security issues: <file-list>")
 ```
 
-Agent type names follow the pattern: `compound-engineering:review:<agent-name>`.
+Agent type names follow the pattern: `yellow-core:review:<agent-name>`.
 
 ## GraphQL Scripts
 
