@@ -1,6 +1,6 @@
 ---
 name: chatprd:setup
-description: Configure ChatPRD workspace — set default organization and project for all commands. Use when first installing the plugin, when documents are landing in the wrong workspace, or when switching to a different org or project.
+description: "Configure ChatPRD workspace \u2014 set default organization and project for all commands. Use when first installing the plugin, when documents are landing in the wrong workspace, or when switching to a different org or project."
 argument-hint: ''
 allowed-tools:
   - Bash

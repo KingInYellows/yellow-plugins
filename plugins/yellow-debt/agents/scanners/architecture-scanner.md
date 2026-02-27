@@ -1,8 +1,6 @@
 ---
 name: architecture-scanner
-description:
-  'Architecture and module design analysis. Use when auditing code for circular
-  dependencies, god modules, boundary violations, or structural issues.'
+description: "Architecture and module design analysis. Use when auditing code for circular dependencies, god modules, boundary violations, or structural issues."
 model: inherit
 allowed-tools:
   - Read

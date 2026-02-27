@@ -1,9 +1,6 @@
 ---
 name: test-conventions
-description:
-  Testing conventions and configuration reference. Use when agents or commands
-  need config schema, severity classification, report templates, or credential
-  rules for browser testing.
+description: "Testing conventions and configuration reference. Use when agents or commands need config schema, severity classification, report templates, or credential rules for browser testing."
 user-invokable: false
 ---
 

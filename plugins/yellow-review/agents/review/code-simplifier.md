@@ -1,9 +1,6 @@
 ---
 name: code-simplifier
-description:
-  'Code simplification preserving all functionality. Use when reviewing PRs
-  after fixes have been applied to identify remaining unnecessary complexity,
-  redundant abstractions, and YAGNI violations. Runs as the final review pass.'
+description: "Code simplification preserving all functionality. Use when reviewing PRs after fixes have been applied to identify remaining unnecessary complexity, redundant abstractions, and YAGNI violations. Runs as the final review pass."
 model: inherit
 allowed-tools:
   - Read

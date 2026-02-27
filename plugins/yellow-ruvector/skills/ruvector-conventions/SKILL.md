@@ -1,9 +1,6 @@
 ---
 name: ruvector-conventions
-description:
-  ruvector workflow patterns and conventions reference. Use when commands or
-  agents need ruvector context, namespace definitions, memory schema, MCP tool
-  naming, or error handling patterns.
+description: "ruvector workflow patterns and conventions reference. Use when commands or agents need ruvector context, namespace definitions, memory schema, MCP tool naming, or error handling patterns."
 user-invokable: false
 ---
 

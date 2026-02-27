@@ -1,8 +1,6 @@
 ---
 name: audit-synthesizer
-description:
-  'Merge scanner outputs, deduplicate findings, score severity, and generate
-  reports. Use when synthesizing results from multiple debt scanners.'
+description: "Merge scanner outputs, deduplicate findings, score severity, and generate reports. Use when synthesizing results from multiple debt scanners."
 model: inherit
 allowed-tools:
   - Read

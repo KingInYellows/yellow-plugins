@@ -57,13 +57,13 @@ fi
 TIMEOUT_CMD="$(command -v timeout || command -v gtimeout || true)"
 if [ -n "$TIMEOUT_CMD" ]; then
   RECALL_OUTPUT=$("$TIMEOUT_CMD" --kill-after=0.1 0.9 "${RUVECTOR_CMD[@]}" hooks recall \
-    --top-k 3 "$PROMPT" 2>/dev/null) || {
+    --top-k 3 -- "$PROMPT" 2>/dev/null) || {
     printf '[ruvector] recall timed out or failed\n' >&2
     RECALL_OUTPUT=""
   }
 else
   RECALL_OUTPUT=$("${RUVECTOR_CMD[@]}" hooks recall \
-    --top-k 3 "$PROMPT" 2>/dev/null) || {
+    --top-k 3 -- "$PROMPT" 2>/dev/null) || {
     printf '[ruvector] recall failed\n' >&2
     RECALL_OUTPUT=""
   }

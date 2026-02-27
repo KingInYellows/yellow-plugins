@@ -27,14 +27,17 @@ cycles, and documents.
 
 ## Plugin Components
 
-### Commands (5)
+### Commands (7)
 
 - `/linear:create` — Create a Linear issue from current context
 - `/linear:sync` — Sync current branch with its Linear issue (load context, link
   PR, update status)
+- `/linear:sync-all` — Audit open Linear issues and close ones with merged PRs
 - `/linear:triage` — Review and assign incoming Linear issues
 - `/linear:plan-cycle` — Plan sprint cycle by selecting backlog issues
 - `/linear:status` — Generate project and initiative health report
+- `/linear:delegate` — Delegate a Linear issue to a Devin AI session (requires
+  yellow-devin plugin)
 
 ### Agents (3)
 
@@ -68,6 +71,12 @@ patterns:
 
 For advanced workflows, agents can call Linear MCP tools directly (e.g.,
 `get_issue`, `list_issues`) without going through commands.
+
+## Cross-Plugin Dependencies
+
+- **yellow-devin** — Required for `/linear:delegate` command (delegates Linear
+  issues to Devin AI sessions). Without it, `/linear:delegate` will report that
+  the yellow-devin plugin is not installed.
 
 ## Known Limitations
 

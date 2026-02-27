@@ -43,7 +43,7 @@ eval "$(printf '%s' "$INPUT" | jq -r '
   @sh "TOOL=\(.tool_name // "")",
   @sh "file_path=\(.tool_input.file_path // "")",
   @sh "command_text=\(.tool_input.command // "" | .[0:200])",
-  @sh "exit_code=\(.tool_result.exit_code // 0)"
+  @sh "exit_code=\(.tool_result.exit_code // 1)"
 ')" 2>/dev/null || json_exit "Warning: jq parse failed; skipping post-tool-use"
 
 case "$TOOL" in
@@ -66,7 +66,7 @@ case "$TOOL" in
     if [ -n "$command_text" ]; then
       # Validate exit_code is numeric
       case "$exit_code" in
-        ''|*[!0-9]*) exit_code=0 ;;
+        ''|*[!0-9]*) exit_code=1 ;;
       esac
       if [ "$exit_code" -eq 0 ]; then
         if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-command --success "$command_text" 2>&1); then
