@@ -1,9 +1,6 @@
 ---
 name: review:resolve
-description: >
-  Parallel resolution of unresolved PR review comments. Use when you want to
-  address all pending review feedback on a PR by spawning parallel resolver
-  agents.
+description: Parallel resolution of unresolved PR review comments. Use when you want to address all pending review feedback on a PR by spawning parallel resolver agents.
 argument-hint: '[PR#]'
 allowed-tools:
   - Bash

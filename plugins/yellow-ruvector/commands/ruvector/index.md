@@ -1,9 +1,6 @@
 ---
 name: ruvector:index
-description: >
-  Index codebase for semantic search. Use when user says "index my code", "build
-  search index", "update embeddings", "re-index project", or wants to enable
-  semantic code search.
+description: "Index codebase for semantic search. Use when user says \"index my code\", \"build search index\", \"update embeddings\", \"re-index project\", or wants to enable semantic code search."
 argument-hint: '[path]'
 allowed-tools:
   - Bash

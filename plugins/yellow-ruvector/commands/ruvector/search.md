@@ -1,9 +1,6 @@
 ---
 name: ruvector:search
-description: >
-  Search codebase by meaning using vector similarity. Use when user says "find
-  code that does X", "search for implementations of Y", "semantic search", "find
-  similar functions", or "where is X implemented".
+description: "Search codebase by meaning using vector similarity. Use when user says \"find code that does X\", \"search for implementations of Y\", \"semantic search\", \"find similar functions\", or \"where is X implemented\"."
 argument-hint: '<query>'
 allowed-tools:
   - ToolSearch

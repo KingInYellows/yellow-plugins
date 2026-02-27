@@ -1,9 +1,6 @@
 ---
 name: browser-test:setup
-description: >
-  Install agent-browser and discover app configuration. Use when user says "set
-  up browser testing", "install agent-browser", "configure testing", or wants to
-  initialize browser testing for a web project.
+description: "Install agent-browser and discover app configuration. Use when user says \"set up browser testing\", \"install agent-browser\", \"configure testing\", or wants to initialize browser testing for a web project."
 argument-hint: ''
 allowed-tools:
   - Bash

@@ -1,9 +1,6 @@
 ---
 name: ruvector:status
-description: >
-  Show ruvector health, DB stats, and queue status. Use when user says "ruvector
-  status", "check vector DB", "how many vectors", "is ruvector working", or
-  wants to verify the installation.
+description: "Show ruvector health, DB stats, and queue status. Use when user says \"ruvector status\", \"check vector DB\", \"how many vectors\", \"is ruvector working\", or wants to verify the installation."
 argument-hint: ''
 allowed-tools:
   - Bash

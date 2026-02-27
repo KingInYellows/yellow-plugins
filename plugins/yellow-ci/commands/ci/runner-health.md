@@ -1,9 +1,6 @@
 ---
 name: ci:runner-health
-description: >
-  Check self-hosted runner health via SSH. Use when user asks "runner status",
-  "is runner healthy", "check runner", or wants to verify infrastructure before
-  diagnosing CI failures.
+description: "Check self-hosted runner health via SSH. Use when user asks \"runner status\", \"is runner healthy\", \"check runner\", or wants to verify infrastructure before diagnosing CI failures."
 argument-hint: '[runner-name]'
 allowed-tools:
   - Bash

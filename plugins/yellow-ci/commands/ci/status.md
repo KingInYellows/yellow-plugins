@@ -1,8 +1,6 @@
 ---
 name: ci:status
-description: >
-  Show recent CI workflow run status. Use when user asks "CI status", "recent
-  builds", "what's running", or needs to find run IDs for diagnosis.
+description: "Show recent CI workflow run status. Use when user asks \"CI status\", \"recent builds\", \"what's running\", or needs to find run IDs for diagnosis."
 allowed-tools:
   - Bash
 model: haiku
