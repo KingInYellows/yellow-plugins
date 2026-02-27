@@ -3,7 +3,19 @@
 # Receives hook input as JSON on stdin. Budget: <50ms.
 # Uses ruvector's built-in post-edit and post-command hooks.
 # shellcheck disable=SC2154
-set -eu
+set -uo pipefail
+# Note: -e omitted intentionally — hook must output {"continue": true} on all paths
+
+# --- json_exit: centralized exit for all early-return paths ---
+json_exit() {
+  local msg="${1:-}"
+  [ -n "$msg" ] && printf '[ruvector] %s\n' "$msg" >&2
+  printf '{"continue": true}\n'
+  exit 0
+}
+
+# Require jq for JSON parsing
+command -v jq >/dev/null 2>&1 || json_exit "Warning: jq not found; skipping post-tool-use"
 
 # Read hook input from stdin
 INPUT=$(cat)
@@ -14,8 +26,7 @@ RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 
 # Exit silently if ruvector is not initialized
 if [ ! -d "$RUVECTOR_DIR" ]; then
-  printf '{"continue": true}\n'
-  exit 0
+  json_exit
 fi
 
 # Resolve ruvector command: prefer direct binary (62ms) over npx (2700ms)
@@ -24,8 +35,7 @@ if command -v ruvector >/dev/null 2>&1; then
 elif command -v npx >/dev/null 2>&1; then
   RUVECTOR_CMD=(npx --no ruvector)
 else
-  printf '{"continue": true}\n'
-  exit 0
+  json_exit "Warning: neither ruvector nor npx found"
 fi
 
 # Parse all fields in a single jq invocation
@@ -34,10 +44,7 @@ eval "$(printf '%s' "$INPUT" | jq -r '
   @sh "file_path=\(.tool_input.file_path // "")",
   @sh "command_text=\(.tool_input.command // "" | .[0:200])",
   @sh "exit_code=\(.tool_result.exit_code // 0)"
-')" 2>/dev/null || {
-  printf '{"continue": true}\n'
-  exit 0
-}
+')" 2>/dev/null || json_exit "Warning: jq parse failed; skipping post-tool-use"
 
 case "$TOOL" in
   Edit|Write)
