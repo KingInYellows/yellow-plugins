@@ -1,9 +1,6 @@
 ---
 name: browser-test:test
-description: >
-  Run structured browser test suite. Use when user says "test the app", "run
-  browser tests", "check if the UI works", "verify routes", or wants to run the
-  full structured test suite against discovered routes.
+description: "Run structured browser test suite. Use when user says \"test the app\", \"run browser tests\", \"check if the UI works\", \"verify routes\", or wants to run the full structured test suite against discovered routes."
 argument-hint: '[route-filter]'
 allowed-tools:
   - Bash

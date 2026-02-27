@@ -1,9 +1,6 @@
 ---
 name: ruvector:learn
-description: >
-  Record a learning, mistake, or pattern for future sessions. Use when user says
-  "remember this", "save this pattern", "record this mistake", "learn from
-  this", "don't forget X", or wants to persist an insight.
+description: "Record a learning, mistake, or pattern for future sessions. Use when user says \"remember this\", \"save this pattern\", \"record this mistake\", \"learn from this\", \"don't forget X\", or wants to persist an insight."
 argument-hint: '[learning description]'
 allowed-tools:
   - ToolSearch
