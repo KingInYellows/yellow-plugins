@@ -90,14 +90,15 @@ Add to `~/.zshrc` (or equivalent shell config):
 export EXA_API_KEY="your-key-here"
 export TAVILY_API_KEY="your-key-here"
 export PERPLEXITY_API_KEY="your-key-here"
-export PARALLEL_API_KEY="your-key-here"
 ```
 
 Get keys from:
 - EXA: https://exa.ai/
 - Tavily: https://tavily.com/
 - Perplexity: https://www.perplexity.ai/settings/api
-- Parallel: https://platform.parallel.ai/
+
+The **Parallel Task** server uses OAuth (no API key needed). Claude Code handles
+authentication automatically — you'll be prompted to authorize on first use.
 
 After adding keys: source `~/.zshrc` and restart Claude Code.
 

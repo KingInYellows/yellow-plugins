@@ -35,7 +35,7 @@ Off-by-default tools (enable by adding them to the `tools=` arg in `plugin.json`
 - `deep_researcher_start` — Start async EXA deep research report
 - `deep_researcher_check` — Poll async research status
 
-### parallel — `PARALLEL_API_KEY` (HTTP Bearer auth)
+### parallel — OAuth (auto-managed by Claude Code)
 
 - `createDeepResearch` — Launch async research; returns task ID
 - `createTaskGroup` — Parallel enrichment for multiple items
@@ -82,11 +82,13 @@ Add to `~/.zshrc`:
 export EXA_API_KEY="..."
 export TAVILY_API_KEY="..."
 export PERPLEXITY_API_KEY="..."
-export PARALLEL_API_KEY="..."
 ```
 
 Source or restart shell after setting. Keys are passed to MCP servers at
 startup — restart Claude Code after adding new keys.
+
+The **parallel** server uses OAuth — Claude Code handles authentication
+automatically (no API key needed). You'll be prompted to authorize on first use.
 
 ## Optional Dependencies
 

@@ -25,10 +25,12 @@ Add to your shell config (`~/.zshrc` or `~/.bashrc`):
 export EXA_API_KEY="..."          # https://exa.ai/
 export TAVILY_API_KEY="..."       # https://tavily.com/
 export PERPLEXITY_API_KEY="..."   # https://www.perplexity.ai/settings/api
-export PARALLEL_API_KEY="..."     # https://platform.parallel.ai/
 ```
 
 Restart Claude Code after setting keys.
+
+The **Parallel Task** server uses OAuth — Claude Code handles authentication
+automatically. You'll be prompted to authorize on first use (no API key needed).
 
 ## Usage
 
