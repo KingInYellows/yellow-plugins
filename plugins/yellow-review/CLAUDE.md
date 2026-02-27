@@ -30,7 +30,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
 
-### Agents (8)
+### Agents (7)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
@@ -47,7 +47,6 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 - `pr-comment-resolver` — Implements fix for a single review comment (spawned in
   parallel)
-- `learning-compounder` — Captures review patterns to memory and solution docs
 
 ### Skills (1)
 

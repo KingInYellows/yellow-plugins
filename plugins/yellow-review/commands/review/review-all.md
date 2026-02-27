@@ -1,6 +1,6 @@
 ---
 name: review:all
-description: "Sequential review of multiple PRs — your Graphite stack, all open PRs, or a single PR. Use when you want to review an entire stack in dependency order or batch-review all your open PRs."
+description: 'Sequential review of multiple PRs — your Graphite stack, all open PRs, or a single PR. Use when you want to review an entire stack in dependency order or batch-review all your open PRs.'
 argument-hint: '[scope: stack|all|PR#]'
 allowed-tools:
   - Bash
@@ -88,8 +88,9 @@ For each PR in order:
    gt upstack restack
    ```
    If restack conflicts: abort restack, report to user, continue to next PR
-5. **Compound**: Handled automatically by `review-pr.md` (Knowledge compounding
-   step) — no separate spawn needed here.
+5. **Compound**: Handled automatically by the inline `review:pr` flow (Step 9:
+   Knowledge Compounding) — no separate spawn needed here. On failure,
+   `review:pr` logs the warning and continues.
 
 ### Step 5: Final Summary
 

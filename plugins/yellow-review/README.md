@@ -38,12 +38,11 @@ resolution, and sequential stack review.
 | `type-design-analyzer`  | Type design, encapsulation, invariants               |
 | `silent-failure-hunter` | Silent failure and error handling analysis           |
 
-### Workflow (2)
+### Workflow (1)
 
-| Agent                 | Description                                          |
-| --------------------- | ---------------------------------------------------- |
-| `pr-comment-resolver` | Implements fix for a single review comment           |
-| `learning-compounder` | Captures review patterns to memory and solution docs |
+| Agent                 | Description                                 |
+| --------------------- | ------------------------------------------- |
+| `pr-comment-resolver` | Implements fix for a single review comment  |
 
 ## Skills
 
@@ -56,7 +55,7 @@ resolution, and sequential stack review.
 - Very large PRs (1000+ lines) may cause agent context overflow — consider
   splitting
 - Draft PRs excluded from `/review:all scope=all` by default
-- Cross-plugin agents require the yellow-core plugin
+- Cross-plugin agents require the yellow-core plugin to be installed
 
 ## License
 
