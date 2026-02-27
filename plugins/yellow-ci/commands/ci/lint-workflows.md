@@ -1,9 +1,6 @@
 ---
 name: ci:lint-workflows
-description: >
-  Lint GitHub Actions workflows for self-hosted runner issues. Use when user
-  wants to check workflows before pushing, asks "lint CI", "check workflows", or
-  wants to find common pitfalls in their GitHub Actions configuration.
+description: "Lint GitHub Actions workflows for self-hosted runner issues. Use when user wants to check workflows before pushing, asks \"lint CI\", \"check workflows\", or wants to find common pitfalls in their GitHub Actions configuration."
 argument-hint: '[workflow-file.yml]'
 allowed-tools:
   - Bash

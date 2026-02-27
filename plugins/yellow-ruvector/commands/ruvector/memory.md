@@ -1,9 +1,6 @@
 ---
 name: ruvector:memory
-description: >
-  Browse, search, and manage stored memories and learnings. Use when user says
-  "show memories", "what do we know about X", "list learnings", "delete memory",
-  "browse reflexions", or wants to view stored agent knowledge.
+description: "Browse, search, and manage stored memories and learnings. Use when user says \"show memories\", \"what do we know about X\", \"list learnings\", \"delete memory\", \"browse reflexions\", or wants to view stored agent knowledge."
 argument-hint: '[namespace] [filter]'
 allowed-tools:
   - ToolSearch
