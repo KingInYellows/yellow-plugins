@@ -1,10 +1,6 @@
 ---
 name: performance-oracle
-description:
-  'Performance bottleneck analysis specialist. Identifies algorithmic complexity
-  issues, database query problems (N+1), memory management concerns, caching
-  opportunities, and network optimization. Use when reviewing code for
-  performance issues or optimizing hot paths.'
+description: "Performance bottleneck analysis specialist. Identifies algorithmic complexity issues, database query problems (N+1), memory management concerns, caching opportunities, and network optimization. Use when reviewing code for performance issues or optimizing hot paths."
 model: inherit
 allowed-tools:
   - Read

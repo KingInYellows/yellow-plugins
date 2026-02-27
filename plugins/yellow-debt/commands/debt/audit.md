@@ -1,9 +1,6 @@
 ---
 name: debt:audit
-description:
-  'Run comprehensive technical debt audit with parallel scanner agents. Use when
-  you need to assess codebase health, identify AI-generated debt patterns, or
-  scan for technical debt.'
+description: "Run comprehensive technical debt audit with parallel scanner agents. Use when you need to assess codebase health, identify AI-generated debt patterns, or scan for technical debt."
 argument-hint: '[path] [--category <name>] [--severity <level>]'
 allowed-tools:
   - Bash

@@ -1,7 +1,6 @@
 ---
 name: workflows:work
-description:
-  Execute implementation plans systematically with testing and quality checks
+description: "Execute implementation plans systematically with testing and quality checks"
 argument-hint: '[plan file path]'
 allowed-tools:
   - Bash

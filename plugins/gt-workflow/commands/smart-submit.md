@@ -1,8 +1,6 @@
 ---
 name: smart-submit
-description:
-  'Stage, audit, commit, and submit changes via Graphite with parallel code
-  review agents'
+description: "Stage, audit, commit, and submit changes via Graphite with parallel code review agents"
 allowed-tools:
   - Bash
   - Read

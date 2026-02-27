@@ -1,6 +1,6 @@
 ---
 name: ci:runner-cleanup
-description: Clean Docker images/containers, old logs, and caches on self-hosted runner. Destructive operation with dry-run preview and confirmation. Use when runner disk is full, Docker space needs freeing, or old CI logs need pruning.
+description: "Clean Docker images/containers, old logs, and caches on self-hosted runner. Destructive operation with dry-run preview and confirmation. Use when runner disk is full, Docker space needs freeing, or old CI logs need pruning."
 argument-hint: '[runner-name]'
 allowed-tools:
   - Bash

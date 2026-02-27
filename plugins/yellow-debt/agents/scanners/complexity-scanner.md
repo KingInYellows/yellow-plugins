@@ -1,8 +1,6 @@
 ---
 name: complexity-scanner
-description:
-  'Cyclomatic and cognitive complexity analysis. Use when auditing code for high
-  complexity, deep nesting, and god functions.'
+description: "Cyclomatic and cognitive complexity analysis. Use when auditing code for high complexity, deep nesting, and god functions."
 model: inherit
 allowed-tools:
   - Read

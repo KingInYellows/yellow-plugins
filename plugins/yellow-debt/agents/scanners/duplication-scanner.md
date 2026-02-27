@@ -1,8 +1,6 @@
 ---
 name: duplication-scanner
-description:
-  'Code duplication and near-duplicate detection. Use when auditing code for
-  repeated patterns, copy-paste code, or duplicate logic.'
+description: "Code duplication and near-duplicate detection. Use when auditing code for repeated patterns, copy-paste code, or duplicate logic."
 model: inherit
 allowed-tools:
   - Read
