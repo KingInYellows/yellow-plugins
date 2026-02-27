@@ -65,8 +65,12 @@ if [ -f "$cache_file" ]; then
 
   if [ "$cache_age" -lt 60 ]; then
     # Cache hit — output cached result as JSON
-    cached_msg=$(cat "$cache_file")
-    json_exit "$cached_msg"
+    if cached_msg=$(cat "$cache_file" 2>/dev/null); then
+      json_exit "$cached_msg"
+    else
+      printf '[yellow-ci] Warning: Cannot read cache file %s\n' "$cache_file" >&2
+      json_exit
+    fi
   fi
 fi
 
