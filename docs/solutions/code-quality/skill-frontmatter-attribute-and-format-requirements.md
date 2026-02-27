@@ -138,15 +138,52 @@ description: "Analyzes test run output and produces a structured report. Use whe
 ---
 ```
 
+### Multi-Line Single-Quoted YAML Strings Also Fail (PR #70)
+
+Multi-line YAML strings are not limited to `>` (folded scalar) — a single-quoted
+string spanning multiple YAML lines also fails the parser:
+
+**Broken (PR #70, multi-line single-quoted string):**
+
+```yaml
+---
+name: pattern-recognition-specialist
+description: 'Identifies recurring anti-patterns and structural problems in plugin
+  code. Use when reviewing multiple agent files for systematic quality issues.'
+---
+```
+
+Claude Code's line-by-line frontmatter parser reads `description:` as the
+first line only: `'Identifies recurring anti-patterns...'` (truncated, possibly
+unclosed). The continuation line is treated as an unknown attribute and
+silently dropped.
+
+**Fixed:**
+
+```yaml
+---
+name: pattern-recognition-specialist
+description: "Identifies recurring anti-patterns and structural problems in plugin code. Use when reviewing multiple agent files for systematic quality issues."
+---
+```
+
+**Rule:** ALL of the following must be single-line: `description: >`, `description: |`,
+and `description: 'multi\n  line'`. Use double-quoted strings on one line only.
+
 ### On-Touch Check Rule
 
 Whenever ANY agent or skill `.md` file is touched in a PR (even for unrelated
 changes), verify that its `description:` field is a single-line quoted string
-with no `>` or `|` folded/literal scalar syntax.
+with no `>` or `|` folded/literal scalar syntax, and that the value does not
+wrap across lines.
 
 ```bash
 # Grep for folded-scalar descriptions across all agent and skill files
 grep -r '^description: [>|]' plugins/*/agents/*.md plugins/*/skills/*/*.md
+
+# Grep for single-quoted descriptions that continue on the next line
+grep -rA1 "^description: '" plugins/*/agents/*.md plugins/*/skills/*/*.md \
+  | grep -B1 "^  "
 ```
 
 ## Prevention

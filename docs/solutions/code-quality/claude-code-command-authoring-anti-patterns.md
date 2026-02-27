@@ -12,12 +12,14 @@ tags:
   - security-patterns
   - tool-prerequisites
   - subagent-authoring
-date: "2026-02-22"
+date: "2026-02-26"
 components:
   - plugins/yellow-linear/commands/linear/delegate.md
   - plugins/yellow-linear/commands/linear/sync-all.md
   - plugins/yellow-ci/commands/ci/report-linear.md
   - plugins/yellow-debt/commands/debt/sync.md
+  - plugins/yellow-debt/commands/debt/triage.md
+  - plugins/yellow-core/agents/knowledge-compounder.md
 ---
 
 # Claude Code Command Authoring: Anti-Patterns and Fixes
@@ -415,9 +417,90 @@ yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' || {
 Apply this two-step check whenever the script uses `-y`, `--arg`, or `@sh`
 with yq. If using mikefarah/yq's native YAML syntax instead, flip the check.
 
+**yq -r required for raw string output (from PR #74):**
+
+Even with the correct kislyuk/yq variant, omitting `-r` causes all string
+comparisons to silently fail. kislyuk/yq without `-r` returns JSON-encoded
+output: `yq '.status'` returns `"pending"` (with double-quotes), not `pending`.
+Every `case "$STATUS"` and `[ "$STATUS" = pending ]` check silently fails
+because it compares against `"pending"` (the literal string with quotes).
+
+**WRONG:**
+```bash
+STATUS=$(yq '.status' "$FILE")
+case "$STATUS" in
+  pending) echo "found pending" ;;  # NEVER matches — STATUS is '"pending"'
+esac
+```
+
+**RIGHT:**
+```bash
+STATUS=$(yq -r '.status' "$FILE")
+case "$STATUS" in
+  pending) echo "found pending" ;;  # Correctly matches
+esac
+```
+
+**Rule:** Always use `yq -r` when extracting string fields that will be used
+in comparisons, case statements, or concatenations. The `-r` flag is separate
+from the variant check — it applies to all string extraction with kislyuk/yq.
+
 ---
 
-### 12. AskUserQuestion for Sub-Step Input — Not a "Follow-Up Question in Your Response"
+### 12. AskUserQuestion "Other" Is the Only Free-Text Button
+
+The `AskUserQuestion` tool in Claude Code presents buttons to the user. Button
+labels such as "Submit reason", "Enter date", "Provide details", or any custom
+label do **not** open a free-text input field. Only the literal button labeled
+`"Other"` opens a free-text input in Claude Code's UI.
+
+**WRONG:**
+```markdown
+Use AskUserQuestion with buttons: ["Approve", "Reject", "Submit reason"]
+If "Submit reason": capture the typed reason.
+```
+The "Submit reason" button does not accept free-text — it acts as a simple
+selection with no input field.
+
+**RIGHT:**
+```markdown
+Use AskUserQuestion with buttons: ["Approve", "Reject", "Other"]
+If "Other": capture the text the user types in the free-text field.
+```
+
+**Rule:** When free-text input is required at any step (defer reason, override
+message, custom note), use the "Other" button label. For purely binary choices
+with no free text, any label works.
+
+---
+
+### 13. Agent Step Skip Guards Must Be Explicit
+
+When a step in an agent or command is conditional (e.g., "only if findings
+exist", "only if the API call succeeded"), the LLM will proceed unless the
+false-branch is stated as a literal instruction.
+
+**WRONG:**
+```markdown
+Step 9: Spawn the knowledge-compounder agent to extract learnings from
+findings across this review session.
+```
+If there are no findings, the agent spawns anyway and compoundes nothing.
+
+**RIGHT:**
+```markdown
+Step 9: Spawn the knowledge-compounder agent to extract learnings.
+  If no P1 or P2 findings were reported in this session, skip this step.
+  subagent_type: "yellow-core:workflow:knowledge-compounder"
+```
+
+**Rule:** Every optional step needs an explicit skip instruction as its
+**first** line. "If [condition not met], skip this step." is the canonical
+phrasing. Do not rely on the LLM inferring that a step is optional from context.
+
+---
+
+### 14. AskUserQuestion for Sub-Step Input — Not a "Follow-Up Question in Your Response"
 
 When a command needs user input at an intermediate step (e.g., choosing a defer
 date, confirming a target path), the instruction must explicitly use
@@ -443,7 +526,7 @@ prose does not. Applies equally to AskUserQuestion in agents. See PR #74.
 
 ---
 
-### 13. Variables in Bash Code Blocks Don't Survive Across Subprocess Calls
+### 15. Variables in Bash Code Blocks Don't Survive Across Subprocess Calls
 
 Prose-instruction commands (command markdown files) run bash code blocks as
 separate subprocess calls. Variables set in one bash block — or referenced by
@@ -483,7 +566,7 @@ See PR #74.
 
 ---
 
-### 14. Argument Guard for Missing Flag Values
+### 16. Argument Guard for Missing Flag Values
 
 `--flag` with no value silently consumes the next positional argument as the
 flag's value.
@@ -547,6 +630,11 @@ flag's value.
 **User Input Mid-Workflow**
 - [ ] Every mid-step user input uses `AskUserQuestion`, not prose "ask as follow-up"
 - [ ] Every `AskUserQuestion` Cancel/No branch has an explicit stop instruction
+- [ ] Free-text input buttons use the "Other" label — no other label opens free-text in Claude Code UI
+
+**Conditional Steps**
+- [ ] Every optional step begins with "If [condition not met], skip this step."
+- [ ] The skip instruction is the FIRST line of the step, not buried in the body
 
 **Variable Scope**
 - [ ] No `$VAR` references in bash code blocks that don't define that variable in the same block
@@ -570,6 +658,9 @@ When reviewing command markdown files, scan for:
 9. Mid-step input — does prose say "ask as follow-up"? Must be `AskUserQuestion` instead.
 10. Bash code blocks — do they reference `$VAR` that was never set in that same block?
 11. `command -v yq` — is a yq variant check also present when `-y`/`@sh` flags are used?
+12. `yq '.field'` — is `-r` flag present for all string fields used in comparisons or case statements?
+13. `AskUserQuestion` free-text buttons — do they use "Other" as the label (not a custom label)?
+14. Conditional steps — does each optional step start with "If [condition not met], skip this step."?
 
 ---
 
