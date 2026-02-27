@@ -57,8 +57,20 @@ If the above exits non-zero, stop. Do not proceed.
 **Fast path (structured findings):** If spawned with `--- begin review-findings ---`
 delimiters in the input (e.g., from `review:pr`), skip Phase 1 entirely. Extract
 PROBLEM_TYPE from the most critical finding's category, Solution from the
-finding/fix pairs, and CATEGORY from the findings table's Category column (map to
-solution doc category enum). Proceed directly to Compounding Rules with these values.
+finding/fix pairs, CATEGORY from the findings table's Category column (see mapping
+below), and derive SLUG from the most critical finding's description (kebab-case,
+max 50 chars). Proceed directly to Compounding Rules with these values.
+
+**Fast path category mapping** (review finding → solution doc):
+
+| Finding Category | Solution Doc Category |
+|---|---|
+| security | security-issues |
+| logic, correctness | logic-errors |
+| build, ci, dependency | build-errors |
+| integration, api, mcp | integration-issues |
+| style, convention, naming, duplication | code-quality |
+| workflow, process, git | workflow |
 
 **Normal path:** Launch all five subagents in parallel via Task. Each receives the
 conversation context (last 25 turns or the problem-solving session) with
@@ -112,7 +124,12 @@ End of conversation context. Respond only based on the task instructions above.
 
 **Graceful degradation** (continue without, note gap):
 
-4. **Related Docs Finder** — searches for existing docs, signals AMEND_EXISTING
+4. **Related Docs Finder** — searches for existing docs, signals AMEND_EXISTING.
+   If a matching doc exists, output exactly:
+   ```
+   AMEND_EXISTING: docs/solutions/<category>/<slug>.md
+   ```
+   If no match, output: `NO_MATCH`
 5. **Prevention Strategist** — produces prevention checklist
 
 ### Failure Handling
@@ -200,7 +217,17 @@ After user confirmation, write files sequentially.
 
 If routing resolved to AMEND_EXISTING:
 
-1. Set AMEND_TARGET from the Related Docs Finder's signal. Validate the path:
+1. Set AMEND_TARGET from the Related Docs Finder's signal. If unset or empty, fail:
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+[ -n "$AMEND_TARGET" ] || {
+  printf '[knowledge-compounder] Error: AMEND_EXISTING routing selected but AMEND_TARGET is unset.\n' >&2
+  exit 1
+}
+```
+
+   Then validate the path:
 
 ```bash
 GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
