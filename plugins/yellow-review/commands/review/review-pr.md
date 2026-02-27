@@ -1,8 +1,6 @@
 ---
 name: review:pr
-description: >
-  Adaptive multi-agent review of a single PR. Use when you want comprehensive
-  code review with automatic agent selection based on PR size and content.
+description: 'Adaptive multi-agent review of a single PR. Use when you want comprehensive code review with automatic agent selection based on PR size and content.'
 argument-hint: '[PR# | URL | branch]'
 allowed-tools:
   - Bash
@@ -104,7 +102,7 @@ Apply selection rules from `pr-review-workflow` skill:
   `type-design-analyzer`, `silent-failure-hunter`
 - Cross-plugin (via Task tool) when conditions match: `security-sentinel`,
   `architecture-strategist`, `performance-oracle`,
-  `pattern-recognition-specialist`, `agent-native-reviewer`
+  `pattern-recognition-specialist`, `code-simplicity-reviewer`
 
 ### Step 5: Pass 1 — Parallel Agent Review
 
