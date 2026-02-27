@@ -102,7 +102,7 @@ No other actions permitted.
 | Agent >200 lines without justification | Line count check | P2 |
 | Missing `<examples>` section in agent body | Body text scan | P2 |
 | `user-invocable` instead of `user-invokable` | String match | P1 |
-| `description: >` or `description: \|` scalar indicator (quoted strings are fine; only the `>` or `\|` indicator is invalid) | String match | P1 |
+| `description:` value spans multiple lines (any syntax: `>`, `\|`, multi-line quoted, or plain multi-line — only single-line values work in Claude Code's frontmatter parser) | String match + next-line check | P1 |
 | Missing "Use when" in description | String match | P2 |
 | `allowed-tools` missing tools used in body | Cross-reference | P1 |
 | Hardcoded paths instead of `${CLAUDE_PLUGIN_ROOT}` | String match | P2 |

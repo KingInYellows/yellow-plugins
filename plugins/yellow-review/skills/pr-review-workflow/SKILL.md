@@ -1,9 +1,6 @@
 ---
 name: pr-review-workflow
-description:
-  Internal reference for PR review workflow patterns. Use when agents or
-  commands need shared conventions for adaptive selection, output format, or
-  error handling.
+description: "Internal reference for PR review workflow patterns. Use when agents or commands need shared conventions for adaptive selection, output format, or error handling."
 user-invokable: false
 ---
 
