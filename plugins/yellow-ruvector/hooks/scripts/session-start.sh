@@ -3,7 +3,19 @@
 # NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.
 # Receives hook input as JSON on stdin. Must complete within 3 seconds.
 # Uses ruvector's built-in CLI hooks — no manual queue management needed.
-set -eu
+set -uo pipefail
+# Note: -e omitted intentionally — hook must output {"continue": true} on all paths
+
+# --- json_exit: centralized exit for all early-return paths ---
+json_exit() {
+  local msg="${1:-}"
+  [ -n "$msg" ] && printf '[ruvector] %s\n' "$msg" >&2
+  printf '{"continue": true}\n'
+  exit 0
+}
+
+# Require jq for JSON parsing
+command -v jq >/dev/null 2>&1 || json_exit "Warning: jq not found; skipping session-start"
 
 # Read hook input from stdin
 INPUT=$(cat)
@@ -14,8 +26,7 @@ RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 
 # Exit silently if ruvector is not initialized in this project
 if [ ! -d "$RUVECTOR_DIR" ]; then
-  printf '{"continue": true}\n'
-  exit 0
+  json_exit
 fi
 
 # Resolve ruvector command: prefer direct binary (62ms) over npx (2700ms)
@@ -24,8 +35,7 @@ if command -v ruvector >/dev/null 2>&1; then
 elif command -v npx >/dev/null 2>&1; then
   RUVECTOR_CMD=(npx --no ruvector)
 else
-  printf '{"continue": true}\n'
-  exit 0
+  json_exit "Warning: neither ruvector nor npx found"
 fi
 
 learnings=""
