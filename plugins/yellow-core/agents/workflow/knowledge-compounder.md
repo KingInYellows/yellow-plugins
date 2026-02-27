@@ -54,11 +54,11 @@ If the above exits non-zero, stop. Do not proceed.
 
 ## Phase 1: Parallel Extraction (5 Subagents)
 
-**Fast path (structured findings):** If spawned with `begin review-findings`
+**Fast path (structured findings):** If spawned with `--- begin review-findings ---`
 delimiters in the input (e.g., from `review:pr`), skip Phase 1 entirely. Extract
 PROBLEM_TYPE from the most critical finding's category, Solution from the
-finding/fix pairs, and CATEGORY from the file paths. Proceed directly to
-Compounding Rules with these values.
+finding/fix pairs, and CATEGORY from the findings table's Category column (map to
+solution doc category enum). Proceed directly to Compounding Rules with these values.
 
 **Normal path:** Launch all five subagents in parallel via Task. Each receives the
 conversation context (last 25 turns or the problem-solving session) with
@@ -195,6 +195,51 @@ chosen route. If Cancel: output "Knowledge compounding cancelled." and stop.
 ## Phase 2: Assembly and Write
 
 After user confirmation, write files sequentially.
+
+### AMEND_EXISTING Route
+
+If routing resolved to AMEND_EXISTING:
+
+1. Set AMEND_TARGET from the Related Docs Finder's signal. Validate the path:
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+# Reject path traversal
+case "$AMEND_TARGET" in
+  *..*) printf '[knowledge-compounder] Error: path traversal in AMEND_TARGET: %s
+' "$AMEND_TARGET" >&2; exit 1 ;;
+esac
+# Ensure path stays within docs/solutions/
+case "$AMEND_TARGET" in
+  docs/solutions/*) ;;
+  *) printf '[knowledge-compounder] Error: AMEND_TARGET outside docs/solutions/: %s
+' "$AMEND_TARGET" >&2; exit 1 ;;
+esac
+# Check intermediate directories for symlinks
+TARGET_DIR="$(dirname "$GIT_ROOT/$AMEND_TARGET")"
+while [ "$TARGET_DIR" \!= "$GIT_ROOT" ] && [ "$TARGET_DIR" \!= "/" ]; do
+  [ -L "$TARGET_DIR" ] && { printf '[knowledge-compounder] Error: symlink in path: %s
+' "$TARGET_DIR" >&2; exit 1; }
+  TARGET_DIR="$(dirname "$TARGET_DIR")"
+done
+# File must exist
+[ -f "$GIT_ROOT/$AMEND_TARGET" ] || {
+  printf '[knowledge-compounder] Error: AMEND_TARGET does not exist: %s
+' "$AMEND_TARGET" >&2; exit 1
+}
+```
+
+If the above exits non-zero, stop. Do not proceed.
+
+2. Use the Edit tool to append a new dated section to the existing doc:
+   - Add a horizontal rule separator `---`
+   - Add heading: `## Update — YYYY-MM-DD`
+   - Add the new findings/solution content below
+
+3. Skip the new-file Write path and slug collision loop entirely.
+
+4. If routing is BOTH (AMEND_EXISTING + MEMORY), still proceed to the MEMORY.md
+   Update section after amending.
 
 ### Solution Doc (DOC_ONLY or BOTH)
 
