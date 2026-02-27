@@ -1,8 +1,6 @@
 ---
 name: workflows:review
-description:
-  Multi-agent comprehensive code review with security, performance, and
-  architecture analysis
+description: "Multi-agent comprehensive code review with security, performance, and architecture analysis"
 argument-hint: '[PR number/URL/branch/latest]'
 allowed-tools:
   - Bash

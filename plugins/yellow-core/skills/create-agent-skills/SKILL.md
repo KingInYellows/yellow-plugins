@@ -1,9 +1,6 @@
 ---
 name: create-agent-skills
-description:
-  Expert guidance for creating Claude Code skills and agents. Use when working
-  with SKILL.md files, authoring new skills, creating slash commands, or
-  designing agent workflows.
+description: "Expert guidance for creating Claude Code skills and agents. Use when working with SKILL.md files, authoring new skills, creating slash commands, or designing agent workflows."
 argument-hint: '[skill-name|agent-name]'
 user-invokable: true
 ---

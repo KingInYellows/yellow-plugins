@@ -1,9 +1,6 @@
 ---
 name: agent-browser-patterns
-description:
-  agent-browser usage patterns and conventions reference. Use when agents or
-  commands need agent-browser context, ref-based workflow, session persistence,
-  semantic locator fallbacks, or error handling patterns.
+description: "agent-browser usage patterns and conventions reference. Use when agents or commands need agent-browser context, ref-based workflow, session persistence, semantic locator fallbacks, or error handling patterns."
 user-invokable: false
 ---
 

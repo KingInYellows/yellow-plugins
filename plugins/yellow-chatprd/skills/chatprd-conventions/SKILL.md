@@ -1,8 +1,6 @@
 ---
 name: chatprd-conventions
-description:
-  ChatPRD conventions and patterns reference. Use when commands or agents need
-  context about ChatPRD templates, project structure, or error handling.
+description: "ChatPRD conventions and patterns reference. Use when commands or agents need context about ChatPRD templates, project structure, or error handling."
 user-invokable: false
 ---
 

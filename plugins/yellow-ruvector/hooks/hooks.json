@@ -1,4 +1,5 @@
 {
+  "_comment": "Reference only — Claude Code reads inline hooks from plugin.json",
   "hooks": {
     "UserPromptSubmit": [
       {

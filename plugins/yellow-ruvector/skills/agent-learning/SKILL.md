@@ -1,9 +1,6 @@
 ---
 name: agent-learning
-description:
-  Agent learning patterns and quality guidelines. Use when commands or agents
-  need to determine when and how to record learnings, apply quality gates, or
-  retrieve past knowledge using ranked retrieval.
+description: "Agent learning patterns and quality guidelines. Use when commands or agents need to determine when and how to record learnings, apply quality gates, or retrieve past knowledge using ranked retrieval."
 user-invokable: false
 ---
 

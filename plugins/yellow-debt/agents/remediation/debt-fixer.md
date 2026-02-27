@@ -1,8 +1,6 @@
 ---
 name: debt-fixer
-description:
-  'Implement fixes for specific technical debt findings with human approval. Use
-  when remediating accepted debt items.'
+description: "Implement fixes for specific technical debt findings with human approval. Use when remediating accepted debt items."
 model: inherit
 allowed-tools:
   - Read

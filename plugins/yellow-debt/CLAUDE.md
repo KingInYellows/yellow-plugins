@@ -83,6 +83,12 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 - **`/debt:status`** — Check current debt levels
 - **`/debt:sync`** — Push accepted findings to Linear for team tracking
 
+## Cross-Plugin Dependencies
+
+- **yellow-linear** — Required for `/debt:sync` command (pushes debt findings to
+  Linear as issues). Without it, `/debt:sync` will report that the yellow-linear
+  plugin is not installed.
+
 ## Known Limitations
 
 - Scanners are LLM-based, not deterministic static analysis tools

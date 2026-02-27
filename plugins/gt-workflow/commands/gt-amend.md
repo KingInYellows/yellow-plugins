@@ -1,8 +1,6 @@
 ---
 name: gt-amend
-description:
-  'Amend the current branch commit: audit changes, update the commit, and
-  re-submit via Graphite'
+description: "Amend the current branch commit: audit changes, update the commit, and re-submit via Graphite"
 allowed-tools:
   - Bash
   - Read
