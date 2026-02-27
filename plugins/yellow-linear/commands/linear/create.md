@@ -1,9 +1,6 @@
 ---
 name: linear:create
-description: >
-  Create a Linear issue from current context. Use when user describes a bug,
-  requests a feature, says "file an issue", "track this", or "create ticket for
-  X".
+description: "Create a Linear issue from current context. Use when user describes a bug, requests a feature, says \"file an issue\", \"track this\", or \"create ticket for X\"."
 argument-hint: '[title]'
 allowed-tools:
   - Read
@@ -11,12 +8,12 @@ allowed-tools:
   - Grep
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_linear_linear__create_issue
-  - mcp__plugin_linear_linear__list_teams
-  - mcp__plugin_linear_linear__get_team
-  - mcp__plugin_linear_linear__list_issue_labels
-  - mcp__plugin_linear_linear__list_issue_statuses
-  - mcp__plugin_linear_linear__list_projects
+  - mcp__plugin_yellow-linear_linear__create_issue
+  - mcp__plugin_yellow-linear_linear__list_teams
+  - mcp__plugin_yellow-linear_linear__get_team
+  - mcp__plugin_yellow-linear_linear__list_issue_labels
+  - mcp__plugin_yellow-linear_linear__list_issue_statuses
+  - mcp__plugin_yellow-linear_linear__list_projects
 ---
 
 # Create Linear Issue

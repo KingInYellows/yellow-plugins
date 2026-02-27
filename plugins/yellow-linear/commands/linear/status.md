@@ -1,22 +1,20 @@
 ---
 name: linear:status
-description: >
-  Generate project and initiative health report. Use when user asks "project
-  status", "how are we tracking", "what's blocked", or "sprint health".
+description: "Generate project and initiative health report. Use when user asks \"project status\", \"how are we tracking\", \"what's blocked\", or \"sprint health\"."
 argument-hint: ''
 allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_linear_linear__list_projects
-  - mcp__plugin_linear_linear__get_project
-  - mcp__plugin_linear_linear__list_issues
-  - mcp__plugin_linear_linear__list_initiatives
-  - mcp__plugin_linear_linear__get_initiative
-  - mcp__plugin_linear_linear__list_initiative_updates
-  - mcp__plugin_linear_linear__create_initiative_update
-  - mcp__plugin_linear_linear__list_teams
-  - mcp__plugin_linear_linear__list_issue_statuses
+  - mcp__plugin_yellow-linear_linear__list_projects
+  - mcp__plugin_yellow-linear_linear__get_project
+  - mcp__plugin_yellow-linear_linear__list_issues
+  - mcp__plugin_yellow-linear_linear__list_initiatives
+  - mcp__plugin_yellow-linear_linear__get_initiative
+  - mcp__plugin_yellow-linear_linear__list_initiative_updates
+  - mcp__plugin_yellow-linear_linear__create_initiative_update
+  - mcp__plugin_yellow-linear_linear__list_teams
+  - mcp__plugin_yellow-linear_linear__list_issue_statuses
 ---
 
 # Project & Initiative Status Report
@@ -50,12 +48,12 @@ Present as a table:
 
 ### Step 2: Fetch Initiative Health
 
-Query active initiatives via `mcp__plugin_linear_linear__list_initiatives`.
+Query active initiatives via `mcp__plugin_yellow-linear_linear__list_initiatives`.
 
 For each initiative:
 
-- Fetch details via `mcp__plugin_linear_linear__get_initiative`
-- Fetch recent updates via `mcp__plugin_linear_linear__list_initiative_updates`
+- Fetch details via `mcp__plugin_yellow-linear_linear__get_initiative`
+- Fetch recent updates via `mcp__plugin_yellow-linear_linear__list_initiative_updates`
 - Show: name, status, last update date, health indicator
 
 ### Step 3: Surface Blockers and Risks
@@ -94,10 +92,10 @@ Use `AskUserQuestion` to ask:
 If yes:
 
 - Select which initiative to update via `AskUserQuestion`
-- **Validate access (C1):** Call `mcp__plugin_linear_linear__get_initiative`
+- **Validate access (C1):** Call `mcp__plugin_yellow-linear_linear__get_initiative`
   with the selected initiative ID to verify it exists and belongs to the user's
   workspace. If validation fails, report the error and stop.
-- Post via `mcp__plugin_linear_linear__create_initiative_update` with the report
+- Post via `mcp__plugin_yellow-linear_linear__create_initiative_update` with the report
   content
 
 ## Error Handling

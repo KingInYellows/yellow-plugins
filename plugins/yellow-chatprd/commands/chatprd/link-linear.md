@@ -1,9 +1,6 @@
 ---
 name: chatprd:link-linear
-description: >
-  Create Linear issues from a ChatPRD document. Use when user wants to "link PRD
-  to Linear", "create issues from spec", "turn PRD into Linear issues", or
-  bridge any ChatPRD document to Linear.
+description: "Create Linear issues from a ChatPRD document. Use when user wants to \"link PRD to Linear\", \"create issues from spec\", \"turn PRD into Linear issues\", or bridge any ChatPRD document to Linear."
 argument-hint: '[document title or search query]'
 allowed-tools:
   - Read
@@ -11,14 +8,14 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_chatprd_chatprd__search_documents
-  - mcp__plugin_chatprd_chatprd__get_document
-  - mcp__plugin_linear_linear__create_issue
-  - mcp__plugin_linear_linear__list_teams
-  - mcp__plugin_linear_linear__list_issues
-  - mcp__plugin_linear_linear__list_issue_statuses
-  - mcp__plugin_linear_linear__get_issue
-  - mcp__plugin_linear_linear__update_issue
+  - mcp__plugin_yellow-chatprd_chatprd__search_documents
+  - mcp__plugin_yellow-chatprd_chatprd__get_document
+  - mcp__plugin_yellow-linear_linear__create_issue
+  - mcp__plugin_yellow-linear_linear__list_teams
+  - mcp__plugin_yellow-linear_linear__list_issues
+  - mcp__plugin_yellow-linear_linear__list_issue_statuses
+  - mcp__plugin_yellow-linear_linear__get_issue
+  - mcp__plugin_yellow-linear_linear__update_issue
 ---
 
 # Link ChatPRD Document to Linear
@@ -30,7 +27,7 @@ selection, and rate-limited batch creation.
 
 ### Step 1: Check Linear Availability (Fail-Fast)
 
-Call `mcp__plugin_linear_linear__list_teams` to verify the yellow-linear plugin
+Call `mcp__plugin_yellow-linear_linear__list_teams` to verify the yellow-linear plugin
 is available:
 
 - **If successful:** Store the teams list for Step 6.

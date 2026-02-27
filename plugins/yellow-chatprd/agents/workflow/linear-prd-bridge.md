@@ -1,26 +1,21 @@
 ---
 name: linear-prd-bridge
 model: inherit
-description: >
-  Bridge ChatPRD documents to Linear issues. Use when user explicitly mentions
-  both PRD/document AND Linear together, such as "link PRD to Linear", "create
-  Linear issues from PRD", "create issues from PRD", or "turn this spec into
-  Linear issues". Only triggers when Linear is explicitly mentioned alongside
-  document context.
+description: "Bridge ChatPRD documents to Linear issues. Use when user explicitly mentions both PRD/document AND Linear together, such as \"link PRD to Linear\", \"create Linear issues from PRD\", \"create issues from PRD\", or \"turn this spec into Linear issues\". Only triggers when Linear is explicitly mentioned alongside document context."
 allowed-tools:
   - Read
   - Grep
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_chatprd_chatprd__search_documents
-  - mcp__plugin_chatprd_chatprd__get_document
-  - mcp__plugin_linear_linear__create_issue
-  - mcp__plugin_linear_linear__list_teams
-  - mcp__plugin_linear_linear__list_issues
-  - mcp__plugin_linear_linear__list_issue_statuses
-  - mcp__plugin_linear_linear__get_issue
-  - mcp__plugin_linear_linear__update_issue
+  - mcp__plugin_yellow-chatprd_chatprd__search_documents
+  - mcp__plugin_yellow-chatprd_chatprd__get_document
+  - mcp__plugin_yellow-linear_linear__create_issue
+  - mcp__plugin_yellow-linear_linear__list_teams
+  - mcp__plugin_yellow-linear_linear__list_issues
+  - mcp__plugin_yellow-linear_linear__list_issue_statuses
+  - mcp__plugin_yellow-linear_linear__get_issue
+  - mcp__plugin_yellow-linear_linear__update_issue
 ---
 
 <examples>
@@ -55,7 +50,7 @@ mapping and input validation.
 
 ### Step 1: Check Linear MCP Availability
 
-Attempt to call `mcp__plugin_linear_linear__list_teams`:
+Attempt to call `mcp__plugin_yellow-linear_linear__list_teams`:
 
 - If successful: Linear MCP is available, proceed with bridging flow
 - If error "tool not found": report "yellow-linear plugin not installed. Install
