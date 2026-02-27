@@ -1,20 +1,17 @@
 ---
 name: linear:sync
-description: >
-  Sync current branch with its Linear issue — load context, link PR, update
-  status. Use when user says "sync with linear", "link my branch", or "update
-  issue status".
+description: "Sync current branch with its Linear issue — load context, link PR, update status. Use when user says \"sync with linear\", \"link my branch\", or \"update issue status\"."
 argument-hint: '[issue-id]'
 allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_linear_linear__get_issue
-  - mcp__plugin_linear_linear__update_issue
-  - mcp__plugin_linear_linear__list_issue_statuses
-  - mcp__plugin_linear_linear__create_comment
-  - mcp__plugin_linear_linear__list_comments
+  - mcp__plugin_yellow-linear_linear__get_issue
+  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__list_issue_statuses
+  - mcp__plugin_yellow-linear_linear__create_comment
+  - mcp__plugin_yellow-linear_linear__list_comments
 ---
 
 # Sync Branch with Linear Issue
@@ -42,7 +39,7 @@ If no issue ID found, ask user via AskUserQuestion.
 ### Step 2: Validate Issue Exists
 
 **Security requirement (C1):** Before any operations, call
-`mcp__plugin_linear_linear__get_issue` with the extracted ID to verify:
+`mcp__plugin_yellow-linear_linear__get_issue` with the extracted ID to verify:
 
 - The issue exists
 - It belongs to the user's workspace
@@ -61,7 +58,7 @@ Present the issue context:
 - **Assignee**
 - **Description** (full text for coding reference)
 
-Fetch recent comments (up to 5) via `mcp__plugin_linear_linear__list_comments`
+Fetch recent comments (up to 5) via `mcp__plugin_yellow-linear_linear__list_comments`
 and display them for context.
 
 ### Step 4: Check for PR
@@ -76,7 +73,7 @@ Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 
 - **If PR exists:** Check the comments fetched in Step 3 for an existing PR link
   comment matching this PR URL. If already linked, skip. Otherwise, add via
-  `mcp__plugin_linear_linear__create_comment`:
+  `mcp__plugin_yellow-linear_linear__create_comment`:
   ```
   PR linked: [PR Title](PR URL) — State: open/merged
   ```
@@ -86,7 +83,7 @@ Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 ### Step 5: Update Issue Status
 
 Query valid workflow statuses via
-`mcp__plugin_linear_linear__list_issue_statuses` for the issue's team.
+`mcp__plugin_yellow-linear_linear__list_issue_statuses` for the issue's team.
 
 Determine the appropriate status transition:
 

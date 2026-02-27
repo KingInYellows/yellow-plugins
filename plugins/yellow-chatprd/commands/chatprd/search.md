@@ -1,17 +1,14 @@
 ---
 name: chatprd:search
-description: >
-  Search ChatPRD workspace for documents. Use when user wants to "find a PRD",
-  "search for docs about", "look up the spec for", or find any existing ChatPRD
-  document.
+description: "Search ChatPRD workspace for documents. Use when user wants to \"find a PRD\", \"search for docs about\", \"look up the spec for\", or find any existing ChatPRD document."
 argument-hint: '[search query]'
 allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_chatprd_chatprd__search_documents
-  - mcp__plugin_chatprd_chatprd__get_document
+  - mcp__plugin_yellow-chatprd_chatprd__search_documents
+  - mcp__plugin_yellow-chatprd_chatprd__get_document
 ---
 
 # Search ChatPRD Documents

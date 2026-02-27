@@ -1,19 +1,15 @@
 ---
 name: linear-explorer
-description: >
-  Deep search and analysis of Linear backlog. Use when user asks to search,
-  analyze, or explore Linear issues, projects, or backlog. Also use when user
-  says "search linear", "has anyone reported", "find similar issues", "is this a
-  duplicate", "what's in the backlog", or "related issues".
+description: "Deep search and analysis of Linear backlog. Use when user asks to search, analyze, or explore Linear issues, projects, or backlog. Also use when user says \"search linear\", \"has anyone reported\", \"find similar issues\", \"is this a duplicate\", \"what's in the backlog\", or \"related issues\"."
 model: inherit
 allowed-tools:
   - Bash
   - ToolSearch
-  - mcp__plugin_linear_linear__list_issues
-  - mcp__plugin_linear_linear__list_projects
-  - mcp__plugin_linear_linear__list_teams
-  - mcp__plugin_linear_linear__list_users
-  - mcp__plugin_linear_linear__list_cycles
+  - mcp__plugin_yellow-linear_linear__list_issues
+  - mcp__plugin_yellow-linear_linear__list_projects
+  - mcp__plugin_yellow-linear_linear__list_teams
+  - mcp__plugin_yellow-linear_linear__list_users
+  - mcp__plugin_yellow-linear_linear__list_cycles
 ---
 
 <examples>

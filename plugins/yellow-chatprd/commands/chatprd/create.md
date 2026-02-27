@@ -1,9 +1,6 @@
 ---
 name: chatprd:create
-description: >
-  Create a new document in ChatPRD. Use when user wants to "write a PRD",
-  "create a spec", "draft a one-pager", "make an API doc", or create any product
-  document in ChatPRD.
+description: "Create a new document in ChatPRD. Use when user wants to \"write a PRD\", \"create a spec\", \"draft a one-pager\", \"make an API doc\", or create any product document in ChatPRD."
 argument-hint: '[description of what to create]'
 allowed-tools:
   - Read
@@ -11,10 +8,10 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_chatprd_chatprd__create_document
-  - mcp__plugin_chatprd_chatprd__search_documents
-  - mcp__plugin_chatprd_chatprd__list_templates
-  - mcp__plugin_chatprd_chatprd__list_projects
+  - mcp__plugin_yellow-chatprd_chatprd__create_document
+  - mcp__plugin_yellow-chatprd_chatprd__search_documents
+  - mcp__plugin_yellow-chatprd_chatprd__list_templates
+  - mcp__plugin_yellow-chatprd_chatprd__list_projects
 ---
 
 # Create ChatPRD Document
