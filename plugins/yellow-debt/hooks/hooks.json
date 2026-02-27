@@ -1,0 +1,17 @@
+{
+  "_comment": "REFERENCE ONLY — not loaded by Claude Code. Authoritative hook config is in .claude-plugin/plugin.json. Keep timeout and all numeric fields in sync with plugin.json.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
