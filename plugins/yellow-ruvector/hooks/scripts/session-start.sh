@@ -1,5 +1,6 @@
 #!/bin/bash
 # session-start.sh — Initialize ruvector session and load past learnings
+# NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.
 # Receives hook input as JSON on stdin. Must complete within 3 seconds.
 # Uses ruvector's built-in CLI hooks — no manual queue management needed.
 set -eu
