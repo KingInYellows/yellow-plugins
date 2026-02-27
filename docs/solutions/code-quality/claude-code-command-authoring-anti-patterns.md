@@ -485,7 +485,7 @@ false-branch is stated as a literal instruction.
 Step 9: Spawn the knowledge-compounder agent to extract learnings from
 findings across this review session.
 ```
-If there are no findings, the agent spawns anyway and compoundes nothing.
+If there are no findings, the agent spawns anyway and compounds nothing.
 
 **RIGHT:**
 ```markdown
