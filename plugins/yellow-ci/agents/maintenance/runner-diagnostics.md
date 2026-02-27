@@ -1,11 +1,6 @@
 ---
 name: runner-diagnostics
-description: >
-  Deep runner diagnostics specialist for self-hosted GitHub Actions runners. Use
-  when runner infrastructure issues are suspected (not application failures).
-  Triggers on "check runner health", "runner offline", "investigate runner", or
-  when failure-analyst identifies runner-side patterns (F02 disk full, F04
-  Docker, F09 runner agent).
+description: "Deep runner diagnostics specialist for self-hosted GitHub Actions runners. Use when runner infrastructure issues are suspected (not application failures). Triggers on \"check runner health\", \"runner offline\", \"investigate runner\", or when failure-analyst identifies runner-side patterns (F02 disk full, F04 Docker, F09 runner agent)."
 model: inherit
 color: yellow
 allowed-tools:

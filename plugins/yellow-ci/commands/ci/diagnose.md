@@ -1,9 +1,6 @@
 ---
 name: ci:diagnose
-description: >
-  Diagnose CI failure and suggest fixes. Use when user wants to analyze a failed
-  GitHub Actions run, understand why CI broke, or get actionable fix
-  suggestions.
+description: Diagnose CI failure and suggest fixes. Use when user wants to analyze a failed GitHub Actions run, understand why CI broke, or get actionable fix suggestions.
 argument-hint: '[run-id] [--repo owner/name]'
 allowed-tools:
   - Bash

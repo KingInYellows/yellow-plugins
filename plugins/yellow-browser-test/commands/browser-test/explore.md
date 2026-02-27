@@ -1,9 +1,6 @@
 ---
 name: browser-test:explore
-description: >
-  Run autonomous exploratory browser testing. Use when user says "explore the
-  app", "find bugs", "test everything", "autonomous testing", or wants the agent
-  to freely navigate and discover issues without predefined test flows.
+description: "Run autonomous exploratory browser testing. Use when user says \"explore the app\", \"find bugs\", \"test everything\", \"autonomous testing\", or wants the agent to freely navigate and discover issues without predefined test flows."
 argument-hint: '[starting-route]'
 allowed-tools:
   - Bash

@@ -1,10 +1,6 @@
 ---
 name: failure-analyst
-description: >
-  CI failure diagnosis specialist that analyzes GitHub Actions logs against a
-  failure pattern library (F01-F12). Use when CI builds fail and you need to
-  identify root cause, when user asks "why did CI fail?", "diagnose the build",
-  "what broke?", or when analyzing exit codes from failed runs.
+description: "CI failure diagnosis specialist that analyzes GitHub Actions logs against a failure pattern library (F01-F12). Use when CI builds fail and you need to identify root cause, when user asks \"why did CI fail?\", \"diagnose the build\", \"what broke?\", or when analyzing exit codes from failed runs."
 model: inherit
 color: red
 allowed-tools:
