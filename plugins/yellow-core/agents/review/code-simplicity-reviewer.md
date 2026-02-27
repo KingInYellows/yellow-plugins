@@ -1,9 +1,6 @@
 ---
 name: code-simplicity-reviewer
-description:
-  'YAGNI enforcement and simplification analysis. Use this for final review
-  passes to ensure code is minimal, removing unnecessary abstractions, premature
-  optimizations, and unused features.'
+description: "YAGNI enforcement and simplification analysis. Use this for final review passes to ensure code is minimal, removing unnecessary abstractions, premature optimizations, and unused features."
 model: inherit
 allowed-tools:
   - Read

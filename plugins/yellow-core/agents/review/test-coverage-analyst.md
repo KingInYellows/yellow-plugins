@@ -1,10 +1,6 @@
 ---
 name: test-coverage-analyst
-description:
-  'Test quality and coverage analysis specialist. Evaluates test structure,
-  naming conventions, edge case coverage, mock usage, and assertion quality. Use
-  when reviewing test suites, identifying coverage gaps, or improving test
-  strategy.'
+description: "Test quality and coverage analysis specialist. Evaluates test structure, naming conventions, edge case coverage, mock usage, and assertion quality. Use when reviewing test suites, identifying coverage gaps, or improving test strategy."
 model: inherit
 allowed-tools:
   - Read

@@ -1,9 +1,6 @@
 ---
 name: diagnose-ci
-description:
-  CI debugging workflow guide for self-hosted runners. Use when learning CI
-  debugging workflows, understanding failure patterns (F01-F12), or
-  troubleshooting GitHub Actions on self-hosted runners.
+description: "CI debugging workflow guide for self-hosted runners. Use when learning CI debugging workflows, understanding failure patterns (F01-F12), or troubleshooting GitHub Actions on self-hosted runners."
 user-invokable: true
 ---
 

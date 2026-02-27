@@ -1,9 +1,6 @@
 ---
 name: linear-workflows
-description:
-  Linear workflow patterns and conventions reference. Use when commands or
-  agents need Linear workflow context, issue writing guidance, or branch naming
-  conventions.
+description: "Linear workflow patterns and conventions reference. Use when commands or agents need Linear workflow context, issue writing guidance, or branch naming conventions."
 user-invokable: false
 ---
 

@@ -118,3 +118,9 @@ defaults:
 - `gh` CLI installed and authenticated
 - `ssh` client (for Layer 3)
 - `jq` for JSON parsing in hooks
+
+## Cross-Plugin Dependencies
+
+- **yellow-linear** — Required for `/ci:report-linear` command (creates Linear
+  issues from CI failures). Without it, `/ci:report-linear` will report that the
+  yellow-linear plugin is not installed.

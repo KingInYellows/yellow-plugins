@@ -1,9 +1,6 @@
 ---
 name: security-debt-scanner
-description:
-  'Security-related technical debt detection. Use when auditing code for missing
-  validation, hardcoded config, deprecated crypto, or security debt patterns
-  (not active vulnerabilities).'
+description: "Security-related technical debt detection. Use when auditing code for missing validation, hardcoded config, deprecated crypto, or security debt patterns (not active vulnerabilities)."
 model: inherit
 allowed-tools:
   - Read
