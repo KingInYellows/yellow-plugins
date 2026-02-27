@@ -52,7 +52,11 @@ Stop immediately. Do not proceed.
 
 ## Step 2: Fetch Runner Inventory
 
-Fetch all registered runners with pagination and assemble into a JSON array:
+Fetch runners from **both** the repository level and the organization level,
+then merge. Org-level runners are shared across all repos in the org and are
+commonly used for self-hosted setups.
+
+### Step 2a: Fetch repo-level runners
 
 ```bash
 GH_OUTPUT=$(timeout 15 gh api --paginate \
@@ -62,8 +66,8 @@ if [ $GH_EXIT -ne 0 ]; then
   echo "$GH_OUTPUT"
   exit $GH_EXIT
 fi
-RUNNERS_JSON=$(echo "$GH_OUTPUT" | jq -s '.') || {
-  printf '[yellow-ci] Error: Failed to assemble runner JSON\n' >&2
+REPO_RUNNERS=$(echo "$GH_OUTPUT" | jq -s '.') || {
+  printf '[yellow-ci] Error: Failed to assemble repo runner JSON\n' >&2
   exit 1
 }
 ```
@@ -73,17 +77,53 @@ If this fails (non-zero exit or `jq -s` produces invalid JSON):
 - If output contains "403" or "Resource not accessible":
   > Token missing `repo` scope. Run: `gh auth refresh -s repo`
 - If output contains "404":
-  > No self-hosted runners registered for this repo. Register runners first via
-  > GitHub repository settings → Actions → Runners.
+  > No self-hosted runners registered for this repo.
 - If output contains "429":
   > GitHub API rate limited. Check reset time with `gh api rate_limit`.
 - Otherwise:
-  > [yellow-ci] Error: Failed to fetch runners from GitHub API: {error}
+  > [yellow-ci] Error: Failed to fetch repo runners from GitHub API: {error}
 
-If the assembled JSON array is empty (`[]`) or `null`:
+### Step 2b: Fetch org-level runners
 
-> No self-hosted runners registered for this repo. Register runners first via
-> GitHub repository settings → Actions → Runners.
+Query the organization endpoint using `OWNER` as the org name. This requires
+the `admin:org` scope — if the token lacks it, skip gracefully.
+
+```bash
+ORG_GH_OUTPUT=$(timeout 15 gh api --paginate \
+  "orgs/${OWNER}/actions/runners" \
+  --jq '.runners[]' 2>&1); ORG_GH_EXIT=$?
+if [ $ORG_GH_EXIT -ne 0 ]; then
+  printf '[yellow-ci] Note: Org-level runner query failed (token may lack admin:org scope or %s is a user account) — using repo-level runners only\n' "$OWNER" >&2
+  ORG_RUNNERS="[]"
+else
+  ORG_RUNNERS=$(echo "$ORG_GH_OUTPUT" | jq -s '.') || ORG_RUNNERS="[]"
+fi
+```
+
+Do **not** stop on org-level failure — it is expected when `OWNER` is a personal
+account or the token lacks org scope.
+
+### Step 2c: Merge and deduplicate
+
+Merge repo-level and org-level runners. If the same runner name appears in both,
+keep the **repo-level** entry (it has more specific context). Add a `"source"`
+field (`"repo"` or `"org"`) so the agent can display provenance.
+
+```bash
+RUNNERS_JSON=$(jq -n \
+  --argjson repo "$REPO_RUNNERS" \
+  --argjson org "$ORG_RUNNERS" \
+  '($repo | map(. + {"source":"repo"})) as $r |
+   ($org | map(. + {"source":"org"})) as $o |
+   ($r | map(.name)) as $repo_names |
+   $r + [$o[] | select(.name as $n | $repo_names | index($n) | not)]')
+```
+
+If the merged JSON array is empty (`[]`) or `null`:
+
+> No self-hosted runners found at repo or organization level. Register runners
+> via GitHub repository settings → Actions → Runners, or organization settings
+> → Actions → Runner groups.
 
 **Filter and validate runners:**
 
@@ -200,7 +240,18 @@ so the agent can distinguish offline runners from unknown GitHub-hosted labels.
     "load_score": 72,
     "load_note": "(CPU 28%, disk 35%)",
     "os": "linux",
-    "busy": false
+    "busy": false,
+    "source": "repo"
+  },
+  {
+    "name": "org-shared-01",
+    "status": "online",
+    "labels": ["self-hosted", "linux", "x64", "org-shared-01"],
+    "load_score": 50,
+    "load_note": "(no SSH config)",
+    "os": "linux",
+    "busy": false,
+    "source": "org"
   }
 ],
 "offline_runner_names": ["runner-02", "runner-03"]}
