@@ -99,7 +99,7 @@ Spot-check that these maintain correct patterns:
 - [x] `plugins/gt-workflow/hooks/check-commit-message.sh` — confirm `exit_ok` pattern, `set -uo pipefail`
 - [x] `plugins/gt-workflow/hooks/check-git-push.sh` — confirm blocking exit pattern
 
-#### 3.4 Validate non-hook scripts (2 files)
+#### 3.4 Validate non-hook scripts (3 files)
 
 These are standalone scripts (not hooks) — different rules:
 - [x] `plugins/yellow-ruvector/scripts/install.sh` — general shell safety check

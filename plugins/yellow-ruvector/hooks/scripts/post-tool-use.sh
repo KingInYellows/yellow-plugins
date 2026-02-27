@@ -66,7 +66,7 @@ case "$TOOL" in
     if [ -n "$command_text" ]; then
       # Validate exit_code is numeric
       case "$exit_code" in
-        ''|*[!0-9]*) exit_code=0 ;;
+        ''|*[!0-9]*) exit_code=1 ;;
       esac
       if [ "$exit_code" -eq 0 ]; then
         if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-command --success "$command_text" 2>&1); then
