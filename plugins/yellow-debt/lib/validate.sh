@@ -119,6 +119,7 @@ validate_severity() {
 transition_todo_state() {
   local todo_file="$1"
   local new_state="$2"
+  local defer_reason="${3:-}"
   local temp_file="${todo_file}.tmp"
   local lock_file="${todo_file}.lock"
 
@@ -137,7 +138,7 @@ transition_todo_state() {
 
   # Re-read current state inside lock (TOCTOU prevention)
   local current_state
-  current_state=$(extract_frontmatter "$todo_file" | yq '.status' 2>/dev/null) || return 1
+  current_state=$(extract_frontmatter "$todo_file" | yq -r '.status' 2>/dev/null) || return 1
 
   # Validate transition
   validate_transition "$current_state" "$new_state" || {
@@ -148,6 +149,17 @@ transition_todo_state() {
   # Update frontmatter (extract YAML, update, reconstruct markdown)
   local updated_frontmatter body
   updated_frontmatter=$(extract_frontmatter "$todo_file" | yq -y --arg val "$new_state" '.status = $val' 2>/dev/null) || return 1
+
+  # Add defer_reason if state is deferred and reason is provided; clear it otherwise
+  if [ "$new_state" = "deferred" ] && [ -n "$defer_reason" ]; then
+    # cut -c counts chars (not bytes) when LC_CTYPE is UTF-8; falls back to bytes on C/ASCII locale
+    local clean_reason
+    clean_reason=$(printf '%s' "$defer_reason" | tr -d '\n\r' | cut -c1-200)
+    updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y --arg val "$clean_reason" '.defer_reason = $val' 2>/dev/null) || return 1
+  else
+    # Clear any stale defer_reason when not deferring (or deferring without reason)
+    updated_frontmatter=$(printf '%s' "$updated_frontmatter" | yq -y 'del(.defer_reason)' 2>/dev/null) || return 1
+  fi
   body=$(awk '/^---$/{if(++c==2) {p=1; next}} p' "$todo_file")
 
   # Write updated content to temp file

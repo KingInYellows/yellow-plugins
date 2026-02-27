@@ -4,7 +4,9 @@
 # Budget: 3s total (filesystem 1ms, cache check 5ms, gh API 2s, parse 50ms, buffer 500ms)
 # Output: JSON {systemMessage, continue: true} if failures detected, {"continue": true} otherwise
 
-set -euo pipefail
+# Note: -e omitted intentionally — hook must output {"continue": true} on all paths.
+# With -e, any unexpected command failure would exit before JSON is printed, blocking startup.
+set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname "$0")" 2>/dev/null && pwd -P)"
 
@@ -16,6 +18,9 @@ SCRIPT_DIR="$(cd -- "$(dirname "$0")" 2>/dev/null && pwd -P)"
 json_exit() {
   if [ -n "${1:-}" ] && command -v jq >/dev/null 2>&1; then
     jq -n --arg msg "$1" '{"systemMessage": $msg, "continue": true}'
+  elif [ -n "${1:-}" ]; then
+    printf '[yellow-ci] Warning: jq not available; cannot emit system message\n' >&2
+    printf '{"continue": true}\n'
   else
     printf '{"continue": true}\n'
   fi
@@ -60,8 +65,12 @@ if [ -f "$cache_file" ]; then
 
   if [ "$cache_age" -lt 60 ]; then
     # Cache hit — output cached result as JSON
-    cached_msg=$(cat "$cache_file")
-    json_exit "$cached_msg"
+    if cached_msg=$(cat "$cache_file" 2>/dev/null); then
+      json_exit "$cached_msg"
+    else
+      printf '[yellow-ci] Warning: Cannot read cache file %s\n' "$cache_file" >&2
+      json_exit
+    fi
   fi
 fi
 

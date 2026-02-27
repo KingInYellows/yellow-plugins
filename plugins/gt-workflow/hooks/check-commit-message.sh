@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# check-commit-message.sh — PostToolUse hook: warn on non-conventional commit messages
+# NOTE: This is a warn-only hook. Never exit 2 (blocking). Never include
+# commit message content in output (injection surface).
+# Budget: 50ms (no network, no file I/O beyond stdin)
+
+# Intentionally omit -e: hook must always output {"continue": true}.
+# With -e, any unexpected command failure could exit without JSON.
+set -uo pipefail
+
+# Helper: output {"continue": true} and exit
+exit_ok() { printf '{"continue": true}\n'; exit 0; }
+
+# Bound stdin to 64KB to prevent memory issues
+INPUT=$(head -c 65536)
+
+# Require jq for safe JSON parsing
+command -v jq >/dev/null 2>&1 || {
+  printf '[gt-workflow] Warning: jq not found, skipping commit validation\n' >&2
+  exit_ok
+}
+
+# PostToolUse schema: .tool_input.command (NOT .command — that's PreToolUse)
+COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null) || exit_ok
+
+# Only check gt modify / gt commit / gt create commands
+case "$COMMAND" in
+  *"gt modify"*|*"gt commit"*|*"gt create"*) ;;
+  *) exit_ok ;;
+esac
+
+# Skip validation if command failed
+EXIT_CODE=$(printf '%s' "$INPUT" | jq -r '.tool_result.exit_code // 0') || {
+  printf '[gt-workflow] Warning: could not parse exit_code from hook input\n' >&2
+  EXIT_CODE=1
+}
+if [ "$EXIT_CODE" != "0" ]; then
+  exit_ok
+fi
+
+# Extract first non-empty -m flag value (double-quoted form only).
+# Known gaps (permissive by design — warn-only hook):
+#   - Single-quoted: -m 'message' → not matched, skips validation
+#   - Multi -m flags: -m "subject" -m "body" → only first is checked
+# These gaps cause false-negatives (no warning), never false-positives or blocks.
+MSG=$(printf '%s' "$COMMAND" | grep -oE '\-m "[^"]*"' | head -1 | sed 's/^-m "//;s/"$//') || MSG=""
+
+# If we couldn't extract the message, skip validation (permissive)
+[ -z "$MSG" ] && exit_ok
+
+# Check for conventional commit prefix
+printf '%s' "$MSG" | grep -qE '^(feat|fix|refactor|docs|test|chore|perf|ci|build|revert)(\(.+\))?!?:' && exit_ok
+
+# Warn-only — static message, never include commit content
+jq -n '{"continue": true, "systemMessage": "[gt-workflow] Commit message does not follow conventional commits. Consider: gt modify -c -m \"type(scope): description\""}'
