@@ -1,21 +1,19 @@
 ---
 name: linear:triage
-description: >
-  Review and assign incoming Linear issues. Use when user says "triage issues",
-  "assign incoming tickets", "what needs triage", or "review new issues".
+description: "Review and assign incoming Linear issues. Use when user says \"triage issues\", \"assign incoming tickets\", \"what needs triage\", or \"review new issues\"."
 argument-hint: '[filter query]'
 allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_linear_linear__list_issues
-  - mcp__plugin_linear_linear__get_issue
-  - mcp__plugin_linear_linear__update_issue
-  - mcp__plugin_linear_linear__list_teams
-  - mcp__plugin_linear_linear__get_team
-  - mcp__plugin_linear_linear__list_users
-  - mcp__plugin_linear_linear__list_issue_statuses
-  - mcp__plugin_linear_linear__list_issue_labels
+  - mcp__plugin_yellow-linear_linear__list_issues
+  - mcp__plugin_yellow-linear_linear__get_issue
+  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__list_teams
+  - mcp__plugin_yellow-linear_linear__get_team
+  - mcp__plugin_yellow-linear_linear__list_users
+  - mcp__plugin_yellow-linear_linear__list_issue_statuses
+  - mcp__plugin_yellow-linear_linear__list_issue_labels
 ---
 
 # Triage Incoming Issues

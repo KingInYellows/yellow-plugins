@@ -6,12 +6,12 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_linear_linear__list_teams
-  - mcp__plugin_linear_linear__list_projects
-  - mcp__plugin_linear_linear__list_issues
-  - mcp__plugin_linear_linear__list_issue_labels
-  - mcp__plugin_linear_linear__create_issue
-  - mcp__plugin_linear_linear__create_issue_label
+  - mcp__plugin_yellow-linear_linear__list_teams
+  - mcp__plugin_yellow-linear_linear__list_projects
+  - mcp__plugin_yellow-linear_linear__list_issues
+  - mcp__plugin_yellow-linear_linear__list_issue_labels
+  - mcp__plugin_yellow-linear_linear__create_issue
+  - mcp__plugin_yellow-linear_linear__create_issue_label
 ---
 
 # Technical Debt Linear Sync

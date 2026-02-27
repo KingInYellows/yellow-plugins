@@ -7,12 +7,12 @@ allowed-tools:
   - Skill
   - ToolSearch
   - AskUserQuestion
-  - mcp__plugin_deepwiki_deepwiki__ask_question
-  - mcp__plugin_deepwiki_deepwiki__read_wiki_structure
-  - mcp__plugin_deepwiki_deepwiki__read_wiki_contents
-  - mcp__plugin_devin_devin__ask_question
-  - mcp__plugin_devin_devin__read_wiki_structure
-  - mcp__plugin_devin_devin__read_wiki_contents
+  - mcp__plugin_yellow-devin_deepwiki__ask_question
+  - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
+  - mcp__plugin_yellow-devin_deepwiki__read_wiki_contents
+  - mcp__plugin_yellow-devin_devin__ask_question
+  - mcp__plugin_yellow-devin_devin__read_wiki_structure
+  - mcp__plugin_yellow-devin_devin__read_wiki_contents
 ---
 
 # Query Repository Documentation
@@ -64,7 +64,7 @@ calls fail with auth errors, announce the fallback to DeepWiki.
   `read_wiki_structure`, `read_wiki_contents`)
 
 **Important:** MCP tool names follow the pattern
-`mcp__plugin_<server_key>_<server_key>__<tool>`. Verify exact names via
+`mcp__plugin_{pluginName}_{serverName}__{toolName}`. Verify exact names via
 ToolSearch during first use — the actual registered names may differ.
 
 ### Step 4: Present Results
