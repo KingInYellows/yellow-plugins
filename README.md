@@ -30,8 +30,8 @@ Add the marketplace, then install individual plugins:
 
 ## MCP Servers & Authentication
 
-Eight plugins connect to external MCP servers. Authentication requirements vary
-by server.
+Six plugins connect to MCP servers. Authentication requirements vary by
+server.
 
 | Plugin            | MCP Server  | Auth                                                           |
 | ----------------- | ----------- | -------------------------------------------------------------- |
@@ -72,9 +72,11 @@ No authentication needed for public repositories.
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
-export DEVIN_API_TOKEN="apk_your_token_here"
+export DEVIN_SERVICE_USER_TOKEN="cog_your_token_here"
+export DEVIN_ORG_ID="your-org-id"
 
-# Get your token: https://devin.ai/settings/api
+# Create a service user at: Enterprise Settings > Service Users
+# Find your org ID at: Enterprise Settings > Organizations
 ```
 
 Never commit tokens to version control.
