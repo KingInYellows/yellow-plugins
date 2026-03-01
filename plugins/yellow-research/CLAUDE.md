@@ -57,6 +57,7 @@ Off-by-default tools (enable by adding them to the `tools=` arg in `plugin.json`
 
 ### Commands
 
+- `/research:setup` — Check which API keys are configured and which providers are active
 - `/research:code [topic]` — Inline code research: delegates to code-researcher,
   returns synthesized answer in-context. No file saved.
 - `/research:deep [topic]` — Multi-source deep research: conductor decides
@@ -110,6 +111,7 @@ Without these, the plugin degrades gracefully: Context7 falls back to EXA,
 
 ## When to Use What
 
+- `/research:setup` — First install, after adding API keys, or to diagnose degraded sources
 - `/research:code` — Actively coding, need quick answer about a library or API
 - `/research:deep` — Need a comprehensive report saved for later reference
 - `research-conductor` auto-triggers via `/research:deep` — do not call directly

@@ -97,6 +97,14 @@ Executive summary of findings.
 - [Source](URL) — what was found here
 ```
 
+## Commands
+
+| Command | Description |
+|---|---|
+| `/research:setup` | Check which API keys are active and which providers are available |
+| `/research:code [topic]` | Inline code research — returns answer in-context, no file saved |
+| `/research:deep [topic]` | Multi-source deep research — saves report to `docs/research/<slug>.md` |
+
 ## Graceful Degradation
 
 If a source MCP is unavailable (key not set, rate limited, connection error),
