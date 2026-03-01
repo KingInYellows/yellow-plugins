@@ -28,7 +28,8 @@ printf '\n=== Environment ===\n'
 [ -n "${DEVIN_ORG_ID:-}" ]            && printf 'DEVIN_ORG_ID:             set\n' || printf 'DEVIN_ORG_ID:             NOT SET\n'
 ```
 
-Stop conditions (report message and stop; do not continue):
+If **any** of the following are true, report **all** that apply and stop (do not
+continue to Step 2):
 
 - `curl` not found: "curl is required. Install via your system package manager."
 - `jq` not found: "jq is required. Install from https://jqlang.github.io/jq/download/"
@@ -255,7 +256,7 @@ Never commit tokens to version control.
 | Token not set | Show Setup Instructions block | Stop |
 | Org ID not set | Show Setup Instructions block | Stop |
 | `apk_` token detected | Show V1→V3 migration steps | Stop |
-| Token format invalid | "Expected: cog_ + 20-128 alphanumeric chars" | Stop |
+| Token format invalid | "Expected: cog_ + 20-128 alphanumeric/dash/underscore chars" | Stop |
 | Org ID format invalid | "Expected: 4-64 alphanumeric/dash/underscore chars" | Stop |
 | curl exit 6 | "Could not resolve api.devin.ai — check DNS/internet" | Stop |
 | curl exit 7 | "Could not connect to Devin API" | Stop |
