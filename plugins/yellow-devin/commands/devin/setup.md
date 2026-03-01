@@ -65,6 +65,9 @@ printf 'Token format: valid (cog_ prefix confirmed, length ok)\n'
 
 Never echo the token value in any output. Only describe format mismatches.
 
+If the Bash call exits non-zero (apk_ detected or invalid cog_ format), stop
+here — display the error message above and do not proceed to Step 3.
+
 Then validate `DEVIN_ORG_ID`:
 
 ```bash
@@ -79,6 +82,9 @@ fi
 
 printf 'Org ID format:   valid (%s)\n' "$org"
 ```
+
+If the Bash call exits non-zero (invalid org ID format), stop here — display
+the error message above and do not proceed to Step 3.
 
 ### Step 3: Probe ManageOrgSessions
 
@@ -97,8 +103,8 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
   -X GET "${ORG_URL}/sessions?first=1" \
   -H "Authorization: Bearer ${DEVIN_SERVICE_USER_TOKEN}")
 curl_exit=$?
-http_status=$(printf '%s' "$response" | tail -n1)
-body=$(printf '%s' "$response" | sed '$d')
+http_status=${response##*$'\n'}
+body=${response%$'\n'*}
 ```
 
 Outcome mapping:
@@ -113,10 +119,12 @@ Outcome mapping:
 - **HTTP 403:** Record `ManageOrgSessions` as MISSING. Continue to Step 4 to collect all permission failures before reporting.
 - **HTTP 404:** "Organization not found (404). Verify DEVIN_ORG_ID matches the ID shown at Enterprise Settings > Organizations." Stop.
 - **HTTP 5xx:** "Devin API server error ($http_status). Try again in a few minutes." Stop.
-- **Other:** "Unexpected HTTP status $http_status." Show sanitized body preview (200 chars max). Stop.
+- **Other:** "Unexpected HTTP status $http_status." Redact and show first 200 chars of body:
+  `printf '%s' "$body" | sed 's/\(cog\|apk\)_[a-zA-Z0-9_-]*/***REDACTED***/g' | head -c 200`
+  Stop.
 
 All error output must sanitize tokens:
-`sed 's/cog_[a-zA-Z0-9_-]*/***REDACTED***/g'`
+`sed 's/\(cog\|apk\)_[a-zA-Z0-9_-]*/***REDACTED***/g'`
 
 Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers.
 
@@ -125,24 +133,37 @@ Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers.
 Make a read-only call to the enterprise sessions endpoint:
 
 ```bash
+DEVIN_API_BASE="https://api.devin.ai/v3beta1"
 printf 'Probing ManageAccountSessions...\n'
 
 org_param=$(jq -rn --arg o "${DEVIN_ORG_ID}" '@uri "\($o)"')
+if [ $? -ne 0 ] || [ -z "$org_param" ]; then
+  printf 'ERROR: jq failed — cannot URL-encode DEVIN_ORG_ID. Ensure jq is installed.\n'
+  exit 1
+fi
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \
   -w "\n%{http_code}" \
   -X GET "${DEVIN_API_BASE}/enterprise/sessions?org_ids=${org_param}&first=1" \
   -H "Authorization: Bearer ${DEVIN_SERVICE_USER_TOKEN}")
 curl_exit=$?
-http_status=$(printf '%s' "$response" | tail -n1)
-body=$(printf '%s' "$response" | sed '$d')
+http_status=${response##*$'\n'}
+body=${response%$'\n'*}
 ```
 
-Apply the same outcome mapping as Step 3:
+Outcome mapping:
 
+- **curl non-zero exit:**
+  - Exit 6: "Could not resolve api.devin.ai — check DNS or internet connectivity." Stop.
+  - Exit 7: "Could not connect to Devin API — the API may be temporarily down." Stop.
+  - Exit 28: "Request timed out — check network connectivity and try again." Stop.
+  - Other: "Network error (curl exit $curl_exit)." Stop.
 - **HTTP 200:** `ManageAccountSessions` confirmed. Record as PASS.
-- **HTTP 403:** Record `ManageAccountSessions` as MISSING.
-- Network/other HTTP errors: same handling as Step 3 (stop with clear message).
+- **HTTP 401:** "Authentication failed (401). DEVIN_SERVICE_USER_TOKEN was rejected. Rotate the token at Enterprise Settings > Service Users." Stop immediately.
+- **HTTP 403:** Record `ManageAccountSessions` as MISSING. Continue to Step 5.
+- **HTTP 404:** "Enterprise sessions endpoint not found (404). The V3 beta API may have changed — check Devin release notes." Stop.
+- **HTTP 5xx:** "Devin API server error ($http_status). Try again in a few minutes." Stop.
+- **Other:** "Unexpected HTTP status $http_status." Redact and show first 200 chars of body (same as Step 3). Stop.
 
 ### Step 5: Report Results
 
@@ -239,10 +260,13 @@ Never commit tokens to version control.
 | curl exit 6 | "Could not resolve api.devin.ai — check DNS/internet" | Stop |
 | curl exit 7 | "Could not connect to Devin API" | Stop |
 | curl exit 28 | "Request timed out" | Stop |
+| curl exit other | "Network error (curl exit N)" | Stop |
 | HTTP 401 | "Token rejected. Rotate at Enterprise Settings > Service Users." | Stop |
 | HTTP 403 | Record permission as MISSING, continue to next check | Collect |
 | HTTP 404 | "Org not found. Verify DEVIN_ORG_ID." | Stop |
 | HTTP 5xx | "Devin API server error. Try again later." | Stop |
+| Other HTTP status | "Unexpected HTTP status N." + redacted body preview | Stop |
+| jq exit non-zero (Step 4) | "jq failed — cannot URL-encode DEVIN_ORG_ID." | Stop |
 
 See `devin-workflows` skill for token sanitization patterns and curl error
 handling conventions.
