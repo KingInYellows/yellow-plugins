@@ -4,6 +4,7 @@ description: "Validate Devin V3 credentials and permissions. Use when first inst
 argument-hint: ''
 allowed-tools:
   - Bash
+  - Skill
   - AskUserQuestion
 ---
 
@@ -24,15 +25,15 @@ command -v curl >/dev/null 2>&1 && printf 'curl: ok\n' || printf 'curl: NOT FOUN
 command -v jq  >/dev/null 2>&1 && printf 'jq:   ok\n' || printf 'jq:   NOT FOUND\n'
 
 printf '\n=== Environment ===\n'
-[ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf 'DEVIN_SERVICE_USER_TOKEN: set\n' || printf 'DEVIN_SERVICE_USER_TOKEN: NOT SET\n'
-[ -n "${DEVIN_ORG_ID:-}" ]            && printf 'DEVIN_ORG_ID:             set\n' || printf 'DEVIN_ORG_ID:             NOT SET\n'
+[ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf '%-28s set\n' 'DEVIN_SERVICE_USER_TOKEN:' || printf '%-28s NOT SET\n' 'DEVIN_SERVICE_USER_TOKEN:'
+[ -n "${DEVIN_ORG_ID:-}" ]            && printf '%-28s set\n' 'DEVIN_ORG_ID:' || printf '%-28s NOT SET\n' 'DEVIN_ORG_ID:'
 ```
 
 If **any** of the following are true, report **all** that apply and stop (do not
 continue to Step 2):
 
 - `curl` not found: "curl is required. Install via your system package manager."
-- `jq` not found: "jq is required. Install from https://jqlang.github.io/jq/download/"
+- `jq` not found: "jq is required. Install from [jqlang.github.io](https://jqlang.github.io/jq/download/)"
 - `DEVIN_SERVICE_USER_TOKEN` not set: show the Setup Instructions block below.
 - `DEVIN_ORG_ID` not set: show the Setup Instructions block below.
 
@@ -61,7 +62,7 @@ if ! printf '%s' "$token" | grep -qE '^cog_[a-zA-Z0-9_-]{20,128}$'; then
   exit 1
 fi
 
-printf 'Token format: valid (cog_ prefix confirmed, length ok)\n'
+printf '%-18s valid (cog_ prefix confirmed, length ok)\n' 'Token format:'
 ```
 
 Never echo the token value in any output. Only describe format mismatches.
@@ -81,7 +82,7 @@ if ! printf '%s' "$org" | grep -qE '^[a-zA-Z0-9_-]{4,64}$'; then
   exit 1
 fi
 
-printf 'Org ID format:   valid (%s)\n' "$org"
+printf '%-18s valid (%s)\n' 'Org ID format:' "$org"
 ```
 
 If the Bash call exits non-zero (invalid org ID format), stop here — display
@@ -170,7 +171,7 @@ Outcome mapping:
 
 Collect results from Steps 3 and 4 and display a unified status table:
 
-```
+```text
 Devin V3 Setup Check
 ====================
 
@@ -191,7 +192,7 @@ Overall: [PASS | FAIL]
 
 **If any permission is MISSING**, display:
 
-```
+```text
 One or more required permissions are missing.
 
 To fix:
@@ -205,7 +206,7 @@ To fix:
 
 **If all checks pass**, display:
 
-```
+```text
 All checks passed. The yellow-devin plugin is ready to use.
 
 Next steps:
@@ -221,7 +222,7 @@ Then ask via AskUserQuestion: "What would you like to do next?" with options:
 
 Show this block when `DEVIN_SERVICE_USER_TOKEN` or `DEVIN_ORG_ID` is not set:
 
-```
+```text
 DEVIN_SERVICE_USER_TOKEN and/or DEVIN_ORG_ID are not set.
 
 To configure:
@@ -252,7 +253,7 @@ Never commit tokens to version control.
 | Error | Message | Action |
 |---|---|---|
 | `curl` not found | "curl is required. Install via system package manager." | Stop |
-| `jq` not found | "jq is required. Install from https://jqlang.github.io/jq/download/" | Stop |
+| `jq` not found | "jq is required. Install from [jqlang.github.io](https://jqlang.github.io/jq/download/)" | Stop |
 | Token not set | Show Setup Instructions block | Stop |
 | Org ID not set | Show Setup Instructions block | Stop |
 | `apk_` token detected | Show V1→V3 migration steps | Stop |
