@@ -43,10 +43,13 @@ Stop conditions (after reporting all failures):
 gh auth status 2>&1
 ```
 
-- **Not authenticated** (non-zero exit or output contains "You are not logged in"):
-  Stop. Report: "GitHub CLI is not authenticated. Run: `gh auth login`"
-- **Authenticated:** Record PASS. Parse the output to extract:
-  - Logged-in account (e.g., `github.com account @username`)
+- **Non-zero exit:** Check if output contains "not logged in" (auth failure) or
+  network/connectivity language (API unreachable). Report accordingly:
+  - Auth failure: "GitHub CLI is not authenticated. Run: `gh auth login`". Stop.
+  - Network error: "Could not reach GitHub API — check connectivity." Stop.
+- **Zero exit (authenticated):** Record PASS. Parse the output to extract:
+  - Logged-in account: look for the line containing `account` — extract the
+    token after "account " and prepend `@` for display (e.g., `@username`)
   - Active token scopes from the `Active token scopes:` line
 
 Check required scopes. Warn (do not stop) if `repo` or `workflow` are absent:
@@ -69,12 +72,12 @@ fi
 If `config_exists`:
 
 - Read `.claude/yellow-ci.local.md` with the Read tool
-- Count runners: `grep -c '^\s*- name:' .claude/yellow-ci.local.md` (or 0 if
-  none)
+- Count runners: `grep -cE '^[[:space:]]*- name:' .claude/yellow-ci.local.md || echo 0`
+  (exits 1 on zero matches — `|| echo 0` prevents false failure)
 - Extract runner names and display them
 - Ask via AskUserQuestion: "Runner config already exists (N runner(s) configured:
   runner-01, runner-02). Reconfigure?"
-  - **No** → display current runner summary, go to Step 6 (report), stop after.
+  - **No** → display current runner summary, skip Steps 4–6, go directly to Step 7 (report), stop after.
   - **Yes** → continue to Step 4.
 
 If absent: continue to Step 4.
@@ -91,11 +94,14 @@ Ask via AskUserQuestion: "Do you use self-hosted GitHub Actions runners?
 
 Ask via AskUserQuestion for runner details in a single prompt:
 - Runner name (e.g., `runner-01`) — validate `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`
-- SSH host (private IPv4 like `192.168.1.50` or FQDN) — validate private IPv4
-  (`^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)`) or FQDN
-  (`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`).
-  If a public routable IP is entered: warn "This looks like a public IP. Runner
-  hosts should typically be on a private network." but do not block.
+- SSH host (private IPv4 like `192.168.1.50` or FQDN) — validate against one
+  of these patterns:
+  - Private IPv4 (full address, anchored):
+    `^(10\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){2}|172\.(1[6-9]|2[0-9]|3[01])\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|127\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|192\.168\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$`
+  - FQDN (lowercase only, anchored):
+    `^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`
+  Public IPs and hostnames that do not match either pattern must be **rejected
+  and re-prompted** — do not warn-and-continue. Policy: private network only.
 - SSH user — validate `^[a-z_][a-z0-9_-]{0,31}$`
 - SSH key path (optional — press Enter to use default SSH key)
 
@@ -110,7 +116,10 @@ Collect all runners before proceeding to Step 5.
 Create `.claude/` directory if it does not exist:
 
 ```bash
-mkdir -p .claude
+mkdir -p .claude || {
+  printf '[yellow-ci] Cannot create .claude/ directory — check permissions.\n'
+  exit 1
+}
 ```
 
 **With runners configured**, write `.claude/yellow-ci.local.md`:
@@ -172,8 +181,13 @@ grep -qE '^schema:' .claude/yellow-ci.local.md
 If this fails: Report "[yellow-ci] Config validation failed. Check `.claude/`
 directory permissions and re-run `/ci:setup`." and stop.
 
-After the bash check passes, use the Read tool to confirm the file was written
-correctly and runner names match what was entered.
+After the bash check passes, **use the Read tool** to confirm:
+- The file contains the expected `schema: 1` header
+- Runner count in the file matches the number of runners collected in Step 4
+- Each runner name entered appears verbatim in the file
+
+If any runner name is missing or the count differs: report the mismatch and
+stop. Do not proceed to Step 7 until the Read tool confirms correct content.
 
 ### Step 7: Report
 
@@ -214,13 +228,17 @@ runner assignments), `Done`.
 | `jq` not found | "Install from https://jqlang.github.io/jq/download/" | Collect, stop after all checks |
 | `ssh` not found | "Needed for runner health/cleanup commands only" | Warn, continue |
 | `gh` not authenticated | "Run: gh auth login" | Stop |
+| `gh auth status` network error | "Could not reach GitHub API — check connectivity." | Stop |
 | Missing `repo` scope | "Re-authenticate: gh auth login --scopes repo,workflow,read:org" | Warn, continue |
 | Missing `workflow` scope | Same as above | Warn, continue |
 | Runner name invalid | "Expected: lowercase alphanumeric/dash, 2-64 chars" | Re-prompt |
-| SSH host invalid | "Expected: private IPv4 (10.x, 192.168.x, 172.16-31.x) or FQDN" | Re-prompt with warning |
+| SSH host invalid | "Must be private IPv4 (10.x, 127.x, 192.168.x, 172.16-31.x) or lowercase FQDN" | Re-prompt |
+| SSH public IP entered | "Public IPs are not allowed. Use a private network address." | Re-prompt |
 | SSH user invalid | "Expected: lowercase, starts with letter/underscore, max 32 chars" | Re-prompt |
+| `mkdir -p .claude` fails | "[yellow-ci] Cannot create .claude/ — check permissions." | Stop |
 | Config write fails | "Check .claude/ directory permissions" | Stop |
 | Config validation fails | "[yellow-ci] Config validation failed. Re-run /ci:setup." | Stop |
+| Runner count mismatch after write | "[yellow-ci] Written runner count differs from collected. Re-run /ci:setup." | Stop |
 
 See `ci-conventions` skill for SSH host validation patterns and runner name
 format rules.
