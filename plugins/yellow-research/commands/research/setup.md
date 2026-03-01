@@ -81,9 +81,7 @@ fi
 Per-key status after this step: `ABSENT` / `FORMAT VALID` / `FORMAT INVALID`
 
 Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
-`UNREACHABLE` / `UNKNOWN` / `PRESENT (untested)` (when user skips testing).
-Treat `UNKNOWN` as `UNREACHABLE` in the capability summary — do not count it
-as active.
+`UNREACHABLE` / `PRESENT (untested)` (when user skips testing).
 
 ### Step 3: Optional Live API Testing
 
@@ -163,7 +161,7 @@ elif printf '%s' "$http_status" | grep -qE '^5[0-9][0-9]$'; then
   provider_status="UNREACHABLE"
   provider_detail="API server error (HTTP $http_status)"
 else
-  provider_status="UNKNOWN"
+  provider_status="UNREACHABLE"
   provider_detail="Unexpected HTTP $http_status"
 fi
 ```
@@ -189,15 +187,15 @@ If user skips testing: all format-valid keys show `PRESENT (untested)`.
 
 Display a unified status table:
 
-```
+```text
 yellow-research Setup Check
 ===========================
 
 API Keys (all optional — plugin degrades gracefully)
   Provider       Key         Format    Live Test      Status
   -----------    --------    ------    -----------    ------
-  EXA            SET         VALID     PASS           ACTIVE
-  Tavily         SET         VALID     PASS           ACTIVE
+  EXA            SET         VALID     ACTIVE         ACTIVE
+  Tavily         SET         VALID     ACTIVE         ACTIVE
   Perplexity     NOT SET     N/A       N/A            INACTIVE
 
 Parallel Task server (OAuth)
@@ -205,20 +203,21 @@ Parallel Task server (OAuth)
   You'll be prompted to authorize in your browser on first /research:deep use.
 
 Capability summary:
-  /research:deep    PARTIAL (2/3 sources)
-  /research:code    PARTIAL (2/3 sources)
+  /research:deep    PARTIAL (2/3 sources — Perplexity inactive)
+  /research:code    PARTIAL (2/3 sources — Perplexity inactive)
 ```
 
 Adjust the capability summary based on how many keys are active:
+
 - 3 active: `FULL (3/3 sources)`
 - 1-2 active: `PARTIAL (N/3 sources)`
 - 0 active: `MINIMAL (Parallel Task OAuth only — no API key sources)`
 
 ### Step 5: Setup Instructions (for absent or invalid keys)
 
-If any keys are `ABSENT` or `INVALID`, show this block:
+If any keys are `ABSENT`, `FORMAT INVALID`, or `INVALID`, show this block:
 
-```
+```sh
 To enable missing providers, add to your shell profile (~/.zshrc or ~/.bashrc):
 
   export EXA_API_KEY="..."          # Get key: https://exa.ai/
