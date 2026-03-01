@@ -131,17 +131,44 @@ curl_exit=$?
 http_status=$(printf '%s' "$response" | tail -n1)
 ```
 
-HTTP outcome mapping for each probe:
+After each probe, evaluate `$curl_exit` first, then `$http_status`. Apply this
+explicit decision tree for each provider:
 
-- curl exit 28 or non-zero: status = `UNREACHABLE` — "API unreachable (timeout or network error)"
-- HTTP 200: status = `ACTIVE`
-- HTTP 401 or 403: status = `INVALID` — "Key rejected by API"
-- HTTP 429: status = `RATE LIMITED` — "Key may be valid; service is busy. Try again later."
-- HTTP 5xx: status = `UNREACHABLE` — "API server error"
-- Other: status = `UNKNOWN` — "Unexpected HTTP $http_status"
+```bash
+if [ "$curl_exit" -ne 0 ]; then
+  provider_status="UNREACHABLE"
+  provider_detail="API unreachable (curl exit $curl_exit — timeout or network error)"
+elif [ "$http_status" = "200" ]; then
+  provider_status="ACTIVE"
+  provider_detail="Live test passed"
+elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
+  provider_status="INVALID"
+  provider_detail="Key rejected by API (HTTP $http_status)"
+elif [ "$http_status" = "429" ]; then
+  provider_status="RATE LIMITED"
+  provider_detail="Key may be valid; service is busy. Try again later."
+elif printf '%s' "$http_status" | grep -qE '^5'; then
+  provider_status="UNREACHABLE"
+  provider_detail="API server error (HTTP $http_status)"
+else
+  provider_status="UNKNOWN"
+  provider_detail="Unexpected HTTP $http_status"
+fi
+```
 
-All API responses must have keys redacted before any display:
-`sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9]*/***REDACTED***/g'`
+All API response bodies must be redacted before any display — apply all three
+patterns (EXA has no known prefix, so limit to 1-line sanitized summary only):
+
+```bash
+# Redact Tavily and Perplexity key patterns from response body
+safe_body=$(printf '%s' "$body" | \
+  sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9]*/***REDACTED***/g')
+# For EXA: never display raw response body — only show status code
+```
+
+Never display raw EXA API response bodies since EXA keys have no public format
+prefix and cannot be reliably redacted. Show only the HTTP status code and
+derived status label.
 
 Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers in
 request/response dumps.
