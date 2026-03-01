@@ -20,6 +20,19 @@ self-hosted GitHub Actions runners.
 
 ## Commands
 
+### `/ci:setup`
+
+Verify prerequisites and configure the self-hosted runner SSH config.
+
+```
+/ci:setup
+```
+
+Checks `gh` (installed and authenticated), `jq`, and `ssh`. Optionally walks
+through an interactive wizard to write `.claude/yellow-ci.local.md` with runner
+host details. Run this first after installing the plugin or after adding new
+self-hosted runners.
+
 ### `/ci:diagnose [run-id]`
 
 Diagnose CI failures and get actionable fix suggestions.
