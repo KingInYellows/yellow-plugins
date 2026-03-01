@@ -43,7 +43,7 @@ server.
 | `yellow-research` | Perplexity  | `PERPLEXITY_API_KEY` required                                  |
 | `yellow-research` | Tavily      | `TAVILY_API_KEY` required                                      |
 | `yellow-research` | EXA         | `EXA_API_KEY` required                                         |
-| `yellow-research` | Parallel    | OAuth (auto-managed by Claude Code)                            |
+| `yellow-research` | Parallel    | No API key — auto-authenticated by Claude Code                 |
 | `yellow-ruvector` | ruvector    | Local stdio — no auth required                                 |
 
 ### Context7 (yellow-core)
@@ -111,7 +111,7 @@ environment variables at startup.
 - **Perplexity:** [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api)
 - **Tavily:** [app.tavily.com](https://app.tavily.com)
 - **EXA:** [dashboard.exa.ai](https://dashboard.exa.ai)
-- **Parallel Task MCP:** OAuth only — Claude Code handles it automatically
+- **Parallel Task MCP:** No API key needed — Claude Code handles authentication automatically
 
 Plugins degrade gracefully: if a key is missing, that provider is skipped and
 research continues with the remaining sources.

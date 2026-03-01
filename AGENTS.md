@@ -44,7 +44,7 @@ Use pnpm only (`preinstall` enforces this).
 - If plugin behavior changes, update corresponding `README.md`, `CLAUDE.md`, and marketplace/plugin manifests as needed.
 
 ## Security & Configuration Tips
-- Never commit credentials (for example `DEVIN_API_TOKEN`).
+- Never commit credentials (for example `DEVIN_SERVICE_USER_TOKEN`).
 - Validate manifests and schema changes locally before pushing.
 
 ## Critical Agent Authoring Rules
