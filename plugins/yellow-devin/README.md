@@ -53,6 +53,7 @@ If you previously used `DEVIN_API_TOKEN` with an `apk_` key:
 
 | Command | Description |
 |---|---|
+| `/devin:setup` | Validate credentials and permissions (first install, token rotation, 401/403 errors) |
 | `/devin:delegate` | Create a session with task prompt, tags, ACU limit |
 | `/devin:status` | Check session status or list recent sessions |
 | `/devin:message` | Send follow-up message (auto-resumes suspended sessions) |

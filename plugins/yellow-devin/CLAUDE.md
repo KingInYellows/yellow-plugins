@@ -60,8 +60,9 @@ The service user needs both:
 
 ## Plugin Components
 
-### Commands (7)
+### Commands (8)
 
+- `/devin:setup` — Validate credentials and permissions for the V3 API
 - `/devin:delegate` — Create a Devin session with task prompt, tags, ACU limit
 - `/devin:status` — Check session status or list recent sessions with filters
 - `/devin:message` — Send follow-up message (auto-resumes suspended sessions)
@@ -96,6 +97,7 @@ The service user needs both:
 
 | Capability | Command | Agent | When to Use |
 |---|---|---|---|
+| Validate credentials | `/devin:setup` | — | First install, after token rotation, on 401/403 errors |
 | Create session | `/devin:delegate` | devin-orchestrator | Command for one-off delegation; agent for multi-step cycles |
 | Check progress | `/devin:status` | devin-orchestrator | Command for manual checks; agent polls automatically |
 | Send message | `/devin:message` | devin-orchestrator | Command for ad-hoc messages; agent for review feedback |
