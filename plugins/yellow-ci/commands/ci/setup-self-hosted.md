@@ -93,7 +93,7 @@ ORG_GH_OUTPUT=$(timeout 15 gh api --paginate \
   "orgs/${OWNER}/actions/runners" \
   --jq '.runners[]' 2>&1); ORG_GH_EXIT=$?
 if [ $ORG_GH_EXIT -ne 0 ]; then
-  printf '[yellow-ci] Note: Org-level runner query failed (token may lack admin:org scope or %s is a user account) — using repo-level runners only\n' "$OWNER" >&2
+  printf '[yellow-ci] Note: Org-level runner query failed (token may lack admin:org scope or %s is a user account). Using repo-level runners only. Details:\n%s\n' "$OWNER" "$ORG_GH_OUTPUT" >&2
   ORG_RUNNERS="[]"
 else
   ORG_RUNNERS=$(echo "$ORG_GH_OUTPUT" | jq -s '.') || ORG_RUNNERS="[]"
@@ -115,8 +115,11 @@ RUNNERS_JSON=$(jq -n \
   --argjson org "$ORG_RUNNERS" \
   '($repo | map(. + {"source":"repo"})) as $r |
    ($org | map(. + {"source":"org"})) as $o |
-   ($r | map(.name)) as $repo_names |
-   $r + [$o[] | select(.name as $n | $repo_names | index($n) | not)]')
+   ($r | map({(.name): true}) | add) as $repo_names_lookup |
+   $r + ($o | map(select($repo_names_lookup[.name] | not)))') || {
+  printf '[yellow-ci] Error: Failed to merge runner inventories\n' >&2
+  exit 1
+}
 ```
 
 If the merged JSON array is empty (`[]`) or `null`:
