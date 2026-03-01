@@ -258,7 +258,12 @@ validate_ssh_host() {
     return 1
   fi
 
-  return 0
+  # TLD restriction: only internal suffixes allowed (private-network-only policy)
+  case "$host" in
+    *.internal|*.local|*.lan|*.corp|*.home|*.intra|*.private) return 0 ;;
+  esac
+
+  return 1  # Public TLD rejected
 }
 
 # Validate SSH username: Linux username rules
@@ -369,6 +374,46 @@ validate_ssh_command() {
   # Reject shell metacharacters that enable injection
   case "$cmd" in
     *\;*|*\&*|*\|*|*\$\(*|*\`*) return 1 ;;
+  esac
+
+  return 0
+}
+
+# Validate SSH key path: starts with ~ or /, safe characters only
+# Usage: validate_ssh_key_path "$path"
+validate_ssh_key_path() {
+  local key_path="$1"
+
+  # Empty is valid (means use default SSH key)
+  if [ -z "$key_path" ]; then
+    return 0
+  fi
+
+  # Length check
+  if [ ${#key_path} -gt 256 ]; then
+    return 1
+  fi
+
+  # Reject newlines
+  if has_newline "$key_path"; then
+    return 1
+  fi
+
+  # Must start with ~ or /
+  case "$key_path" in
+    ~*|/*) ;;
+    *) return 1 ;;
+  esac
+
+  # Reject path traversal and shell metacharacters
+  case "$key_path" in
+    *..*) return 1 ;;
+    *\;*|*\|*|*\&*|*\$*|*\`*) return 1 ;;
+  esac
+
+  # Only allow safe characters
+  case "$key_path" in
+    *[!a-zA-Z0-9_./-~]*) return 1 ;;
   esac
 
   return 0

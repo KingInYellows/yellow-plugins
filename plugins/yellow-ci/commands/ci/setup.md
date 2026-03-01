@@ -78,7 +78,7 @@ If `config_exists`:
 - Extract runner names and display them
 - Ask via AskUserQuestion: "Runner config already exists (N runner(s) configured:
   runner-01, runner-02). Reconfigure?"
-  - **No** → display current runner summary, skip Steps 4–6, go directly to Step 7 (report), stop after.
+  - **No** → show current config summary (prerequisites + existing runner details) and stop. Do not proceed to Steps 4–7.
   - **Yes** → continue to Step 4.
 
 If absent: continue to Step 4.
@@ -95,22 +95,16 @@ Ask via AskUserQuestion: "Do you use self-hosted GitHub Actions runners?
 
 Ask via AskUserQuestion for runner details in a single prompt:
 - Runner name (e.g., `runner-01`) — validate `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`
-- SSH host (private IPv4 like `192.168.1.50` or FQDN) — validate against one
-  of these patterns:
-  - Private IPv4 (full address, anchored):
-    `^(10\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){2}|172\.(1[6-9]|2[0-9]|3[01])\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|127\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|192\.168\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$`
-  - FQDN (lowercase only, anchored, max 253 chars per RFC 1035):
-    `^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`
-    Additionally, FQDNs must end with a known internal suffix: `.internal`,
-    `.local`, `.lan`, `.corp`, `.home`, `.intra`, or `.private`. Reject FQDNs
-    with public TLDs (`.com`, `.org`, `.net`, etc.) — they can resolve to
-    public IPs, bypassing the private-network-only policy.
-  Public IPs and hostnames that do not match either pattern must be **rejected
-  and re-prompted** — do not warn-and-continue. Policy: private network only.
+- SSH host (private IPv4 like `192.168.1.50` or internal FQDN) — validate using
+  `validate_ssh_host` from `hooks/scripts/lib/validate.sh` (accepts private IPv4
+  ranges 10.x, 127.x, 172.16-31.x, 192.168.x and FQDNs ending with `.internal`,
+  `.local`, `.lan`, `.corp`, `.home`, `.intra`, or `.private`).
+  Public IPs and hostnames that do not match must be **rejected and re-prompted**
+  — do not warn-and-continue. Policy: private network only.
 - SSH user — validate `^[a-z_][a-z0-9_-]{0,31}$`
-- SSH key path (optional — press Enter to use default SSH key) — if provided,
-  validate `^(~|/)[a-zA-Z0-9_./-]{1,255}$` and reject paths containing `..`
-  or shell metacharacters (`` ;|&$` ``)
+- SSH key path (optional — press Enter to use default SSH key) — validate using
+  `validate_ssh_key_path` from `hooks/scripts/lib/validate.sh` (must start with
+  `~` or `/`, safe characters only, no `..` or shell metacharacters).
 
 Validate each field before accepting. On validation failure: report the specific
 issue and ask again.
@@ -128,6 +122,9 @@ mkdir -p .claude || {
   exit 1
 }
 ```
+
+Replace `[ISO-8601-UTC]` with the current UTC timestamp in ISO 8601 format
+(run `date -u +%Y-%m-%dT%H:%M:%SZ` in Bash to obtain it).
 
 **With runners configured**, write `.claude/yellow-ci.local.md`:
 
@@ -150,7 +147,7 @@ defaults:
 
 ## Runner Notes
 
-Configured by /ci:setup on $(date -u +%Y-%m-%dT%H:%M:%SZ). Edit this file directly to add
+Configured by /ci:setup on [ISO-8601-UTC]. Edit this file directly to add
 runners or change defaults. Run `/ci:setup` to reconfigure interactively.
 ```
 
@@ -177,7 +174,7 @@ defaults:
 
 ## Runner Notes
 
-Configured by /ci:setup on $(date -u +%Y-%m-%dT%H:%M:%SZ).
+Configured by /ci:setup on [ISO-8601-UTC].
 No self-hosted runners configured. Run `/ci:setup` to add runners.
 ```
 
@@ -199,6 +196,8 @@ If any runner name is missing or the count differs: report the mismatch and
 stop. Do not proceed to Step 7 until the Read tool confirms correct content.
 
 ### Step 7: Report
+
+_This step runs only when new config was written (Steps 4–6 completed)._
 
 ```
 yellow-ci Setup Check
