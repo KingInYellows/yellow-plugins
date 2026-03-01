@@ -98,12 +98,18 @@ Ask via AskUserQuestion for runner details in a single prompt:
   of these patterns:
   - Private IPv4 (full address, anchored):
     `^(10\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){2}|172\.(1[6-9]|2[0-9]|3[01])\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|127\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|192\.168\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$`
-  - FQDN (lowercase only, anchored):
-    `^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$`
+  - FQDN (lowercase only, anchored, max 253 chars per RFC 1035):
+    `^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`
+    Additionally, FQDNs must end with a known internal suffix: `.internal`,
+    `.local`, `.lan`, `.corp`, `.home`, `.intra`, or `.private`. Reject FQDNs
+    with public TLDs (`.com`, `.org`, `.net`, etc.) — they can resolve to
+    public IPs, bypassing the private-network-only policy.
   Public IPs and hostnames that do not match either pattern must be **rejected
   and re-prompted** — do not warn-and-continue. Policy: private network only.
 - SSH user — validate `^[a-z_][a-z0-9_-]{0,31}$`
-- SSH key path (optional — press Enter to use default SSH key)
+- SSH key path (optional — press Enter to use default SSH key) — if provided,
+  validate `^(~|/)[a-zA-Z0-9_./-]{1,255}$` and reject paths containing `..`
+  or shell metacharacters (`` ;|&$` ``)
 
 Validate each field before accepting. On validation failure: report the specific
 issue and ask again.
@@ -232,9 +238,11 @@ runner assignments), `Done`.
 | Missing `repo` scope | "Re-authenticate: gh auth login --scopes repo,workflow,read:org" | Warn, continue |
 | Missing `workflow` scope | Same as above | Warn, continue |
 | Runner name invalid | "Expected: lowercase alphanumeric/dash, 2-64 chars" | Re-prompt |
-| SSH host invalid | "Must be private IPv4 (10.x, 127.x, 192.168.x, 172.16-31.x) or lowercase FQDN" | Re-prompt |
+| SSH host invalid | "Must be private IPv4 (10.x, 127.x, 192.168.x, 172.16-31.x) or internal FQDN" | Re-prompt |
 | SSH public IP entered | "Public IPs are not allowed. Use a private network address." | Re-prompt |
+| FQDN has public TLD | "FQDNs must end with an internal suffix (.internal, .local, .lan, .corp, .home, .intra, .private)." | Re-prompt |
 | SSH user invalid | "Expected: lowercase, starts with letter/underscore, max 32 chars" | Re-prompt |
+| SSH key path invalid | "Must start with ~ or /, alphanumeric/dots/dashes only, no '..' or metacharacters" | Re-prompt |
 | `mkdir -p .claude` fails | "[yellow-ci] Cannot create .claude/ — check permissions." | Stop |
 | Config write fails | "Check .claude/ directory permissions" | Stop |
 | Config validation fails | "[yellow-ci] Config validation failed. Re-run /ci:setup." | Stop |

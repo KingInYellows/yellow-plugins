@@ -68,7 +68,7 @@ Three-layer plugin where each layer is independently useful:
 
 ## When to Use What
 
-- **`/ci:setup`** — First install, after adding runners, or when commands fail with auth/connectivity errors.
+- **`/ci:setup`** — Verify prerequisites and configure runner SSH. Use when first installing, after adding runners, or when commands fail with auth/connectivity errors.
 - **`/ci:diagnose`** — Manual CI failure diagnosis. Use when builds fail.
 - **`failure-analyst` agent** — Auto-triggers on "why did CI fail?", "what
   broke?", exit code questions.
