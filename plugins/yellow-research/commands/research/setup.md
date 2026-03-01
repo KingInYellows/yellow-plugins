@@ -47,7 +47,7 @@ if [ -n "$key" ]; then
   if ! printf '%s' "$key" | grep -qE '^[a-zA-Z0-9_-]{20,}$'; then
     printf 'EXA_API_KEY: FORMAT INVALID (expected 20+ alphanumeric/dash/underscore chars, no whitespace)\n'
   else
-    printf 'EXA_API_KEY: format ok\n'
+    printf 'EXA_API_KEY: FORMAT VALID\n'
   fi
 fi
 ```
@@ -60,7 +60,7 @@ if [ -n "$key" ]; then
   if ! printf '%s' "$key" | grep -qE '^tvly-[a-zA-Z0-9_-]{20,}$'; then
     printf 'TAVILY_API_KEY: FORMAT INVALID (expected tvly- prefix + 20+ chars)\n'
   else
-    printf 'TAVILY_API_KEY: format ok\n'
+    printf 'TAVILY_API_KEY: FORMAT VALID\n'
   fi
 fi
 ```
@@ -73,7 +73,7 @@ if [ -n "$key" ]; then
   if ! printf '%s' "$key" | grep -qE '^pplx-[a-zA-Z0-9_-]{40,}$'; then
     printf 'PERPLEXITY_API_KEY: FORMAT INVALID (expected pplx- prefix + 40+ alphanumeric/dash/underscore chars)\n'
   else
-    printf 'PERPLEXITY_API_KEY: format ok\n'
+    printf 'PERPLEXITY_API_KEY: FORMAT VALID\n'
   fi
 fi
 ```
@@ -81,7 +81,9 @@ fi
 Per-key status after this step: `ABSENT` / `FORMAT VALID` / `FORMAT INVALID`
 
 Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
-`UNREACHABLE` / `PRESENT (untested)` (when user skips testing).
+`UNREACHABLE` / `UNKNOWN` / `PRESENT (untested)` (when user skips testing).
+Treat `UNKNOWN` as `UNREACHABLE` in the capability summary — do not count it
+as active.
 
 ### Step 3: Optional Live API Testing
 
@@ -192,19 +194,19 @@ yellow-research Setup Check
 ===========================
 
 API Keys (all optional — plugin degrades gracefully)
-  Provider       Key         Format    Live Test    Status
-  -----------    --------    ------    ---------    ------
-  EXA            SET         VALID     PASS         ACTIVE
-  Tavily         SET         VALID     SKIP         PRESENT
-  Perplexity     NOT SET     N/A       N/A          INACTIVE
+  Provider       Key         Format    Live Test      Status
+  -----------    --------    ------    -----------    ------
+  EXA            SET         VALID     PASS           ACTIVE
+  Tavily         SET         VALID     PASS           ACTIVE
+  Perplexity     NOT SET     N/A       N/A            INACTIVE
 
 Parallel Task server (OAuth)
   No key required — authenticates via Claude Code browser OAuth automatically.
   You'll be prompted to authorize in your browser on first /research:deep use.
 
 Capability summary:
-  /research:deep    FULL (3/3 sources)
-  /research:code    FULL (3/3 sources)
+  /research:deep    PARTIAL (2/3 sources)
+  /research:code    PARTIAL (2/3 sources)
 ```
 
 Adjust the capability summary based on how many keys are active:
@@ -245,7 +247,7 @@ research), `Done`.
 | Error | Message | Action |
 |---|---|---|
 | `curl` not found | "curl not found — live testing unavailable. Install via system package manager." | Warn, skip Step 3 |
-| `jq` not found | "jq not found — some research commands may be limited." | Warn, continue |
+| `jq` not found | "jq not found — Tavily live test will use printf fallback for JSON body." | Warn, continue |
 | All 3 keys absent | Show all INACTIVE in table + full setup instructions block | Complete normally |
 | Key format invalid | "FORMAT INVALID — [description of expected format]. Key not echoed." | Record, continue |
 | Non-zero curl exit | "UNREACHABLE — API unreachable (timeout or network error)." | Record per-provider |
