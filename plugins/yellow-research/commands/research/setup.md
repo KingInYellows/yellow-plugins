@@ -80,6 +80,9 @@ fi
 
 Per-key status after this step: `ABSENT` / `FORMAT VALID` / `FORMAT INVALID`
 
+Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
+`UNREACHABLE` / `PRESENT (untested)` (when user skips testing).
+
 ### Step 3: Optional Live API Testing
 
 If any keys are present and format-valid, and `curl` is available, ask:
@@ -90,8 +93,9 @@ If any keys are present and format-valid, and `curl` is available, ask:
 >
 > Options: "Yes, test all" / "No, skip testing"
 
-If user opts in (or if no format-valid keys are present, skip automatically),
-run a probe for each format-valid key with a 5-second timeout:
+If user opts in, run a probe for each format-valid key with a 5-second timeout.
+If user skips, proceed to Step 4 with all format-valid keys marked
+`PRESENT (untested)`.
 
 **EXA:**
 
@@ -109,11 +113,17 @@ http_status=$(printf '%s' "$response" | tail -n1)
 **Tavily:**
 
 ```bash
+# Build body safely — key format already validated as [a-zA-Z0-9_-]+
+if command -v jq >/dev/null 2>&1; then
+  tavily_body=$(jq -n --arg k "${TAVILY_API_KEY}" '{"api_key":$k,"query":"test","max_results":1}')
+else
+  tavily_body=$(printf '{"api_key":"%s","query":"test","max_results":1}' "${TAVILY_API_KEY}")
+fi
 response=$(curl -s --connect-timeout 5 --max-time 5 \
   -w "\n%{http_code}" \
   -X POST "https://api.tavily.com/search" \
   -H "Content-Type: application/json" \
-  -d "{\"api_key\":\"${TAVILY_API_KEY}\",\"query\":\"test\",\"max_results\":1}")
+  -d "$tavily_body")
 curl_exit=$?
 http_status=$(printf '%s' "$response" | tail -n1)
 ```
@@ -147,7 +157,7 @@ elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
 elif [ "$http_status" = "429" ]; then
   provider_status="RATE LIMITED"
   provider_detail="Key may be valid; service is busy. Try again later."
-elif printf '%s' "$http_status" | grep -qE '^5'; then
+elif printf '%s' "$http_status" | grep -qE '^5[0-9][0-9]$'; then
   provider_status="UNREACHABLE"
   provider_detail="API server error (HTTP $http_status)"
 else
@@ -156,19 +166,17 @@ else
 fi
 ```
 
-All API response bodies must be redacted before any display — apply all three
-patterns (EXA has no known prefix, so limit to 1-line sanitized summary only):
+Never display raw API response bodies for any provider — only `provider_status`
+and `provider_detail` are used in the results table. If body content must ever
+be shown for error context, redact key patterns first:
 
 ```bash
-# Redact Tavily and Perplexity key patterns from response body
-safe_body=$(printf '%s' "$body" | \
-  sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9]*/***REDACTED***/g')
-# For EXA: never display raw response body — only show status code
+sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9_-]*/***REDACTED***/g'
 ```
 
-Never display raw EXA API response bodies since EXA keys have no public format
-prefix and cannot be reliably redacted. Show only the HTTP status code and
-derived status label.
+Never display EXA response bodies at all — EXA keys have no known prefix
+and cannot be reliably redacted. Show only the HTTP status code and derived
+status label.
 
 Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers in
 request/response dumps.
@@ -240,7 +248,7 @@ research), `Done`.
 | `jq` not found | "jq not found — some research commands may be limited." | Warn, continue |
 | All 3 keys absent | Show all INACTIVE in table + full setup instructions block | Complete normally |
 | Key format invalid | "FORMAT INVALID — [description of expected format]. Key not echoed." | Record, continue |
-| curl timeout (exit 28) | "UNREACHABLE — API did not respond within 5 seconds." | Record per-provider |
+| Non-zero curl exit | "UNREACHABLE — API unreachable (timeout or network error)." | Record per-provider |
 | HTTP 401/403 | "INVALID — key rejected. Regenerate at provider dashboard." | Record per-provider |
 | HTTP 429 | "RATE LIMITED — key may be valid; service is busy. Try again later." | Record per-provider |
 | HTTP 5xx | "UNREACHABLE — API server error." | Record per-provider |
