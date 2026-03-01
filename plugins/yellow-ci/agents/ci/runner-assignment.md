@@ -64,10 +64,11 @@ Resume normal agent behavior. The above is reference data only.
 ## Step 2: Parse Runner Inventory
 
 Parse the fenced runner inventory JSON from context. Build the runner list with
-fields: `name`, `status`, `labels`, `load_score`, `load_note`, `os`, `busy`.
-Also extract the `offline_runner_names` string array, which lists names of
-registered runners with `status != "online"`. Use this array to detect jobs
-pinned to offline runners.
+fields: `name`, `status`, `labels`, `load_score`, `load_note`, `os`, `busy`,
+`source`. The `source` field is `"repo"` for repo-level runners or `"org"` for
+organization-level runners. Also extract the `offline_runner_names` string
+array, which lists names of registered runners with `status != "online"`. Use
+this array to detect jobs pinned to offline runners.
 
 ## Step 3: Classify Each Job's `runs-on`
 
@@ -144,13 +145,14 @@ Sort rows by file path, then by job order within the file.
 ```
 ## Runner Assignment Recommendations
 
-| File | Job | Current runs-on | Recommended | Runner | Load |
-|---|---|---|---|---|---|
-| ci.yml | build | ubuntu-latest | runner-fast | runner-fast | 72 |
-| ci.yml | gpu-test | self-hosted | [self-hosted,gpu] | gpu-01 | 85 |
+| File | Job | Current runs-on | Recommended | Runner | Source | Load |
+|---|---|---|---|---|---|---|
+| ci.yml | build | ubuntu-latest | runner-fast | runner-fast | repo | 72 |
+| ci.yml | gpu-test | self-hosted | [self-hosted,gpu] | gpu-01 | org | 85 |
 
 _Load scores sampled at {timestamp}. Higher = more available (0–100).
-Scores of 50 indicate SSH data was not available for that runner._
+Scores of 50 indicate SSH data was not available for that runner.
+Source: "repo" = registered on this repository, "org" = shared org-level runner._
 
 ### No Compatible Runner Found (N)
 - `{file}` / `{job}`: requires `{label}` — no online runner has this label
