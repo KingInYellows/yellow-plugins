@@ -70,8 +70,8 @@ fi
 ```bash
 key="${PERPLEXITY_API_KEY:-}"
 if [ -n "$key" ]; then
-  if ! printf '%s' "$key" | grep -qE '^pplx-[a-zA-Z0-9]{40,}$'; then
-    printf 'PERPLEXITY_API_KEY: FORMAT INVALID (expected pplx- prefix + 40+ alphanumeric chars)\n'
+  if ! printf '%s' "$key" | grep -qE '^pplx-[a-zA-Z0-9_-]{40,}$'; then
+    printf 'PERPLEXITY_API_KEY: FORMAT INVALID (expected pplx- prefix + 40+ alphanumeric/dash/underscore chars)\n'
   else
     printf 'PERPLEXITY_API_KEY: format ok\n'
   fi
