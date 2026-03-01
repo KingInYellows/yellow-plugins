@@ -37,8 +37,8 @@ by server.
 | ----------------- | ----------- | -------------------------------------------------------------- |
 | `yellow-core`     | Context7    | Free (no key); optional API key for higher rate limits         |
 | `yellow-chatprd`  | ChatPRD     | OAuth (browser popup on first use)                             |
-| `yellow-devin`    | DeepWiki    | Free for public repos; `DEVIN_API_TOKEN` for private repos     |
-| `yellow-devin`    | Devin       | `DEVIN_API_TOKEN` required                                     |
+| `yellow-devin`    | DeepWiki    | Free for public repos; `DEVIN_SERVICE_USER_TOKEN` for private repos     |
+| `yellow-devin`    | Devin       | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                    |
 | `yellow-linear`   | Linear      | OAuth (browser popup on first use)                             |
 | `yellow-research` | Perplexity  | `PERPLEXITY_API_KEY` required                                  |
 | `yellow-research` | Tavily      | `TAVILY_API_KEY` required                                      |
@@ -68,7 +68,7 @@ key (format: `ctx7sk_...`). Then configure it in your Claude Code settings:
 **DeepWiki (public repos):** Works out of the box at `https://mcp.deepwiki.com/mcp`.
 No authentication needed for public repositories.
 
-**DeepWiki (private repos) + Devin sessions:** Both require a Devin API token.
+**DeepWiki (private repos) + Devin sessions:** Both require a `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`.
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
