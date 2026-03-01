@@ -6,6 +6,7 @@ allowed-tools:
   - Bash
   - Read
   - Write
+  - Skill
   - AskUserQuestion
 ---
 
@@ -137,7 +138,7 @@ runners:
   - name: [name]
     host: [host]
     user: [user]
-    # ssh_key: ~/.ssh/runner-key   # Uncomment to specify a key
+    ssh_key: ~/.ssh/runner-key   # Only include when user provided a key path
 defaults:
   ssh_timeout: 3
   max_parallel_ssh: 5
@@ -149,12 +150,14 @@ defaults:
 
 ## Runner Notes
 
-Configured by /ci:setup on [ISO-8601 timestamp]. Edit this file directly to add
+Configured by /ci:setup on $(date -u +%Y-%m-%dT%H:%M:%SZ). Edit this file directly to add
 runners or change defaults. Run `/ci:setup` to reconfigure interactively.
 ```
 
 For multiple runners, repeat the `- name:` block under `runners:` for each.
-For runners with an `ssh_key`, include the uncommented line.
+When the user provided an SSH key path, include `ssh_key: <path>` in that
+runner's config block. When they left the key path blank (pressed Enter), omit
+the `ssh_key` field entirely for that runner.
 
 **With no runners (user declined self-hosted)**, write a minimal config:
 
@@ -174,7 +177,7 @@ defaults:
 
 ## Runner Notes
 
-Configured by /ci:setup on [ISO-8601 timestamp].
+Configured by /ci:setup on $(date -u +%Y-%m-%dT%H:%M:%SZ).
 No self-hosted runners configured. Run `/ci:setup` to add runners.
 ```
 
