@@ -30,12 +30,21 @@ assurance.
 
 **Steps:**
 
-1. Read the plan document completely:
+1. Read the plan document:
+
+   #$ARGUMENTS
+
+   If no arguments are provided, check for recent plan files:
 
    ```bash
-   # Plan path from argument
-   cat "#$ARGUMENTS"
+   ls -t plans/*.md 2>/dev/null | head -5
    ```
+
+   If plans exist, use `AskUserQuestion` to ask: "Which plan file should I
+   work from?" and present the available plans as options. If no plans exist,
+   ask: "Please provide a path to the plan file you want to implement."
+
+   Once the plan path is resolved, read it completely.
 
 2. Parse plan sections:
    - Extract all implementation tasks
@@ -180,7 +189,7 @@ assurance.
    h. Make incremental commit using Graphite:
 
    ```bash
-   gt commit create -m "feat(scope): implement X component
+   gt modify -c -m "feat(scope): implement X component
 
    - Add core functionality
    - Include error handling
@@ -289,7 +298,7 @@ assurance.
 6. Make final quality commit if changes needed:
 
    ```bash
-   gt commit create -m "refactor: address code review feedback
+   gt modify -c -m "refactor: address code review feedback
 
    - Simplify complex function X
    - Fix potential security issue in Y
@@ -317,7 +326,7 @@ assurance.
 3. Create final summary commit if needed (combining context):
 
    ```bash
-   gt commit create -m "feat(scope): implement feature X
+   gt modify -c -m "feat(scope): implement feature X
 
    Closes #123
 
@@ -379,7 +388,7 @@ assurance.
    Next steps:
    - Request reviews from team
    - Monitor CI/CD pipeline
-   - Address review feedback with: gt commit create -m "..." && gt stack submit
+   - Address review feedback with: gt modify -c -m "..." && gt stack submit
    - Merge when approved
    ```
 
@@ -403,7 +412,7 @@ assurance.
 gt create feature-name
 
 # Make a commit
-gt commit create -m "feat: message"
+gt modify -c -m "feat: message"
 
 # View stack
 gt log short

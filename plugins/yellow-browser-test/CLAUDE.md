@@ -42,6 +42,11 @@ routes, and auth flows. Runs structured and exploratory browser tests.
   exploration
 - **`/browser-test:report`** — Regenerate report from cached test results
 
+## Git Operations
+
+This plugin does not perform git operations. Graphite commands and git workflows
+do not apply.
+
 ## Known Limitations
 
 - Chromium only (agent-browser uses Chromium)

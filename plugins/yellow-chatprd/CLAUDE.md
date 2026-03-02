@@ -69,6 +69,11 @@ patterns:
   `linear-prd-bridge` agent. Graceful degradation with install message when not
   present.
 
+## Git Operations
+
+This plugin does not perform git operations. Graphite commands and git workflows
+do not apply.
+
 ## Known Limitations
 
 - MCP-only — no offline mode, no local fallback

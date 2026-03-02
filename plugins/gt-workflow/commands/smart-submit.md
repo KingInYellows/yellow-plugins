@@ -63,7 +63,7 @@ echo "current=$current trunk=$trunk"
 
 - If `current == trunk` → will use `gt create <branch-name> -m "message"` to
   create a new branch
-- If `current != trunk` → will use `gt commit create -m "message"` to add to the
+- If `current != trunk` → will use `gt modify -c -m "message"` to add to the
   current branch
 - If `--amend` argument was passed and on a feature branch → will use
   `gt commit amend` instead
@@ -226,7 +226,7 @@ The branch name should be derived from the commit type and a short slug (e.g.,
 **If on feature branch** (adding to existing):
 
 ```bash
-gt commit create -m "<conventional commit message>"
+gt modify -c -m "<conventional commit message>"
 ```
 
 **If `--amend`** (modifying current branch):

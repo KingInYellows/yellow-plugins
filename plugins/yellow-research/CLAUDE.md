@@ -109,6 +109,11 @@ These external tools improve research quality but are not required:
 Without these, the plugin degrades gracefully: Context7 falls back to EXA,
 `searchGitHub` is simply skipped.
 
+## Git Operations
+
+This plugin does not perform git operations. Graphite commands and git workflows
+do not apply.
+
 ## When to Use What
 
 - `/research:setup` — First install, after adding API keys, or to diagnose degraded sources
