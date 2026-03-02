@@ -21,11 +21,12 @@ Pass arguments through to `/review:pr`:
 
 Invoke the Skill tool with `skill: "review:pr"` and `args: "$ARGUMENTS"`.
 
-If the yellow-review plugin is not installed, inform the user:
+If the Skill invocation fails (skill not found, plugin not installed, or any
+error), inform the user:
 
 > yellow-review plugin is not installed. Install it for full adaptive PR review:
 >
-> ```
+> ```text
 > /plugin marketplace add KingInYellows/yellow-plugins
 > ```
 >

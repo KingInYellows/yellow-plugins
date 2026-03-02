@@ -35,6 +35,10 @@ assurance.
 
    #$ARGUMENTS
 
+   If arguments are provided, treat them as the plan file path. Validate the
+   file exists and read it. If the file does not exist, report the error and
+   ask the user for the correct path.
+
    If no arguments are provided, check for recent plan files:
 
    ```bash
@@ -334,14 +338,17 @@ assurance.
    - Generate a conventional commit message from the diff
    - Submit via `gt submit --no-interactive`
 
-   **Fallback:** If the gt-workflow plugin is not installed, stage and submit
-   directly:
+   **Fallback:** If the Skill invocation fails (skill not found, gt-workflow
+   plugin not installed, or any error), generate a conventional commit message
+   from the changes and submit directly:
 
-   ```bash
-   git add -- <changed-files>
-   gt modify -c -m "feat(scope): implement feature X"
-   gt submit --no-interactive
-   ```
+   1. Generate a conventional commit message summarizing the work done
+   2. Stage only the changed files individually: `git add -- <changed-files>`
+   3. Commit and submit:
+      ```bash
+      gt modify -c -m "<generated conventional commit message>"
+      gt submit --no-interactive
+      ```
 
 4. After submission, get the PR URL:
 
@@ -371,11 +378,13 @@ assurance.
    - Apply P1/P2 fixes automatically
    - Compound findings to docs/solutions/ if significant
 
-   **Graceful degradation:** If the yellow-review plugin is not installed,
-   skip this phase and inform the user:
+   **Graceful degradation:** If the Skill invocation fails (skill not found,
+   yellow-review plugin not installed, or any error), skip this phase and
+   inform the user:
 
-   > Automated PR review skipped — yellow-review plugin not installed.
-   > Consider manual review or install yellow-review for adaptive PR review.
+   > Automated PR review skipped — yellow-review plugin not installed or
+   > review:pr skill unavailable. Consider manual review or install
+   > yellow-review for adaptive PR review.
 
 ## Guidelines
 

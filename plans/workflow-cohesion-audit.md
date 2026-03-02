@@ -204,7 +204,7 @@ All changes modify existing files. No new files needed.
 
 ## Acceptance Criteria
 
-1. `gt commit create` appears nowhere in the codebase (replaced by `gt modify -c`)
+1. No commands, workflows, or scripts instruct users to run `gt commit create` (all such flows use `gt modify -c` instead)
 2. All ruvector hook scripts have 755 permissions
 3. `/workflows:review` redirects to `/review:pr` with deprecation notice
 4. `/workflows:work` delegates submit to `/smart-submit` and runs review:pr after

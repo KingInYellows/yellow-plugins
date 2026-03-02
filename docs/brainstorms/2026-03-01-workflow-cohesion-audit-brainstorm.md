@@ -48,7 +48,7 @@ These conventions apply to every plugin in the monorepo, regardless of domain.
 
 **Target state:**
 - All git write operations (branch creation, commits, pushes, PR creation) MUST
-  use Graphite (`gt create`, `gt commit create`, `gt modify`, `gt submit`)
+  use Graphite (`gt create`, `gt modify -c`, `gt submit`)
 - `gh` is acceptable for read operations (`gh pr view`, `gh pr list`,
   `gh api repos/.../comments`, `gh repo view`)
 - `git` read operations (`git diff`, `git status`, `git log`, `git branch
@@ -131,8 +131,8 @@ integrate with this spine at well-defined entry/exit points.
      |                      |                |              /review:resolve        or gt submit
      |                      |                |              /review:all               |
      v                      v                v                   |                    v
-docs/brainstorms/      plans/*.md       gt create +          gt modify +          gt submit
-                                        gt commit create     gt submit            PR merged
+docs/brainstorms/      plans/*.md       gt create +          gt modify -c +       gt submit
+                                        tests/quality pass   gt submit            PR merged
 ```
 
 #### Spine Entry Points (where plugins connect)
