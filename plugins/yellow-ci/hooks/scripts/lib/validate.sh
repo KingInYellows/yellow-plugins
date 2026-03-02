@@ -413,7 +413,7 @@ validate_ssh_key_path() {
 
   # Only allow safe characters
   case "$key_path" in
-    *[!a-zA-Z0-9_./-~]*) return 1 ;;
+    *[!a-zA-Z0-9_./~-]*) return 1 ;;
   esac
 
   return 0

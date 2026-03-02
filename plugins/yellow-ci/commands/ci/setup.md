@@ -55,7 +55,7 @@ gh auth status 2>&1
 
 Check required scopes. Warn (do not stop) if `repo` or `workflow` are absent:
 
-```
+```text
 [yellow-ci] Warning: Missing scope(s): repo, workflow
 These scopes are needed for /ci:diagnose and /ci:status.
 Re-authenticate with: gh auth login --scopes repo,workflow,read:org
@@ -73,8 +73,8 @@ fi
 If `config_exists`:
 
 - Read `.claude/yellow-ci.local.md` with the Read tool
-- Count runners: `grep -cE '^[[:space:]]*- name:' .claude/yellow-ci.local.md || echo 0`
-  (exits 1 on zero matches — `|| echo 0` prevents false failure)
+- Count runners: `awk '/^[[:space:]]*- name:/{c++} END{print c+0}' .claude/yellow-ci.local.md`
+  (always emits exactly one integer, including `0` for no matches)
 - Extract runner names and display them
 - Ask via AskUserQuestion: "Runner config already exists (N runner(s) configured:
   runner-01, runner-02). Reconfigure?"
@@ -94,7 +94,7 @@ Ask via AskUserQuestion: "Do you use self-hosted GitHub Actions runners?
 **For each runner** (loop until user says "done"):
 
 Ask via AskUserQuestion for runner details in a single prompt:
-- Runner name (e.g., `runner-01`) — validate `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`
+- Runner name (e.g., `runner-01`) — validate `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` (length 1-64)
 - SSH host (private IPv4 like `192.168.1.50` or internal FQDN) — validate using
   `validate_ssh_host` from `hooks/scripts/lib/validate.sh` (accepts private IPv4
   ranges 10.x, 127.x, 172.16-31.x, 192.168.x and FQDNs ending with `.internal`,
@@ -199,7 +199,7 @@ stop. Do not proceed to Step 7 until the Read tool confirms correct content.
 
 _This step runs only when new config was written (Steps 4–6 completed)._
 
-```
+```text
 yellow-ci Setup Check
 =====================
 
@@ -239,7 +239,7 @@ runner assignments), `Done`.
 | `gh auth status` network error | "Could not reach GitHub API — check connectivity." | Stop |
 | Missing `repo` scope | "Re-authenticate: gh auth login --scopes repo,workflow,read:org" | Warn, continue |
 | Missing `workflow` scope | Same as above | Warn, continue |
-| Runner name invalid | "Expected: lowercase alphanumeric/dash, 2-64 chars" | Re-prompt |
+| Runner name invalid | "Expected: lowercase alphanumeric/dash, 1-64 chars" | Re-prompt |
 | SSH host invalid | "Must be private IPv4 (10.x, 127.x, 192.168.x, 172.16-31.x) or internal FQDN" | Re-prompt |
 | SSH public IP entered | "Public IPs are not allowed. Use a private network address." | Re-prompt |
 | FQDN has public TLD | "FQDNs must end with an internal suffix (.internal, .local, .lan, .corp, .home, .intra, .private)." | Re-prompt |

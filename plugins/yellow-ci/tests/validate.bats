@@ -456,3 +456,65 @@ setup() {
   [ "$status" -eq 0 ]
   rm -rf "$tmpdir"
 }
+
+# --- validate_ssh_key_path ---
+
+@test "ssh_key_path: valid empty (default key)" {
+  run validate_ssh_key_path ""
+  [ "$status" -eq 0 ]
+}
+
+@test "ssh_key_path: valid tilde path" {
+  run validate_ssh_key_path "~/.ssh/id_rsa"
+  [ "$status" -eq 0 ]
+}
+
+@test "ssh_key_path: valid absolute path" {
+  run validate_ssh_key_path "/home/runner/.ssh/id_ed25519"
+  [ "$status" -eq 0 ]
+}
+
+@test "ssh_key_path: valid path with hyphens" {
+  run validate_ssh_key_path "~/.ssh/runner-key"
+  [ "$status" -eq 0 ]
+}
+
+@test "ssh_key_path: reject path traversal" {
+  run validate_ssh_key_path "~/.ssh/../../../etc/passwd"
+  [ "$status" -eq 1 ]
+}
+
+@test "ssh_key_path: reject semicolon injection" {
+  run validate_ssh_key_path "/tmp/key;rm -rf /"
+  [ "$status" -eq 1 ]
+}
+
+@test "ssh_key_path: reject backtick injection" {
+  run validate_ssh_key_path '/tmp/key`whoami`'
+  [ "$status" -eq 1 ]
+}
+
+@test "ssh_key_path: reject pipe" {
+  run validate_ssh_key_path "/tmp/key|evil"
+  [ "$status" -eq 1 ]
+}
+
+@test "ssh_key_path: reject dollar" {
+  run validate_ssh_key_path '/tmp/$HOME/key'
+  [ "$status" -eq 1 ]
+}
+
+@test "ssh_key_path: reject relative path (no ~ or /)" {
+  run validate_ssh_key_path "relative/path/key"
+  [ "$status" -eq 1 ]
+}
+
+@test "ssh_key_path: reject newline" {
+  run validate_ssh_key_path $'/home/runner/.ssh/key\n/etc/shadow'
+  [ "$status" -eq 1 ]
+}
+
+@test "ssh_key_path: reject spaces" {
+  run validate_ssh_key_path "/tmp/my key"
+  [ "$status" -eq 1 ]
+}
