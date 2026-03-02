@@ -43,12 +43,12 @@ printf '\n=== Existing State ===\n'
 [ -f ~/.claude/settings.json ] && printf 'settings: exists\n' || printf 'settings: missing\n'
 
 if [ -f ~/.claude/settings.json ]; then
-  if python3 -c "import json; d=json.load(open('$HOME/.claude/settings.json')); print('statusLine:', json.dumps(d.get('statusLine', 'NONE')))" 2>/dev/null; then
+  if python3 -c "import json, os; d=json.load(open(os.path.expanduser('~/.claude/settings.json'))); print('statusLine:', json.dumps(d.get('statusLine', 'NONE')))" 2>/dev/null; then
     :
   else
     printf 'settings_parse: ERROR (invalid JSON)\n'
   fi
-  python3 -c "import json; d=json.load(open('$HOME/.claude/settings.json')); print('disableAllHooks:', d.get('disableAllHooks', False))" 2>/dev/null
+  python3 -c "import json, os; d=json.load(open(os.path.expanduser('~/.claude/settings.json'))); print('disableAllHooks:', d.get('disableAllHooks', False))" 2>/dev/null
 fi
 
 printf '\n=== Plugin Detection ===\n'
@@ -65,7 +65,7 @@ for path in sys.argv[1:]:
         for sname, sconf in servers.items():
             stype = sconf.get('type', 'command')
             env_keys = list(sconf.get('env', {}).keys())
-            env_str = env_keys[0] if env_keys else '-'
+            env_str = ','.join(env_keys) if env_keys else '-'
             srv_info.append(f'{sname}({stype},{env_str})')
         print(f'plugin: {name} | servers: {\" \".join(srv_info) if srv_info else \"(none)\"}')
     except Exception as e:
@@ -103,20 +103,20 @@ DETECTED_PLUGINS = {
 ```
 
 **ENV_REQUIREMENTS** — Only for command-type servers that have env var
-dependencies. Map server name to the env var that must be set:
+dependencies. Map server name to the full list of required env vars:
 
 ```python
 ENV_REQUIREMENTS = {
-    "perplexity": "PERPLEXITY_API_KEY",
-    "tavily": "TAVILY_API_KEY",
-    "exa": "EXA_API_KEY",
+    "perplexity": ["PERPLEXITY_API_KEY"],
+    "tavily": ["TAVILY_API_KEY"],
+    "exa": ["EXA_API_KEY"],
 }
 ```
 
 Rules for building these dicts:
 
 - HTTP-type servers (`type: "http"`) → always considered healthy, no env check
-- Command-type servers with `env` field → extract the first env var name
+- Command-type servers with `env` field → extract all env var names into a list
 - Command-type servers without `env` (e.g., ruvector) → no env check; use
   special ruvector health check (`.ruvector/` directory existence)
 - Plugins with zero MCP servers → omit from DETECTED_PLUGINS entirely
@@ -159,7 +159,7 @@ RUVECTOR_CHECK = REPLACE_WITH_BOOLEAN  # True if yellow-ruvector is installed
 CONTEXT_WARN = 70
 CONTEXT_CRIT = 90
 GIT_CACHE_TTL = 5
-TMPDIR = os.environ.get("TMPDIR", "/tmp")
+CACHE_DIR = os.path.expanduser("~/.claude")
 
 # --- Color helpers ---
 USE_COLOR = (
@@ -204,16 +204,16 @@ def segment_context(data):
     filled = pct * bar_w // 100
     bar = "\u2588" * filled + "\u2591" * (bar_w - filled)
     if pct >= CONTEXT_CRIT:
-        return (c("31", f"{bar} {pct}%"), 2)
+        return (c("31", f"{bar} {pct}%"), 2, [f"ctx: {pct}% (critical)"])
     elif pct >= CONTEXT_WARN:
-        return (c("33", f"{bar} {pct}%"), 1)
+        return (c("33", f"{bar} {pct}%"), 1, [f"ctx: {pct}% (warning)"])
     return (c("32", f"{bar} {pct}%"), 0)
 
 def segment_git(data):
-    cache_path = os.path.join(TMPDIR, "yellow-sl-git")
+    cache_path = os.path.join(CACHE_DIR, "yellow-sl-git")
     cached = read_cache(cache_path, GIT_CACHE_TTL)
     if cached:
-        parts = cached.split("|")
+        parts = cached.split("\n")
         if len(parts) == 3:
             branch, staged, modified = parts[0], int(parts[1]), int(parts[2])
         else:
@@ -231,7 +231,7 @@ def segment_git(data):
             lines = [l for l in status.splitlines() if l]
             staged = sum(1 for l in lines if l[0] in "MADRC")
             modified = sum(1 for l in lines if len(l) > 1 and l[1] in "MD")
-            write_cache(cache_path, f"{branch}|{staged}|{modified}")
+            write_cache(cache_path, f"{branch}\n{staged}\n{modified}")
         except Exception:
             return ("git:--", 0)
     dirty = staged + modified
@@ -241,7 +241,12 @@ def segment_git(data):
             info.append(f"+{staged}")
         if modified:
             info.append(f"~{modified}")
-        return (c("33", f"{branch} {' '.join(info)}"), 1)
+        detail_parts = []
+        if staged:
+            detail_parts.append(f"{staged} staged")
+        if modified:
+            detail_parts.append(f"{modified} modified")
+        return (c("33", f"{branch} {' '.join(info)}"), 1, [f"git: {', '.join(detail_parts)}"])
     return (c("36", branch), 0)
 
 def segment_mcp_health(data):
@@ -255,17 +260,18 @@ def segment_mcp_health(data):
         ok = 0
         total = len(servers)
         for s in servers:
-            env = ENV_REQUIREMENTS.get(s)
+            envs = ENV_REQUIREMENTS.get(s)
             if s == "ruvector" and RUVECTOR_CHECK:
                 # Special check: .ruvector/ directory in cwd
                 if os.path.isdir(os.path.join(cwd, ".ruvector")):
                     ok += 1
                 else:
                     alerts.append(f"ruvector: .ruvector/ missing (run /ruvector:setup)")
-            elif env is None or os.environ.get(env):
+            elif envs is None or all(os.environ.get(e) for e in envs):
                 ok += 1
             else:
-                alerts.append(f"{s}: ${env} not set (run /{short}:setup)")
+                missing = [e for e in (envs or []) if not os.environ.get(e)]
+                alerts.append(f"{s}: ${', $'.join(missing)} not set (run /{short}:setup)")
         if ok == total:
             summaries.append(c("32", f"{short}:OK"))
         else:
@@ -325,7 +331,7 @@ if __name__ == "__main__":
         pass  # Claude Code cancelled mid-output
     except Exception:
         try:
-            with open(os.path.join(TMPDIR, "yellow-sl-error.log"), "a") as f:
+            with open(os.path.join(CACHE_DIR, "yellow-sl-error.log"), "a") as f:
                 f.write(traceback.format_exc())
         except Exception:
             pass  # Never crash — blank statusline is better than error
@@ -467,7 +473,7 @@ If the output is non-empty and the exit code is 0, report success.
 Read back `~/.claude/settings.json` to confirm `statusLine` is present:
 
 ```bash
-python3 -c "import json; d=json.load(open('$HOME/.claude/settings.json')); print('statusLine:', json.dumps(d.get('statusLine'), indent=2))"
+python3 -c "import json, os; d=json.load(open(os.path.expanduser('~/.claude/settings.json'))); print('statusLine:', json.dumps(d.get('statusLine'), indent=2))"
 ```
 
 Display the final report:

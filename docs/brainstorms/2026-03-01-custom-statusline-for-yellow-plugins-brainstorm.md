@@ -52,7 +52,7 @@ The `/statusline:setup` command follows the pattern established by `/research:se
 1. **Detect** -- Scan the plugin cache directory (`~/.claude/plugins/cache/yellow-plugins/`) for installed yellow plugins. For each, read its `plugin.json` to extract registered MCP servers.
 2. **Generate** -- Build a Python statusline script with segments tailored to the detected plugins. Only include MCP health checks for plugins that are actually installed. Include all must-have segments unconditionally; include nice-to-have segments with sensible defaults.
 3. **Preview** -- Show the user: which plugins were detected, which segments will be included, and a mock rendering of what the statusline will look like in normal and alert states.
-4. **Confirm** -- Ask for explicit confirmation before writing `~/.claude/statusline.py` and updating `~/.claude/settings.json`.
+4. **Confirm** -- Ask for explicit confirmation before writing `~/.claude/yellow-statusline.py` and updating `~/.claude/settings.json`.
 
 This avoids surprising the user while still being low-friction. Running the command again regenerates the script (useful after installing new plugins).
 

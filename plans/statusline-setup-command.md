@@ -70,8 +70,9 @@ generates a tailored Python statusline script, previews it, and installs it into
 
 ### Phase 1: Command File
 
-- [ ] 1.1: Create `plugins/yellow-core/commands/statusline/setup.md`
-  - YAML frontmatter: `name: statusline:setup`, allowed-tools: `[Bash, Read, Write, AskUserQuestion]`
+- [x] 1.1: Create `plugins/yellow-core/commands/statusline/setup.md`
+  - YAML frontmatter: `name: statusline:setup`,
+    allowed-tools: `[Bash, Read, Write, AskUserQuestion]`
   - Workflow sections following the established setup command pattern
 
 ### Phase 2: Python Statusline Script (Generated Template)
@@ -81,24 +82,28 @@ gets written to `~/.claude/yellow-statusline.py`.
 
 - [ ] 2.1: Design the segment functions
   - `segment_model(data)` — Show model display name (e.g., `Opus`)
-  - `segment_git(data)` — Branch name + staged/modified counts from `git status --porcelain`
-  - `segment_context(data)` — Unicode progress bar + percentage, color-coded by threshold
+  - `segment_git(data)` — Branch name + staged/modified counts
+    from `git status --porcelain`
+  - `segment_context(data)` — Unicode progress bar + percentage,
+    color-coded by threshold
   - `segment_mcp_health(data)` — Plugin-level rollup from baked-in config
   - `segment_agent(data)` — Show agent name when present
   - `segment_duration(data)` — Session duration formatted as `Xm`
-  - Each function returns `(text: str, alert_level: int)` where 0=normal, 1=warning, 2=critical
+  - Each function returns `(text: str, alert_level: int)` where
+    0=normal, 1=warning, 2=critical
   - Each function wrapped in try/except for error isolation
 
 - [ ] 2.2: Design the layout engine
   - Collect all segment results
   - If max(alert_levels) == 0: render single line with all segments joined by ` | `
   - If max(alert_levels) > 0: Line 1 = primary segments, Line 2 = alert details
-  - Alert details: which MCP servers are unhealthy (with setup command hint), context warning, git dirty count
+  - Alert details: which MCP servers are unhealthy
+    (with setup command hint), context warning, git dirty count
 
 - [ ] 2.3: Design the caching layer
-  - Git cache: `$TMPDIR/yellow-sl-git` with 5s TTL (default `/tmp` if `$TMPDIR` unset)
-  - MCP cache: `$TMPDIR/yellow-sl-mcp` with 30s TTL (default `/tmp` if `$TMPDIR` unset)
-  - Resolve via `os.environ.get("TMPDIR", "/tmp")` for cross-platform portability
+  - Git cache: `~/.claude/yellow-sl-git` with 5s TTL
+  - MCP cache: `~/.claude/yellow-sl-mcp` with 30s TTL
+  - Resolve via `os.path.expanduser("~/.claude")`
   - Use `os.path.getmtime()` for TTL checks — no dependencies
   - Stable filenames (not PID-based) since each run is a new process
 
@@ -163,11 +168,11 @@ The command markdown will instruct Claude to follow these steps:
 
 ### Phase 4: Plugin Registration
 
-- [ ] 4.1: Update `plugins/yellow-core/CLAUDE.md`
+- [x] 4.1: Update `plugins/yellow-core/CLAUDE.md`
   - Add `/statusline:setup` to the Commands section (bump count from 5 to 6)
   - Add to "When to Use What" section (if it exists)
 
-- [ ] 4.2: Update `plugins/yellow-core/README.md`
+- [x] 4.2: Update `plugins/yellow-core/README.md`
   - Add `/statusline:setup` to commands table
 
 - [ ] 4.3: Optionally bump `plugins/yellow-core/.claude-plugin/plugin.json` version
@@ -242,6 +247,7 @@ ENV_REQUIREMENTS = {
     "tavily": "TAVILY_API_KEY",
     "exa": "EXA_API_KEY",
 }
+CACHE_DIR = os.path.expanduser("~/.claude")
 CONTEXT_WARN = 70
 CONTEXT_CRIT = 90
 GIT_CACHE_TTL = 5
@@ -289,10 +295,18 @@ def segment_context(data):
     return (c('32', f"{bar} {pct}%"), 0)
 
 def segment_git(data):
-    cached = read_cache('/tmp/yellow-sl-git', GIT_CACHE_TTL)
+    cache_path = os.path.join(CACHE_DIR, "yellow-sl-git")
+    cached = read_cache(cache_path, GIT_CACHE_TTL)
     if cached:
-        parts = cached.split('|')
-        branch, staged, modified = parts[0], int(parts[1]), int(parts[2])
+        parts = cached.split("\n")
+        if len(parts) == 3:
+            try:
+                branch = parts[0]
+                staged, modified = int(parts[1]), int(parts[2])
+            except ValueError:
+                return ("git:--", 0)
+        else:
+            return ("git:--", 0)
     else:
         try:
             branch = subprocess.check_output(
@@ -303,9 +317,12 @@ def segment_git(data):
                 ['git', 'status', '--porcelain'],
                 stderr=subprocess.DEVNULL, timeout=2
             ).decode()
-            staged = sum(1 for l in status.splitlines() if l and l[0] in 'MADRC')
-            modified = sum(1 for l in status.splitlines() if l and len(l) > 1 and l[1] in 'MD')
-            write_cache('/tmp/yellow-sl-git', f"{branch}|{staged}|{modified}")
+            lines = [l for l in status.splitlines() if l]
+            staged = sum(1 for l in lines if l[0] in 'MADRC')
+            modified = sum(
+                1 for l in lines if len(l) > 1 and l[1] in 'MD'
+            )
+            write_cache(cache_path, f"{branch}\n{staged}\n{modified}")
         except Exception:
             return ("git:--", 0)
     dirty = staged + modified
@@ -338,9 +355,10 @@ def segment_mcp_health(data):
     return (text, alert, alerts if alerts else [])
 
 def segment_agent(data):
-    agent = data.get('agent', {}).get('name')
-    if agent:
-        return (c('35', f"@{agent}"), 0)
+    agent = data.get('agent', {})
+    name = agent.get('name') if isinstance(agent, dict) else None
+    if name:
+        return (c('35', f"@{name}"), 0)
     return (None, 0)
 
 def segment_duration(data):
@@ -348,6 +366,8 @@ def segment_duration(data):
     if ms is None:
         return (None, 0)
     minutes = int(ms) // 60000
+    if minutes < 1:
+        return ("<1m", 0)
     return (f"{minutes}m", 0)
 
 # --- Layout engine ---
@@ -357,9 +377,12 @@ def render():
     alert_details = []
     max_alert = 0
 
-    for fn in [segment_model, segment_context, segment_git, segment_mcp_health,
-               segment_agent, segment_duration]:
-        result = fn(data)
+    for fn in [segment_model, segment_context, segment_git,
+               segment_mcp_health, segment_agent, segment_duration]:
+        try:
+            result = fn(data)
+        except Exception:
+            continue
         text, alert = result[0], result[1]
         if text is None:
             continue
@@ -447,11 +470,11 @@ not in MCP health.
 | `settings.json` does not exist | Create it with just the `statusLine` key |
 | `used_percentage` is null | Show `ctx:--` placeholder |
 | `agent` field absent | Skip agent segment |
-| `agent` field structure | Access as `data.get('agent', {}).get('name')` — object with `name` key |
+| `agent` field structure | `isinstance(agent, dict)` guard before `.get('name')` |
 | Git not available | Show `git:--` placeholder, alert_level 0 (not an error) |
 | Not in a git repository | Show `git:--` placeholder, alert_level 0 |
 | Cache file permission error | Skip caching, compute fresh each time |
-| Cache at `/tmp/` cleaned by OS | Script recreates on next run; use `$TMPDIR` fallback |
+| Cache at `~/.claude/` removed | Script recreates on next run |
 | Script cancelled mid-execution (debounce) | Cache ensures next run is fast; handle `BrokenPipeError` |
 | Concurrent sessions sharing cache | Acceptable — cache is read-only between writes, no corruption risk |
 | Ruvector health check (no env var) | Check if `.ruvector/` exists in cwd; treat as "installed" if present |
