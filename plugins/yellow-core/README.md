@@ -17,11 +17,12 @@ TypeScript, Python, Rust, and Go.
 
 ## Commands
 
-| Command             | Description                                          |
-| ------------------- | ---------------------------------------------------- |
-| `/workflows:plan`   | Transform feature descriptions into structured plans |
-| `/workflows:work`   | Execute work plans systematically                    |
-| `/workflows:review` | Multi-agent comprehensive code review                |
+| Command              | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `/workflows:plan`    | Transform feature descriptions into structured plans     |
+| `/workflows:work`    | Execute work plans systematically                        |
+| `/workflows:review`  | Multi-agent comprehensive code review                    |
+| `/statusline:setup`  | Generate and install an adaptive statusline for plugins  |
 
 ## Agents
 

@@ -38,13 +38,14 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `brainstorm-orchestrator` — iterative brainstorm dialogue with research integration
 - `knowledge-compounder` — extract and document solved problems to docs/solutions/ and MEMORY.md
 
-### Commands (5)
+### Commands (6)
 
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
 - `/workflows:work` — execute work plans systematically
 - `/workflows:review` — multi-agent comprehensive code review
 - `/workflows:compound` — document a recently solved problem to compound knowledge
+- `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 
 ### Skills (3)
 
