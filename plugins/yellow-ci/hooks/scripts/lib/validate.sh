@@ -237,7 +237,7 @@ validate_ssh_host() {
 
     # Check octet bounds
     for octet in "$octet1" "$octet2" "$octet3" "$octet4"; do
-      if [ "$octet" -gt 255 ] 2>/dev/null || [ "$octet" -lt 0 ] 2>/dev/null; then
+      if [ ${#octet} -gt 3 ] || [ "$octet" -gt 255 ] 2>/dev/null; then
         return 1
       fi
     done

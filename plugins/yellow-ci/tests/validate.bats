@@ -237,6 +237,16 @@ setup() {
   [ "$status" -eq 1 ]
 }
 
+@test "ssh_host: reject integer-overflowing octet" {
+  run validate_ssh_host "10.0.0.99999999999999999999"
+  [ "$status" -eq 1 ]
+}
+
+@test "ssh_host: reject octet >255" {
+  run validate_ssh_host "192.168.1.256"
+  [ "$status" -eq 1 ]
+}
+
 # --- validate_ssh_user ---
 
 @test "ssh_user: valid simple" {
