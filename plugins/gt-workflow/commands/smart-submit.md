@@ -63,7 +63,7 @@ echo "current=$current trunk=$trunk"
 
 - If `current == trunk` → will use `gt create <branch-name> -m "message"` to
   create a new branch
-- If `current != trunk` → will use `gt commit create -m "message"` to add to the
+- If `current != trunk` → will use `gt modify -c -m "message"` to add to the
   current branch
 - If `--amend` argument was passed and on a feature branch → will use
   `gt commit amend` instead
@@ -86,7 +86,7 @@ Store this output as `$DIFF_OUTPUT` (pass it as context to each agent below).
 Use the Task tool to launch all three agents in parallel in a **single
 message**, passing `$DIFF_OUTPUT` as context to each:
 
-**code-reviewer** (subagent_type: `general-purpose`):
+**quick-code-review** (subagent_type: `general-purpose`):
 
 > Analyze the following uncommitted diff for:
 >
@@ -104,7 +104,7 @@ message**, passing `$DIFF_OUTPUT` as context to each:
 > Report findings as a list with file:line references. If nothing found, say
 > "CLEAN".
 
-**security-sentinel** (subagent_type: `general-purpose`):
+**quick-security-scan** (subagent_type: `general-purpose`):
 
 > Scan the following uncommitted diff for:
 >
@@ -122,7 +122,7 @@ message**, passing `$DIFF_OUTPUT` as context to each:
 > Be extremely strict. Report findings with file:line references. If nothing
 > found, say "CLEAN".
 
-**silent-failure-hunter** (subagent_type: `general-purpose`):
+**quick-error-check** (subagent_type: `general-purpose`):
 
 > Analyze the following uncommitted diff for:
 >
@@ -226,7 +226,7 @@ The branch name should be derived from the commit type and a short slug (e.g.,
 **If on feature branch** (adding to existing):
 
 ```bash
-gt commit create -m "<conventional commit message>"
+gt modify -c -m "<conventional commit message>"
 ```
 
 **If `--amend`** (modifying current branch):

@@ -15,6 +15,7 @@ allowed-tools:
   - TaskList
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
@@ -30,12 +31,25 @@ assurance.
 
 **Steps:**
 
-1. Read the plan document completely:
+1. Read the plan document:
+
+   #$ARGUMENTS
+
+   If arguments are provided, treat them as the plan file path. Validate the
+   file exists and read it. If the file does not exist, report the error and
+   ask the user for the correct path.
+
+   If no arguments are provided, check for recent plan files:
 
    ```bash
-   # Plan path from argument
-   cat "#$ARGUMENTS"
+   ls -t plans/*.md 2>/dev/null | head -5
    ```
+
+   If plans exist, use `AskUserQuestion` to ask: "Which plan file should I
+   work from?" and present the available plans as options. If no plans exist,
+   ask: "Please provide a path to the plan file you want to implement."
+
+   Once the plan path is resolved, read it completely.
 
 2. Parse plan sections:
    - Extract all implementation tasks
@@ -180,7 +194,7 @@ assurance.
    h. Make incremental commit using Graphite:
 
    ```bash
-   gt commit create -m "feat(scope): implement X component
+   gt modify -c -m "feat(scope): implement X component
 
    - Add core functionality
    - Include error handling
@@ -289,7 +303,7 @@ assurance.
 6. Make final quality commit if changes needed:
 
    ```bash
-   gt commit create -m "refactor: address code review feedback
+   gt modify -c -m "refactor: address code review feedback
 
    - Simplify complex function X
    - Fix potential security issue in Y
@@ -298,7 +312,7 @@ assurance.
 
 ## Phase 4: Ship It
 
-**Objective:** Submit work for review.
+**Objective:** Submit work for review via Graphite.
 
 **Steps:**
 
@@ -314,76 +328,63 @@ assurance.
    - Note any deviations
    - Document reasons for changes
 
-3. Create final summary commit if needed (combining context):
+3. Delegate to `/smart-submit` for audit + commit + submit:
+
+   Invoke the Skill tool with `skill: "smart-submit"`.
+
+   `/smart-submit` will:
+   - Run 3 parallel audit agents (code review, security, silent failures)
+   - Stage files individually (no blanket `git add .`)
+   - Generate a conventional commit message from the diff
+   - Submit via `gt submit --no-interactive`
+
+   **Fallback:** If the Skill invocation fails (skill not found, gt-workflow
+   plugin not installed, or any error), generate a conventional commit message
+   from the changes and submit directly:
+
+   1. Generate a conventional commit message summarizing the work done
+   2. Stage only the changed files individually: `git add -- <changed-files>`
+   3. Commit and submit:
+      ```bash
+      gt modify -c -m "<generated conventional commit message>"
+      gt submit --no-interactive
+      ```
+
+4. After submission, get the PR URL:
 
    ```bash
-   gt commit create -m "feat(scope): implement feature X
-
-   Closes #123
-
-   Implementation includes:
-   - Core functionality in src/feature/
-   - Comprehensive test coverage (95%)
-   - Documentation and examples
-   - Integration with existing system
-
-   Co-authored-by: Claude <claude@anthropic.com>"
+   gh pr view --json url -q .url
    ```
 
-4. Push and create PR using Graphite:
+5. Note any deviations from plan or follow-up work needed.
+
+## Phase 5: Review
+
+**Objective:** Run adaptive PR review on the submitted PR.
+
+**Steps:**
+
+1. Get the PR number for the current branch:
 
    ```bash
-   gt stack submit
+   gh pr view --json number -q .number
    ```
 
-5. Graphite will prompt for PR details. Use this template:
+2. Invoke `/review:pr` via the Skill tool with `skill: "review:pr"` and `args`
+   set to the PR number.
 
-   ```markdown
-   ## Summary
+   `/review:pr` will:
+   - Select review agents adaptively based on PR size and content
+   - Apply P1/P2 fixes automatically
+   - Compound findings to docs/solutions/ if significant
 
-   Brief description of what this PR does and why.
+   **Graceful degradation:** If the Skill invocation fails (skill not found,
+   yellow-review plugin not installed, or any error), skip this phase and
+   inform the user:
 
-   Implements feature X as described in [plan](link-to-plan).
-
-   ## Changes
-
-   - Added: List new features/files
-   - Modified: List changed components
-   - Fixed: List bugs resolved
-
-   ## Testing
-
-   - [ ] Unit tests pass (X% coverage)
-   - [ ] Integration tests pass
-   - [ ] Manual testing completed
-   - [ ] Edge cases verified
-
-   ## Screenshots
-
-   (If applicable - UI changes, CLI output, etc.)
-
-   ## Checklist
-
-   - [ ] Follows project conventions
-   - [ ] Tests included and passing
-   - [ ] Documentation updated
-   - [ ] No breaking changes (or documented if necessary)
-   - [ ] Acceptance criteria met
-   ```
-
-6. After PR created, Graphite will output PR URL. Copy and present to user:
-
-   ```
-   PR created: https://github.com/org/repo/pull/123
-
-   Next steps:
-   - Request reviews from team
-   - Monitor CI/CD pipeline
-   - Address review feedback with: gt commit create -m "..." && gt stack submit
-   - Merge when approved
-   ```
-
-7. Note any deviations from plan or follow-up work needed.
+   > Automated PR review skipped — yellow-review plugin not installed or
+   > review:pr skill unavailable. Consider manual review or install
+   > yellow-review for adaptive PR review.
 
 ## Guidelines
 
@@ -403,7 +404,7 @@ assurance.
 gt create feature-name
 
 # Make a commit
-gt commit create -m "feat: message"
+gt modify -c -m "feat: message"
 
 # View stack
 gt log short
@@ -415,7 +416,7 @@ gt repo sync
 gt upstack restack
 
 # Submit PR(s)
-gt stack submit
+gt submit --no-interactive
 
 # Amend last commit
 gt commit amend -m "new message"

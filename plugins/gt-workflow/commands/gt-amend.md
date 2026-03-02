@@ -59,7 +59,7 @@ Store this output as `$DIFF_OUTPUT` and pass it to each audit agent below.
 Use the Task tool to launch all three agents in parallel in a **single
 message**:
 
-**code-reviewer** (subagent_type: `general-purpose`):
+**quick-code-review** (subagent_type: `general-purpose`):
 
 > Analyze the following diff for mock/stub code, unfinished TODOs, commented-out
 > blocks, or obvious logic errors.
@@ -72,7 +72,7 @@ message**:
 >
 > Report file:line findings. If nothing found, say "CLEAN".
 
-**security-sentinel** (subagent_type: `general-purpose`):
+**quick-security-scan** (subagent_type: `general-purpose`):
 
 > Scan the following diff for hardcoded credentials, API keys, tokens, private
 > keys, PII, or sensitive config files.
@@ -85,7 +85,7 @@ message**:
 >
 > Be extremely strict. Report file:line findings. If nothing found, say "CLEAN".
 
-**silent-failure-hunter** (subagent_type: `general-purpose`):
+**quick-error-check** (subagent_type: `general-purpose`):
 
 > Analyze the following diff for empty catch blocks, swallowed errors, fallback
 > values without logging, or missing error boundaries.

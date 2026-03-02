@@ -23,7 +23,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `performance-oracle` — bottlenecks, algorithmic complexity, scalability
 - `architecture-strategist` — architectural compliance, design patterns
 - `polyglot-reviewer` — language-idiomatic review for TS/Py/Rust/Go
-- `test-coverage-analyst` — test quality, coverage gaps, edge cases
+- `test-coverage-analyst` — full test suite audits, coverage gaps, strategy
 - `pattern-recognition-specialist` — anti-patterns, duplication, naming drift
 
 **Research** — codebase and external research:
@@ -43,7 +43,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
 - `/workflows:work` — execute work plans systematically
-- `/workflows:review` — multi-agent comprehensive code review
+- `/workflows:review` — redirects to `/review:pr` (yellow-review)
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 
@@ -52,6 +52,15 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `create-agent-skills` — guidance for creating skills and agents
 - `git-worktree` — git worktree management for parallel development
+
+### Optional Plugin Dependencies
+
+- **gt-workflow** — `/workflows:work` delegates to `/smart-submit` for
+  commit+submit. Without it, falls back to inline `gt modify -c` +
+  `gt submit --no-interactive`.
+- **yellow-review** — `/workflows:work` invokes `/review:pr` after submission;
+  `/workflows:review` redirects to `/review:pr`. Without either, review steps
+  are skipped with a user notice.
 
 ### MCP Servers (1)
 

@@ -301,7 +301,7 @@ Phase renumbering invalidates all downstream references. See re-review finding N
 
 ### Pre-Commit Checklist for Agent .md Files
 
-Before any `gt commit create` on files under `agents/`, `commands/`, or
+Before any `gt modify -c` on files under `agents/`, `commands/`, or
 `skills/`:
 
 - [ ] Every `exit 1` in a bash block is followed within 2 lines by explicit "stop, do not proceed" prose

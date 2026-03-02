@@ -121,14 +121,6 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
 
 5. If `hooks_remember` fails or is unavailable, skip silently.
 
-### After `gt stack submit` in /workflows:work
-
-6. Run `gt pr` to get the submitted PR URL.
-7. Invoke `/workflows:review <PR URL>` with that URL. **Do not skip this step**
-   unless the user explicitly said to skip review before `gt stack submit` ran.
-8. If the stack has multiple PRs, invoke `/workflows:review` for each PR in
-   the stack, starting from the base branch PR.
-
 ## Known Limitations
 
 - First stdio MCP server in this repo — less battle-tested than HTTP pattern

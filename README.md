@@ -24,7 +24,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 5 commands, 1 skill, 1 hook               |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 7 commands, 1 skill, 2 MCPs                |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 7 commands, 1 skill, 1 MCP                |
-| `yellow-research`     | Deep research with Perplexity, Tavily, EXA, and Parallel Task MCPs — inline code research and saved reports | 2 agents, 2 commands, 1 skill, 4 MCPs               |
+| `yellow-research`     | Deep research with Perplexity, Tavily, EXA, and Parallel Task MCPs — inline code research and saved reports | 2 agents, 3 commands, 1 skill, 4 MCPs               |
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 7 agents, 3 commands, 1 skill                       |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 3 skills, 4 hooks, 1 MCP      |
 
@@ -217,7 +217,7 @@ yellow-plugins/
 │   ├── yellow-debt/           # Debt audit (7 agents, 5 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 7 commands, 1 skill, 2 MCPs)
 │   ├── yellow-linear/         # Linear PM (3 agents, 7 commands, 1 skill, 1 MCP)
-│   ├── yellow-research/       # Deep research (2 agents, 2 commands, 1 skill, 4 MCPs)
+│   ├── yellow-research/       # Deep research (2 agents, 3 commands, 1 skill, 4 MCPs)
 │   ├── yellow-review/         # PR review (7 agents, 3 commands, 1 skill)
 │   └── yellow-ruvector/       # Vector memory (2 agents, 6 commands, 3 skills, 4 hooks, 1 MCP)
 ├── packages/                  # Validation tooling (domain, infrastructure, cli)
