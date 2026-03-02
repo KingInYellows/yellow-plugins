@@ -46,7 +46,12 @@ if [ -f ~/.claude/settings.json ]; then
   if python3 -c "import json, os; d=json.load(open(os.path.expanduser('~/.claude/settings.json'))); print('statusLine:', json.dumps(d.get('statusLine', 'NONE')))" 2>/dev/null; then
     :
   else
-    printf 'settings_parse: ERROR (invalid JSON)\n'
+    # Check if failure is due to JSONC comments
+    if python3 -c "import re, os; raw=open(os.path.expanduser('~/.claude/settings.json')).read(); exit(0 if re.search(r'(^\s*//|/\*)', raw, re.MULTILINE) else 1)" 2>/dev/null; then
+      printf 'settings_parse: ERROR (JSONC comments detected)\n'
+    else
+      printf 'settings_parse: ERROR (invalid JSON)\n'
+    fi
   fi
   python3 -c "import json, os; d=json.load(open(os.path.expanduser('~/.claude/settings.json'))); print('disableAllHooks:', d.get('disableAllHooks', False))" 2>/dev/null
 fi
@@ -86,7 +91,10 @@ fi
 - `disableAllHooks: True` → warn: "Your settings have `disableAllHooks: true`.
   The statusline will not appear until you disable that setting."
 - `statusLine:` not `NONE` → note the existing config for Step 4.
-- `settings_parse: ERROR` → note for Step 5 (will need to create fresh file).
+- `settings_parse: ERROR (JSONC comments detected)` → stop with error:
+  "Your settings.json contains JSONC comments (// or /* */). Please remove all
+  comments and re-run this command. Claude Code requires pure JSON."
+- `settings_parse: ERROR (invalid JSON)` → note for Step 5 (will need to create fresh file).
 
 ### Step 2: Build Configuration from Detected Plugins
 
@@ -199,7 +207,7 @@ def segment_context(data):
     pct = data.get("context_window", {}).get("used_percentage")
     if pct is None:
         return ("ctx:--", 0)
-    pct = int(pct)
+    pct = max(0, min(int(pct), 100))  # Clamp to 0-100
     bar_w = 10
     filled = pct * bar_w // 100
     bar = "\u2588" * filled + "\u2591" * (bar_w - filled)
@@ -519,9 +527,11 @@ Then ask via AskUserQuestion: "What would you like to do next?" with options:
 | Python 3 < 3.7 | "Python 3.7+ required (found X.Y). Please upgrade." | Stop |
 | Plugin cache not found | "No plugin cache at ~/.claude/plugins/cache/. Are yellow-plugins installed?" | Warn, generate minimal script |
 | No MCP-enabled plugins | "No plugins with MCP servers detected. MCP health segment disabled." | Continue, skip MCP segment |
+| settings.json has JSONC comments | "Your settings.json contains JSONC comments. Please remove all comments." | Stop |
 | settings.json invalid JSON | "Could not parse settings.json. A fresh file will be created." | Warn, create new |
 | settings.json write failed | "Could not write settings.json. Check permissions on ~/.claude/." | Stop |
 | Script validation failed | "Generated script produced no output. Check Python installation." | Stop before writing settings |
 | disableAllHooks is true | "Warning: disableAllHooks is true — statusline won't appear." | Warn, continue |
 | User cancels | "Setup cancelled. No files were modified." | Stop |
 | Backup copy failed | "Could not back up existing script. Proceeding without backup." | Warn, continue |
+
