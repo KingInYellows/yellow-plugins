@@ -27,7 +27,7 @@ via ToolSearch).
 
 A new optional command that sits between `/workflows:plan` and `/workflows:work`:
 
-```
+```text
 /workflows:plan → [/workflows:deepen-plan] → /workflows:work
 ```
 

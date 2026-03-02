@@ -201,40 +201,41 @@ For each source below, follow this pattern:
 1. Call ToolSearch with the keyword shown. If the exact tool name is absent from
    the results, record status as `UNAVAILABLE` and move to the next source.
 2. If the tool is found, invoke it with the minimal test arguments shown.
-3. If the call returns any structured data, record status as `ACTIVE`.
-4. If the call throws an exception or returns empty/null, record status as
-   `FAIL`.
+3. If the call succeeds and returns a structured payload (object or array),
+   record status as `ACTIVE` — even if the results array is empty.
+4. If the call throws an exception, returns an explicit error object, `null`,
+   or a non-structured response, record status as `FAIL`.
 
 **Context7** (yellow-core plugin — library docs and code examples):
 
-```
+```text
 ToolSearch keyword: "resolve-library-id"
 Tool name: mcp__plugin_yellow-core_context7__resolve-library-id
-Test call: resolve-library-id with libraryName: "react"
+Test call: mcp__plugin_yellow-core_context7__resolve-library-id with libraryName: "react"
 ```
 
 **Grep MCP** (global — GitHub code pattern search):
 
-```
+```text
 ToolSearch keyword: "searchGitHub"
 Tool name: mcp__grep__searchGitHub
-Test call: searchGitHub with query: "test", maxResults: 1
+Test call: mcp__grep__searchGitHub with query: "test", maxResults: 1
 ```
 
 **WarpGrep** (global — agentic codebase and GitHub search):
 
-```
+```text
 ToolSearch keyword: "warpgrep_codebase_search"
 Tool name: mcp__filesystem-with-morph__warpgrep_codebase_search
-Test call: warpgrep_codebase_search with query: "README"
+Test call: mcp__filesystem-with-morph__warpgrep_codebase_search with query: "README"
 ```
 
 **DeepWiki** (yellow-devin plugin — AI-powered repo documentation):
 
-```
+```text
 ToolSearch keyword: "read_wiki_structure"
 Tool name: mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
-Test call: read_wiki_structure with repoName: "facebook/react"
+Test call: mcp__plugin_yellow-devin_deepwiki__read_wiki_structure with repoName: "facebook/react"
 ```
 
 Run all four ToolSearch probes. For sources that are found, run their test calls.
@@ -352,7 +353,7 @@ research), `Done`.
 | HTTP 5xx | "UNREACHABLE — API server error." | Record per-provider |
 | ToolSearch returns no match for MCP tool | "[source] UNAVAILABLE — plugin not installed or MCP not configured." | Record, continue |
 | MCP test call throws exception | "[source] FAIL — tool found but test call errored." | Record, continue |
-| MCP test call returns empty/null | "[source] FAIL — tool returned no data." | Record, continue |
+| MCP test call returns empty result set | "[source] ACTIVE — tool reachable, probe returned no matches." | Record, continue |
 
 Never stop on a per-provider or per-source error — report it and continue to
 the next provider/source. The overall command always completes.
