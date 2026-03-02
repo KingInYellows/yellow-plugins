@@ -1,6 +1,6 @@
 ---
 name: research:setup
-description: "Check which research API keys are configured and which providers are active. Use when first installing the plugin, after adding API keys, or to understand why a research command degraded to fewer sources."
+description: "Check which research API keys and MCP sources are configured and active. Use when first installing the plugin, after adding API keys, or to understand why a research command degraded to fewer sources."
 argument-hint: ''
 allowed-tools:
   - Bash

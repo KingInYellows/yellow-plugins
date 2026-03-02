@@ -111,9 +111,19 @@ These external tools improve research quality but are not required:
 - **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search.
   Used by `/research:code` and `/research:deep`. No API key required. Configure
   globally in Claude Code MCP settings.
+- **filesystem-with-morph MCP** — provides WarpGrep
+  (`mcp__filesystem-with-morph__warpgrep_codebase_search`) for agentic
+  codebase and GitHub search. No API key required. Configure globally in
+  Claude Code MCP settings.
+- **yellow-devin plugin** — provides DeepWiki
+  (`mcp__plugin_yellow-devin_deepwiki__read_wiki_structure`) for AI-powered
+  repo documentation. Install: `/plugin marketplace add
+  KingInYellows/yellow-plugins` (select yellow-devin)
 
 Without these, the plugin degrades gracefully: Context7 falls back to EXA,
 `searchGitHub` is simply skipped, deepen-plan runs external research only.
+`/research:setup` reports all optional sources as UNAVAILABLE with install
+instructions.
 
 ## Git Operations
 
