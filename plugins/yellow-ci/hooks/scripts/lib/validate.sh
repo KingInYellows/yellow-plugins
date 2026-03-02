@@ -229,10 +229,25 @@ validate_ssh_host() {
 
   # Try IPv4 first: N.N.N.N format
   if [[ "$host" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    # Validate private range: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+    # Validate each octet is 0-255
     local octet1=${BASH_REMATCH[1]}
     local octet2=${BASH_REMATCH[2]}
+    local octet3=${BASH_REMATCH[3]}
+    local octet4=${BASH_REMATCH[4]}
 
+    # Check octet bounds and reject leading zeros
+    for octet in "$octet1" "$octet2" "$octet3" "$octet4"; do
+      # Reject leading zeros (except "0" itself)
+      if [ ${#octet} -gt 1 ] && [ "${octet:0:1}" = "0" ]; then
+        return 1
+      fi
+      # Validate 0-255 range
+      if [ ${#octet} -gt 3 ] || [ "$octet" -gt 255 ] 2>/dev/null; then
+        return 1
+      fi
+    done
+
+    # Validate private range: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
     if [ "$octet1" -eq 10 ] 2>/dev/null; then
       return 0
     elif [ "$octet1" -eq 172 ] 2>/dev/null && [ "$octet2" -ge 16 ] 2>/dev/null && [ "$octet2" -le 31 ] 2>/dev/null; then
@@ -258,7 +273,12 @@ validate_ssh_host() {
     return 1
   fi
 
-  return 0
+  # TLD restriction: only internal suffixes allowed (private-network-only policy)
+  case "$host" in
+    *.internal|*.local|*.lan|*.corp|*.home|*.intra|*.private) return 0 ;;
+  esac
+
+  return 1  # Public TLD rejected
 }
 
 # Validate SSH username: Linux username rules
@@ -369,6 +389,46 @@ validate_ssh_command() {
   # Reject shell metacharacters that enable injection
   case "$cmd" in
     *\;*|*\&*|*\|*|*\$\(*|*\`*) return 1 ;;
+  esac
+
+  return 0
+}
+
+# Validate SSH key path: starts with ~ or /, safe characters only
+# Usage: validate_ssh_key_path "$path"
+validate_ssh_key_path() {
+  local key_path="$1"
+
+  # Empty is valid (means use default SSH key)
+  if [ -z "$key_path" ]; then
+    return 0
+  fi
+
+  # Length check
+  if [ ${#key_path} -gt 256 ]; then
+    return 1
+  fi
+
+  # Reject newlines
+  if has_newline "$key_path"; then
+    return 1
+  fi
+
+  # Must start with ~ or /
+  case "$key_path" in
+    ~*|/*) ;;
+    *) return 1 ;;
+  esac
+
+  # Reject path traversal and shell metacharacters
+  case "$key_path" in
+    *..*) return 1 ;;
+    *\;*|*\|*|*\&*|*\$*|*\`*) return 1 ;;
+  esac
+
+  # Only allow safe characters
+  case "$key_path" in
+    *[!a-zA-Z0-9_./~-]*) return 1 ;;
   esac
 
   return 0

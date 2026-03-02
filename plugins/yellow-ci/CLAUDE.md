@@ -34,8 +34,9 @@ Three-layer plugin where each layer is independently useful:
 
 ## Plugin Components
 
-### Commands (7)
+### Commands (8)
 
+- `/ci:setup` — Verify prerequisites and configure self-hosted runner SSH config
 - `/ci:diagnose [run-id]` — Diagnose CI failure and suggest fixes
 - `/ci:status` — Show recent CI workflow run status
 - `/ci:lint-workflows [file]` — Lint GitHub Actions workflows for common issues
@@ -67,6 +68,7 @@ Three-layer plugin where each layer is independently useful:
 
 ## When to Use What
 
+- **`/ci:setup`** — Verify prerequisites and configure runner SSH. Use when first installing, after adding runners, or when commands fail with auth/connectivity errors.
 - **`/ci:diagnose`** — Manual CI failure diagnosis. Use when builds fail.
 - **`failure-analyst` agent** — Auto-triggers on "why did CI fail?", "what
   broke?", exit code questions.
