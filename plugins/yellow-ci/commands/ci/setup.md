@@ -35,8 +35,9 @@ Stop conditions (after reporting all failures):
 - `gh` not found: "GitHub CLI is required. Install from https://cli.github.com/ then run `gh auth login`."
 - `jq` not found: "jq is required. Install from https://jqlang.github.io/jq/download/"
 
-`ssh` missing is a warning only — it only affects `/ci:runner-health` and
-`/ci:runner-cleanup`, not diagnosis or linting commands.
+`ssh` missing is a warning only — it affects `/ci:runner-health`,
+`/ci:runner-cleanup`, and `/ci:setup-self-hosted` (for live load checks).
+Diagnosis and linting commands are unaffected.
 
 ### Step 2: Check GitHub CLI Auth
 
@@ -94,7 +95,7 @@ Ask via AskUserQuestion: "Do you use self-hosted GitHub Actions runners?
 **For each runner** (loop until user says "done"):
 
 Ask via AskUserQuestion for runner details in a single prompt:
-- Runner name (e.g., `runner-01`) — validate `^[a-z0-9]([a-z0-9-]*[a-z0-9])?$` (length 1-64)
+- Runner name (e.g., `runner-01`) — validate `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` (length 2-64)
 - SSH host (private IPv4 like `192.168.1.50` or internal FQDN) — validate using
   `validate_ssh_host` from `hooks/scripts/lib/validate.sh` (accepts private IPv4
   ranges 10.x, 127.x, 172.16-31.x, 192.168.x and FQDNs ending with `.internal`,
@@ -234,12 +235,12 @@ runner assignments), `Done`.
 |---|---|---|
 | `gh` not found | "Install from https://cli.github.com/" | Collect, stop after all checks |
 | `jq` not found | "Install from https://jqlang.github.io/jq/download/" | Collect, stop after all checks |
-| `ssh` not found | "Needed for runner health/cleanup commands only" | Warn, continue |
+| `ssh` not found | "Needed for runner health/cleanup and SSH-health checks in /ci:setup-self-hosted" | Warn, continue |
 | `gh` not authenticated | "Run: gh auth login" | Stop |
 | `gh auth status` network error | "Could not reach GitHub API — check connectivity." | Stop |
 | Missing `repo` scope | "Re-authenticate: gh auth login --scopes repo,workflow,read:org" | Warn, continue |
 | Missing `workflow` scope | Same as above | Warn, continue |
-| Runner name invalid | "Expected: lowercase alphanumeric/dash, 1-64 chars" | Re-prompt |
+| Runner name invalid | "Expected: lowercase alphanumeric/dash, 2-64 chars" | Re-prompt |
 | SSH host invalid | "Must be private IPv4 (10.x, 127.x, 192.168.x, 172.16-31.x) or internal FQDN" | Re-prompt |
 | SSH public IP entered | "Public IPs are not allowed. Use a private network address." | Re-prompt |
 | FQDN has public TLD | "FQDNs must end with an internal suffix (.internal, .local, .lan, .corp, .home, .intra, .private)." | Re-prompt |

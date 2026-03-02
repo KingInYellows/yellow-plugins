@@ -229,10 +229,20 @@ validate_ssh_host() {
 
   # Try IPv4 first: N.N.N.N format
   if [[ "$host" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    # Validate private range: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+    # Validate each octet is 0-255
     local octet1=${BASH_REMATCH[1]}
     local octet2=${BASH_REMATCH[2]}
+    local octet3=${BASH_REMATCH[3]}
+    local octet4=${BASH_REMATCH[4]}
 
+    # Check octet bounds
+    for octet in "$octet1" "$octet2" "$octet3" "$octet4"; do
+      if [ "$octet" -gt 255 ] 2>/dev/null || [ "$octet" -lt 0 ] 2>/dev/null; then
+        return 1
+      fi
+    done
+
+    # Validate private range: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
     if [ "$octet1" -eq 10 ] 2>/dev/null; then
       return 0
     elif [ "$octet1" -eq 172 ] 2>/dev/null && [ "$octet2" -ge 16 ] 2>/dev/null && [ "$octet2" -le 31 ] 2>/dev/null; then
