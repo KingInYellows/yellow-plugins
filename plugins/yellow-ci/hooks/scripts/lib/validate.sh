@@ -235,8 +235,13 @@ validate_ssh_host() {
     local octet3=${BASH_REMATCH[3]}
     local octet4=${BASH_REMATCH[4]}
 
-    # Check octet bounds
+    # Check octet bounds and reject leading zeros
     for octet in "$octet1" "$octet2" "$octet3" "$octet4"; do
+      # Reject leading zeros (except "0" itself)
+      if [ ${#octet} -gt 1 ] && [ "${octet:0:1}" = "0" ]; then
+        return 1
+      fi
+      # Validate 0-255 range
       if [ ${#octet} -gt 3 ] || [ "$octet" -gt 255 ] 2>/dev/null; then
         return 1
       fi

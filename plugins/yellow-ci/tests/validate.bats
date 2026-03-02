@@ -247,6 +247,11 @@ setup() {
   [ "$status" -eq 1 ]
 }
 
+@test "ssh_host: reject leading zeros in octet" {
+  run validate_ssh_host "10.0.0.010"
+  [ "$status" -eq 1 ]
+}
+
 # --- validate_ssh_user ---
 
 @test "ssh_user: valid simple" {
