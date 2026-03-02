@@ -95,7 +95,7 @@ Ask via AskUserQuestion: "Do you use self-hosted GitHub Actions runners?
 **For each runner** (loop until user says "done"):
 
 - Runner name (e.g., `runner-01`) — validate `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` (length 2-64)
-- Runner name (e.g., `runner-01`) — validate `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` (length 2-64)
+
 - SSH host (private IPv4 like `192.168.1.50` or internal FQDN) — validate using
   `validate_ssh_host` from `hooks/scripts/lib/validate.sh` (accepts private IPv4
   ranges 10.x, 127.x, 172.16-31.x, 192.168.x and FQDNs ending with `.internal`,
