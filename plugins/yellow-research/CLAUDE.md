@@ -1,7 +1,8 @@
 # yellow-research Plugin
 
-Deep research plugin with 4 bundled MCP servers. Two workflows: `/research:code`
-(inline, fast) and `/research:deep` (multi-source, saved to `docs/research/`).
+Deep research plugin with 4 bundled MCP servers. Three workflows: `/research:code`
+(inline, fast), `/research:deep` (multi-source, saved to `docs/research/`), and
+`/workflows:deepen-plan` (enrich plans with codebase + external research).
 
 ## MCP Servers
 
@@ -57,11 +58,14 @@ Off-by-default tools (enable by adding them to the `tools=` arg in `plugin.json`
 
 ### Commands
 
-- `/research:setup` — Check which API keys are configured and which providers are active
+- `/research:setup` — Check which API keys and MCP sources are configured and active
 - `/research:code [topic]` — Inline code research: delegates to code-researcher,
   returns synthesized answer in-context. No file saved.
 - `/research:deep [topic]` — Multi-source deep research: conductor decides
   fan-out strategy, saves to `docs/research/<slug>.md`.
+- `/workflows:deepen-plan [plan path]` — Enrich an existing plan with codebase
+  validation and external research, annotating inline. Optional step between
+  `/workflows:plan` and `/workflows:work`.
 
 ### Agents
 
@@ -98,8 +102,10 @@ These external tools improve research quality but are not required:
 - **yellow-core plugin** — provides Context7
   (`mcp__plugin_yellow-core_context7__resolve-library-id`,
   `mcp__plugin_yellow-core_context7__query-docs`) for official library
-  docs. Used by `/research:code` for library queries. Falls back to EXA if not
-  installed.
+  docs. Used by `/research:code` for library queries. Also provides
+  `repo-research-analyst` agent used by `/workflows:deepen-plan` for codebase
+  validation. Falls back to EXA (for Context7) or skips codebase research
+  (for deepen-plan) if not installed.
   Install: `/plugin marketplace add KingInYellows/yellow-plugins` (select
   yellow-core)
 - **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search.
@@ -107,7 +113,7 @@ These external tools improve research quality but are not required:
   globally in Claude Code MCP settings.
 
 Without these, the plugin degrades gracefully: Context7 falls back to EXA,
-`searchGitHub` is simply skipped.
+`searchGitHub` is simply skipped, deepen-plan runs external research only.
 
 ## Git Operations
 
@@ -119,5 +125,6 @@ do not apply.
 - `/research:setup` — First install, after adding API keys, or to diagnose degraded sources
 - `/research:code` — Actively coding, need quick answer about a library or API
 - `/research:deep` — Need a comprehensive report saved for later reference
-- `research-conductor` auto-triggers via `/research:deep` — do not call directly
+- `/workflows:deepen-plan` — Have a plan from `/workflows:plan` that needs deeper validation before `/workflows:work`
+- `research-conductor` auto-triggers via `/research:deep` and `/workflows:deepen-plan` — do not call directly
 - `code-researcher` auto-triggers via `/research:code` — do not call directly

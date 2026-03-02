@@ -5,12 +5,18 @@ argument-hint: ''
 allowed-tools:
   - Bash
   - AskUserQuestion
+  - ToolSearch
+  - mcp__plugin_yellow-core_context7__resolve-library-id
+  - mcp__grep__searchGitHub
+  - mcp__filesystem-with-morph__warpgrep_codebase_search
+  - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
 ---
 
 # Set Up yellow-research
 
-Check which API keys are configured, validate their format, and optionally test
-live connectivity. All three API keys are optional — the plugin degrades
+Check which API keys are configured, validate their format, optionally test live
+connectivity, and health-check MCP sources. All API keys are optional and MCP
+sources are always available if their plugin is installed — the plugin degrades
 gracefully and continues with whichever sources are available.
 
 ## Workflow
@@ -87,9 +93,10 @@ Step 3 assigns final live-test status: `ACTIVE` / `INVALID` / `RATE LIMITED` /
 
 If any keys are present and format-valid, and `curl` is available, ask:
 
-> "Test live API connectivity? This will make 1 small call per present key and
-> **may consume a small amount of API quota** (1 search credit or 1 token per
-> provider). Skip if you're on a paid plan and quota is a concern."
+> "Test live API connectivity? MCP sources are always checked (no quota cost).
+> This option controls whether API key sources are also probed — **1 small call
+> per present key, consuming a small amount of API quota** (1 search credit or
+> 1 token per provider). Skip if quota is a concern."
 >
 > Options: "Yes, test all" / "No, skip testing"
 
@@ -183,6 +190,64 @@ request/response dumps.
 
 If user skips testing: all format-valid keys show `PRESENT (untested)`.
 
+### Step 3.5: MCP Source Health Checks
+
+This step runs unconditionally — MCP calls have no quota cost and require no
+user opt-in. Check each of the four MCP sources using a ToolSearch probe
+followed by a lightweight test call.
+
+For each source below, follow this pattern:
+
+1. Call ToolSearch with the keyword shown. If the exact tool name is absent from
+   the results, record status as `UNAVAILABLE` and move to the next source.
+2. If the tool is found, invoke it with the minimal test arguments shown.
+3. If the call returns any structured data, record status as `ACTIVE`.
+4. If the call throws an exception or returns empty/null, record status as
+   `FAIL`.
+
+**Context7** (yellow-core plugin — library docs and code examples):
+
+```
+ToolSearch keyword: "resolve-library-id"
+Tool name: mcp__plugin_yellow-core_context7__resolve-library-id
+Test call: resolve-library-id with libraryName: "react"
+```
+
+**Grep MCP** (global — GitHub code pattern search):
+
+```
+ToolSearch keyword: "searchGitHub"
+Tool name: mcp__grep__searchGitHub
+Test call: searchGitHub with query: "test", maxResults: 1
+```
+
+**WarpGrep** (global — agentic codebase and GitHub search):
+
+```
+ToolSearch keyword: "warpgrep_codebase_search"
+Tool name: mcp__filesystem-with-morph__warpgrep_codebase_search
+Test call: warpgrep_codebase_search with query: "README"
+```
+
+**DeepWiki** (yellow-devin plugin — AI-powered repo documentation):
+
+```
+ToolSearch keyword: "read_wiki_structure"
+Tool name: mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
+Test call: read_wiki_structure with repoName: "facebook/react"
+```
+
+Run all four ToolSearch probes. For sources that are found, run their test calls.
+Record each source's status for the Step 4 report table.
+
+Never stop on a per-source error — record the status and continue to the next
+source. A failing MCP source does not affect API key checks or overall command
+completion.
+
+Note: ToolSearch results reflect the session-start state. If a plugin was
+installed mid-session, a Claude Code restart may be needed for the tool to
+appear.
+
 ### Step 4: Report Results
 
 Display a unified status table:
@@ -202,16 +267,31 @@ Parallel Task server (OAuth)
   No key required — authenticates via Claude Code browser OAuth automatically.
   You'll be prompted to authorize in your browser on first /research:deep use.
 
+MCP Sources (no API key required — always available if plugin installed)
+  Source         Plugin          Status
+  -----------    -----------     --------
+  Context7       yellow-core     ACTIVE
+  Grep MCP       (global)        ACTIVE
+  WarpGrep       (global)        UNAVAILABLE
+  DeepWiki       yellow-devin    ACTIVE
+
 Capability summary:
-  /research:deep    PARTIAL (2/3 sources — Perplexity inactive)
-  /research:code    PARTIAL (2/3 sources — Perplexity inactive)
+  /research:deep    PARTIAL (2/3 API sources — Perplexity inactive)
+  /research:code    PARTIAL (2/3 API sources — Perplexity inactive)
+  MCP sources:      3/4 available
 ```
 
 Adjust the capability summary based on how many keys are active:
 
-- 3 active: `FULL (3/3 sources)`
-- 1-2 active: `PARTIAL (N/3 sources)`
+- 3 active: `FULL (3/3 API sources)`
+- 1-2 active: `PARTIAL (N/3 API sources)`
 - 0 active: `MINIMAL (Parallel Task OAuth only — no API key sources)`
+
+Adjust the MCP sources line based on how many MCP sources are ACTIVE:
+
+- 4 active: `MCP sources: 4/4 available`
+- 1-3 active: `MCP sources: N/4 available`
+- 0 active: `MCP sources: 0/4 available — install plugins or configure MCPs`
 
 ### Step 5: Setup Instructions (for absent or invalid keys)
 
@@ -235,6 +315,23 @@ required after adding new keys. Never commit API keys to version control.
 Only show the lines for keys that are absent or invalid (not all three if some
 are already working).
 
+If any MCP sources are `UNAVAILABLE` or `FAIL`, show this block:
+
+```text
+To enable missing MCP sources:
+
+  Context7:   Install yellow-core — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-core)
+  Grep MCP:   Configure grep MCP globally in Claude Code MCP settings
+  WarpGrep:   Configure filesystem-with-morph MCP globally in Claude Code MCP settings
+  DeepWiki:   Install yellow-devin — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-devin)
+
+If a source shows FAIL (installed but test failed), try restarting Claude Code.
+ToolSearch results reflect session-start state — restart after installing new plugins.
+```
+
+Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all four
+if some are already working).
+
 ### Step 6: Next Steps
 
 Ask via AskUserQuestion: "What would you like to do next?" with options:
@@ -253,6 +350,9 @@ research), `Done`.
 | HTTP 401/403 | "INVALID — key rejected. Regenerate at provider dashboard." | Record per-provider |
 | HTTP 429 | "RATE LIMITED — key may be valid; service is busy. Try again later." | Record per-provider |
 | HTTP 5xx | "UNREACHABLE — API server error." | Record per-provider |
+| ToolSearch returns no match for MCP tool | "[source] UNAVAILABLE — plugin not installed or MCP not configured." | Record, continue |
+| MCP test call throws exception | "[source] FAIL — tool found but test call errored." | Record, continue |
+| MCP test call returns empty/null | "[source] FAIL — tool returned no data." | Record, continue |
 
-Never stop on a per-provider error — report it and continue to the next
-provider. The overall command always completes.
+Never stop on a per-provider or per-source error — report it and continue to
+the next provider/source. The overall command always completes.

@@ -1,10 +1,11 @@
 # yellow-research
 
 Deep research plugin for Claude Code. Bundles Perplexity, Tavily, EXA, and
-Parallel Task MCP servers with two workflows:
+Parallel Task MCP servers with three workflows:
 
 - **`/research:code`** — Inline code research for active development
 - **`/research:deep`** — Multi-source deep research saved to `docs/research/`
+- **`/workflows:deepen-plan`** — Enrich plans with codebase + external research
 
 ## Installation
 
@@ -101,9 +102,10 @@ Executive summary of findings.
 
 | Command | Description |
 |---|---|
-| `/research:setup` | Check which API keys are active and which providers are available |
+| `/research:setup` | Check which API keys and MCP sources are active |
 | `/research:code [topic]` | Inline code research — returns answer in-context, no file saved |
 | `/research:deep [topic]` | Multi-source deep research — saves report to `docs/research/<slug>.md` |
+| `/workflows:deepen-plan [path]` | Enrich a plan with codebase validation + external research |
 
 ## Graceful Degradation
 
