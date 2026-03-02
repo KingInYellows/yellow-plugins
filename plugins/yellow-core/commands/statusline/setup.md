@@ -215,18 +215,22 @@ def segment_git(data):
     if cached:
         parts = cached.split("\n")
         if len(parts) == 3:
-            branch, staged, modified = parts[0], int(parts[1]), int(parts[2])
+            try:
+                branch, staged, modified = parts[0], int(parts[1]), int(parts[2])
+            except ValueError:
+                return ("git:--", 0)
         else:
             return ("git:--", 0)
     else:
         try:
+            git_cwd = data.get("cwd")
             branch = subprocess.check_output(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                stderr=subprocess.DEVNULL, timeout=2
+                stderr=subprocess.DEVNULL, timeout=2, cwd=git_cwd
             ).decode().strip()
             status = subprocess.check_output(
                 ["git", "status", "--porcelain"],
-                stderr=subprocess.DEVNULL, timeout=2
+                stderr=subprocess.DEVNULL, timeout=2, cwd=git_cwd
             ).decode()
             lines = [l for l in status.splitlines() if l]
             staged = sum(1 for l in lines if l[0] in "MADRC")
@@ -291,10 +295,12 @@ def segment_duration(data):
     ms = data.get("cost", {}).get("total_duration_ms")
     if ms is None:
         return (None, 0)
-    minutes = int(ms) // 60000
+    total_s = int(ms) // 1000
+    minutes = total_s // 60
+    seconds = total_s % 60
     if minutes < 1:
-        return ("<1m", 0)
-    return (f"{minutes}m", 0)
+        return (f"{seconds}s", 0)
+    return (f"{minutes}m {seconds}s", 0)
 
 # --- Layout engine ---
 def render():
@@ -400,13 +406,13 @@ If user chose "Back up existing and replace":
 
 ```bash
 python3 -c "
-import json, os, shutil
+import json, os, shlex, shutil
 settings_path = os.path.expanduser('~/.claude/settings.json')
 try:
     with open(settings_path) as f:
         cmd = json.load(f).get('statusLine', {}).get('command', '')
     # Extract the script path (last token handles 'python3 /path/to/script.py')
-    parts = cmd.split()
+    parts = shlex.split(cmd)
     script = parts[-1] if parts else ''
     if script and os.path.isfile(script):
         shutil.copy2(script, script + '.backup')
@@ -423,7 +429,7 @@ Resolve the absolute path to the script:
 
 ```bash
 python3 -c "
-import json, os, sys
+import json, os, re, shlex, shutil, sys
 
 home = os.path.expanduser('~')
 script_path = os.path.join(home, '.claude', 'yellow-statusline.py')
@@ -436,13 +442,22 @@ if os.path.isfile(settings_path):
     try:
         with open(settings_path) as f:
             settings = json.load(f)
-    except (json.JSONDecodeError, OSError) as e:
-        print(f'Warning: Could not parse settings.json ({e}). Creating fresh.', file=sys.stderr)
+    except json.JSONDecodeError as e:
+        with open(settings_path) as f:
+            raw = f.read()
+        if re.search(r'(^\s*//|/\*)', raw, re.MULTILINE):
+            print('Error: settings.json contains JSONC comments. Please remove comments or manually add the statusLine key.', file=sys.stderr)
+            sys.exit(1)
+        backup_path = settings_path + '.corrupt.backup'
+        shutil.copy2(settings_path, backup_path)
+        print(f'Warning: settings.json is corrupt ({e}). Backed up to {backup_path} and creating fresh.', file=sys.stderr)
+    except OSError as e:
+        print(f'Warning: Could not read settings.json ({e}). Creating fresh.', file=sys.stderr)
 
 # Merge statusLine key
 settings['statusLine'] = {
     'type': 'command',
-    'command': f'python3 {script_path}'
+    'command': f'python3 {shlex.quote(script_path)}'
 }
 
 # Atomic write: tmp -> validate -> rename
