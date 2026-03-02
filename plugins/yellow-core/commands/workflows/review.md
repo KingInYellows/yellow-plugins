@@ -1,15 +1,10 @@
 ---
 name: workflows:review
-description: 'Deprecated — redirects to /review:pr for adaptive multi-agent PR review'
+description: 'Multi-agent PR review (redirects to /review:pr from yellow-review)'
 argument-hint: '[PR number/URL/branch]'
 allowed-tools:
-  - Bash
-  - Read
-  - Glob
-  - Grep
-  - Task
-  - AskUserQuestion
   - Skill
+  - AskUserQuestion
 ---
 
 # Code Review (Redirect)

@@ -43,7 +43,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
 - `/workflows:work` — execute work plans systematically
-- `/workflows:review` — **deprecated**, redirects to `/review:pr` (yellow-review)
+- `/workflows:review` — redirects to `/review:pr` (yellow-review)
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 
 ### Skills (3)
@@ -51,6 +51,15 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `create-agent-skills` — guidance for creating skills and agents
 - `git-worktree` — git worktree management for parallel development
+
+### Optional Plugin Dependencies
+
+- **gt-workflow** — `/workflows:work` delegates to `/smart-submit` for
+  commit+submit. Without it, falls back to inline `gt modify -c` +
+  `gt submit --no-interactive`.
+- **yellow-review** — `/workflows:work` invokes `/review:pr` after submission;
+  `/workflows:review` redirects to `/review:pr`. Without either, review steps
+  are skipped with a user notice.
 
 ### MCP Servers (1)
 
