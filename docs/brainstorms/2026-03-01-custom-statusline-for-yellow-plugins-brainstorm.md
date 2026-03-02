@@ -5,7 +5,7 @@
 
 ## What We're Building
 
-A `/statusline:setup` command for the yellow-plugins ecosystem that auto-detects which yellow plugins are installed, generates a Python statusline script tailored to those plugins, previews the result for the user, and installs it into `~/.claude/statusline.sh` + updates `~/.claude/settings.json` upon confirmation.
+A `/statusline:setup` command for the yellow-plugins ecosystem that auto-detects which yellow plugins are installed, generates a Python statusline script tailored to those plugins, previews the result for the user, and installs it into `~/.claude/yellow-statusline.py` + updates `~/.claude/settings.json` upon confirmation.
 
 The statusline uses an **adaptive layout**: a single compact line during normal operation that expands to two lines when something needs attention (context window > 70%, an MCP server is down, or git has uncommitted changes).
 

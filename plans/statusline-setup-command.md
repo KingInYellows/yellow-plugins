@@ -96,8 +96,9 @@ gets written to `~/.claude/yellow-statusline.py`.
   - Alert details: which MCP servers are unhealthy (with setup command hint), context warning, git dirty count
 
 - [ ] 2.3: Design the caching layer
-  - Git cache: `/tmp/yellow-statusline-git-cache` with 5s TTL
-  - MCP cache: `/tmp/yellow-statusline-mcp-cache` with 30s TTL
+  - Git cache: `$TMPDIR/yellow-sl-git` with 5s TTL (default `/tmp` if `$TMPDIR` unset)
+  - MCP cache: `$TMPDIR/yellow-sl-mcp` with 30s TTL (default `/tmp` if `$TMPDIR` unset)
+  - Resolve via `os.environ.get("TMPDIR", "/tmp")` for cross-platform portability
   - Use `os.path.getmtime()` for TTL checks — no dependencies
   - Stable filenames (not PID-based) since each run is a new process
 
