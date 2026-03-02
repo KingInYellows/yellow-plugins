@@ -15,6 +15,7 @@ allowed-tools:
   - TaskList
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
@@ -307,7 +308,7 @@ assurance.
 
 ## Phase 4: Ship It
 
-**Objective:** Submit work for review.
+**Objective:** Submit work for review via Graphite.
 
 **Steps:**
 
@@ -323,76 +324,58 @@ assurance.
    - Note any deviations
    - Document reasons for changes
 
-3. Create final summary commit if needed (combining context):
+3. Delegate to `/smart-submit` for audit + commit + submit:
+
+   Invoke the Skill tool with `skill: "smart-submit"`.
+
+   `/smart-submit` will:
+   - Run 3 parallel audit agents (code review, security, silent failures)
+   - Stage files individually (no blanket `git add .`)
+   - Generate a conventional commit message from the diff
+   - Submit via `gt submit --no-interactive`
+
+   **Fallback:** If the gt-workflow plugin is not installed, stage and submit
+   directly:
 
    ```bash
-   gt modify -c -m "feat(scope): implement feature X
-
-   Closes #123
-
-   Implementation includes:
-   - Core functionality in src/feature/
-   - Comprehensive test coverage (95%)
-   - Documentation and examples
-   - Integration with existing system
-
-   Co-authored-by: Claude <claude@anthropic.com>"
+   git add -- <changed-files>
+   gt modify -c -m "feat(scope): implement feature X"
+   gt submit --no-interactive
    ```
 
-4. Push and create PR using Graphite:
+4. After submission, get the PR URL:
 
    ```bash
-   gt stack submit
+   gh pr view --json url -q .url
    ```
 
-5. Graphite will prompt for PR details. Use this template:
+5. Note any deviations from plan or follow-up work needed.
 
-   ```markdown
-   ## Summary
+## Phase 5: Review
 
-   Brief description of what this PR does and why.
+**Objective:** Run adaptive PR review on the submitted PR.
 
-   Implements feature X as described in [plan](link-to-plan).
+**Steps:**
 
-   ## Changes
+1. Get the PR number for the current branch:
 
-   - Added: List new features/files
-   - Modified: List changed components
-   - Fixed: List bugs resolved
-
-   ## Testing
-
-   - [ ] Unit tests pass (X% coverage)
-   - [ ] Integration tests pass
-   - [ ] Manual testing completed
-   - [ ] Edge cases verified
-
-   ## Screenshots
-
-   (If applicable - UI changes, CLI output, etc.)
-
-   ## Checklist
-
-   - [ ] Follows project conventions
-   - [ ] Tests included and passing
-   - [ ] Documentation updated
-   - [ ] No breaking changes (or documented if necessary)
-   - [ ] Acceptance criteria met
+   ```bash
+   gh pr view --json number -q .number
    ```
 
-6. After PR created, Graphite will output PR URL. Copy and present to user:
+2. Invoke `/review:pr` via the Skill tool with `skill: "review:pr"` and `args`
+   set to the PR number.
 
-   ```
-   PR created: https://github.com/org/repo/pull/123
+   `/review:pr` will:
+   - Select review agents adaptively based on PR size and content
+   - Apply P1/P2 fixes automatically
+   - Compound findings to docs/solutions/ if significant
 
-   Next steps:
-   - Request reviews from team
-   - Monitor CI/CD pipeline
-   - Address review feedback with: gt modify -c -m "..." && gt stack submit
-   - Merge when approved
-   ```
+   **Graceful degradation:** If the yellow-review plugin is not installed,
+   skip this phase and inform the user:
 
-7. Note any deviations from plan or follow-up work needed.
+   > Automated PR review skipped — yellow-review plugin not installed.
+   > Consider manual review or install yellow-review for adaptive PR review.
 
 ## Guidelines
 
@@ -424,7 +407,7 @@ gt repo sync
 gt upstack restack
 
 # Submit PR(s)
-gt stack submit
+gt submit --no-interactive
 
 # Amend last commit
 gt commit amend -m "new message"
