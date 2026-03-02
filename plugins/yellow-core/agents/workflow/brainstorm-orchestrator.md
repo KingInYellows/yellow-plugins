@@ -110,5 +110,9 @@ If this check fails, stop. Do not print Phase 5 success message.
 
 ## Phase 5: Handoff
 
-Print: `Brainstorm saved to: $RESOLVED_TARGET` — then suggest `/workflows:plan` to turn
-this brainstorm into an implementation plan.
+Print: `Brainstorm saved to: $RESOLVED_TARGET`
+
+Then suggest the exact next command with the resolved path pre-filled:
+
+> To turn this into an implementation plan, run:
+> `/workflows:plan $RESOLVED_TARGET`

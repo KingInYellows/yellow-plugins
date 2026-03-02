@@ -38,6 +38,17 @@ Graphite-native workflow commands for stacked PR development.
 - `/gt-sync` — Sync repo, restack, clean up
 - `/gt-nav` — Visualize and navigate the stack
 
+## Submit Paths
+
+- **`/smart-submit`** — Ad-hoc commit+submit for working changes. Runs 3-agent
+  audit (code review, security, silent failures), generates conventional commit,
+  submits via Graphite. Use when committing standalone changes outside a plan.
+- **`/workflows:work`** (yellow-core) — Plan-driven implementation. Delegates to
+  `/smart-submit` in its final phase. Use when executing a structured plan from
+  `/workflows:plan`.
+
+Both paths use `gt submit --no-interactive` for submission.
+
 ## Hooks
 
 - **PreToolUse (Bash)** — Blocks any raw `git push` call; redirects to
