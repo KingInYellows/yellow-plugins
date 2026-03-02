@@ -17,24 +17,28 @@ TypeScript, Python, Rust, and Go.
 
 ## Commands
 
-| Command             | Description                                          |
-| ------------------- | ---------------------------------------------------- |
-| `/workflows:plan`   | Transform feature descriptions into structured plans |
-| `/workflows:work`   | Execute work plans systematically                    |
-| `/workflows:review` | Multi-agent comprehensive code review                |
+| Command                 | Description                                                        |
+| ----------------------- | ------------------------------------------------------------------ |
+| `/workflows:brainstorm` | Explore requirements through dialogue and research before planning |
+| `/workflows:plan`       | Transform feature descriptions into structured plans               |
+| `/workflows:work`       | Execute work plans systematically                                  |
+| `/workflows:review`     | Multi-agent comprehensive code review                              |
+| `/workflows:compound`   | Document a recently solved problem to compound knowledge           |
+| `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
 
 ## Agents
 
-### Review (6)
+### Review (7)
 
-| Agent                      | Description                                      |
-| -------------------------- | ------------------------------------------------ |
-| `code-simplicity-reviewer` | YAGNI enforcement, simplification                |
-| `security-sentinel`        | Security audit, OWASP, secrets scanning          |
-| `performance-oracle`       | Bottlenecks, algorithmic complexity, scalability |
-| `architecture-strategist`  | Architectural compliance, design patterns        |
-| `polyglot-reviewer`        | Language-idiomatic review for TS/Py/Rust/Go      |
-| `test-coverage-analyst`    | Test quality, coverage gaps, edge cases          |
+| Agent                              | Description                                      |
+| ---------------------------------- | ------------------------------------------------ |
+| `code-simplicity-reviewer`         | YAGNI enforcement, simplification                |
+| `security-sentinel`                | Security audit, OWASP, secrets scanning          |
+| `performance-oracle`               | Bottlenecks, algorithmic complexity, scalability |
+| `architecture-strategist`          | Architectural compliance, design patterns        |
+| `polyglot-reviewer`                | Language-idiomatic review for TS/Py/Rust/Go      |
+| `test-coverage-analyst`            | Test quality, coverage gaps, edge cases          |
+| `pattern-recognition-specialist`   | Anti-patterns, duplication, naming drift         |
 
 ### Research (3)
 
@@ -44,11 +48,13 @@ TypeScript, Python, Rust, and Go.
 | `best-practices-researcher` | External docs, community standards |
 | `git-history-analyzer`      | Git archaeology, change history    |
 
-### Workflow (1)
+### Workflow (3)
 
-| Agent                | Description                            |
-| -------------------- | -------------------------------------- |
-| `spec-flow-analyzer` | User flow analysis, gap identification |
+| Agent                    | Description                                                    |
+| ------------------------ | -------------------------------------------------------------- |
+| `spec-flow-analyzer`     | User flow analysis, gap identification                         |
+| `brainstorm-orchestrator` | Iterative brainstorm dialogue with research integration       |
+| `knowledge-compounder`   | Extract and document solved problems to compound knowledge     |
 
 ## Skills
 
