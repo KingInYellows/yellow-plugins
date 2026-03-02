@@ -331,7 +331,7 @@ Schema migrations if applicable.
    What would you like to do next?
 
    1. Start implementation (/workflows:work plans/<name>.md)
-   2. Review the plan (/workflows:review plans/<name>.md)
+   2. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md)
    3. Create GitHub issue (I'll use gh issue create)
    4. Simplify the plan (reduce detail level)
    5. Something else
@@ -339,7 +339,7 @@ Schema migrations if applicable.
 
 3. Based on response:
    - Option 1: Transition to /workflows:work
-   - Option 2: Transition to /workflows:review
+   - Option 2: Transition to /gt-stack-plan with the plan file path
    - Option 3: Create issue with
      `gh issue create --title "..." --body-file plans/<name>.md`
    - Option 4: Rewrite plan with simpler template
