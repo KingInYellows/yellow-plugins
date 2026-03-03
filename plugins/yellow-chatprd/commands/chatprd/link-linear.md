@@ -69,20 +69,10 @@ Organize into a proposed issue breakdown with titles and descriptions.
 
 ### Step 5: Fetch Related Specs
 
-Determine the source document's project:
-
-1. Read `default_project_id` from `.claude/yellow-chatprd.local.md` workspace
-   config.
-2. If `default_project_id` is not configured, set `related_specs = []` and skip
-   to Step 6.
-
-If a project ID is available, call `list_project_documents` with that
-`projectId` and workspace `organizationId`. Filter out the source document
-itself (by UUID). Store the remaining documents as `related_specs` (title +
-document UUID).
-
-**Timeout:** If `list_project_documents` does not respond within 5 seconds, set
-`related_specs = []` and proceed. Log: "Related specs could not be loaded."
+Fetch related specs per `chatprd-conventions` Related-Specs Pattern using
+`default_project_id` from workspace config. Filter out the source document by
+UUID. Store results as `related_specs` (title + UUID). Skip silently if project
+ID is unavailable or API times out.
 
 ### Step 6: Dedup Check
 
@@ -119,15 +109,7 @@ Create approved (non-duplicate) issues via `create_issue`:
   Never fall through on rate limit.
 - Include ChatPRD document title as reference in each issue description.
 - When `related_specs` is non-empty, include a References section in each issue
-  description:
-
-  ```markdown
-  ## References
-  - Source: [Document Title] (ChatPRD)
-  - Related specs in this project:
-    - [Spec Title 1]
-    - [Spec Title 2]
-  ```
+  description per `chatprd-conventions` Related-Specs Pattern template.
 
 ### Step 10: Report
 

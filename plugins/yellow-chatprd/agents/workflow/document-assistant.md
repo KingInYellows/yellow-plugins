@@ -55,12 +55,10 @@ mapping, template selection, input validation, and workspace config patterns.
 
 ## Workspace Config
 
-At the start of any session, check if `.claude/yellow-chatprd.local.md` exists.
-If missing: surface "Run `/chatprd:setup` to configure your workspace first."
-and stop. If present: read it and parse `org_id`, `org_name`,
-`default_project_id`, `default_project_name` from YAML frontmatter. If
-`org_id` is empty or blank: report "Config malformed — re-run `/chatprd:setup`."
-and stop. Use these values for all org-scoped tool calls.
+At the start of any session, read workspace config per `chatprd-conventions`
+Workspace Config section. Extract `org_id`, `org_name`, `default_project_id`,
+`default_project_name`. Stop if config is missing or malformed. Use these
+values for all org-scoped tool calls.
 
 ## Behavior
 

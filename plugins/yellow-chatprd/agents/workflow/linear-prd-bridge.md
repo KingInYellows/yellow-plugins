@@ -8,7 +8,6 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - Read
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__get_document
   - mcp__plugin_yellow-chatprd_chatprd__list_project_documents
@@ -61,11 +60,9 @@ Attempt to call `mcp__plugin_yellow-linear_linear__list_teams`:
 
 ### Step 2: Read Workspace Config
 
-Check if `.claude/yellow-chatprd.local.md` exists. If missing: surface "Run
-`/chatprd:setup` to configure your workspace first." and stop. If present: read
-it and parse `org_id`, `org_name`, `default_project_id`,
-`default_project_name` from YAML frontmatter. If `org_id` is empty or blank:
-report "Config malformed — re-run `/chatprd:setup`." and stop.
+Read workspace config per `chatprd-conventions` Workspace Config section.
+Extract `org_id`, `org_name`, `default_project_id`, `default_project_name`.
+Stop if config is missing or malformed.
 
 ### Step 3: Find ChatPRD Document
 
@@ -82,16 +79,10 @@ Call `get_document` to read the full content.
 
 ### Step 4: Fetch Related Specs
 
-Use `default_project_id` from workspace config (Step 2):
-
-1. If `default_project_id` is not configured, set `related_specs = []` and skip
-   to Step 5.
-2. Call `list_project_documents` with the `projectId` and `organizationId`.
-3. Filter out the source document itself (by UUID).
-4. Store remaining documents as `related_specs` (title + UUID).
-
-**Timeout:** If `list_project_documents` does not respond within 5 seconds, set
-`related_specs = []` and proceed. Log: "Related specs could not be loaded."
+Fetch related specs per `chatprd-conventions` Related-Specs Pattern using
+`default_project_id` from workspace config (Step 2). Filter out the source
+document by UUID. Store results as `related_specs` (title + UUID). Skip
+silently if project ID is unavailable or API times out.
 
 ### Step 5: Extract Requirements
 
@@ -139,15 +130,7 @@ Create approved issues via `create_issue`:
 - Include ChatPRD document title as reference in each issue description
 - Skip any issues the user removed or marked as duplicate
 - When `related_specs` is non-empty, include a References section in each issue
-  description:
-
-  ```markdown
-  ## References
-  - Source: [Document Title] (ChatPRD)
-  - Related specs in this project:
-    - [Spec Title 1]
-    - [Spec Title 2]
-  ```
+  description per `chatprd-conventions` Related-Specs Pattern template.
 
 ### Step 10: Report
 

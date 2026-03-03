@@ -78,26 +78,28 @@ Suggest the best-fit template based on the description (see
 
 ### Step 5: Inject Repository Context (Optional)
 
-1. Check if the selected template is technical: "Technical Design Document" or
-   "API Documentation".
-2. If not technical, skip to Step 6.
-3. Attempt to discover DeepWiki tools via `ToolSearch` with query
-   `"+deepwiki read_wiki"`.
-4. If DeepWiki tools not found: display "Tip: Install yellow-devin for automatic
-   repository context in technical specs." Skip to Step 6.
-5. Ask via `AskUserQuestion`: "Pull architecture context from the repository via
-   DeepWiki? [Yes / No]"
-6. If no: skip to Step 6.
-7. Determine the repository name from git remote:
+Only applies to technical templates ("Technical Design Document" or "API
+Documentation"). For non-technical templates, skip to Step 6.
+
+a. Discover DeepWiki tools via `ToolSearch` with query `"+deepwiki read_wiki"`.
+   If not found: display "Tip: Install yellow-devin for automatic repository
+   context in technical specs." Skip to Step 6.
+
+b. Ask via `AskUserQuestion`: "Pull architecture context from the repository
+   via DeepWiki? [Yes / No]". If no, skip to Step 6.
+
+c. Determine the repository name from git remote:
    ```bash
    git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]//' | sed 's/.git$//'
    ```
-8. If `read_wiki_structure` returns empty or errors: display "No repository
-   context available from DeepWiki. Proceeding without it." Skip to Step 6.
-9. If successful: extract architecture-relevant sections. Inject them into the
-   document outline as additional `description` content in relevant sections
-   (e.g., architecture section gets component overview, dependencies section
-   gets dependency list from the repo).
+
+d. Call `read_wiki_structure` with the repo name. If empty or error: display
+   "No repository context available from DeepWiki. Proceeding without it."
+   Skip to Step 6.
+
+e. Extract architecture-relevant sections and inject into the document outline
+   as additional `description` content (e.g., architecture section gets
+   component overview, dependencies section gets dependency list).
 
 **Cross-plugin dependency:** yellow-devin (optional). Graceful degradation at
 every step — the command works identically without yellow-devin installed.

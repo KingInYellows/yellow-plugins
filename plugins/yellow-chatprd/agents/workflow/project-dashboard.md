@@ -49,11 +49,9 @@ mapping, input validation, and dashboard formatting.
 
 ### Step 1: Read Workspace Config
 
-Check if `.claude/yellow-chatprd.local.md` exists. If missing: surface "Run
-`/chatprd:setup` to configure your workspace first." and stop. If present: read
-it and parse `org_id`, `org_name`, `default_project_id`,
-`default_project_name` from YAML frontmatter. If `org_id` is empty or blank:
-report "Config malformed — re-run `/chatprd:setup`." and stop.
+Read workspace config per `chatprd-conventions` Workspace Config section.
+Extract `org_id`, `org_name`, `default_project_id`, `default_project_name`.
+Stop if config is missing or malformed.
 
 ### Step 2: Resolve Project
 

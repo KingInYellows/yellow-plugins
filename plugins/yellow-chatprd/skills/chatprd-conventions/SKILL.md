@@ -66,6 +66,16 @@ When enriching external outputs (e.g., Linear issues) with project context:
 4. Include remaining documents as reference links.
 5. If project ID unavailable or API times out (5s), skip silently.
 
+When `related_specs` is non-empty, include a References section in outputs:
+
+```markdown
+## References
+- Source: [Document Title] (ChatPRD)
+- Related specs in this project:
+  - [Spec Title 1]
+  - [Spec Title 2]
+```
+
 Include all project documents initially. Filter by relevance in future
 iterations if reference lists become unwieldy.
 

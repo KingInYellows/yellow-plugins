@@ -22,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `document-assistant` agent now shows related conversation count in searches
-- `project-dashboard` agent includes conversation count from `list_chats`
 
 ---
 

@@ -74,8 +74,8 @@ Determine listing mode from `$ARGUMENTS`:
 
 Present documents as a formatted list:
 
-- **Project-scoped:** Up to 50 results (the `list_project_documents` limit)
-- **Org-scoped / Personal:** Up to 20 results
+- **Project-scoped:** Up to 50 results (the `list_project_documents` default)
+- **Org-scoped / Personal:** Up to 10 results (API default)
 
 For each document show:
 
