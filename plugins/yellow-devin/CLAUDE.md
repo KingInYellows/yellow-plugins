@@ -2,7 +2,7 @@
 
 Devin.AI integration for multi-agent workflows — delegate tasks, research
 codebases via DeepWiki, orchestrate plan-implement-review chains. Targets
-**Devin V3 API (beta)** with service user authentication.
+**Devin V3 API** with service user authentication.
 
 ## Required Environment Variables
 
@@ -13,19 +13,20 @@ codebases via DeepWiki, orchestrate plan-implement-review chains. Targets
 
 ## Required Permissions
 
-The service user needs at minimum:
+The service user needs these permissions for full functionality:
 
-- **`ManageOrgSessions`** — Create, list, terminate, archive sessions (org scope)
+| Permission | Scope | Grants | Required? |
+|---|---|---|---|
+| `UseDevinSessions` | Org | Create sessions | **Required** |
+| `ViewOrgSessions` | Org | List and get sessions | **Required** |
+| `ManageOrgSessions` | Org | Send messages, terminate, archive | **Required** |
+| `ViewAccountSessions` | Enterprise | List sessions cross-org | Optional |
+| `ManageAccountSessions` | Enterprise | Enterprise-scope messaging | Optional |
 
-Recommended for full functionality:
-
-- **`ManageAccountSessions`** — Send messages, enterprise-scope listing
-- **`ViewOrgSessions`** — Individual session GET (not needed if using list
-  endpoint with `session_ids` filter)
-
-**Note:** The individual session GET endpoint (`/sessions/{id}`) requires
-`ViewOrgSessions`. All commands use the list endpoint with `session_ids` filter
-as a workaround — see Session Lookup Pattern in `devin-workflows` skill.
+**Note:** All commands use the list endpoint with `session_ids` filter for
+session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
+`/devin:message` command tries the org-scoped endpoint first
+(`ManageOrgSessions`), falling back to enterprise (`ManageAccountSessions`).
 
 ## MCP Servers
 
@@ -38,9 +39,9 @@ as a workaround — see Session Lookup Pattern in `devin-workflows` skill.
 ## Conventions
 
 - **API calls:** All session management via `curl` to
-  `api.devin.ai/v3beta1/`. Two scopes:
-  - **Org:** `https://api.devin.ai/v3beta1/organizations/${DEVIN_ORG_ID}/...`
-  - **Enterprise:** `https://api.devin.ai/v3beta1/enterprise/...`
+  `api.devin.ai/v3/`. Two scopes:
+  - **Org:** `https://api.devin.ai/v3/organizations/${DEVIN_ORG_ID}/...`
+  - **Enterprise:** `https://api.devin.ai/v3/enterprise/...`
 - **JSON construction:** Always use `jq` — never interpolate user input into
   JSON strings.
 - **Shell quoting:** Always quote variables: `"$VAR"` not `$VAR`.
@@ -117,7 +118,8 @@ as a workaround — see Session Lookup Pattern in `devin-workflows` skill.
 
 ## Known Limitations
 
-- **V3 API is in beta** — endpoint URLs use `/v3beta1/` and may change
+- **V3 API** — session endpoints promoted to `/v3/` (Feb 2026); some endpoints
+  like repo indexing remain on `/v3beta1/`
 - **MCP auth with `cog_` tokens unverified** — Devin MCP at `mcp.devin.ai` may
   need separate auth configuration
 - **Scheduled sessions are UI-only** — manage at Settings > Schedules in the

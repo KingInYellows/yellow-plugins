@@ -23,16 +23,16 @@ yellow-devin plugin's commands and agents.
 
 ## API Base
 
-All REST API calls target `https://api.devin.ai/v3beta1/`. Two scopes:
+All REST API calls target `https://api.devin.ai/v3/`. Two scopes:
 
-- **Organization:** `https://api.devin.ai/v3beta1/organizations/{org_id}/...`
-- **Enterprise:** `https://api.devin.ai/v3beta1/enterprise/...`
+- **Organization:** `https://api.devin.ai/v3/organizations/{org_id}/...`
+- **Enterprise:** `https://api.devin.ai/v3/enterprise/...`
 
 Authentication via Bearer token from `DEVIN_SERVICE_USER_TOKEN` env var (service
 user credential, `cog_` prefix). Organization ID from `DEVIN_ORG_ID` env var.
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
 ```
@@ -84,9 +84,8 @@ command -v jq >/dev/null 2>&1 || {
 ## Session Lookup Pattern
 
 To fetch a single session by ID, use the org-scoped **list** endpoint with the
-`session_ids` query parameter. Do **not** use the individual GET endpoint
-(`/sessions/{id}`) — it requires the `ViewOrgSessions` permission, which service
-users may lack.
+`session_ids` query parameter. This avoids per-session permission edge cases with
+the individual GET endpoint (`/sessions/{id}`).
 
 ```bash
 response=$(curl -s --connect-timeout 5 --max-time 10 \

@@ -48,7 +48,7 @@ Fetch using the org-scoped **list** endpoint with `session_ids` filter (see
 Session Lookup Pattern in `devin-workflows` skill):
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \

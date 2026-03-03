@@ -51,7 +51,7 @@ Validate `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`. Construct prompt using
 `jq` (see devin-workflows skill for API patterns).
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
 ```
@@ -107,7 +107,8 @@ If review found issues and iteration count < 3:
 
 1. Construct specific fix instructions from review findings
 2. Re-fetch session status (TOCTOU protection)
-3. Send fix message via `POST ${ENTERPRISE_URL}/sessions/${SESSION_ID}/messages`
+3. Send fix message via `POST ${ORG_URL}/sessions/${SESSION_ID}/messages`
+   (org-scoped; falls back to enterprise endpoint on 403)
 4. Return to Step 3
 
 If iteration count >= 3: escalate to user with summary, suggest manual

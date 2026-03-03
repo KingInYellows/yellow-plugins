@@ -33,7 +33,7 @@ Fetch session to confirm it exists and check current state. Use the org-scoped
 `devin-workflows` skill):
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \

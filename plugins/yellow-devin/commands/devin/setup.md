@@ -88,17 +88,17 @@ printf '%-18s valid (%s)\n' 'Org ID format:' "$org"
 If the Bash call exits non-zero (invalid org ID format), stop here — display
 the error message above and do not proceed to Step 3.
 
-### Step 3: Probe ManageOrgSessions
+### Step 3: Probe Org-Scoped Permissions
 
-Make a read-only call to the org-scoped sessions list to verify the token works
-and `ManageOrgSessions` is granted:
+Run two probes against the org-scoped API to check `ViewOrgSessions` (list) and
+`UseDevinSessions` (create — tested via list, confirmed by session creation).
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
 printf '\n=== Permission Checks ===\n'
-printf 'Probing ManageOrgSessions...\n'
+printf 'Probing ViewOrgSessions (list)...\n'
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \
   -w "\n%{http_code}" \
@@ -116,10 +116,11 @@ Outcome mapping:
   - Exit 7: "Could not connect to Devin API — the API may be temporarily down." Stop.
   - Exit 28: "Request timed out — check network connectivity and try again." Stop.
   - Other: "Network error (curl exit $curl_exit)." Stop.
-- **HTTP 200:** `ManageOrgSessions` confirmed. Record as PASS. Also verify
-  response uses `items` array (not `sessions`).
+- **HTTP 200:** `ViewOrgSessions` confirmed. Record as PASS. Verify response
+  uses `items` array (not `sessions`).
 - **HTTP 401:** "Authentication failed (401). DEVIN_SERVICE_USER_TOKEN was rejected. Rotate the token at Enterprise Settings > Service Users." Stop immediately.
-- **HTTP 403:** Record `ManageOrgSessions` as MISSING. Continue to Step 4 to collect all permission failures before reporting.
+- **HTTP 403:** Record `ViewOrgSessions` as MISSING. Continue to collect all
+  permission failures before reporting.
 - **HTTP 404:** "Organization not found (404). Verify DEVIN_ORG_ID matches the ID shown at Enterprise Settings > Organizations." Stop.
 - **HTTP 5xx:** "Devin API server error ($http_status). Try again in a few minutes." Stop.
 - **Other:** "Unexpected HTTP status $http_status." Redact and show first 200 chars of body:
@@ -131,12 +132,13 @@ All error output must sanitize tokens:
 
 Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers.
 
-### Step 4: Probe ManageAccountSessions
+### Step 4: Probe ManageAccountSessions (Optional)
 
-Make a read-only call to the enterprise sessions endpoint:
+Make a read-only call to the enterprise sessions endpoint. This permission is
+optional — the plugin works without it (org-scoped messaging is preferred).
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 printf 'Probing ManageAccountSessions...\n'
 
 org_param=$(jq -rn --arg o "${DEVIN_ORG_ID}" '@uri "\($o)"')
@@ -156,17 +158,14 @@ body=${response%$'\n'*}
 
 Outcome mapping:
 
-- **curl non-zero exit:**
-  - Exit 6: "Could not resolve api.devin.ai — check DNS or internet connectivity." Stop.
-  - Exit 7: "Could not connect to Devin API — the API may be temporarily down." Stop.
-  - Exit 28: "Request timed out — check network connectivity and try again." Stop.
-  - Other: "Network error (curl exit $curl_exit)." Stop.
+- **curl non-zero exit:** Same as Step 3. Stop.
 - **HTTP 200:** `ManageAccountSessions` confirmed. Record as PASS.
-- **HTTP 401:** "Authentication failed (401). DEVIN_SERVICE_USER_TOKEN was rejected. Rotate the token at Enterprise Settings > Service Users." Stop immediately.
+- **HTTP 401:** "Authentication failed (401). Token rejected." Stop immediately.
 - **HTTP 403:** Record `ManageAccountSessions` as MISSING. Continue to Step 5.
-- **HTTP 404:** "Enterprise sessions endpoint not found (404). The V3 beta API may have changed — check Devin release notes." Stop.
-- **HTTP 5xx:** "Devin API server error ($http_status). Try again in a few minutes." Stop.
-- **Other:** "Unexpected HTTP status $http_status." Redact and show first 200 chars of body (same as Step 3). Stop.
+  This is not a critical failure — org-scoped messaging works without it.
+- **HTTP 404:** "Enterprise sessions endpoint not found (404)." Stop.
+- **HTTP 5xx:** "Devin API server error ($http_status). Try again later." Stop.
+- **Other:** "Unexpected HTTP status $http_status." Redact body. Stop.
 
 ### Step 5: Report Results
 
@@ -184,38 +183,48 @@ Credentials
   DEVIN_SERVICE_USER_TOKEN     OK  (cog_ format confirmed, token not echoed)
   DEVIN_ORG_ID                 OK  ([DEVIN_ORG_ID value])
 
-Permissions (required)
-  ManageOrgSessions            [OK | MISSING]
+Permissions (required — org-scoped)
+  ViewOrgSessions (list)       [OK | MISSING]
 
-Permissions (recommended)
+Permissions (optional — enterprise-scoped)
   ManageAccountSessions        [OK | MISSING]
 
 Overall: [PASS | PARTIAL | FAIL]
 ```
 
-**If ManageOrgSessions is MISSING**, display:
+**Note:** `UseDevinSessions` (create) and `ManageOrgSessions` (message/terminate/
+archive) cannot be probed non-destructively. If the list endpoint (ViewOrgSessions)
+passes, the other org permissions are typically also granted. If session creation
+or archival later fails with 403, the user should verify these permissions.
+
+**If ViewOrgSessions is MISSING**, display:
 
 ```text
-Required permission ManageOrgSessions is missing.
+Required permission ViewOrgSessions is missing.
 
 To fix:
   1. Go to Enterprise Settings > Service Users in the Devin web app
   2. Select your service user
-  3. Grant: ManageOrgSessions — Create, list, terminate, archive sessions
+  3. Grant these org-scoped permissions:
+       UseDevinSessions    — Create sessions
+       ViewOrgSessions     — List and get sessions
+       ManageOrgSessions   — Send messages, terminate, archive
   4. Re-run /devin:setup to verify
 ```
 
-**If ManageOrgSessions is OK but ManageAccountSessions is MISSING**, display:
+**If ViewOrgSessions is OK but ManageAccountSessions is MISSING**, display:
 
 ```text
 Overall: PARTIAL PASS
 
-ManageOrgSessions is granted — session creation, listing, and management work.
-ManageAccountSessions is missing — /devin:message will not work.
+Org-scoped permissions are granted — session creation, listing, messaging,
+and management should work.
+ManageAccountSessions is missing — enterprise-scope messaging will fall back
+to org-scoped endpoint (should still work).
 
-To enable messaging:
+To enable enterprise-scope features:
   1. Go to Enterprise Settings > Service Users
-  2. Grant: ManageAccountSessions — Send messages, enterprise-scope listing
+  2. Grant: ManageAccountSessions — Enterprise-scope messaging
   3. Re-run /devin:setup to verify
 ```
 

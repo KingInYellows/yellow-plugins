@@ -24,10 +24,11 @@ codebases via DeepWiki, orchestrate plan-implement-review chains.
 Go to **Enterprise Settings > Service Users** in the Devin web app. Create a new
 service user with the following permissions:
 
-- `ManageOrgSessions` — create, list, terminate, archive sessions (required)
-- `ManageAccountSessions` — send messages, enterprise-scope listing (recommended)
-- `ViewOrgSessions` — individual session GET (optional; plugin uses list
-  workaround)
+- `UseDevinSessions` — create sessions (required)
+- `ViewOrgSessions` — list and get sessions (required)
+- `ManageOrgSessions` — send messages, terminate, archive (required)
+- `ViewAccountSessions` — list sessions cross-org (optional)
+- `ManageAccountSessions` — enterprise-scope messaging (optional)
 
 ### 2. Set Environment Variables
 
@@ -100,7 +101,7 @@ service user at Enterprise Settings > Service Users.
 
 ## Limitations
 
-- V3 API is in beta — endpoint URLs may change
+- V3 session endpoints promoted from `/v3beta1/` to `/v3/` (Feb 2026)
 - Devin MCP auth with `cog_` tokens unverified
 - Scheduled sessions are UI-only (no API)
 - No idempotent session creation (title-based dedup used instead)

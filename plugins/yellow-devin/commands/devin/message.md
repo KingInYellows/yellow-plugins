@@ -42,7 +42,7 @@ Fetch session status using the org-scoped **list** endpoint with `session_ids`
 filter (see Session Lookup Pattern in `devin-workflows` skill):
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \
@@ -73,18 +73,32 @@ Check session status against messageable states:
 
 ### Step 5: Send Message
 
-Construct JSON via `jq` and POST to V3 enterprise endpoint:
+Construct JSON via `jq` and POST. Try the **org-scoped** endpoint first (requires
+`ManageOrgSessions`); if it returns 403, fall back to the **enterprise** endpoint
+(requires `ManageAccountSessions`):
 
 ```bash
-ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
-
+# Try org-scoped endpoint first
 response=$(jq -n --arg msg "$MESSAGE" '{message: $msg}' | \
   curl -s --connect-timeout 5 --max-time 30 \
     -w "\n%{http_code}" \
-    -X POST "${ENTERPRISE_URL}/sessions/${SESSION_ID}/messages" \
+    -X POST "${ORG_URL}/sessions/${SESSION_ID}/messages" \
     -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN" \
     -H "Content-Type: application/json" \
     -d @-)
+http_status=${response##*$'\n'}
+
+# Fall back to enterprise endpoint on 403
+if [ "$http_status" = "403" ]; then
+  ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
+  response=$(jq -n --arg msg "$MESSAGE" '{message: $msg}' | \
+    curl -s --connect-timeout 5 --max-time 30 \
+      -w "\n%{http_code}" \
+      -X POST "${ENTERPRISE_URL}/sessions/${SESSION_ID}/messages" \
+      -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d @-)
+fi
 ```
 
 **Never use the `message_as_user_id` field** — impersonation risk.
