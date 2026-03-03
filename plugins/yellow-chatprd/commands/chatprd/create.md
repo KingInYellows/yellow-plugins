@@ -92,6 +92,9 @@ c. Determine the repository name from git remote:
    ```bash
    git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]//' | sed 's/.git$//'
    ```
+   If the result is empty (no git remote or not a GitHub repo): display
+   "No repository detected. Proceeding without DeepWiki context." Skip to
+   Step 6.
 
 d. Call `read_wiki_structure` with the repo name. If empty or error: display
    "No repository context available from DeepWiki. Proceeding without it."

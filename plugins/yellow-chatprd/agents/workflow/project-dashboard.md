@@ -10,10 +10,10 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-chatprd_chatprd__list_project_documents
   - mcp__plugin_yellow-chatprd_chatprd__list_projects
   - mcp__plugin_yellow-chatprd_chatprd__get_document
-  - mcp__plugin_yellow-chatprd_chatprd__list_templates
   - mcp__plugin_yellow-chatprd_chatprd__list_chats
 ---
 
@@ -55,8 +55,9 @@ Stop if config is missing or malformed.
 
 ### Step 2: Resolve Project
 
-Parse the user's request for a project name. Call `list_projects` scoped to
-workspace org. Match by name (case-insensitive substring).
+Parse the user's request for a project name. Call
+`mcp__plugin_yellow-chatprd_chatprd__list_projects` scoped to workspace org.
+Match by name (case-insensitive substring).
 
 - If multiple matches: present options via `AskUserQuestion`.
 - If zero matches: display all available projects and ask user to select or
@@ -64,8 +65,8 @@ workspace org. Match by name (case-insensitive substring).
 
 ### Step 3: Fetch Project Documents
 
-Call `list_project_documents` with the resolved `projectId` and workspace
-`organizationId`. Returns up to 50 documents.
+Call `mcp__plugin_yellow-chatprd_chatprd__list_project_documents` with the
+resolved `projectId` and workspace `organizationId`. Returns up to 50 documents.
 
 **Zero documents case:** Display: "Project **[name]** exists but has no
 documents yet. Consider creating:" followed by a suggested starter set (PRD,
@@ -88,10 +89,11 @@ Group documents by type based on title keywords:
 
 ### Step 5: Fetch Activity Context
 
-Call `list_chats` with the `projectId` to get recent conversation count.
+Call `mcp__plugin_yellow-chatprd_chatprd__list_chats` with the `projectId` to
+get recent conversation count.
 
-If `list_chats` fails, suppress silently and omit the conversations line from
-the dashboard.
+If `mcp__plugin_yellow-chatprd_chatprd__list_chats` fails, suppress silently and
+omit the conversations line from the dashboard.
 
 ### Step 6: Analyze Coverage
 
@@ -109,7 +111,7 @@ Identify missing categories and flag them as suggestions.
 
 Output:
 
-```
+```markdown
 ## Project Dashboard: [Name]
 
 **Documents:** [N] total | **Conversations:** [M] recent
@@ -144,5 +146,6 @@ Output:
 - **Read-only agent** — never creates or modifies documents directly
 - Offer creation via `/chatprd:create` suggestions, not direct API calls
 - Reference `chatprd-conventions` skill for error mapping
-- Suppress `list_chats` failures silently (supplementary data only)
+- Suppress `mcp__plugin_yellow-chatprd_chatprd__list_chats` failures silently
+  (supplementary data only)
 - Validate all user input per `chatprd-conventions` rules

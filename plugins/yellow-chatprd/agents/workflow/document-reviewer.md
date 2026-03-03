@@ -10,9 +10,9 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-chatprd_chatprd__get_document
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
-  - mcp__plugin_yellow-chatprd_chatprd__list_templates
   - mcp__plugin_yellow-chatprd_chatprd__update_document
 ---
 
@@ -63,7 +63,10 @@ Stop if config is missing or malformed.
 Parse the user's request for a document title or query. Validate input per
 `chatprd-conventions` rules.
 
-Call `search_documents` with the query.
+Call `mcp__plugin_yellow-chatprd_chatprd__search_documents` with the query. Pass
+`org_id` if the tool supports org scoping — check schema at runtime. If org
+scoping is not supported, warn the user: "Note: Search results may include
+documents from other organizations you have access to."
 
 - If multiple matches: present results, let user select via `AskUserQuestion`.
 - If zero matches: report "No documents found matching '[query]'. Try
@@ -71,7 +74,8 @@ Call `search_documents` with the query.
 
 ### Step 3: Fetch Document
 
-Call `get_document` with the selected document UUID. Store full content.
+Call `mcp__plugin_yellow-chatprd_chatprd__get_document` with the selected
+document UUID. Store full content.
 
 ### Step 4: Determine Template
 
@@ -114,7 +118,7 @@ If document exceeds 5000 words, summarize each section before comparison.
 
 Output structured findings:
 
-```
+```markdown
 ## Document Review: [Title]
 
 **Template:** [Template Name] (or "General Review")
@@ -140,18 +144,21 @@ Ask via `AskUserQuestion`: "Would you like me to suggest improvements for the
 
 If yes:
 
-1. **H1 TOCTOU:** Re-fetch document with `get_document` immediately before
-   writing.
-2. Compose improvement instructions for the missing/thin sections.
-3. **M3 confirmation:** Present the proposed changes and confirm via
+1. Compose improvement instructions for the missing/thin sections.
+2. **M3 confirmation:** Present the proposed changes and confirm via
    `AskUserQuestion` before applying.
-4. Call `update_document` with the improvement instructions.
+3. **H1 TOCTOU:** If confirmed, re-fetch the document with
+   `mcp__plugin_yellow-chatprd_chatprd__get_document` immediately before writing
+   to prevent overwriting concurrent changes.
+4. Call `mcp__plugin_yellow-chatprd_chatprd__update_document` with the
+   improvement instructions.
 5. Report the updated document.
 
 ## Rules
 
 - Never modify a document without explicit user confirmation (M3)
-- Always re-fetch before writing (H1 TOCTOU)
+- Always re-fetch with `mcp__plugin_yellow-chatprd_chatprd__get_document` before
+  writing (H1 TOCTOU)
 - Reference `chatprd-conventions` skill for error mapping and input validation
 - If document exceeds 5000 words, summarize each section before comparison
 - Validate all user input per `chatprd-conventions` rules

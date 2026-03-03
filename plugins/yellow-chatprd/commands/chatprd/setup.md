@@ -43,14 +43,20 @@ If missing or `org_id` is empty/malformed: skip directly to Step 2.
 
 Call `get_user_profile`. If successful, display:
 
-```
+```text
 Logged in as **[firstName] [lastName]** ([email])
 ```
 
 If `firstName` or `lastName` is null, omit the null field gracefully.
 
-Parse the `subscriptions` array to determine plan tier. If the array is empty
-or contains no active subscription: warn "Some ChatPRD features require a Pro
+Parse the `subscriptions` array to determine plan tier and
+`subscription_status` for the config file:
+- If any subscription object has `status: "active"` (or `isActive: true`):
+  set `subscription_status` to `active`.
+- If subscriptions array is non-empty but no active entries: set to `free`.
+- If subscriptions array is empty or missing: set to `unknown`.
+
+If the status is not `active`: warn "Some ChatPRD features require a Pro
 or Team plan. Setup will continue, but you may encounter feature limitations."
 
 **Non-blocking:** If `get_user_profile` fails or times out, log: "Could not

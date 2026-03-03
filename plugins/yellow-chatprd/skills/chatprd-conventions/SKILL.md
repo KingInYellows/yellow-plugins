@@ -60,8 +60,9 @@ author.
 
 When enriching external outputs (e.g., Linear issues) with project context:
 
-1. Extract project ID from workspace config `default_project_id`.
-2. Call `list_project_documents` with the project ID.
+1. Extract project ID from workspace config `default_project_id` and `org_id`.
+2. Call `list_project_documents` with the project ID and `organizationId`
+   (from `org_id` in workspace config).
 3. Filter out the source document.
 4. Include remaining documents as reference links.
 5. If project ID unavailable or API times out (5s), skip silently.
@@ -91,7 +92,7 @@ creating documents, suggest the best-fit template:
 | User Persona      | Audience definition — demographics, goals, pain points             |
 | API Documentation | Endpoint specs — routes, parameters, responses, auth               |
 | Launch Plan       | Go-to-market — timeline, channels, success metrics                 |
-| Technical Spec    | Architecture decisions — system design, trade-offs, dependencies   |
+| Technical Design Document | Architecture decisions — system design, trade-offs, dependencies   |
 
 When `list_templates` is available, fetch the live list and match against the
 user's description. Fall back to this static mapping if the tool is unavailable.

@@ -66,7 +66,7 @@ patterns:
 | Modify document content                           | `/chatprd:update`            |
 | Browse all documents                              | `/chatprd:list`              |
 | Create Linear issues from PRD                     | `/chatprd:link-linear`       |
-| Conversational document work (create/read/update) | `document-assistant` agent   |
+| Conversational document work (create/read/update/search) | `document-assistant` agent   |
 | "Create issues from this PRD"                     | `linear-prd-bridge` agent    |
 | "Review this PRD" / "Is this spec complete?"      | `document-reviewer` agent    |
 | "What docs exist for project X?"                  | `project-dashboard` agent    |
