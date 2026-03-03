@@ -97,3 +97,9 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 - Linear sync requires yellow-linear plugin to be installed
 - Fix agent modifies working directory — commit or stash changes first
 - Concurrent audits not supported (single-user CLI tool)
+
+### Optional Enhancement: yellow-morph
+
+When yellow-morph is installed, `warpgrep_codebase_search` can find anti-pattern
+instances by intent, and `edit_file` provides higher-accuracy code remediation
+on large files during freeform debt-fixing conversations.

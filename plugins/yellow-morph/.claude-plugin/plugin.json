@@ -1,0 +1,24 @@
+{
+  "name": "yellow-morph",
+  "version": "1.0.0",
+  "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-morph",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": ["code-editing", "code-search", "fast-apply", "warpgrep", "morph"],
+  "mcpServers": {
+    "morph-mcp": {
+      "command": "npx",
+      "args": ["-y", "@morphllm/morphmcp@0.8.110"],
+      "env": {
+        "MORPH_API_KEY": "${MORPH_API_KEY}",
+        "ENABLED_TOOLS": "edit_file,warpgrep_codebase_search",
+        "WORKSPACE_MODE": "true"
+      }
+    }
+  }
+}

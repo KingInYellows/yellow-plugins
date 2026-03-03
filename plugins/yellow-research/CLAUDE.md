@@ -111,10 +111,17 @@ These external tools improve research quality but are not required:
 - **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search.
   Used by `/research:code` and `/research:deep`. No API key required. Configure
   globally in Claude Code MCP settings.
-- **filesystem-with-morph MCP** — provides WarpGrep
+- **yellow-morph plugin** (preferred) — provides WarpGrep
+  (`mcp__plugin_yellow-morph_morph-mcp__warpgrep_codebase_search`) for agentic
+  codebase search. Replaces the global `filesystem-with-morph` MCP. When both
+  are installed, yellow-morph's plugin-namespaced tool is preferred.
+  Install: `/plugin marketplace add KingInYellows/yellow-plugins` (select
+  yellow-morph)
+- **filesystem-with-morph MCP** (legacy) — provides WarpGrep
   (`mcp__filesystem-with-morph__warpgrep_codebase_search`) for agentic
   codebase and GitHub search. No API key required. Configure globally in
-  Claude Code MCP settings.
+  Claude Code MCP settings. When yellow-morph is installed, prefer the
+  plugin-namespaced tool instead.
 - **yellow-devin plugin** — provides DeepWiki
   (`mcp__plugin_yellow-devin_deepwiki__read_wiki_structure`) for AI-powered
   repo documentation. Install: `/plugin marketplace add
