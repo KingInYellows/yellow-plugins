@@ -82,6 +82,17 @@ Permission: `ViewOrgSessions`
 
 Response: Same `SessionResponse` schema as create.
 
+**Important:** This endpoint requires the `ViewOrgSessions` permission, which
+service users with only `ManageOrgSessions` may lack. Prefer using the list
+endpoint with `session_ids` filter instead:
+
+```
+GET /v3beta1/organizations/{org_id}/sessions?session_ids={devin_id}&first=1
+```
+
+This returns the same data in `{ items: [SessionResponse] }` and only requires
+`ManageOrgSessions`. See Session Lookup Pattern in SKILL.md.
+
 ### List Sessions (Org-Scoped)
 
 ```

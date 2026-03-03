@@ -13,10 +13,19 @@ codebases via DeepWiki, orchestrate plan-implement-review chains. Targets
 
 ## Required Permissions
 
-The service user needs both:
+The service user needs at minimum:
 
-- **`ManageOrgSessions`** — Create, get, terminate, archive sessions (org scope)
-- **`ManageAccountSessions`** — List sessions, send messages (enterprise scope)
+- **`ManageOrgSessions`** — Create, list, terminate, archive sessions (org scope)
+
+Recommended for full functionality:
+
+- **`ManageAccountSessions`** — Send messages, enterprise-scope listing
+- **`ViewOrgSessions`** — Individual session GET (not needed if using list
+  endpoint with `session_ids` filter)
+
+**Note:** The individual session GET endpoint (`/sessions/{id}`) requires
+`ViewOrgSessions`. All commands use the list endpoint with `session_ids` filter
+as a workaround — see Session Lookup Pattern in `devin-workflows` skill.
 
 ## MCP Servers
 

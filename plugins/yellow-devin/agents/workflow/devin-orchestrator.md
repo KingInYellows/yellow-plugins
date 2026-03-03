@@ -67,8 +67,9 @@ Check all three error layers (curl exit, HTTP status, jq parse).
 
 ### Step 3: Poll for Completion
 
-Poll via `GET ${ORG_URL}/sessions/${SESSION_ID}` with session ID validation
-before each request. Polling strategy:
+Poll via `GET ${ORG_URL}/sessions?session_ids=${SESSION_ID}&first=1` (list
+endpoint with `session_ids` filter — see Session Lookup Pattern in
+`devin-workflows` skill). Parse session from `.items[0]`. Polling strategy:
 
 - Initial delay: 30s, base interval: 30s, backoff: 1.5x after 10 polls
 - Max interval: 5 minutes, max wall-clock: 15 minutes

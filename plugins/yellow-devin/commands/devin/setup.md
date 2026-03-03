@@ -116,7 +116,8 @@ Outcome mapping:
   - Exit 7: "Could not connect to Devin API — the API may be temporarily down." Stop.
   - Exit 28: "Request timed out — check network connectivity and try again." Stop.
   - Other: "Network error (curl exit $curl_exit)." Stop.
-- **HTTP 200:** `ManageOrgSessions` confirmed. Record as PASS.
+- **HTTP 200:** `ManageOrgSessions` confirmed. Record as PASS. Also verify
+  response uses `items` array (not `sessions`).
 - **HTTP 401:** "Authentication failed (401). DEVIN_SERVICE_USER_TOKEN was rejected. Rotate the token at Enterprise Settings > Service Users." Stop immediately.
 - **HTTP 403:** Record `ManageOrgSessions` as MISSING. Continue to Step 4 to collect all permission failures before reporting.
 - **HTTP 404:** "Organization not found (404). Verify DEVIN_ORG_ID matches the ID shown at Enterprise Settings > Organizations." Stop.
@@ -183,25 +184,39 @@ Credentials
   DEVIN_SERVICE_USER_TOKEN     OK  (cog_ format confirmed, token not echoed)
   DEVIN_ORG_ID                 OK  ([DEVIN_ORG_ID value])
 
-Permissions
+Permissions (required)
   ManageOrgSessions            [OK | MISSING]
+
+Permissions (recommended)
   ManageAccountSessions        [OK | MISSING]
 
-Overall: [PASS | FAIL]
+Overall: [PASS | PARTIAL | FAIL]
 ```
 
-**If any permission is MISSING**, display:
+**If ManageOrgSessions is MISSING**, display:
 
 ```text
-One or more required permissions are missing.
+Required permission ManageOrgSessions is missing.
 
 To fix:
   1. Go to Enterprise Settings > Service Users in the Devin web app
   2. Select your service user
-  3. Grant the missing permission(s):
-       ManageOrgSessions     — Create, get, terminate, archive sessions (org scope)
-       ManageAccountSessions — List sessions, send messages (enterprise scope)
+  3. Grant: ManageOrgSessions — Create, list, terminate, archive sessions
   4. Re-run /devin:setup to verify
+```
+
+**If ManageOrgSessions is OK but ManageAccountSessions is MISSING**, display:
+
+```text
+Overall: PARTIAL PASS
+
+ManageOrgSessions is granted — session creation, listing, and management work.
+ManageAccountSessions is missing — /devin:message will not work.
+
+To enable messaging:
+  1. Go to Enterprise Settings > Service Users
+  2. Grant: ManageAccountSessions — Send messages, enterprise-scope listing
+  3. Re-run /devin:setup to verify
 ```
 
 **If all checks pass**, display:

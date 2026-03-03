@@ -43,7 +43,8 @@ Suggest lowercase-with-dashes format: `project-auth`, `sprint-42`, `bug-fix`.
 
 ### Step 4: Fetch Current Tags
 
-Fetch session to get current tag list:
+Fetch session to get current tag list. Use the org-scoped **list** endpoint with
+`session_ids` filter (see Session Lookup Pattern in `devin-workflows` skill):
 
 ```bash
 DEVIN_API_BASE="https://api.devin.ai/v3beta1"
@@ -51,11 +52,11 @@ ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \
   -w "\n%{http_code}" \
-  -X GET "${ORG_URL}/sessions/${SESSION_ID}" \
+  -X GET "${ORG_URL}/sessions?session_ids=${SESSION_ID}&first=1" \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
 
-Extract current `.tags` array from response.
+Parse from `items` array: `jq '.items[0]'`. Extract current `.tags` array.
 
 ### Step 5: Execute Subcommand
 

@@ -24,8 +24,10 @@ codebases via DeepWiki, orchestrate plan-implement-review chains.
 Go to **Enterprise Settings > Service Users** in the Devin web app. Create a new
 service user with the following permissions:
 
-- `ManageOrgSessions` — create, get, terminate, archive sessions
-- `ManageAccountSessions` — list sessions, send messages
+- `ManageOrgSessions` — create, list, terminate, archive sessions (required)
+- `ManageAccountSessions` — send messages, enterprise-scope listing (recommended)
+- `ViewOrgSessions` — individual session GET (optional; plugin uses list
+  workaround)
 
 ### 2. Set Environment Variables
 
@@ -89,8 +91,9 @@ a service user token (cog_ prefix) at Enterprise Settings > Service Users.
 **"DEVIN_ORG_ID not set"** — V3 requires an org ID. Find yours at Enterprise
 Settings > Organizations.
 
-**"Permission denied (403)"** — Your service user needs `ManageOrgSessions` and
-`ManageAccountSessions` permissions.
+**"Permission denied (403)"** — Your service user needs `ManageOrgSessions` at
+minimum. Add `ManageAccountSessions` for messaging and `ViewOrgSessions` for
+individual session lookups.
 
 **"Authentication failed (401)"** — Your token was rejected. Create a new
 service user at Enterprise Settings > Service Users.

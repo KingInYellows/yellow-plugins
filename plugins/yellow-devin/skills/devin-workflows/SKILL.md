@@ -81,6 +81,36 @@ command -v jq >/dev/null 2>&1 || {
 }
 ```
 
+## Session Lookup Pattern
+
+To fetch a single session by ID, use the org-scoped **list** endpoint with the
+`session_ids` query parameter. Do **not** use the individual GET endpoint
+(`/sessions/{id}`) — it requires the `ViewOrgSessions` permission, which service
+users may lack.
+
+```bash
+response=$(curl -s --connect-timeout 5 --max-time 10 \
+  -w "\n%{http_code}" \
+  -X GET "${ORG_URL}/sessions?session_ids=${SESSION_ID}&first=1" \
+  -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
+curl_exit=$?
+http_status=${response##*$'\n'}
+body=${response%$'\n'*}
+```
+
+Parse the session from the `items` array (not `sessions`):
+
+```bash
+session=$(printf '%s' "$body" | jq '.items[0] // empty')
+if [ -z "$session" ] || [ "$session" = "null" ]; then
+  printf 'ERROR: Session %s not found\n' "$SESSION_ID" >&2
+  exit 1
+fi
+status=$(printf '%s' "$session" | jq -r '.status')
+```
+
+**Key:** The list response shape is `{ items: [...], has_next_page, end_cursor, total }`.
+
 ## curl Pattern
 
 Standard curl pattern with exit code, HTTP status, and timeout. **Never use

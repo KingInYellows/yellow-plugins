@@ -28,7 +28,9 @@ Validate with `validate_session_id` from `devin-workflows` skill.
 
 ### Step 3: Verify Session Exists (C1 Validation)
 
-Fetch session to confirm it exists and check current state:
+Fetch session to confirm it exists and check current state. Use the org-scoped
+**list** endpoint with `session_ids` filter (see Session Lookup Pattern in
+`devin-workflows` skill):
 
 ```bash
 DEVIN_API_BASE="https://api.devin.ai/v3beta1"
@@ -36,9 +38,12 @@ ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \
   -w "\n%{http_code}" \
-  -X GET "${ORG_URL}/sessions/${SESSION_ID}" \
+  -X GET "${ORG_URL}/sessions?session_ids=${SESSION_ID}&first=1" \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
+
+Parse from `items` array: `jq '.items[0]'`. If `items` is empty, report
+"Session not found."
 
 If `is_archived` is already true:
 
