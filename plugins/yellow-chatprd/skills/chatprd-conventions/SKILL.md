@@ -85,14 +85,15 @@ iterations if reference lists become unwieldy.
 ChatPRD provides AI-powered templates for different document types. When
 creating documents, suggest the best-fit template:
 
-| Template          | Use For                                                            |
-| ----------------- | ------------------------------------------------------------------ |
-| PRD               | Product requirements — features, user stories, acceptance criteria |
-| One-Pager         | Quick proposals — problem statement, solution, key metrics         |
-| User Persona      | Audience definition — demographics, goals, pain points             |
-| API Documentation | Endpoint specs — routes, parameters, responses, auth               |
-| Launch Plan       | Go-to-market — timeline, channels, success metrics                 |
+| Template                  | Use For                                                            |
+| ------------------------- | ------------------------------------------------------------------ |
+| PRD                       | Product requirements — features, user stories, acceptance criteria |
+| One-Pager                 | Quick proposals — problem statement, solution, key metrics         |
+| User Personas             | Audience definition — demographics, goals, pain points             |
+| API Documentation         | Endpoint specs — routes, parameters, responses, auth               |
+| Launch Plan               | Go-to-market — timeline, channels, success metrics                 |
 | Technical Design Document | Architecture decisions — system design, trade-offs, dependencies   |
+| Product Strategy Document | Strategic vision — market context, goals, roadmap, success metrics |
 
 When `list_templates` is available, fetch the live list and match against the
 user's description. Fall back to this static mapping if the tool is unavailable.
@@ -173,6 +174,10 @@ demand if absent. Values: `active`, `free`, or `unknown`.
 Since `get_document` returns no template metadata and `list_templates` returns
 no section structure, maintain a static section map here:
 
+Note: Template Guide names (above) are the short names used in the ChatPRD
+template picker. The Section Map below uses the full document title patterns
+that appear in generated documents (e.g., "ChatPRD: PRD").
+
 | Template Title | Expected H2 Sections |
 |---------------|---------------------|
 | ChatPRD: PRD | Goals, Context, User Stories, Requirements, Success Metrics, Technical Considerations |
@@ -181,6 +186,7 @@ no section structure, maintain a static section map here:
 | User Personas | Demographics, Goals, Frustrations, Behaviors, Scenarios |
 | One-Pager | Problem, Solution, Key Metrics, Timeline |
 | Product Strategy Document | Vision, Market Context, Goals, Roadmap, Success Metrics |
+| Launch Plan | Timeline, Channels, Milestones, Success Metrics, Risks |
 
 This map is used by the `document-reviewer` agent for heading-based template
 matching (>=60% H2 overlap). Update when ChatPRD adds new templates or changes

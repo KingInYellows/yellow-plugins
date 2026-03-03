@@ -81,7 +81,7 @@ Suggest the best-fit template based on the description (see
 Only applies to technical templates ("Technical Design Document" or "API
 Documentation"). For non-technical templates, skip to Step 6.
 
-a. Discover DeepWiki tools via `ToolSearch` with query `"+deepwiki read_wiki"`.
+a. Discover DeepWiki tools via `ToolSearch` with query `"read_wiki_structure"`.
    If not found: display "Tip: Install yellow-devin for automatic repository
    context in technical specs." Skip to Step 6.
 
