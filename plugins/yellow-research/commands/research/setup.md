@@ -8,6 +8,7 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-core_context7__resolve-library-id
   - mcp__grep__searchGitHub
+  - mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
   - mcp__filesystem-with-morph__warpgrep_codebase_search
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
 ---
@@ -222,13 +223,17 @@ Tool name: mcp__grep__searchGitHub
 Test call: mcp__grep__searchGitHub with query: "test", maxResults: 1
 ```
 
-**WarpGrep** (global — agentic codebase and GitHub search):
+**WarpGrep** (yellow-morph plugin preferred, global MCP fallback):
 
 ```text
 ToolSearch keyword: "warpgrep_codebase_search"
-Tool name: mcp__filesystem-with-morph__warpgrep_codebase_search
-Test call: mcp__filesystem-with-morph__warpgrep_codebase_search with query: "README"
+Preferred tool name: mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
+Fallback tool name: mcp__filesystem-with-morph__warpgrep_codebase_search
+Test call: <matched tool> with query: "README"
 ```
+
+Check for the plugin-namespaced tool first. If not found, fall back to the
+global MCP tool name. Report which variant is active.
 
 **DeepWiki** (yellow-devin plugin — AI-powered repo documentation):
 
@@ -323,7 +328,8 @@ To enable missing MCP sources:
 
   Context7:   Install yellow-core — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-core)
   Grep MCP:   Configure grep MCP globally in Claude Code MCP settings
-  WarpGrep:   Configure filesystem-with-morph MCP globally in Claude Code MCP settings
+  WarpGrep:   Install yellow-morph — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-morph)
+              Or configure filesystem-with-morph MCP globally in Claude Code MCP settings
   DeepWiki:   Install yellow-devin — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-devin)
 
 If a source shows FAIL (installed but test failed), try restarting Claude Code.

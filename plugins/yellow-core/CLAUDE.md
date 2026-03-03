@@ -67,3 +67,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `context7` — up-to-date library documentation via
   [context7.com](https://context7.com). Third-party HTTP service; all agents
   work without it (used only for fetching live docs). No credentials are sent.
+
+### Optional Enhancement: yellow-morph
+
+When yellow-morph is installed, two additional MCP tools become available:
+`mcp__plugin_yellow-morph_morph__edit_file` (Fast Apply for high-accuracy code merging) and
+`mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` (intent-based code discovery). See yellow-morph's
+CLAUDE.md for tool preference rules and domain separation with ruvector. These
+tools are available in freeform conversations; structured commands use built-in
+Edit and Grep.

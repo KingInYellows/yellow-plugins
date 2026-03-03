@@ -120,6 +120,16 @@
       },
       "source": "./plugins/yellow-research",
       "category": "productivity"
+    },
+    {
+      "name": "yellow-morph",
+      "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
+      "version": "1.0.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-morph",
+      "category": "development"
     }
   ]
 }
