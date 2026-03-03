@@ -138,7 +138,7 @@ Response: `SessionResponse` with `is_archived: true`.
 
 Notes:
 
-- No unarchive endpoint documented in V3 beta
+- No unarchive endpoint documented in V3
 - Archived sessions remain queryable via list endpoint with filters
 
 ### Send Message (Org-Scoped)
@@ -218,8 +218,9 @@ Notes:
   returns sessions from all orgs in the enterprise account
 - `total` is optional and may be null
 - Use `first=10` for interactive listing, `first=100` for bulk operations
-- Single-session lookups should use the org-scoped `GET /organizations/{org_id}/sessions/{id}`
-  endpoint — it requires no `org_ids` filter and avoids cross-org ambiguity
+- Single-session lookups should use the org-scoped list endpoint with
+  `session_ids` filter (see Session Lookup Pattern in SKILL.md) — it avoids
+  per-session permission edge cases
 
 ### Send Message
 

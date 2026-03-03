@@ -86,10 +86,13 @@ response=$(jq -n --arg msg "$MESSAGE" '{message: $msg}' | \
     -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN" \
     -H "Content-Type: application/json" \
     -d @-)
+curl_exit=$?
 http_status=${response##*$'\n'}
+body=${response%$'\n'*}
 
 # Fall back to enterprise endpoint on 403
-if [ "$http_status" = "403" ]; then
+if [ "$curl_exit" -eq 0 ] && [ "$http_status" = "403" ]; then
+  printf 'WARN: Org-scoped message endpoint returned 403, trying enterprise scope...\n' >&2
   ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
   response=$(jq -n --arg msg "$MESSAGE" '{message: $msg}' | \
     curl -s --connect-timeout 5 --max-time 30 \
@@ -98,6 +101,9 @@ if [ "$http_status" = "403" ]; then
       -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN" \
       -H "Content-Type: application/json" \
       -d @-)
+  curl_exit=$?
+  http_status=${response##*$'\n'}
+  body=${response%$'\n'*}
 fi
 ```
 

@@ -11,7 +11,8 @@ allowed-tools:
 # Set Up Devin V3 Credentials
 
 Validate that `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` are correctly set,
-then verify both required permissions with live API calls.
+then verify permissions with live API calls (required org-scoped and optional
+enterprise-scoped).
 
 ## Workflow
 
@@ -49,7 +50,7 @@ if printf '%s' "$token" | grep -qE '^apk_'; then
   printf 'V3 requires a service user token (cog_ prefix).\n'
   printf 'Migration:\n'
   printf '  1. Go to Enterprise Settings > Service Users\n'
-  printf '  2. Create a new service user with ManageOrgSessions + ManageAccountSessions\n'
+  printf '  2. Create a new service user with UseDevinSessions + ViewOrgSessions + ManageOrgSessions\n'
   printf '  3. export DEVIN_SERVICE_USER_TOKEN="cog_your_new_token"\n'
   printf '  4. Remove the old DEVIN_API_TOKEN export\n'
   exit 1
@@ -90,8 +91,9 @@ the error message above and do not proceed to Step 3.
 
 ### Step 3: Probe Org-Scoped Permissions
 
-Run two probes against the org-scoped API to check `ViewOrgSessions` (list) and
-`UseDevinSessions` (create — tested via list, confirmed by session creation).
+Probe the org-scoped API to check `ViewOrgSessions` (list). `UseDevinSessions`
+and `ManageOrgSessions` cannot be probed non-destructively — they are assumed
+granted alongside `ViewOrgSessions`.
 
 ```bash
 DEVIN_API_BASE="https://api.devin.ai/v3"
@@ -159,7 +161,8 @@ body=${response%$'\n'*}
 Outcome mapping:
 
 - **curl non-zero exit:** Same as Step 3. Stop.
-- **HTTP 200:** `ManageAccountSessions` confirmed. Record as PASS.
+- **HTTP 200:** Enterprise endpoint accessible (`ViewAccountSessions` confirmed).
+  Record as PASS.
 - **HTTP 401:** "Authentication failed (401). Token rejected." Stop immediately.
 - **HTTP 403:** Record `ManageAccountSessions` as MISSING. Continue to Step 5.
   This is not a critical failure — org-scoped messaging works without it.
@@ -217,8 +220,6 @@ To fix:
 ```text
 Overall: PARTIAL PASS
 
-Org-scoped permissions are granted — session creation, listing, messaging,
-and management should work.
 ManageAccountSessions is missing — enterprise-scope messaging will fall back
 to org-scoped endpoint (should still work).
 
@@ -253,7 +254,11 @@ To configure:
   1. Create a service user:
        Enterprise Settings > Service Users > Create new user
        Required permissions:
+         - UseDevinSessions
+         - ViewOrgSessions
          - ManageOrgSessions
+       Optional permissions:
+         - ViewAccountSessions
          - ManageAccountSessions
        Token format: cog_<...>
 

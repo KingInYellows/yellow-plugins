@@ -78,9 +78,9 @@ endpoint with `session_ids` filter — see Session Lookup Pattern in
 
 - `new` / `claimed` → wait (normal startup)
 - `running` → wait (actively working)
-- `suspended` → send "continue" message via enterprise message endpoint (see
-  `devin-workflows` skill for curl pattern), then poll until `running` or 60s
-  elapses
+- `suspended` → send "continue" message via org-scoped message endpoint
+  (falls back to enterprise on 403 — see Step 5), then poll until `running`
+  or 60s elapses
 - `resuming` → wait (max 60s, then escalate to user)
 - `exit` → terminal success, proceed to Step 4 review
 - `error` → terminal failure, skip to Step 6

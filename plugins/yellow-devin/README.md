@@ -92,9 +92,9 @@ a service user token (cog_ prefix) at Enterprise Settings > Service Users.
 **"DEVIN_ORG_ID not set"** — V3 requires an org ID. Find yours at Enterprise
 Settings > Organizations.
 
-**"Permission denied (403)"** — Your service user needs `ManageOrgSessions` at
-minimum. Add `ManageAccountSessions` for messaging and `ViewOrgSessions` for
-individual session lookups.
+**"Permission denied (403)"** — Your service user may be missing a required
+permission. Run `/devin:setup` to check, and verify all three org-scoped
+permissions are granted: `UseDevinSessions`, `ViewOrgSessions`, `ManageOrgSessions`.
 
 **"Authentication failed (401)"** — Your token was rejected. Create a new
 service user at Enterprise Settings > Service Users.
