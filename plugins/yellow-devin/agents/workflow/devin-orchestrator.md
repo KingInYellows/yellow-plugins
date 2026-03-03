@@ -51,7 +51,7 @@ Validate `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`. Construct prompt using
 `jq` (see devin-workflows skill for API patterns).
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
 ```
@@ -67,8 +67,11 @@ Check all three error layers (curl exit, HTTP status, jq parse).
 
 ### Step 3: Poll for Completion
 
-Poll via `GET ${ORG_URL}/sessions/${SESSION_ID}` with session ID validation
-before each request. Polling strategy:
+Poll via `GET ${ORG_URL}/sessions?session_ids=${SESSION_ID}&first=1` (list
+endpoint with `session_ids` filter — see Session Lookup Pattern in
+`devin-workflows` skill). Parse session from `.items[0]`. If `items` is empty
+(session deleted or ID stale), report "Session not found" and exit the poll loop.
+Polling strategy:
 
 - Initial delay: 30s, base interval: 30s, backoff: 1.5x after 10 polls
 - Max interval: 5 minutes, max wall-clock: 15 minutes
@@ -77,9 +80,9 @@ before each request. Polling strategy:
 
 - `new` / `claimed` → wait (normal startup)
 - `running` → wait (actively working)
-- `suspended` → send "continue" message via enterprise message endpoint (see
-  `devin-workflows` skill for curl pattern), then poll until `running` or 60s
-  elapses
+- `suspended` → send "continue" message via org-scoped message endpoint
+  (falls back to enterprise on 403 — see Step 5), then poll until `running`
+  or 60s elapses
 - `resuming` → wait (max 60s, then escalate to user)
 - `exit` → terminal success, proceed to Step 4 review
 - `error` → terminal failure, skip to Step 6
@@ -106,7 +109,8 @@ If review found issues and iteration count < 3:
 
 1. Construct specific fix instructions from review findings
 2. Re-fetch session status (TOCTOU protection)
-3. Send fix message via `POST ${ENTERPRISE_URL}/sessions/${SESSION_ID}/messages`
+3. Send fix message via `POST ${ORG_URL}/sessions/${SESSION_ID}/messages`
+   (org-scoped; falls back to enterprise endpoint on 403)
 4. Return to Step 3
 
 If iteration count >= 3: escalate to user with summary, suggest manual

@@ -1,6 +1,6 @@
 # Devin API V3 Reference
 
-Base URL: `https://api.devin.ai/v3beta1/`
+Base URL: `https://api.devin.ai/v3/`
 
 Authentication: `Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN`
 
@@ -10,11 +10,11 @@ Headers: `Content-Type: application/json` for all POST requests.
 
 ### Create Session
 
-```
-POST /v3beta1/organizations/{org_id}/sessions
+```http
+POST /v3/organizations/{org_id}/sessions
 ```
 
-Permission: `ManageOrgSessions`
+Permission: `UseDevinSessions`
 
 Request body (construct via jq):
 
@@ -74,18 +74,28 @@ Notes:
 
 ### Get Session
 
-```
-GET /v3beta1/organizations/{org_id}/sessions/{devin_id}
+```http
+GET /v3/organizations/{org_id}/sessions/{devin_id}
 ```
 
 Permission: `ViewOrgSessions`
 
 Response: Same `SessionResponse` schema as create.
 
+**Note:** Prefer using the list endpoint with `session_ids` filter instead — it
+works with `ViewOrgSessions` and avoids per-session permission edge cases:
+
+```http
+GET /v3/organizations/{org_id}/sessions?session_ids={devin_id}&first=1
+```
+
+This returns the same data in `{ items: [SessionResponse] }`. See Session Lookup
+Pattern in SKILL.md.
+
 ### List Sessions (Org-Scoped)
 
-```
-GET /v3beta1/organizations/{org_id}/sessions
+```http
+GET /v3/organizations/{org_id}/sessions
 ```
 
 Permission: `ViewOrgSessions`
@@ -95,15 +105,15 @@ Query parameters: same pagination (`first`, `after`) and filtering (`session_ids
 list endpoint — but inherently scoped to this org, no `org_ids` parameter needed.
 
 Use this endpoint when listing or searching within a single org. The enterprise
-`GET /v3beta1/enterprise/sessions` endpoint is only needed when querying across
+`GET /v3/enterprise/sessions` endpoint is only needed when querying across
 multiple orgs.
 
 Response: same `{ items, has_next_page, end_cursor, total }` shape as enterprise.
 
 ### Terminate Session
 
-```
-DELETE /v3beta1/organizations/{org_id}/sessions/{devin_id}
+```http
+DELETE /v3/organizations/{org_id}/sessions/{devin_id}
 ```
 
 Permission: `ManageOrgSessions`
@@ -116,8 +126,8 @@ Notes:
 
 ### Archive Session
 
-```
-POST /v3beta1/organizations/{org_id}/sessions/{devin_id}/archive
+```http
+POST /v3/organizations/{org_id}/sessions/{devin_id}/archive
 ```
 
 Permission: `ManageOrgSessions`
@@ -128,18 +138,45 @@ Response: `SessionResponse` with `is_archived: true`.
 
 Notes:
 
-- No unarchive endpoint documented in V3 beta
+- No unarchive endpoint documented in V3
 - Archived sessions remain queryable via list endpoint with filters
+
+### Send Message (Org-Scoped)
+
+```http
+POST /v3/organizations/{org_id}/sessions/{devin_id}/messages
+```
+
+Permission: `ManageOrgSessions`
+
+Request body:
+
+```json
+{
+  "message": "Follow-up text here"
+}
+```
+
+**Forbidden field:** `message_as_user_id` — never use (impersonation risk).
+
+Response: `SessionResponse` with updated status.
+
+Notes:
+
+- Prefer this over the enterprise-scoped endpoint when possible — it only
+  requires `ManageOrgSessions` instead of `ManageAccountSessions`
+- **Auto-resumes suspended sessions** — same behavior as enterprise endpoint
+- Same 2000 character limit on messages
 
 ## Sessions — Enterprise Scope
 
 ### List Sessions
 
-```
-GET /v3beta1/enterprise/sessions
+```http
+GET /v3/enterprise/sessions
 ```
 
-Permission: `ManageAccountSessions`
+Permission: `ViewAccountSessions`
 
 Query parameters:
 
@@ -181,13 +218,14 @@ Notes:
   returns sessions from all orgs in the enterprise account
 - `total` is optional and may be null
 - Use `first=10` for interactive listing, `first=100` for bulk operations
-- Single-session lookups should use the org-scoped `GET /organizations/{org_id}/sessions/{id}`
-  endpoint — it requires no `org_ids` filter and avoids cross-org ambiguity
+- Single-session lookups should use the org-scoped list endpoint with
+  `session_ids` filter (see Session Lookup Pattern in SKILL.md) — it avoids
+  per-session permission edge cases
 
 ### Send Message
 
-```
-POST /v3beta1/enterprise/sessions/{devin_id}/messages
+```http
+POST /v3/enterprise/sessions/{devin_id}/messages
 ```
 
 Permission: `ManageAccountSessions`
@@ -215,7 +253,7 @@ Notes:
 
 ### Update Session Tags (V1 Endpoint)
 
-```
+```http
 PUT /v1/sessions/{session_id}/tags
 ```
 

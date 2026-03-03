@@ -11,7 +11,8 @@ allowed-tools:
 # Set Up Devin V3 Credentials
 
 Validate that `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` are correctly set,
-then verify both required permissions with live API calls.
+then verify permissions with live API calls (required org-scoped and optional
+enterprise-scoped).
 
 ## Workflow
 
@@ -49,7 +50,7 @@ if printf '%s' "$token" | grep -qE '^apk_'; then
   printf 'V3 requires a service user token (cog_ prefix).\n'
   printf 'Migration:\n'
   printf '  1. Go to Enterprise Settings > Service Users\n'
-  printf '  2. Create a new service user with ManageOrgSessions + ManageAccountSessions\n'
+  printf '  2. Create a new service user with UseDevinSessions + ViewOrgSessions + ManageOrgSessions\n'
   printf '  3. export DEVIN_SERVICE_USER_TOKEN="cog_your_new_token"\n'
   printf '  4. Remove the old DEVIN_API_TOKEN export\n'
   exit 1
@@ -88,17 +89,18 @@ printf '%-18s valid (%s)\n' 'Org ID format:' "$org"
 If the Bash call exits non-zero (invalid org ID format), stop here — display
 the error message above and do not proceed to Step 3.
 
-### Step 3: Probe ManageOrgSessions
+### Step 3: Probe Org-Scoped Permissions
 
-Make a read-only call to the org-scoped sessions list to verify the token works
-and `ManageOrgSessions` is granted:
+Probe the org-scoped API to check `ViewOrgSessions` (list). `UseDevinSessions`
+and `ManageOrgSessions` cannot be probed non-destructively — they are assumed
+granted alongside `ViewOrgSessions`.
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 
 printf '\n=== Permission Checks ===\n'
-printf 'Probing ManageOrgSessions...\n'
+printf 'Probing ViewOrgSessions (list)...\n'
 
 response=$(curl -s --connect-timeout 5 --max-time 10 \
   -w "\n%{http_code}" \
@@ -116,9 +118,11 @@ Outcome mapping:
   - Exit 7: "Could not connect to Devin API — the API may be temporarily down." Stop.
   - Exit 28: "Request timed out — check network connectivity and try again." Stop.
   - Other: "Network error (curl exit $curl_exit)." Stop.
-- **HTTP 200:** `ManageOrgSessions` confirmed. Record as PASS.
+- **HTTP 200:** `ViewOrgSessions` confirmed. Record as PASS. Verify response
+  uses `items` array (not `sessions`).
 - **HTTP 401:** "Authentication failed (401). DEVIN_SERVICE_USER_TOKEN was rejected. Rotate the token at Enterprise Settings > Service Users." Stop immediately.
-- **HTTP 403:** Record `ManageOrgSessions` as MISSING. Continue to Step 4 to collect all permission failures before reporting.
+- **HTTP 403:** Record `ViewOrgSessions` as MISSING. Continue to collect all
+  permission failures before reporting.
 - **HTTP 404:** "Organization not found (404). Verify DEVIN_ORG_ID matches the ID shown at Enterprise Settings > Organizations." Stop.
 - **HTTP 5xx:** "Devin API server error ($http_status). Try again in a few minutes." Stop.
 - **Other:** "Unexpected HTTP status $http_status." Redact and show first 200 chars of body:
@@ -130,13 +134,14 @@ All error output must sanitize tokens:
 
 Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers.
 
-### Step 4: Probe ManageAccountSessions
+### Step 4: Probe ViewAccountSessions (Optional)
 
-Make a read-only call to the enterprise sessions endpoint:
+Make a read-only call to the enterprise sessions endpoint. This permission is
+optional — the plugin works without it (org-scoped messaging is preferred).
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
-printf 'Probing ManageAccountSessions...\n'
+DEVIN_API_BASE="https://api.devin.ai/v3"
+printf 'Probing ViewAccountSessions (enterprise list)...\n'
 
 org_param=$(jq -rn --arg o "${DEVIN_ORG_ID}" '@uri "\($o)"')
 if [ $? -ne 0 ] || [ -z "$org_param" ]; then
@@ -155,17 +160,15 @@ body=${response%$'\n'*}
 
 Outcome mapping:
 
-- **curl non-zero exit:**
-  - Exit 6: "Could not resolve api.devin.ai — check DNS or internet connectivity." Stop.
-  - Exit 7: "Could not connect to Devin API — the API may be temporarily down." Stop.
-  - Exit 28: "Request timed out — check network connectivity and try again." Stop.
-  - Other: "Network error (curl exit $curl_exit)." Stop.
-- **HTTP 200:** `ManageAccountSessions` confirmed. Record as PASS.
-- **HTTP 401:** "Authentication failed (401). DEVIN_SERVICE_USER_TOKEN was rejected. Rotate the token at Enterprise Settings > Service Users." Stop immediately.
-- **HTTP 403:** Record `ManageAccountSessions` as MISSING. Continue to Step 5.
-- **HTTP 404:** "Enterprise sessions endpoint not found (404). The V3 beta API may have changed — check Devin release notes." Stop.
-- **HTTP 5xx:** "Devin API server error ($http_status). Try again in a few minutes." Stop.
-- **Other:** "Unexpected HTTP status $http_status." Redact and show first 200 chars of body (same as Step 3). Stop.
+- **curl non-zero exit:** Same as Step 3. Stop.
+- **HTTP 200:** Enterprise endpoint accessible (`ViewAccountSessions` confirmed).
+  Record as PASS.
+- **HTTP 401:** "Authentication failed (401). Token rejected." Stop immediately.
+- **HTTP 403:** Record `ViewAccountSessions` as MISSING. Continue to Step 5.
+  This is not a critical failure — org-scoped messaging works without it.
+- **HTTP 404:** "Enterprise sessions endpoint not found (404)." Stop.
+- **HTTP 5xx:** "Devin API server error ($http_status). Try again later." Stop.
+- **Other:** "Unexpected HTTP status $http_status." Redact body. Stop.
 
 ### Step 5: Report Results
 
@@ -183,24 +186,51 @@ Credentials
   DEVIN_SERVICE_USER_TOKEN     OK  (cog_ format confirmed, token not echoed)
   DEVIN_ORG_ID                 OK  ([DEVIN_ORG_ID value])
 
-Permissions
-  ManageOrgSessions            [OK | MISSING]
-  ManageAccountSessions        [OK | MISSING]
+Permissions (required — org-scoped)
+  ViewOrgSessions (list)       [OK | MISSING]
 
-Overall: [PASS | FAIL]
+Permissions (optional — enterprise-scoped)
+  ViewAccountSessions          [OK | MISSING]
+
+Overall: [PASS | PARTIAL | FAIL]
 ```
 
-**If any permission is MISSING**, display:
+**Note:** `UseDevinSessions` (create) and `ManageOrgSessions` (message/terminate/
+archive) cannot be probed non-destructively. If the list endpoint (ViewOrgSessions)
+passes, the other org permissions are typically also granted. If session creation
+or archival later fails with 403, the user should verify these permissions.
+
+**If ViewOrgSessions is MISSING**, display:
 
 ```text
-One or more required permissions are missing.
+Required permission ViewOrgSessions is missing.
 
 To fix:
   1. Go to Enterprise Settings > Service Users in the Devin web app
   2. Select your service user
-  3. Grant the missing permission(s):
-       ManageOrgSessions     — Create, get, terminate, archive sessions (org scope)
-       ManageAccountSessions — List sessions, send messages (enterprise scope)
+  3. Grant these org-scoped permissions:
+       UseDevinSessions    — Create sessions
+       ViewOrgSessions     — List and get sessions
+       ManageOrgSessions   — Send messages, terminate, archive
+  4. Re-run /devin:setup to verify
+```
+
+**If ViewOrgSessions is OK but ViewAccountSessions is MISSING**, display:
+
+```text
+Overall: PARTIAL PASS
+
+ViewAccountSessions is missing — enterprise-scope session listing unavailable.
+Org-scoped messaging (the primary path) will still work as normal.
+
+Note: ManageAccountSessions (enterprise-scope messaging) cannot be probed
+non-destructively. If enterprise messaging fails with 403 later, grant it at
+Enterprise Settings > Service Users.
+
+To enable enterprise-scope features:
+  1. Go to Enterprise Settings > Service Users
+  2. Grant: ViewAccountSessions — Enterprise-scope session listing
+  3. Grant: ManageAccountSessions — Enterprise-scope messaging (optional)
   4. Re-run /devin:setup to verify
 ```
 
@@ -229,7 +259,11 @@ To configure:
   1. Create a service user:
        Enterprise Settings > Service Users > Create new user
        Required permissions:
+         - UseDevinSessions
+         - ViewOrgSessions
          - ManageOrgSessions
+       Optional permissions:
+         - ViewAccountSessions
          - ManageAccountSessions
        Token format: cog_<...>
 
