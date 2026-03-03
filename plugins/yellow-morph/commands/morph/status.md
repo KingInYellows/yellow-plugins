@@ -30,6 +30,7 @@ to configure." and stop.
 
 ```bash
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+  --connect-timeout 5 --max-time 10 \
   -H "Authorization: Bearer ${MORPH_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"model":"morph-v3-fast","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
@@ -64,8 +65,6 @@ Environment
 
 API
   Status                OK (200)
-  Available models      morph-v3-fast (16K), morph-v3-large (32K),
-                        morph-warp-grep-v1
 
 MCP Tools
   edit_file             available | not loaded

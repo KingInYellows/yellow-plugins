@@ -11,7 +11,7 @@
   "license": "MIT",
   "keywords": ["code-editing", "code-search", "fast-apply", "warpgrep", "morph"],
   "mcpServers": {
-    "morph-mcp": {
+    "morph": {
       "command": "npx",
       "args": ["-y", "@morphllm/morphmcp@0.8.110"],
       "env": {

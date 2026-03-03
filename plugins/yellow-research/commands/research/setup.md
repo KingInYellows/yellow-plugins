@@ -226,7 +226,7 @@ Test call: mcp__grep__searchGitHub with query: "test", maxResults: 1
 
 ```text
 ToolSearch keyword: "warpgrep_codebase_search"
-Preferred tool name: mcp__plugin_yellow-morph_morph-mcp__warpgrep_codebase_search
+Preferred tool name: mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
 Fallback tool name: mcp__filesystem-with-morph__warpgrep_codebase_search
 Test call: <matched tool> with query: "README"
 ```

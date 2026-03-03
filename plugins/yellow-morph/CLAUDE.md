@@ -4,7 +4,7 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
 
 ## MCP Server
 
-- **morph-mcp** — Stdio transport via `npx @morphllm/morphmcp@0.8.110`
+- **morph** — Stdio transport via `npx @morphllm/morphmcp@0.8.110`
 - Requires `MORPH_API_KEY` environment variable (will not start without it)
 - Tools: `edit_file`, `warpgrep_codebase_search`
 - Lifecycle: starts on first MCP tool call, shuts down on session end
@@ -15,7 +15,7 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
 
 ### edit_file (Fast Apply) vs built-in Edit
 
-- Prefer `mcp__plugin_yellow-morph_morph-mcp__edit_file` when the change spans
+- Prefer `mcp__plugin_yellow-morph_morph__edit_file` when the change spans
   3+ non-contiguous lines OR when the target file exceeds 200 lines
 - Continue using built-in Edit for small, precise single-line replacements where
   the exact old_string is known and unique
@@ -27,7 +27,7 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
 
 ### warpgrep_codebase_search (WarpGrep) vs built-in Grep
 
-- Prefer `mcp__plugin_yellow-morph_morph-mcp__warpgrep_codebase_search` for
+- Prefer `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` for
   intent-based queries ("how does authentication work?", "find error handling
   for payment failures", "what calls this function?")
 - Continue using built-in Grep for exact pattern matching (regex, literal
@@ -51,7 +51,6 @@ Routing rules:
 - Discovery query about unseen code → `warpgrep_codebase_search`
 - Recall query about past learning or similar pattern → ruvector tools
 - If ruvector is not installed → WarpGrep handles all code search
-- If yellow-morph is not installed → ruvector and built-in Grep handle search
 
 ## Graceful Degradation
 
@@ -72,7 +71,8 @@ Routing rules:
   offers zero-data-retention (ZDR) mode.
 - **Sensitive files:** Do not use WarpGrep to search files that may contain
   secrets (.env, credentials.json, private keys). Use built-in Grep for these.
-- **API key:** Transmitted via headers (standard HTTPS). Never log or display.
+- **API key:** Transmitted via headers (standard HTTPS). Never display in full.
+  Setup shows only the first 4 characters for verification.
 - **Privacy details:** https://morphllm.com/privacy
 
 ## Plugin Components

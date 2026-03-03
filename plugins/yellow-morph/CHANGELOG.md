@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `/morph:status` command for API health and MCP tool availability
 - CLAUDE.md with tool preference rules and domain separation guidance
 - Cross-plugin hints in yellow-core, yellow-review, yellow-debt, yellow-ci
+- Updated yellow-research to reference yellow-morph as preferred WarpGrep source
 
 ---
 

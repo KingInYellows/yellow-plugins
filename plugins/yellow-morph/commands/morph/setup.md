@@ -6,7 +6,6 @@ argument-hint: ''
 allowed-tools:
   - Bash
   - Read
-  - Write
   - AskUserQuestion
 ---
 
@@ -27,7 +26,7 @@ command -v rg   >/dev/null 2>&1 && printf 'ripgrep (rg):  OK\n' || printf 'ripgr
 command -v node >/dev/null 2>&1 && printf 'node:          OK (%s)\n' "$(node --version 2>/dev/null)" || printf 'node:          NOT FOUND\n'
 command -v npx  >/dev/null 2>&1 && printf 'npx:           OK\n' || printf 'npx:           NOT FOUND\n'
 printf '\n=== Environment ===\n'
-[ -n "${MORPH_API_KEY:-}" ] && printf '%-20s set (%s...)\n' 'MORPH_API_KEY:' "$(printf '%s' "$MORPH_API_KEY" | head -c 8)" || printf '%-20s NOT SET\n' 'MORPH_API_KEY:'
+[ -n "${MORPH_API_KEY:-}" ] && printf '%-20s set (%s...)\n' 'MORPH_API_KEY:' "$(printf '%s' "$MORPH_API_KEY" | head -c 4)" || printf '%-20s NOT SET\n' 'MORPH_API_KEY:'
 ```
 
 Collect **all** failures before stopping — report them together.
@@ -76,6 +75,7 @@ Test API key with a minimal completion call:
 
 ```bash
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+  --connect-timeout 5 --max-time 10 \
   -H "Authorization: Bearer ${MORPH_API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"model":"morph-v3-fast","messages":[{"role":"user","content":"test"}],"max_tokens":1}' \
@@ -91,55 +91,13 @@ printf 'API response: %s\n' "$HTTP_CODE"
 - **429**: "Rate limit exceeded. You may have exhausted your free tier credits."
   Warn, continue.
 
-### Step 4: Verify MCP Package
+### Step 4: Report
 
-```bash
-npm view @morphllm/morphmcp version 2>/dev/null || echo "NPM_LOOKUP_FAILED"
-```
-
-- **Version output**: Package accessible. Record version and compare with
-  pinned version in plugin.json.
-- **NPM_LOOKUP_FAILED**: "Cannot query npm for @morphllm/morphmcp. Check npm
-  registry access." Warn, continue.
-
-### Step 5: Report
+Display a summary of all checks. Include a privacy note:
 
 ```text
-yellow-morph Setup Check
-========================
-
-Prerequisites
-  ripgrep (rg)   OK
-  node           OK (v22.x.x)
-  npx            OK
-
-API
-  MORPH_API_KEY   set (morph-k_...)
-  API status      OK (authenticated)
-  MCP package     @morphllm/morphmcp@0.8.110 (pinned in plugin.json)
-
-Privacy
-  Data retention: 90 days (free/starter) | ZDR available (enterprise)
-  Code is sent to api.morphllm.com for processing
-
-Overall: PASS
+Privacy: Code is sent to api.morphllm.com. Free/Starter retains data 90 days.
+         Enterprise offers zero-data-retention (ZDR). See https://morphllm.com/privacy
 ```
 
-Ask via AskUserQuestion: "Setup complete. What would you like to do next?"
-Options: "Test morph tools" (suggest a sample edit_file and warpgrep call),
-"Check status" (`/morph:status`), "Done".
-
-## Error Handling
-
-| Error | Message | Action |
-|---|---|---|
-| `rg` not found | "Install ripgrep: https://github.com/BurntSushi/ripgrep" | Collect, stop |
-| `node` not found | "Install Node.js 18+: https://nodejs.org/" | Collect, stop |
-| `npx` not found | "npx required (bundled with Node.js)" | Collect, stop |
-| Node <18 | "Node.js 18+ recommended. Current: vX.Y.Z" | Warn, continue |
-| `MORPH_API_KEY` not set | Prompt for key or signup | Guided flow, stop |
-| API key invalid (401) | "API key is invalid" | Stop |
-| API forbidden (403) | "Account may be suspended" | Stop |
-| Network error (000) | "Cannot reach api.morphllm.com" | Stop |
-| Rate limit (429) | "Rate limit exceeded" | Warn, continue |
-| npm lookup failed | "Cannot query npm registry" | Warn, continue |
+Report overall status as PASS or FAIL based on the checks above.
