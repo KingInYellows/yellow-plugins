@@ -17,6 +17,7 @@ allowed-tools:
   - mcp__plugin_yellow-chatprd_chatprd__get_document
   - mcp__plugin_yellow-chatprd_chatprd__list_templates
   - mcp__plugin_yellow-chatprd_chatprd__list_projects
+  - mcp__plugin_yellow-chatprd_chatprd__search_chats
 ---
 
 <examples>
@@ -84,11 +85,15 @@ Route by intent: create ("write a PRD", "draft a spec") → Create Flow; find/re
 
 ### Read/Search Flow
 
-1. `search_documents` with user's query (pass `org_id` if the tool supports
-   org scoping — check schema at runtime). If org scoping is not supported,
-   warn the user: "Note: Search results may include documents from other
-   organizations you have access to."
-2. Present results (title, project, date)
+1. Call `search_documents` and `search_chats` in parallel with the user's query.
+   Pass `org_id` if the tools support org scoping — check schema at runtime. If
+   org scoping is not supported, warn the user: "Note: Search results may
+   include documents from other organizations you have access to."
+   If `search_chats` fails, suppress silently — it must never block or delay the
+   primary `search_documents` response.
+2. Present document results (title, project, date). If `search_chats` returned
+   results, append: "Also found [N] related ChatPRD conversations." Do not
+   display chat content unless the user asks.
 3. If user wants details: `get_document` for full content
 
 ### List Flow

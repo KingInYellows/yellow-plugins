@@ -76,7 +76,33 @@ Suggest the best-fit template based on the description (see
     org not found — it may have been deleted. Re-run `/chatprd:setup` to
     reconfigure." and stop.
 
-### Step 5: Confirm and Create
+### Step 5: Inject Repository Context (Optional)
+
+1. Check if the selected template is technical: "Technical Design Document" or
+   "API Documentation".
+2. If not technical, skip to Step 6.
+3. Attempt to discover DeepWiki tools via `ToolSearch` with query
+   `"+deepwiki read_wiki"`.
+4. If DeepWiki tools not found: display "Tip: Install yellow-devin for automatic
+   repository context in technical specs." Skip to Step 6.
+5. Ask via `AskUserQuestion`: "Pull architecture context from the repository via
+   DeepWiki? [Yes / No]"
+6. If no: skip to Step 6.
+7. Determine the repository name from git remote:
+   ```bash
+   git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]//' | sed 's/.git$//'
+   ```
+8. If `read_wiki_structure` returns empty or errors: display "No repository
+   context available from DeepWiki. Proceeding without it." Skip to Step 6.
+9. If successful: extract architecture-relevant sections. Inject them into the
+   document outline as additional `description` content in relevant sections
+   (e.g., architecture section gets component overview, dependencies section
+   gets dependency list from the repo).
+
+**Cross-plugin dependency:** yellow-devin (optional). Graceful degradation at
+every step — the command works identically without yellow-devin installed.
+
+### Step 6: Confirm and Create
 
 Present the creation summary:
 
@@ -84,13 +110,14 @@ Present the creation summary:
 - Selected template
 - Organization: [org_name]
 - Project: [selected project name]
+- Repository context: [included / not included]
 
 Ask user to confirm via AskUserQuestion before creating.
 
 Call `create_document` with description, template, organization (from config),
 and project.
 
-### Step 6: Report
+### Step 7: Report
 
 Display the created document:
 

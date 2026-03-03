@@ -38,10 +38,12 @@ choose "Clear authentication".
 
 ## Agents
 
-| Agent                | Description                                                |
-| -------------------- | ---------------------------------------------------------- |
-| `document-assistant` | ChatPRD document management (create, read, update, search) |
-| `linear-prd-bridge`  | Bridge ChatPRD documents to Linear issues                  |
+| Agent                | Description                                                          |
+| -------------------- | -------------------------------------------------------------------- |
+| `document-assistant` | ChatPRD document management (create, read, update, search)           |
+| `linear-prd-bridge`  | Bridge ChatPRD documents to Linear issues with related-specs context |
+| `document-reviewer`  | PRD completeness analysis against template structure                 |
+| `project-dashboard`  | One-stop project overview with document inventory and coverage gaps  |
 
 ## Skills
 
