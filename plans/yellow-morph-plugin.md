@@ -183,7 +183,7 @@ When morph tools fail at runtime (API error, timeout, credits exhausted):
 
 ### Files to Create
 
-```
+```text
 plugins/yellow-morph/
   .claude-plugin/plugin.json     # MCP server config
   .gitattributes                 # LF line endings
@@ -264,7 +264,7 @@ plugins/yellow-morph/
 
 #### 2. `.gitattributes`
 
-```
+```text
 * text=auto eol=lf
 *.md text eol=lf
 *.json text eol=lf
@@ -489,8 +489,8 @@ Stop conditions (after reporting all):
 - `npx` not found: "npx is required (bundled with Node.js). Verify Node.js
   installation."
 
-Node version check: If node version is below 18, warn: "Node.js 18+ is
-recommended. Current: vX.Y.Z"
+Node version check: If node version is below 18, stop with: "Node.js 18+ is
+required. Current: vX.Y.Z. Please upgrade Node.js, then re-run /morph:setup."
 
 `MORPH_API_KEY` not set is a warning, not a stop — continue to Step 2.
 
@@ -586,13 +586,14 @@ Options: "Test morph tools" (suggest a sample edit_file and warpgrep call),
 | `rg` not found | "Install ripgrep: https://github.com/BurntSushi/ripgrep" | Collect, stop |
 | `node` not found | "Install Node.js 18+: https://nodejs.org/" | Collect, stop |
 | `npx` not found | "npx required (bundled with Node.js)" | Collect, stop |
-| Node <18 | "Node.js 18+ recommended. Current: vX.Y.Z" | Warn, continue |
+| Node <18 | "Node.js 18+ is required. Current: vX.Y.Z. Please upgrade Node.js, then re-run /morph:setup." | Collect, stop |
 | `MORPH_API_KEY` not set | Prompt for key or signup | Guided flow, stop |
 | API key invalid (401) | "API key is invalid" | Stop |
 | API forbidden (403) | "Account may be suspended" | Stop |
 | Network error (000) | "Cannot reach api.morphllm.com" | Stop |
 | Rate limit (429) | "Rate limit exceeded" | Warn, continue |
 | npm lookup failed | "Cannot query npm registry" | Warn, continue |
+
 ```
 
 <!-- deepen-plan: external -->
@@ -663,7 +664,7 @@ printf 'API status: %s\n' "$HTTP_CODE"
 
 Use ToolSearch to check if morph MCP tools are loaded:
 
-```
+```text
 ToolSearch query: "+morph edit"
 ```
 
@@ -690,6 +691,7 @@ MCP Tools
 
 Overall: HEALTHY | DEGRADED | OFFLINE
 ```
+
 ```
 
 <!-- deepen-plan: external -->

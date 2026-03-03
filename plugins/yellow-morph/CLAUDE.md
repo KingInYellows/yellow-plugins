@@ -6,7 +6,7 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
 
 - **morph** — Stdio transport via `npx @morphllm/morphmcp@0.8.110`
 - Requires `MORPH_API_KEY` environment variable (will not start without it)
-- Tools: `edit_file`, `warpgrep_codebase_search`
+- Tools: `mcp__plugin_yellow-morph_morph__edit_file`, `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`
 - Lifecycle: starts on first MCP tool call, shuts down on session end
 - First call may be slow (20-40s cold start on first npx download; subsequent
   sessions use npm cache and start in seconds)
@@ -19,7 +19,7 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
   3+ non-contiguous lines OR when the target file exceeds 200 lines
 - Continue using built-in Edit for small, precise single-line replacements where
   the exact old_string is known and unique
-- Never use `edit_file` for non-code files (.md, .json, .yaml, .yml, .toml,
+- Never use `mcp__plugin_yellow-morph_morph__edit_file` for non-code files (.md, .json, .yaml, .yml, .toml,
   .env, .xml, .ini, .cfg) — always use built-in Edit for these
 - Fast Apply accepts "lazy edit snippets" with `// ... existing code ...`
   markers — the AI specifies what changes, morph handles the merge
@@ -48,15 +48,15 @@ When both yellow-morph and yellow-ruvector are installed:
   patterns, and session memory.
 
 Routing rules:
-- Discovery query about unseen code → `warpgrep_codebase_search`
+- Discovery query about unseen code → `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`
 - Recall query about past learning or similar pattern → ruvector tools
 - If ruvector is not installed → WarpGrep handles all code search
 
 ## Graceful Degradation
 
-- If `edit_file` fails (API error, timeout, credits exhausted): fall back to
+- If `mcp__plugin_yellow-morph_morph__edit_file` fails (API error, timeout, credits exhausted): fall back to
   built-in Edit tool. Note the fallback briefly.
-- If `warpgrep_codebase_search` fails: fall back to built-in Grep. Note the
+- If `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` fails: fall back to built-in Grep. Note the
   fallback briefly.
 - If `MORPH_API_KEY` is not set: MCP server does not start. All workflows
   continue with built-in tools. No error.
@@ -65,7 +65,7 @@ Routing rules:
 
 ## Security and Privacy
 
-- **Data transmission:** Both `edit_file` and `warpgrep_codebase_search` send
+- **Data transmission:** Both `mcp__plugin_yellow-morph_morph__edit_file` and `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` send
   code to Morph's API servers (api.morphllm.com)
 - **Data retention:** Free/Starter tiers retain data for 90 days. Enterprise
   offers zero-data-retention (ZDR) mode.

@@ -100,6 +100,6 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 
 ### Optional Enhancement: yellow-morph
 
-When yellow-morph is installed, `warpgrep_codebase_search` can find anti-pattern
-instances by intent, and `edit_file` provides higher-accuracy code remediation
+When yellow-morph is installed, `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` can find anti-pattern
+instances by intent, and `mcp__plugin_yellow-morph_morph__edit_file` provides higher-accuracy code remediation
 on large files during freeform debt-fixing conversations.

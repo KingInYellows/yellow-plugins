@@ -90,7 +90,7 @@ silently degrade — only yellow-review's own agents run.
 
 ### Optional Enhancement: yellow-morph
 
-When yellow-morph is installed, `warpgrep_codebase_search` can find related code
+When yellow-morph is installed, `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` can find related code
 across the codebase (callers, similar patterns, blast radius) during freeform
 review conversations. Preferred over Grep for intent-based queries like "what
 else calls this function?"

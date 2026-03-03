@@ -129,6 +129,6 @@ defaults:
 
 ### Optional Enhancement: yellow-morph
 
-When yellow-morph is installed, `edit_file` is preferred for applying code fixes
+When yellow-morph is installed, `mcp__plugin_yellow-morph_morph__edit_file` is preferred for applying code fixes
 to resolve CI failures in freeform conversations, especially in files longer
 than 200 lines where built-in edit accuracy degrades.

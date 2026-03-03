@@ -105,7 +105,7 @@ Integration" precedent.
 
 ### 1. Plugin Structure
 
-```
+```text
 plugins/yellow-morph/
   .claude-plugin/
     plugin.json            # MCP server config for @morphllm/morphmcp
@@ -262,7 +262,7 @@ The single command in v1. Responsibilities:
 
 The CLAUDE.md should contain these sections:
 
-```
+```markdown
 # yellow-morph Plugin
 
 Intelligent code editing and search via Morph Fast Apply and WarpGrep.

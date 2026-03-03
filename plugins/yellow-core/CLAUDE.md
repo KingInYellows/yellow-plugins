@@ -71,8 +71,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 ### Optional Enhancement: yellow-morph
 
 When yellow-morph is installed, two additional MCP tools become available:
-`edit_file` (Fast Apply for high-accuracy code merging) and
-`warpgrep_codebase_search` (intent-based code discovery). See yellow-morph's
+`mcp__plugin_yellow-morph_morph__edit_file` (Fast Apply for high-accuracy code merging) and
+`mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` (intent-based code discovery). See yellow-morph's
 CLAUDE.md for tool preference rules and domain separation with ruvector. These
 tools are available in freeform conversations; structured commands use built-in
 Edit and Grep.

@@ -80,7 +80,12 @@ HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
   -H "Content-Type: application/json" \
   -d '{"model":"morph-v3-fast","messages":[{"role":"user","content":"test"}],"max_tokens":1}' \
   https://api.morphllm.com/v1/chat/completions 2>/dev/null)
-printf 'API response: %s\n' "$HTTP_CODE"
+CURL_EXIT=$?
+if [ "$CURL_EXIT" -ne 0 ]; then
+  printf 'API response: UNREACHABLE (curl exit %d)\n' "$CURL_EXIT"
+else
+  printf 'API response: %s\n' "$HTTP_CODE"
+fi
 ```
 
 - **200**: API key valid. Continue to Step 4.
@@ -91,7 +96,19 @@ printf 'API response: %s\n' "$HTTP_CODE"
 - **429**: "Rate limit exceeded. You may have exhausted your free tier credits."
   Warn, continue.
 
-### Step 4: Report
+### Step 4: Verify MCP Package
+
+Check that the MCP package is accessible from the npm registry:
+
+```bash
+npm view @morphllm/morphmcp@0.8.110 version 2>/dev/null || echo "NPM_LOOKUP_FAILED"
+```
+
+- Version output (e.g., `0.8.110`): Package accessible. Continue to Step 5.
+- `NPM_LOOKUP_FAILED`: "Cannot query npm registry for @morphllm/morphmcp. Check
+  npm access." Warn, continue.
+
+### Step 5: Report
 
 Display a summary of all checks. Include a privacy note:
 

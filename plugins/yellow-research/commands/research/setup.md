@@ -8,6 +8,7 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-core_context7__resolve-library-id
   - mcp__grep__searchGitHub
+  - mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
   - mcp__filesystem-with-morph__warpgrep_codebase_search
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
 ---

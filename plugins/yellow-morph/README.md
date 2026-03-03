@@ -6,7 +6,7 @@ Intelligent code editing and search via
 
 ## Installation
 
-```
+```bash
 /plugin marketplace add KingInYellows/yellow-plugins
 /plugin install yellow-morph@yellow-plugins
 ```

@@ -49,7 +49,8 @@ Morph-LLM is a specialized AI infrastructure platform (founded 2025, by Tejas Bh
 - Scales to 1,500-line files at 99.2% accuracy (traditional approaches degrade above 200 lines)
 
 **API details:**
-```
+
+```text
 Endpoint: OpenAI-compatible (https://api.morphllm.com/v1/chat/completions)
 Models:
   - morph-v3-fast: 16K context, $0.80/$1.00 per 1M tokens (input/output)
@@ -82,7 +83,8 @@ SDK: morph.fastApply.execute(input, overrides)
 - Typically completes in 3.8 steps (vs. 12.4 steps for Claude Haiku at equivalent F1)
 
 **API details:**
-```
+
+```text
 SDK: morph.warpGrep.execute(input, overrides)
   Input: { query, repoRoot, excludes?, includes?, streamSteps?, provider? }
   Output: Structured results with file paths and relevant code sections
@@ -114,12 +116,15 @@ Default timeout: 30,000ms (configurable via MORPH_WARP_GREP_TIMEOUT)
 Morph ships an official MCP server package: `@morphllm/morphmcp`
 
 **Setup (one command):**
+
 ```bash
 npx -y @morphllm/morph-setup --morph-api-key YOUR_API_KEY
 ```
+
 This auto-detects Claude Code, Cursor, VS Code, and Codex and configures them automatically.
 
 **Manual Claude Code setup:**
+
 ```bash
 claude mcp add morph-mcp -e MORPH_API_KEY=YOUR_API_KEY -- npx @morphllm/morphmcp
 ```
@@ -150,6 +155,7 @@ claude mcp add morph-mcp -e MORPH_API_KEY=YOUR_API_KEY -- npx @morphllm/morphmcp
 **Python package:** `morph-python-sdk`
 
 **SDK namespaces:**
+
 ```typescript
 import { MorphClient } from '@morphllm/morphsdk';
 
@@ -200,7 +206,7 @@ morph.git.*                                   // Git operations
 
 #### Current Ecosystem Context
 
-The yellow-plugins monorepo contains 11 plugins:
+The yellow-plugins monorepo contains 12 plugins:
 
 | Plugin | Domain | Relevance to Morph |
 |--------|--------|-------------------|
@@ -247,7 +253,8 @@ Both WarpGrep and ruvector provide code search, but they are **complementary, no
 Create a new `yellow-morph` plugin following the existing plugin architecture pattern.
 
 **Plugin structure:**
-```
+
+```text
 plugins/yellow-morph/
   .claude-plugin/
     plugin.json          # MCP server config for @morphllm/morphmcp
@@ -273,6 +280,7 @@ plugins/yellow-morph/
 ```
 
 **plugin.json MCP server configuration:**
+
 ```json
 {
   "name": "yellow-morph",
@@ -293,7 +301,8 @@ plugins/yellow-morph/
 ```
 
 **MCP tool naming convention (per AGENTS.md rules):**
-```
+
+```text
 mcp__plugin_yellow-morph_morph-mcp__edit_file
 mcp__plugin_yellow-morph_morph-mcp__warpgrep_codebase_search
 ```
@@ -309,6 +318,7 @@ This is the recommended primary path because:
 #### Integration Pattern: SDK (Secondary, for Custom Agents)
 
 For custom agent logic (e.g., a debt remediation agent that chains WarpGrep search with Fast Apply edits), import the SDK directly:
+
 ```typescript
 import { MorphClient } from '@morphllm/morphsdk';
 ```
