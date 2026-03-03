@@ -30,7 +30,8 @@ the plugin orchestrates access and connects tools.
   API doc)
 - `/chatprd:search` — Search ChatPRD workspace for documents
 - `/chatprd:update` — Update an existing ChatPRD document
-- `/chatprd:list` — List documents in ChatPRD workspace
+- `/chatprd:list` — List documents in ChatPRD workspace (project-scoped,
+  org-scoped, or personal)
 - `/chatprd:link-linear` — Create Linear issues from a ChatPRD document
 
 ### Agents (2)
@@ -39,8 +40,9 @@ the plugin orchestrates access and connects tools.
 
 - `document-assistant` — ChatPRD document management (create, read, update,
   search). Does NOT handle Linear bridging.
-- `linear-prd-bridge` — Bridge ChatPRD documents to Linear issues. Only triggers
-  when Linear is explicitly mentioned alongside document context.
+- `linear-prd-bridge` — Bridge ChatPRD documents to Linear issues with
+  related-specs enrichment. Only triggers when Linear is explicitly mentioned
+  alongside document context.
 
 ### Skills (1)
 

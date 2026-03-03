@@ -34,8 +34,39 @@ Map MCP errors to user-friendly messages. Always handle these cases:
 | Rate limited (429)                      | "ChatPRD rate limit hit. Retrying..."                                    | Exponential backoff: 1s, 2s, 4s. Max 3 retries. Abort if all retries fail. |
 | Network timeout                         | "ChatPRD server unavailable. Retry in a moment."                         | Retry once, then report failure                                            |
 | MCP tool not found                      | "ChatPRD MCP tools unavailable. Check plugin installation."              | Verify MCP server connection                                               |
+| `list_project_documents` 404            | "Project not found. Verify project name with `list_projects`."           | Suggest listing without project filter                                     |
+| `list_documents` empty                  | "No personal documents found."                                           | Suggest org-scoped listing                                                 |
 
 **Empty list vs API error:** When calling `list_user_organizations` or `list_projects`, an empty results array only indicates "no organizations/projects" if the call succeeded without errors. If the response contains an error object or the call throws an exception, route to the error table above — do NOT treat API failures as empty lists.
+
+## Listing Tool Selection
+
+Three listing tools serve different scopes:
+
+| Tool | Scope | Default Limit | Use When |
+|------|-------|---------------|----------|
+| `list_project_documents` | Project | 50 | User specifies a project or context is project-scoped |
+| `list_organization_documents` | Organization | 10 | Default listing, no project specified |
+| `list_documents` | Personal/User | 10 | User asks for "my drafts" or personal documents |
+
+**Hierarchy:** personal < org < project (most specific).
+Never use `list_documents` as a substitute for `list_project_documents` —
+`list_documents` returns only the current user's documents, while
+`list_project_documents` returns all documents in a project regardless of
+author.
+
+## Related-Specs Pattern
+
+When enriching external outputs (e.g., Linear issues) with project context:
+
+1. Extract project ID from workspace config `default_project_id`.
+2. Call `list_project_documents` with the project ID.
+3. Filter out the source document.
+4. Include remaining documents as reference links.
+5. If project ID unavailable or API times out (5s), skip silently.
+
+Include all project documents initially. Filter by relevance in future
+iterations if reference lists become unwieldy.
 
 ## Template Guide
 

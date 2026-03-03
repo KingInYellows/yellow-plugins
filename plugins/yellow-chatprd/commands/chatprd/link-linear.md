@@ -10,6 +10,7 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__get_document
+  - mcp__plugin_yellow-chatprd_chatprd__list_project_documents
   - mcp__plugin_yellow-linear_linear__create_issue
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issues
@@ -66,21 +67,38 @@ Extract requirement sections:
 
 Organize into a proposed issue breakdown with titles and descriptions.
 
-### Step 5: Dedup Check
+### Step 5: Fetch Related Specs
+
+Determine the source document's project:
+
+1. Read `default_project_id` from `.claude/yellow-chatprd.local.md` workspace
+   config.
+2. If `default_project_id` is not configured, set `related_specs = []` and skip
+   to Step 6.
+
+If a project ID is available, call `list_project_documents` with that
+`projectId` and workspace `organizationId`. Filter out the source document
+itself (by UUID). Store the remaining documents as `related_specs` (title +
+document UUID).
+
+**Timeout:** If `list_project_documents` does not respond within 5 seconds, set
+`related_specs = []` and proceed. Log: "Related specs could not be loaded."
+
+### Step 6: Dedup Check
 
 Call `list_issues` to search for existing Linear issues matching the proposed
 titles.
 
 - Mark duplicates in the proposal with existing Linear issue identifiers.
 
-### Step 6: Select Linear Team
+### Step 7: Select Linear Team
 
 Use the teams list from Step 1:
 
 - If single team: use it automatically.
 - If multiple teams: let user pick via AskUserQuestion.
 
-### Step 7: Review and Confirm (M3)
+### Step 8: Review and Confirm (M3)
 
 Present the proposed issue breakdown:
 
@@ -91,7 +109,7 @@ Present the proposed issue breakdown:
 Ask user to review and approve via AskUserQuestion. Only proceed after explicit
 confirmation.
 
-### Step 8: Create Issues
+### Step 9: Create Issues
 
 Create approved (non-duplicate) issues via `create_issue`:
 
@@ -100,8 +118,18 @@ Create approved (non-duplicate) issues via `create_issue`:
 - **429 handling:** Exponential backoff (1s, 2s, 4s), max 3 retries per issue.
   Never fall through on rate limit.
 - Include ChatPRD document title as reference in each issue description.
+- When `related_specs` is non-empty, include a References section in each issue
+  description:
 
-### Step 9: Report
+  ```markdown
+  ## References
+  - Source: [Document Title] (ChatPRD)
+  - Related specs in this project:
+    - [Spec Title 1]
+    - [Spec Title 2]
+  ```
+
+### Step 10: Report
 
 Display summary:
 

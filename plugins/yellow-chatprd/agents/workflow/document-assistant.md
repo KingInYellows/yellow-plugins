@@ -12,6 +12,8 @@ allowed-tools:
   - mcp__plugin_yellow-chatprd_chatprd__update_document
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__list_organization_documents
+  - mcp__plugin_yellow-chatprd_chatprd__list_project_documents
+  - mcp__plugin_yellow-chatprd_chatprd__list_documents
   - mcp__plugin_yellow-chatprd_chatprd__get_document
   - mcp__plugin_yellow-chatprd_chatprd__list_templates
   - mcp__plugin_yellow-chatprd_chatprd__list_projects
@@ -91,9 +93,24 @@ Route by intent: create ("write a PRD", "draft a spec") → Create Flow; find/re
 
 ### List Flow
 
-1. `list_organization_documents` scoped to `org_id` from config
-2. Optionally filter by project (ask via AskUserQuestion)
-3. Present top 20 results; offer `get_document` for details
+Detect listing mode from conversational context:
+
+- "Show docs in the mobile project" / project name mentioned → **project-scoped**
+- "List all docs" / "Show documents" / no qualifier → **org-scoped**
+- "Show my drafts" / "My personal documents" → **personal**
+
+Route by mode:
+
+1. **Project-scoped:** Resolve project name via `list_projects` scoped to
+   `org_id`. Call `list_project_documents` with the resolved `projectId` and
+   `organizationId`. Present up to 50 results.
+2. **Org-scoped:** Call `list_organization_documents` scoped to `org_id`.
+   Optionally filter by project (ask via AskUserQuestion). Present top 20
+   results.
+3. **Personal:** Call `list_documents` without `organizationId`. Surfaces the
+   user's own documents. If empty, suggest org-scoped listing.
+
+Offer `get_document` for details on any listed document.
 
 ### Update Flow
 
@@ -114,6 +131,9 @@ do NOT attempt to handle it. Instead, explicitly suggest:
 
 - `/chatprd:link-linear` command for quick bridging
 - `linear-prd-bridge` agent for conversational bridging
+
+When the user asks for document review, completeness check, or gap analysis,
+suggest the `document-reviewer` agent.
 
 ## Rules
 

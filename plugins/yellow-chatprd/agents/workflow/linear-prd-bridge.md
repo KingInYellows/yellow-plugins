@@ -8,8 +8,10 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
+  - Read
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__get_document
+  - mcp__plugin_yellow-chatprd_chatprd__list_project_documents
   - mcp__plugin_yellow-linear_linear__create_issue
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issues
@@ -57,7 +59,15 @@ Attempt to call `mcp__plugin_yellow-linear_linear__list_teams`:
   it with `/plugin marketplace add KingInYellows/yellow-plugins yellow-linear`"
   and stop
 
-### Step 2: Find ChatPRD Document
+### Step 2: Read Workspace Config
+
+Check if `.claude/yellow-chatprd.local.md` exists. If missing: surface "Run
+`/chatprd:setup` to configure your workspace first." and stop. If present: read
+it and parse `org_id`, `org_name`, `default_project_id`,
+`default_project_name` from YAML frontmatter. If `org_id` is empty or blank:
+report "Config malformed — re-run `/chatprd:setup`." and stop.
+
+### Step 3: Find ChatPRD Document
 
 Parse the user's request for a document title or query. Validate input per
 `chatprd-conventions` rules.
@@ -70,7 +80,20 @@ Call `search_documents` to locate the referenced document.
 
 Call `get_document` to read the full content.
 
-### Step 3: Extract Requirements
+### Step 4: Fetch Related Specs
+
+Use `default_project_id` from workspace config (Step 2):
+
+1. If `default_project_id` is not configured, set `related_specs = []` and skip
+   to Step 5.
+2. Call `list_project_documents` with the `projectId` and `organizationId`.
+3. Filter out the source document itself (by UUID).
+4. Store remaining documents as `related_specs` (title + UUID).
+
+**Timeout:** If `list_project_documents` does not respond within 5 seconds, set
+`related_specs = []` and proceed. Log: "Related specs could not be loaded."
+
+### Step 5: Extract Requirements
 
 Parse the document content to identify:
 
@@ -81,7 +104,7 @@ Parse the document content to identify:
 
 Organize into a proposed issue breakdown with titles and descriptions.
 
-### Step 4: Dedup Check
+### Step 6: Dedup Check
 
 Call `list_issues` to search for existing Linear issues matching the proposed
 titles.
@@ -89,12 +112,12 @@ titles.
 - Mark any duplicates in the proposal
 - Show existing issue IDs alongside duplicates
 
-### Step 5: Select Linear Team
+### Step 7: Select Linear Team
 
 Use the `list_teams` result from Step 1. If multiple teams, let user pick via
 AskUserQuestion.
 
-### Step 6: Review and Confirm (M3)
+### Step 8: Review and Confirm (M3)
 
 Present the full proposed issue breakdown to the user:
 
@@ -105,7 +128,7 @@ Present the full proposed issue breakdown to the user:
 Ask user to review, edit, or approve via AskUserQuestion. Only proceed after
 explicit confirmation.
 
-### Step 7: Create Issues
+### Step 9: Create Issues
 
 Create approved issues via `create_issue`:
 
@@ -115,8 +138,18 @@ Create approved issues via `create_issue`:
   Never fall through.
 - Include ChatPRD document title as reference in each issue description
 - Skip any issues the user removed or marked as duplicate
+- When `related_specs` is non-empty, include a References section in each issue
+  description:
 
-### Step 8: Report
+  ```markdown
+  ## References
+  - Source: [Document Title] (ChatPRD)
+  - Related specs in this project:
+    - [Spec Title 1]
+    - [Spec Title 2]
+  ```
+
+### Step 10: Report
 
 Display summary:
 
