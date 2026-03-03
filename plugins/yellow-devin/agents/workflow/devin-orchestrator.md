@@ -69,7 +69,9 @@ Check all three error layers (curl exit, HTTP status, jq parse).
 
 Poll via `GET ${ORG_URL}/sessions?session_ids=${SESSION_ID}&first=1` (list
 endpoint with `session_ids` filter — see Session Lookup Pattern in
-`devin-workflows` skill). Parse session from `.items[0]`. Polling strategy:
+`devin-workflows` skill). Parse session from `.items[0]`. If `items` is empty
+(session deleted or ID stale), report "Session not found" and exit the poll loop.
+Polling strategy:
 
 - Initial delay: 30s, base interval: 30s, backoff: 1.5x after 10 polls
 - Max interval: 5 minutes, max wall-clock: 15 minutes

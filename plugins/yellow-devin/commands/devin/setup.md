@@ -134,14 +134,14 @@ All error output must sanitize tokens:
 
 Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers.
 
-### Step 4: Probe ManageAccountSessions (Optional)
+### Step 4: Probe ViewAccountSessions (Optional)
 
 Make a read-only call to the enterprise sessions endpoint. This permission is
 optional — the plugin works without it (org-scoped messaging is preferred).
 
 ```bash
 DEVIN_API_BASE="https://api.devin.ai/v3"
-printf 'Probing ManageAccountSessions...\n'
+printf 'Probing ViewAccountSessions (enterprise list)...\n'
 
 org_param=$(jq -rn --arg o "${DEVIN_ORG_ID}" '@uri "\($o)"')
 if [ $? -ne 0 ] || [ -z "$org_param" ]; then
@@ -164,7 +164,7 @@ Outcome mapping:
 - **HTTP 200:** Enterprise endpoint accessible (`ViewAccountSessions` confirmed).
   Record as PASS.
 - **HTTP 401:** "Authentication failed (401). Token rejected." Stop immediately.
-- **HTTP 403:** Record `ManageAccountSessions` as MISSING. Continue to Step 5.
+- **HTTP 403:** Record `ViewAccountSessions` as MISSING. Continue to Step 5.
   This is not a critical failure — org-scoped messaging works without it.
 - **HTTP 404:** "Enterprise sessions endpoint not found (404)." Stop.
 - **HTTP 5xx:** "Devin API server error ($http_status). Try again later." Stop.
@@ -190,7 +190,7 @@ Permissions (required — org-scoped)
   ViewOrgSessions (list)       [OK | MISSING]
 
 Permissions (optional — enterprise-scoped)
-  ManageAccountSessions        [OK | MISSING]
+  ViewAccountSessions          [OK | MISSING]
 
 Overall: [PASS | PARTIAL | FAIL]
 ```
@@ -215,18 +215,23 @@ To fix:
   4. Re-run /devin:setup to verify
 ```
 
-**If ViewOrgSessions is OK but ManageAccountSessions is MISSING**, display:
+**If ViewOrgSessions is OK but ViewAccountSessions is MISSING**, display:
 
 ```text
 Overall: PARTIAL PASS
 
-ManageAccountSessions is missing — enterprise-scope messaging will fall back
-to org-scoped endpoint (should still work).
+ViewAccountSessions is missing — enterprise-scope session listing unavailable.
+Org-scoped messaging (the primary path) will still work as normal.
+
+Note: ManageAccountSessions (enterprise-scope messaging) cannot be probed
+non-destructively. If enterprise messaging fails with 403 later, grant it at
+Enterprise Settings > Service Users.
 
 To enable enterprise-scope features:
   1. Go to Enterprise Settings > Service Users
-  2. Grant: ManageAccountSessions — Enterprise-scope messaging
-  3. Re-run /devin:setup to verify
+  2. Grant: ViewAccountSessions — Enterprise-scope session listing
+  3. Grant: ManageAccountSessions — Enterprise-scope messaging (optional)
+  4. Re-run /devin:setup to verify
 ```
 
 **If all checks pass**, display:

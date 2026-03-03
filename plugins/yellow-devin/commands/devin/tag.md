@@ -56,7 +56,8 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
 
-Parse from `items` array: `jq '.items[0]'`. Extract current `.tags` array.
+Parse from `items` array: `jq '.items[0]'`. If the result is null or the array
+is empty, report "Session not found." and stop. Extract current `.tags` array.
 
 ### Step 5: Execute Subcommand
 

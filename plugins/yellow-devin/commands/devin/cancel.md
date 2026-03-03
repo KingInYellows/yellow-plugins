@@ -41,8 +41,8 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
 
-Parse from `items` array: `jq '.items[0]'`. If `items` is empty, report
-"Session not found."
+Parse from `items` array: `jq '.items[0]'`. If the result is null or the array
+is empty, report "Session not found."
 
 Check curl exit code, HTTP status, jq parse.
 
@@ -81,7 +81,8 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
 
-Parse from `items` array: `jq '.items[0]'`.
+Parse from `items` array: `jq '.items[0]'`. If no session is found, report
+"Session already completed or not found." and exit gracefully.
 
 If session is now in a terminal state (`exit`, `error`):
 

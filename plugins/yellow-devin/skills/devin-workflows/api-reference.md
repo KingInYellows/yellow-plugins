@@ -10,7 +10,7 @@ Headers: `Content-Type: application/json` for all POST requests.
 
 ### Create Session
 
-```
+```http
 POST /v3/organizations/{org_id}/sessions
 ```
 
@@ -74,7 +74,7 @@ Notes:
 
 ### Get Session
 
-```
+```http
 GET /v3/organizations/{org_id}/sessions/{devin_id}
 ```
 
@@ -85,7 +85,7 @@ Response: Same `SessionResponse` schema as create.
 **Note:** Prefer using the list endpoint with `session_ids` filter instead — it
 works with `ViewOrgSessions` and avoids per-session permission edge cases:
 
-```
+```http
 GET /v3/organizations/{org_id}/sessions?session_ids={devin_id}&first=1
 ```
 
@@ -94,7 +94,7 @@ Pattern in SKILL.md.
 
 ### List Sessions (Org-Scoped)
 
-```
+```http
 GET /v3/organizations/{org_id}/sessions
 ```
 
@@ -112,7 +112,7 @@ Response: same `{ items, has_next_page, end_cursor, total }` shape as enterprise
 
 ### Terminate Session
 
-```
+```http
 DELETE /v3/organizations/{org_id}/sessions/{devin_id}
 ```
 
@@ -126,7 +126,7 @@ Notes:
 
 ### Archive Session
 
-```
+```http
 POST /v3/organizations/{org_id}/sessions/{devin_id}/archive
 ```
 
@@ -143,7 +143,7 @@ Notes:
 
 ### Send Message (Org-Scoped)
 
-```
+```http
 POST /v3/organizations/{org_id}/sessions/{devin_id}/messages
 ```
 
@@ -172,7 +172,7 @@ Notes:
 
 ### List Sessions
 
-```
+```http
 GET /v3/enterprise/sessions
 ```
 
@@ -224,7 +224,7 @@ Notes:
 
 ### Send Message
 
-```
+```http
 POST /v3/enterprise/sessions/{devin_id}/messages
 ```
 
@@ -253,7 +253,7 @@ Notes:
 
 ### Update Session Tags (V1 Endpoint)
 
-```
+```http
 PUT /v1/sessions/{session_id}/tags
 ```
 

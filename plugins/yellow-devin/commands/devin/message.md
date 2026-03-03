@@ -51,8 +51,8 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
   -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN")
 ```
 
-Parse from `items` array: `jq '.items[0]'`. If `items` is empty, report
-"Session not found."
+Parse from `items` array: `jq '.items[0]'`. If the result is null or the array
+is empty, report "Session not found."
 
 Check session status against messageable states:
 
