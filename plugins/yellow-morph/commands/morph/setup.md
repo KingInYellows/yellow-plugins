@@ -37,9 +37,11 @@ Stop conditions (after reporting all):
 - `node` not found: "Node.js 18+ is required. Install from https://nodejs.org/"
 - `npx` not found: "npx is required (bundled with Node.js). Verify Node.js
   installation."
+- Node <18: "Node.js 18+ is required. Current: vX.Y.Z. Please upgrade."
 
-Node version check: If node version is below 18, warn: "Node.js 18+ is
-recommended. Current: vX.Y.Z"
+Node version check: If node version is below 18, stop with: "Node.js 18+ is
+required. Current: vX.Y.Z. Please upgrade Node.js from https://nodejs.org/,
+then re-run /morph:setup."
 
 `MORPH_API_KEY` not set is a warning, not a stop — continue to Step 2.
 
