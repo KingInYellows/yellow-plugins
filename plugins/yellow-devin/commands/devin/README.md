@@ -9,7 +9,7 @@ progress, send messages, and research codebases.
 |---|---|---|---|
 | `/devin:setup` | Validate V3 credentials and permissions with live API probes. | _(none)_ | `/devin:setup` |
 | `/devin:delegate` | Create a new Devin session with a task prompt. | `<task description> [--tags t1,t2] [--max-acu N]` | `/devin:delegate Refactor the auth module --tags auth,refactor --max-acu 5` |
-| `/devin:status` | Check status of a specific session or list recent sessions. | `[session-id] [--tag TAG] [--status STATUS] [--archived]` | `/devin:status abc123 ` |
+| `/devin:status` | Check status of a specific session or list recent sessions. | `[session-id] [--tag TAG] [--status STATUS] [--archived]` | `/devin:status abc123` |
 | `/devin:message` | Send a follow-up message to an active session (auto-resumes suspended sessions). | `<session-id> <message>` | `/devin:message abc123 Please also add unit tests` |
 | `/devin:cancel` | Terminate a running session after user confirmation. | `<session-id>` | `/devin:cancel abc123` |
 | `/devin:wiki` | Query DeepWiki or Devin Wiki about a repository's architecture and patterns. | `<question> [--repo owner/repo]` | `/devin:wiki How does authentication work --repo acme/backend` |
