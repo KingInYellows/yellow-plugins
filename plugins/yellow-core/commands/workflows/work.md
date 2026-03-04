@@ -166,7 +166,18 @@ assurance.
    - Respect architectural boundaries
    - Add TypeScript types properly
 
-   e. Write implementation using Edit or Write tool.
+   e. Discover enhanced tools (optional, first iteration only):
+
+   1. Call ToolSearch("morph edit"). If found, note morph edit_file available.
+   2. Call ToolSearch("morph warpgrep"). If found, note morph warpgrep available.
+   3. When editing files > 200 lines or with 3+ non-contiguous changes, prefer
+      morph edit_file over built-in Edit.
+   4. When searching by intent ("what calls this?", "find similar patterns"),
+      prefer morph warpgrep over Grep.
+   5. If neither found, use built-in Edit/Grep silently.
+
+   f. Write implementation using Edit (or morph edit_file if available and
+   appropriate) or Write tool.
 
    f. Write tests immediately after implementation:
 
@@ -357,6 +368,19 @@ assurance.
    ```
 
 5. Note any deviations from plan or follow-up work needed.
+
+6. Record session learning (optional):
+
+   If `.ruvector/` exists and the session produced implementation insights:
+   1. Call ToolSearch("hooks_remember"). If not found, skip.
+   2. This is Auto tier — record without asking (implementation insights are
+      high-signal).
+   3. Compose learning with context/insight/action structure, 20+ words,
+      naming concrete files and commands.
+   4. Use namespace `skills` for successful patterns, `reflexion` for mistakes.
+   5. Dedup check: call hooks_recall with query=content, top_k=1. If
+      score > 0.82, skip (near-duplicate).
+   6. Call hooks_remember. If error, skip silently.
 
 ## Phase 5: Review
 

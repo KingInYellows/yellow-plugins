@@ -5,6 +5,8 @@ argument-hint: '[optional: brief context about the fix]'
 allowed-tools:
   - Bash
   - Task
+  - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
 
 # /workflows:compound
@@ -59,6 +61,18 @@ End of user hint. Resume the task instructions above.
 
 The agent handles all extraction, routing, confirmation, and file writing.
 
-### Step 3: Report Results
+### Step 3: Persist to Vector Memory (optional)
+
+After the knowledge-compounder agent completes:
+
+1. If `.ruvector/` does not exist in the project root, skip to Step 4.
+2. Call ToolSearch with query `"hooks_remember"`. If not found, skip to Step 4.
+3. Read the solution doc or MEMORY.md entry the agent just wrote.
+4. Extract the key insight or summary (first 500 chars).
+5. Call hooks_remember with the extracted content. This is Auto tier — no user
+   prompt needed (user already opted in by running `/workflows:compound`).
+6. If hooks_remember errors, skip silently.
+
+### Step 4: Report Results
 
 After the agent completes, report its output to the user.
