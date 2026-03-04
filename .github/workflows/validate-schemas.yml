@@ -5,8 +5,8 @@ on:
   pull_request:
     paths:
       - '.claude-plugin/marketplace.json'
-      - 'plugins/**/.claude-plugin/plugin.json'
-      - 'plugins/*/package.json'
+      - 'plugins/**'
+      - '.changeset/**'
       - 'schemas/*.schema.json'
       - 'scripts/validate-*.js'
       - 'api/cli-contracts/*.json'
@@ -17,8 +17,7 @@ on:
       - main
     paths:
       - '.claude-plugin/marketplace.json'
-      - 'plugins/**/.claude-plugin/plugin.json'
-      - 'plugins/*/package.json'
+      - 'plugins/**'
       - 'schemas/*.schema.json'
       - 'api/cli-contracts/*.json'
   workflow_dispatch:

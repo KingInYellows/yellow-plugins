@@ -146,13 +146,14 @@ auto-update mechanism.
 
 ### When to create a changeset
 
-Required when your PR modifies any file under `plugins/` that affects plugin
-behavior, commands, agents, skills, or configuration schemas.
+Required when your PR modifies **any** file under `plugins/` — including
+commands, agents, skills, hooks, CLAUDE.md, README.md, and configuration
+files. Documentation changes inside a plugin directory are user-visible and
+should be versioned.
 
 Not required for:
 - Changes only to `packages/` (internal TypeScript tooling)
-- Changes only to `scripts/`, `.github/`, or `docs/`
-- Changes only to non-functional files (README, comments, formatting)
+- Changes only to `scripts/`, `.github/`, or root-level `docs/`
 
 ### How to create a changeset
 
@@ -189,6 +190,13 @@ The PR is created by the Changesets bot. Before merging, verify:
 - `plugin.json` and `marketplace.json` versions match `package.json`.
 
 The PR can be held open to batch multiple features before releasing.
+
+**Note on CI coverage:** The Version Packages PR is created by the
+`github-actions[bot]` using `GITHUB_TOKEN`. GitHub does not trigger
+`on: pull_request` CI on bot-created PRs, so `validate-schemas.yml` will
+not run on this PR. The PR content is machine-generated (version bumps and
+CHANGELOG entries only), so manual review of the three bullet points above
+is the primary verification gate before merging.
 
 ### Emergency manual release
 

@@ -55,6 +55,10 @@ jobs:
           # and propagates to plugin.json + marketplace.json via sync-manifests.js.
           # catalog-version.js patch then bumps the root package.json (yellow-plugins-root)
           # which has no workspace dependencies on plugins and won't auto-bump.
+          # The catalog version always uses a patch bump because it tracks release
+          # snapshots (each merge batch), not the semver semantics of individual
+          # plugins. A single release can contain a mix of patch/minor/major plugin
+          # bumps; the catalog version simply advances by one patch per release.
           version: pnpm apply:changesets && node scripts/catalog-version.js patch
 
           # publish: called after the Version Packages PR merges.

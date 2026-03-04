@@ -27,9 +27,9 @@ Claude Code maintains a **plugin cache** at `~/.claude/plugins/cache/` and a mar
 **Background auto-updates** run at startup without interactive credential helpers. For private repositories this requires setting an environment token:
 
 ```bash
-export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx  # GitHub
-export GITLAB_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx  # GitLab
-export BITBUCKET_TOKEN=<app-password>           # Bitbucket
+export GITHUB_TOKEN=<your-token>       # GitHub
+export GITLAB_TOKEN=<your-token>       # GitLab
+export BITBUCKET_TOKEN=<your-token>    # Bitbucket (app password)
 ```
 
 ### 2. Versioning Conventions for Claude Code Plugins

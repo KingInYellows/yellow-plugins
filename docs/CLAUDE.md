@@ -49,7 +49,7 @@ handles all of that natively.
 
 Plugin versions use a three-way sync model:
 
-```
+```text
 plugins/<name>/package.json  →  plugin.json  →  marketplace.json
 ```
 

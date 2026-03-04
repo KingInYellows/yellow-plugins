@@ -16,10 +16,27 @@
 
 set -euo pipefail
 
-# Step 1: Create per-plugin tags via changeset tag.
+# Step 1: Create per-plugin tags via changeset tag and push them to remote.
 # `changeset tag` is idempotent — it skips tags that already exist locally.
+# To push only tags created in this run (not the remote-fetched tags the
+# checkout already has locally), capture the local tag list before and after,
+# then push only the difference.
+git tag -l | sort > /tmp/plugin-tags-before.txt
 echo "Creating per-plugin tags..."
 pnpm tag
+git tag -l | sort > /tmp/plugin-tags-after.txt
+
+NEW_PLUGIN_TAGS=$(comm -13 /tmp/plugin-tags-before.txt /tmp/plugin-tags-after.txt)
+if [ -n "$NEW_PLUGIN_TAGS" ]; then
+  echo "Pushing per-plugin tags..."
+  printf '%s\n' "$NEW_PLUGIN_TAGS" | while IFS= read -r tag; do
+    [ -z "$tag" ] && continue
+    git push origin "refs/tags/$tag"
+    echo "  Pushed: $tag"
+  done
+else
+  echo "No new per-plugin tags to push."
+fi
 
 # Step 2: Read and validate the catalog version.
 CATALOG_VERSION=$(node -p "require('./package.json').version")
