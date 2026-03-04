@@ -146,6 +146,204 @@ function validatePlugin(pluginDir) {
     }
   }
 
+  // RULE 6: Hook script existence (if hooks declared as inline object)
+  if (manifest.hooks && typeof manifest.hooks === 'object') {
+    const VALID_HOOK_EVENTS = [
+      'PreToolUse',
+      'PostToolUse',
+      'PostToolUseFailure',
+      'PermissionRequest',
+      'UserPromptSubmit',
+      'Notification',
+      'Stop',
+      'SubagentStart',
+      'SubagentStop',
+      'SessionStart',
+      'SessionEnd',
+      'TeammateIdle',
+      'TaskCompleted',
+      'PreCompact',
+    ];
+
+    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
+      // Validate event name
+      if (!VALID_HOOK_EVENTS.includes(eventName)) {
+        logWarning(
+          `Unknown hook event "${eventName}". Known events: ${VALID_HOOK_EVENTS.join(', ')}`
+        );
+      }
+
+      if (!Array.isArray(hookEntries)) continue;
+
+      for (const entry of hookEntries) {
+        if (!entry.hooks || !Array.isArray(entry.hooks)) continue;
+
+        for (const hook of entry.hooks) {
+          if (hook.type !== 'command' || !hook.command) continue;
+
+          // Resolve ${CLAUDE_PLUGIN_ROOT} to the plugin directory
+          const resolvedCommand = hook.command.replace(
+            '${CLAUDE_PLUGIN_ROOT}',
+            pluginDir
+          );
+
+          // Extract script path from "bash <path>" format
+          const match = resolvedCommand.match(/^bash\s+(.+)$/);
+          if (!match) continue;
+
+          const scriptPath = match[1].trim();
+
+          if (!fs.existsSync(scriptPath)) {
+            errors.push(
+              `Hook script not found: ${hook.command} (resolved: ${scriptPath})`
+            );
+            logError(
+              `Hook script not found for ${eventName}: ${hook.command}`
+            );
+          } else {
+            try {
+              const stats = fs.statSync(scriptPath);
+              if ((stats.mode & 0o111) === 0) {
+                logWarning(
+                  `Hook script not executable: ${scriptPath} (run: chmod +x)`
+                );
+              }
+            } catch (statErr) {
+              logWarning(`Cannot stat hook script: ${scriptPath}`);
+            }
+          }
+        }
+      }
+    }
+  } else if (typeof manifest.hooks === 'string') {
+    // String hooks field — check for known anti-pattern
+    if (
+      manifest.hooks === './hooks/hooks.json' ||
+      manifest.hooks === 'hooks/hooks.json'
+    ) {
+      logWarning(
+        'hooks field points to standard hooks/hooks.json — Claude Code auto-discovers this file. ' +
+          'Explicit declaration may cause duplicate hooks error in Claude Code v2.1+. ' +
+          'Consider using inline hooks in plugin.json instead.'
+      );
+    }
+  }
+
+  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist)
+  if (manifest.hooks && typeof manifest.hooks === 'object') {
+    const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
+    if (fs.existsSync(hooksJsonPath)) {
+      try {
+        const hooksJson = JSON.parse(
+          fs.readFileSync(hooksJsonPath, 'utf-8')
+        );
+        const hooksJsonHooks = hooksJson.hooks || {};
+        const manifestHooks = manifest.hooks;
+
+        // Compare event names
+        const manifestEvents = new Set(Object.keys(manifestHooks));
+        const jsonEvents = new Set(Object.keys(hooksJsonHooks));
+
+        for (const event of manifestEvents) {
+          if (!jsonEvents.has(event)) {
+            logWarning(
+              `hooks.json missing event "${event}" declared in plugin.json`
+            );
+          }
+        }
+        for (const event of jsonEvents) {
+          if (!manifestEvents.has(event)) {
+            logWarning(
+              `hooks.json has extra event "${event}" not in plugin.json`
+            );
+          }
+        }
+
+        // Compare matchers for shared events
+        for (const event of manifestEvents) {
+          if (!jsonEvents.has(event)) continue;
+          const mEntries = manifestHooks[event];
+          const jEntries = hooksJsonHooks[event];
+          if (!Array.isArray(mEntries) || !Array.isArray(jEntries)) continue;
+
+          for (
+            let i = 0;
+            i < Math.min(mEntries.length, jEntries.length);
+            i++
+          ) {
+            if (mEntries[i].matcher !== jEntries[i].matcher) {
+              logWarning(
+                `hooks.json matcher drift for ${event}[${i}]: ` +
+                  `plugin.json="${mEntries[i].matcher}" vs hooks.json="${jEntries[i].matcher}"`
+              );
+            }
+          }
+        }
+
+        logSuccess('hooks.json sync check completed');
+      } catch (parseErr) {
+        logWarning(`Cannot parse hooks.json: ${parseErr.message}`);
+      }
+    }
+  }
+
+  // RULE 8: Hook script basics (shebang, JSON output, no set -e)
+  if (manifest.hooks && typeof manifest.hooks === 'object') {
+    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
+      if (!Array.isArray(hookEntries)) continue;
+
+      for (const entry of hookEntries) {
+        if (!entry.hooks || !Array.isArray(entry.hooks)) continue;
+
+        for (const hook of entry.hooks) {
+          if (hook.type !== 'command' || !hook.command) continue;
+
+          const resolvedCommand = hook.command.replace(
+            '${CLAUDE_PLUGIN_ROOT}',
+            pluginDir
+          );
+          const match = resolvedCommand.match(/^bash\s+(.+)$/);
+          if (!match) continue;
+
+          const scriptPath = match[1].trim();
+          if (!fs.existsSync(scriptPath)) continue;
+
+          let content;
+          try {
+            content = fs.readFileSync(scriptPath, 'utf-8');
+          } catch {
+            continue;
+          }
+
+          const relPath = path.relative(pluginDir, scriptPath);
+
+          // Check shebang
+          if (!content.startsWith('#!/')) {
+            logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
+          }
+
+          // Check for required output — either JSON {"continue": true} or exit-code protocol
+          const hasJsonOutput = content.includes('"continue"');
+          const hasExitCodeProtocol =
+            /exit\s+0/.test(content) && /exit\s+2/.test(content);
+          if (!hasJsonOutput && !hasExitCodeProtocol) {
+            logWarning(
+              `${relPath}: missing hook output — expected {"continue": true} or exit 0/2 protocol`
+            );
+          }
+
+          // Check for set -e anti-pattern (e as a flag, not in option args like "pipefail")
+          if (/^set\s+-[a-zA-Z]*e[a-zA-Z]*(\s|$)/m.test(content)) {
+            logWarning(
+              `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
+                'use "set -uo pipefail" instead'
+            );
+          }
+        }
+      }
+    }
+  }
+
   // Summary
   if (errors.length === 0) {
     logSuccess(`Plugin "${manifest.name}" is valid`);
