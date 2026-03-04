@@ -9,6 +9,7 @@ allowed-tools:
   - Glob
   - Bash
   - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-research_exa__get_code_context_exa
   - mcp__plugin_yellow-research_exa__web_search_exa
   - mcp__plugin_yellow-core_context7__resolve-library-id

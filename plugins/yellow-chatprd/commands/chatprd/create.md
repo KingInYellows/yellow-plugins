@@ -8,6 +8,7 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-chatprd_chatprd__create_document
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__list_templates

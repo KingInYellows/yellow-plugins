@@ -8,6 +8,7 @@ allowed-tools:
   - Grep
   - AskUserQuestion
   - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-linear_linear__create_issue
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__get_team

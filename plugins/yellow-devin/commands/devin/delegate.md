@@ -7,6 +7,9 @@ allowed-tools:
   - Read
   - Skill
   - AskUserQuestion
+  - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
 
 # Delegate Task to Devin

@@ -127,8 +127,10 @@ defaults:
   issues from CI failures). Without it, `/ci:report-linear` will report that the
   yellow-linear plugin is not installed.
 
-### Optional Enhancement: yellow-morph
+### MCP Tool Integration
 
-When yellow-morph is installed, `mcp__plugin_yellow-morph_morph__edit_file` is preferred for applying code fixes
-to resolve CI failures in freeform conversations, especially in files longer
-than 200 lines where built-in edit accuracy degrades.
+- **ruvector** — Recall past CI failure patterns at diagnosis start; tiered
+  remember (Auto for root cause identified, Prompted for workarounds). Graceful
+  skip if yellow-ruvector not installed.
+- **morph** — Preferred for applying code fixes to large files (>200 lines).
+  Discovered via ToolSearch at runtime; falls back to built-in Edit silently.

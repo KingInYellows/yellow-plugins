@@ -56,3 +56,9 @@ Both paths use `gt submit --no-interactive` for submission.
 - **PostToolUse (Bash)** — Warns when a `gt commit`, `gt modify`, or
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
+
+### MCP Tool Integration
+
+- **ruvector** — Recall past git workflow issues at submit time. Graceful skip
+  if yellow-ruvector not installed.
+- **morph** — Not applicable (submit workflow does not edit source files).

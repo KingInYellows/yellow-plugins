@@ -132,6 +132,15 @@ Without these, the plugin degrades gracefully: Context7 falls back to EXA,
 `/research:setup` reports all optional sources as UNAVAILABLE with install
 instructions.
 
+### MCP Tool Integration
+
+- **ruvector** — Recall past research on same topics at research start;
+  Prompted remember for novel findings. Graceful skip if yellow-ruvector not
+  installed.
+- **morph** — WarpGrep preferred for intent-based codebase search in
+  `/research:code`. Discovered via ToolSearch at runtime; falls back to
+  built-in Grep silently.
+
 ## Git Operations
 
 This plugin does not perform git operations. Graphite commands and git workflows

@@ -8,6 +8,8 @@ allowed-tools:
   - Grep
   - Task
   - AskUserQuestion
+  - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
 # Smart Submit (Graphite Edition)

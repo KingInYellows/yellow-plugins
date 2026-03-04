@@ -78,6 +78,12 @@ For advanced workflows, agents can call Linear MCP tools directly (e.g.,
   issues to Devin AI sessions). Without it, `/linear:delegate` will report that
   the yellow-devin plugin is not installed.
 
+### MCP Tool Integration
+
+- **ruvector** — Recall past issue patterns at issue creation (find similar
+  past issues). Graceful skip if yellow-ruvector not installed.
+- **morph** — Not applicable (issue management does not edit source files).
+
 ## Known Limitations
 
 - MCP-only — no offline mode, no direct GraphQL fallback

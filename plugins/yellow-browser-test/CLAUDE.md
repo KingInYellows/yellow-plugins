@@ -47,6 +47,13 @@ routes, and auth flows. Runs structured and exploratory browser tests.
 This plugin does not perform git operations. Graphite commands and git workflows
 do not apply.
 
+### MCP Tool Integration
+
+- **ruvector** — Recall past test failures at test/explore start; tiered
+  remember (Auto for critical bugs, Prompted for UI issues). Graceful skip
+  if yellow-ruvector not installed.
+- **morph** — Not applicable (browser testing does not edit source files).
+
 ## Known Limitations
 
 - Chromium only (agent-browser uses Chromium)
