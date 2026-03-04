@@ -63,14 +63,17 @@ assurance.
       (Clarify ambiguities).
    2. Call ToolSearch with query "hooks_recall". If not found: proceed to
       Step 3.
-   3. Extract plan Overview section text (text under first `## Overview`
-      heading, or first 500 chars of plan body if no Overview heading).
+   3. Build query: `"[implementation] "` + plan Overview section text (text
+      under first `## Overview` heading, or first 500 chars of plan body if no
+      Overview heading).
    4. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5). If execution error: note
       "[yellow-ruvector] Warning: Memory retrieval unavailable" and proceed to
       Step 3 (Clarify ambiguities).
    5. Discard results with score < 0.5. If none remain: proceed to Step 3.
       Take top 3. Truncate combined content to 800 chars at word boundary.
-   6. Note as advisory context:
+   6. Sanitize XML metacharacters in each finding's content: replace `&` with
+      `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`.
+   7. Note as advisory context:
 
       ```xml
       <reflexion_context>

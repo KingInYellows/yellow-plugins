@@ -52,12 +52,12 @@ case "$TOOL" in
   Edit|Write)
     if [ -n "$file_path" ]; then
       # Side-effect only: updates ruvector's internal pre-edit state
-      "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$file_path" >/dev/null 2>&1 || true
+      "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$file_path" >/dev/null 2>&1 &
     fi
     ;;
   Bash)
     if [ -n "$command_text" ]; then
-      "${RUVECTOR_CMD[@]}" hooks pre-command -- "$command_text" >/dev/null 2>&1 || true
+      "${RUVECTOR_CMD[@]}" hooks pre-command -- "$command_text" >/dev/null 2>&1 &
     fi
     ;;
 esac
