@@ -86,7 +86,7 @@ Run health check and hook status in a single command:
 printf '=== Doctor ===\n' && \
 npx ruvector doctor 2>&1 && \
 printf '\n=== Hook Scripts ===\n' && \
-PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(dirname "$(readlink -f "$0")")")")}" && \
+PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}" && \
 for script in pre-tool-use.sh user-prompt-submit.sh session-start.sh post-tool-use.sh stop.sh; do \
   if [ -x "${PLUGIN_DIR}/hooks/scripts/${script}" ]; then \
     printf '  ✓ %s (executable)\n' "$script"; \

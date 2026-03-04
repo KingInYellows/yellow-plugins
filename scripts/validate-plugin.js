@@ -21,6 +21,21 @@ const path = require('path');
 
 const PROJECT_ROOT = process.cwd();
 
+/**
+ * Resolve a hook command to a script path within the plugin directory.
+ * Returns the resolved path, or null if the command is not a "bash <path>"
+ * format or the path escapes the plugin directory.
+ */
+function resolveHookScriptPath(command, pluginDir) {
+  const resolved = command.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
+  const match = resolved.match(/^bash\s+(\S+)/);
+  if (!match) return null;
+  const scriptPath = match[1];
+  const normalized = path.resolve(scriptPath);
+  if (!normalized.startsWith(path.resolve(pluginDir) + path.sep)) return null;
+  return scriptPath;
+}
+
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
@@ -181,17 +196,23 @@ function validatePlugin(pluginDir) {
         for (const hook of entry.hooks) {
           if (hook.type !== 'command' || !hook.command) continue;
 
-          // Resolve ${CLAUDE_PLUGIN_ROOT} to the plugin directory
-          const resolvedCommand = hook.command.replace(
-            '${CLAUDE_PLUGIN_ROOT}',
-            pluginDir
-          );
-
-          // Extract script path from "bash <path>" format
-          const match = resolvedCommand.match(/^bash\s+(.+)$/);
-          if (!match) continue;
-
-          const scriptPath = match[1].trim();
+          const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
+          if (!scriptPath) {
+            // Check if it was a bash command that escaped the plugin dir
+            const resolved = hook.command.replaceAll(
+              '${CLAUDE_PLUGIN_ROOT}',
+              pluginDir
+            );
+            if (/^bash\s+/.test(resolved)) {
+              errors.push(
+                `Hook script path escapes plugin directory: ${hook.command}`
+              );
+              logError(
+                `Hook script path escapes plugin directory: ${hook.command}`
+              );
+            }
+            continue;
+          }
 
           if (!fs.existsSync(scriptPath)) {
             errors.push(
@@ -239,6 +260,7 @@ function validatePlugin(pluginDir) {
         );
         const hooksJsonHooks = hooksJson.hooks || {};
         const manifestHooks = manifest.hooks;
+        let driftFound = false;
 
         // Compare event names
         const manifestEvents = new Set(Object.keys(manifestHooks));
@@ -249,6 +271,7 @@ function validatePlugin(pluginDir) {
             logWarning(
               `hooks.json missing event "${event}" declared in plugin.json`
             );
+            driftFound = true;
           }
         }
         for (const event of jsonEvents) {
@@ -256,6 +279,7 @@ function validatePlugin(pluginDir) {
             logWarning(
               `hooks.json has extra event "${event}" not in plugin.json`
             );
+            driftFound = true;
           }
         }
 
@@ -265,6 +289,14 @@ function validatePlugin(pluginDir) {
           const mEntries = manifestHooks[event];
           const jEntries = hooksJsonHooks[event];
           if (!Array.isArray(mEntries) || !Array.isArray(jEntries)) continue;
+
+          if (mEntries.length !== jEntries.length) {
+            logWarning(
+              `hooks.json entry count mismatch for ${event}: ` +
+                `plugin.json has ${mEntries.length}, hooks.json has ${jEntries.length}`
+            );
+            driftFound = true;
+          }
 
           for (
             let i = 0;
@@ -276,11 +308,16 @@ function validatePlugin(pluginDir) {
                 `hooks.json matcher drift for ${event}[${i}]: ` +
                   `plugin.json="${mEntries[i].matcher}" vs hooks.json="${jEntries[i].matcher}"`
               );
+              driftFound = true;
             }
           }
         }
 
-        logSuccess('hooks.json sync check completed');
+        if (driftFound) {
+          logWarning('hooks.json sync check completed with drift warnings');
+        } else {
+          logSuccess('hooks.json sync check passed — no drift');
+        }
       } catch (parseErr) {
         logWarning(`Cannot parse hooks.json: ${parseErr.message}`);
       }
@@ -298,20 +335,16 @@ function validatePlugin(pluginDir) {
         for (const hook of entry.hooks) {
           if (hook.type !== 'command' || !hook.command) continue;
 
-          const resolvedCommand = hook.command.replace(
-            '${CLAUDE_PLUGIN_ROOT}',
-            pluginDir
-          );
-          const match = resolvedCommand.match(/^bash\s+(.+)$/);
-          if (!match) continue;
-
-          const scriptPath = match[1].trim();
-          if (!fs.existsSync(scriptPath)) continue;
+          const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
+          if (!scriptPath || !fs.existsSync(scriptPath)) continue;
 
           let content;
           try {
             content = fs.readFileSync(scriptPath, 'utf-8');
-          } catch {
+          } catch (readErr) {
+            logWarning(
+              `Cannot read hook script: ${scriptPath} (${readErr.message})`
+            );
             continue;
           }
 
@@ -322,8 +355,8 @@ function validatePlugin(pluginDir) {
             logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
           }
 
-          // Check for required output — either JSON {"continue": true} or exit-code protocol
-          const hasJsonOutput = content.includes('"continue"');
+          // Heuristic: check if script source contains JSON output or exit-code protocol
+          const hasJsonOutput = /\{[^}]*"continue"\s*:/.test(content);
           const hasExitCodeProtocol =
             /exit\s+0/.test(content) && /exit\s+2/.test(content);
           if (!hasJsonOutput && !hasExitCodeProtocol) {
@@ -332,8 +365,12 @@ function validatePlugin(pluginDir) {
             );
           }
 
-          // Check for set -e anti-pattern (e as a flag, not in option args like "pipefail")
-          if (/^set\s+-[a-zA-Z]*e[a-zA-Z]*(\s|$)/m.test(content)) {
+          // Check for set -e anti-pattern (matches -e flag or -o errexit)
+          if (
+            /^\s*set\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
+              content
+            )
+          ) {
             logWarning(
               `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
                 'use "set -uo pipefail" instead'
