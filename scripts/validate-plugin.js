@@ -223,14 +223,11 @@ function validatePlugin(pluginDir) {
             );
           } else {
             try {
-              const stats = fs.statSync(scriptPath);
-              if ((stats.mode & 0o111) === 0) {
-                logWarning(
-                  `Hook script not executable: ${scriptPath} (run: chmod +x)`
-                );
-              }
-            } catch (statErr) {
-              logWarning(`Cannot stat hook script: ${scriptPath}`);
+              fs.accessSync(scriptPath, fs.constants.R_OK);
+            } catch (accessErr) {
+              logWarning(
+                `Hook script not readable: ${scriptPath} (check file permissions)`
+              );
             }
           }
         }
@@ -303,12 +300,39 @@ function validatePlugin(pluginDir) {
             i < Math.min(mEntries.length, jEntries.length);
             i++
           ) {
-            if (mEntries[i].matcher !== jEntries[i].matcher) {
+            const mEntry = mEntries[i] || {};
+            const jEntry = jEntries[i] || {};
+
+            if (mEntry.matcher !== jEntry.matcher) {
               logWarning(
                 `hooks.json matcher drift for ${event}[${i}]: ` +
-                  `plugin.json="${mEntries[i].matcher}" vs hooks.json="${jEntries[i].matcher}"`
+                  `plugin.json="${mEntry.matcher}" vs hooks.json="${jEntry.matcher}"`
               );
               driftFound = true;
+            }
+
+            // Compare hooks within each entry (command, timeout, type)
+            const mHooks = mEntry.hooks || [];
+            const jHooks = jEntry.hooks || [];
+            for (
+              let j = 0;
+              j < Math.min(mHooks.length, jHooks.length);
+              j++
+            ) {
+              if (mHooks[j].command !== jHooks[j].command) {
+                logWarning(
+                  `hooks.json command drift for ${event}[${i}].hooks[${j}]: ` +
+                    `plugin.json="${mHooks[j].command}" vs hooks.json="${jHooks[j].command}"`
+                );
+                driftFound = true;
+              }
+              if (mHooks[j].timeout !== jHooks[j].timeout) {
+                logWarning(
+                  `hooks.json timeout drift for ${event}[${i}].hooks[${j}]: ` +
+                    `plugin.json=${mHooks[j].timeout} vs hooks.json=${jHooks[j].timeout}`
+                );
+                driftFound = true;
+              }
             }
           }
         }
@@ -326,7 +350,7 @@ function validatePlugin(pluginDir) {
 
   // RULE 8: Hook script basics (shebang, JSON output, no set -e)
   if (manifest.hooks && typeof manifest.hooks === 'object') {
-    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
+    for (const [, hookEntries] of Object.entries(manifest.hooks)) {
       if (!Array.isArray(hookEntries)) continue;
 
       for (const entry of hookEntries) {

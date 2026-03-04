@@ -88,10 +88,10 @@ npx ruvector doctor 2>&1 && \
 printf '\n=== Hook Scripts ===\n' && \
 PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}" && \
 for script in pre-tool-use.sh user-prompt-submit.sh session-start.sh post-tool-use.sh stop.sh; do \
-  if [ -x "${PLUGIN_DIR}/hooks/scripts/${script}" ]; then \
-    printf '  ✓ %s (executable)\n' "$script"; \
+  if [ -r "${PLUGIN_DIR}/hooks/scripts/${script}" ]; then \
+    printf '  ✓ %s (readable)\n' "$script"; \
   elif [ -f "${PLUGIN_DIR}/hooks/scripts/${script}" ]; then \
-    printf '  ⚠ %s (not executable)\n' "$script"; \
+    printf '  ⚠ %s (not readable)\n' "$script"; \
   else \
     printf '  ✗ %s (missing)\n' "$script"; \
   fi; \
