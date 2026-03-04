@@ -55,7 +55,7 @@ GET /api/v1/deployments/{slug}/findings
 Query Parameters:
   triage_state  string   "fixing" for to-fix findings
   repos         string[] Filter by repo name(s)
-  severity      string   "HIGH", "MEDIUM", "LOW", "INFO"
+  severity      string   "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"
   confidence    string   "HIGH", "MEDIUM", "LOW"
   check_id      string   Filter by rule ID
   ref           string   Git branch (e.g., "main") — must be explicit
@@ -113,11 +113,12 @@ Response 200:
 }
 ```
 
-**Required fields:** `issue_type` + (`issue_ids` OR filter params) +
-(`new_triage_state` OR `new_note`).
+**Required fields:** `issue_type` + `issue_ids` + (`new_triage_state` OR
+`new_note`).
 
-**SAFETY RULE:** Always use explicit `issue_ids` — never filter-based selection
-without IDs.
+**SAFETY RULE:** Always use explicit `issue_ids`. The API also accepts filter
+params instead of IDs, but this plugin **never** uses filter-based selection —
+it risks unintended mass state changes.
 
 ## HTTP Status Codes
 

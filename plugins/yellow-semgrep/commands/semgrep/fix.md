@@ -95,7 +95,7 @@ If not found, present AskUserQuestion:
 Before attempting a fix, verify the finding is still present locally:
 
 ```bash
-semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}" 2>/dev/null
+semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}"
 ```
 
 Parse JSON output. If zero results for this rule at this location: the finding
@@ -141,7 +141,7 @@ See `semgrep-conventions` skill for the fix strategy decision tree and
 **Try autofix first:**
 
 ```bash
-semgrep scan --config "r/${CHECK_ID}" --autofix --dryrun --metrics off "${FILE_PATH}" 2>/dev/null
+semgrep scan --config "r/${CHECK_ID}" --autofix --dryrun --metrics off "${FILE_PATH}"
 ```
 
 If autofix produces a diff:
@@ -158,7 +158,7 @@ If no autofix available or autofix failed:
 
 **Deterministic autofix (after approval):**
 ```bash
-semgrep scan --config "r/${CHECK_ID}" --autofix --metrics off "${FILE_PATH}" 2>/dev/null
+semgrep scan --config "r/${CHECK_ID}" --autofix --metrics off "${FILE_PATH}"
 ```
 
 **LLM-based fix:** The `finding-fixer` agent applies via the Edit tool.
@@ -168,9 +168,8 @@ semgrep scan --config "r/${CHECK_ID}" --autofix --metrics off "${FILE_PATH}" 2>/
 Spawn `scan-verifier` agent via Task:
 
 The agent will:
-1. Re-scan with same rule: `semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}"`
-2. Full rescan: `semgrep scan --config auto --json --metrics off "${FILE_PATH}"`
-3. Report: pass (finding gone, no new issues), fail (finding still present),
+1. Re-scan with `--config auto` (covers the target rule + all others in one pass)
+2. Report: pass (finding gone, no new issues), fail (finding still present),
    or warning (new findings introduced)
 
 **If finding still present:** Offer to revert: `git checkout -- "${FILE_PATH}"`

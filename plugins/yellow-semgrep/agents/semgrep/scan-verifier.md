@@ -33,45 +33,30 @@ security fix resolved the target finding without introducing new issues.
 
 ## Verification Process
 
-### Step 1: Targeted Re-Scan
+### Step 1: Combined Scan
 
-Re-scan the fixed file with the specific rule that triggered the finding:
-
-```bash
-semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}" 2>/dev/null
-```
-
-Parse the JSON output. Check if any results match the original finding's
-location (allow for minor line number shifts from the fix).
-
-- **Finding gone:** Proceed to Step 2
-- **Finding still present:** Report FAIL:
-  ```
-  Verification: FAIL
-  Finding {check_id} is still present at {path}:{line}.
-  The fix did not resolve the vulnerability.
-  ```
-
-### Step 2: Full Regression Scan
-
-Run a full scan of the modified file to check for newly introduced findings:
+Run a single `--config auto` scan (covers the target rule and all others):
 
 ```bash
-semgrep scan --config auto --json --metrics off "${FILE_PATH}" 2>/dev/null
+semgrep scan --config auto --json --metrics off "${FILE_PATH}"
 ```
 
-Compare results against a pre-fix baseline (if available) or check for findings
-at lines modified by the fix.
+See `semgrep-conventions` skill for stderr handling pattern — never use
+`2>/dev/null`.
 
-- **No new findings:** Proceed to reporting PASS
-- **New findings found:** Report WARNING with details:
-  ```
-  Verification: WARNING
-  Original finding resolved, but {n} new finding(s) detected:
-    {check_id} at {path}:{line} — {message}
-  ```
+Parse JSON output and check:
 
-### Step 3: Report Result
+1. **Original finding resolved?** Look for `check_id` matches at the original
+   location (allow for minor line shifts from the fix).
+   - Still present → Report FAIL
+   - Gone → Continue to regression check
+
+2. **New findings introduced?** Compare results against a pre-fix baseline (if
+   available) or check for findings at lines modified by the fix.
+   - New findings found → Report WARNING with details
+   - No new findings → Report PASS
+
+### Step 2: Report Result
 
 Return a structured result:
 

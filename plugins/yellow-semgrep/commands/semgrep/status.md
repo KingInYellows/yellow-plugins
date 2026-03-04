@@ -24,8 +24,10 @@ skill for token validation pattern.
 
 Parse `$ARGUMENTS` for:
 
-- **`--severity high,critical`:** Comma-separated severity filter
-- **`--repo org/name`:** Override auto-detected repository name
+- **`--severity high,critical`:** Comma-separated severity filter (allowed
+  values: `critical`, `high`, `medium`, `low` — reject unknown values)
+- **`--repo org/name`:** Override auto-detected repository name (validate format:
+  `^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$`)
 
 If no `--repo` specified, auto-detect from git remote. See
 `semgrep-conventions` skill for `repo_name_extraction` pattern.

@@ -71,7 +71,7 @@ case "$http_status" in
   2*) ;; # success
   401) printf '[yellow-semgrep] Error: Invalid or expired token\n' >&2; exit 1 ;;
   404) printf '[yellow-semgrep] Error: Not found (token may have CI scope instead of Web API)\n' >&2; exit 1 ;;
-  429) printf '[yellow-semgrep] Error: Rate limit exceeded. Wait 60s and retry.\n' >&2; exit 1 ;;
+  429) printf '[yellow-semgrep] Warning: Rate limit hit. Waiting 60s...\n' >&2; sleep 60 ;;
   *) printf '[yellow-semgrep] Error: HTTP %s\n' "$http_status" >&2; exit 1 ;;
 esac
 
@@ -99,7 +99,10 @@ jq -n --argjson ids "[$FINDING_ID]" --arg state "fixed" --arg note "Fixed via ye
 
 ```bash
 REMOTE_URL=$(git remote get-url origin 2>/dev/null) || {
-  printf '[yellow-semgrep] Error: No git remote configured\n' >&2; exit 1
+  printf '[yellow-semgrep] Error: No git remote "origin" configured\n' >&2
+  printf 'In /semgrep:setup this is a warning (manual entry allowed).\n' >&2
+  printf 'In other commands this is fatal — run /semgrep:setup first.\n' >&2
+  exit 1
 }
 REPO_NAME=$(printf '%s' "$REMOTE_URL" | sed -E 's#.+[:/]([^/]+/[^/.]+)(\.git)?$#\1#')
 if ! printf '%s' "$REPO_NAME" | grep -qE '^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$'; then
@@ -183,6 +186,31 @@ if ! printf '%s' "$CHECK_ID" | grep -qE '^[a-zA-Z0-9._/-]+$'; then
   printf '[yellow-semgrep] Error: Invalid check_id format: %s\n' "$CHECK_ID" >&2
   exit 1
 fi
+```
+
+## Deployment Slug Validation
+
+```bash
+if ! printf '%s' "$SLUG" | grep -qE '^[a-z0-9][a-z0-9-]*$'; then
+  printf '[yellow-semgrep] Error: Invalid deployment slug: %s\n' "$SLUG" >&2
+  exit 1
+fi
+```
+
+## Semgrep Stderr Handling
+
+Semgrep emits progress and config-parse errors on stderr. Never suppress with
+`2>/dev/null` — capture and display on failure with token redaction:
+
+```bash
+SCAN_STDERR=$(mktemp)
+semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}" 2>"$SCAN_STDERR"
+scan_exit=$?
+if [ "$scan_exit" -ne 0 ]; then
+  printf '[yellow-semgrep] Warning: semgrep scan errors:\n' >&2
+  sed 's/sgp_[a-zA-Z0-9]*/***REDACTED***/g' "$SCAN_STDERR" >&2
+fi
+rm -f "$SCAN_STDERR"
 ```
 
 ## Security Rules

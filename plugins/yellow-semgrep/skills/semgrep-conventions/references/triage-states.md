@@ -27,7 +27,9 @@ open → reviewing → fixing → fixed
 ## REST API Triage Mutation
 
 ```bash
-curl -s -X POST -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
+curl -s -X POST --connect-timeout 5 --max-time 15 \
+  -w "\n%{http_code}" \
+  -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
   -H "Content-Type: application/json" \
   "https://semgrep.dev/api/v1/deployments/${SLUG}/triage" \
   -d "$(jq -n --argjson ids "[$FINDING_ID]" '{
