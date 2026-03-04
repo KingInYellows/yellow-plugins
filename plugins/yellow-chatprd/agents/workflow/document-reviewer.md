@@ -157,9 +157,13 @@ If yes:
    drop that section's improvements. If all improvements are now unnecessary,
    report "Document has been updated since the review — no changes needed."
    and stop.
-5. Call `mcp__plugin_yellow-chatprd_chatprd__update_document` with the
-   validated improvement instructions.
-6. Report the updated document.
+5. **Merge improvements:** Integrate the validated improvement instructions into
+   the TOCTOU re-fetched document content (from sub-step 3 above). For missing
+   sections, add new section headings and content. For thin sections, expand
+   the existing content. Preserve all existing adequate sections unchanged.
+6. Call `mcp__plugin_yellow-chatprd_chatprd__update_document` with the
+   merged document content.
+7. Report the updated document.
 
 ## Rules
 

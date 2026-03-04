@@ -52,10 +52,14 @@ Determine listing mode from `$ARGUMENTS`:
 
 - **Project-scoped** (user explicitly specifies a project name in
   `$ARGUMENTS`): Resolve project name to ID via `list_projects` scoped to the
-  org (case-insensitive name match). If no match found, ask via AskUserQuestion
-  to pick from available projects or show all documents. Call
-  `list_project_documents` with the resolved `projectId` and workspace
-  `organizationId`. This returns up to 50 results.
+  org (case-insensitive name match).
+  - If `list_projects` fails or is unavailable: display "Could not load project
+    list. Try `/chatprd:list` without a project filter to see all org documents."
+    and stop.
+  - If no match found, ask via AskUserQuestion to pick from available projects
+    or show all documents.
+  - Call `list_project_documents` with the resolved `projectId` and workspace
+    `organizationId`. This returns up to 50 results.
 
 - **Org-scoped** (no project specified, no "my drafts" / personal qualifier):
   This is the default mode. Call `list_projects` scoped to the org. Present

@@ -14,9 +14,6 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__create_issue
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issues
-  - mcp__plugin_yellow-linear_linear__list_issue_statuses
-  - mcp__plugin_yellow-linear_linear__get_issue
-  - mcp__plugin_yellow-linear_linear__update_issue
 ---
 
 # Link ChatPRD Document to Linear

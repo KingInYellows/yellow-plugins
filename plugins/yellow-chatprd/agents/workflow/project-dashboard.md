@@ -76,7 +76,7 @@ Technical Design Document) and offer `/chatprd:create`.
 
 ### Step 4: Categorize Documents
 
-Group documents by type based on title keywords:
+Group documents by type based on title keywords (case-insensitive match):
 
 - **PRDs & Requirements** — titles containing "PRD", "requirements",
   "feature spec"
