@@ -71,10 +71,10 @@ run_hook_no_ruvector() {
   echo "$output" | jq -e '.continue == true' > /dev/null
 }
 
-# --- Tool dispatch: unhandled tools pass through ---
+# --- Tool dispatch: MultiEdit iterates edits array ---
 
-@test "outputs continue:true for unhandled tool (MultiEdit)" {
-  input='{"tool_name":"MultiEdit","tool_input":{"file_path":"file.txt"}}'
+@test "outputs continue:true for MultiEdit with edits array" {
+  input='{"tool_name":"MultiEdit","tool_input":{"edits":[{"file_path":"a.txt"},{"file_path":"b.txt"}]}}'
   run run_hook "$input"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true' > /dev/null

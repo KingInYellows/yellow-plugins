@@ -55,6 +55,12 @@ case "$TOOL" in
       "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$file_path" >/dev/null 2>&1 &
     fi
     ;;
+  MultiEdit)
+    # MultiEdit uses edits[] array — iterate over each file_path
+    while IFS= read -r edit_path; do
+      [ -n "$edit_path" ] && "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$edit_path" >/dev/null 2>&1 &
+    done < <(printf '%s' "$INPUT" | jq -r '.tool_input.edits[]?.file_path // empty' 2>/dev/null)
+    ;;
   Bash)
     if [ -n "$command_text" ]; then
       "${RUVECTOR_CMD[@]}" hooks pre-command -- "$command_text" >/dev/null 2>&1 &
