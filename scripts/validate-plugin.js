@@ -21,6 +21,21 @@ const path = require('path');
 
 const PROJECT_ROOT = process.cwd();
 
+/**
+ * Resolve a hook command to a script path within the plugin directory.
+ * Returns the resolved path, or null if the command is not a "bash <path>"
+ * format or the path escapes the plugin directory.
+ */
+function resolveHookScriptPath(command, pluginDir) {
+  const resolved = command.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
+  const match = resolved.match(/^bash\s+(\S+)/);
+  if (!match) return null;
+  const scriptPath = match[1];
+  const normalized = path.resolve(pluginDir, scriptPath);
+  if (!normalized.startsWith(path.resolve(pluginDir) + path.sep)) return null;
+  return normalized;
+}
+
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
@@ -142,6 +157,264 @@ function validatePlugin(pluginDir) {
       if (invalidKeywords.length > 0) {
         errors.push('All keywords must be strings');
         logError('All keywords must be strings');
+      }
+    }
+  }
+
+  // RULE 6: Hook script existence (if hooks declared as inline object)
+  if (manifest.hooks && typeof manifest.hooks === 'object') {
+    const VALID_HOOK_EVENTS = [
+      'PreToolUse',
+      'PostToolUse',
+      'PostToolUseFailure',
+      'PermissionRequest',
+      'UserPromptSubmit',
+      'Notification',
+      'Stop',
+      'SubagentStart',
+      'SubagentStop',
+      'SessionStart',
+      'SessionEnd',
+      'TeammateIdle',
+      'TaskCompleted',
+      'PreCompact',
+    ];
+
+    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
+      // Validate event name
+      if (!VALID_HOOK_EVENTS.includes(eventName)) {
+        logWarning(
+          `Unknown hook event "${eventName}". Known events: ${VALID_HOOK_EVENTS.join(', ')}`
+        );
+      }
+
+      if (!Array.isArray(hookEntries)) continue;
+
+      for (const entry of hookEntries) {
+        if (!entry.hooks || !Array.isArray(entry.hooks)) continue;
+
+        for (const hook of entry.hooks) {
+          if (hook.type !== 'command' || !hook.command) continue;
+
+          const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
+          if (!scriptPath) {
+            // Check if it was a bash command that escaped the plugin dir
+            const resolved = hook.command.replaceAll(
+              '${CLAUDE_PLUGIN_ROOT}',
+              pluginDir
+            );
+            if (/^bash\s+/.test(resolved)) {
+              errors.push(
+                `Hook script path escapes plugin directory: ${hook.command}`
+              );
+              logError(
+                `Hook script path escapes plugin directory: ${hook.command}`
+              );
+            }
+            continue;
+          }
+
+          if (!fs.existsSync(scriptPath)) {
+            errors.push(
+              `Hook script not found: ${hook.command} (resolved: ${scriptPath})`
+            );
+            logError(
+              `Hook script not found for ${eventName}: ${hook.command}`
+            );
+          } else {
+            try {
+              fs.accessSync(scriptPath, fs.constants.R_OK);
+            } catch (accessErr) {
+              logWarning(
+                `Hook script not readable: ${scriptPath} (check file permissions)`
+              );
+            }
+          }
+        }
+      }
+    }
+  } else if (typeof manifest.hooks === 'string') {
+    // String hooks field — check for known anti-pattern
+    if (
+      manifest.hooks === './hooks/hooks.json' ||
+      manifest.hooks === 'hooks/hooks.json'
+    ) {
+      logWarning(
+        'hooks field points to standard hooks/hooks.json — Claude Code auto-discovers this file. ' +
+          'Explicit declaration may cause duplicate hooks error in Claude Code v2.1+. ' +
+          'Consider using inline hooks in plugin.json instead.'
+      );
+    }
+  }
+
+  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist)
+  if (manifest.hooks && typeof manifest.hooks === 'object') {
+    const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
+    if (fs.existsSync(hooksJsonPath)) {
+      try {
+        const hooksJson = JSON.parse(
+          fs.readFileSync(hooksJsonPath, 'utf-8')
+        );
+        const hooksJsonHooks = hooksJson.hooks || {};
+        const manifestHooks = manifest.hooks;
+        let driftFound = false;
+
+        // Compare event names
+        const manifestEvents = new Set(Object.keys(manifestHooks));
+        const jsonEvents = new Set(Object.keys(hooksJsonHooks));
+
+        for (const event of manifestEvents) {
+          if (!jsonEvents.has(event)) {
+            logWarning(
+              `hooks.json missing event "${event}" declared in plugin.json`
+            );
+            driftFound = true;
+          }
+        }
+        for (const event of jsonEvents) {
+          if (!manifestEvents.has(event)) {
+            logWarning(
+              `hooks.json has extra event "${event}" not in plugin.json`
+            );
+            driftFound = true;
+          }
+        }
+
+        // Compare matchers for shared events
+        for (const event of manifestEvents) {
+          if (!jsonEvents.has(event)) continue;
+          const mEntries = manifestHooks[event];
+          const jEntries = hooksJsonHooks[event];
+          if (!Array.isArray(mEntries) || !Array.isArray(jEntries)) continue;
+
+          if (mEntries.length !== jEntries.length) {
+            logWarning(
+              `hooks.json entry count mismatch for ${event}: ` +
+                `plugin.json has ${mEntries.length}, hooks.json has ${jEntries.length}`
+            );
+            driftFound = true;
+          }
+
+          for (
+            let i = 0;
+            i < Math.min(mEntries.length, jEntries.length);
+            i++
+          ) {
+            const mEntry = mEntries[i] || {};
+            const jEntry = jEntries[i] || {};
+
+            if (mEntry.matcher !== jEntry.matcher) {
+              logWarning(
+                `hooks.json matcher drift for ${event}[${i}]: ` +
+                  `plugin.json="${mEntry.matcher}" vs hooks.json="${jEntry.matcher}"`
+              );
+              driftFound = true;
+            }
+
+            // Compare hooks within each entry (command, timeout, type)
+            const mHooks = mEntry.hooks || [];
+            const jHooks = jEntry.hooks || [];
+            if (mHooks.length !== jHooks.length) {
+              logWarning(
+                `hooks.json inner hooks count mismatch for ${event}[${i}]: ` +
+                  `plugin.json has ${mHooks.length}, hooks.json has ${jHooks.length}`
+              );
+              driftFound = true;
+            }
+            for (
+              let j = 0;
+              j < Math.min(mHooks.length, jHooks.length);
+              j++
+            ) {
+              if (mHooks[j].command !== jHooks[j].command) {
+                logWarning(
+                  `hooks.json command drift for ${event}[${i}].hooks[${j}]: ` +
+                    `plugin.json="${mHooks[j].command}" vs hooks.json="${jHooks[j].command}"`
+                );
+                driftFound = true;
+              }
+              if (mHooks[j].type !== jHooks[j].type) {
+                logWarning(
+                  `hooks.json type drift for ${event}[${i}].hooks[${j}]: ` +
+                    `plugin.json="${mHooks[j].type}" vs hooks.json="${jHooks[j].type}"`
+                );
+                driftFound = true;
+              }
+              if (mHooks[j].timeout !== jHooks[j].timeout) {
+                logWarning(
+                  `hooks.json timeout drift for ${event}[${i}].hooks[${j}]: ` +
+                    `plugin.json=${mHooks[j].timeout} vs hooks.json=${jHooks[j].timeout}`
+                );
+                driftFound = true;
+              }
+            }
+          }
+        }
+
+        if (driftFound) {
+          logWarning('hooks.json sync check completed with drift warnings');
+        } else {
+          logSuccess('hooks.json sync check passed — no drift');
+        }
+      } catch (parseErr) {
+        logWarning(`Cannot parse hooks.json: ${parseErr.message}`);
+      }
+    }
+  }
+
+  // RULE 8: Hook script basics (shebang, JSON output, no set -e)
+  if (manifest.hooks && typeof manifest.hooks === 'object') {
+    for (const [, hookEntries] of Object.entries(manifest.hooks)) {
+      if (!Array.isArray(hookEntries)) continue;
+
+      for (const entry of hookEntries) {
+        if (!entry.hooks || !Array.isArray(entry.hooks)) continue;
+
+        for (const hook of entry.hooks) {
+          if (hook.type !== 'command' || !hook.command) continue;
+
+          const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
+          if (!scriptPath || !fs.existsSync(scriptPath)) continue;
+
+          let content;
+          try {
+            content = fs.readFileSync(scriptPath, 'utf-8');
+          } catch (readErr) {
+            logWarning(
+              `Cannot read hook script: ${scriptPath} (${readErr.message})`
+            );
+            continue;
+          }
+
+          const relPath = path.relative(pluginDir, scriptPath);
+
+          // Check shebang
+          if (!content.startsWith('#!/')) {
+            logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
+          }
+
+          // Heuristic: check if script source contains JSON output or exit-code protocol
+          const hasJsonOutput = /"continue"\s*:/.test(content);
+          const hasExitCodeProtocol =
+            /exit\s+0/.test(content) && /exit\s+2/.test(content);
+          if (!hasJsonOutput && !hasExitCodeProtocol) {
+            logWarning(
+              `${relPath}: missing hook output — expected {"continue": true} or exit 0/2 protocol`
+            );
+          }
+
+          // Check for set -e anti-pattern (matches -e flag or -o errexit)
+          if (
+            /^\s*set\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
+              content
+            )
+          ) {
+            logWarning(
+              `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
+                'use "set -uo pipefail" instead'
+            );
+          }
+        }
       }
     }
   }

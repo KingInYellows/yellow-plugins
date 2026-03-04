@@ -17,10 +17,13 @@ Install the ruvector CLI and initialize `.ruvector/` for the current project.
 
 - `npx ruvector hooks init` — Initialize `.ruvector/` directory
 - `npx ruvector mcp start` — Start the MCP server (stdio transport)
-- `npx ruvector hooks verify` — Verify hooks are working
 - `npx ruvector doctor` — System health check
 
 **Commands that do NOT exist:** `ruvector init`, `ruvector mcp-server`.
+
+**Do NOT use** `npx ruvector hooks verify` — it checks `.claude/settings.json`
+for hooks, but Claude Code reads hooks from `plugin.json` at runtime. The verify
+command will always report false negatives for plugin-managed hooks.
 
 ## Workflow
 
@@ -77,14 +80,31 @@ If `.ruvector/` already exists, skip this step entirely.
 
 ### Step 3: Verify (ONE Bash call)
 
-Run health checks and report:
+Run health check and hook status in a single command:
 
 ```bash
 printf '=== Doctor ===\n' && \
 npx ruvector doctor 2>&1 && \
-printf '\n=== Hooks Verify ===\n' && \
-npx ruvector hooks verify 2>&1
+printf '\n=== Hook Scripts ===\n' && \
+PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}" && \
+for script in pre-tool-use.sh user-prompt-submit.sh session-start.sh post-tool-use.sh stop.sh; do \
+  if [ -r "${PLUGIN_DIR}/hooks/scripts/${script}" ]; then \
+    printf '  ✓ %s (readable)\n' "$script"; \
+  elif [ -f "${PLUGIN_DIR}/hooks/scripts/${script}" ]; then \
+    printf '  ⚠ %s (not readable)\n' "$script"; \
+  else \
+    printf '  ✗ %s (missing)\n' "$script"; \
+  fi; \
+done && \
+printf '\n=== Global Binary ===\n' && \
+(command -v ruvector >/dev/null 2>&1 && printf 'ruvector in PATH: %s\n' "$(which ruvector)" || \
+  printf 'ruvector NOT in PATH — hooks with 1s budget (PreToolUse, UserPromptSubmit) will be skipped.\nRun: npm install -g ruvector\n')
 ```
+
+**Important:** Do NOT run `npx ruvector hooks verify` — it checks
+`.claude/settings.json` which is the wrong place. Claude Code reads hooks
+from `plugin.json` at runtime. Instead, verify by checking that the hook
+scripts exist and are executable (as above).
 
 Summarize results in a table:
 
@@ -98,7 +118,15 @@ Summarize results in a table:
 | .ruvector/ directory | Initialized |
 | .gitignore entry     | Present     |
 | Health check         | Passing     |
+| Hooks (5)            | Active via plugin.json |
+| Global binary        | In PATH / ⚠ Not found (degraded) |
 ```
+
+If global binary is not found, add a note:
+
+> ⚠ Without a global `ruvector` binary, hooks with 1-second budgets
+> (PreToolUse, UserPromptSubmit) will silently skip — npx startup (~2700ms)
+> exceeds the timeout. Run `npm install -g ruvector` for full hook support.
 
 ### Step 4: Offer next steps
 
