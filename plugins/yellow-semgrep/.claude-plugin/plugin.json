@@ -1,0 +1,22 @@
+{
+  "name": "yellow-semgrep",
+  "version": "1.0.0",
+  "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-semgrep",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": ["semgrep", "security", "sast", "remediation", "mcp"],
+  "mcpServers": {
+    "semgrep": {
+      "command": "uvx",
+      "args": ["semgrep-mcp"],
+      "env": {
+        "SEMGREP_APP_TOKEN": "${SEMGREP_APP_TOKEN}"
+      }
+    }
+  }
+}
