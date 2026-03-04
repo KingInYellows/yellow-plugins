@@ -1,0 +1,72 @@
+name: Version Packages
+
+# Runs on every push to main. When pending .changeset/*.md files are found,
+# opens (or updates) a "chore: version packages" PR that bumps package.json,
+# plugin.json, and marketplace.json in lockstep via pnpm apply:changesets.
+# When that PR merges, the publish step creates per-plugin git tags
+# (e.g. yellow-core@1.2.0) and a root catalog tag (e.g. v1.2.1), which
+# triggers publish-release.yml to build a GitHub Release.
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: version-packages
+  # Never cancel mid-run — a partially-created PR leaves dirty state.
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  version:
+    name: Version or Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Full history required for changeset to build CHANGELOG entries.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: '8.15.0'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create Version PR or tag released packages
+        uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
+        with:
+          # version: pnpm apply:changesets bumps plugin package.json files
+          # and propagates to plugin.json + marketplace.json via sync-manifests.js.
+          # catalog-version.js patch then bumps the root package.json (yellow-plugins-root)
+          # which has no workspace dependencies on plugins and won't auto-bump.
+          # The catalog version always uses a patch bump because it tracks release
+          # snapshots (each merge batch), not the semver semantics of individual
+          # plugins. A single release can contain a mix of patch/minor/major plugin
+          # bumps; the catalog version simply advances by one patch per release.
+          version: pnpm apply:changesets && node scripts/catalog-version.js patch
+
+          # publish: called after the Version Packages PR merges.
+          # Uses a multi-line shell script (see release-tags step below) for
+          # explicit error handling and targeted tag push.
+          publish: bash scripts/ci/release-tags.sh
+
+          commit: 'chore: version packages'
+          title: 'chore: version packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

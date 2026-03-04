@@ -44,3 +44,38 @@ The TypeScript packages under `packages/` provide schema validation tooling:
 
 Install/uninstall/rollback/browse logic is NOT in this repo — Claude Code
 handles all of that natively.
+
+## Versioning
+
+Plugin versions use a three-way sync model:
+
+```text
+plugins/<name>/package.json  →  plugin.json  →  marketplace.json
+```
+
+`package.json` is the Changesets source of truth. `sync-manifests.js` propagates
+it to the other two. `validate-versions.js` blocks CI if any of the three drift.
+
+**Always run `pnpm changeset` before committing plugin file changes.** CI blocks
+PRs that modify `plugins/*/` without a `.changeset/*.md` file.
+
+```bash
+pnpm changeset              # record bump type (patch/minor/major) for affected plugins
+pnpm apply:changesets       # apply pending changesets locally (also runs sync-manifests.js)
+node scripts/catalog-version.js patch  # bump root catalog version (required for release tags)
+pnpm tag                    # create per-plugin git tags after version bump
+```
+
+**Bump type guide:**
+- `patch` — bug fix or documentation-only change inside a plugin
+- `minor` — new command, skill, or agent (additive change)
+- `major` — breaking change or removal of a command
+
+**Release flow (automated):** On merge to `main`, `version-packages.yml` opens a
+"chore: version packages" PR. When that PR merges, per-plugin tags
+(`yellow-core@1.1.1`) and a root catalog tag (`v1.1.2`) are created, triggering
+`publish-release.yml` to build a GitHub Release.
+
+**Known issue:** Claude Code's background auto-update has a bug (GH #26744) where
+it doesn't prompt users when a new version is available. Users can run
+`/plugin marketplace update` manually.
