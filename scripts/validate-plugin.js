@@ -314,6 +314,13 @@ function validatePlugin(pluginDir) {
             // Compare hooks within each entry (command, timeout, type)
             const mHooks = mEntry.hooks || [];
             const jHooks = jEntry.hooks || [];
+            if (mHooks.length !== jHooks.length) {
+              logWarning(
+                `hooks.json inner hooks count mismatch for ${event}[${i}]: ` +
+                  `plugin.json has ${mHooks.length}, hooks.json has ${jHooks.length}`
+              );
+              driftFound = true;
+            }
             for (
               let j = 0;
               j < Math.min(mHooks.length, jHooks.length);
@@ -323,6 +330,13 @@ function validatePlugin(pluginDir) {
                 logWarning(
                   `hooks.json command drift for ${event}[${i}].hooks[${j}]: ` +
                     `plugin.json="${mHooks[j].command}" vs hooks.json="${jHooks[j].command}"`
+                );
+                driftFound = true;
+              }
+              if (mHooks[j].type !== jHooks[j].type) {
+                logWarning(
+                  `hooks.json type drift for ${event}[${i}].hooks[${j}]: ` +
+                    `plugin.json="${mHooks[j].type}" vs hooks.json="${jHooks[j].type}"`
                 );
                 driftFound = true;
               }
