@@ -82,7 +82,6 @@ For advanced workflows, agents can call Linear MCP tools directly (e.g.,
 
 - **ruvector** — Recall past issue patterns at issue creation (find similar
   past issues). Graceful skip if yellow-ruvector not installed.
-- **morph** — Not applicable (issue management does not edit source files).
 
 ## Known Limitations
 

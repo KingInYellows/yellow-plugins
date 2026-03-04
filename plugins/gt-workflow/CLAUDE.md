@@ -61,4 +61,3 @@ Both paths use `gt submit --no-interactive` for submission.
 
 - **ruvector** — Recall past git workflow issues at submit time. Graceful skip
   if yellow-ruvector not installed.
-- **morph** — Not applicable (submit workflow does not edit source files).

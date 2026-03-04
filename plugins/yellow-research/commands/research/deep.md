@@ -9,8 +9,6 @@ allowed-tools:
   - Task
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
-  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-research_exa__web_search_exa
   - mcp__plugin_yellow-research_exa__web_search_advanced_exa
   - mcp__plugin_yellow-research_exa__crawling_exa

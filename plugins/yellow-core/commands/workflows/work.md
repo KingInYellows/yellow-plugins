@@ -179,7 +179,7 @@ assurance.
    f. Write implementation using Edit (or morph edit_file if available and
    appropriate) or Write tool.
 
-   f. Write tests immediately after implementation:
+   g. Write tests immediately after implementation:
 
    ```bash
    # Run tests to ensure they work
@@ -192,7 +192,7 @@ assurance.
    go test ./pkg/feature/...
    ```
 
-   g. Verify tests pass:
+   h. Verify tests pass:
 
    ```bash
    # Run full test suite or relevant subset
@@ -202,7 +202,7 @@ assurance.
    go test ./...
    ```
 
-   h. Make incremental commit using Graphite:
+   i. Make incremental commit using Graphite:
 
    ```bash
    gt modify -c -m "feat(scope): implement X component
@@ -212,7 +212,7 @@ assurance.
    - Add unit tests"
    ```
 
-   i. Mark task completed:
+   j. Mark task completed:
 
    ```
    TaskUpdate: {taskId: "X", status: "completed"}

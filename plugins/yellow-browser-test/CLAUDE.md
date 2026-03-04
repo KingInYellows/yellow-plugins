@@ -52,7 +52,6 @@ do not apply.
 - **ruvector** — Recall past test failures at test/explore start; tiered
   remember (Auto for critical bugs, Prompted for UI issues). Graceful skip
   if yellow-ruvector not installed.
-- **morph** — Not applicable (browser testing does not edit source files).
 
 ## Known Limitations
 

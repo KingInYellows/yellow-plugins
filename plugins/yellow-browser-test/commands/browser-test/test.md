@@ -10,9 +10,6 @@ allowed-tools:
   - Task
   - Glob
   - Grep
-  - ToolSearch
-  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
-  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
 
 # Run Browser Test Suite

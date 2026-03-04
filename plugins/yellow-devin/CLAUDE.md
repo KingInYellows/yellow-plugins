@@ -137,4 +137,3 @@ session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
 
 - **ruvector** — Recall past delegation outcomes at delegate start (Prompted
   remember for failures). Graceful skip if yellow-ruvector not installed.
-- **morph** — Not applicable (delegation does not edit source files).

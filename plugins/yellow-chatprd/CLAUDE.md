@@ -89,7 +89,6 @@ do not apply.
 
 - **ruvector** — Recall past PRD decisions at document creation start. Graceful
   skip if yellow-ruvector not installed.
-- **morph** — Not applicable (document creation does not edit source files).
 
 ## Known Limitations
 
