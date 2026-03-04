@@ -6,7 +6,7 @@
 
 ## Authentication
 
-```
+```http
 Authorization: Bearer $SEMGREP_APP_TOKEN
 ```
 
@@ -21,7 +21,7 @@ endpoints.
 
 ### Validate Token
 
-```
+```http
 GET /me
 
 Response 200:
@@ -36,7 +36,7 @@ Response 200:
 
 ### List Deployments
 
-```
+```http
 GET /deployments
 
 Response 200:
@@ -49,7 +49,7 @@ Response 200:
 
 ### List Findings
 
-```
+```http
 GET /deployments/{slug}/findings
 
 Query Parameters:
@@ -93,7 +93,7 @@ than the Semgrep UI shows.
 
 ### Bulk Triage
 
-```
+```http
 POST /deployments/{slug}/triage
 Content-Type: application/json
 

@@ -126,8 +126,8 @@ For each finding, execute the per-finding workflow from `/semgrep:fix`:
 5. Determine fix strategy (autofix → syntax check → LLM fallback)
 6. Apply fix (with user approval)
 7. Verify fix (spawn scan-verifier)
-8. Update triage state
-9. Commit
+8. Commit
+9. Update triage state
 
 After each fix, present AskUserQuestion:
 - "Finding {id} fixed. {remaining} remaining."

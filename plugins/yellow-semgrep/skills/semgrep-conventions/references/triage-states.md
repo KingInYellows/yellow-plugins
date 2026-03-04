@@ -13,7 +13,7 @@
 
 ## State Transitions
 
-```
+```text
 open → reviewing → fixing → fixed
   ↓         ↓         ↓
   └─────────┴─────────┴──→ ignored

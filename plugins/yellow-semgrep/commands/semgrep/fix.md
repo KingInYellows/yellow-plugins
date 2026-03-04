@@ -62,6 +62,7 @@ while [ -z "$FOUND" ] && [ "$PAGE" -lt "$MAX_PAGES" ]; do
   # Filter: jq --argjson fid "$FINDING_ID" '.findings[] | select(.id == $fid)'
   # If findings array empty, stop pagination
   PAGE=$((PAGE + 1))
+  sleep 1  # Rate limiting
 done
 ```
 
@@ -97,6 +98,11 @@ Before attempting a fix, verify the finding is still present locally. Validate
 using in shell commands.
 
 ```bash
+if ! printf '%s' "$CHECK_ID" | grep -qE '^[a-zA-Z0-9._/-]+$'; then
+  printf '[yellow-semgrep] Error: Invalid check_id format: %s\n' "$CHECK_ID" >&2
+  exit 1
+fi
+
 semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}"
 ```
 
@@ -122,6 +128,10 @@ If `$DIRTY` is true, present AskUserQuestion:
 - Options: [Stash and proceed] [Abort]
 
 If user chooses stash: `git stash push -- "${FILE_PATH}"`
+
+**IMPORTANT:** If stash was performed, ALL subsequent exit paths (revert, skip,
+abort) MUST run `git stash pop` before exiting to restore the user's original
+changes.
 
 ### Step 6: Read Context
 
@@ -175,11 +185,30 @@ The agent will:
    or warning (new findings introduced)
 
 **If finding still present:** Offer to revert: `git checkout -- "${FILE_PATH}"`
+If changes were stashed in Step 5: `git stash pop`
 **If new findings introduced:** Show the new findings, ask user to proceed or revert.
+If user chooses to revert and changes were stashed in Step 5: `git stash pop`
 
-### Step 10: Update Triage State
+### Step 10: Commit
 
-Only after user approves the verified fix.
+Create a commit via Graphite with structured metadata per `semgrep-conventions`
+skill:
+
+```bash
+gt commit create -m "fix(security): resolve {check_id} in {path}
+
+Finding-ID: {id}
+Rule: {check_id}
+Severity: {severity}
+Fix-Type: autofix|llm
+Verified: pass"
+```
+
+If user had stashed changes in Step 5: `git stash pop`
+
+### Step 11: Update Triage State
+
+Only after commit succeeds.
 
 ```bash
 curl -s -X POST --connect-timeout 5 --max-time 15 \
@@ -200,23 +229,6 @@ Parse response for `succeeded`, `failed`, `skipped` arrays. Report each:
 - Failed: "Triage update failed: {error}. Fix was applied locally — update
   manually at {platform_url}."
 - Skipped: "Finding already in 'fixed' state."
-
-### Step 11: Commit
-
-Create a commit via Graphite with structured metadata per `semgrep-conventions`
-skill:
-
-```bash
-gt commit create -m "fix(security): resolve {check_id} in {path}
-
-Finding-ID: {id}
-Rule: {check_id}
-Severity: {severity}
-Fix-Type: autofix|llm
-Verified: pass"
-```
-
-If user had stashed changes in Step 5: `git stash pop`
 
 ### Step 12: Report
 
@@ -243,7 +255,7 @@ Finding {id} — FIXED
 | File has uncommitted changes | "Uncommitted changes" | [Stash] [Abort] |
 | Finding not present locally | "Already fixed locally" | [Mark fixed] [Skip] |
 | Autofix syntax check fails | Warning, fall through to LLM | Continue |
-| Fix does not resolve finding | "Fix did not resolve" | [Revert] [Retry] |
+| Fix does not resolve finding | "Fix did not resolve" | [Revert + stash pop] [Retry] |
 | New findings introduced | "New findings at modified lines" | [Proceed] [Revert] |
 | Triage POST fails | "Triage update failed" | Show manual URL |
 | Network failure | curl error message | Exit |

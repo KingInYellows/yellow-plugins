@@ -46,14 +46,14 @@ fi
 
 ### Step 4: Run Local Scan
 
-If `--changed-only`, build include flags safely using a bash array:
+If `--changed-only`, pass changed files as positional arguments using a bash array:
 
 ```bash
-include_args=()
+file_args=()
 while IFS= read -r file; do
-  [ -n "$file" ] && include_args+=(--include "$file")
+  [ -n "$file" ] && file_args+=("$file")
 done <<< "$CHANGED_FILES"
-semgrep scan --config auto --json --metrics off "${include_args[@]}"
+semgrep scan --config auto --json --metrics off "${file_args[@]}"
 ```
 
 If scanning the full workspace (no `--changed-only`):
