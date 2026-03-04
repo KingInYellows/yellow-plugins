@@ -84,10 +84,12 @@ Organize into a proposed issue breakdown with titles and descriptions.
 
 ### Step 6: Fetch Related Specs
 
-Fetch related specs per `chatprd-conventions` Related-Specs Pattern using
-`default_project_id` and `org_id` from workspace config (loaded in Step 2).
-Filter out the source document by UUID. Store results as `related_specs`
-(title + UUID). Skip silently if project ID is unavailable or API times out.
+Fetch related specs per `chatprd-conventions` Related-Specs Pattern. Use the
+source document's project ID (from Step 5's `get_document` response) and
+`org_id` from workspace config. If the document has no project ID, fall back to
+`default_project_id` from workspace config (loaded in Step 2). Filter out the
+source document by UUID. Store results as `related_specs` (title + UUID). Skip
+silently if project ID is unavailable or API times out.
 
 ### Step 7: Dedup Check
 

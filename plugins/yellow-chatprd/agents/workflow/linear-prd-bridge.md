@@ -8,6 +8,7 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__get_document
   - mcp__plugin_yellow-chatprd_chatprd__list_project_documents
@@ -18,6 +19,8 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__get_issue
   - mcp__plugin_yellow-linear_linear__update_issue
 ---
+
+# Linear PRD Bridge
 
 <examples>
 <example>
@@ -69,13 +72,15 @@ Stop if config is missing or malformed.
 Parse the user's request for a document title or query. Validate input per
 `chatprd-conventions` rules.
 
-Call `search_documents` to locate the referenced document.
+Call `mcp__plugin_yellow-chatprd_chatprd__search_documents` to locate the
+referenced document.
 
 - If multiple matches: present results, let user confirm via AskUserQuestion
 - If no matches: report "Document not found" and suggest `/chatprd:search`.
   Stop.
 
-Call `get_document` to read the full content.
+Call `mcp__plugin_yellow-chatprd_chatprd__get_document` to read the full
+content.
 
 ### Step 4: Fetch Related Specs
 
@@ -97,16 +102,16 @@ Organize into a proposed issue breakdown with titles and descriptions.
 
 ### Step 6: Dedup Check
 
-Call `list_issues` to search for existing Linear issues matching the proposed
-titles.
+Call `mcp__plugin_yellow-linear_linear__list_issues` to search for existing
+Linear issues matching the proposed titles.
 
 - Mark any duplicates in the proposal
 - Show existing issue IDs alongside duplicates
 
 ### Step 7: Select Linear Team
 
-Use the `list_teams` result from Step 1. If multiple teams, let user pick via
-AskUserQuestion.
+Use the `mcp__plugin_yellow-linear_linear__list_teams` result from Step 1. If
+multiple teams, let user pick via AskUserQuestion.
 
 ### Step 8: Review and Confirm (M3)
 
@@ -121,7 +126,7 @@ explicit confirmation.
 
 ### Step 9: Create Issues
 
-Create approved issues via `create_issue`:
+Create approved issues via `mcp__plugin_yellow-linear_linear__create_issue`:
 
 - **Rate limiting:** Create at most 3 issues concurrently, with 200ms delay
   between batches

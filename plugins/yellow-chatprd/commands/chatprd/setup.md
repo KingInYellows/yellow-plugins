@@ -51,6 +51,7 @@ If `firstName` or `lastName` is null, omit the null field gracefully.
 
 Parse the `subscriptions` array to determine plan tier and
 `subscription_status` for the config file:
+
 - If any subscription object has `status: "active"` (or `isActive: true`):
   set `subscription_status` to `active`.
 - If subscriptions array is non-empty but no active entries: set to `free`.
@@ -59,8 +60,9 @@ Parse the `subscriptions` array to determine plan tier and
 If the status is not `active`: warn "Some ChatPRD features require a Pro
 or Team plan. Setup will continue, but you may encounter feature limitations."
 
-**Non-blocking:** If `get_user_profile` fails or times out, log: "Could not
-fetch profile — continuing setup." Proceed to Step 3.
+**Non-blocking:** If `get_user_profile` fails or times out, set
+`subscription_status` to `unknown`, log: "Could not fetch profile — continuing
+setup." Proceed to Step 3.
 
 ### Step 3: Verify MCP Connectivity
 

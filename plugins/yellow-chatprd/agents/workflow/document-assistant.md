@@ -21,6 +21,8 @@ allowed-tools:
   - mcp__plugin_yellow-chatprd_chatprd__search_chats
 ---
 
+# Document Assistant
+
 <examples>
 <example>
 Context: User wants to create a new product document.

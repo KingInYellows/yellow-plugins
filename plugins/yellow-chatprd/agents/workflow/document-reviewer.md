@@ -16,6 +16,8 @@ allowed-tools:
   - mcp__plugin_yellow-chatprd_chatprd__update_document
 ---
 
+# Document Reviewer
+
 <examples>
 <example>
 Context: User wants to review a specific PRD.
@@ -150,9 +152,14 @@ If yes:
 3. **H1 TOCTOU:** If confirmed, re-fetch the document with
    `mcp__plugin_yellow-chatprd_chatprd__get_document` immediately before writing
    to prevent overwriting concurrent changes.
-4. Call `mcp__plugin_yellow-chatprd_chatprd__update_document` with the
-   improvement instructions.
-5. Report the updated document.
+4. **Re-validate:** Compare the refreshed content against the improvement
+   instructions. If a previously missing/thin section now has adequate content,
+   drop that section's improvements. If all improvements are now unnecessary,
+   report "Document has been updated since the review — no changes needed."
+   and stop.
+5. Call `mcp__plugin_yellow-chatprd_chatprd__update_document` with the
+   validated improvement instructions.
+6. Report the updated document.
 
 ## Rules
 

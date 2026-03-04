@@ -17,6 +17,8 @@ allowed-tools:
   - mcp__plugin_yellow-chatprd_chatprd__list_chats
 ---
 
+# Project Dashboard
+
 <examples>
 <example>
 Context: User wants a project overview.
