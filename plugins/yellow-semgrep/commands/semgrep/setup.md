@@ -88,7 +88,11 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null) || {
   REPO_NAME=""
 }
 if [ -n "$REMOTE_URL" ]; then
-  REPO_NAME=$(printf '%s' "$REMOTE_URL" | sed -E 's#.+[:/]([^/]+/[^/.]+)(\.git)?$#\1#')
+  REPO_NAME=$(printf '%s' "$REMOTE_URL" | sed -E 's/\.git$//' | sed -E 's#.+[:/]([^/]+/[^/]+)$#\1#')
+  if ! printf '%s' "$REPO_NAME" | grep -qE '^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$'; then
+    printf '[yellow-semgrep] Warning: Could not parse repo name from remote URL.\n' >&2
+    REPO_NAME=""
+  fi
 fi
 ```
 
@@ -98,19 +102,20 @@ Use ToolSearch to discover available Semgrep MCP tools:
 
 Call ToolSearch with query `"+semgrep"` to find all Semgrep MCP tools.
 
-Expected tools:
-- `semgrep_scan`
-- `semgrep_findings`
-- `semgrep_scan_with_custom_rule`
-- `get_abstract_syntax_tree`
-- `semgrep_rule_schema`
-- `get_supported_languages`
-- `semgrep_scan_supply_chain`
-- `semgrep_whoami`
+Expected tools (fully qualified):
+- `mcp__plugin_yellow-semgrep_semgrep__semgrep_scan`
+- `mcp__plugin_yellow-semgrep_semgrep__semgrep_findings`
+- `mcp__plugin_yellow-semgrep_semgrep__semgrep_scan_with_custom_rule`
+- `mcp__plugin_yellow-semgrep_semgrep__get_abstract_syntax_tree`
+- `mcp__plugin_yellow-semgrep_semgrep__semgrep_rule_schema`
+- `mcp__plugin_yellow-semgrep_semgrep__get_supported_languages`
+- `mcp__plugin_yellow-semgrep_semgrep__semgrep_scan_supply_chain`
+- `mcp__plugin_yellow-semgrep_semgrep__semgrep_whoami`
 
-Count discovered tools. If fewer than 2 core tools (`semgrep_scan`,
-`semgrep_findings`) are found, warn: "MCP server may not be running. Check that
-`uvx semgrep-mcp` is available."
+Count discovered tools. If fewer than 2 core tools
+(`mcp__plugin_yellow-semgrep_semgrep__semgrep_scan`,
+`mcp__plugin_yellow-semgrep_semgrep__semgrep_findings`) are found, warn: "MCP
+server may not be running. Check that `uvx semgrep-mcp` is available."
 
 ### Step 6: Report Results
 

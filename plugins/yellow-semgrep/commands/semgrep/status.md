@@ -40,7 +40,9 @@ deployment if only one exists.
 ### Step 4: Fetch Findings by Triage State
 
 For each triage state (`open`, `reviewing`, `fixing`, `ignored`, `fixed`),
-fetch the first page with `page_size=1` to get a count. Use `dedup=true`.
+fetch one page with `page_size=100` and count the `findings` array length.
+Use `dedup=true`. The API does not return a total count field — use the
+array length as the count (approximate for states with >100 findings).
 
 ```bash
 SEMGREP_API="https://semgrep.dev/api/v1"
@@ -49,21 +51,32 @@ for state in open reviewing fixing ignored fixed; do
   response=$(curl -s --connect-timeout 5 --max-time 15 \
     -w "\n%{http_code}" \
     -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
-    "${SEMGREP_API}/deployments/${SLUG}/findings?triage_state=${state}&repos=${REPO_NAME}&dedup=true&page_size=1")
-  # Extract count from response
+    "${SEMGREP_API}/deployments/${SLUG}/findings?triage_state=${state}&repos=${REPO_NAME}&dedup=true&page=0&page_size=100")
+  # Three-layer error check per skill
+  # Count: jq '.findings | length' — append "+" if count == 100 (more pages exist)
 done
 ```
 
 ### Step 5: Fetch To-Fix Details
 
-Fetch all `fixing` findings (paginate with `page_size=100`) to build the
-severity breakdown and top rules table.
+Paginate through all `fixing` findings to build the severity breakdown and
+top rules table:
 
 ```bash
-response=$(curl -s --connect-timeout 5 --max-time 30 \
-  -w "\n%{http_code}" \
-  -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
-  "${SEMGREP_API}/deployments/${SLUG}/findings?triage_state=fixing&repos=${REPO_NAME}&dedup=true&page=0&page_size=100")
+PAGE=0
+ALL_FINDINGS="[]"
+MAX_PAGES=100
+while [ "$PAGE" -lt "$MAX_PAGES" ]; do
+  response=$(curl -s --connect-timeout 5 --max-time 30 \
+    -w "\n%{http_code}" \
+    -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
+    "${SEMGREP_API}/deployments/${SLUG}/findings?triage_state=fixing&repos=${REPO_NAME}&dedup=true&page=${PAGE}&page_size=100")
+  # Three-layer error check per skill
+  # Append findings to ALL_FINDINGS
+  # Break if findings array is empty
+  PAGE=$((PAGE + 1))
+  sleep 1  # Rate limiting
+done
 ```
 
 Fence the response:

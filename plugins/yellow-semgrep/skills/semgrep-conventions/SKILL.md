@@ -104,7 +104,7 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null) || {
   printf 'In other commands this is fatal — run /semgrep:setup first.\n' >&2
   exit 1
 }
-REPO_NAME=$(printf '%s' "$REMOTE_URL" | sed -E 's#.+[:/]([^/]+/[^/.]+)(\.git)?$#\1#')
+REPO_NAME=$(printf '%s' "$REMOTE_URL" | sed -E 's/\.git$//' | sed -E 's#.+[:/]([^/]+/[^/]+)$#\1#')
 if ! printf '%s' "$REPO_NAME" | grep -qE '^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$'; then
   printf '[yellow-semgrep] Error: Could not parse repo name from: %s\n' "$REMOTE_URL" >&2
   exit 1

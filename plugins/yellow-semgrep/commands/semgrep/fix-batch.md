@@ -63,7 +63,7 @@ while [ "$PAGE" -lt "$MAX_PAGES" ]; do
     -w "\n%{http_code}" \
     -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
     "${SEMGREP_API}/deployments/${SLUG}/findings?triage_state=fixing&repos=${REPO_NAME}&dedup=true&page=${PAGE}&page_size=100")
-  # Three-layer error check per skill
+  # Three-layer error check per skill (on 429: sleep 60, retry once)
   # Append findings to ALL_FINDINGS
   # Break if findings array is empty
   PAGE=$((PAGE + 1))

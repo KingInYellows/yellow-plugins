@@ -56,10 +56,12 @@ Setting `triage_state=ignored` **requires** a `new_triage_reason` field:
 }
 ```
 
-## MCP `semgrep_findings` Parameters
+## MCP Findings Parameters
+
+Use the fully qualified tool name when calling:
 
 ```python
-semgrep_findings(
+mcp__plugin_yellow-semgrep_semgrep__semgrep_findings(
     issue_type="ISSUE_TYPE_SAST",    # or "ISSUE_TYPE_SCA"
     repos=["org/repo-name"],          # REQUIRED — auto-detect from git remote
     status="ISSUE_TAB_FIXING",        # maps to "fixing" in REST

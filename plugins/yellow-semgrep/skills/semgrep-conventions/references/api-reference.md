@@ -22,7 +22,7 @@ endpoints.
 ### Validate Token
 
 ```
-GET /api/v1/me
+GET /me
 
 Response 200:
 {
@@ -37,7 +37,7 @@ Response 200:
 ### List Deployments
 
 ```
-GET /api/v1/deployments
+GET /deployments
 
 Response 200:
 {
@@ -50,7 +50,7 @@ Response 200:
 ### List Findings
 
 ```
-GET /api/v1/deployments/{slug}/findings
+GET /deployments/{slug}/findings
 
 Query Parameters:
   triage_state  string   "fixing" for to-fix findings
@@ -58,7 +58,7 @@ Query Parameters:
   severity      string   "CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"
   confidence    string   "HIGH", "MEDIUM", "LOW"
   check_id      string   Filter by rule ID
-  ref           string   Git branch (e.g., "main") — must be explicit
+  ref           string   Git branch (e.g., "main") — omit to search all branches
   dedup         string   "true" — ALWAYS USE THIS
   page          int      0-indexed page number
   page_size     int      Results per page (default: 100)
@@ -94,7 +94,7 @@ than the Semgrep UI shows.
 ### Bulk Triage
 
 ```
-POST /api/v1/deployments/{slug}/triage
+POST /deployments/{slug}/triage
 Content-Type: application/json
 
 Request:

@@ -33,9 +33,9 @@ skill for token validation pattern.
 Parse `$ARGUMENTS` for the finding ID. Validate: `^[0-9]+$`.
 
 ```bash
-FINDING_ID=$(printf '%s' "$ARGUMENTS" | grep -oE '^[0-9]+')
-if [ -z "$FINDING_ID" ]; then
-  printf '[yellow-semgrep] Error: Finding ID required. Usage: /semgrep:fix <finding-id>\n' >&2
+FINDING_ID=$(printf '%s' "$ARGUMENTS" | tr -d '[:space:]')
+if ! printf '%s' "$FINDING_ID" | grep -qE '^[0-9]+$'; then
+  printf '[yellow-semgrep] Error: Finding ID required (integer). Usage: /semgrep:fix <finding-id>\n' >&2
   exit 1
 fi
 ```
@@ -59,7 +59,7 @@ while [ -z "$FOUND" ] && [ "$PAGE" -lt "$MAX_PAGES" ]; do
     -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
     "${SEMGREP_API}/deployments/${SLUG}/findings?triage_state=fixing&repos=${REPO_NAME}&dedup=true&page=${PAGE}&page_size=100")
   # Three-layer error check per skill
-  # Filter: jq ".findings[] | select(.id == $FINDING_ID)"
+  # Filter: jq --argjson fid "$FINDING_ID" '.findings[] | select(.id == $fid)'
   # If findings array empty, stop pagination
   PAGE=$((PAGE + 1))
 done
@@ -92,7 +92,9 @@ If not found, present AskUserQuestion:
 
 ### Step 4: Pre-Fix Scan
 
-Before attempting a fix, verify the finding is still present locally:
+Before attempting a fix, verify the finding is still present locally. Validate
+`CHECK_ID` against the check ID pattern from `semgrep-conventions` skill before
+using in shell commands.
 
 ```bash
 semgrep scan --config "r/${CHECK_ID}" --json --metrics off "${FILE_PATH}"
@@ -201,16 +203,17 @@ Parse response for `succeeded`, `failed`, `skipped` arrays. Report each:
 
 ### Step 11: Commit
 
-Create a commit with structured metadata per `semgrep-conventions` skill:
+Create a commit via Graphite with structured metadata per `semgrep-conventions`
+skill:
 
-```
-fix(security): resolve {check_id} in {path}
+```bash
+gt commit create -m "fix(security): resolve {check_id} in {path}
 
 Finding-ID: {id}
 Rule: {check_id}
 Severity: {severity}
 Fix-Type: autofix|llm
-Verified: pass
+Verified: pass"
 ```
 
 If user had stashed changes in Step 5: `git stash pop`
