@@ -171,10 +171,44 @@ This prevents cross-workspace data corruption from ID collisions.
 Between user review and confirmation, issues may change. Re-fetch state before
 applying bulk changes.
 
-### M3: Agent Write Safety
+### M3: Agent Write Safety (Two-Tier Model)
 
-Agents that modify Linear state (e.g., `linear-pr-linker`) must request explicit
-user confirmation before writes. Read-only agents never modify state.
+Linear state transitions follow a two-tier safety model based on reversibility
+and impact:
+
+**Tier 1 — Auto-apply (notify only):** Non-terminal, reversible transitions
+triggered by explicit user actions. Applied with post-hoc notification (e.g.,
+"Updated ENG-123 to In Review") but no pre-confirmation.
+
+| Transition | Trigger | Rationale |
+|------------|---------|-----------|
+| `* → In Progress` | `/linear:work` starts work on issue | Reversible, no external notifications |
+| `* → In Review` | `/smart-submit` creates a PR | Reversible, user explicitly submitted code |
+| `In Review → In Progress` | Moving backward (re-opening work) | Reversible, no data loss |
+
+**Tier 2 — Confirm (AskUserQuestion required):** Terminal, ambiguous, or
+externally-visible transitions. Requires explicit user confirmation via
+`AskUserQuestion` before applying.
+
+| Transition | Trigger | Rationale |
+|------------|---------|-----------|
+| `* → Done` | PR merged, work verified | Terminal, triggers notifications, may close PRs |
+| `* → Cancelled` | Issue abandoned | Terminal, may have cascading effects |
+| `* → Backlog` | De-prioritization | Ambiguous intent, may lose cycle assignment |
+
+**Classification criteria:** Auto-apply when ALL of these hold: (1) transition
+is reversible, (2) no information is destroyed, (3) minimal external
+notifications, (4) no cascading side effects. Confirm when ANY criterion fails.
+
+**Evolution note:** This is an evolution of the original M3 rule ("always
+confirm before writes"). The original rule was overly conservative for
+transitions triggered by explicit user workflow actions (e.g., submitting a PR
+implies intent to move to "In Review"). Tier 2 preserves the original M3
+behavior for all terminal transitions. Agents that modify Linear state outside
+the two-tier model (e.g., custom status updates) must still use Tier 2
+confirmation.
+
+Read-only agents never modify state.
 
 ## PR Convention
 
