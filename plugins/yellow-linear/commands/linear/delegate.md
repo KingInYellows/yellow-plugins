@@ -173,7 +173,7 @@ fi
 ### Step 5: Create Devin Session via REST API
 
 ```bash
-DEVIN_API_BASE="https://api.devin.ai/v3beta1"
+DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 BODY_FILE=$(mktemp)
 
