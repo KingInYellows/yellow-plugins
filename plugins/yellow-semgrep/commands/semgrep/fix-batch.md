@@ -39,7 +39,14 @@ Parse `$ARGUMENTS` for:
 - **`--max N`:** Maximum findings to process (default: 10)
 - **`--rule check-id`:** Filter to a specific rule ID
 
-Validate `--max` is a positive integer, capped at 50.
+```bash
+MAX=$(printf '%s' "$ARGUMENTS" | grep -oE '\-\-max[= ]+([0-9]+)' | grep -oE '[0-9]+')
+MAX=${MAX:-10}
+if [ "$MAX" -gt 50 ]; then
+  printf '[yellow-semgrep] Warning: --max capped at 50 (requested %d)\n' "$MAX" >&2
+  MAX=50
+fi
+```
 
 ### Step 3: Fetch All To-Fix Findings
 
@@ -50,7 +57,8 @@ SEMGREP_API="https://semgrep.dev/api/v1"
 PAGE=0
 ALL_FINDINGS="[]"
 
-while true; do
+MAX_PAGES=100
+while [ "$PAGE" -lt "$MAX_PAGES" ]; do
   response=$(curl -s --connect-timeout 5 --max-time 30 \
     -w "\n%{http_code}" \
     -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \

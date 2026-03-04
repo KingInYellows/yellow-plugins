@@ -51,8 +51,9 @@ SEMGREP_API="https://semgrep.dev/api/v1"
 
 # Paginate until finding is found or all pages exhausted
 PAGE=0
+MAX_PAGES=100
 FOUND=""
-while [ -z "$FOUND" ]; do
+while [ -z "$FOUND" ] && [ "$PAGE" -lt "$MAX_PAGES" ]; do
   response=$(curl -s --connect-timeout 5 --max-time 30 \
     -w "\n%{http_code}" \
     -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \

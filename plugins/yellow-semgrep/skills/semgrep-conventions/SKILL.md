@@ -146,7 +146,7 @@ After autofix and before applying:
 
 | Language | Check Command |
 |---|---|
-| Python | `python3 -c "import ast; ast.parse(open('${FILE}').read())"` |
+| Python | `python3 -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "${FILE}"` |
 | JavaScript | `node --check "${FILE}"` |
 | TypeScript | `npx tsc --noEmit "${FILE}" 2>/dev/null` |
 | Go | `go vet "${FILE}" 2>/dev/null` |
@@ -172,6 +172,15 @@ Verified: pass
 ```bash
 if ! printf '%s' "$FINDING_ID" | grep -qE '^[0-9]+$'; then
   printf '[yellow-semgrep] Error: Invalid finding ID: %s (expected integer)\n' "$FINDING_ID" >&2
+  exit 1
+fi
+```
+
+## Check ID Validation
+
+```bash
+if ! printf '%s' "$CHECK_ID" | grep -qE '^[a-zA-Z0-9._/-]+$'; then
+  printf '[yellow-semgrep] Error: Invalid check_id format: %s\n' "$CHECK_ID" >&2
   exit 1
 fi
 ```

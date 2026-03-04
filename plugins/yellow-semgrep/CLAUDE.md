@@ -50,6 +50,7 @@ Layer 3: LIFECYCLE (write state)  → REST API for triage mutations
   - Finding ID: `^[0-9]+$`
   - Deployment slug: `^[a-z0-9][a-z0-9-]*$`
   - Repo name: `^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$`
+  - Check ID (rule): `^[a-zA-Z0-9._/-]+$`
 - **Error handling:** Check curl exit code, HTTP status code, jq exit code on
   every API call. See `semgrep-conventions` skill for patterns.
 - **Write safety:** C1 (validate before write), M3 (confirm every fix via
