@@ -56,3 +56,12 @@ Both paths use `gt submit --no-interactive` for submission.
 - **PostToolUse (Bash)** — Warns when a `gt commit`, `gt modify`, or
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
+
+### MCP Tool Integration
+
+- **ruvector** — Not directly integrated. gt-workflow commands are thin
+  wrappers around Graphite CLI; memory operations happen in calling workflows
+  (e.g., `/workflows:work`). Graceful skip if yellow-ruvector not installed.
+- **morph** — Not applicable. gt-workflow operates on git/Graphite CLI, not
+  file editing.
+

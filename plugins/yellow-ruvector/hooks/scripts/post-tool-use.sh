@@ -38,29 +38,49 @@ else
   json_exit "Warning: neither ruvector nor npx found"
 fi
 
-# Parse all fields in a single jq invocation
-eval "$(printf '%s' "$INPUT" | jq -r '
-  @sh "TOOL=\(.tool_name // "")",
-  @sh "file_path=\(.tool_input.file_path // "")",
-  @sh "command_text=\(.tool_input.command // "" | .[0:200])",
-  @sh "exit_code=\(.tool_result.exit_code // 1)"
-')" 2>/dev/null || json_exit "Warning: jq parse failed; skipping post-tool-use"
+# Parse fields using NUL-delimited output (avoids eval)
+TOOL="" file_path="" command_text="" exit_code="1"
+{
+  IFS= read -r -d '' TOOL
+  IFS= read -r -d '' file_path
+  IFS= read -r -d '' command_text
+  IFS= read -r -d '' exit_code
+} < <(printf '%s' "$INPUT" | jq -j '
+  (.tool_name // ""), "\u0000",
+  (.tool_input.file_path // ""), "\u0000",
+  (.tool_input.command // "" | .[0:200]), "\u0000",
+  (.tool_result.exit_code // 1 | tostring), "\u0000"
+' 2>/dev/null) || json_exit "Warning: jq parse failed; skipping post-tool-use"
 
 case "$TOOL" in
   Edit|Write)
     if [ -n "$file_path" ]; then
       # Skip solution docs: knowledge-compounder writes these directly.
-      # Suppress post-edit behavioral tracking for solution doc edits.
       case "$file_path" in
         */docs/solutions/*|docs/solutions/*)
           ;;
         *)
-          if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success "$file_path" 2>&1); then
+          if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success -- "$file_path" 2>&1); then
             printf '[ruvector] post-edit failed for %s: %s\n' "$file_path" "$ERR" >&2
           fi
           ;;
       esac
     fi
+    ;;
+  MultiEdit)
+    # MultiEdit uses edits[] array — iterate over each file_path
+    while IFS= read -r edit_path; do
+      [ -z "$edit_path" ] && continue
+      case "$edit_path" in
+        */docs/solutions/*|docs/solutions/*)
+          ;;
+        *)
+          if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success -- "$edit_path" 2>&1); then
+            printf '[ruvector] post-edit failed for %s: %s\n' "$edit_path" "$ERR" >&2
+          fi
+          ;;
+      esac
+    done < <(printf '%s' "$INPUT" | jq -r '.tool_input.edits[]?.file_path // empty' 2>/dev/null)
     ;;
   Bash)
     if [ -n "$command_text" ]; then
@@ -69,11 +89,11 @@ case "$TOOL" in
         ''|*[!0-9]*) exit_code=1 ;;
       esac
       if [ "$exit_code" -eq 0 ]; then
-        if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-command --success "$command_text" 2>&1); then
+        if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-command --success -- "$command_text" 2>&1); then
           printf '[ruvector] post-command failed: %s\n' "$ERR" >&2
         fi
       else
-        if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-command --error "exit code $exit_code" "$command_text" 2>&1); then
+        if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-command --error "exit code $exit_code" -- "$command_text" 2>&1); then
           printf '[ruvector] post-command failed: %s\n' "$ERR" >&2
         fi
       fi

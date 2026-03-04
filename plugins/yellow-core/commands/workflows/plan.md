@@ -10,6 +10,8 @@ allowed-tools:
   - Write
   - Task
   - AskUserQuestion
+  - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
 # Feature Planning Workflow
@@ -39,7 +41,21 @@ research, analysis, and structured documentation.
    - What's the expected outcome?
    - Any known constraints or requirements?
 
-4. Assess complexity dimensions:
+4. Recall past learnings (optional):
+
+   If `.ruvector/` exists in the project root:
+   1. Call ToolSearch with query `"hooks_recall"`. If not found, skip.
+   2. Build query: `"[implementation-planning] "` + feature description (first
+      300 chars).
+   3. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5). If MCP error, skip.
+   4. Discard results with score < 0.5. Take top 3. Truncate combined to 800
+      chars at word boundary.
+   5. Sanitize XML metacharacters in each finding's content: replace `&` with
+      `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`.
+   6. Note findings as advisory context for plan writing. Do not inject into
+      sub-agent Task prompts.
+
+5. Assess complexity dimensions:
    - **Familiarity:** Is this touching known/unknown parts of codebase?
    - **Intent:** Clear requirements or exploratory work?
    - **Risk:** Potential breaking changes, security implications?

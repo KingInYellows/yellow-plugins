@@ -63,14 +63,17 @@ assurance.
       (Clarify ambiguities).
    2. Call ToolSearch with query "hooks_recall". If not found: proceed to
       Step 3.
-   3. Extract plan Overview section text (text under first `## Overview`
-      heading, or first 500 chars of plan body if no Overview heading).
-   4. Call hooks_recall(query, top_k=5). If execution error: note
+   3. Build query: `"[implementation] "` + plan Overview section text (text
+      under first `## Overview` heading, or first 500 chars of plan body if no
+      Overview heading).
+   4. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5). If execution error: note
       "[yellow-ruvector] Warning: Memory retrieval unavailable" and proceed to
       Step 3 (Clarify ambiguities).
    5. Discard results with score < 0.5. If none remain: proceed to Step 3.
       Take top 3. Truncate combined content to 800 chars at word boundary.
-   6. Note as advisory context:
+   6. Sanitize XML metacharacters in each finding's content: replace `&` with
+      `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`.
+   7. Note as advisory context:
 
       ```xml
       <reflexion_context>
@@ -166,9 +169,23 @@ assurance.
    - Respect architectural boundaries
    - Add TypeScript types properly
 
-   e. Write implementation using Edit or Write tool.
+   e. Discover enhanced tools (optional, first iteration only):
 
-   f. Write tests immediately after implementation:
+   1. Call ToolSearch("morph edit"). If found, note morph edit_file available.
+   2. Call ToolSearch("morph warpgrep"). If found, note morph warpgrep available.
+   3. When editing files > 200 lines or with 3+ non-contiguous changes, prefer
+      morph edit_file over built-in Edit.
+   4. When searching by intent ("what calls this?", "find similar patterns"),
+      prefer morph warpgrep over Grep.
+   5. If neither found, use built-in Edit/Grep silently.
+
+   Note: Tools returned by ToolSearch are immediately available for use without
+   explicit `allowed-tools` entries — ToolSearch loads them on discovery.
+
+   f. Write implementation using Edit (or morph edit_file if available and
+   appropriate) or Write tool.
+
+   g. Write tests immediately after implementation:
 
    ```bash
    # Run tests to ensure they work
@@ -181,7 +198,7 @@ assurance.
    go test ./pkg/feature/...
    ```
 
-   g. Verify tests pass:
+   h. Verify tests pass:
 
    ```bash
    # Run full test suite or relevant subset
@@ -191,7 +208,7 @@ assurance.
    go test ./...
    ```
 
-   h. Make incremental commit using Graphite:
+   i. Make incremental commit using Graphite:
 
    ```bash
    gt modify -c -m "feat(scope): implement X component
@@ -201,7 +218,7 @@ assurance.
    - Add unit tests"
    ```
 
-   i. Mark task completed:
+   j. Mark task completed:
 
    ```
    TaskUpdate: {taskId: "X", status: "completed"}
@@ -357,6 +374,19 @@ assurance.
    ```
 
 5. Note any deviations from plan or follow-up work needed.
+
+6. Record session learning:
+
+   If `.ruvector/` exists:
+   1. Call ToolSearch("hooks_remember"). If not found, skip.
+   2. This is Auto tier — record without asking (implementation insights are
+      high-signal).
+   3. Compose learning with context/insight/action structure, 20+ words,
+      naming concrete files and commands.
+   4. Use namespace `skills` for successful patterns, `reflexion` for mistakes.
+   5. Dedup check: call mcp__plugin_yellow-ruvector_ruvector__hooks_recall with query=content, top_k=1. If
+      score > 0.82, skip (near-duplicate).
+   6. Call mcp__plugin_yellow-ruvector_ruvector__hooks_remember. If error, skip silently.
 
 ## Phase 5: Review
 

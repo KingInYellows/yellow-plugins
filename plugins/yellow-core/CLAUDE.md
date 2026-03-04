@@ -47,11 +47,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 
-### Skills (3)
+### Skills (4)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `create-agent-skills` — guidance for creating skills and agents
 - `git-worktree` — git worktree management for parallel development
+- `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
 
 ### Optional Plugin Dependencies
 
@@ -68,11 +69,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   [context7.com](https://context7.com). Third-party HTTP service; all agents
   work without it (used only for fetching live docs). No credentials are sent.
 
-### Optional Enhancement: yellow-morph
+### MCP Tool Integration
 
-When yellow-morph is installed, two additional MCP tools become available:
-`mcp__plugin_yellow-morph_morph__edit_file` (Fast Apply for high-accuracy code merging) and
-`mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` (intent-based code discovery). See yellow-morph's
-CLAUDE.md for tool preference rules and domain separation with ruvector. These
-tools are available in freeform conversations; structured commands use built-in
-Edit and Grep.
+- **ruvector** — Recall past learnings at workflow start; tiered remember at
+  workflow end. Graceful skip if yellow-ruvector not installed. See
+  `mcp-integration-patterns` skill for canonical patterns.
+- **morph** — Preferred for file edits (>200 lines or 3+ non-contiguous
+  regions) and intent-based code search. Discovered via ToolSearch at runtime;
+  falls back to built-in tools silently.

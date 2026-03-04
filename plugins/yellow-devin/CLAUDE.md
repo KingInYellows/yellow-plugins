@@ -132,3 +132,12 @@ session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
 - Session state not persisted locally — after Claude Code restart, use
   `/devin:status` to re-discover active sessions
 - Polling-based session monitoring — no push/webhook support
+
+### MCP Tool Integration
+
+- **ruvector** — Recall past delegation outcomes at workflow start; tiered
+  remember for delegation failures (Prompted tier). Graceful skip if
+  yellow-ruvector not installed.
+- **morph** — Not applicable. yellow-devin delegates to Devin's own editing
+  capabilities, not local file edits.
+

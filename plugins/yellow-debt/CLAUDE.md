@@ -98,8 +98,11 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 - Fix agent modifies working directory — commit or stash changes first
 - Concurrent audits not supported (single-user CLI tool)
 
-### Optional Enhancement: yellow-morph
+### MCP Tool Integration
 
-When yellow-morph is installed, `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` can find anti-pattern
-instances by intent, and `mcp__plugin_yellow-morph_morph__edit_file` provides higher-accuracy code remediation
-on large files during freeform debt-fixing conversations.
+- **ruvector** — Recall past debt analysis at audit start; tiered remember
+  (Auto for security debt, Prompted for complexity hotspots). Graceful skip
+  if yellow-ruvector not installed.
+- **morph** — Preferred for intent-based anti-pattern search and large file
+  remediation. Discovered via ToolSearch at runtime; falls back to built-in
+  tools silently.
