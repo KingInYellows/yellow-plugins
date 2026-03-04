@@ -62,6 +62,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - **yellow-review** — `/workflows:work` invokes `/review:pr` after submission;
   `/workflows:review` redirects to `/review:pr`. Without either, review steps
   are skipped with a user notice.
+- **yellow-linear** — `/workflows:work` invokes `/linear:sync --after-submit`
+  after PR submission to auto-transition the linked issue to "In Review" (Tier 1
+  auto-apply). `/workflows:plan` detects Linear issue context in brainstorm docs
+  and includes a `## Linear Issues` metadata section. Without yellow-linear,
+  both features skip silently.
 
 ### MCP Servers (1)
 

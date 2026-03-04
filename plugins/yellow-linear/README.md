@@ -28,11 +28,14 @@ Linear server, and choose "Clear authentication".
 
 | Command              | Description                                                                      |
 | -------------------- | -------------------------------------------------------------------------------- |
+| `/linear:work`       | Start working on a Linear issue — loads context and routes to plan or stack      |
 | `/linear:create`     | Create a Linear issue from current context                                       |
 | `/linear:sync`       | Sync current branch with its Linear issue (load context, link PR, update status) |
+| `/linear:sync-all`   | Audit open issues and close ones with merged PRs                                 |
 | `/linear:triage`     | Review and assign incoming Linear issues                                         |
 | `/linear:plan-cycle` | Plan sprint cycle by selecting backlog issues                                    |
 | `/linear:status`     | Generate project and initiative health report                                    |
+| `/linear:delegate`   | Delegate a Linear issue to a Devin AI session                                    |
 
 ## Agents
 

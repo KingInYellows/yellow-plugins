@@ -57,6 +57,15 @@ Both paths use `gt submit --no-interactive` for submission.
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
 
+### Input Integrations
+
+- **Linear issues** — `/gt-stack-plan` reads a `## Linear Issues` section from
+  plan files (written by `/workflows:plan` when Linear context is detected).
+  When present, defaults to 1:1 issue-to-branch mapping with
+  `feat/<ISSUE-ID>-<slug>` naming and outputs an issue-to-branch table. This is
+  input-only (reads plan metadata) and does not create a runtime dependency on
+  yellow-linear.
+
 ### MCP Tool Integration
 
 - **ruvector** — Not directly integrated. gt-workflow commands are thin
