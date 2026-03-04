@@ -13,7 +13,6 @@ allowed-tools:
   - AskUserQuestion
   - ToolSearch
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
-  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
 
 # Review All PRs

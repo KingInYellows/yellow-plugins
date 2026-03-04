@@ -44,10 +44,10 @@ research, analysis, and structured documentation.
 4. Recall past learnings (optional):
 
    If `.ruvector/` exists in the project root:
-   1. Call ToolSearch with query `"hooks_recall"`. If not found, skip.
+   1. Call ToolSearch with query `"mcp__plugin_yellow-ruvector_ruvector__hooks_recall"`. If not found, skip.
    2. Build query: `"[implementation-planning] "` + feature description (first
       300 chars).
-   3. Call hooks_recall(query, top_k=5). If MCP error, skip.
+   3. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5). If MCP error, skip.
    4. Discard results with score < 0.5. Take top 3. Truncate combined to 800
       chars at word boundary.
    5. Note findings as advisory context for plan writing. Do not inject into

@@ -55,12 +55,13 @@ ruvector.
 - `memory-query` — Standard pattern for querying ruvector institutional memory
   before acting
 
-### Hooks (4)
+### Hooks (5)
 
 - `user-prompt-submit.sh` — Inject relevant memories before Claude processes each
   user prompt via `hooks recall` (1s budget)
 - `session-start.sh` — Run ruvector's session-start hook and load top learnings
   via `hooks recall` (3s budget)
+- `pre-tool-use.sh` — Pre-edit context injection and pre-command context for Edit/Write/Bash tools (1s budget)
 - `post-tool-use.sh` — Record file edits and bash outcomes via ruvector's
   `hooks post-edit` and `hooks post-command` (<50ms)
 - `stop.sh` — Run ruvector's session-end hook for cleanup and metrics export

@@ -47,11 +47,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 
-### Skills (3)
+### Skills (4)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `create-agent-skills` — guidance for creating skills and agents
 - `git-worktree` — git worktree management for parallel development
+- `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
 
 ### Optional Plugin Dependencies
 

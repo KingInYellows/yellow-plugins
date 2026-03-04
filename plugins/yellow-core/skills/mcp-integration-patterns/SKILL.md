@@ -79,7 +79,7 @@ tokens.
 ### Injection Format
 
 Before interpolating recalled content into `<content>` elements, sanitize XML
-metacharacters: replace `<` with `&lt;`, `>` with `&gt;`, `&` with `&amp;`.
+metacharacters: replace `&` with `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`.
 This prevents XML tag breakout from stored memory content.
 
 ```xml

@@ -65,7 +65,7 @@ assurance.
       Step 3.
    3. Extract plan Overview section text (text under first `## Overview`
       heading, or first 500 chars of plan body if no Overview heading).
-   4. Call hooks_recall(query, top_k=5). If execution error: note
+   4. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5). If execution error: note
       "[yellow-ruvector] Warning: Memory retrieval unavailable" and proceed to
       Step 3 (Clarify ambiguities).
    5. Discard results with score < 0.5. If none remain: proceed to Step 3.
@@ -175,6 +175,9 @@ assurance.
    4. When searching by intent ("what calls this?", "find similar patterns"),
       prefer morph warpgrep over Grep.
    5. If neither found, use built-in Edit/Grep silently.
+
+   Note: Tools returned by ToolSearch are immediately available for use without
+   explicit `allowed-tools` entries — ToolSearch loads them on discovery.
 
    f. Write implementation using Edit (or morph edit_file if available and
    appropriate) or Write tool.
@@ -369,18 +372,18 @@ assurance.
 
 5. Note any deviations from plan or follow-up work needed.
 
-6. Record session learning (optional):
+6. Record session learning:
 
-   If `.ruvector/` exists and the session produced implementation insights:
+   If `.ruvector/` exists:
    1. Call ToolSearch("hooks_remember"). If not found, skip.
    2. This is Auto tier — record without asking (implementation insights are
       high-signal).
    3. Compose learning with context/insight/action structure, 20+ words,
       naming concrete files and commands.
    4. Use namespace `skills` for successful patterns, `reflexion` for mistakes.
-   5. Dedup check: call hooks_recall with query=content, top_k=1. If
+   5. Dedup check: call mcp__plugin_yellow-ruvector_ruvector__hooks_recall with query=content, top_k=1. If
       score > 0.82, skip (near-duplicate).
-   6. Call hooks_remember. If error, skip silently.
+   6. Call mcp__plugin_yellow-ruvector_ruvector__hooks_remember. If error, skip silently.
 
 ## Phase 5: Review
 

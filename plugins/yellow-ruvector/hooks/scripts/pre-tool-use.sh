@@ -49,15 +49,15 @@ TOOL="" file_path="" command_text=""
 ' 2>/dev/null) || json_exit "Warning: jq parse failed; skipping pre-tool-use"
 
 case "$TOOL" in
-  Edit|Write|MultiEdit)
+  Edit|Write)
     if [ -n "$file_path" ]; then
       # Side-effect only: updates ruvector's internal pre-edit state
-      "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$file_path" 2>/dev/null || true
+      "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$file_path" >/dev/null 2>&1 || true
     fi
     ;;
   Bash)
     if [ -n "$command_text" ]; then
-      "${RUVECTOR_CMD[@]}" hooks pre-command -- "$command_text" 2>/dev/null || true
+      "${RUVECTOR_CMD[@]}" hooks pre-command -- "$command_text" >/dev/null 2>&1 || true
     fi
     ;;
 esac

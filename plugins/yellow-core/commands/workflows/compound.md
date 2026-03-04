@@ -4,8 +4,10 @@ description: Document a recently solved problem to compound team knowledge into 
 argument-hint: '[optional: brief context about the fix]'
 allowed-tools:
   - Bash
+  - Read
   - Task
   - ToolSearch
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
 
@@ -69,9 +71,14 @@ After the knowledge-compounder agent completes:
 2. Call ToolSearch with query `"hooks_remember"`. If not found, skip to Step 4.
 3. Read the solution doc or MEMORY.md entry the agent just wrote.
 4. Extract the key insight or summary (first 500 chars).
-5. Call hooks_remember with the extracted content. This is Auto tier — no user
-   prompt needed (user already opted in by running `/workflows:compound`).
-6. If hooks_remember errors, skip silently.
+5. Dedup check: call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with
+   query=content, top_k=1. If score > 0.82, skip (near-duplicate). If
+   `hooks_recall` errors, skip dedup and proceed to step 6.
+6. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_remember` with the
+   extracted content. This is Auto tier — no user prompt needed (user already
+   opted in by running `/workflows:compound`).
+7. If `mcp__plugin_yellow-ruvector_ruvector__hooks_remember` errors, skip
+   silently.
 
 ### Step 4: Report Results
 
