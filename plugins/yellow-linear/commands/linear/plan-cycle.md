@@ -13,6 +13,7 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_users
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
+  - Skill
 ---
 
 # Plan Sprint Cycle
@@ -99,6 +100,23 @@ Display planning results:
 - Number of issues added to cycle
 - Updated cycle totals
 - Suggest: "Run `/linear:status` to see project health after planning."
+
+### Step 8: What Next?
+
+After the planning summary, present routing options via `AskUserQuestion`:
+
+1. "Start working on an issue (`/linear:work <issue-id>`)" — present cycle
+   issue identifiers for selection, then invoke via Skill tool with
+   `skill: "linear:work"` and `args` set to the selected issue ID.
+2. "Plan the full cycle as a stack (`/linear:work <cycle-name>`)" — invoke via
+   Skill tool with `skill: "linear:work"` and `args` set to the cycle name.
+3. "Delegate an issue to Devin (`/linear:delegate <issue-id>`)" — present cycle
+   issue identifiers for selection, then invoke via Skill tool with
+   `skill: "linear:delegate"` and `args` set to the selected issue ID.
+4. "Done for now" — stop.
+
+**Graceful degradation:** If a Skill invocation fails (command not found),
+report the command the user should run manually and continue.
 
 ## Error Handling
 
