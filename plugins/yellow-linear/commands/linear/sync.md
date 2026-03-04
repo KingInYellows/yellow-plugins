@@ -91,8 +91,22 @@ Determine the appropriate status transition:
 - If PR exists and is **merged** → suggest "Done" status
 - If no PR and status is early (Backlog/Triage) → suggest "In Progress" status
 
-Present the suggestion via AskUserQuestion and let user confirm or choose a
-different status. Apply via `update_issue` only after confirmation.
+**Two-tier safety model** (see `linear-workflows` SKILL.md):
+
+- **Tier 1 transitions** (`→ In Progress`, `→ In Review`, `In Review → In
+  Progress`): If `$ARGUMENTS` contains `--after-submit`, auto-apply the
+  transition and report: "Updated <ISSUE-ID> to <status>." No confirmation
+  needed. If invoked manually (no `--after-submit`), present the suggestion via
+  `AskUserQuestion` as before for consistency with user expectations.
+- **Tier 2 transitions** (`→ Done`, `→ Cancelled`, `→ Backlog`): Always present
+  via `AskUserQuestion` and require explicit confirmation, regardless of
+  invocation context.
+
+Apply via `update_issue` only after the appropriate tier check passes.
+
+**Note:** When invoked programmatically after `/smart-submit` (via Skill tool
+from `/workflows:work`), the caller passes `--after-submit` to enable Tier 1
+auto-apply. This preserves existing manual behavior while enabling automation.
 
 ### Step 6: Summary
 
