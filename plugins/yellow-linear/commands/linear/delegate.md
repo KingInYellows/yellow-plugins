@@ -234,16 +234,17 @@ comment to the Linear issue? [Yes / No]"
 
 If Yes: Call `create_comment` with the built body.
 
-### Step 7: Suggest Status Transition (Optional)
+### Step 7: Update Status (Tier 1 Auto-Apply)
 
-Use `AskUserQuestion` — "Transition issue to In Progress? [Yes / No]"
+Transition issue to "In Progress" (Tier 1 — auto-apply, non-terminal):
 
-If Yes:
 1. Call `list_issue_statuses` for the issue's team
 2. Find the status whose `type` is `started` (In Progress equivalent)
 3. **H1 re-fetch**: Call `get_issue` again to check current status
 4. If status has changed since Step 2: report the new status and skip the update
-5. If still same: Call `update_issue` with the new `stateId`
+5. If already In Progress: skip silently
+6. Call `update_issue` with the new `stateId`
+7. Report: "Updated <ISSUE-ID> to In Progress."
 
 ### Step 8: Report
 
@@ -263,7 +264,8 @@ Next steps:
 - **Credential validation**: Token format checked before any API call
 - **C1**: `get_issue` validates issue exists before delegation
 - **H1**: Re-fetch before status transition
-- **M3**: `AskUserQuestion` before both `create_comment` and `update_issue`
+- **M3**: `AskUserQuestion` before `create_comment`; `update_issue` uses Tier 1
+  auto-apply per two-tier safety model
 - **Token never echoed**: All token references use env var only; never print or
   log the token value
 - **No shell injection**: Prompt built via `jq -n --arg`, not string interpolation

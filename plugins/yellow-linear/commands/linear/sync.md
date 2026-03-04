@@ -25,8 +25,10 @@ issue.
 
 Determine the issue ID to sync:
 
-1. **If `$ARGUMENTS` provided:** Validate format matches `[A-Z]{2,5}-[0-9]{1,6}`
-   exactly. If invalid, report format error and stop.
+1. **If `$ARGUMENTS` provided:** Extract the issue ID by matching
+   `[A-Z]{2,5}-[0-9]{1,6}` within `$ARGUMENTS` (first match). Also check if
+   `$ARGUMENTS` contains `--after-submit` and note the flag for Step 5. If no
+   issue ID can be extracted, report format error and stop.
 2. **Otherwise:** Extract from current branch name:
    ```bash
    git branch --show-current
@@ -94,18 +96,20 @@ Determine the appropriate status transition:
 **Two-tier safety model** (see `linear-workflows` SKILL.md):
 
 - **Tier 1 transitions** (`→ In Progress`, `→ In Review`, `In Review → In
-  Progress`): If `$ARGUMENTS` contains `--after-submit`, auto-apply the
-  transition and report: "Updated <ISSUE-ID> to <status>." No confirmation
-  needed. If invoked manually (no `--after-submit`), present the suggestion via
-  `AskUserQuestion` as before for consistency with user expectations.
+  Progress`): If `--after-submit` flag is set (from Step 1) AND a PR exists for
+  the current branch (verified in Step 4), auto-apply the transition and report:
+  "Updated <ISSUE-ID> to <status>." No confirmation needed. If `--after-submit`
+  is set but no PR exists, fall back to `AskUserQuestion` (treat as manual
+  invocation). If invoked manually (no `--after-submit`), present the suggestion
+  via `AskUserQuestion` as before for consistency with user expectations.
 - **Tier 2 transitions** (`→ Done`, `→ Cancelled`, `→ Backlog`): Always present
   via `AskUserQuestion` and require explicit confirmation, regardless of
   invocation context.
 
 Apply via `update_issue` only after the appropriate tier check passes.
 
-**Note:** When invoked programmatically after `/smart-submit` (via Skill tool
-from `/workflows:work`), the caller passes `--after-submit` to enable Tier 1
+**Note:** When invoked programmatically from `/workflows:work` after PR
+submission (via Skill tool), the caller passes `--after-submit` to enable Tier 1
 auto-apply. This preserves existing manual behavior while enabling automation.
 
 ### Step 6: Summary

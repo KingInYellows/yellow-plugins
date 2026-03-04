@@ -11,6 +11,7 @@ allowed-tools:
   - Task
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
@@ -33,7 +34,7 @@ research, analysis, and structured documentation.
 
 2. If brainstorm docs exist, read them for context. If found, use them to enrich
    understanding. **Linear issue detection:** If a brainstorm doc contains a
-   `## Linear Issue` section with issue identifiers (matching
+   `## Linear Issues` section with issue identifiers (matching
    `[A-Z]{2,5}-[0-9]{1,6}`), treat those as source-of-truth requirements.
    Extract all issue IDs and titles for inclusion in the plan file.
 
@@ -382,14 +383,13 @@ Schema migrations if applicable.
    6. Something else
    ```
 
-3. Based on response:
-   - Option 1: Transition to /workflows:work
-   - Option 2: Transition to /workflows:deepen-plan (requires yellow-research plugin)
-   - Option 3: Transition to /gt-stack-plan with the plan file path
-   - Option 4: Create issue with
-     `gh issue create --title "..." --body-file plans/<name>.md`
-   - Option 5: Rewrite plan with simpler template
-   - Option 6: Ask for clarification
+3. Based on response, invoke the chosen command via Skill tool:
+   - `/workflows:work`: `skill: "workflows:work"`, args: plan file path
+   - `/workflows:deepen-plan`: `skill: "workflows:deepen-plan"`, args: plan file path (requires yellow-research)
+   - `/gt-stack-plan`: `skill: "gt-stack-plan"`, args: plan file path
+   - Create GitHub issue: `gh issue create --title "..." --body-file plans/<name>.md`
+   - Simplify: Rewrite plan with simpler template
+   - Something else: Ask for clarification
 
 ## Guidelines
 

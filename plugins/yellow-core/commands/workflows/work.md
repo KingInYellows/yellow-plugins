@@ -398,7 +398,7 @@ assurance.
 
 6. Note any deviations from plan or follow-up work needed.
 
-6. Record session learning:
+7. Record session learning:
 
    If `.ruvector/` exists:
    1. Call ToolSearch("hooks_remember"). If not found, skip.

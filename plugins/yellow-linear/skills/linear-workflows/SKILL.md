@@ -137,7 +137,7 @@ Do NOT hardcode status names. Always fetch valid statuses from
 | In Progress   | Actively being worked on      |
 | In Review     | PR submitted, awaiting review |
 | Done          | Completed and verified        |
-| Canceled      | Won't do                      |
+| Cancelled     | Won't do                      |
 
 ## Input Validation
 
