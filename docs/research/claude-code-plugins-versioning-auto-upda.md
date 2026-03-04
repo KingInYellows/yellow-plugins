@@ -230,7 +230,7 @@ For **manual marketplace refresh** (refreshes the catalog, not installed plugins
 
 **Recommended distribution path: GitHub repository**
 
-```
+```text
 my-marketplace-repo/
 ├── .claude-plugin/
 │   └── marketplace.json        # Marketplace catalog
@@ -362,7 +362,7 @@ Extensions from the **official Anthropic directory** update automatically. Priva
 { "plugins": [{ "name": "my-tool", "source": { "source": "github", "repo": "org/my-tool", "ref": "main" } }] }
 ```
 
-5. **Automate version bumps** with Release Please or a simple CI script that increments `plugin.json` version on each merge to main.
+1. **Automate version bumps** with Release Please or a simple CI script that increments `plugin.json` version on each merge to main.
 
 **Recommended GitHub Actions workflow for automated release:**
 
@@ -398,7 +398,7 @@ jobs:
           git push origin --tags
 ```
 
-6. **For team distribution**, check `marketplace.json` into version control and configure auto-installation via `.claude/settings.json`:
+1. **For team distribution**, check `marketplace.json` into version control and configure auto-installation via `.claude/settings.json`:
 
 ```json
 {
@@ -417,7 +417,7 @@ jobs:
 }
 ```
 
-7. **Validate before shipping:**
+1. **Validate before shipping:**
 
 ```bash
 claude plugin validate .        # from marketplace or plugin directory
