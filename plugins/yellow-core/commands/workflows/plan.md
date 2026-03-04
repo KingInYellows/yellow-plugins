@@ -50,7 +50,9 @@ research, analysis, and structured documentation.
    3. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5). If MCP error, skip.
    4. Discard results with score < 0.5. Take top 3. Truncate combined to 800
       chars at word boundary.
-   5. Note findings as advisory context for plan writing. Do not inject into
+   5. Sanitize XML metacharacters in each finding's content: replace `&` with
+      `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`.
+   6. Note findings as advisory context for plan writing. Do not inject into
       sub-agent Task prompts.
 
 5. Assess complexity dimensions:

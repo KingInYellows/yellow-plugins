@@ -53,10 +53,9 @@ TOOL="" file_path="" command_text="" exit_code="1"
 ' 2>/dev/null) || json_exit "Warning: jq parse failed; skipping post-tool-use"
 
 case "$TOOL" in
-  Edit|Write|MultiEdit)
+  Edit|Write)
     if [ -n "$file_path" ]; then
       # Skip solution docs: knowledge-compounder writes these directly.
-      # Suppress post-edit behavioral tracking for solution doc edits.
       case "$file_path" in
         */docs/solutions/*|docs/solutions/*)
           ;;
@@ -67,6 +66,21 @@ case "$TOOL" in
           ;;
       esac
     fi
+    ;;
+  MultiEdit)
+    # MultiEdit uses edits[] array — iterate over each file_path
+    while IFS= read -r edit_path; do
+      [ -z "$edit_path" ] && continue
+      case "$edit_path" in
+        */docs/solutions/*|docs/solutions/*)
+          ;;
+        *)
+          if ! ERR=$("${RUVECTOR_CMD[@]}" hooks post-edit --success -- "$edit_path" 2>&1); then
+            printf '[ruvector] post-edit failed for %s: %s\n' "$edit_path" "$ERR" >&2
+          fi
+          ;;
+      esac
+    done < <(printf '%s' "$INPUT" | jq -r '.tool_input.edits[]?.file_path // empty' 2>/dev/null)
     ;;
   Bash)
     if [ -n "$command_text" ]; then

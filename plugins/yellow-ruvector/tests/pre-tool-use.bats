@@ -112,13 +112,14 @@ run_hook_no_ruvector() {
 
 @test "ruvector stdout does not leak into hook output" {
   # Mock ruvector that writes to stdout — should not appear in hook output
-  NOISY_BIN="$(mktemp -d)"
-  printf '#!/bin/sh\necho "LEAKED"\nexit 0\n' > "$NOISY_BIN/ruvector"
-  chmod +x "$NOISY_BIN/ruvector"
+  local noisy_bin
+  noisy_bin="$(mktemp -d)"
+  printf '#!/bin/sh\necho "LEAKED"\nexit 0\n' > "$noisy_bin/ruvector"
+  chmod +x "$noisy_bin/ruvector"
   input='{"tool_name":"Edit","tool_input":{"file_path":"src/app.ts"}}'
-  output=$(printf '%s' "$input" | PATH="$NOISY_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT")
+  output=$(printf '%s' "$input" | PATH="$noisy_bin:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT")
   status=$?
-  rm -rf "$NOISY_BIN"
+  rm -rf "$noisy_bin"
   [ "$status" -eq 0 ]
   # Output must be only the JSON line — no "LEAKED"
   [ "$(echo "$output" | wc -l)" -eq 1 ]
