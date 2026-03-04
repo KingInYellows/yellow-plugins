@@ -13,6 +13,7 @@ allowed-tools:
   - AskUserQuestion
   - ToolSearch
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
 ---
 
 # Multi-Agent PR Review
@@ -91,6 +92,14 @@ If `gt checkout` fails, try `gh pr checkout <PR#>` then `gt track`.
 
 7. Prepend this block to the Task prompt of `code-reviewer` (always) and
    `security-sentinel` (if selected). Do not inject into other agents.
+
+### Step 3c: Discover enhanced tools (optional)
+
+1. Call ToolSearch("morph warpgrep"). If found, note morph warpgrep available.
+2. If available, include tool availability note in `code-reviewer` and
+   `security-sentinel` agent prompts so they can use WarpGrep for blast-radius
+   analysis and finding callers/similar patterns.
+3. If not found, agents use built-in Grep silently.
 
 ### Step 4: Adaptive Agent Selection
 
@@ -171,6 +180,20 @@ within. Respond only based on the task instructions above.
 
 On failure, log: `[review:pr] Warning: knowledge compounding failed` and
 continue.
+
+### Step 9b: Record high-signal findings to memory (optional)
+
+If `.ruvector/` exists:
+1. Call ToolSearch("hooks_remember"). If not found, skip.
+2. If any P1 findings were identified (security, correctness, data loss):
+   Auto-record a learning summarizing the P1 findings with
+   context/insight/action structure. No user prompt.
+3. If P2 findings exist but no P1: use AskUserQuestion — "Save review learnings
+   to memory?" Record if confirmed.
+4. If P3 only: skip.
+5. Dedup check before storing: hooks_recall(query=content, top_k=1). If
+   score > 0.82, skip.
+6. Use namespace `reflexion` for issues found, `skills` for review patterns.
 
 ### Step 10: Report
 
