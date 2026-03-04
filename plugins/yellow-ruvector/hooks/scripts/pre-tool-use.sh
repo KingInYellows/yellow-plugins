@@ -28,16 +28,16 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit
 fi
 
-# Resolve ruvector command: prefer direct binary (62ms) over npx (2700ms)
+# Resolve ruvector command: require direct binary for PreToolUse (1s budget).
+# npx fallback (~2700ms) exceeds the timeout and would be killed, so skip entirely.
 if command -v ruvector >/dev/null 2>&1; then
   RUVECTOR_CMD=(ruvector)
-elif command -v npx >/dev/null 2>&1; then
-  RUVECTOR_CMD=(npx --no ruvector)
 else
-  json_exit "Warning: neither ruvector nor npx found"
+  json_exit
 fi
 
 # Parse fields using NUL-delimited output (avoids eval)
+TOOL="" file_path="" command_text=""
 {
   IFS= read -r -d '' TOOL
   IFS= read -r -d '' file_path
@@ -51,8 +51,8 @@ fi
 case "$TOOL" in
   Edit|Write|MultiEdit)
     if [ -n "$file_path" ]; then
+      # Side-effect only: updates ruvector's internal pre-edit state
       "${RUVECTOR_CMD[@]}" hooks pre-edit -- "$file_path" 2>/dev/null || true
-      "${RUVECTOR_CMD[@]}" hooks coedit-suggest --file "$file_path" 2>/dev/null || true
     fi
     ;;
   Bash)

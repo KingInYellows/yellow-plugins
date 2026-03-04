@@ -10,6 +10,12 @@ Canonical patterns for integrating ruvector (memory) and morph (editing/search)
 across yellow-plugins commands and agents. All patterns degrade gracefully when
 tools are not installed.
 
+> **Design reference.** Each command adapts error handling and skip targets to
+> its own workflow structure. When updating parameters (top_k, score cutoff,
+> char limits), update this document AND all consuming commands:
+> `brainstorm.md`, `plan.md`, `compound.md`, `work.md`, `review-pr.md`,
+> `resolve-pr.md`.
+
 ## Pattern 1: Recall-Before-Act
 
 Query ruvector memory for relevant past learnings before executing a workflow.
@@ -71,6 +77,10 @@ tokens.
 ```
 
 ### Injection Format
+
+Before interpolating recalled content into `<content>` elements, sanitize XML
+metacharacters: replace `<` with `&lt;`, `>` with `&gt;`, `&` with `&amp;`.
+This prevents XML tag breakout from stored memory content.
 
 ```xml
 <reflexion_context>

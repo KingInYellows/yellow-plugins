@@ -39,6 +39,7 @@ else
 fi
 
 # Parse fields using NUL-delimited output (avoids eval)
+TOOL="" file_path="" command_text="" exit_code="1"
 {
   IFS= read -r -d '' TOOL
   IFS= read -r -d '' file_path

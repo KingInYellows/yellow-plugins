@@ -57,7 +57,3 @@ Both paths use `gt submit --no-interactive` for submission.
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
 
-### MCP Tool Integration
-
-- **ruvector** — Recall past git workflow issues at submit time. Graceful skip
-  if yellow-ruvector not installed.

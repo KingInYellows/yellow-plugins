@@ -70,8 +70,9 @@ If `.ruvector/` exists:
    concatenated comment bodies.
 3. Call hooks_recall(query, top_k=5). If error, skip to Step 4.
 4. Discard results with score < 0.5. Take top 3. Truncate to 800 chars.
-5. Include as advisory context in each resolver agent's prompt (past resolution
-   patterns may help).
+5. Include as advisory context in each resolver agent's prompt using the
+   `<reflexion_context>` XML format from the `mcp-integration-patterns` skill
+   (past resolution patterns may help).
 
 ### Step 4: Spawn Parallel Resolvers
 

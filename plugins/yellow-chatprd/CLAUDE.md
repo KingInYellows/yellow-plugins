@@ -85,11 +85,6 @@ patterns:
 This plugin does not perform git operations. Graphite commands and git workflows
 do not apply.
 
-### MCP Tool Integration
-
-- **ruvector** — Recall past PRD decisions at document creation start. Graceful
-  skip if yellow-ruvector not installed.
-
 ## Known Limitations
 
 - MCP-only — no offline mode, no local fallback

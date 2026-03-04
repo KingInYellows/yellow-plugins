@@ -133,7 +133,3 @@ session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
   `/devin:status` to re-discover active sessions
 - Polling-based session monitoring — no push/webhook support
 
-### MCP Tool Integration
-
-- **ruvector** — Recall past delegation outcomes at delegate start (Prompted
-  remember for failures). Graceful skip if yellow-ruvector not installed.
