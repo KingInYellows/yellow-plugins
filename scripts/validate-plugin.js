@@ -31,9 +31,9 @@ function resolveHookScriptPath(command, pluginDir) {
   const match = resolved.match(/^bash\s+(\S+)/);
   if (!match) return null;
   const scriptPath = match[1];
-  const normalized = path.resolve(scriptPath);
+  const normalized = path.resolve(pluginDir, scriptPath);
   if (!normalized.startsWith(path.resolve(pluginDir) + path.sep)) return null;
-  return scriptPath;
+  return normalized;
 }
 
 const colors = {
@@ -380,7 +380,7 @@ function validatePlugin(pluginDir) {
           }
 
           // Heuristic: check if script source contains JSON output or exit-code protocol
-          const hasJsonOutput = /\{[^}]*"continue"\s*:/.test(content);
+          const hasJsonOutput = /"continue"\s*:/.test(content);
           const hasExitCodeProtocol =
             /exit\s+0/.test(content) && /exit\s+2/.test(content);
           if (!hasJsonOutput && !hasExitCodeProtocol) {
