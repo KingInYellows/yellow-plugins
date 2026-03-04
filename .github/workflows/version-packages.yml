@@ -1,0 +1,81 @@
+name: Version Packages
+
+# Runs on every push to main. When pending .changeset/*.md files are found,
+# opens (or updates) a "chore: version packages" PR that bumps package.json,
+# plugin.json, and marketplace.json in lockstep via pnpm apply:changesets.
+# When that PR merges, the publish step runs pnpm tag to create per-plugin
+# git tags (e.g. yellow-core@1.2.0), which the publish-release.yml workflow
+# picks up to create GitHub Releases.
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: version-packages
+  # Never cancel mid-run — a partially-created PR leaves dirty state.
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8.15.0'
+
+jobs:
+  version:
+    name: Version or Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history is required for changeset to build CHANGELOG entries
+          # from git log and for the action to detect changed packages.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create Version PR or tag released packages
+        uses: changesets/action@v1
+        with:
+          # version: runs when .changeset/*.md files are pending.
+          # 1. pnpm apply:changesets = changeset version + sync-manifests.js
+          #    Bumps plugin package.json files AND propagates to plugin.json +
+          #    marketplace.json in one step, keeping the three-way sync in lockstep.
+          # 2. node scripts/catalog-version.js patch bumps the root package.json
+          #    (yellow-plugins-root) by one patch version. The root has no workspace
+          #    dependencies on plugins, so Changesets won't auto-bump it. We bump it
+          #    explicitly here so the v*.*.*  catalog tag (created in the publish step)
+          #    always advances past the previous release.
+          version: pnpm apply:changesets && node scripts/catalog-version.js patch
+
+          # publish: runs after the Version Packages PR merges.
+          # 1. pnpm tag = changeset tag: creates per-plugin git tags like yellow-core@1.1.1
+          #    for all packages with privatePackages.tag: true in .changeset/config.json.
+          # 2. git tag v$(root version): creates the catalog tag (e.g. v1.1.2) that
+          #    triggers publish-release.yml. The root package.json was already bumped
+          #    to this version in the Version Packages PR.
+          # 3. git push --tags: pushes all newly created tags.
+          publish: pnpm tag && git tag "v$(node -p "require('./package.json').version")" && git push origin --tags
+
+          commit: 'chore: version packages'
+          title: 'chore: version packages'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

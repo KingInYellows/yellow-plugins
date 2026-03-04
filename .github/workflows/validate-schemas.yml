@@ -712,10 +712,10 @@ jobs:
         run: node scripts/validate-versions.js
 
   # ============================================================================
-  # CHANGESET ADVISORY (non-blocking — warns when plugin changes lack changeset)
+  # CHANGESET ENFORCEMENT (blocking — plugin changes require a changeset file)
   # ============================================================================
   changeset-check:
-    name: Changeset Advisory
+    name: Changeset Required
     runs-on: ubuntu-latest
     timeout-minutes: 2
     if: github.event_name == 'pull_request'
@@ -743,10 +743,11 @@ jobs:
             | grep -E '^\.changeset/[^/]+\.md$' || true)
 
           if [ -z "$NEW_CHANGESETS" ]; then
-            echo "::warning::Plugin files changed but no .changeset/*.md file found."
-            echo "::warning::Changed plugins: $(echo "$CHANGED_PLUGINS" | tr '\n' ' ')"
-            echo "::warning::Run \`pnpm changeset\` to record the change type (patch/minor/major)."
-            echo "::warning::This is advisory — the PR can still merge without a changeset."
+            echo "::error::Plugin files were modified but no .changeset/*.md file found."
+            echo "::error::Changed plugins: $(echo "$CHANGED_PLUGINS" | tr '\n' ' ')"
+            echo "::error::Run 'pnpm changeset' and commit the resulting .changeset/*.md file."
+            echo "::error::See CONTRIBUTING.md#versioning for the developer workflow."
+            exit 1
           else
             echo "Changeset present for plugin changes. OK."
             echo "Changed plugins: $(echo "$CHANGED_PLUGINS" | tr '\n' ' ')"
@@ -859,6 +860,7 @@ jobs:
         contract-drift,
         security-audit,
         build,
+        changeset-check,
       ]
 
     steps:
@@ -871,7 +873,8 @@ jobs:
              [ "${{ needs.integration-tests.result }}" == "success" ] && \
              [ "${{ needs.contract-drift.result }}" == "success" ] && \
              [ "${{ needs.security-audit.result }}" == "success" ] && \
-             { [ "${{ needs.build.result }}" == "success" ] || [ "${{ needs.build.result }}" == "skipped" ]; }; then
+             { [ "${{ needs.build.result }}" == "success" ] || [ "${{ needs.build.result }}" == "skipped" ]; } && \
+             { [ "${{ needs.changeset-check.result }}" == "success" ] || [ "${{ needs.changeset-check.result }}" == "skipped" ]; }; then
             echo "::notice::✅ All CI validation checks passed"
             exit 0
           else
@@ -884,5 +887,6 @@ jobs:
             echo "Contract Drift: ${{ needs.contract-drift.result }}"
             echo "Security Audit: ${{ needs.security-audit.result }}"
             echo "Build (main only): ${{ needs.build.result }}"
+            echo "Changeset Required: ${{ needs.changeset-check.result }}"
             exit 1
           fi

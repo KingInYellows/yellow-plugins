@@ -128,6 +128,7 @@ pnpm release:check
 - [ ] Plugin validation passes: `pnpm validate:plugins`
 - [ ] Documentation updated (README + CLAUDE.md)
 - [ ] Commit messages use conventional format (`feat:`, `fix:`, `docs:`, etc.)
+- [ ] Changeset file created if plugin files changed: `pnpm changeset` (see [Versioning](#versioning))
 
 ### PR Review Process
 
@@ -135,6 +136,80 @@ pnpm release:check
 2. At least one maintainer review required
 3. All review comments addressed
 4. Documentation reviewed for completeness
+
+## Versioning
+
+Yellow-plugins uses [Changesets](https://github.com/changesets/changesets) to
+manage plugin versions. **CI will block any PR that modifies plugin files without
+a `.changeset/*.md` file.** This ensures every change surfaces to users via the
+auto-update mechanism.
+
+### When to create a changeset
+
+Required when your PR modifies any file under `plugins/` that affects plugin
+behavior, commands, agents, skills, or configuration schemas.
+
+Not required for:
+- Changes only to `packages/` (internal TypeScript tooling)
+- Changes only to `scripts/`, `.github/`, or `docs/`
+- Changes only to non-functional files (README, comments, formatting)
+
+### How to create a changeset
+
+```bash
+pnpm changeset
+```
+
+The CLI will prompt you to:
+1. Select which plugin packages changed (e.g. `yellow-core`, `yellow-review`)
+2. Choose the bump type:
+   - `patch` — bug fix, behavior correction, documentation update inside a plugin
+   - `minor` — new command, new skill, new agent, or any additive change
+   - `major` — breaking change to a command's interface, or removal of a command
+
+This writes a `.changeset/<auto-slug>.md` file. Commit it alongside your changes.
+
+Also update the PR checklist item:
+- [ ] Changeset file created: `pnpm changeset`
+
+### What happens on merge
+
+1. The `version-packages.yml` workflow runs on push to `main`.
+2. If changeset files are pending: a **"chore: version packages" PR** is opened
+   (or updated) that bumps `package.json`, `plugin.json`, and `marketplace.json`
+   for each changed plugin, and writes `CHANGELOG.md` entries.
+3. When that PR merges, git tags are created (e.g. `yellow-core@1.1.1` and a
+   root catalog tag `v1.1.2`) and a GitHub Release is published.
+
+### Reviewing the "Version Packages" PR
+
+The PR is created by the Changesets bot. Before merging, verify:
+- Bump types are correct (patch/minor/major) for each plugin.
+- `CHANGELOG.md` entries are coherent.
+- `plugin.json` and `marketplace.json` versions match `package.json`.
+
+The PR can be held open to batch multiple features before releasing.
+
+### Emergency manual release
+
+```bash
+pnpm apply:changesets         # bumps plugin versions + syncs manifests
+node scripts/catalog-version.js patch   # bumps root catalog version
+git add -A
+git commit -m "chore: version packages"
+git push
+pnpm tag                      # creates per-plugin git tags
+git tag v<catalog-version>    # e.g. v1.1.2
+git push --tags               # triggers publish-release.yml
+```
+
+### Note on auto-updates (GitHub issue #26744)
+
+Claude Code's background auto-update check has a known bug where it does not
+prompt users even when a newer version is available in the marketplace. Until
+fixed, users can run `/plugin marketplace update` to fetch the latest. Version
+bumps are still worth doing — they will be retroactively effective once the bug
+is fixed.
 
 ## Coding Standards
 
