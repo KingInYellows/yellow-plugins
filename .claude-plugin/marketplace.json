@@ -130,6 +130,16 @@
       },
       "source": "./plugins/yellow-morph",
       "category": "development"
+    },
+    {
+      "name": "yellow-semgrep",
+      "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
+      "version": "1.0.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-semgrep",
+      "category": "development"
     }
   ]
 }
