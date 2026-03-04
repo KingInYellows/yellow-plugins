@@ -1,4 +1,3 @@
-
 # Claude Flow generated files
 .claude/
 .mcp.json
@@ -90,3 +89,6 @@ temp/
 # ruvector per-developer runtime data
 .ruvector/
 **/.ruvector/
+
+# RuVector intelligence data
+.claude/statusline.sh
