@@ -130,8 +130,8 @@ If `$DIRTY` is true, present AskUserQuestion:
 If user chooses stash: `git stash push -- "${FILE_PATH}"`
 
 **IMPORTANT:** If stash was performed, ALL subsequent exit paths (revert, skip,
-abort) MUST run `git stash pop` before exiting to restore the user's original
-changes.
+abort, triage failure) MUST run `git stash pop` before exiting to restore the
+user's original changes.
 
 ### Step 6: Read Context
 
@@ -195,7 +195,7 @@ Create a commit via Graphite with structured metadata per `semgrep-conventions`
 skill:
 
 ```bash
-gt commit create -m "fix(security): resolve {check_id} in {path}
+gt modify -c -m "fix(security): resolve {check_id} in {path}
 
 Finding-ID: {id}
 Rule: {check_id}
