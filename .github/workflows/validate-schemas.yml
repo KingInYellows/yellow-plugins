@@ -771,6 +771,7 @@ jobs:
         contract-drift,
         security-audit,
         build,
+        changeset-check,
       ]
 
     steps:
