@@ -367,13 +367,36 @@ assurance.
       gt submit --no-interactive
       ```
 
-4. After submission, get the PR URL:
+4. **Post-Submit Linear Sync:**
+
+   After successful submission, check if the current branch is linked to a
+   Linear issue:
+
+   ```bash
+   BRANCH=$(git branch --show-current)
+   ISSUE_ID=$(printf '%s' "$BRANCH" | grep -oE '[A-Z]{2,5}-[0-9]{1,6}' | head -1)
+   ```
+
+   If an issue ID is found, invoke `/linear:sync` via Skill tool with
+   `skill: "linear:sync"` and `args` set to `"$ISSUE_ID --after-submit"`.
+
+   The `--after-submit` flag enables Tier 1 auto-apply: `/linear:sync` will
+   automatically transition the issue to "In Review" and report the change
+   without prompting for confirmation.
+
+   **Graceful degradation:** If the Skill invocation fails (yellow-linear not
+   installed or `linear:sync` unavailable), skip silently. Do not block the
+   submission workflow for an optional Linear integration.
+
+   If no issue ID is extractable from the branch name, skip this step silently.
+
+5. After submission, get the PR URL:
 
    ```bash
    gh pr view --json url -q .url
    ```
 
-5. Note any deviations from plan or follow-up work needed.
+6. Note any deviations from plan or follow-up work needed.
 
 6. Record session learning:
 
