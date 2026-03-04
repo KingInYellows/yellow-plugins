@@ -25,49 +25,60 @@ the plugin orchestrates access and connects tools.
 
 ### Commands (6)
 
-- `/chatprd:setup` — Configure default org and project for the ChatPRD workspace
-- `/chatprd:create` — Create a new document in ChatPRD (PRD, spec, one-pager,
-  API doc)
+- `/chatprd:setup` — Configure default org and project with profile check
+- `/chatprd:create` — Create a new document in ChatPRD with optional DeepWiki
+  context for technical templates
 - `/chatprd:search` — Search ChatPRD workspace for documents
 - `/chatprd:update` — Update an existing ChatPRD document
-- `/chatprd:list` — List documents in ChatPRD workspace
+- `/chatprd:list` — List documents in ChatPRD workspace (project-scoped,
+  org-scoped, or personal)
 - `/chatprd:link-linear` — Create Linear issues from a ChatPRD document
 
-### Agents (2)
+### Agents (4)
 
 **Workflow:**
 
 - `document-assistant` — ChatPRD document management (create, read, update,
-  search). Does NOT handle Linear bridging.
-- `linear-prd-bridge` — Bridge ChatPRD documents to Linear issues. Only triggers
-  when Linear is explicitly mentioned alongside document context.
+  search) with supplementary chat context. Does NOT handle Linear bridging.
+- `linear-prd-bridge` — Bridge ChatPRD documents to Linear issues with
+  related-specs enrichment. Only triggers when Linear is explicitly mentioned
+  alongside document context.
+- `document-reviewer` — PRD completeness analysis against template structure.
+  Reviews documents for missing/thin/adequate sections.
+- `project-dashboard` — One-stop project overview showing document inventory,
+  coverage gaps, and activity context. Read-only.
 
 ### Skills (1)
 
-- `chatprd-conventions` — Error mapping, template guide, and input validation
-  reference for commands and agents
+- `chatprd-conventions` — Error mapping, template guide, input validation,
+  document review patterns, and dashboard formatting reference
 
 ## When to Use What
 
 Commands and agents overlap intentionally to serve different invocation
 patterns:
 
-| Use Case                                          | Use This                   |
-| ------------------------------------------------- | -------------------------- |
-| Configure workspace org/project                   | `/chatprd:setup`           |
-| Quick document creation                           | `/chatprd:create`          |
-| Find a specific document                          | `/chatprd:search`          |
-| Modify document content                           | `/chatprd:update`          |
-| Browse all documents                              | `/chatprd:list`            |
-| Create Linear issues from PRD                     | `/chatprd:link-linear`     |
-| Conversational document work (create/read/update) | `document-assistant` agent |
-| "Create issues from this PRD"                     | `linear-prd-bridge` agent  |
+| Use Case                                          | Use This                     |
+| ------------------------------------------------- | ---------------------------- |
+| Configure workspace org/project                   | `/chatprd:setup`             |
+| Quick document creation                           | `/chatprd:create`            |
+| Find a specific document                          | `/chatprd:search`            |
+| Modify document content                           | `/chatprd:update`            |
+| Browse all documents                              | `/chatprd:list`              |
+| Create Linear issues from PRD                     | `/chatprd:link-linear`       |
+| Conversational document work (create/read/update/search) | `document-assistant` agent   |
+| "Create issues from this PRD"                     | `linear-prd-bridge` agent    |
+| "Review this PRD" / "Is this spec complete?"      | `document-reviewer` agent    |
+| "What docs exist for project X?"                  | `project-dashboard` agent    |
 
 ## Cross-Plugin Dependencies
 
 - **yellow-linear** — Required for `/chatprd:link-linear` command and
   `linear-prd-bridge` agent. Graceful degradation with install message when not
   present.
+- **yellow-devin** — Optional for `/chatprd:create` (DeepWiki context injection
+  for technical templates). Graceful degradation with tip message when not
+  installed.
 
 ## Git Operations
 

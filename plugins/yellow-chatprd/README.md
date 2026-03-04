@@ -28,9 +28,10 @@ choose "Clear authentication".
 
 ## Commands
 
-| Command                | Description                                           |
-| ---------------------- | ----------------------------------------------------- |
-| `/chatprd:create`      | Create a new document (PRD, spec, one-pager, API doc) |
+| Command                | Description                                                    |
+| ---------------------- | -------------------------------------------------------------- |
+| `/chatprd:setup`       | Configure default org and project with profile check           |
+| `/chatprd:create`      | Create a new document with optional DeepWiki context           |
 | `/chatprd:search`      | Search ChatPRD workspace for documents                |
 | `/chatprd:update`      | Update an existing ChatPRD document                   |
 | `/chatprd:list`        | List documents in ChatPRD workspace                   |
@@ -38,16 +39,18 @@ choose "Clear authentication".
 
 ## Agents
 
-| Agent                | Description                                                |
-| -------------------- | ---------------------------------------------------------- |
-| `document-assistant` | ChatPRD document management (create, read, update, search) |
-| `linear-prd-bridge`  | Bridge ChatPRD documents to Linear issues                  |
+| Agent                | Description                                                          |
+| -------------------- | -------------------------------------------------------------------- |
+| `document-assistant` | ChatPRD document management (create, read, update, search)           |
+| `linear-prd-bridge`  | Bridge ChatPRD documents to Linear issues with related-specs context |
+| `document-reviewer`  | PRD completeness analysis against template structure                 |
+| `project-dashboard`  | One-stop project overview with document inventory and coverage gaps  |
 
 ## Skills
 
 | Skill                 | Description                                                   |
 | --------------------- | ------------------------------------------------------------- |
-| `chatprd-conventions` | Error mapping, template guide, and input validation reference |
+| `chatprd-conventions` | Error mapping, template guide, input validation, document review patterns, and dashboard formatting reference |
 
 ## MCP Servers
 

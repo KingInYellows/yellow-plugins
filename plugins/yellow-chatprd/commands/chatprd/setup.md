@@ -10,6 +10,7 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-chatprd_chatprd__list_user_organizations
   - mcp__plugin_yellow-chatprd_chatprd__list_projects
+  - mcp__plugin_yellow-chatprd_chatprd__get_user_profile
 ---
 
 # Set Up ChatPRD Workspace
@@ -38,7 +39,32 @@ Ask via AskUserQuestion: "ChatPRD is already configured for **[org_name]** /
 
 If missing or `org_id` is empty/malformed: skip directly to Step 2.
 
-### Step 2: Verify MCP Connectivity
+### Step 2: Profile Check
+
+Call `get_user_profile`. If successful, display:
+
+```text
+Logged in as **[firstName] [lastName]** ([email])
+```
+
+If `firstName` or `lastName` is null, omit the null field gracefully.
+
+Parse the `subscriptions` array to determine plan tier and
+`subscription_status` for the config file:
+
+- If any subscription object has `status: "active"` (or `isActive: true`):
+  set `subscription_status` to `active`.
+- If subscriptions array is non-empty but no active entries: set to `free`.
+- If subscriptions array is empty or missing: set to `unknown`.
+
+If the status is not `active`: warn "Some ChatPRD features require a Pro
+or Team plan. Setup will continue, but you may encounter feature limitations."
+
+**Non-blocking:** If `get_user_profile` fails or times out, set
+`subscription_status` to `unknown`, log: "Could not fetch profile — continuing
+setup." Proceed to Step 3.
+
+### Step 3: Verify MCP Connectivity
 
 Use `ToolSearch "list_user_organizations"` to confirm the ChatPRD MCP server is
 reachable.
@@ -47,7 +73,7 @@ If the tool is not found: Report "[chatprd] ChatPRD MCP unavailable. Ensure
 Claude Code has browser access for OAuth (required on first connection). Check
 plugin installation." and stop.
 
-### Step 3: Discover Organizations
+### Step 4: Discover Organizations
 
 Call `list_user_organizations`.
 
@@ -59,7 +85,7 @@ Call `list_user_organizations`.
 - **2+ results:** Present a numbered list and ask via AskUserQuestion: "Which
   organization is your default workspace?"
 
-### Step 4: Discover Projects
+### Step 5: Discover Projects
 
 Call `list_projects` scoped to the selected organization.
 
@@ -71,7 +97,7 @@ Call `list_projects` scoped to the selected organization.
 - **2+ results:** Present a numbered list and ask via AskUserQuestion: "Which
   project is your default?"
 
-### Step 5: Confirm Configuration (M3)
+### Step 6: Confirm Configuration (M3)
 
 Display a summary:
 
@@ -86,7 +112,7 @@ Ask via AskUserQuestion: "Save this configuration?"
   write any files.
 - **Confirm** → Continue.
 
-### Step 6: Write Config
+### Step 7: Write Config
 
 Write `.claude/yellow-chatprd.local.md`:
 
@@ -98,6 +124,7 @@ org_name: "[org_name]"
 default_project_id: "[project_id]"
 default_project_name: "[project_name]"
 setup_completed_at: "[ISO-8601 timestamp]"
+subscription_status: "[active|free|unknown]"
 ---
 
 # ChatPRD Workspace Config
@@ -108,7 +135,7 @@ Default project: **[project_name]**
 Run `/chatprd:setup` to reconfigure.
 ```
 
-### Step 7: Validate Written Config
+### Step 8: Validate Written Config
 
 ```bash
 grep -qE '^org_id: ".+"' .claude/yellow-chatprd.local.md && \
@@ -119,9 +146,9 @@ grep -qE '^schema: ".+"' .claude/yellow-chatprd.local.md
 If validation fails: Report "[chatprd] Config validation failed. Check `.claude/`
 directory permissions and re-run `/chatprd:setup`." and stop.
 
-After the bash check passes, use the `Read` tool to read `.claude/yellow-chatprd.local.md` and confirm the written `org_id` value exactly matches the `org_id` selected in Step 3. If they differ, report "[chatprd] Config write verification failed — written org_id does not match selection. Re-run `/chatprd:setup`." and stop.
+After the bash check passes, use the `Read` tool to read `.claude/yellow-chatprd.local.md` and confirm the written `org_id` value exactly matches the `org_id` selected in Step 4. If they differ, report "[chatprd] Config write verification failed — written org_id does not match selection. Re-run `/chatprd:setup`." and stop.
 
-### Step 8: Report Completion
+### Step 9: Report Completion
 
 Print a completion summary:
 

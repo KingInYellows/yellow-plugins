@@ -12,6 +12,9 @@ allowed-tools:
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__list_templates
   - mcp__plugin_yellow-chatprd_chatprd__list_projects
+  # Optional DeepWiki context (yellow-devin)
+  - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
+  - mcp__plugin_yellow-devin_deepwiki__read_wiki_contents
 ---
 
 # Create ChatPRD Document
@@ -76,7 +79,47 @@ Suggest the best-fit template based on the description (see
     org not found — it may have been deleted. Re-run `/chatprd:setup` to
     reconfigure." and stop.
 
-### Step 5: Confirm and Create
+### Step 5: Inject Repository Context (Optional)
+
+Only applies to technical templates ("Technical Design Document" or "API
+Documentation"). For non-technical templates, skip to Step 6.
+
+a. Discover DeepWiki tools via `ToolSearch` with query `"read_wiki_structure"`.
+   If not found: display "Tip: Install yellow-devin for automatic repository
+   context in technical specs." Skip to Step 6.
+
+b. Ask via `AskUserQuestion`: "Pull architecture context from the repository
+   via DeepWiki? [Yes / No]". If no, skip to Step 6.
+
+c. Determine the repository name from git remote:
+
+   ```bash
+   git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]//' | sed 's/.git$//'
+   ```
+
+   If the result is empty (no git remote or not a GitHub repo): display
+   "No repository detected. Proceeding without DeepWiki context." Skip to
+   Step 6.
+
+d. Call `read_wiki_structure` with the repo name. If empty or error: display
+   "No repository context available from DeepWiki. Proceeding without it."
+   Skip to Step 6.
+
+e. Extract architecture-relevant context from the wiki structure:
+   1. From `read_wiki_structure`, identify sections related to architecture,
+      components, dependencies, and API design.
+   2. Call `mcp__plugin_yellow-devin_deepwiki__read_wiki_contents` with those
+      section paths to retrieve the content. If unavailable, use the structure
+      summary alone.
+   3. Inject the extracted context into the document `description` as additional
+      input (e.g., architecture section gets component overview, dependencies
+      section gets dependency list). Keep the injected context concise — summary
+      form, not verbatim wiki content.
+
+**Cross-plugin dependency:** yellow-devin (optional). Graceful degradation at
+every step — the command works identically without yellow-devin installed.
+
+### Step 6: Confirm and Create
 
 Present the creation summary:
 
@@ -84,13 +127,14 @@ Present the creation summary:
 - Selected template
 - Organization: [org_name]
 - Project: [selected project name]
+- Repository context: [included / not included]
 
 Ask user to confirm via AskUserQuestion before creating.
 
 Call `create_document` with description, template, organization (from config),
 and project.
 
-### Step 6: Report
+### Step 7: Report
 
 Display the created document:
 

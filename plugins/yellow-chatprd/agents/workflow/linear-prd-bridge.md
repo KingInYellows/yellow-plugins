@@ -8,15 +8,16 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__get_document
+  - mcp__plugin_yellow-chatprd_chatprd__list_project_documents
   - mcp__plugin_yellow-linear_linear__create_issue
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issues
-  - mcp__plugin_yellow-linear_linear__list_issue_statuses
-  - mcp__plugin_yellow-linear_linear__get_issue
-  - mcp__plugin_yellow-linear_linear__update_issue
 ---
+
+# Linear PRD Bridge
 
 <examples>
 <example>
@@ -57,20 +58,35 @@ Attempt to call `mcp__plugin_yellow-linear_linear__list_teams`:
   it with `/plugin marketplace add KingInYellows/yellow-plugins yellow-linear`"
   and stop
 
-### Step 2: Find ChatPRD Document
+### Step 2: Read Workspace Config
+
+Read workspace config per `chatprd-conventions` Workspace Config section.
+Extract `org_id`, `org_name`, `default_project_id`, `default_project_name`.
+Stop if config is missing or malformed.
+
+### Step 3: Find ChatPRD Document
 
 Parse the user's request for a document title or query. Validate input per
 `chatprd-conventions` rules.
 
-Call `search_documents` to locate the referenced document.
+Call `mcp__plugin_yellow-chatprd_chatprd__search_documents` to locate the
+referenced document.
 
 - If multiple matches: present results, let user confirm via AskUserQuestion
 - If no matches: report "Document not found" and suggest `/chatprd:search`.
   Stop.
 
-Call `get_document` to read the full content.
+Call `mcp__plugin_yellow-chatprd_chatprd__get_document` to read the full
+content.
 
-### Step 3: Extract Requirements
+### Step 4: Fetch Related Specs
+
+Fetch related specs per `chatprd-conventions` Related-Specs Pattern using
+`default_project_id` from workspace config (Step 2). Filter out the source
+document by UUID. Store results as `related_specs` (title + UUID). Skip
+silently if project ID is unavailable or API times out.
+
+### Step 5: Extract Requirements
 
 Parse the document content to identify:
 
@@ -81,20 +97,20 @@ Parse the document content to identify:
 
 Organize into a proposed issue breakdown with titles and descriptions.
 
-### Step 4: Dedup Check
+### Step 6: Dedup Check
 
-Call `list_issues` to search for existing Linear issues matching the proposed
-titles.
+Call `mcp__plugin_yellow-linear_linear__list_issues` to search for existing
+Linear issues matching the proposed titles.
 
 - Mark any duplicates in the proposal
 - Show existing issue IDs alongside duplicates
 
-### Step 5: Select Linear Team
+### Step 7: Select Linear Team
 
-Use the `list_teams` result from Step 1. If multiple teams, let user pick via
-AskUserQuestion.
+Use the `mcp__plugin_yellow-linear_linear__list_teams` result from Step 1. If
+multiple teams, let user pick via AskUserQuestion.
 
-### Step 6: Review and Confirm (M3)
+### Step 8: Review and Confirm (M3)
 
 Present the full proposed issue breakdown to the user:
 
@@ -105,9 +121,9 @@ Present the full proposed issue breakdown to the user:
 Ask user to review, edit, or approve via AskUserQuestion. Only proceed after
 explicit confirmation.
 
-### Step 7: Create Issues
+### Step 9: Create Issues
 
-Create approved issues via `create_issue`:
+Create approved issues via `mcp__plugin_yellow-linear_linear__create_issue`:
 
 - **Rate limiting:** Create at most 3 issues concurrently, with 200ms delay
   between batches
@@ -115,8 +131,10 @@ Create approved issues via `create_issue`:
   Never fall through.
 - Include ChatPRD document title as reference in each issue description
 - Skip any issues the user removed or marked as duplicate
+- When `related_specs` is non-empty, include a References section in each issue
+  description per `chatprd-conventions` Related-Specs Pattern template.
 
-### Step 8: Report
+### Step 10: Report
 
 Display summary:
 
