@@ -36,6 +36,9 @@ else
   json_exit "Warning: neither ruvector nor npx found"
 fi
 
+# End trajectory tracking before session cleanup
+"${RUVECTOR_CMD[@]}" hooks trajectory-end --success --quality 0.8 2>/dev/null || true
+
 # Use ruvector's built-in session-end hook
 "${RUVECTOR_CMD[@]}" hooks session-end 2>/dev/null || {
   printf '[ruvector] hooks session-end failed\n' >&2

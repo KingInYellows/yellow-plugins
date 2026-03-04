@@ -46,6 +46,9 @@ learnings=""
   printf '[ruvector] hooks session-start failed\n' >&2
 }
 
+# --- Priority 1b: Begin trajectory tracking ---
+"${RUVECTOR_CMD[@]}" hooks trajectory-begin -c "claude-session" -a "claude" 2>/dev/null || true
+
 # --- Priority 2: Load top learnings for context ---
 recent_learnings=$("${RUVECTOR_CMD[@]}" hooks recall --top-k 3 "recent mistakes and fixes" 2>/dev/null) || {
   printf '[ruvector] Failed to retrieve learnings\n' >&2

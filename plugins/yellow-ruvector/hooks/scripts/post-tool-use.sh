@@ -47,7 +47,7 @@ eval "$(printf '%s' "$INPUT" | jq -r '
 ')" 2>/dev/null || json_exit "Warning: jq parse failed; skipping post-tool-use"
 
 case "$TOOL" in
-  Edit|Write)
+  Edit|Write|MultiEdit)
     if [ -n "$file_path" ]; then
       # Skip solution docs: knowledge-compounder writes these directly.
       # Suppress post-edit behavioral tracking for solution doc edits.
