@@ -111,8 +111,7 @@ READY/PARTIAL/NEEDS SETUP for installed plugins:
 **yellow-morph:**
 
 - READY: `rg` OK AND `node` OK AND `npx` OK AND `MORPH_API_KEY` set
-- PARTIAL: `rg` OK AND `node` OK AND `npx` OK but `MORPH_API_KEY` NOT SET
-- NEEDS SETUP: any required tool missing (`rg`, `node`, or `npx`)
+- NEEDS SETUP: `MORPH_API_KEY` NOT SET OR any required tool missing (`rg`, `node`, or `npx`)
 
 **yellow-devin:**
 
@@ -139,7 +138,7 @@ READY/PARTIAL/NEEDS SETUP for installed plugins:
 **yellow-ci:**
 
 - READY: `gh` OK AND `jq` OK AND `ssh` OK AND `gh_auth` OK AND `.claude/yellow-ci.local.md` exists
-- PARTIAL: `gh` OK AND `jq` OK but `gh_auth` NOT AUTHENTICATED OR `ssh` NOT FOUND
+- PARTIAL: `gh` OK AND `jq` OK AND `.claude/yellow-ci.local.md` exists AND (`gh_auth` NOT AUTHENTICATED OR `ssh` NOT FOUND)
 - NEEDS SETUP: `gh` NOT FOUND OR `jq` NOT FOUND OR `.claude/yellow-ci.local.md` missing
 
 **yellow-browser-test:**
@@ -290,6 +289,11 @@ If all plugins are now READY:
 All plugins are fully configured.
 ```
 
+Use AskUserQuestion: "What would you like to do next?" with options:
+- "Re-run setup:all" — restart from Step 1
+- "Done"
+If user picks "Re-run setup:all", restart from Step 1.
+
 ## Error Handling
 
 | Error | Message | Action |
@@ -300,4 +304,4 @@ All plugins are fully configured.
 | Skill invocation fails (skill not found) | "yellow-<plugin> setup: FAILED (skill not found — plugin may not be installed)" | Record, continue to next plugin |
 | Skill invocation fails (MCP error) | "yellow-<plugin> setup: FAILED (<error>)" | Record, continue to next plugin |
 | User cancels during interactive phase | Show partial before/after for completed setups | Show summary, stop |
-| All plugins already READY | "All plugins are configured. Nothing to do." | Stop |
+| All plugins already READY | "All installed plugins are configured." | Use AskUserQuestion: "Run statusline refresh" or "Done"; invoke `statusline:setup` if selected |
