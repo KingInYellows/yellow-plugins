@@ -182,7 +182,7 @@ triggered by explicit user actions. Applied with post-hoc notification (e.g.,
 
 | Transition | Trigger | Rationale |
 |------------|---------|-----------|
-| `* → In Progress` | `/linear:work` starts work on issue | Reversible, no external notifications |
+| `* → In Progress` | `/linear:work` starts work on issue; `/linear:delegate` delegates to Devin | Reversible, no external notifications |
 | `* → In Review` | `/smart-submit` creates a PR | Reversible, user explicitly submitted code |
 | `In Review → In Progress` | Moving backward (re-opening work) | Reversible, no data loss |
 

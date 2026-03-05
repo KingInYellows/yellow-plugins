@@ -7,6 +7,7 @@ allowed-tools:
   - Read
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-linear_linear__get_issue
   - mcp__plugin_yellow-linear_linear__update_issue
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
@@ -105,6 +106,9 @@ Determine the appropriate status transition:
 - **Tier 2 transitions** (`→ Done`, `→ Cancelled`, `→ Backlog`): Always present
   via `AskUserQuestion` and require explicit confirmation, regardless of
   invocation context.
+
+If the issue is already in the suggested target status (e.g., already "In
+Review" when suggesting "In Review"), skip the transition silently.
 
 Apply via `update_issue` only after the appropriate tier check passes.
 

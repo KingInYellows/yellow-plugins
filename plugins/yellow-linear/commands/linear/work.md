@@ -92,7 +92,10 @@ Example: "Add User Auth (v2)" → `add-user-auth-v2`
 
 Full path example: `docs/brainstorms/2026-03-04-ENG-123-add-user-auth-v2-brainstorm.md`
 
-For multiple issues, use the first issue ID in the filename.
+**Multiple issues:** Write a separate brainstorm doc per issue, each with only
+that issue's data in its `## Linear Issues` section. Use each issue's own ID in
+its filename. This ensures "Plan each separately" in Step 5 routes each plan to
+a single-issue brainstorm doc without cross-contamination.
 
 Generate the current date:
 ```bash
@@ -155,7 +158,24 @@ Present options via `AskUserQuestion`:
 2. "Plan each issue separately"
 3. "Just load context (skip planning)"
 
-### Step 6: Invoke Selected Command
+### Step 6: Update Linear Status
+
+**Skip this step** if the user selected "Just load context" in Step 5.
+
+Transition issue(s) to "In Progress" (Tier 1 — auto-apply, safe transition):
+
+1. **H1 re-fetch:** Call `mcp__plugin_yellow-linear_linear__get_issue` to check
+   current status. If status has changed since Step 2 (e.g., moved to "In
+   Review" or "Done" by another team member), report the new status and skip.
+2. If the issue is already In Progress, skip silently.
+3. Call `mcp__plugin_yellow-linear_linear__list_issue_statuses` for the issue's
+   team.
+4. Find the status whose `type` is `started` (In Progress equivalent).
+5. Call `mcp__plugin_yellow-linear_linear__update_issue` with the new `stateId`
+   for each issue.
+6. Report: "Updated <ISSUE-ID> to In Progress."
+
+### Step 7: Invoke Selected Command
 
 Based on user's choice in Step 5:
 
@@ -177,24 +197,6 @@ Based on user's choice in Step 5:
     plan manually in `plans/`."
   - For `/gt-stack-plan`: "Break the work into branches manually with
     `gt create <branch-name>`."
-
-### Step 7: Update Linear Status
-
-**Skip this step** if the user selected "Just load context" in Step 5.
-
-Transition issue(s) to "In Progress" (Tier 1 — auto-apply, safe transition):
-
-1. **H1 re-fetch:** Call `mcp__plugin_yellow-linear_linear__get_issue` to check
-   current status. If status has
-   changed since Step 2 (e.g., moved to "In Review" or "Done" by another team
-   member), report the new status and skip the transition.
-2. If the issue is already In Progress, skip silently.
-3. Call `mcp__plugin_yellow-linear_linear__list_issue_statuses` for the issue's
-   team.
-4. Find the status whose `type` is `started` (In Progress equivalent).
-5. Call `mcp__plugin_yellow-linear_linear__update_issue` with the new `stateId`
-   for each issue.
-6. Report: "Updated <ISSUE-ID> to In Progress."
 
 ## Security Patterns
 

@@ -238,11 +238,11 @@ If Yes: Call `create_comment` with the built body.
 
 Transition issue to "In Progress" (Tier 1 — auto-apply, non-terminal):
 
-1. Call `list_issue_statuses` for the issue's team
-2. Find the status whose `type` is `started` (In Progress equivalent)
-3. **H1 re-fetch**: Call `get_issue` again to check current status
-4. If status has changed since Step 2: report the new status and skip the update
-5. If already In Progress: skip silently
+1. **H1 re-fetch**: Call `get_issue` again to check current status
+2. If status has changed since Step 2: report the new status and skip the update
+3. If already In Progress: skip silently
+4. Call `list_issue_statuses` for the issue's team
+5. Find the status whose `type` is `started` (In Progress equivalent)
 6. Call `update_issue` with the new `stateId`
 7. Report: "Updated <ISSUE-ID> to In Progress."
 
