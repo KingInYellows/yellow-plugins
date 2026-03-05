@@ -6,6 +6,7 @@ allowed-tools:
   - Bash
   - Skill
   - AskUserQuestion
+  - Read
 ---
 
 # Set Up All Yellow Plugins
@@ -26,12 +27,20 @@ in a single command:
 ```bash
 printf '=== Prerequisites ===\n'
 command -v node    >/dev/null 2>&1 && printf '%-14s OK (%s)\n' 'node:' "$(node --version 2>/dev/null)" || printf '%-14s NOT FOUND\n' 'node:'
+command -v npm     >/dev/null 2>&1 && printf '%-14s OK (%s)\n' 'npm:' "$(npm --version 2>/dev/null)" || printf '%-14s NOT FOUND\n' 'npm:'
+command -v npx     >/dev/null 2>&1 && printf '%-14s OK\n' 'npx:' || printf '%-14s NOT FOUND\n' 'npx:'
 command -v curl    >/dev/null 2>&1 && printf '%-14s OK\n' 'curl:' || printf '%-14s NOT FOUND\n' 'curl:'
 command -v jq      >/dev/null 2>&1 && printf '%-14s OK\n' 'jq:' || printf '%-14s NOT FOUND\n' 'jq:'
 command -v rg      >/dev/null 2>&1 && printf '%-14s OK\n' 'rg:' || printf '%-14s NOT FOUND\n' 'rg:'
 command -v gh      >/dev/null 2>&1 && printf '%-14s OK\n' 'gh:' || printf '%-14s NOT FOUND\n' 'gh:'
 command -v ssh     >/dev/null 2>&1 && printf '%-14s OK\n' 'ssh:' || printf '%-14s NOT FOUND\n' 'ssh:'
-command -v python3 >/dev/null 2>&1 && printf '%-14s OK (%s)\n' 'python3:' "$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)" || printf '%-14s NOT FOUND\n' 'python3:'
+if command -v python3 >/dev/null 2>&1; then
+  py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+  py_ok=$(python3 -c "import sys; print('ok' if sys.version_info >= (3, 7) else 'too_old')" 2>/dev/null)
+  [ "$py_ok" = "ok" ] && printf '%-14s OK (%s)\n' 'python3:' "$py_ver" || printf '%-14s TOO OLD (%s, need 3.7+)\n' 'python3:' "$py_ver"
+else
+  printf '%-14s NOT FOUND\n' 'python3:'
+fi
 command -v semgrep >/dev/null 2>&1 && printf '%-14s OK\n' 'semgrep:' || printf '%-14s NOT FOUND\n' 'semgrep:'
 
 printf '\n=== Environment Variables ===\n'
@@ -57,7 +66,7 @@ if [ -d "$plugin_cache" ]; then
     found=0
     for d in "$plugin_cache"/*/; do
       if [ -f "${d}.claude-plugin/plugin.json" ]; then
-        name=$(python3 -c "import json; print(json.load(open('${d}.claude-plugin/plugin.json')).get('name',''))" 2>/dev/null)
+        name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "${d}.claude-plugin/plugin.json" 2>/dev/null)
         if [ "$name" = "$p" ]; then found=1; break; fi
       fi
     done
@@ -86,43 +95,53 @@ as **NOT INSTALLED** and skip all other checks for that plugin. Only classify
 READY/PARTIAL/NEEDS SETUP for installed plugins:
 
 **yellow-ruvector:**
-- READY: `.ruvector/` exists AND `node` OK
+
+- READY: `.ruvector/` exists AND `node` OK AND `npx` OK
 - NEEDS SETUP: any READY condition not met
 
 **yellow-morph:**
-- READY: `rg` OK AND `node` OK AND `MORPH_API_KEY` set
-- NEEDS SETUP: any READY condition not met
+
+- READY: `rg` OK AND `node` OK AND `npx` OK AND `MORPH_API_KEY` set
+- PARTIAL: `rg` OK AND `node` OK AND `npx` OK but `MORPH_API_KEY` NOT SET
+- NEEDS SETUP: any required tool missing (`rg`, `node`, or `npx`)
 
 **yellow-devin:**
+
 - READY: `curl` OK AND `jq` OK AND `DEVIN_SERVICE_USER_TOKEN` set AND `DEVIN_ORG_ID` set
-- NEEDS SETUP: any READY condition not met
+- NEEDS SETUP: any READY condition not met (`curl` or `jq` missing, or either env var not set)
 
 **yellow-semgrep:**
-- READY: `SEMGREP_APP_TOKEN` set AND `semgrep` OK
-- PARTIAL: `SEMGREP_APP_TOKEN` set but `semgrep` NOT FOUND
-- NEEDS SETUP: `SEMGREP_APP_TOKEN` NOT SET
+
+- READY: `curl` OK AND `jq` OK AND `SEMGREP_APP_TOKEN` set AND `semgrep` OK
+- PARTIAL: `SEMGREP_APP_TOKEN` set but `semgrep` NOT FOUND (and `curl`/`jq` OK)
+- NEEDS SETUP: `SEMGREP_APP_TOKEN` NOT SET OR `curl` NOT FOUND OR `jq` NOT FOUND
 
 **yellow-research:**
+
 - READY: all 3 API keys set (`EXA_API_KEY`, `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`)
 - PARTIAL: 1-2 of 3 API keys set
 - NEEDS SETUP: 0 of 3 API keys set
 
 **yellow-chatprd:**
+
 - READY: `.claude/yellow-chatprd.local.md` exists
 - NEEDS SETUP: config file missing
 
 **yellow-ci:**
+
 - READY: `gh` OK AND `jq` OK AND `ssh` OK AND `gh_auth` OK
-- PARTIAL: tools OK but `gh_auth` NOT AUTHENTICATED, or `ssh` NOT FOUND
+- PARTIAL: `gh` OK AND `jq` OK but `gh_auth` NOT AUTHENTICATED OR `ssh` NOT FOUND
 - NEEDS SETUP: `gh` NOT FOUND OR `jq` NOT FOUND
 
 **yellow-browser-test:**
-- READY: `.claude/yellow-browser-test.local.md` exists
-- NEEDS SETUP: config file missing
+
+- READY: `.claude/yellow-browser-test.local.md` exists AND `node` OK AND `npm` OK
+- NEEDS SETUP: config file missing OR `node` NOT FOUND OR `npm` NOT FOUND
 
 **yellow-core (statusline):**
-- READY: `~/.claude/yellow-statusline.py` exists
-- NEEDS SETUP: statusline not installed
+
+- READY: `~/.claude/yellow-statusline.py` exists AND `python3` OK (>= 3.7)
+- NEEDS SETUP: statusline not installed OR `python3` NOT FOUND OR python version < 3.7
 
 Display the status table:
 
@@ -152,13 +171,16 @@ about what is missing (e.g., which env var, which CLI tool, which config file).
 
 Based on the dashboard classification:
 
-**If all 9 plugins are READY:**
+**If all installed plugins are READY (regardless of NOT INSTALLED count):**
 
-Display: "All plugins are configured. Nothing to do." Stop.
+Display: "All installed plugins are configured. Nothing to do."
+If any plugins are NOT INSTALLED, also display: "X plugin(s) not installed:
+[list]." Stop.
 
-**If 1+ plugins are NEEDS SETUP or PARTIAL:**
+**If 1+ installed plugins are NEEDS SETUP or PARTIAL:**
 
-Count the plugins that are not READY. Use AskUserQuestion:
+Count the installed plugins that are not READY (exclude NOT INSTALLED from the
+count and from all selection lists). Use AskUserQuestion:
 
 "N plugins need attention. How would you like to proceed?" with options:
 - "Run all N setups" — walk through each sequentially
@@ -258,7 +280,7 @@ All plugins are fully configured.
 |---|---|---|
 | Bash check fails to execute | "Dashboard check failed. Verify shell environment." | Stop |
 | Plugin not installed | Show as NOT INSTALLED in dashboard | Skip — do not offer interactive setup for uninstalled plugins |
-| Plugin cache not found | "Cannot detect installed plugins — assuming all are installed." | Continue — rely on Skill invocation to detect missing plugins |
+| Plugin cache not found | Dashboard prints "plugin_cache: NOT FOUND" | Continue — classify plugins based on prerequisite/env/config checks only; Skill invocation will detect missing plugins |
 | Skill invocation fails (skill not found) | "yellow-<plugin> setup: FAILED (skill not found — plugin may not be installed)" | Record, continue to next plugin |
 | Skill invocation fails (MCP error) | "yellow-<plugin> setup: FAILED (<error>)" | Record, continue to next plugin |
 | User cancels during interactive phase | Show partial before/after for completed setups | Show summary, stop |

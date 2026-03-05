@@ -55,32 +55,34 @@ wizards. Invoked via `Skill` tool.
   A single comprehensive Bash call that checks:
 
   - CLI prerequisites: `node`, `npm`, `npx`, `curl`, `jq`, `rg`, `gh`, `ssh`,
-    `python3`, `semgrep` — using `command -v` pattern
+    `python3` (with >= 3.7 version check), `semgrep` — using `command -v` pattern
   - Environment variables: `MORPH_API_KEY`, `DEVIN_SERVICE_USER_TOKEN`,
     `DEVIN_ORG_ID`, `SEMGREP_APP_TOKEN`, `EXA_API_KEY`, `TAVILY_API_KEY`,
     `PERPLEXITY_API_KEY` — using `[ -n "${VAR:-}" ]` pattern
   - Config files: `.ruvector/` dir, `.claude/yellow-chatprd.local.md`,
     `.claude/yellow-ci.local.md`, `.claude/yellow-browser-test.local.md`,
     `~/.claude/yellow-statusline.py`
-  - Plugin installation: check `$HOME/.claude/plugins/cache` for installed
-    plugin directories
+  - Plugin installation: scan `$HOME/.claude/plugins/cache` for installed
+    plugin directories by reading each `plugin.json` and matching names
+  - GitHub CLI auth: `gh auth status` check
 
   Output format follows the dashboard mock in the brainstorm doc, with sections:
-  Prerequisites, Environment Variables, Plugin Status, Summary.
+  Prerequisites, Environment Variables, Config Files, Installed Plugins, GitHub
+  CLI Auth.
 
   **Status classification logic per plugin:**
 
   | Plugin | READY when | PARTIAL when | NEEDS SETUP when |
   |--------|-----------|-------------|-----------------|
-  | yellow-ruvector | `.ruvector/` exists, `node` available | — | `.ruvector/` missing |
-  | yellow-morph | `rg`, `node`, `npx` available, `MORPH_API_KEY` set | — | `MORPH_API_KEY` not set or `rg` missing |
-  | yellow-devin | `curl`, `jq` available, both env vars set | — | Either env var missing |
-  | yellow-semgrep | `SEMGREP_APP_TOKEN` set, `semgrep` CLI available | `SEMGREP_APP_TOKEN` set but no CLI | Token not set |
+  | yellow-ruvector | `.ruvector/` exists, `node` and `npx` available | — | `.ruvector/` missing or `node`/`npx` missing |
+  | yellow-morph | `rg`, `node`, `npx` available, `MORPH_API_KEY` set | Tools OK but `MORPH_API_KEY` not set | Any required tool missing (`rg`, `node`, `npx`) |
+  | yellow-devin | `curl`, `jq` available, both env vars set | — | `curl`/`jq` missing or either env var missing |
+  | yellow-semgrep | `curl`, `jq` OK, `SEMGREP_APP_TOKEN` set, `semgrep` CLI available | `SEMGREP_APP_TOKEN` set but `semgrep` CLI missing (and `curl`/`jq` OK) | Token not set or `curl`/`jq` missing |
   | yellow-research | All 3 API keys set | 1-2 of 3 API keys set | 0 of 3 API keys set |
   | yellow-chatprd | `.claude/yellow-chatprd.local.md` exists | — | Config file missing |
-  | yellow-ci | `gh`, `jq`, `ssh` available, `gh auth status` passes | Tools available but no auth | Tools missing |
-  | yellow-browser-test | `.claude/yellow-browser-test.local.md` exists | — | Config file missing |
-  | yellow-core (statusline) | `~/.claude/yellow-statusline.py` exists | — | Statusline not installed |
+  | yellow-ci | `gh`, `jq` available, `ssh` available, `gh auth status` passes | `gh`/`jq` OK but `gh_auth` not authenticated or `ssh` missing | `gh` or `jq` missing |
+  | yellow-browser-test | `.claude/yellow-browser-test.local.md` exists, `node` and `npm` available | — | Config file missing or `node`/`npm` missing |
+  | yellow-core (statusline) | `~/.claude/yellow-statusline.py` exists, `python3` >= 3.7 | — | Statusline not installed or `python3` missing/too old |
 
   **Step 2: Decision tree after dashboard**
 
