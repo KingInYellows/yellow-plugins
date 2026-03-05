@@ -39,7 +39,7 @@ jobs:
   # ============================================================================
   validate-schemas:
     name: Validate Schemas (${{ matrix.target }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 2 # NFR-MAINT-002: Critical path budget
 
     strategy:
@@ -55,6 +55,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          clean: true
           fetch-depth: 0
 
       - name: Setup pnpm
@@ -217,12 +218,14 @@ jobs:
   # ============================================================================
   lint-and-typecheck:
     name: Lint & TypeCheck
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 3
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
@@ -287,13 +290,15 @@ jobs:
   # ============================================================================
   unit-tests:
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 5
     needs: [lint-and-typecheck]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
@@ -354,13 +359,15 @@ jobs:
   # ============================================================================
   integration-tests:
     name: Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 8
     needs: [unit-tests]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
@@ -421,7 +428,7 @@ jobs:
   # ============================================================================
   contract-drift:
     name: Contract Drift Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 3
     needs: [validate-schemas]
 
@@ -429,6 +436,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          clean: true
           fetch-depth: 0 # Need history for drift detection
 
       - name: Setup pnpm
@@ -542,12 +550,14 @@ jobs:
   # ============================================================================
   security-audit:
     name: Security Audit
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 5
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
@@ -627,7 +637,7 @@ jobs:
   # ============================================================================
   build:
     name: Build Verification
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 5
     if: github.ref == 'refs/heads/main'
     needs: [validate-schemas, lint-and-typecheck, unit-tests]
@@ -635,6 +645,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
@@ -695,12 +707,14 @@ jobs:
   # ============================================================================
   validate-versions:
     name: Version Consistency Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 2
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          clean: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -715,7 +729,7 @@ jobs:
   # ============================================================================
   changeset-check:
     name: Changeset Required
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 2
     if: github.event_name == 'pull_request'
 
@@ -723,6 +737,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          clean: true
           fetch-depth: 0
 
       - name: Check for missing changesets
@@ -758,7 +773,7 @@ jobs:
   # ============================================================================
   report-metrics:
     name: Aggregate CI Metrics
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     if: always()
     needs:
       [
@@ -848,7 +863,7 @@ jobs:
   # ============================================================================
   ci-status:
     name: CI Status Summary
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, ubuntu24]
     if: always()
     needs:
       [
