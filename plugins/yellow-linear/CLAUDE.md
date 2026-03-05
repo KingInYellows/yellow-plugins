@@ -27,14 +27,18 @@ cycles, and documents.
 
 ## Plugin Components
 
-### Commands (7)
+### Commands (8)
 
+- `/linear:work` — Start working on a Linear issue: loads context, writes
+  brainstorm doc, routes to `/workflows:plan` or `/gt-stack-plan`
 - `/linear:create` — Create a Linear issue from current context
 - `/linear:sync` — Sync current branch with its Linear issue (load context, link
-  PR, update status)
+  PR, update status). Supports `--after-submit` for Tier 1 auto-apply.
 - `/linear:sync-all` — Audit open Linear issues and close ones with merged PRs
-- `/linear:triage` — Review and assign incoming Linear issues
-- `/linear:plan-cycle` — Plan sprint cycle by selecting backlog issues
+- `/linear:triage` — Review and assign incoming Linear issues. Offers "What
+  Next?" routing to `/linear:work` or `/linear:delegate` after triage.
+- `/linear:plan-cycle` — Plan sprint cycle by selecting backlog issues. Offers
+  "What Next?" routing after planning.
 - `/linear:status` — Generate project and initiative health report
 - `/linear:delegate` — Delegate a Linear issue to a Devin AI session (requires
   yellow-devin plugin)
@@ -74,6 +78,11 @@ For advanced workflows, agents can call Linear MCP tools directly (e.g.,
 
 ## Cross-Plugin Dependencies
 
+- **yellow-core** (optional) — `/linear:work` routes to `/workflows:plan` and
+  `/workflows:work` via Skill tool. Without it, `/linear:work` writes the
+  brainstorm doc but cannot invoke planning commands; suggests manual workflow.
+- **gt-workflow** (optional) — `/linear:work` routes to `/gt-stack-plan` via
+  Skill tool. Without it, suggests manual branch creation with `gt create`.
 - **yellow-devin** — Required for `/linear:delegate` command (delegates Linear
   issues to Devin AI sessions). Without it, `/linear:delegate` will report that
   the yellow-devin plugin is not installed.

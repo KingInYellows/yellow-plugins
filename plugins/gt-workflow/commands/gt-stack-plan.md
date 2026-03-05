@@ -49,6 +49,21 @@ Read the feature description and identify:
 - What existing code will be touched
 - What the key components/layers are (types, logic, API, UI, tests)
 
+### 1b. Detect Linear Issues
+
+If reading a plan file, check for a `## Linear Issues` section. If found,
+extract issue IDs and titles:
+
+```
+## Linear Issues
+- ENG-123: Title of issue
+- ENG-456: Title of other issue
+```
+
+Parse each line matching `- <ID>: <title>` and store the issue-to-title mapping.
+These will be used in Phase 2 for branch naming and in Phase 3 for the mapping
+table.
+
 ### 2. Explore the Codebase
 
 Use Glob and Grep to understand the project structure:
@@ -86,7 +101,16 @@ PR should:
 - Build on the previous PR in the stack
 - Be as small as possible while still being coherent
 
-Common layering patterns:
+**When Linear issues are detected** (from Phase 1, Step 1b):
+- Default to **one branch per Linear issue** (1:1 mapping).
+- Each branch name follows `feat/<ISSUE-ID>-<slug>` convention (e.g.,
+  `feat/ENG-123-add-auth-model`).
+- If the natural decomposition requires many-to-one (multiple issues addressed
+  by a single PR), present the deviation to the user via `AskUserQuestion` and
+  confirm before proceeding.
+- Include the issue ID in the `gt create` scaffold commit message.
+
+**When no Linear issues are detected**, use common layering patterns:
 
 1. **Types/Schema first** — domain models, interfaces, types
 2. **Core logic** — business logic, validation, transformations
@@ -182,7 +206,19 @@ top of the previous branch automatically.
 gt log short
 ```
 
-### 3. Output Next Steps
+### 3. Output Mapping Table (if Linear issues detected)
+
+When Linear issues were used for branch naming, output the issue-to-branch
+mapping:
+
+```
+Stack created:
+Branch                        | Linear Issue
+feat/ENG-123-add-auth-model   | ENG-123
+feat/ENG-456-add-auth-api     | ENG-456
+```
+
+### 4. Output Next Steps
 
 Tell the user:
 
@@ -190,6 +226,8 @@ Tell the user:
 - How to navigate: `gt checkout <branch>` or `gt up`/`gt down`
 - How to start working: begin on the bottom branch and work up
 - How to submit when ready: `gt submit --no-interactive` or `/smart-submit`
+- If Linear issues present: "Work through the stack bottom-up with
+  `/workflows:work plans/<name>.md`"
 
 ## Success Criteria
 

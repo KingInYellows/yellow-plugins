@@ -14,6 +14,7 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_users
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
   - mcp__plugin_yellow-linear_linear__list_issue_labels
+  - Skill
 ---
 
 # Triage Incoming Issues
@@ -95,6 +96,21 @@ Display triage results:
 - Number of issues triaged
 - Changes applied per issue (assigned to, priority set, status changed, labels
   added)
+
+### Step 8: What Next?
+
+After the triage summary, present routing options via `AskUserQuestion`:
+
+1. "Start working on an issue (`/linear:work`)" — ask which issue (present
+   recently triaged issue identifiers), then invoke via Skill tool with
+   `skill: "linear:work"` and `args` set to the selected issue ID.
+2. "Delegate an issue to Devin (`/linear:delegate`)" — ask which issue, then
+   invoke via Skill tool with `skill: "linear:delegate"` and `args` set to the
+   selected issue ID.
+3. "Done for now" — stop.
+
+**Graceful degradation:** If a Skill invocation fails (command not found),
+report the command the user should run manually and continue.
 
 ## Error Handling
 

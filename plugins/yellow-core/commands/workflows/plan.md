@@ -11,6 +11,7 @@ allowed-tools:
   - Task
   - AskUserQuestion
   - ToolSearch
+  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
@@ -32,7 +33,10 @@ research, analysis, and structured documentation.
    ```
 
 2. If brainstorm docs exist, read them for context. If found, use them to enrich
-   understanding.
+   understanding. **Linear issue detection:** If a brainstorm doc contains a
+   `## Linear Issues` section with issue identifiers (matching
+   `[A-Z]{2,5}-[0-9]{1,6}`), treat those as source-of-truth requirements.
+   Extract all issue IDs and titles for inclusion in the plan file.
 
 3. Parse the feature description from `#$ARGUMENTS`. If vague or missing, use
    AskUserQuestion to gather:
@@ -329,7 +333,20 @@ Schema migrations if applicable.
 - [External Documentation](url)
 ```
 
-3. Write the plan file using Write tool.
+3. **Linear Issues metadata:** If Linear issue IDs were detected in brainstorm
+   docs (Phase 1, Step 2), add a `## Linear Issues` section to the plan:
+
+   ```markdown
+   ## Linear Issues
+   - ENG-123: Title of issue
+   - ENG-456: Title of other issue
+   ```
+
+   Place this section after `## Problem Statement` (or `## Overview` in MINIMAL
+   templates). This metadata enables downstream commands (`/gt-stack-plan`) to
+   create issue-aware branch names.
+
+4. Write the plan file using Write tool.
 
 ## Phase 5: Post-Generation
 
@@ -346,6 +363,18 @@ Schema migrations if applicable.
 
    What would you like to do next?
 
+   **When the plan contains a `## Linear Issues` section** (reorder to surface
+   stacking first, since multi-issue plans benefit most from it):
+
+   1. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md)
+   2. Start implementation (/workflows:work plans/<name>.md)
+   3. Enrich with research (/workflows:deepen-plan plans/<name>.md)
+   4. Create GitHub issue (I'll use gh issue create)
+   5. Simplify the plan (reduce detail level)
+   6. Something else
+
+   **Otherwise** (default ordering):
+
    1. Start implementation (/workflows:work plans/<name>.md)
    2. Enrich with research (/workflows:deepen-plan plans/<name>.md)
    3. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md)
@@ -354,14 +383,13 @@ Schema migrations if applicable.
    6. Something else
    ```
 
-3. Based on response:
-   - Option 1: Transition to /workflows:work
-   - Option 2: Transition to /workflows:deepen-plan (requires yellow-research plugin)
-   - Option 3: Transition to /gt-stack-plan with the plan file path
-   - Option 4: Create issue with
-     `gh issue create --title "..." --body-file plans/<name>.md`
-   - Option 5: Rewrite plan with simpler template
-   - Option 6: Ask for clarification
+3. Based on response, invoke the chosen command via Skill tool:
+   - `/workflows:work`: `skill: "workflows:work"`, args: plan file path
+   - `/workflows:deepen-plan`: `skill: "workflows:deepen-plan"`, args: plan file path (requires yellow-research)
+   - `/gt-stack-plan`: `skill: "gt-stack-plan"`, args: plan file path
+   - Create GitHub issue: `gh issue create --title "..." --body-file plans/<name>.md`
+   - Simplify: Rewrite plan with simpler template
+   - Something else: Ask for clarification
 
 ## Guidelines
 
