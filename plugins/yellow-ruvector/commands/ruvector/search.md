@@ -7,6 +7,7 @@ allowed-tools:
   - Read
   - Grep
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # Semantic Code Search
@@ -30,7 +31,12 @@ Sanitize:
 
 Use ToolSearch to discover ruvector MCP search tools.
 
-If the MCP tool is unavailable or DB is empty, fall back:
+1. Call ToolSearch with query `"hooks_recall"`. If not found, fall back to
+   Grep.
+2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+   If it errors, fall back to Grep.
+
+If ruvector is unavailable, fall back:
 
 - Extract key terms from the query
 - Use Grep to search for those terms
@@ -38,21 +44,24 @@ If the MCP tool is unavailable or DB is empty, fall back:
 
 ### Step 3: Execute Vector Search
 
-Call `hooks_recall` (discovered via ToolSearch) with:
+Call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with:
 
-- Query text from `$ARGUMENTS`
-- Namespace: `code`
-- Top-k: 10
-- Include metadata in results
+- `query` = sanitized query text from `$ARGUMENTS`
+- `top_k` = 10
+
+If the MCP call errors with timeout, connection refused, or service
+unavailable: wait approximately 500 milliseconds and retry exactly once.
+If the retry also fails, fall back to Grep with extracted keywords.
+Do NOT invent `namespace`, `metadata`, or other unsupported parameters.
 
 ### Step 4: Display Results
 
-For each result (ranked by similarity):
+For each result (ranked by score):
 
 ````
-### 1. src/auth/handler.ts (score: 0.87)
+### 1. Match (score: 0.87)
 
-**Type:** function | **Symbols:** authenticateUser, validateToken
+**Type:** [tool-provided type if present]
 
 ```typescript
 async function authenticateUser(req: Request): Promise<User> {
@@ -64,16 +73,16 @@ async function authenticateUser(req: Request): Promise<User> {
 
 Show:
 
-- File path with similarity score
-- Chunk type and symbols from metadata
-- Code snippet with syntax highlighting
+- Score
+- Content snippet or code block
+- File paths or symbols only if the returned content clearly includes them
 - Up to 10 results
 
 ### Step 5: Offer Actions
 
 After showing results:
 
-- "Use Read tool to open any of these files for full context"
+- "Use Read tool to open any referenced files for full context"
 - If results seem poor: "Try `/ruvector:index` to rebuild the index"
 
 ## Error Handling

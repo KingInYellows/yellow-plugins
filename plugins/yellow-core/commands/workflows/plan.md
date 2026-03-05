@@ -13,6 +13,7 @@ allowed-tools:
   - ToolSearch
   - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # Feature Planning Workflow
@@ -49,14 +50,20 @@ research, analysis, and structured documentation.
 
    If `.ruvector/` exists in the project root:
    1. Call ToolSearch with query `"hooks_recall"`. If not found, skip.
-   2. Build query: `"[implementation-planning] "` + feature description (first
+   2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+      If it errors, note "[ruvector] Warning: MCP warmup failed" and skip
+      recall (MCP server not available).
+   3. Build query: `"[implementation-planning] "` + feature description (first
       300 chars).
-   3. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5). If MCP error, skip.
-   4. Discard results with score < 0.5. Take top 3. Truncate combined to 800
+   4. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5).
+      If MCP execution error (timeout, connection refused, service unavailable):
+      wait approximately 500 milliseconds, retry exactly once. If retry also
+      fails, skip. Do NOT retry on validation or parameter errors.
+   5. Discard results with score < 0.5. Take top 3. Truncate combined to 800
       chars at word boundary.
-   5. Sanitize XML metacharacters in each finding's content: replace `&` with
+   6. Sanitize XML metacharacters in each finding's content: replace `&` with
       `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`.
-   6. Note findings as advisory context for plan writing. Do not inject into
+   7. Note findings as advisory context for plan writing. Do not inject into
       sub-agent Task prompts.
 
 5. Assess complexity dimensions:

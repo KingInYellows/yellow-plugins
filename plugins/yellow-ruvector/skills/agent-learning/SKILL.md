@@ -114,10 +114,10 @@ final_score = sum(1 / (rank_i + 60)) for each signal i
 
 ## Skill Promotion
 
-When a reflexion pattern appears 3+ times across sessions, consider promoting it
-to a skill:
+When a recurring `context` pattern appears 3+ times across sessions, consider
+promoting it to a reusable `decision` entry:
 
-1. Identify the recurring pattern from reflexion entries
+1. Identify the recurring pattern from prior context entries
 2. Formulate as a positive "do this" rule (not "don't do that")
-3. Store in the `skills` namespace with broader context
+3. Store as a `decision` entry with broader context
 4. Optionally add to project CLAUDE.md if it's a project-wide convention

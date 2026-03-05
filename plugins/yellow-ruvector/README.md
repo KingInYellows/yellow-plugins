@@ -38,7 +38,7 @@ Persistent vector memory and semantic code search for Claude Code agents via
 | `/ruvector:search <query>`              | Search codebase by meaning using vector similarity     |
 | `/ruvector:status`                      | Show ruvector health, DB stats, and queue status       |
 | `/ruvector:learn [description]`         | Record a learning, mistake, or pattern                 |
-| `/ruvector:memory [namespace] [filter]` | Browse, search, and manage stored memories             |
+| `/ruvector:memory [filter]`             | Browse and search stored memories                      |
 
 ## Agents
 
@@ -51,8 +51,9 @@ Persistent vector memory and semantic code search for Claude Code agents via
 
 - **Semantic search:** Code is chunked and embedded using all-MiniLM-L6-v2 (384
   dims). Search queries are embedded and compared via vector similarity.
-- **Agent memory:** Learnings are stored in namespaces (reflexion, skills,
-  causal) and retrieved via RRF ranking.
+- **Agent memory:** Learnings are stored through
+  `hooks_remember(content, type)` and retrieved with
+  `hooks_recall(query, top_k)`.
 - **Passive capture:** Hooks automatically track file changes and bash outcomes
   in a local queue. The queue is flushed to ruvector on session end or next
   session start.

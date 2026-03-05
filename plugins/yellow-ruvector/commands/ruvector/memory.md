@@ -1,99 +1,92 @@
 ---
 name: ruvector:memory
-description: "Browse, search, and manage stored memories and learnings. Use when user says \"show memories\", \"what do we know about X\", \"list learnings\", \"delete memory\", \"browse reflexions\", or wants to view stored agent knowledge."
-argument-hint: '[namespace] [filter]'
+description: "Browse and search stored memories and learnings. Use when user says \"show memories\", \"what do we know about X\", \"list learnings\", \"browse reflexions\", or wants to view stored agent knowledge."
+argument-hint: '[filter]'
 allowed-tools:
   - ToolSearch
   - AskUserQuestion
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_stats
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # Browse Memories
 
-Browse, search, and manage stored memories and learnings across all namespaces.
+Browse and search stored memories and learnings exposed by the current ruvector
+MCP surface.
 
 ## Workflow
 
 ### Step 1: Parse Arguments
 
-From `$ARGUMENTS`, extract:
-
-- **Namespace filter:** If first word matches a known namespace (`reflexion`,
-  `skills`, `causal`, `code`, `sessions`), filter to that namespace. Otherwise
-  search all.
-- **Text filter:** Remaining text used as search query.
+Treat `$ARGUMENTS` as a free-text filter. If the first word is a legacy label
+such as `reflexion`, `skills`, `causal`, `code`, or `sessions`, keep it in the
+query as a hint only; the current MCP schema does not expose server-side
+namespace filtering.
 
 Sanitize all input:
 
 - Strip HTML tags (replace `<[^>]+>` with empty string)
-- Namespace names must match `[a-z0-9-]` only, 1-64 chars, no leading/trailing
-  hyphens. Reject `..`, `/`, `~`.
 - Text filter: truncate to 1000 characters maximum
-- Reject any input that is empty after sanitization
+- If empty after sanitization, treat it as "no filter"
 
 ### Step 2: Query Entries
 
-Use ToolSearch to discover ruvector MCP tools.
+1. Call ToolSearch("hooks_recall"). If not found, report:
+   "ruvector not available. Run `/ruvector:setup` to initialize." and stop.
+2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+   If it errors, report "ruvector not available right now. Check
+   `/ruvector:status` and try again." and stop.
 
 If a text filter is provided:
 
-- Call `hooks_recall` with the filter text in the target namespace(s)
+- Call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with the filter text
 - Return top 10 results ranked by similarity
 
 If no text filter:
 
-- Call `hooks_stats` to show counts per namespace
+- Call `hooks_stats` to show the overall store summary (if available)
 - Call `hooks_recall` with a broad query to show recent entries
+
+For `hooks_recall`, if the MCP call errors with timeout, connection refused, or
+service unavailable: wait approximately 500 milliseconds and retry exactly
+once. If the retry also fails, report the failure and stop.
 
 ### Step 3: Display Results
 
 Show results paginated (10 per page):
 
 ```
-### Reflexion Entries (23 total)
+### Memory Results
 
 1. **Missing index caused slow queries** (score: 0.92)
-   Trigger: Query timeout on users table
-   Action: Always add index on foreign keys
+   Type: decision
+   Content: Query timeout on users table. Add an index on foreign keys...
    _2 days ago_
 
 2. **Wrong API version in client** (score: 0.88)
-   Trigger: 404 errors from API calls
-   Action: Check API version in base URL
+   Type: context
+   Content: 404 errors from API calls. Check API version in the base URL...
    _5 days ago_
 ```
 
-For `code` namespace entries, check if the source file still exists on disk
-(orphan detection).
+If `hooks_stats` returned an overview, show it before the result list.
 
 ### Step 4: Offer Actions
 
 After displaying results, offer:
 
 - **View detail:** Show full entry with all metadata
-- **Delete entry:** Remove a specific entry (confirm first)
-- **Delete all in namespace:** Bulk delete with AskUserQuestion confirmation (M3
-  pattern)
-
-### Step 5: Handle Deletions
-
-For single delete: confirm via AskUserQuestion, then delete.
-
-For bulk delete:
-
-1. Show count: "Delete all 23 reflexion entries?"
-2. Use AskUserQuestion to confirm — this is destructive
-3. On approval: delete all entries in namespace
-4. Report: "Deleted 23 reflexion entries."
+- **Refine query:** Search again with a narrower or broader phrase
+- **Open referenced files:** Use Read if a result mentions a concrete path
+- **Deletion note:** Current ruvector MCP tools do not expose delete operations;
+  if asked to delete entries, explain that the command is read-only today
 
 ## Error Handling
 
 See `ruvector-conventions` skill for error catalog.
 
-- **Empty namespace:** "No entries found in [namespace]. Use `/ruvector:learn`
-  to add learnings."
+- **No results:** "No matching memories found. Try a broader query or add a
+  learning with `/ruvector:learn`."
 - **MCP unavailable:** "ruvector not available. Run `/ruvector:setup` to
   initialize."
-- **Orphaned code entries:** "File no longer exists: src/old-file.ts — consider
-  re-indexing."

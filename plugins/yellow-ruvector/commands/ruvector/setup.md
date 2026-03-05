@@ -40,7 +40,7 @@ node --version && \
 npm --version && \
 (command -v jq >/dev/null 2>&1 && jq --version || printf 'jq: not found\n') && \
 printf '\n=== ruvector ===\n' && \
-(npx ruvector --version 2>/dev/null || printf 'not installed\n') && \
+(ruvector --version 2>/dev/null || printf 'not installed\n') && \
 printf '\n=== .ruvector/ ===\n' && \
 (ls -d .ruvector/ 2>/dev/null && printf 'exists\n' || printf 'not initialized\n') && \
 printf '\n=== .gitignore ===\n' && \
@@ -83,10 +83,11 @@ If `.ruvector/` already exists, skip this step entirely.
 Run health check and hook status in a single command:
 
 ```bash
-printf '=== Doctor ===\n' && \
-npx ruvector doctor 2>&1 && \
-printf '\n=== Hook Scripts ===\n' && \
-PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}" && \
+printf '=== Doctor ===\n'
+npx ruvector doctor 2>&1 || printf '(doctor exited non-zero — see above)\n'
+
+printf '\n=== Hook Scripts ===\n'
+PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
 for script in pre-tool-use.sh user-prompt-submit.sh session-start.sh post-tool-use.sh stop.sh; do \
   if [ -r "${PLUGIN_DIR}/hooks/scripts/${script}" ]; then \
     printf '  ✓ %s (readable)\n' "$script"; \
@@ -95,10 +96,33 @@ for script in pre-tool-use.sh user-prompt-submit.sh session-start.sh post-tool-u
   else \
     printf '  ✗ %s (missing)\n' "$script"; \
   fi; \
-done && \
-printf '\n=== Global Binary ===\n' && \
-(command -v ruvector >/dev/null 2>&1 && printf 'ruvector in PATH: %s\n' "$(which ruvector)" || \
-  printf 'ruvector NOT in PATH — hooks with 1s budget (PreToolUse, UserPromptSubmit) will be skipped.\nRun: npm install -g ruvector\n')
+done
+
+printf '\n=== Global Binary (REQUIRED) ===\n'
+if command -v ruvector >/dev/null 2>&1; then \
+  printf 'ruvector in PATH: %s\n' "$(command -v ruvector)"; \
+  printf '\n=== Smoke Test (must complete in <1s) ===\n'; \
+  TIMEOUT_CMD=""; \
+  if command -v timeout >/dev/null 2>&1; then TIMEOUT_CMD="timeout"; \
+  elif command -v gtimeout >/dev/null 2>&1; then TIMEOUT_CMD="gtimeout"; fi; \
+  if [ -n "$TIMEOUT_CMD" ]; then \
+    if [ ! -d ".ruvector" ]; then \
+      printf 'Smoke test skipped: .ruvector/ not initialized in current directory\n'; \
+    else \
+      "$TIMEOUT_CMD" 1 ruvector hooks recall --top-k 1 "setup-test" >/dev/null 2>&1 && \
+        printf 'Smoke test passed\n' || \
+        printf 'FAILED: Smoke test failed (recall took >1s or errored)\n'; \
+    fi; \
+  else \
+    printf 'Smoke test skipped: no timeout/gtimeout utility\n'; \
+  fi; \
+else \
+  printf 'FAILED: ruvector NOT in PATH.\n'; \
+  printf 'Global binary is REQUIRED — hooks with 1s budgets will not function without it.\n'; \
+  printf 'npx adds ~1900ms overhead, exceeding hook timeouts.\n'; \
+  printf 'Fix: npm install -g ruvector --ignore-scripts\n'; \
+  printf 'If using nvm/fnm: binary is per-Node-version.\n'; \
+fi
 ```
 
 **Important:** Do NOT run `npx ruvector hooks verify` — it checks
@@ -119,14 +143,37 @@ Summarize results in a table:
 | .gitignore entry     | Present     |
 | Health check         | Passing     |
 | Hooks (5)            | Active via plugin.json |
-| Global binary        | In PATH / ⚠ Not found (degraded) |
+| Global binary        | REQUIRED: In PATH / FAILED: Not found |
+| Smoke test (<1s)     | Passed / Failed / Skipped |
 ```
 
-If global binary is not found, add a note:
+If global binary is not found, **stop setup and report failure:**
 
-> ⚠ Without a global `ruvector` binary, hooks with 1-second budgets
-> (PreToolUse, UserPromptSubmit) will silently skip — npx startup (~2700ms)
-> exceeds the timeout. Run `npm install -g ruvector` for full hook support.
+> Setup incomplete: global `ruvector` binary is REQUIRED but not found in PATH.
+> Without it, hooks with 1-second budgets (PreToolUse, UserPromptSubmit,
+> PostToolUse) cannot function — npx adds ~1900ms overhead.
+>
+> Remediation:
+> 1. `npm install -g ruvector --ignore-scripts`
+> 2. Verify: `command -v ruvector` (should print a path)
+> 3. Re-run `/ruvector:setup`
+>
+> If using nvm/fnm: global installs are per-Node-version.
+
+If the smoke test failed, **stop setup and report failure:**
+
+> Setup incomplete: `ruvector hooks recall` did not complete within the
+> required 1-second budget.
+> This means Claude Code hooks with 1-second budgets are still unreliable even
+> though the binary is in PATH.
+>
+> Remediation:
+> 1. Run `ruvector doctor`
+> 2. Re-run `timeout 1 ruvector hooks recall --top-k 1 "setup-test"`
+> 3. Re-run `/ruvector:setup` after the latency issue is resolved
+
+Do NOT proceed to Step 4 if the global binary is missing or the smoke test
+failed.
 
 ### Step 4: Offer next steps
 

@@ -9,7 +9,7 @@ allowed-tools:
   - ToolSearch
   - AskUserQuestion
   - mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain
-  - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # Index Codebase
@@ -53,32 +53,24 @@ Filter out:
   `.ruvector/`
 - Patterns in `.ruvectorignore` (if it exists)
 
-### Step 4: Chunk Files
+### Step 4: Index via MCP
 
-For each file:
+1. Call ToolSearch with query `"hooks_pretrain"`. If not found, report that
+   ruvector indexing is unavailable and stop.
+2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+   If it errors, report that ruvector MCP is unavailable and stop.
+3. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain`.
+4. If the MCP call errors with timeout, connection refused, or service
+   unavailable: wait approximately 500 milliseconds and retry exactly once.
+   If the retry also fails, report the failure and stop.
 
-1. Read the file content
-2. Split into chunks at semantic boundaries when possible:
-   - Function/method boundaries for supported languages
-   - Class/module boundaries
-   - Fall back to ~512-token chunks for unsupported formats
-3. Each chunk gets metadata: `file_path`, `language`, `chunk_type`, `symbols`
-
-### Step 5: Index via MCP
-
-Use ToolSearch to discover ruvector MCP tools. Two approaches:
-
-**Preferred — Use `hooks_pretrain`:** This is ruvector's built-in bulk indexing
-tool. Call `hooks_pretrain` which analyzes the repository and indexes code
-automatically. This is faster and handles chunking internally.
-
-**Manual — Use `hooks_remember`:** For each chunk, call `hooks_remember` with
-the content and metadata in the `code` namespace. Process in batches of 100
-files for large repos.
+Use `hooks_pretrain` as the authoritative bulk-indexing path. Do not document
+manual `hooks_remember` indexing flows that rely on unsupported metadata or
+namespace parameters.
 
 Show progress: "Indexing 142/350 files..."
 
-### Step 6: Report Results
+### Step 5: Report Results
 
 Display summary:
 
@@ -101,5 +93,4 @@ timeout, permission denied).
 - **Large repo (>5000 files):** Use AskUserQuestion to confirm before
   proceeding. Suggest indexing a subdirectory first.
 - **Interrupted:** Report progress so far. Re-running re-indexes all files
-  (ruvector deduplicates by file_path in the `code` namespace, replacing
-  existing entries).
+  through `hooks_pretrain`.
