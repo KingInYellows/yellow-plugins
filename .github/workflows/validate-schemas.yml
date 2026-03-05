@@ -39,6 +39,7 @@ jobs:
   # ============================================================================
   validate-schemas:
     name: Validate Schemas (${{ matrix.target }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 2 # NFR-MAINT-002: Critical path budget
 
@@ -218,6 +219,7 @@ jobs:
   # ============================================================================
   lint-and-typecheck:
     name: Lint & TypeCheck
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 3
 
@@ -550,6 +552,7 @@ jobs:
   # ============================================================================
   security-audit:
     name: Security Audit
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 5
 
@@ -707,6 +710,7 @@ jobs:
   # ============================================================================
   validate-versions:
     name: Version Consistency Check
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 2
 
@@ -731,7 +735,7 @@ jobs:
     name: Changeset Required
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 2
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
       - name: Checkout repository
@@ -774,7 +778,7 @@ jobs:
   report-metrics:
     name: Aggregate CI Metrics
     runs-on: [self-hosted, Linux, X64, ubuntu24]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs:
       [
         validate-schemas,
@@ -864,7 +868,7 @@ jobs:
   ci-status:
     name: CI Status Summary
     runs-on: [self-hosted, Linux, X64, ubuntu24]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs:
       [
         validate-schemas,
