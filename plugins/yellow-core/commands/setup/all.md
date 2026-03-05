@@ -31,7 +31,7 @@ command -v jq      >/dev/null 2>&1 && printf '%-14s OK\n' 'jq:' || printf '%-14s
 command -v rg      >/dev/null 2>&1 && printf '%-14s OK\n' 'rg:' || printf '%-14s NOT FOUND\n' 'rg:'
 command -v gh      >/dev/null 2>&1 && printf '%-14s OK\n' 'gh:' || printf '%-14s NOT FOUND\n' 'gh:'
 command -v ssh     >/dev/null 2>&1 && printf '%-14s OK\n' 'ssh:' || printf '%-14s NOT FOUND\n' 'ssh:'
-command -v python3 >/dev/null 2>&1 && printf '%-14s OK (%s)\n' 'python3:' "$(python3 --version 2>/dev/null | awk '{print $2}')" || printf '%-14s NOT FOUND\n' 'python3:'
+command -v python3 >/dev/null 2>&1 && printf '%-14s OK (%s)\n' 'python3:' "$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)" || printf '%-14s NOT FOUND\n' 'python3:'
 command -v semgrep >/dev/null 2>&1 && printf '%-14s OK\n' 'semgrep:' || printf '%-14s NOT FOUND\n' 'semgrep:'
 
 printf '\n=== Environment Variables ===\n'
@@ -50,6 +50,23 @@ printf '\n=== Config Files ===\n'
 [ -f .claude/yellow-browser-test.local.md ]          && printf '%-48s exists\n' '.claude/yellow-browser-test.local.md:' || printf '%-48s missing\n' '.claude/yellow-browser-test.local.md:'
 [ -f ~/.claude/yellow-statusline.py ]                && printf '%-48s exists\n' '~/.claude/yellow-statusline.py:' || printf '%-48s missing\n' '~/.claude/yellow-statusline.py:'
 
+printf '\n=== Installed Plugins ===\n'
+plugin_cache="$HOME/.claude/plugins/cache"
+if [ -d "$plugin_cache" ]; then
+  for p in yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-chatprd yellow-ci yellow-browser-test yellow-core; do
+    found=0
+    for d in "$plugin_cache"/*/; do
+      if [ -f "${d}.claude-plugin/plugin.json" ]; then
+        name=$(python3 -c "import json; print(json.load(open('${d}.claude-plugin/plugin.json')).get('name',''))" 2>/dev/null)
+        if [ "$name" = "$p" ]; then found=1; break; fi
+      fi
+    done
+    [ "$found" = "1" ] && printf '%-24s installed\n' "$p:" || printf '%-24s NOT INSTALLED\n' "$p:"
+  done
+else
+  printf 'plugin_cache: NOT FOUND (cannot detect installed plugins)\n'
+fi
+
 printf '\n=== GitHub CLI Auth ===\n'
 if command -v gh >/dev/null 2>&1; then
   gh auth status >/dev/null 2>&1 && printf 'gh_auth: OK\n' || printf 'gh_auth: NOT AUTHENTICATED\n'
@@ -61,8 +78,12 @@ fi
 ### Step 2: Classify Plugin Status
 
 Parse the Bash output from Step 1 and classify each plugin. Use this decision
-tree to assign a status of **READY**, **PARTIAL**, or **NEEDS SETUP** to each
-plugin:
+tree to assign a status of **NOT INSTALLED**, **READY**, **PARTIAL**, or
+**NEEDS SETUP** to each plugin.
+
+If a plugin shows `NOT INSTALLED` in the Installed Plugins section, classify it
+as **NOT INSTALLED** and skip all other checks for that plugin. Only classify
+READY/PARTIAL/NEEDS SETUP for installed plugins:
 
 **yellow-ruvector:**
 - READY: `.ruvector/` exists AND `node` OK
@@ -236,7 +257,8 @@ All plugins are fully configured.
 | Error | Message | Action |
 |---|---|---|
 | Bash check fails to execute | "Dashboard check failed. Verify shell environment." | Stop |
-| No plugins installed in cache | "yellow-plugins detected via setup commands (cache check skipped)." | Continue — rely on Skill invocation to detect missing plugins |
+| Plugin not installed | Show as NOT INSTALLED in dashboard | Skip — do not offer interactive setup for uninstalled plugins |
+| Plugin cache not found | "Cannot detect installed plugins — assuming all are installed." | Continue — rely on Skill invocation to detect missing plugins |
 | Skill invocation fails (skill not found) | "yellow-<plugin> setup: FAILED (skill not found — plugin may not be installed)" | Record, continue to next plugin |
 | Skill invocation fails (MCP error) | "yellow-<plugin> setup: FAILED (<error>)" | Record, continue to next plugin |
 | User cancels during interactive phase | Show partial before/after for completed setups | Show summary, stop |
