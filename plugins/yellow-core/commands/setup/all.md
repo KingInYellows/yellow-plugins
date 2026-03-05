@@ -6,7 +6,6 @@ allowed-tools:
   - Bash
   - Skill
   - AskUserQuestion
-  - Read
 ---
 
 # Set Up All Yellow Plugins
@@ -27,8 +26,6 @@ in a single command:
 ```bash
 printf '=== Prerequisites ===\n'
 command -v node    >/dev/null 2>&1 && printf '%-14s OK (%s)\n' 'node:' "$(node --version 2>/dev/null)" || printf '%-14s NOT FOUND\n' 'node:'
-command -v npm     >/dev/null 2>&1 && printf '%-14s OK (%s)\n' 'npm:' "$(npm --version 2>/dev/null)" || printf '%-14s NOT FOUND\n' 'npm:'
-command -v npx     >/dev/null 2>&1 && printf '%-14s OK\n' 'npx:' || printf '%-14s NOT FOUND\n' 'npx:'
 command -v curl    >/dev/null 2>&1 && printf '%-14s OK\n' 'curl:' || printf '%-14s NOT FOUND\n' 'curl:'
 command -v jq      >/dev/null 2>&1 && printf '%-14s OK\n' 'jq:' || printf '%-14s NOT FOUND\n' 'jq:'
 command -v rg      >/dev/null 2>&1 && printf '%-14s OK\n' 'rg:' || printf '%-14s NOT FOUND\n' 'rg:'
@@ -69,15 +66,15 @@ plugin:
 
 **yellow-ruvector:**
 - READY: `.ruvector/` exists AND `node` OK
-- NEEDS SETUP: `.ruvector/` missing OR `node` NOT FOUND
+- NEEDS SETUP: any READY condition not met
 
 **yellow-morph:**
-- READY: `rg` OK AND `node` OK AND `npx` OK AND `MORPH_API_KEY` set
-- NEEDS SETUP: `MORPH_API_KEY` NOT SET OR `rg` NOT FOUND
+- READY: `rg` OK AND `node` OK AND `MORPH_API_KEY` set
+- NEEDS SETUP: any READY condition not met
 
 **yellow-devin:**
 - READY: `curl` OK AND `jq` OK AND `DEVIN_SERVICE_USER_TOKEN` set AND `DEVIN_ORG_ID` set
-- NEEDS SETUP: either env var NOT SET
+- NEEDS SETUP: any READY condition not met
 
 **yellow-semgrep:**
 - READY: `SEMGREP_APP_TOKEN` set AND `semgrep` OK
@@ -95,7 +92,7 @@ plugin:
 
 **yellow-ci:**
 - READY: `gh` OK AND `jq` OK AND `ssh` OK AND `gh_auth` OK
-- PARTIAL: tools OK but `gh_auth` NOT AUTHENTICATED
+- PARTIAL: tools OK but `gh_auth` NOT AUTHENTICATED, or `ssh` NOT FOUND
 - NEEDS SETUP: `gh` NOT FOUND OR `jq` NOT FOUND
 
 **yellow-browser-test:**
@@ -136,11 +133,7 @@ Based on the dashboard classification:
 
 **If all 9 plugins are READY:**
 
-Display: "All plugins are configured. Nothing to do."
-
-Use AskUserQuestion: "What would you like to do next?" with options:
-- "Refresh statusline" — invoke `statusline:setup` to re-detect plugins
-- "Done"
+Display: "All plugins are configured. Nothing to do." Stop.
 
 **If 1+ plugins are NEEDS SETUP or PARTIAL:**
 
@@ -238,12 +231,6 @@ If all plugins are now READY:
 All plugins are fully configured.
 ```
 
-### Step 6: Next Steps
-
-Use AskUserQuestion: "What would you like to do next?" with options:
-- "Re-run setup:all" — start from Step 1 again
-- "Done"
-
 ## Error Handling
 
 | Error | Message | Action |
@@ -253,4 +240,4 @@ Use AskUserQuestion: "What would you like to do next?" with options:
 | Skill invocation fails (skill not found) | "yellow-<plugin> setup: FAILED (skill not found — plugin may not be installed)" | Record, continue to next plugin |
 | Skill invocation fails (MCP error) | "yellow-<plugin> setup: FAILED (<error>)" | Record, continue to next plugin |
 | User cancels during interactive phase | Show partial before/after for completed setups | Show summary, stop |
-| All plugins already READY | "All plugins are configured. Nothing to do." | Offer statusline refresh or done |
+| All plugins already READY | "All plugins are configured. Nothing to do." | Stop |
