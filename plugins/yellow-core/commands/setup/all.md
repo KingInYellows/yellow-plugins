@@ -66,12 +66,21 @@ if [ -d "$plugin_cache" ]; then
     found=0
     for d in "$plugin_cache"/*/; do
       if [ -f "${d}.claude-plugin/plugin.json" ]; then
-        name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "${d}.claude-plugin/plugin.json" 2>/dev/null)
+        if command -v python3 >/dev/null 2>&1; then
+          name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "${d}.claude-plugin/plugin.json" 2>/dev/null)
+        elif command -v jq >/dev/null 2>&1; then
+          name=$(jq -r '.name // ""' "${d}.claude-plugin/plugin.json" 2>/dev/null)
+        else
+          name=""
+        fi
         if [ "$name" = "$p" ]; then found=1; break; fi
       fi
     done
     [ "$found" = "1" ] && printf '%-24s installed\n' "$p:" || printf '%-24s NOT INSTALLED\n' "$p:"
   done
+  if ! command -v python3 >/dev/null 2>&1 && ! command -v jq >/dev/null 2>&1; then
+    printf 'WARNING: neither python3 nor jq found — plugin detection may be inaccurate\n'
+  fi
 else
   printf 'plugin_cache: NOT FOUND (cannot detect installed plugins)\n'
 fi
@@ -129,9 +138,9 @@ READY/PARTIAL/NEEDS SETUP for installed plugins:
 
 **yellow-ci:**
 
-- READY: `gh` OK AND `jq` OK AND `ssh` OK AND `gh_auth` OK
+- READY: `gh` OK AND `jq` OK AND `ssh` OK AND `gh_auth` OK AND `.claude/yellow-ci.local.md` exists
 - PARTIAL: `gh` OK AND `jq` OK but `gh_auth` NOT AUTHENTICATED OR `ssh` NOT FOUND
-- NEEDS SETUP: `gh` NOT FOUND OR `jq` NOT FOUND
+- NEEDS SETUP: `gh` NOT FOUND OR `jq` NOT FOUND OR `.claude/yellow-ci.local.md` missing
 
 **yellow-browser-test:**
 
@@ -171,11 +180,18 @@ about what is missing (e.g., which env var, which CLI tool, which config file).
 
 Based on the dashboard classification:
 
+**If 0 plugins are installed (all are NOT INSTALLED):**
+
+Display: "No yellow-plugins are installed. Install plugins first, then run
+setup:all." Stop.
+
 **If all installed plugins are READY (regardless of NOT INSTALLED count):**
 
-Display: "All installed plugins are configured. Nothing to do."
+Display: "All installed plugins are configured."
 If any plugins are NOT INSTALLED, also display: "X plugin(s) not installed:
-[list]." Stop.
+[list]."
+Use AskUserQuestion with options: "Run statusline refresh" and "Done". If user
+picks "Run statusline refresh", invoke `Skill` with `statusline:setup`. Stop.
 
 **If 1+ installed plugins are NEEDS SETUP or PARTIAL:**
 

@@ -80,7 +80,7 @@ wizards. Invoked via `Skill` tool.
   | yellow-semgrep | `curl`, `jq` OK, `SEMGREP_APP_TOKEN` set, `semgrep` CLI available | `SEMGREP_APP_TOKEN` set but `semgrep` CLI missing (and `curl`/`jq` OK) | Token not set or `curl`/`jq` missing |
   | yellow-research | All 3 API keys set | 1-2 of 3 API keys set | 0 of 3 API keys set |
   | yellow-chatprd | `.claude/yellow-chatprd.local.md` exists | — | Config file missing |
-  | yellow-ci | `gh`, `jq` available, `ssh` available, `gh auth status` passes | `gh`/`jq` OK but `gh_auth` not authenticated or `ssh` missing | `gh` or `jq` missing |
+  | yellow-ci | `gh`, `jq` available, `ssh` available, `gh auth status` passes, `.claude/yellow-ci.local.md` exists | `gh`/`jq` OK but `gh_auth` not authenticated or `ssh` missing | `gh` or `jq` missing or config file missing |
   | yellow-browser-test | `.claude/yellow-browser-test.local.md` exists, `node` and `npm` available | — | Config file missing or `node`/`npm` missing |
   | yellow-core (statusline) | `~/.claude/yellow-statusline.py` exists, `python3` >= 3.7 | — | Statusline not installed or `python3` missing/too old |
 
