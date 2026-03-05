@@ -41,6 +41,7 @@ if command -v python3 >/dev/null 2>&1; then
 else
   printf '%-14s NOT FOUND\n' 'python3:'
 fi
+command -v agent-browser >/dev/null 2>&1 && printf '%-14s OK\n' 'agent-browser:' || printf '%-14s NOT FOUND\n' 'agent-browser:'
 command -v semgrep >/dev/null 2>&1 && printf '%-14s OK\n' 'semgrep:' || printf '%-14s NOT FOUND\n' 'semgrep:'
 
 printf '\n=== Environment Variables ===\n'
@@ -143,8 +144,8 @@ READY/PARTIAL/NEEDS SETUP for installed plugins:
 
 **yellow-browser-test:**
 
-- READY: `.claude/yellow-browser-test.local.md` exists AND `node` OK AND `npm` OK
-- NEEDS SETUP: config file missing OR `node` NOT FOUND OR `npm` NOT FOUND
+- READY: `.claude/yellow-browser-test.local.md` exists AND `node` OK AND `npm` OK AND `agent-browser` OK
+- NEEDS SETUP: config file missing OR `node` NOT FOUND OR `npm` NOT FOUND OR `agent-browser` NOT FOUND
 
 **yellow-core (statusline):**
 
