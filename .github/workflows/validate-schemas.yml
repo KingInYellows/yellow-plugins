@@ -73,7 +73,9 @@ jobs:
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Install AJV CLI
-        run: npm install -g ajv-cli@5.0.0 ajv-formats@3.0.1
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ajv-tools" ajv-cli@5.0.0 ajv-formats@3.0.1
+          echo "$RUNNER_TEMP/ajv-tools/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Start schema validation timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -146,7 +148,7 @@ jobs:
 
                 for contract in $CONTRACTS; do
                   echo "Validating JSON syntax: $contract"
-                  node -e "JSON.parse(require('fs').readFileSync('$contract', 'utf8'))"
+                  node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$contract"
                 done
                 echo "::endgroup::"
                 ;;
@@ -455,7 +457,9 @@ jobs:
         run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Install AJV CLI
-        run: npm install -g ajv-cli@5.0.0 ajv-formats@3.0.1
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ajv-tools" ajv-cli@5.0.0 ajv-formats@3.0.1
+          echo "$RUNNER_TEMP/ajv-tools/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Start contract drift timer
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
@@ -489,7 +493,7 @@ jobs:
             else
               for contract in $CONTRACTS; do
                 echo "Validating JSON syntax: $contract"
-                node -e "JSON.parse(require('fs').readFileSync('$contract', 'utf8'))"
+                node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$contract"
               done
             fi
             echo "::endgroup::"
