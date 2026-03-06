@@ -1,7 +1,10 @@
 ---
 name: research-patterns
 user-invokable: false
-description: Reference conventions for yellow-research plugin — slug naming, output format, source selection, API key setup, graceful degradation, and when to compound findings.
+description:
+  Reference conventions for yellow-research plugin — slug naming, output format,
+  source selection, API key setup, graceful degradation, and when to compound
+  findings.
 ---
 
 # Research Patterns
@@ -33,8 +36,7 @@ mkdir -p docs/research
 ```markdown
 # <Topic Title>
 
-**Date:** YYYY-MM-DD
-**Sources:** Perplexity, EXA, Tavily (list which were used)
+**Date:** YYYY-MM-DD **Sources:** Perplexity, EXA, Tavily (list which were used)
 
 ## Summary
 

@@ -152,8 +152,7 @@ Synthesize all results into this format:
 ```markdown
 # <Topic Title>
 
-**Date:** YYYY-MM-DD
-**Sources:** [list sources actually used]
+**Date:** YYYY-MM-DD **Sources:** [list sources actually used]
 
 ## Summary
 
