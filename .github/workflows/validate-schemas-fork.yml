@@ -1,0 +1,202 @@
+# Lightweight CI for fork pull requests — runs on GitHub-hosted runners (ubuntu-latest)
+# so untrusted code never touches self-hosted infrastructure.
+# The main validate-schemas.yml skips fork PRs; this workflow provides CI feedback.
+name: Validate (Fork PRs)
+
+on:
+  pull_request:
+    paths:
+      - '.claude-plugin/marketplace.json'
+      - 'plugins/**'
+      - '.changeset/**'
+      - 'schemas/*.schema.json'
+      - 'scripts/validate-*.js'
+      - 'api/cli-contracts/*.json'
+      - 'packages/**/*.ts'
+      - '.github/workflows/validate-schemas-fork.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8.15.0'
+  PNPM_INSTALL_FLAGS: '--frozen-lockfile --prefer-offline'
+
+jobs:
+  # Only run for fork PRs — same-repo PRs use the main workflow
+  validate-schemas:
+    name: Validate Schemas (${{ matrix.target }})
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - marketplace
+          - plugins
+          - contracts
+          - examples
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
+
+      - name: Install AJV CLI
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ajv-tools" ajv-cli@5.0.0 ajv-formats@3.0.1
+          echo "$RUNNER_TEMP/ajv-tools/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Run schema validations
+        run: |
+          set -euo pipefail
+          case "${{ matrix.target }}" in
+            marketplace)
+              ajv validate \
+                -s schemas/official-marketplace.schema.json \
+                -d .claude-plugin/marketplace.json \
+                -c ajv-formats --strict=true --all-errors
+              node scripts/validate-marketplace.js
+              ;;
+            plugins)
+              PLUGIN_MANIFESTS=$(find plugins -type f -name 'plugin.json' -path '*/.claude-plugin/plugin.json' || true)
+              if [ -z "$PLUGIN_MANIFESTS" ]; then
+                echo "::warning::No plugin.json files found"
+                exit 0
+              fi
+              for manifest in $PLUGIN_MANIFESTS; do
+                ajv validate \
+                  -s schemas/plugin.schema.json \
+                  -d "$manifest" \
+                  -c ajv-formats --strict=true --all-errors
+              done
+              for manifest in $PLUGIN_MANIFESTS; do
+                node scripts/validate-plugin.js --plugin "$manifest"
+              done
+              ;;
+            contracts)
+              CONTRACTS=$(find api/cli-contracts -name '*.json' -type f || true)
+              if [ -z "$CONTRACTS" ]; then
+                echo "::warning::No contract files found"
+                exit 0
+              fi
+              for contract in $CONTRACTS; do
+                node -e "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'))" "$contract"
+              done
+              ;;
+            examples)
+              if [ -f examples/marketplace.example.json ]; then
+                ajv validate \
+                  -s schemas/official-marketplace.schema.json \
+                  -d examples/marketplace.example.json \
+                  -c ajv-formats --strict=true --all-errors
+              fi
+              find examples -name 'plugin*.json' -type f | while read example; do
+                ajv validate \
+                  -s schemas/plugin.schema.json \
+                  -d "$example" \
+                  -c ajv-formats --strict=true --all-errors
+              done
+              ;;
+            *)
+              echo "::error::Unknown validation target: ${{ matrix.target }}"
+              exit 1
+              ;;
+          esac
+
+  lint-and-typecheck:
+    name: Lint & TypeCheck
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
+
+      - name: Run lint and typecheck
+        run: |
+          set -euo pipefail
+          pnpm lint
+          pnpm typecheck
+
+  unit-tests:
+    name: Unit Tests
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [lint-and-typecheck]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
+
+      - name: Run unit tests
+        run: pnpm test:unit --reporter=verbose
+
+  ci-status:
+    name: CI Status (Fork)
+    runs-on: ubuntu-latest
+    if: always() && github.event.pull_request.head.repo.full_name != github.repository
+    needs: [validate-schemas, lint-and-typecheck, unit-tests]
+
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.validate-schemas.result }}" == "success" ] && \
+             [ "${{ needs.lint-and-typecheck.result }}" == "success" ] && \
+             [ "${{ needs.unit-tests.result }}" == "success" ]; then
+            echo "::notice::All fork PR checks passed"
+            exit 0
+          else
+            echo "::error::One or more checks failed"
+            echo "Schema Validation: ${{ needs.validate-schemas.result }}"
+            echo "Lint & TypeCheck: ${{ needs.lint-and-typecheck.result }}"
+            echo "Unit Tests: ${{ needs.unit-tests.result }}"
+            exit 1
+          fi

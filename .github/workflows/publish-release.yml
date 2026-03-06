@@ -300,7 +300,7 @@ jobs:
           echo "::group::Publishing packages to NPM"
 
           # Check if NPM_TOKEN is configured
-          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
             echo "::warning::NPM_TOKEN secret not configured, skipping NPM publish"
             exit 0
           fi
