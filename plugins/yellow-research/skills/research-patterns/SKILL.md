@@ -1,7 +1,10 @@
 ---
 name: research-patterns
 user-invokable: false
-description: Reference conventions for yellow-research plugin — slug naming, output format, source selection, API key setup, graceful degradation, and when to compound findings.
+description:
+  Reference conventions for yellow-research plugin — slug naming, output format,
+  source selection, API key setup, graceful degradation, and when to compound
+  findings.
 ---
 
 # Research Patterns
@@ -23,6 +26,7 @@ Convert the research topic to a slug for the output filename:
 All deep research saves to: `docs/research/<slug>.md`
 
 Create the directory if it doesn't exist:
+
 ```bash
 mkdir -p docs/research
 ```
@@ -32,8 +36,7 @@ mkdir -p docs/research
 ```markdown
 # <Topic Title>
 
-**Date:** YYYY-MM-DD
-**Sources:** Perplexity, EXA, Tavily (list which were used)
+**Date:** YYYY-MM-DD **Sources:** Perplexity, EXA, Tavily (list which were used)
 
 ## Summary
 
@@ -42,9 +45,11 @@ mkdir -p docs/research
 ## Key Findings
 
 ### <Subtopic 1>
+
 [Findings with source citations]
 
 ### <Subtopic 2>
+
 [Findings with source citations]
 
 ## Sources
@@ -54,23 +59,25 @@ mkdir -p docs/research
 
 ## Source Selection Guide
 
-| Query Type | Primary Source | Secondary |
-|------------|---------------|-----------|
-| Library / framework docs | Context7 | EXA `get_code_context_exa` |
-| Code examples, GitHub patterns | EXA `get_code_context_exa` | GitHub grep |
-| Recent news, current events | Perplexity `perplexity_search` | Tavily `tavily_search` |
-| Competitive / company research | EXA `company_research_exa` | Perplexity |
-| Deep technical report | Perplexity `perplexity_research` | Tavily `tavily_research` |
-| AST / structural code patterns | ast-grep `find_code` | ast-grep `find_code_by_rule` |
-| Long-horizon async report | Parallel `createDeepResearch` | EXA `deep_researcher_start` |
-| Specific URL content | EXA `crawling_exa` | Tavily `tavily_extract` |
+| Query Type                     | Primary Source                   | Secondary                    |
+| ------------------------------ | -------------------------------- | ---------------------------- |
+| Library / framework docs       | Context7                         | EXA `get_code_context_exa`   |
+| Code examples, GitHub patterns | EXA `get_code_context_exa`       | GitHub grep                  |
+| Recent news, current events    | Perplexity `perplexity_search`   | Tavily `tavily_search`       |
+| Competitive / company research | EXA `company_research_exa`       | Perplexity                   |
+| Deep technical report          | Perplexity `perplexity_research` | Tavily `tavily_research`     |
+| AST / structural code patterns | ast-grep `find_code`             | ast-grep `find_code_by_rule` |
+| Long-horizon async report      | Parallel `createDeepResearch`    | EXA `deep_researcher_start`  |
+| Specific URL content           | EXA `crawling_exa`               | Tavily `tavily_extract`      |
 
 ## When to Compound Findings
 
 After `/research:deep`, run `/compound` if the findings include:
+
 - A novel architectural pattern worth sharing with the team
 - A critical gotcha or anti-pattern discovered
-- An institutional decision that will recur (e.g., "we use X instead of Y because...")
+- An institutional decision that will recur (e.g., "we use X instead of Y
+  because...")
 - A bug root cause that took significant investigation
 
 Routine informational research does not need to be compounded.
@@ -78,6 +85,7 @@ Routine informational research does not need to be compounded.
 ## Graceful Degradation
 
 If an MCP server is unavailable (key not set, connection error, rate limit):
+
 - Log a brief note: "Skipping [source] — unavailable"
 - Continue with remaining sources
 - Never fail completely if at least 1 source is available
@@ -94,6 +102,7 @@ export PERPLEXITY_API_KEY="your-key-here"
 ```
 
 Get keys from:
+
 - EXA: https://exa.ai/
 - Tavily: https://tavily.com/
 - Perplexity: https://www.perplexity.ai/settings/api
@@ -105,19 +114,22 @@ After adding keys: source `~/.zshrc` and restart Claude Code.
 
 ## MCP Tool Name Verification
 
-After installing yellow-research, always verify actual tool names before
-writing agent code or troubleshooting:
+After installing yellow-research, always verify actual tool names before writing
+agent code or troubleshooting:
 
 ```
 ToolSearch "exa"
 ToolSearch "tavily"
 ToolSearch "perplexity"
 ToolSearch "parallel"
-ToolSearch "ast-grep"
+ToolSearch "ast-grep__find_code"
+ToolSearch "ast-grep__find_code_by_rule"
+ToolSearch "ast-grep__dump_syntax_tree"
+ToolSearch "ast-grep__test_match_code_rule"
 ```
 
 Or run `/mcp` in Claude Code to see all registered tools.
 
 **Never trust LLM-generated tool names** — they may be fictitious. Empirical
-verification is required. If names differ from what's in agents/commands,
-update the `allowed-tools` lists.
+verification is required. If names differ from what's in agents/commands, update
+the `allowed-tools` lists and any MCP tool references in agent bodies.

@@ -1,6 +1,9 @@
 ---
 name: research:setup
-description: "Check which research API keys and MCP sources are configured and active. Use when first installing the plugin, after adding API keys, or to understand why a research command degraded to fewer sources."
+description:
+  'Check which research API keys and MCP sources are configured and active. Use
+  when first installing the plugin, after adding API keys, or to understand why
+  a research command degraded to fewer sources.'
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -53,8 +56,8 @@ set, the command still completes successfully (showing all INACTIVE).
 
 ### Step 2: Validate Format of Present Keys
 
-For each key that is set, run a format check. Never echo the key value —
-only describe format mismatches.
+For each key that is set, run a format check. Never echo the key value — only
+describe format mismatches.
 
 **EXA** (no public prefix documented — length/charset only):
 
@@ -106,8 +109,8 @@ If any keys are present and format-valid, and `curl` is available, ask:
 
 > "Test live API connectivity? MCP sources are always checked (no quota cost).
 > This option controls whether API key sources are also probed — **1 small call
-> per present key, consuming a small amount of API quota** (1 search credit or
-> 1 token per provider). Skip if quota is a concern."
+> per present key, consuming a small amount of API quota** (1 search credit or 1
+> token per provider). Skip if quota is a concern."
 >
 > Options: "Yes, test all" / "No, skip testing"
 
@@ -192,9 +195,9 @@ be shown for error context, redact key patterns first:
 sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9_-]*/***REDACTED***/g'
 ```
 
-Never display EXA response bodies at all — EXA keys have no known prefix
-and cannot be reliably redacted. Show only the HTTP status code and derived
-status label.
+Never display EXA response bodies at all — EXA keys have no known prefix and
+cannot be reliably redacted. Show only the HTTP status code and derived status
+label.
 
 Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers in
 request/response dumps.
@@ -204,9 +207,8 @@ If user skips testing: all format-valid keys show `PRESENT (untested)`.
 ### Step 3.5: MCP Source Health Checks
 
 This step runs unconditionally — MCP calls have no quota cost and require no
-user opt-in. Check each of the six MCP sources using a ToolSearch probe
-followed by a lightweight test call (except Parallel Task which uses
-ToolSearch-only).
+user opt-in. Check each of the six MCP sources using a ToolSearch probe followed
+by a lightweight test call (except Parallel Task which uses ToolSearch-only).
 
 For each source below, follow this pattern:
 
@@ -215,8 +217,8 @@ For each source below, follow this pattern:
 2. If the tool is found, invoke it with the minimal test arguments shown.
 3. If the call succeeds and returns a structured payload (object or array),
    record status as `ACTIVE` — even if the results array is empty.
-4. If the call throws an exception, returns an explicit error object, `null`,
-   or a non-structured response, record status as `FAIL`.
+4. If the call throws an exception, returns an explicit error object, `null`, or
+   a non-structured response, record status as `FAIL`.
 
 **Context7** (yellow-core plugin — library docs and code examples):
 
@@ -257,7 +259,7 @@ Test call: mcp__plugin_yellow-devin_deepwiki__read_wiki_structure with repoName:
 **ast-grep MCP** (bundled stdio — AST structural code search):
 
 ```text
-ToolSearch keyword: "find_code"
+ToolSearch keyword: "ast-grep__find_code"
 Tool name: mcp__plugin_yellow-research_ast-grep__find_code
 Test call: mcp__plugin_yellow-research_ast-grep__find_code with pattern: "function $NAME() {}", lang: "javascript"
 ```
@@ -270,7 +272,7 @@ status as `FAIL` with a note to install the `ast-grep` binary.
 **Parallel Task MCP** (bundled HTTP — async research orchestration):
 
 ```text
-ToolSearch keyword: "createDeepResearch"
+ToolSearch keyword: "parallel__createDeepResearch"
 Tool name: mcp__plugin_yellow-research_parallel__createDeepResearch
 Test: ToolSearch probe only (do not create actual tasks — they have compute cost)
 ```
@@ -281,8 +283,8 @@ task ID. If the tool appears in ToolSearch results, record status as
 `ACTIVE (ToolSearch only — server reachability not verified)`.
 
 Run all six ToolSearch probes. For sources that are found, run their test calls
-(except Parallel Task which uses ToolSearch-only).
-Record each source's status for the Step 4 report table.
+(except Parallel Task which uses ToolSearch-only). Record each source's status
+for the Step 4 report table.
 
 Never stop on a per-source error — record the status and continue to the next
 source. A failing MCP source does not affect API key checks or overall command
@@ -319,7 +321,7 @@ MCP Sources (no API key required — always available if plugin installed)
   WarpGrep       (global)           UNAVAILABLE
   DeepWiki       yellow-devin       ACTIVE
   ast-grep       (bundled)          ACTIVE
-  Parallel Task  (bundled)          ACTIVE
+  Parallel Task  (bundled)          ACTIVE (ToolSearch only — server reachability not verified)
 
 Capability summary:
   /research:deep    PARTIAL (2/3 API sources — Perplexity inactive)
@@ -361,8 +363,8 @@ required after adding new keys. Never commit API keys to version control.
 Only show the lines for keys that are absent or invalid (not all three if some
 are already working).
 
-If ast-grep prerequisites are missing (`ast-grep`, `uv`, or Python < 3.13),
-show this block:
+If ast-grep prerequisites are missing (`ast-grep`, `uv`, or Python < 3.13), show
+this block:
 
 ```text
 To enable ast-grep MCP (AST structural code search):
@@ -393,8 +395,8 @@ If a source shows FAIL (installed but test failed), try restarting Claude Code.
 ToolSearch results reflect session-start state — restart after installing new plugins.
 ```
 
-Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all six
-if some are already working).
+Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all six if
+some are already working).
 
 ### Step 6: Next Steps
 
@@ -404,19 +406,19 @@ research), `Done`.
 
 ## Error Handling
 
-| Error | Message | Action |
-|---|---|---|
-| `curl` not found | "curl not found — live testing unavailable. Install via system package manager." | Warn, skip Step 3 |
-| `jq` not found | "jq not found — Tavily live test will use printf fallback for JSON body." | Warn, continue |
-| All 3 keys absent | Show all INACTIVE in table + full setup instructions block | Complete normally |
-| Key format invalid | "FORMAT INVALID — [description of expected format]. Key not echoed." | Record, continue |
-| Non-zero curl exit | "UNREACHABLE — API unreachable (timeout or network error)." | Record per-provider |
-| HTTP 401/403 | "INVALID — key rejected. Regenerate at provider dashboard." | Record per-provider |
-| HTTP 429 | "RATE LIMITED — key may be valid; service is busy. Try again later." | Record per-provider |
-| HTTP 5xx | "UNREACHABLE — API server error." | Record per-provider |
-| ToolSearch returns no match for MCP tool | "[source] UNAVAILABLE — plugin not installed or MCP not configured." | Record, continue |
-| MCP test call throws exception | "[source] FAIL — tool found but test call errored." | Record, continue |
-| MCP test call returns empty result set | "[source] ACTIVE — tool reachable, probe returned no matches." | Record, continue |
+| Error                                    | Message                                                                          | Action              |
+| ---------------------------------------- | -------------------------------------------------------------------------------- | ------------------- |
+| `curl` not found                         | "curl not found — live testing unavailable. Install via system package manager." | Warn, skip Step 3   |
+| `jq` not found                           | "jq not found — Tavily live test will use printf fallback for JSON body."        | Warn, continue      |
+| All 3 keys absent                        | Show all INACTIVE in table + full setup instructions block                       | Complete normally   |
+| Key format invalid                       | "FORMAT INVALID — [description of expected format]. Key not echoed."             | Record, continue    |
+| Non-zero curl exit                       | "UNREACHABLE — API unreachable (timeout or network error)."                      | Record per-provider |
+| HTTP 401/403                             | "INVALID — key rejected. Regenerate at provider dashboard."                      | Record per-provider |
+| HTTP 429                                 | "RATE LIMITED — key may be valid; service is busy. Try again later."             | Record per-provider |
+| HTTP 5xx                                 | "UNREACHABLE — API server error."                                                | Record per-provider |
+| ToolSearch returns no match for MCP tool | "[source] UNAVAILABLE — plugin not installed or MCP not configured."             | Record, continue    |
+| MCP test call throws exception           | "[source] FAIL — tool found but test call errored."                              | Record, continue    |
+| MCP test call returns empty result set   | "[source] ACTIVE — tool reachable, probe returned no matches."                   | Record, continue    |
 
-Never stop on a per-provider or per-source error — report it and continue to
-the next provider/source. The overall command always completes.
+Never stop on a per-provider or per-source error — report it and continue to the
+next provider/source. The overall command always completes.

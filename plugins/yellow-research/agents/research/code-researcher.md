@@ -1,6 +1,10 @@
 ---
 name: code-researcher
-description: Inline code research for active development. Use when user asks how to use a library, needs code examples, API patterns, or framework documentation. Routes to best source by query type; returns concise in-context synthesis without saving a file.
+description:
+  Inline code research for active development. Use when user asks how to use a
+  library, needs code examples, API patterns, or framework documentation. Routes
+  to best source by query type; returns concise in-context synthesis without
+  saving a file.
 model: inherit
 allowed-tools:
   - Read
@@ -27,17 +31,21 @@ to code questions and return them inline — no file saved, no lengthy reports.
 
 Choose the best source based on query type:
 
-| Query Type | Primary Tool |
-|------------|-------------|
-| Library/framework docs | `resolve-library-id` → `query-docs` (Context7) |
-| Code examples, patterns, GitHub | `get_code_context_exa` |
-| AST/structural code patterns | `mcp__plugin_yellow-research_ast-grep__find_code` / `mcp__plugin_yellow-research_ast-grep__find_code_by_rule` (ast-grep) |
-| GitHub code search | `mcp__grep__searchGitHub` |
-| Recent releases, new APIs | `perplexity_search` |
-| General web | `web_search_exa` |
+| Query Type                      | Primary Tool                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Library/framework docs          | `mcp__plugin_yellow-core_context7__resolve-library-id` → `mcp__plugin_yellow-core_context7__query-docs` (Context7)       |
+| Code examples, patterns, GitHub | `mcp__plugin_yellow-research_exa__get_code_context_exa`                                                                  |
+| AST/structural code patterns    | `mcp__plugin_yellow-research_ast-grep__find_code` / `mcp__plugin_yellow-research_ast-grep__find_code_by_rule` (ast-grep) |
+| GitHub code search              | `mcp__grep__searchGitHub`                                                                                                |
+| Recent releases, new APIs       | `mcp__plugin_yellow-research_perplexity__perplexity_search`                                                              |
+| General web                     | `mcp__plugin_yellow-research_exa__web_search_exa`                                                                        |
 
-**Start with Context7** for any named library — it has official, up-to-date docs.
-If Context7 `resolve-library-id` returns no match, fall back to `get_code_context_exa` for code examples. If `get_code_context_exa` returns nothing useful, use `web_search_exa` as last resort.
+**Start with Context7** for any named library — it has official, up-to-date
+docs. If `mcp__plugin_yellow-core_context7__resolve-library-id` returns no
+match, fall back to `mcp__plugin_yellow-research_exa__get_code_context_exa` for
+code examples. If `mcp__plugin_yellow-research_exa__get_code_context_exa`
+returns nothing useful, use `mcp__plugin_yellow-research_exa__web_search_exa` as
+last resort.
 
 ## Workflow
 
@@ -48,14 +56,17 @@ If Context7 `resolve-library-id` returns no match, fall back to `get_code_contex
 
 ## Output Format
 
-- 1-3 paragraphs; shorter is fine if the question has a simple answer. Only go longer if the user explicitly asks for detail.
+- 1-3 paragraphs; shorter is fine if the question has a simple answer. Only go
+  longer if the user explicitly asks for detail.
 - Include code snippets when they directly answer the question
 - Cite the source (library version, URL, or GitHub repo)
-- If findings are large enough to warrant saving, suggest: "This is substantial —
-  consider running `/research:deep [topic]` to save a full report."
+- If findings are large enough to warrant saving, suggest: "This is substantial
+  — consider running `/research:deep [topic]` to save a full report."
 
 ## Rules
 
 - Never save to a file — inline only
 - Never use Parallel Task or Tavily tools — those are for deep research
-- If no useful results found, stop and report: 'No results found for [query] from [sources tried]. Try `/research:deep [topic]` for a comprehensive multi-source search.'
+- If no useful results found, stop and report: 'No results found for [query]
+  from [sources tried]. Try `/research:deep [topic]` for a comprehensive
+  multi-source search.'

@@ -1,8 +1,9 @@
 # yellow-research Plugin
 
-Deep research plugin with 5 bundled MCP servers. Three workflows: `/research:code`
-(inline, fast), `/research:deep` (multi-source, saved to `docs/research/`), and
-`/workflows:deepen-plan` (enrich plans with codebase + external research).
+Deep research plugin with 5 bundled MCP servers. Three workflows:
+`/research:code` (inline, fast), `/research:deep` (multi-source, saved to
+`docs/research/`), and `/workflows:deepen-plan` (enrich plans with codebase +
+external research).
 
 ## MCP Servers
 
@@ -26,10 +27,13 @@ All tool names follow `mcp__plugin_yellow-research_<server>__<tool>`.
 ### exa — `EXA_API_KEY`
 
 Default-on tools (enabled by EXA by default):
+
 - `web_search_exa` — General neural web search
 - `get_code_context_exa` — Code examples, GitHub, Stack Overflow, docs
 
-Off-by-default tools (enable by adding them to the `tools=` arg in `plugin.json`):
+Off-by-default tools (enable by adding them to the `tools=` arg in
+`plugin.json`):
+
 - `company_research_exa` — Company/org research
 - `web_search_advanced_exa` — Full-control search with date/domain filters
 - `crawling_exa` — Full content of a specific URL
@@ -68,7 +72,8 @@ on invocation with "Command 'ast-grep' not found"; other servers unaffected.
 
 ### Commands
 
-- `/research:setup` — Check which API keys and MCP sources are configured and active
+- `/research:setup` — Check which API keys and MCP sources are configured and
+  active
 - `/research:code [topic]` — Inline code research: delegates to code-researcher,
   returns synthesized answer in-context. No file saved.
 - `/research:deep [topic]` — Multi-source deep research: conductor decides
@@ -81,19 +86,20 @@ on invocation with "Command 'ast-grep' not found"; other servers unaffected.
 
 - `research-conductor` — Routes /research:deep queries. Triages complexity
   (simple/moderate/complex) and dispatches parallel or sequential queries.
-- `code-researcher` — Inline code research. Routes by query type: library docs
-  → Context7, code examples → EXA, recent → Perplexity.
+- `code-researcher` — Inline code research. Routes by query type: library docs →
+  Context7, code examples → EXA, recent → Perplexity.
 
 ### Skills
 
-- `research-patterns` — Reference: slug naming, source selection, API key
-  setup, graceful degradation, when to compound findings.
+- `research-patterns` — Reference: slug naming, source selection, API key setup,
+  graceful degradation, when to compound findings.
 
 ## Prerequisites
 
 For the **ast-grep** MCP server (other servers have no system prerequisites):
 
-- `ast-grep` binary — `brew install ast-grep` or `cargo install ast-grep --locked` or `pip install ast-grep-cli`
+- `ast-grep` binary — `brew install ast-grep` or
+  `cargo install ast-grep --locked` or `pip install ast-grep-cli`
 - `uv` — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - Python >= 3.13 — hard requirement from ast-grep-mcp's `pyproject.toml`
 
@@ -110,8 +116,8 @@ export TAVILY_API_KEY="..."
 export PERPLEXITY_API_KEY="..."
 ```
 
-Source or restart shell after setting. Keys are passed to MCP servers at
-startup — restart Claude Code after adding new keys.
+Source or restart shell after setting. Keys are passed to MCP servers at startup
+— restart Claude Code after adding new keys.
 
 The **parallel** server uses OAuth — Claude Code handles authentication
 automatically (no API key needed). You'll be prompted to authorize on first use.
@@ -122,33 +128,31 @@ These external tools improve research quality but are not required:
 
 - **yellow-core plugin** — provides Context7
   (`mcp__plugin_yellow-core_context7__resolve-library-id`,
-  `mcp__plugin_yellow-core_context7__query-docs`) for official library
-  docs. Used by `/research:code` for library queries. Also provides
+  `mcp__plugin_yellow-core_context7__query-docs`) for official library docs.
+  Used by `/research:code` for library queries. Also provides
   `repo-research-analyst` agent used by `/workflows:deepen-plan` for codebase
-  validation. Falls back to EXA (for Context7) or skips codebase research
-  (for deepen-plan) if not installed.
-  Install: `/plugin marketplace add KingInYellows/yellow-plugins` (select
-  yellow-core)
-- **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search
-  via grep.app (web-based GitHub search). This is distinct from the bundled
-  ast-grep MCP which does local AST-based code search. Used by `/research:code`
-  and `/research:deep`. No API key required. Configure globally in Claude Code
-  MCP settings.
+  validation. Falls back to EXA (for Context7) or skips codebase research (for
+  deepen-plan) if not installed. Install:
+  `/plugin marketplace add KingInYellows/yellow-plugins` (select yellow-core)
+- **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search via
+  grep.app (web-based GitHub search). This is distinct from the bundled ast-grep
+  MCP which does local AST-based code search. Used by `/research:code` and
+  `/research:deep`. No API key required. Configure globally in Claude Code MCP
+  settings.
 - **yellow-morph plugin** (preferred) — provides WarpGrep
   (`mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`) for agentic
   codebase search. Replaces the global `filesystem-with-morph` MCP. When both
-  are installed, yellow-morph's plugin-namespaced tool is preferred.
-  Install: `/plugin marketplace add KingInYellows/yellow-plugins` (select
-  yellow-morph)
+  are installed, yellow-morph's plugin-namespaced tool is preferred. Install:
+  `/plugin marketplace add KingInYellows/yellow-plugins` (select yellow-morph)
 - **filesystem-with-morph MCP** (legacy) — provides WarpGrep
-  (`mcp__filesystem-with-morph__warpgrep_codebase_search`) for agentic
-  codebase and GitHub search. No API key required. Configure globally in
-  Claude Code MCP settings. When yellow-morph is installed, prefer the
-  plugin-namespaced tool instead.
+  (`mcp__filesystem-with-morph__warpgrep_codebase_search`) for agentic codebase
+  and GitHub search. No API key required. Configure globally in Claude Code MCP
+  settings. When yellow-morph is installed, prefer the plugin-namespaced tool
+  instead.
 - **yellow-devin plugin** — provides DeepWiki
-  (`mcp__plugin_yellow-devin_deepwiki__read_wiki_structure`) for AI-powered
-  repo documentation. Install: `/plugin marketplace add
-  KingInYellows/yellow-plugins` (select yellow-devin)
+  (`mcp__plugin_yellow-devin_deepwiki__read_wiki_structure`) for AI-powered repo
+  documentation. Install: `/plugin marketplace add KingInYellows/yellow-plugins`
+  (select yellow-devin)
 
 Without these, the plugin degrades gracefully: Context7 falls back to EXA,
 `searchGitHub` is simply skipped, deepen-plan runs external research only.
@@ -162,9 +166,12 @@ do not apply.
 
 ## When to Use What
 
-- `/research:setup` — First install, after adding API keys, or to diagnose degraded sources
+- `/research:setup` — First install, after adding API keys, or to diagnose
+  degraded sources
 - `/research:code` — Actively coding, need quick answer about a library or API
 - `/research:deep` — Need a comprehensive report saved for later reference
-- `/workflows:deepen-plan` — Have a plan from `/workflows:plan` that needs deeper validation before `/workflows:work`
-- `research-conductor` auto-triggers via `/research:deep` and `/workflows:deepen-plan` — do not call directly
+- `/workflows:deepen-plan` — Have a plan from `/workflows:plan` that needs
+  deeper validation before `/workflows:work`
+- `research-conductor` auto-triggers via `/research:deep` and
+  `/workflows:deepen-plan` — do not call directly
 - `code-researcher` auto-triggers via `/research:code` — do not call directly
