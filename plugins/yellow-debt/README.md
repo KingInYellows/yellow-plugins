@@ -37,6 +37,15 @@ codebase:
 
 ## Commands
 
+### `/debt:setup`
+
+Validate required local tooling, repo writability, and optional yellow-linear
+integration before running debt workflows.
+
+```bash
+/debt:setup
+```
+
 ### `/debt:audit [path] [--category <name>] [--severity <level>]`
 
 Run a comprehensive or targeted technical debt audit.
@@ -117,11 +126,13 @@ Push accepted findings to Linear as issues.
 
 ## Workflow
 
-1. **Run audit**: `/debt:audit` to scan your codebase
-2. **Review findings**: `/debt:triage` to accept/reject/defer
-3. **Fix issues**: `/debt:fix <path>` for agent-assisted remediation
-4. **Track progress**: `/debt:status` to see current state
-5. **Sync to Linear**: `/debt:sync` for team visibility
+1. **Validate setup**: `/debt:setup` to verify required tools and repo
+   writability
+2. **Run audit**: `/debt:audit` to scan your codebase
+3. **Review findings**: `/debt:triage` to accept/reject/defer
+4. **Fix issues**: `/debt:fix <path>` for agent-assisted remediation
+5. **Track progress**: `/debt:status` to see current state
+6. **Sync to Linear**: `/debt:sync` for team visibility
 
 ## Todo File Format
 

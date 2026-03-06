@@ -25,7 +25,7 @@ TypeScript, Python, Rust, and Go.
 | `/workflows:review`     | Multi-agent comprehensive code review                              |
 | `/workflows:compound`   | Document a recently solved problem to compound knowledge           |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
-| `/setup:all`            | Run setup for all installed yellow-plugins with unified dashboard  |
+| `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |
 
 ## Agents
 

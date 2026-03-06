@@ -32,6 +32,7 @@ Graphite-native workflow commands for stacked PR development.
 
 ## Plugin Commands
 
+- `/gt-setup` — validate Graphite CLI, auth detection, and repo initialization
 - `/smart-submit` — Audit + commit + submit in one flow
 - `/gt-amend` — Audit + amend current branch commit + re-submit (quick fix path)
 - `/gt-stack-plan` — Plan stacked PRs for a feature
@@ -73,4 +74,3 @@ Both paths use `gt submit --no-interactive` for submission.
   (e.g., `/workflows:work`). Graceful skip if yellow-ruvector not installed.
 - **morph** — Not applicable. gt-workflow operates on git/Graphite CLI, not
   file editing.
-

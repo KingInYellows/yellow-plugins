@@ -6,6 +6,15 @@ commits with code auditing, repo sync, and stack navigation — all through the
 
 ## Commands
 
+### `/gt-setup`
+
+Validate Graphite CLI, auth detection, and repo initialization before running
+the workflow commands.
+
+```
+/gt-setup
+```
+
 ### `/gt-amend`
 
 The fastest solo-dev path: audit your current fix and fold it into the current
@@ -101,6 +110,9 @@ convention automatically — no rule gets silently bypassed.
 - Git repository initialized with Graphite (`gt init`)
 - [`jq`](https://jqlang.github.io/jq/) installed (used by the `git push` guard
   hook)
+
+Run `/gt-setup` after first install, after Graphite auth changes, or when `gt`
+commands stop working in a repo that should already be initialized.
 
 ## License
 

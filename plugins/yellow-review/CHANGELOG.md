@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## Unreleased
+
+### Added
+
+- Add `/review:setup` to validate local review prerequisites and optional
+  yellow-core integration before reviewing PRs.
+
+---
+
 ## [1.1.0] - 2026-02-25
 
 ### Fixed
