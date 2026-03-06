@@ -36,7 +36,8 @@ mkdir -p docs/research
 ```markdown
 # <Topic Title>
 
-**Date:** YYYY-MM-DD **Sources:** Perplexity, EXA, Tavily (list which were used)
+**Date:** YYYY-MM-DD
+**Sources:** Perplexity, EXA, Tavily (list which were used)
 
 ## Summary
 

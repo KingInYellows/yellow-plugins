@@ -12,12 +12,11 @@ and this project adheres to
 
 ### Minor Changes
 
-- [`eb5c43c`](https://github.com/KingInYellows/yellow-plugins/commit/eb5c43c)
+- [`eb5c43c`](https://github.com/KingInYellows/yellow-plugins/commit/eb5c43c88c810c1452d3d6a034e6bf2e8ea18ee1)
   Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add ast-grep
   MCP server for AST-based structural code search. Bundles 4 new tools
   (find_code, find_code_by_rule, dump_syntax_tree, test_match_code_rule) via
-  uvx. Adds health checks for ast-grep and Parallel Task MCP to
-  /research:setup.
+  uvx. Adds health checks for ast-grep and Parallel Task MCP to /research:setup.
 
 ---
 
