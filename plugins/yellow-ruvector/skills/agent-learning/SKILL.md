@@ -24,7 +24,7 @@ yellow-ruvector plugin's learning workflows.
 
 ## Learning Triggers
 
-### Record a Reflexion When
+### Record a Context Entry When (type: `context`)
 
 - Test failure that required a code fix
 - Lint or type error that needed resolution
@@ -32,14 +32,14 @@ yellow-ruvector plugin's learning workflows.
 - Agent retried after an error and succeeded
 - Build or deploy failure
 
-### Record a Skill When
+### Record a Decision Entry When (type: `decision`)
 
 - Complex operation succeeded on first attempt
 - User explicitly praised a technique
 - Clean solution to a recurring problem
 - Novel approach that worked well
 
-### Record a Causal Observation When
+### Record a Code Entry When (type: `code`)
 
 - Debugging revealed "X caused Y"
 - Configuration change resolved an issue
@@ -66,13 +66,13 @@ Every learning entry must meet these criteria:
 
 ### Good Examples
 
-**Reflexion:**
+**Context:**
 
 > "Test `auth.test.ts:testTokenRefresh` failed because the mock JWT was expired.
 > Fix: always set mock token expiry to `Date.now() + 3600000` instead of a
 > hardcoded timestamp. Applied in commit abc123."
 
-**Skill:**
+**Decision:**
 
 > "Batch database inserts wrapped in a transaction are 10x faster than
 > individual inserts for the users table. Use

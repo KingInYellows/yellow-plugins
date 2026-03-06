@@ -5,6 +5,7 @@ argument-hint: '[filter]'
 allowed-tools:
   - ToolSearch
   - AskUserQuestion
+  - Read
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_stats
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
