@@ -2,7 +2,7 @@
 name: research-conductor
 description: Routes /research:deep queries across multiple MCP sources. Use when deep research needs multi-source investigation. Triages complexity and dispatches parallel fan-out — simple queries go to Perplexity alone; moderate to 2-3 parallel sources; complex topics trigger full fan-out including Parallel Task MCP for async reports.
 model: inherit
-tools:
+allowed-tools:
   - Task
   - ToolSearch
   - mcp__plugin_yellow-research_exa__web_search_exa
@@ -47,10 +47,10 @@ Classify as **Complex** if: the topic requires comparing >2 entities OR spans >2
 
 **Code pattern queries** — When the topic involves finding specific code
 structures, API usage patterns, or AST-level analysis, use ast-grep tools:
-- `find_code` for simple pattern matching (e.g., "find all async functions")
-- `find_code_by_rule` for complex AST rules
-- `dump_syntax_tree` to understand AST structure before writing rules
-- `test_match_code_rule` to validate rules before searching
+- `mcp__plugin_yellow-research_ast-grep__find_code` for simple pattern matching (e.g., "find all async functions")
+- `mcp__plugin_yellow-research_ast-grep__find_code_by_rule` for complex AST rules
+- `mcp__plugin_yellow-research_ast-grep__dump_syntax_tree` to understand AST structure before writing rules
+- `mcp__plugin_yellow-research_ast-grep__test_match_code_rule` to validate rules before searching
 ast-grep is a **code search** complement — it does NOT change the
 Simple/Moderate/Complex web research fan-out below.
 

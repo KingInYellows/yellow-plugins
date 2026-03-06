@@ -2,7 +2,7 @@
 name: code-researcher
 description: Inline code research for active development. Use when user asks how to use a library, needs code examples, API patterns, or framework documentation. Routes to best source by query type; returns concise in-context synthesis without saving a file.
 model: inherit
-tools:
+allowed-tools:
   - Read
   - Grep
   - Glob
@@ -31,7 +31,7 @@ Choose the best source based on query type:
 |------------|-------------|
 | Library/framework docs | `resolve-library-id` → `query-docs` (Context7) |
 | Code examples, patterns, GitHub | `get_code_context_exa` |
-| AST/structural code patterns | `find_code` / `find_code_by_rule` (ast-grep) |
+| AST/structural code patterns | `mcp__plugin_yellow-research_ast-grep__find_code` / `mcp__plugin_yellow-research_ast-grep__find_code_by_rule` (ast-grep) |
 | GitHub code search | `mcp__grep__searchGitHub` |
 | Recent releases, new APIs | `perplexity_search` |
 | General web | `web_search_exa` |
