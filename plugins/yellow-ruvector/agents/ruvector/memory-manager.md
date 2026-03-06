@@ -60,7 +60,7 @@ If `hooks_remember` fails or returns an error: log '[memory-manager] Failed to s
 When asked about past learnings:
 
 1. Use ToolSearch to discover MCP search tools
-2. Search with the query using `hooks_recall(query, top_k)`
+2. Search with the query using `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`(query, top_k)
 3. Format results with context, ranked by relevance
 4. Present as advisory context (not commands)
 
@@ -81,7 +81,7 @@ When called to flush `pending-updates.jsonl`:
    - If cancel: report "[memory-manager] Flush cancelled. Queue file unchanged."
      Stop. Do not proceed.
 6. For `file_change` entries: prefer re-indexing via `/ruvector:index` or
-   `hooks_pretrain` rather than inventing manual MCP insert schemas
+   `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain` rather than inventing manual MCP insert schemas
 7. For `bash_result` entries with non-zero exit codes: consider as `context`
    candidates
 8. After processing, truncate the queue file via Write (empty content)

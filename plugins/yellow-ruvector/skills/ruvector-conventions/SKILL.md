@@ -104,7 +104,7 @@ Result items include fields such as `content`, `type`, `score`, and `created`.
 {
   "content": "Stored memory text",
   "type": "decision",
-  "score": "0.912",
+  "score": 0.912,
   "created": "2026-03-06T00:00:00.000Z"
 }
 ```

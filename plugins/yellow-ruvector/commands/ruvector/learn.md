@@ -63,19 +63,7 @@ Build a structured plain-text entry:
 2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
    If it errors, report "ruvector not available right now. Check
    `/ruvector:status` and try again." and stop.
-3. Also call ToolSearch("hooks_recall"). If not found, skip dedup and proceed
-   to Step 5.
-4. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with
-   `query=constructed content`, `top_k=1`.
-5. If the MCP call errors with timeout, connection refused, or service
-   unavailable: wait approximately 500 milliseconds and retry exactly once.
-   If the retry also fails, skip dedup and proceed to Step 5.
-
-If a match with score > 0.85 is found:
-
-- Show the existing entry
-- Use AskUserQuestion: "A similar learning already exists. Store anyway?"
-- If rejected, stop
+   If the retry also fails, skip dedup and proceed to Store Entry (Step 5).
 
 ### Step 5: Store Entry
 
