@@ -649,7 +649,7 @@ jobs:
     name: Build Verification
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 5
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs: [validate-schemas, lint-and-typecheck, unit-tests]
 
     steps:
