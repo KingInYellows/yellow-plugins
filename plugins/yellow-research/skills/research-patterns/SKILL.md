@@ -61,6 +61,7 @@ mkdir -p docs/research
 | Recent news, current events | Perplexity `perplexity_search` | Tavily `tavily_search` |
 | Competitive / company research | EXA `company_research_exa` | Perplexity |
 | Deep technical report | Perplexity `perplexity_research` | Tavily `tavily_research` |
+| AST / structural code patterns | ast-grep `find_code` | ast-grep `find_code_by_rule` |
 | Long-horizon async report | Parallel `createDeepResearch` | EXA `deep_researcher_start` |
 | Specific URL content | EXA `crawling_exa` | Tavily `tavily_extract` |
 
@@ -112,6 +113,7 @@ ToolSearch "exa"
 ToolSearch "tavily"
 ToolSearch "perplexity"
 ToolSearch "parallel"
+ToolSearch "find_code"
 ```
 
 Or run `/mcp` in Claude Code to see all registered tools.

@@ -1,6 +1,6 @@
 # yellow-research Plugin
 
-Deep research plugin with 4 bundled MCP servers. Three workflows: `/research:code`
+Deep research plugin with 5 bundled MCP servers. Three workflows: `/research:code`
 (inline, fast), `/research:deep` (multi-source, saved to `docs/research/`), and
 `/workflows:deepen-plan` (enrich plans with codebase + external research).
 
@@ -35,6 +35,16 @@ Off-by-default tools (enable by adding them to the `tools=` arg in `plugin.json`
 - `crawling_exa` — Full content of a specific URL
 - `deep_researcher_start` — Start async EXA deep research report
 - `deep_researcher_check` — Poll async research status
+
+### ast-grep — No API key (requires `ast-grep` binary, `uv`, Python >= 3.13)
+
+- `find_code` — Pattern-based code search using AST
+- `find_code_by_rule` — Search using YAML rule definitions
+- `dump_syntax_tree` — Dump AST structure of code snippets
+- `test_match_code_rule` — Test a rule against sample code
+
+Graceful degradation: missing `ast-grep` binary → server starts but tools fail
+on invocation with "Command 'ast-grep' not found"; other servers unaffected.
 
 ### parallel — OAuth (auto-managed by Claude Code)
 
@@ -79,6 +89,17 @@ Off-by-default tools (enable by adding them to the `tools=` arg in `plugin.json`
 - `research-patterns` — Reference: slug naming, source selection, API key
   setup, graceful degradation, when to compound findings.
 
+## Prerequisites
+
+For the **ast-grep** MCP server (other servers have no system prerequisites):
+
+- `ast-grep` binary — `brew install ast-grep` or `cargo install ast-grep --locked` or `pip install ast-grep-cli`
+- `uv` — `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Python >= 3.13 — hard requirement from ast-grep-mcp's `pyproject.toml`
+
+If any prerequisite is missing, the ast-grep MCP server still starts (lazy
+check) but tools will fail on invocation. Other servers are unaffected.
+
 ## API Key Setup
 
 Add to `~/.zshrc`:
@@ -108,9 +129,11 @@ These external tools improve research quality but are not required:
   (for deepen-plan) if not installed.
   Install: `/plugin marketplace add KingInYellows/yellow-plugins` (select
   yellow-core)
-- **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search.
-  Used by `/research:code` and `/research:deep`. No API key required. Configure
-  globally in Claude Code MCP settings.
+- **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search
+  via grep.app (web-based GitHub search). This is distinct from the bundled
+  ast-grep MCP which does local AST-based code search. Used by `/research:code`
+  and `/research:deep`. No API key required. Configure globally in Claude Code
+  MCP settings.
 - **yellow-morph plugin** (preferred) — provides WarpGrep
   (`mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`) for agentic
   codebase search. Replaces the global `filesystem-with-morph` MCP. When both

@@ -113,7 +113,7 @@
     },
     {
       "name": "yellow-research",
-      "description": "Deep research plugin with Perplexity, Tavily, EXA, and Parallel Task MCP servers. Code research inline; deep research saved to docs/research/.",
+      "description": "Deep research plugin with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
       "version": "1.1.0",
       "author": {
         "name": "KingInYellows"
