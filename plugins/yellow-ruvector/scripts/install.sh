@@ -117,7 +117,9 @@ elif npm_output=$(npm "${install_args[@]}" --prefix "${HOME:?HOME not set}/.loca
   warning "Installed to ~/.local prefix"
   # Ensure ~/.local/bin is in PATH for verification and inform user
   local_bin="${HOME}/.local/bin"
+  path_needs_update=false
   if ! printf '%s' "$PATH" | tr ':' '\n' | grep -qxF "$local_bin"; then
+    path_needs_update=true
     # Detect user's login shell rc file for the suggestion
     case "$(basename "${SHELL:-}")" in
       zsh)  rc_file="${HOME}/.zshrc" ;;
@@ -153,7 +155,11 @@ if [ -z "$installed_version" ]; then
 fi
 
 if [ "$install_path" = "local" ]; then
-  success "ruvector ${installed_version} installed to ~/.local/bin — restart your shell to use it"
+  if [ "$path_needs_update" = "true" ]; then
+    success "ruvector ${installed_version} installed to ~/.local/bin — restart your shell to use it"
+  else
+    success "ruvector ${installed_version} installed to ~/.local/bin (already in PATH)"
+  fi
 else
   success "ruvector ${installed_version} installed successfully (global binary in PATH)"
 fi
