@@ -1,10 +1,7 @@
 ---
 name: research-patterns
 user-invokable: false
-description:
-  Reference conventions for yellow-research plugin — slug naming, output format,
-  source selection, API key setup, graceful degradation, and when to compound
-  findings.
+description: Reference conventions for yellow-research plugin — slug naming, output format, source selection, API key setup, graceful degradation, and when to compound findings.
 ---
 
 # Research Patterns
@@ -36,7 +33,8 @@ mkdir -p docs/research
 ```markdown
 # <Topic Title>
 
-**Date:** YYYY-MM-DD **Sources:** Perplexity, EXA, Tavily (list which were used)
+**Date:** YYYY-MM-DD
+**Sources:** Perplexity, EXA, Tavily (list which were used)
 
 ## Summary
 
@@ -117,16 +115,33 @@ After adding keys: source `~/.zshrc` and restart Claude Code.
 After installing yellow-research, always verify actual tool names before writing
 agent code or troubleshooting:
 
+```text
+ToolSearch keyword: "exa"
+Tool name: mcp__plugin_yellow-research_exa__...
+
+ToolSearch keyword: "tavily"
+Tool name: mcp__plugin_yellow-research_tavily__...
+
+ToolSearch keyword: "perplexity"
+Tool name: mcp__plugin_yellow-research_perplexity__...
+
+ToolSearch keyword: "parallel"
+Tool name: mcp__plugin_yellow-research_parallel__...
+
+ToolSearch keyword: "ast-grep__find_code"
+Tool name: mcp__plugin_yellow-research_ast-grep__find_code
+
+ToolSearch keyword: "ast-grep__find_code_by_rule"
+Tool name: mcp__plugin_yellow-research_ast-grep__find_code_by_rule
+
+ToolSearch keyword: "ast-grep__dump_syntax_tree"
+Tool name: mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
+
+ToolSearch keyword: "ast-grep__test_match_code_rule"
+Tool name: mcp__plugin_yellow-research_ast-grep__test_match_code_rule
 ```
-ToolSearch "exa"
-ToolSearch "tavily"
-ToolSearch "perplexity"
-ToolSearch "parallel"
-ToolSearch "ast-grep__find_code"
-ToolSearch "ast-grep__find_code_by_rule"
-ToolSearch "ast-grep__dump_syntax_tree"
-ToolSearch "ast-grep__test_match_code_rule"
-```
+
+Naming convention: `mcp__plugin_yellow-research_<server>__<tool>`.
 
 Or run `/mcp` in Claude Code to see all registered tools.
 

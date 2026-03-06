@@ -8,7 +8,7 @@ and this project adheres to
 
 ---
 
-## [1.2.0]
+## [1.2.0] - 2026-03-06
 
 ### Minor Changes
 
