@@ -2,7 +2,8 @@
 name: pr-test-analyzer
 description: "Test coverage and behavioral completeness analysis. Use when reviewing PRs that include test files or add testable business logic to verify tests cover critical paths, edge cases, and failure modes."
 model: inherit
-allowed-tools:
+memory: true
+tools:
   - Read
   - Grep
   - Glob

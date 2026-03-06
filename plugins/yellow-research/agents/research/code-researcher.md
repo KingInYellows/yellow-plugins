@@ -6,7 +6,8 @@ description:
   to best source by query type; returns concise in-context synthesis without
   saving a file.
 model: inherit
-allowed-tools:
+memory: true
+tools:
   - Read
   - Grep
   - Glob

@@ -24,7 +24,7 @@ set -euo pipefail
 
 # Source shared validation library for extract_frontmatter helper
 # shellcheck source=../../lib/validate.sh
-. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 
 # Parse arguments
 JSON_OUTPUT=false

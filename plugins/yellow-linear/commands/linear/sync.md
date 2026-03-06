@@ -20,6 +20,10 @@ allowed-tools:
 Load issue context, link PRs, and update status for the current branch's Linear
 issue.
 
+Prefer native Linear GitHub automation for the default branch/PR linking and
+status flow. Use this command when you need richer issue context, a manual
+repair path, or a fallback because native automation is unavailable.
+
 ## Workflow
 
 ### Step 1: Resolve Issue ID

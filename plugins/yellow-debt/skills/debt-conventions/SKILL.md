@@ -208,13 +208,14 @@ name: <category>-scanner
 description:
   '<category> analysis. Use when auditing code for <specific patterns>.'
 model: inherit
-allowed-tools:
+skills:
+  - debt-conventions
+tools:
   - Read
   - Grep
   - Glob
   - Bash
   - Write
-  - Skill
 ---
 
 <3 concrete examples>
@@ -249,7 +250,7 @@ Todo files must use one of the following status values:
 - `ready` — Approved for remediation
 - `in-progress` — Fix work has started
 - `complete` — Fix completed
-- `deferred` — Postponed to future sprint (includes optional `defer_reason`
+- `deferred` — Postponed to future sprint (includes optional `deferred_reason`
   field in frontmatter)
 - `deleted` — Rejected or no longer relevant
 

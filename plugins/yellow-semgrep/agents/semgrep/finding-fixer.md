@@ -3,13 +3,14 @@ name: finding-fixer
 description: "Security finding fix specialist. Applies deterministic autofix first, falls back to LLM-generated fix. Shows diff for approval before applying. Spawned by /semgrep:fix and /semgrep:fix-batch."
 model: inherit
 color: yellow
-allowed-tools:
+skills:
+  - semgrep-conventions
+tools:
   - Bash
   - Read
   - Edit
   - Grep
   - Glob
-  - Skill
   - AskUserQuestion
   - mcp__plugin_yellow-semgrep_semgrep__semgrep_scan
   - mcp__plugin_yellow-semgrep_semgrep__get_abstract_syntax_tree

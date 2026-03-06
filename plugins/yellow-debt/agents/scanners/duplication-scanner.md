@@ -2,13 +2,15 @@
 name: duplication-scanner
 description: "Code duplication and near-duplicate detection. Use when auditing code for repeated patterns, copy-paste code, or duplicate logic."
 model: inherit
-allowed-tools:
+background: true
+skills:
+  - debt-conventions
+tools:
   - Read
   - Grep
   - Glob
   - Bash
   - Write
-  - Skill
 ---
 
 <examples>

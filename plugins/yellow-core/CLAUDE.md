@@ -58,16 +58,16 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 ### Optional Plugin Dependencies
 
 - **gt-workflow** — `/workflows:work` delegates to `/smart-submit` for
-  commit+submit. Without it, falls back to inline `gt modify -c` +
+  commit+submit. Without it, falls back to inline `gt modify -m` +
   `gt submit --no-interactive`.
 - **yellow-review** — `/workflows:work` invokes `/review:pr` after submission;
   `/workflows:review` redirects to `/review:pr`. Without either, review steps
   are skipped with a user notice.
-- **yellow-linear** — `/workflows:work` invokes `/linear:sync --after-submit`
-  after PR submission to auto-transition the linked issue to "In Review" (Tier 1
-  auto-apply). `/workflows:plan` detects Linear issue context in brainstorm docs
-  and includes a `## Linear Issues` metadata section. Without yellow-linear,
-  both features skip silently.
+- **yellow-linear** — `/workflows:work` can invoke `/linear:sync --after-submit`
+  as a fallback when native Linear GitHub automation is unavailable or needs
+  repair. `/workflows:plan` detects Linear issue context in brainstorm docs and
+  includes a `## Linear Issues` metadata section. Without yellow-linear, both
+  features skip silently.
 
 ### MCP Servers (1)
 

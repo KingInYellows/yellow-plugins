@@ -31,10 +31,11 @@ Parse `$ARGUMENTS` to determine scope:
 **scope=stack** (default if empty or "stack"):
 
 ```bash
-gt log --json 2>/dev/null
+gt log short --no-interactive 2>/dev/null
 ```
 
-Extract branch names from Graphite stack output. For each branch:
+Parse branch names from Graphite stack output (one branch per line, strip
+leading graph characters). For each branch:
 
 ```bash
 gh pr view <branch> --json number,state -q '{number: .number, state: .state}'
@@ -82,7 +83,7 @@ For each PR in order:
    - Parallel agent review
    - Fix application
    - Code simplifier pass
-   - Commit and push
+   - Commit via `gt modify` and submit via `gt submit --no-interactive`
 3. **Resolve**: Fetch unresolved comments → run `/review:resolve` flow if any
    exist
 4. **Restack**: If changes were made and this is a stack:

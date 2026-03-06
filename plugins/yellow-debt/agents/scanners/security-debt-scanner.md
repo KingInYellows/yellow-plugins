@@ -2,13 +2,15 @@
 name: security-debt-scanner
 description: "Security-related technical debt detection. Use when auditing code for missing validation, hardcoded config, deprecated crypto, or security debt patterns (not active vulnerabilities)."
 model: inherit
-allowed-tools:
+background: true
+skills:
+  - debt-conventions
+tools:
   - Read
   - Grep
   - Glob
   - Bash
   - Write
-  - Skill
 ---
 
 <examples>

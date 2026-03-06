@@ -115,6 +115,11 @@
         }
       ],
       "description": "Hooks configuration — inline object (preferred) or path to hooks file (string)."
+    },
+    "outputStyles": {
+      "type": "string",
+      "pattern": "^(\\./)?(?!.*\\.\\.)[A-Za-z0-9._/-]+/?$",
+      "description": "Path to a directory of markdown output style files."
     }
   },
   "additionalProperties": false

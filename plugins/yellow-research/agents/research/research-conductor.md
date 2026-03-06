@@ -7,7 +7,9 @@ description:
   parallel sources; complex topics trigger full fan-out including Parallel Task
   MCP for async reports.
 model: inherit
-allowed-tools:
+background: true
+memory: true
+tools:
   - Task
   - ToolSearch
   - mcp__plugin_yellow-research_exa__web_search_exa

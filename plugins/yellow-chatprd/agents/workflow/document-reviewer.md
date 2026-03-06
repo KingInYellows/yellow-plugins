@@ -5,12 +5,13 @@ description: >-
   AI-powered document review and completeness analysis. Use when user wants to
   "review this PRD", "check the spec for gaps", "is this PRD complete", or
   "what's missing from the auth spec".
-allowed-tools:
+skills:
+  - chatprd-conventions
+tools:
   - Read
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - Skill
   - mcp__plugin_yellow-chatprd_chatprd__get_document
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__update_document

@@ -2,7 +2,10 @@
 name: debt-fixer
 description: "Implement fixes for specific technical debt findings with human approval. Use when remediating accepted debt items."
 model: inherit
-allowed-tools:
+isolation: worktree
+skills:
+  - debt-conventions
+tools:
   - Read
   - Edit
   - Write
@@ -52,11 +55,12 @@ patterns and style.
 1. Source `lib/validate.sh` for `extract_frontmatter()` function
 2. Extract `affected_files` from todo frontmatter:
    `yq -r '.affected_files[]' | cut -d: -f1`
-3. Get modified files: `git diff --name-only`
+3. Get modified files: `git status --porcelain | cut -c4-`
 4. For each modified file, verify it's in `affected_files` list
 5. If ANY file outside scope was modified:
    - Log error: `[debt-fixer] ERROR: Modified file outside affected_files scope`
-   - Revert all changes: `git restore .`
+   - Restore only the out-of-scope files with `git restore --staged --worktree -- "$file"`
+   - If an out-of-scope file was newly created and untracked, remove just that file with `rm -f -- "$file"`
    - Reset todo to ready: `transition_todo_state "$TODO_PATH" "ready"`
    - Exit with error message
 
@@ -90,21 +94,28 @@ Options: Yes (apply + commit) | No (discard + revert to ready)
 
 ```bash
 safe_title=$(printf '%s' "$finding_title" | LC_ALL=C tr -cd '[:alnum:][:space:]-_.' | cut -c1-72)
-gt modify -c "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s' \
+gt modify -m "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s' \
   "$safe_title" "$todo_path" "$category" "$severity")"
-source lib/validate.sh
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 transition_todo_state "$todo_path" "complete"
 ```
 
 **If rejected**:
 
 ```bash
-git restore .
-source lib/validate.sh
+while IFS= read -r changed_file; do
+  [ -z "$changed_file" ] && continue
+  git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
+done < <(git status --porcelain | cut -c4-)
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 transition_todo_state "$todo_path" "ready"
 ```
 
 Inform user: "Changes reverted. Todo reset to 'ready' state."
+
+Because this agent runs in `isolation: worktree`, never use `git restore .`.
+If the run must be abandoned entirely, prefer failing the isolated worktree and
+letting Claude Code discard it.
 
 ## Safety Rules
 
