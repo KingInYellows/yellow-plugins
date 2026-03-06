@@ -33,11 +33,11 @@ Run a single Bash call to check tools and all three env vars:
 ```bash
 printf '=== Prerequisites ===\n'
 command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:      NOT FOUND\n'
+command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:      NOT FOUND\n'
 command -v jq       >/dev/null 2>&1 && printf 'jq:        ok\n' || printf 'jq:        NOT FOUND\n'
+command -v git      >/dev/null 2>&1 && printf 'git:       ok\n' || printf 'git:       NOT FOUND (needed for ast-grep MCP via uvx)\n'
 command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
 command -v uv       >/dev/null 2>&1 && printf 'uv:        ok\n' || printf 'uv:        NOT FOUND (needed for ast-grep MCP)\n'
-if ! command -v python3 >/dev/null 2>&1; then
-  printf 'python3:   NOT FOUND (needed for ast-grep MCP)\n'
 elif python3 --version 2>/dev/null | grep -qE '3\.(1[3-9]|[2-9][0-9])'; then
   printf 'python3:   ok (>=3.13)\n'
 else
