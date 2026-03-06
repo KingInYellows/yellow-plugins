@@ -294,6 +294,7 @@ jobs:
   # ============================================================================
   unit-tests:
     name: Unit Tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 5
     needs: [lint-and-typecheck]
@@ -363,6 +364,7 @@ jobs:
   # ============================================================================
   integration-tests:
     name: Integration Tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 8
     needs: [unit-tests]
@@ -432,6 +434,7 @@ jobs:
   # ============================================================================
   contract-drift:
     name: Contract Drift Check
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, X64, ubuntu24]
     timeout-minutes: 3
     needs: [validate-schemas]
