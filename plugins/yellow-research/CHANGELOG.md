@@ -1,19 +1,23 @@
 # Changelog
 
-## 1.2.0
-
-### Minor Changes
-
-- Add ast-grep MCP server for AST-based structural code search. Bundles 4 new
-  tools (find_code, find_code_by_rule, dump_syntax_tree, test_match_code_rule)
-  via uvx. Adds health checks for ast-grep and Parallel Task MCP to
-  /research:setup.
-
 All notable changes to this plugin are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.2.0] - 2026-03-06
+
+### Minor Changes
+
+- [`eb5c43c`](https://github.com/KingInYellows/yellow-plugins/commit/eb5c43c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add ast-grep
+  MCP server for AST-based structural code search. Bundles 4 new tools
+  (find_code, find_code_by_rule, dump_syntax_tree, test_match_code_rule) via
+  uvx. Adds health checks for ast-grep and Parallel Task MCP to
+  /research:setup.
 
 ---
 

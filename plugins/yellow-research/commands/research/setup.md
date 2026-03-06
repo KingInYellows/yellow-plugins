@@ -12,7 +12,6 @@ allowed-tools:
   - mcp__filesystem-with-morph__warpgrep_codebase_search
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
   - mcp__plugin_yellow-research_ast-grep__find_code
-  - mcp__plugin_yellow-research_parallel__createDeepResearch
 ---
 
 # Set Up yellow-research

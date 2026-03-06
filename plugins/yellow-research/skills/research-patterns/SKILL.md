@@ -113,7 +113,7 @@ ToolSearch "exa"
 ToolSearch "tavily"
 ToolSearch "perplexity"
 ToolSearch "parallel"
-ToolSearch "find_code"
+ToolSearch "ast-grep"
 ```
 
 Or run `/mcp` in Claude Code to see all registered tools.

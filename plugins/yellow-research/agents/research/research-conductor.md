@@ -51,6 +51,7 @@ structures, API usage patterns, or AST-level analysis, use ast-grep tools:
 - `mcp__plugin_yellow-research_ast-grep__find_code_by_rule` for complex AST rules
 - `mcp__plugin_yellow-research_ast-grep__dump_syntax_tree` to understand AST structure before writing rules
 - `mcp__plugin_yellow-research_ast-grep__test_match_code_rule` to validate rules before searching
+
 ast-grep is a **code search** complement — it does NOT change the
 Simple/Moderate/Complex web research fan-out below.
 
