@@ -60,11 +60,11 @@ Build a structured plain-text entry:
 
 1. Call ToolSearch("hooks_remember"). If not found, report
    "ruvector not available. Run `/ruvector:setup` to initialize." and stop.
-2. Also call ToolSearch("hooks_recall"). If not found, skip dedup and proceed
-   to Step 5.
-3. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
    If it errors, report "ruvector not available right now. Check
    `/ruvector:status` and try again." and stop.
+3. Also call ToolSearch("hooks_recall"). If not found, skip dedup and proceed
+   to Step 5.
 4. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with
    `query=constructed content`, `top_k=1`.
 5. If the MCP call errors with timeout, connection refused, or service

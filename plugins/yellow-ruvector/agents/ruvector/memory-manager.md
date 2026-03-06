@@ -8,6 +8,7 @@ allowed-tools:
   - Read
   - Write
   - Bash
+  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---

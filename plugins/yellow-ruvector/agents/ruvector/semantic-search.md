@@ -6,6 +6,7 @@ allowed-tools:
   - ToolSearch
   - Grep
   - Read
+  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 

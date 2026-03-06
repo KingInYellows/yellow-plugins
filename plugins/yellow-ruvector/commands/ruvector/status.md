@@ -18,7 +18,7 @@ Show installation health, database statistics, and queue status.
 ### Step 1: Check Installation
 
 ```bash
-npx ruvector --version 2>/dev/null
+ruvector --version 2>/dev/null
 ```
 
 Report: installed version or "not installed".
@@ -50,7 +50,7 @@ MCP server: not responding
 
 Recovery options:
 1. Restart the session (MCP server starts automatically on session start)
-2. Check manually: npx ruvector mcp start
+2. Check manually: ruvector mcp start
 3. Re-install: /ruvector:setup
 ```
 
