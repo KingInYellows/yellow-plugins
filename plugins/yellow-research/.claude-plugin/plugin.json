@@ -15,6 +15,7 @@
     "perplexity",
     "exa",
     "tavily",
+    "ast-grep",
     "mcp"
   ],
   "mcpServers": {

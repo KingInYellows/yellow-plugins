@@ -34,7 +34,13 @@ command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:
 command -v jq       >/dev/null 2>&1 && printf 'jq:        ok\n' || printf 'jq:        NOT FOUND\n'
 command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
 command -v uv       >/dev/null 2>&1 && printf 'uv:        ok\n' || printf 'uv:        NOT FOUND (needed for ast-grep MCP)\n'
-python3 --version 2>/dev/null | grep -qE '3\.(1[3-9]|[2-9][0-9])' && printf 'python:    ok (>=3.13)\n' || printf 'python:    NEEDS >=3.13 (needed for ast-grep MCP)\n'
+if ! command -v python3 >/dev/null 2>&1; then
+  printf 'python3:   NOT FOUND (needed for ast-grep MCP)\n'
+elif python3 --version 2>/dev/null | grep -qE '3\.(1[3-9]|[2-9][0-9])'; then
+  printf 'python3:   ok (>=3.13)\n'
+else
+  printf 'python3:   %s (NEEDS >=3.13 for ast-grep MCP)\n' "$(python3 --version 2>/dev/null || echo 'unknown version')"
+fi
 
 printf '\n=== API Keys ===\n'
 [ -n "${EXA_API_KEY:-}" ]          && printf 'EXA_API_KEY:          set\n' || printf 'EXA_API_KEY:          NOT SET\n'
@@ -272,7 +278,8 @@ Test: ToolSearch probe only (do not create actual tasks — they have compute co
 
 For Parallel Task, a ToolSearch-only check is used instead of the test-call
 pattern. Creating tasks has real compute cost and `getStatus` requires a valid
-task ID. If the tool appears in ToolSearch results, record status as `ACTIVE`.
+task ID. If the tool appears in ToolSearch results, record status as
+`ACTIVE (ToolSearch only — server reachability not verified)`.
 
 Run all six ToolSearch probes. For sources that are found, run their test calls
 (except Parallel Task which uses ToolSearch-only).

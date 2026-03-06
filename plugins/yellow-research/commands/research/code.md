@@ -23,7 +23,7 @@ allowed-tools:
 
 # Code Research
 
-Research code topics inline using EXA, Context7, GitHub, and Perplexity.
+Research code topics inline using EXA, Context7, GitHub, Perplexity, and ast-grep.
 Results are returned in-context — no file is saved.
 
 ## Workflow
