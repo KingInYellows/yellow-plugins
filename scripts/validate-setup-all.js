@@ -62,15 +62,23 @@ function parseFrontmatterName(markdown) {
   return nameMatch ? nameMatch[1].trim().replace(/^['"]|['"]$/g, '') : null;
 }
 
-function parseDashboardPlugins(markdown) {
-  const match = markdown.match(/for p in\s+([\s\S]*?)\s*;\s*do/);
+function extractMarkedSection(markdown, startMarker, endMarker) {
+  const start = markdown.indexOf(startMarker);
+  if (start === -1) return null;
+  const end = markdown.indexOf(endMarker, start + startMarker.length);
+  if (end === -1) return null;
+  return markdown.slice(start + startMarker.length, end);
+}
+
+function parseDashboardPlugins(section) {
+  const match = section.match(/for p in\s+([\s\S]*?)\s*;\s*do/);
   if (!match) return [];
   return match[1].split(/\s+/).filter(Boolean);
 }
 
-function parseClassificationPlugins(markdown, marketplacePlugins) {
+function parseClassificationPlugins(section, marketplacePlugins) {
   const headings = [];
-  for (const match of markdown.matchAll(/^\*\*([a-z0-9-]+):\*\*$/gm)) {
+  for (const match of section.matchAll(/^\*\*([a-z0-9-]+):\*\*$/gm)) {
     const name = match[1];
     if (marketplacePlugins.includes(name)) {
       headings.push(name);
@@ -79,12 +87,8 @@ function parseClassificationPlugins(markdown, marketplacePlugins) {
   return headings;
 }
 
-function parseDelegatedCommands(markdown) {
+function parseDelegatedCommands(section) {
   const commands = [];
-  const step4 = markdown.match(
-    /### Step 4: Sequential Interactive Setups([\s\S]*?)### Step 5:/m
-  );
-  const section = step4 ? step4[1] : markdown;
   for (const match of section.matchAll(/^\d+\.\s+`([^`]+)`$/gm)) {
     commands.push(match[1]);
   }
@@ -106,12 +110,44 @@ function main() {
   const marketplacePlugins = marketplace.plugins.map((plugin) => plugin.name);
   const setupAll = readText(SETUP_ALL_PATH);
 
-  const dashboardPlugins = parseDashboardPlugins(setupAll);
-  const classificationPlugins = parseClassificationPlugins(
+  const dashboardSection = extractMarkedSection(
     setupAll,
-    marketplacePlugins
+    '# setup-all-dashboard-plugin-loop:start',
+    '# setup-all-dashboard-plugin-loop:end'
   );
-  const delegatedCommands = parseDelegatedCommands(setupAll);
+  const classificationSection = extractMarkedSection(
+    setupAll,
+    '<!-- setup-all-classification:start -->',
+    '<!-- setup-all-classification:end -->'
+  );
+  const delegatedSection = extractMarkedSection(
+    setupAll,
+    '<!-- setup-all-delegated-commands:start -->',
+    '<!-- setup-all-delegated-commands:end -->'
+  );
+
+  if (!dashboardSection) {
+    errors.push('missing dashboard plugin loop markers in setup:all');
+  }
+  if (!classificationSection) {
+    errors.push('missing classification markers in setup:all');
+  }
+  if (!delegatedSection) {
+    errors.push('missing delegated command markers in setup:all');
+  }
+
+  const dashboardPlugins = dashboardSection
+    ? parseDashboardPlugins(dashboardSection)
+    : [];
+  const classificationPlugins = classificationSection
+    ? parseClassificationPlugins(
+        classificationSection,
+        marketplacePlugins
+      )
+    : [];
+  const delegatedCommands = delegatedSection
+    ? parseDelegatedCommands(delegatedSection)
+    : [];
   const delegatedPlugins = delegatedCommands.map(
     (command) => COMMAND_PLUGIN_MAP[command]
   );

@@ -124,26 +124,18 @@ printf '\n=== Optional Working Paths ===\n'
 printf '\n=== Installed Plugins ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
 if [ -d "$plugin_cache" ]; then
-  for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-core; do
-    found=0
-    for d in "$plugin_cache"/*/; do
-      [ -f "${d}.claude-plugin/plugin.json" ] || continue
-      if command -v python3 >/dev/null 2>&1; then
-        name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "${d}.claude-plugin/plugin.json" 2>/dev/null)
-      elif command -v jq >/dev/null 2>&1; then
-        name=$(jq -r '.name // ""' "${d}.claude-plugin/plugin.json" 2>/dev/null)
+  if installed_plugins=$(bash ./scripts/list-installed-plugins.sh "$plugin_cache" 2>/dev/null); then
+    # setup-all-dashboard-plugin-loop:start
+    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-core; do
+      if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
+        printf '%-22s installed\n' "$p:"
       else
-        name=''
-      fi
-      if [ "$name" = "$p" ]; then
-        found=1
-        break
+        printf '%-22s NOT INSTALLED\n' "$p:"
       fi
     done
-    [ "$found" = "1" ] && printf '%-22s installed\n' "$p:" || printf '%-22s NOT INSTALLED\n' "$p:"
-  done
-  if ! command -v python3 >/dev/null 2>&1 && ! command -v jq >/dev/null 2>&1; then
-    printf 'plugin_cache_warning: neither python3 nor jq is available for plugin detection\n'
+    # setup-all-dashboard-plugin-loop:end
+  else
+    printf 'plugin_cache_warning: unable to inspect plugin cache (need python3 or jq)\n'
   fi
 else
   printf 'plugin_cache: NOT FOUND (cannot detect installed plugins)\n'
@@ -183,6 +175,7 @@ Classify each installed plugin as **READY**, **PARTIAL**, or **NEEDS SETUP**.
 If a plugin shows `NOT INSTALLED` in the Installed Plugins section, classify it
 as **NOT INSTALLED** and skip all other checks for that plugin.
 
+<!-- setup-all-classification:start -->
 **gt-workflow:**
 
 - READY: `gt` OK AND `jq` OK AND `graphite_auth` present AND (`graphite_repo`
@@ -277,6 +270,7 @@ Compute bundled source availability out of 5:
 - PARTIAL: script exists AND `statusLine_key` is present AND `python37_check`
   is ok, but `disableAllHooks` is `True`
 - NEEDS SETUP: any other READY condition not met
+<!-- setup-all-classification:end -->
 
 Display the dashboard in this order:
 
@@ -353,6 +347,7 @@ If the user picks **"Skip for now"**, display the dashboard summary and stop.
 For each selected plugin, invoke the corresponding setup command via the Skill
 tool in this fixed order:
 
+<!-- setup-all-delegated-commands:start -->
 1. `gt-setup`
 2. `ruvector:setup`
 3. `morph:setup`
@@ -366,6 +361,7 @@ tool in this fixed order:
 11. `review:setup`
 12. `browser-test:setup`
 13. `statusline:setup`
+<!-- setup-all-delegated-commands:end -->
 
 Only invoke setups for plugins the user selected. Use this mapping:
 

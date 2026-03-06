@@ -37,20 +37,9 @@ printf '\n=== Optional Integration ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
 linear_installed=0
 if [ -d "$plugin_cache" ]; then
-  for d in "$plugin_cache"/*/; do
-    [ -f "${d}.claude-plugin/plugin.json" ] || continue
-    if command -v python3 >/dev/null 2>&1; then
-      name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "${d}.claude-plugin/plugin.json" 2>/dev/null)
-    elif command -v jq >/dev/null 2>&1; then
-      name=$(jq -r '.name // ""' "${d}.claude-plugin/plugin.json" 2>/dev/null)
-    else
-      name=''
-    fi
-    if [ "$name" = "yellow-linear" ]; then
-      linear_installed=1
-      break
-    fi
-  done
+  if installed_plugins=$(bash ./scripts/list-installed-plugins.sh "$plugin_cache" 2>/dev/null); then
+    printf '%s\n' "$installed_plugins" | grep -Fxq 'yellow-linear' && linear_installed=1
+  fi
 fi
 [ "$linear_installed" = "1" ] && printf 'yellow_linear: installed\n' || printf 'yellow_linear: NOT INSTALLED\n'
 ```
