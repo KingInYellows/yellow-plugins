@@ -11,6 +11,8 @@ allowed-tools:
   - mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
   - mcp__filesystem-with-morph__warpgrep_codebase_search
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
+  - mcp__plugin_yellow-research_ast-grep__find_code
+  - mcp__plugin_yellow-research_parallel__createDeepResearch
 ---
 
 # Set Up yellow-research
@@ -28,8 +30,11 @@ Run a single Bash call to check tools and all three env vars:
 
 ```bash
 printf '=== Prerequisites ===\n'
-command -v curl >/dev/null 2>&1 && printf 'curl: ok\n' || printf 'curl: NOT FOUND\n'
-command -v jq   >/dev/null 2>&1 && printf 'jq:   ok\n' || printf 'jq:   NOT FOUND\n'
+command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:      NOT FOUND\n'
+command -v jq       >/dev/null 2>&1 && printf 'jq:        ok\n' || printf 'jq:        NOT FOUND\n'
+command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
+command -v uv       >/dev/null 2>&1 && printf 'uv:        ok\n' || printf 'uv:        NOT FOUND (needed for ast-grep MCP)\n'
+python3 --version 2>/dev/null | grep -qE '3\.(1[3-9]|[2-9][0-9])' && printf 'python:    ok (>=3.13)\n' || printf 'python:    NEEDS >=3.13 (needed for ast-grep MCP)\n'
 
 printf '\n=== API Keys ===\n'
 [ -n "${EXA_API_KEY:-}" ]          && printf 'EXA_API_KEY:          set\n' || printf 'EXA_API_KEY:          NOT SET\n'
@@ -194,8 +199,9 @@ If user skips testing: all format-valid keys show `PRESENT (untested)`.
 ### Step 3.5: MCP Source Health Checks
 
 This step runs unconditionally — MCP calls have no quota cost and require no
-user opt-in. Check each of the four MCP sources using a ToolSearch probe
-followed by a lightweight test call.
+user opt-in. Check each of the six MCP sources using a ToolSearch probe
+followed by a lightweight test call (except Parallel Task which uses
+ToolSearch-only).
 
 For each source below, follow this pattern:
 
@@ -243,7 +249,33 @@ Tool name: mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
 Test call: mcp__plugin_yellow-devin_deepwiki__read_wiki_structure with repoName: "facebook/react"
 ```
 
-Run all four ToolSearch probes. For sources that are found, run their test calls.
+**ast-grep MCP** (bundled stdio — AST structural code search):
+
+```text
+ToolSearch keyword: "find_code"
+Tool name: mcp__plugin_yellow-research_ast-grep__find_code
+Test call: mcp__plugin_yellow-research_ast-grep__find_code with pattern: "function $NAME() {}", lang: "javascript"
+```
+
+Note: The ast-grep MCP server starts even without the `ast-grep` binary
+installed (lazy check). ToolSearch finding the tool does NOT confirm the binary
+is available. If the test call fails with "Command 'ast-grep' not found", record
+status as `FAIL` with a note to install the `ast-grep` binary.
+
+**Parallel Task MCP** (bundled HTTP — async research orchestration):
+
+```text
+ToolSearch keyword: "createDeepResearch"
+Tool name: mcp__plugin_yellow-research_parallel__createDeepResearch
+Test: ToolSearch probe only (do not create actual tasks — they have compute cost)
+```
+
+For Parallel Task, a ToolSearch-only check is used instead of the test-call
+pattern. Creating tasks has real compute cost and `getStatus` requires a valid
+task ID. If the tool appears in ToolSearch results, record status as `ACTIVE`.
+
+Run all six ToolSearch probes. For sources that are found, run their test calls
+(except Parallel Task which uses ToolSearch-only).
 Record each source's status for the Step 4 report table.
 
 Never stop on a per-source error — record the status and continue to the next
@@ -274,17 +306,19 @@ Parallel Task server (OAuth)
   You'll be prompted to authorize in your browser on first /research:deep use.
 
 MCP Sources (no API key required — always available if plugin installed)
-  Source         Plugin          Status
-  -----------    -----------     --------
-  Context7       yellow-core     ACTIVE
-  Grep MCP       (global)        ACTIVE
-  WarpGrep       (global)        UNAVAILABLE
-  DeepWiki       yellow-devin    ACTIVE
+  Source         Plugin             Status
+  -----------    ---------------    --------
+  Context7       yellow-core        ACTIVE
+  Grep MCP       (global)           ACTIVE
+  WarpGrep       (global)           UNAVAILABLE
+  DeepWiki       yellow-devin       ACTIVE
+  ast-grep       (bundled)          ACTIVE
+  Parallel Task  (bundled)          ACTIVE
 
 Capability summary:
   /research:deep    PARTIAL (2/3 API sources — Perplexity inactive)
   /research:code    PARTIAL (2/3 API sources — Perplexity inactive)
-  MCP sources:      3/4 available
+  MCP sources:      5/6 available
 ```
 
 Adjust the capability summary based on how many keys are active:
@@ -295,9 +329,9 @@ Adjust the capability summary based on how many keys are active:
 
 Adjust the MCP sources line based on how many MCP sources are ACTIVE:
 
-- 4 active: `MCP sources: 4/4 available`
-- 1-3 active: `MCP sources: N/4 available`
-- 0 active: `MCP sources: 0/4 available — install plugins or configure MCPs`
+- 6 active: `MCP sources: 6/6 available`
+- 1-5 active: `MCP sources: N/6 available`
+- 0 active: `MCP sources: 0/6 available — install plugins or configure MCPs`
 
 ### Step 5: Setup Instructions (for absent or invalid keys)
 
@@ -321,6 +355,21 @@ required after adding new keys. Never commit API keys to version control.
 Only show the lines for keys that are absent or invalid (not all three if some
 are already working).
 
+If ast-grep prerequisites are missing (`ast-grep`, `uv`, or Python < 3.13),
+show this block:
+
+```text
+To enable ast-grep MCP (AST structural code search):
+
+  ast-grep:  brew install ast-grep  (or: cargo install ast-grep --locked, or: pip install ast-grep-cli)
+  uv:        curl -LsSf https://astral.sh/uv/install.sh | sh
+  python:    Requires >= 3.13 (check with: python3 --version)
+
+All three are needed for the ast-grep MCP server. Other MCP servers are unaffected.
+```
+
+Only show this block if at least one ast-grep prerequisite is missing.
+
 If any MCP sources are `UNAVAILABLE` or `FAIL`, show this block:
 
 ```text
@@ -331,12 +380,14 @@ To enable missing MCP sources:
   WarpGrep:   Install yellow-morph — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-morph)
               Or configure filesystem-with-morph MCP globally in Claude Code MCP settings
   DeepWiki:   Install yellow-devin — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-devin)
+  ast-grep:   Bundled — install prerequisites: ast-grep binary, uv, Python >= 3.13 (see above)
+  Parallel:   Bundled — OAuth auto-managed; if FAIL, restart Claude Code
 
 If a source shows FAIL (installed but test failed), try restarting Claude Code.
 ToolSearch results reflect session-start state — restart after installing new plugins.
 ```
 
-Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all four
+Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all six
 if some are already working).
 
 ### Step 6: Next Steps
