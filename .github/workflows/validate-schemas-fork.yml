@@ -179,18 +179,78 @@ jobs:
       - name: Run unit tests
         run: pnpm test:unit --reporter=verbose
 
+  validate-versions:
+    name: Version Consistency Check
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run version consistency check
+        run: node scripts/validate-versions.js
+
+  changeset-check:
+    name: Changeset Required
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for missing changesets
+        run: |
+          set -euo pipefail
+          CHANGED_PLUGINS=$(git diff --name-only origin/main...HEAD \
+            | grep -E '^plugins/[^/]+/' \
+            | sed 's|^plugins/\([^/]*\)/.*|\1|' \
+            | sort -u || true)
+
+          if [ -z "$CHANGED_PLUGINS" ]; then
+            echo "No plugin files changed — no changeset required."
+            exit 0
+          fi
+
+          NEW_CHANGESETS=$(git diff --name-only origin/main...HEAD \
+            | grep -E '^\.changeset/[^/]+\.md$' || true)
+
+          if [ -z "$NEW_CHANGESETS" ]; then
+            echo "::error::Plugin files were modified but no .changeset/*.md file found."
+            echo "::error::Changed plugins: $(echo "$CHANGED_PLUGINS" | tr '\n' ' ')"
+            echo "::error::Run 'pnpm changeset' and commit the resulting .changeset/*.md file."
+            echo "::error::See CONTRIBUTING.md#versioning for the developer workflow."
+            exit 1
+          else
+            echo "Changeset present for plugin changes. OK."
+            echo "Changed plugins: $(echo "$CHANGED_PLUGINS" | tr '\n' ' ')"
+            echo "Changesets: $(echo "$NEW_CHANGESETS" | tr '\n' ' ')"
+          fi
+
   ci-status:
     name: CI Status (Fork)
     runs-on: ubuntu-latest
     if: always() && github.event.pull_request.head.repo.full_name != github.repository
-    needs: [validate-schemas, lint-and-typecheck, unit-tests]
+    needs: [validate-schemas, lint-and-typecheck, unit-tests, validate-versions, changeset-check]
 
     steps:
       - name: Check results
         run: |
           if [ "${{ needs.validate-schemas.result }}" == "success" ] && \
              [ "${{ needs.lint-and-typecheck.result }}" == "success" ] && \
-             [ "${{ needs.unit-tests.result }}" == "success" ]; then
+             [ "${{ needs.unit-tests.result }}" == "success" ] && \
+             [ "${{ needs.validate-versions.result }}" == "success" ] && \
+             { [ "${{ needs.changeset-check.result }}" == "success" ] || [ "${{ needs.changeset-check.result }}" == "skipped" ]; }; then
             echo "::notice::All fork PR checks passed"
             exit 0
           else
@@ -198,5 +258,8 @@ jobs:
             echo "Schema Validation: ${{ needs.validate-schemas.result }}"
             echo "Lint & TypeCheck: ${{ needs.lint-and-typecheck.result }}"
             echo "Unit Tests: ${{ needs.unit-tests.result }}"
+            echo "Version Consistency: ${{ needs.validate-versions.result }}"
+            echo "Changeset Required: ${{ needs.changeset-check.result }}"
             exit 1
           fi
+
