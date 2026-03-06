@@ -1,6 +1,6 @@
 {
   "name": "yellow-core",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
@@ -9,7 +9,14 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-core",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": ["code-review", "research", "typescript", "python", "rust", "go"],
+  "keywords": [
+    "code-review",
+    "research",
+    "typescript",
+    "python",
+    "rust",
+    "go"
+  ],
   "mcpServers": {
     "context7": {
       "type": "http",

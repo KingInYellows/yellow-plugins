@@ -1,7 +1,7 @@
 # yellow-research
 
-Deep research plugin for Claude Code. Bundles Perplexity, Tavily, EXA, and
-Parallel Task MCP servers with three workflows:
+Deep research plugin for Claude Code. Bundles Perplexity, Tavily, EXA,
+Parallel Task, and ast-grep MCP servers with three workflows:
 
 - **`/research:code`** — Inline code research for active development
 - **`/research:deep`** — Multi-source deep research saved to `docs/research/`
@@ -64,6 +64,7 @@ run `/compound` to add to institutional knowledge.
 | Tavily | `tavily-mcp` | Fast web search and page extraction |
 | EXA | `exa-mcp-server` | Neural semantic search, code examples |
 | Parallel Task | `task-mcp.parallel.ai` | Async long-horizon research reports |
+| ast-grep | `ast-grep-mcp` (via uvx) | AST-based structural code search |
 
 ## Research Conductor
 
