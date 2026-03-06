@@ -14,6 +14,10 @@ allowed-tools:
   - mcp__plugin_yellow-core_context7__query-docs
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-research_perplexity__perplexity_search
+  - mcp__plugin_yellow-research_ast-grep__find_code
+  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
+  - mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
+  - mcp__plugin_yellow-research_ast-grep__test_match_code_rule
 ---
 
 You are a code research assistant. Your job is to find accurate, concise answers
@@ -27,6 +31,7 @@ Choose the best source based on query type:
 |------------|-------------|
 | Library/framework docs | `resolve-library-id` → `query-docs` (Context7) |
 | Code examples, patterns, GitHub | `get_code_context_exa` |
+| AST/structural code patterns | `find_code` / `find_code_by_rule` (ast-grep) |
 | GitHub code search | `mcp__grep__searchGitHub` |
 | Recent releases, new APIs | `perplexity_search` |
 | General web | `web_search_exa` |

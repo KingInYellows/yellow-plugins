@@ -24,6 +24,10 @@ allowed-tools:
   - mcp__plugin_yellow-research_perplexity__perplexity_research
   - mcp__plugin_yellow-research_perplexity__perplexity_reason
   - mcp__grep__searchGitHub
+  - mcp__plugin_yellow-research_ast-grep__find_code
+  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
+  - mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
+  - mcp__plugin_yellow-research_ast-grep__test_match_code_rule
 ---
 
 You are a research conductor. Your job is to triage a research topic, decide how
@@ -40,6 +44,15 @@ Classify as **Complex** if: the topic requires comparing >2 entities OR spans >2
 **Moderate** — 2-3 aspects or medium depth:
 - 2-3 parallel Task calls to complementary sources
 - e.g., `perplexity_research` for synthesis + `tavily_search` for recent web
+
+**Code pattern queries** — When the topic involves finding specific code
+structures, API usage patterns, or AST-level analysis, use ast-grep tools:
+- `find_code` for simple pattern matching (e.g., "find all async functions")
+- `find_code_by_rule` for complex AST rules
+- `dump_syntax_tree` to understand AST structure before writing rules
+- `test_match_code_rule` to validate rules before searching
+ast-grep is a **code search** complement — it does NOT change the
+Simple/Moderate/Complex web research fan-out below.
 
 **Complex** — Broad topic, multiple angles, report-grade depth:
 - Full fan-out in parallel:

@@ -28,6 +28,10 @@ allowed-tools:
   - mcp__plugin_yellow-research_perplexity__perplexity_research
   - mcp__plugin_yellow-research_perplexity__perplexity_reason
   - mcp__grep__searchGitHub
+  - mcp__plugin_yellow-research_ast-grep__find_code
+  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
+  - mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
+  - mcp__plugin_yellow-research_ast-grep__test_match_code_rule
 ---
 
 # Deep Research
