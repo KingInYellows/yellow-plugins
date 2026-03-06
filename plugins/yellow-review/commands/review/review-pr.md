@@ -196,6 +196,7 @@ continue.
 ### Step 9b: Record high-signal findings to memory (optional)
 
 If `.ruvector/` exists:
+
 1. Call ToolSearch("hooks_remember"). If not found, skip. Also call
    ToolSearch("hooks_recall"). If not found, skip dedup in step 5
    (proceed directly to step 6).

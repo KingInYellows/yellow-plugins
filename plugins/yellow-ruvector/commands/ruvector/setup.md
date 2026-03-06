@@ -154,6 +154,7 @@ If global binary is not found, **stop setup and report failure:**
 > PostToolUse) cannot function — npx adds ~1900ms overhead.
 >
 > Remediation:
+>
 > 1. `npm install -g ruvector --ignore-scripts`
 > 2. Verify: `command -v ruvector` (should print a path)
 > 3. Re-run `/ruvector:setup`
@@ -168,6 +169,7 @@ If the smoke test failed, **stop setup and report failure:**
 > though the binary is in PATH.
 >
 > Remediation:
+>
 > 1. Run `ruvector doctor`
 > 2. Re-run `timeout 1 ruvector hooks recall --top-k 1 "setup-test"`
 > 3. Re-run `/ruvector:setup` after the latency issue is resolved
