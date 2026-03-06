@@ -76,13 +76,10 @@ function parseDashboardPlugins(section) {
   return match[1].split(/\s+/).filter(Boolean);
 }
 
-function parseClassificationPlugins(section, marketplacePlugins) {
+function parseClassificationPlugins(section) {
   const headings = [];
   for (const match of section.matchAll(/^\*\*([a-z0-9-]+):\*\*$/gm)) {
-    const name = match[1];
-    if (marketplacePlugins.includes(name)) {
-      headings.push(name);
-    }
+    headings.push(match[1]);
   }
   return headings;
 }
@@ -140,10 +137,7 @@ function main() {
     ? parseDashboardPlugins(dashboardSection)
     : [];
   const classificationPlugins = classificationSection
-    ? parseClassificationPlugins(
-        classificationSection,
-        marketplacePlugins
-      )
+    ? parseClassificationPlugins(classificationSection)
     : [];
   const delegatedCommands = delegatedSection
     ? parseDelegatedCommands(delegatedSection)
@@ -211,7 +205,7 @@ function main() {
   if (
     dashboardPlugins.length > 0 &&
     delegatedPlugins.length > 0 &&
-    dashboardPlugins.join('|') !== delegatedPlugins.join('|')
+    dashboardPlugins.join('|') !== delegatedPlugins.filter(Boolean).join('|')
   ) {
     errors.push(
       `dashboard order does not match delegated setup order: dashboard=[${dashboardPlugins.join(', ')}] delegated=[${delegatedPlugins.join(', ')}]`

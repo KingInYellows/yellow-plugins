@@ -34,8 +34,16 @@ printf '\n=== Optional Integration ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
 core_installed=0
 if [ -d "$plugin_cache" ]; then
-  if installed_plugins=$(bash ./scripts/list-installed-plugins.sh "$plugin_cache" 2>/dev/null); then
-    printf '%s\n' "$installed_plugins" | grep -Fxq 'yellow-core' && core_installed=1
+  if command -v python3 >/dev/null 2>&1; then
+    find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+      | while IFS= read -r -d '' pj; do
+          python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "$pj" 2>/dev/null || true
+        done | grep -Fxq 'yellow-core' && core_installed=1
+  elif command -v jq >/dev/null 2>&1; then
+    find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+      | while IFS= read -r -d '' pj; do
+          jq -r '.name // empty' "$pj" 2>/dev/null || true
+        done | grep -Fxq 'yellow-core' && core_installed=1
   fi
 fi
 [ "$core_installed" = "1" ] && printf 'yellow_core:   installed\n' || printf 'yellow_core:   NOT INSTALLED\n'

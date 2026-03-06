@@ -124,7 +124,19 @@ printf '\n=== Optional Working Paths ===\n'
 printf '\n=== Installed Plugins ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
 if [ -d "$plugin_cache" ]; then
-  if installed_plugins=$(bash ./scripts/list-installed-plugins.sh "$plugin_cache" 2>/dev/null); then
+  installed_plugins=""
+  if command -v python3 >/dev/null 2>&1; then
+    installed_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+      | while IFS= read -r -d '' pj; do
+          python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "$pj" 2>/dev/null || true
+        done | sed '/^$/d' | LC_ALL=C sort -u)
+  elif command -v jq >/dev/null 2>&1; then
+    installed_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+      | while IFS= read -r -d '' pj; do
+          jq -r '.name // empty' "$pj" 2>/dev/null || true
+        done | sed '/^$/d' | LC_ALL=C sort -u)
+  fi
+  if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
     for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
