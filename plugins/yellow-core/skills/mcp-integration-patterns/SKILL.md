@@ -14,7 +14,10 @@ tools are not installed.
 > its own workflow structure. When updating parameters (top_k, score cutoff,
 > char limits), update this document AND all consuming commands:
 > `brainstorm.md`, `plan.md`, `compound.md`, `work.md`, `review-pr.md`,
-> `resolve-pr.md`.
+> `resolve-pr.md`, `review-all.md` (allowed-tools only — no inline steps),
+> `plugins/yellow-ruvector/commands/ruvector/search.md`,
+> `plugins/yellow-ruvector/commands/ruvector/learn.md`, and
+> `plugins/yellow-ruvector/commands/ruvector/memory.md`.
 
 ## Pattern 1: Recall-Before-Act
 
@@ -25,7 +28,14 @@ Query ruvector memory for relevant past learnings before executing a workflow.
 ```text
 1. Fast-path: test -d .ruvector || skip to next workflow step
 2. Call ToolSearch("hooks_recall"). If not found: skip entirely.
+3. Warmup: call hooks_capabilities(). This absorbs MCP cold start
+   (300-1500ms on first tool call per session). If it errors: note
+   "[ruvector] Warning: MCP warmup failed" and skip recall entirely.
 ```
+
+The warmup call has no side effects and returns engine status in sub-100ms
+once the server is warm. It forces the MCP server through its initialization
+handshake before the real recall call.
 
 ### Query Construction
 
@@ -69,7 +79,14 @@ tokens.
 
 ```text
 1. Call hooks_recall(query, top_k=5)
-2. If MCP execution error: note warning, skip to next step
+2. If MCP execution error (timeout, connection refused, or service
+   unavailable): wait approximately 500 milliseconds, then retry
+   exactly once with the same parameters.
+   - If the retry succeeds: continue with its results.
+   - If the retry also fails: note "[ruvector] Warning: recall
+     unavailable after retry" and skip to next workflow step.
+   - Do NOT retry on validation errors or parameter errors.
+   - Do NOT attempt alternative approaches or workarounds.
 3. Discard results with score < 0.5
 4. If no results remain: skip (normal on cold DB)
 5. Take top 3 results
@@ -146,13 +163,15 @@ All remembered content must meet these gates:
 - **Specificity:** Name concrete files, commands, or error messages.
   "Fixed CRLF in hooks.sh by running `sed -i 's/\r$//'`" not "Fixed a bug"
 
-### Namespace Guidance
+### Type Guidance
 
-| Namespace | Use for |
+| Type | Use for |
 |---|---|
-| `skills` | Successful patterns, techniques, conventions |
-| `reflexion` | Mistakes, failures, and their fixes |
-| `sessions` | Session summaries, high-level outcomes |
+| `decision` | Successful patterns, techniques, conventions |
+| `context` | Mistakes, failures, and their fixes |
+| `project` | Session summaries, high-level outcomes |
+| `code` | Code-specific implementation notes |
+| `general` | Fallback when none of the above fit cleanly |
 
 ### Deduplication Check
 
@@ -161,7 +180,10 @@ Before storing, check for near-duplicates:
 ```text
 1. Call hooks_recall(query=content, top_k=1)
 2. If score > 0.82: skip ("near-duplicate exists")
-3. If hooks_recall errors: skip dedup check, proceed to store
+3. If hooks_recall errors (timeout, connection refused, service
+   unavailable): wait approximately 500 milliseconds, retry exactly
+   once. If retry also fails: skip dedup check, proceed to store.
+   Do NOT retry on validation errors or parameter errors.
 ```
 
 ### Execution
@@ -170,12 +192,21 @@ Before storing, check for near-duplicates:
 1. If .ruvector/ does not exist: skip
 2. Call ToolSearch("hooks_remember"). If not found: skip
 3. Classify signal tier using the table above
-4. If Auto: call hooks_remember directly
+4. If Auto: call hooks_remember(content, type) directly
 5. If Prompted: AskUserQuestion "Save this learning to memory?" with
    preview of the content. Record if confirmed.
 6. If Skip: no-op
-7. If hooks_remember errors: skip silently
+7. If hooks_remember errors (timeout, connection refused, or service
+   unavailable): wait approximately 500 milliseconds, retry exactly
+   once. If retry also fails: note "[ruvector] Warning: remember
+   failed after retry — learning not persisted" and continue.
+   Do NOT retry on validation errors or parameter errors.
 ```
+
+Note: If Pattern 1 (Recall-Before-Act) already ran earlier in the same
+session, the MCP server is warm and the warmup step is not needed before
+Pattern 2. Only add a warmup call before Pattern 2 if it runs in a
+workflow that does not use Pattern 1 (e.g., `/workflows:compound`).
 
 ## Pattern 3: Morph-Discovery
 

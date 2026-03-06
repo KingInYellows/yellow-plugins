@@ -6,6 +6,7 @@ allowed-tools:
   - Bash
   - ToolSearch
   - mcp__plugin_yellow-ruvector_ruvector__hooks_stats
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # ruvector Status
@@ -17,7 +18,7 @@ Show installation health, database statistics, and queue status.
 ### Step 1: Check Installation
 
 ```bash
-npx ruvector --version 2>/dev/null
+ruvector --version 2>/dev/null
 ```
 
 Report: installed version or "not installed".
@@ -33,8 +34,12 @@ Report: directory exists/missing, total disk usage.
 
 ### Step 3: MCP Server Health Check
 
-Use ToolSearch to discover ruvector MCP tools. Attempt a lightweight call (e.g.,
-`hooks_stats`) to verify the server responds.
+1. Call ToolSearch with query `"hooks_stats"`. If not found, mark MCP as
+   unavailable.
+2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+   If it errors, mark MCP as unavailable.
+3. If warmup succeeds, call `mcp__plugin_yellow-ruvector_ruvector__hooks_stats`
+   to verify the server responds.
 
 **Healthy:** "MCP server: connected (responded in Xms)"
 
@@ -45,7 +50,7 @@ MCP server: not responding
 
 Recovery options:
 1. Restart the session (MCP server starts automatically on session start)
-2. Check manually: npx ruvector mcp start
+2. Check manually: ruvector mcp start
 3. Re-install: /ruvector:setup
 ```
 
@@ -54,12 +59,14 @@ parse the output to decide whether to fall back to Grep.
 
 ### Step 4: Database Statistics
 
-If MCP is available, call `hooks_stats` (or equivalent via ToolSearch) to
-get:
+If MCP is available, report the overall statistics returned by `hooks_stats`
+and any engine capabilities returned by `hooks_capabilities`, such as:
 
-- Vector count per namespace (`code`, `reflexion`, `skills`, `causal`,
-  `sessions`)
-- Approximate total size
+- Total memories
+- Patterns learned
+- Trajectories recorded
+- Storage path
+- Engine features or embedding mode when present
 
 ### Step 5: Queue Health
 
@@ -91,14 +98,14 @@ Warn if queue > 5MB or > 1000 entries.
 | MCP Server | Available |
 | Storage | .ruvector/ (12.4 MB) |
 
-### Namespaces
+### Intelligence
 
-| Namespace | Vectors | Status |
-|-----------|---------|--------|
-| code | 1,247 | Indexed |
-| reflexion | 23 | Active |
-| skills | 8 | Active |
-| causal | 5 | Active |
+| Property | Value |
+|----------|-------|
+| Total memories | 208 |
+| Patterns learned | 13 |
+| Trajectories | 52 |
+| Engine features | VectorDB, SONA, Attention |
 
 ### Queue
 

@@ -7,6 +7,7 @@ allowed-tools:
   - Task
   - ToolSearch
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # /workflows:brainstorm
@@ -27,14 +28,19 @@ If the above exits non-zero, stop. Do not delegate.
 If `.ruvector/` exists in the project root:
 
 1. Call ToolSearch with query `"hooks_recall"`. If not found, skip to Delegate.
-2. Build query: `"[brainstorm-design] "` + first 300 chars of `$ARGUMENTS`.
-3. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`(query, top_k=5).
-   If MCP execution error, skip to Delegate.
-4. Discard results with score < 0.5. Take top 3. Truncate combined content to
+2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+   If it errors, note "[ruvector] Warning: MCP warmup failed" and skip to
+   Delegate (MCP server not available).
+3. Build query: `"[brainstorm-design] "` + first 300 chars of `$ARGUMENTS`.
+4. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`(query, top_k=5).
+   If MCP execution error (timeout, connection refused, service unavailable):
+   wait approximately 500 milliseconds, retry exactly once. If retry also
+   fails, skip to Delegate. Do NOT retry on validation or parameter errors.
+5. Discard results with score < 0.5. Take top 3. Truncate combined content to
    800 chars at word boundary.
-5. Sanitize XML metacharacters in each finding's content before interpolation:
+6. Sanitize XML metacharacters in each finding's content before interpolation:
    replace `&` with `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`.
-6. Include as advisory context when delegating to brainstorm-orchestrator —
+7. Include as advisory context when delegating to brainstorm-orchestrator —
    prefix the agent prompt with:
 
 --- recall context begin (reference only) ---

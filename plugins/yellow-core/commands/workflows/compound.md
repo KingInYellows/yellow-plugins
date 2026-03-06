@@ -9,6 +9,7 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # /workflows:compound
@@ -67,18 +68,30 @@ The agent handles all extraction, routing, confirmation, and file writing.
 
 After the knowledge-compounder agent completes:
 
-1. If `.ruvector/` does not exist in the project root, skip to Step 4.
-2. Call ToolSearch with query `"hooks_remember"`. If not found, skip to Step 4.
-3. Read the solution doc or MEMORY.md entry the agent just wrote.
-4. Extract the key insight or summary (first 500 chars).
-5. Dedup check: call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with
+1. If `.ruvector/` does not exist in the project root, skip to Step 4
+   (Report Results).
+2. Call ToolSearch with query `"hooks_remember"`. If not found, skip to Step 4
+   (Report Results). Also call ToolSearch with query `"hooks_recall"`. If not
+   found, skip dedup in step 6 (proceed directly to step 7).
+3. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+   If it errors, note "[ruvector] Warning: MCP warmup failed" and skip to
+   Step 4 (Report Results).
+4. Read the solution doc or MEMORY.md entry the agent just wrote.
+5. Extract the key insight or summary (first 500 chars).
+6. Dedup check: call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with
    query=content, top_k=1. If score > 0.82, skip (near-duplicate). If
-   `hooks_recall` errors, skip dedup and proceed to step 6.
-6. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_remember` with the
-   extracted content. This is Auto tier — no user prompt needed (user already
-   opted in by running `/workflows:compound`).
-7. If `mcp__plugin_yellow-ruvector_ruvector__hooks_remember` errors, skip
-   silently.
+   `hooks_recall` errors (timeout, connection refused, service unavailable):
+   wait approximately 500 milliseconds, retry exactly once. If retry also
+   fails, skip dedup and proceed to step 7. Do NOT retry on validation or
+   parameter errors.
+7. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_remember` with the
+   extracted content as `content` and `type=project`. This is Auto tier — no
+   user prompt needed (user already opted in by running
+   `/workflows:compound`). If error (timeout, connection refused, service
+   unavailable): wait approximately 500 milliseconds, retry exactly once. If
+   retry also fails: note "[ruvector] Warning: remember failed after retry —
+   learning not persisted" and continue. Do NOT retry on validation or
+   parameter errors.
 
 ### Step 4: Report Results
 

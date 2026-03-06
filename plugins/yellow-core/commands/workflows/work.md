@@ -18,6 +18,7 @@ allowed-tools:
   - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # Implementation Workflow
@@ -62,18 +63,24 @@ assurance.
    1. If `.ruvector/` does not exist in the project root: proceed to Step 3
       (Clarify ambiguities).
    2. Call ToolSearch with query "hooks_recall". If not found: proceed to
-      Step 3.
-   3. Build query: `"[implementation] "` + plan Overview section text (text
+      Clarify Ambiguities (Step 3).
+   3. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+      If it errors, note "[ruvector] Warning: MCP warmup failed" and proceed
+      to Clarify Ambiguities (Step 3).
+   4. Build query: `"[implementation] "` + plan Overview section text (text
       under first `## Overview` heading, or first 500 chars of plan body if no
       Overview heading).
-   4. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5). If execution error: note
-      "[yellow-ruvector] Warning: Memory retrieval unavailable" and proceed to
-      Step 3 (Clarify ambiguities).
-   5. Discard results with score < 0.5. If none remain: proceed to Step 3.
+   5. Call mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5).
+      If MCP execution error (timeout, connection refused, service
+      unavailable): wait approximately 500 milliseconds, retry exactly once.
+      If retry also fails: note "[ruvector] Warning: recall unavailable after
+      retry" and proceed to Clarify Ambiguities (Step 3). Do NOT retry on
+      validation or parameter errors.
+   6. Discard results with score < 0.5. If none remain: proceed to Step 3.
       Take top 3. Truncate combined content to 800 chars at word boundary.
-   6. Sanitize XML metacharacters in each finding's content: replace `&` with
+   7. Sanitize XML metacharacters in each finding's content: replace `&` with
       `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`.
-   7. Note as advisory context:
+   8. Note as advisory context:
 
       ```xml
       <reflexion_context>
@@ -401,15 +408,27 @@ assurance.
 7. Record session learning:
 
    If `.ruvector/` exists:
-   1. Call ToolSearch("hooks_remember"). If not found, skip.
+   1. Call ToolSearch("hooks_remember"). If not found, skip. Also call
+      ToolSearch("hooks_recall"). If not found, skip dedup in step 5
+      (proceed directly to step 6).
    2. This is Auto tier — record without asking (implementation insights are
       high-signal).
    3. Compose learning with context/insight/action structure, 20+ words,
       naming concrete files and commands.
-   4. Use namespace `skills` for successful patterns, `reflexion` for mistakes.
-   5. Dedup check: call mcp__plugin_yellow-ruvector_ruvector__hooks_recall with query=content, top_k=1. If
-      score > 0.82, skip (near-duplicate).
-   6. Call mcp__plugin_yellow-ruvector_ruvector__hooks_remember. If error, skip silently.
+   4. Choose `type`: use `decision` for successful patterns and `context` for
+      mistakes or failures.
+   5. Dedup check: call mcp__plugin_yellow-ruvector_ruvector__hooks_recall with
+      query=content, top_k=1. If score > 0.82, skip (near-duplicate). If
+      hooks_recall errors (timeout, connection refused, service unavailable):
+      wait approximately 500 milliseconds, retry exactly once. If retry also
+      fails, skip dedup and proceed to step 6. Do NOT retry on validation or
+      parameter errors.
+   6. Call mcp__plugin_yellow-ruvector_ruvector__hooks_remember with the
+      composed learning as `content` and the selected `type`. If error
+      (timeout, connection refused, service unavailable): wait approximately
+      500 milliseconds, retry exactly once. If retry also fails: note
+      "[ruvector] Warning: remember failed after retry — learning not
+      persisted" and continue. Do NOT retry on validation or parameter errors.
 
 ## Phase 5: Review
 

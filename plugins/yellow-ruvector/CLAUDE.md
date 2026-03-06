@@ -16,8 +16,9 @@ ruvector.
 
 ## Conventions
 
-- **Namespace naming:** `[a-z0-9-]` only — `code`, `reflexion`, `skills`,
-  `causal`, `sessions`. Reject path traversal characters (`..`, `/`, `~`).
+- **MCP write schema:** `hooks_remember` accepts `content` and optional `type`.
+  Preferred `type` values in this plugin are `decision`, `context`, `project`,
+  `code`, and `general`. Do not invent `namespace` or `metadata` parameters.
 - **MCP tool naming:** All tools referenced as
   `mcp__plugin_yellow-ruvector_ruvector__*` (e.g.,
   `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`)
@@ -39,7 +40,7 @@ ruvector.
 - `/ruvector:search` — Search codebase by meaning using vector similarity
 - `/ruvector:status` — Show ruvector health, DB stats, and queue status
 - `/ruvector:learn` — Record a learning, mistake, or pattern for future sessions
-- `/ruvector:memory` — Browse, search, and manage stored memories and learnings
+- `/ruvector:memory` — Browse and search stored memories and learnings
 
 ### Agents (2)
 
@@ -49,7 +50,7 @@ ruvector.
 
 ### Skills (3)
 
-- `ruvector-conventions` — Namespace definitions, memory schema, error handling
+- `ruvector-conventions` — MCP schema, memory patterns, and error handling
   catalog
 - `agent-learning` — Learning triggers, quality gates, retrieval strategy
 - `memory-query` — Standard pattern for querying ruvector institutional memory
@@ -82,8 +83,8 @@ ruvector.
   a mistake, pattern, or insight.
 - **`ruvector-memory-manager` agent** — Auto-triggers for storing/retrieving
   learnings. Handles bulk memory operations and memory curation.
-- **`/ruvector:memory`** — Browse and manage all stored memories. Use for
-  viewing, filtering, or deleting entries.
+- **`/ruvector:memory`** — Browse stored memories. Use for viewing and
+  filtering entries.
 - **`/ruvector:index`** — Manual full or incremental index. Use after major code
   changes.
 - **`/ruvector:status`** — Health check. Use to verify ruvector is working and
@@ -117,16 +118,17 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
      steps for a future agent in the same situation)
    - **Specificity:** name concrete files, commands, or error messages —
      "Fixed CRLF in hooks.sh by running `sed -i 's/\r$//'`" not "Fixed a bug"
-   - Use namespace `skills` for successful patterns, `reflexion` for mistakes
-     and fixes, `sessions` for session summaries
+   - Use `type=decision` for successful patterns, `type=context` for mistakes
+     and fixes, and `type=project` for session summaries
 
 5. If `hooks_remember` fails or is unavailable, skip silently.
 
 ## Known Limitations
 
 - First stdio MCP server in this repo — less battle-tested than HTTP pattern
-- Hooks use ruvector CLI directly (not MCP tools) — if `ruvector` binary and
-  `npx` are both unavailable, hooks exit silently without error
+- Hooks use ruvector CLI directly (not MCP tools) — global `ruvector` binary
+  in PATH is required (npx adds ~1900ms, exceeding 1s hook budgets). If the
+  binary is unavailable, hooks exit silently without error
 - No offline MCP fallback — if ruvector MCP is down, search and memory
   operations fail gracefully
 - `.ruvector/` is shared across git worktrees — concurrent indexing may race

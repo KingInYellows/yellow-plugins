@@ -7,12 +7,12 @@ allowed-tools:
   - AskUserQuestion
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
+  - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
 # Record a Learning
 
-Store a structured learning entry (reflexion, skill, or causal observation) for
-retrieval in future sessions.
+Store a structured learning entry for retrieval in future sessions.
 
 ## Workflow
 
@@ -32,51 +32,56 @@ If empty, use AskUserQuestion to gather:
 - **What's the insight?** (what was learned)
 - **What's the action?** (how to apply this in the future)
 
-### Step 2: Determine Namespace
+### Step 2: Determine Storage Type
 
-Based on the learning content, route to the appropriate namespace:
+Based on the learning content, route to the appropriate `type` value:
 
-| Signal                                       | Namespace                                      |
-| -------------------------------------------- | ---------------------------------------------- |
-| Mistake, error, failure, correction, retry   | `reflexion`                                    |
-| Successful pattern, technique, best practice | `skills`                                       |
-| "X caused Y", debugging observation          | `causal`                                       |
-| Unclear                                      | Ask via AskUserQuestion with the three options |
+| Signal                                       | Type                                            |
+| -------------------------------------------- | ----------------------------------------------- |
+| Mistake, error, failure, correction, retry   | `context`                                       |
+| Successful pattern, technique, best practice | `decision`                                      |
+| Code-specific implementation note            | `code`                                          |
+| Repo/project-wide background                 | `project`                                       |
+| Unclear                                      | Ask via AskUserQuestion with the four options   |
 
-Validate namespace name matches `[a-z0-9-]` (see `ruvector-conventions` skill).
+Do not invent `namespace` parameters. The current MCP schema accepts `content`
+and optional `type`.
 
 ### Step 3: Construct Entry
 
-Build a structured entry per the schema in `ruvector-conventions` skill:
+Build a structured plain-text entry:
 
 - **Content:** Human-readable description combining context + insight + action
   (minimum 20 words)
-- **Metadata:** Appropriate fields for the chosen namespace
-  (`trigger`/`insight`/`action` for reflexion, `pattern`/`context`/`benefit` for
-  skills, `cause`/`effect`/`context` for causal)
+- **Structure:** Include all three parts explicitly so future recall remains useful
 - **Timestamp:** Current UTC time
 
 ### Step 4: Check for Duplicates
 
-Use ToolSearch to discover ruvector search tools, then search the target
-namespace for similar entries (cosine similarity).
-
-If a match with score > 0.85 is found:
-
-- Show the existing entry
-- Use AskUserQuestion: "A similar learning already exists. Store anyway?"
-- If rejected, stop
+1. Call ToolSearch("hooks_remember"). If not found, report
+   "ruvector not available. Run `/ruvector:setup` to initialize." and stop.
+2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
+   If it errors, report "ruvector not available right now. Check
+   `/ruvector:status` and try again." and stop.
+   If the retry also fails, skip dedup and proceed to Store Entry (Step 5).
 
 ### Step 5: Store Entry
 
-Call `hooks_remember` (via ToolSearch discovery) with the constructed entry in
-the appropriate namespace.
+Call `mcp__plugin_yellow-ruvector_ruvector__hooks_remember` with:
+
+- `content` = constructed entry
+- `type` = selected storage type
+
+If the MCP call errors with timeout, connection refused, or service
+unavailable: wait approximately 500 milliseconds and retry exactly once.
+If the retry also fails, report the error and suggest checking
+`/ruvector:status`.
 
 ### Step 6: Confirm
 
 Report the stored entry:
 
-- Namespace
+- Type
 - Brief summary
 - Entry ID (if returned by MCP)
 - "This learning will be loaded in future sessions via the SessionStart hook."

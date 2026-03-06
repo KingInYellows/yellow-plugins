@@ -6,6 +6,7 @@ allowed-tools:
   - ToolSearch
   - Grep
   - Read
+  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---
 
@@ -37,7 +38,7 @@ ruvector's vector database, falling back to keyword search when ruvector is
 unavailable.
 
 **Reference:** Follow conventions in the `ruvector-conventions` skill for MCP
-tool naming, namespace definitions, and error handling.
+tool naming, current tool schemas, and error handling.
 
 ## Workflow
 
@@ -48,11 +49,14 @@ not found, skip to Step 4 (fallback).
 
 ### Step 2: Execute Vector Search
 
-Call the discovered search tool with:
+Call `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with:
 
 - Query text derived from the user's request
-- Namespace: `code`
 - Top-k: 10
+
+Do not invent `namespace` or metadata parameters. If the MCP call errors with
+timeout, connection refused, or service unavailable, retry once after roughly
+500 milliseconds, then fall back to Grep.
 
 ### Step 3: Present Results
 
