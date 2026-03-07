@@ -1,6 +1,6 @@
 {
   "name": "yellow-research",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Deep research plugin with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
@@ -9,11 +9,22 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-research",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": ["research", "deep-research", "perplexity", "exa", "tavily", "ast-grep", "mcp"],
+  "keywords": [
+    "research",
+    "deep-research",
+    "perplexity",
+    "exa",
+    "tavily",
+    "ast-grep",
+    "mcp"
+  ],
   "mcpServers": {
     "perplexity": {
       "command": "npx",
-      "args": ["-y", "@perplexity-ai/mcp-server@0.8.2"],
+      "args": [
+        "-y",
+        "@perplexity-ai/mcp-server@0.8.2"
+      ],
       "env": {
         "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}",
         "PERPLEXITY_TIMEOUT_MS": "${PERPLEXITY_TIMEOUT_MS:-600000}"
@@ -21,7 +32,10 @@
     },
     "tavily": {
       "command": "npx",
-      "args": ["-y", "tavily-mcp@0.2.17"],
+      "args": [
+        "-y",
+        "tavily-mcp@0.2.17"
+      ],
       "env": {
         "TAVILY_API_KEY": "${TAVILY_API_KEY}"
       }

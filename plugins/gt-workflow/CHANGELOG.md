@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+### Minor Changes
+
+- [`69d84c8`](https://github.com/KingInYellows/yellow-plugins/commit/69d84c8f17a23da89979765c434d4e2c0c683935)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Expand
+  marketplace setup coverage with dedicated setup commands, repository-root
+  aware setup checks, and stricter setup validation guardrails.
+
 All notable changes to this plugin are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
