@@ -53,8 +53,8 @@ generate findings." and stop.
 
 Parse `$ARGUMENTS` for optional filters:
 
-- `--category <name>` — filter to: ai-patterns, complexity, duplication,
-  architecture, security
+- `--category <name>` — filter to: ai-pattern, complexity, duplication,
+  architecture, security-debt
 - `--priority <level>` — filter to minimum priority: p1, p2, p3, p4
 
 Guard against `--flag` missing value: if the next argument starts with `--` or

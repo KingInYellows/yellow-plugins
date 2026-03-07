@@ -19,8 +19,8 @@ files.
 ## Arguments
 
 - `[path]` — Optional path to limit scan scope (default: entire codebase)
-- `--category <name>` — Run only specific scanner: ai-patterns, complexity,
-  duplication, architecture, security
+- `--category <name>` — Run only specific scanner: ai-pattern, complexity,
+  duplication, architecture, security-debt
 - `--severity <level>` — Filter output to minimum severity: critical, high,
   medium, low
 
@@ -58,7 +58,7 @@ while [ $# -gt 0 ]; do
     --category)
       CATEGORY_FILTER="$2"
       validate_category "$CATEGORY_FILTER" || {
-        printf 'ERROR: Invalid category "%s". Must be: ai-patterns, complexity, duplication, architecture, security\n' "$CATEGORY_FILTER" >&2
+        printf 'ERROR: Invalid category "%s". Must be: ai-pattern, complexity, duplication, architecture, security-debt\n' "$CATEGORY_FILTER" >&2
         exit 1
       }
       shift 2

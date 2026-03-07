@@ -156,10 +156,7 @@ for (const filePath of agentFiles) {
     if (tools.length === 0) {
       errors.push(`${relative(filePath)}: missing or empty "tools:" list`);
     }
-  }
 
-  if (!hasAllowedTools) {
-    const tools = parseList(frontmatter, 'tools');
     const skills = new Set(parseList(frontmatter, 'skills'));
     const referencedSkills = new Set();
     for (const match of content.matchAll(skillReferencePattern)) {

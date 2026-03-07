@@ -56,8 +56,8 @@ All scanner agents MUST produce output matching this JSON schema:
 
 - `schema_version`: Always "1.0" (for forward compatibility)
 - `status`: "success" | "partial" | "error"
-- `category`: "ai-patterns" | "complexity" | "duplication" | "architecture" |
-  "security"
+- `category`: "ai-pattern" | "complexity" | "duplication" | "architecture" |
+  "security-debt"
 - `severity`: "critical" | "high" | "medium" | "low"
 - `effort`: "quick" | "small" | "medium" | "large"
 - `confidence`: 0.0-1.0 (how confident the scanner is in this finding)
@@ -280,7 +280,7 @@ for validation logic.
 
 Tags must be lowercase with hyphens only. No underscores, spaces, or uppercase.
 
-**Example**: `code-review`, `security`, `ai-patterns`
+**Example**: `code-review`, `security-debt`, `ai-pattern`
 
 **Remediation**: Convert tags to lowercase and replace spaces/underscores with
 hyphens.

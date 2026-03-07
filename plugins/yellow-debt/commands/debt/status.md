@@ -53,7 +53,7 @@ for status in pending ready in-progress deferred complete deleted; do
   by_status["$status"]=0
 done
 
-for category in ai-patterns complexity duplication architecture security; do
+for category in ai-pattern complexity duplication architecture security-debt; do
   by_category["$category"]=0
 done
 
@@ -101,7 +101,7 @@ if [ -d todos/debt ]; then
 
     # Validate and increment category counter
     case "$CATEGORY" in
-      ai-patterns|complexity|duplication|architecture|security)
+      ai-pattern|complexity|duplication|architecture|security-debt)
         val_category=${by_category["$CATEGORY"]:-0}
         by_category["$CATEGORY"]=$((val_category + 1))
         ;;
@@ -169,11 +169,11 @@ if [ "$JSON_OUTPUT" = true ]; then
     "deleted": ${by_status[deleted]}
   },
   "by_category": {
-    "ai_patterns": ${by_category[ai-patterns]},
+    "ai_pattern": ${by_category[ai-pattern]},
     "complexity": ${by_category[complexity]},
     "duplication": ${by_category[duplication]},
     "architecture": ${by_category[architecture]},
-    "security": ${by_category[security]}
+    "security_debt": ${by_category[security-debt]}
   },
   "by_severity": {
     "critical": ${by_severity[critical]},
@@ -201,9 +201,9 @@ By Status:
 By Category:
   Complexity:    ${by_category[complexity]}
   Duplication:   ${by_category[duplication]}
-  AI Patterns:   ${by_category[ai-patterns]}
+  AI Pattern:    ${by_category[ai-pattern]}
   Architecture:  ${by_category[architecture]}
-  Security:      ${by_category[security]}
+  Security Debt: ${by_category[security-debt]}
 
 By Severity:
   Critical: ${by_severity[critical]}
@@ -295,11 +295,11 @@ Next Steps:
     "complete": 15
   },
   "by_category": {
-    "ai_patterns": 4,
+    "ai_pattern": 4,
     "complexity": 8,
     "duplication": 5,
     "architecture": 3,
-    "security": 2
+    "security_debt": 2
   },
   "by_severity": {
     "critical": 6,

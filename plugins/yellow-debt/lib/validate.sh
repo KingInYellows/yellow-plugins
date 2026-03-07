@@ -103,7 +103,7 @@ validate_file_path() {
 validate_category() {
   local category="$1"
   case "$category" in
-    ai-patterns|complexity|duplication|architecture|security) return 0 ;;
+    ai-pattern|complexity|duplication|architecture|security-debt) return 0 ;;
     *) return 1 ;;
   esac
 }
