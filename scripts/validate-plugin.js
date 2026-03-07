@@ -229,6 +229,18 @@ function validatePlugin(pluginDir) {
                 `Hook script not readable: ${scriptPath} (check file permissions)`
               );
             }
+            try {
+              const mode = fs.statSync(scriptPath).mode;
+              if ((mode & 0o111) === 0) {
+                logWarning(
+                  `Hook script not executable: ${scriptPath} (check file permissions)`
+                );
+              }
+            } catch (statErr) {
+              logWarning(
+                `Cannot inspect hook script mode: ${scriptPath} (${statErr.message})`
+              );
+            }
           }
         }
       }
@@ -362,9 +374,15 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 8: Hook script basics (shebang, JSON output, no set -e)
+  // RULE 8: Hook script basics (shebang, decision output, no set -e)
   if (manifest.hooks && typeof manifest.hooks === 'object') {
-    for (const [, hookEntries] of Object.entries(manifest.hooks)) {
+    const DECISION_PROTOCOL_EVENTS = new Set([
+      'PreToolUse',
+      'PostToolUse',
+      'Stop',
+    ]);
+
+    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
       if (!Array.isArray(hookEntries)) continue;
 
       for (const entry of hookEntries) {
@@ -393,14 +411,17 @@ function validatePlugin(pluginDir) {
             logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
           }
 
-          // Heuristic: check if script source contains JSON output or exit-code protocol
-          const hasJsonOutput = /"continue"\s*:/.test(content);
-          const hasExitCodeProtocol =
-            /exit\s+0/.test(content) && /exit\s+2/.test(content);
-          if (!hasJsonOutput && !hasExitCodeProtocol) {
-            logWarning(
-              `${relPath}: missing hook output — expected {"continue": true} or exit 0/2 protocol`
-            );
+          if (DECISION_PROTOCOL_EVENTS.has(eventName)) {
+            // Decision hooks should either emit a JSON decision or use exit 0/2.
+            const hasJsonOutput =
+              /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
+            const hasExitCodeProtocol =
+              /exit\s+0/.test(content) && /exit\s+2/.test(content);
+            if (!hasJsonOutput && !hasExitCodeProtocol) {
+              logWarning(
+                `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`
+              );
+            }
           }
 
           // Check for set -e anti-pattern (matches -e flag or -o errexit)
