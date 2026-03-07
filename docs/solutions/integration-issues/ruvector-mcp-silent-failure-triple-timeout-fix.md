@@ -204,7 +204,7 @@ The following findings from PR review were incorporated:
 
 | Severity | Finding | Fix |
 |---|---|---|
-| P1 | Deprecated `npm bin -g` in install.sh | Replaced with `npm config get prefix` + `/bin` |
+| P1 | Deprecated `npm bin -g` in install.sh | Replaced with `npm prefix -g` + `/bin` |
 | P2 | Ambiguous step references in workflow commands | Disambiguated step references in compound.md, review-pr.md, work.md, resolve-pr.md |
 | P2 | Inconsistent warning labels | Standardized to `[ruvector] Warning` prefix across all commands |
 | P2 | hooks_remember silently skipped (asymmetric with recall which warned) | Changed to emit warning on skip |
