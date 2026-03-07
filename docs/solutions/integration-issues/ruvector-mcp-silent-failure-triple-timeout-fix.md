@@ -92,10 +92,8 @@ resolvable package.
 
 - Verification changed from `npx ruvector --version` to `command -v ruvector`
 - Added nvm/fnm detection with warnings about per-version binary isolation
-- Auto-configures PATH in shell rc file (`~/.zshrc`/`~/.bashrc`) for
-  `--prefix ~/.local` fallback installs
-- Uses `printf %q` for safe rc file writing (prevents shell injection via
-  `$HOME` containing special characters)
+- Prints PATH guidance warnings for `--prefix ~/.local` fallback installs
+  (does not auto-modify shell rc files)
 - Hard failure if global binary is not in PATH after install -- degraded mode
   with npx is misleading because hooks would still be broken
 
@@ -166,7 +164,7 @@ the calling code.
 
 | File | Layer | Change |
 |---|---|---|
-| `plugins/yellow-ruvector/scripts/install.sh` | 1 | Global binary verification, nvm/fnm detection, rc file PATH config |
+| `plugins/yellow-ruvector/scripts/install.sh` | 1 | Global binary verification, nvm/fnm detection, PATH guidance warnings |
 | `plugins/yellow-ruvector/commands/ruvector/setup.md` | 1 | Hard failure on missing binary, smoke test with gtimeout macOS fallback |
 | `plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md` | 2+3 | Canonical warmup + retry-once patterns (design reference) |
 | `plugins/yellow-core/commands/workflows/brainstorm.md` | 2+3 | Warmup + retry-once for recall |
@@ -186,14 +184,13 @@ from `SKILL.md` must be manually propagated to all 7 consuming commands. The
 `SKILL.md` serves as the canonical reference, and each command file includes
 the full warmup + retry-once pattern inline.
 
-### Auto-write to rc file
+### Manual PATH guidance (no auto-write to rc file)
 
-The install script intentionally writes to the user's shell rc file to ensure
-zero-interaction plugin setup. This is protected by:
-
-- `grep` dedup check (does not add if the line already exists)
-- `printf %q` escaping (prevents shell injection via `$HOME`)
-- Only triggers in the fallback path (when `--prefix ~/.local` was needed)
+The install script does NOT auto-modify shell rc files. When the
+`--prefix ~/.local` fallback path is used and `~/.local/bin` is not in PATH,
+the script detects the user's login shell rc file and prints warning messages
+with the exact export line to add. PATH is exported in the current subshell
+for verification purposes only (does not propagate to the parent session).
 
 ### Hard failure on missing global binary
 
