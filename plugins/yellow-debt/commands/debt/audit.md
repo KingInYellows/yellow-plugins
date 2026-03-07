@@ -129,9 +129,11 @@ printf '%s\n' "${SCANNERS[@]}" > .debt/scanners-to-run.txt
 if [ -n "$SEVERITY_FILTER" ]; then
   printf '%s\n' "$SEVERITY_FILTER" > .debt/severity-filter.txt
   printf '[audit] Severity filter: %s (written to .debt/severity-filter.txt)\n' "$SEVERITY_FILTER" >&2
+else
+  rm -f .debt/severity-filter.txt
 fi
 printf '[audit] Prepared scanner list in .debt/scanners-to-run.txt\n' >&2
-printf '[audit] Run the listed scanner agents in parallel, then run audit-synthesizer.\n' >&2
+printf '[audit] Run the listed scanner agents in parallel, then run yellow-debt:audit-synthesizer.\n' >&2
 ```
 
 ## Agent Orchestration
@@ -140,12 +142,12 @@ After the bash block succeeds:
 
 1. Read `.debt/scanners-to-run.txt`.
 2. Launch one Task per scanner in parallel using subagent type
-   `<scanner>-scanner`.
+   `yellow-debt:<scanner>-scanner`.
 3. Each scanner prompt should instruct the agent to read
    `.debt/file-list.txt`, write findings to
    `.debt/scanner-output/<scanner>-scanner.json`, and if
    `.debt/severity-filter.txt` exists, filter to that minimum severity.
-4. After all scanner tasks complete, launch `audit-synthesizer` to merge
+4. After all scanner tasks complete, launch `yellow-debt:audit-synthesizer` to merge
    `.debt/scanner-output/`, write the audit report to
    `docs/audits/YYYY-MM-DD-audit-report.md`, and create todo files in
    `todos/debt/`.

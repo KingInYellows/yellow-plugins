@@ -98,11 +98,11 @@ CATEGORY=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.category' 2>/dev/null)
 SEVERITY=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.severity' 2>/dev/null)
 TODO_ID=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.id' 2>/dev/null)
 
-printf '[fix] Launching debt-fixer agent for: %s\n' "$TITLE" >&2
+printf '[fix] Launching yellow-debt:debt-fixer agent for: %s\n' "$TITLE" >&2
 printf '[fix] Category: %s | Severity: %s | ID: %s\n' "$CATEGORY" "$SEVERITY" "$TODO_ID" >&2
 
 printf '[fix] Ready todo path: %s\n' "$NEW_TODO_PATH" >&2
-printf '[fix] Next step: launch debt-fixer in an isolated worktree for this todo.\n' >&2
+printf '[fix] Next step: launch yellow-debt:debt-fixer in an isolated worktree for this todo.\n' >&2
 
 # Show next ready finding if any
 NEXT_READY=$(find todos/debt -name '*-ready-*.md' 2>/dev/null | head -1)
@@ -113,7 +113,7 @@ fi
 
 ## Agent Orchestration
 
-After the bash block succeeds, launch `debt-fixer` directly via Task with the
+After the bash block succeeds, launch `yellow-debt:debt-fixer` directly via Task with the
 updated todo path. The agent must run in its isolated worktree, read the todo
 file, implement the fix, show the diff, request approval, and either commit or
 restore only the files it changed before resetting the todo to `ready`.
