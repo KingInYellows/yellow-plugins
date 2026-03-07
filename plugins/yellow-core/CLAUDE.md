@@ -46,7 +46,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:review` — redirects to `/review:pr` (yellow-review)
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
-- `/setup:all` — run setup for all installed yellow-plugins with unified dashboard
+- `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 
 ### Skills (4)
 

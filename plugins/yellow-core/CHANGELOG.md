@@ -8,6 +8,16 @@ and this project adheres to
 
 ---
 
+## Unreleased
+
+### Changed
+
+- Expand `/setup:all` from a 9-plugin yellow-only dashboard to a
+  marketplace-wide setup orchestrator with stricter readiness checks, new
+  delegated setup commands, and setup coverage validation in repo checks.
+
+---
+
 ## [1.2.0] - 2026-03-06
 
 ### Minor Changes

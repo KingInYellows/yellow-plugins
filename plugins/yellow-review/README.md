@@ -17,10 +17,14 @@ resolution, and sequential stack review.
 - Graphite CLI (`gt`) for branch management
 - Clean working directory before running review commands
 
+Run `/review:setup` after install to verify the local prerequisites and optional
+yellow-core integration before reviewing real PRs.
+
 ## Commands
 
 | Command           | Description                                                               |
 | ----------------- | ------------------------------------------------------------------------- |
+| `/review:setup`   | Validate review prerequisites and optional yellow-core integration        |
 | `/review:pr`      | Adaptive multi-agent review of a single PR with automatic fix application |
 | `/review:resolve` | Parallel resolution of unresolved PR review comments                      |
 | `/review:all`     | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
@@ -40,9 +44,9 @@ resolution, and sequential stack review.
 
 ### Workflow (1)
 
-| Agent                 | Description                                 |
-| --------------------- | ------------------------------------------- |
-| `pr-comment-resolver` | Implements fix for a single review comment  |
+| Agent                 | Description                                |
+| --------------------- | ------------------------------------------ |
+| `pr-comment-resolver` | Implements fix for a single review comment |
 
 ## Skills
 

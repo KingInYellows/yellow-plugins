@@ -27,8 +27,10 @@ cycles, and documents.
 
 ## Plugin Components
 
-### Commands (8)
+### Commands (9)
 
+- `/linear:setup` — Validate Linear MCP visibility, first-use OAuth readiness,
+  and Graphite availability
 - `/linear:work` — Start working on a Linear issue: loads context, writes
   brainstorm doc, routes to `/workflows:plan` or `/gt-stack-plan`
 - `/linear:create` — Create a Linear issue from current context
@@ -63,6 +65,8 @@ cycles, and documents.
 Commands and agents overlap intentionally to serve different invocation
 patterns:
 
+- **`/linear:setup`** — First install, after clearing OAuth, or when ToolSearch
+  no longer sees Linear MCP tools in the current session.
 - **`/linear:sync`** — Manual, comprehensive sync: loads context + links PR +
   updates status in one shot. Use when you want full branch-to-issue
   synchronization.

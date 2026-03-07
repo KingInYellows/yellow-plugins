@@ -8,6 +8,15 @@ and this project adheres to
 
 ---
 
+## Unreleased
+
+### Added
+
+- Add `/linear:setup` to validate Linear MCP visibility, first-use OAuth
+  readiness, and Graphite availability.
+
+---
+
 ## [1.2.0] - 2026-03-06
 
 ### Minor Changes

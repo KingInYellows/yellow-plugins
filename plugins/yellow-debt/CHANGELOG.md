@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## Unreleased
+
+### Added
+
+- Add `/debt:setup` to validate required tooling, repo writability, and
+  optional yellow-linear integration before running debt workflows.
+
+---
+
 ## [1.1.0] - 2026-02-25
 
 ### Fixed

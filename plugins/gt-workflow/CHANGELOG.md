@@ -8,6 +8,15 @@ and this project adheres to
 
 ---
 
+## Unreleased
+
+### Added
+
+- Add `/gt-setup` to validate Graphite CLI availability, auth detection, and
+  repo initialization before running workflow commands.
+
+---
+
 ## [1.1.1] - 2026-03-06
 
 ### Patch Changes

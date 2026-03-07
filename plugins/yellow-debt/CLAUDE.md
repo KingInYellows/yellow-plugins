@@ -33,8 +33,10 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 
 ## Plugin Components
 
-### Commands (5)
+### Commands (6)
 
+- `/debt:setup` — Validate required local tooling, repo writability, and
+  optional yellow-linear integration
 - `/debt:audit` — Run full or targeted technical debt audit
 - `/debt:triage` — Interactive review of pending findings
 - `/debt:fix` — Agent-driven remediation of specific findings
@@ -76,6 +78,8 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 
 ## When to Use What
 
+- **`/debt:setup`** — First install, after environment changes, or when debt
+  commands fail before scanning starts.
 - **`/debt:audit`** — Run a comprehensive or targeted audit to identify
   technical debt
 - **`/debt:triage`** — Review and categorize findings after an audit

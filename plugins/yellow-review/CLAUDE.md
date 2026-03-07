@@ -21,8 +21,10 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ## Plugin Components
 
-### Commands (3)
+### Commands (4)
 
+- `/review:setup` — Validate GitHub, jq, Graphite, and optional yellow-core
+  integration before reviewing PRs
 - `/review:pr` — Adaptive multi-agent review of a single PR with automatic fix
   application
 - `/review:resolve` — Parallel resolution of unresolved PR review comments via
@@ -62,6 +64,8 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ## When to Use What
 
+- **`/review:setup`** — First install, after auth issues, or when review
+  commands fail before agent analysis begins.
 - **`/review:pr`** — Review a single PR with adaptive agent selection. Best for
   focused reviews of individual changes.
 - **`/review:resolve`** — Address pending review comments. Run after receiving
