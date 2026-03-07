@@ -66,7 +66,7 @@ fi
 
 # Remediation runs in an isolated worktree and must start from a clean repo.
 # Exclude .debt/ artifacts left by /debt:audit so the audit→fix flow works.
-if [ -n "$(git status --porcelain | grep -v '^\(??\|[MADRCU ]\{2\}\) \.debt/')" ]; then
+if [ -n "$(git status --porcelain | grep -Ev '^(\?\?|[MADRCU ]{2}) \.debt/')" ]; then
   printf 'ERROR: /debt:fix requires a clean working tree (ignoring .debt/). Commit, stash, or discard unrelated changes first.\n' >&2
   exit 1
 fi

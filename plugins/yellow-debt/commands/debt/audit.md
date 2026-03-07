@@ -120,7 +120,7 @@ printf '[audit] Found %d source files to scan\n' "$FILE_COUNT" >&2
 if [ -n "$CATEGORY_FILTER" ]; then
   SCANNERS=("${CATEGORY_FILTER}")
 else
-  SCANNERS=(ai-patterns complexity duplication architecture security)
+  SCANNERS=(ai-pattern complexity duplication architecture security-debt)
 fi
 
 # Persist the scanner plan for the command body to orchestrate directly.

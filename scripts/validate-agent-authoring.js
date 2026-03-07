@@ -146,28 +146,34 @@ for (const filePath of agentFiles) {
     pluginAgents.add(`${pluginName}:${name}`);
   }
 
-  if (/^allowed-tools:/m.test(frontmatter)) {
+  const hasAllowedTools = /^allowed-tools:/m.test(frontmatter);
+  if (hasAllowedTools) {
     errors.push(`${relative(filePath)}: use "tools:" instead of "allowed-tools:"`);
   }
 
-  const tools = parseList(frontmatter, 'tools');
-  if (tools.length === 0) {
-    errors.push(`${relative(filePath)}: missing or empty "tools:" list`);
+  if (!hasAllowedTools) {
+    const tools = parseList(frontmatter, 'tools');
+    if (tools.length === 0) {
+      errors.push(`${relative(filePath)}: missing or empty "tools:" list`);
+    }
   }
 
-  const skills = new Set(parseList(frontmatter, 'skills'));
-  const referencedSkills = new Set();
-  for (const match of content.matchAll(skillReferencePattern)) {
-    referencedSkills.add(match[1].toLowerCase());
-  }
+  if (!hasAllowedTools) {
+    const tools = parseList(frontmatter, 'tools');
+    const skills = new Set(parseList(frontmatter, 'skills'));
+    const referencedSkills = new Set();
+    for (const match of content.matchAll(skillReferencePattern)) {
+      referencedSkills.add(match[1].toLowerCase());
+    }
 
-  if (referencedSkills.size > 0) {
-    const hasSkillTool = tools.includes('Skill');
-    for (const skill of referencedSkills) {
-      if (!skills.has(skill) && !hasSkillTool) {
-        errors.push(
-          `${relative(filePath)}: references skill "${skill}" without frontmatter "skills:" preload or Skill tool access`
-        );
+    if (referencedSkills.size > 0) {
+      const hasSkillTool = tools.includes('Skill');
+      for (const skill of referencedSkills) {
+        if (!skills.has(skill) && !hasSkillTool) {
+          errors.push(
+            `${relative(filePath)}: references skill "${skill}" without frontmatter "skills:" preload or Skill tool access`
+          );
+        }
       }
     }
   }
@@ -191,7 +197,10 @@ for (const filePath of markdownFiles) {
 
 for (const filePath of commandFiles) {
   const content = fs.readFileSync(filePath, 'utf8');
-  if (content.includes('BASH_SOURCE')) {
+  const frontmatter = extractFrontmatter(content);
+  const codeBlocks = content.match(/```[^\n]*\n[\s\S]*?```/g) || [];
+  const codeContent = (frontmatter || '') + '\n' + codeBlocks.join('\n');
+  if (codeContent.includes('BASH_SOURCE')) {
     errors.push(
       `${relative(filePath)}: markdown command sources plugin files via BASH_SOURCE; use \${CLAUDE_PLUGIN_ROOT} or a real script path`
     );

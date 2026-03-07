@@ -4,6 +4,7 @@ description: "Execute browser tests using agent-browser. Use when running struct
 model: inherit
 skills:
   - test-conventions
+  - agent-browser-patterns
 tools:
   - Bash
   - Read
