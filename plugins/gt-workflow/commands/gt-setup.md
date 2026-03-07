@@ -23,8 +23,10 @@ command -v gt >/dev/null 2>&1 && printf 'gt:            ok (%s)\n' "$(gt --versi
 command -v jq >/dev/null 2>&1 && printf 'jq:            ok\n' || printf 'jq:            NOT FOUND\n'
 
 printf '\n=== Repository ===\n'
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 && printf 'git_repo:       ok\n' || printf 'git_repo:       NOT A GIT REPOSITORY\n'
-[ -f .git/.graphite_repo_config ] && printf 'repo_config:    present\n' || printf 'repo_config:    missing\n'
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+[ -n "$repo_top" ] && printf 'git_repo:       ok\n' || printf 'git_repo:       NOT A GIT REPOSITORY\n'
+graphite_repo_config=$(git rev-parse --git-path .graphite_repo_config 2>/dev/null || true)
+[ -n "$graphite_repo_config" ] && [ -f "$graphite_repo_config" ] && printf 'repo_config:    present (%s)\n' "$graphite_repo_config" || printf 'repo_config:    missing\n'
 
 if command -v gt >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   trunk=$(gt trunk 2>/dev/null || true)
@@ -37,9 +39,9 @@ printf '\n=== Graphite Auth ===\n'
 auth_ok=0
 for path in \
   "$HOME/.graphite_user_config" \
-  "${XDG_CONFIG_HOME:-$HOME/.config}/graphite" \
-  "$HOME/.config/graphite"; do
-  if [ -e "$path" ]; then
+  "${XDG_CONFIG_HOME:-$HOME/.config}/graphite/user_config" \
+  "$HOME/.config/graphite/user_config"; do
+  if [ -f "$path" ]; then
     auth_ok=1
     printf 'auth_config:    present (%s)\n' "$path"
     break

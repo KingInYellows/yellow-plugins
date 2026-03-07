@@ -33,18 +33,20 @@ fi
 printf '\n=== Optional Integration ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
 core_installed=0
+plugin_names=''
 if [ -d "$plugin_cache" ]; then
   if command -v python3 >/dev/null 2>&1; then
-    find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+    plugin_names=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
       | while IFS= read -r -d '' pj; do
           python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "$pj" 2>/dev/null || true
-        done | grep -Fxq 'yellow-core' && core_installed=1
+        done | sed '/^$/d' | LC_ALL=C sort -u)
   elif command -v jq >/dev/null 2>&1; then
-    find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+    plugin_names=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
       | while IFS= read -r -d '' pj; do
           jq -r '.name // empty' "$pj" 2>/dev/null || true
-        done | grep -Fxq 'yellow-core' && core_installed=1
+        done | sed '/^$/d' | LC_ALL=C sort -u)
   fi
+  printf '%s\n' "$plugin_names" | grep -Fxq 'yellow-core' && core_installed=1
 fi
 [ "$core_installed" = "1" ] && printf 'yellow_core:   installed\n' || printf 'yellow_core:   NOT INSTALLED\n'
 ```

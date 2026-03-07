@@ -74,12 +74,14 @@ printf '\n=== Environment Variables ===\n'
 [ -n "${PERPLEXITY_API_KEY:-}" ] && printf 'PERPLEXITY_API_KEY:        set\n' || printf 'PERPLEXITY_API_KEY:        NOT SET\n'
 
 printf '\n=== Repository State ===\n'
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 && printf 'git_repo:           ok\n' || printf 'git_repo:           NOT A GIT REPOSITORY\n'
-[ -w . ] && printf 'repo_root:          writable\n' || printf 'repo_root:          NOT WRITABLE\n'
-[ -f .git/.graphite_repo_config ] && printf 'graphite_repo:      present\n' || printf 'graphite_repo:      missing\n'
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+[ -n "$repo_top" ] && printf 'git_repo:           ok\n' || printf 'git_repo:           NOT A GIT REPOSITORY\n'
+[ -n "$repo_top" ] && [ -w "$repo_top" ] && printf 'repo_root:          writable\n' || printf 'repo_root:          NOT WRITABLE\n'
+graphite_repo_config=$(git rev-parse --git-path .graphite_repo_config 2>/dev/null || true)
+[ -n "$graphite_repo_config" ] && [ -f "$graphite_repo_config" ] && printf 'graphite_repo:      present (%s)\n' "$graphite_repo_config" || printf 'graphite_repo:      missing\n'
 auth_path=''
-for path in "$HOME/.graphite_user_config" "${XDG_CONFIG_HOME:-$HOME/.config}/graphite" "$HOME/.config/graphite"; do
-  if [ -e "$path" ]; then
+for path in "$HOME/.graphite_user_config" "${XDG_CONFIG_HOME:-$HOME/.config}/graphite/user_config" "$HOME/.config/graphite/user_config"; do
+  if [ -f "$path" ]; then
     auth_path="$path"
     break
   fi
@@ -93,10 +95,10 @@ else
 fi
 
 printf '\n=== Config Files ===\n'
-[ -d .ruvector ] && printf '.ruvector/:                         exists\n' || printf '.ruvector/:                         missing\n'
-[ -f .claude/yellow-chatprd.local.md ] && printf '.claude/yellow-chatprd.local.md:    exists\n' || printf '.claude/yellow-chatprd.local.md:    missing\n'
-[ -f .claude/yellow-ci.local.md ] && printf '.claude/yellow-ci.local.md:         exists\n' || printf '.claude/yellow-ci.local.md:         missing\n'
-[ -f .claude/yellow-browser-test.local.md ] && printf '.claude/yellow-browser-test.local.md: exists\n' || printf '.claude/yellow-browser-test.local.md: missing\n'
+[ -n "$repo_top" ] && [ -d "$repo_top/.ruvector" ] && printf '.ruvector/:                         exists\n' || printf '.ruvector/:                         missing\n'
+[ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-chatprd.local.md" ] && printf '.claude/yellow-chatprd.local.md:    exists\n' || printf '.claude/yellow-chatprd.local.md:    missing\n'
+[ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-ci.local.md" ] && printf '.claude/yellow-ci.local.md:         exists\n' || printf '.claude/yellow-ci.local.md:         missing\n'
+[ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-browser-test.local.md" ] && printf '.claude/yellow-browser-test.local.md: exists\n' || printf '.claude/yellow-browser-test.local.md: missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
@@ -117,9 +119,9 @@ else
 fi
 
 printf '\n=== Optional Working Paths ===\n'
-[ -d .debt ] && printf '.debt/:                             exists\n' || printf '.debt/:                             missing\n'
-[ -d docs/audits ] && printf 'docs/audits/:                       exists\n' || printf 'docs/audits/:                       missing\n'
-[ -d todos/debt ] && printf 'todos/debt/:                        exists\n' || printf 'todos/debt/:                        missing\n'
+[ -n "$repo_top" ] && [ -d "$repo_top/.debt" ] && printf '.debt/:                             exists\n' || printf '.debt/:                             missing\n'
+[ -n "$repo_top" ] && [ -d "$repo_top/docs/audits" ] && printf 'docs/audits/:                       exists\n' || printf 'docs/audits/:                       missing\n'
+[ -n "$repo_top" ] && [ -d "$repo_top/todos/debt" ] && printf 'todos/debt/:                        exists\n' || printf 'todos/debt/:                        missing\n'
 
 printf '\n=== Installed Plugins ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
@@ -377,6 +379,7 @@ tool in this fixed order:
 
 Only invoke setups for plugins the user selected. Use this mapping:
 
+<!-- setup-all-plugin-command-map:start -->
 - `gt-workflow` → `gt-setup`
 - `yellow-ruvector` → `ruvector:setup`
 - `yellow-morph` → `morph:setup`
@@ -390,6 +393,7 @@ Only invoke setups for plugins the user selected. Use this mapping:
 - `yellow-review` → `review:setup`
 - `yellow-browser-test` → `browser-test:setup`
 - `yellow-core` → `statusline:setup`
+<!-- setup-all-plugin-command-map:end -->
 
 Before each setup, display:
 

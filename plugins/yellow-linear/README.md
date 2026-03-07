@@ -21,8 +21,8 @@ your Linear account. The OAuth token is stored in your system keychain and
 refreshed automatically. No API keys or `.env` files needed.
 
 Requires browser access — will not work in headless SSH sessions. To
-re-authenticate or revoke access: run `/mcp` in Claude Code, select the
-Linear server, and choose "Clear authentication".
+re-authenticate or revoke access: run `/mcp` in Claude Code, select the Linear
+server, and choose "Clear authentication".
 
 Run `/linear:setup` after install or after clearing auth to verify that the MCP
 server is visible in the current session.

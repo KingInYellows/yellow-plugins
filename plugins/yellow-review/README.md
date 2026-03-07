@@ -44,9 +44,9 @@ yellow-core integration before reviewing real PRs.
 
 ### Workflow (1)
 
-| Agent                 | Description                                 |
-| --------------------- | ------------------------------------------- |
-| `pr-comment-resolver` | Implements fix for a single review comment  |
+| Agent                 | Description                                |
+| --------------------- | ------------------------------------------ |
+| `pr-comment-resolver` | Implements fix for a single review comment |
 
 ## Skills
 

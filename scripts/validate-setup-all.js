@@ -100,12 +100,52 @@ function compareSets(actual, expected) {
   return { missing, extra };
 }
 
+function parsePluginCommandMap(section) {
+  const mapping = {};
+  for (const match of section.matchAll(/^- `([^`]+)` → `([^`]+)`$/gm)) {
+    const plugin = match[1];
+    const command = match[2];
+    mapping[command] = plugin;
+  }
+  return mapping;
+}
+
+function compareMappings(actual, expected) {
+  const actualKeys = Object.keys(actual);
+  const expectedKeys = Object.keys(expected);
+  const missing = expectedKeys.filter((key) => !(key in actual));
+  const extra = actualKeys.filter((key) => !(key in expected));
+  const mismatched = expectedKeys
+    .filter((key) => key in actual && actual[key] !== expected[key])
+    .map((key) => `${key}=>${actual[key]} (expected ${expected[key]})`);
+  return { missing, extra, mismatched };
+}
+
+function exitWithErrors(errors) {
+  console.error('[validate-setup-all] Setup coverage validation failed:');
+  for (const error of errors) {
+    console.error(`  - ${error}`);
+  }
+  process.exit(1);
+}
+
 function main() {
   const errors = [];
 
-  const marketplace = readJson(MARKETPLACE_PATH);
+  let marketplace;
+  let setupAll;
+  try {
+    marketplace = readJson(MARKETPLACE_PATH);
+    setupAll = readText(SETUP_ALL_PATH);
+  } catch (error) {
+    console.error(
+      `[validate-setup-all] Failed to read required file: ${error.message}`
+    );
+    console.error('  Ensure this script is run from the repository root.');
+    process.exit(1);
+  }
+
   const marketplacePlugins = marketplace.plugins.map((plugin) => plugin.name);
-  const setupAll = readText(SETUP_ALL_PATH);
 
   const dashboardSection = extractMarkedSection(
     setupAll,
@@ -122,6 +162,11 @@ function main() {
     '<!-- setup-all-delegated-commands:start -->',
     '<!-- setup-all-delegated-commands:end -->'
   );
+  const mappingSection = extractMarkedSection(
+    setupAll,
+    '<!-- setup-all-plugin-command-map:start -->',
+    '<!-- setup-all-plugin-command-map:end -->'
+  );
 
   if (!dashboardSection) {
     errors.push('missing dashboard plugin loop markers in setup:all');
@@ -132,19 +177,21 @@ function main() {
   if (!delegatedSection) {
     errors.push('missing delegated command markers in setup:all');
   }
+  if (!mappingSection) {
+    errors.push('missing plugin-command mapping markers in setup:all');
+  }
 
-  const dashboardPlugins = dashboardSection
-    ? parseDashboardPlugins(dashboardSection)
-    : [];
-  const classificationPlugins = classificationSection
-    ? parseClassificationPlugins(classificationSection)
-    : [];
-  const delegatedCommands = delegatedSection
-    ? parseDelegatedCommands(delegatedSection)
-    : [];
+  if (!dashboardSection || !classificationSection || !delegatedSection || !mappingSection) {
+    exitWithErrors(errors);
+  }
+
+  const dashboardPlugins = parseDashboardPlugins(dashboardSection);
+  const classificationPlugins = parseClassificationPlugins(classificationSection);
+  const delegatedCommands = parseDelegatedCommands(delegatedSection);
   const delegatedPlugins = delegatedCommands.map(
     (command) => COMMAND_PLUGIN_MAP[command]
   );
+  const markdownMapping = parsePluginCommandMap(mappingSection);
 
   const commandNames = new Set();
   for (const filePath of walk(PLUGINS_DIR)) {
@@ -212,12 +259,19 @@ function main() {
     );
   }
 
+  const mappingDiff = compareMappings(markdownMapping, COMMAND_PLUGIN_MAP);
+  if (
+    mappingDiff.missing.length ||
+    mappingDiff.extra.length ||
+    mappingDiff.mismatched.length
+  ) {
+    errors.push(
+      `plugin-command mapping drift: missing=[${mappingDiff.missing.join(', ')}] extra=[${mappingDiff.extra.join(', ')}] mismatched=[${mappingDiff.mismatched.join(', ')}]`
+    );
+  }
+
   if (errors.length > 0) {
-    console.error('[validate-setup-all] Setup coverage validation failed:');
-    for (const error of errors) {
-      console.error(`  - ${error}`);
-    }
-    process.exit(1);
+    exitWithErrors(errors);
   }
 
   console.log(

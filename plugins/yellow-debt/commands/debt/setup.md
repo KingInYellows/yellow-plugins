@@ -25,29 +25,32 @@ for cmd in git jq yq realpath flock gt; do
 done
 
 printf '\n=== Repository ===\n'
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 && printf 'git_repo:     ok\n' || printf 'git_repo:     NOT A GIT REPOSITORY\n'
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+[ -n "$repo_top" ] && printf 'git_repo:     ok\n' || printf 'git_repo:     NOT A GIT REPOSITORY\n'
 
 printf '\n=== Working Paths ===\n'
-[ -d .debt ] && printf '.debt/:       present\n' || printf '.debt/:       missing (created by /debt:audit)\n'
-[ -d docs/audits ] && printf 'docs/audits/: present\n' || printf 'docs/audits/: missing (created by /debt:audit)\n'
-[ -d todos/debt ] && printf 'todos/debt/:  present\n' || printf 'todos/debt/:  missing (created by /debt:audit)\n'
-[ -w . ] && printf 'repo_root:    writable\n' || printf 'repo_root:    NOT WRITABLE\n'
+[ -n "$repo_top" ] && [ -d "$repo_top/.debt" ] && printf '.debt/:       present\n' || printf '.debt/:       missing (created by /debt:audit)\n'
+[ -n "$repo_top" ] && [ -d "$repo_top/docs/audits" ] && printf 'docs/audits/: present\n' || printf 'docs/audits/: missing (created by /debt:audit)\n'
+[ -n "$repo_top" ] && [ -d "$repo_top/todos/debt" ] && printf 'todos/debt/:  present\n' || printf 'todos/debt/:  missing (created by /debt:audit)\n'
+[ -n "$repo_top" ] && [ -w "$repo_top" ] && printf 'repo_root:    writable\n' || printf 'repo_root:    NOT WRITABLE\n'
 
 printf '\n=== Optional Integration ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
 linear_installed=0
+plugin_names=''
 if [ -d "$plugin_cache" ]; then
   if command -v python3 >/dev/null 2>&1; then
-    find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+    plugin_names=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
       | while IFS= read -r -d '' pj; do
           python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "$pj" 2>/dev/null || true
-        done | grep -Fxq 'yellow-linear' && linear_installed=1
+        done | sed '/^$/d' | LC_ALL=C sort -u)
   elif command -v jq >/dev/null 2>&1; then
-    find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
+    plugin_names=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
       | while IFS= read -r -d '' pj; do
           jq -r '.name // empty' "$pj" 2>/dev/null || true
-        done | grep -Fxq 'yellow-linear' && linear_installed=1
+        done | sed '/^$/d' | LC_ALL=C sort -u)
   fi
+  printf '%s\n' "$plugin_names" | grep -Fxq 'yellow-linear' && linear_installed=1
 fi
 [ "$linear_installed" = "1" ] && printf 'yellow_linear: installed\n' || printf 'yellow_linear: NOT INSTALLED\n'
 ```
