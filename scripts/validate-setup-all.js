@@ -129,9 +129,7 @@ function exitWithErrors(errors) {
   process.exit(1);
 }
 
-function main() {
-  const errors = [];
-
+function loadInputs() {
   let marketplace;
   let setupAll;
   try {
@@ -145,57 +143,79 @@ function main() {
     process.exit(1);
   }
 
-  const marketplacePlugins = marketplace.plugins.map((plugin) => plugin.name);
+  return {
+    marketplacePlugins: marketplace.plugins.map((plugin) => plugin.name),
+    setupAll,
+  };
+}
 
-  const dashboardSection = extractMarkedSection(
-    setupAll,
-    '# setup-all-dashboard-plugin-loop:start',
-    '# setup-all-dashboard-plugin-loop:end'
-  );
-  const classificationSection = extractMarkedSection(
-    setupAll,
-    '<!-- setup-all-classification:start -->',
-    '<!-- setup-all-classification:end -->'
-  );
-  const delegatedSection = extractMarkedSection(
-    setupAll,
-    '<!-- setup-all-delegated-commands:start -->',
-    '<!-- setup-all-delegated-commands:end -->'
-  );
-  const mappingSection = extractMarkedSection(
-    setupAll,
-    '<!-- setup-all-plugin-command-map:start -->',
-    '<!-- setup-all-plugin-command-map:end -->'
-  );
+function extractRequiredSections(setupAll) {
+  const errors = [];
+  const sections = {
+    dashboardSection: extractMarkedSection(
+      setupAll,
+      '# setup-all-dashboard-plugin-loop:start',
+      '# setup-all-dashboard-plugin-loop:end'
+    ),
+    classificationSection: extractMarkedSection(
+      setupAll,
+      '<!-- setup-all-classification:start -->',
+      '<!-- setup-all-classification:end -->'
+    ),
+    delegatedSection: extractMarkedSection(
+      setupAll,
+      '<!-- setup-all-delegated-commands:start -->',
+      '<!-- setup-all-delegated-commands:end -->'
+    ),
+    mappingSection: extractMarkedSection(
+      setupAll,
+      '<!-- setup-all-plugin-command-map:start -->',
+      '<!-- setup-all-plugin-command-map:end -->'
+    ),
+  };
 
-  if (!dashboardSection) {
+  if (!sections.dashboardSection) {
     errors.push('missing dashboard plugin loop markers in setup:all');
   }
-  if (!classificationSection) {
+  if (!sections.classificationSection) {
     errors.push('missing classification markers in setup:all');
   }
-  if (!delegatedSection) {
+  if (!sections.delegatedSection) {
     errors.push('missing delegated command markers in setup:all');
   }
-  if (!mappingSection) {
+  if (!sections.mappingSection) {
     errors.push('missing plugin-command mapping markers in setup:all');
   }
 
-  if (!dashboardSection || !classificationSection || !delegatedSection || !mappingSection) {
+  if (errors.length > 0) {
     exitWithErrors(errors);
   }
 
-  const dashboardPlugins = parseDashboardPlugins(dashboardSection);
-  const classificationPlugins = parseClassificationPlugins(classificationSection);
-  const delegatedCommands = parseDelegatedCommands(delegatedSection);
-  const delegatedPlugins = delegatedCommands.map(
-    (command) => COMMAND_PLUGIN_MAP[command]
-  );
-  const markdownMapping = parsePluginCommandMap(mappingSection);
+  return sections;
+}
 
+function parseSetupAllData(sections) {
+  const delegatedCommands = parseDelegatedCommands(sections.delegatedSection);
+  return {
+    dashboardPlugins: parseDashboardPlugins(sections.dashboardSection),
+    classificationPlugins: parseClassificationPlugins(
+      sections.classificationSection
+    ),
+    delegatedCommands,
+    delegatedPlugins: delegatedCommands.map(
+      (command) => COMMAND_PLUGIN_MAP[command]
+    ),
+    markdownMapping: parsePluginCommandMap(sections.mappingSection),
+  };
+}
+
+function loadCommandNames() {
   const commandNames = new Set();
   for (const filePath of walk(PLUGINS_DIR)) {
-    if (!filePath.endsWith('.md') || !filePath.includes(`${path.sep}commands${path.sep}`)) {
+    if (
+      !filePath.endsWith('.md') ||
+      !filePath.includes(`${path.sep}commands${path.sep}`)
+    ) {
       continue;
     }
     const name = parseFrontmatterName(readText(filePath));
@@ -203,8 +223,11 @@ function main() {
       commandNames.add(name);
     }
   }
+  return commandNames;
+}
 
-  const dashboardDiff = compareSets(dashboardPlugins, marketplacePlugins);
+function validateCoverage(data, marketplacePlugins, errors) {
+  const dashboardDiff = compareSets(data.dashboardPlugins, marketplacePlugins);
   if (dashboardDiff.missing.length || dashboardDiff.extra.length) {
     errors.push(
       `dashboard plugin coverage drift: missing=[${dashboardDiff.missing.join(', ')}] extra=[${dashboardDiff.extra.join(', ')}]`
@@ -212,7 +235,7 @@ function main() {
   }
 
   const classificationDiff = compareSets(
-    classificationPlugins,
+    data.classificationPlugins,
     marketplacePlugins
   );
   if (classificationDiff.missing.length || classificationDiff.extra.length) {
@@ -221,7 +244,19 @@ function main() {
     );
   }
 
-  const unknownCommands = delegatedCommands.filter(
+  const delegatedDiff = compareSets(
+    data.delegatedPlugins.filter(Boolean),
+    marketplacePlugins
+  );
+  if (delegatedDiff.missing.length || delegatedDiff.extra.length) {
+    errors.push(
+      `delegated setup coverage drift: missing=[${delegatedDiff.missing.join(', ')}] extra=[${delegatedDiff.extra.join(', ')}]`
+    );
+  }
+}
+
+function validateDelegation(data, commandNames, errors) {
+  const unknownCommands = data.delegatedCommands.filter(
     (command) => !(command in COMMAND_PLUGIN_MAP)
   );
   if (unknownCommands.length > 0) {
@@ -230,7 +265,7 @@ function main() {
     );
   }
 
-  const missingCommandFiles = delegatedCommands.filter(
+  const missingCommandFiles = data.delegatedCommands.filter(
     (command) => !commandNames.has(command)
   );
   if (missingCommandFiles.length > 0) {
@@ -239,27 +274,7 @@ function main() {
     );
   }
 
-  const delegatedDiff = compareSets(
-    delegatedPlugins.filter(Boolean),
-    marketplacePlugins
-  );
-  if (delegatedDiff.missing.length || delegatedDiff.extra.length) {
-    errors.push(
-      `delegated setup coverage drift: missing=[${delegatedDiff.missing.join(', ')}] extra=[${delegatedDiff.extra.join(', ')}]`
-    );
-  }
-
-  if (
-    dashboardPlugins.length > 0 &&
-    delegatedPlugins.length > 0 &&
-    dashboardPlugins.join('|') !== delegatedPlugins.filter(Boolean).join('|')
-  ) {
-    errors.push(
-      `dashboard order does not match delegated setup order: dashboard=[${dashboardPlugins.join(', ')}] delegated=[${delegatedPlugins.join(', ')}]`
-    );
-  }
-
-  const mappingDiff = compareMappings(markdownMapping, COMMAND_PLUGIN_MAP);
+  const mappingDiff = compareMappings(data.markdownMapping, COMMAND_PLUGIN_MAP);
   if (
     mappingDiff.missing.length ||
     mappingDiff.extra.length ||
@@ -269,6 +284,31 @@ function main() {
       `plugin-command mapping drift: missing=[${mappingDiff.missing.join(', ')}] extra=[${mappingDiff.extra.join(', ')}] mismatched=[${mappingDiff.mismatched.join(', ')}]`
     );
   }
+}
+
+function validateOrder(data, errors) {
+  if (
+    data.dashboardPlugins.length > 0 &&
+    data.delegatedPlugins.length > 0 &&
+    data.dashboardPlugins.join('|') !==
+      data.delegatedPlugins.filter(Boolean).join('|')
+  ) {
+    errors.push(
+      `dashboard order does not match delegated setup order: dashboard=[${data.dashboardPlugins.join(', ')}] delegated=[${data.delegatedPlugins.join(', ')}]`
+    );
+  }
+}
+
+function main() {
+  const { marketplacePlugins, setupAll } = loadInputs();
+  const sections = extractRequiredSections(setupAll);
+  const data = parseSetupAllData(sections);
+  const commandNames = loadCommandNames();
+  const errors = [];
+
+  validateCoverage(data, marketplacePlugins, errors);
+  validateDelegation(data, commandNames, errors);
+  validateOrder(data, errors);
 
   if (errors.length > 0) {
     exitWithErrors(errors);
