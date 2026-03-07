@@ -76,7 +76,13 @@ printf '\n=== Environment Variables ===\n'
 printf '\n=== Repository State ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
 [ -n "$repo_top" ] && printf 'git_repo:           ok\n' || printf 'git_repo:           NOT A GIT REPOSITORY\n'
-[ -n "$repo_top" ] && [ -w "$repo_top" ] && printf 'repo_root:          writable\n' || printf 'repo_root:          NOT WRITABLE\n'
+if [ -z "$repo_top" ]; then
+  printf 'repo_root:          SKIPPED (not in git repo)\n'
+elif [ -w "$repo_top" ]; then
+  printf 'repo_root:          writable\n'
+else
+  printf 'repo_root:          NOT WRITABLE\n'
+fi
 graphite_repo_config=$(git rev-parse --git-path .graphite_repo_config 2>/dev/null || true)
 [ -n "$graphite_repo_config" ] && [ -f "$graphite_repo_config" ] && printf 'graphite_repo:      present (%s)\n' "$graphite_repo_config" || printf 'graphite_repo:      missing\n'
 auth_path=''

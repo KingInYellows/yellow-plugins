@@ -32,7 +32,13 @@ printf '\n=== Working Paths ===\n'
 [ -n "$repo_top" ] && [ -d "$repo_top/.debt" ] && printf '.debt/:       present\n' || printf '.debt/:       missing (created by /debt:audit)\n'
 [ -n "$repo_top" ] && [ -d "$repo_top/docs/audits" ] && printf 'docs/audits/: present\n' || printf 'docs/audits/: missing (created by /debt:audit)\n'
 [ -n "$repo_top" ] && [ -d "$repo_top/todos/debt" ] && printf 'todos/debt/:  present\n' || printf 'todos/debt/:  missing (created by /debt:audit)\n'
-[ -n "$repo_top" ] && [ -w "$repo_top" ] && printf 'repo_root:    writable\n' || printf 'repo_root:    NOT WRITABLE\n'
+if [ -z "$repo_top" ]; then
+  printf 'repo_root:    SKIPPED (not in git repo)\n'
+elif [ -w "$repo_top" ]; then
+  printf 'repo_root:    writable\n'
+else
+  printf 'repo_root:    NOT WRITABLE\n'
+fi
 
 printf '\n=== Optional Integration ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
