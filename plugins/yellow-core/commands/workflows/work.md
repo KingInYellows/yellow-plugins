@@ -218,7 +218,7 @@ assurance.
    i. Make incremental commit using Graphite:
 
    ```bash
-   gt modify -c -m "feat(scope): implement X component
+   gt modify -m "feat(scope): implement X component
 
    - Add core functionality
    - Include error handling
@@ -327,7 +327,7 @@ assurance.
 6. Make final quality commit if changes needed:
 
    ```bash
-   gt modify -c -m "refactor: address code review feedback
+   gt modify -m "refactor: address code review feedback
 
    - Simplify complex function X
    - Fix potential security issue in Y
@@ -370,22 +370,27 @@ assurance.
    2. Stage only the changed files individually: `git add -- <changed-files>`
    3. Commit and submit:
       ```bash
-      gt modify -c -m "<generated conventional commit message>"
+      gt modify -m "<generated conventional commit message>"
       gt submit --no-interactive
       ```
 
 4. **Post-Submit Linear Sync:**
 
-   After successful submission, check if the current branch is linked to a
-   Linear issue:
+   After successful submission, prefer native Linear GitHub automation for
+   branch linking and status movement. Only fall back to `/linear:sync` if
+   native automation is unavailable, misconfigured, or did not move the issue.
+
+   To decide whether fallback sync is needed, check if the current branch is
+   linked to a Linear issue:
 
    ```bash
    BRANCH=$(git branch --show-current)
    ISSUE_ID=$(printf '%s' "$BRANCH" | grep -oE '[A-Z]{2,5}-[0-9]{1,6}' | head -1)
    ```
 
-   If an issue ID is found, invoke `/linear:sync` via Skill tool with
-   `skill: "linear:sync"` and `args` set to `"$ISSUE_ID --after-submit"`.
+   If an issue ID is found and fallback sync is required, invoke
+   `/linear:sync` via Skill tool with `skill: "linear:sync"` and `args` set to
+   `"$ISSUE_ID --after-submit"`.
 
    The `--after-submit` flag enables Tier 1 auto-apply: `/linear:sync` will
    automatically transition the issue to "In Review" and report the change
@@ -393,7 +398,7 @@ assurance.
 
    **Graceful degradation:** If the Skill invocation fails (yellow-linear not
    installed or `linear:sync` unavailable), skip silently. Do not block the
-   submission workflow for an optional Linear integration.
+   submission workflow for an optional repair path.
 
    If no issue ID is extractable from the branch name, skip this step silently.
 
@@ -476,7 +481,7 @@ assurance.
 gt create feature-name
 
 # Make a commit
-gt modify -c -m "feat: message"
+gt modify -m "feat: message"
 
 # View stack
 gt log short

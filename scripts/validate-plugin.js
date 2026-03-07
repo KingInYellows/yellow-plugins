@@ -36,6 +36,15 @@ function resolveHookScriptPath(command, pluginDir) {
   return normalized;
 }
 
+function resolvePluginPath(inputPath, pluginDir) {
+  const normalized = path.resolve(pluginDir, inputPath);
+  const pluginRoot = path.resolve(pluginDir);
+  if (normalized === pluginRoot || normalized.startsWith(pluginRoot + path.sep)) {
+    return normalized;
+  }
+  return null;
+}
+
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
@@ -157,6 +166,50 @@ function validatePlugin(pluginDir) {
       if (invalidKeywords.length > 0) {
         errors.push('All keywords must be strings');
         logError('All keywords must be strings');
+      }
+    }
+  }
+
+  // RULE 5b: output styles directory (if present)
+  if (manifest.outputStyles !== undefined) {
+    if (typeof manifest.outputStyles !== 'string') {
+      errors.push('outputStyles must be a string path');
+      logError('outputStyles must be a string path');
+    } else {
+      const stylesDir = resolvePluginPath(manifest.outputStyles, pluginDir);
+      if (!stylesDir) {
+        errors.push(
+          `outputStyles path escapes plugin directory: ${manifest.outputStyles}`
+        );
+        logError(
+          `outputStyles path escapes plugin directory: ${manifest.outputStyles}`
+        );
+      } else if (!fs.existsSync(stylesDir)) {
+        errors.push(`outputStyles directory not found: ${manifest.outputStyles}`);
+        logError(`outputStyles directory not found: ${manifest.outputStyles}`);
+      } else if (!fs.statSync(stylesDir).isDirectory()) {
+        errors.push(
+          `outputStyles must point to a directory: ${manifest.outputStyles}`
+        );
+        logError(
+          `outputStyles must point to a directory: ${manifest.outputStyles}`
+        );
+      } else {
+        const styleFiles = fs
+          .readdirSync(stylesDir, { withFileTypes: true })
+          .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
+        if (styleFiles.length === 0) {
+          errors.push(
+            `outputStyles directory must contain at least one .md file: ${manifest.outputStyles}`
+          );
+          logError(
+            `outputStyles directory must contain at least one .md file: ${manifest.outputStyles}`
+          );
+        } else {
+          logSuccess(
+            `Output styles: ${manifest.outputStyles} (${styleFiles.length} file${styleFiles.length === 1 ? '' : 's'})`
+          );
+        }
       }
     }
   }

@@ -52,4 +52,4 @@ MSG=$(printf '%s' "$COMMAND" | grep -oE '\-m "[^"]*"' | head -1 | sed 's/^-m "//
 printf '%s' "$MSG" | grep -qE '^(feat|fix|refactor|docs|test|chore|perf|ci|build|revert)(\(.+\))?!?:' && exit_ok
 
 # Warn-only — static message, never include commit content
-jq -n '{"continue": true, "systemMessage": "[gt-workflow] Commit message does not follow conventional commits. Consider: gt modify -c -m \"type(scope): description\""}'
+jq -n '{"continue": true, "systemMessage": "[gt-workflow] Commit message does not follow conventional commits. Consider: gt modify -m \"type(scope): description\""}'

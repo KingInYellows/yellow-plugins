@@ -2,13 +2,15 @@
 name: architecture-scanner
 description: "Architecture and module design analysis. Use when auditing code for circular dependencies, god modules, boundary violations, or structural issues."
 model: inherit
-allowed-tools:
+background: true
+skills:
+  - debt-conventions
+tools:
   - Read
   - Grep
   - Glob
   - Bash
   - Write
-  - Skill
 ---
 
 <examples>

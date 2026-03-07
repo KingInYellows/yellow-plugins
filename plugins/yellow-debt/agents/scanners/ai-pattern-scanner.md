@@ -2,13 +2,15 @@
 name: ai-pattern-scanner
 description: "AI-specific anti-pattern detection. Use when auditing code for excessive comments, boilerplate, over-specification, or other AI-generated debt patterns."
 model: inherit
-allowed-tools:
+background: true
+skills:
+  - debt-conventions
+tools:
   - Read
   - Grep
   - Glob
   - Bash
   - Write
-  - Skill
 ---
 
 <examples>

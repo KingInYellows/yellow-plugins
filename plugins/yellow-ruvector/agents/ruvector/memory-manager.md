@@ -2,13 +2,15 @@
 name: ruvector-memory-manager
 description: "Store, retrieve, and flush agent learnings across sessions. Use when an agent needs to record a mistake and its fix, retrieve past learnings for a similar task, check what patterns have been successful, or flush pending updates from the queue. Also use when user says \"remember this\", \"what did we learn about X\", \"record this mistake\", or \"flush pending updates\"."
 model: inherit
-allowed-tools:
+skills:
+  - agent-learning
+  - ruvector-conventions
+tools:
   - ToolSearch
   - AskUserQuestion
   - Read
   - Write
   - Bash
-  - Skill
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
 ---

@@ -16,6 +16,7 @@
     "productivity",
     "pm"
   ],
+  "outputStyles": "./output-styles",
   "mcpServers": {
     "linear": {
       "type": "http",

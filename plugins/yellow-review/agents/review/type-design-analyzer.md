@@ -2,7 +2,8 @@
 name: type-design-analyzer
 description: "Type design, encapsulation, and invariant analysis. Use when reviewing PRs that introduce or modify type definitions (interfaces, classes, structs, enums, models) in TypeScript, Python, Rust, or Go to ensure strong invariants and proper encapsulation."
 model: inherit
-allowed-tools:
+memory: true
+tools:
   - Read
   - Grep
   - Glob

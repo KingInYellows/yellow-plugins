@@ -2,7 +2,8 @@
 name: comment-analyzer
 description: "Code comment accuracy and rot detection. Use when reviewing PRs that add or modify documentation comments, docstrings, JSDoc, or inline comments to verify they accurately reflect the code they describe."
 model: inherit
-allowed-tools:
+memory: true
+tools:
   - Read
   - Grep
   - Glob

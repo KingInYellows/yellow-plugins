@@ -2,7 +2,7 @@
 name: pr-comment-resolver
 description: 'Implements fixes for individual PR review comments. Use when spawned in parallel by /review:resolve to address a single unresolved review thread by reading the file, understanding the comment, and applying the requested change.'
 model: inherit
-allowed-tools:
+tools:
   - Read
   - Grep
   - Glob

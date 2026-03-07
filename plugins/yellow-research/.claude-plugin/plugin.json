@@ -10,6 +10,7 @@
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
   "keywords": ["research", "deep-research", "perplexity", "exa", "tavily", "ast-grep", "mcp"],
+  "outputStyles": "./output-styles",
   "mcpServers": {
     "perplexity": {
       "command": "npx",

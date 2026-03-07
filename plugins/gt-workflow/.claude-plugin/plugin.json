@@ -21,6 +21,7 @@
     "workflow",
     "pull-requests"
   ],
+  "outputStyles": "./output-styles",
   "hooks": {
     "PreToolUse": [
       {

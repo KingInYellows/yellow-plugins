@@ -26,7 +26,7 @@ set -euo pipefail
 
 # Source shared validation library for extract_frontmatter and transition_todo_state
 # shellcheck source=../../lib/validate.sh
-. "$(dirname "${BASH_SOURCE[0]}")/../../lib/validate.sh"
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 
 # Parse arguments
 if [ $# -ne 1 ]; then
@@ -64,6 +64,13 @@ if [ ! -f "$TODO_PATH" ]; then
   exit 1
 fi
 
+# Remediation runs in an isolated worktree and must start from a clean repo.
+# Exclude .debt/ artifacts left by /debt:audit so the audit→fix flow works.
+if [ -n "$(git status --porcelain | grep -Ev '^(\?\?|[MADRCU ]{2}) \.debt/')" ]; then
+  printf 'ERROR: /debt:fix requires a clean working tree (ignoring .debt/). Commit, stash, or discard unrelated changes first.\n' >&2
+  exit 1
+fi
+
 # Read todo metadata
 STATUS=$(extract_frontmatter "$TODO_PATH" | yq -r '.status' 2>/dev/null)
 
@@ -91,30 +98,11 @@ CATEGORY=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.category' 2>/dev/null)
 SEVERITY=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.severity' 2>/dev/null)
 TODO_ID=$(extract_frontmatter "$NEW_TODO_PATH" | yq -r '.id' 2>/dev/null)
 
-printf '[fix] Launching debt-fixer agent for: %s\n' "$TITLE" >&2
+printf '[fix] Launching yellow-debt:debt-fixer agent for: %s\n' "$TITLE" >&2
 printf '[fix] Category: %s | Severity: %s | ID: %s\n' "$CATEGORY" "$SEVERITY" "$TODO_ID" >&2
 
-# Launch debt-fixer agent with finding context
-# The agent will:
-# 1. Read the todo file to understand the finding
-# 2. Implement the fix
-# 3. Show git diff
-# 4. Use AskUserQuestion for approval
-# 5. On approval: commit via heredoc pattern
-# 6. On rejection: git restore and revert state
-
-printf '\nLaunching debt-fixer agent...\n'
-printf 'Task(subagent_type="debt-fixer"): "Fix technical debt finding in %s. ' "$NEW_TODO_PATH"
-printf 'Read todo file, implement fix, show diff, get approval, commit if approved."\n'
-
-printf '\nThe debt-fixer agent will:\n'
-printf '  1. Analyze the finding and implement a fix\n'
-printf '  2. Show you the diff of changes\n'
-printf '  3. Ask for your approval (MANDATORY - no auto-commit)\n'
-printf '  4. On YES: commit changes and transition todo to complete\n'
-printf '  5. On NO: revert changes and transition todo back to ready\n'
-
-printf '\nSecurity note: All fixes require explicit human approval before committing.\n'
+printf '[fix] Ready todo path: %s\n' "$NEW_TODO_PATH" >&2
+printf '[fix] Next step: launch yellow-debt:debt-fixer in an isolated worktree for this todo.\n' >&2
 
 # Show next ready finding if any
 NEXT_READY=$(find todos/debt -name '*-ready-*.md' 2>/dev/null | head -1)
@@ -122,6 +110,13 @@ if [ -n "$NEXT_READY" ]; then
   printf '\nNext ready finding: %s\n' "$NEXT_READY"
 fi
 ```
+
+## Agent Orchestration
+
+After the bash block succeeds, launch `yellow-debt:debt-fixer` directly via Task with the
+updated todo path. The agent must run in its isolated worktree, read the todo
+file, implement the fix, show the diff, request approval, and either commit or
+restore only the files it changed before resetting the todo to `ready`.
 
 ## Example Usage
 
@@ -150,8 +145,8 @@ Therefore:
    - No: Discard changes and keep todo in 'ready' state
    ```
 
-3. On "Yes": commit via `gt modify -c "fix: resolve <finding-title>"`
-4. On "No": revert changes via `git restore`, reset todo to `ready`
+3. On "Yes": commit via `gt modify -m "fix: resolve <finding-title>"`
+4. On "No": restore only touched files, reset todo to `ready`
 
 **Never auto-commit without human review.**
 
@@ -165,7 +160,7 @@ quoting to prevent command injection:
 safe_title=$(printf '%s' "$finding_title" | LC_ALL=C tr -cd '[:alnum:][:space:]-_.' | cut -c1-72)
 
 # Use printf (prevents injection)
-gt modify -c "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s' \
+gt modify -m "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s' \
   "$safe_title" "$todo_path" "$category" "$severity")"
 ```
 
@@ -184,8 +179,11 @@ If fix agent fails:
 - Run `/debt:fix` again to retry (will fail - need to manually reset to ready)
 - Or manually transition back to ready: `transition_todo_state "<path>" ready`
 
-If git changes need to be reverted:
+If git changes need to be reverted, restore only the files touched by the fix:
 
 ```bash
-git restore .
+while IFS= read -r changed_file; do
+  [ -z "$changed_file" ] && continue
+  git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
+done < <(git status --porcelain | cut -c4-)
 ```

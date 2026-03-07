@@ -3,7 +3,9 @@ name: workflow-optimizer
 description: "GitHub Actions workflow optimization specialist. Use when analyzing CI performance, suggesting caching strategies, or improving workflow efficiency. Triggers on \"optimize workflows\", \"why is CI slow?\", \"add caching\", or when lint finds optimization opportunities (W02, W04, W08)."
 model: inherit
 color: cyan
-allowed-tools:
+skills:
+  - ci-conventions
+tools:
   - Read
   - Glob
   - Grep

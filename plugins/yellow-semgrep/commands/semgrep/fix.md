@@ -195,7 +195,7 @@ Create a commit via Graphite with structured metadata per `semgrep-conventions`
 skill:
 
 ```bash
-gt modify -c -m "fix(security): resolve {check_id} in {path}
+gt modify -m "fix(security): resolve {check_id} in {path}
 
 Finding-ID: {id}
 Rule: {check_id}

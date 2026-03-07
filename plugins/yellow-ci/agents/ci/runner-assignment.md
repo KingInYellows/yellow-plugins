@@ -3,7 +3,9 @@ name: runner-assignment
 description: 'GitHub Actions runner assignment specialist. Analyzes workflow jobs against available self-hosted runner inventory to recommend optimal runs-on values. Use when spawned by ci:setup-self-hosted with a fenced runner inventory.'
 model: inherit
 color: yellow
-allowed-tools:
+skills:
+  - ci-conventions
+tools:
   - Read
   - Glob
   - Grep
