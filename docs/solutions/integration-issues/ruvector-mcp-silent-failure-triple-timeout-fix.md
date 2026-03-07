@@ -1,5 +1,7 @@
 ---
-title: 'ruvector MCP Silent Failure: Triple Timeout Fix (npx Latency + Cold Start + No Retry)'
+title:
+  'ruvector MCP Silent Failure: Triple Timeout Fix (npx Latency + Cold Start +
+  No Retry)'
 date: 2026-03-05
 category: integration-issues
 tags:
@@ -30,9 +32,9 @@ components:
 
 ## Problem
 
-All ruvector MCP integration across the yellow-plugins ecosystem silently
-failed with the message "Knowledge Compounding -- Skipped -- ruvector recall
-not available." Hooks that depend on ruvector (PreToolUse, UserPromptSubmit,
+All ruvector MCP integration across the yellow-plugins ecosystem silently failed
+with the message "Knowledge Compounding -- Skipped -- ruvector recall not
+available." Hooks that depend on ruvector (PreToolUse, UserPromptSubmit,
 PostToolUse) were silently skipped in every session, and workflow commands
 (brainstorm, plan, work, compound, review-pr, resolve-pr) could not recall or
 remember learnings.
@@ -41,8 +43,8 @@ remember learnings.
 
 - "Knowledge Compounding -- Skipped -- ruvector recall not available" in every
   compound/review session
-- Hooks with 1-second budgets (PreToolUse, UserPromptSubmit, PostToolUse)
-  always timed out and were silently discarded
+- Hooks with 1-second budgets (PreToolUse, UserPromptSubmit, PostToolUse) always
+  timed out and were silently discarded
 - First MCP tool call in a session consistently failed or timed out
 - Transient MCP errors (timeout, connection refused) caused permanent skip with
   no recovery attempt for the rest of the session
@@ -56,8 +58,8 @@ functionally broken:
 
 `npx` adds approximately 1,869ms overhead per invocation due to package
 resolution. The global binary (`ruvector`) takes only 81ms -- a 23x difference.
-Hooks with 1-second execution budgets always exceeded their timeout when
-invoked via `npx`, causing silent skip every time.
+Hooks with 1-second execution budgets always exceeded their timeout when invoked
+via `npx`, causing silent skip every time.
 
 ```text
 npx ruvector hooks recall: ~1,869ms (exceeds 1s budget -> silent skip)
@@ -68,8 +70,8 @@ ruvector hooks recall:     ~81ms    (within budget -> works)
 
 The MCP server takes 300-1500ms to initialize on the first tool call per
 session. No built-in warmup mechanism exists in the MCP protocol. ToolSearch
-locating a tool does not guarantee the MCP server is running -- it only
-confirms the tool is registered in the plugin manifest.
+locating a tool does not guarantee the MCP server is running -- it only confirms
+the tool is registered in the plugin manifest.
 
 ### 3. No Retry on Transient Errors
 
@@ -92,8 +94,8 @@ resolvable package.
 
 - Verification changed from `npx ruvector --version` to `command -v ruvector`
 - Added nvm/fnm detection with warnings about per-version binary isolation
-- Prints PATH guidance warnings for `--prefix ~/.local` fallback installs
-  (does not auto-modify shell rc files)
+- Prints PATH guidance warnings for `--prefix ~/.local` fallback installs (does
+  not auto-modify shell rc files)
 - Hard failure if global binary is not in PATH after install -- degraded mode
   with npx is misleading because hooks would still be broken
 
@@ -113,8 +115,10 @@ based features silently do nothing.
 
 ### Layer 2: MCP Warmup via hooks_capabilities()
 
-All 7 consuming commands now call `hooks_capabilities()` before `hooks_recall`
-to absorb the MCP cold start penalty.
+All commands that directly issue `hooks_recall()` now call
+`hooks_capabilities()` first to absorb the MCP cold start penalty. Orchestration
+entrypoints such as `review-all.md` keep the required tools in `allowed-tools`
+and rely on the inline `review-pr` flow for the actual warmup/recall sequence.
 
 ```text
 1. Call ToolSearch("hooks_recall"). If not found: skip entirely.
@@ -131,8 +135,8 @@ predictable warmup step.
 
 **Warmup placement:** Warmup is placed before `hooks_recall` only, not before
 `hooks_remember`. If recall already ran earlier in the same session, the MCP
-server is warm and remember does not need another warmup. This is documented
-in `mcp-integration-patterns/SKILL.md`.
+server is warm and remember does not need another warmup. This is documented in
+`mcp-integration-patterns/SKILL.md`.
 
 ### Layer 3: Retry-Once on Transient MCP Errors
 
@@ -162,56 +166,57 @@ the calling code.
 
 ## Files Changed (10 files, 3 plugins)
 
-| File | Layer | Change |
-|---|---|---|
-| `plugins/yellow-ruvector/scripts/install.sh` | 1 | Global binary verification, nvm/fnm detection, PATH guidance warnings |
-| `plugins/yellow-ruvector/commands/ruvector/setup.md` | 1 | Hard failure on missing binary, smoke test with gtimeout macOS fallback |
-| `plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md` | 2+3 | Canonical warmup + retry-once patterns (design reference) |
-| `plugins/yellow-core/commands/workflows/brainstorm.md` | 2+3 | Warmup + retry-once for recall |
-| `plugins/yellow-core/commands/workflows/plan.md` | 2+3 | Warmup + retry-once for recall |
-| `plugins/yellow-core/commands/workflows/work.md` | 2+3 | Warmup + retry-once for recall and remember |
-| `plugins/yellow-core/commands/workflows/compound.md` | 2+3 | Warmup + retry-once for recall and remember |
-| `plugins/yellow-review/commands/review/review-pr.md` | 2+3 | Warmup + retry-once for recall and remember |
-| `plugins/yellow-review/commands/review/resolve-pr.md` | 2+3 | Warmup + retry-once for recall |
-| `plugins/yellow-review/commands/review/review-all.md` | — | Added hooks_remember to allowed-tools |
+| File                                                           | Layer       | Change                                                                                                                         |
+| -------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `plugins/yellow-ruvector/scripts/install.sh`                   | 1           | Global binary verification, nvm/fnm detection, PATH guidance warnings                                                          |
+| `plugins/yellow-ruvector/commands/ruvector/setup.md`           | 1           | Hard failure on missing binary, smoke test with gtimeout macOS fallback                                                        |
+| `plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md` | 2+3         | Canonical warmup + retry-once patterns (design reference)                                                                      |
+| `plugins/yellow-core/commands/workflows/brainstorm.md`         | 2+3         | Warmup + retry-once for recall                                                                                                 |
+| `plugins/yellow-core/commands/workflows/plan.md`               | 2+3         | Warmup + retry-once for recall                                                                                                 |
+| `plugins/yellow-core/commands/workflows/work.md`               | 2+3         | Warmup + retry-once for recall and remember                                                                                    |
+| `plugins/yellow-core/commands/workflows/compound.md`           | 2+3         | Warmup + retry-once for recall and remember                                                                                    |
+| `plugins/yellow-review/commands/review/review-pr.md`           | 2+3         | Warmup + retry-once for recall and remember                                                                                    |
+| `plugins/yellow-review/commands/review/resolve-pr.md`          | 2+3         | Warmup + retry-once for recall                                                                                                 |
+| `plugins/yellow-review/commands/review/review-all.md`          | 2+3 support | Kept the inline `review-pr` flow wired up by adding the required ruvector tools to `allowed-tools`, including `hooks_remember` |
 
 ## Key Design Decisions
 
 ### Inline patterns in each command (no shared include mechanism)
 
 No skill tag or include mechanism exists in Claude Code command files. Patterns
-from `SKILL.md` must be manually propagated to all 7 consuming commands. The
-`SKILL.md` serves as the canonical reference, and each command file includes
-the full warmup + retry-once pattern inline.
+from `SKILL.md` must be manually propagated to all 7 consuming entrypoints. The
+`SKILL.md` serves as the canonical reference. Direct workflow commands include
+the full warmup + retry-once pattern inline, while orchestration commands such
+as `review-all.md` keep their inline delegated flow and `allowed-tools` in sync.
 
 ### Manual PATH guidance (no auto-write to rc file)
 
 The install script does NOT auto-modify shell rc files. When the
-`--prefix ~/.local` fallback path is used and `~/.local/bin` is not in PATH,
-the script detects the user's login shell rc file and prints warning messages
-with the exact export line to add. PATH is exported in the current subshell
-for verification purposes only (does not propagate to the parent session).
+`--prefix ~/.local` fallback path is used and `~/.local/bin` is not in PATH, the
+script detects the user's login shell rc file and prints warning messages with
+the exact export line to add. PATH is exported in the current subshell for
+verification purposes only (does not propagate to the parent session).
 
 ### Hard failure on missing global binary
 
-A deliberate choice: npx overhead (1,869ms) makes hooks functionally broken,
-so allowing installation to "succeed" with only npx would create a false sense
-of correctness where every hook silently does nothing.
+A deliberate choice: npx overhead (1,869ms) makes hooks functionally broken, so
+allowing installation to "succeed" with only npx would create a false sense of
+correctness where every hook silently does nothing.
 
 ## Review Findings Applied
 
 The following findings from PR review were incorporated:
 
-| Severity | Finding | Fix |
-|---|---|---|
-| P1 | Deprecated `npm bin -g` in install.sh | Replaced with `npm prefix -g` + `/bin` |
-| P2 | Ambiguous step references in workflow commands | Disambiguated step references in compound.md, review-pr.md, work.md, resolve-pr.md |
-| P2 | Inconsistent warning labels | Standardized to `[ruvector] Warning` prefix across all commands |
-| P2 | hooks_remember silently skipped (asymmetric with recall which warned) | Changed to emit warning on skip |
-| P2 | hooks_remember missing from review-all.md allowed-tools | Added to allowed-tools |
-| P2 | fnm detection used wrong env var (FNM_USING_NODE) | Changed to FNM_DIR + `command -v fnm` |
-| P3 | No macOS timeout fallback in setup.md smoke test | Added gtimeout macOS fallback |
-| P3 | Used `which` instead of POSIX-compliant `command -v` | Replaced throughout |
+| Severity | Finding                                                               | Fix                                                                                |
+| -------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| P1       | Deprecated `npm bin -g` in install.sh                                 | Replaced with `npm prefix -g` + `/bin`                                             |
+| P2       | Ambiguous step references in workflow commands                        | Disambiguated step references in compound.md, review-pr.md, work.md, resolve-pr.md |
+| P2       | Inconsistent warning labels                                           | Standardized to `[ruvector] Warning` prefix across all commands                    |
+| P2       | hooks_remember silently skipped (asymmetric with recall which warned) | Changed to emit warning on skip                                                    |
+| P2       | hooks_remember missing from review-all.md allowed-tools               | Added to allowed-tools                                                             |
+| P2       | fnm detection used wrong env var (FNM_USING_NODE)                     | Changed to FNM_DIR + `command -v fnm`                                              |
+| P3       | No macOS timeout fallback in setup.md smoke test                      | Added gtimeout macOS fallback                                                      |
+| P3       | Used `which` instead of POSIX-compliant `command -v`                  | Replaced throughout                                                                |
 
 ## Prevention
 
@@ -258,5 +263,5 @@ warmup so future maintainers do not add redundant warmup calls.
   -- same ecosystem, different failure mode (fictitious tool names)
 - [MCP Bundled Server Tool Naming](mcp-bundled-server-tool-naming-and-plugin-authoring-patterns.md)
   -- MCP plugin authoring patterns
-- `plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md`
-  -- canonical warmup + retry-once patterns (design reference for all commands)
+- `plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md` -- canonical
+  warmup + retry-once patterns (design reference for all commands)

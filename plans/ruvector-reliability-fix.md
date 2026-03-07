@@ -196,12 +196,13 @@ Three-layer fix per the brainstorm's Approach B:
 
 <!-- /deepen-plan -->
 
-### Phase 3: Propagate to Consuming Commands (Layer 4)
+### Phase 3: Propagate to Consuming Commands
 
-All 7 commands inline the recall/remember patterns. Each needs: (a)
-`hooks_capabilities` added to `allowed-tools` (b) Warmup step added before first
-`hooks_recall` call (c) Retry-once added to `hooks_recall` and `hooks_remember`
-error handling
+All 7 workflow entrypoints rely on the recall/remember patterns. Each needs: (a)
+`hooks_capabilities` added to `allowed-tools` (b) Warmup step added before the
+first direct `hooks_recall` call or delegated inline review flow (c) retry-once
+added to `hooks_recall` and `hooks_remember` error handling where those calls
+are spelled out directly.
 
 - [ ] 3.1: Update `plugins/yellow-core/commands/workflows/brainstorm.md`
   - Add `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities` to
@@ -239,17 +240,19 @@ error handling
 
 - [ ] 3.7: Update `plugins/yellow-review/commands/review/review-all.md`
   - Add `hooks_capabilities` to allowed-tools
-  - Add warmup before inline review:pr recall flow
-  - Add retry-once to recall error handling
+  - Keep its inline `review-pr` flow aligned with the hardened `review-pr`
+    sequence
+  - No inline warmup/retry copy needed here because the delegated `review-pr`
+    flow owns the warmup + recall + retry behavior
 
 <!-- deepen-plan: codebase -->
 
 > **Codebase:** Scope correction — `review-all.md` (at
-> `plugins/yellow-review/commands/review/review-all.md`) must stay in scope. It
-> includes `hooks_recall` in allowed-tools (line 15) and runs the `review:pr`
-> flow inline (line 77-78: "Run the full /review:pr flow inline, not as command
-> invocation"). Since it re-executes review:pr logic directly rather than
-> delegating via Skill, it needs its own warmup/retry coverage.
+> `plugins/yellow-review/commands/review/review-all.md`) must stay in scope,
+> but only for tool parity. It needs `hooks_capabilities` and
+> `hooks_remember` kept in `allowed-tools`, while the delegated inline
+> `review-pr` flow remains the single place that owns warmup + recall + retry
+> behavior. Do not duplicate that sequence in `review-all.md`.
 
 <!-- /deepen-plan -->
 
@@ -305,7 +308,7 @@ error handling
 | 7   | `plugins/yellow-core/commands/workflows/compound.md`           | yellow-core     | allowed-tools + warmup + retry                         |
 | 8   | `plugins/yellow-review/commands/review/review-pr.md`           | yellow-review   | allowed-tools + warmup + retry (recall + remember)     |
 | 9   | `plugins/yellow-review/commands/review/resolve-pr.md`          | yellow-review   | allowed-tools + warmup + retry                         |
-| 10  | `plugins/yellow-review/commands/review/review-all.md`          | yellow-review   | allowed-tools + warmup + retry                         |
+| 10  | `plugins/yellow-review/commands/review/review-all.md`          | yellow-review   | allowed-tools only; warmup + retry stay in inline `review-pr` flow |
 
 ### Plugins Affected
 
