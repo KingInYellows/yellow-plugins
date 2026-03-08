@@ -65,9 +65,9 @@ if [ ! -f "$TODO_PATH" ]; then
 fi
 
 # Remediation runs in an isolated worktree and must start from a clean repo.
-# Exclude .debt/ artifacts left by /debt:audit so the audit→fix flow works.
-if [ -n "$(git status --porcelain | grep -Ev '^(\?\?|[MADRCU ]{2}) \.debt/')" ]; then
-  printf 'ERROR: /debt:fix requires a clean working tree (ignoring .debt/). Commit, stash, or discard unrelated changes first.\n' >&2
+# Exclude .debt/ and todos/debt/ artifacts left by /debt:audit so the audit→fix flow works.
+if [ -n "$(git status --porcelain | grep -Ev '^(\?\?|[MADRCU ]{2}) (\.debt/|todos/debt/)')" ]; then
+  printf 'ERROR: /debt:fix requires a clean working tree (ignoring .debt/ and todos/debt/). Commit, stash, or discard unrelated changes first.\n' >&2
   exit 1
 fi
 
