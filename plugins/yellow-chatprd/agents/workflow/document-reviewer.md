@@ -1,10 +1,7 @@
 ---
 name: document-reviewer
 model: inherit
-description: >-
-  AI-powered document review and completeness analysis. Use when user wants to
-  "review this PRD", "check the spec for gaps", "is this PRD complete", or
-  "what's missing from the auth spec".
+description: "AI-powered document review and completeness analysis. Use when user wants to review a PRD, check the spec for gaps, or identify what is missing from a spec."
 skills:
   - chatprd-conventions
 tools:
