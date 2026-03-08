@@ -126,7 +126,7 @@ const errors = [];
 const pluginAgents = new Set();
 const skillReferencePattern = /`([a-z0-9][a-z0-9-]*)`\s+skill\b/gi;
 const pluginSubagentPattern =
-  /subagent_type\s*(?:=|:)\s*"?([a-z0-9-]+:[a-z0-9-]+(?::[a-z0-9-]+)?)"?/g;
+  /subagent_type\s*(?:=|:)\s*["']?([a-z0-9-]+:[a-z0-9-]+(?::[a-z0-9-]+)?)["']?/g;
 
 for (const filePath of agentFiles) {
   const content = fs.readFileSync(filePath, 'utf8');
