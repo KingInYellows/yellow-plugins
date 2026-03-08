@@ -6,9 +6,11 @@ Each plugin (yellow-linear, yellow-core, gt-workflow, yellow-devin) works well
 in isolation, but handoffs between them are manual and disconnected. After
 `/linear:plan-cycle` assigns issues to a cycle, there is no suggested next step.
 `/workflows:plan` cannot pull context from Linear issues automatically.
-`/gt-stack-plan` does not understand Linear issue IDs. PR submission via Graphite
-does not update Linear statuses. Devin delegation is available but never surfaced
-during triage or cycle planning.
+`/gt-stack-plan` does not understand Linear issue IDs. While `/workflows:work`
+now includes a post-submit Linear sync step, `/smart-submit` alone does not
+update Linear statuses, and the sync relies on branch-name conventions that are
+not yet enforced by the pipeline. Devin delegation is available but never
+surfaced during triage or cycle planning.
 
 ## Proposed Solution
 
@@ -92,13 +94,12 @@ linear:triage / linear:plan-cycle
 
 This is the keystone connector -- the bridge from Linear issues to workflows.
 
-- [ ] **1.1: Create `plugins/yellow-linear/commands/linear/work.md`**
+- [x] **1.1: `plugins/yellow-linear/commands/linear/work.md`** _(already exists)_
 
-  New command file with:
-  - **YAML frontmatter:** `name: linear:work`, `description: "Start working on a Linear
-    issue — loads context and routes to plan or stack. Use when 'work on
-    ENG-123', 'start issue', 'pick up this ticket'."`
-  - **argument-hint:** `'<issue-id(s) or cycle-name>'`
+  The command file already exists with:
+  - **YAML frontmatter:** `name: linear:work`, `description: "Start working on
+    a Linear issue — loads context and routes to plan or stack."`
+  - **argument-hint:** `'[issue-id(s) or cycle-name]'`
   - **allowed-tools:** Linear MCP tools (`get_issue`, `list_issues`,
     `list_cycles`, `list_issue_statuses`, `list_comments`), `Bash`, `Read`,
     `Write`, `AskUserQuestion`, `ToolSearch`, `Skill`
@@ -148,11 +149,14 @@ This is the keystone connector -- the bridge from Linear issues to workflows.
   5. **Update Linear status:** Transition issue(s) to "In Progress" before
      handing off to the downstream workflow (auto-apply, safe transition).
   6. **Route to workflow:** Present options via `AskUserQuestion`:
-     - **Single issue:** "Plan this issue (`/workflows:plan <title>`)" or
-       "Plan as stacked PRs (`/gt-stack-plan <brainstorm-path>`)"
+     - **Single issue:** "Plan this issue — `/workflows:plan` (auto-detects
+       brainstorm doc for `<title>`)" or "Plan as stacked PRs
+       (`/gt-stack-plan <brainstorm-path>`)"
      - **Multiple issues:** "Plan as stacked PRs (`/gt-stack-plan <path>`)" or
        "Plan each issue separately"
-  7. **Invoke via Skill tool:** Call the selected command with pre-filled args.
+  7. **Invoke via Skill tool:** Call the selected command with the brainstorm
+     doc path as the argument (not the raw issue title). `/workflows:plan`
+     auto-detects Linear context from the brainstorm doc written in Step 4.
      Graceful degradation: if target plugin not installed, output install
      instructions and suggest manual workflow.
 
@@ -292,7 +296,9 @@ Add automatic Linear status updates after Graphite submission.
   - If issue ID found, invoke `/linear:sync --auto-tier1` via Skill tool.
   - `/linear:sync` already handles: fetching issue, detecting PR state,
     suggesting status transition with confirmation.
-  - Graceful degradation: if yellow-linear not installed, skip silently.
+  - Graceful degradation: if yellow-linear not installed, skip with a note:
+    "Linear sync skipped — yellow-linear not installed. Install with
+    `/plugin marketplace add KingInYellows/yellow-plugins yellow-linear`."
 
 - [ ] **5.2: Update `linear-workflows` SKILL.md with two-tier safety model**
 
@@ -362,11 +368,11 @@ Add automatic Linear status updates after Graphite submission.
 
 ### Phase 6: Prerequisite Fix
 
-- [ ] **6.1: Update `/linear:delegate` API endpoint**
+- [x] **6.1: Update `/linear:delegate` API endpoint** _(already completed)_
 
-  In `plugins/yellow-linear/commands/linear/delegate.md`, update the base URL
-  from `https://api.devin.ai/v3beta1` to `https://api.devin.ai/v3/` to match
-  the stable API documented in yellow-devin's CLAUDE.md.
+  Verified that `plugins/yellow-linear/commands/linear/delegate.md` already
+  uses the `https://api.devin.ai/v3` base URL, matching the stable API
+  documented in yellow-devin's CLAUDE.md. No changes needed.
 
 ### Phase 7: Cross-Plugin Documentation
 
@@ -391,22 +397,19 @@ Add automatic Linear status updates after Graphite submission.
 
 - [ ] **7.4: Update `plugins/yellow-linear/README.md`**
 
-  Update the command list and command count to reflect the new `/linear:work`
-  command (7 commands -> 8 commands).
+  Verify the command list and command count include `/linear:work`. The root
+  `README.md` already lists yellow-linear as "8 commands" — confirm
+  `plugins/yellow-linear/README.md` is consistent.
 
-- [ ] **7.5: Update root `README.md`**
+- [x] **7.5: Update root `README.md`** _(already accurate)_
 
-  Update the yellow-linear entry from "7 commands" to "8 commands".
+  The root `README.md` already lists yellow-linear as "8 commands" (includes
+  `/linear:work`). No changes needed.
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** Phase 7 is missing README.md updates. The root `README.md`
-> (line 28) lists yellow-linear as "3 agents, 7 commands, 1 skill, 1 MCP" —
-> adding `/linear:work` changes this to 8 commands.
-> `plugins/yellow-linear/README.md` also lists commands and needs updating.
-> Add tasks: (7.4) Update `plugins/yellow-linear/README.md` command list and
-> count, (7.5) Update root `README.md` yellow-linear entry to "8 commands".
-> This brings the estimated scope to 1 new file, 7 modified files, 3 CLAUDE.md
-> updates, **+ 2 README updates**.
+> **Codebase:** The root `README.md` already lists yellow-linear as
+> "3 agents, 8 commands, 1 skill, 1 MCP" — `/linear:work` is already counted.
+> `plugins/yellow-linear/README.md` should also be verified for consistency.
 <!-- /deepen-plan -->
 
 ## Acceptance Criteria
@@ -429,7 +432,7 @@ Add automatic Linear status updates after Graphite submission.
    requires user confirmation (Tier 2).
 9. All cross-plugin Skill invocations degrade gracefully with install
    instructions when the target plugin is missing.
-10. `/linear:delegate` uses the stable v3 API endpoint.
+10. `/linear:delegate` uses the stable v3 API endpoint. _(already met)_
 
 ## Edge Cases
 

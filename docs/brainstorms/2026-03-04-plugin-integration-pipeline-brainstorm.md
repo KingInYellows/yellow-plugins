@@ -20,8 +20,10 @@ manual and disconnected:
   automatically.
 - `/gt-stack-plan` does not understand Linear issue IDs or maintain issue-to-PR
   mappings.
-- `/workflows:work` and `/smart-submit` do not update Linear statuses after
-  Graphite submission.
+- `/workflows:work` now runs a post-submit Linear sync (`linear:sync
+  --after-submit`), but `/smart-submit` alone does not update Linear statuses,
+  and the sync depends on branch-name conventions not yet enforced by the
+  pipeline.
 - Devin delegation (`/linear:delegate`) is available but never surfaced during
   triage or cycle planning, forcing users to remember it exists.
 
