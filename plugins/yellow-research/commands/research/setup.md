@@ -52,10 +52,18 @@ If the user chooses **Yes**: run the install script:
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-ast-grep.sh"
 ```
 
-If the install script exits non-zero, print a warning and continue to Step 1:
+If the install script exits non-zero, print a warning with manual instructions
+and continue to Step 1:
+
 ```
 [yellow-research] Warning: ast-grep installation failed. AST-based code search
 will be unavailable. Other MCP sources are unaffected.
+Install ast-grep manually using one of:
+  npm install -g @ast-grep/cli   (Node.js)
+  brew install ast-grep          (macOS/Linux)
+  pip install ast-grep-cli       (Python)
+  cargo install ast-grep --locked (Rust)
+Then re-run /research:setup
 ```
 
 If the user chooses **No**: show manual install instructions and continue:

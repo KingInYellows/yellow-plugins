@@ -36,10 +36,16 @@ If the user chooses **Yes**: run the install script:
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-semgrep.sh"
 ```
 
-If the install script exits non-zero, print a warning and continue to Step 1:
+If the install script exits non-zero, print a warning with manual instructions
+and continue to Step 1:
+
 ```
 [yellow-semgrep] Warning: semgrep installation failed. Some features will be
-unavailable. See manual install instructions above.
+unavailable. Install semgrep manually using one of:
+  pipx install semgrep          (recommended — install pipx: brew install pipx)
+  pip install semgrep           (requires Python 3.9+)
+  brew install semgrep          (macOS only)
+Then re-run /semgrep:setup
 ```
 
 If the user chooses **No**: show manual install instructions and continue:

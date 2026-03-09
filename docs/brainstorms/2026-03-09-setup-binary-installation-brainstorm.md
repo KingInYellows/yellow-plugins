@@ -70,8 +70,6 @@ No silent installation.
 ```
 setup:all (orchestrator)
   |
-  +-- pre-setup phase: runs install scripts for PARTIAL/NEEDS SETUP plugins
-  |
   +-- delegates to individual setup commands (existing Step 4 flow)
         |
         +-- semgrep:setup calls install-semgrep.sh (new Step 0)
@@ -80,6 +78,9 @@ setup:all (orchestrator)
               +-- scripts are idempotent (check command -v first)
 ```
 
+Note: `setup:all` was NOT modified — it already delegates to individual setup
+commands which now handle binary installation via their new Step 0.
+
 **New files:**
 - `plugins/yellow-semgrep/scripts/install-semgrep.sh`
 - `plugins/yellow-research/scripts/install-ast-grep.sh`
@@ -87,7 +88,6 @@ setup:all (orchestrator)
 **Modified files:**
 - `plugins/yellow-semgrep/commands/semgrep/setup.md` -- add Step 0 calling install script
 - `plugins/yellow-research/commands/research/setup.md` -- add Step 0 calling install script
-- `plugins/yellow-core/commands/setup/all.md` -- add pre-setup install phase
 
 ### 4. Confirm one at a time
 

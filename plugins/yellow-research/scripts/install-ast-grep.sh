@@ -56,16 +56,22 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 # --- Detect version manager (nvm/fnm) ---
-# When a version manager is active, skip --prefix ~/.local fallback on failure
-# (it installs to a different location than the version manager expects)
+# When a version manager is actively managing npm, skip --prefix ~/.local fallback
+# on failure (it installs to a different location than the version manager expects).
+# A dormant ~/.nvm directory alone doesn't count — check if npm is actually
+# running from the version manager's prefix.
 has_version_mgr=false
-if [ -n "${NVM_DIR:-}" ] || [ -d "${HOME}/.nvm" ]; then
+npm_prefix=$(npm prefix -g 2>/dev/null || true)
+if [ -n "${NVM_DIR:-}" ] && printf '%s' "$npm_prefix" | grep -q "${NVM_DIR}"; then
   has_version_mgr=true
-  warning "nvm detected. Global npm binaries are per-Node-version and may disappear after 'nvm use <other-version>'."
+  warning "nvm detected (npm managed by nvm). Global npm binaries are per-Node-version and may disappear after 'nvm use <other-version>'."
+elif [ -d "${HOME}/.nvm" ] && printf '%s' "$npm_prefix" | grep -q ".nvm"; then
+  has_version_mgr=true
+  warning "nvm detected (npm managed by nvm). Global npm binaries are per-Node-version and may disappear after 'nvm use <other-version>'."
 fi
-if [ -n "${FNM_DIR:-}" ] || [ -d "${HOME}/.fnm" ] || command -v fnm >/dev/null 2>&1; then
+if { [ -n "${FNM_DIR:-}" ] || [ -d "${HOME}/.fnm" ] || command -v fnm >/dev/null 2>&1; } && printf '%s' "$npm_prefix" | grep -q "fnm"; then
   has_version_mgr=true
-  warning "fnm detected. Global npm binaries are per-Node-version and may not persist across shell restarts."
+  warning "fnm detected (npm managed by fnm). Global npm binaries are per-Node-version and may not persist across shell restarts."
 fi
 
 # --- Detect OS/arch ---
