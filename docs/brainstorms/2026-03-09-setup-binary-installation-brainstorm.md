@@ -29,7 +29,7 @@ not found" and "plugin ready."
 **Approach chosen: Plugin-Scoped Install Scripts (ruvector pattern)**
 
 This follows the exact pattern already established by `yellow-ruvector`, which has
-a `hooks/scripts/install.sh` that its setup command delegates to. The pattern is
+a `scripts/install.sh` that its setup command delegates to. The pattern is
 proven, the convention exists, and no new architecture is needed.
 
 Three alternative approaches were considered:
@@ -81,8 +81,8 @@ setup:all (orchestrator)
 ```
 
 **New files:**
-- `plugins/yellow-semgrep/hooks/scripts/install-semgrep.sh`
-- `plugins/yellow-research/hooks/scripts/install-ast-grep.sh`
+- `plugins/yellow-semgrep/scripts/install-semgrep.sh`
+- `plugins/yellow-research/scripts/install-ast-grep.sh`
 
 **Modified files:**
 - `plugins/yellow-semgrep/commands/semgrep/setup.md` -- add Step 0 calling install script

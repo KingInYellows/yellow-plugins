@@ -63,8 +63,14 @@ if command -v pipx >/dev/null 2>&1; then
 # Fall back to pip
 elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
   INSTALL_METHOD="pip"
-  pip_cmd="pip3"
-  command -v pip3 >/dev/null 2>&1 || pip_cmd="pip"
+  # Prefer python3 -m pip (ensures correct interpreter) over raw pip3/pip
+  if command -v python3 >/dev/null 2>&1; then
+    pip_cmd="python3 -m pip"
+  elif command -v pip3 >/dev/null 2>&1; then
+    pip_cmd="pip3"
+  else
+    pip_cmd="pip"
+  fi
 
   # Warn about active virtual environment
   if [ -n "${VIRTUAL_ENV:-}" ]; then
@@ -77,7 +83,7 @@ elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
   printf '[yellow-semgrep] Installing semgrep via %s...\n' "$pip_cmd"
 
   pip_output=""
-  if ! pip_output=$("$pip_cmd" install semgrep 2>&1); then
+  if ! pip_output=$($pip_cmd install semgrep 2>&1); then
     # Detect PEP 668 externally-managed-environment error
     if printf '%s' "$pip_output" | grep -qi "externally-managed-environment"; then
       printf '%s\n' "$pip_output" >&2

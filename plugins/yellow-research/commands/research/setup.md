@@ -28,13 +28,18 @@ gracefully and continues with whichever sources are available.
 
 ### Step 0: Install ast-grep (if missing)
 
-Check if `ast-grep` is already installed:
+Check if the ast-grep CLI is already installed (`@ast-grep/cli` provides both
+`sg` and `ast-grep` binaries):
 
 ```bash
-command -v ast-grep >/dev/null 2>&1 && printf '[yellow-research] ast-grep: ok (%s)\n' "$(ast-grep --version 2>/dev/null)"
+if command -v sg >/dev/null 2>&1; then
+  printf '[yellow-research] ast-grep (sg): ok (%s)\n' "$(sg --version 2>/dev/null)"
+elif command -v ast-grep >/dev/null 2>&1; then
+  printf '[yellow-research] ast-grep: ok (%s)\n' "$(ast-grep --version 2>/dev/null)"
+fi
 ```
 
-If `ast-grep` is NOT found, use AskUserQuestion:
+If neither `sg` nor `ast-grep` is found, use AskUserQuestion:
 
 > "ast-grep binary not found. Install it now? (Enables AST-based code search
 > in /research:code and /research:deep)"
@@ -73,7 +78,7 @@ printf '=== Prerequisites ===\n'
 command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:      NOT FOUND\n'
 command -v jq       >/dev/null 2>&1 && printf 'jq:        ok\n' || printf 'jq:        NOT FOUND\n'
 command -v git      >/dev/null 2>&1 && printf 'git:       ok\n' || printf 'git:       NOT FOUND (needed for ast-grep MCP via uvx)\n'
-command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
+{ command -v sg >/dev/null 2>&1 || command -v ast-grep >/dev/null 2>&1; } && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
 command -v uv       >/dev/null 2>&1 && printf 'uv:        ok\n' || printf 'uv:        NOT FOUND (needed for ast-grep MCP)\n'
 if ! command -v python3 >/dev/null 2>&1; then
   printf 'python3:   NOT FOUND (needs >=3.13 for ast-grep MCP)\n'

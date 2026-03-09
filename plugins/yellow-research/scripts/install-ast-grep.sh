@@ -36,9 +36,17 @@ cleanup() {
 trap cleanup EXIT
 
 # --- Check if already installed ---
-if command -v ast-grep >/dev/null 2>&1; then
-  installed_version=$(ast-grep --version 2>/dev/null || true)
-  success "ast-grep already installed: ${installed_version:-unknown version}"
+# @ast-grep/cli provides both 'sg' and 'ast-grep' binaries
+AST_GREP_CMD=""
+if command -v sg >/dev/null 2>&1; then
+  AST_GREP_CMD="sg"
+elif command -v ast-grep >/dev/null 2>&1; then
+  AST_GREP_CMD="ast-grep"
+fi
+
+if [ -n "$AST_GREP_CMD" ]; then
+  installed_version=$("$AST_GREP_CMD" --version 2>/dev/null || true)
+  success "ast-grep already installed (${AST_GREP_CMD}): ${installed_version:-unknown version}"
   exit 0
 fi
 
@@ -48,12 +56,15 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 # --- Detect version manager (nvm/fnm) ---
-has_nvm=false
+# When a version manager is active, skip --prefix ~/.local fallback on failure
+# (it installs to a different location than the version manager expects)
+has_version_mgr=false
 if [ -n "${NVM_DIR:-}" ] || [ -d "${HOME}/.nvm" ]; then
-  has_nvm=true
+  has_version_mgr=true
   warning "nvm detected. Global npm binaries are per-Node-version and may disappear after 'nvm use <other-version>'."
 fi
 if [ -n "${FNM_DIR:-}" ] || [ -d "${HOME}/.fnm" ] || command -v fnm >/dev/null 2>&1; then
+  has_version_mgr=true
   warning "fnm detected. Global npm binaries are per-Node-version and may not persist across shell restarts."
 fi
 
@@ -72,28 +83,35 @@ install_path="global"
 
 if npm_output=$(npm install -g @ast-grep/cli 2>&1); then
   true
-elif [ "$has_nvm" = "true" ]; then
-  # NVM manages its own prefix — don't fall back to --prefix ~/.local
-  # as it would install to a different location than NVM expects
+elif [ "$has_version_mgr" = "true" ]; then
+  # Version managers (nvm/fnm) manage their own prefix — don't fall back to
+  # --prefix ~/.local as it would install to a different location
   printf '%s\n' "$npm_output" >&2
-  error "npm install failed under nvm. Check nvm permissions or try: nvm install-latest-npm"
-elif npm_output=$(npm install -g @ast-grep/cli --prefix "${HOME:?HOME not set}/.local" 2>&1); then
-  install_path="local"
-  warning "Installed to ~/.local prefix"
-  local_bin="${HOME}/.local/bin"
-  path_needs_update=false
-  if ! printf '%s' "$PATH" | tr ':' '\n' | grep -qxF "$local_bin"; then
-    path_needs_update=true
-    case "$(basename "${SHELL:-}")" in
-      zsh)  rc_file="${HOME}/.zshrc" ;;
-      bash) rc_file="${HOME}/.bashrc" ;;
-      *)    rc_file="${HOME}/.profile" ;;
-    esac
-    warning "${local_bin} is not in PATH."
-    warning "Add this line to ${rc_file}:"
-    warning "  export PATH=\"${local_bin}:\$PATH\""
-    warning "Then restart your shell or run: source ${rc_file}"
-    export PATH="${local_bin}:${PATH}"
+  error "npm install failed under version manager. Check permissions or try reinstalling npm."
+elif printf '%s' "$npm_output" | grep -qi "EACCES\|permission denied\|EPERM"; then
+  # Only fall back to --prefix ~/.local on permission errors (not network/other failures)
+  warning "Global install failed with permission error — retrying with --prefix ~/.local"
+  if npm_output=$(npm install -g @ast-grep/cli --prefix "${HOME:?HOME not set}/.local" 2>&1); then
+    install_path="local"
+    warning "Installed to ~/.local prefix"
+    local_bin="${HOME}/.local/bin"
+    path_needs_update=false
+    if ! printf '%s' "$PATH" | tr ':' '\n' | grep -qxF "$local_bin"; then
+      path_needs_update=true
+      case "$(basename "${SHELL:-}")" in
+        zsh)  rc_file="${HOME}/.zshrc" ;;
+        bash) rc_file="${HOME}/.bashrc" ;;
+        *)    rc_file="${HOME}/.profile" ;;
+      esac
+      warning "${local_bin} is not in PATH."
+      warning "Add this line to ${rc_file}:"
+      warning "  export PATH=\"${local_bin}:\$PATH\""
+      warning "Then restart your shell or run: source ${rc_file}"
+      export PATH="${local_bin}:${PATH}"
+    fi
+  else
+    printf '%s\n' "$npm_output" >&2
+    error "npm install -g @ast-grep/cli --prefix ~/.local also failed."
   fi
 else
   printf '%s\n' "$npm_output" >&2
@@ -109,26 +127,34 @@ INSTRUCTIONS
 fi
 
 # --- Verify installation ---
-if ! command -v ast-grep >/dev/null 2>&1; then
+# @ast-grep/cli provides both 'sg' and 'ast-grep' binaries — check both
+VERIFIED_CMD=""
+if command -v sg >/dev/null 2>&1; then
+  VERIFIED_CMD="sg"
+elif command -v ast-grep >/dev/null 2>&1; then
+  VERIFIED_CMD="ast-grep"
+fi
+
+if [ -z "$VERIFIED_CMD" ]; then
   npm_global_prefix=$(npm prefix -g 2>/dev/null || true)
   npm_global_bin="${npm_global_prefix}/bin"
-  if [ -n "$npm_global_prefix" ] && [ -x "${npm_global_bin}/ast-grep" ]; then
-    error "ast-grep installed at ${npm_global_bin}/ast-grep but that directory is not in PATH. Add to your shell profile: export PATH=\"${npm_global_bin}:\$PATH\""
+  if [ -n "$npm_global_prefix" ] && { [ -x "${npm_global_bin}/ast-grep" ] || [ -x "${npm_global_bin}/sg" ]; }; then
+    error "ast-grep installed at ${npm_global_bin} but that directory is not in PATH. Add to your shell profile: export PATH=\"${npm_global_bin}:\$PATH\""
   fi
   error "ast-grep not found in PATH after install."
 fi
 
-installed_version=$(ast-grep --version 2>/dev/null || true)
+installed_version=$("$VERIFIED_CMD" --version 2>/dev/null || true)
 if [ -z "$installed_version" ]; then
-  error "ast-grep binary found but 'ast-grep --version' failed. Try reinstalling."
+  error "${VERIFIED_CMD} binary found but '${VERIFIED_CMD} --version' failed. Try reinstalling."
 fi
 
 if [ "$install_path" = "local" ]; then
   if [ "${path_needs_update:-false}" = "true" ]; then
-    success "ast-grep ${installed_version} installed to ~/.local/bin — restart your shell to use it"
+    success "ast-grep ${installed_version} installed to ~/.local/bin (${VERIFIED_CMD}) — restart your shell to use it"
   else
-    success "ast-grep ${installed_version} installed to ~/.local/bin (already in PATH)"
+    success "ast-grep ${installed_version} installed to ~/.local/bin (${VERIFIED_CMD}, already in PATH)"
   fi
 else
-  success "ast-grep ${installed_version} installed successfully (global binary in PATH)"
+  success "ast-grep ${installed_version} installed successfully (${VERIFIED_CMD}, global binary in PATH)"
 fi
