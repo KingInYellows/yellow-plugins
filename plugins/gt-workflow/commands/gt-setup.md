@@ -19,23 +19,28 @@ Run a single Bash call:
 
 ```bash
 printf '=== Prerequisites ===\n'
-gt_version_raw=$(gt --version 2>/dev/null | head -n1 || true)
-if command -v gt >/dev/null 2>&1 && [ -n "$gt_version_raw" ]; then
-  printf 'gt:            ok (%s)\n' "$gt_version_raw"
-  gt_ver=$(printf '%s' "$gt_version_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-  if [ -z "$gt_ver" ]; then
-    printf 'mcp_server:    UNKNOWN (could not parse version from: %s)\n' "$gt_version_raw"
-  else
-    gt_major=$(printf '%s' "$gt_ver" | cut -d. -f1)
-    gt_minor=$(printf '%s' "$gt_ver" | cut -d. -f2)
-    gt_patch=$(printf '%s' "$gt_ver" | cut -d. -f3)
-    if [ "${gt_major:-0}" -gt 1 ] 2>/dev/null || \
-       { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -gt 6 ]; } 2>/dev/null || \
-       { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -eq 6 ] && [ "${gt_patch:-0}" -ge 7 ]; } 2>/dev/null; then
-      printf 'mcp_server:    ok (gt >= 1.6.7)\n'
+if command -v gt >/dev/null 2>&1; then
+  gt_version_raw=$(gt --version 2>/dev/null | head -n1 || true)
+  if [ -n "$gt_version_raw" ]; then
+    printf 'gt:            ok (%s)\n' "$gt_version_raw"
+    gt_ver=$(printf '%s' "$gt_version_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    if [ -z "$gt_ver" ]; then
+      printf 'mcp_server:    UNKNOWN (could not parse version from: %s)\n' "$gt_version_raw"
     else
-      printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\n' "$gt_ver"
+      gt_major=$(printf '%s' "$gt_ver" | cut -d. -f1)
+      gt_minor=$(printf '%s' "$gt_ver" | cut -d. -f2)
+      gt_patch=$(printf '%s' "$gt_ver" | cut -d. -f3)
+      if [ "${gt_major:-0}" -gt 1 ] 2>/dev/null || \
+         { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -gt 6 ]; } 2>/dev/null || \
+         { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -eq 6 ] && [ "${gt_patch:-0}" -ge 7 ]; } 2>/dev/null; then
+        printf 'mcp_server:    ok (gt >= 1.6.7)\n'
+      else
+        printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\n' "$gt_ver"
+      fi
     fi
+  else
+    printf 'gt:            ok (version unknown)\n'
+    printf 'mcp_server:    UNKNOWN (gt --version returned no output)\n'
   fi
 else
   printf 'gt:            NOT FOUND\n'
@@ -73,14 +78,18 @@ done
 
 ### Step 2: Interpret Results
 
-Stop after reporting all failures that apply:
+**Failures (hard stop)** — stop after reporting all that apply:
 
 - `gt` missing: "Graphite CLI is required. Install it from https://graphite.dev/docs/cli and re-run `/gt-setup`."
 - `jq` missing: "jq is required for gt-workflow hooks. Install it from https://jqlang.github.io/jq/download/."
 - `git_repo` not ok: "gt-workflow must be run inside a git repository."
 - `auth_config` missing: "Graphite auth was not detected. Run `gt auth` or sign in through the Graphite CLI, then re-run `/gt-setup`."
 - `repo_config` missing OR `gt_trunk` unavailable: "This repository is not initialized for Graphite. Run `gt init`, confirm `gt trunk` works, then re-run `/gt-setup`."
-- `mcp_server` UPGRADE NEEDED: *(warning, not a hard stop)* "Graphite MCP server requires gt v1.6.7+. Upgrade to unlock MCP features. Existing CLI commands work without it."
+
+**Warnings (informational, do not block setup):**
+
+- `mcp_server` UPGRADE NEEDED: "Graphite MCP server requires gt v1.6.7+. Run `npm i -g @withgraphite/graphite-cli@latest` to upgrade, or see https://graphite.dev/docs/cli. Existing CLI commands work without it."
+- `mcp_server` SKIPPED or UNKNOWN: Implicitly covered by the `gt` missing or version check above — no separate action needed.
 
 ### Step 3: Report
 

@@ -2,6 +2,16 @@
 
 Graphite-native workflow commands for stacked PR development.
 
+## MCP Server
+
+- **Graphite** — Bundled stdio server via `gt mcp` (requires gt CLI v1.6.7+)
+- Authentication: Inherited from `gt` CLI auth — no separate token required
+- Tool prefix: `mcp__plugin_gt-workflow_graphite__`
+- Tool names must be discovered empirically via ToolSearch after installation
+- If `gt` is not installed or is below v1.6.7, the server silently fails to
+  start and graphite MCP tools are simply unavailable — run `/gt-setup` to
+  diagnose
+
 ## Conventions
 
 - **ALWAYS** use `gt` (Graphite CLI) for branch management, commits, and PR
@@ -70,14 +80,6 @@ Both paths use `gt submit --no-interactive` for submission.
 
 ### MCP Tool Integration
 
-- **graphite** — Bundled MCP server (stdio via `gt mcp`, requires gt v1.6.7+).
-  Exposes Graphite API operations as MCP tools for richer PR/stack data (review
-  status, comments, CI checks, stack metadata). Uses the existing `gt` CLI auth
-  — no separate API token required. Tool prefix:
-  `mcp__plugin_gt-workflow_graphite__`. Actual tool names must be discovered
-  empirically via ToolSearch after installation. If `gt` is not installed or is
-  below v1.6.7, the MCP server silently fails to start and graphite MCP tools
-  are simply unavailable — run `/gt-setup` to diagnose.
 - **ruvector** — Not directly integrated. gt-workflow commands are thin
   wrappers around Graphite CLI; memory operations happen in calling workflows
   (e.g., `/workflows:work`). Graceful skip if yellow-ruvector not installed.
