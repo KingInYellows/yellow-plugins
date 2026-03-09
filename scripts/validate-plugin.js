@@ -39,7 +39,7 @@ function resolveHookScriptPath(command, pluginDir) {
 function resolvePluginPath(inputPath, pluginDir) {
   const normalized = path.resolve(pluginDir, inputPath);
   const pluginRoot = path.resolve(pluginDir);
-  if (normalized === pluginRoot || normalized.startsWith(pluginRoot + path.sep)) {
+  if (normalized.startsWith(pluginRoot + path.sep)) {
     return normalized;
   }
   return null;
