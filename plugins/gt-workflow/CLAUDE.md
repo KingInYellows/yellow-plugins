@@ -75,7 +75,9 @@ Both paths use `gt submit --no-interactive` for submission.
   status, comments, CI checks, stack metadata). Uses the existing `gt` CLI auth
   — no separate API token required. Tool prefix:
   `mcp__plugin_gt-workflow_graphite__`. Actual tool names must be discovered
-  empirically via ToolSearch after installation.
+  empirically via ToolSearch after installation. If `gt` is not installed or is
+  below v1.6.7, the MCP server silently fails to start and graphite MCP tools
+  are simply unavailable — run `/gt-setup` to diagnose.
 - **ruvector** — Not directly integrated. gt-workflow commands are thin
   wrappers around Graphite CLI; memory operations happen in calling workflows
   (e.g., `/workflows:work`). Graceful skip if yellow-ruvector not installed.

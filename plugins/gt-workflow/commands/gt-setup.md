@@ -23,15 +23,19 @@ gt_version_raw=$(gt --version 2>/dev/null | head -n1 || true)
 if command -v gt >/dev/null 2>&1 && [ -n "$gt_version_raw" ]; then
   printf 'gt:            ok (%s)\n' "$gt_version_raw"
   gt_ver=$(printf '%s' "$gt_version_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-  gt_major=$(printf '%s' "$gt_ver" | cut -d. -f1)
-  gt_minor=$(printf '%s' "$gt_ver" | cut -d. -f2)
-  gt_patch=$(printf '%s' "$gt_ver" | cut -d. -f3)
-  if [ "${gt_major:-0}" -gt 1 ] 2>/dev/null || \
-     { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -gt 6 ]; } 2>/dev/null || \
-     { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -eq 6 ] && [ "${gt_patch:-0}" -ge 7 ]; } 2>/dev/null; then
-    printf 'mcp_server:    ok (gt >= 1.6.7)\n'
+  if [ -z "$gt_ver" ]; then
+    printf 'mcp_server:    UNKNOWN (could not parse version from: %s)\n' "$gt_version_raw"
   else
-    printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\n' "$gt_ver"
+    gt_major=$(printf '%s' "$gt_ver" | cut -d. -f1)
+    gt_minor=$(printf '%s' "$gt_ver" | cut -d. -f2)
+    gt_patch=$(printf '%s' "$gt_ver" | cut -d. -f3)
+    if [ "${gt_major:-0}" -gt 1 ] 2>/dev/null || \
+       { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -gt 6 ]; } 2>/dev/null || \
+       { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -eq 6 ] && [ "${gt_patch:-0}" -ge 7 ]; } 2>/dev/null; then
+      printf 'mcp_server:    ok (gt >= 1.6.7)\n'
+    else
+      printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\n' "$gt_ver"
+    fi
   fi
 else
   printf 'gt:            NOT FOUND\n'
