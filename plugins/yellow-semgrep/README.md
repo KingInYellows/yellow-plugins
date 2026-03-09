@@ -85,7 +85,8 @@ one at Organization Settings > API Tokens with Web API scope.
 **"Token validation failed (401)"** — Your token was rejected. Verify it has Web
 API scope (not CI scope) and has not expired.
 
-**"semgrep CLI not found"** — Install with `pip install semgrep` or
+**"semgrep CLI not found"** — Run `/semgrep:setup` which offers to install
+semgrep automatically via pipx (preferred) or pip. Or install manually:
 `pipx install semgrep`.
 
 **"MCP tools not found"** — The semgrep MCP server may not be running. Run

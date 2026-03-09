@@ -18,6 +18,10 @@ Then enable `yellow-research` from the plugin list.
 **Optional:** Install the `yellow-core` plugin for Context7 library docs
 support in `/research:code`. If absent, the code-researcher falls back to EXA.
 
+**ast-grep:** The ast-grep MCP server requires the `ast-grep` binary. Run
+`/research:setup` which offers to install it automatically via npm. Or install
+manually: `npm install -g @ast-grep/cli`.
+
 ## API Key Setup
 
 Add to your shell config (`~/.zshrc` or `~/.bashrc`):
