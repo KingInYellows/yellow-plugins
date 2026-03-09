@@ -26,6 +26,57 @@ gracefully and continues with whichever sources are available.
 
 ## Workflow
 
+### Step 0: Install ast-grep (if missing)
+
+Check if the ast-grep CLI is already installed (`@ast-grep/cli` provides both
+`sg` and `ast-grep` binaries):
+
+```bash
+if command -v sg >/dev/null 2>&1; then
+  printf '[yellow-research] ast-grep (sg): ok (%s)\n' "$(sg --version 2>/dev/null)"
+elif command -v ast-grep >/dev/null 2>&1; then
+  printf '[yellow-research] ast-grep: ok (%s)\n' "$(ast-grep --version 2>/dev/null)"
+fi
+```
+
+If neither `sg` nor `ast-grep` is found, use AskUserQuestion:
+
+> "ast-grep binary not found. Install it now? (Enables AST-based code search
+> in /research:code and /research:deep)"
+>
+> Options: "Yes, install ast-grep" / "No, I'll install manually"
+
+If the user chooses **Yes**: run the install script:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-ast-grep.sh"
+```
+
+If the install script exits non-zero, print a warning with manual instructions
+and continue to Step 1:
+
+```
+[yellow-research] Warning: ast-grep installation failed. AST-based code search
+will be unavailable. Other MCP sources are unaffected.
+Install ast-grep manually using one of:
+  npm install -g @ast-grep/cli   (Node.js)
+  brew install ast-grep          (macOS/Linux)
+  pip install ast-grep-cli       (Python)
+  cargo install ast-grep --locked (Rust)
+Then re-run /research:setup
+```
+
+If the user chooses **No**: show manual install instructions and continue:
+
+```
+Install ast-grep manually using one of:
+  npm install -g @ast-grep/cli   (Node.js)
+  brew install ast-grep          (macOS/Linux)
+  pip install ast-grep-cli       (Python)
+  cargo install ast-grep --locked (Rust)
+Then re-run /research:setup
+```
+
 ### Step 1: Check Prerequisites and API Keys
 
 Run a single Bash call to check tools and all three env vars:
@@ -35,7 +86,7 @@ printf '=== Prerequisites ===\n'
 command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:      NOT FOUND\n'
 command -v jq       >/dev/null 2>&1 && printf 'jq:        ok\n' || printf 'jq:        NOT FOUND\n'
 command -v git      >/dev/null 2>&1 && printf 'git:       ok\n' || printf 'git:       NOT FOUND (needed for ast-grep MCP via uvx)\n'
-command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
+{ command -v sg >/dev/null 2>&1 || command -v ast-grep >/dev/null 2>&1; } && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
 command -v uv       >/dev/null 2>&1 && printf 'uv:        ok\n' || printf 'uv:        NOT FOUND (needed for ast-grep MCP)\n'
 if ! command -v python3 >/dev/null 2>&1; then
   printf 'python3:   NOT FOUND (needs >=3.13 for ast-grep MCP)\n'
@@ -409,6 +460,8 @@ research), `Done`.
 
 | Error                                    | Message                                                                          | Action              |
 | ---------------------------------------- | -------------------------------------------------------------------------------- | ------------------- |
+| `ast-grep` not found (Step 0)            | AskUserQuestion: install now?                                                    | Offer install or show manual instructions |
+| Install script fails (Step 0)            | "ast-grep installation failed"                                                   | Warn, continue to Step 1 |
 | `curl` not found                         | "curl not found — live testing unavailable. Install via system package manager." | Warn, skip Step 3   |
 | `jq` not found                           | "jq not found — Tavily live test will use printf fallback for JSON body."        | Warn, continue      |
 | All 3 keys absent                        | Show all INACTIVE in table + full setup instructions block                       | Complete normally   |

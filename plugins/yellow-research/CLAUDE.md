@@ -98,8 +98,9 @@ on invocation with "Command 'ast-grep' not found"; other servers unaffected.
 
 For the **ast-grep** MCP server (other servers have no system prerequisites):
 
-- `ast-grep` binary — `brew install ast-grep` or
-  `cargo install ast-grep --locked` or `pip install ast-grep-cli`
+- `ast-grep` binary — `/research:setup` offers to install this automatically
+  via `npm install -g @ast-grep/cli`. Manual alternatives: `brew install ast-grep`,
+  `cargo install ast-grep --locked`, or `pip install ast-grep-cli`
 - `uv` — `curl -LsSf https://astral.sh/uv/install.sh | sh`
 - Python >= 3.13 — hard requirement from ast-grep-mcp's `pyproject.toml`
 

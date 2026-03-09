@@ -15,7 +15,9 @@ hybrid MCP + REST API architecture.
 
 - **`curl`** — REST API calls
 - **`jq`** — JSON construction and parsing
-- **`semgrep`** — Local scanning and autofix verification
+- **`semgrep`** — Local scanning and autofix verification. `/semgrep:setup`
+  offers to install this automatically via `pipx` (preferred) or `pip` if
+  missing.
 
 ## MCP Servers
 
