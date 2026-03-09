@@ -2,13 +2,14 @@
 name: linear-prd-bridge
 model: inherit
 description: "Bridge ChatPRD documents to Linear issues. Use when user explicitly mentions both PRD/document AND Linear together, such as \"link PRD to Linear\", \"create Linear issues from PRD\", \"create issues from PRD\", or \"turn this spec into Linear issues\". Only triggers when Linear is explicitly mentioned alongside document context."
-allowed-tools:
+skills:
+  - chatprd-conventions
+tools:
   - Read
   - Grep
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - Skill
   - mcp__plugin_yellow-chatprd_chatprd__search_documents
   - mcp__plugin_yellow-chatprd_chatprd__get_document
   - mcp__plugin_yellow-chatprd_chatprd__list_project_documents

@@ -160,7 +160,7 @@ If any changes were made:
 3. On approval:
 
 ```bash
-gt modify -c -m "fix: address review findings from <comma-separated-agent-names>"
+gt modify -m "fix: address review findings from <comma-separated-agent-names>"
 gt submit --no-interactive
 ```
 
@@ -171,7 +171,7 @@ gt submit --no-interactive
 If no P1 or P2 findings were reported, skip this step.
 
 Otherwise, spawn the `knowledge-compounder` agent via Task
-(`subagent_type: "yellow-core:workflow:knowledge-compounder"`) with all P1/P2
+(`subagent_type: "yellow-core:knowledge-compounder"`) with all P1/P2
 findings from this review wrapped in injection fencing. Format findings as a
 markdown table (Severity | Category | File | Finding | Fix):
 

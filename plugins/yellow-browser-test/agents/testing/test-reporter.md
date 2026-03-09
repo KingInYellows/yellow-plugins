@@ -2,12 +2,13 @@
 name: test-reporter
 description: "Generate test reports and create GitHub issues from browser test results. Use when test results exist at test-reports/results.json and a formatted report or bug issues are needed."
 model: inherit
-allowed-tools:
+skills:
+  - test-conventions
+tools:
   - Bash
   - Read
   - Write
   - AskUserQuestion
-  - Skill
 ---
 
 <examples>

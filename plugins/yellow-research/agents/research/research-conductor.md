@@ -1,13 +1,10 @@
 ---
 name: research-conductor
-description:
-  Routes /research:deep queries across multiple MCP sources. Use when deep
-  research needs multi-source investigation. Triages complexity and dispatches
-  parallel fan-out — simple queries go to Perplexity alone; moderate to 2-3
-  parallel sources; complex topics trigger full fan-out including Parallel Task
-  MCP for async reports.
+description: "Routes /research:deep queries across multiple MCP sources. Use when deep research needs multi-source investigation. Triages complexity and dispatches parallel fan-out -- simple queries go to Perplexity alone; moderate to 2-3 parallel sources; complex topics trigger full fan-out including Parallel Task MCP for async reports."
 model: inherit
-allowed-tools:
+background: true
+memory: true
+tools:
   - Task
   - ToolSearch
   - mcp__plugin_yellow-research_exa__web_search_exa

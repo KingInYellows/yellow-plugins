@@ -2,7 +2,10 @@
 name: audit-synthesizer
 description: "Merge scanner outputs, deduplicate findings, score severity, and generate reports. Use when synthesizing results from multiple debt scanners."
 model: inherit
-allowed-tools:
+background: true
+skills:
+  - debt-conventions
+tools:
   - Read
   - Write
   - Bash

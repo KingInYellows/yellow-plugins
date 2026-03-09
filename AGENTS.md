@@ -67,13 +67,15 @@ agent files must comply with these before merging.
    security scanner), use redaction format: `--- redacted credential at line N
    ---`. Include only file path, line number, and credential type in the output.
 
-3. **Skill tool inclusion:** If an agent references a skill by name in its body
-   (e.g., "Reference the `debt-conventions` skill"), include `Skill` in the
-   agent's `allowed-tools` frontmatter. Without this, the skill cannot be
-   invoked at runtime and all references to it are dead prose.
+3. **Skill preloading:** If an agent references a skill by name in its body
+   (e.g., "Reference the `debt-conventions` skill"), list it under the
+   `skills:` frontmatter key so it is preloaded at agent start. Alternatively,
+   include `Skill` in the agent's `tools:` list for dynamic runtime loading.
+   Without either, the skill cannot be invoked and all references are dead
+   prose.
 
 4. **MCP tool name qualification:** Use fully-qualified tool names in agent
    bodies when referencing MCP tools. Format:
    `mcp__plugin_{pluginName}_{serverName}__{toolName}`. Bare tool names in body
    text may be misread as literal call identifiers by the LLM. The qualified
-   name must match the entry in `allowed-tools`.
+   name must match the entry in the agent's `tools:` or command's `allowed-tools:` list.

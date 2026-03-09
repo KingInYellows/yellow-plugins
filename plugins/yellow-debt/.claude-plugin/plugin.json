@@ -13,6 +13,7 @@
     "code-quality",
     "scanner"
   ],
+  "outputStyles": "./output-styles",
   "hooks": {
     "SessionStart": [
       {

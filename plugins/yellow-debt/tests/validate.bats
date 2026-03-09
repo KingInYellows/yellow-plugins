@@ -80,8 +80,8 @@ teardown() {
 
 # --- validate_category ---
 
-@test "validate_category accepts ai-patterns" {
-  run validate_category "ai-patterns"
+@test "validate_category accepts ai-pattern" {
+  run validate_category "ai-pattern"
   [ "$status" -eq 0 ]
 }
 
@@ -100,8 +100,8 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
-@test "validate_category accepts security" {
-  run validate_category "security"
+@test "validate_category accepts security-debt" {
+  run validate_category "security-debt"
   [ "$status" -eq 0 ]
 }
 

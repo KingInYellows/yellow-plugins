@@ -16,8 +16,9 @@ Graphite-native workflow commands for stacked PR development.
 | Command                      | Purpose                                 |
 | ---------------------------- | --------------------------------------- |
 | `gt create <name> -m "msg"`  | Create a new branch (stacks on current) |
-| `gt modify -c -m "msg"`      | Add a commit to current branch (preferred) |
-| `gt commit create -m "msg"`  | Add a commit (deprecated, use `gt modify -c`) |
+| `gt modify -m "msg"`         | Update the current branch's default commit (preferred) |
+| `gt modify --commit -m "msg"` | Add an extra commit to the current branch when intentional |
+| `gt commit create -m "msg"`  | Add a commit (deprecated, use `gt modify --commit`) |
 | `gt commit amend -m "msg"`   | Amend the current branch commit         |
 | `gt submit --no-interactive` | Push stack and create/update PRs        |
 | `gt repo sync`               | Fetch trunk, detect merged branches     |
@@ -52,8 +53,8 @@ Both paths use `gt submit --no-interactive` for submission.
 
 ## Hooks
 
-- **PreToolUse (Bash)** — Blocks any raw `git push` call; redirects to
-  `gt submit --no-interactive`
+- **PreToolUse (Bash)** — Backstop that blocks raw `git push` and points the
+  workflow back to `gt submit --no-interactive`
 - **PostToolUse (Bash)** — Warns when a `gt commit`, `gt modify`, or
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)

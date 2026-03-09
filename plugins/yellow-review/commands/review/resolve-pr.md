@@ -126,7 +126,7 @@ If changes were made:
 3. On approval:
 
 ```bash
-gt modify -c -m "fix: resolve PR #<PR#> review comments"
+gt modify -m "fix: resolve PR #<PR#> review comments"
 gt submit --no-interactive
 ```
 

@@ -1,16 +1,14 @@
 ---
 name: project-dashboard
 model: inherit
-description: >-
-  One-stop project overview showing all documents, coverage gaps, and activity.
-  Use when user asks "what's the status of project X", "show me the project
-  overview", "what docs exist for the mobile project", or "project dashboard".
-allowed-tools:
+description: "One-stop project overview showing all documents, coverage gaps, and activity. Use when user asks about project status, project overview, existing docs, or project dashboard."
+skills:
+  - chatprd-conventions
+tools:
   - Read
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - Skill
   - mcp__plugin_yellow-chatprd_chatprd__list_project_documents
   - mcp__plugin_yellow-chatprd_chatprd__list_projects
   - mcp__plugin_yellow-chatprd_chatprd__get_document

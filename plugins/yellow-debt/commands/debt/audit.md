@@ -19,8 +19,8 @@ files.
 ## Arguments
 
 - `[path]` — Optional path to limit scan scope (default: entire codebase)
-- `--category <name>` — Run only specific scanner: ai-patterns, complexity,
-  duplication, architecture, security
+- `--category <name>` — Run only specific scanner: ai-pattern, complexity,
+  duplication, architecture, security-debt
 - `--severity <level>` — Filter output to minimum severity: critical, high,
   medium, low
 
@@ -31,10 +31,8 @@ files.
 set -euo pipefail
 
 # Source validation library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # shellcheck source=../../lib/validate.sh
-source "${PLUGIN_ROOT}/lib/validate.sh"
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 
 # Parse arguments - normalize path before validation
 RAW_PATH_FILTER="${1:-.}"
@@ -60,7 +58,7 @@ while [ $# -gt 0 ]; do
     --category)
       CATEGORY_FILTER="$2"
       validate_category "$CATEGORY_FILTER" || {
-        printf 'ERROR: Invalid category "%s". Must be: ai-patterns, complexity, duplication, architecture, security\n' "$CATEGORY_FILTER" >&2
+        printf 'ERROR: Invalid category "%s". Must be: ai-pattern, complexity, duplication, architecture, security-debt\n' "$CATEGORY_FILTER" >&2
         exit 1
       }
       shift 2
@@ -122,67 +120,37 @@ printf '[audit] Found %d source files to scan\n' "$FILE_COUNT" >&2
 if [ -n "$CATEGORY_FILTER" ]; then
   SCANNERS=("${CATEGORY_FILTER}")
 else
-  SCANNERS=(ai-patterns complexity duplication architecture security)
+  SCANNERS=(ai-pattern complexity duplication architecture security-debt)
 fi
 
-# Launch scanners in parallel with error tracking
+# Persist the scanner plan for the command body to orchestrate directly.
 printf '[audit] Launching %d scanner(s)...\n' "${#SCANNERS[@]}" >&2
-
-declare -A scanner_status
-
-for scanner in "${SCANNERS[@]}"; do
-  # Launch scanner agent via Task tool
-  # The scanner will read .debt/file-list.txt and write results to .debt/scanner-output/<scanner>-scanner.json
-  printf '[audit] Starting %s-scanner...\n' "$scanner" >&2
-
-  # Create task description
-  TASK_DESC="Scan codebase for ${scanner} technical debt patterns. Read file list from .debt/file-list.txt and write findings to .debt/scanner-output/${scanner}-scanner.json following the debt-conventions skill schema."
-
-  if [ -n "$SEVERITY_FILTER" ]; then
-    TASK_DESC="${TASK_DESC} Filter to ${SEVERITY_FILTER} severity or higher."
-  fi
-
-  # Store scanner name for status tracking
-  scanner_status["$scanner"]="pending"
-done
-
-# Display launch message
-printf '[audit] All scanner agents launched. Waiting for results...\n' >&2
-printf '[audit] This may take 1-5 minutes depending on codebase size.\n' >&2
-
-# Output Task tool orchestration instructions for Claude
-printf '\n=== AGENT ORCHESTRATION REQUIRED ===\n'
-printf 'Launch the following scanner agents in PARALLEL:\n\n'
-
-for scanner in "${SCANNERS[@]}"; do
-  TASK_DESC="Scan codebase for ${scanner} technical debt patterns. Read file list from .debt/file-list.txt and write findings to .debt/scanner-output/${scanner}-scanner.json following the debt-conventions skill schema."
-  if [ -n "$SEVERITY_FILTER" ]; then
-    TASK_DESC="${TASK_DESC} Filter to ${SEVERITY_FILTER} severity or higher."
-  fi
-
-  # Output Task tool call for Claude to execute
-  cat <<EOF
-Task(
-  subagent_type="${scanner}-scanner",
-  description="Scan for ${scanner} technical debt",
-  prompt="${TASK_DESC}"
-)
-EOF
-  printf '\n'
-done
-
-printf 'After ALL scanner agents complete, launch the synthesizer:\n\n'
-cat <<EOF
-Task(
-  subagent_type="audit-synthesizer",
-  description="Synthesize scanner outputs into report",
-  prompt="Merge scanner outputs from .debt/scanner-output/, deduplicate findings using debt-conventions scoring, generate audit report at docs/audits/$(date +%Y-%m-%d)-audit-report.md and create todo files in todos/debt/ following atomic state conventions."
-)
-EOF
-
-printf '\n=== END ORCHESTRATION ===\n'
-printf '[audit] Setup complete. Launch agents as shown above.\n' >&2
+printf '%s\n' "${SCANNERS[@]}" > .debt/scanners-to-run.txt
+if [ -n "$SEVERITY_FILTER" ]; then
+  printf '%s\n' "$SEVERITY_FILTER" > .debt/severity-filter.txt
+  printf '[audit] Severity filter: %s (written to .debt/severity-filter.txt)\n' "$SEVERITY_FILTER" >&2
+else
+  rm -f .debt/severity-filter.txt
+fi
+printf '[audit] Prepared scanner list in .debt/scanners-to-run.txt\n' >&2
+printf '[audit] Run the listed scanner agents in parallel, then run yellow-debt:audit-synthesizer.\n' >&2
 ```
+
+## Agent Orchestration
+
+After the bash block succeeds:
+
+1. Read `.debt/scanners-to-run.txt`.
+2. Launch one Task per scanner in parallel using subagent type
+   `yellow-debt:<scanner>-scanner`.
+3. Each scanner prompt should instruct the agent to read
+   `.debt/file-list.txt`, write findings to
+   `.debt/scanner-output/<scanner>-scanner.json`, and if
+   `.debt/severity-filter.txt` exists, filter to that minimum severity.
+4. After all scanner tasks complete, launch `yellow-debt:audit-synthesizer` to merge
+   `.debt/scanner-output/`, write the audit report to
+   `docs/audits/YYYY-MM-DD-audit-report.md`, and create todo files in
+   `todos/debt/`.
 
 ## Example Usage
 

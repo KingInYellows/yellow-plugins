@@ -13,5 +13,6 @@
     "pr",
     "code-review",
     "graphite"
-  ]
+  ],
+  "outputStyles": "./output-styles"
 }

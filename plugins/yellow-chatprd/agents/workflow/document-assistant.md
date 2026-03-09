@@ -2,13 +2,14 @@
 name: document-assistant
 model: inherit
 description: "ChatPRD document management assistant. Use when user wants to create, find, read, or update product documents in ChatPRD. Triggers on \"write a PRD\", \"create a spec\", \"draft a one-pager\", \"what does the PRD say about\", \"find the spec for\", \"update the requirements\", or any ChatPRD document interaction that does NOT involve Linear."
-allowed-tools:
+skills:
+  - chatprd-conventions
+tools:
   - Read
   - Grep
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - Skill
   - mcp__plugin_yellow-chatprd_chatprd__create_document
   - mcp__plugin_yellow-chatprd_chatprd__update_document
   - mcp__plugin_yellow-chatprd_chatprd__search_documents

@@ -3,10 +3,11 @@ name: scan-verifier
 description: "Post-fix verification specialist. Re-scans with the specific rule to confirm finding is resolved, then full-scans for regressions. Spawned by /semgrep:fix after a fix is applied."
 model: sonnet
 color: green
-allowed-tools:
+skills:
+  - semgrep-conventions
+tools:
   - Bash
   - Read
-  - Skill
   - mcp__plugin_yellow-semgrep_semgrep__semgrep_scan
 ---
 

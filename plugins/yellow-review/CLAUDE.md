@@ -78,7 +78,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 ## Cross-Plugin Agent References
 
 When conditions warrant, commands spawn these agents via Task tool (using
-`yellow-core:review:<name>` subagent_type):
+`yellow-core:<name>` subagent_type):
 
 - `security-sentinel` — for auth, crypto, and shell script changes
 - `architecture-strategist` — for large (10+ file) cross-module changes

@@ -166,14 +166,15 @@ fix: resolve PR #<num> review comments
 
 Same per-PR messages as above, applied to each PR in sequence.
 
-All commits via `gt modify -c -m "<message>"`. Push via
-`gt submit --no-interactive`.
+All default single-commit branches use `gt modify -m "<message>"`. Only use
+`gt modify --commit -m "<message>"` when you intentionally want multiple
+commits on one branch. Push via `gt submit --no-interactive`.
 
 ## Graphite Integration
 
 ### Standard Operations
 
-- **Commit**: `gt modify -c -m "fix: ..."`
+- **Commit**: `gt modify -m "fix: ..."`
 - **Push**: `gt submit --no-interactive`
 - **Restack**: `gt upstack restack` (abort on conflict, report to user)
 - **Checkout**: `gt checkout <branch>`
@@ -190,11 +191,11 @@ All commits via `gt modify -c -m "<message>"`. Push via
 To spawn cross-plugin agents from yellow-review commands, use the Task tool:
 
 ```
-Task(subagent_type="yellow-core:review:security-sentinel",
+Task(subagent_type="yellow-core:security-sentinel",
      prompt="Review these files for security issues: <file-list>")
 ```
 
-Agent type names follow the pattern: `yellow-core:review:<agent-name>`.
+Agent type names follow the pattern: `yellow-core:<agent-name>`.
 
 ## GraphQL Scripts
 

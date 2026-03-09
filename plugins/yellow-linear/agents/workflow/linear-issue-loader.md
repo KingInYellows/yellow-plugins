@@ -2,7 +2,9 @@
 name: linear-issue-loader
 description: "Auto-load Linear issue context from branch name. Use when user is working on a branch whose name contains a Linear issue identifier (e.g., ENG-123, feat/ENG-123-auth-flow). Also use when user says \"load issue\", \"get context\", \"what's this issue about\", or asks for background on a Linear issue."
 model: inherit
-allowed-tools:
+skills:
+  - linear-workflows
+tools:
   - Bash
   - ToolSearch
   - mcp__plugin_yellow-linear_linear__get_issue
