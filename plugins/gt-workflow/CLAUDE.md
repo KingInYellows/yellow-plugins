@@ -70,6 +70,12 @@ Both paths use `gt submit --no-interactive` for submission.
 
 ### MCP Tool Integration
 
+- **graphite** — Bundled MCP server (stdio via `gt mcp`, requires gt v1.6.7+).
+  Exposes Graphite API operations as MCP tools for richer PR/stack data (review
+  status, comments, CI checks, stack metadata). Uses the existing `gt` CLI auth
+  — no separate API token required. Tool prefix:
+  `mcp__plugin_gt-workflow_graphite__`. Actual tool names must be discovered
+  empirically via ToolSearch after installation.
 - **ruvector** — Not directly integrated. gt-workflow commands are thin
   wrappers around Graphite CLI; memory operations happen in calling workflows
   (e.g., `/workflows:work`). Graceful skip if yellow-ruvector not installed.

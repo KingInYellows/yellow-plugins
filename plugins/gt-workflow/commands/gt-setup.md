@@ -19,7 +19,24 @@ Run a single Bash call:
 
 ```bash
 printf '=== Prerequisites ===\n'
-command -v gt >/dev/null 2>&1 && printf 'gt:            ok (%s)\n' "$(gt --version 2>/dev/null | head -n1)" || printf 'gt:            NOT FOUND\n'
+gt_version_raw=$(gt --version 2>/dev/null | head -n1 || true)
+if command -v gt >/dev/null 2>&1 && [ -n "$gt_version_raw" ]; then
+  printf 'gt:            ok (%s)\n' "$gt_version_raw"
+  gt_ver=$(printf '%s' "$gt_version_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  gt_major=$(printf '%s' "$gt_ver" | cut -d. -f1)
+  gt_minor=$(printf '%s' "$gt_ver" | cut -d. -f2)
+  gt_patch=$(printf '%s' "$gt_ver" | cut -d. -f3)
+  if [ "${gt_major:-0}" -gt 1 ] 2>/dev/null || \
+     { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -gt 6 ]; } 2>/dev/null || \
+     { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -eq 6 ] && [ "${gt_patch:-0}" -ge 7 ]; } 2>/dev/null; then
+    printf 'mcp_server:    ok (gt >= 1.6.7)\n'
+  else
+    printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\n' "$gt_ver"
+  fi
+else
+  printf 'gt:            NOT FOUND\n'
+  printf 'mcp_server:    SKIPPED (gt not found)\n'
+fi
 command -v jq >/dev/null 2>&1 && printf 'jq:            ok\n' || printf 'jq:            NOT FOUND\n'
 
 printf '\n=== Repository ===\n'
@@ -59,6 +76,7 @@ Stop after reporting all failures that apply:
 - `git_repo` not ok: "gt-workflow must be run inside a git repository."
 - `auth_config` missing: "Graphite auth was not detected. Run `gt auth` or sign in through the Graphite CLI, then re-run `/gt-setup`."
 - `repo_config` missing OR `gt_trunk` unavailable: "This repository is not initialized for Graphite. Run `gt init`, confirm `gt trunk` works, then re-run `/gt-setup`."
+- `mcp_server` UPGRADE NEEDED: *(warning, not a hard stop)* "Graphite MCP server requires gt v1.6.7+. Upgrade to unlock MCP features. Existing CLI commands work without it."
 
 ### Step 3: Report
 
@@ -71,6 +89,7 @@ Graphite CLI:  ready
 jq:            ready
 Auth:          detected
 Repository:    initialized (trunk: <branch>)
+MCP Server:    available (or: unavailable — gt < 1.6.7)
 
 Setup complete. Run `/gt-sync` or `/smart-submit` to verify your workflow.
 ```
