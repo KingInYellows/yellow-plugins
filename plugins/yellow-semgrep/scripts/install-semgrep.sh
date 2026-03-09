@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # install-semgrep.sh — Install Semgrep CLI for yellow-semgrep plugin
-# Usage: bash install-semgrep.sh [--yes]
+# Usage: bash install-semgrep.sh
 
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -35,27 +35,6 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Parse arguments ---
-AUTO_YES=false
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --yes)
-      AUTO_YES=true
-      shift
-      ;;
-    --)
-      shift
-      break
-      ;;
-    -*)
-      error "Unknown option: $1"
-      ;;
-    *)
-      break
-      ;;
-  esac
-done
-
 # --- Check if already installed ---
 if command -v semgrep >/dev/null 2>&1; then
   installed_version=$(semgrep --version 2>/dev/null || true)
@@ -75,7 +54,9 @@ INSTALL_METHOD=""
 if command -v pipx >/dev/null 2>&1; then
   INSTALL_METHOD="pipx"
   printf '[yellow-semgrep] Installing semgrep via pipx (recommended)...\n'
-  if ! pipx install semgrep 2>&1; then
+  pipx_output=""
+  if ! pipx_output=$(pipx install semgrep 2>&1); then
+    printf '%s\n' "$pipx_output" >&2
     error "pipx install semgrep failed. Try manually: pipx install semgrep"
   fi
 
@@ -96,7 +77,7 @@ elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
   printf '[yellow-semgrep] Installing semgrep via %s...\n' "$pip_cmd"
 
   pip_output=""
-  if ! pip_output=$(python3 -m pip install semgrep 2>&1); then
+  if ! pip_output=$("$pip_cmd" install semgrep 2>&1); then
     # Detect PEP 668 externally-managed-environment error
     if printf '%s' "$pip_output" | grep -qi "externally-managed-environment"; then
       printf '%s\n' "$pip_output" >&2

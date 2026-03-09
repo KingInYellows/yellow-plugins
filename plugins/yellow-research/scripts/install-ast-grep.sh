@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # install-ast-grep.sh — Install ast-grep CLI for yellow-research plugin
-# Usage: bash install-ast-grep.sh [--yes]
+# Usage: bash install-ast-grep.sh
 
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -26,31 +26,14 @@ cleanup() {
   local exit_code=$?
   if [ $exit_code -ne 0 ]; then
     warning "Installation failed. Partial install may remain."
-    warning "To clean up: npm uninstall -g @ast-grep/cli"
+    if [ "${install_path:-global}" = "local" ]; then
+      warning "To clean up: npm uninstall -g @ast-grep/cli --prefix ~/.local"
+    else
+      warning "To clean up: npm uninstall -g @ast-grep/cli"
+    fi
   fi
 }
 trap cleanup EXIT
-
-# --- Parse arguments ---
-AUTO_YES=false
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --yes)
-      AUTO_YES=true
-      shift
-      ;;
-    --)
-      shift
-      break
-      ;;
-    -*)
-      error "Unknown option: $1"
-      ;;
-    *)
-      break
-      ;;
-  esac
-done
 
 # --- Check if already installed ---
 if command -v ast-grep >/dev/null 2>&1; then
