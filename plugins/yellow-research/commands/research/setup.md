@@ -26,6 +26,44 @@ gracefully and continues with whichever sources are available.
 
 ## Workflow
 
+### Step 0: Install ast-grep (if missing)
+
+Check if `ast-grep` is already installed:
+
+```bash
+command -v ast-grep >/dev/null 2>&1 && printf '[yellow-research] ast-grep: ok (%s)\n' "$(ast-grep --version 2>/dev/null)"
+```
+
+If `ast-grep` is NOT found, use AskUserQuestion:
+
+> "ast-grep binary not found. Install it now? (Enables AST-based code search
+> in /research:code and /research:deep)"
+>
+> Options: "Yes, install ast-grep" / "No, I'll install manually"
+
+If the user chooses **Yes**: run the install script:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-ast-grep.sh"
+```
+
+If the install script exits non-zero, print a warning and continue to Step 1:
+```
+[yellow-research] Warning: ast-grep installation failed. AST-based code search
+will be unavailable. Other MCP sources are unaffected.
+```
+
+If the user chooses **No**: show manual install instructions and continue:
+
+```
+Install ast-grep manually using one of:
+  npm install -g @ast-grep/cli   (Node.js)
+  brew install ast-grep          (macOS/Linux)
+  pip install ast-grep-cli       (Python)
+  cargo install ast-grep --locked (Rust)
+Then re-run /research:setup
+```
+
 ### Step 1: Check Prerequisites and API Keys
 
 Run a single Bash call to check tools and all three env vars:
@@ -409,6 +447,8 @@ research), `Done`.
 
 | Error                                    | Message                                                                          | Action              |
 | ---------------------------------------- | -------------------------------------------------------------------------------- | ------------------- |
+| `ast-grep` not found (Step 0)            | AskUserQuestion: install now?                                                    | Offer install or show manual instructions |
+| Install script fails (Step 0)            | "ast-grep installation failed"                                                   | Warn, continue to Step 1 |
 | `curl` not found                         | "curl not found — live testing unavailable. Install via system package manager." | Warn, skip Step 3   |
 | `jq` not found                           | "jq not found — Tavily live test will use printf fallback for JSON body."        | Warn, continue      |
 | All 3 keys absent                        | Show all INACTIVE in table + full setup instructions block                       | Complete normally   |

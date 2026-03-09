@@ -15,18 +15,61 @@ the deployment slug and repository name, and verify MCP tool availability.
 
 ## Workflow
 
-### Step 1: Validate Prerequisites
+### Step 0: Install semgrep CLI (if missing)
 
-Check required CLI tools are available:
+Check if `semgrep` is already installed:
 
 ```bash
-for cmd in curl jq semgrep; do
+command -v semgrep >/dev/null 2>&1 && printf '[yellow-semgrep] semgrep: ok (%s)\n' "$(semgrep --version 2>/dev/null)"
+```
+
+If `semgrep` is NOT found, use AskUserQuestion:
+
+> "semgrep CLI not found. Install it now? (Required for /semgrep:scan and
+> /semgrep:fix)"
+>
+> Options: "Yes, install semgrep" / "No, I'll install manually"
+
+If the user chooses **Yes**: run the install script:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-semgrep.sh"
+```
+
+If the install script exits non-zero, print a warning and continue to Step 1:
+```
+[yellow-semgrep] Warning: semgrep installation failed. Some features will be
+unavailable. See manual install instructions above.
+```
+
+If the user chooses **No**: show manual install instructions and continue:
+
+```
+Install semgrep manually using one of:
+  pipx install semgrep          (recommended — install pipx: brew install pipx)
+  pip install semgrep           (requires Python 3.9+)
+  brew install semgrep          (macOS only)
+Then re-run /semgrep:setup
+```
+
+### Step 1: Validate Prerequisites
+
+Check required CLI tools are available. `curl` and `jq` are hard prerequisites
+(needed for API calls). `semgrep` is a soft prerequisite — warn if missing
+(Step 0 already offered installation).
+
+```bash
+for cmd in curl jq; do
   command -v "$cmd" >/dev/null 2>&1 || {
     printf '[yellow-semgrep] Error: %s is required but not found.\n' "$cmd" >&2
     exit 1
   }
 done
-printf '[yellow-semgrep] Prerequisites: curl, jq, semgrep ✓\n'
+if command -v semgrep >/dev/null 2>&1; then
+  printf '[yellow-semgrep] Prerequisites: curl, jq, semgrep ✓\n'
+else
+  printf '[yellow-semgrep] Prerequisites: curl ✓, jq ✓, semgrep ✗ (not installed — scan features limited)\n' >&2
+fi
 ```
 
 ### Step 2: Validate Token
@@ -141,6 +184,10 @@ list warnings at the bottom.
 
 | Condition | Message | Action |
 |---|---|---|
+| `semgrep` not found (Step 0) | AskUserQuestion: install now? | Offer install or show manual instructions |
+| Install script fails (Step 0) | "semgrep installation failed" | Warn, continue to Step 1 |
+| `curl` or `jq` not found | "Error: {cmd} is required" | Exit |
+| `semgrep` not found (Step 1) | "semgrep not installed — scan features limited" | Warn, continue |
 | `SEMGREP_APP_TOKEN` not set | "SEMGREP_APP_TOKEN not set" | Exit with setup instructions |
 | Token format invalid | "Invalid token format (expected sgp_ prefix)" | Exit |
 | 401 on /me | "Invalid or expired token" | Exit |
