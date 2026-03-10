@@ -202,11 +202,15 @@ CLEAN_URL="${CLEAN_URL%/}"
 PR_NUM="${CLEAN_URL##*/}"
 ```
 
-For each unique PR, check current state via `gh pr view`:
+For each unique PR, check current state via `gh pr view` and capture metadata:
 
 ```bash
-gh pr view "$PR_NUM" --repo "$REPO" --json state,isDraft,title,headRefName,baseRefName \
-  -q '{state: .state, isDraft: .isDraft, title: .title, head: .headRefName, base: .baseRefName}'
+PR_METADATA=$(gh pr view "$PR_NUM" --repo "$REPO" --json state,isDraft,title,headRefName,baseRefName)
+PR_STATE=$(printf '%s' "$PR_METADATA" | jq -r '.state')
+PR_IS_DRAFT=$(printf '%s' "$PR_METADATA" | jq -r '.isDraft')
+PR_TITLE=$(printf '%s' "$PR_METADATA" | jq -r '.title')
+HEAD_REF_NAME=$(printf '%s' "$PR_METADATA" | jq -r '.headRefName')
+BASE_REF_NAME=$(printf '%s' "$PR_METADATA" | jq -r '.baseRefName')
 ```
 
 Filter: keep only `state=OPEN` and `isDraft=false`. If a PR was closed/merged
