@@ -373,8 +373,8 @@ Schema migrations if applicable.
    **When the plan contains a `## Linear Issues` section** (reorder to surface
    stacking first, since multi-issue plans benefit most from it):
 
-   1. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md)
-   2. Start implementation (/workflows:work plans/<name>.md)
+   1. Decompose into stacked PRs (/gt-stack-plan) — adds a ## Stack Decomposition section to the plan (no branches created)
+   2. Start implementation (/workflows:work) — if decomposition exists, executes bottom-up as stacked PRs
    3. Enrich with research (/workflows:deepen-plan plans/<name>.md)
    4. Create GitHub issue (I'll use gh issue create)
    5. Simplify the plan (reduce detail level)
@@ -382,9 +382,9 @@ Schema migrations if applicable.
 
    **Otherwise** (default ordering):
 
-   1. Start implementation (/workflows:work plans/<name>.md)
+   1. Start implementation (/workflows:work) — if decomposition exists, executes bottom-up as stacked PRs
    2. Enrich with research (/workflows:deepen-plan plans/<name>.md)
-   3. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md)
+   3. Decompose into stacked PRs (/gt-stack-plan) — adds a ## Stack Decomposition section to the plan (no branches created)
    4. Create GitHub issue (I'll use gh issue create)
    5. Simplify the plan (reduce detail level)
    6. Something else
