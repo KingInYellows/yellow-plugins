@@ -50,15 +50,16 @@ Stage, audit, and submit changes via Graphite in one flow.
 
 ### `/gt-stack-plan`
 
-Plan a series of stacked PRs for a feature, ordered by dependency.
+Decompose a feature into stacked PRs, ordered by dependency (plan-only).
 
 - Explores codebase to understand scope
 - Proposes ordered stack with branch names, commit types, and sizes
-- Optionally scaffolds all branches via `gt create`
+- Writes a structured `## Stack Decomposition` section to the plan file
+- Does **not** create branches — use `/workflows:work` to execute bottom-up
 
 ```
 /gt-stack-plan add user authentication with OAuth
-/gt-stack-plan refactor the payment processing pipeline
+/gt-stack-plan plans/my-feature.md
 ```
 
 ### `/gt-sync`
