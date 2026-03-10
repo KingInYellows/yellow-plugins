@@ -1,6 +1,6 @@
 {
   "name": "yellow-semgrep",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
   "author": {
     "name": "KingInYellows",

@@ -51,6 +51,10 @@ version_gte() {
 cleanup() {
   local exit_code=$?
   if [ $exit_code -ne 0 ] && [ -n "${INSTALL_METHOD:-}" ]; then
+    case "${INSTALL_METHOD:-}" in
+      pipx|pip) ;;
+      *) return ;;
+    esac
     warning "Installation failed. Partial install may remain."
     if [ "${INSTALL_METHOD:-}" = "pipx" ]; then
       warning "To clean up: pipx uninstall semgrep"
@@ -82,7 +86,7 @@ if command -v semgrep >/dev/null 2>&1; then
 
   INSTALL_METHOD=""
   if command -v pipx >/dev/null 2>&1; then
-    INSTALL_METHOD="pipx"
+    INSTALL_METHOD="pipx-upgrade"
     printf '[yellow-semgrep] Upgrading semgrep via pipx...\n'
     pipx_output=""
     if ! pipx_output=$(pipx upgrade semgrep 2>&1); then
@@ -97,7 +101,7 @@ if command -v semgrep >/dev/null 2>&1; then
   elif (command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1) \
     || command -v pip3 >/dev/null 2>&1 \
     || command -v pip >/dev/null 2>&1; then
-    INSTALL_METHOD="pip"
+    INSTALL_METHOD="pip-upgrade"
     if command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
       pip_cmd=(python3 -m pip)
     elif command -v pip3 >/dev/null 2>&1; then
