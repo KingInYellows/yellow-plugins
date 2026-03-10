@@ -63,7 +63,7 @@ assurance.
    Search the plan content for a `## Stack Decomposition` section. If found:
 
    - Parse HTML comment metadata: `<!-- stack-topology: linear|parallel|mixed -->`
-     and `<!-- stack-trunk: main -->`
+     and `<!-- stack-trunk: <branch> -->` (value is dynamic, usually `main`)
    - Parse each `### N. type/branch-name` subsection, extracting:
      - Item number, branch name (from heading)
      - **Type**, **Description**, **Scope**, **Tasks**, **Depends on**, **Linear**
@@ -72,10 +72,12 @@ assurance.
 
    Also check for a `## Stack Progress` section. If found:
    - Parse completed items (lines with `- [x]`)
-   - Cross-reference with `git branch --list` to verify branches exist
-   - If a completed item's branch is not found, ask the user via
+   - Cross-reference with `gt log short --no-interactive` and
+     `git branch -r --list "origin/<name>"` to verify branches exist locally
+     or on remote
+   - If a completed item's branch is not found anywhere, ask the user via
      AskUserQuestion: "Item N is marked complete but branch [name] was not
-     found. Re-execute or skip?"
+     found locally or on remote. Re-execute or skip?"
    - Verified completed items will be skipped during execution
 
    **If no `## Stack Decomposition` section is found:** proceed with single-branch
@@ -192,12 +194,14 @@ in order from bottom (item 1) to top:
 
    - **Linear topology:** If resuming (skipping completed items), first
      `gt checkout <last-completed-branch>`. Then `gt create "<branch-name>"`
-     (automatically stacks on top of the previous branch).
+     (automatically stacks on top of the previous branch). After checkout,
+     verify with `git branch --show-current` that the expected branch is active.
    - **Parallel topology:** First `gt checkout <trunk>` (from
-     `<!-- stack-trunk: -->` metadata), then `gt create "<branch-name>"`
-   - **Mixed topology:** Check the item's `Depends on:` field. If `(none)`,
-     follow parallel rules (checkout trunk). If `#N`, follow linear rules
-     (checkout item N's branch).
+     `<!-- stack-trunk: -->` metadata), then `gt create "<branch-name>"`.
+     After checkout, verify with `git branch --show-current` that trunk is active.
+   - **Mixed topology:** Not yet supported. If detected, report to the user:
+     "Mixed topology is not yet supported by workflows:work. Please restructure
+     as linear or parallel." and stop execution.
 
    If `gt create` fails (name collision, Graphite error):
    - Stop immediately
@@ -221,12 +225,19 @@ in order from bottom (item 1) to top:
 
 5. **Commit and submit:**
 
+   First verify changes exist: `git status --porcelain`. If no changes are
+   detected, ask the user: "No changes for item N. Skip or investigate?"
+
    ```bash
    gt modify -m "<type>: <description>"
    gt submit --no-interactive
    ```
 
    Where `<type>` and `<description>` come from the stack item fields.
+
+   If `gt submit` fails, do NOT proceed to step 6. Report the failure and ask
+   the user: "Submit failed for [item]. Retry / Continue without submit (mark
+   incomplete) / Stop here."
 
 6. **Update progress:** Write or update `## Stack Progress` in the plan file
    using the Edit tool:
@@ -242,6 +253,12 @@ in order from bottom (item 1) to top:
    If it exists, update the relevant line from `- [ ]` to `- [x]` with the
    completion date.
 
+   After updating, Read the plan file and verify the progress section reflects
+   the expected state. If the Edit failed (e.g., `old_string` mismatch), retry
+   with the actual file content. If retry fails, warn the user: "Progress
+   tracking update failed for item N. The item was submitted but progress may
+   be inconsistent."
+
 7. **Checkpoint:** Use AskUserQuestion:
 
    "Item N of M complete ([branch-name] submitted). What next?"
@@ -249,7 +266,10 @@ in order from bottom (item 1) to top:
    Options:
    - "Continue to next item" — proceed to item N+1
    - "Continue all remaining" — skip future checkpoints, auto-proceed
-   - "Revise remaining decomposition" — pause for the user to edit the plan
+   - "Revise remaining decomposition" — pause for the user to edit the plan.
+     After the user signals completion, re-read and re-parse `## Stack
+     Decomposition` and `## Stack Progress` from the plan file. Validate that
+     already-completed items are unchanged before continuing.
    - "Stop here" — exit; completed items are already submitted
 
    If the user previously selected "Continue all remaining", skip this
@@ -468,10 +488,12 @@ it at a Phase 1b checkpoint.
 step 5. Phase 4 becomes a summary phase:
 
 1. Show the completed stack and submitted PRs: `gt log short --no-interactive`
-2. Verify all acceptance criteria from the plan are met across the full stack
+2. Verify all acceptance criteria from the plan are met across the full stack.
+   If any are unmet, report them to the user and ask: "Continue to review or
+   address unmet criteria first?"
 3. Run the **Post-Submit Linear Sync** (single-branch mode step 4 below) for
    each branch that has a Linear issue ID
-5. Skip directly to Phase 5 (Review)
+4. Skip directly to Phase 5 (Review)
 
 **Single-branch mode (steps below):**
 
