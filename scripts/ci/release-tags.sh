@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # release-tags.sh — called by changesets/action publish step after the
 # Version Packages PR merges. Creates per-plugin git tags and the root
-# catalog tag, then pushes them to the remote.
+# catalog tag, then pushes them to the remote. Per-plugin tags are pushed
+# individually in Step 1; the catalog tag is pushed in Step 5.
 #
 # Per-plugin tags (e.g. yellow-core@1.1.1) are created by `changeset tag`
 # for all packages with privatePackages.tag: true in .changeset/config.json.
@@ -49,20 +50,25 @@ fi
 CATALOG_TAG="v${CATALOG_VERSION}"
 
 # Step 3: Verify the catalog tag does not already exist on the remote.
-# This prevents duplicate release triggers from reruns.
+# In normal mode, this prevents duplicate release triggers from reruns.
+# In recovery mode (RECOVERY_MODE=true), skip tag creation if it already exists.
 if git ls-remote --tags origin "refs/tags/${CATALOG_TAG}" | grep -q "${CATALOG_TAG}"; then
-  echo "::error::Catalog tag ${CATALOG_TAG} already exists on remote."
-  echo "::error::This is likely a duplicate run. If a release was not created,"
-  echo "::error::re-run with workflow_dispatch (force_publish=true), or create"
-  echo "::error::the GitHub Release manually: gh release create ${CATALOG_TAG}"
-  exit 1
+  if [ "${RECOVERY_MODE:-}" = "true" ]; then
+    echo "::warning::Catalog tag ${CATALOG_TAG} already exists — recovery mode, skipping tag creation."
+  else
+    echo "::error::Catalog tag ${CATALOG_TAG} already exists on remote."
+    echo "::error::This is likely a duplicate run. Re-run with workflow_dispatch"
+    echo "::error::(force_publish=true) to skip tag creation, or create the"
+    echo "::error::GitHub Release manually: gh release create ${CATALOG_TAG}"
+    exit 1
+  fi
+else
+  # Step 4: Create the local catalog tag.
+  git tag "$CATALOG_TAG"
+  echo "Created catalog tag: ${CATALOG_TAG}"
+
+  # Step 5: Push only the new catalog tag (not all local tags).
+  # Using a specific ref avoids pushing stale tags from prior failed runs.
+  git push origin "$CATALOG_TAG"
+  echo "Pushed ${CATALOG_TAG} — build-and-release job will proceed."
 fi
-
-# Step 4: Create the local catalog tag.
-git tag "$CATALOG_TAG"
-echo "Created catalog tag: ${CATALOG_TAG}"
-
-# Step 5: Push only the new catalog tag (not all local tags).
-# Using a specific ref avoids pushing stale tags from prior failed runs.
-git push origin "$CATALOG_TAG"
-echo "Pushed ${CATALOG_TAG} — build-and-release job will proceed."

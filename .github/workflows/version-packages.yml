@@ -61,8 +61,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! gh api "repos/${{ github.repository }}/pulls" \
-               -f state=closed -f per_page=1 --silent 2>/dev/null; then
+          if ! gh api "repos/${{ github.repository }}/pulls?state=closed&per_page=1" \
+               --silent 2>/dev/null; then
             echo "::error::GITHUB_TOKEN cannot access the pull requests API."
             echo "::error::Enable 'Allow GitHub Actions to create and approve pull requests'"
             echo "::error::in Settings > Actions > General > Workflow permissions."
@@ -118,6 +118,7 @@ jobs:
         run: bash scripts/ci/release-tags.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RECOVERY_MODE: 'true'
 
       - name: Read catalog version
         id: version
@@ -161,6 +162,7 @@ jobs:
         with:
           node-version: '22.22.0'
           cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -207,13 +209,12 @@ jobs:
           prerelease: ${{ needs.version-or-publish.outputs.is_prerelease == 'true' }}
           draft: false
           files: dist-release/*
-          generate_release_notes: true
           fail_on_unmatched_files: false
 
       - name: Publish to NPM (optional)
         if: |
           needs.version-or-publish.outputs.is_prerelease != 'true' &&
-          github.repository == 'kinginyellow/yellow-plugins'
+          github.repository == 'kinginyellows/yellow-plugins'
         run: |
           if [ -z "$NODE_AUTH_TOKEN" ]; then
             echo "::warning::NPM_TOKEN not configured — skipping NPM publish"

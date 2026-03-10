@@ -215,7 +215,9 @@ git commit -m "chore: version packages"
 git push
 pnpm tag                      # creates per-plugin git tags
 git tag v<catalog-version>    # e.g. v1.1.2
-git push --tags               # tags are used by version-packages.yml build-and-release job
+git push --tags               # tags are for release tracking (do not trigger the workflow)
+# To trigger the release workflow manually:
+# gh workflow run version-packages.yml -f force_publish=true
 ```
 
 ### Note on auto-updates (GitHub issue #26744)

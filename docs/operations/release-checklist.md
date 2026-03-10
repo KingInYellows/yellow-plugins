@@ -324,23 +324,21 @@ seconds median.
 
 ---
 
-### 2.2 CI Workflow Dry-Run
+### 2.2 CI Workflow Validation
 
-**Objective**: Simulate release workflow without actually publishing.
+**Objective**: Verify the release workflow runs successfully.
 
-- [ ] Trigger workflow dry-run using workflow_dispatch
+> **Warning**: `force_publish=true` is a **recovery mechanism**, not a dry-run.
+> It will create real tags and a real GitHub Release. Use it only after a failed
+> release where tags were already created but the release was not published.
 
-  ```bash
-  gh workflow run version-packages.yml \
-    --field force_publish=true
-  ```
-
-- [ ] Monitor workflow execution
+- [ ] Verify the Version Packages PR exists and CI passes on it
 
   ```bash
-  gh run watch
-  # Wait for completion, verify all jobs succeed
+  gh pr list --search "chore: version packages"
   ```
+
+- [ ] Confirm the PR's CI checks are green before merging
 
 - [ ] Review workflow summary
   ```bash
@@ -794,14 +792,16 @@ Section 4 traceability enforcement.
   git tag -l | grep "v$VERSION"
   ```
 
-**Reference**: `.github/workflows/version-packages.yml` tag trigger pattern,
-Section 4 git tagging conventions.
+**Reference**: `.github/workflows/version-packages.yml` (triggers on push to
+`main` and `workflow_dispatch`), Section 4 git tagging conventions.
 
 ---
 
-### 5.2 Push Tag to Trigger Workflow
+### 5.2 Push Tag (for manual/emergency releases)
 
-**Objective**: Push tag to GitHub to trigger automated release workflow.
+**Objective**: Push tag to GitHub for release tracking. Note: tags do **not**
+trigger the workflow — the workflow triggers on push to `main` or
+`workflow_dispatch`.
 
 - [ ] Push tag to remote
 
@@ -814,7 +814,7 @@ Section 4 git tagging conventions.
   gh api repos/:owner/:repo/git/refs/tags | jq '.[] | select(.ref | contains("v$(node -p "require('./package.json').version"))"))'
   ```
 
-**Reference**: `.github/workflows/version-packages.yml` on.push.tags trigger.
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job.
 
 ---
 
