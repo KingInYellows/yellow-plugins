@@ -15,19 +15,22 @@ hybrid MCP + REST API architecture.
 
 - **`curl`** — REST API calls
 - **`jq`** — JSON construction and parsing
-- **`semgrep`** — Local scanning and autofix verification. `/semgrep:setup`
-  offers to install this automatically via `pipx` (preferred) or `pip` if
-  missing.
+- **`semgrep`** — Local scanning, autofix verification, and MCP server.
+  Requires version **1.146.0+** for built-in MCP support (`semgrep mcp`).
+  `/semgrep:setup` offers to install or upgrade automatically via `pipx`
+  (preferred) or `pip` if missing or outdated.
 
 ## MCP Servers
 
-- **semgrep** — Local stdio server via `uvx semgrep-mcp`
+- **semgrep** — Built-in MCP server via `semgrep mcp` (requires v1.146.0+)
   - Provides: `semgrep_scan`, `semgrep_findings`, `get_abstract_syntax_tree`,
     `semgrep_scan_with_custom_rule`, `semgrep_rule_schema`,
     `get_supported_languages`, `semgrep_scan_supply_chain`, `semgrep_whoami`
   - Auth: `SEMGREP_APP_TOKEN` passed via env var
   - Note: MCP tools are read-only for triage state. Triage mutations use the
     REST API directly.
+  - Migration: The standalone `semgrep-mcp` PyPI package was archived Oct 2025.
+    The MCP server is now built into the main `semgrep` binary.
 
 ## Architecture
 
