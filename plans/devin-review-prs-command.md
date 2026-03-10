@@ -243,7 +243,7 @@ PR_MAP: {
 Extract PR numbers from URLs. For each PR, check state via `gh pr view`:
 
 ```bash
-gh pr view $PR_NUM --repo "$REPO" --json state,isDraft -q '{state: .state, isDraft: .isDraft}'
+gh pr view "$PR_NUM" --repo "$REPO" --json state,isDraft -q '{state: .state, isDraft: .isDraft}'
 ```
 
 Filter: keep only `state=OPEN` and `isDraft=false`. If a PR was closed/merged
@@ -256,7 +256,7 @@ If zero open non-draft PRs remain: report and exit cleanly.
 For each PR not already tracked by Graphite:
 
 ```bash
-gh pr checkout $PR_NUM
+gh pr checkout "$PR_NUM"
 gt track 2>/dev/null || {
   printf 'WARN: gt track failed for PR #%s. Proceeding in degraded mode.\n' "$PR_NUM"
   DEGRADED_PRS+=("$PR_NUM")
@@ -266,7 +266,7 @@ gt track 2>/dev/null || {
 Detect stack relationships via base/head refs:
 
 ```bash
-gh pr view $PR_NUM --json baseRefName,headRefName
+gh pr view "$PR_NUM" --json baseRefName,headRefName
 ```
 
 If PR A's `headRefName` equals PR B's `baseRefName`, they are stacked. Order
@@ -293,7 +293,7 @@ gt checkout "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
 **5b. Re-validate PR state (TOCTOU protection):**
 
 ```bash
-gh pr view $PR_NUM --json state -q '.state'
+gh pr view "$PR_NUM" --json state -q '.state'
 ```
 
 If no longer `OPEN`, skip: "PR #X closed since discovery. Skipping."

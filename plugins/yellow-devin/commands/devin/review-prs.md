@@ -389,7 +389,7 @@ CHANGED_FILES=()
 # After each file edit, append the path:
 CHANGED_FILES+=("path/to/edited/file.ext")
 # Deduplicate before use:
-CHANGED_FILES=($(printf '%s\n' "${CHANGED_FILES[@]}" | sort -u))
+mapfile -t CHANGED_FILES < <(printf '%s\n' "${CHANGED_FILES[@]}" | sort -u)
 ```
 
 If PR is Graphite-tracked (not in `GT_DEGRADED_PRS`):
@@ -425,7 +425,8 @@ explanation and are confident dismissal is appropriate.
    Exclude items already determined to be likely false positives. Structure:
    - Start with a summary line: "Review found N issues in PR #{num}:"
    - List P1 findings first, then P2, with file paths and descriptions
-   - Truncate to 2000 characters (Devin message limit) at a word boundary
+   - Truncate to 1949 characters at a word boundary to leave room for the
+     truncation suffix (51 chars)
    - If truncated, append: "... (truncated — see PR comments for full details)"
 
 3. **Preview message** via AskUserQuestion: "Send this message to Devin session
