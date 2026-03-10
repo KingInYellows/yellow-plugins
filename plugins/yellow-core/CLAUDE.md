@@ -58,8 +58,10 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 ### Optional Plugin Dependencies
 
 - **gt-workflow** — `/workflows:work` delegates to `/smart-submit` for
-  commit+submit. Without it, falls back to inline `gt modify -m` +
-  `gt submit --no-interactive`.
+  commit+submit and supports stack-aware execution when a
+  `## Stack Decomposition` section exists in the plan (produced by
+  `/gt-stack-plan`). Without gt-workflow, falls back to inline `gt modify -m` +
+  `gt submit --no-interactive` and stack features are unavailable.
 - **yellow-review** — `/workflows:work` invokes `/review:pr` after submission;
   `/workflows:review` redirects to `/review:pr`. Without either, review steps
   are skipped with a user notice.
