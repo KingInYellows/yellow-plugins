@@ -129,8 +129,8 @@ git add scripts/validate-marketplace.js
 # Commit
 git commit -m "Initialize personal plugin marketplace"
 
-# Push
-git push origin main
+# Push via Graphite
+gt submit --no-interactive
 ```
 
 ## Next Steps

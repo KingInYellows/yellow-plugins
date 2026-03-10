@@ -521,7 +521,7 @@ Before publishing:
 - [ ] Test permissions work as expected
 - [ ] Update marketplace.json with plugin entry
 - [ ] Create git tag: `git tag my-plugin-v1.0.0`
-- [ ] Push to GitHub: `git push && git push --tags`
+- [ ] Push to GitHub: `gt submit --no-interactive && git push --tags`
 
 ---
 

@@ -660,9 +660,9 @@ npm version 1.2.3 --no-git-tag-version
 # Commit the change
 git add package.json
 git commit -m "chore: bump version to 1.2.3"
-git push origin main
+gt submit --no-interactive
 
-# Delete and recreate tag
+# Delete and recreate tag (tag operations — not managed by Graphite)
 git tag -d v1.2.3
 git push origin :refs/tags/v1.2.3
 git tag -a v1.2.3 -m "Release v1.2.3"
@@ -696,9 +696,9 @@ git push origin v1.2.3
    # Fix broken tests
    git add .
    git commit -m "fix: resolve test failures"
-   git push origin main
+   gt submit --no-interactive
 
-   # Move tag to new commit
+   # Move tag to new commit (tag operations — not managed by Graphite)
    git tag -d v1.2.3
    git tag -a v1.2.3 -m "Release v1.2.3"
    git push origin v1.2.3 --force

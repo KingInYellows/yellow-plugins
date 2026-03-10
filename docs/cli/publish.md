@@ -368,7 +368,7 @@ The publish command validates two manifest files:
 If push fails after commit:
 
 1. **Local Commit Exists**: Your changes are committed locally but not pushed
-2. **Manual Retry**: Use `git push origin <branch>` to retry manually
+2. **Manual Retry**: Use `gt submit --no-interactive` to retry via Graphite
 3. **Rollback**: Use `git reset --soft HEAD~1` to undo the commit (preserves
    changes)
 
