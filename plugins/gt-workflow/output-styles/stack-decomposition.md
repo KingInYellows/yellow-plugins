@@ -91,8 +91,8 @@ trunk before creating each branch.
 ### Mixed
 
 Some items are stacked, others are parallel. The `Depends on` field determines
-the dependency graph. v1 supports linear and parallel only; mixed topology is
-a future consideration.
+the dependency graph. Note that while `mixed` topology is defined for forward-compatibility,
+the `workflows:work` consumer currently only supports `linear` and `parallel` topologies.
 
 ```markdown
 <!-- stack-topology: mixed -->
