@@ -758,7 +758,7 @@ artifact.
 #### 3. Release Artifacts (Not in Validation Workflow)
 
 **Pattern:** `release-artifacts-v{VERSION}` **Workflow:**
-`.github/workflows/publish-release.yml` **Content:** Tarball, SBOM, checksums,
+`.github/workflows/version-packages.yml` (build-and-release job) **Content:** Tarball, SBOM, checksums,
 release notes **Retention:** 90 days **Purpose:** Release publishing,
 distribution
 
@@ -1115,7 +1115,7 @@ requirements:
 | **FR-001**        | Marketplace validation               | `validate-schemas` matrix target `marketplace` with AJV + business rules                                    |
 | **FR-002**        | Plugin validation                    | `validate-schemas` matrix target `plugins` with 12 schema rules                                             |
 | **FR-009**        | Simple publishing                    | Git-native PR/merge workflow, automated validation in CI                                                    |
-| **FR-011**        | Release automation                   | Separate `publish-release.yml` workflow (not covered in this spec)                                          |
+| **FR-011**        | Release automation                   | Unified `version-packages.yml` workflow (build-and-release job)                                             |
 | **Section 2.1**   | CI Validation Pipeline Spec artifact | This document serves as the formal Section 2.1 architectural artifact                                       |
 | **Section 6**     | Verification & integration strategy  | Workflow implements CI/CD validation, artifact collection, metrics export                                   |
 

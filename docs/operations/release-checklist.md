@@ -197,7 +197,7 @@ tagging.
   ```
 
 **Reference**: `package.json` engines field,
-`.github/workflows/publish-release.yml` env vars.
+`.github/workflows/version-packages.yml` env vars.
 
 ---
 
@@ -221,7 +221,7 @@ tagging.
   # Expected: "Hi <username>! You've successfully authenticated..."
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` permissions block,
+**Reference**: `.github/workflows/version-packages.yml` permissions block,
 Section 4 security directives.
 
 ---
@@ -270,7 +270,7 @@ Section 4 security directives.
   ```
 
 **Reference**: `docs/operations/versioning.md`,
-`.github/workflows/publish-release.yml` version validation step,
+`.github/workflows/version-packages.yml` version validation step,
 `scripts/validate-versions.js`.
 
 ---
@@ -331,9 +331,8 @@ seconds median.
 - [ ] Trigger workflow dry-run using workflow_dispatch
 
   ```bash
-  gh workflow run publish-release.yml \
-    --field version="$(node -p "require('./package.json').version")" \
-    --field prerelease="false"
+  gh workflow run version-packages.yml \
+    --field force_publish=true
   ```
 
 - [ ] Monitor workflow execution
@@ -349,7 +348,7 @@ seconds median.
   # Confirm validation, build, artifact generation steps all green
   ```
 
-**Reference**: `.github/workflows/publish-release.yml`, Iteration 4 validation
+**Reference**: `.github/workflows/version-packages.yml`, Iteration 4 validation
 focus.
 
 ---
@@ -676,7 +675,7 @@ targets.
   # Expected: Clean extraction of release notes
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` changelog extraction,
+**Reference**: `.github/workflows/version-packages.yml` changelog extraction,
 Section 4 traceability enforcement.
 
 ---
@@ -795,7 +794,7 @@ Section 4 traceability enforcement.
   git tag -l | grep "v$VERSION"
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` tag trigger pattern,
+**Reference**: `.github/workflows/version-packages.yml` tag trigger pattern,
 Section 4 git tagging conventions.
 
 ---
@@ -815,7 +814,7 @@ Section 4 git tagging conventions.
   gh api repos/:owner/:repo/git/refs/tags | jq '.[] | select(.ref | contains("v$(node -p "require('./package.json').version"))"))'
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` on.push.tags trigger.
+**Reference**: `.github/workflows/version-packages.yml` on.push.tags trigger.
 
 ---
 
@@ -830,10 +829,8 @@ Section 4 git tagging conventions.
   ```
 
 - [ ] Verify all jobs complete successfully:
-  - [ ] validate-release
-  - [ ] build-artifacts
-  - [ ] publish-release
-  - [ ] publish-npm (if applicable)
+  - [ ] version-or-publish
+  - [ ] build-and-release
   - [ ] notify
 
 - [ ] Check workflow summary for warnings or notices
@@ -841,7 +838,7 @@ Section 4 git tagging conventions.
   gh run view --log
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` job dependencies and
+**Reference**: `.github/workflows/version-packages.yml` job dependencies and
 outputs.
 
 ---
@@ -854,7 +851,7 @@ outputs.
 
   ```bash
   VERSION=$(node -p "require('./package.json').version")
-  gh run download $(gh run list --workflow=publish-release.yml --limit 1 --json databaseId -q '.[0].databaseId')
+  gh run download $(gh run list --workflow=version-packages.yml --limit 1 --json databaseId -q '.[0].databaseId')
   ```
 
 - [ ] Verify artifact contents:
@@ -871,7 +868,7 @@ outputs.
   # Expected: All files OK
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` build-artifacts job,
+**Reference**: `.github/workflows/version-packages.yml` build-artifacts job,
 Section 4 audit requirements.
 
 ---
@@ -910,7 +907,7 @@ Section 4 audit requirements.
   gh release view "v$VERSION" --json url -q '.url'
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` publish-release job,
+**Reference**: `.github/workflows/version-packages.yml` publish-release job,
 softprops/action-gh-release.
 
 ---
@@ -940,7 +937,7 @@ softprops/action-gh-release.
   # Expected: Non-zero dependency count
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` tarball creation step.
+**Reference**: `.github/workflows/version-packages.yml` tarball creation step.
 
 ---
 
@@ -974,7 +971,7 @@ pre-release.
   # Expected: Successful installation
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` publish-npm job,
+**Reference**: `.github/workflows/version-packages.yml` publish-npm job,
 package.json repository field.
 
 ---

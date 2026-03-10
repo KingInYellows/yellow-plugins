@@ -30,13 +30,13 @@ procedures.
 
 | Topic                  | Command/Link                                                |
 | ---------------------- | ----------------------------------------------------------- |
-| **Trigger Release**    | `git push origin v1.2.3` (tag push)                         |
-| **Manual Trigger**     | `gh workflow run publish-release.yml --field version=1.2.3` |
+| **Trigger Release**    | Merge the Version Packages PR (automatic)                   |
+| **Manual Trigger**     | `gh workflow run version-packages.yml -f force_publish=true` |
 | **Monitor Release**    | `gh run watch`                                              |
 | **View Artifacts**     | `gh release view v1.2.3`                                    |
 | **Download Artifacts** | `gh release download v1.2.3`                                |
 | **Release Checklist**  | `docs/operations/release-checklist.md`                      |
-| **Workflow File**      | `.github/workflows/publish-release.yml`                     |
+| **Workflow File**      | `.github/workflows/version-packages.yml`                     |
 
 ---
 
@@ -128,15 +128,14 @@ git push origin v1.2.3-beta.1
 **Trigger**:
 
 ```bash
-gh workflow run publish-release.yml \
-  --field version="1.2.3" \
-  --field prerelease="false"
+gh workflow run version-packages.yml \
+  --field force_publish=true
 ```
 
 **Behavior**:
 
-- Same as tag-triggered workflow
-- Useful for republishing or testing without creating tags
+- Skips changeset detection and goes straight to publish phase
+- Useful for recovery after fixing configuration issues
 - Requires workflow_dispatch inputs:
   - `version` (required): Version number without 'v' prefix (e.g., "1.2.3")
   - `prerelease` (optional): Boolean flag, defaults to false
@@ -198,7 +197,7 @@ standards
    - From git tag (tag push) or workflow inputs (manual dispatch)
    - Detect pre-release flag from version string (contains `-`)
 2. **Setup environment**
-   - Node.js 20 + pnpm 8.15.0
+   - Node.js 22.22.0 + pnpm 8.15.0
    - Install dependencies with frozen lockfile
 3. **Validate version consistency**
    - Compare `package.json` version with release version
@@ -601,7 +600,7 @@ gh run view --job=publish-release --log
 **List recent runs**:
 
 ```bash
-gh run list --workflow=publish-release.yml --limit 10
+gh run list --workflow=version-packages.yml --limit 10
 ```
 
 ---
@@ -622,7 +621,7 @@ gh release download v1.2.3 --pattern "yellow-plugins-v1.2.3.tar.gz"
 
 ```bash
 # Find run ID
-gh run list --workflow=publish-release.yml --limit 1 --json databaseId -q '.[0].databaseId'
+gh run list --workflow=version-packages.yml --limit 1 --json databaseId -q '.[0].databaseId'
 
 # Download artifacts from run
 gh run download <RUN_ID>
@@ -687,12 +686,11 @@ git tag -a v1.2.3 -m "Release v1.2.3"
 git push origin v1.2.3
 ```
 
-**Option 3: Manual dispatch** (testing only)
+**Option 3: Manual dispatch** (recovery)
 
 ```bash
-gh workflow run publish-release.yml \
-  --field version="1.2.3" \
-  --field prerelease="false"
+gh workflow run version-packages.yml \
+  --field force_publish=true
 ```
 
 **Caution**: Option 2 may confuse users who already downloaded v1.2.3. Prefer
@@ -766,7 +764,7 @@ Option 1 for production.
 
    ```bash
    # Validate YAML syntax
-   yamllint .github/workflows/publish-release.yml
+   yamllint .github/workflows/version-packages.yml
    ```
 
 3. **GitHub Actions disabled**
@@ -995,7 +993,7 @@ Track these metrics for each release:
 
 ```bash
 # Release duration
-gh run list --workflow=publish-release.yml --json conclusion,startedAt,completedAt
+gh run list --workflow=version-packages.yml --json conclusion,startedAt,completedAt
 
 # Artifact sizes
 gh release view v1.2.3 --json assets -q '.assets[] | {name, size}'
@@ -1041,7 +1039,7 @@ stack
 - **Release Checklist**: `docs/operations/release-checklist.md` (gated
   validation steps)
 - **CHANGELOG**: `CHANGELOG.md` (historical release notes)
-- **Workflow Definition**: `.github/workflows/publish-release.yml` (GitHub
+- **Workflow Definition**: `.github/workflows/version-packages.yml` (GitHub
   Actions YAML)
 - **CI Documentation**: `docs/operations/ci.md` (CI architecture)
 - **Metrics Guide**: `docs/operations/metrics.md` (KPI definitions)

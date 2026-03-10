@@ -215,7 +215,7 @@ git commit -m "chore: version packages"
 git push
 pnpm tag                      # creates per-plugin git tags
 git tag v<catalog-version>    # e.g. v1.1.2
-git push --tags               # triggers publish-release.yml
+git push --tags               # tags are used by version-packages.yml build-and-release job
 ```
 
 ### Note on auto-updates (GitHub issue #26744)

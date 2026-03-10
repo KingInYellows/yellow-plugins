@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # release-tags.sh — called by changesets/action publish step after the
 # Version Packages PR merges. Creates per-plugin git tags and the root
-# catalog tag, then pushes only the new catalog tag.
+# catalog tag, then pushes them to the remote.
 #
 # Per-plugin tags (e.g. yellow-core@1.1.1) are created by `changeset tag`
 # for all packages with privatePackages.tag: true in .changeset/config.json.
 #
-# The catalog tag (e.g. v1.1.2) triggers publish-release.yml. The root
-# package.json was already bumped in the Version Packages PR by
-# catalog-version.js, so its version is the new catalog version.
+# The catalog tag (e.g. v1.1.2) is used by the build-and-release job in
+# version-packages.yml to create the GitHub Release. The root package.json
+# was already bumped in the Version Packages PR by catalog-version.js, so
+# its version is the new catalog version.
 #
 # Exit codes:
 #   0  — all tags created and pushed successfully
@@ -48,12 +49,12 @@ fi
 CATALOG_TAG="v${CATALOG_VERSION}"
 
 # Step 3: Verify the catalog tag does not already exist on the remote.
-# This prevents duplicate publish-release.yml triggers from reruns.
+# This prevents duplicate release triggers from reruns.
 if git ls-remote --tags origin "refs/tags/${CATALOG_TAG}" | grep -q "${CATALOG_TAG}"; then
   echo "::error::Catalog tag ${CATALOG_TAG} already exists on remote."
   echo "::error::This is likely a duplicate run. If a release was not created,"
-  echo "::error::check publish-release.yml for the tag trigger, or create the"
-  echo "::error::GitHub Release manually at the tag ${CATALOG_TAG}."
+  echo "::error::re-run with workflow_dispatch (force_publish=true), or create"
+  echo "::error::the GitHub Release manually: gh release create ${CATALOG_TAG}"
   exit 1
 fi
 
@@ -64,4 +65,4 @@ echo "Created catalog tag: ${CATALOG_TAG}"
 # Step 5: Push only the new catalog tag (not all local tags).
 # Using a specific ref avoids pushing stale tags from prior failed runs.
 git push origin "$CATALOG_TAG"
-echo "Pushed ${CATALOG_TAG} — publish-release.yml will be triggered."
+echo "Pushed ${CATALOG_TAG} — build-and-release job will proceed."

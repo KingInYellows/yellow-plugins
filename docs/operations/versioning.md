@@ -54,7 +54,7 @@ pnpm release:check
 
 # 7. Tag and push
 git tag v1.x.x && git push --tags  # Tags are not managed by Graphite — raw git push is correct here
-# → publish-release.yml fires and creates a GitHub Release
+# → version-packages.yml build-and-release job creates the GitHub Release
 ```
 
 ## Semver Bump Rules
