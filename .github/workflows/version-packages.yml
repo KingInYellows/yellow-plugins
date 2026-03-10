@@ -75,7 +75,7 @@ jobs:
           if [ "${{ inputs.force_publish }}" == "true" ]; then
             echo "force_publish requested — skipping changeset detection"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          elif ls .changeset/*.md 2>/dev/null | grep -qv README; then
+          elif [ -n "$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' -print -quit 2>/dev/null)" ]; then
             echo "Pending changesets found — will create/update Version PR"
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           else
@@ -104,6 +104,10 @@ jobs:
           # version: bumps plugin package.json files and propagates to
           # plugin.json + marketplace.json via sync-manifests.js. Then
           # catalog-version.js patch bumps the root package.json.
+          # Note: The catalog version is hardcoded to 'patch' bump because it
+          # represents a marketplace snapshot timestamp, not semantic compatibility.
+          # Each release batch gets one patch increment regardless of whether
+          # plugins had patch/minor/major bumps. See docs/operations/versioning.md.
           version: pnpm apply:changesets && node scripts/catalog-version.js patch
           # publish: called after the Version Packages PR merges (no pending
           # changesets). Creates per-plugin + catalog tags.
@@ -198,7 +202,7 @@ jobs:
       - name: Compute checksums
         run: |
           cd dist-release
-          sha256sum * > SHA256SUMS.txt
+          sha256sum ./* > SHA256SUMS.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@26994186c0ac3ef5cae75ac16aa32e8153525f77 # v1

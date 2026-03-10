@@ -207,17 +207,21 @@ verification gate before merging.
 
 ### Emergency manual release
 
+> **Note**: Tags are for release tracking only and do **not** trigger the workflow.  
+> The workflow triggers on push to `main` or manual `workflow_dispatch`.
+
 ```bash
 pnpm apply:changesets         # bumps plugin versions + syncs manifests
 node scripts/catalog-version.js patch   # bumps root catalog version
 git add -A
 git commit -m "chore: version packages"
-git push
-pnpm tag                      # creates per-plugin git tags
+git push                      # this triggers the workflow automatically
+pnpm tag                      # creates per-plugin git tags for tracking
 git tag v<catalog-version>    # e.g. v1.1.2
-git push --tags               # tags are for release tracking (do not trigger the workflow)
-# To trigger the release workflow manually:
-# gh workflow run version-packages.yml -f force_publish=true
+git push --tags               # push tags for tracking
+
+# If the automated workflow failed and you need manual recovery:
+gh workflow run version-packages.yml -f force_publish=true
 ```
 
 ### Note on auto-updates (GitHub issue #26744)

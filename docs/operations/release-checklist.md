@@ -765,43 +765,59 @@ Section 4 traceability enforcement.
 
 ## Section 5: Release Preparation
 
-### 5.1 Create Release Tag
+### 5.1 Verify Release Readiness
 
-**Objective**: Tag the release commit following semantic versioning.
+**Objective**: Confirm the unified workflow will handle tag creation automatically.
 
-- [ ] Verify current commit is the intended release commit
+> **Note**: In the standard release flow, git tags are created **automatically**  
+> when the "chore: version packages" PR merges. The `release-tags.sh` script  
+> creates per-plugin tags (e.g., `yellow-core@1.2.0`) and the root catalog tag  
+> (e.g., `v1.2.1`). Manual tag creation is **only** needed for emergency recovery  
+> scenarios where `workflow_dispatch` with `force_publish=true` won't suffice.
+
+- [ ] Verify the Version Packages PR has been merged to `main`
 
   ```bash
-  git log --oneline -1
+  gh pr list --search "chore: version packages" --state merged --limit 1
   ```
 
-- [ ] Create annotated tag with release notes
+- [ ] Confirm the workflow has started automatically
+
+  ```bash
+  gh run list --workflow=version-packages.yml --limit 1
+  ```
+
+- [ ] Verify the expected catalog version
 
   ```bash
   VERSION=$(node -p "require('./package.json').version")
-  git tag -a "v$VERSION" -m "Release v$VERSION
+  echo "Expected catalog tag: v$VERSION"
+  ```
 
-  $(awk "/## \[?$VERSION\]?/,/## \[?[0-9]/" CHANGELOG.md | head -n -1)
+**Reference**: `.github/workflows/version-packages.yml` (triggers on push to
+`main`), `scripts/ci/release-tags.sh` (automatic tag creation), Section 4 git
+tagging conventions.
+
+---
+
+### 5.2 Manual Tag Creation (Emergency Recovery Only)
+
+**Objective**: Create tags manually when automated flow cannot be used.
+
+> **Warning**: This section is for emergency recovery only. In normal releases,  
+> tags are created automatically by the workflow.
+
+**Only perform these steps if you must bypass the normal automated flow:**
+
+- [ ] Create annotated tag locally
+
+  ```bash
+  VERSION=$(node -p "require('./package.json').version")
+  git tag -a "v$VERSION" -m "Release v$VERSION (emergency manual release)
 
   Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
   "
   ```
-
-- [ ] Verify tag created locally
-  ```bash
-  git tag -l | grep "v$VERSION"
-  ```
-
-**Reference**: `.github/workflows/version-packages.yml` (triggers on push to
-`main` and `workflow_dispatch`), Section 4 git tagging conventions.
-
----
-
-### 5.2 Push Tag (for manual/emergency releases)
-
-**Objective**: Push tag to GitHub for release tracking. Note: tags do **not**
-trigger the workflow — the workflow triggers on push to `main` or
-`workflow_dispatch`.
 
 - [ ] Push tag to remote
 
@@ -809,12 +825,19 @@ trigger the workflow — the workflow triggers on push to `main` or
   git push origin "v$(node -p "require('./package.json').version")"
   ```
 
-- [ ] Confirm tag appears on GitHub
+- [ ] Trigger workflow with force_publish
+
   ```bash
-  gh api repos/:owner/:repo/git/refs/tags | jq '.[] | select(.ref | contains("v$(node -p "require('./package.json').version"))"))'
+  gh workflow run version-packages.yml -f force_publish=true
   ```
 
-**Reference**: `.github/workflows/version-packages.yml` build-and-release job.
+- [ ] Confirm workflow started
+  ```bash
+  gh run watch
+  ```
+
+**Reference**: `.github/workflows/version-packages.yml` (workflow_dispatch with
+`force_publish`), `CONTRIBUTING.md` emergency release section.
 
 ---
 
@@ -829,9 +852,9 @@ trigger the workflow — the workflow triggers on push to `main` or
   ```
 
 - [ ] Verify all jobs complete successfully:
-  - [ ] version-or-publish
-  - [ ] build-and-release
-  - [ ] notify
+  - [ ] `version-or-publish` — Phase detection and tag creation
+  - [ ] `build-and-release` — Artifact creation and GitHub Release
+  - [ ] `notify` — Success/failure notification
 
 - [ ] Check workflow summary for warnings or notices
   ```bash
@@ -868,7 +891,7 @@ outputs.
   # Expected: All files OK
   ```
 
-**Reference**: `.github/workflows/version-packages.yml` build-artifacts job,
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job,
 Section 4 audit requirements.
 
 ---
@@ -907,7 +930,7 @@ Section 4 audit requirements.
   gh release view "v$VERSION" --json url -q '.url'
   ```
 
-**Reference**: `.github/workflows/version-packages.yml` publish-release job,
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job,
 softprops/action-gh-release.
 
 ---
@@ -937,7 +960,7 @@ softprops/action-gh-release.
   # Expected: Non-zero dependency count
   ```
 
-**Reference**: `.github/workflows/version-packages.yml` tarball creation step.
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job (tarball creation step).
 
 ---
 
@@ -971,7 +994,7 @@ pre-release.
   # Expected: Successful installation
   ```
 
-**Reference**: `.github/workflows/version-packages.yml` publish-npm job,
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job (NPM publish step),
 package.json repository field.
 
 ---
