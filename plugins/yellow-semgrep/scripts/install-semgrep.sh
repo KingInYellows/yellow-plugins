@@ -31,6 +31,10 @@ version_gte() {
   local i a=($1) b=($2)
   for ((i=0; i<${#b[@]}; i++)); do
     local av="${a[i]:-0}" bv="${b[i]:-0}"
+    av="${av%%[^0-9]*}"
+    bv="${bv%%[^0-9]*}"
+    av="${av:-0}"
+    bv="${bv:-0}"
     if ((av > bv)); then return 0; fi
     if ((av < bv)); then return 1; fi
   done
@@ -70,7 +74,7 @@ if command -v semgrep >/dev/null 2>&1; then
       if ! pipx upgrade semgrep 2>&1; then
         # pipx upgrade fails if not installed via pipx — try reinstall
         printf '[yellow-semgrep] pipx upgrade failed — trying pipx install...\n'
-        if ! pipx install semgrep 2>&1; then
+        if ! pipx install --force semgrep 2>&1; then
           warning "pipx upgrade/install failed. Try manually: pipx upgrade semgrep"
         fi
       fi
