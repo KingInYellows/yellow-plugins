@@ -46,7 +46,7 @@ Graphite-native workflow commands for stacked PR development.
 - `/gt-setup` — validate Graphite CLI, auth detection, and repo initialization
 - `/smart-submit` — Audit + commit + submit in one flow
 - `/gt-amend` — Audit + amend current branch commit + re-submit (quick fix path)
-- `/gt-stack-plan` — Plan stacked PRs for a feature
+- `/gt-stack-plan` — Decompose a feature into stacked PRs (plan-only, no branch creation)
 - `/gt-sync` — Sync repo, restack, clean up
 - `/gt-nav` — Visualize and navigate the stack
 
