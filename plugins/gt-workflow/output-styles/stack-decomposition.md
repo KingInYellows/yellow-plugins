@@ -1,6 +1,6 @@
 ---
 name: stack-decomposition
-description: Structured format contract for ## Stack Decomposition sections in plan documents.
+description: "Structured format contract for Stack Decomposition sections in plan documents."
 ---
 
 # Stack Decomposition Format
@@ -63,6 +63,9 @@ first item.
 | `stack-trunk` | Yes | Branch name | Base branch for the stack (usually `main`) |
 
 ## Topologies
+
+Examples below show dependency relationships in shorthand for readability.
+Actual output uses the full field format from Section Structure above.
 
 ### Linear
 

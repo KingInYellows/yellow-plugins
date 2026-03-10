@@ -84,7 +84,7 @@ Format contract:
 See `output-styles/stack-decomposition.md` for the full specification with
 examples for all topologies.
 
-## Input Integrations
+### Input Integrations
 
 - **Linear issues** — `/gt-stack-plan` reads a `## Linear Issues` section from
   plan files (written by `/workflows:plan` when Linear context is detected).
@@ -93,7 +93,7 @@ examples for all topologies.
   the `## Stack Decomposition` output. This is input-only (reads plan metadata)
   and does not create a runtime dependency on yellow-linear.
 
-## MCP Tool Integration
+### MCP Tool Integration
 
 - **ruvector** — Not directly integrated. gt-workflow commands are thin
   wrappers around Graphite CLI; memory operations happen in calling workflows
