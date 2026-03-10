@@ -81,7 +81,7 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null)
 # Format 1: https://github.com/owner/repo.git or https://host:port/owner/repo
 # Format 2: git@github.com:owner/repo.git (SCP-style)
 REPO=$(echo "$REMOTE_URL" | sed -E \
-  -e 's#^[a-z+]+://([^@]+@)?[^/:]+(:[:digit:]+)?/##' \
+  -e 's#^[a-z+]+://([^@]+@)?[^/:]+(:[0-9]+)?/##' \
   -e 's#^git@[^:]+:##' \
   -e 's/\.git$//' \
   -e 's#/$##')
@@ -95,8 +95,9 @@ and exit.
 Parse `$ARGUMENTS` for flags:
 
 - `--tag TAG` → use server-side filter: append `&tags=TAG` to the API URL
-- `--session SESSION_ID` → skip discovery, fetch single session using
-  `&session_ids=SESSION_ID`
+- `--session SESSION_ID` → validate with `validate_session_id` from
+  `devin-workflows` skill (`^[a-zA-Z0-9_-]{8,64}$`), then skip discovery and
+  fetch single session using `&session_ids=SESSION_ID`
 
 Default discovery (no flags):
 
@@ -119,16 +120,25 @@ Apply three-layer error handling per `devin-workflows` skill:
 2. Check `http_status` (401/403/404/422/429/5xx handling)
 3. Validate JSON with jq
 
-Client-side repo filtering — for each session, check if any entry in
-`pull_requests` array has a `pr_url` containing the target `owner/repo`:
+Client-side repo filtering — for each session, match `pull_requests[].pr_url`
+against the target `owner/repo` exactly after stripping the host and
+`/pull/<num>` suffix:
 
 ```bash
-# Extract sessions with PRs matching this repo
+# Extract sessions with PRs matching this repo exactly
 printf '%s' "$body" | jq --arg repo "$REPO" '
   [.items[] |
+   select(.is_archived != true) |
    select(.pull_requests | length > 0) |
-   select(.pull_requests | any(.pr_url | test($repo))) |
-   {session_id, status, title, pull_requests, tags, acus_consumed, updated_at}]'
+   . as $session |
+   ($session.pull_requests
+     | map(select(
+         ((.pr_url
+           | sub("^https?://[^/]+/"; "")
+           | sub("/pull/[0-9]+$"; "")) == $repo)
+       ))) as $matching_prs |
+   select($matching_prs | length > 0) |
+   {session_id, status, title, pull_requests: $matching_prs, tags, acus_consumed, updated_at}]'
 ```
 
 Skip sessions with empty `pull_requests` arrays silently. Filter out archived
@@ -214,7 +224,7 @@ If stacked PRs detected and `GT_AVAILABLE`:
 gt upstack restack
 ```
 
-On conflict: abort restack (`gt restack --abort`), warn "Stack restack failed.
+On conflict: abort restack (`git rebase --abort`), warn "Stack restack failed.
 Processing PRs as independent.", and process as independent.
 
 ### Step 5: Sequential Review Loop
@@ -240,43 +250,64 @@ PR_STATE=$(gh pr view "$PR_NUM" --json state -q '.state')
 If no longer `OPEN`, skip: "PR #X closed since discovery. Skipping." and
 continue to next PR.
 
-**5c. Review via Skill tool:**
+**5c. Analysis-only review pass:**
 
-Invoke `/review:pr` via the Skill tool with `skill: "review:pr"` and `args`
-set to the PR number.
+Load `pr-review-workflow` context from yellow-review via the Skill tool and run
+the same adaptive reviewer selection used by `/review:pr`, but keep this phase
+report-only:
 
-**Graceful degradation:** If the Skill invocation fails (skill not found,
-yellow-review plugin not installed, or any error), fall back to lightweight
-review:
+- Always include `code-reviewer`
+- Conditionally include `pr-test-analyzer`, `comment-analyzer`,
+  `type-design-analyzer`, `silent-failure-hunter`
+- Spawn yellow-core cross-plugin reviewers when the same trigger rules match
+
+Provide each reviewer with the PR diff, PR metadata, changed file list, and
+relevant `CLAUDE.md` context. Collect findings sorted by severity (P1 → P2 →
+P3).
+
+**Do not invoke `/review:pr` or `/review:resolve` directly in this phase.**
+Those commands may commit and push before the user chooses a remediation path.
+This command must gather findings first and defer all file edits, commits,
+pushes, and thread resolution until after the user selects **Fix locally**.
+
+**Graceful degradation:** If yellow-review is unavailable (plugin not installed,
+skill load fails, or reviewer agents cannot be spawned), fall back to
+lightweight review:
 
 1. Show CI check status:
    ```bash
-   gh pr checks "$PR_NUM"
+   gh pr checks "$PR_NUM" --repo "$REPO"
    ```
 2. Show PR comments:
    ```bash
-   gh pr view "$PR_NUM" --comments
+   gh pr view "$PR_NUM" --repo "$REPO" --comments
    ```
 3. Show diff summary:
    ```bash
-   gh pr diff "$PR_NUM" --stat
+   gh pr diff "$PR_NUM" --repo "$REPO" --stat
    ```
 4. Note: "Full multi-agent review unavailable (yellow-review not installed).
    Install yellow-review for adaptive multi-agent PR review."
 
-**5d. Resolve comments via Skill tool:**
+**5d. Comment triage pass:**
 
-Invoke `/review:resolve` via the Skill tool with `skill: "review:resolve"` and
-`args` set to the PR number.
+If yellow-review is available, fetch unresolved threads using the same GraphQL
+script used by `/review:resolve`, then classify each thread as:
 
-If Skill fails (yellow-review missing): skip comment resolution, note in
-summary: "Comment resolution skipped (yellow-review not installed)."
+- **Actionable** — needs a code change
+- **Likely false positive** — does not warrant a code change
+- **Needs manual judgment** — ambiguous; surface to the user
+
+Do not edit files or resolve threads yet. This phase is classification only.
+
+If yellow-review is unavailable, note in the summary:
+"Comment triage limited to raw PR comments (yellow-review not installed)."
 
 **5e. Present per-PR summary and remediation choice:**
 
 Gather information for the summary:
-- Review findings (from review:pr output, or lightweight review)
-- Comment resolution results (from review:resolve output)
+- Review findings (from the analysis-only review pass, or lightweight review)
+- Comment triage results (actionable vs likely false positive)
 - CI check status: `gh pr checks "$PR_NUM" --json name,state,conclusion`
 - Session info: status, ACUs consumed (from discovery data)
 
@@ -288,8 +319,8 @@ Use AskUserQuestion to present remediation choice:
 
 ```
 PR #142 'Add auth middleware' — Review complete.
-- Findings: 2 P1, 1 P2 applied by review:pr
-- Comments: 3 resolved, 1 false positive dismissed
+- Findings: 2 P1, 1 P2 actionable
+- Comments: 3 actionable, 1 likely false positive
 - CI: 2/3 checks passing, 1 failing (lint)
 - Session: abc123 (suspended, 4.2 ACUs consumed)
 
@@ -307,6 +338,11 @@ Options:
 
 **Option 1 — Fix locally:**
 
+Apply concrete P1/P2 findings and actionable review comments now. Reuse the
+yellow-review reviewer/resolver agents as needed, but only after the user has
+chosen this option. Maintain a deduplicated `CHANGED_FILES` list while making
+edits.
+
 If PR is Graphite-tracked:
 
 ```bash
@@ -317,13 +353,17 @@ gt submit --no-interactive
 If PR is in degraded mode (gt track failed):
 
 ```bash
-git add -- <specific-changed-files>
+git add -- "${CHANGED_FILES[@]}"
 git commit -m "fix: address review findings"
 git push
 ```
 
 Note: degraded-mode `git push` is a documented exception to the repo convention
 when `gt submit` is unavailable.
+
+Only after the push succeeds, resolve the review threads that were actually
+addressed. Leave likely false positives unresolved unless you add a short human
+explanation and are confident dismissal is appropriate.
 
 **Option 2 — Message Devin:**
 
@@ -332,7 +372,8 @@ when `gt submit` is unavailable.
    user: "Session {id} is now in {status} state. Cannot send message." and
    offer to fix locally instead via AskUserQuestion.
 
-2. **Compose fix message** from review findings. Structure:
+2. **Compose fix message** from review findings and actionable comments.
+   Exclude items already determined to be likely false positives. Structure:
    - Start with a summary line: "Review found N issues in PR #{num}:"
    - List P1 findings first, then P2, with file paths and descriptions
    - Truncate to 2000 characters (Devin message limit) at a word boundary
@@ -361,6 +402,7 @@ when `gt submit` is unavailable.
 
    # Fall back to enterprise endpoint on 403
    if [ "$curl_exit" -eq 0 ] && [ "$http_status" = "403" ]; then
+     printf 'WARN: Org-scoped message endpoint returned 403, trying enterprise scope...\n' >&2
      ENTERPRISE_URL="${DEVIN_API_BASE}/enterprise"
      response=$(jq -n --arg msg "$MESSAGE" '{message: $msg}' | \
        curl -s --connect-timeout 5 --max-time 30 \
@@ -369,10 +411,18 @@ when `gt submit` is unavailable.
          -H "Authorization: Bearer $DEVIN_SERVICE_USER_TOKEN" \
          -H "Content-Type: application/json" \
          -d @-)
+     curl_exit=$?
+     http_status=${response##*$'\n'}
+     body=${response%$'\n'*}
    fi
    ```
 
    **Never use the `message_as_user_id` field** — impersonation risk.
+
+   Apply three-layer error handling per `devin-workflows` skill (curl exit →
+   HTTP status → jq parse). On failure, inform the user: "Failed to send
+   message to Devin session {id}: {error}. You can fix locally instead." and
+   offer the "Fix locally" option via AskUserQuestion.
 
 5. If Edit chosen: let user modify the composed message via AskUserQuestion,
    validate it is under 2000 characters, then send.

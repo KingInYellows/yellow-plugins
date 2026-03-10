@@ -25,16 +25,18 @@ A new `/devin:review-prs` composition command in yellow-devin that:
 
 1. **Discovers** Devin sessions with PRs targeting the current repo
 2. **Adopts** those PRs into Graphite with stack detection
-3. **Delegates** review to yellow-review via Skill tool (graceful degradation)
+3. **Reuses** yellow-review workflow patterns and agents for analysis/triage
+   with graceful degradation
 4. **Presents** per-PR remediation choices to the user
 5. **Executes** chosen remediation (local fix or message Devin)
 
 ### Key Design Decisions
 
-1. **Skill tool delegation (not inline reimplementation).** Invoke `/review:pr`
-   and `/review:resolve` via Skill tool rather than reimplementing their flows.
-   This avoids CLAUDE_PLUGIN_ROOT path issues, stays in sync with yellow-review
-   updates, and gets graceful degradation for free.
+1. **Reuse yellow-review patterns, not side-effecting command invocation.**
+   Borrow the adaptive agent selection and comment-resolution workflow from
+   yellow-review, but do not invoke `/review:pr` or `/review:resolve`
+   directly before remediation choice because those commands can commit/push as
+   part of their own flow.
 
 2. **Per-PR remediation choice.** User chooses fix locally / message Devin /
    skip for each PR as a whole. Keeps interaction manageable (N decisions for N
@@ -102,10 +104,10 @@ allowed-tools:
 <!-- deepen-plan: codebase -->
 > **Codebase:** Description collapsed to single-line as required by MEMORY.md.
 > Commands use `allowed-tools:` (not `tools:`), and do NOT use `skills:`
-> preloading (that is agent-only). The `Skill` tool in `allowed-tools` enables
-> cross-plugin invocation of `review:pr` and `review:resolve` at runtime, and
-> loading `devin-workflows` context. This matches the pattern in `workflows:work`
-> and `workflows:review`.
+> preloading (that is agent-only). The `Skill` tool in `allowed-tools` is still
+> useful here for loading `devin-workflows` and yellow-review workflow context,
+> but this command should inline the report-only parts of review/resolve rather
+> than invoke their side-effecting commands verbatim.
 <!-- /deepen-plan -->
 
 #### Workflow Steps
@@ -137,7 +139,7 @@ REMOTE_URL=$(git remote get-url origin 2>/dev/null)
 # Format 1: https://github.com/owner/repo.git or https://host:port/owner/repo
 # Format 2: git@github.com:owner/repo.git (SCP-style)
 REPO=$(echo "$REMOTE_URL" | sed -E \
-  -e 's#^[a-z+]+://([^@]+@)?[^/:]+(:[:digit:]+)?/##' \
+  -e 's#^[a-z+]+://([^@]+@)?[^/:]+(:[0-9]+)?/##' \
   -e 's#^git@[^:]+:##' \
   -e 's/\.git$//' \
   -e 's#/$##')
@@ -187,16 +189,27 @@ response=$(curl -s --connect-timeout 5 --max-time 10 \
 Three-layer error handling per `devin-workflows` skill (curl exit → HTTP status
 → jq parse).
 
-Client-side repo filtering using jq:
+Client-side repo filtering using jq with exact `owner/repo` matching:
 
 ```bash
-# Extract PR URLs from each session's pull_requests array
-printf '%s' "$body" | jq -r '.items[] | select(.pull_requests | length > 0) |
-  {session_id, status, pull_requests, tags, acus_consumed, updated_at}'
+# Extract only PRs whose URL path maps exactly to owner/repo
+printf '%s' "$body" | jq --arg repo "$REPO" '
+  [.items[] |
+   select(.is_archived != true) |
+   select(.pull_requests | length > 0) |
+   . as $session |
+   ($session.pull_requests
+     | map(select(
+         ((.pr_url
+           | sub("^https?://[^/]+/"; "")
+           | sub("/pull/[0-9]+$"; "")) == $repo)
+       ))) as $matching_prs |
+   select($matching_prs | length > 0) |
+   {session_id, status, pull_requests: $matching_prs, tags, acus_consumed, updated_at}]'
 ```
 
-For each session, check if any `pr_url` contains the target `owner/repo`. Skip
-sessions with empty `pull_requests` arrays silently.
+This avoids false positives such as `owner/repo-tools` matching
+`owner/repo`. Skip sessions with empty `pull_requests` arrays silently.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The established jq pattern for extracting PR URLs from session
@@ -285,35 +298,32 @@ gh pr view $PR_NUM --json state -q '.state'
 
 If no longer `OPEN`, skip: "PR #X closed since discovery. Skipping."
 
-**5c. Review via Skill tool:**
+**5c. Analysis-only review pass:**
 
-Invoke `/review:pr` via the Skill tool with `skill: "review:pr"` and `args`
-set to the PR number.
+Load yellow-review workflow context and run the same adaptive reviewer
+selection used by `/review:pr`, but keep this phase report-only. Collect
+findings without editing files, committing, or pushing.
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** The canonical Skill invocation phrasing (from `workflows:work`
-> lines 609-623 and `workflows:review` line 22) is natural language, not
-> function-call syntax: `Invoke the Skill tool with skill: "review:pr" and args
-> set to the PR number.` The graceful degradation pattern is also established:
-> "If the Skill invocation fails (skill not found, yellow-review plugin not
-> installed, or any error), skip this phase and inform the user."
+> **Codebase:** `review:pr` and `review:resolve` are not safe to invoke
+> directly here because they own their own commit/push flow. Reuse their
+> reviewer selection, GraphQL comment fetch, and resolver-agent patterns
+> inline, but keep the pre-choice phase analysis-only.
 <!-- /deepen-plan -->
 
-**Graceful degradation:** If Skill invocation fails (yellow-review not
-installed), fall back to lightweight review:
+**Graceful degradation:** If yellow-review context or agents are unavailable,
+fall back to lightweight review:
 
 1. Show CI check status: `gh pr checks $PR_NUM`
 2. Show PR comments: `gh pr view $PR_NUM --comments`
 3. Show diff summary: `gh pr diff $PR_NUM --stat`
 4. Note: "Full multi-agent review unavailable (yellow-review not installed)"
 
-**5d. Resolve comments via Skill tool:**
+**5d. Comment triage pass:**
 
-Invoke `/review:resolve` via the Skill tool with `skill: "review:resolve"` and
-`args` set to the PR number.
-
-If Skill fails (yellow-review missing): skip comment resolution, note in
-summary.
+Fetch unresolved review threads using the same GraphQL script used by
+`/review:resolve`, then classify them as actionable, likely false positive, or
+manual judgment required. Do not edit files or resolve threads yet.
 
 **5e. Present per-PR summary and remediation choice:**
 
@@ -321,8 +331,8 @@ Use AskUserQuestion:
 
 ```
 PR #142 'Add auth middleware' — Review complete.
-- Findings: 2 P1, 1 P2 applied by review:pr
-- Comments: 3 resolved, 1 false positive dismissed
+- Findings: 2 P1, 1 P2 actionable
+- Comments: 3 actionable, 1 likely false positive
 - CI: 2/3 checks passing, 1 failing (lint)
 - Session: abc123 (suspended, 4.2 ACUs consumed)
 
@@ -345,7 +355,7 @@ gt submit --no-interactive
 
 If PR is in degraded mode (gt track failed):
 ```bash
-git add -- <specific-changed-files>
+git add -- "${CHANGED_FILES[@]}"
 git commit -m "fix: address review findings"
 git push
 ```
@@ -354,18 +364,18 @@ git push
 > **Codebase:** The degraded-mode push deviates from the repo convention
 > ("ALWAYS use `gt submit --no-interactive` -- NEVER raw `git push`"). This is
 > a documented exception: when `gt track` fails, `gt submit` is unavailable.
-> Use `git add -- <specific-files>` instead of `git add -A` to avoid
-> accidentally staging sensitive files (`.env`, credentials). This matches the
-> safety guidance from `review:all`'s degraded mode pattern at
-> `plugins/yellow-review/commands/review/review-all.md:72`.
+> Track a deduplicated `CHANGED_FILES` list during local remediation and stage
+> exactly those paths instead of using `git add -A`, which could accidentally
+> capture unrelated or sensitive files.
 <!-- /deepen-plan -->
 
 **Option 2 — Message Devin:**
 
 1. Re-fetch session status (TOCTOU protection). If terminal (`exit`/`error`),
    inform user and offer to fix locally instead.
-2. Compose fix message from review findings. Truncate to 2000 chars (Devin
-   message limit). Prioritize P1 findings, then P2.
+2. Compose fix message from review findings and actionable comments only.
+   Exclude likely false positives. Truncate to 2000 chars (Devin message
+   limit). Prioritize P1 findings, then P2.
 3. Show composed message to user: "Send this to Devin session abc123?
    [Send / Edit / Cancel]"
 4. On Send: POST to `${ORG_URL}/sessions/${SESSION_ID}/messages`

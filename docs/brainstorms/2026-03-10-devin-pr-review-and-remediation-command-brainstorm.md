@@ -48,22 +48,19 @@ Devin to apply fixes.
 
 5. **Sequential Review Loop** -- For each PR in order:
    a. Checkout: `gt checkout <branch>` (or `git checkout` in degraded mode)
-   b. Review: Run the inline `review:pr` flow (adaptive multi-agent review,
-      P1/P2 fix application, code simplifier pass)
-   c. Resolve: Run the inline `review:resolve` flow (fetch unresolved comments
-      via GraphQL, spawn parallel resolvers, apply fixes, mark threads resolved)
-   d. False-positive handling: During comment resolution, the resolver agents
-      assess each comment for validity. Bot comments identified as false
-      positives are marked resolved with a dismissal note. CI check false
-      positives are noted in the summary for the user.
-   e. Present per-PR summary with remediation choice via AskUserQuestion:
+   b. Review: Run the inline yellow-review analysis flow (adaptive multi-agent
+      review, findings only, no edits/commits/pushes yet)
+   c. Triage comments: Fetch unresolved comments via GraphQL and classify them
+      as actionable vs likely false positive, but defer fixes and thread
+      resolution until after the user chooses remediation
+   d. Present per-PR summary with remediation choice via AskUserQuestion:
       - **[Fix locally]** -- Apply fixes in Claude Code, commit via `gt modify`,
         push via `gt submit --no-interactive`
       - **[Message Devin]** -- Compose fix instructions from review findings,
         send via `POST ${ORG_URL}/sessions/${SESSION_ID}/messages` (the existing
         `/devin:message` pattern with org-scoped + enterprise fallback)
       - **[Skip]** -- Leave PR as-is, report findings only
-   f. If stack: run `gt upstack restack` after changes. On conflict: abort
+   e. If stack: run `gt upstack restack` after changes. On conflict: abort
       restack, report to user, continue to next PR.
 
 6. **Final Summary** -- Present aggregate report across all processed PRs.
@@ -102,17 +99,20 @@ handling, and session status conventions needed for Devin API interactions.
 
 ## Why This Approach
 
-**Composition over reimplementation.** The yellow-review plugin already has a
-battle-tested multi-agent review pipeline with 7 specialized review agents,
-parallel comment resolution, knowledge compounding, and ruvector memory
-integration. Reimplementing any of this would be duplicative and lower quality.
-The only genuinely new logic needed is Devin session discovery (filtering by
-repo), PR extraction, and the remediation routing (fix locally vs message Devin).
+**Reuse the review building blocks, but preserve remediation control.**
+yellow-review already has a battle-tested multi-agent review pipeline, comment
+resolution machinery, knowledge compounding, and ruvector memory integration.
+This command should reuse those patterns and agents, but it cannot invoke the
+side-effecting `/review:pr` and `/review:resolve` commands before the user picks
+Fix locally / Message Devin / Skip. The new logic is Devin session discovery,
+exact repo filtering, and remediation routing with side effects deferred until
+after user choice.
 
 **Follows established patterns.** The `review:all` command already does
 sequential multi-PR review with Graphite adoption (`gh pr checkout` + `gt
-track`), stack restacking, and inline `review:pr` + `review:resolve` flows.
-This command adds a Devin-specific discovery layer on top of that same pattern.
+track`) and stack restacking. This command should follow the same ordering and
+agent-selection conventions, but keep the first pass analysis-only so the user
+still controls whether any fixes are applied locally or delegated back to Devin.
 
 **Per-PR user choice preserves control.** Rather than auto-deciding whether to
 fix locally or message Devin, the command presents a summary and lets the user
@@ -134,10 +134,10 @@ command surfaces these in the summary and marks resolved with dismissal notes.
    and manually review them.
 
 2. **Client-side repo filtering**: The Devin V3 API does not support filtering
-   sessions by repository. The command fetches up to 50 recent sessions and
-   filters client-side by matching `pull_requests` URLs against the current
-   repo. This is pragmatic but means very active Devin orgs may need pagination
-   or tag-based filtering to find relevant sessions.
+   sessions by repository. The command fetches recent sessions and filters
+   client-side by extracting `owner/repo` from `pull_requests[].pr_url` and
+   matching it exactly against the current repo. This avoids false positives
+   like `owner/repo-tools` matching `owner/repo`.
 
 3. **Stack detection heuristic**: Related PRs are detected by checking GitHub
    base/head ref relationships (`gh pr view --json baseRefName,headRefName`).
