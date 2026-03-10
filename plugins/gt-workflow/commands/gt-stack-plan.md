@@ -1,10 +1,12 @@
 ---
 name: gt-stack-plan
-description: 'Plan a series of stacked PRs for a feature, ordered by dependency'
+description: 'Decompose a feature into stacked PRs, ordered by dependency (plan-only)'
 argument-hint: '[feature-description or plan-file-path]'
 allowed-tools:
   - Bash
   - Read
+  - Write
+  - Edit
   - Glob
   - Grep
   - Task
@@ -86,8 +88,8 @@ gt log short
 gt trunk
 ```
 
-Note the current branch position — the stack will be planned on top of the
-current branch.
+Note the trunk branch — it will be recorded as `stack-trunk` in the
+decomposition metadata.
 
 ## Phase 2: Design the Stack
 
