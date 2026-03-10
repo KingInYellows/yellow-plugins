@@ -392,14 +392,14 @@ CHANGED_FILES+=("path/to/edited/file.ext")
 mapfile -t CHANGED_FILES < <(printf '%s\n' "${CHANGED_FILES[@]}" | sort -u)
 ```
 
-If PR is Graphite-tracked (not in `GT_DEGRADED_PRS`):
+If `GT_AVAILABLE` is true and PR is not in `GT_DEGRADED_PRS`:
 
 ```bash
 gt modify -m "fix: address review findings"
 gt submit --no-interactive
 ```
 
-If PR is in degraded mode (PR number is in `GT_DEGRADED_PRS`):
+If `GT_AVAILABLE` is false, or PR number is in `GT_DEGRADED_PRS`:
 
 ```bash
 git add -- "${CHANGED_FILES[@]}"
