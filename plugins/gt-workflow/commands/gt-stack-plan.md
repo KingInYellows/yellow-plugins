@@ -78,17 +78,13 @@ Use Glob and Grep to understand the project structure:
 Use the Task tool with `subagent_type: "Explore"` if the scope is large and
 requires deep exploration.
 
-### 3. Check Current Stack State
-
-```bash
-gt log short
-```
+### 3. Identify Trunk Branch
 
 ```bash
 gt trunk
 ```
 
-Note the trunk branch — it will be recorded as `stack-trunk` in the
+Record the trunk branch name — it will be set as `stack-trunk` in the
 decomposition metadata.
 
 ## Phase 2: Design the Stack
@@ -127,8 +123,6 @@ Output the plan in this format:
 
 ```
 Stack Plan: <feature name>
-
-Current position: <current branch>
 
 ┌─ <trunk branch>
 ├── 1. <type>/<branch-slug>
@@ -191,9 +185,10 @@ graph. Set `<!-- stack-trunk: -->` to the trunk branch from Phase 1 Step 3.
 
 - **If a plan file was provided as input** (`$ARGUMENTS` ended with `.md`):
   append the `## Stack Decomposition` section to that plan file. If the section
-  already exists in the file, replace it entirely (do not duplicate). Use the
-  Edit tool to find `## Stack Decomposition` and replace everything from that
-  heading to the next `##` heading (or end of file).
+  already exists in the file, replace it entirely (do not duplicate). Read the
+  file first, identify the exact text from `## Stack Decomposition` through to
+  the next `## ` heading (exclusive) or end of file, then pass that entire block
+  as `old_string` to the Edit tool with the new decomposition as `new_string`.
 - **If invoked standalone** (plain text or no arguments): write to
   `.gt-stack-plan.md` in the repo root using the Write tool.
 
