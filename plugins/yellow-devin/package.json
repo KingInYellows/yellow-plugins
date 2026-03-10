@@ -2,5 +2,5 @@
   "name": "yellow-devin",
   "version": "2.0.1",
   "private": true,
-  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki, orchestrate plan-implement-review chains"
+  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains"
 }
