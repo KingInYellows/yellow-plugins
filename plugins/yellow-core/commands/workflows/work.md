@@ -72,8 +72,11 @@ assurance.
 
    Also check for a `## Stack Progress` section. If found:
    - Parse completed items (lines with `- [x]`)
-   - Cross-reference with `gt log short` to verify branches exist
-   - These items will be skipped during execution
+   - Cross-reference with `git branch --list` to verify branches exist
+   - If a completed item's branch is not found, ask the user via
+     AskUserQuestion: "Item N is marked complete but branch [name] was not
+     found. Re-execute or skip?"
+   - Verified completed items will be skipped during execution
 
    **If no `## Stack Decomposition` section is found:** proceed with single-branch
    execution (the existing behavior in Phases 2-5 below). Zero behavioral change
@@ -132,7 +135,10 @@ assurance.
    **Stack mode** (if `## Stack Decomposition` was detected in step 2a):
    - Skip individual branch creation here. Branches are created per-item in
      the Stack Execution Loop (Phase 1b below).
-   - If not already on trunk, confirm with user before proceeding.
+   - **Fresh start:** If not already on trunk, checkout trunk before proceeding.
+   - **Resume (completed items exist):** For linear topology, checkout the last
+     completed branch so the next `gt create` stacks correctly. For parallel
+     topology, checkout trunk.
 
    **Single-branch mode** (no decomposition):
    - **If on feature branch:** Ask user: "Continue on this branch or create new
@@ -184,10 +190,14 @@ in order from bottom (item 1) to top:
 
 1. **Create the branch:**
 
-   - **Linear topology:** `gt create "<branch-name>"` (automatically stacks
-     on top of the previous branch)
+   - **Linear topology:** If resuming (skipping completed items), first
+     `gt checkout <last-completed-branch>`. Then `gt create "<branch-name>"`
+     (automatically stacks on top of the previous branch).
    - **Parallel topology:** First `gt checkout <trunk>` (from
      `<!-- stack-trunk: -->` metadata), then `gt create "<branch-name>"`
+   - **Mixed topology:** Check the item's `Depends on:` field. If `(none)`,
+     follow parallel rules (checkout trunk). If `#N`, follow linear rules
+     (checkout item N's branch).
 
    If `gt create` fails (name collision, Graphite error):
    - Stop immediately
@@ -205,7 +215,11 @@ in order from bottom (item 1) to top:
    (read files, find patterns, implement, write tests, commit). All commits for
    this item use the branch created in step 1.
 
-4. **Commit and submit:**
+4. **Run tests** scoped to changed files. If tests fail:
+   - **Linear topology:** Stop and ask user (item N+1 depends on N)
+   - **Parallel topology:** Ask user: "Skip to next item or fix and retry?"
+
+5. **Commit and submit:**
 
    ```bash
    gt modify -m "<type>: <description>"
@@ -213,10 +227,6 @@ in order from bottom (item 1) to top:
    ```
 
    Where `<type>` and `<description>` come from the stack item fields.
-
-5. **Run tests** scoped to changed files. If tests fail:
-   - **Linear topology:** Stop and ask user (item N+1 depends on N)
-   - **Parallel topology:** Ask user: "Skip to next item or fix and retry?"
 
 6. **Update progress:** Write or update `## Stack Progress` in the plan file
    using the Edit tool:
@@ -374,10 +384,12 @@ Phase 3 (Quality Check) in stack summary mode.
 **Objective:** Ensure code quality before submission.
 
 **Stack mode note:** In stack mode, lightweight quality checks (tests only) run
-per-item during Phase 1b step 5. The full review agent suite below runs only
-once, after all stack items are complete. It reviews the cumulative diff across
-the entire stack. To run the full suite on a specific item's branch, the user
-can request it at a Phase 1b checkpoint.
+per-item during Phase 1b step 4. The full review agent suite below runs only
+once, after all stack items are complete. For linear topology, remain on the
+topmost branch and diff against trunk (`git diff <trunk>..HEAD`). For parallel
+topology, review each branch individually by checking it out and diffing against
+trunk. To run the full suite on a specific item's branch, the user can request
+it at a Phase 1b checkpoint.
 
 **Steps:**
 
@@ -453,16 +465,12 @@ can request it at a Phase 1b checkpoint.
 **Objective:** Submit work for review via Graphite.
 
 **Stack mode:** In stack mode, each item was already submitted during Phase 1b
-step 4. Phase 4 becomes a summary phase:
+step 5. Phase 4 becomes a summary phase:
 
-1. Show the completed stack: `gt log short`
-2. List all submitted PRs with their URLs:
-   ```bash
-   gt log short --no-interactive
-   ```
-3. Verify all acceptance criteria from the plan are met across the full stack
-4. Run the Post-Submit Linear Sync (step 4 below) for each branch that has a
-   Linear issue ID
+1. Show the completed stack and submitted PRs: `gt log short --no-interactive`
+2. Verify all acceptance criteria from the plan are met across the full stack
+3. Run the **Post-Submit Linear Sync** (single-branch mode step 4 below) for
+   each branch that has a Linear issue ID
 5. Skip directly to Phase 5 (Review)
 
 **Single-branch mode (steps below):**
