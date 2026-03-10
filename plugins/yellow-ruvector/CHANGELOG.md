@@ -8,6 +8,17 @@ and this project adheres to
 
 ---
 
+## [1.1.2] - 2026-03-10
+
+### Patch Changes
+
+- [`91908d9`](https://github.com/KingInYellows/yellow-plugins/commit/91908d935feb46fbb447a67eae997e5f491e3c05)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add MCP warmup
+  and retry-once patterns to all consuming commands for ruvector integration
+  consistency. Harden install.sh and setup.md to require global binary in PATH.
+
+---
+
 ## [1.1.1] - 2026-03-06
 
 ### Patch Changes

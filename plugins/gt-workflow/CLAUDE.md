@@ -2,6 +2,16 @@
 
 Graphite-native workflow commands for stacked PR development.
 
+## MCP Server
+
+- **Graphite** — Bundled stdio server via `gt mcp` (requires gt CLI v1.6.7+)
+- Authentication: Inherited from `gt` CLI auth — no separate token required
+- Tool prefix: `mcp__plugin_gt-workflow_graphite__`
+- Tool names must be discovered empirically via ToolSearch after installation
+- If `gt` is not installed or is below v1.6.7, the server silently fails to
+  start and graphite MCP tools are simply unavailable — run `/gt-setup` to
+  diagnose
+
 ## Conventions
 
 - **ALWAYS** use `gt` (Graphite CLI) for branch management, commits, and PR

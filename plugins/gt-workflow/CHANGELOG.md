@@ -10,10 +10,24 @@ and this project adheres to
 
 ## Unreleased
 
-### Added
+_No unreleased changes yet._
 
+---
+
+## [1.2.0] - 2026-03-10
+
+### Minor Changes
+
+- Add Graphite MCP server (stdio via `gt mcp`) as bundled MCP server in
+  plugin.json. Extend `/gt-setup` to validate gt CLI version 1.6.7+ for MCP
+  availability. Update CLAUDE.md with MCP tool documentation.
 - Add `/gt-setup` to validate Graphite CLI availability, auth detection, and
   repo initialization before running workflow commands.
+
+- [`69d84c8`](https://github.com/KingInYellows/yellow-plugins/commit/69d84c8f17a23da89979765c434d4e2c0c683935)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Expand
+  marketplace setup coverage with dedicated setup commands, repository-root
+  aware setup checks, and stricter setup validation guardrails.
 
 ---
 

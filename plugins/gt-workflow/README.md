@@ -105,8 +105,8 @@ convention automatically — no rule gets silently bypassed.
 
 ## Requirements
 
-- [Graphite CLI](https://graphite.dev/docs/graphite-cli) (`gt`) installed and
-  authenticated
+- [Graphite CLI](https://graphite.dev/docs/graphite-cli) (`gt`) v1.6.7+
+  installed and authenticated
 - Git repository initialized with Graphite (`gt init`)
 - [`jq`](https://jqlang.github.io/jq/) installed (used by the `git push` guard
   hook)

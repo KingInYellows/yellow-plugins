@@ -8,6 +8,24 @@ and this project adheres to
 
 ---
 
+## [1.3.0] - 2026-03-10
+
+### Minor Changes
+
+- [`1c183f3`](https://github.com/KingInYellows/yellow-plugins/commit/1c183f3529250822df87180b5c9e69dadc2830a0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  auto-install with confirmation for semgrep CLI and ast-grep binary in setup
+  commands
+
+### Patch Changes
+
+- [`69d84c8`](https://github.com/KingInYellows/yellow-plugins/commit/69d84c8f17a23da89979765c434d4e2c0c683935)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Expand
+  marketplace setup coverage with dedicated setup commands, repository-root
+  aware setup checks, and stricter setup validation guardrails.
+
+---
+
 ## [1.2.0] - 2026-03-06
 
 ### Minor Changes

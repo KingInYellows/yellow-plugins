@@ -10,11 +10,25 @@ and this project adheres to
 
 ## Unreleased
 
-### Changed
+_No unreleased changes yet._
 
-- Expand `/setup:all` from a 9-plugin yellow-only dashboard to a
-  marketplace-wide setup orchestrator with stricter readiness checks, new
-  delegated setup commands, and setup coverage validation in repo checks.
+---
+
+## [1.3.0] - 2026-03-10
+
+### Minor Changes
+
+- [`69d84c8`](https://github.com/KingInYellows/yellow-plugins/commit/69d84c8f17a23da89979765c434d4e2c0c683935)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Expand
+  marketplace setup coverage with dedicated setup commands, repository-root
+  aware setup checks, and stricter setup validation guardrails.
+
+### Patch Changes
+
+- [`91908d9`](https://github.com/KingInYellows/yellow-plugins/commit/91908d935feb46fbb447a67eae997e5f491e3c05)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add MCP warmup
+  and retry-once patterns to all consuming commands for ruvector integration
+  consistency. Harden install.sh and setup.md to require global binary in PATH.
 
 ---
 
