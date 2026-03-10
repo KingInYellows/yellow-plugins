@@ -74,6 +74,7 @@ top of the last with `gt create`.
 
 ```markdown
 <!-- stack-topology: linear -->
+<!-- stack-trunk: main -->
 ### 1. feat/auth-types       → Depends on: (none)
 ### 2. feat/auth-middleware   → Depends on: #1
 ### 3. feat/auth-routes       → Depends on: #2
@@ -86,6 +87,7 @@ trunk before creating each branch.
 
 ```markdown
 <!-- stack-topology: parallel -->
+<!-- stack-trunk: main -->
 ### 1. docs/update-readme     → Depends on: (none)
 ### 2. fix/lint-warnings      → Depends on: (none)
 ### 3. test/add-coverage      → Depends on: (none)
@@ -99,6 +101,7 @@ the `workflows:work` consumer currently only supports `linear` and `parallel` to
 
 ```markdown
 <!-- stack-topology: mixed -->
+<!-- stack-trunk: main -->
 ### 1. feat/core-types        → Depends on: (none)
 ### 2. feat/core-logic        → Depends on: #1
 ### 3. feat/api-routes        → Depends on: #2
