@@ -1,5 +1,7 @@
 # Feature: Migrate semgrep MCP from deprecated standalone to built-in subcommand
 
+> **Status**: Phases 1 and 3 complete. Outstanding work: tool name validation (Phase 1.2) and documentation updates (Phase 4).
+
 ## Problem Statement
 
 The yellow-semgrep plugin uses `uvx semgrep-mcp` (the standalone PyPI package)
@@ -49,12 +51,12 @@ All endpoints (`/api/v1/me`, `/deployments`, `/deployments/{slug}/findings`,
 
 ## Implementation Plan
 
-### Phase 1: MCP Server Config Migration
+### Phase 1: MCP Server Config Migration ✅ COMPLETE
 
-- [ ] **1.1:** Update `plugins/yellow-semgrep/.claude-plugin/plugin.json`
-  - Change `"command": "uvx"` → `"command": "semgrep"`
-  - Change `"args": ["semgrep-mcp"]` → `"args": ["mcp"]`
-  - Keep env block unchanged
+- [x] **1.1:** Update `plugins/yellow-semgrep/.claude-plugin/plugin.json`
+  - ✅ Changed `"command": "uvx"` → `"command": "semgrep"`
+  - ✅ Changed `"args": ["semgrep-mcp"]` → `"args": ["mcp"]`
+  - ✅ Env block unchanged
 
   ```json
   "mcpServers": {
@@ -108,19 +110,19 @@ All endpoints (`/api/v1/me`, `/deployments`, `/deployments/{slug}/findings`,
   - If MCP tools not found AND semgrep version >= minimum: "MCP server failed
     to start. Check SEMGREP_APP_TOKEN and try restarting Claude Code."
 
-### Phase 3: Install Script — Minimum Version
+### Phase 3: Install Script — Minimum Version ✅ COMPLETE
 
-- [ ] **3.1:** Update `scripts/install-semgrep.sh`
-  - Add `MIN_VERSION="1.146.0"` constant
-  - After successful install, compare installed version against minimum
-  - If installed version < minimum: warn and suggest upgrade command
-  - If already installed but below minimum: offer to upgrade
+- [x] **3.1:** Update `scripts/install-semgrep.sh`
+  - ✅ Added `MIN_VERSION="1.146.0"` constant
+  - ✅ After successful install, compares installed version against minimum with `version_gte()` function
+  - ✅ If installed version < minimum: warns and suggests upgrade command
+  - ✅ If already installed but below minimum: offers to upgrade
     (`pipx upgrade semgrep` or `pip install --upgrade semgrep`)
 
-- [ ] **3.2:** Add upgrade path for existing installs
-  - Currently the script exits early if semgrep is already installed
-  - Change: if installed but below `MIN_VERSION`, offer to upgrade
-  - Keep the early exit only if version is >= minimum
+- [x] **3.2:** Add upgrade path for existing installs
+  - ✅ Script now checks version even if semgrep is already installed
+  - ✅ If installed but below `MIN_VERSION`, offers to upgrade
+  - ✅ Early exit only if version is >= minimum
 
 ### Phase 4: Documentation & Conventions
 

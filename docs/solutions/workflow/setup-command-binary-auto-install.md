@@ -46,7 +46,7 @@ and `yellow-research` did not follow the pattern.
 
 Created install scripts at the established path:
 
-```
+```text
 plugins/<name>/scripts/install-<binary>.sh
 ```
 

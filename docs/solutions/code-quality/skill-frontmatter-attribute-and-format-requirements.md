@@ -232,7 +232,7 @@ description: "Reviews documentation changes for accuracy, completeness, and adhe
 
 ### Updated Detection Grep
 
-The original grep patterns did not catch `>-` or `>+` variants. Updated:
+The original grep patterns used a looser match that caught basic folded scalars but required more precise anchoring for modifier variants. Updated to explicitly match `>-`, `>+`, `|-`, `|+`:
 
 ```bash
 # All folded/literal scalar variants (>, >-, >+, |, |-, |+)
@@ -246,13 +246,13 @@ grep -rA1 '^description: [^"'"'"'>|]' plugins/*/agents/*.md plugins/*/skills/*/*
 ### Complete Disallowed Syntax Reference
 
 | Syntax | Example | Status |
-|--------|---------|--------|
+| --- | --- | --- |
 | `>` (folded) | `description: >` | Broken (PR #23) |
 | `>-` (folded strip) | `description: >-` | Broken (PR #139) |
 | `>+` (folded keep) | `description: >+` | Broken (presumed) |
-| `|` (literal) | `description: |` | Broken (PR #23) |
-| `|-` (literal strip) | `description: |-` | Broken (presumed) |
-| `|+` (literal keep) | `description: |+` | Broken (presumed) |
+| `\|` (literal) | `description: \|` | Broken (PR #23) |
+| `\|-` (literal strip) | `description: \|-` | Broken (presumed) |
+| `\|+` (literal keep) | `description: \|+` | Broken (presumed) |
 | Multi-line single-quoted | `description: 'text\n  cont'` | Broken (PR #70) |
 | Multi-line bare | `description: text\n  cont` | Broken (PR #139) |
 | Single-line double-quoted | `description: "text"` | **Working** |

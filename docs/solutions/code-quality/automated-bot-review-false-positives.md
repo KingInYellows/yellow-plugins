@@ -93,6 +93,21 @@ were structured as review findings but contained no actionable suggestion.
 **Detection rule:** If a bot comment describes what code does without stating
 what is wrong or what should change, it is informational noise, not a finding.
 
+### FP5: "`tools:` and `allowed-tools:` are interchangeable" (potential)
+
+**What bots may flag:** Suggestions that `tools:` and `allowed-tools:` are
+equivalent or can be used interchangeably in frontmatter.
+
+**Why it's wrong:** These are distinct keys with different purposes after the
+frontmatter migration:
+- `tools:` is the current key for agents (post-migration) — lists MCP tools the
+  agent can use
+- `allowed-tools:` is for commands only — specifies which tools a command permits
+
+**Detection rule:** If a bot conflates `tools:` and `allowed-tools:`,
+cross-reference the "Agent Frontmatter" section of MEMORY.md. `tools:` is the
+post-migration key for agents; `allowed-tools:` is for commands only.
+
 ## Root Cause
 
 External automated review bots operate without project-specific context:
