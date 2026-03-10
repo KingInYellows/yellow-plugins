@@ -13,6 +13,8 @@ components:
   - plugins/yellow-research/scripts/install-ast-grep.sh
   - plugins/yellow-semgrep/commands/semgrep/setup.md
   - plugins/yellow-research/commands/research/setup.md
+  - plugins/yellow-semgrep/CLAUDE.md
+  - plugins/yellow-research/CLAUDE.md
 ---
 
 # Setup command binary auto-install pattern
@@ -111,7 +113,7 @@ needed.
 ## Files Changed
 
 | File | Change |
-|---|---|
+| --- | --- |
 | `plugins/yellow-semgrep/scripts/install-semgrep.sh` | NEW |
 | `plugins/yellow-research/scripts/install-ast-grep.sh` | NEW |
 | `plugins/yellow-semgrep/commands/semgrep/setup.md` | Added Step 0 |

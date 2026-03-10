@@ -1,5 +1,5 @@
 ---
-title: 'Automated Bot Review False Positives: skills Preloading and Tooling Misconceptions'
+title: 'Automated Bot Review False Positives: Skills Preloading and Tooling Misconceptions'
 category: code-quality
 date: 2026-03-08
 tags:
@@ -19,7 +19,7 @@ related:
   - docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md
 ---
 
-# Automated Bot Review False Positives: skills Preloading and Tooling Misconceptions
+# Automated Bot Review False Positives: Skills Preloading and Tooling Misconceptions
 
 ## Problem
 
@@ -135,7 +135,7 @@ When reviewing bot comments on PRs that touch agent/skill files:
 ### Known Bot Blind Spots (as of 2026-03)
 
 | Topic | Bot Misconception | Reality |
-|-------|-------------------|---------|
+| --- | --- | --- |
 | `skills:` preloading | Requires `Skill` in `tools:` | `skills:` injects at startup; `Skill` tool is redundant |
 | `gt log --json` | Exists and is preferred | Flag was never implemented |
 | `tools:` vs `allowed-tools:` | Interchangeable | `tools:` is for agents (post-migration); `allowed-tools:` is for commands |

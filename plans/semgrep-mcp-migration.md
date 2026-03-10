@@ -20,7 +20,7 @@ stale client code, and prevents users from getting MCP bug fixes and new tools.
 ## Current State
 
 ### plugin.json MCP config (broken)
-```json
+```jsonc
 "mcpServers": {
   "semgrep": {
     "command": "uvx",
@@ -88,8 +88,11 @@ All endpoints (`/api/v1/me`, `/deployments`, `/deployments/{slug}/findings`,
 - [ ] **2.2:** Add version comparison after semgrep install/detection (between
   current Step 0 and Step 1)
   ```bash
-  installed=$(semgrep --version 2>/dev/null)
-  # Compare semver: if < 1.146.0, warn that MCP features require upgrade
+  installed=$(semgrep --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  min="1.146.0"
+  if [ "$(printf '%s\n' "$min" "$installed" | sort -V | head -1)" != "$min" ]; then
+    # installed < min — warn that MCP features require upgrade
+  fi
   ```
   - If version is below minimum: warn that MCP tools won't work, suggest upgrade
   - If version is at/above minimum: proceed normally

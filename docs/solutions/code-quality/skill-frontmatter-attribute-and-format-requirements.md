@@ -224,7 +224,7 @@ description: "Reviews documentation changes for accuracy, completeness, and adhe
 **Affected files (PR #139):**
 
 | File | Scalar Type |
-|------|-------------|
+| --- | --- |
 | `document-reviewer.md` | `>-` |
 | `project-dashboard.md` | `>-` |
 | `code-researcher.md` | `>-` |
@@ -240,7 +240,7 @@ grep -rE '^description: [>|][-+]?$' plugins/*/agents/*.md plugins/*/skills/*/*.m
 
 # Bare multi-line (no quotes, value continues on next line with indentation)
 grep -rA1 '^description: [^"'"'"'>|]' plugins/*/agents/*.md plugins/*/skills/*/*.md \
-  | grep -B1 '^\s\s'
+  | grep -B1 '^  '
 ```
 
 ### Complete Disallowed Syntax Reference
