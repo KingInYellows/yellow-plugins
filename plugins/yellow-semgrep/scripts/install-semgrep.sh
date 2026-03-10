@@ -25,12 +25,19 @@ success() {
   printf '%b%s%b\n' "$GREEN" "$1" "$NC"
 }
 
+extract_version() {
+  printf '%s\n' "$1" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true
+}
+
 # Compare two semver strings. Returns 0 if $1 >= $2, 1 otherwise.
 version_gte() {
-  local IFS=.
-  local i a=($1) b=($2)
+  local i av bv
+  local -a a b
+  IFS='.' read -r -a a <<< "$1"
+  IFS='.' read -r -a b <<< "$2"
   for ((i=0; i<${#b[@]}; i++)); do
-    local av="${a[i]:-0}" bv="${b[i]:-0}"
+    av="${a[i]:-0}"
+    bv="${b[i]:-0}"
     av="${av%%[^0-9]*}"
     bv="${bv%%[^0-9]*}"
     av="${av:-0}"
@@ -56,57 +63,69 @@ trap cleanup EXIT
 
 # --- Check if already installed ---
 if command -v semgrep >/dev/null 2>&1; then
-  installed_version=$(semgrep --version 2>/dev/null || true)
-  if [ -n "$installed_version" ] && version_gte "$installed_version" "$MIN_VERSION"; then
+  semgrep_version_output=$(semgrep --version 2>/dev/null || true)
+  installed_version=$(extract_version "$semgrep_version_output")
+  if [ -z "$installed_version" ]; then
+    warning "semgrep is installed but 'semgrep --version' returned an unexpected value: ${semgrep_version_output:-<empty>}"
+    warning "Try reinstalling with: bash \"${0}\""
+    exit 1
+  fi
+
+  if version_gte "$installed_version" "$MIN_VERSION"; then
     success "semgrep ${installed_version} already installed (>= ${MIN_VERSION})"
     exit 0
   fi
 
   # Installed but below minimum version — offer upgrade
-  if [ -n "$installed_version" ]; then
-    printf '[yellow-semgrep] semgrep %s installed but MCP support requires >= %s\n' "$installed_version" "$MIN_VERSION"
-    printf '[yellow-semgrep] Attempting upgrade...\n'
+  printf '[yellow-semgrep] semgrep %s installed but MCP support requires >= %s\n' "$installed_version" "$MIN_VERSION"
+  printf '[yellow-semgrep] Attempting upgrade...\n'
 
-    INSTALL_METHOD=""
-    if command -v pipx >/dev/null 2>&1; then
-      INSTALL_METHOD="pipx"
-      printf '[yellow-semgrep] Upgrading semgrep via pipx...\n'
-      if ! pipx upgrade semgrep 2>&1; then
-        # pipx upgrade fails if not installed via pipx — try reinstall
-        printf '[yellow-semgrep] pipx upgrade failed — trying pipx install...\n'
-        if ! pipx install --force semgrep 2>&1; then
-          warning "pipx upgrade/install failed. Try manually: pipx upgrade semgrep"
-        fi
+  INSTALL_METHOD=""
+  if command -v pipx >/dev/null 2>&1; then
+    INSTALL_METHOD="pipx"
+    printf '[yellow-semgrep] Upgrading semgrep via pipx...\n'
+    if ! pipx upgrade semgrep 2>&1; then
+      # pipx upgrade fails if not installed via pipx — try reinstall
+      printf '[yellow-semgrep] pipx upgrade failed — trying pipx install...\n'
+      if ! pipx install --force semgrep 2>&1; then
+        warning "pipx upgrade/install failed. Try manually: pipx upgrade semgrep"
       fi
-    elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
-      INSTALL_METHOD="pip"
-      if command -v python3 >/dev/null 2>&1; then
-        pip_cmd="python3 -m pip"
-      elif command -v pip3 >/dev/null 2>&1; then
-        pip_cmd="pip3"
-      else
-        pip_cmd="pip"
-      fi
-      printf '[yellow-semgrep] Upgrading semgrep via %s...\n' "$pip_cmd"
-      if ! $pip_cmd install --upgrade semgrep 2>&1; then
-        warning "pip upgrade failed. Try manually: pip install --upgrade semgrep"
-      fi
+    fi
+  elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+    INSTALL_METHOD="pip"
+    if command -v python3 >/dev/null 2>&1; then
+      pip_cmd=(python3 -m pip)
+    elif command -v pip3 >/dev/null 2>&1; then
+      pip_cmd=(pip3)
     else
-      warning "Cannot auto-upgrade — no pipx or pip found."
-      warning "Upgrade manually: pipx upgrade semgrep"
+      pip_cmd=(pip)
     fi
-
-    # Re-check version after upgrade attempt
-    upgraded_version=$(semgrep --version 2>/dev/null || true)
-    if [ -n "$upgraded_version" ] && version_gte "$upgraded_version" "$MIN_VERSION"; then
-      success "semgrep upgraded to ${upgraded_version} (>= ${MIN_VERSION})"
-      exit 0
+    printf '[yellow-semgrep] Upgrading semgrep via %s...\n' "${pip_cmd[*]}"
+    if ! "${pip_cmd[@]}" install --upgrade semgrep 2>&1; then
+      warning "pip upgrade failed. Try manually: pip install --upgrade semgrep"
     fi
+  else
+    warning "Cannot auto-upgrade — no pipx or pip found."
+    warning "Upgrade manually: pipx upgrade semgrep"
+  fi
 
-    warning "semgrep ${upgraded_version:-${installed_version}} is below ${MIN_VERSION}."
-    warning "MCP tools will not be available. Upgrade manually: pipx upgrade semgrep"
+  # Re-check version after upgrade attempt
+  upgraded_version_output=$(semgrep --version 2>/dev/null || true)
+  upgraded_version=$(extract_version "$upgraded_version_output")
+  if [ -n "$upgraded_version" ] && version_gte "$upgraded_version" "$MIN_VERSION"; then
+    success "semgrep upgraded to ${upgraded_version} (>= ${MIN_VERSION})"
     exit 0
   fi
+
+  if [ -z "$upgraded_version" ]; then
+    warning "semgrep is installed but 'semgrep --version' returned an unexpected value after upgrade: ${upgraded_version_output:-<empty>}"
+    warning "MCP tools will not be available until semgrep is reinstalled cleanly."
+    exit 0
+  fi
+
+  warning "semgrep ${upgraded_version:-${installed_version}} is below ${MIN_VERSION}."
+  warning "MCP tools will not be available. Upgrade manually: pipx upgrade semgrep"
+  exit 0
 fi
 
 # --- Detect OS/arch ---
@@ -132,11 +151,11 @@ elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
   INSTALL_METHOD="pip"
   # Prefer python3 -m pip (ensures correct interpreter) over raw pip3/pip
   if command -v python3 >/dev/null 2>&1; then
-    pip_cmd="python3 -m pip"
+    pip_cmd=(python3 -m pip)
   elif command -v pip3 >/dev/null 2>&1; then
-    pip_cmd="pip3"
+    pip_cmd=(pip3)
   else
-    pip_cmd="pip"
+    pip_cmd=(pip)
   fi
 
   # Warn about active virtual environment
@@ -147,10 +166,10 @@ elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
   fi
 
   printf '[yellow-semgrep] pipx not found — falling back to pip.\n'
-  printf '[yellow-semgrep] Installing semgrep via %s...\n' "$pip_cmd"
+  printf '[yellow-semgrep] Installing semgrep via %s...\n' "${pip_cmd[*]}"
 
   pip_output=""
-  if ! pip_output=$($pip_cmd install semgrep 2>&1); then
+  if ! pip_output=$("${pip_cmd[@]}" install semgrep 2>&1); then
     # Detect PEP 668 externally-managed-environment error
     if printf '%s' "$pip_output" | grep -qi "externally-managed-environment"; then
       printf '%s\n' "$pip_output" >&2
@@ -196,9 +215,10 @@ if ! command -v semgrep >/dev/null 2>&1; then
   error "semgrep not found in PATH after install. Check that your PATH includes the install location."
 fi
 
-installed_version=$(semgrep --version 2>/dev/null || true)
+semgrep_version_output=$(semgrep --version 2>/dev/null || true)
+installed_version=$(extract_version "$semgrep_version_output")
 if [ -z "$installed_version" ]; then
-  error "semgrep binary found but 'semgrep --version' failed. Try reinstalling."
+  error "semgrep binary found but 'semgrep --version' returned an unexpected value: ${semgrep_version_output:-<empty>}"
 fi
 
 if ! version_gte "$installed_version" "$MIN_VERSION"; then

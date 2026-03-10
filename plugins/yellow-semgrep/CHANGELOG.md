@@ -19,20 +19,6 @@ and this project adheres to
 
 ---
 
-## [1.1.0] - 2026-03-09
-
-### Changed
-
-- **BREAKING (MCP):** Migrated MCP server from deprecated `uvx semgrep-mcp`
-  (standalone, archived Oct 2025) to built-in `semgrep mcp` subcommand.
-  Requires semgrep **v1.146.0+**.
-- `/semgrep:setup` now checks semgrep version and offers upgrade if below
-  v1.146.0. Provides version-aware MCP diagnostics.
-- Install script (`install-semgrep.sh`) now supports upgrading outdated
-  semgrep installs instead of exiting early.
-
----
-
 ## [1.0.0] - 2026-03-04
 
 ### Added

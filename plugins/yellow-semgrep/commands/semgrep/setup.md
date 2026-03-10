@@ -67,11 +67,37 @@ Then re-run /semgrep:setup
 
 ```bash
 MIN_SEMGREP_VERSION="1.146.0"
-installed_version=$(semgrep --version 2>/dev/null)
+semgrep_version_output=$(semgrep --version 2>/dev/null || true)
+installed_version=$(printf '%s\n' "$semgrep_version_output" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true)
+version_gte() {
+  local i av bv
+  local -a a b
+  IFS='.' read -r -a a <<< "$1"
+  IFS='.' read -r -a b <<< "$2"
+  for ((i=0; i<${#b[@]}; i++)); do
+    av="${a[i]:-0}"
+    bv="${b[i]:-0}"
+    av="${av%%[^0-9]*}"
+    bv="${bv%%[^0-9]*}"
+    av="${av:-0}"
+    bv="${bv:-0}"
+    if ((av > bv)); then return 0; fi
+    if ((av < bv)); then return 1; fi
+  done
+  return 0
+}
 ```
 
-Compare `installed_version` against `MIN_SEMGREP_VERSION` (semver comparison).
-If below minimum, use AskUserQuestion:
+If `installed_version` is empty, warn that `semgrep --version` returned an
+unexpected value and suggest reinstalling with:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-semgrep.sh"
+```
+
+Otherwise, use `version_gte "$installed_version" "$MIN_SEMGREP_VERSION"` for
+the semver comparison. If the installed version is below minimum, use
+AskUserQuestion:
 
 > "semgrep {version} is installed but MCP tools require >= 1.146.0. Upgrade
 > now?"
@@ -201,6 +227,8 @@ Count discovered tools. If fewer than 2 core tools
 
 - If semgrep version < 1.146.0: "MCP tools require semgrep >= 1.146.0.
   Upgrade with: `pipx upgrade semgrep`"
+- Use the same parsed `installed_version` and `version_gte` helper from Step 0.
+  Do not use lexicographic string comparison for versions.
 - If semgrep version >= 1.146.0: "MCP server failed to start. Verify
   SEMGREP_APP_TOKEN is set and try restarting Claude Code."
 - If semgrep not installed: "Install semgrep >= 1.146.0 for MCP support.
