@@ -1,5 +1,5 @@
 ---
-'yellow-semgrep': minor
+'yellow-semgrep': major
 ---
 
 # yellow-semgrep MCP migration

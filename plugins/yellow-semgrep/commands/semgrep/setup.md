@@ -112,7 +112,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-semgrep.sh"
 
 If the user chooses **No**: warn and continue:
 
-```
+```text
 [yellow-semgrep] Warning: semgrep < 1.146.0 — MCP tools will not be available.
 Scan and fix commands will fall back to CLI-only mode.
 ```

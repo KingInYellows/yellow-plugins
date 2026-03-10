@@ -50,7 +50,7 @@ version_gte() {
 
 cleanup() {
   local exit_code=$?
-  if [ $exit_code -ne 0 ]; then
+  if [ $exit_code -ne 0 ] && [ -n "${INSTALL_METHOD:-}" ]; then
     warning "Installation failed. Partial install may remain."
     if [ "${INSTALL_METHOD:-}" = "pipx" ]; then
       warning "To clean up: pipx uninstall semgrep"
@@ -84,16 +84,21 @@ if command -v semgrep >/dev/null 2>&1; then
   if command -v pipx >/dev/null 2>&1; then
     INSTALL_METHOD="pipx"
     printf '[yellow-semgrep] Upgrading semgrep via pipx...\n'
-    if ! pipx upgrade semgrep 2>&1; then
+    pipx_output=""
+    if ! pipx_output=$(pipx upgrade semgrep 2>&1); then
       # pipx upgrade fails if not installed via pipx — try reinstall
       printf '[yellow-semgrep] pipx upgrade failed — trying pipx install...\n'
-      if ! pipx install --force semgrep 2>&1; then
+      pipx_output=""
+      if ! pipx_output=$(pipx install --force semgrep 2>&1); then
+        printf '%s\n' "$pipx_output" >&2
         warning "pipx upgrade/install failed. Try manually: pipx upgrade semgrep"
       fi
     fi
-  elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+  elif (command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1) \
+    || command -v pip3 >/dev/null 2>&1 \
+    || command -v pip >/dev/null 2>&1; then
     INSTALL_METHOD="pip"
-    if command -v python3 >/dev/null 2>&1; then
+    if command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
       pip_cmd=(python3 -m pip)
     elif command -v pip3 >/dev/null 2>&1; then
       pip_cmd=(pip3)
@@ -147,10 +152,12 @@ if command -v pipx >/dev/null 2>&1; then
   fi
 
 # Fall back to pip
-elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+elif (command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1) \
+  || command -v pip3 >/dev/null 2>&1 \
+  || command -v pip >/dev/null 2>&1; then
   INSTALL_METHOD="pip"
   # Prefer python3 -m pip (ensures correct interpreter) over raw pip3/pip
-  if command -v python3 >/dev/null 2>&1; then
+  if command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
     pip_cmd=(python3 -m pip)
   elif command -v pip3 >/dev/null 2>&1; then
     pip_cmd=(pip3)
