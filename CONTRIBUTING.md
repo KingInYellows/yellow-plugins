@@ -215,10 +215,10 @@ pnpm apply:changesets         # bumps plugin versions + syncs manifests
 node scripts/catalog-version.js patch   # bumps root catalog version
 git add -A
 git commit -m "chore: version packages"
-git push                      # this triggers the workflow automatically
+gt submit --no-interactive    # push via Graphite (triggers the workflow automatically)
 pnpm tag                      # creates per-plugin git tags for tracking
 git tag v<catalog-version>    # e.g. v1.1.2
-git push --tags               # push tags for tracking
+git push --tags               # push tags for tracking (tag push — not managed by Graphite)
 
 # If the automated workflow failed and you need manual recovery:
 gh workflow run version-packages.yml -f force_publish=true

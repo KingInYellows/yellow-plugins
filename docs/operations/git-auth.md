@@ -3,6 +3,10 @@
 **Document Version**: 1.0.0 **Last Updated**: 2026-01-12 **Part of**: Task
 I4.T1 - Publish Service and CLI Command
 
+> **Note:** This repository uses Graphite for all branch pushes. The `git push`
+> commands below demonstrate git authentication mechanics. For the development
+> workflow, use `gt submit --no-interactive` instead. See CONTRIBUTING.md.
+
 ---
 
 ## Overview

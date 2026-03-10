@@ -224,7 +224,7 @@ node scripts/validate-plugin.js --plugin plugins/example/.claude-plugin/plugin.j
 # After fixing validation errors
 git add .claude-plugin/marketplace.json plugins/
 git commit -m "fix: resolve schema validation errors"
-git push
+gt submit --no-interactive
 
 # CI will automatically re-run
 ```
@@ -272,7 +272,7 @@ pnpm typecheck --pretty
 ```bash
 git add .
 git commit -m "fix: resolve lint and type errors"
-git push
+gt submit --no-interactive
 ```
 
 **Reference:**
@@ -326,7 +326,7 @@ pnpm test
 ```bash
 git add tests/
 git commit -m "fix: resolve test failures"
-git push
+gt submit --no-interactive
 ```
 
 **Reference:**
@@ -751,7 +751,7 @@ pnpm test
 ```bash
 git add pnpm-lock.yaml
 git commit -m "fix(deps): update dependencies to resolve CVEs"
-git push
+gt submit --no-interactive
 ```
 
 **Escalation:** If vulnerabilities cannot be resolved (no patch available):
@@ -1034,16 +1034,16 @@ git log HEAD..upstream/main --oneline
 **Remediation:**
 
 ```bash
-# Sync fork with upstream
+# Sync fork with upstream — operator procedure, runs outside Claude Code
 git fetch upstream
 git checkout main
 git merge upstream/main
-git push origin main
+gt submit --no-interactive
 
 # Rebase feature branch
 git checkout feature-branch
 git rebase main
-git push --force-with-lease
+gt submit --no-interactive
 ```
 
 ---
@@ -1288,10 +1288,10 @@ git revert <commit-sha>
 # Verify revert fixes validation
 pnpm validate:schemas
 
-# Push revert
-git push origin main
+# Push revert — operator procedure, runs outside Claude Code
+gt submit --no-interactive
 
-# Delete incorrect git tag if created
+# Delete incorrect git tag if created (tag operations — not managed by Graphite)
 git tag -d v2.0.0
 git push origin :refs/tags/v2.0.0
 ```
@@ -1314,7 +1314,7 @@ pnpm validate:schemas
 # Commit correction
 git add .claude-plugin/marketplace.json
 git commit -m "fix: correct text-analyzer version to 1.3.1"
-git push origin main
+gt submit --no-interactive
 ```
 
 #### Option 3: Restore from Backup
@@ -1336,7 +1336,7 @@ pnpm validate:schemas
 # Commit restoration
 git add .claude-plugin/marketplace.json
 git commit -m "fix: restore marketplace.json from previous commit"
-git push origin main
+gt submit --no-interactive
 ```
 
 ### Post-Rollback Actions
