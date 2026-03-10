@@ -70,7 +70,7 @@ session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
 
 ## Plugin Components
 
-### Commands (8)
+### Commands (9)
 
 - `/devin:setup` — Validate credentials and permissions for the V3 API
 - `/devin:delegate` — Create a Devin session with task prompt, tags, ACU limit
@@ -80,6 +80,7 @@ session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
 - `/devin:wiki` — Query DeepWiki/Devin Wiki about a repository
 - `/devin:archive` — Archive a session (hides from default listing)
 - `/devin:tag` — Add, remove, or list session tags
+- `/devin:review-prs` — Discover Devin PRs for current repo, review, and remediate
 
 ### Agents (1)
 
@@ -115,6 +116,7 @@ session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
 | Research repo | `/devin:wiki` | — | Command for quick queries |
 | Archive session | `/devin:archive` | — | Clean up completed sessions |
 | Manage tags | `/devin:tag` | — | Organize sessions by project/sprint |
+| Review Devin PRs | `/devin:review-prs` | — | Discover, review, and remediate all Devin PRs for current repo |
 
 ## Known Limitations
 

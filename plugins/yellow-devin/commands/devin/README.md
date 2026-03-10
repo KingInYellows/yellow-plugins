@@ -15,6 +15,7 @@ progress, send messages, and research codebases.
 | `/devin:wiki` | Query DeepWiki or Devin Wiki about a repository's architecture and patterns. | `<question> [--repo owner/repo]` | `/devin:wiki How does authentication work --repo acme/backend` |
 | `/devin:archive` | Archive a session to hide it from the default status listing. | `<session-id>` | `/devin:archive abc123` |
 | `/devin:tag` | Add, remove, or list tags on a session. | `<session-id> <add\|remove\|list> [tags...]` | `/devin:tag abc123 add sprint-42 bug-fix` |
+| `/devin:review-prs` | Discover Devin PRs for current repo, review with multi-agent pipeline, and remediate. | `[--tag TAG] [--session SESSION_ID]` | `/devin:review-prs --tag sprint-42` |
 
 ## Prerequisites
 
