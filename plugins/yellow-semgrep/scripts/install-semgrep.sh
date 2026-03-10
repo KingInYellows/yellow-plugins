@@ -106,7 +106,9 @@ if command -v semgrep >/dev/null 2>&1; then
       pip_cmd=(pip)
     fi
     printf '[yellow-semgrep] Upgrading semgrep via %s...\n' "${pip_cmd[*]}"
-    if ! "${pip_cmd[@]}" install --upgrade semgrep 2>&1; then
+    pip_upgrade_output=""
+    if ! pip_upgrade_output=$("${pip_cmd[@]}" install --upgrade semgrep 2>&1); then
+      printf '%s\n' "$pip_upgrade_output" >&2
       warning "pip upgrade failed. Try manually: pip install --upgrade semgrep"
     fi
   else
