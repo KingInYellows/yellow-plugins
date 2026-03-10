@@ -28,7 +28,7 @@ per stack item.
 - **Depends on:** (none)
 - **Linear:** ENG-123
 
-### 2. feat/branch-slug-two
+### 2. fix/branch-slug-two
 - **Type:** fix
 - **Description:** Short description of what this PR does
 - **Scope:** path/to/file3.ts
