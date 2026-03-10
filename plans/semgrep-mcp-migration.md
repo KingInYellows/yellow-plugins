@@ -90,6 +90,8 @@ All endpoints (`/api/v1/me`, `/deployments`, `/deployments/{slug}/findings`,
   ```bash
   installed=$(semgrep --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
   min="1.146.0"
+  # Note: sort -V requires GNU coreutils or a compatible sort (macOS, FreeBSD, OpenBSD).
+  # Not portable to all BSDs (e.g. NetBSD). Acceptable here since setup targets Linux/macOS.
   if [ "$(printf '%s\n' "$min" "$installed" | sort -V | head -1)" != "$min" ]; then
     # installed < min — warn that MCP features require upgrade
   fi

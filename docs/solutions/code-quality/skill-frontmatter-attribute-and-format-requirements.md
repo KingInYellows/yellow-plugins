@@ -250,9 +250,9 @@ grep -rA1 '^description: [^"'"'"'>|]' plugins/*/agents/*.md plugins/*/skills/*/*
 | `>` (folded) | `description: >` | Broken (PR #23) |
 | `>-` (folded strip) | `description: >-` | Broken (PR #139) |
 | `>+` (folded keep) | `description: >+` | Broken (presumed) |
-| `\|` (literal) | `description: \|` | Broken (PR #23) |
-| `\|-` (literal strip) | `description: \|-` | Broken (presumed) |
-| `\|+` (literal keep) | `description: \|+` | Broken (presumed) |
+| `|` (literal) | `description: |` | Broken (PR #23) |
+| `|-` (literal strip) | `description: |-` | Broken (presumed) |
+| `|+` (literal keep) | `description: |+` | Broken (presumed) |
 | Multi-line single-quoted | `description: 'text\n  cont'` | Broken (PR #70) |
 | Multi-line bare | `description: text\n  cont` | Broken (PR #139) |
 | Single-line double-quoted | `description: "text"` | **Working** |
