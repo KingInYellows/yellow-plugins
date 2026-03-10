@@ -1,10 +1,12 @@
 ---
 name: gt-stack-plan
-description: 'Plan a series of stacked PRs for a feature, ordered by dependency'
+description: 'Decompose a feature into stacked PRs, ordered by dependency (plan-only)'
 argument-hint: '[feature-description or plan-file-path]'
 allowed-tools:
   - Bash
   - Read
+  - Write
+  - Edit
   - Glob
   - Grep
   - Task
@@ -61,8 +63,8 @@ extract issue IDs and titles:
 ```
 
 Parse each line matching `- <ID>: <title>` and store the issue-to-title mapping.
-These will be used in Phase 2 for branch naming and in Phase 3 for the mapping
-table.
+These will be used in Phase 2 for branch naming and included as `Linear:` fields
+in the `## Stack Decomposition` output.
 
 ### 2. Explore the Codebase
 
@@ -76,18 +78,14 @@ Use Glob and Grep to understand the project structure:
 Use the Task tool with `subagent_type: "Explore"` if the scope is large and
 requires deep exploration.
 
-### 3. Check Current Stack State
-
-```bash
-gt log short
-```
+### 3. Identify Trunk Branch
 
 ```bash
 gt trunk
 ```
 
-Note the current branch position — the stack will be planned on top of the
-current branch.
+Record the trunk branch name — it will be set as `stack-trunk` in the
+decomposition metadata.
 
 ## Phase 2: Design the Stack
 
@@ -108,7 +106,7 @@ PR should:
 - If the natural decomposition requires many-to-one (multiple issues addressed
   by a single PR), present the deviation to the user via `AskUserQuestion` and
   confirm before proceeding.
-- Include the issue ID in the `gt create` scaffold commit message.
+- Include the issue ID in the decomposition output as a `Linear:` field.
 
 **When no Linear issues are detected**, use common layering patterns:
 
@@ -125,8 +123,6 @@ Output the plan in this format:
 
 ```
 Stack Plan: <feature name>
-
-Current position: <current branch>
 
 ┌─ <trunk branch>
 ├── 1. <type>/<branch-slug>
@@ -157,82 +153,57 @@ Current position: <current branch>
 
 Use AskUserQuestion to ask the user:
 
-- "Create these branches now (Recommended)" — scaffold all branches with empty
-  commits
-- "Adjust the plan" — let the user modify before creating
-- "Save plan only" — write the plan to `.gt-stack-plan.md` in the repo root and
-  display the path
+- "Save to plan (Recommended)" — write the `## Stack Decomposition` section to
+  the plan file (if a plan file was provided as input) or to `.gt-stack-plan.md`
+  in the repo root (if invoked standalone)
+- "Adjust the plan" — let the user modify before saving
 - "Cancel"
 
-### If "Save plan only"
+## Phase 3: Write Stack Decomposition
 
-Write the formatted stack plan (the output from Phase 2 Step 2) to
-`.gt-stack-plan.md` in the repository root:
+### 1. Build the Structured Decomposition
 
-```bash
-cat > .gt-stack-plan.md << 'EOF'
-<stack plan content here>
-EOF
-echo "Stack plan saved to .gt-stack-plan.md"
+Convert the visual stack plan from Phase 2 Step 2 into the structured
+`## Stack Decomposition` format defined in `output-styles/stack-decomposition.md`.
+
+For each stack item, produce:
+
+```markdown
+### N. type/branch-slug
+- **Type:** <conventional commit type>
+- **Description:** <one-line summary for PR title>
+- **Scope:** <comma-separated file paths or directories>
+- **Tasks:** <comma-separated plan task IDs, e.g., 1.1, 1.2>
+- **Depends on:** (none) or #N
+- **Linear:** <issue ID, if detected in Phase 1 Step 1b>
 ```
 
-Then exit without creating any branches.
+Set `<!-- stack-topology: linear|parallel|mixed -->` based on the dependency
+graph. Set `<!-- stack-trunk: -->` to the trunk branch from Phase 1 Step 3.
 
-## Phase 3: Create Branches (if confirmed)
+### 2. Determine Output Destination
 
-### 1. Scaffold the Stack
+- **If a plan file was provided as input** (`$ARGUMENTS` ended with `.md`):
+  append the `## Stack Decomposition` section to that plan file. If the section
+  already exists in the file, replace it entirely (do not duplicate). Read the
+  file first, identify the exact text from `## Stack Decomposition` through to
+  the next `## ` heading (exclusive) or end of file, then pass that entire block
+  as `old_string` to the Edit tool with the new decomposition as `new_string`.
+- **If invoked standalone** (plain text or no arguments): write to
+  `.gt-stack-plan.md` in the repo root using the Write tool.
 
-For each PR in the plan, starting from the bottom of the stack:
-
-```bash
-gt create "<branch-name>" -m "<commit-type>: scaffold for <description>"
-```
-
-**After each `gt create`**, verify it succeeded before proceeding to the next
-branch. If a branch creation fails, stop immediately and report:
-
-- Which branches were successfully created
-- Which branch failed and why
-- The current stack state via `gt log short`
-
-Do not continue creating branches on a broken stack.
-
-This creates the branch chain in Graphite. Each subsequent `gt create` stacks on
-top of the previous branch automatically.
-
-### 2. Show the Created Stack
-
-```bash
-gt log short
-```
-
-### 3. Output Mapping Table (if Linear issues detected)
-
-When Linear issues were used for branch naming, output the issue-to-branch
-mapping:
-
-```
-Stack created:
-Branch                        | Linear Issue
-feat/ENG-123-add-auth-model   | ENG-123
-feat/ENG-456-add-auth-api     | ENG-456
-```
-
-### 4. Output Next Steps
+### 3. Output Next Steps
 
 Tell the user:
 
-- Which branch they're currently on (the top of the new stack)
-- How to navigate: `gt checkout <branch>` or `gt up`/`gt down`
-- How to start working: begin on the bottom branch and work up
-- How to submit when ready: `gt submit --no-interactive` or `/smart-submit`
-- If Linear issues present: "Work through the stack bottom-up with
-  `/workflows:work plans/<name>.md`"
+- Where the decomposition was saved (plan file path or `.gt-stack-plan.md`)
+- "Run `/workflows:work <path>` to execute the stack bottom-up"
+- If Linear issues present: list the issue-to-branch mapping
 
 ## Success Criteria
 
 - Feature broken into small, dependency-ordered PRs
 - Each PR has a clear scope and conventional commit type
 - Stack plan presented clearly with dependency chain
-- Branches created in correct order via Graphite (if user confirms)
-- User understands how to navigate and work on the stack
+- Decomposition saved in structured format to the target file
+- No branches created — decomposition is plan-only
