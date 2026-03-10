@@ -18,6 +18,17 @@ current repository. This command does not write any files.
 Run a single Bash call:
 
 ```bash
+version_gte() {
+  local IFS=.
+  local i a=($1) b=($2)
+  for ((i=0; i<${#b[@]}; i++)); do
+    local av="${a[i]:-0}" bv="${b[i]:-0}"
+    if ((av > bv)); then return 0; fi
+    if ((av < bv)); then return 1; fi
+  done
+  return 0
+}
+
 printf '=== Prerequisites ===\n'
 if command -v gt >/dev/null 2>&1; then
   gt_version_raw=$(gt --version 2>/dev/null | head -n1 || true)
@@ -26,17 +37,10 @@ if command -v gt >/dev/null 2>&1; then
     gt_ver=$(printf '%s' "$gt_version_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     if [ -z "$gt_ver" ]; then
       printf 'mcp_server:    UNKNOWN (could not parse version from: %s)\n' "$gt_version_raw"
+    elif version_gte "$gt_ver" "1.6.7"; then
+      printf 'mcp_server:    ok (gt >= 1.6.7)\n'
     else
-      gt_major=$(printf '%s' "$gt_ver" | cut -d. -f1)
-      gt_minor=$(printf '%s' "$gt_ver" | cut -d. -f2)
-      gt_patch=$(printf '%s' "$gt_ver" | cut -d. -f3)
-      if [ "${gt_major:-0}" -gt 1 ] 2>/dev/null || \
-         { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -gt 6 ]; } 2>/dev/null || \
-         { [ "${gt_major:-0}" -eq 1 ] && [ "${gt_minor:-0}" -eq 6 ] && [ "${gt_patch:-0}" -ge 7 ]; } 2>/dev/null; then
-        printf 'mcp_server:    ok (gt >= 1.6.7)\n'
-      else
-        printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\n' "$gt_ver"
-      fi
+      printf 'mcp_server:    UPGRADE NEEDED (current: %s, need 1.6.7+)\n' "$gt_ver"
     fi
   else
     printf 'gt:            ok (version unknown)\n'
@@ -88,8 +92,16 @@ done
 
 **Warnings (informational, do not block setup):**
 
-- `mcp_server` UPGRADE NEEDED: "Graphite MCP server requires gt v1.6.7+. Run `npm i -g @withgraphite/graphite-cli@latest` to upgrade, or see https://graphite.dev/docs/cli. Existing CLI commands work without it."
-- `mcp_server` SKIPPED or UNKNOWN: Implicitly covered by the `gt` missing or version check above — no separate action needed.
+- `mcp_server` UPGRADE NEEDED: "Graphite MCP server requires gt v1.6.7+.
+  Run `npm i -g @withgraphite/graphite-cli@latest` to upgrade, or see the
+  [Graphite CLI docs](https://graphite.dev/docs/cli). Existing CLI commands
+  work without it."
+- `mcp_server` SKIPPED: "The MCP server check was skipped because `gt` is
+  missing. Install Graphite CLI, then re-run `/gt-setup`."
+- `mcp_server` UNKNOWN: "MCP server status could not be determined. Run
+  `gt --version` to confirm your Graphite CLI version. If the command fails or
+  shows an unexpected format, reinstall or upgrade `gt`, then re-run
+  `/gt-setup`."
 
 ### Step 3: Report
 

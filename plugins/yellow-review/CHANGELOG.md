@@ -1,6 +1,20 @@
 # Changelog
 
-## 1.2.0
+All notable changes to this plugin are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## Unreleased
+
+_No unreleased changes yet._
+
+---
+
+## [1.2.0] - 2026-03-10
 
 ### Minor Changes
 
@@ -15,21 +29,6 @@
   Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add MCP warmup
   and retry-once patterns to all consuming commands for ruvector integration
   consistency. Harden install.sh and setup.md to require global binary in PATH.
-
-All notable changes to this plugin are documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
----
-
-## Unreleased
-
-### Added
-
-- Add `/review:setup` to validate local review prerequisites and optional
-  yellow-core integration before reviewing PRs.
 
 ---
 

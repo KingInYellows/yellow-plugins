@@ -9,25 +9,25 @@ to optionally consume for richer PR/stack data.
 
 ## Implementation
 
-- [ ] **Step 1: Add `mcpServers.graphite` to plugin.json**
+- [x] **Step 1: Add `mcpServers.graphite` to plugin.json**
   - File: `plugins/gt-workflow/.claude-plugin/plugin.json`
   - Add `mcpServers` block with stdio transport: `"command": "gt", "args": ["mcp"]`
   - Pattern reference: yellow-research uses `"command"` + `"args"` for stdio MCPs
 
-- [ ] **Step 2: Extend `/gt-setup` with version check**
+- [x] **Step 2: Extend `/gt-setup` with version check**
   - File: `plugins/gt-workflow/commands/gt-setup.md`
   - In Step 1 bash block: parse `gt --version` output, extract semver, compare against 1.6.7
   - Add `mcp_server` line to prerequisites output: `ok (v1.6.7+)` or `UPGRADE NEEDED (current: vX.Y.Z, need 1.6.7+)`
   - In Step 2: treat version < 1.6.7 as a **warning** (not a hard stop) — "Upgrade gt to v1.6.7+ to unlock MCP features"
   - In Step 3: add `MCP Server:  available` or `MCP Server:  unavailable (gt < 1.6.7)` to success report
 
-- [ ] **Step 3: Update CLAUDE.md MCP integration section**
+- [x] **Step 3: Update CLAUDE.md MCP integration section**
   - File: `plugins/gt-workflow/CLAUDE.md`
   - Update the `### MCP Tool Integration` section to document the Graphite MCP server
   - Note the `mcp__plugin_gt-workflow_graphite__` tool prefix convention
   - Note that actual tool names must be discovered empirically via ToolSearch after installation
 
-- [ ] **Step 4: Bump version and changeset**
+- [x] **Step 4: Bump version and changeset**
   - Run `pnpm changeset` — minor bump (new additive capability)
   - Run `pnpm apply:changesets` to sync versions
 
