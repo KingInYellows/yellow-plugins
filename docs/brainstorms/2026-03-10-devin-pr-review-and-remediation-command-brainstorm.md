@@ -26,7 +26,7 @@ Devin to apply fixes.
 ### Workflow Steps
 
 1. **Discover** -- Query Devin V3 API for recent sessions (`GET
-   ${ORG_URL}/sessions?first=50`). Client-side filter by matching
+   ${ORG_URL}/sessions?first=200`). Client-side filter by matching
    `pull_requests` URLs against the current repo's `owner/repo` (extracted from
    `git remote get-url origin`). The API does not support server-side repo
    filtering, so this must be done post-fetch. Paginate if needed.
