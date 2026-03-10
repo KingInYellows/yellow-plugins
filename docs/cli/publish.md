@@ -310,7 +310,7 @@ If using HTTPS, configure a PAT:
 # Configure PAT as credential helper
 git config --global credential.helper store
 
-# Push once to cache credentials (or use gt submit --no-interactive)
+# Push once to cache credentials
 git push origin main
 ```
 

@@ -1038,12 +1038,12 @@ git log HEAD..upstream/main --oneline
 git fetch upstream
 git checkout main
 git merge upstream/main
-gt submit --no-interactive
+git push origin main  # direct push to main (not managed by Graphite)
 
-# Rebase feature branch
+# Rebase feature branch (or use gt submit --no-interactive if branch is Graphite-tracked)
 git checkout feature-branch
 git rebase main
-gt submit --no-interactive
+git push --force-with-lease
 ```
 
 ---
@@ -1288,8 +1288,8 @@ git revert <commit-sha>
 # Verify revert fixes validation
 pnpm validate:schemas
 
-# Push revert — operator procedure, runs outside Claude Code
-gt submit --no-interactive
+# Push revert directly to main (operator procedure — not managed by Graphite)
+git push origin main
 
 # Delete incorrect git tag if created (tag operations — not managed by Graphite)
 git tag -d v2.0.0
