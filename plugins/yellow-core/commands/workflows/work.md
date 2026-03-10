@@ -58,6 +58,27 @@ assurance.
    - Identify dependencies
    - Understand acceptance criteria
 
+2a. Detect stack decomposition:
+
+   Search the plan content for a `## Stack Decomposition` section. If found:
+
+   - Parse HTML comment metadata: `<!-- stack-topology: linear|parallel|mixed -->`
+     and `<!-- stack-trunk: main -->`
+   - Parse each `### N. type/branch-name` subsection, extracting:
+     - Item number, branch name (from heading)
+     - **Type**, **Description**, **Scope**, **Tasks**, **Depends on**, **Linear**
+       (from bullet fields)
+   - Store as structured data for the stack execution loop
+
+   Also check for a `## Stack Progress` section. If found:
+   - Parse completed items (lines with `- [x]`)
+   - Cross-reference with `gt log short` to verify branches exist
+   - These items will be skipped during execution
+
+   **If no `## Stack Decomposition` section is found:** proceed with single-branch
+   execution (the existing behavior in Phases 2-5 below). Zero behavioral change
+   for existing plans without decomposition.
+
 2b. Query institutional memory (if ruvector available):
 
    1. If `.ruvector/` does not exist in the project root: proceed to Step 3
@@ -107,6 +128,13 @@ assurance.
    ```
 
 5. Branch decision:
+
+   **Stack mode** (if `## Stack Decomposition` was detected in step 2a):
+   - Skip individual branch creation here. Branches are created per-item in
+     the Stack Execution Loop (Phase 1b below).
+   - If not already on trunk, confirm with user before proceeding.
+
+   **Single-branch mode** (no decomposition):
    - **If on feature branch:** Ask user: "Continue on this branch or create new
      one?"
    - **If on trunk (main/master):** Create new feature branch:
@@ -141,6 +169,86 @@ assurance.
    ```
 
 7. Display task list with TaskList.
+
+## Phase 1b: Stack Execution Loop (stack mode only)
+
+**Objective:** Execute stack items bottom-up, creating branches just-in-time.
+
+Skip this phase entirely if no `## Stack Decomposition` was detected. Proceed
+directly to Phase 2 for single-branch execution.
+
+**Steps:**
+
+For each incomplete stack item (not marked `[x]` in `## Stack Progress`),
+in order from bottom (item 1) to top:
+
+1. **Create the branch:**
+
+   - **Linear topology:** `gt create "<branch-name>"` (automatically stacks
+     on top of the previous branch)
+   - **Parallel topology:** First `gt checkout <trunk>` (from
+     `<!-- stack-trunk: -->` metadata), then `gt create "<branch-name>"`
+
+   If `gt create` fails (name collision, Graphite error):
+   - Stop immediately
+   - Report which items completed, which failed, and the current stack state
+     via `gt log short`
+   - Ask user how to proceed via AskUserQuestion:
+     "Branch creation failed for [item]. [Retry with different name / Skip this
+     item / Stop here]"
+
+2. **Filter tasks:** From the plan's `## Implementation Plan`, select only the
+   tasks whose IDs appear in this item's `Tasks:` field. Create TaskCreate
+   entries for these tasks only.
+
+3. **Execute tasks:** Follow the same implementation logic as Phase 2 below
+   (read files, find patterns, implement, write tests, commit). All commits for
+   this item use the branch created in step 1.
+
+4. **Commit and submit:**
+
+   ```bash
+   gt modify -m "<type>: <description>"
+   gt submit --no-interactive
+   ```
+
+   Where `<type>` and `<description>` come from the stack item fields.
+
+5. **Run tests** scoped to changed files. If tests fail:
+   - **Linear topology:** Stop and ask user (item N+1 depends on N)
+   - **Parallel topology:** Ask user: "Skip to next item or fix and retry?"
+
+6. **Update progress:** Write or update `## Stack Progress` in the plan file
+   using the Edit tool:
+
+   ```markdown
+   ## Stack Progress
+   <!-- Updated by workflows:work. Do not edit manually. -->
+   - [x] 1. feat/branch-one (completed YYYY-MM-DD)
+   - [ ] 2. feat/branch-two
+   ```
+
+   If the section does not exist yet, insert it after `## Stack Decomposition`.
+   If it exists, update the relevant line from `- [ ]` to `- [x]` with the
+   completion date.
+
+7. **Checkpoint:** Use AskUserQuestion:
+
+   "Item N of M complete ([branch-name] submitted). What next?"
+
+   Options:
+   - "Continue to next item" — proceed to item N+1
+   - "Continue all remaining" — skip future checkpoints, auto-proceed
+   - "Revise remaining decomposition" — pause for the user to edit the plan
+   - "Stop here" — exit; completed items are already submitted
+
+   If the user previously selected "Continue all remaining", skip this
+   checkpoint for subsequent items.
+
+After all stack items are complete, skip Phase 2 and proceed directly to
+Phase 3 (Quality Check) in stack summary mode.
+
+---
 
 ## Phase 2: Execute
 
@@ -265,6 +373,12 @@ assurance.
 
 **Objective:** Ensure code quality before submission.
 
+**Stack mode note:** In stack mode, lightweight quality checks (tests only) run
+per-item during Phase 1b step 5. The full review agent suite below runs only
+once, after all stack items are complete. It reviews the cumulative diff across
+the entire stack. To run the full suite on a specific item's branch, the user
+can request it at a Phase 1b checkpoint.
+
 **Steps:**
 
 1. Run full test suite:
@@ -337,6 +451,21 @@ assurance.
 ## Phase 4: Ship It
 
 **Objective:** Submit work for review via Graphite.
+
+**Stack mode:** In stack mode, each item was already submitted during Phase 1b
+step 4. Phase 4 becomes a summary phase:
+
+1. Show the completed stack: `gt log short`
+2. List all submitted PRs with their URLs:
+   ```bash
+   gt log short --no-interactive
+   ```
+3. Verify all acceptance criteria from the plan are met across the full stack
+4. Run the Post-Submit Linear Sync (step 4 below) for each branch that has a
+   Linear issue ID
+5. Skip directly to Phase 5 (Review)
+
+**Single-branch mode (steps below):**
 
 **Steps:**
 
@@ -473,6 +602,21 @@ assurance.
 - **Document decisions:** Add comments explaining non-obvious choices
 - **Keep PRs focused:** If scope grows, split into multiple PRs
 - **Be thorough:** Quality over speed
+
+### Stack Execution Guidelines
+
+- **Bottom-up execution:** Always work from item 1 upward. Each branch builds
+  on the previous one (linear topology) or starts fresh from trunk (parallel).
+- **Just-in-time branches:** Never pre-create branches. Create each branch only
+  when starting that item's work.
+- **Progress persistence:** `## Stack Progress` is written to the plan file
+  after each item. This enables resume across sessions if context is exhausted.
+- **Checkpoints are safe stops:** At each checkpoint, all previous items are
+  already submitted. Stopping mid-stack leaves the codebase in a clean state.
+- **Do not sync mid-stack:** Avoid `gt repo sync` or `gt stack restack` between
+  items unless explicitly requested. Stacked PRs should be based on each other.
+- **Changeset strategy:** One changeset in the bottom branch covers the whole
+  feature. Subsequent branches inherit it.
 
 ## Common Graphite Commands
 
