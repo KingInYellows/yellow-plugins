@@ -186,13 +186,92 @@ grep -rA1 "^description: '" plugins/*/agents/*.md plugins/*/skills/*/*.md \
   | grep -B1 "^  "
 ```
 
+---
+
+## Update — 2026-03-08
+
+### New Variant: `>-` (Folded Block Scalar with Strip Chomping)
+
+PR #139 discovered 4 additional agent files using `>-` (folded scalar with
+trailing-newline stripping) or bare multi-line syntax in their `description:`
+fields. This is the same class of failure as `>` and `|` but uses less common
+YAML syntax that was not caught by the original fix or the PR #69/70 updates.
+
+**Broken (PR #139):**
+
+```yaml
+---
+name: document-reviewer
+description: >-
+  Reviews documentation changes for accuracy, completeness, and adherence
+  to project conventions. Checks cross-references and link validity.
+---
+```
+
+Claude Code's line-by-line parser treats `>-` the same as `>` — it reads only
+`description: >-` as the value (an empty/malformed string), and all continuation
+lines become orphaned unknown attributes that are silently dropped.
+
+**Fixed:**
+
+```yaml
+---
+name: document-reviewer
+description: "Reviews documentation changes for accuracy, completeness, and adherence to project conventions. Checks cross-references and link validity."
+---
+```
+
+**Affected files (PR #139):**
+
+| File | Scalar Type |
+|------|-------------|
+| `document-reviewer.md` | `>-` |
+| `project-dashboard.md` | `>-` |
+| `code-researcher.md` | `>-` |
+| `research-conductor.md` | bare multi-line |
+
+### Updated Detection Grep
+
+The original grep patterns did not catch `>-` or `>+` variants. Updated:
+
+```bash
+# All folded/literal scalar variants (>, >-, >+, |, |-, |+)
+grep -rE '^description: [>|][-+]?$' plugins/*/agents/*.md plugins/*/skills/*/*.md
+
+# Bare multi-line (no quotes, value continues on next line with indentation)
+grep -rA1 '^description: [^"'"'"'>|]' plugins/*/agents/*.md plugins/*/skills/*/*.md \
+  | grep -B1 '^\s\s'
+```
+
+### Complete Disallowed Syntax Reference
+
+| Syntax | Example | Status |
+|--------|---------|--------|
+| `>` (folded) | `description: >` | Broken (PR #23) |
+| `>-` (folded strip) | `description: >-` | Broken (PR #139) |
+| `>+` (folded keep) | `description: >+` | Broken (presumed) |
+| `\|` (literal) | `description: \|` | Broken (PR #23) |
+| `\|-` (literal strip) | `description: \|-` | Broken (presumed) |
+| `\|+` (literal keep) | `description: \|+` | Broken (presumed) |
+| Multi-line single-quoted | `description: 'text\n  cont'` | Broken (PR #70) |
+| Multi-line bare | `description: text\n  cont` | Broken (PR #139) |
+| Single-line double-quoted | `description: "text"` | **Working** |
+| Single-line bare | `description: text` | Working |
+| Single-line single-quoted | `description: 'text'` | Working |
+
+**Rule:** The only safe formats are single-line values. Double-quoted
+single-line strings are the canonical recommendation because they handle
+special characters predictably.
+
 ## Prevention
 
 1. **Use the correct attribute name:** Always `user-invokable` (with k)
-2. **Keep frontmatter values single-line:** No `>`, `|`, or multi-line YAML
-   constructs in any `.md` plugin file (skills AND agents)
-3. **On-touch check:** Run the grep above whenever any agent or skill `.md` is
-   modified — folded scalars may be pre-existing and surface only on next touch
+2. **Keep frontmatter values single-line:** No `>`, `>-`, `>+`, `|`, `|-`,
+   `|+`, or multi-line YAML constructs in any `.md` plugin file (skills AND
+   agents)
+3. **On-touch check:** Run the updated grep above whenever any agent or skill
+   `.md` is modified — folded scalars may be pre-existing and surface only on
+   next touch
 4. **Check VS Code diagnostics** before committing changes to SKILL.md files
 5. **Update `create-agent-skills` SKILL.md** when attribute names change — it's
    the documentation source other plugin authors reference
@@ -202,8 +281,13 @@ grep -rA1 "^description: '" plugins/*/agents/*.md plugins/*/skills/*/*.md \
 ## Cross-References
 
 - PR #23: Marketplace readiness audit (where fix was applied)
+- PR #69: Agent description folded scalar fix
+- PR #70: Multi-line single-quoted string fix
+- PR #139: `>-` folded strip variant and bare multi-line fix
 - `plugins/yellow-core/skills/create-agent-skills/SKILL.md`: Canonical
   documentation for skill authoring
 - `docs/solutions/code-quality/parallel-multi-agent-review-orchestration.md`:
   Related plugin quality patterns
+- `docs/solutions/code-quality/automated-bot-review-false-positives.md`:
+  Bot false positives on frontmatter patterns
 - Memory: `Plugin Authoring Quality Rules` section updated with new rules
