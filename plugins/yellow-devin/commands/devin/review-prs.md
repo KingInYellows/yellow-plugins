@@ -177,7 +177,10 @@ PR_MAP: {
 Extract PR numbers from URLs:
 
 ```bash
-PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+# Normalize PR URL (strip query/fragment and trailing slash) and extract PR number
+CLEAN_URL="${PR_URL%%[\?#]*}"
+CLEAN_URL="${CLEAN_URL%/}"
+PR_NUM="${CLEAN_URL##*/}"
 ```
 
 For each unique PR, check current state via `gh pr view`:
@@ -238,7 +241,7 @@ Reviewing PR N/M: #142 'Add auth middleware' [session: abc123]
 **5a. Checkout:**
 
 ```bash
-gt checkout "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+gt checkout "$HEAD_REF_NAME" 2>/dev/null || git checkout "$HEAD_REF_NAME"
 ```
 
 **5b. Re-validate PR state (TOCTOU protection):**
