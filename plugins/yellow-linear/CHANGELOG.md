@@ -10,10 +10,7 @@ and this project adheres to
 
 ## Unreleased
 
-### Added
-
-- Add `/linear:setup` to validate Linear MCP visibility, first-use OAuth
-  readiness, and Graphite availability.
+_No unreleased changes yet._
 
 ---
 
@@ -25,6 +22,8 @@ and this project adheres to
   Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Expand
   marketplace setup coverage with dedicated setup commands, repository-root
   aware setup checks, and stricter setup validation guardrails.
+- Add `/linear:setup` to validate Linear MCP visibility, first-use OAuth
+  readiness, and Graphite availability.
 
 ---
 
