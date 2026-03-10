@@ -1,13 +1,16 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-# install-semgrep.sh — Install Semgrep CLI for yellow-semgrep plugin
+# install-semgrep.sh — Install or upgrade Semgrep CLI for yellow-semgrep plugin
 # Usage: bash install-semgrep.sh
 
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
 readonly NC='\033[0m'
+
+# Minimum version required for built-in MCP server (semgrep mcp subcommand)
+readonly MIN_VERSION="1.146.0"
 
 error() {
   printf '%bError: %s%b\n' "$RED" "$1" "$NC" >&2
@@ -20,6 +23,18 @@ warning() {
 
 success() {
   printf '%b%s%b\n' "$GREEN" "$1" "$NC"
+}
+
+# Compare two semver strings. Returns 0 if $1 >= $2, 1 otherwise.
+version_gte() {
+  local IFS=.
+  local i a=($1) b=($2)
+  for ((i=0; i<${#b[@]}; i++)); do
+    local av="${a[i]:-0}" bv="${b[i]:-0}"
+    if ((av > bv)); then return 0; fi
+    if ((av < bv)); then return 1; fi
+  done
+  return 0
 }
 
 cleanup() {
@@ -38,8 +53,56 @@ trap cleanup EXIT
 # --- Check if already installed ---
 if command -v semgrep >/dev/null 2>&1; then
   installed_version=$(semgrep --version 2>/dev/null || true)
-  success "semgrep already installed: ${installed_version:-unknown version}"
-  exit 0
+  if [ -n "$installed_version" ] && version_gte "$installed_version" "$MIN_VERSION"; then
+    success "semgrep ${installed_version} already installed (>= ${MIN_VERSION})"
+    exit 0
+  fi
+
+  # Installed but below minimum version — offer upgrade
+  if [ -n "$installed_version" ]; then
+    printf '[yellow-semgrep] semgrep %s installed but MCP support requires >= %s\n' "$installed_version" "$MIN_VERSION"
+    printf '[yellow-semgrep] Attempting upgrade...\n'
+
+    INSTALL_METHOD=""
+    if command -v pipx >/dev/null 2>&1; then
+      INSTALL_METHOD="pipx"
+      printf '[yellow-semgrep] Upgrading semgrep via pipx...\n'
+      if ! pipx upgrade semgrep 2>&1; then
+        # pipx upgrade fails if not installed via pipx — try reinstall
+        printf '[yellow-semgrep] pipx upgrade failed — trying pipx install...\n'
+        if ! pipx install semgrep 2>&1; then
+          warning "pipx upgrade/install failed. Try manually: pipx upgrade semgrep"
+        fi
+      fi
+    elif command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+      INSTALL_METHOD="pip"
+      if command -v python3 >/dev/null 2>&1; then
+        pip_cmd="python3 -m pip"
+      elif command -v pip3 >/dev/null 2>&1; then
+        pip_cmd="pip3"
+      else
+        pip_cmd="pip"
+      fi
+      printf '[yellow-semgrep] Upgrading semgrep via %s...\n' "$pip_cmd"
+      if ! $pip_cmd install --upgrade semgrep 2>&1; then
+        warning "pip upgrade failed. Try manually: pip install --upgrade semgrep"
+      fi
+    else
+      warning "Cannot auto-upgrade — no pipx or pip found."
+      warning "Upgrade manually: pipx upgrade semgrep"
+    fi
+
+    # Re-check version after upgrade attempt
+    upgraded_version=$(semgrep --version 2>/dev/null || true)
+    if [ -n "$upgraded_version" ] && version_gte "$upgraded_version" "$MIN_VERSION"; then
+      success "semgrep upgraded to ${upgraded_version} (>= ${MIN_VERSION})"
+      exit 0
+    fi
+
+    warning "semgrep ${upgraded_version:-${installed_version}} is below ${MIN_VERSION}."
+    warning "MCP tools will not be available. Upgrade manually: pipx upgrade semgrep"
+    exit 0
+  fi
 fi
 
 # --- Detect OS/arch ---
@@ -132,6 +195,12 @@ fi
 installed_version=$(semgrep --version 2>/dev/null || true)
 if [ -z "$installed_version" ]; then
   error "semgrep binary found but 'semgrep --version' failed. Try reinstalling."
+fi
+
+if ! version_gte "$installed_version" "$MIN_VERSION"; then
+  warning "semgrep ${installed_version} installed but MCP support requires >= ${MIN_VERSION}."
+  warning "Upgrade with: pipx upgrade semgrep"
+  warning "Scan and fix commands will work, but MCP tools will not be available."
 fi
 
 success "semgrep ${installed_version} installed successfully via ${INSTALL_METHOD}"

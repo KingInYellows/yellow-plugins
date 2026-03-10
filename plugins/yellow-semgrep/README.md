@@ -15,7 +15,7 @@ verify via re-scan, and update triage state.
 
 - `SEMGREP_APP_TOKEN` environment variable (Web API scope, `sgp_` prefix)
 - `curl` and `jq` installed
-- `semgrep` CLI installed (`pip install semgrep`)
+- `semgrep` CLI installed, version **1.146.0+** (`pipx install semgrep`)
 - Graphite CLI (`gt`) for branch management
 
 ## Setup
@@ -64,9 +64,9 @@ verify MCP tool availability.
 
 ## MCP Servers
 
-| Server | Command | Auth |
-|---|---|---|
-| semgrep | `uvx semgrep-mcp` | `SEMGREP_APP_TOKEN` env var |
+| Server | Command | Auth | Min Version |
+|---|---|---|---|
+| semgrep | `semgrep mcp` | `SEMGREP_APP_TOKEN` env var | 1.146.0+ |
 
 ## Typical Workflow
 
@@ -89,8 +89,9 @@ API scope (not CI scope) and has not expired.
 semgrep automatically via pipx (preferred) or pip. Or install manually:
 `pipx install semgrep`.
 
-**"MCP tools not found"** — The semgrep MCP server may not be running. Run
-`/semgrep:setup` to verify, or check that `uvx semgrep-mcp` is available.
+**"MCP tools not found"** — The MCP server is built into the semgrep binary
+(v1.146.0+). Ensure semgrep is up to date: `pipx upgrade semgrep`. Run
+`/semgrep:setup` to verify.
 
 **"Finding not found in 'fixing' state"** — The finding may have been resolved
 or is in a different triage state. Check `/semgrep:status` for current state.

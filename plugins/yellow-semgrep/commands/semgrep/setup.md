@@ -15,7 +15,11 @@ the deployment slug and repository name, and verify MCP tool availability.
 
 ## Workflow
 
-### Step 0: Install semgrep CLI (if missing)
+### Step 0: Install or upgrade semgrep CLI
+
+The MCP server is built into the semgrep binary (`semgrep mcp`) and requires
+version **1.146.0 or later**. This step ensures semgrep is installed and meets
+the minimum version.
 
 Check if `semgrep` is already installed:
 
@@ -25,12 +29,13 @@ command -v semgrep >/dev/null 2>&1 && printf '[yellow-semgrep] semgrep: ok (%s)\
 
 If `semgrep` is NOT found, use AskUserQuestion:
 
-> "semgrep CLI not found. Install it now? (Required for /semgrep:scan and
-> /semgrep:fix)"
+> "semgrep CLI not found. Install it now? (Required for scanning, fixing, and
+> MCP tools)"
 >
 > Options: "Yes, install semgrep" / "No, I'll install manually"
 
-If the user chooses **Yes**: run the install script:
+If the user chooses **Yes**: run the install script (handles both fresh install
+and upgrade to minimum version):
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-semgrep.sh"
@@ -56,6 +61,34 @@ Install semgrep manually using one of:
   pip install semgrep           (requires Python 3.9+)
   brew install semgrep          (macOS only)
 Then re-run /semgrep:setup
+```
+
+**If semgrep IS found**, check the version meets the minimum for MCP support:
+
+```bash
+MIN_SEMGREP_VERSION="1.146.0"
+installed_version=$(semgrep --version 2>/dev/null)
+```
+
+Compare `installed_version` against `MIN_SEMGREP_VERSION` (semver comparison).
+If below minimum, use AskUserQuestion:
+
+> "semgrep {version} is installed but MCP tools require >= 1.146.0. Upgrade
+> now?"
+>
+> Options: "Yes, upgrade semgrep" / "No, continue without MCP"
+
+If the user chooses **Yes**: run the install script (it handles upgrades):
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-semgrep.sh"
+```
+
+If the user chooses **No**: warn and continue:
+
+```
+[yellow-semgrep] Warning: semgrep < 1.146.0 — MCP tools will not be available.
+Scan and fix commands will fall back to CLI-only mode.
 ```
 
 ### Step 1: Validate Prerequisites
@@ -147,6 +180,7 @@ fi
 
 ### Step 5: Verify MCP Tools
 
+The MCP server runs via `semgrep mcp` (built into the semgrep binary, v1.146.0+).
 Use ToolSearch to discover available Semgrep MCP tools:
 
 Call ToolSearch with query `"+semgrep"` to find all Semgrep MCP tools.
@@ -163,8 +197,14 @@ Expected tools (fully qualified):
 
 Count discovered tools. If fewer than 2 core tools
 (`mcp__plugin_yellow-semgrep_semgrep__semgrep_scan`,
-`mcp__plugin_yellow-semgrep_semgrep__semgrep_findings`) are found, warn: "MCP
-server may not be running. Check that `uvx semgrep-mcp` is available."
+`mcp__plugin_yellow-semgrep_semgrep__semgrep_findings`) are found, diagnose:
+
+- If semgrep version < 1.146.0: "MCP tools require semgrep >= 1.146.0.
+  Upgrade with: `pipx upgrade semgrep`"
+- If semgrep version >= 1.146.0: "MCP server failed to start. Verify
+  SEMGREP_APP_TOKEN is set and try restarting Claude Code."
+- If semgrep not installed: "Install semgrep >= 1.146.0 for MCP support.
+  Re-run /semgrep:setup to install."
 
 ### Step 6: Report Results
 
@@ -191,6 +231,7 @@ list warnings at the bottom.
 | Condition | Message | Action |
 |---|---|---|
 | `semgrep` not found (Step 0) | AskUserQuestion: install now? | Offer install or show manual instructions |
+| `semgrep` below v1.146.0 (Step 0) | AskUserQuestion: upgrade now? | Offer upgrade or warn MCP unavailable |
 | Install script fails (Step 0) | "semgrep installation failed" | Warn, continue to Step 1 |
 | `curl` or `jq` not found | "Error: {cmd} is required" | Exit |
 | `semgrep` not found (Step 1) | "semgrep not installed — scan features limited" | Warn, continue |
@@ -201,4 +242,5 @@ list warnings at the bottom.
 | DNS/network failure | "Cannot reach semgrep.dev" | Exit |
 | No deployments | "No deployments found" | Exit |
 | No git remote | Warning only — continue | Commands needing repo will prompt |
-| MCP tools not found | Warning only — continue | Scan features may be limited |
+| MCP tools not found (version ok) | "MCP server failed to start" | Check token, restart Claude Code |
+| MCP tools not found (version low) | "Upgrade semgrep >= 1.146.0" | Warn, MCP tools unavailable |
