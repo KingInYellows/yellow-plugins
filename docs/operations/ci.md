@@ -64,20 +64,18 @@ The Yellow Plugins CI/CD system consists of two primary workflows:
 **Performance Target:** Complete in <5 minutes total, with validation jobs <60
 seconds
 
-### 2. Release Workflow (`.github/workflows/publish-release.yml`)
+### 2. Release Workflow (`.github/workflows/version-packages.yml`)
 
-**Purpose:** Automated release publishing with artifact generation **Triggers:**
+**Purpose:** Unified versioning and release publishing. **Triggers:**
 
-- Tag push matching `v[0-9]+.[0-9]+.[0-9]+` (semantic versioning)
-- Manual workflow dispatch with version input
+- Push to `main` (automatic — detects pending changesets vs publish phase)
+- Manual `workflow_dispatch` with optional `force_publish` input for recovery
 
 **Jobs:**
 
-- `validate-release` (full validation suite)
-- `build-artifacts` (tarball, SBOM, checksums)
-- `publish-release` (GitHub release creation)
-- `publish-npm` (optional NPM publish)
-- `notify` (status summary)
+- `version-or-publish` (changeset detection, Version PR creation or tag push)
+- `build-and-release` (validate versions, build artifacts, GitHub Release, optional NPM publish)
+- `notify` (failure notification)
 
 ---
 
@@ -803,8 +801,8 @@ docker run --rm -v $(pwd):/workspace yellow-plugins-ci:latest pnpm test
 # Trigger validation workflow
 gh workflow run validate-schemas.yml
 
-# Trigger release workflow
-gh workflow run publish-release.yml -f version=1.2.3 -f prerelease=false
+# Trigger release workflow (recovery mode)
+gh workflow run version-packages.yml -f force_publish=true
 
 # List workflow runs
 gh run list --workflow=validate-schemas.yml

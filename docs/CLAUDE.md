@@ -73,8 +73,10 @@ pnpm tag                    # create per-plugin git tags after version bump
 
 **Release flow (automated):** On merge to `main`, `version-packages.yml` opens a
 "chore: version packages" PR. When that PR merges, per-plugin tags
-(`yellow-core@1.1.1`) and a root catalog tag (`v1.1.2`) are created, triggering
-`publish-release.yml` to build a GitHub Release.
+(`yellow-core@1.1.1`) and a root catalog tag (`v1.1.2`) are created, and the
+build-and-release job in the same workflow builds artifacts and publishes a
+GitHub Release. Manual recovery: trigger `workflow_dispatch` with
+`force_publish=true`.
 
 **Known issue:** Claude Code's background auto-update has a bug (GH #26744) where
 it doesn't prompt users when a new version is available. Users can run

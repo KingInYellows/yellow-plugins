@@ -1,20 +1,34 @@
 name: Version Packages
 
-# Runs on every push to main. When pending .changeset/*.md files are found,
-# opens (or updates) a "chore: version packages" PR that bumps package.json,
-# plugin.json, and marketplace.json in lockstep via pnpm apply:changesets.
-# When that PR merges, the publish step creates per-plugin git tags
-# (e.g. yellow-core@1.2.0) and a root catalog tag (e.g. v1.2.1), which
-# triggers publish-release.yml to build a GitHub Release.
+# Unified release workflow — two phases in one file:
+#
+# Phase 1 (pending changesets exist): Opens or updates a "chore: version
+# packages" PR that bumps package.json, plugin.json, and marketplace.json
+# in lockstep via pnpm apply:changesets.
+#
+# Phase 2 (no pending changesets — i.e. the Version PR just merged): Creates
+# per-plugin git tags (e.g. yellow-core@1.2.0), a root catalog tag
+# (e.g. v1.2.1), builds release artifacts, and publishes a GitHub Release.
+#
+# Manual recovery: trigger workflow_dispatch with force_publish=true to skip
+# changeset detection and go straight to the publish phase.
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      force_publish:
+        description: 'Skip changeset detection and go straight to publish (for recovery)'
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: version-packages
-  # Never cancel mid-run — a partially-created PR leaves dirty state.
+  # Never cancel mid-run — a partially-created PR or half-pushed tags leave
+  # dirty state.
   cancel-in-progress: false
 
 permissions:
@@ -22,17 +36,52 @@ permissions:
   pull-requests: write
 
 jobs:
-  version:
+  # ==========================================================================
+  # PHASE DETECTION + VERSION/TAG
+  # ==========================================================================
+  version-or-publish:
     name: Version or Publish
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    outputs:
+      should_publish: ${{ steps.detect.outputs.should_publish }}
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          # Full history required for changeset to build CHANGELOG entries.
+          # Full history required for changeset to build CHANGELOG entries
+          # and for release-tags.sh to diff plugin tags.
           fetch-depth: 0
+
+      - name: Preflight — verify PR creation permissions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh api "repos/${{ github.repository }}/pulls?state=closed&per_page=1" \
+               --silent 2>/dev/null; then
+            echo "::error::GITHUB_TOKEN cannot access the pull requests API."
+            echo "::error::Enable 'Allow GitHub Actions to create and approve pull requests'"
+            echo "::error::in Settings > Actions > General > Workflow permissions."
+            exit 1
+          fi
+
+      - name: Detect phase
+        id: detect
+        run: |
+          if [ "${{ inputs.force_publish }}" == "true" ]; then
+            echo "force_publish requested — skipping changeset detection"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' -print -quit 2>/dev/null)" ]; then
+            echo "Pending changesets found — will create/update Version PR"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No pending changesets — will run publish phase"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
@@ -49,24 +98,158 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Create Version PR or tag released packages
+        if: inputs.force_publish != true
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
-          # version: pnpm apply:changesets bumps plugin package.json files
-          # and propagates to plugin.json + marketplace.json via sync-manifests.js.
-          # catalog-version.js patch then bumps the root package.json (yellow-plugins-root)
-          # which has no workspace dependencies on plugins and won't auto-bump.
-          # The catalog version always uses a patch bump because it tracks release
-          # snapshots (each merge batch), not the semver semantics of individual
-          # plugins. A single release can contain a mix of patch/minor/major plugin
-          # bumps; the catalog version simply advances by one patch per release.
+          # version: bumps plugin package.json files and propagates to
+          # plugin.json + marketplace.json via sync-manifests.js. Then
+          # catalog-version.js patch bumps the root package.json.
+          # Note: The catalog version is hardcoded to 'patch' bump because it
+          # represents a marketplace snapshot timestamp, not semantic compatibility.
+          # Each release batch gets one patch increment regardless of whether
+          # plugins had patch/minor/major bumps. See docs/operations/versioning.md.
           version: pnpm apply:changesets && node scripts/catalog-version.js patch
-
-          # publish: called after the Version Packages PR merges.
-          # Uses a multi-line shell script (see release-tags step below) for
-          # explicit error handling and targeted tag push.
+          # publish: called after the Version Packages PR merges (no pending
+          # changesets). Creates per-plugin + catalog tags.
           publish: bash scripts/ci/release-tags.sh
-
           commit: 'chore: version packages'
           title: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run release tags (force_publish recovery)
+        if: inputs.force_publish == true
+        run: bash scripts/ci/release-tags.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RECOVERY_MODE: 'true'
+
+      - name: Read catalog version
+        id: version
+        if: steps.detect.outputs.should_publish == 'true'
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          if [[ "$VERSION" == *-* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Catalog version: $VERSION"
+
+  # ==========================================================================
+  # BUILD ARTIFACTS + GITHUB RELEASE + NPM PUBLISH
+  # ==========================================================================
+  build-and-release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [version-or-publish]
+    if: needs.version-or-publish.outputs.should_publish == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # Full history needed for generate-release-notes.js changelog parsing.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: '8.15.0'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.0'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate version consistency
+        run: pnpm validate:versions
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Generate release notes
+        run: |
+          VERSION="${{ needs.version-or-publish.outputs.version }}"
+          node scripts/generate-release-notes.js "$VERSION"
+
+      - name: Create tarball archive
+        run: |
+          VERSION="${{ needs.version-or-publish.outputs.version }}"
+          mkdir -p dist-release
+          tar -czf "dist-release/yellow-plugins-v${VERSION}.tar.gz" \
+            --exclude=node_modules \
+            --exclude=.git \
+            --exclude=dist-release \
+            --exclude=.ci-metrics \
+            .
+
+      - name: Generate SBOM
+        run: |
+          mkdir -p dist-release
+          pnpm list --json --recursive > dist-release/sbom.json
+          pnpm list --recursive --depth=0 > dist-release/dependencies.txt
+
+      - name: Compute checksums
+        run: |
+          cd dist-release
+          sha256sum ./* > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@26994186c0ac3ef5cae75ac16aa32e8153525f77 # v1
+        with:
+          tag_name: v${{ needs.version-or-publish.outputs.version }}
+          name: Release v${{ needs.version-or-publish.outputs.version }}
+          body_path: release-notes.md
+          prerelease: ${{ needs.version-or-publish.outputs.is_prerelease == 'true' }}
+          draft: false
+          files: dist-release/*
+          fail_on_unmatched_files: false
+
+      - name: Publish to NPM (optional)
+        if: |
+          needs.version-or-publish.outputs.is_prerelease != 'true' &&
+          github.repository == 'kinginyellows/yellow-plugins'
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::warning::NPM_TOKEN not configured — skipping NPM publish"
+            exit 0
+          fi
+          pnpm -r publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ==========================================================================
+  # FAILURE NOTIFICATION
+  # ==========================================================================
+  notify:
+    name: Release Notification
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    needs: [version-or-publish, build-and-release]
+    if: always() && needs.version-or-publish.outputs.should_publish == 'true'
+
+    steps:
+      - name: Release status
+        run: |
+          echo "::group::Release Status"
+          echo "Version: v${{ needs.version-or-publish.outputs.version }}"
+          echo "Build & Release: ${{ needs.build-and-release.result }}"
+          echo "::endgroup::"
+
+          if [ "${{ needs.build-and-release.result }}" == "success" ]; then
+            echo "::notice::Release v${{ needs.version-or-publish.outputs.version }} published successfully"
+          else
+            echo "::error::Release failed — check the build-and-release job logs for details"
+            echo "::error::Recovery: fix the issue, then run workflow_dispatch with force_publish=true"
+            exit 1
+          fi

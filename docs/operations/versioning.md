@@ -52,9 +52,11 @@ gt modify -c -m "chore(release): bump catalog to v1.x.x"
 # 6. Run pre-flight checks
 pnpm release:check
 
-# 7. Tag and push
+# 7. Tag and push (for release tracking — tags do NOT trigger the workflow)
 git tag v1.x.x && git push --tags  # Tags are not managed by Graphite — raw git push is correct here
-# → publish-release.yml fires and creates a GitHub Release
+# → Normal path: merge the "Version Packages" PR; its push to `main` runs
+#   version-packages.yml, which builds and creates the GitHub Release.
+#   Recovery: gh workflow run version-packages.yml -f force_publish=true
 ```
 
 ## Semver Bump Rules

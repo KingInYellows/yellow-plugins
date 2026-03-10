@@ -197,7 +197,7 @@ tagging.
   ```
 
 **Reference**: `package.json` engines field,
-`.github/workflows/publish-release.yml` env vars.
+`.github/workflows/version-packages.yml` env vars.
 
 ---
 
@@ -221,7 +221,7 @@ tagging.
   # Expected: "Hi <username>! You've successfully authenticated..."
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` permissions block,
+**Reference**: `.github/workflows/version-packages.yml` permissions block,
 Section 4 security directives.
 
 ---
@@ -270,7 +270,7 @@ Section 4 security directives.
   ```
 
 **Reference**: `docs/operations/versioning.md`,
-`.github/workflows/publish-release.yml` version validation step,
+`.github/workflows/version-packages.yml` version validation step,
 `scripts/validate-versions.js`.
 
 ---
@@ -324,24 +324,21 @@ seconds median.
 
 ---
 
-### 2.2 CI Workflow Dry-Run
+### 2.2 CI Workflow Validation
 
-**Objective**: Simulate release workflow without actually publishing.
+**Objective**: Verify the release workflow runs successfully.
 
-- [ ] Trigger workflow dry-run using workflow_dispatch
+> **Warning**: `force_publish=true` is a **recovery mechanism**, not a dry-run.
+> It will create real tags and a real GitHub Release. Use it only after a failed
+> release where tags were already created but the release was not published.
 
-  ```bash
-  gh workflow run publish-release.yml \
-    --field version="$(node -p "require('./package.json').version")" \
-    --field prerelease="false"
-  ```
-
-- [ ] Monitor workflow execution
+- [ ] Verify the Version Packages PR exists and CI passes on it
 
   ```bash
-  gh run watch
-  # Wait for completion, verify all jobs succeed
+  gh pr list --search "chore: version packages"
   ```
+
+- [ ] Confirm the PR's CI checks are green before merging
 
 - [ ] Review workflow summary
   ```bash
@@ -349,7 +346,7 @@ seconds median.
   # Confirm validation, build, artifact generation steps all green
   ```
 
-**Reference**: `.github/workflows/publish-release.yml`, Iteration 4 validation
+**Reference**: `.github/workflows/version-packages.yml`, Iteration 4 validation
 focus.
 
 ---
@@ -676,7 +673,7 @@ targets.
   # Expected: Clean extraction of release notes
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` changelog extraction,
+**Reference**: `.github/workflows/version-packages.yml` changelog extraction,
 Section 4 traceability enforcement.
 
 ---
@@ -768,41 +765,59 @@ Section 4 traceability enforcement.
 
 ## Section 5: Release Preparation
 
-### 5.1 Create Release Tag
+### 5.1 Verify Release Readiness
 
-**Objective**: Tag the release commit following semantic versioning.
+**Objective**: Confirm the unified workflow will handle tag creation automatically.
 
-- [ ] Verify current commit is the intended release commit
+> **Note**: In the standard release flow, git tags are created **automatically**  
+> when the "chore: version packages" PR merges. The `release-tags.sh` script  
+> creates per-plugin tags (e.g., `yellow-core@1.2.0`) and the root catalog tag  
+> (e.g., `v1.2.1`). Manual tag creation is **only** needed for emergency recovery  
+> scenarios where `workflow_dispatch` with `force_publish=true` won't suffice.
+
+- [ ] Verify the Version Packages PR has been merged to `main`
 
   ```bash
-  git log --oneline -1
+  gh pr list --search "chore: version packages" --state merged --limit 1
   ```
 
-- [ ] Create annotated tag with release notes
+- [ ] Confirm the workflow has started automatically
+
+  ```bash
+  gh run list --workflow=version-packages.yml --limit 1
+  ```
+
+- [ ] Verify the expected catalog version
 
   ```bash
   VERSION=$(node -p "require('./package.json').version")
-  git tag -a "v$VERSION" -m "Release v$VERSION
+  echo "Expected catalog tag: v$VERSION"
+  ```
 
-  $(awk "/## \[?$VERSION\]?/,/## \[?[0-9]/" CHANGELOG.md | head -n -1)
+**Reference**: `.github/workflows/version-packages.yml` (triggers on push to
+`main`), `scripts/ci/release-tags.sh` (automatic tag creation), Section 4 git
+tagging conventions.
+
+---
+
+### 5.2 Manual Tag Creation (Emergency Recovery Only)
+
+**Objective**: Create tags manually when automated flow cannot be used.
+
+> **Warning**: This section is for emergency recovery only. In normal releases,  
+> tags are created automatically by the workflow.
+
+**Only perform these steps if you must bypass the normal automated flow:**
+
+- [ ] Create annotated tag locally
+
+  ```bash
+  VERSION=$(node -p "require('./package.json').version")
+  git tag -a "v$VERSION" -m "Release v$VERSION (emergency manual release)
 
   Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
   "
   ```
-
-- [ ] Verify tag created locally
-  ```bash
-  git tag -l | grep "v$VERSION"
-  ```
-
-**Reference**: `.github/workflows/publish-release.yml` tag trigger pattern,
-Section 4 git tagging conventions.
-
----
-
-### 5.2 Push Tag to Trigger Workflow
-
-**Objective**: Push tag to GitHub to trigger automated release workflow.
 
 - [ ] Push tag to remote
 
@@ -810,12 +825,19 @@ Section 4 git tagging conventions.
   git push origin "v$(node -p "require('./package.json').version")"
   ```
 
-- [ ] Confirm tag appears on GitHub
+- [ ] Trigger workflow with force_publish
+
   ```bash
-  gh api repos/:owner/:repo/git/refs/tags | jq '.[] | select(.ref | contains("v$(node -p "require('./package.json').version"))"))'
+  gh workflow run version-packages.yml -f force_publish=true
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` on.push.tags trigger.
+- [ ] Confirm workflow started
+  ```bash
+  gh run watch
+  ```
+
+**Reference**: `.github/workflows/version-packages.yml` (workflow_dispatch with
+`force_publish`), `CONTRIBUTING.md` emergency release section.
 
 ---
 
@@ -830,18 +852,16 @@ Section 4 git tagging conventions.
   ```
 
 - [ ] Verify all jobs complete successfully:
-  - [ ] validate-release
-  - [ ] build-artifacts
-  - [ ] publish-release
-  - [ ] publish-npm (if applicable)
-  - [ ] notify
+  - [ ] `version-or-publish` — Phase detection and tag creation
+  - [ ] `build-and-release` — Artifact creation and GitHub Release
+  - [ ] `notify` — Success/failure notification
 
 - [ ] Check workflow summary for warnings or notices
   ```bash
   gh run view --log
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` job dependencies and
+**Reference**: `.github/workflows/version-packages.yml` job dependencies and
 outputs.
 
 ---
@@ -854,7 +874,7 @@ outputs.
 
   ```bash
   VERSION=$(node -p "require('./package.json').version")
-  gh run download $(gh run list --workflow=publish-release.yml --limit 1 --json databaseId -q '.[0].databaseId')
+  gh run download $(gh run list --workflow=version-packages.yml --limit 1 --json databaseId -q '.[0].databaseId')
   ```
 
 - [ ] Verify artifact contents:
@@ -871,7 +891,7 @@ outputs.
   # Expected: All files OK
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` build-artifacts job,
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job,
 Section 4 audit requirements.
 
 ---
@@ -910,7 +930,7 @@ Section 4 audit requirements.
   gh release view "v$VERSION" --json url -q '.url'
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` publish-release job,
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job,
 softprops/action-gh-release.
 
 ---
@@ -940,7 +960,7 @@ softprops/action-gh-release.
   # Expected: Non-zero dependency count
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` tarball creation step.
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job (tarball creation step).
 
 ---
 
@@ -974,7 +994,7 @@ pre-release.
   # Expected: Successful installation
   ```
 
-**Reference**: `.github/workflows/publish-release.yml` publish-npm job,
+**Reference**: `.github/workflows/version-packages.yml` build-and-release job (NPM publish step),
 package.json repository field.
 
 ---
