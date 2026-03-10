@@ -90,14 +90,17 @@ done
 - `auth_config` missing: "Graphite auth was not detected. Run `gt auth` or sign in through the Graphite CLI, then re-run `/gt-setup`."
 - `repo_config` missing OR `gt_trunk` unavailable: "This repository is not initialized for Graphite. Run `gt init`, confirm `gt trunk` works, then re-run `/gt-setup`."
 
-**Warnings (informational, do not block setup):**
+**Warnings (do not block setup — CLI commands still work):**
 
 - `mcp_server` UPGRADE NEEDED: "Graphite MCP server requires gt v1.6.7+.
-  Run `npm i -g @withgraphite/graphite-cli@latest` to upgrade, or see the
-  [Graphite CLI docs](https://graphite.dev/docs/cli). Existing CLI commands
-  work without it."
+  The `gt mcp` stdio server registered in plugin.json will fail to start and
+  Graphite MCP tools will be unavailable until you upgrade.
+  Run `npm i -g @withgraphite/graphite-cli@latest` to upgrade, then re-run
+  `/gt-setup`. All CLI-based commands (`/smart-submit`, `/gt-sync`, etc.)
+  continue to work without MCP."
 - `mcp_server` SKIPPED: "The MCP server check was skipped because `gt` is
-  missing. Install Graphite CLI, then re-run `/gt-setup`."
+  missing. The `gt mcp` stdio server registered in plugin.json will fail to
+  start. Install Graphite CLI, then re-run `/gt-setup`."
 - `mcp_server` UNKNOWN: "MCP server status could not be determined. Run
   `gt --version` to confirm your Graphite CLI version. If the command fails or
   shows an unexpected format, reinstall or upgrade `gt`, then re-run
