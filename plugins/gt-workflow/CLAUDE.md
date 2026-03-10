@@ -69,6 +69,21 @@ Both paths use `gt submit --no-interactive` for submission.
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
 
+## Stack Decomposition Format
+
+`gt-stack-plan` produces a `## Stack Decomposition` section in plan documents.
+`workflows:work` (yellow-core) consumes it for bottom-up stacked PR execution.
+
+Format contract:
+- `## Stack Decomposition` heading with `<!-- stack-topology: linear|parallel|mixed -->`
+  and `<!-- stack-trunk: main -->` HTML comment metadata
+- Numbered `### N. type/branch-name` subsections, each with required fields:
+  **Type**, **Description**, **Scope**, **Tasks**, **Depends on**; optional: **Linear**
+- `workflows:work` writes a `## Stack Progress` section to track completion
+
+See `output-styles/stack-decomposition.md` for the full specification with
+examples for all topologies.
+
 ### Input Integrations
 
 - **Linear issues** — `/gt-stack-plan` reads a `## Linear Issues` section from
