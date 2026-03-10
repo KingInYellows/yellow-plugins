@@ -11,6 +11,44 @@ readonly NC='\033[0m'
 
 RUVECTOR_DEFAULT_VERSION="latest"
 RUVECTOR_VERSION=""
+REQUIRED_NODE_VERSION="22.22.0"
+
+version_lt() {
+  local left="$1"
+  local right="$2"
+  local left_major left_minor left_patch
+  local right_major right_minor right_patch
+
+  IFS='.' read -r left_major left_minor left_patch <<EOF
+$left
+EOF
+  IFS='.' read -r right_major right_minor right_patch <<EOF
+$right
+EOF
+
+  left_minor=${left_minor:-0}
+  left_patch=${left_patch:-0}
+  right_minor=${right_minor:-0}
+  right_patch=${right_patch:-0}
+
+  if [ "$left_major" -lt "$right_major" ]; then
+    return 0
+  fi
+  if [ "$left_major" -gt "$right_major" ]; then
+    return 1
+  fi
+  if [ "$left_minor" -lt "$right_minor" ]; then
+    return 0
+  fi
+  if [ "$left_minor" -gt "$right_minor" ]; then
+    return 1
+  fi
+  if [ "$left_patch" -lt "$right_patch" ]; then
+    return 0
+  fi
+
+  return 1
+}
 
 error() {
   printf '%bError: %s%b\n' "$RED" "$1" "$NC" >&2
@@ -72,15 +110,13 @@ check_dependency "node" "https://nodejs.org/"
 check_dependency "npm" "https://nodejs.org/"
 check_dependency "jq" "https://jqlang.github.io/jq/"
 
-# --- Verify Node.js version >= 18 ---
+# --- Verify Node.js version >= 22.22.0 ---
 node_version=$(node --version 2>/dev/null | sed 's/^v//') || true
-node_major="${node_version%%.*}"
-# Validate node_major is numeric before arithmetic comparison
-case "$node_major" in
-  ''|*[!0-9]*) error "Could not parse Node.js version. Found: '${node_version:-none}'. Update from: https://nodejs.org/" ;;
+case "$node_version" in
+  ''|*[!0-9.]*|*.*.*.*) error "Could not parse Node.js version. Found: '${node_version:-none}'. Update from: https://nodejs.org/" ;;
 esac
-if [ "$node_major" -lt 18 ]; then
-  error "Node.js 18+ required. Found: v${node_version}. Update from: https://nodejs.org/"
+if version_lt "$node_version" "$REQUIRED_NODE_VERSION"; then
+  error "Node.js ${REQUIRED_NODE_VERSION} or later required. Found: v${node_version}. Update from: https://nodejs.org/"
 fi
 
 # --- Detect version manager (nvm/fnm) ---

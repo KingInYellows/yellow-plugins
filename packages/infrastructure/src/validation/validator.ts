@@ -23,6 +23,16 @@ import * as semver from 'semver';
 
 import { AjvValidatorFactory } from './ajvFactory.js';
 
+function normalizeCompatibilityVersion(
+  version: string | undefined
+): string | null {
+  if (!version) {
+    return null;
+  }
+
+  return semver.coerce(version)?.version ?? null;
+}
+
 /**
  * Schema validator implementing domain validation interface
  *
@@ -196,19 +206,36 @@ export class SchemaValidator implements IValidator {
     }
 
     // Validate Node.js version
-    if (compatibility.nodeMin) {
-      const nodeMajor = semver.major(environment.nodeVersion);
-      const requiredMajor = parseInt(compatibility.nodeMin, 10);
+    const normalizedNodeMin = normalizeCompatibilityVersion(
+      compatibility.nodeMin
+    );
+    if (
+      normalizedNodeMin &&
+      semver.lt(environment.nodeVersion, normalizedNodeMin)
+    ) {
+      errors.push(
+        ValidationErrorFactory.compatibilityError(
+          'nodeMin',
+          environment.nodeVersion,
+          `>= ${normalizedNodeMin}`
+        )
+      );
+    }
 
-      if (nodeMajor < requiredMajor) {
-        errors.push(
-          ValidationErrorFactory.compatibilityError(
-            'nodeMin',
-            environment.nodeVersion,
-            `>= ${compatibility.nodeMin}.x`
-          )
-        );
-      }
+    const normalizedNodeMax = normalizeCompatibilityVersion(
+      compatibility.nodeMax
+    );
+    if (
+      normalizedNodeMax &&
+      semver.gt(environment.nodeVersion, normalizedNodeMax)
+    ) {
+      errors.push(
+        ValidationErrorFactory.compatibilityError(
+          'nodeMax',
+          environment.nodeVersion,
+          `<= ${normalizedNodeMax}`
+        )
+      );
     }
 
     // Validate platform (OS)

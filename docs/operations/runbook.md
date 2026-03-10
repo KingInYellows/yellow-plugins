@@ -38,6 +38,7 @@ artifacts.
 - [CI Validation Pipeline Spec](./ci-pipeline.md) - Technical pipeline
   specification
 - [Metrics Guide](./metrics.md) - Telemetry and monitoring
+
 ---
 
 ## Prerequisites
@@ -1576,8 +1577,8 @@ jq 'select(.level == "audit")' .claude-plugin/audit/*.jsonl | tail -50
 ```bash
 # Update Docker base image digest (security patches)
 # Check for new Node 20 slim image
-docker pull node:20-slim
-docker inspect node:20-slim | jq '.[0].Id'
+docker pull node:22.22.0-slim
+docker inspect node:22.22.0-slim | jq '.[0].Id'
 
 # Update Dockerfile SHA-256 pin
 # Edit Dockerfile and update @sha256:... to latest digest
@@ -1630,6 +1631,7 @@ jq 'select(.eventType == "lifecycle_consent" and .consentGranted == false)' \
 - [Metrics Guide](./metrics.md) - Telemetry catalog and monitoring
 - [Postmortem Template](./postmortem-template.md) - Incident investigation
   workflow
+
 ### External Resources
 
 - [GitHub Actions Troubleshooting](https://docs.github.com/en/actions/monitoring-and-troubleshooting-workflows)

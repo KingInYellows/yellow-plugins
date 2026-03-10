@@ -21,16 +21,16 @@ Intelligent code editing and search via
 /morph:status
 ```
 
-Once configured, morph tools are available automatically — no explicit invocation
-needed. Claude will prefer `edit_file` for large edits and
+Once configured, morph tools are available automatically — no explicit
+invocation needed. Claude will prefer `edit_file` for large edits and
 `warpgrep_codebase_search` for intent-based code discovery.
 
 ## Commands
 
-| Command          | Description                                          |
-| ---------------- | ---------------------------------------------------- |
-| `/morph:setup`   | Check prerequisites, configure API key, verify MCP   |
-| `/morph:status`  | Show API health and MCP tool availability            |
+| Command         | Description                                        |
+| --------------- | -------------------------------------------------- |
+| `/morph:setup`  | Check prerequisites, configure API key, verify MCP |
+| `/morph:status` | Show API health and MCP tool availability          |
 
 ## How It Works
 
@@ -45,7 +45,7 @@ with ruvector, cost/credit details, and privacy notes.
 ## Prerequisites
 
 - **ripgrep** (`rg`) — required by WarpGrep for local search
-- **Node.js 18+** — required for MCP server via npx
+- **Node.js 22.22.0 or later** — required for MCP server via npx
 - **MORPH_API_KEY** — obtain from https://morphllm.com (free tier: 250K
   credits/month)
 - **Network access** to api.morphllm.com (port 443)

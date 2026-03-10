@@ -28,7 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22.22.0'
   PNPM_VERSION: '8.15.0'
   CI_UPLOAD_ARTIFACTS: 'false'
   PNPM_INSTALL_FLAGS: '--frozen-lockfile --prefer-offline --fetch-retries=5 --fetch-retry-factor=2 --fetch-retry-mintimeout=10000 --fetch-retry-maxtimeout=120000 --network-concurrency=16'

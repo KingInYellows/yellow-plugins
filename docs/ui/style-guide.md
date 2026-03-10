@@ -163,8 +163,7 @@ lifecycle scripts.
 
 **Reset Code**: `\x1b[0m` (always append after colored text)
 
-**Specification References**: FR-001,
-CRIT-006,
+**Specification References**: FR-001, CRIT-006,
 [6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback)
 
 ---
@@ -955,7 +954,7 @@ Provide textual summaries for complex tables:
 
 1 plugin skipped due to compatibility:
 
-- incompatible-plugin: Requires Node.js >= 22
+- incompatible-plugin: Requires Node.js >= 22.22.0
 ```
 
 Helps screen readers and plain-text exports.

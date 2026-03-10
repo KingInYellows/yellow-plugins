@@ -93,8 +93,8 @@ const result = validator.validatePluginManifest(pluginData, 'hookify');
 
 // Validate compatibility
 const result = validator.validateCompatibility(
-  { claudeCodeMin: '2.0.0', nodeMin: '18' },
-  { claudeCodeVersion: '2.1.0', nodeVersion: '18.19.0', ... }
+  { claudeCodeMin: '2.0.0', nodeMin: '22.22.0' },
+  { claudeCodeVersion: '2.1.0', nodeVersion: '22.22.0', ... }
 );
 ```
 
@@ -177,14 +177,14 @@ if (result.status === ValidationStatus.ERROR) {
 ```typescript
 const compatibility = {
   claudeCodeMin: '2.1.0',
-  nodeMin: '20',
+  nodeMin: '22.22.0',
   os: ['linux', 'macos'],
   arch: ['x64'],
 };
 
 const environment = {
   claudeCodeVersion: '2.0.12', // Too low!
-  nodeVersion: '18.19.0', // Too low!
+  nodeVersion: '22.21.0', // Too low!
   platform: 'linux',
   arch: 'x64',
   installedPlugins: [],

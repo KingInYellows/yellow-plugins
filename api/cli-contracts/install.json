@@ -13,7 +13,7 @@
           "type": "string",
           "description": "Node.js version (semver)",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
-          "examples": ["20.10.0", "18.19.0"]
+          "examples": ["22.22.0", "24.14.0"]
         },
         "os": {
           "type": "string",

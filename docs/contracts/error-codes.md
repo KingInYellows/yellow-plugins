@@ -376,8 +376,8 @@ installed.
 **Example**:
 
 ```
-Plugin requires: Node.js >= 20
-Your version: 18.19.0
+Plugin requires: Node.js >= 22.22.0
+Your version: 22.21.0
 ```
 
 ---

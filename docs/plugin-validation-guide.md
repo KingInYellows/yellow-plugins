@@ -74,7 +74,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
       Entrypoint file not found: commands/missing.md
 
    [NODE_VERSION_RANGE] compatibility.nodeMin
-      Node.js version must be 18-24 (got 25)
+      Node.js version must be 22.22.0-24.x (got 22.21.0)
 ```
 
 ---
@@ -231,7 +231,8 @@ ls -la plugins/hookify/scripts/install.sh
 
 ### Rule 6: Node.js Version Range
 
-**Check**: nodeMin must be 18-24 (Claude Code does NOT support Node.js 25+)
+**Check**: nodeMin must be at least 22.22.0. If you set an upper bound, keep it
+below Node.js 25.0.0.
 
 **Example Error**:
 
@@ -239,7 +240,7 @@ ls -la plugins/hookify/scripts/install.sh
 {
   "rule": "NODE_VERSION_RANGE",
   "field": "compatibility.nodeMin",
-  "message": "Node.js version must be 18-24 (got 25). Claude Code does NOT support Node.js 25+."
+  "message": "Node.js version must be at least 22.22.0 (got 22.21.0)."
 }
 ```
 
@@ -248,12 +249,12 @@ ls -la plugins/hookify/scripts/install.sh
 ```json
 // ❌ Invalid
 "compatibility": {
-  "nodeMin": "25"
+  "nodeMin": "22.21.0"
 }
 
 // ✅ Valid
 "compatibility": {
-  "nodeMin": "18"
+  "nodeMin": "22.22.0"
 }
 ```
 
@@ -674,7 +675,7 @@ Before publishing plugin:
 - [ ] Lifecycle scripts are executable (`chmod +x`)
 - [ ] Description is informative (20+ chars)
 - [ ] Version is valid semver (e.g., 1.2.3)
-- [ ] Node.js version is 18-24 (if dependencies)
+- [ ] Node.js version is 22.22.0-24.x (if dependencies)
 - [ ] README URL is reachable
 - [ ] No duplicate keywords
 - [ ] Permission reasons are clear (10-200 chars)
@@ -825,7 +826,7 @@ Validation ensures plugin quality and compatibility:
 1. **Schema Compliance**: All required fields, correct formats
 2. **File Existence**: Entrypoints and scripts actually exist
 3. **Executability**: Lifecycle scripts have execute permission
-4. **Compatibility**: Node.js 18-24, valid Claude Code versions
+4. **Compatibility**: Node.js 22.22.0-24.x, valid Claude Code versions
 5. **Documentation**: README accessible, description informative
 6. **Permissions**: Transparently declared with justification
 

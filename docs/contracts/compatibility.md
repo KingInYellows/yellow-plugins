@@ -100,7 +100,7 @@ const verdict = service.evaluateCompatibility(
   '1.0.0',
   {
     claudeCodeMin: '1.0.0',
-    nodeMin: '18.0.0',
+    nodeMin: '22.22.0',
     os: ['linux', 'darwin'],
     arch: ['x64', 'arm64'],
   },
@@ -148,7 +148,7 @@ const environment = provider.getEnvironment();
 
 // {
 //   claudeCodeVersion: '1.5.0',
-//   nodeVersion: '20.10.0',
+//   nodeVersion: '22.22.0',
 //   platform: 'linux',
 //   arch: 'x64',
 //   installedPlugins: ['installed-plugin-a']
@@ -227,7 +227,7 @@ plugin.
 ```json
 {
   "compatibility": {
-    "nodeMin": "18.0.0",
+    "nodeMin": "22.22.0",
     "nodeMax": "24.0.0"
   }
 }
@@ -439,15 +439,15 @@ The bridge logs detailed evidence for each check:
   "level": "WARN",
   "command": "install",
   "correlationId": "abc123-def456",
-  "message": "Node.js 16.0.0 below minimum 18.0.0",
+  "message": "Node.js 22.21.0 below minimum 22.22.0",
   "data": {
     "checkId": "node-min",
     "checkType": "node-version",
-    "required": ">=18.0.0",
-    "actual": "16.0.0",
+    "required": ">=22.22.0",
+    "actual": "22.21.0",
     "passed": false,
     "errorCode": "ERROR-COMPAT-003",
-    "errorMessage": "Compatibility check failed for nodeMin: expected >=18.0.0, got 16.0.0",
+    "errorMessage": "Compatibility check failed for nodeMin: expected >=22.22.0, got 22.21.0",
     "specReference": "CRIT-005"
   }
 }
@@ -503,7 +503,7 @@ const verdict = service.evaluateCompatibility(
   '2.0.0',
   {
     claudeCodeMin: '1.5.0',
-    nodeMin: '18.0.0',
+    nodeMin: '22.22.0',
     os: ['linux', 'darwin'],
   },
   fingerprint.getEnvironment()

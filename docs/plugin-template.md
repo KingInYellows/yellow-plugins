@@ -208,7 +208,7 @@ MIT
   },
   "compatibility": {
     "claudeCodeMin": "2.0.12",
-    "nodeMin": "18",
+    "nodeMin": "22.22.0",
     "os": ["linux", "macos", "windows"],
     "arch": ["x64", "arm64"]
   },
@@ -437,7 +437,7 @@ chmod +x scripts/install.sh scripts/uninstall.sh
   "version": "1.0.0",
   "description": "A Claude Code plugin for...",
   "engines": {
-    "node": ">=18.0.0 <25.0.0"
+    "node": ">=22.22.0 <25.0.0"
   },
   "dependencies": {
     "ajv": "^8.12.0"

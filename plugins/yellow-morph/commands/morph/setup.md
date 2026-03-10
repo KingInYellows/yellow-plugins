@@ -1,7 +1,8 @@
 ---
 name: morph:setup
-description: "Check prerequisites and configure Morph API key. Use when first
-  installing the plugin, when morph tools fail, or to verify API connectivity."
+description:
+  'Check prerequisites and configure Morph API key. Use when first installing
+  the plugin, when morph tools fail, or to verify API connectivity.'
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -32,16 +33,19 @@ printf '\n=== Environment ===\n'
 Collect **all** failures before stopping — report them together.
 
 Stop conditions (after reporting all):
+
 - `rg` not found: "ripgrep is required for WarpGrep. Install from
   https://github.com/BurntSushi/ripgrep#installation"
-- `node` not found: "Node.js 18+ is required. Install from https://nodejs.org/"
+- `node` not found: "Node.js 22.22.0 or later is required. Install from
+  https://nodejs.org/"
 - `npx` not found: "npx is required (bundled with Node.js). Verify Node.js
   installation."
-- Node <18: "Node.js 18+ is required. Current: vX.Y.Z. Please upgrade."
+- Node <22.22.0: "Node.js 22.22.0 or later is required. Current: vX.Y.Z. Please
+  upgrade."
 
-Node version check: If node version is below 18, stop with: "Node.js 18+ is
-required. Current: vX.Y.Z. Please upgrade Node.js from https://nodejs.org/,
-then re-run /morph:setup."
+Node version check: If node version is below 22.22.0, stop with: "Node.js
+22.22.0 or later is required. Current: vX.Y.Z. Please upgrade Node.js from
+https://nodejs.org/, then re-run /morph:setup."
 
 `MORPH_API_KEY` not set is a warning, not a stop — continue to Step 2.
 
@@ -54,20 +58,20 @@ key?"
 
 - **Yes, I have one** → "Please set it in your shell profile and restart Claude
   Code:
+
   ```bash
   echo 'export MORPH_API_KEY=your-key-here' >> ~/.zshrc  # or ~/.bashrc
   source ~/.zshrc
   ```
-  Then re-run `/morph:setup` to verify."
-  Show info: "Get a key at https://morphllm.com — free tier includes 250K
-  credits/month."
-  Stop here (cannot verify without key).
 
-- **No, I need one** → "Sign up at https://morphllm.com to get an API key.
-  Free tier includes 250K credits/month (200 requests/month)."
-  Show privacy note: "Note: Morph tools send code to Morph's API servers.
-  Free/Starter tiers retain data for 90 days. See https://morphllm.com/privacy"
-  Stop here.
+  Then re-run `/morph:setup` to verify." Show info: "Get a key at
+  https://morphllm.com — free tier includes 250K credits/month." Stop here
+  (cannot verify without key).
+
+- **No, I need one** → "Sign up at https://morphllm.com to get an API key. Free
+  tier includes 250K credits/month (200 requests/month)." Show privacy note:
+  "Note: Morph tools send code to Morph's API servers. Free/Starter tiers retain
+  data for 90 days. See https://morphllm.com/privacy" Stop here.
 
 If `MORPH_API_KEY` is set: continue to Step 3.
 

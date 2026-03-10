@@ -39,7 +39,7 @@ ajv validate -s api/cli-contracts/install.json -d my-install-request.json
   "dryRun": false,
   "correlationId": "automation-001",
   "compatibilityIntent": {
-    "nodeVersion": "20.10.0",
+    "nodeVersion": "22.22.0",
     "os": "linux",
     "arch": "x64"
   },
@@ -75,7 +75,7 @@ cat install-result.json | jq '.success'
   "dryRun": false,
   "correlationId": "update-all-20260111",
   "compatibilityIntent": {
-    "nodeVersion": "20.10.0",
+    "nodeVersion": "22.22.0",
     "os": "linux",
     "arch": "x64"
   }
@@ -122,7 +122,7 @@ pnpm cli rollback --input rollback-request.json --output rollback-result.json
   "dryRun": true,
   "correlationId": "dry-run-test",
   "compatibilityIntent": {
-    "nodeVersion": "20.10.0",
+    "nodeVersion": "22.22.0",
     "os": "darwin",
     "arch": "arm64"
   }
@@ -272,7 +272,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.22.0'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v2
@@ -350,7 +350,7 @@ jobs:
 ```yaml
 install-plugin:
   stage: install
-  image: node:20
+  image: node:22.22.0
   variables:
     PLUGIN_ID: 'example-plugin'
     VERSION: 'latest'

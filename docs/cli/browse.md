@@ -287,7 +287,7 @@ Downloads: 12,000
 Last Updated: 2026-01-10 (2 days ago)
 Repository: https://github.com/example/example-plugin
 Homepage: https://example-plugin.dev
-Compatibility: Node.js >= 18.0.0
+Compatibility: Node.js >= 22.22.0
 License: MIT
 
 ---
@@ -340,8 +340,7 @@ When `--sort name`:
 - Primary: Plugin ID (case-insensitive alphabetical)
 - Order controlled by `--order asc|desc`
 
-**Specification References**: FR-006,
-CRIT-006,
+**Specification References**: FR-006, CRIT-006,
 [Iteration 3 Validation](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
@@ -428,8 +427,7 @@ Configure in `.claude-plugin/flags.json`:
 ```
 
 **Specification Reference**:
-[Feature Flag Governance](../operations/feature-flags.md),
-CRIT-004
+[Feature Flag Governance](../operations/feature-flags.md), CRIT-004
 
 ---
 
@@ -461,8 +459,7 @@ Resolution:
 See: https://yellow-plugins.dev/docs/errors#err-browse-001
 ```
 
-**Cross-Reference**: [Error Codes Reference](../errors.md),
-CRIT-007
+**Cross-Reference**: [Error Codes Reference](../errors.md), CRIT-007
 
 ---
 
@@ -472,10 +469,8 @@ CRIT-007
 
 This command implements the following specification requirements:
 
-- **FR-006**: Plugin Discovery - Browse
-  marketplace and list available plugins
-- **CRIT-006**: Browse UX - Deterministic
-  ranking with offline support
+- **FR-006**: Plugin Discovery - Browse marketplace and list available plugins
+- **CRIT-006**: Browse UX - Deterministic ranking with offline support
 - **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**:
   CLI interaction patterns and workflow control
 - **[6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback)**:

@@ -1,6 +1,9 @@
 ---
 name: ruvector:setup
-description: "Install ruvector and initialize vector storage. Use when user says \"set up ruvector\", \"install vector search\", \"enable semantic search\", \"initialize ruvector\", or wants persistent agent memory for a project."
+description:
+  'Install ruvector and initialize vector storage. Use when user says "set up
+  ruvector", "install vector search", "enable semantic search", "initialize
+  ruvector", or wants persistent agent memory for a project.'
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -49,7 +52,7 @@ printf '\n=== .gitignore ===\n' && \
 
 **Decision tree from output:**
 
-- Node.js missing or < 18 → stop, report install URL
+- Node.js missing or < 22.22.0 → stop, report install URL
 - ruvector not installed → proceed to Step 2a (install)
 - ruvector installed but `.ruvector/` missing → proceed to Step 2b (init only)
 - Everything present → skip to Step 3 (verify)
@@ -126,9 +129,9 @@ fi
 ```
 
 **Important:** Do NOT run `npx ruvector hooks verify` — it checks
-`.claude/settings.json` which is the wrong place. Claude Code reads hooks
-from `plugin.json` at runtime. Instead, verify by checking that the hook
-scripts exist and are executable (as above).
+`.claude/settings.json` which is the wrong place. Claude Code reads hooks from
+`plugin.json` at runtime. Instead, verify by checking that the hook scripts
+exist and are executable (as above).
 
 Summarize results in a table:
 
@@ -163,10 +166,9 @@ If global binary is not found, **stop setup and report failure:**
 
 If the smoke test failed, **stop setup and report failure:**
 
-> Setup incomplete: `ruvector hooks recall` did not complete within the
-> required 1-second budget.
-> This means Claude Code hooks with 1-second budgets are still unreliable even
-> though the binary is in PATH.
+> Setup incomplete: `ruvector hooks recall` did not complete within the required
+> 1-second budget. This means Claude Code hooks with 1-second budgets are still
+> unreliable even though the binary is in PATH.
 >
 > Remediation:
 >
@@ -187,11 +189,11 @@ Use AskUserQuestion to offer:
 
 ## Error Handling
 
-| Error                   | Action                                       |
-| ----------------------- | -------------------------------------------- |
+| Error                   | Action                                         |
+| ----------------------- | ---------------------------------------------- |
 | Node.js not found       | Stop. Report: install from https://nodejs.org/ |
-| Node.js < 18            | Stop. Report version, suggest upgrade        |
-| npm install failed      | Suggest `--prefix "$HOME/.local"`            |
-| hooks init failed       | Check disk space, permissions, try `--force` |
-| doctor reports failures | Show output, suggest `/ruvector:status`      |
-| .gitignore not writable | Report and suggest manual edit               |
+| Node.js < 22.22.0       | Stop. Report version, suggest upgrade          |
+| npm install failed      | Suggest `--prefix "$HOME/.local"`              |
+| hooks init failed       | Check disk space, permissions, try `--force`   |
+| doctor reports failures | Show output, suggest `/ruvector:status`        |
+| .gitignore not writable | Report and suggest manual edit                 |

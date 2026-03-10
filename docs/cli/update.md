@@ -469,8 +469,7 @@ After force update, plugin is no longer pinned. Re-pin with:
 plugin pin important-plugin
 ```
 
-**Specification References**: FR-008,
-CRIT-008,
+**Specification References**: FR-008, CRIT-008,
 [Iteration 3 Exit Criteria](../plan/02_Iteration_I3.md#iteration-3-validation)
 
 ---
@@ -583,8 +582,7 @@ Configure in `.claude-plugin/flags.json`:
 ```
 
 **Specification Reference**:
-[Feature Flag Governance](../operations/feature-flags.md),
-CRIT-004
+[Feature Flag Governance](../operations/feature-flags.md), CRIT-004
 
 ---
 
@@ -608,23 +606,22 @@ CRIT-004
 ```
 ✖ Compatibility check failed (ERR-UPDATE-003)
 
-Plugin 'example-plugin' v1.5.0 requires Node.js >= 20.0.0
-Current Node.js version: 18.16.0
+Plugin 'example-plugin' v1.5.0 requires Node.js >= 22.22.0
+Current Node.js version: 22.21.0
 
 Resolution:
-  • Upgrade Node.js to v20.0.0 or later
+  • Upgrade Node.js to v22.22.0 or later
   • Check plugin docs for compatibility matrix
   • Consider staying on current version (1.2.3)
 
 Compatibility details:
-  Required: Node.js >= 20.0.0, Claude >= 2.5.0
-  Current: Node.js 18.16.0, Claude 2.4.0
+  Required: Node.js >= 22.22.0, Claude >= 2.5.0
+  Current: Node.js 22.21.0, Claude 2.4.0
 
 See: https://yellow-plugins.dev/docs/errors#err-update-003
 ```
 
-**Cross-Reference**: [Error Codes Reference](../errors.md),
-CRIT-007
+**Cross-Reference**: [Error Codes Reference](../errors.md), CRIT-007
 
 ---
 
@@ -634,14 +631,11 @@ CRIT-007
 
 This command implements the following specification requirements:
 
-- **FR-002**: Update installed plugins to latest
-  versions
+- **FR-002**: Update installed plugins to latest versions
 - **FR-008**: Pin management integration
 - **FR-009**: Check for available updates
-- **CRIT-002**: Compatibility validation during
-  updates
-- **CRIT-008**: Pin awareness and override
-  behavior
+- **CRIT-002**: Compatibility validation during updates
+- **CRIT-008**: Pin awareness and override behavior
 - **[3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)**:
   CLI interaction patterns
 - **[6-1-progress-feedback](../architecture/06_UI_UX_Architecture.md#6-1-progress-feedback)**:

@@ -3,6 +3,45 @@ set -euo pipefail
 
 # install-agent-browser.sh — Install agent-browser CLI and Chromium
 
+required_node_version='22.22.0'
+
+version_lt() {
+  local left="$1"
+  local right="$2"
+  local left_major left_minor left_patch
+  local right_major right_minor right_patch
+
+  IFS='.' read -r left_major left_minor left_patch <<EOF
+$left
+EOF
+  IFS='.' read -r right_major right_minor right_patch <<EOF
+$right
+EOF
+
+  left_minor=${left_minor:-0}
+  left_patch=${left_patch:-0}
+  right_minor=${right_minor:-0}
+  right_patch=${right_patch:-0}
+
+  if [ "$left_major" -lt "$right_major" ]; then
+    return 0
+  fi
+  if [ "$left_major" -gt "$right_major" ]; then
+    return 1
+  fi
+  if [ "$left_minor" -lt "$right_minor" ]; then
+    return 0
+  fi
+  if [ "$left_minor" -gt "$right_minor" ]; then
+    return 1
+  fi
+  if [ "$left_patch" -lt "$right_patch" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
 # Check if already installed
 if command -v agent-browser >/dev/null 2>&1; then
   printf '[browser-test] agent-browser already installed: %s\n' \
@@ -14,17 +53,17 @@ else
     exit 1
   fi
 
-  # Check Node.js version (requires 18+)
+  # Check Node.js version (requires 22.22.0 or later)
   if command -v node >/dev/null 2>&1; then
-    NODE_VERSION=$(node --version 2>/dev/null | sed 's/^v//' | cut -d. -f1)
-    if [ -z "$NODE_VERSION" ] || ! printf '%s' "$NODE_VERSION" | grep -qE '^[0-9]+$'; then
-      printf '[browser-test] Warning: Could not parse Node.js version. Requires 18+.\n' >&2
-    elif [ "$NODE_VERSION" -lt 18 ]; then
-      printf '[browser-test] Error: Node.js 18+ required (found v%s). Update at https://nodejs.org/\n' "$NODE_VERSION" >&2
+    NODE_VERSION=$(node --version 2>/dev/null | sed 's/^v//')
+    if [ -z "$NODE_VERSION" ] || ! printf '%s' "$NODE_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+      printf '[browser-test] Warning: Could not parse Node.js version. Requires %s or later.\n' "$required_node_version" >&2
+    elif version_lt "$NODE_VERSION" "$required_node_version"; then
+      printf '[browser-test] Error: Node.js %s or later required (found v%s). Update at https://nodejs.org/\n' "$required_node_version" "$NODE_VERSION" >&2
       exit 1
     fi
   else
-    printf '[browser-test] Warning: Could not verify Node.js version. Requires 18+.\n' >&2
+    printf '[browser-test] Warning: Could not verify Node.js version. Requires %s or later.\n' "$required_node_version" >&2
   fi
 
   # Install via npm (pinned version)

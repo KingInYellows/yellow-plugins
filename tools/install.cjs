@@ -7,12 +7,14 @@
  *
  * Project type: Node.js with pnpm monorepo
  * Package manager: pnpm (>=8.0.0)
- * Node version: >=18.0.0 <=24.x
+ * Node version: >=22.22.0 <25.0.0
  */
 
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+const { checkNodeVersion } = require('../scripts/check-node-version.js');
 
 // ANSI color codes for better output visibility
 const colors = {
@@ -78,9 +80,8 @@ function execCommand(command, description, silent = false) {
  */
 function commandExists(command) {
   try {
-    const checkCmd = process.platform === 'win32'
-      ? `where ${command}`
-      : `which ${command}`;
+    const checkCmd =
+      process.platform === 'win32' ? `where ${command}` : `which ${command}`;
     execSync(checkCmd, { stdio: 'pipe' });
     return true;
   } catch {
@@ -97,7 +98,7 @@ function getVersion(packageManager) {
   try {
     const version = execSync(`${packageManager} --version`, {
       encoding: 'utf8',
-      stdio: 'pipe'
+      stdio: 'pipe',
     }).trim();
     return version;
   } catch {
@@ -112,8 +113,8 @@ function getVersion(packageManager) {
  * @returns {boolean} - True if version meets requirement
  */
 function meetsVersionRequirement(version, required) {
-  const v = version.split('.').map(n => parseInt(n, 10));
-  const r = required.split('.').map(n => parseInt(n, 10));
+  const v = version.split('.').map((n) => parseInt(n, 10));
+  const r = required.split('.').map((n) => parseInt(n, 10));
 
   for (let i = 0; i < Math.max(v.length, r.length); i++) {
     const vNum = v[i] || 0;
@@ -149,9 +150,19 @@ function main() {
   }
 
   // Check Node.js version
-  const nodeVersion = process.version.slice(1); // Remove 'v' prefix
-  const requiredNodeVersion = packageJson.engines?.node || '>=18.0.0';
-  log('info', `Node.js version: ${nodeVersion} (required: ${requiredNodeVersion})`);
+  const nodeCheck = checkNodeVersion({
+    currentVersion: process.version,
+    projectRoot: rootDir,
+    requiredRange: packageJson.engines?.node,
+  });
+  log(
+    'info',
+    `Node.js version: ${nodeCheck.currentVersion} (required: ${nodeCheck.requiredRange})`
+  );
+  if (!nodeCheck.ok) {
+    log('error', nodeCheck.message);
+    process.exit(1);
+  }
 
   // Check if pnpm is installed
   if (!commandExists('pnpm')) {
@@ -164,7 +175,10 @@ function main() {
   // Check pnpm version
   const pnpmVersion = getVersion('pnpm');
   const requiredPnpmVersion = packageJson.engines?.pnpm || '>=8.0.0';
-  log('info', `pnpm version: ${pnpmVersion} (required: ${requiredPnpmVersion})`);
+  log(
+    'info',
+    `pnpm version: ${pnpmVersion} (required: ${requiredPnpmVersion})`
+  );
 
   if (pnpmVersion && !meetsVersionRequirement(pnpmVersion, '8.0.0')) {
     log('warn', `pnpm version ${pnpmVersion} may not meet requirements`);
@@ -174,8 +188,9 @@ function main() {
   // Check if node_modules exists and has content
   const nodeModulesPath = path.join(rootDir, 'node_modules');
   const lockFilePath = path.join(rootDir, 'pnpm-lock.yaml');
-  const needsInstall = !fs.existsSync(nodeModulesPath) ||
-                       fs.readdirSync(nodeModulesPath).length === 0;
+  const needsInstall =
+    !fs.existsSync(nodeModulesPath) ||
+    fs.readdirSync(nodeModulesPath).length === 0;
 
   if (needsInstall) {
     log('info', 'Dependencies not found. Installing...');
@@ -193,8 +208,13 @@ function main() {
 
       // Still run a quick install to ensure everything is in sync
       // This is idempotent and fast if nothing needs to be done
-      if (!execCommand('pnpm install --frozen-lockfile --prefer-offline',
-                       'Verifying dependencies...', true)) {
+      if (
+        !execCommand(
+          'pnpm install --frozen-lockfile --prefer-offline',
+          'Verifying dependencies...',
+          true
+        )
+      ) {
         log('warn', 'Failed to verify dependencies. Trying full install...');
         if (!execCommand('pnpm install', 'Installing dependencies...', false)) {
           log('error', 'Failed to install dependencies');
@@ -242,7 +262,7 @@ function main() {
   const workspacePackages = [
     'packages/cli',
     'packages/domain',
-    'packages/infrastructure'
+    'packages/infrastructure',
   ];
 
   let allPackagesValid = true;

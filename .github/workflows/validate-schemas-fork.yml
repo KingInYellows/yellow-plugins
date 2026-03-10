@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22.22.0'
   PNPM_VERSION: '8.15.0'
   PNPM_INSTALL_FLAGS: '--frozen-lockfile --prefer-offline'
 
@@ -241,7 +241,14 @@ jobs:
     name: CI Status (Fork)
     runs-on: ubuntu-latest
     if: always() && github.event.pull_request.head.repo.full_name != github.repository
-    needs: [validate-schemas, lint-and-typecheck, unit-tests, validate-versions, changeset-check]
+    needs:
+      [
+        validate-schemas,
+        lint-and-typecheck,
+        unit-tests,
+        validate-versions,
+        changeset-check,
+      ]
 
     steps:
       - name: Check results
@@ -262,4 +269,3 @@ jobs:
             echo "Changeset Required: ${{ needs.changeset-check.result }}"
             exit 1
           fi
-

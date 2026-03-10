@@ -122,9 +122,7 @@ All CLI commands support dual modes of operation:
 2. **Automated Mode**: JSON input via `--input` flag, JSON output via `--output`
    flag
 
-**Specification References**: FR-001,
-FR-002, CRIT-001,
-CRIT-004
+**Specification References**: FR-001, FR-002, CRIT-001, CRIT-004
 
 ### 1.3 Schema Locations
 
@@ -220,8 +218,7 @@ interface CompatibilityIntent {
 }
 ```
 
-**Specification Reference**: CRIT-002b,
-CRIT-005
+**Specification Reference**: CRIT-002b, CRIT-005
 
 ### 2.4 Feature Flag Evaluations
 
@@ -314,8 +311,7 @@ interface TelemetryMetrics {
 }
 ```
 
-**Specification Reference**: CRIT-010, Section 4
-Security & Observability
+**Specification Reference**: CRIT-010, Section 4 Security & Observability
 
 ---
 
@@ -329,8 +325,7 @@ Security & Observability
 - **Aliases**: `i`, `add`
 - **Schema**:
   [`api/cli-contracts/install.json`](../../api/cli-contracts/install.json)
-- **Specification Anchors**: FR-001,
-  CRIT-001,
+- **Specification Anchors**: FR-001, CRIT-001,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-INSTALL-001`, `ERR-INSTALL-002`, `ERR-COMPAT-001`
 
@@ -446,7 +441,7 @@ cat install-request.json | pnpm cli install --input - --output -
   "dryRun": false,
   "correlationId": "req-install-20260111-001",
   "compatibilityIntent": {
-    "nodeVersion": "20.10.0",
+    "nodeVersion": "22.22.0",
     "os": "linux",
     "arch": "x64",
     "claudeVersion": "2.5.0"
@@ -522,8 +517,7 @@ cat install-request.json | pnpm cli install --input - --output -
 - **Aliases**: `up`, `upgrade`
 - **Schema**:
   [`api/cli-contracts/update.json`](../../api/cli-contracts/update.json)
-- **Specification Anchors**: FR-002,
-  CRIT-002,
+- **Specification Anchors**: FR-002, CRIT-002,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-UPDATE-001`, `ERR-UPDATE-002`, `ERR-COMPAT-001`
 
@@ -631,7 +625,7 @@ pnpm cli update --all --check-only
   "dryRun": false,
   "correlationId": "req-update-20260111-002",
   "compatibilityIntent": {
-    "nodeVersion": "20.10.0",
+    "nodeVersion": "22.22.0",
     "os": "linux",
     "arch": "x64"
   }
@@ -668,7 +662,7 @@ pnpm cli update --all --check-only
     "skipped": [
       {
         "pluginId": "incompatible-plugin",
-        "reason": "Requires Node.js >= 22, current: 20.10.0",
+        "reason": "Requires Node.js >= 22.22.0, current: 22.21.0",
         "errorCode": "ERROR-COMPAT-003"
       }
     ],
@@ -700,8 +694,7 @@ pnpm cli update --all --check-only
 - **Aliases**: `rb`, `revert`
 - **Schema**:
   [`api/cli-contracts/rollback.json`](../../api/cli-contracts/rollback.json)
-- **Specification Anchors**: FR-003,
-  CRIT-018,
+- **Specification Anchors**: FR-003, CRIT-018,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-ROLLBACK-001`, `ERR-ROLLBACK-002`, `ERR-CACHE-001`
 - **Required Feature Flag**: `enableRollback`
@@ -899,7 +892,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.22.0'
 
       - name: Generate Install Request
         run: |
@@ -1287,8 +1280,7 @@ All schemas use JSON Schema Draft-07:
 - **Aliases**: `list`, `ls`
 - **Schema**:
   [`api/cli-contracts/browse.json`](../../api/cli-contracts/browse.json)
-- **Specification Anchors**: FR-006,
-  CRIT-006,
+- **Specification Anchors**: FR-006, CRIT-006,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-BROWSE-001`, `ERR-BROWSE-002`, `ERR-BROWSE-003`,
   `ERR-BROWSE-004`, `ERR-BROWSE-005`
@@ -1386,8 +1378,7 @@ See [Browse Command Documentation](../cli/browse.md) for detailed examples.
 - **Aliases**: `find`
 - **Schema**:
   [`api/cli-contracts/search.json`](../../api/cli-contracts/search.json)
-- **Specification Anchors**: FR-007,
-  CRIT-007,
+- **Specification Anchors**: FR-007, CRIT-007,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-SEARCH-001`, `ERR-SEARCH-002`
 
@@ -1542,9 +1533,7 @@ interface InfoResponse extends BaseResponse {
 - **Aliases**: `rm`, `remove`
 - **Schema**:
   [`api/cli-contracts/uninstall.json`](../../api/cli-contracts/uninstall.json)
-- **Specification Anchors**: FR-004,
-  CRIT-004,
-  CRIT-010,
+- **Specification Anchors**: FR-004, CRIT-004, CRIT-010,
   [3-3-cli-workflow-control](../architecture/04_Operational_Architecture.md#3-3-cli-workflow-control)
 - **Error Codes**: `ERR-UNINSTALL-001`, `ERR-UNINSTALL-002`,
   `ERR-UNINSTALL-003`, `ERR-UNINSTALL-004`, `ERR-UNINSTALL-005`,

@@ -31,14 +31,14 @@ Persistent vector memory and semantic code search for Claude Code agents via
 
 ## Commands
 
-| Command                                 | Description                                            |
-| --------------------------------------- | ------------------------------------------------------ |
-| `/ruvector:setup`                       | Install ruvector and initialize `.ruvector/` directory |
-| `/ruvector:index [path]`                | Index codebase (or specific path) for semantic search  |
-| `/ruvector:search <query>`              | Search codebase by meaning using vector similarity     |
-| `/ruvector:status`                      | Show ruvector health, DB stats, and queue status       |
-| `/ruvector:learn [description]`         | Record a learning, mistake, or pattern                 |
-| `/ruvector:memory [filter]`             | Browse and search stored memories                      |
+| Command                         | Description                                            |
+| ------------------------------- | ------------------------------------------------------ |
+| `/ruvector:setup`               | Install ruvector and initialize `.ruvector/` directory |
+| `/ruvector:index [path]`        | Index codebase (or specific path) for semantic search  |
+| `/ruvector:search <query>`      | Search codebase by meaning using vector similarity     |
+| `/ruvector:status`              | Show ruvector health, DB stats, and queue status       |
+| `/ruvector:learn [description]` | Record a learning, mistake, or pattern                 |
+| `/ruvector:memory [filter]`     | Browse and search stored memories                      |
 
 ## Agents
 
@@ -51,9 +51,8 @@ Persistent vector memory and semantic code search for Claude Code agents via
 
 - **Semantic search:** Code is chunked and embedded using all-MiniLM-L6-v2 (384
   dims). Search queries are embedded and compared via vector similarity.
-- **Agent memory:** Learnings are stored through
-  `hooks_remember(content, type)` and retrieved with
-  `hooks_recall(query, top_k)`.
+- **Agent memory:** Learnings are stored through `hooks_remember(content, type)`
+  and retrieved with `hooks_recall(query, top_k)`.
 - **Passive capture:** Hooks automatically track file changes and bash outcomes
   in a local queue. The queue is flushed to ruvector on session end or next
   session start.
@@ -62,7 +61,7 @@ Persistent vector memory and semantic code search for Claude Code agents via
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 22.22.0 or later
 - npm
 - jq
 

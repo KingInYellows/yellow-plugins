@@ -155,7 +155,7 @@ targets:
 ### Environment Variables
 
 ```yaml
-NODE_VERSION: '20' # Node.js 20 LTS
+NODE_VERSION: '22.22.0' # Minimum supported Node.js runtime
 PNPM_VERSION: '8.15.0' # Locked pnpm version (matches packageManager)
 ```
 
@@ -246,7 +246,7 @@ Requires configuration:
 ### Base Image
 
 ```dockerfile
-FROM node:20-slim@sha256:a22f79e64de59efd3533828aecc9817bfdc1cd37dde598aa27d6065e7b1f0abc
+FROM node:22.22.0-slim@sha256:7cc56ef285a8568121537d17b05e72128f01b89c54607b51acf084a50ef483f3
 ```
 
 **Digest Pinning Rationale:**

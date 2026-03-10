@@ -71,7 +71,7 @@ recommended.
 **Suggested Fixes:**
 
 1. Install missing tool in workflow setup step
-2. Pin version: `uses: actions/setup-node@v4` with `node-version: '20'`
+2. Pin version: `uses: actions/setup-node@v4` with `node-version: '22.22.0'`
 3. Add version check step before build
 4. Use Docker container with pre-installed tools
 

@@ -29,7 +29,7 @@ node tools/install.cjs
 
 **Features:**
 
-- Detects and validates Node.js version (>=18.0.0 <=24.x)
+- Detects and validates Node.js version (>=22.22.0 <25.0.0)
 - Detects and validates pnpm version (>=8.0.0)
 - Installs or updates all project dependencies using pnpm
 - Verifies workspace packages are properly configured
@@ -184,7 +184,7 @@ These scripts are designed to be used:
 
 ## Requirements
 
-- **Node.js**: >=18.0.0 <=24.x
+- **Node.js**: >=22.22.0 <25.0.0
 - **pnpm**: >=8.0.0 (must be installed globally)
 
 To install pnpm:

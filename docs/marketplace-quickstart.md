@@ -13,7 +13,7 @@ A personal Claude Code plugin marketplace that lets you:
 
 ## Prerequisites
 
-- Node.js 18+ installed
+- Node.js 22.22.0 or later installed
 - Git repository for your plugins
 - Basic familiarity with JSON
 

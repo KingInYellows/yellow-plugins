@@ -169,11 +169,11 @@ tagging.
 
 **Objective**: Verify tooling versions match project requirements.
 
-- [ ] Node.js version: 18-24 LTS
+- [ ] Node.js version: 22.22.0-24.x
 
   ```bash
   node --version
-  # Expected: v18.x.x, v20.x.x, or v22.x.x
+  # Expected: >= v22.22.0 and < v25.0.0
   ```
 
 - [ ] pnpm version: 8.15.0 or higher
@@ -238,7 +238,8 @@ Section 4 security directives.
   # Run: pnpm install after (lockfile changes)
   ```
 
-- [ ] Three-way version consistency check passes (package.json == plugin.json == marketplace.json)
+- [ ] Three-way version consistency check passes (package.json == plugin.json ==
+      marketplace.json)
 
   ```bash
   pnpm validate:versions
@@ -253,7 +254,8 @@ Section 4 security directives.
   # Expected: X.Y.Z matching intended release
   ```
 
-- [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's date
+- [ ] Root `CHANGELOG.md` contains catalog entry for this version with today's
+      date
 
   ```bash
   grep -A 1 "## \[$(node -p 'require("./package.json").version')\]" CHANGELOG.md
@@ -267,9 +269,9 @@ Section 4 security directives.
   # Verify all plugin versions are in sync
   ```
 
-
-**Reference**: `docs/operations/versioning.md`, `.github/workflows/publish-release.yml`
-version validation step, `scripts/validate-versions.js`.
+**Reference**: `docs/operations/versioning.md`,
+`.github/workflows/publish-release.yml` version validation step,
+`scripts/validate-versions.js`.
 
 ---
 

@@ -22,7 +22,7 @@ respectful, constructive, and focused on technical merit in all interactions.
 
 ### Prerequisites
 
-- Node.js 18-24 LTS
+- Node.js 22.22.0-24.x
 - pnpm 8.0.0 or higher
 - Git
 
@@ -128,7 +128,8 @@ pnpm release:check
 - [ ] Plugin validation passes: `pnpm validate:plugins`
 - [ ] Documentation updated (README + CLAUDE.md)
 - [ ] Commit messages use conventional format (`feat:`, `fix:`, `docs:`, etc.)
-- [ ] Changeset file created if plugin files changed: `pnpm changeset` (see [Versioning](#versioning))
+- [ ] Changeset file created if plugin files changed: `pnpm changeset` (see
+      [Versioning](#versioning))
 
 ### PR Review Process
 
@@ -140,18 +141,19 @@ pnpm release:check
 ## Versioning
 
 Yellow-plugins uses [Changesets](https://github.com/changesets/changesets) to
-manage plugin versions. **CI will block any PR that modifies plugin files without
-a `.changeset/*.md` file.** This ensures every change surfaces to users via the
-auto-update mechanism.
+manage plugin versions. **CI will block any PR that modifies plugin files
+without a `.changeset/*.md` file.** This ensures every change surfaces to users
+via the auto-update mechanism.
 
 ### When to create a changeset
 
 Required when your PR modifies **any** file under `plugins/` — including
-commands, agents, skills, hooks, CLAUDE.md, README.md, and configuration
-files. Documentation changes inside a plugin directory are user-visible and
-should be versioned.
+commands, agents, skills, hooks, CLAUDE.md, README.md, and configuration files.
+Documentation changes inside a plugin directory are user-visible and should be
+versioned.
 
 Not required for:
+
 - Changes only to `packages/` (internal TypeScript tooling)
 - Changes only to `scripts/`, `.github/`, or root-level `docs/`
 
@@ -162,15 +164,19 @@ pnpm changeset
 ```
 
 The CLI will prompt you to:
+
 1. Select which plugin packages changed (e.g. `yellow-core`, `yellow-review`)
 2. Choose the bump type:
-   - `patch` — bug fix, behavior correction, documentation update inside a plugin
+   - `patch` — bug fix, behavior correction, documentation update inside a
+     plugin
    - `minor` — new command, new skill, new agent, or any additive change
    - `major` — breaking change to a command's interface, or removal of a command
 
-This writes a `.changeset/<auto-slug>.md` file. Commit it alongside your changes.
+This writes a `.changeset/<auto-slug>.md` file. Commit it alongside your
+changes.
 
 Also update the PR checklist item:
+
 - [ ] Changeset file created: `pnpm changeset`
 
 ### What happens on merge
@@ -185,6 +191,7 @@ Also update the PR checklist item:
 ### Reviewing the "Version Packages" PR
 
 The PR is created by the Changesets bot. Before merging, verify:
+
 - Bump types are correct (patch/minor/major) for each plugin.
 - `CHANGELOG.md` entries are coherent.
 - `plugin.json` and `marketplace.json` versions match `package.json`.
@@ -193,10 +200,10 @@ The PR can be held open to batch multiple features before releasing.
 
 **Note on CI coverage:** The Version Packages PR is created by the
 `github-actions[bot]` using `GITHUB_TOKEN`. GitHub does not trigger
-`on: pull_request` CI on bot-created PRs, so `validate-schemas.yml` will
-not run on this PR. The PR content is machine-generated (version bumps and
-CHANGELOG entries only), so manual review of the three bullet points above
-is the primary verification gate before merging.
+`on: pull_request` CI on bot-created PRs, so `validate-schemas.yml` will not run
+on this PR. The PR content is machine-generated (version bumps and CHANGELOG
+entries only), so manual review of the three bullet points above is the primary
+verification gate before merging.
 
 ### Emergency manual release
 

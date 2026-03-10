@@ -1,6 +1,9 @@
 ---
 name: browser-test:setup
-description: "Install agent-browser and discover app configuration. Use when user says \"set up browser testing\", \"install agent-browser\", \"configure testing\", or wants to initialize browser testing for a web project."
+description:
+  'Install agent-browser and discover app configuration. Use when user says "set
+  up browser testing", "install agent-browser", "configure testing", or wants to
+  initialize browser testing for a web project.'
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -24,7 +27,7 @@ flow.
 Verify required tools:
 
 ```bash
-node --version  # Must be >= 18
+node --version  # Must be >= 22.22.0
 npm --version
 ```
 
@@ -120,7 +123,7 @@ Report setup complete and suggest:
 
 | Error                | Action                                                                                 |
 | -------------------- | -------------------------------------------------------------------------------------- |
-| Node.js not found    | "Node.js required. Install from https://nodejs.org/"                                   |
+| Node.js not found    | "Node.js 22.22.0 or later required. Install from https://nodejs.org/"                  |
 | npm install fails    | Show error, suggest `sudo npm install -g agent-browser`                                |
 | No package.json      | "No package.json found. Is this a web project?" then AskUserQuestion for manual config |
 | No routes discovered | "Could not auto-detect routes. Describe your app's main pages."                        |

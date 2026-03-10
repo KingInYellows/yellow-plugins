@@ -1,9 +1,9 @@
 # Yellow Plugins CI Container
 # Purpose: Reproducible build environment for GitHub Actions workflows
-# Node 20 LTS Slim (digest-pinned for immutability)
+# Node 22.22.0 Slim (digest-pinned for immutability)
 # Last updated: 2026-01-12
 
-FROM node:20-slim@sha256:a22f79e64de59efd3533828aecc9817bfdc1cd37dde598aa27d6065e7b1f0abc
+FROM node:22.22.0-slim@sha256:7cc56ef285a8568121537d17b05e72128f01b89c54607b51acf084a50ef483f3
 
 LABEL maintainer="KingInYellows"
 LABEL description="CI environment for yellow-plugins validation and testing"
