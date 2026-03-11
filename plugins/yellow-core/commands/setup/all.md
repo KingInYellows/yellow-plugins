@@ -309,6 +309,7 @@ Marketplace Setup Dashboard
   yellow-ruvector      NEEDS SETUP     Global ruvector binary missing from PATH
   yellow-morph         PARTIAL         Local tools ready, MORPH_API_KEY missing
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
+  yellow-docs          READY           git available, repo is a git repository
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
   yellow-research      PARTIAL         2/5 bundled sources available
   yellow-linear        READY           Linear MCP visible, Graphite available

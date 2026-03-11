@@ -134,7 +134,7 @@ plugins/yellow-docs/
   - Directory path -> file structure (mindmap or class diagram)
   - "architecture" -> system-level component diagram
   - No scope -> auto-detect most useful diagram for the repo
-- Embeds diagrams as ```mermaid code blocks in markdown files
+- Embeds diagrams as ```` ```mermaid ```` code blocks in markdown files
 - Uses `diagram-architect` agent for generation
 
 **`/docs:refresh [--since <ref>]`**

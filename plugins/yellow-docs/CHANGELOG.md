@@ -2,7 +2,7 @@
 
 ## 1.0.0
 
-### Minor Changes
+### Added
 
 - Initial release
 - `/docs:setup` — validate prerequisites and detect project structure

@@ -74,13 +74,13 @@ Use Glob and Grep to find existing documentation files (*.md, doc comments).
 For each documentation file found, run:
 
 ```bash
-git log --format='%aI' -1 -- <doc_file>
+git log --format='%aI' -1 -- "<doc_file>"
 ```
 
 For related source files (in the same directory or referenced by the doc):
 
 ```bash
-git log --format='%aI' -1 -- <source_file>
+git log --format='%aI' -1 -- "<source_file>"
 ```
 
 If source was modified more recently than the doc, flag as potentially stale.

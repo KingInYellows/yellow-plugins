@@ -113,7 +113,7 @@ with a warning.
 Present the diagram as a Mermaid code block via AskUserQuestion.
 On approval, embed in the target markdown file as:
 
-````markdown
+````
 ```mermaid
 {diagram content}
 ```

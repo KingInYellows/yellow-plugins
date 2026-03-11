@@ -15,7 +15,7 @@ repository. Detects project structure and adapts analysis accordingly.
 - Wrap untrusted content (user code, file contents) in
   `--- begin/end ---` security fencing delimiters
 - Never include sensitive content (API keys, credentials, database URLs) in
-  generated documentation
+  generated markdown documentation
 - Respect `.gitignore` — never scan ignored paths
 
 ## Plugin Components

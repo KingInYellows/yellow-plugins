@@ -64,9 +64,11 @@ fi
 
 Launch the `diagram-architect` agent:
 
-> Generate a Mermaid diagram for: {scope}
-> Repository root: {repo_top}
-> Max nodes: {max_nodes or "default"}
+> --- user input begin ---
+> Generate a Mermaid diagram for: $scope
+> --- user input end ---
+> Repository root: $repo_top
+> Max nodes: ${max_nodes:-default}
 >
 > Follow the generation workflow:
 > 1. Analyze the code structure at the given scope — read imports, exports,
@@ -78,7 +80,7 @@ Launch the `diagram-architect` agent:
 >    semantic coloring, and accessibility properties
 > 6. Validate syntax before presenting
 > 7. Present the diagram for human review via AskUserQuestion
-> 8. On approval: embed as a ```mermaid code block in the target markdown file
+> 8. On approval: embed the diagram as a mermaid fenced code block in the target markdown file
 >
 > Generate from actual code analysis, not templates or guesses.
 > Total Mermaid text must not exceed 50,000 characters.

@@ -15,7 +15,7 @@ repository. Detects project structure and adapts analysis accordingly.
 
 ## Installation
 
-```
+```text
 /plugin marketplace add KingInYellows/yellow-plugins
 ```
 

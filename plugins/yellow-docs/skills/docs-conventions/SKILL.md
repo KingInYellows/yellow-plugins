@@ -98,7 +98,7 @@ Primary output is the findings list; the score is a secondary summary metric.
 
 ### API Reference Template
 
-```markdown
+````markdown
 # API Reference
 
 ## {Function/Endpoint Name}
@@ -112,10 +112,13 @@ Primary output is the findings list; the score is a secondary summary metric.
 
 **Example:**
 ```
+{Usage example}
+```
+````
 
 ### Function Doc Template
 
-```markdown
+````markdown
 ## {Function Name}
 
 {Summary of what the function does.}
@@ -128,8 +131,10 @@ Primary output is the findings list; the score is a secondary summary metric.
 **Throws:** {error conditions}
 
 **Example:**
+```
 {Usage example}
 ```
+````
 
 ## Diagram Type Selection
 

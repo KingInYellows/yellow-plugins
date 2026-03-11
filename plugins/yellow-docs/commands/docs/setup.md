@@ -60,7 +60,7 @@ if [ -n "$repo_top" ]; then
   [ -f "$repo_top/book.toml" ] && printf 'tooling:      mdBook\n'
 
   printf '\n=== Documentation Files ===\n'
-  doc_count=$(find "$repo_top" -maxdepth 3 -name '*.md' -not -path '*/node_modules/*' -not -path '*/.git/*' 2>/dev/null | wc -l)
+  doc_count=$(git -C "$repo_top" ls-files -- '*.md' 2>/dev/null | wc -l)
   printf 'markdown:     %d files found\n' "$doc_count"
   [ -f "$repo_top/README.md" ] && printf 'readme:       present\n' || printf 'readme:       MISSING\n'
   [ -d "$repo_top/docs" ] && printf 'docs/:        present\n' || printf 'docs/:        missing\n'

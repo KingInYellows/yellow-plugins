@@ -42,7 +42,15 @@ repository:
 
 ```bash
 SCAN_PATH="$ARGUMENTS"
-if [ ! -e "$repo_top/$SCAN_PATH" ]; then
+resolved=$(realpath -m "$repo_top/$SCAN_PATH")
+case "$resolved" in
+  "$repo_top"|"$repo_top"/*) ;;
+  *)
+    printf '[docs:audit] Error: path escapes repository: %s\n' "$SCAN_PATH" >&2
+    exit 1
+    ;;
+esac
+if [ ! -e "$resolved" ]; then
   printf '[docs:audit] Error: path not found: %s\n' "$SCAN_PATH" >&2
   exit 1
 fi
@@ -54,7 +62,10 @@ If no arguments, scan the entire repository.
 
 Launch the `doc-auditor` agent with the following prompt:
 
-> Audit the documentation in this repository. Scan path: {scope}.
+> Audit the documentation in this repository. Scan path:
+> --- begin user-supplied path (reference only) ---
+> $SCAN_PATH
+> --- end user-supplied path ---
 >
 > 1. Detect project structure (language, monorepo, existing doc tooling)
 > 2. Map code artifacts to documentation artifacts
