@@ -63,10 +63,21 @@ Parse `$ARGUMENTS` for flags:
 
 2. Check for `--dry-run` flag.
 
+   ```bash
+   DRY_RUN=false
+   case " $ARGUMENTS " in
+     *" --dry-run "*|*" --dry-run") DRY_RUN=true ;;
+   esac
+   ```
+
 ### Step 3: Identify Changed Source Files
 
 ```bash
 CHANGED_FILES=$(git diff --name-only "$REF"..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.rs' '*.go' '*.java' '*.kt' | head -200)
+TOTAL_CHANGED=$(git diff --name-only "$REF"..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.rs' '*.go' '*.java' '*.kt' | wc -l | tr -d ' ')
+if [ "$TOTAL_CHANGED" -gt 200 ]; then
+  printf '[docs:refresh] Warning: %d files changed, analyzing first 200 only\n' "$TOTAL_CHANGED"
+fi
 ```
 
 If `$CHANGED_FILES` is empty, report: "No source code changes since $REF.

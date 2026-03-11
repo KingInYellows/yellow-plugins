@@ -42,7 +42,15 @@ repository:
 
 ```bash
 SCAN_PATH="$ARGUMENTS"
-resolved=$(realpath -m "$repo_top/$SCAN_PATH")
+if [ -z "$SCAN_PATH" ]; then
+  SCAN_PATH="."
+fi
+if [ ! -e "$repo_top/$SCAN_PATH" ]; then
+  printf '[docs:audit] Error: path not found: %s\n' "$SCAN_PATH" >&2
+  exit 1
+fi
+# Resolve to absolute path and check containment (portable — no GNU realpath -m)
+resolved=$(cd "$repo_top/$SCAN_PATH" 2>/dev/null && pwd -P || realpath "$repo_top/$SCAN_PATH" 2>/dev/null)
 case "$resolved" in
   "$repo_top"|"$repo_top"/*) ;;
   *)
@@ -50,10 +58,6 @@ case "$resolved" in
     exit 1
     ;;
 esac
-if [ ! -e "$resolved" ]; then
-  printf '[docs:audit] Error: path not found: %s\n' "$SCAN_PATH" >&2
-  exit 1
-fi
 ```
 
 If no arguments, scan the entire repository.

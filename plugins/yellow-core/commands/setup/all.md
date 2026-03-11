@@ -309,7 +309,6 @@ Marketplace Setup Dashboard
   yellow-ruvector      NEEDS SETUP     Global ruvector binary missing from PATH
   yellow-morph         PARTIAL         Local tools ready, MORPH_API_KEY missing
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
-  yellow-docs          READY           git available, repo is a git repository
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
   yellow-research      PARTIAL         2/5 bundled sources available
   yellow-linear        READY           Linear MCP visible, Graphite available
@@ -318,6 +317,7 @@ Marketplace Setup Dashboard
   yellow-ci            READY           gh authenticated, runner config present
   yellow-review        PARTIAL         Review prerequisites ready, yellow-core missing
   yellow-browser-test  NEEDS SETUP     agent-browser missing
+  yellow-docs          READY           git available, repo is a git repository
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
 
   Summary: X ready, Y partial, Z need setup

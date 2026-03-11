@@ -30,7 +30,17 @@ review before writing.
 
 ## Workflow
 
-### Step 1: Resolve Target
+### Step 1: Validate Environment
+
+```bash
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+if [ -z "$repo_top" ]; then
+  printf '[docs:generate] Error: not in a git repository\n' >&2
+  exit 1
+fi
+```
+
+### Step 2: Resolve Target
 
 Parse `$ARGUMENTS` to determine what to generate. Set `$target_type` to one of:
 `readme`, `architecture`, `api-reference`, `file`, or `module`.
@@ -46,16 +56,6 @@ Parse `$ARGUMENTS` to determine what to generate. Set `$target_type` to one of:
 
 3. If a file or directory path: validate it exists, then set `$target_type` to
    `file` or `module` accordingly.
-
-### Step 2: Validate Environment
-
-```bash
-repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
-if [ -z "$repo_top" ]; then
-  printf '[docs:generate] Error: not in a git repository\n' >&2
-  exit 1
-fi
-```
 
 ### Step 3: Check for Existing Documentation
 

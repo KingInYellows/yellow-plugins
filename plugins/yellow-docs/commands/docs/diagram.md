@@ -31,7 +31,17 @@ Auto-selects the best diagram type based on what is being visualized.
 
 ## Workflow
 
-### Step 1: Resolve Scope
+### Step 1: Validate Environment
+
+```bash
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+if [ -z "$repo_top" ]; then
+  printf '[docs:diagram] Error: not in a git repository\n' >&2
+  exit 1
+fi
+```
+
+### Step 2: Resolve Scope
 
 Parse `$ARGUMENTS` to determine the diagram scope:
 
@@ -49,16 +59,6 @@ Parse `$ARGUMENTS` to determine the diagram scope:
 
 4. Parse `--max-nodes` if provided, otherwise use defaults from
    docs-conventions.
-
-### Step 2: Validate Environment
-
-```bash
-repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
-if [ -z "$repo_top" ]; then
-  printf '[docs:diagram] Error: not in a git repository\n' >&2
-  exit 1
-fi
-```
 
 ### Step 3: Delegate to diagram-architect Agent
 
