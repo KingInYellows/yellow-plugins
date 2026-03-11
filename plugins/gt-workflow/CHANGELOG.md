@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.3.0
+
+### Minor Changes
+
+- [`2775f9b`](https://github.com/KingInYellows/yellow-plugins/commit/2775f9ba0617e6c9cf1f83cc4e604ebc8ee3b450)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Repurpose
+  gt-stack-plan as plan-only decomposition tool. Removes branch creation phase
+  (Phase 3) and writes structured `## Stack Decomposition` section to plan files
+  instead. Branches are created just-in-time during `workflows:work` execution.
+
+### Patch Changes
+
+- [`d791c9c`](https://github.com/KingInYellows/yellow-plugins/commit/d791c9c208abd62c4673c7f0522b2e4cdb341bf6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Migrate
+  branch-push `git push` references to `gt submit --no-interactive` across
+  operational docs. Tag pushes remain unchanged. Adds Graphite callout to
+  git-auth.md.
+
+- [`474795e`](https://github.com/KingInYellows/yellow-plugins/commit/474795e8964d358acb047e392b56620a65e817ea)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add stack
+  decomposition output format contract defining the structured markdown
+  interface between gt-stack-plan (producer) and workflows:work (consumer).
+
 All notable changes to this plugin are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),

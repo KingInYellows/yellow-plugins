@@ -1,6 +1,6 @@
 {
   "name": "yellow-semgrep",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
   "author": {
     "name": "KingInYellows",
@@ -19,7 +19,9 @@
   "mcpServers": {
     "semgrep": {
       "command": "semgrep",
-      "args": ["mcp"],
+      "args": [
+        "mcp"
+      ],
       "env": {
         "SEMGREP_APP_TOKEN": "${SEMGREP_APP_TOKEN}"
       }

@@ -1,9 +1,20 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- [`f2e890a`](https://github.com/KingInYellows/yellow-plugins/commit/f2e890aff6868a7926eab930c20dbddc33c2683f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  `/devin:review-prs` command for discovering Devin-authored PRs in the current
+  repository, triaging review findings, and choosing whether to fix them locally
+  or send remediation back to Devin.
+
 All notable changes to this plugin are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
@@ -11,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Remove unsupported `changelog` key from plugin.json that blocked installation via Claude Code's remote validator.
+- Remove unsupported `changelog` key from plugin.json that blocked installation
+  via Claude Code's remote validator.
 
 ---
 
@@ -23,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Migrate to Devin V3 API. Breaking change: all session management endpoints updated.
+- Migrate to Devin V3 API. Breaking change: all session management endpoints
+  updated.
 
 ---
 
@@ -31,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial release — Devin.AI integration for multi-agent workflows: delegate tasks, research codebases, orchestrate plan-implement-review chains.
+- Initial release — Devin.AI integration for multi-agent workflows: delegate
+  tasks, research codebases, orchestrate plan-implement-review chains.
 
 ---
 

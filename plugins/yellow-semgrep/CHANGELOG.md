@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- [`3603a9e`](https://github.com/KingInYellows/yellow-plugins/commit/3603a9e850cfdc7f55ad93db38f85686dcbd8462)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - #
+  yellow-semgrep MCP migration
+
+  BREAKING (MCP): migrate the plugin from deprecated `uvx semgrep-mcp` to the
+  built-in `semgrep mcp` subcommand, requiring Semgrep CLI v1.146.0+ with
+  version-aware setup and install diagnostics.
+
 All notable changes to this plugin are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),

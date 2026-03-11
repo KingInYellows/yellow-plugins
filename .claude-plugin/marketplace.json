@@ -14,7 +14,7 @@
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -24,7 +24,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -44,7 +44,7 @@
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
-      "version": "2.0.1",
+      "version": "2.1.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -134,7 +134,7 @@
     {
       "name": "yellow-semgrep",
       "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
-      "version": "1.1.0",
+      "version": "2.0.0",
       "author": {
         "name": "KingInYellows"
       },

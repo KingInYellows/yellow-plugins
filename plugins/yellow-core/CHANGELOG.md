@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.4.0
+
+### Minor Changes
+
+- [`7565442`](https://github.com/KingInYellows/yellow-plugins/commit/7565442d220810f5a20e833eaf75976875cbe4c8)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add stack-aware
+  bottom-up execution to workflows:work. When a plan contains a
+  `## Stack Decomposition` section, workflows:work creates branches just-in-time
+  and executes each stack item sequentially with checkpoints and progress
+  tracking.
+
+### Patch Changes
+
+- [`906430f`](https://github.com/KingInYellows/yellow-plugins/commit/906430f988f7a8f333d3faa530bbcfb6f87cfca3)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Update
+  yellow-core CLAUDE.md to document stack-aware workflows:work capability and
+  gt-workflow dependency for stack decomposition features.
+
+- [`dc72dfa`](https://github.com/KingInYellows/yellow-plugins/commit/dc72dfa52c47a0578171071c452b58350b85b5bc)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Update
+  workflows:plan post-generation options to clarify that gt-stack-plan adds
+  decomposition to the plan (no branches created) and workflows:work executes
+  bottom-up when decomposition exists.
+
 All notable changes to this plugin are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
