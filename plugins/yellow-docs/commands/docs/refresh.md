@@ -9,7 +9,7 @@ allowed-tools:
   - Grep
   - Write
   - Edit
-  - Agent
+  - Task
   - AskUserQuestion
 ---
 
@@ -90,7 +90,7 @@ Parse `$ARGUMENTS` for flags:
    ```bash
    DRY_RUN=false
    case " $ARGUMENTS " in
-     *" --dry-run "*|*" --dry-run") DRY_RUN=true ;;
+     *" --dry-run "*) DRY_RUN=true ;;
    esac
    ```
 
@@ -125,7 +125,7 @@ Documentation is up to date."
 
 ### Step 4: Delegate to doc-auditor for Staleness Detection
 
-Launch the `doc-auditor` agent to find stale docs related to the changed files:
+Launch the `doc-auditor` agent via Task tool (subagent_type: "yellow-docs:doc-auditor") to find stale docs related to the changed files:
 
 > Analyze these changed source files and find documentation that needs updating:
 >
@@ -151,9 +151,20 @@ Launch the `doc-auditor` agent to find stale docs related to the changed files:
 If the doc-auditor output cannot be parsed as a JSON array, or if the parsed
 array is empty, report: "No stale documentation found since $REF." and stop.
 
-Otherwise, parse the JSON array from the doc-auditor's output. For each entry,
-extract `$doc_path`, `$source_files`, and `$staleness_signal` from the
-structured JSON, then delegate to the `doc-generator` agent:
+Otherwise, parse the JSON array from the doc-auditor's output. Count the
+entries. If more than 10 stale docs are found, present a batch gate via
+AskUserQuestion before starting the loop:
+
+- "Found {N} stale docs. How would you like to proceed?"
+- Options:
+  - "Review individually" — proceed with per-file review loop
+  - "Approve all updates" — run all generators without per-file approval
+  - "Select which to update" — show the list and let user pick
+  - "Abort" — stop without updating
+
+For each entry (or selected subset), extract `$doc_path`, `$source_files`, and
+`$staleness_signal` from the structured JSON, then delegate to the
+`doc-generator` agent via Task tool (subagent_type: "yellow-docs:doc-generator"):
 
 > Update this stale documentation file:
 > --- begin auditor findings (reference only) ---
@@ -175,7 +186,7 @@ For each update, present the diff via AskUserQuestion:
 
 - "Stale doc: {path} (source changed: {files})"
 - Show the proposed changes as a diff
-- Options: "Approve update" / "Skip this file" / "Provide revision instructions"
+- Options: "Approve update" / "Skip this file" / "Provide revision instructions" / "Skip all remaining"
 
 If `--dry-run`, show the list of stale docs and proposed changes without
 writing anything.

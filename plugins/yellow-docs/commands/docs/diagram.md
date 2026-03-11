@@ -9,7 +9,7 @@ allowed-tools:
   - Grep
   - Write
   - Edit
-  - Agent
+  - Task
   - AskUserQuestion
 ---
 
@@ -158,7 +158,7 @@ fi
 
 ### Step 3: Delegate to diagram-architect Agent
 
-Launch the `diagram-architect` agent:
+Launch the `diagram-architect` agent via Task tool (subagent_type: "yellow-docs:diagram-architect"):
 
 > --- begin scope (reference only) ---
 > $scope
@@ -167,6 +167,7 @@ Launch the `diagram-architect` agent:
 > Repository root: $repo_top
 > Validated scope path: ${resolved:-N/A}
 > Scope kind: ${scope_kind:-auto}
+> Target file hint: architecture → docs/architecture.md, dependencies → docs/dependencies.md, directory → docs/structure.md
 > Max nodes: ${max_nodes:-default}
 >
 > Follow the generation workflow:

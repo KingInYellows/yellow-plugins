@@ -4,8 +4,6 @@ description: "Validate docs plugin prerequisites and detect project structure. U
 argument-hint: ''
 allowed-tools:
   - Bash
-  - Read
-  - Glob
   - AskUserQuestion
 ---
 

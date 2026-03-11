@@ -9,7 +9,7 @@ allowed-tools:
   - Grep
   - Write
   - Edit
-  - Agent
+  - Task
   - AskUserQuestion
 ---
 
@@ -66,6 +66,10 @@ Parse `$ARGUMENTS` to determine what to generate. Set `$target_type` to one of:
 # Run this block for every file/module target, whether it came from $ARGUMENTS
 # or from a follow-up AskUserQuestion response
 TARGET="${TARGET:-$ARGUMENTS}"
+# Skip validation for reserved keywords — handled by the prose above
+case "$TARGET" in
+  readme|architecture|api-reference) echo "keyword:$TARGET"; exit 0 ;;
+esac
 # Neutralize leading-dash paths
 case "$TARGET" in
   -*) TARGET="./$TARGET" ;;
@@ -109,7 +113,7 @@ note this for the agent — it should show a diff rather than overwrite blindly.
 
 ### Step 4: Delegate to doc-generator Agent
 
-Launch the `doc-generator` agent with the resolved target:
+Launch the `doc-generator` agent via Task tool (subagent_type: "yellow-docs:doc-generator") with the resolved target:
 
 > --- begin target (reference only) ---
 > $ARGUMENTS

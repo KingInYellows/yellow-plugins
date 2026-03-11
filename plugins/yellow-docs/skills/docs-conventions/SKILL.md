@@ -194,13 +194,6 @@ Composite signal with multiple factors:
 4. **Broken references**: Function/class names in docs that no longer exist in
    source
 
-### Noise Reduction (from CodeScene research)
-
-- Ignore temporal couples with fewer than 10 shared commits
-- Ignore coupling strength below 50%
-- Ignore changesets where >50 files changed together (refactor noise)
-- Use `git blame -M -C` for move/copy detection across renames
-
 ## Project Structure Detection
 
 Detect project type from manifest files (most specific wins):
@@ -222,19 +215,27 @@ Detect project type from manifest files (most specific wins):
 - `go.work` → Go workspace
 - Multiple manifest files at different directory levels
 
-### Existing Doc Tooling Detection
+## Staleness Report Schema
 
-- `mkdocs.yml` → MkDocs
-- `conf.py` in docs/ → Sphinx
-- `typedoc.json` → TypeDoc
-- `.readthedocs.yml` → ReadTheDocs
-- `docusaurus.config.js` → Docusaurus
-- `book.toml` → mdBook (Rust)
+Each entry in the staleness JSON array returned by `doc-auditor` in refresh
+mode:
+
+```json
+{
+  "doc_path": "string — relative path from repo root",
+  "source_files": ["string — relative paths of changed source files"],
+  "last_doc_update": "string — ISO 8601 date from git log",
+  "last_source_update": "string — ISO 8601 date from git log",
+  "staleness_signal": "string — one of: age_exceeded, source_newer, broken_ref"
+}
+```
 
 ## Output Location Conventions
 
 - API docs: alongside source files
-- Architecture docs: in `docs/` directory
+- Architecture docs / diagrams: `docs/architecture.md`
+- Dependency diagrams: `docs/dependencies.md`
+- Directory structure diagrams: `docs/structure.md`
 - READMEs: at project/module root
 - Diagrams: inline in the doc they illustrate
 
@@ -257,13 +258,3 @@ All generated files include provenance comment. Resolve the values first with
 - Wrap untrusted content in `--- begin/end ---` security fencing delimiters
 - All generated content requires human approval via AskUserQuestion
 
-## Error Taxonomy
-
-| Error | When | User Message |
-|-------|------|-------------|
-| `DETECTION_FAILED` | Cannot determine project type | "Could not detect project type. Falling back to file-structure analysis." |
-| `NO_GIT` | No git history | "No git history found. Staleness detection unavailable; reporting gaps only." |
-| `INVALID_REF` | Bad --since ref | "Git ref not found. Use a valid commit SHA, branch, or tag." |
-| `NO_RESULTS` | Nothing to report | "All documentation appears up to date." |
-| `WRITE_FAILED` | File write fails | "Could not write to path. Check file permissions." |
-| `GENERATION_FAILED` | Unusable output | "Documentation generation failed. Try narrowing the scope." |
