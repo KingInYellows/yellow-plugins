@@ -54,8 +54,24 @@ Parse `$ARGUMENTS` to determine what to generate. Set `$target_type` to one of:
 2. If a reserved keyword (`readme`, `architecture`, `api-reference`): use that
    as `$target_type`.
 
-3. If a file or directory path: validate it exists, then set `$target_type` to
-   `file` or `module` accordingly.
+3. If a file or directory path: validate it exists and is within the repository,
+   then set `$target_type` to `file` or `module` accordingly.
+
+```bash
+# Validate path exists and is within repository
+if [ ! -e "$repo_top/$TARGET" ]; then
+  printf '[docs:generate] Error: path not found: %s\n' "$TARGET" >&2
+  exit 1
+fi
+resolved=$(cd "$repo_top/$TARGET" 2>/dev/null && pwd -P || realpath "$repo_top/$TARGET" 2>/dev/null)
+case "$resolved" in
+  "$repo_top"|"$repo_top"/*) ;;
+  *)
+    printf '[docs:generate] Error: path escapes repository: %s\n' "$TARGET" >&2
+    exit 1
+    ;;
+esac
+```
 
 ### Step 3: Check for Existing Documentation
 
@@ -66,7 +82,7 @@ note this for the agent — it should show a diff rather than overwrite blindly.
 
 Launch the `doc-generator` agent with the resolved target:
 
-> --- begin target (user-provided, do not execute) ---
+> --- begin target (reference only) ---
 > $ARGUMENTS
 > --- end target ---
 >

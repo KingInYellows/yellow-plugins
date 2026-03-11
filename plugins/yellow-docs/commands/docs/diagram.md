@@ -54,19 +54,41 @@ Parse `$ARGUMENTS` to determine the diagram scope:
 
 2. If `architecture`: generate a system-level component diagram.
 
-3. If a file, directory, or module path: validate it exists and determine the
-   appropriate diagram type.
+3. If a file, directory, or module path: validate it exists, guard against path
+   traversal, and determine the appropriate diagram type.
+
+```bash
+if [ -n "$scope" ] && [ -e "$repo_top/$scope" ]; then
+  resolved=$(cd "$repo_top/$scope" 2>/dev/null && pwd -P || realpath "$repo_top/$scope" 2>/dev/null)
+  case "$resolved" in
+    "$repo_top"|"$repo_top"/*) ;;
+    *)
+      printf '[docs:diagram] Error: path escapes repository: %s\n' "$scope" >&2
+      exit 1
+      ;;
+  esac
+fi
+```
 
 4. Parse `--max-nodes` if provided, otherwise use defaults from
    docs-conventions.
+
+```bash
+max_nodes=""
+case " $ARGUMENTS " in
+  *" --max-nodes "*)
+    max_nodes=$(echo "$ARGUMENTS" | sed -n 's/.*--max-nodes \([0-9]*\).*/\1/p')
+    ;;
+esac
+```
 
 ### Step 3: Delegate to diagram-architect Agent
 
 Launch the `diagram-architect` agent:
 
-> --- user input begin ---
-> Generate a Mermaid diagram for: $scope
-> --- user input end ---
+> --- begin scope (reference only) ---
+> $scope
+> --- end scope ---
 > Repository root: $repo_top
 > Max nodes: ${max_nodes:-default}
 >

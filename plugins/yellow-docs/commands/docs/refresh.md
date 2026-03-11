@@ -73,8 +73,9 @@ Parse `$ARGUMENTS` for flags:
 ### Step 3: Identify Changed Source Files
 
 ```bash
-CHANGED_FILES=$(git diff --name-only "$REF"..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.rs' '*.go' '*.java' '*.kt' | head -200)
-TOTAL_CHANGED=$(git diff --name-only "$REF"..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.rs' '*.go' '*.java' '*.kt' | wc -l | tr -d ' ')
+ALL_CHANGED=$(git diff --name-only "$REF"..HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.rs' '*.go' '*.java' '*.kt')
+CHANGED_FILES=$(printf '%s\n' "$ALL_CHANGED" | head -200)
+TOTAL_CHANGED=$(printf '%s\n' "$ALL_CHANGED" | wc -l | tr -d ' ')
 if [ "$TOTAL_CHANGED" -gt 200 ]; then
   printf '[docs:refresh] Warning: %d files changed, analyzing first 200 only\n' "$TOTAL_CHANGED"
 fi
@@ -110,9 +111,11 @@ findings. For each entry, extract `$doc_path`, `$source_files`, and
 `doc-generator` agent:
 
 > Update this stale documentation file:
+> --- begin auditor findings (reference only) ---
 > Doc path: $doc_path
 > Related source changes: $source_files
 > Staleness signal: $staleness_signal
+> --- end auditor findings ---
 >
 > Read the current doc and the changed source files. Generate an updated version
 > that reflects the code changes. Present the diff for review.
