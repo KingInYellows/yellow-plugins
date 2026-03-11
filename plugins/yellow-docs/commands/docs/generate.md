@@ -58,12 +58,21 @@ Parse `$ARGUMENTS` to determine what to generate. Set `$target_type` to one of:
    then set `$target_type` to `file` or `module` accordingly.
 
 ```bash
+# Neutralize leading-dash paths
+case "$TARGET" in
+  -*) TARGET="./$TARGET" ;;
+esac
 # Validate path exists and is within repository
 if [ ! -e "$repo_top/$TARGET" ]; then
   printf '[docs:generate] Error: path not found: %s\n' "$TARGET" >&2
   exit 1
 fi
-resolved=$(cd "$repo_top/$TARGET" 2>/dev/null && pwd -P || realpath "$repo_top/$TARGET" 2>/dev/null)
+# Resolve to absolute path (POSIX-portable, no realpath dependency)
+if [ -d "$repo_top/$TARGET" ]; then
+  resolved=$(cd "$repo_top/$TARGET" && pwd -P)
+else
+  resolved=$(cd "$(dirname "$repo_top/$TARGET")" && printf '%s/%s' "$(pwd -P)" "$(basename "$TARGET")")
+fi
 case "$resolved" in
   "$repo_top"|"$repo_top"/*) ;;
   *)

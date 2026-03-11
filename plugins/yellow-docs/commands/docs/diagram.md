@@ -58,8 +58,17 @@ Parse `$ARGUMENTS` to determine the diagram scope:
    traversal, and determine the appropriate diagram type.
 
 ```bash
+# Neutralize leading-dash paths
+case "$scope" in
+  -*) scope="./$scope" ;;
+esac
 if [ -n "$scope" ] && [ -e "$repo_top/$scope" ]; then
-  resolved=$(cd "$repo_top/$scope" 2>/dev/null && pwd -P || realpath "$repo_top/$scope" 2>/dev/null)
+  # Resolve to absolute path (POSIX-portable, no realpath dependency)
+  if [ -d "$repo_top/$scope" ]; then
+    resolved=$(cd "$repo_top/$scope" && pwd -P)
+  else
+    resolved=$(cd "$(dirname "$repo_top/$scope")" && printf '%s/%s' "$(pwd -P)" "$(basename "$scope")")
+  fi
   case "$resolved" in
     "$repo_top"|"$repo_top"/*) ;;
     *)

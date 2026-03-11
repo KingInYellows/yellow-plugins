@@ -45,12 +45,20 @@ SCAN_PATH="$ARGUMENTS"
 if [ -z "$SCAN_PATH" ]; then
   SCAN_PATH="."
 fi
+# Neutralize leading-dash paths
+case "$SCAN_PATH" in
+  -*) SCAN_PATH="./$SCAN_PATH" ;;
+esac
 if [ ! -e "$repo_top/$SCAN_PATH" ]; then
   printf '[docs:audit] Error: path not found: %s\n' "$SCAN_PATH" >&2
   exit 1
 fi
-# Resolve to absolute path and check containment (portable — no GNU realpath -m)
-resolved=$(cd "$repo_top/$SCAN_PATH" 2>/dev/null && pwd -P || realpath "$repo_top/$SCAN_PATH" 2>/dev/null)
+# Resolve to absolute path (POSIX-portable, no realpath dependency)
+if [ -d "$repo_top/$SCAN_PATH" ]; then
+  resolved=$(cd "$repo_top/$SCAN_PATH" && pwd -P)
+else
+  resolved=$(cd "$(dirname "$repo_top/$SCAN_PATH")" && printf '%s/%s' "$(pwd -P)" "$(basename "$SCAN_PATH")")
+fi
 case "$resolved" in
   "$repo_top"|"$repo_top"/*) ;;
   *)

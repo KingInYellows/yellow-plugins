@@ -42,7 +42,16 @@ MAIN_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^re
 
 Parse `$ARGUMENTS` for flags:
 
-1. Extract `--since <ref>` if present. If omitted, default to the main branch:
+1. Extract `--since <ref>` if present:
+   ```bash
+   REF=""
+   case " $ARGUMENTS " in
+     *" --since "*)
+       REF=$(echo "$ARGUMENTS" | sed -n 's/.*--since \([^ ]*\).*/\1/p')
+       ;;
+   esac
+   ```
+   If omitted, default to the main branch:
    ```bash
    # Default REF: use origin/<main> if available, else local main branch
    if [ -z "$REF" ]; then
