@@ -588,6 +588,150 @@ flag's value.
 
 ---
 
+### 17. Task Tool Over Agent Tool in Commands
+
+Commands must use `Task` (with `subagent_type`) to spawn agents, not the `Agent`
+tool directly. Every established plugin in this repository follows the `Task`
+convention. The `Agent` tool works at runtime, but using it bypasses
+cross-reference validation -- when commands use `Task` with an explicit
+`subagent_type`, the validator and review agents can verify the agent name
+exists and matches a registered agent file.
+
+**WRONG:**
+```markdown
+Step 3: Use the Agent tool to spawn the doc-auditor agent.
+Provide the file list as context.
+```
+
+The `Agent` tool does not take `subagent_type`, so the agent identity is
+implicit and unverifiable. There is no way to statically check which agent
+was invoked, and the LLM may spawn a generic agent instead of the intended
+specialist.
+
+**RIGHT:**
+```markdown
+Step 3: Use the Task tool to spawn the doc-auditor agent:
+  subagent_type: "yellow-docs:doc-auditor"
+  description: "Audit staleness of documentation files"
+  (exact name: field from plugins/yellow-docs/agents/doc-auditor.md)
+```
+
+**Rule:** Commands always delegate to agents via `Task` with a literal
+`subagent_type`. Reserve the `Agent` tool for ad-hoc user-initiated work
+where a specific agent identity is not needed. If a command uses `Agent`,
+treat it as a review finding.
+
+**Note:** This extends anti-pattern #4 (subagent_type naming). Pattern #4
+covers getting the name right; this pattern covers using the right tool
+in the first place.
+
+---
+
+### 18. Batch Cap with Escape Hatch for Per-Item Agent Spawns
+
+Any loop that spawns an agent (via `Task`) per item -- e.g., refreshing N
+documents, auditing N files, reviewing N PRs -- must include a threshold
+gate that pauses for user confirmation when the item count exceeds a cap.
+
+**WRONG:**
+```markdown
+Step 4: For each stale document in the list:
+  Spawn a doc-refresher agent via Task to update the document.
+```
+
+If 47 documents are stale, this spawns 47 sequential agents with no user
+visibility into progress and no way to abort. The user cannot interrupt
+mid-loop.
+
+**RIGHT:**
+```markdown
+Step 4: For each stale document in the list:
+  If the total count exceeds 10:
+    Use AskUserQuestion: "Found N stale documents. Options:"
+    ["Refresh all N" / "Refresh first 10 only" / "Cancel"]
+    If Cancel: stop. Do not spawn any agents.
+    If "Refresh first 10 only": truncate the list to 10.
+
+  For each document in the (possibly truncated) list:
+    Spawn a doc-refresher agent via Task.
+    After each agent completes, print progress: "[3/10] Refreshed docs/api.md"
+```
+
+**Rule:** Per-item agent spawns require three safeguards:
+1. **Threshold gate** (default: 10) with user confirmation before the loop.
+2. **Progress indicator** after each iteration so the user sees movement.
+3. **Truncation option** ("first N only") so the user can limit scope.
+
+The threshold value (10) is a default -- commands may adjust based on the
+cost of each agent spawn, but must never omit the gate entirely.
+
+**Extends:** Anti-pattern #10 (M3 confirmation before bulk writes) covers
+bulk *data* creation (issues, files). This pattern covers bulk *agent*
+spawns, which are more expensive and harder to undo.
+
+---
+
+### 19. Keyword Guard in Bash Validation Blocks
+
+When a command accepts user input that must be validated against reserved
+keywords (e.g., doc types like "readme", "architecture", "api-reference"),
+the validation must happen in the bash code block itself -- not in
+surrounding LLM prose that says "if the user chose a reserved keyword,
+branch to a different step."
+
+**WRONG:**
+```markdown
+Step 2: Use AskUserQuestion to ask the user for a doc type keyword.
+
+Step 3: If the keyword is one of: readme, architecture, api-reference,
+then skip to Step 5 (reserved keyword handler).
+Otherwise, proceed to Step 4 (custom generation).
+
+Step 4:
+```bash
+DOC_TYPE="$USER_INPUT"
+# ... generate custom doc ...
+```
+```
+
+The LLM decides whether to branch at Step 3 based on prose reasoning. If
+the user provides "README" (case mismatch) or "api reference" (missing
+hyphen), the LLM may fail to match and fall through to the custom path,
+bypassing the reserved keyword handler.
+
+**RIGHT:**
+```markdown
+Step 2: Use AskUserQuestion to ask the user for a doc type keyword.
+
+Step 3: Validate the keyword:
+```bash
+DOC_TYPE="$USER_INPUT"
+# Normalize and check reserved keywords
+DOC_TYPE_LOWER=$(printf '%s' "$DOC_TYPE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+case "$DOC_TYPE_LOWER" in
+  readme|architecture|api-reference|changelog)
+    printf 'RESERVED_KEYWORD=%s\n' "$DOC_TYPE_LOWER"
+    ;;
+  *)
+    printf 'RESERVED_KEYWORD=\n'
+    ;;
+esac
+```
+If RESERVED_KEYWORD is non-empty: proceed to Step 5 (reserved handler).
+Otherwise: proceed to Step 4 (custom generation).
+```
+
+**Rule:** Input validation that gates control flow must be implemented in
+bash, not prose. Bash handles case normalization, whitespace trimming, and
+exact string matching deterministically. Prose-based branching is
+probabilistic and fails on edge cases.
+
+**Applies to:** Reserved keywords, enum validation, format validation
+(dates, slugs, identifiers), and any input that determines which code path
+executes.
+
+---
+
 ## Prevention Strategies
 
 ### Pre-PR Checklist for Command Markdown Files
@@ -607,6 +751,7 @@ flag's value.
 - [ ] `subagent_type` matches the exact `name:` field in the agent's frontmatter
 - [ ] Verified by checking `plugins/<plugin>/agents/<file>.md`, not inferred
 - [ ] The literal `subagent_type: "..."` string is spelled out in the command prose — not left for the LLM to guess from a description like "spawn the X agent"
+- [ ] Commands use `Task` tool (not `Agent`) for all agent delegation
 
 **Prompt Injection**
 - [ ] Linear issue bodies, PR comments, CI logs wrapped in `--- begin/end ---` delimiters
@@ -627,6 +772,11 @@ flag's value.
 - [ ] `AskUserQuestion` with title list before any loop that creates N issues/files — no count threshold, always required
 - [ ] Cancel path exits without creating anything
 
+**Batch Agent Spawns**
+- [ ] Per-item agent spawn loops have a threshold gate (default: 10) with user confirmation
+- [ ] Threshold gate offers "all N" / "first N only" / "Cancel" options
+- [ ] Each iteration prints a progress indicator (`[3/10] Completed ...`)
+
 **User Input Mid-Workflow**
 - [ ] Every mid-step user input uses `AskUserQuestion`, not prose "ask as follow-up"
 - [ ] Every `AskUserQuestion` Cancel/No branch has an explicit stop instruction
@@ -642,6 +792,11 @@ flag's value.
 
 **Argument Parsing**
 - [ ] `--flag` handlers check `$2` is non-empty and not another flag
+
+**Input Validation**
+- [ ] Reserved keyword checks are in bash (case/if), not LLM prose branching
+- [ ] Keyword matching normalizes case (`tr '[:upper:]' '[:lower:]'`) and whitespace before comparison
+- [ ] Enum/format validation that gates control flow is deterministic bash, not probabilistic prose
 
 ### Review Agent Heuristics
 
@@ -661,6 +816,9 @@ When reviewing command markdown files, scan for:
 12. `yq '.field'` — is `-r` flag present for all string fields used in comparisons or case statements?
 13. `AskUserQuestion` free-text buttons — do they use "Other" as the label (not a custom label)?
 14. Conditional steps — does each optional step start with "If [condition not met], skip this step."?
+15. `Agent` tool in commands — should be `Task` with `subagent_type` instead?
+16. Per-item agent loops — is there a threshold gate with user confirmation before spawning N agents?
+17. Prose-based branching — does an `if` condition in prose gate control flow that should be a bash `case`/`if` instead?
 
 ---
 
