@@ -3,6 +3,7 @@ name: doc-auditor
 description: "Documentation audit specialist — scan repos for doc gaps, staleness, and coverage. Use when auditing documentation health."
 model: inherit
 background: true
+memory: true
 skills:
   - docs-conventions
 tools:
@@ -128,7 +129,7 @@ omit prose sections entirely.
 Otherwise, produce a structured report with:
 
 1. **Summary**: Project type, total files scanned, documentation coverage %
-2. **Health score**: `max(0, 100 - (P1_count * 15 + P2_count * 5 + P3_count * 1))`
+2. **Health score**: Use the formula from docs-conventions skill
 3. **Findings by severity**:
    - P1 (Critical): Missing README, undocumented public API
    - P2 (Important): Stale docs (code changed, docs didn't)

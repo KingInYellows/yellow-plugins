@@ -3,6 +3,7 @@ name: doc-generator
 description: "AI-assisted documentation generator with human review gates. Use when generating READMEs, API references, architecture docs, or module documentation."
 model: inherit
 background: true
+memory: true
 skills:
   - docs-conventions
 tools:

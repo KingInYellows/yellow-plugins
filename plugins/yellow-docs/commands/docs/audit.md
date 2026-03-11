@@ -97,7 +97,7 @@ Launch the `doc-auditor` agent via Task tool (subagent_type: "yellow-docs:doc-au
 >    changed, 90-day threshold)
 > 5. Identify gaps (undocumented modules, missing README, no architecture docs)
 > 6. Produce a structured findings report with P1/P2/P3 severity
-> 7. Calculate health score: max(0, 100 - (P1*15 + P2*5 + P3*1))
+> 7. Calculate health score per the docs-conventions formula
 > 8. Recommend top 3 actionable next steps
 >
 > Cap findings at 50 per severity category. Respect .gitignore.

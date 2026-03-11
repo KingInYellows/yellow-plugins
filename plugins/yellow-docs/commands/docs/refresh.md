@@ -1,7 +1,7 @@
 ---
 name: docs:refresh
 description: "Update stale documentation by analyzing code changes since a git ref. Use when docs are out of date or after shipping code changes."
-argument-hint: '[--since <ref>] [--dry-run]'
+argument-hint: '[path] [--since <ref>] [--dry-run]'
 allowed-tools:
   - Bash
   - Read
@@ -20,6 +20,7 @@ update diffs for human review.
 
 ## Arguments
 
+- `[path]` — Optional path to limit refresh scope (e.g., `./src/auth/`)
 - `--since <ref>` — Git ref to compare against (default: last commit on main)
 - `--dry-run` — Show what would change without writing
 
@@ -34,9 +35,18 @@ if [ -z "$repo_top" ]; then
   exit 1
 fi
 
-# Determine the base ref
+# Determine the default branch with fallback chain
 MAIN_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-MAIN_BRANCH=${MAIN_BRANCH:-main}
+if [ -z "$MAIN_BRANCH" ]; then
+  # origin/HEAD not set — try common default branch names
+  for candidate in main master develop; do
+    if git rev-parse --verify "origin/$candidate" >/dev/null 2>&1; then
+      MAIN_BRANCH="$candidate"
+      break
+    fi
+  done
+  MAIN_BRANCH=${MAIN_BRANCH:-main}
+fi
 ```
 
 ### Step 2: Parse Arguments
@@ -94,7 +104,14 @@ Parse `$ARGUMENTS` for flags:
    esac
    ```
 
+3. Extract optional `[path]` scope — any remaining argument that is not a flag
+   and resolves to a valid directory within the repository. If provided, only
+   source changes under that path will be analyzed.
+
 ### Step 3: Identify Changed Source Files
+
+If a `[path]` scope was provided, prepend it to the pathspecs so only changes
+under that directory are considered.
 
 ```bash
 ALL_CHANGED=$(git diff --name-only "$REF"..HEAD -- \
