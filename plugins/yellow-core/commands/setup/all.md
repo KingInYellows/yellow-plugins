@@ -146,7 +146,7 @@ if [ -d "$plugin_cache" ]; then
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-core; do
+    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -283,6 +283,11 @@ Compute bundled source availability out of 5:
   AND `npm` OK AND `agent-browser` OK
 - NEEDS SETUP: any READY condition not met
 
+**yellow-docs:**
+
+- READY: `git_repo` ok AND `git` OK
+- NEEDS SETUP: `git` missing OR not in a git repository
+
 **yellow-core:**
 
 - READY: `python37_check` ok AND `~/.claude/yellow-statusline.py` exists AND
@@ -380,7 +385,8 @@ tool in this fixed order:
 10. `ci:setup`
 11. `review:setup`
 12. `browser-test:setup`
-13. `statusline:setup`
+13. `docs:setup`
+14. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 Only invoke setups for plugins the user selected. Use this mapping:
@@ -398,6 +404,7 @@ Only invoke setups for plugins the user selected. Use this mapping:
 - `yellow-ci` → `ci:setup`
 - `yellow-review` → `review:setup`
 - `yellow-browser-test` → `browser-test:setup`
+- `yellow-docs` → `docs:setup`
 - `yellow-core` → `statusline:setup`
 <!-- setup-all-plugin-command-map:end -->
 

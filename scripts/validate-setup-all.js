@@ -30,6 +30,7 @@ const COMMAND_PLUGIN_MAP = {
   'ci:setup': 'yellow-ci',
   'review:setup': 'yellow-review',
   'browser-test:setup': 'yellow-browser-test',
+  'docs:setup': 'yellow-docs',
   'statusline:setup': 'yellow-core',
 };
 
