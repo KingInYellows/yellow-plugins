@@ -50,6 +50,8 @@ if [ -n "$repo_top" ]; then
   if [ -f "$repo_top/Cargo.toml" ]; then
     grep -q '\[workspace\]' "$repo_top/Cargo.toml" 2>/dev/null && printf 'workspace:    Rust workspace\n'
   fi
+  sub_plugins=$(git -C "$repo_top" ls-files -- '**/.claude-plugin/plugin.json' 2>/dev/null | wc -l)
+  [ "$sub_plugins" -gt 0 ] && printf 'subprojects:  %d Claude Code plugins detected\n' "$sub_plugins"
 
   printf '\n=== Existing Doc Tooling ===\n'
   [ -f "$repo_top/mkdocs.yml" ] && printf 'tooling:      MkDocs\n'

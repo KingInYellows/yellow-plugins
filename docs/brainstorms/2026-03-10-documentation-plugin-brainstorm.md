@@ -8,7 +8,8 @@
 
 A general-purpose `yellow-docs` plugin that both diagnoses and treats
 documentation problems in any repository. The plugin detects project structure
-(package.json, Cargo.toml, pyproject.toml, go.mod, plugin.json, etc.) and
+(package.json, Cargo.toml, pyproject.toml, go.mod,
+`.claude-plugin/plugin.json`, etc.) and
 adapts its analysis and generation to the repo it's working in.
 
 ### Target Audiences
@@ -56,7 +57,8 @@ already established in yellow-core.
 ### Research Findings That Shaped This
 
 **Codebase patterns:**
-- 13 plugins follow a consistent structure (plugin.json, CLAUDE.md, commands/,
+- 13 plugins follow a consistent structure (`.claude-plugin/plugin.json`,
+  CLAUDE.md, commands/,
   agents/, skills/) -- the docs plugin should follow this same structure
 - The `knowledge-compounder` agent already generates docs to `docs/solutions/`
   and MEMORY.md -- precedent for doc-generating agents exists
@@ -82,7 +84,7 @@ already established in yellow-core.
 
 ### Plugin Structure
 
-```
+```text
 plugins/yellow-docs/
   .claude-plugin/
     plugin.json
@@ -134,7 +136,7 @@ plugins/yellow-docs/
   - Directory path -> file structure (mindmap or class diagram)
   - "architecture" -> system-level component diagram
   - No scope -> auto-detect most useful diagram for the repo
-- Embeds diagrams as ```` ```mermaid ```` code blocks in markdown files
+- Embeds diagrams as fenced `mermaid` code blocks in markdown files
 - Uses `diagram-architect` agent for generation
 
 **`/docs:refresh [--since <ref>]`**
@@ -184,7 +186,8 @@ codebase to build an accurate model before rendering Mermaid syntax.
 - Analyzes code structure (imports, exports, function calls, directory layout)
 - Selects appropriate diagram type based on what's being visualized
 - Generates syntactically valid Mermaid that renders on GitHub
-- Keeps diagrams focused -- max ~30 nodes to maintain readability
+- Keeps diagrams focused -- target 15-30 nodes, hard limit 50 for dense graphs
+  and 100 for sparse graphs
 - Can update existing diagrams when code structure changes
 
 ### Project Structure Detection
@@ -193,7 +196,7 @@ The plugin adapts to any repo by detecting structure signals:
 
 | Signal | Project Type | Doc Strategy |
 |--------|-------------|-------------|
-| `plugin.json` + `commands/` | Claude Code plugin | Plugin CLAUDE.md, command docs, skill docs |
+| `.claude-plugin/plugin.json` + `commands/` | Claude Code plugin | Plugin CLAUDE.md, command docs, skill docs |
 | `package.json` + `src/` | Node.js library/app | README, API reference, module docs |
 | `Cargo.toml` | Rust project | README, crate docs, module docs |
 | `pyproject.toml` or `setup.py` | Python project | README, API reference, module docs |
