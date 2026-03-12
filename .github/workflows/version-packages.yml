@@ -126,7 +126,7 @@ jobs:
           # credential helper. Set the extraheader manually so release-tags.sh
           # can git-push and git-ls-remote. The cleanup step removes this.
           git config --local http.https://github.com/.extraheader \
-            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
