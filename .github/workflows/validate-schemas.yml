@@ -40,7 +40,7 @@ jobs:
   validate-schemas:
     name: Validate Schemas (${{ matrix.target }})
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
     timeout-minutes: 2 # NFR-MAINT-002: Critical path budget
 
     strategy:
@@ -68,6 +68,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
@@ -222,7 +223,7 @@ jobs:
   lint-and-typecheck:
     name: Lint & TypeCheck
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
     timeout-minutes: 3
 
     steps:
@@ -240,6 +241,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
@@ -295,7 +297,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
     timeout-minutes: 5
     needs: [lint-and-typecheck]
 
@@ -314,6 +316,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
@@ -365,7 +368,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:ares]
     timeout-minutes: 8
     needs: [unit-tests]
 
@@ -384,6 +387,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
@@ -435,7 +439,7 @@ jobs:
   contract-drift:
     name: Contract Drift Check
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
     timeout-minutes: 3
     needs: [validate-schemas]
 
@@ -455,6 +459,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
@@ -560,7 +565,7 @@ jobs:
   security-audit:
     name: Security Audit
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
     timeout-minutes: 5
 
     steps:
@@ -578,6 +583,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
@@ -647,7 +653,7 @@ jobs:
   # ============================================================================
   build:
     name: Build Verification
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:ares]
     timeout-minutes: 5
     if: github.ref == 'refs/heads/main' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs: [validate-schemas, lint-and-typecheck, unit-tests]
@@ -667,6 +673,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install ${PNPM_INSTALL_FLAGS}
@@ -718,7 +725,7 @@ jobs:
   validate-versions:
     name: Version Consistency Check
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
     timeout-minutes: 2
 
     steps:
@@ -740,7 +747,7 @@ jobs:
   # ============================================================================
   changeset-check:
     name: Changeset Required
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
     timeout-minutes: 2
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
 
@@ -784,7 +791,8 @@ jobs:
   # ============================================================================
   report-metrics:
     name: Aggregate CI Metrics
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
+    timeout-minutes: 5
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs:
       [
@@ -874,7 +882,8 @@ jobs:
   # ============================================================================
   ci-status:
     name: CI Status Summary
-    runs-on: [self-hosted, Linux, X64, ubuntu24]
+    runs-on: [self-hosted, pool:atlas]
+    timeout-minutes: 2
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs:
       [
