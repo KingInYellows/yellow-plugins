@@ -54,6 +54,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           clean: true
+          persist-credentials: false
           # Full history required for changeset to build CHANGELOG entries
           # and for release-tags.sh to diff plugin tags.
           fetch-depth: 0
@@ -118,6 +119,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Configure git credentials (recovery)
+        if: inputs.force_publish == true
+        run: |
+          # persist-credentials: false means checkout did not configure a
+          # credential helper. Set the extraheader manually so release-tags.sh
+          # can git-push and git-ls-remote. The cleanup step removes this.
+          git config --local http.https://github.com/.extraheader \
+            "AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run release tags (force_publish recovery)
         if: inputs.force_publish == true
         run: bash scripts/ci/release-tags.sh
@@ -140,6 +152,17 @@ jobs:
 
           echo "Catalog version: $VERSION"
 
+      - name: Cleanup credentials
+        if: always()
+        run: |
+          # Remove any credential extraheader left by action steps (e.g. changesets/action, recovery setup)
+          git config --local --unset-all http.https://github.com/.extraheader || echo "::notice::No git credential extraheader to remove"
+          git config --global --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+          # Remove .npmrc (defense-in-depth on persistent runners)
+          rm -f "$HOME/.npmrc" "$RUNNER_TEMP/.npmrc" || echo "::warning::Failed to remove .npmrc files"
+          # Remove temporary files from release-tags.sh
+          rm -f /tmp/plugin-tags-before.txt /tmp/plugin-tags-after.txt || true
+
   # ==========================================================================
   # BUILD ARTIFACTS + GITHUB RELEASE + NPM PUBLISH
   # ==========================================================================
@@ -156,6 +179,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           clean: true
+          persist-credentials: false
           # Full history needed for generate-release-notes.js changelog parsing.
           fetch-depth: 0
 
@@ -230,6 +254,15 @@ jobs:
           pnpm -r publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Cleanup credentials
+        if: always()
+        run: |
+          # Remove any credential extraheader left by action steps (e.g. changesets/action, recovery setup)
+          git config --local --unset-all http.https://github.com/.extraheader || echo "::notice::No git credential extraheader to remove"
+          git config --global --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+          # Remove .npmrc written by actions/setup-node with registry-url
+          rm -f "$HOME/.npmrc" "$RUNNER_TEMP/.npmrc" || echo "::warning::Failed to remove .npmrc files"
 
   # ==========================================================================
   # FAILURE NOTIFICATION
