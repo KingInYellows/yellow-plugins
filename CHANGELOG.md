@@ -13,6 +13,44 @@ and this project adheres to
 
 ---
 
+## [1.2.0] - 2026-03-12
+
+### Added
+
+- **yellow-docs** — Documentation audit, generation, and Mermaid diagram
+  creation for any repository. 3 agents, 5 commands, 1 skill.
+- **yellow-morph** — Intelligent code editing and search via Morph Fast Apply
+  and WarpGrep MCP. 2 commands, 1 MCP.
+- **yellow-semgrep** — Semgrep security finding remediation — fetch, fix, and
+  verify findings from the Semgrep platform. 2 agents, 5 commands, 1 skill,
+  1 MCP.
+- **yellow-research** — Added ast-grep MCP server (5th MCP source).
+- **yellow-devin** — Added `/devin:review-prs` command for multi-agent PR
+  review and remediation of Devin-authored PRs.
+- **yellow-ci** — Added `/ci:report-linear` command for CI failure Linear issue
+  creation.
+- **yellow-core** — Added `/setup:all` command to validate all installed plugin
+  prerequisites at once.
+- **gt-workflow** — Added `/gt-amend` command, `smart-submit` command, and
+  Graphite MCP server integration.
+
+### Changed
+
+- Consolidated CI from 3 workflows to 1 unified `version-packages.yml`.
+- All agent definitions now use `tools:` frontmatter (migrated from `allowed-tools:`).
+- Per-plugin independent versioning via changesets is now fully operational.
+
+### Totals
+
+- **14 plugins** across 5 categories
+- **51 agents** for autonomous task execution
+- **81 commands** for manual workflows
+- **19 skills** for shared conventions and patterns
+- **9 hooks** for automated event-driven behavior
+- **14 MCP server integrations**
+
+---
+
 ## [1.1.0] - 2026-02-23
 
 ### Added
