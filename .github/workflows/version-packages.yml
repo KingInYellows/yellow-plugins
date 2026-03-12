@@ -140,6 +140,16 @@ jobs:
 
           echo "Catalog version: $VERSION"
 
+      - name: Cleanup credentials
+        if: always()
+        run: |
+          # Remove git credential helpers written by actions/checkout
+          git config --unset-all credential.helper 2>/dev/null || true
+          # Remove any cached tokens from the runner temp directory
+          rm -f "$RUNNER_TEMP/.npmrc" 2>/dev/null || true
+          # Remove temporary files from release-tags.sh
+          rm -f /tmp/plugin-tags-before.txt /tmp/plugin-tags-after.txt 2>/dev/null || true
+
   # ==========================================================================
   # BUILD ARTIFACTS + GITHUB RELEASE + NPM PUBLISH
   # ==========================================================================
@@ -230,6 +240,16 @@ jobs:
           pnpm -r publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Cleanup credentials
+        if: always()
+        run: |
+          # Remove git credential helpers written by actions/checkout
+          git config --unset-all credential.helper 2>/dev/null || true
+          # Remove .npmrc written by actions/setup-node with registry-url
+          rm -f "$HOME/.npmrc" "$RUNNER_TEMP/.npmrc" 2>/dev/null || true
+          # Remove any cached tokens from the runner temp directory
+          rm -f /tmp/plugin-tags-before.txt /tmp/plugin-tags-after.txt 2>/dev/null || true
 
   # ==========================================================================
   # FAILURE NOTIFICATION
