@@ -1,7 +1,7 @@
 ---
 name: docs:refresh
 description: "Update stale documentation by analyzing code changes since a git ref. Use when docs are out of date or after shipping code changes."
-argument-hint: '[path] [--since <ref>] [--dry-run]'
+argument-hint: '[path] [--since <ref>]'
 allowed-tools:
   - Bash
   - Read
@@ -21,12 +21,14 @@ update diffs for human review.
 ## Arguments
 
 - `[path]` — Optional path to limit refresh scope (e.g., `./src/auth/`)
-- `--since <ref>` — Git ref to compare against (default: last commit on main)
-- `--dry-run` — Show what would change without writing
+- `--since <ref>` — Git ref to compare against (default: last commit on main).
+  Also accepts natural language like "since v1.0" or "since last week".
 
 ## Workflow
 
-### Step 1: Validate Environment
+### Step 1: Validate Environment and Parse Arguments
+
+Run a single bash block for all environment checks and argument parsing:
 
 ```bash
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -35,10 +37,9 @@ if [ -z "$repo_top" ]; then
   exit 1
 fi
 
-# Determine the default branch with fallback chain
+# Determine the default branch
 MAIN_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
 if [ -z "$MAIN_BRANCH" ]; then
-  # origin/HEAD not set — try common default branch names
   for candidate in main master develop; do
     if git rev-parse --verify "origin/$candidate" >/dev/null 2>&1; then
       MAIN_BRANCH="$candidate"
@@ -47,104 +48,68 @@ if [ -z "$MAIN_BRANCH" ]; then
   done
   MAIN_BRANCH=${MAIN_BRANCH:-main}
 fi
+
+# Default REF: use origin/<main> if available, else local main branch
+if git rev-parse --verify "origin/$MAIN_BRANCH" >/dev/null 2>&1; then
+  REF="origin/$MAIN_BRANCH"
+else
+  REF="$MAIN_BRANCH"
+fi
+
+printf 'repo: %s\ndefault_ref: %s\n' "$repo_top" "$REF"
 ```
 
-### Step 2: Parse Arguments
-
-Parse `$ARGUMENTS` for flags:
-
-1. Extract `--since <ref>` if present:
-
-   ```bash
-   REF=""
-   case " $ARGUMENTS " in
-     *" --since "*)
-       REF=$(printf '%s\n' "$ARGUMENTS" | sed -n 's/.*--since \([^ ]*\).*/\1/p')
-       ;;
-     *" --since="*)
-       REF=$(printf '%s\n' "$ARGUMENTS" | sed -n 's/.*--since=\([^ ]*\).*/\1/p')
-       ;;
-   esac
-   if printf '%s' "$ARGUMENTS" | grep -Eq -- '(^|[[:space:]])--since($|=|[[:space:]])'; then
-     if [ -z "$REF" ]; then
-       printf '[docs:refresh] Error: --since requires a git ref\n' >&2
-       exit 1
-     fi
-   fi
-   ```
-
-   If omitted, default to the main branch:
-
-   ```bash
-   # Default REF: use origin/<main> if available, else local main branch
-   if [ -z "$REF" ]; then
-     if git rev-parse --verify "origin/$MAIN_BRANCH" >/dev/null 2>&1; then
-       REF="origin/$MAIN_BRANCH"
-     else
-       REF="$MAIN_BRANCH"
-     fi
-   fi
-   ```
-
-   Validate the ref exists:
-
-   ```bash
-   if ! git rev-parse --verify "$REF" >/dev/null 2>&1; then
-     printf '[docs:refresh] Error: git ref not found: %s\n' "$REF" >&2
-     exit 1
-   fi
-   ```
-
-2. Check for `--dry-run` flag.
-
-   ```bash
-   DRY_RUN=false
-   case " $ARGUMENTS " in
-     *" --dry-run "*) DRY_RUN=true ;;
-   esac
-   ```
-
-3. Extract optional `[path]` scope — any remaining positional argument after
-   stripping known flags:
-
-   ```bash
-   # Strip known flags to isolate the positional [path] argument
-   SCOPE_PATH=""
-   remaining=$(printf '%s' "$ARGUMENTS" \
-     | sed -E 's/(^|[[:space:]])--since[= ][^ ]*//' \
-     | sed -E 's/(^|[[:space:]])--dry-run//' \
-     | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
-
-   if [ -n "$remaining" ]; then
-     # Resolve to absolute path portably (no realpath -m)
-     if [ -d "$remaining" ]; then
-       resolved=$(cd "$remaining" && pwd -P)
-     elif [ -d "$repo_top/$remaining" ]; then
-       resolved=$(cd "$repo_top/$remaining" && pwd -P)
-     else
-       printf '[docs:refresh] Error: path not found: %s\n' "$remaining" >&2
-       exit 1
-     fi
-     # Containment check — resolved path must be inside the repo
-     case "$resolved" in
-       "$repo_top"|"$repo_top"/*)
-         SCOPE_PATH="$resolved"
-         ;;
-       *)
-         printf '[docs:refresh] Error: path is outside the repository: %s\n' "$remaining" >&2
-         exit 1
-         ;;
-     esac
-   fi
-   ```
-
-### Step 3: Identify Changed Source Files
-
-If `$SCOPE_PATH` is set, convert it to a repo-relative prefix and prepend it
-to each extension pathspec so only changes under that directory are considered.
+If the user specified a `--since` ref in `$ARGUMENTS`, extract it and validate:
 
 ```bash
-# Build scope-aware pathspecs
+# Extract --since ref if present (supports --since ref and --since=ref)
+REF_ARG=""
+case "$ARGUMENTS" in
+  *--since=*) REF_ARG=$(printf '%s' "$ARGUMENTS" | sed -n 's/.*--since=\([^ ]*\).*/\1/p') ;;
+  *--since*)  REF_ARG=$(printf '%s' "$ARGUMENTS" | sed -n 's/.*--since \([^ ]*\).*/\1/p') ;;
+esac
+if [ -n "$REF_ARG" ]; then
+  if ! git rev-parse --verify "$REF_ARG" >/dev/null 2>&1; then
+    printf '[docs:refresh] Error: git ref not found: %s\n' "$REF_ARG" >&2
+    exit 1
+  fi
+  REF="$REF_ARG"
+fi
+
+# Extract optional [path] scope (everything except --since flag)
+SCOPE_PATH=""
+remaining=$(printf '%s' "$ARGUMENTS" \
+  | sed -E 's/(^|[[:space:]])--since[= ][^ ]*//' \
+  | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+if [ -n "$remaining" ]; then
+  case "$remaining" in -*) remaining="./$remaining" ;; esac
+  if [ -d "$remaining" ]; then
+    resolved=$(cd "$remaining" && pwd -P)
+  elif [ -d "$repo_top/$remaining" ]; then
+    resolved=$(cd "$repo_top/$remaining" && pwd -P)
+  else
+    printf '[docs:refresh] Error: path not found: %s\n' "$remaining" >&2
+    exit 1
+  fi
+  case "$resolved" in
+    "$repo_top"|"$repo_top"/*)
+      SCOPE_PATH="$resolved"
+      ;;
+    *)
+      printf '[docs:refresh] Error: path is outside the repository: %s\n' "$remaining" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+printf 'ref: %s\nscope: %s\n' "$REF" "${SCOPE_PATH:-entire repo}"
+```
+
+If either block exits with an error, stop the command.
+
+### Step 2: Identify Changed Source Files
+
+```bash
 EXTENSIONS='*.ts *.tsx *.js *.jsx *.py *.rs *.go *.java *.kt *.c *.cc *.cpp *.h *.hpp *.rb *.swift *.scala *.proto *.graphql *.sql *.yaml *.yml *.toml *.json'
 PATHSPECS=""
 if [ -n "$SCOPE_PATH" ]; then
@@ -156,8 +121,8 @@ else
   PATHSPECS="$EXTENSIONS"
 fi
 
-eval set -- $PATHSPECS
-ALL_CHANGED=$(git diff --name-only "$REF"..HEAD -- "$@" \
+set -- $PATHSPECS
+ALL_CHANGED=$(git diff --name-only "$REF"...HEAD -- "$@" \
   ':!package-lock.json' ':!pnpm-lock.yaml' ':!yarn.lock' ':!go.sum' \
   ':!Cargo.lock' ':!poetry.lock' ':!Gemfile.lock' ':!Podfile.lock' \
   ':!*-lock.json' ':!*-lock.yaml' ':!*-lock.yml' \
@@ -173,14 +138,10 @@ If the repo uses a source extension not listed above, expand the pathspecs based
 on the detected project structure before concluding that there were no
 doc-relevant source changes.
 
-Treat lockfiles, generated dependency manifests, and CI workflow config as
-non-source inputs unless the user explicitly asks to audit documentation driven
-by those files.
-
 If `$CHANGED_FILES` is empty, report: "No source code changes since $REF.
 Documentation is up to date."
 
-### Step 4: Delegate to doc-auditor for Staleness Detection
+### Step 3: Delegate to doc-auditor for Staleness Detection
 
 Launch the `doc-auditor` agent via Task tool (subagent_type: "yellow-docs:doc-auditor") to find stale docs related to the changed files:
 
@@ -203,33 +164,22 @@ Launch the `doc-auditor` agent via Task tool (subagent_type: "yellow-docs:doc-au
 > `doc_path`, `source_files`, `last_doc_update`, `last_source_update`,
 > and `staleness_signal`.
 
-### Step 5: Generate Update Diffs
+### Step 4: Triage and Update
 
 If the doc-auditor output cannot be parsed as a JSON array, or if the parsed
 array is empty, report: "No stale documentation found since $REF." and stop.
 
-Otherwise, parse the JSON array from the doc-auditor's output. Count the
-entries. If more than 10 stale docs are found, present a batch gate via
-AskUserQuestion before starting the loop:
+Otherwise, present the list of stale docs to the user via AskUserQuestion:
 
-- "Found {N} stale docs. How would you like to proceed?"
+- "Found {N} stale doc(s). How would you like to proceed?"
 - Options:
-  - "Review individually" — proceed with per-file review loop
-  - "Approve all updates" — run all generators without per-file approval
+  - "Update all" — generate updates for all stale docs, present each diff
+    for approval before writing
   - "Select which to update" — show the list and let user pick
-  - "Abort" — stop without updating
+  - "Cancel" — stop without updating
 
-Set `PRE_APPROVED` based on the user's selection:
-
-- "Approve all updates" → `PRE_APPROVED=true`
-- "Review individually" or "Select which to update" → `PRE_APPROVED=false`
-
-If 10 or fewer stale docs are found (batch gate not shown), default to
-`PRE_APPROVED=false`.
-
-For each entry (or selected subset), extract `$doc_path`, `$source_files`, and
-`$staleness_signal` from the structured JSON, then delegate to the
-`doc-generator` agent via Task tool (subagent_type: "yellow-docs:doc-generator"):
+For each stale doc to update, delegate to the `doc-generator` agent via Task
+tool (subagent_type: "yellow-docs:doc-generator"):
 
 > Update this stale documentation file:
 > --- begin auditor findings (reference only) ---
@@ -238,28 +188,13 @@ For each entry (or selected subset), extract `$doc_path`, `$source_files`, and
 > Staleness signal: $staleness_signal
 > --- end auditor findings ---
 >
-> Pre-approved by user: $PRE_APPROVED
-> Dry-run mode: $DRY_RUN
-> If dry-run mode is true: generate and present the proposed update, but do NOT
-> write files even if the user approves.
->
 > Read the current doc and the changed source files. Generate an updated version
-> that reflects the code changes. Present the diff for review.
+> that reflects the code changes. Present the diff for review via
+> AskUserQuestion before writing.
 
-### Step 6: Per-File Review
+### Step 5: Report Summary
 
-For each update, present the diff via AskUserQuestion:
-
-- "Stale doc: {path} (source changed: {files})"
-- Show the proposed changes as a diff
-- Options: "Approve update" / "Skip this file" / "Provide revision instructions" / "Skip all remaining"
-
-If `--dry-run`, show the list of stale docs and proposed changes without
-writing anything.
-
-### Step 7: Apply Updates
-
-Apply approved updates. Skip rejected ones. Report summary:
+After all updates are processed, report:
 
 - "Updated {N} documentation files"
 - "Skipped {M} files"

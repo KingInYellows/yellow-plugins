@@ -7,8 +7,6 @@ allowed-tools:
   - Read
   - Glob
   - Grep
-  - Write
-  - Edit
   - Task
   - AskUserQuestion
 ---
@@ -42,54 +40,31 @@ fi
 
 ### Step 2: Resolve Target
 
-Parse `$ARGUMENTS` to determine what to generate. Set `$target_type` to one of:
-`readme`, `architecture`, `api-reference`, `file`, or `module`.
+Interpret `$ARGUMENTS` to determine what to generate:
 
-1. If empty: analyze the repo to detect the most useful target. Suggest via
-   AskUserQuestion: "What would you like to document?" with options:
-   - "README" — set `target_type="readme"`
-   - "Architecture overview" — set `target_type="architecture"`
-   - "API reference" — set `target_type="api-reference"`
-   - "A specific file or module" — ask for path, assign the response to
-     `$TARGET`, and then run the same file/module validation block below before
-     continuing
+1. If empty: suggest via AskUserQuestion: "What would you like to document?"
+   with options: "README", "Architecture overview", "API reference", or
+   "A specific file or module" (ask for path if selected).
 
-2. If a reserved keyword (`readme`, `architecture`, `api-reference`): use that
-   as `$target_type`.
+2. If a keyword (`readme`, `architecture`, `api-reference`): use as
+   `$target_type`.
 
-3. If a file or directory path: validate it exists and is within the repository,
-   then set `$target_type` to `file` or `module` accordingly. This same
-   validation must also run for paths collected interactively after the initial
-   AskUserQuestion flow.
+3. If a file or directory path: validate it exists and is within the repo.
 
 ```bash
-# Run this block for every file/module target, whether it came from $ARGUMENTS
-# or from a follow-up AskUserQuestion response
-TARGET="${TARGET:-$ARGUMENTS}"
-# Skip validation for reserved keywords — handled by the prose above
+TARGET="$ARGUMENTS"
+# Keywords don't need path validation
 case "$TARGET" in
-  readme|architecture|api-reference) echo "keyword:$TARGET"; exit 0 ;;
+  readme|architecture|api-reference|"") exit 0 ;;
 esac
 # Neutralize leading-dash paths
-case "$TARGET" in
-  -*) TARGET="./$TARGET" ;;
-esac
+case "$TARGET" in -*) TARGET="./$TARGET" ;; esac
+# Resolve path
 case "$TARGET" in
   /*) target_path="$TARGET" ;;
-  *)
-    if [ -e "$repo_top/$TARGET" ]; then
-      target_path="$repo_top/$TARGET"
-    else
-      target_path="$TARGET"
-    fi
-    ;;
+  *)  [ -e "$repo_top/$TARGET" ] && target_path="$repo_top/$TARGET" || target_path="$TARGET" ;;
 esac
-# Validate path exists and is within repository
-if [ ! -e "$target_path" ]; then
-  printf '[docs:generate] Error: path not found: %s\n' "$TARGET" >&2
-  exit 1
-fi
-# Resolve to absolute path (POSIX-portable, no realpath dependency)
+[ -e "$target_path" ] || { printf '[docs:generate] Error: path not found: %s\n' "$TARGET" >&2; exit 1; }
 if [ -d "$target_path" ]; then
   target_type="module"
   resolved=$(cd "$target_path" && pwd -P)
@@ -99,10 +74,7 @@ else
 fi
 case "$resolved" in
   "$repo_top"|"$repo_top"/*) ;;
-  *)
-    printf '[docs:generate] Error: path escapes repository: %s\n' "$TARGET" >&2
-    exit 1
-    ;;
+  *) printf '[docs:generate] Error: path escapes repository: %s\n' "$TARGET" >&2; exit 1 ;;
 esac
 ```
 
@@ -136,7 +108,7 @@ Launch the `doc-generator` agent via Task tool (subagent_type: "yellow-docs:doc-
 > 4. Sanitize for sensitive content (API keys, credentials, database URLs)
 > 5. Present the draft for human review via AskUserQuestion
 > 6. On approval: write with provenance comment
-> 7. On revision: incorporate feedback and re-present (up to 3 rounds)
+> 7. On revision: incorporate feedback and re-present
 > 8. On rejection: discard and suggest alternatives
 >
 > If the target file already exists: show diff between current and proposed.

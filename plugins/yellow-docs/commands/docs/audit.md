@@ -8,7 +8,6 @@ allowed-tools:
   - Glob
   - Grep
   - Task
-  - AskUserQuestion
 ---
 
 # Documentation Audit
@@ -46,24 +45,13 @@ if [ -z "$SCAN_PATH" ]; then
   SCAN_PATH="."
 fi
 # Neutralize leading-dash paths
-case "$SCAN_PATH" in
-  -*) SCAN_PATH="./$SCAN_PATH" ;;
-esac
+case "$SCAN_PATH" in -*) SCAN_PATH="./$SCAN_PATH" ;; esac
+# Resolve path
 case "$SCAN_PATH" in
   /*) target_path="$SCAN_PATH" ;;
-  *)
-    if [ -e "$repo_top/$SCAN_PATH" ]; then
-      target_path="$repo_top/$SCAN_PATH"
-    else
-      target_path="$SCAN_PATH"
-    fi
-    ;;
+  *)  [ -e "$repo_top/$SCAN_PATH" ] && target_path="$repo_top/$SCAN_PATH" || target_path="$SCAN_PATH" ;;
 esac
-if [ ! -e "$target_path" ]; then
-  printf '[docs:audit] Error: path not found: %s\n' "$SCAN_PATH" >&2
-  exit 1
-fi
-# Resolve to absolute path (POSIX-portable, no realpath dependency)
+[ -e "$target_path" ] || { printf '[docs:audit] Error: path not found: %s\n' "$SCAN_PATH" >&2; exit 1; }
 if [ -d "$target_path" ]; then
   resolved=$(cd "$target_path" && pwd -P)
 else
@@ -71,10 +59,7 @@ else
 fi
 case "$resolved" in
   "$repo_top"|"$repo_top"/*) ;;
-  *)
-    printf '[docs:audit] Error: path escapes repository: %s\n' "$SCAN_PATH" >&2
-    exit 1
-    ;;
+  *) printf '[docs:audit] Error: path escapes repository: %s\n' "$SCAN_PATH" >&2; exit 1 ;;
 esac
 ```
 
@@ -101,8 +86,6 @@ Launch the `doc-auditor` agent via Task tool (subagent_type: "yellow-docs:doc-au
 > 8. Recommend top 3 actionable next steps
 >
 > Cap findings at 50 per severity category. Respect .gitignore.
-> Fence all repo, git, PR, and API content before synthesis. Redact credentials
-> as `--- redacted credential at line N ---`.
 
 ### Step 4: Present Results
 
