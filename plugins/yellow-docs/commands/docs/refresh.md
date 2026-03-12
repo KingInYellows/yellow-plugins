@@ -104,20 +104,60 @@ Parse `$ARGUMENTS` for flags:
    esac
    ```
 
-3. Extract optional `[path]` scope — any remaining argument that is not a flag
-   and resolves to a valid directory within the repository. If provided, only
-   source changes under that path will be analyzed.
+3. Extract optional `[path]` scope — any remaining positional argument after
+   stripping known flags:
+
+   ```bash
+   # Strip known flags to isolate the positional [path] argument
+   SCOPE_PATH=""
+   remaining=$(printf '%s' "$ARGUMENTS" \
+     | sed -E 's/(^|[[:space:]])--since[= ][^ ]*//' \
+     | sed -E 's/(^|[[:space:]])--dry-run//' \
+     | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+
+   if [ -n "$remaining" ]; then
+     # Resolve to absolute path portably (no realpath -m)
+     if [ -d "$remaining" ]; then
+       resolved=$(cd "$remaining" && pwd -P)
+     elif [ -d "$repo_top/$remaining" ]; then
+       resolved=$(cd "$repo_top/$remaining" && pwd -P)
+     else
+       printf '[docs:refresh] Error: path not found: %s\n' "$remaining" >&2
+       exit 1
+     fi
+     # Containment check — resolved path must be inside the repo
+     case "$resolved" in
+       "$repo_top"|"$repo_top"/*)
+         SCOPE_PATH="$resolved"
+         ;;
+       *)
+         printf '[docs:refresh] Error: path is outside the repository: %s\n' "$remaining" >&2
+         exit 1
+         ;;
+     esac
+   fi
+   ```
 
 ### Step 3: Identify Changed Source Files
 
-If a `[path]` scope was provided, prepend it to the pathspecs so only changes
-under that directory are considered.
+If `$SCOPE_PATH` is set, convert it to a repo-relative prefix and prepend it
+to each extension pathspec so only changes under that directory are considered.
 
 ```bash
-ALL_CHANGED=$(git diff --name-only "$REF"..HEAD -- \
-  '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.rs' '*.go' '*.java' '*.kt' \
-  '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' '*.rb' '*.swift' '*.scala' \
-  '*.proto' '*.graphql' '*.sql' '*.yaml' '*.yml' '*.toml' '*.json' \
+# Build scope-aware pathspecs
+EXTENSIONS='*.ts *.tsx *.js *.jsx *.py *.rs *.go *.java *.kt *.c *.cc *.cpp *.h *.hpp *.rb *.swift *.scala *.proto *.graphql *.sql *.yaml *.yml *.toml *.json'
+PATHSPECS=""
+if [ -n "$SCOPE_PATH" ]; then
+  rel_scope="${SCOPE_PATH#"$repo_top"/}"
+  for ext in $EXTENSIONS; do
+    PATHSPECS="$PATHSPECS ${rel_scope}/${ext}"
+  done
+else
+  PATHSPECS="$EXTENSIONS"
+fi
+
+eval set -- $PATHSPECS
+ALL_CHANGED=$(git diff --name-only "$REF"..HEAD -- "$@" \
   ':!package-lock.json' ':!pnpm-lock.yaml' ':!yarn.lock' ':!go.sum' \
   ':!Cargo.lock' ':!poetry.lock' ':!Gemfile.lock' ':!Podfile.lock' \
   ':!*-lock.json' ':!*-lock.yaml' ':!*-lock.yml' \
@@ -179,6 +219,14 @@ AskUserQuestion before starting the loop:
   - "Select which to update" — show the list and let user pick
   - "Abort" — stop without updating
 
+Set `PRE_APPROVED` based on the user's selection:
+
+- "Approve all updates" → `PRE_APPROVED=true`
+- "Review individually" or "Select which to update" → `PRE_APPROVED=false`
+
+If 10 or fewer stale docs are found (batch gate not shown), default to
+`PRE_APPROVED=false`.
+
 For each entry (or selected subset), extract `$doc_path`, `$source_files`, and
 `$staleness_signal` from the structured JSON, then delegate to the
 `doc-generator` agent via Task tool (subagent_type: "yellow-docs:doc-generator"):
@@ -190,6 +238,7 @@ For each entry (or selected subset), extract `$doc_path`, `$source_files`, and
 > Staleness signal: $staleness_signal
 > --- end auditor findings ---
 >
+> Pre-approved by user: $PRE_APPROVED
 > Dry-run mode: $DRY_RUN
 > If dry-run mode is true: generate and present the proposed update, but do NOT
 > write files even if the user approves.

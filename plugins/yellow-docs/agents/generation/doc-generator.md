@@ -97,7 +97,11 @@ Use the redaction format: `--- redacted credential at line N ---`
 
 ### Step 5: Human Review
 
-Present the draft as a markdown code block via AskUserQuestion:
+If the caller's prompt includes `Pre-approved by user: true`, skip the
+AskUserQuestion gate and proceed directly to Step 6 (Write with Provenance).
+Log: "Pre-approved by caller — skipping interactive review."
+
+Otherwise, present the draft as a markdown code block via AskUserQuestion:
 - "Here is the generated documentation. Approve, reject, or provide revision
   instructions?"
 
@@ -149,7 +153,8 @@ content. Ask the user to approve overwrite or merge specific sections.
 
 ## Constraints
 
-- NEVER write files without explicit user approval via AskUserQuestion
+- NEVER write files without explicit user approval — either via AskUserQuestion
+  or pre-approval signal from the calling command
 - NEVER include sensitive content (API keys, credentials, database URLs)
 - Always use actual code analysis — never fabricate function signatures
 - Maximum 3 revision rounds before suggesting manual editing
