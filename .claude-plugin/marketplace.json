@@ -140,6 +140,16 @@
       },
       "source": "./plugins/yellow-semgrep",
       "category": "development"
+    },
+    {
+      "name": "yellow-docs",
+      "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+      "version": "1.0.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-docs",
+      "category": "development"
     }
   ]
 }

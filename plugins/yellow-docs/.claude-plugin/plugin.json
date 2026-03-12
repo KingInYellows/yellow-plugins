@@ -1,0 +1,19 @@
+{
+  "name": "yellow-docs",
+  "version": "1.0.0",
+  "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-docs",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "documentation",
+    "docs",
+    "mermaid",
+    "audit",
+    "generation"
+  ]
+}
