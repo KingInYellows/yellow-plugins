@@ -514,16 +514,21 @@ validate_runner_targets_file() {
     return 1
   fi
 
-  # runner_targets section must exist
-  if ! grep -qE '^runner_targets:' "$filepath"; then
-    printf '[yellow-ci] Error: Missing runner_targets section\n' >&2
-    return 1
-  fi
-
-  # At least one runner target with a name
-  if ! grep -qE '^[[:space:]]*-[[:space:]]+name:' "$filepath"; then
-    printf '[yellow-ci] Error: No runner targets defined (need at least one - name: entry)\n' >&2
-    return 1
+  # runner_targets section is optional (local override may only have routing_rules)
+  # But if present, it must have at least one valid entry
+  if grep -qE '^runner_targets:' "$filepath"; then
+    if ! grep -qE '^[[:space:]]*-[[:space:]]+name:' "$filepath"; then
+      printf '[yellow-ci] Error: runner_targets section exists but has no entries\n' >&2
+      return 1
+    fi
+  else
+    # No runner_targets — valid only if routing_rules exists (local override)
+    if ! grep -qE '^routing_rules:' "$filepath"; then
+      printf '[yellow-ci] Error: File must have runner_targets and/or routing_rules\n' >&2
+      return 1
+    fi
+    # routing_rules-only file — skip runner validation, return success
+    return 0
   fi
 
   # Validate each runner name found

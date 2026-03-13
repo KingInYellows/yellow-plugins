@@ -34,20 +34,22 @@ if [ ! -d ".github/workflows" ]; then
   json_exit
 fi
 
-# Check if gh CLI is available and authenticated (silent)
-if ! command -v gh >/dev/null 2>&1; then
-  json_exit
-fi
-
-if ! gh auth status >/dev/null 2>&1; then
-  json_exit
-fi
-
 # --- Runner targets context (fast path: read pre-rendered summary) ---
+# Read before gh auth checks so routing context surfaces even without gh CLI
 routing_summary=""
 routing_cache="${HOME}/.cache/yellow-ci/routing-summary.txt"
 if [ -f "$routing_cache" ]; then
   routing_summary=$(head -c 500 "$routing_cache" 2>/dev/null) || routing_summary=""
+fi
+
+# Check if gh CLI is available and authenticated (silent)
+# If gh is missing/unauthed, emit routing summary only (no failure data)
+if ! command -v gh >/dev/null 2>&1; then
+  json_exit "$routing_summary"
+fi
+
+if ! gh auth status >/dev/null 2>&1; then
+  json_exit "$routing_summary"
 fi
 
 # --- Cache check (60s TTL) ---

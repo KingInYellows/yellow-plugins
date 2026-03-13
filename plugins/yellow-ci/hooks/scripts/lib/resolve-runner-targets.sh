@@ -61,10 +61,10 @@ rt_extract_runners() {
     sub(/[[:space:]]*$/, "")
     name = $0
     rtype = ""; mode = ""
-    delete selectors; sel_count = 0
-    delete best_for; bf_count = 0
-    delete avoid_for; af_count = 0
-    delete notes; note_count = 0
+    split("", selectors); sel_count = 0
+    split("", best_for); bf_count = 0
+    split("", avoid_for); af_count = 0
+    split("", notes); note_count = 0
     field = ""
     next
   }
@@ -177,6 +177,9 @@ resolve_runner_targets() {
   fi
 
   if [ "$has_global" -eq 0 ] && [ "$has_local" -eq 0 ]; then
+    # Clean up stale cache when no valid config remains
+    rm -f "${cache_dir}/routing-summary.txt" 2>/dev/null
+    rm -f "${cache_dir}/runner-targets-merged.json" 2>/dev/null
     return 1
   fi
 

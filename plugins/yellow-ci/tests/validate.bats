@@ -14,8 +14,13 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "runner_name: valid single char" {
+@test "runner_name: reject single char (min 2)" {
   run validate_runner_name "r"
+  [ "$status" -eq 1 ]
+}
+
+@test "runner_name: valid two char" {
+  run validate_runner_name "r1"
   [ "$status" -eq 0 ]
 }
 
