@@ -144,6 +144,7 @@ rt_extract_rules() {
 # Merge global and local runner targets, write cache files.
 # Resolution: local runner definition wins entirely by name.
 # routing_rules: local replaces global wholesale if present.
+# Requires: bash 4+ (associative arrays)
 #
 # Usage: resolve_runner_targets
 # Side effects:
@@ -151,6 +152,12 @@ rt_extract_rules() {
 #   - Writes ~/.cache/yellow-ci/runner-targets-merged.json
 # Returns 0 on success, 1 if no config found (graceful degradation)
 resolve_runner_targets() {
+  # Associative arrays require Bash 4+
+  if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
+    printf '[yellow-ci] Error: resolve_runner_targets requires Bash 4+. macOS users: install bash via Homebrew.\n' >&2
+    return 1
+  fi
+
   local global_path
   global_path=$(rt_global_path)
   local local_path
@@ -233,7 +240,7 @@ resolve_runner_targets() {
 
   local rule_count=0
   if [ -n "$rules_source" ]; then
-    rule_count=$(rt_extract_rules "$rules_source" | wc -l)
+    rule_count=$(rt_extract_rules "$rules_source" | wc -l | tr -d ' ')
   fi
 
   # Build routing summary (compact, under 300 chars)

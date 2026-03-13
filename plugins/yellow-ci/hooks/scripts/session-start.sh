@@ -57,7 +57,7 @@ fi
 cache_dir="${HOME}/.cache/yellow-ci"
 if ! mkdir -p "$cache_dir" 2>/dev/null; then
   printf '[yellow-ci] Warning: Cannot create cache directory %s\n' "$cache_dir" >&2
-  json_exit
+  json_exit "$routing_summary"
 fi
 
 # Create cache key from current directory
@@ -78,7 +78,7 @@ if [ -f "$cache_file" ]; then
       json_exit "$cached_msg"
     else
       printf '[yellow-ci] Warning: Cannot read cache file %s\n' "$cache_file" >&2
-      json_exit
+      json_exit "$routing_summary"
     fi
   fi
 fi
@@ -90,8 +90,8 @@ failed_json=""
 if ! failed_json=$(timeout 2 gh run list --status failure --limit 3 \
   --json databaseId,headBranch,displayTitle,conclusion,updatedAt \
   -q '[.[] | select(.conclusion == "failure")]' 2>/dev/null); then
-  # gh failed (network, auth, rate limit) — exit silently
-  json_exit
+  # gh failed (network, auth, rate limit) — emit routing summary only
+  json_exit "$routing_summary"
 fi
 
 # Parse results
