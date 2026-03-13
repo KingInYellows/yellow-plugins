@@ -223,21 +223,21 @@ resolve_runner_targets() {
   # Build routing summary (compact, under 300 chars)
   local pool_summary=""
   local pool_count=0
+  local rdata rtype rmode_s bf_first mode_short entry
   for rname in "${runner_order[@]}"; do
-    local rdata="${merged_runners[$rname]}"
-    local rtype mode bf_first
+    rdata="${merged_runners[$rname]}"
     rtype=$(printf '%s' "$rdata" | cut -d'|' -f2)
-    mode=$(printf '%s' "$rdata" | cut -d'|' -f3)
+    rmode_s=$(printf '%s' "$rdata" | cut -d'|' -f3)
     bf_first=$(printf '%s' "$rdata" | cut -d'|' -f5 | cut -d',' -f1)
 
-    local mode_short=""
-    case "$mode" in
+    mode_short=""
+    case "$rmode_s" in
       jit_ephemeral) mode_short="jit" ;;
       persistent) mode_short="persist" ;;
-      *) mode_short="$mode" ;;
+      *) mode_short="$rmode_s" ;;
     esac
 
-    local entry="${rname} (${rtype}/${mode_short}"
+    entry="${rname} (${rtype}/${mode_short}"
     if [ -n "$bf_first" ]; then
       entry="${entry}, ${bf_first}"
     fi
@@ -265,30 +265,42 @@ resolve_runner_targets() {
       printf '[yellow-ci] Warning: Cache write failed for routing-summary.txt\n' >&2
       rm -f "$tmp_summary" 2>/dev/null
     }
+  else
+    printf '[yellow-ci] Warning: Cannot write tmp file %s\n' "$tmp_summary" >&2
   fi
 
   # Build merged JSON for agents
   local json='{"schema":1,"runner_targets":['
   local first=1
+  local rdata rtype rmode selectors bf af nt sel_json bf_json af_json nt_json
   for rname in "${runner_order[@]}"; do
-    local rdata="${merged_runners[$rname]}"
-    local rtype mode selectors bf af nt
+    rdata="${merged_runners[$rname]}"
     rtype=$(printf '%s' "$rdata" | cut -d'|' -f2)
-    mode=$(printf '%s' "$rdata" | cut -d'|' -f3)
+    rmode=$(printf '%s' "$rdata" | cut -d'|' -f3)
     selectors=$(printf '%s' "$rdata" | cut -d'|' -f4)
     bf=$(printf '%s' "$rdata" | cut -d'|' -f5)
     af=$(printf '%s' "$rdata" | cut -d'|' -f6)
     nt=$(printf '%s' "$rdata" | cut -d'|' -f7)
 
+    # Validate type/mode before JSON interpolation (prevents injection)
+    if [ -n "$rtype" ] && ! validate_runner_type "$rtype"; then
+      printf '[yellow-ci] Warning: Invalid runner type for %s: %s — skipping\n' "$rname" "$rtype" >&2
+      continue
+    fi
+    if [ -n "$rmode" ] && ! validate_runner_mode "$rmode"; then
+      printf '[yellow-ci] Warning: Invalid runner mode for %s: %s — skipping\n' "$rname" "$rmode" >&2
+      continue
+    fi
+
     [ "$first" -eq 1 ] && first=0 || json="${json},"
 
     # Build JSON arrays from comma-separated values
-    local sel_json=$(csv_to_json_array "$selectors")
-    local bf_json=$(csv_to_json_array "$bf")
-    local af_json=$(csv_to_json_array "$af")
-    local nt_json=$(csv_to_json_array "$nt")
+    sel_json=$(csv_to_json_array "$selectors")
+    bf_json=$(csv_to_json_array "$bf")
+    af_json=$(csv_to_json_array "$af")
+    nt_json=$(csv_to_json_array "$nt")
 
-    json="${json}{\"name\":\"${rname}\",\"type\":\"${rtype}\",\"mode\":\"${mode}\""
+    json="${json}{\"name\":\"${rname}\",\"type\":\"${rtype}\",\"mode\":\"${rmode}\""
     json="${json},\"preferred_selector\":${sel_json}"
     json="${json},\"best_for\":${bf_json}"
     json="${json},\"avoid_for\":${af_json}"
@@ -302,15 +314,19 @@ resolve_runner_targets() {
     local rfirst=1
     while IFS= read -r rule; do
       [ "$rfirst" -eq 1 ] && rfirst=0 || json="${json},"
-      # Escape double quotes in rule text
-      rule=$(printf '%s' "$rule" | sed 's/"/\\"/g')
+      # Escape backslashes then double quotes for valid JSON
+      rule=$(printf '%s' "$rule" | sed 's/\\/\\\\/g; s/"/\\"/g')
       json="${json}\"${rule}\""
     done < <(rt_extract_rules "$rules_source")
     json="${json}]"
   fi
 
   json="${json},"
-  json="${json}\"_meta\":{\"global_path\":\"${global_path}\",\"local_path\":\"${local_path}\""
+  # Escape paths for safe JSON interpolation (may contain backslashes on WSL)
+  local esc_global esc_local
+  esc_global=$(printf '%s' "$global_path" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  esc_local=$(printf '%s' "$local_path" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  json="${json}\"_meta\":{\"global_path\":\"${esc_global}\",\"local_path\":\"${esc_local}\""
   json="${json},\"has_global\":${has_global},\"has_local\":${has_local}}}"
 
   # Write merged JSON (atomic write)
@@ -320,6 +336,8 @@ resolve_runner_targets() {
       printf '[yellow-ci] Warning: Cache write failed for runner-targets-merged.json\n' >&2
       rm -f "$tmp_json" 2>/dev/null
     }
+  else
+    printf '[yellow-ci] Warning: Cannot write tmp file %s\n' "$tmp_json" >&2
   fi
 
   return 0
@@ -339,8 +357,8 @@ csv_to_json_array() {
   local IFS=','
   for item in $csv; do
     [ "$first" -eq 1 ] && first=0 || result="${result},"
-    # Escape double quotes
-    item=$(printf '%s' "$item" | sed 's/"/\\"/g')
+    # Escape backslashes then double quotes for valid JSON
+    item=$(printf '%s' "$item" | sed 's/\\/\\\\/g; s/"/\\"/g')
     result="${result}\"${item}\""
   done
   result="${result}]"

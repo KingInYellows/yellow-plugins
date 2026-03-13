@@ -175,8 +175,8 @@ TEMP_FILE=$(mktemp /tmp/yellow-ci-import-XXXXXX.yaml)
 # ... write content to TEMP_FILE ...
 
 # Source validation library and check
-SCRIPT_DIR="$(cd -- "$(dirname "$0")" 2>/dev/null && pwd -P)"
-. "${SCRIPT_DIR}/../../hooks/scripts/lib/validate.sh"
+SCRIPT_DIR="${CLAUDE_PLUGIN_ROOT}/hooks/scripts"
+. "${SCRIPT_DIR}/lib/validate.sh"
 
 validate_runner_targets_file "$TEMP_FILE"
 rm -f "$TEMP_FILE"

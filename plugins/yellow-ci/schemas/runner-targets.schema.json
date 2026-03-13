@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://kingin-yellows.dev/schemas/runner-targets.schema.json",
+  "$id": "https://kingin-yellows.dev/schemas/yellow-ci/runner-targets.schema.json",
   "title": "Runner Targets Configuration Schema",
   "description": "Schema for yellow-ci runner targets configuration files. Defines runner pools, routing rules, and semantic metadata for CI workflow optimization.",
   "type": "object",

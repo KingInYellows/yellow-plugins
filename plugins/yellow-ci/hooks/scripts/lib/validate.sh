@@ -79,7 +79,7 @@ validate_file_path() {
   esac
 }
 
-# Validate runner name: DNS-safe, 1-64 chars, lowercase alphanumeric + hyphens
+# Validate runner name: DNS-safe, 2-64 chars, lowercase alphanumeric + hyphens
 # Usage: validate_runner_name "$name"
 validate_runner_name() {
   local name="$1"
@@ -88,8 +88,8 @@ validate_runner_name() {
     return 1
   fi
 
-  # Length check: 1-64 chars
-  if [ ${#name} -gt 64 ] || [ ${#name} -lt 1 ]; then
+  # Length check: 2-64 chars (matches CLAUDE.md and JSON schema minLength: 2)
+  if [ ${#name} -gt 64 ] || [ ${#name} -lt 2 ]; then
     return 1
   fi
 
