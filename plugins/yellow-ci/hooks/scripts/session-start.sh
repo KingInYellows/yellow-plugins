@@ -1,7 +1,7 @@
 #!/bin/bash
 # session-start.sh — Detect CI context and check for recent failures
 # NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.
-# Budget: 3s total (filesystem 1ms, cache check 5ms, gh API 2s, parse 50ms, buffer 500ms)
+# Budget: 3s total (routing cache 1ms, filesystem 1ms, cache check 5ms, gh API 2s, parse 50ms, buffer 500ms)
 # Output: JSON {systemMessage, continue: true} if failures detected, {"continue": true} otherwise
 
 # Note: -e omitted intentionally — hook must output {"continue": true} on all paths.
@@ -34,13 +34,22 @@ if [ ! -d ".github/workflows" ]; then
   json_exit
 fi
 
+# --- Runner targets context (fast path: read pre-rendered summary) ---
+# Read before gh auth checks so routing context surfaces even without gh CLI
+routing_summary=""
+routing_cache="${HOME}/.cache/yellow-ci/routing-summary.txt"
+if [ -f "$routing_cache" ]; then
+  routing_summary=$(head -c 500 "$routing_cache" 2>/dev/null) || routing_summary=""
+fi
+
 # Check if gh CLI is available and authenticated (silent)
+# If gh is missing/unauthed, emit routing summary only (no failure data)
 if ! command -v gh >/dev/null 2>&1; then
-  json_exit
+  json_exit "$routing_summary"
 fi
 
 if ! gh auth status >/dev/null 2>&1; then
-  json_exit
+  json_exit "$routing_summary"
 fi
 
 # --- Cache check (60s TTL) ---
@@ -48,7 +57,7 @@ fi
 cache_dir="${HOME}/.cache/yellow-ci"
 if ! mkdir -p "$cache_dir" 2>/dev/null; then
   printf '[yellow-ci] Warning: Cannot create cache directory %s\n' "$cache_dir" >&2
-  json_exit
+  json_exit "$routing_summary"
 fi
 
 # Create cache key from current directory
@@ -69,7 +78,7 @@ if [ -f "$cache_file" ]; then
       json_exit "$cached_msg"
     else
       printf '[yellow-ci] Warning: Cannot read cache file %s\n' "$cache_file" >&2
-      json_exit
+      json_exit "$routing_summary"
     fi
   fi
 fi
@@ -81,8 +90,8 @@ failed_json=""
 if ! failed_json=$(timeout 2 gh run list --status failure --limit 3 \
   --json databaseId,headBranch,displayTitle,conclusion,updatedAt \
   -q '[.[] | select(.conclusion == "failure")]' 2>/dev/null); then
-  # gh failed (network, auth, rate limit) — exit silently
-  json_exit
+  # gh failed (network, auth, rate limit) — emit routing summary only
+  json_exit "$routing_summary"
 fi
 
 # Parse results
@@ -104,6 +113,13 @@ fi
 # --- Generate output ---
 
 output=""
+
+# Routing rules (always present if configured, static context)
+if [ -n "$routing_summary" ]; then
+  output="$routing_summary"
+fi
+
+# CI failures (conditional, appended after routing summary)
 if [ "$failure_count" -gt 0 ] 2>/dev/null; then
   # Extract branch info for context
   branches=""
@@ -111,10 +127,17 @@ if [ "$failure_count" -gt 0 ] 2>/dev/null; then
     branches=$(printf '%s' "$failed_json" | jq -r '[.[].headBranch] | unique | join(", ")') || branches=""
   fi
 
+  failure_msg=""
   if [ -n "$branches" ]; then
-    output="[yellow-ci] CI: ${failure_count} recent failure(s) on branch(es): ${branches}. Use /ci:diagnose to investigate."
+    failure_msg="[yellow-ci] CI: ${failure_count} recent failure(s) on branch(es): ${branches}. Use /ci:diagnose to investigate."
   else
-    output="[yellow-ci] CI: ${failure_count} recent failure(s) detected. Use /ci:diagnose to investigate."
+    failure_msg="[yellow-ci] CI: ${failure_count} recent failure(s) detected. Use /ci:diagnose to investigate."
+  fi
+
+  if [ -n "$output" ]; then
+    output=$(printf '%s\n%s' "$output" "$failure_msg")
+  else
+    output="$failure_msg"
   fi
 fi
 

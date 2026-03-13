@@ -33,6 +33,21 @@ through an interactive wizard to write `.claude/yellow-ci.local.md` with runner
 host details. Run this first after installing the plugin or after adding new
 self-hosted runners.
 
+### `/ci:setup-runner-targets`
+
+Configure runner pool targets, routing rules, and semantic metadata for CI
+workflow optimization.
+
+```
+/ci:setup-runner-targets
+```
+
+Supports three input paths: interactive wizard, YAML import, and GitHub API
+discovery. Saves configuration globally (`~/.config/yellow-ci/`) or per-repo
+(`.claude/`). The runner-assignment agent uses this config for semantic scoring
+(`best_for`/`avoid_for`) and the session-start hook surfaces routing rules
+automatically.
+
 ### `/ci:diagnose [run-id]`
 
 Diagnose CI failures and get actionable fix suggestions.
@@ -116,6 +131,36 @@ defaults:
 
 Additional context about your runner setup.
 ```
+
+### Runner Targets Config
+
+For runner-aware workflow optimization, configure runner pool targets globally
+or per-repo. Run `/ci:setup-runner-targets` or create the file manually:
+
+**Global** (`~/.config/yellow-ci/runner-targets.yaml`):
+
+```yaml
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+      - pool:ares
+    best_for:
+      - heavy CI
+      - Terraform
+    avoid_for:
+      - tiny status jobs
+routing_rules:
+  - prefer pool:ares for heavy CI
+  - prefer pool:atlas for lightweight checks
+```
+
+**Per-repo override** (`.claude/yellow-ci-runner-targets.yaml`): same format,
+overrides global by runner name. `routing_rules` from local replace global
+wholesale.
 
 ### First-Time SSH Setup
 

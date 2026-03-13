@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/yellow-ci/runner-targets.schema.json",
+  "title": "Runner Targets Configuration Schema",
+  "description": "Schema for yellow-ci runner targets configuration files. Defines runner pools, routing rules, and semantic metadata for CI workflow optimization.",
+  "type": "object",
+  "required": ["schema"],
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "const": 1,
+      "description": "Schema version. Must be 1 for this version."
+    },
+    "runner_targets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "description": "Runner pool/target definitions.",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "mode", "preferred_selector"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$",
+            "minLength": 2,
+            "maxLength": 64,
+            "description": "DNS-safe runner target name (lowercase alphanumeric + hyphens, 2-64 chars)."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["pool", "static-family", "static-host"],
+            "description": "Runner type: pool (autoscaling), static-family (group of persistent hosts), static-host (single persistent host)."
+          },
+          "mode": {
+            "type": "string",
+            "enum": ["jit_ephemeral", "persistent"],
+            "description": "Runner lifecycle: jit_ephemeral (spun up on demand, invisible when idle) or persistent (always registered)."
+          },
+          "preferred_selector": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]*$",
+              "maxLength": 64
+            },
+            "description": "Recommended runs-on label array for this runner target."
+          },
+          "best_for": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Workload types this runner is best suited for. Used for semantic scoring (+15 per match, cap +45)."
+          },
+          "avoid_for": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Workload types to avoid on this runner. Used for semantic scoring (-25 per match, cap -50)."
+          },
+          "notes": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Operational notes about this runner target."
+          }
+        }
+      }
+    },
+    "routing_rules": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "description": "High-level routing guidance for runner assignment. Surfaced via session-start hook systemMessage."
+    }
+  },
+  "additionalProperties": false
+}

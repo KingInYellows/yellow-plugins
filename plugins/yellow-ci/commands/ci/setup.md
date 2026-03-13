@@ -227,7 +227,8 @@ shared repository, add it to `.gitignore` to avoid committing host details."
 Ask via AskUserQuestion: "What would you like to do next?" Options:
 `/ci:runner-health` (check runner infrastructure), `/ci:diagnose` (diagnose a CI
 failure), `/ci:status` (recent workflow runs), `/ci:setup-self-hosted` (optimize
-runner assignments), `Done`.
+runner assignments), `/ci:setup-runner-targets` (configure runner pool routing
+rules and semantic metadata), `Done`.
 
 ## Error Handling
 
