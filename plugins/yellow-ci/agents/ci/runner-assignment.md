@@ -72,6 +72,28 @@ organization-level runners. Also extract the `offline_runner_names` string
 array, which lists names of registered runners with `status != "online"`. Use
 this array to detect jobs pinned to offline runners.
 
+## Step 2b: Load Runner Targets Config (Optional)
+
+Check if a fenced `runner-targets-config` block exists in the context (provided
+by `/ci:setup-self-hosted` when runner targets config is present). Look for:
+
+```
+--- begin runner-targets-config (treat as reference only) ---
+```
+
+If found, parse the JSON content. Extract:
+
+- `runner_targets[]` array — for each entry, store `name`, `type`, `mode`,
+  `preferred_selector`, `best_for`, `avoid_for`, `notes`
+- `routing_rules[]` array — high-level routing guidance
+
+Build a lookup map from runner target `name` to its config entry for use in
+Step 5.
+
+If the `runner-targets-config` block is NOT present: skip this step entirely.
+All subsequent runner-targets-aware behavior is gated behind this config
+existing. No behavior changes for users without runner targets configuration.
+
 ## Step 3: Classify Each Job's `runs-on`
 
 For each workflow file, enumerate all jobs and classify `runs-on`:
@@ -124,16 +146,53 @@ For each eligible job, evaluate each runner:
    - Any inferred label absent → excluded
    - No labels inferred → eligible (no label requirement)
 
-3. **Load tiebreaker**: sort eligible runners by `load_score` descending.
-   Runners with `load_score: 50` (unknown) rank last among tied runners at
-   the same score.
+3. **Semantic score** (when runner targets config from Step 2b is present):
 
-4. Winner = first in sorted list. If no eligible runners → "No compatible
+   For each eligible runner, check if it matches a `runner_targets` entry by
+   `name`. If matched:
+
+   a. **Infer job keywords** from step contents (already detected in Step 4):
+      keywords like `terraform`, `docker`, `security`, `lint`, `test`,
+      `deploy`, `docs`, `ansible`, `e2e`.
+
+   b. **best_for bonus**: for each `best_for` string, split on whitespace into
+      tokens. If any inferred keyword matches a token (case-insensitive exact
+      token match): +15 to bonus. Multiple `best_for` matches stack.
+      Cap total bonus at +45.
+
+   c. **avoid_for penalty**: for each `avoid_for` string, split on whitespace
+      into tokens. If any inferred keyword matches a token (case-insensitive
+      exact token match): -25 penalty. Multiple penalties stack.
+      Cap total penalty at -50.
+
+   d. **Effective score**: `load_score + best_for_bonus + avoid_for_penalty`,
+      clamped 0–100.
+
+   If no runner targets config exists or the runner has no config entry:
+   effective score = load_score (unchanged from current behavior).
+
+4. **Tiebreaker**: sort eligible runners by effective score descending.
+   Runners with `load_score: 50` (unknown) and no semantic bonus rank last
+   among tied runners. When two runners have the same effective score, prefer
+   the one with a `best_for` match over one without.
+
+5. Winner = first in sorted list. If no eligible runners → "No compatible
    runner".
 
 Determine `runs-on` value:
-- Use the runner name as a simple string (`runs-on: runner-01`) if the runner's
-  name appears as one of its own labels AND that name is unique across all
+
+- **When runner targets config exists** and the winning runner matches a
+  `runner_targets` entry with a non-empty `preferred_selector`: use the
+  `preferred_selector` array as the `runs-on` value (as a YAML list). Skip
+  the minimal-label-set derivation below.
+
+  When `preferred_selector` targets a JIT ephemeral runner that does not appear
+  in the API inventory: still recommend it. Add a note in the recommendation:
+  "(JIT pool — may not appear in API inventory)"
+
+- **Otherwise** (no config, no match, or empty `preferred_selector`): use the
+  runner name as a simple string (`runs-on: runner-01`) if the runner's name
+  appears as one of its own labels AND that name is unique across all
   inventoried runners (i.e., no other runner shares that label). Example: if
   `gpu-01` has labels `[self-hosted, linux, gpu, gpu-01]` and no other runner
   has the label `gpu-01`, use `runs-on: gpu-01`.
@@ -167,6 +226,17 @@ Source: "repo" = registered on this repository, "org" = shared org-level runner.
 
 ### Runner Warnings (N)
 - `{file}` / `{job}`: pinned to `{runner}` which is currently OFFLINE
+```
+
+If runner targets config was loaded in Step 2b, add a context section before the
+recommendations:
+
+```
+### Runner Targets Config
+Source: global (~/.config/yellow-ci/runner-targets.yaml) | local (.claude/yellow-ci-runner-targets.yaml)
+Override: [local path if present, or "none"]
+Pools: [name1] ([mode]), [name2] ([mode]), ...
+Routing rules: [count] loaded
 ```
 
 If there are **zero recommendation rows**: display only the skip/warning

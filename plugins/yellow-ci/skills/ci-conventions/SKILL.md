@@ -59,6 +59,40 @@ Quick reference:
 - SSH users: `^[a-z_][a-z0-9_-]{0,31}$`
 - Cache dirs: Whitelist /home/runner, /tmp, /var/cache only
 
+## Runner Targets Config
+
+Runner targets configuration defines runner pools, routing rules, and semantic
+metadata for CI workflow optimization. Schema version: 1.
+
+**Paths:**
+- Global: `${XDG_CONFIG_HOME:-$HOME/.config}/yellow-ci/runner-targets.yaml`
+- Per-repo: `.claude/yellow-ci-runner-targets.yaml`
+- Cache: `~/.cache/yellow-ci/routing-summary.txt` (pre-rendered for hook)
+- Cache: `~/.cache/yellow-ci/runner-targets-merged.json` (merged config for agents)
+
+**Resolution:** local → global → merge by runner `name` (local wins per-name).
+`routing_rules` from local replace global wholesale. If local has no
+`runner_targets`, inherit global's. If local has no `routing_rules`, inherit
+global's.
+
+**Schema fields:**
+- `name`: DNS-safe, 2-64 chars (`^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$`)
+- `type`: `pool` | `static-family` | `static-host`
+- `mode`: `jit_ephemeral` | `persistent`
+- `preferred_selector`: label array for `runs-on` (max 10, regex `^[a-zA-Z0-9][a-zA-Z0-9._:-]*$`)
+- `best_for`: workload tags (+15 per match, cap +45)
+- `avoid_for`: workload tags (-25 per match, cap -50)
+- `notes`: operational notes
+- `routing_rules`: high-level routing guidance (max 20)
+
+**Scoring integration:** When runner targets config is present, the
+runner-assignment agent uses `best_for`/`avoid_for` for semantic scoring. When
+`preferred_selector` is set, it overrides the minimal-label-set derivation.
+
+**Format constraint:** Config files MUST use canonical format (2-space indent,
+block sequences only). Flow syntax (`[a, b]`), multi-line scalars (`|`, `>`),
+and tabs are NOT supported by the shell parser.
+
 ## Linter Rules
 
 14 rules (W01-W14) for workflow linting. For detailed specifications with

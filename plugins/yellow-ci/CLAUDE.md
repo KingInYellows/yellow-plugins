@@ -34,9 +34,11 @@ Three-layer plugin where each layer is independently useful:
 
 ## Plugin Components
 
-### Commands (8)
+### Commands (9)
 
 - `/ci:setup` — Verify prerequisites and configure self-hosted runner SSH config
+- `/ci:setup-runner-targets` — Configure runner pool targets, routing rules, and
+  semantic metadata for CI workflow optimization
 - `/ci:diagnose [run-id]` — Diagnose CI failure and suggest fixes
 - `/ci:status` — Show recent CI workflow run status
 - `/ci:lint-workflows [file]` — Lint GitHub Actions workflows for common issues
@@ -83,12 +85,17 @@ Three-layer plugin where each layer is independently useful:
   preview + confirmation.
 - **`runner-diagnostics` agent** — Auto-triggers for deep runner investigation.
   Invoked by failure-analyst.
+- **`/ci:setup-runner-targets`** — Configure runner pool routing rules and
+  semantic metadata. Use when setting up runner-aware CI optimization or after
+  changing your runner fleet.
 - **`/ci:setup-self-hosted`** — Optimize `runs-on` assignments. Use when runner
   assignments look suboptimal or after registering new self-hosted runners.
 - **`runner-assignment` agent** — Spawned by `/ci:setup-self-hosted`. Not
   invoked directly.
 
 ## Configuration
+
+### Runner SSH Config
 
 Runner SSH config in `.claude/yellow-ci.local.md`:
 
@@ -104,6 +111,37 @@ defaults:
   max_parallel_ssh: 5
 ---
 ```
+
+### Runner Targets Config
+
+Global config at `~/.config/yellow-ci/runner-targets.yaml` (org-wide defaults).
+Per-repo overrides at `.claude/yellow-ci-runner-targets.yaml` (optional).
+
+```yaml
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+      - pool:ares
+      - tier:cpu
+      - size:m
+    best_for:
+      - heavy CI
+      - Terraform plan/validate/test
+    avoid_for:
+      - tiny status or hygiene jobs
+    notes:
+      - default heavy autoscaling pool
+routing_rules:
+  - prefer pool:ares for heavy CI
+  - prefer pool:atlas for lightweight checks
+```
+
+Resolution: local file wins per runner name, routing_rules replace wholesale.
+Routing summary surfaced via session-start hook `systemMessage`.
 
 ## Security Rules
 

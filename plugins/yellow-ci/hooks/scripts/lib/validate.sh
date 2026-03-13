@@ -433,3 +433,127 @@ validate_ssh_key_path() {
 
   return 0
 }
+
+# ============================================================================
+# Runner targets validation functions
+# Used by /ci:setup-runner-targets and resolve-runner-targets.sh
+# ============================================================================
+
+# Validate runner target type: pool | static-family | static-host
+# Usage: validate_runner_type "$type"
+validate_runner_type() {
+  case "$1" in
+    pool|static-family|static-host) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Validate runner target mode: jit_ephemeral | persistent
+# Usage: validate_runner_mode "$mode"
+validate_runner_mode() {
+  case "$1" in
+    jit_ephemeral|persistent) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Validate a selector label for runs-on arrays
+# Usage: validate_selector_label "$label"
+validate_selector_label() {
+  local label="$1"
+
+  if [ -z "$label" ]; then
+    return 1
+  fi
+
+  # Max 64 chars
+  if [ ${#label} -gt 64 ]; then
+    return 1
+  fi
+
+  # Reject newlines
+  if has_newline "$label"; then
+    return 1
+  fi
+
+  # Pattern: starts with [a-zA-Z0-9], then [a-zA-Z0-9._:-]
+  case "$label" in
+    [a-zA-Z0-9]*) ;;
+    *) return 1 ;;
+  esac
+  case "$label" in
+    *[!a-zA-Z0-9._:-]*) return 1 ;;
+  esac
+
+  return 0
+}
+
+# Validate a runner targets YAML file for structural correctness
+# Checks: file exists, size < 32KB, has schema: 1, has runner_targets section
+# Usage: validate_runner_targets_file "$filepath"
+# Returns 0 on success, 1 on failure (with error on stderr)
+validate_runner_targets_file() {
+  local filepath="$1"
+
+  if [ ! -f "$filepath" ]; then
+    printf '[yellow-ci] Error: Runner targets file not found: %s\n' "$filepath" >&2
+    return 1
+  fi
+
+  # Size check: max 32KB
+  local filesize
+  filesize=$(wc -c < "$filepath" 2>/dev/null) || filesize=0
+  if [ "$filesize" -gt 32768 ]; then
+    printf '[yellow-ci] Error: Runner targets file exceeds 32KB limit (%s bytes)\n' "$filesize" >&2
+    return 1
+  fi
+
+  # Schema version check
+  if ! grep -qE '^schema:[[:space:]]*1[[:space:]]*$' "$filepath"; then
+    printf '[yellow-ci] Error: Missing or unsupported schema version (expected: schema: 1)\n' >&2
+    return 1
+  fi
+
+  # runner_targets section must exist
+  if ! grep -qE '^runner_targets:' "$filepath"; then
+    printf '[yellow-ci] Error: Missing runner_targets section\n' >&2
+    return 1
+  fi
+
+  # At least one runner target with a name
+  if ! grep -qE '^[[:space:]]*-[[:space:]]+name:' "$filepath"; then
+    printf '[yellow-ci] Error: No runner targets defined (need at least one - name: entry)\n' >&2
+    return 1
+  fi
+
+  # Validate each runner name found
+  local name
+  while IFS= read -r name; do
+    # Trim whitespace
+    name=$(printf '%s' "$name" | sed 's/^[[:space:]]*-[[:space:]]*name:[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    if [ -n "$name" ] && ! validate_runner_name "$name"; then
+      printf '[yellow-ci] Error: Invalid runner target name: %s\n' "$name" >&2
+      return 1
+    fi
+  done < <(grep -E '^[[:space:]]*-[[:space:]]+name:' "$filepath")
+
+  # Count runner targets (max 20)
+  local target_count
+  target_count=$(grep -cE '^[[:space:]]*-[[:space:]]+name:' "$filepath") || target_count=0
+  if [ "$target_count" -gt 20 ]; then
+    printf '[yellow-ci] Error: Too many runner targets (%s, max 20)\n' "$target_count" >&2
+    return 1
+  fi
+
+  # Count routing rules if present (max 20)
+  if grep -qE '^routing_rules:' "$filepath"; then
+    local rule_count
+    rule_count=$(sed -n '/^routing_rules:/,/^[a-z]/{ /^[[:space:]]*-/p; }' "$filepath" | wc -l) || rule_count=0
+    if [ "$rule_count" -gt 20 ]; then
+      printf '[yellow-ci] Error: Too many routing rules (%s, max 20)\n' "$rule_count" >&2
+      return 1
+    fi
+  fi
+
+  return 0
+}

@@ -1,7 +1,7 @@
 #!/bin/bash
 # session-start.sh — Detect CI context and check for recent failures
 # NOTE: SessionStart hooks run in parallel across plugins. This hook must be independent.
-# Budget: 3s total (filesystem 1ms, cache check 5ms, gh API 2s, parse 50ms, buffer 500ms)
+# Budget: 3s total (routing cache 1ms, filesystem 1ms, cache check 5ms, gh API 2s, parse 50ms, buffer 500ms)
 # Output: JSON {systemMessage, continue: true} if failures detected, {"continue": true} otherwise
 
 # Note: -e omitted intentionally — hook must output {"continue": true} on all paths.
@@ -41,6 +41,13 @@ fi
 
 if ! gh auth status >/dev/null 2>&1; then
   json_exit
+fi
+
+# --- Runner targets context (fast path: read pre-rendered summary) ---
+routing_summary=""
+routing_cache="${HOME}/.cache/yellow-ci/routing-summary.txt"
+if [ -f "$routing_cache" ]; then
+  routing_summary=$(head -c 500 "$routing_cache" 2>/dev/null) || routing_summary=""
 fi
 
 # --- Cache check (60s TTL) ---
@@ -104,6 +111,13 @@ fi
 # --- Generate output ---
 
 output=""
+
+# Routing rules (always present if configured, static context)
+if [ -n "$routing_summary" ]; then
+  output="$routing_summary"
+fi
+
+# CI failures (conditional, appended after routing summary)
 if [ "$failure_count" -gt 0 ] 2>/dev/null; then
   # Extract branch info for context
   branches=""
@@ -111,10 +125,17 @@ if [ "$failure_count" -gt 0 ] 2>/dev/null; then
     branches=$(printf '%s' "$failed_json" | jq -r '[.[].headBranch] | unique | join(", ")') || branches=""
   fi
 
+  failure_msg=""
   if [ -n "$branches" ]; then
-    output="[yellow-ci] CI: ${failure_count} recent failure(s) on branch(es): ${branches}. Use /ci:diagnose to investigate."
+    failure_msg="[yellow-ci] CI: ${failure_count} recent failure(s) on branch(es): ${branches}. Use /ci:diagnose to investigate."
   else
-    output="[yellow-ci] CI: ${failure_count} recent failure(s) detected. Use /ci:diagnose to investigate."
+    failure_msg="[yellow-ci] CI: ${failure_count} recent failure(s) detected. Use /ci:diagnose to investigate."
+  fi
+
+  if [ -n "$output" ]; then
+    output=$(printf '%s\n%s' "$output" "$failure_msg")
+  else
+    output="$failure_msg"
   fi
 fi
 

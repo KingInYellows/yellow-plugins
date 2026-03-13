@@ -123,12 +123,19 @@ cleanup step.
 **Detection:** `runs-on: ubuntu-latest` in a repo that also has
 `runs-on: self-hosted` jobs.
 
+**Future:** When runner targets config is available, this rule can suggest
+specific pool selectors from `preferred_selector` instead of generic guidance.
+
 ### W07: Missing self-hosted Label
 
 **Severity:** Error | **Auto-fix:** No
 
 **Detection:** Job without `runs-on` containing `self-hosted` when repo is
 configured for self-hosted runners.
+
+**Future:** When runner targets config is available, this rule can distinguish
+between intentional `ubuntu-latest` usage and misconfigured jobs using the
+`avoid_for` fields.
 
 ### W08: No Artifact Retention
 
