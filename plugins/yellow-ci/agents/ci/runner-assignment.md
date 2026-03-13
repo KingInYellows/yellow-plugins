@@ -229,15 +229,20 @@ Source: "repo" = registered on this repository, "org" = shared org-level runner.
 ```
 
 If runner targets config was loaded in Step 2b, add a context section before the
-recommendations:
+recommendations. Use the `_meta` object from the merged JSON to determine which
+config files were loaded (`has_global`, `has_local`, `global_path`, `local_path`):
 
 ```
 ### Runner Targets Config
-Source: global (~/.config/yellow-ci/runner-targets.yaml) | local (.claude/yellow-ci-runner-targets.yaml)
-Override: [local path if present, or "none"]
+Loaded from:
+  - Global: ~/.config/yellow-ci/runner-targets.yaml (loaded)
+  - Local:  .claude/yellow-ci-runner-targets.yaml (not found | loaded as override)
 Pools: [name1] ([mode]), [name2] ([mode]), ...
 Routing rules: [count] loaded
 ```
+
+If both global and local were loaded, note which runners came from local
+overrides versus global defaults.
 
 If there are **zero recommendation rows**: display only the skip/warning
 sections and output:

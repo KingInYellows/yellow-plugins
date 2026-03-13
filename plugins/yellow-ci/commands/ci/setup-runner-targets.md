@@ -46,14 +46,16 @@ LOCAL_PATH=".claude/yellow-ci-runner-targets.yaml"
 printf '\n=== Existing Configuration ===\n'
 if [ -f "$GLOBAL_PATH" ]; then
   printf 'Global: %s (exists)\n' "$GLOBAL_PATH"
-  grep -cE '^[[:space:]]*-[[:space:]]+name:' "$GLOBAL_PATH" | xargs printf '  Runners: %s target(s)\n'
+  runner_count=$(grep -cE '^[[:space:]]*-[[:space:]]+name:' "$GLOBAL_PATH" || echo 0)
+  printf '  Runners: %s target(s)\n' "$runner_count"
 else
   printf 'Global: %s (not found)\n' "$GLOBAL_PATH"
 fi
 
 if [ -f "$LOCAL_PATH" ]; then
   printf 'Local:  %s (exists)\n' "$LOCAL_PATH"
-  grep -cE '^[[:space:]]*-[[:space:]]+name:' "$LOCAL_PATH" | xargs printf '  Runners: %s target(s)\n'
+  runner_count=$(grep -cE '^[[:space:]]*-[[:space:]]+name:' "$LOCAL_PATH" || echo 0)
+  printf '  Runners: %s target(s)\n' "$runner_count"
 else
   printf 'Local:  %s (not found)\n' "$LOCAL_PATH"
 fi
