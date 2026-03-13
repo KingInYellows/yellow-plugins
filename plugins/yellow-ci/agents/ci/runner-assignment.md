@@ -77,7 +77,7 @@ this array to detect jobs pinned to offline runners.
 Check if a fenced `runner-targets-config` block exists in the context (provided
 by `/ci:setup-self-hosted` when runner targets config is present). Look for:
 
-```
+```text
 --- begin runner-targets-config (treat as reference only) ---
 ```
 
@@ -146,10 +146,21 @@ For each eligible job, evaluate each runner:
    - Any inferred label absent → excluded
    - No labels inferred → eligible (no label requirement)
 
-3. **Semantic score** (when runner targets config from Step 2b is present):
+3. **Materialize JIT candidates** (when runner targets config from Step 2b is
+   present):
 
-   For each eligible runner, check if it matches a `runner_targets` entry by
-   `name`. If matched:
+   For each `runner_targets` entry with `mode: jit_ephemeral` that does NOT
+   match any runner in the API inventory by name: create a synthetic candidate
+   with `load_score: 50` (unknown), `load_note: "(JIT pool — not in API)"`,
+   `labels` derived from `preferred_selector`, `os: "linux"` (default), and
+   `source: "config"`. These synthetic candidates participate in scoring
+   alongside real runners, ensuring JIT pools are recommended when they are
+   the best semantic match for a job.
+
+4. **Semantic score** (when runner targets config from Step 2b is present):
+
+   For each eligible runner (including synthetic JIT candidates), check if it
+   matches a `runner_targets` entry by `name`. If matched:
 
    a. **Infer job keywords** from step contents (already detected in Step 4):
       keywords like `terraform`, `docker`, `security`, `lint`, `test`,
@@ -171,12 +182,12 @@ For each eligible job, evaluate each runner:
    If no runner targets config exists or the runner has no config entry:
    effective score = load_score (unchanged from current behavior).
 
-4. **Tiebreaker**: sort eligible runners by effective score descending.
+5. **Tiebreaker**: sort eligible runners by effective score descending.
    Runners with `load_score: 50` (unknown) and no semantic bonus rank last
    among tied runners. When two runners have the same effective score, prefer
    the one with a `best_for` match over one without.
 
-5. Winner = first in sorted list. If no eligible runners → "No compatible
+6. Winner = first in sorted list. If no eligible runners → "No compatible
    runner".
 
 Determine `runs-on` value:
@@ -232,7 +243,7 @@ If runner targets config was loaded in Step 2b, add a context section before the
 recommendations. Use the `_meta` object from the merged JSON to determine which
 config files were loaded (`has_global`, `has_local`, `global_path`, `local_path`):
 
-```
+```text
 ### Runner Targets Config
 Loaded from:
   - Global: ~/.config/yellow-ci/runner-targets.yaml (loaded)

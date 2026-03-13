@@ -514,6 +514,20 @@ validate_runner_targets_file() {
     return 1
   fi
 
+  # Reject parser-unsupported YAML syntax (flow sequences, block scalars, tabs)
+  if grep -qP '\t' "$filepath"; then
+    printf '[yellow-ci] Error: Tabs found — use spaces only (canonical YAML)\n' >&2
+    return 1
+  fi
+  if grep -qE '^\s+\w+:\s*\[' "$filepath"; then
+    printf '[yellow-ci] Error: Flow syntax [a, b] not supported — use block sequences\n' >&2
+    return 1
+  fi
+  if grep -qE '^\s+\w+:\s*[|>][-+]?\s*$' "$filepath"; then
+    printf '[yellow-ci] Error: Multi-line scalars (| or >) not supported\n' >&2
+    return 1
+  fi
+
   # runner_targets section is optional (local override may only have routing_rules)
   # But if present, it must have at least one valid entry
   if grep -qE '^runner_targets:' "$filepath"; then

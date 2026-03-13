@@ -17,6 +17,12 @@
 # resolve_runner_targets(), both of which run outside the 3s hook budget.
 # If a proper YAML parser is needed in the future, yq can be added as an
 # optional dependency with graceful fallback to this parser.
+#
+# Delimiter limitation: The internal transport uses | between fields and ,
+# between array items. Free-text values (best_for, avoid_for, notes) that
+# contain literal commas or pipes will be incorrectly split. The setup command
+# should avoid generating such values. If this becomes a real issue, switch
+# the awk output to JSON Lines format.
 
 # Resolve the global config path (XDG-compliant)
 # Usage: rt_global_path
