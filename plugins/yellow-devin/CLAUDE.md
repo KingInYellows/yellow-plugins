@@ -134,6 +134,11 @@ session lookups (see Session Lookup Pattern in `devin-workflows` skill). The
 - Session state not persisted locally — after Claude Code restart, use
   `/devin:status` to re-discover active sessions
 - Polling-based session monitoring — no push/webhook support
+- **API messaging requires ManageOrgSessions or ManageAccountSessions** —
+  Without either permission, `/devin:message` and `/devin:review-prs` API
+  calls fail with 403 on both endpoints. A PR comment fallback is available:
+  feedback can be posted as PR comments with `@devin` prefix. Requires `gh`
+  CLI auth and Devin's GitHub integration enabled on the repo.
 
 ### MCP Tool Integration
 

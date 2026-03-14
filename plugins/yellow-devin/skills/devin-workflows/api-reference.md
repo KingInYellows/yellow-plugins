@@ -168,6 +168,54 @@ Notes:
 - **Auto-resumes suspended sessions** — same behavior as enterprise endpoint
 - Same 2000 character limit on messages
 
+### PR Comment Fallback (on 403)
+
+When both org-scoped and enterprise message endpoints return 403 (missing
+`ManageOrgSessions` and `ManageAccountSessions`), review feedback can be
+delivered via GitHub PR comments instead of the Devin API.
+
+**Mechanism:** Devin automatically responds to PR comments as long as the
+session has not been archived
+([docs](https://docs.devin.ai/integrations/gh)).
+
+**Mention-only filtering:** If the org has "Only respond to PR comments that
+mention Devin" enabled, comments must start with `@devin` or `DevinAI`
+([docs](https://docs.devin.ai/product-guides/bot-comment-settings)). The
+`@devin` prefix must be at the very start of the comment body (prefix match,
+not substring search).
+
+**Bot comment filter:** `gh pr comment` posts as the authenticated GitHub user
+(human), so the bot comment filter does not apply. Only the mention-only
+filter is relevant.
+
+**Command:**
+
+Compose the body with `@devin` prefix first, then sanitize, then post.
+Variable names are illustrative — callers substitute their own (e.g.,
+`$PR_NUM`/`$REPO` in `review-prs.md`, `$PR_NUMBER`/`$REPO_SLUG` in
+`message.md`):
+
+```bash
+COMMENT_BODY="@devin ${BODY}"
+SAFE_BODY=$(printf '%s' "$COMMENT_BODY" | sed 's/\(cog\|apk\)_[a-zA-Z0-9_-]*/***REDACTED***/g')
+gh pr comment "$PR_NUMBER" --repo "$REPO_SLUG" --body "$SAFE_BODY"
+```
+
+**Character limits:**
+
+- GitHub PR comments support up to 65536 characters
+- Truncate at 4000 characters for readability (Devin processes long comments
+  less effectively)
+
+**Requirements:**
+
+- `gh` CLI installed and authenticated (`gh auth status`)
+- Devin's GitHub integration enabled on the repository
+- Session not archived (Devin ignores PR comments on archived sessions)
+
+**Used by:** `/devin:message` (Step 5b), `/devin:review-prs` (Option 2b and
+403 auto-escalation from Option 2).
+
 ## Sessions — Enterprise Scope
 
 ### List Sessions
