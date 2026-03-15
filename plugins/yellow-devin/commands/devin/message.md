@@ -111,6 +111,88 @@ fi
 
 Check curl exit code, HTTP status, jq parse — see `devin-workflows` skill.
 
+### Step 5b: PR Comment Fallback (on 403)
+
+If both org-scoped and enterprise endpoints returned 403, offer to post the
+message as a PR comment instead. Devin automatically responds to PR comments
+as long as the session is not archived.
+
+1. **Check `gh` availability inline:**
+
+   ```bash
+   if ! command -v gh >/dev/null 2>&1; then
+     printf 'gh CLI not found — PR comment fallback unavailable.\n'
+     # Fall through to standard error reporting
+   elif ! gh auth status >/dev/null 2>&1; then
+     printf 'gh not authenticated — run `gh auth login` to enable PR comment fallback.\n'
+     # Fall through to standard error reporting
+   fi
+   ```
+
+   If `gh` is not available or not authenticated, skip the PR comment
+   fallback and report the 403 error with a note to run `/devin:setup`.
+
+2. **Detect current repo:**
+
+   ```bash
+   REPO_SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo "")
+   ```
+
+   If `REPO_SLUG` is empty, skip the PR comment fallback — cannot determine
+   the current repo.
+
+3. **Extract PRs from session data** (already fetched in Step 4):
+
+   Parse `pull_requests` from the session response. Filter for PRs matching
+   the current repo (`REPO_SLUG`). Extract PR number from the PR URL.
+
+4. **Offer fallback via AskUserQuestion:**
+
+   If matching PRs exist:
+
+   ```text
+   API message failed (403 — ManageOrgSessions may be missing).
+
+   This session has PR #N in this repo. Devin monitors PR comments
+   and will pick up instructions posted there.
+
+   Options:
+   - Comment on PR — Post as PR comment with @devin prefix
+   - Run /devin:setup — Check and fix permissions
+   - Cancel
+   ```
+
+   If no matching PRs: skip the fallback, show the 403 error with a note to
+   run `/devin:setup`.
+
+5. **Post comment if chosen:**
+
+   **Check archived status first:** If the session's `is_archived` field is
+   true, warn in the AskUserQuestion prompt: "Session {id} is archived — Devin
+   will not respond to PR comments for archived sessions." Change the option
+   label to "Comment on PR anyway — for documentation purposes".
+
+   Compose with `@devin` prefix first, then sanitize before posting (prevent
+   `cog_` and `apk_` token leakage):
+
+   ```bash
+   COMMENT_BODY="@devin ${MESSAGE}"
+   SAFE_BODY=$(printf '%s' "$COMMENT_BODY" | sed 's/\(cog\|apk\)_[a-zA-Z0-9_-]*/***REDACTED***/g')
+   gh pr comment "$PR_NUMBER" --repo "$REPO_SLUG" --body "$SAFE_BODY"
+   ```
+
+   `@devin` must be at the very start of the comment body (prefix match for
+   mention-only filtering). The comment posts as the authenticated GitHub user,
+   which Devin responds to by default. The message is already bounded by the
+   2000-char input validation in Step 3, so no additional truncation is needed.
+
+   Check the exit code of `gh pr comment`. If non-zero, report the error:
+   "Failed to post PR comment: {error}. Check `gh auth status` and repo
+   permissions." Do not proceed to step 6.
+
+6. **Report result** (only on success): "Message posted as comment on PR #N.
+   Devin will pick up the instructions automatically."
+
 ### Step 6: Report
 
 Display confirmation with updated session status from the response.

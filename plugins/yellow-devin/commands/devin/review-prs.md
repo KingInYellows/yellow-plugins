@@ -373,6 +373,10 @@ Options:
 - **Fix locally** — Commit and push fixes via Graphite
 - **Message Devin** — Send fix instructions to session (disabled if all
   sessions are terminal, with note explaining why)
+- **Comment on PR** — Post review feedback as a PR comment with `@devin` prefix.
+  Requires `gh` CLI (validated in Step 1) and GitHub authentication. Works even
+  for terminal sessions — Devin responds to PR comments as long as the session
+  is not archived.
 - **Skip** — Leave PR as-is, move to next
 
 **5f. Execute remediation:**
@@ -470,14 +474,86 @@ explanation and are confident dismissal is appropriate.
    **Never use the `message_as_user_id` field** — impersonation risk.
 
    Apply three-layer error handling per `devin-workflows` skill (curl exit →
-   HTTP status → jq parse). On failure, inform the user: "Failed to send
-   message to Devin session {id}: {error}. You can fix locally instead." and
-   offer the "Fix locally" option via AskUserQuestion.
+   HTTP status → jq parse). On failure:
+
+   - **If 403 (both endpoints):** Offer PR comment fallback via AskUserQuestion:
+
+     ```
+     Failed to send message to Devin session {id}: 403 Forbidden
+     (ManageOrgSessions permission may be missing)
+
+     Alternative:
+     - Comment on PR — Post the same feedback as a PR comment (@devin prefix)
+     - Fix locally — Apply changes yourself
+     - Run /devin:setup — Check and fix permissions
+     - Skip
+     ```
+
+     If "Comment on PR" chosen, execute Option 2b below.
+
+   - **Other errors:** Inform the user: "Failed to send message to Devin session
+     {id}: {error}. You can fix locally instead." and offer the "Fix locally"
+     option via AskUserQuestion.
 
 5. If Edit chosen: let user modify the composed message via AskUserQuestion,
    validate it is under 2000 characters, then send.
 
 6. If Cancel chosen: treat as Skip.
+
+**Option 2b — Comment on PR:**
+
+Post review feedback as a GitHub PR comment with `@devin` prefix. Devin
+automatically responds to PR comments as long as the session is not archived.
+
+1. **Compose comment** from review findings. Structure:
+   - `@devin` must be the very first text in the comment (prefix match for
+     mention-only filtering — no leading whitespace or newlines before it)
+   - Summary line: "Review found N issues in PR #{num}:"
+   - P1 findings listed first, then P2, with file paths and line numbers
+   - Truncate at 4000 characters at a word boundary for readability (GitHub
+     supports up to 65536 chars, but long comments reduce clarity)
+   - If truncated, append: "... (truncated — see review agent output for full
+     details)"
+
+2. **Sanitize** the comment body before posting (prevent `cog_` token leakage
+   in error-derived findings):
+
+   ```bash
+   SAFE_BODY=$(printf '%s' "$COMMENT_BODY" | sed 's/\(cog\|apk\)_[a-zA-Z0-9_-]*/***REDACTED***/g')
+   ```
+
+3. **Preview** via AskUserQuestion. If the session is archived, include a
+   warning in the prompt:
+
+   ```text
+   Post this comment on PR #{num}?
+
+   ⚠️  Session {id} is archived — Devin will not respond to PR comments
+   for archived sessions. Posting is for documentation purposes only.
+
+   Options: Post anyway | Edit | Cancel
+   ```
+
+   If the session is not archived, use the standard prompt: "Post this comment
+   on PR #{num}?" with options: **Post**, **Edit**, **Cancel**.
+
+4. **Post comment:**
+
+   ```bash
+   gh pr comment "$PR_NUM" --repo "$REPO" --body "$SAFE_BODY"
+   ```
+
+   Check the exit code. If non-zero, report: "Failed to post PR comment:
+   {error}. Check `gh auth status` and repo permissions." Offer the user
+   "Fix locally" or "Skip" via AskUserQuestion. Do not proceed to step 5.
+
+5. **Report result** (only on success): "Review feedback posted as comment on
+   PR #{num}. Devin will pick up the instructions automatically."
+
+6. If Edit chosen: let user modify the composed comment via AskUserQuestion,
+   re-sanitize, then post.
+
+7. If Cancel chosen: treat as Skip.
 
 **Option 3 — Skip:**
 
@@ -516,7 +592,8 @@ Present aggregate report across all processed PRs:
 Processed: 5 PRs from 3 Devin sessions
 - Fixed locally: 2 (#142, #145)
 - Messaged Devin: 1 (#148 → session abc123)
-- Skipped: 2 (#150, #151)
+- Commented on PR: 1 (#149)
+- Skipped: 1 (#151)
 
 Findings: 8 total (4 P1, 3 P2, 1 P3)
 Comments: 12 resolved, 3 false positives dismissed

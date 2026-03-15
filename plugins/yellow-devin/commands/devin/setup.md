@@ -91,9 +91,8 @@ the error message above and do not proceed to Step 3.
 
 ### Step 3: Probe Org-Scoped Permissions
 
-Probe the org-scoped API to check `ViewOrgSessions` (list). `UseDevinSessions`
-and `ManageOrgSessions` cannot be probed non-destructively — they are assumed
-granted alongside `ViewOrgSessions`.
+Probe the org-scoped API to check `ViewOrgSessions` (list) and
+`ManageOrgSessions` (message).
 
 ```bash
 DEVIN_API_BASE="https://api.devin.ai/v3"
@@ -134,6 +133,51 @@ All error output must sanitize tokens:
 
 Never use `curl -v`, `--trace`, or `--trace-ascii` — they leak auth headers.
 
+### Step 3b: Probe ManageOrgSessions
+
+If Step 3 returned HTTP 403 (ViewOrgSessions MISSING), skip this step —
+ManageOrgSessions requires ViewOrgSessions as a prerequisite.
+
+If Step 3 returned HTTP 200 (ViewOrgSessions PASS), probe ManageOrgSessions by
+POSTing a message to a known-invalid session ID. The API checks permissions
+before resource existence, so 403 means the permission is missing while 404/422
+means it's present (the session doesn't exist but the permission check passed).
+
+```bash
+DEVIN_API_BASE="https://api.devin.ai/v3"
+ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
+
+# Probe ManageOrgSessions by sending to a dummy session ID
+# Note: Devin API (FastAPI) checks RBAC before resource existence — empirically
+# validated as of 2026-03. This is undocumented behavior; if probe returns
+# unexpected results, the "Other" outcome treats them as UNKNOWN.
+printf 'Probing ManageOrgSessions (message)...\n'
+dummy_session="00000000000000000000000000000000"
+response=$(jq -n --arg msg "probe" '{message: $msg}' | \
+  curl -s --connect-timeout 5 --max-time 10 \
+    -w "\n%{http_code}" \
+    -X POST "${ORG_URL}/sessions/${dummy_session}/messages" \
+    -H "Authorization: Bearer ${DEVIN_SERVICE_USER_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d @-)
+curl_exit=$?
+http_status=${response##*$'\n'}
+body=${response%$'\n'*}
+```
+
+Outcome mapping:
+
+- **curl non-zero exit:** Same as Step 3. Stop.
+- **HTTP 404 or 422:** `ManageOrgSessions` confirmed (PASS). The session doesn't
+  exist but the permission check passed.
+- **HTTP 401:** "Authentication failed (401). Token rejected." Stop immediately.
+- **HTTP 403:** Record `ManageOrgSessions` as MISSING. Continue to collect all
+  permission failures before reporting.
+- **HTTP 5xx:** "Devin API server error ($http_status). Try again later." Stop.
+- **Other:** Record as UNKNOWN. Redact and show first 200 chars of body:
+  `printf '%s' "$body" | sed 's/\(cog\|apk\)_[a-zA-Z0-9_-]*/***REDACTED***/g' | head -c 200`
+  Continue to Step 4.
+
 ### Step 4: Probe ViewAccountSessions (Optional)
 
 Make a read-only call to the enterprise sessions endpoint. This permission is
@@ -172,7 +216,7 @@ Outcome mapping:
 
 ### Step 5: Report Results
 
-Collect results from Steps 3 and 4 and display a unified status table:
+Collect results from Steps 3, 3b, and 4 and display a unified status table:
 
 ```text
 Devin V3 Setup Check
@@ -188,6 +232,7 @@ Credentials
 
 Permissions (required — org-scoped)
   ViewOrgSessions (list)       [OK | MISSING]
+  ManageOrgSessions (message)  [OK | MISSING | UNKNOWN]
 
 Permissions (optional — enterprise-scoped)
   ViewAccountSessions          [OK | MISSING]
@@ -195,10 +240,9 @@ Permissions (optional — enterprise-scoped)
 Overall: [PASS | PARTIAL | FAIL]
 ```
 
-**Note:** `UseDevinSessions` (create) and `ManageOrgSessions` (message/terminate/
-archive) cannot be probed non-destructively. If the list endpoint (ViewOrgSessions)
-passes, the other org permissions are typically also granted. If session creation
-or archival later fails with 403, the user should verify these permissions.
+**Note:** `UseDevinSessions` (create) cannot be probed non-destructively. If
+the list endpoint (ViewOrgSessions) passes, create is typically also granted. If
+session creation later fails with 403, the user should verify this permission.
 
 **If ViewOrgSessions is MISSING**, display:
 
@@ -212,6 +256,24 @@ To fix:
        UseDevinSessions    — Create sessions
        ViewOrgSessions     — List and get sessions
        ManageOrgSessions   — Send messages, terminate, archive
+  4. Re-run /devin:setup to verify
+```
+
+**If ViewOrgSessions is OK but ManageOrgSessions is MISSING**, display:
+
+```text
+Overall: PARTIAL PASS
+
+ManageOrgSessions is missing — session messaging, cancellation, and archival
+will fail with 403. Session listing and creation work normally.
+
+A PR comment fallback is available: review feedback can be posted as GitHub PR
+comments with @devin prefix instead of using the API message endpoint.
+
+To fix:
+  1. Go to Enterprise Settings > Service Users in the Devin web app
+  2. Select your service user
+  3. Grant: ManageOrgSessions — Send messages, terminate, archive
   4. Re-run /devin:setup to verify
 ```
 
@@ -300,6 +362,7 @@ Never commit tokens to version control.
 | HTTP 401 | "Token rejected. Rotate at Enterprise Settings > Service Users." | Stop |
 | HTTP 403 | Record permission as MISSING, continue to next check | Collect |
 | HTTP 404 | "Org not found. Verify DEVIN_ORG_ID." | Stop |
+| HTTP 404/422 (Step 3b) | ManageOrgSessions confirmed (permission present) | Record PASS |
 | HTTP 5xx | "Devin API server error. Try again later." | Stop |
 | Other HTTP status | "Unexpected HTTP status N." + redacted body preview | Stop |
 | jq exit non-zero (Step 4) | "jq failed — cannot URL-encode DEVIN_ORG_ID." | Stop |
