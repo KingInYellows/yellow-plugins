@@ -173,12 +173,13 @@ INSTRUCTIONS
 fi
 
 # --- Verify installation ---
-# @ast-grep/cli provides both 'sg' and 'ast-grep' binaries — check both
+# @ast-grep/cli provides both 'sg' and 'ast-grep' binaries — prefer ast-grep
+# to avoid collision with shadow-utils sg on Linux.
 VERIFIED_CMD=""
-if command -v sg >/dev/null 2>&1; then
-  VERIFIED_CMD="sg"
-elif command -v ast-grep >/dev/null 2>&1; then
+if command -v ast-grep >/dev/null 2>&1; then
   VERIFIED_CMD="ast-grep"
+elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
+  VERIFIED_CMD="sg"
 fi
 
 if [ -z "$VERIFIED_CMD" ]; then

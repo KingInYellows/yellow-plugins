@@ -32,10 +32,10 @@ Check if the ast-grep CLI is already installed (`@ast-grep/cli` provides both
 `sg` and `ast-grep` binaries):
 
 ```bash
-if command -v sg >/dev/null 2>&1; then
-  printf '[yellow-research] ast-grep (sg): ok (%s)\n' "$(sg --version 2>/dev/null)"
-elif command -v ast-grep >/dev/null 2>&1; then
+if command -v ast-grep >/dev/null 2>&1; then
   printf '[yellow-research] ast-grep: ok (%s)\n' "$(ast-grep --version 2>/dev/null)"
+elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
+  printf '[yellow-research] ast-grep (sg): ok (%s)\n' "$(sg --version 2>/dev/null)"
 fi
 ```
 
