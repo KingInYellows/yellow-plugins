@@ -62,8 +62,11 @@ IMPORTANT: Always invoke the `debt-conventions` skill at the start of every scan
 ## AST-Grep Integration (Optional)
 
 When available, use ast-grep for more accurate complexity detection. Check
-availability with ToolSearch for `ast-grep__find_code` before use. If
-unavailable, fall back to Grep.
+availability with ToolSearch for
+`mcp__plugin_yellow-research_ast-grep__find_code` before use. If unavailable,
+fall back to Grep. Note: ToolSearch visibility does not guarantee the ast-grep
+binary is installed — if an ast-grep call fails with "Command not found", fall
+back to Grep for the remainder of the scan.
 
 **Use ast-grep for:**
 - Counting nesting depth via AST structure (more accurate than indentation)
