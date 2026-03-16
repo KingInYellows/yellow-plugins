@@ -54,6 +54,7 @@ if ! command -v uv >/dev/null 2>&1; then
   if ! command -v curl >/dev/null 2>&1; then
     warning "curl not found. Cannot auto-install uv."
     warning "Install uv manually: https://docs.astral.sh/uv/getting-started/installation/"
+    printf '[yellow-research] uv: NOT FOUND (curl missing, cannot auto-install)\n'
   else
     printf '[yellow-research] uv not found — installing (needed for ast-grep MCP server)...\n'
     if curl -LsSf https://astral.sh/uv/install.sh | sh 2>&1; then
@@ -62,11 +63,13 @@ if ! command -v uv >/dev/null 2>&1; then
       if command -v uv >/dev/null 2>&1; then
         success "uv installed: $(uv --version 2>/dev/null)"
       else
-        warning "uv installed but not in PATH. Add ~/.local/bin to PATH."
+        warning "uv installed but not in PATH for current session. Add ~/.local/bin to PATH permanently."
+        printf '[yellow-research] uv: NOT FOUND (not in PATH after install)\n'
       fi
     else
       warning "uv installation failed. ast-grep MCP server will not work without uv."
       warning "Install manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
+      printf '[yellow-research] uv: NOT FOUND (installation failed)\n'
     fi
   fi
 else
