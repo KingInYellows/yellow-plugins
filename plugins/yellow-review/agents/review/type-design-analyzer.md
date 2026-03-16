@@ -69,12 +69,14 @@ binary is installed — if an ast-grep call fails with "Command not found", fall
 back to Grep for the remainder of the review.
 
 **Use ast-grep for:**
+
 - Interface/type alias definitions with specific shapes
 - Generic type constraints and conditional types
 - Class fields with specific access modifiers
 - Function signatures with particular parameter/return type patterns
 
 **Use Grep for:**
+
 - Type name references in imports or comments
 - Simple `extends`/`implements` keyword searches
 - Documentation and JSDoc type annotations

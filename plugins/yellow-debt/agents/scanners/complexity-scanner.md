@@ -69,12 +69,14 @@ binary is installed — if an ast-grep call fails with "Command not found", fall
 back to Grep for the remainder of the scan.
 
 **Use ast-grep for:**
+
 - Counting nesting depth via AST structure (more accurate than indentation)
 - Finding deeply nested control flow (if/for/while/switch chains)
 - Detecting god functions by parameter count and return path analysis
 - Matching specific complex patterns like nested ternaries or chained optionals
 
 **Use Grep for:**
+
 - Line counting for function length heuristics
 - Finding `TODO`/`FIXME` markers in complex code
 - Simple keyword frequency (number of `if`/`else`/`switch` keywords)

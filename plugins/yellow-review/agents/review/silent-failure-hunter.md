@@ -69,12 +69,14 @@ binary is installed — if an ast-grep call fails with "Command not found", fall
 back to Grep for the remainder of the review.
 
 **Use ast-grep for:**
+
 - Empty catch/except blocks (structural match, not regex approximation)
 - Try-catch that catches but doesn't rethrow or log
 - Functions with multiple return paths where some silently return null/undefined
 - Error callbacks that ignore the error parameter
 
 **Use Grep for:**
+
 - String patterns like `// TODO`, `console.log`, `pass` comments
 - Simple text matching for error message strings
 - Comment-based suppression markers

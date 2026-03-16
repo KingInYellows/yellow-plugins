@@ -67,6 +67,7 @@ guarantee the ast-grep binary is installed — if an ast-grep call fails with
 "Command not found", fall back to Grep for the remainder of the scan.
 
 **Use ast-grep for:**
+
 - Finding structurally similar code blocks with different variable names but
   identical AST shape (Type-2 clones with renaming, and near-duplicates)
 - Detecting repeated patterns like identical error handling blocks, similar
@@ -75,6 +76,7 @@ guarantee the ast-grep binary is installed — if an ast-grep call fails with
   structure of suspected duplicates
 
 **Use Grep for:**
+
 - Finding identical text strings (Type-1 clones)
 - Searching for specific function/class names across files
 - Simple line-count based size comparisons
