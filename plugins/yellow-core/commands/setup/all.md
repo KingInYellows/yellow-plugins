@@ -45,7 +45,7 @@ command -v semgrep >/dev/null 2>&1 && printf 'semgrep:            OK\n' || print
 command -v yq >/dev/null 2>&1 && printf 'yq:                 OK\n' || printf 'yq:                 NOT FOUND\n'
 command -v realpath >/dev/null 2>&1 && printf 'realpath:           OK\n' || printf 'realpath:           NOT FOUND\n'
 command -v flock >/dev/null 2>&1 && printf 'flock:              OK\n' || printf 'flock:              NOT FOUND\n'
-command -v ast-grep >/dev/null 2>&1 && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
+{ command -v sg >/dev/null 2>&1 || command -v ast-grep >/dev/null 2>&1; } && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
 command -v uv >/dev/null 2>&1 && printf 'uv:                 OK\n' || printf 'uv:                 NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 command -v gt >/dev/null 2>&1 && printf 'gt:                 OK (%s)\n' "$(gt --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
@@ -235,7 +235,8 @@ Compute bundled source availability out of 5:
 3. `PERPLEXITY_API_KEY` set
 4. Parallel Task tool visible via ToolSearch
 5. ast-grep counts only when the exact ToolSearch match is present **and**
-   `ast-grep` OK **and** `uv` OK **and** `python313_check` is `ok`
+   `ast-grep` OK **and** `uv` OK (uv manages Python 3.13 transparently via
+   `--python 3.13` in plugin.json — no system Python check needed)
 
 - READY: all 5 bundled sources available
 - PARTIAL: 1-4 bundled sources available

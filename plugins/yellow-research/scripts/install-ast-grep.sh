@@ -47,6 +47,40 @@ fi
 if [ -n "$AST_GREP_CMD" ]; then
   installed_version=$("$AST_GREP_CMD" --version 2>/dev/null || true)
   success "ast-grep already installed (${AST_GREP_CMD}): ${installed_version:-unknown version}"
+fi
+
+# --- Ensure uv is installed (needed for ast-grep MCP server) ---
+if ! command -v uv >/dev/null 2>&1; then
+  if ! command -v curl >/dev/null 2>&1; then
+    warning "curl not found. Cannot auto-install uv."
+    warning "Install uv manually: https://docs.astral.sh/uv/getting-started/installation/"
+  else
+    printf '[yellow-research] uv not found — installing (needed for ast-grep MCP server)...\n'
+    if curl -LsSf https://astral.sh/uv/install.sh | sh 2>&1; then
+      # Source uv into current session
+      export PATH="${HOME}/.local/bin:${PATH}"
+      if command -v uv >/dev/null 2>&1; then
+        success "uv installed: $(uv --version 2>/dev/null)"
+      else
+        warning "uv installed but not in PATH. Add ~/.local/bin to PATH."
+      fi
+    else
+      warning "uv installation failed. ast-grep MCP server will not work without uv."
+      warning "Install manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    fi
+  fi
+else
+  printf '[yellow-research] uv: ok (%s)\n' "$(uv --version 2>/dev/null)"
+fi
+
+# --- Pre-warm Python 3.13 for ast-grep MCP server ---
+if command -v uv >/dev/null 2>&1; then
+  printf '[yellow-research] Pre-warming Python 3.13 for ast-grep MCP...\n'
+  uv python install 3.13 2>&1 || warning "Python 3.13 pre-warm failed (uvx will retry on first use)"
+fi
+
+# If ast-grep binary was already found, exit now (after ensuring uv + Python)
+if [ -n "$AST_GREP_CMD" ]; then
   exit 0
 fi
 

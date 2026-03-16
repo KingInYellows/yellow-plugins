@@ -59,6 +59,8 @@
     "ast-grep": {
       "command": "uvx",
       "args": [
+        "--python",
+        "3.13",
         "--from",
         "git+https://github.com/ast-grep/ast-grep-mcp@674272f1adb56fd1fe48a546952c7ffbe72c09e6",
         "ast-grep-server"

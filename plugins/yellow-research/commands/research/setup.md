@@ -87,13 +87,10 @@ command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:
 command -v jq       >/dev/null 2>&1 && printf 'jq:        ok\n' || printf 'jq:        NOT FOUND\n'
 command -v git      >/dev/null 2>&1 && printf 'git:       ok\n' || printf 'git:       NOT FOUND (needed for ast-grep MCP via uvx)\n'
 { command -v sg >/dev/null 2>&1 || command -v ast-grep >/dev/null 2>&1; } && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
-command -v uv       >/dev/null 2>&1 && printf 'uv:        ok\n' || printf 'uv:        NOT FOUND (needed for ast-grep MCP)\n'
-if ! command -v python3 >/dev/null 2>&1; then
-  printf 'python3:   NOT FOUND (needs >=3.13 for ast-grep MCP)\n'
-elif python3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 13) else 1)" 2>/dev/null; then
-  printf 'python3:   ok (>=3.13)\n'
+if command -v uv >/dev/null 2>&1; then
+  printf 'uv:        ok (%s) — manages Python 3.13 for ast-grep MCP\n' "$(uv --version 2>/dev/null)"
 else
-  printf 'python3:   %s (NEEDS >=3.13 for ast-grep MCP)\n' "$(python3 --version 2>/dev/null || echo 'unknown version')"
+  printf 'uv:        NOT FOUND (needed for ast-grep MCP — install: curl -LsSf https://astral.sh/uv/install.sh | sh)\n'
 fi
 
 printf '\n=== API Keys ===\n'
@@ -415,17 +412,16 @@ required after adding new keys. Never commit API keys to version control.
 Only show the lines for keys that are absent or invalid (not all three if some
 are already working).
 
-If ast-grep prerequisites are missing (`ast-grep`, `uv`, or Python < 3.13), show
-this block:
+If ast-grep prerequisites are missing (`ast-grep` or `uv`), show this block:
 
 ```text
 To enable ast-grep MCP (AST structural code search):
 
-  ast-grep:  brew install ast-grep  (or: cargo install ast-grep --locked, or: pip install ast-grep-cli)
+  ast-grep:  npm install -g @ast-grep/cli  (or: brew, cargo, pip)
   uv:        curl -LsSf https://astral.sh/uv/install.sh | sh
-  python:    Requires >= 3.13 (check with: python3 --version)
 
-All three are needed for the ast-grep MCP server. Other MCP servers are unaffected.
+uv manages Python 3.13 automatically — no system Python upgrade needed.
+Both are needed for the ast-grep MCP server. Other MCP servers are unaffected.
 ```
 
 Only show this block if at least one ast-grep prerequisite is missing.
@@ -440,7 +436,7 @@ To enable missing MCP sources:
   WarpGrep:   Install yellow-morph — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-morph)
               Or configure filesystem-with-morph MCP globally in Claude Code MCP settings
   DeepWiki:   Install yellow-devin — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-devin)
-  ast-grep:   Bundled — install prerequisites: ast-grep binary, uv, Python >= 3.13 (see above)
+  ast-grep:   Bundled — install prerequisites: ast-grep binary and uv (see above)
   Parallel:   Bundled — OAuth auto-managed; if FAIL, restart Claude Code
 
 If a source shows FAIL (installed but test failed), try restarting Claude Code.
