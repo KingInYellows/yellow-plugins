@@ -69,7 +69,8 @@ to Grep.
   variable names but identical AST shape
 - Detecting repeated patterns like identical error handling blocks, similar
   validation sequences, or copy-pasted function bodies
-- Use `dump_syntax_tree` to compare AST structure of suspected duplicates
+- Use `mcp__plugin_yellow-research_ast-grep__dump_syntax_tree` to compare AST
+  structure of suspected duplicates
 
 **Use Grep for:**
 - Finding identical text strings (Type-1 clones)
