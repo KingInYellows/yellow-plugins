@@ -86,7 +86,13 @@ printf '=== Prerequisites ===\n'
 command -v curl     >/dev/null 2>&1 && printf 'curl:      ok\n' || printf 'curl:      NOT FOUND\n'
 command -v jq       >/dev/null 2>&1 && printf 'jq:        ok\n' || printf 'jq:        NOT FOUND\n'
 command -v git      >/dev/null 2>&1 && printf 'git:       ok\n' || printf 'git:       NOT FOUND (needed for ast-grep MCP via uvx)\n'
-{ command -v sg >/dev/null 2>&1 || command -v ast-grep >/dev/null 2>&1; } && printf 'ast-grep:  ok\n' || printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
+if command -v ast-grep >/dev/null 2>&1; then
+  printf 'ast-grep:  ok\n'
+elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
+  printf 'ast-grep:  ok (via sg)\n'
+else
+  printf 'ast-grep:  NOT FOUND (needed for ast-grep MCP)\n'
+fi
 if command -v uv >/dev/null 2>&1; then
   printf 'uv:        ok (%s) — manages Python 3.13 for ast-grep MCP\n' "$(uv --version 2>/dev/null)"
 else
@@ -417,7 +423,10 @@ If ast-grep prerequisites are missing (`ast-grep` or `uv`), show this block:
 ```text
 To enable ast-grep MCP (AST structural code search):
 
-  ast-grep:  npm install -g @ast-grep/cli  (or: brew, cargo, pip)
+  ast-grep:  npm install -g @ast-grep/cli
+             brew install ast-grep
+             cargo install ast-grep --locked
+             pip install ast-grep-cli
   uv:        curl -LsSf https://astral.sh/uv/install.sh | sh
 
 uv manages Python 3.13 automatically — no system Python upgrade needed.

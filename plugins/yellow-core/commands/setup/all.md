@@ -45,7 +45,13 @@ command -v semgrep >/dev/null 2>&1 && printf 'semgrep:            OK\n' || print
 command -v yq >/dev/null 2>&1 && printf 'yq:                 OK\n' || printf 'yq:                 NOT FOUND\n'
 command -v realpath >/dev/null 2>&1 && printf 'realpath:           OK\n' || printf 'realpath:           NOT FOUND\n'
 command -v flock >/dev/null 2>&1 && printf 'flock:              OK\n' || printf 'flock:              NOT FOUND\n'
-{ command -v sg >/dev/null 2>&1 || command -v ast-grep >/dev/null 2>&1; } && printf 'ast-grep:           OK\n' || printf 'ast-grep:           NOT FOUND\n'
+if command -v ast-grep >/dev/null 2>&1; then
+  printf 'ast-grep:           OK\n'
+elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
+  printf 'ast-grep:           OK (via sg)\n'
+else
+  printf 'ast-grep:           NOT FOUND\n'
+fi
 command -v uv >/dev/null 2>&1 && printf 'uv:                 OK\n' || printf 'uv:                 NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 command -v gt >/dev/null 2>&1 && printf 'gt:                 OK (%s)\n' "$(gt --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'

@@ -36,12 +36,13 @@ cleanup() {
 trap cleanup EXIT
 
 # --- Check if already installed ---
-# @ast-grep/cli provides both 'sg' and 'ast-grep' binaries
+# @ast-grep/cli provides both 'sg' and 'ast-grep' binaries.
+# Note: 'sg' can collide with shadow-utils on Linux, so verify via --version.
 AST_GREP_CMD=""
-if command -v sg >/dev/null 2>&1; then
-  AST_GREP_CMD="sg"
-elif command -v ast-grep >/dev/null 2>&1; then
+if command -v ast-grep >/dev/null 2>&1; then
   AST_GREP_CMD="ast-grep"
+elif command -v sg >/dev/null 2>&1 && sg --version 2>&1 | grep -qi 'ast-grep'; then
+  AST_GREP_CMD="sg"
 fi
 
 if [ -n "$AST_GREP_CMD" ]; then
@@ -57,7 +58,9 @@ if ! command -v uv >/dev/null 2>&1; then
     printf '[yellow-research] uv: NOT FOUND (curl missing, cannot auto-install)\n'
   else
     printf '[yellow-research] uv not found — installing (needed for ast-grep MCP server)...\n'
-    if curl -LsSf https://astral.sh/uv/install.sh | sh 2>&1; then
+    # Note: uv installer is from Astral (uv maintainers). User confirmation
+    # happens in research:setup via AskUserQuestion before this script runs.
+    if curl -LsSf https://astral.sh/uv/install.sh | sh; then
       # Source uv into current session
       export PATH="${HOME}/.local/bin:${PATH}"
       if command -v uv >/dev/null 2>&1; then
