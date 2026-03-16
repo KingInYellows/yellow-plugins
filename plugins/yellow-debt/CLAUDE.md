@@ -110,3 +110,6 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 - **morph** — Preferred for intent-based anti-pattern search and large file
   remediation. Discovered via ToolSearch at runtime; falls back to built-in
   tools silently.
+- **ast-grep** (yellow-research) — Optional structural code search for
+  duplication-scanner and complexity-scanner. Discovered via ToolSearch at
+  runtime; falls back to Grep if yellow-research not installed.
