@@ -11,6 +11,10 @@ tools:
   - Glob
   - Bash
   - Write
+  - ToolSearch
+  - mcp__plugin_yellow-research_ast-grep__find_code
+  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
+  - mcp__plugin_yellow-research_ast-grep__dump_syntax_tree
 ---
 
 <examples>
@@ -53,6 +57,24 @@ You are a code duplication detection specialist. Reference the
 ## Security and Fencing Rules
 
 Follow all security and fencing rules from the `debt-conventions` skill.
+
+## AST-Grep Integration (Optional)
+
+When available, use ast-grep for structural clone detection. Check availability
+with ToolSearch for `ast-grep__find_code` before use. If unavailable, fall back
+to Grep.
+
+**Use ast-grep for:**
+- Finding structurally similar code blocks (Type-3 clones) with different
+  variable names but identical AST shape
+- Detecting repeated patterns like identical error handling blocks, similar
+  validation sequences, or copy-pasted function bodies
+- Use `dump_syntax_tree` to compare AST structure of suspected duplicates
+
+**Use Grep for:**
+- Finding identical text strings (Type-1 clones)
+- Searching for specific function/class names across files
+- Simple line-count based size comparisons
 
 ## Detection Heuristics
 

@@ -11,6 +11,9 @@ tools:
   - Glob
   - Bash
   - Write
+  - ToolSearch
+  - mcp__plugin_yellow-research_ast-grep__find_code
+  - mcp__plugin_yellow-research_ast-grep__find_code_by_rule
 ---
 
 <examples>
@@ -55,6 +58,23 @@ skill for:
 Follow all security and fencing rules from the `debt-conventions` skill.
 
 IMPORTANT: Always invoke the `debt-conventions` skill at the start of every scan. Security and fencing rules from that skill are mandatory — do not proceed without reading them first.
+
+## AST-Grep Integration (Optional)
+
+When available, use ast-grep for more accurate complexity detection. Check
+availability with ToolSearch for `ast-grep__find_code` before use. If
+unavailable, fall back to Grep.
+
+**Use ast-grep for:**
+- Counting nesting depth via AST structure (more accurate than indentation)
+- Finding deeply nested control flow (if/for/while/switch chains)
+- Detecting god functions by parameter count and return path analysis
+- Matching specific complex patterns like nested ternaries or chained optionals
+
+**Use Grep for:**
+- Line counting for function length heuristics
+- Finding `TODO`/`FIXME` markers in complex code
+- Simple keyword frequency (number of `if`/`else`/`switch` keywords)
 
 ## Detection Heuristics
 
