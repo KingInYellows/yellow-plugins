@@ -100,6 +100,9 @@ silently degrade — only yellow-review's own agents run.
 - **morph** — Preferred for intent-based code search (blast radius, callers,
   similar patterns) in review agents. Discovered via ToolSearch at runtime;
   falls back to built-in Grep silently.
+- **ast-grep** (yellow-research) — Optional structural code search for
+  silent-failure-hunter and type-design-analyzer. Discovered via ToolSearch at
+  runtime; falls back to Grep if yellow-research not installed.
 
 ## Known Limitations
 
