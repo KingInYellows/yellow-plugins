@@ -40,7 +40,7 @@ Off-by-default tools (enable by adding them to the `tools=` arg in
 - `deep_researcher_start` — Start async EXA deep research report
 - `deep_researcher_check` — Poll async research status
 
-### ast-grep — No API key (requires `ast-grep` binary, `uv`, Python >= 3.13)
+### ast-grep — No API key (requires `ast-grep` binary and `uv`)
 
 - `find_code` — Pattern-based code search using AST
 - `find_code_by_rule` — Search using YAML rule definitions
@@ -101,8 +101,11 @@ For the **ast-grep** MCP server (other servers have no system prerequisites):
 - `ast-grep` binary — `/research:setup` offers to install this automatically
   via `npm install -g @ast-grep/cli`. Manual alternatives: `brew install ast-grep`,
   `cargo install ast-grep --locked`, or `pip install ast-grep-cli`
-- `uv` — `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- Python >= 3.13 — hard requirement from ast-grep-mcp's `pyproject.toml`
+- `uv` — `curl -LsSf https://astral.sh/uv/install.sh | sh` (the install
+  script offers to install this automatically)
+- `uv` manages Python 3.13 automatically via `uvx --python 3.13` — no system
+  Python upgrade needed. Python 3.13 is downloaded into `~/.local/share/uv/python/`
+  on first use without touching the system Python.
 
 If any prerequisite is missing, the ast-grep MCP server still starts (lazy
 check) but tools will fail on invocation. Other servers are unaffected.
