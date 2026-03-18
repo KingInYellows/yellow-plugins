@@ -15,6 +15,22 @@ the workflow commands.
 /gt-setup
 ```
 
+### `/smart-submit`
+
+Stage, audit, and submit changes via Graphite in one flow.
+
+- Runs 3 parallel code review agents (quality, security, silent failures)
+- Stages specific files (never `git add .`)
+- Auto-generates conventional commit messages from diff analysis
+- Detects trunk vs feature branch for correct `gt` command
+- Supports `--amend`, `--dry-run`, `--no-verify`
+
+```
+/smart-submit
+/smart-submit --amend
+/smart-submit --dry-run
+```
+
 ### `/gt-amend`
 
 The fastest solo-dev path: audit your current fix and fold it into the current
@@ -32,22 +48,6 @@ branch commit.
 /gt-amend --no-submit
 ```
 
-### `/smart-submit`
-
-Stage, audit, and submit changes via Graphite in one flow.
-
-- Runs 3 parallel code review agents (quality, security, silent failures)
-- Stages specific files (never `git add .`)
-- Auto-generates conventional commit messages from diff analysis
-- Detects trunk vs feature branch for correct `gt` command
-- Supports `--amend`, `--dry-run`, `--no-verify`
-
-```
-/smart-submit
-/smart-submit --amend
-/smart-submit --dry-run
-```
-
 ### `/gt-stack-plan`
 
 Decompose a feature into stacked PRs, ordered by dependency (plan-only).
@@ -60,6 +60,27 @@ Decompose a feature into stacked PRs, ordered by dependency (plan-only).
 ```
 /gt-stack-plan add user authentication with OAuth
 /gt-stack-plan plans/my-feature.md
+```
+
+### `/gt-cleanup`
+
+Scan all local branches for staleness and divergence, then clean up or
+reconcile. Complements `/gt-sync` (which handles merged branches) by covering
+orphaned, closed-PR, stale, and diverged branches.
+
+- Classifies branches into 6 categories: orphaned, closed PR, stale, diverged,
+  behind remote, ahead of remote
+- Category-based confirmation: batch delete, review individually, or skip
+- Uses `gt delete` for deletions (preserves Graphite metadata)
+- Uses `gt get` for behind-remote sync (respects stack structure)
+- Warn-only for ahead-of-remote and diverged branches (use `/smart-submit` to
+  push)
+- Auto-excludes trunk and current branch
+
+```
+/gt-cleanup
+/gt-cleanup --dry-run
+/gt-cleanup --stale-days 60
 ```
 
 ### `/gt-sync`
@@ -111,6 +132,8 @@ convention automatically — no rule gets silently bypassed.
 - Git repository initialized with Graphite (`gt init`)
 - [`jq`](https://jqlang.github.io/jq/) installed (used by the `git push` guard
   hook)
+- [`gh`](https://cli.github.com/) (GitHub CLI) installed and authenticated (used
+  by `/gt-cleanup` for PR status lookups)
 
 Run `/gt-setup` after first install, after Graphite auth changes, or when `gt`
 commands stop working in a repo that should already be initialized.
