@@ -39,8 +39,7 @@ Add the marketplace, then install individual plugins:
 
 ## MCP Servers & Authentication
 
-Nine plugins connect to MCP servers. Authentication requirements vary by
-server.
+Nine plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                |
 | ----------------- | ---------- | ------------------------------------------------------------------- |
@@ -208,43 +207,44 @@ installs copy plugins to `~/.claude/plugins/cache/`.
 
 1. Create a directory under `plugins/`:
 
-```
-plugins/my-plugin/
-  .claude-plugin/
-    plugin.json
-  commands/
-    my-command.md
-  CLAUDE.md
-```
+   ```text
+   plugins/my-plugin/
+     .claude-plugin/
+       plugin.json
+     commands/
+       my-command.md
+     CLAUDE.md
+   ```
 
-2. Add a minimal `plugin.json`:
+2. Add a minimal plugin manifest at `.claude-plugin/plugin.json`:
 
-```json
-{
-  "name": "my-plugin",
-  "description": "What the plugin does",
-  "version": "1.0.0",
-  "author": { "name": "Your Name" }
-}
-```
+   ```json
+   {
+     "name": "my-plugin",
+     "description": "What the plugin does",
+     "version": "1.0.0",
+     "author": { "name": "Your Name" }
+   }
+   ```
 
-3. Register in `.claude-plugin/marketplace.json`:
+3. Register the plugin in `.claude-plugin/marketplace.json`:
 
-```json
-{
-  "name": "my-plugin",
-  "description": "What the plugin does",
-  "version": "1.0.0",
-  "author": { "name": "Your Name" },
-  "source": "./plugins/my-plugin"
-}
-```
+   ```json
+   {
+     "name": "my-plugin",
+     "description": "What the plugin does",
+     "version": "1.0.0",
+     "author": { "name": "Your Name" },
+     "source": "./plugins/my-plugin",
+     "category": "development"
+   }
+   ```
 
 4. Validate:
 
-```bash
-pnpm validate:schemas
-```
+   ```bash
+   pnpm validate:schemas
+   ```
 
 See each plugin's `CLAUDE.md` for conventions, component details, and usage
 guides.

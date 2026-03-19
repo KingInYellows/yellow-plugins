@@ -1,6 +1,6 @@
 # CI Validation Pipeline Specification
 
-**Status:** Active **Last Updated:** 2026-01-12 **Maintainer:** Platform Team
+**Status:** Partially Current **Last Updated:** 2026-03-19 **Maintainer:** Platform Team
 **Document Type:** Technical Specification (Section 2.1 Artifact)
 
 ---
@@ -9,6 +9,12 @@
 <!-- END doctoc -->
 
 ## Overview
+
+> Current repo note: the authoritative CI workflow is
+> `.github/workflows/validate-schemas.yml`. That workflow currently implements
+> `validate-schemas`, `validate-versions`, `changeset-check`,
+> `lint-and-typecheck`, `unit-tests`, `integration-tests`, `contract-drift`,
+> `security-audit`, `build`, `report-metrics`, and `ci-status`.
 
 This document specifies the CI Validation Pipeline architecture for the Yellow
 Plugins system. It serves as the formal Section 2.1 artifact referenced in the

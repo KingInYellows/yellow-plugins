@@ -1,11 +1,17 @@
 # Plugin Validation Guide
 
-**Version**: 1.0.0 **Last Updated**: 2026-01-11 **Schema Version**:
+**Version**: 1.0.0 **Last Updated**: 2026-03-19 **Schema Version**:
 plugin.schema.json v1.0.0
 
 ---
 
 ## Overview
+
+> Current script scope: `scripts/validate-plugin.js` validates manifest shape,
+> directory-name consistency, semver formatting, short-description warnings,
+> keyword types, `outputStyles`, and plugin-local hook script paths. It does
+> not support `--skip-network` or perform separate runtime checks for
+> compatibility ranges or URL reachability.
 
 This guide explains how to validate Claude Code plugin manifests using the
 `validate-plugin.js` script and JSON Schema validation.
@@ -13,10 +19,9 @@ This guide explains how to validate Claude Code plugin manifests using the
 **Validation Ensures**:
 
 - Manifest complies with plugin.schema.json
-- All declared files actually exist
-- Lifecycle scripts are executable
-- Permissions are properly declared
-- Node.js/Claude Code versions are compatible
+- Plugin name matches the directory name
+- Optional versions use semver
+- Optional keywords are well-formed
 
 ---
 
@@ -35,46 +40,34 @@ npm install --save-dev ajv ajv-formats
 ### Basic Validation
 
 ```bash
-# Validate single plugin
-node scripts/validate-plugin.js plugins/hookify
-
 # Validate all plugins
-for plugin in plugins/*; do
-  node scripts/validate-plugin.js "$plugin"
-done
+node scripts/validate-plugin.js
 
-# Skip network checks (faster, for CI)
-node scripts/validate-plugin.js plugins/hookify --skip-network
+# Validate a single plugin directory
+node scripts/validate-plugin.js plugins/yellow-core
+
+# Validate using the CI-style manifest path
+node scripts/validate-plugin.js --plugin plugins/yellow-core/.claude-plugin/plugin.json
 ```
 
 ### Expected Output
 
 **✅ Success**:
 
-```
-🔍 Validating plugin: hookify
-
-✅ Validation PASSED
-   Plugin: hookify v1.2.3
-   Author: kinginyellow
-   Entrypoints: commands, skills, agents
+```text
+Validating plugin: yellow-core
+✓ PASS: Version: 1.1.0
+✓ PASS: Plugin "yellow-core" is valid
+ℹ INFO:   Version: 1.1.0
+ℹ INFO:   Author: KingInYellows
 ```
 
 **❌ Failure**:
 
-```
-🔍 Validating plugin: broken-plugin
-
-❌ Validation FAILED
-
-   [SCHEMA_COMPLIANCE] name
-      must match pattern "^[a-z0-9-]+$"
-
-   [ENTRYPOINT_EXISTS] entrypoints.commands
-      Entrypoint file not found: commands/missing.md
-
-   [NODE_VERSION_RANGE] compatibility.nodeMin
-      Node.js version must be 22.22.0-24.x (got 22.21.0)
+```text
+Validating plugin: broken-plugin
+✗ ERROR: Missing required field: "description"
+✗ ERROR: Plugin name "wrong-name" does not match directory name "broken-plugin"
 ```
 
 ---
@@ -90,11 +83,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 - `name` (kebab-case, max 64 chars)
 - `version` (semver: MAJOR.MINOR.PATCH)
 - `description` (10-280 chars)
-- `author.name`
-- `entrypoints` (at least one category)
-- `compatibility.claudeCodeMin` (semver)
-- `permissions` (can be empty array)
-- `docs.readme` (valid URI)
+- `author` (`string` or object with `author.name`)
 
 **Example Error**:
 
@@ -118,7 +107,7 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 
 ---
 
-### Rule 2: Name-Version Consistency
+### Rule 2: Name Consistency
 
 **Check**: Plugin name must match directory name
 
@@ -144,196 +133,7 @@ mv plugins/hookify-old plugins/hookify
 
 ---
 
-### Rule 3: Entrypoint File Existence
-
-**Check**: All declared entrypoint files must exist
-
-**Example Error**:
-
-```json
-{
-  "rule": "ENTRYPOINT_EXISTS",
-  "field": "entrypoints.commands",
-  "message": "Entrypoint file not found: commands/missing.md"
-}
-```
-
-**Fix**:
-
-```bash
-# Option 1: Create missing file
-mkdir -p plugins/hookify/commands
-touch plugins/hookify/commands/missing.md
-
-# Option 2: Remove from manifest
-# Delete "commands/missing.md" from entrypoints.commands array
-```
-
----
-
-### Rule 4: Lifecycle Script Existence
-
-**Check**: All lifecycle scripts must exist and be executable
-
-**Example Error**:
-
-```json
-{
-  "rule": "LIFECYCLE_SCRIPT_NOT_EXECUTABLE",
-  "field": "lifecycle.install",
-  "message": "Lifecycle script not executable: scripts/install.sh. Run: chmod +x scripts/install.sh"
-}
-```
-
-**Fix**:
-
-```bash
-# Make script executable
-chmod +x plugins/hookify/scripts/install.sh
-
-# Verify
-ls -la plugins/hookify/scripts/install.sh
-# -rwxr-xr-x ... install.sh  ← Note the 'x' flags
-```
-
----
-
-### Rule 5: Permission Scope Constraints (Warning)
-
-**Check**: Permissions should specify paths/domains/commands for transparency
-
-**Example Warning**:
-
-```
-⚠️  Permission Transparency Warnings:
-   - Filesystem permission should specify paths for transparency (or omit for unrestricted)
-   - Network permission should specify domains for transparency (or omit for unrestricted)
-```
-
-**Fix (Optional)**:
-
-```json
-// ❌ Unrestricted (works but less transparent)
-{
-  "scope": "filesystem",
-  "reason": "Read and write files"
-}
-
-// ✅ Restricted (better transparency)
-{
-  "scope": "filesystem",
-  "reason": "Read conversation history",
-  "paths": [".claude/conversations/"]
-}
-```
-
----
-
-### Rule 6: Node.js Version Range
-
-**Check**: nodeMin must be at least 22.22.0. If you set an upper bound, keep it
-below Node.js 25.0.0.
-
-**Example Error**:
-
-```json
-{
-  "rule": "NODE_VERSION_RANGE",
-  "field": "compatibility.nodeMin",
-  "message": "Node.js version must be at least 22.22.0 (got 22.21.0)."
-}
-```
-
-**Fix**:
-
-```json
-// ❌ Invalid
-"compatibility": {
-  "nodeMin": "22.21.0"
-}
-
-// ✅ Valid
-"compatibility": {
-  "nodeMin": "22.22.0"
-}
-```
-
----
-
-### Rule 7: Plugin Dependency Resolution (Info)
-
-**Check**: Display required plugin dependencies
-
-**Example Info**:
-
-```
-ℹ️  Plugin Dependencies: base-tools, git-integration
-   These plugins must be installed first. Installation will prompt if missing.
-```
-
-**No Action Required**: Informational only.
-
----
-
-### Rule 8: Description Quality
-
-**Check**: Description should be informative (not just plugin name, min 20
-chars)
-
-**Example Error**:
-
-```json
-{
-  "rule": "DESCRIPTION_QUALITY",
-  "field": "description",
-  "message": "Description should be informative and at least 20 characters. Avoid just repeating the plugin name."
-}
-```
-
-**Fix**:
-
-```json
-// ❌ Invalid
-"description": "Hookify plugin"  // Too short, repeats name
-
-// ✅ Valid
-"description": "Create hooks to prevent unwanted AI behaviors through conversation analysis"
-```
-
----
-
-### Rule 9: Documentation URLs Reachability (Optional)
-
-**Check**: README URL returns 200 OK (network check, skippable)
-
-**Example Error**:
-
-```json
-{
-  "rule": "DOCUMENTATION_REACHABILITY",
-  "field": "docs.readme",
-  "message": "README URL returned 404: https://github.com/user/repo/README.md"
-}
-```
-
-**Fix**:
-
-```bash
-# Verify URL in browser
-curl -I https://github.com/kinginyellow/yellow-plugins/tree/main/plugins/hookify/README.md
-
-# Fix broken URL in manifest
-```
-
-**Skip in CI**:
-
-```bash
-node scripts/validate-plugin.js plugins/hookify --skip-network
-```
-
----
-
-### Rule 10: Semantic Version Compliance
+### Rule 3: Semantic Version Compliance
 
 **Check**: Version must be valid semver (MAJOR.MINOR.PATCH)
 
@@ -363,51 +163,37 @@ node scripts/validate-plugin.js plugins/hookify --skip-network
 
 ---
 
-### Rule 11: Repository URL Consistency (Warning)
+### Rule 4: Description Quality Warning
 
-**Check**: Repository and homepage should be on same domain
-
-**Example Warning**:
-
-```
-⚠️  Repository and homepage on different domains: github.com vs kingin-yellows.dev
-```
-
-**Fix (Optional)**:
-
-```json
-// Better: Both on same domain
-"repository": {
-  "url": "https://github.com/kinginyellow/yellow-plugins.git"
-},
-"homepage": "https://github.com/kinginyellow/yellow-plugins"
-
-// Or: Homepage points to docs subdomain
-"homepage": "https://docs.kingin-yellows.dev/plugins/hookify"
-```
-
----
-
-### Rule 12: Keywords Relevance (Warning)
-
-**Check**: Keywords should not duplicate words from name/description
+**Check**: Very short descriptions emit a warning
 
 **Example Warning**:
 
-```
-⚠️  Redundant keywords (already in name/description): hookify, unwanted
+```text
+⚠ WARNING: Description is very short (< 10 chars). Consider being more descriptive.
 ```
 
-**Fix (Optional)**:
+### Rule 5: Keywords Format
+
+**Check**: `keywords`, when present, must be an array of strings
+
+**Example Error**:
 
 ```json
-// ❌ Redundant
-"name": "hookify",
-"description": "Create hooks to prevent unwanted behaviors",
-"keywords": ["hookify", "unwanted", "behaviors"]  // All already in name/description
+{
+  "field": "keywords",
+  "message": "All keywords must be strings"
+}
+```
 
-// ✅ Relevant
-"keywords": ["safety", "ai-control", "conversation-analysis"]  // New information
+**Fix**:
+
+```json
+// ❌ Invalid
+"keywords": ["review", 123]
+
+// ✅ Valid
+"keywords": ["review", "automation"]
 ```
 
 ---
@@ -446,13 +232,10 @@ jobs:
           for plugin in plugins/*; do
             if [ -d "$plugin" ]; then
               echo "Validating $plugin..."
-              node scripts/validate-plugin.js "$plugin" --skip-network
+              node scripts/validate-plugin.js "$plugin"
             fi
           done
 
-      - name: Check version consistency
-        run: |
-          node scripts/check-marketplace-consistency.js
 ```
 
 ### Pre-Commit Hook
@@ -465,7 +248,7 @@ jobs:
 git diff --cached --name-only | grep 'plugins/.*/\.claude-plugin/plugin\.json' | while read file; do
   plugin_dir=$(dirname $(dirname "$file"))
   echo "Validating $plugin_dir..."
-  node scripts/validate-plugin.js "$plugin_dir" --skip-network || exit 1
+  node scripts/validate-plugin.js "$plugin_dir" || exit 1
 done
 
 echo "✅ All plugin manifests valid"
@@ -511,24 +294,6 @@ echo "✅ All plugin manifests valid"
 
 ---
 
-### Error: "must have minProperties 1"
-
-**Cause**: Entrypoints object is empty
-
-**Solution**:
-
-```json
-// ❌ Invalid
-"entrypoints": {}
-
-// ✅ Valid (at least one category)
-"entrypoints": {
-  "commands": ["commands/hello.md"]
-}
-```
-
----
-
 ### Error: "must be >= 10 characters"
 
 **Cause**: Description too short
@@ -541,6 +306,22 @@ echo "✅ All plugin manifests valid"
 
 // ✅ Valid
 "description": "A simple plugin for testing purposes"  // 42 chars
+```
+
+---
+
+### Error: "keywords must be an array"
+
+**Cause**: `keywords` is not an array
+
+**Solution**:
+
+```json
+// ❌ Invalid
+"keywords": "review"
+
+// ✅ Valid
+"keywords": ["review", "automation"]
 ```
 
 ---
@@ -671,15 +452,15 @@ Plugins should NOT require users to create `.env` files. Instead:
 Before publishing plugin:
 
 - [ ] Run `node scripts/validate-plugin.js plugins/<name>`
-- [ ] All entrypoint files exist
-- [ ] Lifecycle scripts are executable (`chmod +x`)
-- [ ] Description is informative (20+ chars)
+- [ ] Required fields are present in `.claude-plugin/plugin.json`
+- [ ] Plugin name matches the directory name
 - [ ] Version is valid semver (e.g., 1.2.3)
-- [ ] Node.js version is 22.22.0-24.x (if dependencies)
-- [ ] README URL is reachable
-- [ ] No duplicate keywords
-- [ ] Permission reasons are clear (10-200 chars)
-- [ ] Plugin name matches directory name
+- [ ] Description is not trivially short
+- [ ] `keywords`, if present, is an array of strings
+- [ ] `outputStyles`, if present, points to a plugin-local directory with `.md`
+  files
+- [ ] Inline hook scripts, if present, resolve inside the plugin and are
+  readable/executable
 
 ---
 
@@ -782,17 +563,14 @@ mkdir -p plugins/hookify/.claude-plugin
 
 ---
 
-### Network timeout on README check
+### Unsupported `--skip-network` flag
 
 **Solution**:
 
 ```bash
-# Skip network checks
-node scripts/validate-plugin.js plugins/hookify --skip-network
-
-# Or increase timeout in validate-plugin.js
-// Change: timeout: 5000
-// To:     timeout: 10000
+# The current validator does not support --skip-network.
+# Run the script directly against the plugin directory instead.
+node scripts/validate-plugin.js plugins/hookify
 ```
 
 ---
@@ -821,14 +599,14 @@ fi
 
 ## Summary
 
-Validation ensures plugin quality and compatibility:
+Validation ensures plugin manifest integrity:
 
-1. **Schema Compliance**: All required fields, correct formats
-2. **File Existence**: Entrypoints and scripts actually exist
-3. **Executability**: Lifecycle scripts have execute permission
-4. **Compatibility**: Node.js 22.22.0-24.x, valid Claude Code versions
-5. **Documentation**: README accessible, description informative
-6. **Permissions**: Transparently declared with justification
+1. **Schema Compliance**: Required fields and JSON schema shape are valid
+2. **Name Consistency**: Plugin name matches the directory name
+3. **Version Quality**: Versions are valid semver strings
+4. **Description Quality**: Very short descriptions are flagged
+5. **Optional Field Hygiene**: `keywords`, `outputStyles`, and inline hook
+   scripts are validated when present
 
 **Golden Rule**: Validate before every publish/commit!
 

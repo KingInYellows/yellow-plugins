@@ -65,19 +65,21 @@ Each plugin lives in `plugins/<name>/` and must contain:
 ```
 plugins/<name>/
   .claude-plugin/
-    plugin.json          # Required: name, description, author
+    plugin.json          # Required: name, description, version, author
   CLAUDE.md              # Plugin context and conventions
   README.md              # User-facing documentation
-  commands/              # Slash commands (*.md)
-  agents/                # Agent definitions (*.md)
-  skills/                # Skill definitions (SKILL.md)
+  commands/              # Optional slash commands (*.md)
+  agents/                # Optional agent definitions (*.md)
+  skills/                # Optional skill definitions (SKILL.md)
 ```
 
 ### Adding a Plugin
 
 1. Create the directory structure above
-2. Add a `plugin.json` with at minimum `name`, `description`, `author`
-3. Register in `.claude-plugin/marketplace.json` under the `plugins` array
+2. Add `.claude-plugin/plugin.json` with at minimum `name`, `description`,
+   `version`, and `author`
+3. Register it in `.claude-plugin/marketplace.json` under the top-level
+   `plugins` array with a `source` like `./plugins/<name>`
 4. Add a README with install command, prerequisites, and component tables
 5. Validate: `pnpm validate:schemas`
 
@@ -236,7 +238,7 @@ is fixed.
 
 ### TypeScript
 
-- Follow strict TypeScript configuration (defined in `tsconfig.base.json`)
+- Follow the strict TypeScript configuration in `tsconfig.json`
 - Use explicit types (avoid `any`)
 - Prefer interfaces over type aliases for objects
 

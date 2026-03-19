@@ -14,6 +14,7 @@ A personal Claude Code plugin marketplace that lets you:
 ## Prerequisites
 
 - Node.js 22.22.0 or later installed
+- pnpm 8+ installed
 - Git repository for your plugins
 - Basic familiarity with JSON
 
@@ -27,10 +28,11 @@ cd /path/to/your/repo
 mkdir -p .claude-plugin
 mkdir -p plugins
 mkdir -p schemas
+mkdir -p scripts
 
-# Copy marketplace schema
-curl -o schemas/marketplace.schema.json \
-  https://raw.githubusercontent.com/KingInYellows/yellow-plugins/main/schemas/marketplace.schema.json
+# Copy the official marketplace schema used by this repository
+curl -o schemas/official-marketplace.schema.json \
+  https://raw.githubusercontent.com/KingInYellows/yellow-plugins/main/schemas/official-marketplace.schema.json
 
 # Copy validation script
 curl -o scripts/validate-marketplace.js \
@@ -44,14 +46,16 @@ chmod +x scripts/validate-marketplace.js
 # Create plugin directory
 mkdir -p plugins/hello-world
 
-# Create minimal plugin.json manifest
-cat > plugins/hello-world/plugin.json << 'EOF'
+# Create minimal plugin manifest
+mkdir -p plugins/hello-world/.claude-plugin
+cat > plugins/hello-world/.claude-plugin/plugin.json << 'EOF'
 {
+  "name": "hello-world",
   "version": "1.0.0",
-  "name": "Hello World Plugin",
   "description": "My first Claude Code plugin",
-  "author": "your-name",
-  "entrypoints": []
+  "author": {
+    "name": "your-name"
+  }
 }
 EOF
 
@@ -70,33 +74,25 @@ EOF
 ## Step 3: Create Marketplace Index (3 minutes)
 
 ```bash
-# Get current timestamp
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
 # Create marketplace.json
 cat > .claude-plugin/marketplace.json << EOF
 {
-  "schemaVersion": "1.0.0",
-  "marketplace": {
-    "name": "My Personal Plugin Marketplace",
-    "author": "your-github-username",
-    "description": "Personal collection of Claude Code plugins",
-    "url": "https://github.com/your-username/your-repo",
-    "updatedAt": "$TIMESTAMP"
+  "name": "my-marketplace",
+  "description": "Personal collection of Claude Code plugins",
+  "owner": {
+    "name": "your-github-username",
+    "url": "https://github.com/your-username"
   },
   "plugins": [
     {
-      "id": "hello-world",
-      "name": "Hello World Plugin",
+      "name": "hello-world",
       "version": "1.0.0",
-      "author": "your-name",
+      "author": {
+        "name": "your-name"
+      },
       "description": "My first Claude Code plugin for testing marketplace",
-      "source": "plugins/hello-world",
-      "category": "development",
-      "tags": ["example", "test"],
-      "featured": true,
-      "verified": true,
-      "updatedAt": "$TIMESTAMP"
+      "source": "./plugins/hello-world",
+      "category": "development"
     }
   ]
 }
@@ -110,11 +106,10 @@ EOF
 node scripts/validate-marketplace.js
 
 # Expected output:
-# ✓ PASS: Marketplace file loaded
-# ✓ PASS: Schema version: 1.0.0
-# ✓ PASS: All plugin IDs are unique
-# ✓ PASS: All validation checks passed!
-# NFR-REL-004: ✓ 100% validation coverage achieved
+# ✓ PASS: Marketplace file loaded: .claude-plugin/marketplace.json
+# ✓ PASS: Marketplace name: my-marketplace
+# ✓ PASS: All plugins have required fields (name, source)
+# ✓ All validation checks passed!
 ```
 
 ## Step 5: Commit and Publish (1 minute)
@@ -123,7 +118,7 @@ node scripts/validate-marketplace.js
 # Add files
 git add .claude-plugin/marketplace.json
 git add plugins/hello-world/
-git add schemas/marketplace.schema.json
+git add schemas/official-marketplace.schema.json
 git add scripts/validate-marketplace.js
 
 # Commit
@@ -141,12 +136,16 @@ gt submit --no-interactive
 # Copy your existing plugin to marketplace structure
 cp -r /path/to/existing-plugin plugins/my-plugin
 
-# Ensure it has a plugin.json manifest
-cat > plugins/my-plugin/plugin.json << 'EOF'
+# Ensure it has a plugin manifest
+mkdir -p plugins/my-plugin/.claude-plugin
+cat > plugins/my-plugin/.claude-plugin/plugin.json << 'EOF'
 {
+  "name": "my-plugin",
   "version": "1.0.0",
-  "name": "My Plugin",
-  "description": "Does something useful"
+  "description": "Does something useful",
+  "author": {
+    "name": "your-name"
+  }
 }
 EOF
 
@@ -164,17 +163,17 @@ on:
   push:
     paths:
       - '.claude-plugin/marketplace.json'
-      - 'plugins/**/plugin.json'
+      - 'plugins/**/.claude-plugin/plugin.json'
   pull_request:
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22.22.0'
       - name: Validate marketplace
         run: node scripts/validate-marketplace.js
 ```
@@ -199,18 +198,17 @@ chmod +x .git/hooks/pre-commit
 ### Adding a New Plugin
 
 1. Create plugin directory: `mkdir -p plugins/new-plugin`
-2. Add `plugin.json` manifest
+2. Add `.claude-plugin/plugin.json` manifest
 3. Edit `.claude-plugin/marketplace.json` to add plugin entry
 4. Validate: `node scripts/validate-marketplace.js`
 5. Commit and push
 
 ### Updating a Plugin Version
 
-1. Update version in `plugins/my-plugin/plugin.json`
+1. Update version in `plugins/my-plugin/.claude-plugin/plugin.json`
 2. Update version in `.claude-plugin/marketplace.json`
-3. Update `updatedAt` timestamp
-4. Validate: `node scripts/validate-marketplace.js`
-5. Commit and push
+3. Validate: `node scripts/validate-marketplace.js`
+4. Commit and push
 
 ### Removing a Plugin
 
@@ -239,19 +237,10 @@ ls -la plugins/my-plugin  # Should exist
 
 ```bash
 # Check plugin.json version
-cat plugins/my-plugin/plugin.json | grep version
+cat plugins/my-plugin/.claude-plugin/plugin.json | grep version
 
 # Update marketplace.json to match
 ```
-
-### Validation Fails: "Invalid category"
-
-**Problem**: Category isn't one of 9 official categories.
-
-**Fix**: Use valid category from this list:
-
-- development, productivity, security, learning, testing
-- design, database, deployment, monitoring
 
 ## Best Practices
 
@@ -259,24 +248,25 @@ cat plugins/my-plugin/plugin.json | grep version
 2. **Keep versions synchronized**: Marketplace and plugin.json must match
 3. **Use semantic versioning**: MAJOR.MINOR.PATCH (e.g., 1.2.3)
 4. **Write clear descriptions**: Help future you remember what plugin does
-5. **Use tags generously**: Makes plugins easier to find
-6. **Update timestamps**: Set `updatedAt` when making changes
+5. **Keep optional categories consistent**: They are schema-supported but not
+   validator-enforced
 
 ## File Structure Reference
 
-```
+```text
 your-repo/
 ├── .claude-plugin/
 │   └── marketplace.json          # Main marketplace index
 ├── plugins/
 │   ├── hello-world/
-│   │   ├── plugin.json           # Plugin manifest
+│   │   ├── .claude-plugin/
+│   │   │   └── plugin.json       # Plugin manifest
 │   │   ├── README.md             # Plugin docs
 │   │   └── ... plugin files ...
 │   └── another-plugin/
 │       └── ... same structure ...
 ├── schemas/
-│   └── marketplace.schema.json   # Schema definition
+│   └── official-marketplace.schema.json
 └── scripts/
     └── validate-marketplace.js   # Validation tool
 ```
@@ -300,7 +290,7 @@ You'll achieve these by following this structure and validation workflow.
 
 ## Support
 
-- Schema definition: `/schemas/marketplace.schema.json`
+- Schema definition: `/schemas/official-marketplace.schema.json`
 - Validation guide: `/docs/validation-guide.md`
 - Example marketplace: `/examples/marketplace.example.json`
 
@@ -310,11 +300,9 @@ You'll achieve these by following this structure and validation workflow.
 
 ```json
 {
-  "schemaVersion": "1.0.0",
-  "marketplace": {
-    "name": "Your Marketplace Name",
-    "author": "your-username",
-    "updatedAt": "2026-01-11T10:00:00Z"
+  "name": "your-marketplace",
+  "owner": {
+    "name": "your-username"
   },
   "plugins": []
 }
@@ -324,9 +312,12 @@ You'll achieve these by following this structure and validation workflow.
 
 ```json
 {
+  "name": "my-plugin",
   "version": "1.0.0",
-  "name": "Plugin Name",
-  "description": "What it does"
+  "description": "What it does",
+  "author": {
+    "name": "your-name"
+  }
 }
 ```
 
