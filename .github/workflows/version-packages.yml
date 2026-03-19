@@ -45,6 +45,7 @@ jobs:
     timeout-minutes: 15
 
     outputs:
+      run_changesets: ${{ steps.detect.outputs.run_changesets }}
       should_publish: ${{ steps.detect.outputs.should_publish }}
       version: ${{ steps.version.outputs.version }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
@@ -76,13 +77,25 @@ jobs:
         run: |
           if [ "${{ inputs.force_publish }}" == "true" ]; then
             echo "force_publish requested — skipping changeset detection"
+            echo "run_changesets=false" >> "$GITHUB_OUTPUT"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
           elif [ -n "$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' -print -quit 2>/dev/null)" ]; then
             echo "Pending changesets found — will create/update Version PR"
+            echo "run_changesets=true" >> "$GITHUB_OUTPUT"
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           else
-            echo "No pending changesets — will run publish phase"
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            CURRENT_VERSION=$(node -p "require('./package.json').version")
+            CURRENT_TAG="v${CURRENT_VERSION}"
+
+            if git ls-remote --tags origin "refs/tags/${CURRENT_TAG}" | grep -q "${CURRENT_TAG}"; then
+              echo "No pending changesets and ${CURRENT_TAG} already exists — nothing to do"
+              echo "run_changesets=false" >> "$GITHUB_OUTPUT"
+              echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "No pending changesets and ${CURRENT_TAG} is missing — will run publish phase"
+              echo "run_changesets=true" >> "$GITHUB_OUTPUT"
+              echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Setup pnpm
@@ -100,7 +113,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Create Version PR or tag released packages
-        if: inputs.force_publish != true
+        if: inputs.force_publish != true && steps.detect.outputs.run_changesets == 'true'
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
           # version: bumps plugin package.json files and propagates to
