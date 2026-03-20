@@ -52,7 +52,10 @@ GW_BRANCH_PREFIX=""
 if command -v yq >/dev/null 2>&1 && \
    yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' && \
    [ -f "$REPO_TOP/.graphite.yml" ]; then
-  GW_BRANCH_PREFIX=$(yq -r '.branch.prefix // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  GW_BRANCH_PREFIX=$(yq -r '.branch.prefix // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || {
+    printf '[gt-workflow] Warning: yq failed to parse branch.prefix. Using empty prefix.\n' >&2
+    GW_BRANCH_PREFIX=""
+  }
   printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP" >&2
 
   # Validate branch.prefix against allow-list

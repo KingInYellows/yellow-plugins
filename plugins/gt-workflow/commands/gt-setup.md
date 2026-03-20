@@ -35,8 +35,13 @@ version_gte() {
 
 printf '=== Prerequisites ===\n'
 if command -v gt >/dev/null 2>&1; then
-  gt_version_raw=$(gt --version 2>/dev/null | head -n1 || true)
-  if [ -n "$gt_version_raw" ]; then
+  gt_version_full=$(gt --version 2>/dev/null)
+  gt_version_exit=$?
+  gt_version_raw=$(printf '%s' "$gt_version_full" | head -n1)
+  if [ "$gt_version_exit" -ne 0 ]; then
+    printf 'gt:            BROKEN (exited with code %s)\n' "$gt_version_exit"
+    printf 'mcp_server:    SKIPPED (gt is broken)\n'
+  elif [ -n "$gt_version_raw" ]; then
     printf 'gt:            ok (%s)\n' "$gt_version_raw"
     gt_ver=$(printf '%s' "$gt_version_raw" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
     if [ -z "$gt_ver" ]; then
@@ -201,9 +206,8 @@ isolate failures. Track the result of each command.
   - "Failed" — command failed (show error)
   - "Skipped" — user chose not to change this setting
 
-If any commands failed, use `AskUserQuestion` to ask:
-- `"Retry failed settings"` — re-run only the failed commands
-- `"Continue with partial configuration"` — proceed to Phase 3
+If any commands failed, note the failures in the summary and proceed to
+Phase 3. The user can re-run `/gt-setup` to retry.
 
 ### Step 8: Settings Summary
 
@@ -233,8 +237,6 @@ repo_top=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 **If the file exists**, read it and show the current contents. Then use
 `AskUserQuestion`:
 - `"Update with new values"` — overwrite with wizard-generated values
-- `"Show diff"` — display a key-by-key comparison of current vs proposed values,
-  then re-prompt with Update or Skip
 - `"Skip"` — keep the existing file unchanged
 
 **If the file exists but is malformed YAML** (read fails or structure is

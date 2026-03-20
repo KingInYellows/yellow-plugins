@@ -43,13 +43,18 @@ GW_BRANCH_PREFIX=""
 if command -v yq >/dev/null 2>&1 && \
    yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' && \
    [ -f "$REPO_TOP/.graphite.yml" ]; then
-  GW_DRAFT=$(yq -r '.submit.draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  GW_MERGE_WHEN_READY=$(yq -r '.submit.merge_when_ready // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  GW_RESTACK_BEFORE=$(yq -r '.submit.restack_before // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  GW_AUDIT_AGENTS=$(yq -r '.audit.agents // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  GW_SKIP_ON_DRAFT=$(yq -r '.audit.skip_on_draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  GW_BRANCH_PREFIX=$(yq -r '.branch.prefix // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP" >&2
+  yq_err=""
+  GW_DRAFT=$(yq -r '.submit.draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="submit.draft"
+  GW_MERGE_WHEN_READY=$(yq -r '.submit.merge_when_ready // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="${yq_err:+$yq_err, }merge_when_ready"
+  GW_RESTACK_BEFORE=$(yq -r '.submit.restack_before // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="${yq_err:+$yq_err, }restack_before"
+  GW_AUDIT_AGENTS=$(yq -r '.audit.agents // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="${yq_err:+$yq_err, }audit.agents"
+  GW_SKIP_ON_DRAFT=$(yq -r '.audit.skip_on_draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="${yq_err:+$yq_err, }skip_on_draft"
+  GW_BRANCH_PREFIX=$(yq -r '.branch.prefix // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="${yq_err:+$yq_err, }branch.prefix"
+  if [ -n "$yq_err" ]; then
+    printf '[gt-workflow] Warning: yq failed to parse fields: %s. Using defaults for those.\n' "$yq_err" >&2
+  else
+    printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP" >&2
+  fi
 elif [ -f "$REPO_TOP/.graphite.yml" ]; then
   printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using defaults.\n' >&2
   printf '[gt-workflow] Install yq: pip install yq\n' >&2
