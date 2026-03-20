@@ -72,7 +72,7 @@ starts with `./`, `../`, or `plans/`):
   1. Find most recently modified plan files:
 
      ```bash
-     ls -t plans/*.md 2>/dev/null | head -5
+     ls -t plans/*.md 2>/dev/null | head -3
      ```
 
   2. If plan files found, use AskUserQuestion: "Which plan should I review
@@ -265,10 +265,12 @@ Compare files actually changed against the plan's declared scope.
    git diff <trunk>...<branch> --name-only
    ```
 
-   For stacked sessions, use the aggregate diff from trunk to the topmost
-   branch (`git diff <trunk>...HEAD --name-only`) to avoid duplicates. Do NOT
-   combine per-branch `--name-only` lists (linear stacks produce cumulative
-   diffs that count the same file multiple times).
+   For **linear** stacks, use the aggregate diff from trunk to the topmost
+   branch (`git diff <trunk>...HEAD --name-only`) — this captures all files
+   without duplicates since HEAD accumulates all ancestor changes.
+
+   For **parallel** stacks (fan-out), `HEAD` only reflects one branch. Combine
+   per-branch `--name-only` lists and deduplicate with `sort -u`.
 
 2. Get the planned scope from `## Technical Specifications` (Files to Modify,
    Files to Create) and `## Stack Decomposition` Scope fields.
@@ -447,10 +449,12 @@ mkdir -p docs/reviews || {
 }
 ```
 
-Derive the plan slug from the plan file path (the argument resolved in Step 1):
+Derive the plan slug from the resolved plan file path (from Step 1 — this may
+be `$ARGUMENTS` if provided, or the path selected via AskUserQuestion in the
+auto-detect flow):
 
 ```bash
-PLAN_SLUG=$(basename "$ARGUMENTS" .md)
+PLAN_SLUG=$(basename "<resolved-plan-path>" .md)
 ```
 
 Write to `docs/reviews/YYYY-MM-DD-${PLAN_SLUG}-session-review.md` with content:
