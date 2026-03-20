@@ -71,6 +71,7 @@ if command -v yq >/dev/null 2>&1 && \
   fi
 elif [ -f "$REPO_TOP/.graphite.yml" ]; then
   printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using default branch naming.\n' >&2
+  printf '[gt-workflow] Install yq: pip install yq\n' >&2
 fi
 ```
 
