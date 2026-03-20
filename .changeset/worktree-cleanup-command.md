@@ -1,7 +1,9 @@
 ---
-"yellow-core": minor
-"gt-workflow": patch
+'yellow-core': minor
+'gt-workflow': patch
 ---
+
+# Summary
 
 feat(yellow-core): add /worktree:cleanup command for smart git worktree cleanup
 

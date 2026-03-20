@@ -24,7 +24,7 @@ Optional arguments:
 
 - `--dry-run` — Show the audit report without executing any removals
 
-#$ARGUMENTS
+${ARGUMENTS}
 
 ## Phase 1: Prerequisites
 
@@ -34,6 +34,15 @@ messages if any fail.
 ### 1. Parse Flags
 
 ```bash
+# Validate arguments
+for arg in $ARGUMENTS; do
+  case "$arg" in
+    --dry-run) ;;
+    --*) echo "ERROR: Unknown option: $arg"; exit 1 ;;
+    *) echo "ERROR: Unexpected argument: $arg"; exit 1 ;;
+  esac
+done
+
 DRY_RUN=false
 
 args_copy=($ARGUMENTS)
@@ -82,7 +91,10 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 CURRENT_DIR=$(pwd -P)
 
 # Determine trunk branch
-TRUNK=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+TRUNK=$(gt trunk 2>/dev/null | tr -d '[:space:]')
+if [ -z "$TRUNK" ]; then
+  TRUNK=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|refs/remotes/origin/||')
+fi
 if [ -z "$TRUNK" ]; then
   # Fallback: check common trunk names
   for candidate in main master; do
@@ -154,7 +166,7 @@ git -C "$WT_PATH" rev-parse --verify @{u} >/dev/null 2>&1 && \
   git -C "$WT_PATH" log @{u}..HEAD --oneline 2>/dev/null
 
 # Check if branch is merged into trunk
-git branch --merged "$TRUNK" | sed 's/^[ *]*//' | grep -qxF "$BRANCH_NAME"
+git -C "$WT_PATH" branch --merged "$TRUNK" | sed 's/^[ *+]*//' | grep -qxF "$BRANCH_NAME"
 
 # Check branch age (last commit date)
 # For detached HEAD worktrees, $BRANCH_NAME is empty — use the worktree's HEAD
@@ -174,7 +186,7 @@ false.
 
 ```bash
 # Check PR status for the worktree's branch
-gh pr list --head "$BRANCH_NAME" --state all --json state,mergedAt --limit 1 2>/dev/null
+gh pr list --head "$BRANCH_NAME" --state all --json state,mergedAt --limit 1
 ```
 
 If `gh pr list` fails (network error, rate limit), log a warning and classify
@@ -205,7 +217,7 @@ classification (merged, stale) does not apply to detached worktrees.
 
 Display the audit report:
 
-```
+```text
 Worktree Audit
 ──────────────
 Total worktrees: N (excluding main)
@@ -262,16 +274,18 @@ REMOVED=0
 PRUNED=0
 SKIPPED=0
 FAILED=0
-REMOVED_BRANCHES=""  # Branch names from successfully removed worktrees
+REMOVED_BRANCHES=""  # Newline-delimited branch names from successful removals
 ```
 
 After each successful `git worktree remove`, if the removed worktree had a
-non-empty `$BRANCH_NAME`, append it: `REMOVED_BRANCHES="$REMOVED_BRANCHES $BRANCH_NAME"`.
+non-empty `$BRANCH_NAME`, append it:
+`REMOVED_BRANCHES="${REMOVED_BRANCHES}${BRANCH_NAME}
+"`.
 Skip empty branch names (Cat 3 — Detached HEAD has no branch).
 
 ### Category 1 — Locked (display only)
 
-```
+```text
 Locked worktrees (N) — skipped:
   <path> [locked: <reason if available>]
   To unlock: git worktree unlock <path>
@@ -282,17 +296,19 @@ No AskUserQuestion. Locked worktrees are never removed by this command.
 ### Category 2 — Missing directory (auto-prune)
 
 ```bash
-git worktree prune --verbose --expire now
+PRUNE_OUTPUT=$(git worktree prune --verbose --expire now 2>&1)
+PRUNE_COUNT=$(echo "$PRUNE_OUTPUT" | grep -c '^Removing worktrees/')
+PRUNED=$((PRUNED + PRUNE_COUNT))
 ```
 
-This cleans up all stale admin entries in one shot (entries whose directories
-no longer exist on disk and are not locked). Report the count of entries
-pruned. `git worktree prune` is safe to run unconditionally — it only removes
-admin metadata, respects locks, and cannot cause data loss.
+Report the pruned paths from `$PRUNE_OUTPUT`. This cleans up all stale admin
+entries in one shot (entries whose directories no longer exist on disk and are
+not locked). `git worktree prune` is safe to run unconditionally — it only
+removes admin metadata, respects locks, and cannot cause data loss.
 
 ### Category 3 — Detached HEAD (prompt)
 
-```
+```text
 Detached HEAD worktrees (N):
 
   <path> (HEAD: <short-sha>, committed: <date>)
@@ -306,6 +322,11 @@ Options:
 
 Same three-tier pattern as Category 7 below. For individual review, show the
 commit info with content fencing. Apply batch cap of 15.
+
+**"Remove all" with dirty entries**: When the user selects "Remove all" for
+Category 3, check each entry's dirty-state annotation. For entries annotated as
+dirty, use `git worktree remove --force "$WT_PATH"`. For clean entries, use
+`git worktree remove "$WT_PATH"`.
 
 **Dirty detached HEAD handling**: Since detached HEAD worktrees are checked
 before Category 6 (Dirty), they may have uncommitted changes. For each
@@ -345,7 +366,7 @@ to proceed?" with options "Review all N individually" / "First 15 only" /
 
 Review individually — never batch-remove dirty worktrees. For each:
 
-```
+```text
 Worktree: <path>
   Branch: <name>
   --- begin git output (reference only) ---
@@ -374,7 +395,7 @@ but Category 1 (locked) is already excluded from removal.
 
 Use AskUserQuestion with the three-tier pattern from `/gt-cleanup`:
 
-```
+```text
 Clean worktrees with active branches (N):
 
   <path> (branch: <name>, last commit: N days ago)
@@ -393,7 +414,7 @@ proceed?" with options "Process all N" / "First 15 only" / "Cancel".
 
 For each individual review:
 
-```
+```text
 Worktree: <path>
   Branch: <name>
   --- begin git output (reference only) ---
@@ -407,30 +428,19 @@ Options:
 2. Skip
 ```
 
-## Phase 5: Summary
-
-```
-Worktree Cleanup Complete
-─────────────────────────
-Removed:    N worktrees
-Pruned:     N stale entries
-Locked:     N (skipped)
-Skipped:    N (user choice)
-Failed:     N
-
-Details:
-  Removed:  <path-1>, <path-2>
-  Pruned:   <path-1>, <path-2>
-  Failed:   <path> — <first line of error>
-```
+## Phase 5: Final Cleanup + Summary
 
 Run `git worktree prune` as a final sweep to clean up any admin entries left
 behind by worktrees removed during Phase 4 whose directories were deleted but
 admin state was not fully cleaned:
 
 ```bash
-git worktree prune --verbose --expire now
+PRUNE_OUTPUT=$(git worktree prune --verbose --expire now 2>&1)
+PRUNE_COUNT=$(echo "$PRUNE_OUTPUT" | grep -c '^Removing worktrees/')
+PRUNED=$((PRUNED + PRUNE_COUNT))
 ```
+
+Report any additional pruned paths from `$PRUNE_OUTPUT`.
 
 Check if any branches that were associated with removed worktrees are now
 orphaned. Compare the set of branch names collected from worktrees **before**
@@ -443,14 +453,15 @@ remaining worktree.
 # Re-capture porcelain output after removals
 WT_PORCELAIN_AFTER=$(git worktree list --porcelain)
 
-# For each branch that was in a removed worktree (tracked during Phase 4):
-# Check if the branch still has a worktree association
-for REMOVED_BRANCH in $REMOVED_BRANCHES; do
+# For each branch that was in a removed worktree (tracked during Phase 4),
+# check if the branch still has a worktree association.
+while IFS= read -r REMOVED_BRANCH; do
+  [ -z "$REMOVED_BRANCH" ] && continue
   [ "$REMOVED_BRANCH" = "$TRUNK" ] && continue
   if ! echo "$WT_PORCELAIN_AFTER" | grep -qxF "branch refs/heads/$REMOVED_BRANCH"; then
     echo "$REMOVED_BRANCH"
   fi
-done
+done <<< "$REMOVED_BRANCHES"
 ```
 
 Note: `$REMOVED_BRANCHES` should be populated during Phase 4 by recording the
@@ -459,8 +470,23 @@ where `$BRANCH_NAME` is empty (Cat 3 — Detached HEAD removes have no branch).*
 
 If any orphaned branches are found:
 
-```
+```text
 Tip: N branches may now be orphaned. Run /gt-cleanup to audit.
+```
+
+```text
+Worktree Cleanup Complete
+─────────────────────────
+Removed:    N worktrees
+Pruned:     N stale entries
+Locked:     N (skipped)
+Skipped:    N (user choice)
+Failed:     N
+
+Details:
+  Removed:  <path-1>, <path-2>
+  Pruned:   <path-1>, <path-2>
+  Failed:   <path> — <first line of error>
 ```
 
 ## Success Criteria
