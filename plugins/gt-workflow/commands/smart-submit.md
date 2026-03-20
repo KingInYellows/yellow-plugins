@@ -49,14 +49,17 @@ if command -v yq >/dev/null 2>&1 && \
   GW_AUDIT_AGENTS=$(yq -r '.audit.agents // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
   GW_SKIP_ON_DRAFT=$(yq -r '.audit.skip_on_draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
   GW_BRANCH_PREFIX=$(yq -r '.branch.prefix // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP"
+  printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP" >&2
 elif [ -f "$REPO_TOP/.graphite.yml" ]; then
   printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using defaults.\n' >&2
   printf '[gt-workflow] Install yq: pip install yq\n' >&2
 fi
 
-# Clamp audit.agents to 1-3 range
+# Validate and clamp audit.agents to 1-3 range
 if [ -n "$GW_AUDIT_AGENTS" ]; then
+  case "$GW_AUDIT_AGENTS" in
+    *[!0-9]*) printf '[gt-workflow] Warning: audit.agents value "%s" is not an integer. Using default 3.\n' "$GW_AUDIT_AGENTS" >&2; GW_AUDIT_AGENTS=3 ;;
+  esac
   if [ "$GW_AUDIT_AGENTS" -lt 1 ] 2>/dev/null; then
     printf '[gt-workflow] Warning: audit.agents=%s is below minimum. Using 1.\n' "$GW_AUDIT_AGENTS" >&2
     GW_AUDIT_AGENTS=1
@@ -66,12 +69,13 @@ if [ -n "$GW_AUDIT_AGENTS" ]; then
   fi
 fi
 
-printf 'GW_DRAFT=%s\n' "$GW_DRAFT"
-printf 'GW_MERGE_WHEN_READY=%s\n' "$GW_MERGE_WHEN_READY"
-printf 'GW_RESTACK_BEFORE=%s\n' "$GW_RESTACK_BEFORE"
-printf 'GW_AUDIT_AGENTS=%s\n' "$GW_AUDIT_AGENTS"
-printf 'GW_SKIP_ON_DRAFT=%s\n' "$GW_SKIP_ON_DRAFT"
-printf 'GW_BRANCH_PREFIX=%s\n' "$GW_BRANCH_PREFIX"
+# Validate branch.prefix against allow-list
+if [ -n "$GW_BRANCH_PREFIX" ]; then
+  if ! printf '%s' "$GW_BRANCH_PREFIX" | grep -qE '^[a-z0-9][a-z0-9/_-]*$'; then
+    printf '[gt-workflow] Error: branch.prefix "%s" contains invalid characters. Using empty prefix.\n' "$GW_BRANCH_PREFIX" >&2
+    GW_BRANCH_PREFIX=""
+  fi
+fi
 ```
 
 Store these values for use in subsequent phases. When a value is empty, use the

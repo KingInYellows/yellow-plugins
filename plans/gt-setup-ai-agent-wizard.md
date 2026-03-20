@@ -106,7 +106,6 @@ Display summary table of current vs AI-agent-recommended values.
 - `"Disable pager (Recommended for AI agents)"` — runs
   `gt user pager --disable`
 - `"Keep current pager setting"` — no change
-- `"Show me what this affects first"` — display explanation, then re-prompt
 
 If pager is disabled, include reversal instructions in the summary:
 `"To re-enable: gt user pager --enable"`
@@ -120,12 +119,12 @@ If pager is disabled, include reversal instructions in the summary:
 Plus pager (from Step 6 answer) if user chose to disable.
 
 **Failure handling:** If any `gt user` command fails:
-- Stop applying further settings
-- Show summary: "Applied" / "Already set" / "Failed (error)" / "Skipped"
+- Record the error output
+- Continue applying remaining settings (do not stop on first failure)
+- After all commands, show summary: "Applied" / "Already set" / "Failed
+  (error)" / "Skipped"
 - Offer via `AskUserQuestion`: "Retry failed settings" or "Continue with
   partial configuration"
-- Include `gt user pager --enable` in failure summary if pager was disabled
-  before a subsequent command failed
 
 **Step 8: Settings summary report.** Show all 5 settings with final status.
 

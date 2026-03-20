@@ -25,7 +25,8 @@ Validate Graphite CLI, configure AI agent settings, and generate a
 
 Stage, audit, and submit changes via Graphite in one flow.
 
-- Runs 3 parallel code review agents (quality, security, silent failures)
+- Runs 1-3 parallel code review agents (configurable via `audit.agents` in
+  `.graphite.yml`, default 3)
 - Stages specific files (never `git add .`)
 - Auto-generates conventional commit messages from diff analysis
 - Detects trunk vs feature branch for correct `gt` command
@@ -42,7 +43,8 @@ Stage, audit, and submit changes via Graphite in one flow.
 The fastest solo-dev path: audit your current fix and fold it into the current
 branch commit.
 
-- Runs 3 parallel code review agents (same as `/smart-submit`)
+- Runs 1-3 parallel code review agents (configurable via `audit.agents`,
+  default 3)
 - Stages specific files (never `git add .`)
 - Amends the existing branch commit via `gt commit amend --no-edit`
 - Re-submits the stack to update the open PR

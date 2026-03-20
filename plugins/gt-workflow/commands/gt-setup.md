@@ -154,10 +154,12 @@ Options:
 The "Other" button allows free-text input for a custom prefix.
 
 **If the user provides a custom prefix via "Other", validate it:**
-- Allowed characters: lowercase letters, digits, `/`, `_`, `-` only
+- Must start with a lowercase letter or digit (`[a-z0-9]`)
+- Allowed subsequent characters: lowercase letters, digits, `/`, `_`, `-` only
 - Reject if it contains `..`, `~`, spaces, or any character outside `[a-z0-9/_-]`
 - Normalize: append trailing `/` if missing
-- Max length: 20 characters
+- Max length: 20 characters (checked **after** normalization, so the effective
+  input limit is 19 characters when a trailing `/` is appended)
 - If validation fails, explain the constraint and re-prompt with AskUserQuestion
 
 Store the chosen prefix (or empty string if skipped) for use in Step 7 and
@@ -185,8 +187,9 @@ isolate failures. Track the result of each command.
 2. `gt user restack-date --use-author-date` (if not already set)
 3. `gt user submit-body --include-commit-messages` (if not already set)
 4. Branch prefix (if user provided one in Step 5): run
-   `gt user branch-prefix --set "$(printf '%s' "<actual-prefix-value>")"` — use
-   `printf '%s'` to safely pass the user-supplied prefix, never raw interpolation
+   Substitute the validated prefix as a literal value in single quotes, e.g.,
+   `gt user branch-prefix --set 'agent/'` — never use shell variable
+   interpolation for user-supplied text
 5. `gt user pager --disable` (only if user chose to disable in Step 6)
 
 **Failure handling:** If any command fails:
@@ -252,7 +255,7 @@ Step 5) and sensible defaults. Use the Write tool to create the file at
 The file content:
 
 ```yaml
-# gt-workflow convention file — read by smart-submit, gt-stack-plan, gt-amend
+# gt-workflow convention file — read by smart-submit, gt-stack-plan, gt-amend, gt-setup
 # This is NOT a Graphite CLI feature. It is a gt-workflow plugin convention.
 # Docs: https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/gt-workflow
 
@@ -279,7 +282,9 @@ After writing, fix CRLF line endings (WSL2 safety):
 
 ```bash
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
-sed -i 's/\r$//' "$repo_top/.graphite.yml"
+sed -i 's/\r$//' "$repo_top/.graphite.yml" 2>/dev/null || \
+  sed -i '' 's/\r$//' "$repo_top/.graphite.yml" 2>/dev/null || \
+  printf '[gt-workflow] Warning: could not strip CRLF from .graphite.yml\n' >&2
 ```
 
 ### Step 11: PR Template
@@ -332,7 +337,9 @@ After writing, fix CRLF:
 
 ```bash
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
-sed -i 's/\r$//' "$repo_top/.github/pull_request_template.md"
+sed -i 's/\r$//' "$repo_top/.github/pull_request_template.md" 2>/dev/null || \
+  sed -i '' 's/\r$//' "$repo_top/.github/pull_request_template.md" 2>/dev/null || \
+  printf '[gt-workflow] Warning: could not strip CRLF from PR template\n' >&2
 ```
 
 ### Step 12: Final Report

@@ -1,6 +1,6 @@
 ---
 name: gt-stack-plan
-description: 'Decompose a feature into stacked PRs, ordered by dependency (plan-only)'
+description: "Decompose a feature into stacked PRs, ordered by dependency (plan-only). Use when breaking a feature into reviewable stacked PRs."
 argument-hint: '[feature-description or plan-file-path]'
 allowed-tools:
   - Bash
@@ -53,7 +53,15 @@ if command -v yq >/dev/null 2>&1 && \
    yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' && \
    [ -f "$REPO_TOP/.graphite.yml" ]; then
   GW_BRANCH_PREFIX=$(yq -r '.branch.prefix // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  printf '[gt-workflow] Convention file loaded: branch.prefix=%s\n' "$GW_BRANCH_PREFIX"
+  printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP" >&2
+
+  # Validate branch.prefix against allow-list
+  if [ -n "$GW_BRANCH_PREFIX" ]; then
+    if ! printf '%s' "$GW_BRANCH_PREFIX" | grep -qE '^[a-z0-9][a-z0-9/_-]*$'; then
+      printf '[gt-workflow] Error: branch.prefix "%s" contains invalid characters. Using empty prefix.\n' "$GW_BRANCH_PREFIX" >&2
+      GW_BRANCH_PREFIX=""
+    fi
+  fi
 elif [ -f "$REPO_TOP/.graphite.yml" ]; then
   printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using default branch naming.\n' >&2
 fi

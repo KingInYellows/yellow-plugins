@@ -55,16 +55,17 @@ Graphite-native workflow commands for stacked PR development.
 
 ## Submit Paths
 
-- **`/smart-submit`** — Ad-hoc commit+submit for working changes. Runs 3-agent
-  audit (code review, security, silent failures), generates conventional commit,
-  submits via Graphite. Use when committing standalone changes outside a plan.
+- **`/smart-submit`** — Ad-hoc commit+submit for working changes. Runs 1-3
+  audit agents (configurable via `audit.agents` in `.graphite.yml`, default 3),
+  generates conventional commit, submits via Graphite. Use when committing
+  standalone changes outside a plan.
 - **`/workflows:work`** (yellow-core) — Plan-driven implementation. Delegates to
   `/smart-submit` in its final phase. Use when executing a structured plan from
   `/workflows:plan`.
 
 Both paths use `gt submit --no-interactive` for submission. Both read
 `.graphite.yml` for repo-level behavior overrides (draft mode, audit agent
-count, branch prefix, merge-when-ready, restack-before).
+count, skip-on-draft, branch prefix, merge-when-ready, restack-before).
 
 ## Convention File: `.graphite.yml`
 
@@ -86,7 +87,7 @@ audit:
 
 branch:
   prefix: ""                # Prepended to branch names (default: "")
-                            # Repo-level; overrides gt user branch-prefix
+                            # Repo-level; overrides gt user branch-prefix when non-empty
 
 pr_template:
   create: true              # Whether gt-setup creates PR template (default: true)

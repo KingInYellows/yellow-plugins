@@ -32,22 +32,30 @@ Check for a `.graphite.yml` convention file and parse audit settings. Run:
 REPO_TOP=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 GW_AUDIT_AGENTS=""
 GW_SKIP_ON_DRAFT=""
+GW_DRAFT=""
 
 if command -v yq >/dev/null 2>&1 && \
    yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' && \
    [ -f "$REPO_TOP/.graphite.yml" ]; then
   GW_AUDIT_AGENTS=$(yq -r '.audit.agents // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
   GW_SKIP_ON_DRAFT=$(yq -r '.audit.skip_on_draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
-  printf '[gt-workflow] Convention file loaded: audit.agents=%s skip_on_draft=%s\n' "$GW_AUDIT_AGENTS" "$GW_SKIP_ON_DRAFT"
+  GW_DRAFT=$(yq -r '.submit.draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP" >&2
 elif [ -f "$REPO_TOP/.graphite.yml" ]; then
   printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using defaults.\n' >&2
+  printf '[gt-workflow] Install yq: pip install yq\n' >&2
 fi
 
-# Clamp audit.agents to 1-3 range
+# Validate and clamp audit.agents to 1-3 range
 if [ -n "$GW_AUDIT_AGENTS" ]; then
+  case "$GW_AUDIT_AGENTS" in
+    *[!0-9]*) printf '[gt-workflow] Warning: audit.agents value "%s" is not an integer. Using default 3.\n' "$GW_AUDIT_AGENTS" >&2; GW_AUDIT_AGENTS=3 ;;
+  esac
   if [ "$GW_AUDIT_AGENTS" -lt 1 ] 2>/dev/null; then
+    printf '[gt-workflow] Warning: audit.agents=%s is below minimum. Using 1.\n' "$GW_AUDIT_AGENTS" >&2
     GW_AUDIT_AGENTS=1
   elif [ "$GW_AUDIT_AGENTS" -gt 3 ] 2>/dev/null; then
+    printf '[gt-workflow] Warning: audit.agents=%s exceeds maximum. Using 3.\n' "$GW_AUDIT_AGENTS" >&2
     GW_AUDIT_AGENTS=3
   fi
 fi
