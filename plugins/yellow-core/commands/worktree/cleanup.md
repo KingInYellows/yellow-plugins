@@ -120,9 +120,12 @@ extract:
 - `prunable` — present if directory is missing; includes reason text
 - `bare` — present for bare repo worktrees
 
-**Skip the first record** — it is always the main worktree. Also skip any
-record where the worktree path equals `$CURRENT_DIR` (mark as "active
-(current)" in the report but exclude from removal candidates).
+**Skip the first record** — it is always the main worktree (or `bare` for bare
+repos — skip any record with the `bare` flag). Also skip any record where the
+worktree path is an ancestor of `$CURRENT_DIR` or equals it — use
+`case "$CURRENT_DIR" in "$WT_PATH"*) skip ;; esac` to match both the worktree
+root and subdirectories within it. Mark matched worktrees as "active (current)"
+in the report but exclude from removal candidates.
 
 ### 2. Per-Worktree Data Collection
 
@@ -174,8 +177,8 @@ A worktree matches the first category whose detection criteria are met:
 | 1 | Locked | Porcelain `locked` field present | Skip with notice |
 | 2 | Missing directory | Porcelain `prunable` field present, OR `! test -d "$WT_PATH"` as fallback | Auto-prune |
 | 3 | Detached HEAD | No branch association (`detached` flag in porcelain) | Prompt user |
-| 4 | Branch merged | `git branch --merged "$TRUNK"` matches, OR PR state=MERGED | Auto-remove if clean |
-| 5 | Stale | Last commit > 30 days, no open PR, clean working tree | Auto-remove |
+| 4 | Branch merged | (`git branch --merged "$TRUNK"` matches, OR PR state=MERGED) AND clean working tree AND no unpushed commits | Auto-remove |
+| 5 | Stale | Last commit > 30 days, no open PR, clean working tree, no unpushed commits | Auto-remove |
 | 6 | Dirty | Uncommitted changes OR unpushed commits | Warn + confirm |
 | 7 | Clean, branch active | No uncommitted changes, branch not merged, recent activity | Prompt user |
 
@@ -194,26 +197,26 @@ Worktree Audit
 ──────────────
 Total worktrees: N (excluding main)
 
-Category 1 — Missing directory (N):
-  /tmp/devin-session-abc/yellow-plugins (admin entry only)
-
-Category 2 — Locked (N):
+Category 1 — Locked (N):
   .worktrees/long-running-experiment [locked: portable device]
 
-Category 3 — Branch merged (N):
+Category 2 — Missing directory (N):
+  /tmp/devin-session-abc/yellow-plugins (admin entry only)
+
+Category 3 — Detached HEAD (N):
+  /mnt/c/Users/brads/.codex/worktrees/92b3/yellow-plugins (HEAD: abc1234)
+
+Category 4 — Branch merged (N):
   .worktrees/feat-auth-flow (branch: feat/auth-flow, merged)
 
-Category 4 — Stale (N):
+Category 5 — Stale (N):
   .worktrees/old-spike (branch: spike/old-idea, last commit: 45 days ago)
-
-Category 5 — Clean, active branch (N):
-  .worktrees/current-work (branch: feat/new-thing, last commit: 2 days ago)
 
 Category 6 — Dirty (N):
   .worktrees/wip (branch: feat/wip, 3 uncommitted files, 2 unpushed commits)
 
-Category 7 — Detached HEAD (N):
-  /mnt/c/Users/brads/.codex/worktrees/92b3/yellow-plugins (HEAD: abc1234)
+Category 7 — Clean, active branch (N):
+  .worktrees/current-work (branch: feat/new-thing, last commit: 2 days ago)
 ```
 
 **Path display**: Use absolute paths for worktrees outside the repo tree. Use
@@ -225,7 +228,7 @@ worktrees were modified."
 If all categories are empty (no worktrees beyond main), print "No worktrees to
 clean up." and exit.
 
-If only Category 2 (locked) and/or active-current worktrees exist with no
+If only Category 1 (locked) and/or active-current worktrees exist with no
 actionable categories, print "No worktrees to clean up (N locked, skipped)."
 and exit.
 
@@ -422,7 +425,8 @@ Tip: N branches may now be orphaned. Run /gt-cleanup to audit.
 - All worktrees from `git worktree list` scanned and classified into 7 categories
 - Main worktree and current worktree auto-excluded
 - `--dry-run` shows report without any removals
-- Auto-remove for categories 2 (missing), 4 (merged), 5 (stale) without per-item prompts
+- Auto-remove for categories 2 (missing), 4 (merged, clean only), 5 (stale) without per-item prompts
+- Merged-but-dirty worktrees fall through to category 6 (dirty) for explicit confirmation
 - Explicit confirmation for category 6 (dirty) with `--force` removal
 - Locked worktrees (category 1) displayed but never removed
 - Detached HEAD worktrees (category 3) always prompted

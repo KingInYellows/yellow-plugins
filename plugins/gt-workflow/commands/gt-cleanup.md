@@ -444,11 +444,9 @@ clean them up too?
 
 If the user chooses "Yes":
 
-Invoke the Skill tool with `skill: "worktree:cleanup"`.
-
-If `--dry-run` was passed to gt-cleanup, forward it:
-
-Invoke the Skill tool with `skill: "worktree:cleanup"` and `args: "--dry-run"`.
+If `$DRY_RUN` is true, invoke the Skill tool with `skill: "worktree:cleanup"`
+and `args: "--dry-run"`. Otherwise, invoke the Skill tool with
+`skill: "worktree:cleanup"` (no args).
 
 **Graceful degradation:** If the Skill call fails (yellow-core not installed or
 command not found), report:
