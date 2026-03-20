@@ -24,6 +24,50 @@ Optional arguments:
 
 #$ARGUMENTS
 
+## Phase 0: Read Convention File
+
+Check for a `.graphite.yml` convention file and parse audit settings. Run:
+
+```bash
+REPO_TOP=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+GW_AUDIT_AGENTS=""
+GW_SKIP_ON_DRAFT=""
+GW_DRAFT=""
+
+if command -v yq >/dev/null 2>&1 && \
+   yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' && \
+   [ -f "$REPO_TOP/.graphite.yml" ]; then
+  yq_err=""
+  GW_AUDIT_AGENTS=$(yq -r '.audit.agents // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="audit.agents"
+  GW_SKIP_ON_DRAFT=$(yq -r '.audit.skip_on_draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="${yq_err:+$yq_err, }skip_on_draft"
+  GW_DRAFT=$(yq -r '.submit.draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || yq_err="${yq_err:+$yq_err, }submit.draft"
+  if [ -n "$yq_err" ]; then
+    printf '[gt-workflow] Warning: yq failed to parse fields: %s. Using defaults for those.\n' "$yq_err" >&2
+  else
+    printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP" >&2
+  fi
+elif [ -f "$REPO_TOP/.graphite.yml" ]; then
+  printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using defaults.\n' >&2
+  printf '[gt-workflow] Install yq: pip install yq\n' >&2
+fi
+
+# Validate and clamp audit.agents to 1-3 range
+if [ -n "$GW_AUDIT_AGENTS" ]; then
+  case "$GW_AUDIT_AGENTS" in
+    *[!0-9]*) printf '[gt-workflow] Warning: audit.agents value "%s" is not an integer. Using default 3.\n' "$GW_AUDIT_AGENTS" >&2; GW_AUDIT_AGENTS=3 ;;
+  esac
+  if [ "$GW_AUDIT_AGENTS" -lt 1 ] 2>/dev/null; then
+    printf '[gt-workflow] Warning: audit.agents=%s is below minimum. Using 1.\n' "$GW_AUDIT_AGENTS" >&2
+    GW_AUDIT_AGENTS=1
+  elif [ "$GW_AUDIT_AGENTS" -gt 3 ] 2>/dev/null; then
+    printf '[gt-workflow] Warning: audit.agents=%s exceeds maximum. Using 3.\n' "$GW_AUDIT_AGENTS" >&2
+    GW_AUDIT_AGENTS=3
+  fi
+fi
+```
+
+Store these values for use in Phase 2. Default: 3 agents, skip_on_draft=false.
+
 ## Phase 1: Understand Current State
 
 Run these commands to confirm there are changes to amend and that we are on a
@@ -46,6 +90,10 @@ gt log short
 
 ## Phase 2: Audit (skip if `--no-verify`)
 
+**Skip-on-draft check:** If `$GW_SKIP_ON_DRAFT` is `true` and `$GW_DRAFT` is
+`true` (from `.graphite.yml`), skip the entire audit phase and proceed to
+Phase 3. This matches the same logic used in `/smart-submit`.
+
 ### 0. Capture the Diff Once
 
 ```bash
@@ -56,8 +104,12 @@ Store this output as `$DIFF_OUTPUT` and pass it to each audit agent below.
 
 ### 1. Spawn Parallel Auditors
 
-Use the Task tool to launch all three agents in parallel in a **single
-message**:
+Determine the number of audit agents to spawn: use `$GW_AUDIT_AGENTS` if set
+(1-3), otherwise default to 3. If the count is 1, spawn only
+**quick-code-review**. If 2, spawn **quick-code-review** and
+**quick-security-scan**. If 3, spawn all three.
+
+Use the Task tool to launch agents in parallel in a **single message**:
 
 **quick-code-review** (subagent_type: `general-purpose`):
 
@@ -148,9 +200,14 @@ gt commit amend -m "<new message>"
 
 Skip this phase if `--no-submit` was passed — report the amended state and exit.
 
+Build the submit command with convention file flags:
+
 ```bash
 gt submit --no-interactive
 ```
+
+Append flags to the submit command (only if set and non-empty):
+- If `$GW_DRAFT` is `true`: add `--draft`
 
 After submitting:
 

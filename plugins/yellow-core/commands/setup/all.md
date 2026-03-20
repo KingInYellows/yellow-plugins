@@ -111,6 +111,8 @@ printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-chatprd.local.md" ] && printf '.claude/yellow-chatprd.local.md:    exists\n' || printf '.claude/yellow-chatprd.local.md:    missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-ci.local.md" ] && printf '.claude/yellow-ci.local.md:         exists\n' || printf '.claude/yellow-ci.local.md:         missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-browser-test.local.md" ] && printf '.claude/yellow-browser-test.local.md: exists\n' || printf '.claude/yellow-browser-test.local.md: missing\n'
+[ -n "$repo_top" ] && [ -f "$repo_top/.graphite.yml" ] && printf '.graphite.yml:                      exists\n' || printf '.graphite.yml:                      missing\n'
+[ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf '.github/pull_request_template.md:   exists\n' || printf '.github/pull_request_template.md:   missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
@@ -205,8 +207,11 @@ as **NOT INSTALLED** and skip all other checks for that plugin.
 **gt-workflow:**
 
 - READY: `gt` OK AND `jq` OK AND `graphite_auth` present AND (`graphite_repo`
-  present OR `gt_trunk` not `UNAVAILABLE`)
-- NEEDS SETUP: any READY condition not met
+  present OR `gt_trunk` not `UNAVAILABLE`) AND `.graphite.yml` present
+- PARTIAL: `gt` OK AND `jq` OK AND `graphite_auth` present AND (`graphite_repo`
+  present OR `gt_trunk` not `UNAVAILABLE`) AND `.graphite.yml` missing
+- NEEDS SETUP: any core condition not met (`gt`, `jq`, `graphite_auth`,
+  `graphite_repo`/`gt_trunk`)
 
 **yellow-ruvector:**
 

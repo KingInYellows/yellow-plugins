@@ -1,6 +1,6 @@
 ---
 name: gt-stack-plan
-description: 'Decompose a feature into stacked PRs, ordered by dependency (plan-only)'
+description: "Decompose a feature into stacked PRs, ordered by dependency (plan-only). Use when breaking a feature into reviewable stacked PRs."
 argument-hint: '[feature-description or plan-file-path]'
 allowed-tools:
   - Bash
@@ -40,6 +40,42 @@ If `$ARGUMENTS` is a plain text description, use it as the feature description.
 
 If no arguments are provided, use `AskUserQuestion` to ask: "What feature do you
 want to plan a stack for?"
+
+## Phase 0: Read Convention File
+
+Check for a `.graphite.yml` convention file and parse the branch prefix. Run:
+
+```bash
+REPO_TOP=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+GW_BRANCH_PREFIX=""
+
+if command -v yq >/dev/null 2>&1 && \
+   yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' && \
+   [ -f "$REPO_TOP/.graphite.yml" ]; then
+  yq_err=""
+  GW_BRANCH_PREFIX=$(yq -r '.branch.prefix // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null) || {
+    printf '[gt-workflow] Warning: yq failed to parse branch.prefix. Using empty prefix.\n' >&2
+    GW_BRANCH_PREFIX=""
+    yq_err="branch.prefix"
+  }
+  if [ -z "$yq_err" ]; then
+    printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP" >&2
+  fi
+
+  # Validate branch.prefix against allow-list
+  if [ -n "$GW_BRANCH_PREFIX" ]; then
+    if ! printf '%s' "$GW_BRANCH_PREFIX" | grep -qE '^[a-z0-9][a-z0-9/_-]*$'; then
+      printf '[gt-workflow] Error: branch.prefix "%s" contains invalid characters. Using empty prefix.\n' "$GW_BRANCH_PREFIX" >&2
+      GW_BRANCH_PREFIX=""
+    fi
+  fi
+elif [ -f "$REPO_TOP/.graphite.yml" ]; then
+  printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using default branch naming.\n' >&2
+  printf '[gt-workflow] Install yq: pip install yq\n' >&2
+fi
+```
+
+Store `$GW_BRANCH_PREFIX` for use in Phase 2 branch naming.
 
 ## Phase 1: Understand the Feature
 
@@ -102,7 +138,8 @@ PR should:
 **When Linear issues are detected** (from Phase 1, Step 1b):
 - Default to **one branch per Linear issue** (1:1 mapping).
 - Each branch name follows `feat/<ISSUE-ID>-<slug>` convention (e.g.,
-  `feat/ENG-123-add-auth-model`).
+  `feat/ENG-123-add-auth-model`). If `$GW_BRANCH_PREFIX` is set, prepend it
+  (e.g., `agent/feat/ENG-123-add-auth-model`).
 - If the natural decomposition requires many-to-one (multiple issues addressed
   by a single PR), present the deviation to the user via `AskUserQuestion` and
   confirm before proceeding.
@@ -125,24 +162,24 @@ Output the plan in this format:
 Stack Plan: <feature name>
 
 ┌─ <trunk branch>
-├── 1. <type>/<branch-slug>
+├── 1. <GW_BRANCH_PREFIX><type>/<branch-slug>
 │       <commit type>: <description>
 │       Scope: <files/areas touched>
 │       Size: ~<estimated lines>
 │
-├── 2. <type>/<branch-slug>
+├── 2. <GW_BRANCH_PREFIX><type>/<branch-slug>
 │       <commit type>: <description>
 │       Scope: <files/areas touched>
 │       Size: ~<estimated lines>
 │       Depends on: #1
 │
-├── 3. <type>/<branch-slug>
+├── 3. <GW_BRANCH_PREFIX><type>/<branch-slug>
 │       <commit type>: <description>
 │       Scope: <files/areas touched>
 │       Size: ~<estimated lines>
 │       Depends on: #2
 │
-└── 4. <type>/<branch-slug>
+└── 4. <GW_BRANCH_PREFIX><type>/<branch-slug>
         <commit type>: <description>
         Scope: <files/areas touched>
         Size: ~<estimated lines>
@@ -169,7 +206,7 @@ Convert the visual stack plan from Phase 2 Step 2 into the structured
 For each stack item, produce:
 
 ```markdown
-### N. type/branch-slug
+### N. <GW_BRANCH_PREFIX>type/branch-slug
 - **Type:** <conventional commit type>
 - **Description:** <one-line summary for PR title>
 - **Scope:** <comma-separated file paths or directories>
