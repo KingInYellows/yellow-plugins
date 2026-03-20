@@ -113,7 +113,10 @@ Parse `$WT_PORCELAIN` into structured data. For each worktree record, extract:
 
 - `worktree` — absolute path
 - `HEAD` — commit SHA
-- `branch` — full ref (e.g., `refs/heads/feat/foo`) or absent if detached
+- `branch` — full ref (e.g., `refs/heads/feat/foo`) or absent if detached.
+  Derive `BRANCH_NAME` by stripping the `refs/heads/` prefix (e.g., `feat/foo`).
+  Use `BRANCH_NAME` for `git branch --merged` matching and `gh pr list --head`.
+  Keep the full ref for exact porcelain comparisons in Phase 5.
 - `detached` — boolean flag (present when HEAD is detached)
 - `locked` — present if locked; may include reason text after space
 - `prunable` — present if directory is missing; includes reason text
@@ -252,14 +255,19 @@ Walk categories in order. Auto-remove categories (2, 4, 5) execute without
 per-worktree prompting but report what they did. Prompt categories (3, 6, 7)
 use AskUserQuestion. Category 1 (locked) is display-only.
 
-Initialize counters:
+Initialize counters and tracking:
 
 ```bash
 REMOVED=0
 PRUNED=0
 SKIPPED=0
 FAILED=0
+REMOVED_BRANCHES=""  # Branch names from successfully removed worktrees
 ```
+
+After each successful `git worktree remove`, if the removed worktree had a
+non-empty `$BRANCH_NAME`, append it: `REMOVED_BRANCHES="$REMOVED_BRANCHES $BRANCH_NAME"`.
+Skip empty branch names (Cat 3 — Detached HEAD has no branch).
 
 ### Category 1 — Locked (display only)
 
