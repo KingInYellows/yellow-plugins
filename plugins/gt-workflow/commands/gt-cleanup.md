@@ -429,7 +429,7 @@ After the branch cleanup summary, check if any git worktrees exist beyond the
 main worktree:
 
 ```bash
-WT_COUNT=$(git worktree list | wc -l)
+WT_COUNT=$(git worktree list --porcelain | grep -c '^worktree ')
 ```
 
 If `WT_COUNT` > 1, use AskUserQuestion:
