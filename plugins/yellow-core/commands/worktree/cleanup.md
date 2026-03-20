@@ -446,7 +446,8 @@ done
 ```
 
 Note: `$REMOVED_BRANCHES` should be populated during Phase 4 by recording the
-branch name of each worktree that was successfully removed.
+branch name of each worktree that was successfully removed. **Skip entries
+where `$BRANCH_NAME` is empty (Cat 3 — Detached HEAD removes have no branch).**
 
 If any orphaned branches are found:
 
