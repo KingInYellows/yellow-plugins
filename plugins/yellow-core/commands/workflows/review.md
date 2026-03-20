@@ -91,6 +91,9 @@ starts with `./`, `../`, or `plans/`):
      If a stack exists, redirect to `review:pr` for the current branch.
      If no stack, redirect to `review:pr` with no arguments.
 
+     If the Skill invocation fails (skill not found, plugin not installed),
+     show the same install message as the file-path redirect path above.
+
 ## Step 2: Prerequisite Checks
 
 Before starting the session review:
@@ -136,8 +139,8 @@ Parse the plan file to extract session context:
    - If `gh pr view` fails for a branch (no PR submitted yet), skip that
      branch with a warning and continue to the next.
    - Filter to open PRs only.
-   - If all PRs are merged: "All session PRs are merged — nothing to review."
-     and stop.
+   - If no open PRs remain (all merged or closed): "All session PRs are
+     merged/closed — nothing to review." and stop.
 
 3. **Technical Specifications:** Extract `## Technical Specifications` for the
    Files to Modify, Files to Create, and Files NOT Modified lists. These define
@@ -281,7 +284,8 @@ Compare files actually changed against the plan's declared scope.
      feature, or unnecessary change. → **P2** (reported, not auto-fixed —
      reverting code is dangerous)
    - **CONTRADICTS:** File change opposes or undermines a plan item. → **P1**
-     (must-fix)
+     (reported, not auto-fixed — reverting code is dangerous; flag for manual
+     removal or plan update before merge)
 
 Format each finding as:
 
