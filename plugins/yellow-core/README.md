@@ -22,7 +22,7 @@ TypeScript, Python, Rust, and Go.
 | `/workflows:brainstorm` | Explore requirements through dialogue and research before planning |
 | `/workflows:plan`       | Transform feature descriptions into structured plans               |
 | `/workflows:work`       | Execute work plans systematically                                  |
-| `/workflows:review`     | Multi-agent comprehensive code review                              |
+| `/workflows:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |
 | `/workflows:compound`   | Document a recently solved problem to compound knowledge           |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
 | `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |

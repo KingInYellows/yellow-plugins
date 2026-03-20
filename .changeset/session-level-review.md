@@ -1,5 +1,6 @@
 ---
 "yellow-core": minor
+"yellow-review": patch
 ---
 
 Transform `/workflows:review` from a thin redirect to `/review:pr` into a

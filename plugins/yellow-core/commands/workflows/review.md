@@ -40,9 +40,16 @@ Parse the argument to determine review mode.
 
 - If the file exists → **session-level review mode** (proceed to Step 2).
 
-**If argument is a PR number, URL, or branch name** (not a file):
+**If argument looks like a file path but does not exist** (contains `/` or ends
+in `.md`):
 
-- Numeric value, GitHub PR URL, or string that is not a file path →
+- Report: "File not found: <path>. Check the path and try again." List
+  available plans from `ls -t plans/*.md 2>/dev/null | head -5` if any exist.
+  Stop here.
+
+**If argument is a PR number, URL, or branch name** (not a file path):
+
+- Numeric value, GitHub PR URL, or string that does not look like a file path →
   **redirect to `review:pr`**. Invoke the Skill tool with
   `skill: "review:pr"` and `args: "$ARGUMENTS"`.
 
@@ -104,8 +111,8 @@ Before starting the session review:
    command -v gt >/dev/null 2>&1 && echo "gt: ok" || echo "gt: missing"
    ```
 
-   If either is missing, warn and continue in degraded mode (no PR operations
-   or stack detection).
+   If either is missing, report: "Session-level review requires both `gh` and
+   `gt`. Install the missing tool and try again." and stop.
 
 3. **Plan file readable:** Read the plan file completely. If it cannot be read,
    report the error and stop.
@@ -123,8 +130,10 @@ Parse the plan file to extract session context:
    - Parse each `### N. type/branch-name` subsection
    - Map branch names to PR numbers via:
      ```bash
-     gh pr view <branch> --json number,state -q '{number: .number, state: .state}' 2>/dev/null
+     gh pr view <branch> --json number,state -q '{number: .number, state: .state}' 2>/dev/null || echo "[session-review] Warning: no PR found for branch <branch> — skipping"
      ```
+   - If `gh pr view` fails for a branch (no PR submitted yet), skip that
+     branch with a warning and continue to the next.
    - Filter to open PRs only.
    - If all PRs are merged: "All session PRs are merged — nothing to review."
      and stop.
@@ -284,12 +293,21 @@ Check that types, functions, or constants exported by branch N are correctly
 imported by branch N+1 in a linear stack. Use Grep to find exports and imports
 across branch diffs:
 
+For **linear** stacks, diff each branch against its parent (not trunk) to
+isolate per-branch changes:
+
 ```bash
-# Example: find exports in branch N's diff
-git diff <trunk>...<branchN> -- '*.ts' '*.js' | grep -E '^\+.*export '
-# Find imports in branch N+1's diff
-git diff <trunk>...<branchN+1> -- '*.ts' '*.js' | grep -E '^\+.*import.*from'
+# Branch N's own changes (diff against its parent, or trunk if N is first)
+git diff <branchN-1>...<branchN> -- '*.ts' '*.js' | grep -E '^\+.*export '
+# Branch N+1's own changes (diff against branch N)
+git diff <branchN>...<branchN+1> -- '*.ts' '*.js' | grep -E '^\+.*import.*from'
 ```
+
+For **parallel** stacks (each branch based on trunk), diff each branch against
+trunk directly: `git diff <trunk>...<branch>`.
+
+Adapt grep patterns for the project's language (Python imports, Go imports,
+Rust `use` statements, etc.).
 
 Broken imports or missing exports → **P1**.
 
@@ -331,6 +349,9 @@ After all three dimensions produce findings:
       ```bash
       gt checkout <target-branch>
       ```
+      If checkout fails, skip this fix with a warning:
+      "[session-review] Error: Failed to checkout <target-branch> — skipping
+      this fix." Do NOT apply fixes to the wrong branch.
 
    c. Apply the fix using the Edit tool. Review the change for correctness
       before proceeding to the next fix.
@@ -353,15 +374,18 @@ After all three dimensions produce findings:
    gt upstack restack
    ```
 
-5. **Re-review** (cycle 2):
+5. **Re-review and optional cycle 2:**
 
    Re-run Steps 5-8 (re-gather diffs and re-evaluate all three dimensions).
-   Compare P1 count:
+   Compare P1 count to the previous cycle:
 
-   - If P1 count decreased → report remaining issues (do not start cycle 3)
+   - If P1 count reached zero → loop complete, proceed to Step 10.
+   - If P1 count decreased and this was cycle 1 → apply P1 fixes again
+     (repeat steps 9.3-9.4), then re-review once more. This is cycle 2.
    - If P1 count did not decrease → "Fixes did not reduce issue count —
      stopping. Remaining issues reported below."
-   - Max **2 review-fix cycles** total.
+   - After cycle 2's re-review, stop regardless — do not start cycle 3.
+   - Max **2 fix-then-verify cycles** total.
 
 6. **Record final finding statuses:**
    - `Fixed` — P1 applied and verified gone in re-review
@@ -403,7 +427,13 @@ mkdir -p docs/reviews || {
 }
 ```
 
-Write to `docs/reviews/YYYY-MM-DD-<plan-slug>-session-review.md` with content:
+Derive the plan slug from the plan file basename:
+
+```bash
+PLAN_SLUG=$(basename "$PLAN_FILE" .md)
+```
+
+Write to `docs/reviews/YYYY-MM-DD-${PLAN_SLUG}-session-review.md` with content:
 
 ```markdown
 # Session Review: <plan title>
