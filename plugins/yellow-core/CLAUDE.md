@@ -65,8 +65,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   `/gt-stack-plan`). Without gt-workflow, falls back to inline `gt modify -m` +
   `gt submit --no-interactive` and stack features are unavailable.
 - **yellow-review** — `/workflows:work` invokes `/review:pr` after submission;
-  `/workflows:review` redirects to `/review:pr`. Without either, review steps
-  are skipped with a user notice.
+  `/workflows:review` falls back to `/review:pr` redirect for PR
+  number/URL/branch arguments. Without yellow-review, the redirect fallback
+  shows an install notice.
 - **yellow-linear** — `/workflows:work` can invoke `/linear:sync --after-submit`
   as a fallback when native Linear GitHub automation is unavailable or needs
   repair. `/workflows:plan` detects Linear issue context in brainstorm docs and
