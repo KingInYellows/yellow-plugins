@@ -24,6 +24,37 @@ Optional arguments:
 
 #$ARGUMENTS
 
+## Phase 0: Read Convention File
+
+Check for a `.graphite.yml` convention file and parse audit settings. Run:
+
+```bash
+REPO_TOP=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+GW_AUDIT_AGENTS=""
+GW_SKIP_ON_DRAFT=""
+
+if command -v yq >/dev/null 2>&1 && \
+   yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' && \
+   [ -f "$REPO_TOP/.graphite.yml" ]; then
+  GW_AUDIT_AGENTS=$(yq -r '.audit.agents // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  GW_SKIP_ON_DRAFT=$(yq -r '.audit.skip_on_draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  printf '[gt-workflow] Convention file loaded: audit.agents=%s skip_on_draft=%s\n' "$GW_AUDIT_AGENTS" "$GW_SKIP_ON_DRAFT"
+elif [ -f "$REPO_TOP/.graphite.yml" ]; then
+  printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using defaults.\n' >&2
+fi
+
+# Clamp audit.agents to 1-3 range
+if [ -n "$GW_AUDIT_AGENTS" ]; then
+  if [ "$GW_AUDIT_AGENTS" -lt 1 ] 2>/dev/null; then
+    GW_AUDIT_AGENTS=1
+  elif [ "$GW_AUDIT_AGENTS" -gt 3 ] 2>/dev/null; then
+    GW_AUDIT_AGENTS=3
+  fi
+fi
+```
+
+Store these values for use in Phase 2. Default: 3 agents, skip_on_draft=false.
+
 ## Phase 1: Understand Current State
 
 Run these commands to confirm there are changes to amend and that we are on a
@@ -46,6 +77,10 @@ gt log short
 
 ## Phase 2: Audit (skip if `--no-verify`)
 
+**Skip-on-draft check:** If `$GW_SKIP_ON_DRAFT` is `true` and `$GW_DRAFT` is
+`true` (from `.graphite.yml`), skip the entire audit phase and proceed to
+Phase 3. This matches the same logic used in `/smart-submit`.
+
 ### 0. Capture the Diff Once
 
 ```bash
@@ -56,8 +91,12 @@ Store this output as `$DIFF_OUTPUT` and pass it to each audit agent below.
 
 ### 1. Spawn Parallel Auditors
 
-Use the Task tool to launch all three agents in parallel in a **single
-message**:
+Determine the number of audit agents to spawn: use `$GW_AUDIT_AGENTS` if set
+(1-3), otherwise default to 3. If the count is 1, spawn only
+**quick-code-review**. If 2, spawn **quick-code-review** and
+**quick-security-scan**. If 3, spawn all three.
+
+Use the Task tool to launch agents in parallel in a **single message**:
 
 **quick-code-review** (subagent_type: `general-purpose`):
 

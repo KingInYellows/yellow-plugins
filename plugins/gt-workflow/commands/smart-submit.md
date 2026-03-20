@@ -26,6 +26,58 @@ Optional arguments:
 
 #$ARGUMENTS
 
+## Phase 0: Read Convention File
+
+Before any other work, check for a `.graphite.yml` convention file and parse
+repo-level settings. Run a single Bash call:
+
+```bash
+REPO_TOP=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+GW_DRAFT=""
+GW_MERGE_WHEN_READY=""
+GW_RESTACK_BEFORE=""
+GW_AUDIT_AGENTS=""
+GW_SKIP_ON_DRAFT=""
+GW_BRANCH_PREFIX=""
+
+if command -v yq >/dev/null 2>&1 && \
+   yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk' && \
+   [ -f "$REPO_TOP/.graphite.yml" ]; then
+  GW_DRAFT=$(yq -r '.submit.draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  GW_MERGE_WHEN_READY=$(yq -r '.submit.merge_when_ready // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  GW_RESTACK_BEFORE=$(yq -r '.submit.restack_before // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  GW_AUDIT_AGENTS=$(yq -r '.audit.agents // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  GW_SKIP_ON_DRAFT=$(yq -r '.audit.skip_on_draft // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  GW_BRANCH_PREFIX=$(yq -r '.branch.prefix // ""' "$REPO_TOP/.graphite.yml" 2>/dev/null || true)
+  printf '[gt-workflow] Convention file loaded: %s/.graphite.yml\n' "$REPO_TOP"
+elif [ -f "$REPO_TOP/.graphite.yml" ]; then
+  printf '[gt-workflow] Warning: .graphite.yml exists but yq (kislyuk) is not installed. Using defaults.\n' >&2
+  printf '[gt-workflow] Install yq: pip install yq\n' >&2
+fi
+
+# Clamp audit.agents to 1-3 range
+if [ -n "$GW_AUDIT_AGENTS" ]; then
+  if [ "$GW_AUDIT_AGENTS" -lt 1 ] 2>/dev/null; then
+    printf '[gt-workflow] Warning: audit.agents=%s is below minimum. Using 1.\n' "$GW_AUDIT_AGENTS" >&2
+    GW_AUDIT_AGENTS=1
+  elif [ "$GW_AUDIT_AGENTS" -gt 3 ] 2>/dev/null; then
+    printf '[gt-workflow] Warning: audit.agents=%s exceeds maximum. Using 3.\n' "$GW_AUDIT_AGENTS" >&2
+    GW_AUDIT_AGENTS=3
+  fi
+fi
+
+printf 'GW_DRAFT=%s\n' "$GW_DRAFT"
+printf 'GW_MERGE_WHEN_READY=%s\n' "$GW_MERGE_WHEN_READY"
+printf 'GW_RESTACK_BEFORE=%s\n' "$GW_RESTACK_BEFORE"
+printf 'GW_AUDIT_AGENTS=%s\n' "$GW_AUDIT_AGENTS"
+printf 'GW_SKIP_ON_DRAFT=%s\n' "$GW_SKIP_ON_DRAFT"
+printf 'GW_BRANCH_PREFIX=%s\n' "$GW_BRANCH_PREFIX"
+```
+
+Store these values for use in subsequent phases. When a value is empty, use the
+hardcoded default (draft=false, merge_when_ready=false, restack_before=true,
+audit_agents=3, skip_on_draft=false, branch_prefix="").
+
 ## Phase 1: Understand Current State
 
 ### 1. Check for Changes
@@ -70,9 +122,13 @@ echo "current=$current trunk=$trunk"
 
 ## Phase 2: Audit (skip if `--no-verify`)
 
+**Skip-on-draft check:** If `$GW_SKIP_ON_DRAFT` is `true` and the `--draft`
+argument was passed (or `$GW_DRAFT` is `true` and no explicit `--publish` was
+passed), skip the entire audit phase and proceed to Phase 3.
+
 ### 0. Capture the Diff Once
 
-Before spawning auditors, capture the full diff so all three agents can use it
+Before spawning auditors, capture the full diff so all agents can use it
 without redundant calls:
 
 ```bash
@@ -83,8 +139,13 @@ Store this output as `$DIFF_OUTPUT` (pass it as context to each agent below).
 
 ### 1. Spawn Parallel Auditors
 
-Use the Task tool to launch all three agents in parallel in a **single
-message**, passing `$DIFF_OUTPUT` as context to each:
+Determine the number of audit agents to spawn: use `$GW_AUDIT_AGENTS` if set
+(1-3), otherwise default to 3. If the count is 1, spawn only
+**quick-code-review**. If 2, spawn **quick-code-review** and
+**quick-security-scan**. If 3, spawn all three.
+
+Use the Task tool to launch agents in parallel in a **single message**, passing
+`$DIFF_OUTPUT` as context to each:
 
 **quick-code-review** (subagent_type: `general-purpose`):
 
@@ -216,12 +277,16 @@ body if the changes are complex.
 
 **If on trunk** (creating new branch):
 
+Derive the branch name from the commit type and a short slug (e.g.,
+`feat/add-user-auth`, `fix/null-pointer-crash`). If `$GW_BRANCH_PREFIX` is set,
+prepend it to the branch name:
+
 ```bash
-gt create "<branch-name>" -m "<conventional commit message>"
+gt create "<GW_BRANCH_PREFIX><branch-name>" -m "<conventional commit message>"
 ```
 
-The branch name should be derived from the commit type and a short slug (e.g.,
-`feat/add-user-auth`, `fix/null-pointer-crash`).
+For example, with `branch.prefix: "agent/"` and slug `feat/add-user-auth`, the
+branch name becomes `agent/feat/add-user-auth`.
 
 **If on feature branch** (adding to existing):
 
@@ -243,9 +308,22 @@ If `--dry-run` was provided, skip this step and do not run `gt submit`; instead,
 only simulate the submission and proceed to the result summary without making
 any remote changes.
 
+Build the submit command with convention file flags. First, if `$GW_RESTACK_BEFORE`
+is `true`, run restack as a **separate preceding command**:
+
+```bash
+gt stack restack
+```
+
+Then submit with flags based on `.graphite.yml` values:
+
 ```bash
 gt submit --no-interactive
 ```
+
+Append flags to the submit command (only if set and non-empty):
+- If `$GW_DRAFT` is `true` (and no explicit `--publish` argument): add `--draft`
+- If `$GW_MERGE_WHEN_READY` is `true`: add `--merge-when-ready`
 
 After submitting, confirm the new stack state:
 
