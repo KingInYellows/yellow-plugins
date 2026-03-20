@@ -5,6 +5,7 @@ argument-hint: '[--stale-days N] [--dry-run]'
 allowed-tools:
   - Bash
   - AskUserQuestion
+  - Skill
 ---
 
 # Branch Cleanup and Divergence Reconciliation
@@ -422,6 +423,43 @@ Details:
 For failed branches, include only the first line of the error message in the
 summary. The full error was already printed during execution.
 
+## Phase 6: Worktree Cleanup Offer (Optional)
+
+After the branch cleanup summary, check if any git worktrees exist beyond the
+main worktree:
+
+```bash
+WT_COUNT=$(git worktree list | wc -l)
+```
+
+If `WT_COUNT` > 1, use AskUserQuestion:
+
+```
+You have $((WT_COUNT - 1)) git worktree(s). Would you like to scan and
+clean them up too?
+
+1. Yes — run /worktree-cleanup
+2. No — done
+```
+
+If the user chooses "Yes":
+
+Invoke the Skill tool with `skill: "worktree-cleanup"`.
+
+If `--dry-run` was passed to gt-cleanup, forward it:
+
+Invoke the Skill tool with `skill: "worktree-cleanup"` and `args: "--dry-run"`.
+
+**Graceful degradation:** If the Skill call fails (yellow-core not installed or
+command not found), report:
+
+```
+/worktree-cleanup not available. Install yellow-core:
+    /plugin marketplace add KingInYellows/yellow-plugins yellow-core
+```
+
+If `WT_COUNT` is 1 (only the main worktree), skip this phase silently.
+
 ## Success Criteria
 
 - All local branches scanned and classified into 6 categories
@@ -436,3 +474,6 @@ summary. The full error was already printed during execution.
 - Prerequisite validation runs before any interactive prompts
 - Stale branches with open PRs are excluded from deletion
 - Orphaned branches show unique commit counts as data-loss warning
+- Phase 6 offers worktree cleanup when worktrees exist (> 1)
+- Graceful degradation when yellow-core is not installed
+- `--dry-run` flag forwarded to worktree-cleanup
