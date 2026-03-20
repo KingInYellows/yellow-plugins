@@ -98,11 +98,12 @@ Before starting the session review:
 1. **Clean working directory:**
 
    ```bash
-   git status --porcelain
+   git status --porcelain --untracked-files=no
    ```
 
-   If output is non-empty: "Uncommitted changes detected. Commit or stash
-   first." and stop.
+   If output is non-empty (staged or modified tracked files): "Uncommitted
+   changes detected. Commit or stash first." and stop. Untracked files
+   (e.g., a previous session review doc in `docs/reviews/`) are ignored.
 
 2. **Tools available:**
 
@@ -151,6 +152,8 @@ Parse the plan file to extract session context:
    BRANCH=$(git branch --show-current)
    gh pr view "$BRANCH" --json number,state,baseRefName -q '{number: .number, state: .state, base: .baseRefName}' 2>/dev/null
    ```
+   If the PR state is `MERGED` or `CLOSED`, report: "Session PR is already
+   merged/closed — nothing to review." and stop.
 
 ## Step 4: Ruvector Recall (optional)
 
@@ -212,8 +215,8 @@ git diff <trunk>...HEAD
 **Single-branch session:**
 
 ```bash
-git diff <trunk>...<branch>
 git diff <trunk>...<branch> --stat
+git diff <trunk>...<branch>
 ```
 
 Where `<trunk>` is the PR's base ref from Step 3.
@@ -259,7 +262,10 @@ Compare files actually changed against the plan's declared scope.
    git diff <trunk>...<branch> --name-only
    ```
 
-   For stacked sessions, combine file lists across all branches.
+   For stacked sessions, use the aggregate diff from trunk to the topmost
+   branch (`git diff <trunk>...HEAD --name-only`) to avoid duplicates. Do NOT
+   combine per-branch `--name-only` lists (linear stacks produce cumulative
+   diffs that count the same file multiple times).
 
 2. Get the planned scope from `## Technical Specifications` (Files to Modify,
    Files to Create) and `## Stack Decomposition` Scope fields.
@@ -372,11 +378,17 @@ After all three dimensions produce findings:
    gt submit --no-interactive
    ```
 
-   If the session has a linear stack and a base branch was modified:
+   If `gt modify` or `gt submit` fails for a branch, report the failure and
+   continue to the next branch. Do not abort the entire loop.
+
+   **After all branches are committed and submitted**, if the session has a
+   linear stack and a base branch was modified:
 
    ```bash
    gt upstack restack
    ```
+
+   Run restack only once, after the per-branch loop completes — not inside it.
 
 5. **Re-review and optional cycle 2:**
 
@@ -431,10 +443,10 @@ mkdir -p docs/reviews || {
 }
 ```
 
-Derive the plan slug from the plan file basename:
+Derive the plan slug from the plan file path (the argument resolved in Step 1):
 
 ```bash
-PLAN_SLUG=$(basename "$PLAN_FILE" .md)
+PLAN_SLUG=$(basename "$ARGUMENTS" .md)
 ```
 
 Write to `docs/reviews/YYYY-MM-DD-${PLAN_SLUG}-session-review.md` with content:
