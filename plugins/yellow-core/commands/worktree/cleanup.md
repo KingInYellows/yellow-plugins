@@ -227,6 +227,10 @@ Category 6 — Dirty (N):
 
 Category 7 — Clean, active branch (N):
   .worktrees/current-work (branch: feat/new-thing, last commit: 2 days ago)
+
+Active (current session) — excluded from cleanup:
+  /home/user/projects/yellow-plugins (main worktree)
+  .worktrees/in-progress (current directory)
 ```
 
 **Path display**: Use absolute paths for worktrees outside the repo tree. Use
@@ -420,22 +424,29 @@ admin state was not fully cleaned:
 git worktree prune --verbose --expire now
 ```
 
-Count branches that are now orphaned (no worktree, not checked out, not trunk):
+Check if any branches that were associated with removed worktrees are now
+orphaned. Compare the set of branch names collected from worktrees **before**
+Phase 4 removals (captured during Phase 2 classification) against the current
+worktree state after removals. Only report branches that (a) were in a removed
+worktree and (b) are not trunk, not currently checked out, and not in any
+remaining worktree.
 
 ```bash
-# Capture porcelain output once, then check each branch against it
-WT_PORCELAIN=$(git worktree list --porcelain)
+# Re-capture porcelain output after removals
+WT_PORCELAIN_AFTER=$(git worktree list --porcelain)
 
-# Branches with no worktree association and not the current or trunk branch
-git branch --list | grep -v "^\*" | while read -r b; do
-  b=$(echo "$b" | xargs)
-  [ "$b" = "$TRUNK" ] && continue
-  # Check if any remaining worktree uses this branch (exact line match)
-  if ! echo "$WT_PORCELAIN" | grep -qxF "branch refs/heads/$b"; then
-    echo "$b"
+# For each branch that was in a removed worktree (tracked during Phase 4):
+# Check if the branch still has a worktree association
+for REMOVED_BRANCH in $REMOVED_BRANCHES; do
+  [ "$REMOVED_BRANCH" = "$TRUNK" ] && continue
+  if ! echo "$WT_PORCELAIN_AFTER" | grep -qxF "branch refs/heads/$REMOVED_BRANCH"; then
+    echo "$REMOVED_BRANCH"
   fi
 done
 ```
+
+Note: `$REMOVED_BRANCHES` should be populated during Phase 4 by recording the
+branch name of each worktree that was successfully removed.
 
 If any orphaned branches are found:
 
