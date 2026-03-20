@@ -74,6 +74,8 @@ jobs:
 
       - name: Detect phase
         id: detect
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ inputs.force_publish }}" == "true" ]; then
             echo "force_publish requested — skipping changeset detection"
@@ -84,10 +86,14 @@ jobs:
             echo "run_changesets=true" >> "$GITHUB_OUTPUT"
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           else
-            CURRENT_VERSION=$(node -p "require('./package.json').version")
+            CURRENT_VERSION=$(
+              grep -m1 '"version"' package.json |
+                sed -E 's/.*"version": "([^"]+)".*/\1/'
+            )
             CURRENT_TAG="v${CURRENT_VERSION}"
 
-            if git ls-remote --tags origin "refs/tags/${CURRENT_TAG}" | grep -q "${CURRENT_TAG}"; then
+            if gh api "repos/${{ github.repository }}/git/ref/tags/${CURRENT_TAG}" \
+                 --silent >/dev/null 2>&1; then
               echo "No pending changesets and ${CURRENT_TAG} already exists — nothing to do"
               echo "run_changesets=false" >> "$GITHUB_OUTPUT"
               echo "should_publish=false" >> "$GITHUB_OUTPUT"
@@ -113,7 +119,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Create Version PR or tag released packages
-        if: inputs.force_publish != true && steps.detect.outputs.run_changesets == 'true'
+        if: steps.detect.outputs.run_changesets == 'true'
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
           # version: bumps plugin package.json files and propagates to
