@@ -106,11 +106,10 @@ Run `git worktree list --porcelain` and parse each record. Records are
 separated by blank lines. Each record starts with `worktree <path>`.
 
 ```bash
-git worktree list --porcelain
+WT_PORCELAIN=$(git worktree list --porcelain)
 ```
 
-Parse the porcelain output into structured data. For each worktree record,
-extract:
+Parse `$WT_PORCELAIN` into structured data. For each worktree record, extract:
 
 - `worktree` — absolute path
 - `HEAD` — commit SHA
@@ -155,7 +154,13 @@ git -C "$WT_PATH" rev-parse --verify @{u} >/dev/null 2>&1 && \
 git branch --merged "$TRUNK" | sed 's/^[ *]*//' | grep -qxF "$BRANCH_NAME"
 
 # Check branch age (last commit date)
-git log -1 --format='%ci' "$BRANCH_NAME" 2>/dev/null
+# For detached HEAD worktrees, $BRANCH_NAME is empty — use the worktree's HEAD
+# commit directly via git -C instead of referencing a branch name
+if [ -n "$BRANCH_NAME" ]; then
+  git log -1 --format='%ci' "$BRANCH_NAME" 2>/dev/null
+else
+  git -C "$WT_PATH" log -1 --format='%ci' HEAD 2>/dev/null
+fi
 ```
 
 ### 3. GitHub API Enrichment
@@ -183,7 +188,7 @@ A worktree matches the first category whose detection criteria are met:
 | 2 | Missing directory | Porcelain `prunable` field present, OR `! test -d "$WT_PATH"` as fallback | Auto-prune |
 | 3 | Detached HEAD | No branch association (`detached` flag in porcelain) | Prompt user |
 | 4 | Branch merged | (`git branch --merged "$TRUNK"` matches, OR PR state=MERGED) AND clean working tree AND no unpushed commits | Auto-remove |
-| 5 | Stale | Last commit > 30 days, no open PR, clean working tree, no unpushed commits | Auto-remove |
+| 5 | Stale | Last commit > 30 days, no open PR (requires `gh`), clean working tree, no unpushed commits | Auto-remove (if `gh` confirmed no open PR); prompt user (if `gh` unavailable) |
 | 6 | Dirty | Uncommitted changes OR unpushed commits | Warn + confirm |
 | 7 | Clean, branch active | No uncommitted changes, branch not merged, recent activity | Prompt user |
 

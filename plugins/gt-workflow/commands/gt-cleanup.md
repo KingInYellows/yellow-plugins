@@ -274,13 +274,15 @@ Note: N merged branches detected. Run /gt-sync to clean those.
 
 ### 3. Dry Run Exit
 
-If `--dry-run` was passed, print "Dry run — no actions taken." and stop here.
+If `--dry-run` was passed, print "Dry run — no actions taken." Then proceed
+directly to Phase 6 (Worktree Cleanup Offer) — `--dry-run` is forwarded.
 
 ### 4. Nothing to Clean
 
 If all actionable categories (orphaned, closed PR, stale, behind remote) are
 empty, print "Nothing to clean up." For warn-only categories that have entries,
-still display the warnings before exiting.
+still display the warnings. Then proceed to Phase 6 (Worktree Cleanup Offer)
+before exiting — users may have stale worktrees even without stale branches.
 
 ## Phase 4: Category Actions
 
