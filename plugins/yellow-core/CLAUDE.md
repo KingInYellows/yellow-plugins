@@ -43,7 +43,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
 - `/workflows:work` — execute work plans systematically
-- `/workflows:review` — redirects to `/review:pr` (yellow-review)
+- `/workflows:review` — session-level review of plan adherence, cross-PR
+  coherence, and scope drift with autonomous P1 fix loop. Falls back to
+  `/review:pr` redirect for PR number/URL/branch arguments.
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
