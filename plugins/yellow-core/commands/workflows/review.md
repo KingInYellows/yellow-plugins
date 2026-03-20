@@ -40,8 +40,8 @@ Parse the argument to determine review mode.
 
 - If the file exists → **session-level review mode** (proceed to Step 2).
 
-**If argument looks like a file path but does not exist** (contains `/` or ends
-in `.md`):
+**If argument looks like a file path but does not exist** (ends in `.md`, or
+starts with `./`, `../`, or `plans/`):
 
 - Report: "File not found: <path>. Check the path and try again." List
   available plans from `ls -t plans/*.md 2>/dev/null | head -5` if any exist.
@@ -49,8 +49,8 @@ in `.md`):
 
 **If argument is a PR number, URL, or branch name** (not a file path):
 
-- Numeric value, GitHub PR URL, or string that does not look like a file path →
-  **redirect to `review:pr`**. Invoke the Skill tool with
+- Numeric value, GitHub PR URL, or branch name (including names with `/` like
+  `feat/my-feature`) → **redirect to `review:pr`**. Invoke the Skill tool with
   `skill: "review:pr"` and `args: "$ARGUMENTS"`.
 
   If the Skill invocation fails (skill not found, plugin not installed):
@@ -69,7 +69,7 @@ in `.md`):
 
 - Auto-detect session context:
 
-  1. Find most recent plan file modified in the last 24 hours:
+  1. Find most recently modified plan files:
 
      ```bash
      ls -t plans/*.md 2>/dev/null | head -5
@@ -191,12 +191,16 @@ Collect the combined diff for all session branches:
 For each open PR branch in the stack:
 
 ```bash
-gt checkout <branch>
+gt checkout <branch> || {
+  printf '[session-review] Error: failed to checkout %s — skipping\n' "<branch>" >&2
+  continue
+}
 git diff <trunk>...<branch> --stat
 git diff <trunk>...<branch>
 ```
 
-Where `<trunk>` is the stack trunk from metadata (usually `main`).
+If checkout fails for a branch, skip it with a warning and continue to the
+next. Where `<trunk>` is the stack trunk from metadata (usually `main`).
 
 Also gather the **aggregate session diff** (all changes from trunk):
 
