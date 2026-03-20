@@ -94,6 +94,15 @@ gt log short
 `true` (from `.graphite.yml`), skip the entire audit phase and proceed to
 Phase 3. This matches the same logic used in `/smart-submit`.
 
+> **Note:** `$GW_DRAFT` reflects the `submit.draft` flag in `.graphite.yml`
+> (the repo-level config intent for *new* submits), **not** the live PR draft
+> state. A PR that has already been promoted out of draft will still trigger
+> the skip if `submit.draft: true` is set in the config. This is intentional —
+> performing a `gh pr view --json isDraft` lookup on every amend would add a
+> network roundtrip. If you need audit enforcement regardless of config, use
+> `--no-verify` in reverse (i.e., omit `skip_on_draft: true`) or promote the
+> repo config to `submit.draft: false`.
+
 ### 0. Capture the Diff Once
 
 ```bash
