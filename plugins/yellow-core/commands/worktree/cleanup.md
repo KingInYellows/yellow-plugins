@@ -1,5 +1,5 @@
 ---
-name: worktree-cleanup
+name: worktree:cleanup
 description: 'Scan git worktrees, evaluate staleness, and remove stale worktrees with safeguards'
 argument-hint: '[--dry-run]'
 allowed-tools:

@@ -438,23 +438,23 @@ If `WT_COUNT` > 1, use AskUserQuestion:
 You have $((WT_COUNT - 1)) git worktree(s). Would you like to scan and
 clean them up too?
 
-1. Yes — run /worktree-cleanup
+1. Yes — run /worktree:cleanup
 2. No — done
 ```
 
 If the user chooses "Yes":
 
-Invoke the Skill tool with `skill: "worktree-cleanup"`.
+Invoke the Skill tool with `skill: "worktree:cleanup"`.
 
 If `--dry-run` was passed to gt-cleanup, forward it:
 
-Invoke the Skill tool with `skill: "worktree-cleanup"` and `args: "--dry-run"`.
+Invoke the Skill tool with `skill: "worktree:cleanup"` and `args: "--dry-run"`.
 
 **Graceful degradation:** If the Skill call fails (yellow-core not installed or
 command not found), report:
 
 ```
-/worktree-cleanup not available. Install yellow-core:
+/worktree:cleanup not available. Install yellow-core:
     /plugin marketplace add KingInYellows/yellow-plugins yellow-core
 ```
 

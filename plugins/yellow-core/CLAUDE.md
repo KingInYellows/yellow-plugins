@@ -49,7 +49,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
-- `/worktree-cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
+- `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
 ### Skills (4)
 
