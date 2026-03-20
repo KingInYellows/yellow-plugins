@@ -157,7 +157,7 @@ git branch --merged "$TRUNK" | sed 's/^[ *]*//' | grep -qxF "$BRANCH_NAME"
 # For detached HEAD worktrees, $BRANCH_NAME is empty — use the worktree's HEAD
 # commit directly via git -C instead of referencing a branch name
 if [ -n "$BRANCH_NAME" ]; then
-  git log -1 --format='%ci' "$BRANCH_NAME" 2>/dev/null
+  git -C "$WT_PATH" log -1 --format='%ci' "$BRANCH_NAME" 2>/dev/null
 else
   git -C "$WT_PATH" log -1 --format='%ci' HEAD 2>/dev/null
 fi
@@ -188,7 +188,7 @@ A worktree matches the first category whose detection criteria are met:
 | 2 | Missing directory | Porcelain `prunable` field present, OR `! test -d "$WT_PATH"` as fallback | Auto-prune |
 | 3 | Detached HEAD | No branch association (`detached` flag in porcelain) | Prompt user |
 | 4 | Branch merged | (`git branch --merged "$TRUNK"` matches, OR PR state=MERGED) AND clean working tree AND no unpushed commits | Auto-remove |
-| 5 | Stale | Last commit > 30 days, no open PR (requires `gh`), clean working tree, no unpushed commits | Auto-remove (if `gh` confirmed no open PR); prompt user (if `gh` unavailable) |
+| 5 | Stale | Last commit > 30 days, `gh` confirmed no open PR, clean working tree, no unpushed commits | Auto-remove (requires `GH_AVAILABLE=true`; if false, reclassify as Cat 7) |
 | 6 | Dirty | Uncommitted changes OR unpushed commits | Warn + confirm |
 | 7 | Clean, branch active | No uncommitted changes, branch not merged, recent activity | Prompt user |
 
@@ -314,9 +314,15 @@ If removal fails (modifications detected despite our earlier check — race
 condition), log the worktree as failed with the error reason and continue to
 the next. Never abort the batch.
 
-### Category 5 — Stale (auto-remove)
+### Category 5 — Stale (auto-remove or prompt)
 
-Same removal logic as Category 4.
+If `GH_AVAILABLE` was true during classification (PR status verified): same
+auto-removal logic as Category 4 — attempt `git worktree remove "$WT_PATH"`
+for each entry, logging failures without aborting.
+
+If `GH_AVAILABLE` was false during classification (worktrees were reclassified
+as Cat 7 per the table): these worktrees appear under Category 7 instead and
+are handled there with the three-tier prompt pattern.
 
 ### Category 6 — Dirty (warn + confirm per-worktree)
 
@@ -411,7 +417,7 @@ behind by worktrees removed during Phase 4 whose directories were deleted but
 admin state was not fully cleaned:
 
 ```bash
-git worktree prune --expire now
+git worktree prune --verbose --expire now
 ```
 
 Count branches that are now orphaned (no worktree, not checked out, not trunk):
