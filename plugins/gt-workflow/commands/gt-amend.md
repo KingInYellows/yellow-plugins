@@ -200,9 +200,14 @@ gt commit amend -m "<new message>"
 
 Skip this phase if `--no-submit` was passed — report the amended state and exit.
 
+Build the submit command with convention file flags:
+
 ```bash
 gt submit --no-interactive
 ```
+
+Append flags to the submit command (only if set and non-empty):
+- If `$GW_DRAFT` is `true`: add `--draft`
 
 After submitting:
 

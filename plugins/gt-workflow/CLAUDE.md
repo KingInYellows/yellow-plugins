@@ -112,6 +112,7 @@ is absent or the file does not exist, commands fall back to hardcoded defaults.
 When `.graphite.yml` exists but `yq` is missing, commands warn to stderr.
 
 Required `yq` variant check:
+
 ```bash
 yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk'
 ```

@@ -1,4 +1,4 @@
-## What We're Building
+# What We're Building
 
 An improved `/gt-setup` command for the `gt-workflow` plugin that does two
 things in sequence: (1) a guided wizard that configures the real Graphite CLI
@@ -147,8 +147,10 @@ interpretation logic is preserved exactly.
 Consumers of `.graphite.yml` (smart-submit, gt-stack-plan, etc.) need `yq` to
 parse the convention file. The `yq` variant check pattern from the project
 memory applies: always check `yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk'`
-before using `-y`/`@sh` flags. When `yq` is absent, consumers fall back to
-defaults silently — the convention file is optional by design.
+before using `-y`/`@sh` flags. When `.graphite.yml` is absent, consumers fall
+back to their built-in defaults silently. When `.graphite.yml` exists but
+cannot be parsed (including because `yq` is missing), consumers emit a warning
+and use defaults.
 
 `gt-setup` Phase 2 adds `yq` to its prerequisites check and warns (but does not
 block) if `yq` is missing, since the real Graphite settings in Phase 2 do not

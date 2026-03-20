@@ -162,7 +162,7 @@ pr_template:
 ```
 
 - Validate `audit.agents` is 1-3 at write time
-- Write atomically: write to temp file, validate with `yq empty`, rename
+- Write atomically: write to temp file, validate with `yq . file.yml > /dev/null 2>&1`, rename
 - Fix CRLF on WSL2: `sed -i 's/\r$//' .graphite.yml` after write
 
 **Step 11: PR template.** Check for `.github/pull_request_template.md`:

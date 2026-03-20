@@ -60,7 +60,15 @@ else
   printf 'mcp_server:    SKIPPED (gt not found)\n'
 fi
 command -v jq >/dev/null 2>&1 && printf 'jq:            ok\n' || printf 'jq:            NOT FOUND\n'
-command -v yq >/dev/null 2>&1 && printf 'yq:            ok\n' || printf 'yq:            NOT FOUND (optional — needed by consumer commands to read .graphite.yml)\n'
+if command -v yq >/dev/null 2>&1; then
+  if yq --help 2>&1 | grep -qi 'jq wrapper\|kislyuk'; then
+    printf 'yq:            ok\n'
+  else
+    printf 'yq:            WRONG VARIANT (found non-kislyuk yq; .graphite.yml parsing will be skipped)\n'
+  fi
+else
+  printf 'yq:            NOT FOUND (optional — needed by consumer commands to read .graphite.yml)\n'
+fi
 
 printf '\n=== Repository ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)

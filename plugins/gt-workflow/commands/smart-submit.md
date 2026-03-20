@@ -131,9 +131,9 @@ echo "current=$current trunk=$trunk"
 
 ## Phase 2: Audit (skip if `--no-verify`)
 
-**Skip-on-draft check:** If `$GW_SKIP_ON_DRAFT` is `true` and the `--draft`
-argument was passed (or `$GW_DRAFT` is `true` and no explicit `--publish` was
-passed), skip the entire audit phase and proceed to Phase 3.
+**Skip-on-draft check:** If `$GW_SKIP_ON_DRAFT` is `true` and `$GW_DRAFT` is
+`true` (from `.graphite.yml`), skip the entire audit phase and proceed to
+Phase 3.
 
 ### 0. Capture the Diff Once
 
@@ -211,11 +211,11 @@ Use the Task tool to launch agents in parallel in a **single message**, passing
 
 ### 2. Gate Check
 
-First, verify all three agents completed successfully. If any agent failed to
+First, verify all spawned agents completed successfully. If any agent failed to
 run or timed out, inform the user which audit is missing and ask whether to
 proceed with partial results or abort.
 
-Synthesize findings from all three agents.
+Synthesize findings from all spawned agents.
 
 **IF CRITICAL ISSUES** (secrets, production mocks, silent failures):
 
@@ -354,7 +354,7 @@ Output a summary:
 
 ## Success Criteria
 
-- All uncommitted code audited by 3 specialized agents (unless `--no-verify`)
+- All uncommitted code audited by 1-3 specialized agents (unless `--no-verify`)
 - No critical issues committed
 - Files staged individually (no blanket `git add .`)
 - Conventional commit message generated from diff analysis
