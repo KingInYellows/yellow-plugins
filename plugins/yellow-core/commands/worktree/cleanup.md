@@ -123,8 +123,8 @@ extract:
 **Skip the first record** — it is always the main worktree (or `bare` for bare
 repos — skip any record with the `bare` flag). Also skip any record where the
 worktree path is an ancestor of `$CURRENT_DIR` or equals it — use
-`case "$CURRENT_DIR" in "$WT_PATH"*) skip ;; esac` to match both the worktree
-root and subdirectories within it. Mark matched worktrees as "active (current)"
+`case "$CURRENT_DIR" in "$WT_PATH"|"$WT_PATH"/*) skip ;; esac` to match the
+worktree root exactly or paths strictly beneath it. Mark matched worktrees as "active (current)"
 in the report but exclude from removal candidates.
 
 ### 2. Per-Worktree Data Collection
@@ -144,7 +144,12 @@ test -d "$WT_PATH" && echo "exists" || echo "missing"
 git -C "$WT_PATH" status --porcelain 2>/dev/null
 
 # Check for unpushed commits (if branch has upstream)
-git -C "$WT_PATH" log @{u}..HEAD --oneline 2>/dev/null
+# Note: @{u} fails with "no upstream configured" when branch has no tracking
+# ref. Suppress stderr AND treat a non-zero exit as "no upstream" (not "no
+# unpushed commits"). A branch with no upstream should be considered as having
+# unpushed commits for safety.
+git -C "$WT_PATH" rev-parse --verify @{u} >/dev/null 2>&1 && \
+  git -C "$WT_PATH" log @{u}..HEAD --oneline 2>/dev/null
 
 # Check if branch is merged into trunk
 git branch --merged "$TRUNK" | sed 's/^[ *]*//' | grep -qxF "$BRANCH_NAME"
@@ -260,7 +265,7 @@ No AskUserQuestion. Locked worktrees are never removed by this command.
 ### Category 2 — Missing directory (auto-prune)
 
 ```bash
-git worktree prune --verbose
+git worktree prune --verbose --expire now
 ```
 
 This cleans up all stale admin entries in one shot (entries whose directories
@@ -284,6 +289,13 @@ Options:
 
 Same three-tier pattern as Category 7 below. For individual review, show the
 commit info with content fencing. Apply batch cap of 15.
+
+**Dirty detached HEAD handling**: Since detached HEAD worktrees are checked
+before Category 6 (Dirty), they may have uncommitted changes. For each
+detached HEAD worktree, check `git -C "$WT_PATH" status --porcelain`. If
+non-empty, annotate the prompt with "(dirty — N uncommitted files)" and use
+`git worktree remove --force "$WT_PATH"` instead of the no-flag version.
+Always warn the user about dirty state before confirming removal.
 
 ### Category 4 — Branch merged (auto-remove)
 
@@ -394,7 +406,7 @@ behind by worktrees removed during Phase 4 whose directories were deleted but
 admin state was not fully cleaned:
 
 ```bash
-git worktree prune
+git worktree prune --expire now
 ```
 
 Count branches that are now orphaned (no worktree, not checked out, not trunk):
