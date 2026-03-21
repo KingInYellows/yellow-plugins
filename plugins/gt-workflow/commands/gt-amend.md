@@ -1,6 +1,8 @@
 ---
 name: gt-amend
-description: "Amend the current branch commit: audit changes, update the commit, and re-submit via Graphite"
+description:
+  'Amend the current branch commit: audit changes, update the commit, and
+  re-submit via Graphite'
 allowed-tools:
   - Bash
   - Read
@@ -21,6 +23,8 @@ Optional arguments:
 
 - `--no-verify` — Skip the audit and amend directly (use with caution)
 - `--no-submit` — Amend the commit locally but do not push to GitHub
+- `--publish` — Override draft mode: submit as published even if
+  `submit.draft: true` in `.graphite.yml`
 
 #$ARGUMENTS
 
@@ -94,14 +98,15 @@ gt log short
 `true` (from `.graphite.yml`), skip the entire audit phase and proceed to
 Phase 3. This matches the same logic used in `/smart-submit`.
 
-> **Note:** `$GW_DRAFT` reflects the `submit.draft` flag in `.graphite.yml`
-> (the repo-level config intent for *new* submits), **not** the live PR draft
-> state. A PR that has already been promoted out of draft will still trigger
-> the skip if `submit.draft: true` is set in the config. This is intentional —
-> performing a `gh pr view --json isDraft` lookup on every amend would add a
-> network roundtrip. If you need audit enforcement regardless of config, use
-> `--no-verify` in reverse (i.e., omit `skip_on_draft: true`) or promote the
-> repo config to `submit.draft: false`.
+> **Note:** `$GW_DRAFT` reflects the `submit.draft` flag in `.graphite.yml` (the
+> repo-level config intent for _new_ submits), **not** the live PR draft state.
+> A PR that has already been promoted out of draft will still trigger the skip
+> if `submit.draft: true` is set in the config. This is intentional — performing
+> a `gh pr view --json isDraft` lookup on every amend would add a network
+> roundtrip. If you need audit enforcement, do not use `--no-verify` because it
+> bypasses checks entirely. Instead, keep `audit.skip_on_draft: false` or set
+> `submit.draft: false` in repo config so the amend path never skips audit
+> because of draft-mode config.
 
 ### 0. Capture the Diff Once
 
@@ -216,7 +221,8 @@ gt submit --no-interactive
 ```
 
 Append flags to the submit command (only if set and non-empty):
-- If `$GW_DRAFT` is `true`: add `--draft`
+
+- If `$GW_DRAFT` is `true` (and no explicit `--publish` argument): add `--draft`
 
 After submitting:
 
