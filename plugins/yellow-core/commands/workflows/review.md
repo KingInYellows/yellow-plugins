@@ -198,24 +198,46 @@ Collect the combined diff for all session branches:
 
 **Stacked session** (Stack Decomposition found):
 
-For each open PR branch in the stack:
+For **linear** stacks, diff each branch against its parent to isolate per-branch changes:
 
 ```bash
-gt checkout <branch> || {
-  printf '[session-review] Error: failed to checkout %s — skipping\n' "<branch>" >&2
-  continue
-}
-git diff <trunk>...<branch> --stat
-git diff <trunk>...<branch>
+# For each branch in order (first branch against trunk, rest against parent)
+for i in "${!BRANCHES[@]}"; do
+  BRANCH="${BRANCHES[$i]}"
+  if [ "$i" -eq 0 ]; then
+    PARENT="<trunk>"
+  else
+    PARENT="${BRANCHES[$((i-1))]}"
+  fi
+  
+  gt checkout "$BRANCH" || {
+    printf '[session-review] Error: failed to checkout %s — skipping\n' "$BRANCH" >&2
+    continue
+  }
+  git diff "$PARENT"..."$BRANCH" --stat
+  git diff "$PARENT"..."$BRANCH"
+done
 ```
 
-If checkout fails for a branch, skip it with a warning and continue to the
-next. Where `<trunk>` is the stack trunk from metadata (usually `main`).
-
-Also gather the **aggregate session diff** (all changes from trunk):
+For **parallel** stacks (all branches based on trunk), diff each against trunk:
 
 ```bash
-# On the topmost branch (for linear topology)
+for BRANCH in "${BRANCHES[@]}"; do
+  gt checkout "$BRANCH" || {
+    printf '[session-review] Error: failed to checkout %s — skipping\n' "$BRANCH" >&2
+    continue
+  }
+  git diff <trunk>..."$BRANCH" --stat
+  git diff <trunk>..."$BRANCH"
+done
+```
+
+Where `<trunk>` is the stack trunk from metadata (usually `main`).
+
+Also gather the **aggregate session diff** (all changes from trunk to top):
+
+```bash
+# On the topmost branch
 git diff <trunk>...HEAD
 ```
 
