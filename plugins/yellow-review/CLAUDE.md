@@ -74,6 +74,10 @@ resolution, and sequential stack review. Graphite-native workflow.
   order (base → tip). Best before submitting a stack for review.
 - **`/review:all scope=all`** — Batch-review all your open non-draft PRs. Best
   for catching up on review backlog.
+- **`/workflows:review`** (yellow-core) — Session-level review against a plan
+  file. Evaluates plan adherence, cross-PR coherence, and scope drift.
+  Complementary to `/review:pr` (per-PR code quality) — use both for full
+  coverage.
 
 ## Cross-Plugin Agent References
 
