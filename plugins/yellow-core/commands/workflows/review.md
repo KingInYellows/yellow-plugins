@@ -155,6 +155,10 @@ Parse the plan file to extract session context:
    BRANCH=$(git branch --show-current)
    gh pr view "$BRANCH" --json number,state,baseRefName -q '{number: .number, state: .state, base: .baseRefName}' 2>/dev/null
    ```
+   If `gh pr view` returns empty output or fails (no PR exists for this
+   branch), report: "No PR found for branch <branch>. Submit the branch
+   first with `gt submit --no-interactive`." and stop.
+
    If the PR state is `MERGED` or `CLOSED`, report: "Session PR is already
    merged/closed — nothing to review." and stop.
 
@@ -256,6 +260,10 @@ Fix: <concrete suggestion for what to implement or test>
 ```
 
 ## Step 7: Scope Drift Detection
+
+Skip this dimension if neither `## Technical Specifications` nor
+`## Stack Decomposition` Scope fields were found in Step 3 — there is no
+declared scope to compare against.
 
 Compare files actually changed against the plan's declared scope.
 
@@ -376,9 +384,10 @@ After all three dimensions produce findings:
 
 4. **Commit and submit fixes** per branch:
 
-   For each branch with uncommitted changes:
+   For each branch with uncommitted changes, checkout the branch first:
 
    ```bash
+   gt checkout <branch>
    git status --porcelain
    gt modify -m "fix: address session review findings"
    gt submit --no-interactive
@@ -507,10 +516,12 @@ If `.ruvector/` exists and P1 or P2 findings were generated:
 5. Choose `type`: `context` for drift findings, `decision` for adherence or
    coherence patterns.
 6. Dedup check: call `hooks_recall` with query=content, top_k=1. If
-   score > 0.82, skip (near-duplicate). If error: wait ~500ms, retry once.
-   If retry fails, skip dedup and proceed.
-7. Call `hooks_remember` with the composed content. If error: wait ~500ms,
-   retry once. If retry fails: "[ruvector] Warning: remember failed — learning
-   not persisted."
+   score > 0.82, skip (near-duplicate). If error (timeout, connection refused,
+   service unavailable): wait ~500ms, retry once. If retry fails, skip dedup
+   and proceed. Do NOT retry on validation or parameter errors.
+7. Call `hooks_remember` with the composed content. If error (timeout,
+   connection refused, service unavailable): wait ~500ms, retry once. If retry
+   fails: "[ruvector] Warning: remember failed — learning not persisted."
+   Do NOT retry on validation or parameter errors.
 
 If `.ruvector/` does not exist, skip this step entirely.

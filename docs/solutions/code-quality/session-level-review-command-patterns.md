@@ -3,7 +3,7 @@ title: "Session-Level Review Command Patterns"
 date: 2026-03-20
 category: code-quality
 tags: [review, commands, git, graphite, delegation, stacks]
-components: [yellow-review]
+components: [yellow-core]
 ---
 
 # Session-Level Review Command Patterns
