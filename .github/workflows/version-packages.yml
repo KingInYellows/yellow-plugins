@@ -72,6 +72,17 @@ jobs:
             exit 1
           fi
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: '8.15.0'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.0'
+          cache: 'pnpm'
+
       - name: Detect phase
         id: detect
         env:
@@ -86,10 +97,11 @@ jobs:
             echo "run_changesets=true" >> "$GITHUB_OUTPUT"
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           else
-            CURRENT_VERSION=$(
-              grep -m1 '"version"' package.json |
-                sed -E 's/.*"version": "([^"]+)".*/\1/'
-            )
+            CURRENT_VERSION=$(node -p "require('./package.json').version")
+            if [ -z "$CURRENT_VERSION" ] || ! echo "$CURRENT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
+              echo "::error::Invalid or missing version in package.json: '${CURRENT_VERSION}'"
+              exit 1
+            fi
             CURRENT_TAG="v${CURRENT_VERSION}"
 
             if gh api "repos/${{ github.repository }}/git/ref/tags/${CURRENT_TAG}" \
@@ -103,17 +115,6 @@ jobs:
               echo "should_publish=true" >> "$GITHUB_OUTPUT"
             fi
           fi
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-        with:
-          version: '8.15.0'
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '22.22.0'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
