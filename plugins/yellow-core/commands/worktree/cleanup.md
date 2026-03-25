@@ -24,7 +24,7 @@ Optional arguments:
 
 - `--dry-run` — Show the audit report without executing any removals
 
-${ARGUMENTS}
+#$ARGUMENTS
 
 ## Phase 1: Prerequisites
 
@@ -297,7 +297,7 @@ No AskUserQuestion. Locked worktrees are never removed by this command.
 
 ```bash
 PRUNE_OUTPUT=$(git worktree prune --verbose --expire now 2>&1)
-PRUNE_COUNT=$(echo "$PRUNE_OUTPUT" | grep -c '^Removing worktrees/')
+PRUNE_COUNT=$(echo "$PRUNE_OUTPUT" | grep -c '^Removing worktrees/' || true)
 PRUNED=$((PRUNED + PRUNE_COUNT))
 ```
 
@@ -436,7 +436,7 @@ admin state was not fully cleaned:
 
 ```bash
 PRUNE_OUTPUT=$(git worktree prune --verbose --expire now 2>&1)
-PRUNE_COUNT=$(echo "$PRUNE_OUTPUT" | grep -c '^Removing worktrees/')
+PRUNE_COUNT=$(echo "$PRUNE_OUTPUT" | grep -c '^Removing worktrees/' || true)
 PRUNED=$((PRUNED + PRUNE_COUNT))
 ```
 
