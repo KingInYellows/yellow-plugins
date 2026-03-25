@@ -20,7 +20,8 @@ This guide explains how to validate Claude Code plugin manifests using the
 
 - Manifest complies with plugin.schema.json
 - Plugin name matches the directory name
-- Required fields (`name`, `version`, `description`, `author`) are present
+- Required fields (`name`, `description`, `author`) are present (the JSON Schema
+  also requires `version`, enforced via AJV in CI)
 - Versions use semver format
 - Optional keywords are well-formed
 

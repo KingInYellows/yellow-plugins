@@ -68,9 +68,9 @@ plugins/<name>/
     plugin.json          # Required: name, description, version, author
   CLAUDE.md              # Plugin context and conventions
   README.md              # User-facing documentation
-  commands/              # Required: slash commands (*.md)
-  agents/                # Required: agent definitions (*.md)
-  skills/                # Required: skill definitions (SKILL.md)
+  commands/              # Slash commands (*.md)
+  agents/                # Agent definitions (*.md)
+  skills/                # Skill definitions (SKILL.md)
 ```
 
 ### Adding a Plugin

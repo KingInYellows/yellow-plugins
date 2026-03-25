@@ -89,9 +89,8 @@ lint-and-typecheck -> unit-tests -> integration-tests
 validate-schemas -> contract-drift
 validate-schemas + lint-and-typecheck + unit-tests
   -> build (pushes to main only)
-all jobs
-  -> report-metrics
-  -> ci-status
+all jobs -> report-metrics (parallel)
+all jobs -> ci-status    (parallel)
 ```
 
 ### Matrix Strategy: validate-schemas
