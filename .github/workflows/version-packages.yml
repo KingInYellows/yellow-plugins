@@ -104,8 +104,8 @@ jobs:
             fi
             CURRENT_TAG="v${CURRENT_VERSION}"
 
-            if gh api "repos/${{ github.repository }}/git/ref/tags/${CURRENT_TAG}" \
-                 --silent >/dev/null 2>&1; then
+            if git ls-remote --tags origin "refs/tags/${CURRENT_TAG}" 2>/dev/null \
+                 | grep -qF "refs/tags/${CURRENT_TAG}"; then
               echo "No pending changesets and ${CURRENT_TAG} already exists — nothing to do"
               echo "run_changesets=false" >> "$GITHUB_OUTPUT"
               echo "should_publish=false" >> "$GITHUB_OUTPUT"
