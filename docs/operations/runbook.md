@@ -50,7 +50,7 @@ Before using this runbook, ensure you have the following tools installed:
 | Tool                  | Version | Installation                               | Verification       |
 | --------------------- | ------- | ------------------------------------------ | ------------------ |
 | **pnpm**              | 8.15.0  | `npm install -g pnpm@8.15.0`               | `pnpm --version`   |
-| **Node.js**           | 20 LTS  | https://nodejs.org                         | `node --version`   |
+| **Node.js**           | 22 LTS  | https://nodejs.org                         | `node --version`   |
 | **Git**               | ≥2.30   | https://git-scm.com                        | `git --version`    |
 | **GitHub CLI**        | Latest  | `brew install gh` / https://cli.github.com | `gh --version`     |
 | **jq**                | Latest  | `brew install jq` / `apt install jq`       | `jq --version`     |
@@ -484,7 +484,7 @@ jq '.plugins[].version' .claude-plugin/marketplace.json | grep -v '^"[0-9]\+\.[0
 
 ```bash
 # After fixing, verify all validations pass
-pnpm validate
+pnpm validate:schemas
 
 # Expected output: "All validations passed"
 ```

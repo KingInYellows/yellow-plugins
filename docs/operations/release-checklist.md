@@ -48,7 +48,7 @@ I4.T5 - Release Packaging & Checklist
 - [Section 6: Post-Release Validation](#section-6-post-release-validation)
   - [6.1 Verify GitHub Release](#61-verify-github-release)
   - [6.2 Test Release Artifacts](#62-test-release-artifacts)
-  - [6.3 NPM Publication Verification (if applicable)](#63-npm-publication-verification-if-applicable)
+  - [6.3 Package Registry Publication](#63-package-registry-publication)
   - [6.4 Announcement & Communication](#64-announcement--communication)
   - [Post-Release Validation Sign-Off](#post-release-validation-sign-off)
 - [Section 7: Final Sign-Off](#section-7-final-sign-off)

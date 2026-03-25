@@ -84,14 +84,12 @@ seconds
 ### Job Dependency Graph
 
 ```text
-validate-schemas (matrix: marketplace, plugins, contracts, examples)
-  -> lint-and-typecheck
-  -> unit-tests
-  -> integration-tests
-  -> contract-drift
+Parallel start: validate-schemas, lint-and-typecheck, validate-versions, changeset-check, security-audit
+lint-and-typecheck -> unit-tests -> integration-tests
+validate-schemas -> contract-drift
 validate-schemas + lint-and-typecheck + unit-tests
   -> build (pushes to main only)
-validate-schemas + validate-versions + changeset-check + lint-and-typecheck + unit-tests + integration-tests + contract-drift + security-audit + build
+all jobs
   -> report-metrics
   -> ci-status
 ```

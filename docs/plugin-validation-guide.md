@@ -20,7 +20,8 @@ This guide explains how to validate Claude Code plugin manifests using the
 
 - Manifest complies with plugin.schema.json
 - Plugin name matches the directory name
-- Optional versions use semver
+- Required fields (`name`, `version`, `description`, `author`) are present
+- Versions use semver format
 - Optional keywords are well-formed
 
 ---
@@ -220,7 +221,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22.22.0'
 
       - name: Install dependencies
         run: |
@@ -506,9 +507,7 @@ async function customValidation(pluginDir) {
 const { validatePlugin } = require('./scripts/validate-plugin');
 
 // Validate in Node.js
-const result = await validatePlugin('plugins/hookify', {
-  skipNetwork: true, // Skip README URL check
-});
+const result = validatePlugin('plugins/hookify');
 
 if (result.valid) {
   console.log('✅ Plugin valid');

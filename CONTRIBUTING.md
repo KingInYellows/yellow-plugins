@@ -68,9 +68,9 @@ plugins/<name>/
     plugin.json          # Required: name, description, version, author
   CLAUDE.md              # Plugin context and conventions
   README.md              # User-facing documentation
-  commands/              # Optional slash commands (*.md)
-  agents/                # Optional agent definitions (*.md)
-  skills/                # Optional skill definitions (SKILL.md)
+  commands/              # Required: slash commands (*.md)
+  agents/                # Required: agent definitions (*.md)
+  skills/                # Required: skill definitions (SKILL.md)
 ```
 
 ### Adding a Plugin
@@ -238,7 +238,8 @@ is fixed.
 
 ### TypeScript
 
-- Follow the strict TypeScript configuration in `tsconfig.json`
+- Follow the strict TypeScript configuration in `tsconfig.json` (extends
+  `tsconfig.base.json` where the strict compiler options are defined)
 - Use explicit types (avoid `any`)
 - Prefer interfaces over type aliases for objects
 
