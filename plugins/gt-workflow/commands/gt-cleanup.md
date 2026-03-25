@@ -5,6 +5,7 @@ argument-hint: '[--stale-days N] [--dry-run]'
 allowed-tools:
   - Bash
   - AskUserQuestion
+  - Skill
 ---
 
 # Branch Cleanup and Divergence Reconciliation
@@ -273,13 +274,15 @@ Note: N merged branches detected. Run /gt-sync to clean those.
 
 ### 3. Dry Run Exit
 
-If `--dry-run` was passed, print "Dry run — no actions taken." and stop here.
+If `--dry-run` was passed, print "Dry run — no actions taken." Then proceed
+directly to Phase 6 (Worktree Cleanup Offer) — `--dry-run` is forwarded.
 
 ### 4. Nothing to Clean
 
 If all actionable categories (orphaned, closed PR, stale, behind remote) are
 empty, print "Nothing to clean up." For warn-only categories that have entries,
-still display the warnings before exiting.
+still display the warnings. Then proceed to Phase 6 (Worktree Cleanup Offer)
+before exiting — users may have stale worktrees even without stale branches.
 
 ## Phase 4: Category Actions
 
@@ -422,6 +425,50 @@ Details:
 For failed branches, include only the first line of the error message in the
 summary. The full error was already printed during execution.
 
+Then proceed to Phase 6 (Worktree Cleanup Offer).
+
+## Phase 6: Worktree Cleanup Offer (Optional)
+
+After the branch cleanup summary, check if any git worktrees exist beyond the
+main worktree:
+
+```bash
+WT_COUNT=$(git worktree list --porcelain | grep -c '^worktree ')
+```
+
+If `WT_COUNT` > 1:
+
+If `$DRY_RUN` is true, skip AskUserQuestion and instead print:
+
+```
+Note: $((WT_COUNT - 1)) git worktree(s) found. Run /worktree:cleanup --dry-run to preview.
+```
+
+Then exit.
+
+Otherwise, proceed with AskUserQuestion:
+
+```
+You have $((WT_COUNT - 1)) git worktree(s). Would you like to scan and
+clean them up too?
+
+1. Yes — run /worktree:cleanup
+2. No — done
+```
+
+If the user chooses "Yes", invoke the Skill tool with
+`skill: "worktree:cleanup"` (no args).
+
+**Graceful degradation:** If the Skill call fails (yellow-core not installed or
+command not found), report:
+
+```
+/worktree:cleanup not available. Install yellow-core:
+    /plugin marketplace add KingInYellows/yellow-plugins yellow-core
+```
+
+If `WT_COUNT` is 1 (only the main worktree), skip this phase silently.
+
 ## Success Criteria
 
 - All local branches scanned and classified into 6 categories
@@ -436,3 +483,6 @@ summary. The full error was already printed during execution.
 - Prerequisite validation runs before any interactive prompts
 - Stale branches with open PRs are excluded from deletion
 - Orphaned branches show unique commit counts as data-loss warning
+- Phase 6 offers worktree cleanup when worktrees exist (> 1)
+- Graceful degradation when yellow-core is not installed
+- `--dry-run` mode remains non-interactive in Phase 6
