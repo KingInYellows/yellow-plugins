@@ -115,7 +115,7 @@ The validation script enforces 8 checks:
 ✗ ERROR: Duplicate plugin names: my-plugin
 ```
 
-**Fix**: Provide all required fields with correct format:
+**Fix**: Ensure each plugin has a unique name:
 
 ```json
 {
@@ -329,13 +329,13 @@ The validation script ensures:
 All 8 validation checks are enforced:
 
 - ✓ File existence and parsing
-- ✓ Official root-field validation
+- ✓ JSON Schema compliance
 - ✓ Metadata version format
 - ✓ Plugin name uniqueness
-- ✓ Required plugin fields (`name`, `source`)
 - ✓ Source path existence
 - ✓ Version format
 - ✓ Version presence
+- ✓ Performance check
 
 **Coverage**: 8/8 checks (100%)
 

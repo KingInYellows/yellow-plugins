@@ -217,8 +217,9 @@ strategy:
 ```bash
 # Validate .claude-plugin/marketplace.json
 ajv validate \
-  -s schemas/marketplace.schema.json \
+  -s schemas/official-marketplace.schema.json \
   -d .claude-plugin/marketplace.json \
+  -c ajv-formats \
   --strict=true \
   --all-errors
 
@@ -226,8 +227,8 @@ ajv validate \
 node scripts/validate-marketplace.js
 ```
 
-**Checks:** Unique plugin IDs, semver compliance, category enums, timestamp
-formats, source path existence **Typical Duration:** ~30s **Log File:**
+**Checks:** Required official marketplace fields, semver formatting, unique
+plugin names, source path existence **Typical Duration:** ~30s **Log File:**
 `.ci-logs/validate-marketplace.log` **Metrics File:**
 `.ci-metrics/validate-marketplace.prom`
 
@@ -253,8 +254,8 @@ for manifest in $PLUGIN_MANIFESTS; do
 done
 ```
 
-**Checks:** 12 plugin schema rules, permission scopes, dependencies, lifecycle
-scripts **Typical Duration:** ~25s (varies with plugin count) **Log File:**
+**Checks:** Required manifest fields, directory-name consistency, semver
+formatting, keyword structure, hook script validation **Typical Duration:** ~25s (varies with plugin count) **Log File:**
 `.ci-logs/validate-plugins.log` **Metrics File:**
 `.ci-metrics/validate-plugins.prom`
 
@@ -279,7 +280,7 @@ schemas) **Typical Duration:** ~10s **Log File:**
 ```bash
 # Validate marketplace examples
 ajv validate \
-  -s schemas/marketplace.schema.json \
+  -s schemas/official-marketplace.schema.json \
   -d examples/marketplace.example.json \
   --strict=true \
   --all-errors

@@ -195,9 +195,8 @@ jq '.' .claude-plugin/marketplace.json
 
 # Common fixes:
 # - Remove trailing commas
-# - Ensure all plugin IDs are unique
+# - Ensure all plugin names are unique
 # - Verify all versions use semver format (1.2.3)
-# - Check category names match allowed enum values
 
 # Validate against schema
 ajv validate -s schemas/official-marketplace.schema.json -d .claude-plugin/marketplace.json -c ajv-formats --strict=true --all-errors
@@ -452,20 +451,6 @@ jq '.plugins[] | select(.name == null or .version == null)' .claude-plugin/marke
 
 # Add missing fields
 jq '.plugins[0] += {"description": "Plugin description"}' .claude-plugin/marketplace.json
-```
-
-**Invalid Enum Values:**
-
-```bash
-# Check allowed categories
-cat schemas/plugin.schema.json | jq '.properties.category.enum'
-
-# Example categories: productivity, development, writing, data, automation,
-#                      api-integration, ui-enhancement, analytics, security, other
-
-# Fix invalid category
-jq '.plugins[] | select(.category == "invalid") | .category = "other"' \
-  .claude-plugin/marketplace.json
 ```
 
 **Invalid Semver:**

@@ -200,6 +200,12 @@ mv plugins/hookify-old plugins/hookify
 
 ---
 
+> **Additional checks**: The script also validates `outputStyles` values and
+> plugin-local hook script paths (existence and basic structure). These checks
+> run automatically but are not documented as separate numbered rules above.
+
+---
+
 ## CI Integration
 
 ### GitHub Actions
@@ -343,27 +349,6 @@ echo "✅ All plugin manifests valid"
 // ✅ Valid
 "author": {
   "email": "dev@example.com"
-}
-```
-
----
-
-### Error: "must be equal to one of the allowed values"
-
-**Cause**: Permission scope not in enum (filesystem, network, shell, env,
-claude-api)
-
-**Solution**:
-
-```json
-// ❌ Invalid
-{
-  "scope": "database"  // Not in enum
-}
-
-// ✅ Valid
-{
-  "scope": "filesystem"
 }
 ```
 
@@ -514,7 +499,7 @@ if (result.valid) {
   console.log('✅ Plugin valid');
 } else {
   console.error('❌ Validation failed');
-  process.exit(result.exitCode);
+  process.exit(1);
 }
 ```
 
