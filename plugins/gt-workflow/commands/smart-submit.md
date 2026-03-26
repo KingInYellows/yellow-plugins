@@ -23,6 +23,7 @@ Optional arguments:
 - `--amend` — Amend the current branch commit instead of creating a new branch
 - `--dry-run` — Run the audit but skip the actual submission
 - `--no-verify` — Skip the audit and submit directly (use with caution)
+- `--publish` — Override draft mode: submit as published even if `submit.draft: true` in `.graphite.yml`
 
 #$ARGUMENTS
 
@@ -134,6 +135,11 @@ echo "current=$current trunk=$trunk"
 **Skip-on-draft check:** If `$GW_SKIP_ON_DRAFT` is `true` and `$GW_DRAFT` is
 `true` (from `.graphite.yml`), skip the entire audit phase and proceed to
 Phase 3.
+
+> **Note:** This check uses the config-derived values in `$GW_SKIP_ON_DRAFT`
+> and `$GW_DRAFT` from `.graphite.yml`. CLI flags such as `--publish` affect
+> the eventual submit mode, but they do not override the audit skip decision in
+> this phase.
 
 ### 0. Capture the Diff Once
 

@@ -98,7 +98,7 @@ pr_template:
 
 | Key | Read by |
 | --- | ------- |
-| `submit.draft` | `/smart-submit` |
+| `submit.draft` | `/smart-submit`, `/gt-amend` |
 | `submit.merge_when_ready` | `/smart-submit` |
 | `submit.restack_before` | `/smart-submit` |
 | `audit.agents` | `/smart-submit`, `/gt-amend` |
