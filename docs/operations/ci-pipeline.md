@@ -284,6 +284,7 @@ schemas) **Typical Duration:** ~10s **Log File:**
 ajv validate \
   -s schemas/official-marketplace.schema.json \
   -d examples/marketplace.example.json \
+  -c ajv-formats \
   --strict=true \
   --all-errors
 
