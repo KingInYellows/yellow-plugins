@@ -77,10 +77,12 @@ concurrency:
 Stale workflow runs are automatically cancelled when new commits are pushed to
 the same PR or branch, preventing resource waste and queue congestion.
 
-**Environment Variables:** | Variable | Value | Purpose |
-|----------|-------|---------| | `NODE_VERSION` | `22.22.0` | Node.js 22 LTS (current
-stable) | | `PNPM_VERSION` | `8.15.0` | Locked pnpm version
-matching `package.json` `packageManager` field |
+**Environment Variables:**
+
+| Variable       | Value      | Purpose                                                    |
+| -------------- | ---------- | ---------------------------------------------------------- |
+| `NODE_VERSION` | `22.22.0`  | Node.js 22 LTS (current stable)                            |
+| `PNPM_VERSION` | `8.15.0`   | Locked pnpm version matching `package.json` packageManager |
 
 ---
 

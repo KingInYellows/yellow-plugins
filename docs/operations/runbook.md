@@ -50,7 +50,7 @@ Before using this runbook, ensure you have the following tools installed:
 | Tool                  | Version | Installation                               | Verification       |
 | --------------------- | ------- | ------------------------------------------ | ------------------ |
 | **pnpm**              | 8.15.0  | `npm install -g pnpm@8.15.0`               | `pnpm --version`   |
-| **Node.js**           | 22 LTS  | https://nodejs.org                         | `node --version`   |
+| **Node.js**           | 22 LTS  | [nodejs.org](https://nodejs.org)           | `node --version`   |
 | **Git**               | ≥2.30   | https://git-scm.com                        | `git --version`    |
 | **GitHub CLI**        | Latest  | `brew install gh` / https://cli.github.com | `gh --version`     |
 | **jq**                | Latest  | `brew install jq` / `apt install jq`       | `jq --version`     |
@@ -447,7 +447,7 @@ cat schemas/official-marketplace.schema.json | jq '.required'
 # - name
 # - plugins
 
-jq '.plugins[] | select(.name == null or .version == null)' .claude-plugin/marketplace.json
+jq '.plugins[] | select(.name == null or .source == null)' .claude-plugin/marketplace.json
 
 # Add missing fields
 jq '.plugins[0] += {"description": "Plugin description"}' .claude-plugin/marketplace.json

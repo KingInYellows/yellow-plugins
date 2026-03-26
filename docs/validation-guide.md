@@ -326,18 +326,19 @@ The validation script ensures:
 
 ### NFR-REL-004: 100% Validation Coverage
 
-All 8 validation checks are enforced:
+Validation includes 9 checks (8 blocking + 1 warning):
 
 - ✓ File existence and parsing
 - ✓ JSON Schema compliance
 - ✓ Metadata version format
 - ✓ Plugin name uniqueness
+- ✓ Required plugin fields (`name`, `source`)
 - ✓ Source path existence
 - ✓ Version format
 - ✓ Version presence
-- ✓ Performance check
+- ✓ Performance check (warning-only; does not fail validation)
 
-**Coverage**: 8/8 checks (100%)
+**Coverage**: 9/9 checks covered; blocking enforcement on 8/9.
 
 ### NFR-PERF-003: Performance
 

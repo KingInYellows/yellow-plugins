@@ -304,7 +304,7 @@ You'll achieve these by following this structure and validation workflow.
   "owner": {
     "name": "your-username"
   },
-  "plugins": []
+  "plugins": [{"name": "example", "source": "./plugins/example"}]
 }
 ```
 
