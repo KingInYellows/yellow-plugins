@@ -45,6 +45,7 @@ jobs:
     timeout-minutes: 15
 
     outputs:
+      run_changesets: ${{ steps.detect.outputs.run_changesets }}
       should_publish: ${{ steps.detect.outputs.should_publish }}
       version: ${{ steps.version.outputs.version }}
       is_prerelease: ${{ steps.version.outputs.is_prerelease }}
@@ -71,20 +72,6 @@ jobs:
             exit 1
           fi
 
-      - name: Detect phase
-        id: detect
-        run: |
-          if [ "${{ inputs.force_publish }}" == "true" ]; then
-            echo "force_publish requested — skipping changeset detection"
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          elif [ -n "$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' -print -quit 2>/dev/null)" ]; then
-            echo "Pending changesets found — will create/update Version PR"
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "No pending changesets — will run publish phase"
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
         with:
@@ -96,11 +83,44 @@ jobs:
           node-version: '22.22.0'
           cache: 'pnpm'
 
+      - name: Detect phase
+        id: detect
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ inputs.force_publish }}" == "true" ]; then
+            echo "force_publish requested — skipping changeset detection"
+            echo "run_changesets=false" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$(find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' -print -quit 2>/dev/null)" ]; then
+            echo "Pending changesets found — will create/update Version PR"
+            echo "run_changesets=true" >> "$GITHUB_OUTPUT"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            CURRENT_VERSION=$(node -p "require('./package.json').version")
+            if [ -z "$CURRENT_VERSION" ] || ! echo "$CURRENT_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
+              echo "::error::Invalid or missing version in package.json: '${CURRENT_VERSION}'"
+              exit 1
+            fi
+            CURRENT_TAG="v${CURRENT_VERSION}"
+
+            if git ls-remote --tags origin "refs/tags/${CURRENT_TAG}" 2>/dev/null \
+                 | grep -qF "refs/tags/${CURRENT_TAG}"; then
+              echo "No pending changesets and ${CURRENT_TAG} already exists — nothing to do"
+              echo "run_changesets=false" >> "$GITHUB_OUTPUT"
+              echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "No pending changesets and ${CURRENT_TAG} is missing — will run publish phase"
+              echo "run_changesets=true" >> "$GITHUB_OUTPUT"
+              echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Create Version PR or tag released packages
-        if: inputs.force_publish != true
+        if: steps.detect.outputs.run_changesets == 'true'
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
           # version: bumps plugin package.json files and propagates to
