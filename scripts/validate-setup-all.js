@@ -31,6 +31,7 @@ const COMMAND_PLUGIN_MAP = {
   'review:setup': 'yellow-review',
   'browser-test:setup': 'yellow-browser-test',
   'docs:setup': 'yellow-docs',
+  'composio:setup': 'yellow-composio',
   'statusline:setup': 'yellow-core',
 };
 

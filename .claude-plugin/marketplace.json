@@ -112,6 +112,16 @@
       "category": "development"
     },
     {
+      "name": "yellow-composio",
+      "description": "Optional Composio accelerator for batch workflows with usage tracking",
+      "version": "1.0.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-composio",
+      "category": "productivity"
+    },
+    {
       "name": "yellow-research",
       "description": "Deep research plugin with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
       "version": "1.3.0",
