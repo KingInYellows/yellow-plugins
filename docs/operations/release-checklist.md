@@ -48,7 +48,7 @@ I4.T5 - Release Packaging & Checklist
 - [Section 6: Post-Release Validation](#section-6-post-release-validation)
   - [6.1 Verify GitHub Release](#61-verify-github-release)
   - [6.2 Test Release Artifacts](#62-test-release-artifacts)
-  - [6.3 NPM Publication Verification (if applicable)](#63-npm-publication-verification-if-applicable)
+  - [6.3 Package Registry Publication](#63-package-registry-publication)
   - [6.4 Announcement & Communication](#64-announcement--communication)
   - [Post-Release Validation Sign-Off](#post-release-validation-sign-off)
 - [Section 7: Final Sign-Off](#section-7-final-sign-off)
@@ -208,12 +208,8 @@ tagging.
 - [ ] GitHub Personal Access Token has `contents: write` permission
   - Check repository settings → Actions → General → Workflow permissions
 
-- [ ] NPM_TOKEN secret is configured (if publishing to npm)
-
-  ```bash
-  gh secret list | grep NPM_TOKEN
-  # Optional: Only required for npm publishing
-  ```
+- [ ] If package-registry publication is expected for this release, verify
+  required credentials (for example, `NPM_TOKEN`) are configured
 
 - [ ] SSH keys or HTTPS credentials are configured for git operations
   ```bash
@@ -964,10 +960,10 @@ softprops/action-gh-release.
 
 ---
 
-### 6.3 NPM Publication Verification (if applicable)
+### 6.3 Package Registry Publication
 
-**Objective**: Confirm packages published to npm registry (stable releases
-only).
+**Objective**: Record whether a separate package-registry publish happened as
+part of the release.
 
 **Note**: Skip this section if NPM_TOKEN is not configured or release is a
 pre-release.

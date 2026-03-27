@@ -50,7 +50,7 @@ Before using this runbook, ensure you have the following tools installed:
 | Tool                  | Version | Installation                               | Verification       |
 | --------------------- | ------- | ------------------------------------------ | ------------------ |
 | **pnpm**              | 8.15.0  | `npm install -g pnpm@8.15.0`               | `pnpm --version`   |
-| **Node.js**           | 20 LTS  | https://nodejs.org                         | `node --version`   |
+| **Node.js**           | 22 LTS  | [nodejs.org](https://nodejs.org)           | `node --version`   |
 | **Git**               | ≥2.30   | https://git-scm.com                        | `git --version`    |
 | **GitHub CLI**        | Latest  | `brew install gh` / https://cli.github.com | `gh --version`     |
 | **jq**                | Latest  | `brew install jq` / `apt install jq`       | `jq --version`     |
@@ -67,7 +67,7 @@ cd yellow-plugins
 pnpm install
 
 # Verify setup
-pnpm validate
+pnpm validate:schemas
 ```
 
 ### GitHub Authentication
@@ -182,7 +182,7 @@ pnpm validate:schemas
 
 # Validate specific target
 node scripts/validate-marketplace.js
-node scripts/validate-plugin.js --plugin plugins/example/.claude-plugin/plugin.json
+node scripts/validate-plugin.js --plugin plugins/yellow-core/.claude-plugin/plugin.json
 ```
 
 **Remediation:**
@@ -195,27 +195,26 @@ jq '.' .claude-plugin/marketplace.json
 
 # Common fixes:
 # - Remove trailing commas
-# - Ensure all plugin IDs are unique
+# - Ensure all plugin names are unique
 # - Verify all versions use semver format (1.2.3)
-# - Check category names match allowed enum values
 
 # Validate against schema
-ajv validate -s schemas/marketplace.schema.json -d .claude-plugin/marketplace.json --all-errors
+ajv validate -s schemas/official-marketplace.schema.json -d .claude-plugin/marketplace.json -c ajv-formats --strict=true --all-errors
 ```
 
 **For Plugin Validation Errors:**
 
 ```bash
 # Check plugin.json syntax
-jq '.' plugins/example/.claude-plugin/plugin.json
+jq '.' plugins/yellow-core/.claude-plugin/plugin.json
 
 # Common fixes:
-# - Ensure required fields present: id, name, version, author, description
-# - Verify permissions array has scope + reason for each entry
-# - Check compatibility.claudeCode matches semver range format
+# - Ensure required fields present: name, version, author, description
+# - Verify plugin name matches the directory name
+# - Check optional keywords are all strings
 
 # Validate specific plugin
-node scripts/validate-plugin.js --plugin plugins/example/.claude-plugin/plugin.json
+node scripts/validate-plugin.js --plugin plugins/yellow-core/.claude-plugin/plugin.json
 ```
 
 **Fix and Re-run:**
@@ -249,7 +248,7 @@ pnpm lint
 pnpm typecheck
 
 # Run both
-pnpm validate
+pnpm lint && pnpm typecheck
 ```
 
 **Remediation:**
@@ -366,7 +365,7 @@ validate-schemas:
 
 ```bash
 # Profile validation script
-time node scripts/validate-plugin.js --plugin plugins/example/.claude-plugin/plugin.json
+time node scripts/validate-plugin.js --plugin plugins/yellow-core/.claude-plugin/plugin.json
 
 # Optimize:
 # - Parallelize plugin iteration
@@ -433,10 +432,10 @@ pnpm validate:schemas
 
 ```bash
 # Run validation with all errors
-ajv validate -s schemas/marketplace.schema.json -d .claude-plugin/marketplace.json --all-errors
+ajv validate -s schemas/official-marketplace.schema.json -d .claude-plugin/marketplace.json -c ajv-formats --strict=true --all-errors
 
 # Review schema requirements
-cat schemas/marketplace.schema.json | jq '.required'
+cat schemas/official-marketplace.schema.json | jq '.required'
 ```
 
 **Remediation:**
@@ -445,26 +444,13 @@ cat schemas/marketplace.schema.json | jq '.required'
 
 ```bash
 # Check marketplace.json has all required fields:
-# - schemaVersion, marketplaceName, marketplaceVersion, lastUpdated, plugins
+# - name
+# - plugins
 
-jq '.plugins[] | select(.id == null or .version == null)' .claude-plugin/marketplace.json
+jq '.plugins[] | select(.name == null or .source == null)' .claude-plugin/marketplace.json
 
 # Add missing fields
 jq '.plugins[0] += {"description": "Plugin description"}' .claude-plugin/marketplace.json
-```
-
-**Invalid Enum Values:**
-
-```bash
-# Check allowed categories
-cat schemas/plugin.schema.json | jq '.properties.category.enum'
-
-# Example categories: productivity, development, writing, data, automation,
-#                      api-integration, ui-enhancement, analytics, security, other
-
-# Fix invalid category
-jq '.plugins[] | select(.category == "invalid") | .category = "other"' \
-  .claude-plugin/marketplace.json
 ```
 
 **Invalid Semver:**
@@ -483,7 +469,7 @@ jq '.plugins[].version' .claude-plugin/marketplace.json | grep -v '^"[0-9]\+\.[0
 
 ```bash
 # After fixing, verify all validations pass
-pnpm validate
+pnpm validate:schemas
 
 # Expected output: "All validations passed"
 ```

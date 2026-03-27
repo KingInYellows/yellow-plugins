@@ -30,27 +30,27 @@ on:
   push:
     paths:
       - '.claude-plugin/marketplace.json'
-      - 'plugins/**/plugin.json'
+      - 'plugins/**/.claude-plugin/plugin.json'
   pull_request:
     paths:
       - '.claude-plugin/marketplace.json'
-      - 'plugins/**/plugin.json'
+      - 'plugins/**/.claude-plugin/plugin.json'
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22.22.0'
       - name: Validate marketplace schema
         run: node scripts/validate-marketplace.js
 ```
 
 ## Validation Rules
 
-The validation script enforces 10 critical rules:
+The validation script enforces 8 checks:
 
 ### 1. File Existence and Parse
 
@@ -58,7 +58,7 @@ The validation script enforces 10 critical rules:
 
 **Error Example**:
 
-```
+```text
 ✗ ERROR: Marketplace file not found: .claude-plugin/marketplace.json
 ✗ ERROR: Failed to parse marketplace.json: Unexpected token
 ```
@@ -67,235 +67,142 @@ The validation script enforces 10 critical rules:
 
 ### 2. JSON Schema Compliance
 
-**Rule**: Marketplace must have required root fields: `schemaVersion`,
-`marketplace`, `plugins`.
+**Rule**: Marketplace must have the required official root fields: `name` and
+`plugins`. `owner` and `metadata` are optional but supported.
 
 **Error Example**:
 
-```
-✗ ERROR: Missing required field: schemaVersion
-✗ ERROR: Missing required field: marketplace
+```text
+✗ ERROR: Missing or invalid required field: "name" (string)
+✗ ERROR: Missing or invalid required field: "plugins" (array)
 ```
 
 **Fix**: Add missing fields per schema:
 
 ```json
 {
-  "schemaVersion": "1.0.0",
-  "marketplace": { ... },
+  "name": "my-marketplace",
   "plugins": [ ... ]
 }
 ```
 
-### 3. Schema Version Format
+### 3. Metadata Version Format
 
-**Rule**: `schemaVersion` must be valid semver (MAJOR.MINOR.PATCH).
+**Rule**: If `metadata.version` is present, it must be valid semver
+(MAJOR.MINOR.PATCH).
 
 **Error Example**:
 
-```
-✗ ERROR: Invalid schemaVersion format: 1.0 (must be semver like 1.0.0)
+```text
+✗ ERROR: Invalid metadata.version format: 1.0 (must be semver)
 ```
 
 **Fix**: Use three-part semver:
 
 ```json
 {
-  "schemaVersion": "1.0.0" // ✓ Correct
+  "metadata": { "version": "1.0.0" } // ✓ Correct
 }
 ```
 
-### 4. Marketplace Metadata
+### 4. Plugin Name Uniqueness
 
-**Rule**: Marketplace object must have `name`, `author`, `updatedAt`.
-
-**Error Example**:
-
-```
-✗ ERROR: Missing required marketplace.name
-✗ ERROR: Invalid marketplace.updatedAt timestamp: 2026-01-11
-```
-
-**Fix**: Provide all required fields with correct format:
-
-```json
-{
-  "marketplace": {
-    "name": "My Plugin Marketplace",
-    "author": "username",
-    "updatedAt": "2026-01-11T10:00:00Z" // ISO 8601 format
-  }
-}
-```
-
-### 5. Plugin ID Uniqueness
-
-**Rule**: All plugin IDs must be unique within marketplace.
+**Rule**: All plugin `name` values must be unique within the marketplace.
 
 **Error Example**:
 
-```
-✗ ERROR: Duplicate plugin IDs found: my-plugin
+```text
+✗ ERROR: Duplicate plugin names: my-plugin
 ```
 
-**Fix**: Ensure each plugin has a unique ID:
+**Fix**: Ensure each plugin has a unique name:
 
 ```json
 {
   "plugins": [
-    { "id": "plugin-one", ... },
-    { "id": "plugin-two", ... }  // ✓ Unique
+    { "name": "plugin-one", ... },
+    { "name": "plugin-two", ... }
   ]
 }
 ```
 
-### 6. Plugin ID Format
+### 5. Source Path Existence
 
-**Rule**: Plugin IDs must be kebab-case (lowercase, numbers, hyphens only).
-
-**Error Example**:
-
-```
-✗ ERROR: Invalid plugin ID format: "MyPlugin" (must be kebab-case)
-✗ ERROR: Invalid plugin ID format: "my_plugin" (must be kebab-case)
-```
-
-**Fix**: Use kebab-case:
-
-```json
-{
-  "id": "my-plugin"        // ✓ Correct
-  "id": "pr-review-v2"     // ✓ Correct
-  "id": "MyPlugin"         // ✗ Wrong
-  "id": "my_plugin"        // ✗ Wrong
-}
-```
-
-### 7. Source Path Existence
-
-**Rule**: Each plugin's `source` directory must exist and contain `plugin.json`.
+**Rule**: Each plugin's `source` directory must exist and contain
+`.claude-plugin/plugin.json`.
 
 **Error Example**:
 
-```
+```text
 ✗ ERROR: Plugin "my-plugin" source directory not found: plugins/my-plugin
-✗ ERROR: Plugin "my-plugin" missing plugin.json at: plugins/my-plugin/plugin.json
+✗ ERROR: Plugin "my-plugin" missing .claude-plugin/plugin.json at: plugins/my-plugin
 ```
 
-**Fix**: Create plugin directory with manifest:
+**Fix**: Create the plugin directory and manifest at the expected path:
 
 ```bash
-mkdir -p plugins/my-plugin
-echo '{"version":"1.0.0"}' > plugins/my-plugin/plugin.json
+mkdir -p plugins/my-plugin/.claude-plugin
+echo '{"name":"my-plugin","version":"1.0.0","description":"Example plugin","author":{"name":"you"}}' > plugins/my-plugin/.claude-plugin/plugin.json
 ```
 
-### 8. Version Consistency
+### 6. Version Format
 
-**Rule**: Marketplace version must match `plugin.json` version (if plugin.json
-exists).
+**Rule**: Marketplace plugin versions must use `MAJOR.MINOR.PATCH` semver.
 
 **Error Example**:
 
-```
-✗ ERROR: Version mismatch for "my-plugin": marketplace=1.0.0, plugin.json=1.1.0
+```text
+✗ ERROR: Plugin "my-plugin" invalid version format: 1.0 (must be semver X.Y.Z)
 ```
 
 **Fix**: Synchronize versions:
 
 ```json
-// marketplace.json
 {
   "plugins": [
-    { "id": "my-plugin", "version": "1.1.0", ... }
+    { "name": "my-plugin", "version": "1.1.0", ... }
   ]
 }
-
-// plugins/my-plugin/plugin.json
-{
-  "version": "1.1.0"
-}
 ```
 
-### 9. Category Validation
+Cross-file version consistency is enforced separately by
+`pnpm validate:versions`.
 
-**Rule**: Plugin category must be one of 9 official categories.
+### 7. Version Presence
 
-**Valid Categories**:
-
-- `development`
-- `productivity`
-- `security`
-- `learning`
-- `testing`
-- `design`
-- `database`
-- `deployment`
-- `monitoring`
+**Rule**: Local marketplace entries must declare a `version` field.
 
 **Error Example**:
 
-```
-✗ ERROR: Plugin "my-plugin" has invalid category: "tools"
+```text
+✗ ERROR: Plugin "my-plugin" is missing a "version" field in marketplace.json.
 ```
 
-**Fix**: Use valid category:
+**Fix**: Add a version field for each local plugin entry:
 
 ```json
 {
-  "category": "productivity"  // ✓ Correct
-  "category": "tools"         // ✗ Wrong
+  "plugins": [
+    { "name": "my-plugin", "version": "1.1.0", ... }
+  ]
 }
 ```
 
-### 10. Tag Format
+### 8. Performance Check
 
-**Rule**: Tags must be kebab-case, max 10 per plugin.
-
-**Error Example**:
-
-```
-✗ ERROR: Plugin "my-plugin" has invalid tag format: "Code_Review"
-✗ ERROR: Plugin "my-plugin" has too many tags (12), max is 10
-```
-
-**Fix**: Use kebab-case tags, limit to 10:
-
-```json
-{
-  "tags": ["code-review", "quality", "testing"]  // ✓ Correct
-  "tags": ["Code_Review", "Quality"]             // ✗ Wrong (not kebab-case)
-}
-```
-
-## Performance Checks
-
-### File Size Warning
-
-**Rule**: Marketplace file should be under 100KB for fast parsing.
+**Rule**: Oversized marketplace files emit a warning once they exceed 100 KB.
 
 **Warning Example**:
 
-```
-⚠ WARNING: Marketplace file is large (150.23 KB). Consider splitting or optimizing.
-```
-
-**Fix**: If marketplace grows large:
-
-1. Remove unnecessary optional fields
-2. Split into multiple marketplace files (if tool supports it)
-3. Consider pagination in UI layer
-
-### Plugin Count Warning
-
-**Rule**: Large plugin counts (>100) may need pagination.
-
-**Warning Example**:
-
-```
-⚠ WARNING: Large number of plugins (150). Consider pagination for UI.
+```text
+⚠ WARNING: Marketplace file is large (101.24 KB). Consider optimizing.
 ```
 
-**Fix**: Pagination is a UI concern, not a blocker.
+**Fix**: Trim unused metadata or split large plugin inventories across smaller
+marketplaces when possible.
+
+`category` remains a schema-supported field, but category and tag conventions
+are not enforced by `scripts/validate-marketplace.js`.
 
 ## Exit Codes
 
@@ -321,23 +228,28 @@ fi
 
 ```bash
 # 1. Create plugin directory and manifest
-mkdir -p plugins/my-new-plugin
-cat > plugins/my-new-plugin/plugin.json << 'EOF'
+mkdir -p plugins/my-new-plugin/.claude-plugin
+cat > plugins/my-new-plugin/.claude-plugin/plugin.json << 'EOF'
 {
+  "name": "my-new-plugin",
   "version": "1.0.0",
-  "name": "My New Plugin"
+  "description": "My new plugin",
+  "author": {
+    "name": "your-name"
+  }
 }
 EOF
 
 # 2. Add to marketplace.json
-# Edit .claude-plugin/marketplace.json to add:
-{
-  "id": "my-new-plugin",
-  "name": "My New Plugin",
+tmp=$(mktemp)
+jq '.plugins += [{
+  "name": "my-new-plugin",
   "version": "1.0.0",
-  "source": "plugins/my-new-plugin",
+  "description": "My new plugin",
+  "source": "./plugins/my-new-plugin",
   "category": "development"
-}
+}]' .claude-plugin/marketplace.json > "$tmp" &&
+  mv "$tmp" .claude-plugin/marketplace.json
 
 # 3. Validate
 node scripts/validate-marketplace.js
@@ -351,19 +263,23 @@ git commit -m "Add my-new-plugin v1.0.0"
 
 ```bash
 # 1. Update plugin.json version
-sed -i 's/"version": "1.0.0"/"version": "1.1.0"/' plugins/my-plugin/plugin.json
+NEW_VERSION=1.1.0
+tmp=$(mktemp)
+jq --arg v "$NEW_VERSION" '.version = $v' \
+  plugins/my-plugin/.claude-plugin/plugin.json > "$tmp" &&
+  mv "$tmp" plugins/my-plugin/.claude-plugin/plugin.json
 
 # 2. Update marketplace.json version
-sed -i 's/"my-plugin.*version": "1.0.0"/"my-plugin", "version": "1.1.0"/' .claude-plugin/marketplace.json
+tmp=$(mktemp)
+jq --arg name "my-plugin" --arg v "$NEW_VERSION" \
+  '(.plugins[] | select(.name == $name) | .version) = $v' \
+  .claude-plugin/marketplace.json > "$tmp" &&
+  mv "$tmp" .claude-plugin/marketplace.json
 
-# 3. Update timestamp
-# Edit marketplace.json to set current timestamp:
-"updatedAt": "2026-01-11T10:00:00Z"
-
-# 4. Validate
+# 3. Validate
 node scripts/validate-marketplace.js
 
-# 5. Commit
+# 4. Commit
 git commit -m "Update my-plugin to v1.1.0"
 ```
 
@@ -410,20 +326,19 @@ The validation script ensures:
 
 ### NFR-REL-004: 100% Validation Coverage
 
-All 10 validation rules are enforced:
+Validation includes 9 checks (8 blocking + 1 warning):
 
 - ✓ File existence and parsing
 - ✓ JSON Schema compliance
-- ✓ Schema version format
-- ✓ Marketplace metadata
-- ✓ Plugin ID uniqueness
-- ✓ Plugin ID format
+- ✓ Metadata version format
+- ✓ Plugin name uniqueness
+- ✓ Required plugin fields (`name`, `source`)
 - ✓ Source path existence
-- ✓ Version consistency
-- ✓ Category validation
-- ✓ Tag format validation
+- ✓ Version format
+- ✓ Version presence
+- ✓ Performance check (warning-only; does not fail validation)
 
-**Coverage**: 10/10 rules (100%)
+**Coverage**: 9/9 checks covered; blocking enforcement on 8/9.
 
 ### NFR-PERF-003: Performance
 
@@ -492,6 +407,6 @@ node scripts/validate-marketplace.js
 
 ## References
 
-- Schema Definition: `/schemas/marketplace.schema.json`
+- Schema Definition: `/schemas/official-marketplace.schema.json`
 - Example Marketplace: `/examples/marketplace.example.json`
 - Validation Script: `/scripts/validate-marketplace.js`

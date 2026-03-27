@@ -1,6 +1,6 @@
 # CI/CD Operations Guide
 
-**Status:** Active **Last Updated:** 2026-01-12 **Maintainer:** Platform Team
+**Status:** Active **Last Updated:** 2026-03-19 **Maintainer:** Platform Team
 
 ---
 
@@ -11,13 +11,11 @@ infrastructure. It covers GitHub Actions workflows, Docker-based build
 environments, performance budgets, artifact management, and failure triage
 procedures.
 
-**Architecture References:**
+**Repo Sources of Truth:**
 
-- Section 8.4.3: CI/CD Workflow Specification
-  (docs/technology-stack-complete.md)
-- Section 6: Automation & CI/CD Integration (docs/contracts/cli-contracts.md)
-- CRIT-021: CI runtime budget enforcement
-- NFR-MAINT-002: CI performance targets (<5 minutes total, <60s for validation)
+- `.github/workflows/validate-schemas.yml`
+- `.github/workflows/version-packages.yml`
+- `package.json`
 
 ---
 
@@ -52,14 +50,16 @@ The Yellow Plugins CI/CD system consists of two primary workflows:
 **Jobs:**
 
 - `validate-schemas` (matrix: marketplace, plugins, contracts, examples)
+- `validate-versions`
+- `changeset-check`
 - `lint-and-typecheck`
 - `unit-tests`
 - `integration-tests`
 - `contract-drift`
 - `security-audit`
-- `build` (main branch only)
-- `report-metrics` (aggregation)
-- `ci-status` (final gate)
+- `build` (pushes to `main` only)
+- `report-metrics`
+- `ci-status`
 
 **Performance Target:** Complete in <5 minutes total, with validation jobs <60
 seconds
@@ -83,39 +83,14 @@ seconds
 
 ### Job Dependency Graph
 
-```
-┌─────────────────────┐
-│ validate-schemas    │  (Matrix: 4 targets, parallel)
-│ - marketplace       │
-│ - plugins           │
-│ - contracts         │
-│ - examples          │
-└──────────┬──────────┘
-           │
-           ├──────────────────┬──────────────────┐
-           ↓                  ↓                  ↓
-  ┌─────────────────┐  ┌─────────────┐  ┌─────────────┐
-  │ lint-typecheck  │  │ contract-   │  │ security-   │
-  │                 │  │ drift       │  │ audit       │
-  └────────┬────────┘  └─────────────┘  └─────────────┘
-           │
-           ↓
-  ┌─────────────────┐
-  │ unit-tests      │
-  └────────┬────────┘
-           │
-           ↓
-  ┌─────────────────┐
-  │ integration-    │
-  │ tests           │
-  └────────┬────────┘
-           │
-           ├──────────────────┬─────────────────┐
-           ↓                  ↓                 ↓
-  ┌─────────────────┐  ┌─────────────┐  ┌───────────┐
-  │ build (main)    │  │ report-     │  │ ci-status │
-  │                 │  │ metrics     │  │           │
-  └─────────────────┘  └─────────────┘  └───────────┘
+```text
+Parallel start: validate-schemas, lint-and-typecheck, validate-versions, changeset-check, security-audit
+lint-and-typecheck -> unit-tests -> integration-tests
+validate-schemas -> contract-drift
+validate-schemas + lint-and-typecheck + unit-tests
+  -> build (pushes to main only)
+all jobs -> report-metrics (parallel)
+all jobs -> ci-status    (parallel)
 ```
 
 ### Matrix Strategy: validate-schemas
@@ -126,17 +101,18 @@ targets:
 #### Target: `marketplace`
 
 - Validates `.claude-plugin/marketplace.json` against
-  `schemas/marketplace.schema.json`
+  `schemas/official-marketplace.schema.json`
 - Runs business rules validation (`scripts/validate-marketplace.js`)
-- Checks: unique plugin IDs, semver compliance, category enums, timestamp
-  formats
+- Checks: required official marketplace fields, semver formatting where
+  applicable, unique plugin names, and source path existence
 
 #### Target: `plugins`
 
 - Discovers all `plugins/**/.claude-plugin/plugin.json` files
 - Validates each against `schemas/plugin.schema.json`
 - Runs plugin-specific validation (`scripts/validate-plugin.js`)
-- Checks: 12 plugin schema rules, permission scopes, dependencies
+- Checks: required manifest fields, directory-name consistency, semver
+  formatting, and keyword structure
 
 #### Target: `contracts`
 

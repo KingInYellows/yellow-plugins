@@ -1,6 +1,6 @@
 # CI Validation Pipeline Specification
 
-**Status:** Active **Last Updated:** 2026-01-12 **Maintainer:** Platform Team
+**Status:** Partially Current **Last Updated:** 2026-03-19 **Maintainer:** Platform Team
 **Document Type:** Technical Specification (Section 2.1 Artifact)
 
 ---
@@ -9,6 +9,12 @@
 <!-- END doctoc -->
 
 ## Overview
+
+> Current repo note: the authoritative CI workflow is
+> `.github/workflows/validate-schemas.yml`. That workflow currently implements
+> `validate-schemas`, `validate-versions`, `changeset-check`,
+> `lint-and-typecheck`, `unit-tests`, `integration-tests`, `contract-drift`,
+> `security-audit`, `build`, `report-metrics`, and `ci-status`.
 
 This document specifies the CI Validation Pipeline architecture for the Yellow
 Plugins system. It serves as the formal Section 2.1 artifact referenced in the
@@ -71,10 +77,12 @@ concurrency:
 Stale workflow runs are automatically cancelled when new commits are pushed to
 the same PR or branch, preventing resource waste and queue congestion.
 
-**Environment Variables:** | Variable | Value | Purpose |
-|----------|-------|---------| | `NODE_VERSION` | `20` | Node.js 20 LTS (current
-stable, 2025 LTS window) | | `PNPM_VERSION` | `8.15.0` | Locked pnpm version
-matching `package.json` `packageManager` field |
+**Environment Variables:**
+
+| Variable       | Value      | Purpose                                                    |
+| -------------- | ---------- | ---------------------------------------------------------- |
+| `NODE_VERSION` | `22.22.0`  | Node.js 22 LTS (current stable)                            |
+| `PNPM_VERSION` | `8.15.0`   | Locked pnpm version matching `package.json` packageManager |
 
 ---
 
@@ -105,8 +113,8 @@ optimize for both parallelism and critical path execution:
     │ lint-and-typecheck       │   │ contract-drift   │  │ security-audit  │
     │                          │   │                  │  │                 │
     │ Timeout: 3 min           │   │ Timeout: 3 min   │  │ Timeout: 5 min  │
-    │ Depends: validate-       │   │ Depends: validate│  │ Depends: none   │
-    │          schemas          │   │          -schemas│  │ (parallel)      │
+    │ Depends: none            │   │ Depends: validate│  │ Depends: none   │
+    │ (parallel)               │   │          -schemas│  │ (parallel)      │
     └────────────┬─────────────┘   └──────────────────┘  └─────────────────┘
                  │
                  ↓
@@ -145,7 +153,7 @@ optimize for both parallelism and critical path execution:
 | validate-schemas (plugins)     | Matrix (4 parallel)     | ✅ Yes                | 2 min   | ~25s             | <60s       |
 | validate-schemas (contracts)   | Matrix (4 parallel)     | ✅ Yes                | 2 min   | ~10s             | <60s       |
 | validate-schemas (examples)    | Matrix (4 parallel)     | ✅ Yes                | 2 min   | ~15s             | <60s       |
-| lint-and-typecheck             | Sequential              | ⚠️ Depends on schemas | 3 min   | ~45s             | <180s      |
+| lint-and-typecheck             | Parallel                | ❌ Independent        | 3 min   | ~45s             | <180s      |
 | unit-tests                     | Sequential              | ⚠️ Depends on lint    | 5 min   | ~90s             | <300s      |
 | integration-tests              | Sequential              | ⚠️ Depends on unit    | 8 min   | ~120s            | <480s      |
 | contract-drift                 | Parallel                | ❌ Independent        | 3 min   | ~20s             | <180s      |
@@ -157,9 +165,9 @@ optimize for both parallelism and critical path execution:
 **Total Pipeline Duration:**
 
 - **Wall-clock time (parallel):** ~4 minutes (typical), <5 minutes (SLO)
-- **Sequential critical path:** validate-schemas → lint → unit → integration →
-  build
-- **Parallelized:** contract-drift, security-audit run concurrently
+- **Sequential critical path:** lint → unit → integration → build
+- **Parallelized:** validate-schemas, contract-drift, security-audit run
+  concurrently with lint chain
 
 ---
 
@@ -211,8 +219,9 @@ strategy:
 ```bash
 # Validate .claude-plugin/marketplace.json
 ajv validate \
-  -s schemas/marketplace.schema.json \
+  -s schemas/official-marketplace.schema.json \
   -d .claude-plugin/marketplace.json \
+  -c ajv-formats \
   --strict=true \
   --all-errors
 
@@ -220,8 +229,8 @@ ajv validate \
 node scripts/validate-marketplace.js
 ```
 
-**Checks:** Unique plugin IDs, semver compliance, category enums, timestamp
-formats, source path existence **Typical Duration:** ~30s **Log File:**
+**Checks:** Required official marketplace fields, semver formatting, unique
+plugin names, source path existence **Typical Duration:** ~30s **Log File:**
 `.ci-logs/validate-marketplace.log` **Metrics File:**
 `.ci-metrics/validate-marketplace.prom`
 
@@ -247,8 +256,8 @@ for manifest in $PLUGIN_MANIFESTS; do
 done
 ```
 
-**Checks:** 12 plugin schema rules, permission scopes, dependencies, lifecycle
-scripts **Typical Duration:** ~25s (varies with plugin count) **Log File:**
+**Checks:** Required manifest fields, directory-name consistency, semver
+formatting, keyword structure, hook script validation **Typical Duration:** ~25s (varies with plugin count) **Log File:**
 `.ci-logs/validate-plugins.log` **Metrics File:**
 `.ci-metrics/validate-plugins.prom`
 
@@ -273,8 +282,9 @@ schemas) **Typical Duration:** ~10s **Log File:**
 ```bash
 # Validate marketplace examples
 ajv validate \
-  -s schemas/marketplace.schema.json \
+  -s schemas/official-marketplace.schema.json \
   -d examples/marketplace.example.json \
+  -c ajv-formats \
   --strict=true \
   --all-errors
 
@@ -328,7 +338,7 @@ yellow_plugins_ci_timestamp_seconds{stage="schema_validation",target="marketplac
 
 | Property   | Value                                         |
 | ---------- | --------------------------------------------- |
-| Runs-on    | `ubuntu-latest`                               |
+| Runs-on    | `[self-hosted, pool:atlas]`                    |
 | Timeout    | 3 minutes                                     |
 | Depends-on | None (runs in parallel with validate-schemas) |
 
