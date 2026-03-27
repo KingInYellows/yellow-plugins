@@ -113,8 +113,8 @@ optimize for both parallelism and critical path execution:
     │ lint-and-typecheck       │   │ contract-drift   │  │ security-audit  │
     │                          │   │                  │  │                 │
     │ Timeout: 3 min           │   │ Timeout: 3 min   │  │ Timeout: 5 min  │
-    │ Depends: validate-       │   │ Depends: validate│  │ Depends: none   │
-    │          schemas          │   │          -schemas│  │ (parallel)      │
+    │ Depends: none            │   │ Depends: validate│  │ Depends: none   │
+    │ (parallel)               │   │          -schemas│  │ (parallel)      │
     └────────────┬─────────────┘   └──────────────────┘  └─────────────────┘
                  │
                  ↓
@@ -153,7 +153,7 @@ optimize for both parallelism and critical path execution:
 | validate-schemas (plugins)     | Matrix (4 parallel)     | ✅ Yes                | 2 min   | ~25s             | <60s       |
 | validate-schemas (contracts)   | Matrix (4 parallel)     | ✅ Yes                | 2 min   | ~10s             | <60s       |
 | validate-schemas (examples)    | Matrix (4 parallel)     | ✅ Yes                | 2 min   | ~15s             | <60s       |
-| lint-and-typecheck             | Sequential              | ⚠️ Depends on schemas | 3 min   | ~45s             | <180s      |
+| lint-and-typecheck             | Parallel                | ❌ Independent        | 3 min   | ~45s             | <180s      |
 | unit-tests                     | Sequential              | ⚠️ Depends on lint    | 5 min   | ~90s             | <300s      |
 | integration-tests              | Sequential              | ⚠️ Depends on unit    | 8 min   | ~120s            | <480s      |
 | contract-drift                 | Parallel                | ❌ Independent        | 3 min   | ~20s             | <180s      |
@@ -165,9 +165,9 @@ optimize for both parallelism and critical path execution:
 **Total Pipeline Duration:**
 
 - **Wall-clock time (parallel):** ~4 minutes (typical), <5 minutes (SLO)
-- **Sequential critical path:** validate-schemas → lint → unit → integration →
-  build
-- **Parallelized:** contract-drift, security-audit run concurrently
+- **Sequential critical path:** lint → unit → integration → build
+- **Parallelized:** validate-schemas, contract-drift, security-audit run
+  concurrently with lint chain
 
 ---
 
@@ -338,7 +338,7 @@ yellow_plugins_ci_timestamp_seconds{stage="schema_validation",target="marketplac
 
 | Property   | Value                                         |
 | ---------- | --------------------------------------------- |
-| Runs-on    | `ubuntu-latest`                               |
+| Runs-on    | `[self-hosted, pool:atlas]`                    |
 | Timeout    | 3 minutes                                     |
 | Depends-on | None (runs in parallel with validate-schemas) |
 
