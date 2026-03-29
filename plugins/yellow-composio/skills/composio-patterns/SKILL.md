@@ -187,6 +187,7 @@ do_increment() {
     mv "${USAGE_FILE}.tmp" "$USAGE_FILE"
   else
     rm -f "${USAGE_FILE}.tmp"
+    return 1
   fi
 }
 
