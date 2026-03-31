@@ -113,6 +113,7 @@ printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-browser-test.local.md" ] && printf '.claude/yellow-browser-test.local.md: exists\n' || printf '.claude/yellow-browser-test.local.md: missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.graphite.yml" ] && printf '.graphite.yml:                      exists\n' || printf '.graphite.yml:                      missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf '.github/pull_request_template.md:   exists\n' || printf '.github/pull_request_template.md:   missing\n'
+[ -n "$repo_top" ] && [ -f "$repo_top/.claude/composio-usage.json" ] && printf '.claude/composio-usage.json:        exists\n' || printf '.claude/composio-usage.json:        missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
@@ -337,6 +338,7 @@ Marketplace Setup Dashboard
   yellow-review        PARTIAL         Review prerequisites ready, yellow-core missing
   yellow-browser-test  NEEDS SETUP     agent-browser missing
   yellow-docs          READY           git available, repo is a git repository
+  yellow-composio      PARTIAL         MCP visible, usage counter missing
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
 
   Summary: X ready, Y partial, Z need setup
