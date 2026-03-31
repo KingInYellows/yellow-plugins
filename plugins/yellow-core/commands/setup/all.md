@@ -113,6 +113,7 @@ printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-browser-test.local.md" ] && printf '.claude/yellow-browser-test.local.md: exists\n' || printf '.claude/yellow-browser-test.local.md: missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.graphite.yml" ] && printf '.graphite.yml:                      exists\n' || printf '.graphite.yml:                      missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf '.github/pull_request_template.md:   exists\n' || printf '.github/pull_request_template.md:   missing\n'
+[ -n "$repo_top" ] && [ -f "$repo_top/.claude/composio-usage.json" ] && printf '.claude/composio-usage.json:        exists\n' || printf '.claude/composio-usage.json:        missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
@@ -154,7 +155,7 @@ if [ -d "$plugin_cache" ]; then
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-core; do
+    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -300,6 +301,13 @@ Compute bundled source availability out of 5:
 - READY: `git_repo` ok AND `git` OK
 - NEEDS SETUP: `git` missing OR not in a git repository
 
+**yellow-composio:**
+
+- READY: `jq` OK AND Composio MCP tools visible via ToolSearch AND
+  `.claude/composio-usage.json` exists with valid `version` field
+- PARTIAL: Composio MCP tools visible but `jq` missing or usage counter missing
+- NEEDS SETUP: Composio MCP tools not visible in the current session
+
 **yellow-core:**
 
 - READY: `python37_check` ok AND `~/.claude/yellow-statusline.py` exists AND
@@ -330,6 +338,7 @@ Marketplace Setup Dashboard
   yellow-review        PARTIAL         Review prerequisites ready, yellow-core missing
   yellow-browser-test  NEEDS SETUP     agent-browser missing
   yellow-docs          READY           git available, repo is a git repository
+  yellow-composio      PARTIAL         MCP visible, usage counter missing
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
 
   Summary: X ready, Y partial, Z need setup
@@ -399,7 +408,8 @@ tool in this fixed order:
 11. `review:setup`
 12. `browser-test:setup`
 13. `docs:setup`
-14. `statusline:setup`
+14. `composio:setup`
+15. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 Only invoke setups for plugins the user selected. Use this mapping:
@@ -418,6 +428,7 @@ Only invoke setups for plugins the user selected. Use this mapping:
 - `yellow-review` → `review:setup`
 - `yellow-browser-test` → `browser-test:setup`
 - `yellow-docs` → `docs:setup`
+- `yellow-composio` → `composio:setup`
 - `yellow-core` → `statusline:setup`
 <!-- setup-all-plugin-command-map:end -->
 
