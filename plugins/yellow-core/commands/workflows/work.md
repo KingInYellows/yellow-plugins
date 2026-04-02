@@ -222,6 +222,14 @@ in order from bottom (item 1) to top:
 4. **Run tests** scoped to changed files. If tests fail:
    - **Linear topology:** Stop and ask user (item N+1 depends on N)
    - **Parallel topology:** Ask user: "Skip to next item or fix and retry?"
+   - **Optional Codex rescue:** If yellow-codex is installed, offer an
+     additional option: "Delegate to Codex for investigation". If chosen,
+     spawn `codex-executor` via
+     `Task(subagent_type="yellow-codex:codex-executor")` with the error
+     context and task description. Present Codex's proposed fixes. Ask:
+     "Apply Codex's fixes?" If yes, apply via Edit tool and re-run tests.
+     **Graceful degradation:** If the agent spawn fails (yellow-codex not
+     installed), omit this option silently.
 
 5. **Commit and submit:**
 

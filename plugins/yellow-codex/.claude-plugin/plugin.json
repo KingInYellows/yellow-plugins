@@ -1,0 +1,13 @@
+{
+  "name": "yellow-codex",
+  "version": "0.1.0",
+  "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-codex",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": ["codex", "openai", "code-review", "ai-agent", "rescue", "analysis"]
+}

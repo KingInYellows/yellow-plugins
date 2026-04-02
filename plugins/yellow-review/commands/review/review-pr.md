@@ -124,6 +124,10 @@ Apply selection rules from `pr-review-workflow` skill:
 - Cross-plugin (via Task tool) when conditions match: `security-sentinel`,
   `architecture-strategist`, `performance-oracle`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`
+- Optional supplementary: `codex-reviewer` (yellow-codex) — when yellow-codex
+  is installed AND diff > 100 lines. Spawn via
+  `Task(subagent_type="yellow-codex:codex-reviewer")`. If the agent is
+  not found (yellow-codex not installed), skip silently.
 
 ### Step 5: Pass 1 — Parallel Agent Review
 

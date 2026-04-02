@@ -32,6 +32,7 @@ const COMMAND_PLUGIN_MAP = {
   'browser-test:setup': 'yellow-browser-test',
   'docs:setup': 'yellow-docs',
   'composio:setup': 'yellow-composio',
+  'codex:setup': 'yellow-codex',
   'statusline:setup': 'yellow-core',
 };
 

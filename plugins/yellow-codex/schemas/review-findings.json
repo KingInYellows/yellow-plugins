@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Codex Review Findings",
+  "description": "Structured output schema for codex exec review --output-schema. Maps to yellow-review P1/P2/P3 convention.",
+  "type": "object",
+  "properties": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Imperative description of the finding, max 80 chars",
+            "maxLength": 80
+          },
+          "body": {
+            "type": "string",
+            "description": "Markdown explanation of why this is an issue and how to fix it"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "0 = critical (P1), 1 = important (P2), 2 = minor (P3), 3 = nit",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "confidence_score": {
+            "type": "number",
+            "description": "Confidence in this finding (0.0 to 1.0)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "category": {
+            "type": "string",
+            "description": "Finding category: security, correctness, quality, performance, style"
+          },
+          "code_location": {
+            "type": "object",
+            "properties": {
+              "absolute_file_path": {
+                "type": "string",
+                "description": "Absolute file path (matches Codex CLI built-in review schema naming)"
+              },
+              "line_range": {
+                "type": "object",
+                "properties": {
+                  "start": { "type": "integer", "minimum": 1 },
+                  "end": { "type": "integer", "minimum": 1 }
+                },
+                "required": ["start", "end"]
+              }
+            },
+            "required": ["absolute_file_path"]
+          }
+        },
+        "required": ["title", "priority"]
+      }
+    },
+    "overall_correctness": {
+      "type": "string",
+      "enum": ["patch is correct", "patch is incorrect"],
+      "description": "Overall assessment of the patch correctness"
+    },
+    "overall_explanation": {
+      "type": "string",
+      "description": "1-3 sentence summary of the review"
+    },
+    "overall_confidence_score": {
+      "type": "number",
+      "description": "Overall confidence in the review (0.0 to 1.0)",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "required": ["findings", "overall_correctness", "overall_explanation"]
+}
