@@ -1,7 +1,7 @@
 ---
 "yellow-codex": minor
-"yellow-review": patch
-"yellow-core": patch
+"yellow-review": minor
+"yellow-core": minor
 ---
 
 Add yellow-codex plugin wrapping OpenAI Codex CLI with review, rescue, and

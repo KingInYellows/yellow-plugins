@@ -31,7 +31,32 @@ codex_procs=$(pgrep -af codex 2>/dev/null || true)
 if [ -n "$codex_procs" ]; then
   proc_count=$(printf '%s\n' "$codex_procs" | wc -l)
   printf '[yellow-codex] Running processes: %d\n' "$proc_count"
-  printf '%s\n' "$codex_procs" | head -5
+  printf '%s\n' "$codex_procs" | head -5 | awk '{
+    line = NR
+    if (in_pem) {
+      print "--- redacted credential at line " line " ---"
+      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem=0
+      next
+    }
+    # OpenAI / generic sk- API keys
+    gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+    # Bearer tokens in output
+    gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20,}/, "--- redacted credential at line " line " ---")
+    # Authorization headers with token values
+    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+    # AWS secret keys
+    gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+    # GitHub tokens (ghp_, gho_, ghs_, ghu_, github_pat_)
+    gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
+    gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+    # PEM private key blocks (multi-line: BEGIN header, base64 body, END marker)
+    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+      print "--- redacted credential at line " line " ---"
+      in_pem=1
+      next
+    }
+    print
+  }'
 else
   printf '[yellow-codex] Running processes: none\n'
 fi
@@ -87,7 +112,7 @@ fi
 
 ### Step 6: Report Summary
 
-```
+```text
 yellow-codex Status
 ─────────────────────────────
 CLI:        {installed vX.X.X | not installed}

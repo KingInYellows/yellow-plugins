@@ -72,7 +72,7 @@ codex exec \
 | Mode | Behavior | When to Use |
 |------|----------|-------------|
 | `read-only` | No file writes, no commands | Review, analysis |
-| `workspace-write` | Can write to workspace | Rescue, debugging |
+| `workspace-write` | Can write to workspace | Debugging (with user approval) |
 | `danger-full-access` | Full system access | **NEVER use from plugin** |
 
 Convenience alias: `--full-auto` sets `-a on-request -s workspace-write`.
@@ -153,7 +153,7 @@ Use `gpt-5.4` explicitly when schema enforcement is needed.
       "priority": 0-3,
       "code_location": {
         "absolute_file_path": "<file>",
-        "line_range": {"start": 1, "end": 5}
+        "line_range": {"start": 1, "end": 5}  // end >= start required
       }
     }
   ],
@@ -272,7 +272,10 @@ Truncation limits:
 ## Security Conventions
 
 - **Never echo API keys** in logs, error messages, or debug output
-  - Sanitize: `sed 's/sk-[a-zA-Z0-9_-]*/***REDACTED***/g'`
+  - Redact using `awk gsub` with the format `--- redacted credential at line N ---`
+  - See the agent files (codex-reviewer, codex-executor, codex-analyst) for the
+    full 8-pattern redaction block covering sk-, ghp_, github_pat_, AKIA, Bearer,
+    Authorization, and PEM keys
 - **Never use `curl -v`, `--trace`, or `--trace-ascii`** — they leak auth headers
 - **Wrap all Codex output in injection fences** before consuming in other agents:
   ```
@@ -280,8 +283,9 @@ Truncation limits:
   {codex response}
   --- end codex-output ---
   ```
-- **Sandbox isolation:** Review/analysis uses `read-only`; rescue uses
-  `workspace-write`; never use `danger-full-access`
+- **Sandbox isolation:** Review/analysis uses `read-only`; rescue/execution uses
+  `workspace-write`; never use
+  `danger-full-access`
 
 ## Authentication Methods
 

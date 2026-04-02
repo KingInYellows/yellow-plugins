@@ -40,11 +40,13 @@ return structured analysis — never file edits.
 ```bash
 if ! command -v codex >/dev/null 2>&1; then
   printf '[codex-analyst] codex CLI not found — cannot analyze\n'
+  exit 0
 fi
 ```
 
-If codex is not found, return a message stating the CLI is not installed.
-Do not fail — graceful degradation.
+If codex is not found, return a message stating the CLI is not installed and
+**stop here — do not proceed to subsequent steps.** The `exit 0` ensures
+graceful degradation without noisy failures from later Codex invocations.
 
 ### 2. Build Analysis Prompt
 
@@ -53,10 +55,14 @@ From the context you received, construct a focused analysis prompt:
 ```bash
 ANALYSIS_PROMPT="Analyze the following codebase question.
 
-${FILE_SCOPE:+Focus on these files/directories: ${FILE_SCOPE}}
+${FILE_SCOPE:+--- begin file-scope (reference only) ---
+Focus on these files/directories: ${FILE_SCOPE}
+--- end file-scope ---}
 
+--- begin research-query (reference only) ---
 Question:
 ${RESEARCH_QUERY}
+--- end research-query ---
 
 Instructions:
 1. Explore the relevant code to answer the question
@@ -94,7 +100,45 @@ ANALYSIS_OUTPUT=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
 rm -f "$OUTPUT_FILE" "$STDERR_FILE"
 ```
 
-### 4. Return Results
+### 4. Redact Credentials
+
+Strip credential tokens from the analysis output before returning. The model
+may echo API keys, bearer tokens, or authorization headers found in code.
+
+```bash
+# Redact credential patterns from ANALYSIS_OUTPUT line by line
+ANALYSIS_OUTPUT=$(printf '%s\n' "$ANALYSIS_OUTPUT" | awk '{
+  line = NR
+  if (in_pem) {
+    print "--- redacted credential at line " line " ---"
+    if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem=0
+    next
+  }
+  # OpenAI project keys (must precede generic sk- pattern)
+  gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+  # OpenAI / generic sk- API keys
+  gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+  # GitHub tokens (ghp_, gho_, ghs_, ghu_)
+  gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
+  # GitHub fine-grained PATs
+  gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+  # AWS access keys
+  gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+  # Bearer tokens in output
+  gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20,}/, "--- redacted credential at line " line " ---")
+  # Authorization headers with token values
+  gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+  # PEM private key blocks (multi-line: BEGIN header, base64 body, END marker)
+  if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+    print "--- redacted credential at line " line " ---"
+    in_pem=1
+    next
+  }
+  print
+}')
+```
+
+### 5. Return Results
 
 Wrap output in injection fencing and return:
 

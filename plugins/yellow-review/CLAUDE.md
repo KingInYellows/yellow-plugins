@@ -91,6 +91,13 @@ When conditions warrant, commands spawn these agents via Task tool (using
   authoring convention checks
 - `code-simplicity-reviewer` — additional simplification pass for large PRs
 
+Optional supplementary agent via Task tool (using `yellow-codex:<name>`
+subagent_type):
+
+- `codex-reviewer` — parallel review when yellow-codex is installed AND diff >
+  100 lines. Tags findings with `[codex]`. Silently skipped when yellow-codex is
+  not installed.
+
 yellow-review requires yellow-core for full review coverage. Without it,
 cross-plugin agents (security-sentinel, architecture-strategist,
 performance-oracle, pattern-recognition-specialist, code-simplicity-reviewer)

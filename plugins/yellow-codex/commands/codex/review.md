@@ -38,7 +38,7 @@ Parse `$ARGUMENTS` to determine what to review:
 - Branch name → `BASE_REF="origin/main"` (or detect base from Graphite)
 - Empty → Review current branch against base:
   ```bash
-  BASE_REF=$(git merge-base HEAD origin/main 2>/dev/null || echo "origin/main")
+  BASE_REF="origin/main"
   ```
 
 ### Step 3: Pre-Flight Checks
@@ -60,9 +60,14 @@ fi
 
 if [ "$estimated_tokens" -gt 100000 ]; then
   printf '[yellow-codex] Warning: diff is ~%d tokens (model limit ~128K).\n' "$estimated_tokens"
-  # AskUserQuestion: "Large diff may exceed context. Continue anyway or review by file group?"
 fi
 ```
+
+If `estimated_tokens` exceeds 100000, use `AskUserQuestion` to ask the user:
+"Large diff (~N tokens) may exceed Codex context limit. Continue with full diff, or skip?"
+with options "Continue anyway" and "Skip review". Replace `~N` with the actual
+`estimated_tokens` value. If the user chooses "Skip review", report that the
+diff is too large for Codex review and stop (do not proceed to Step 4).
 
 **Changed file list (excluding binary):**
 
@@ -99,6 +104,7 @@ CODEX_CMD+=(
   -a never
   -s read-only
   --ephemeral
+  --json
   -m "${CODEX_MODEL:-gpt-5.4}"
   -o "$OUTPUT_FILE"
 )
@@ -118,13 +124,70 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" 2>"$STDERR_FILE" || 
     }
   else
     printf '[yellow-codex] Error: codex exited with code %d\n' "$codex_exit"
-    head -5 "$STDERR_FILE" 2>/dev/null | sed 's/sk-[a-zA-Z0-9_-]*/***REDACTED***/g' >&2
+    head -5 "$STDERR_FILE" 2>/dev/null | awk '{
+      line = NR
+      # OpenAI project keys (must precede generic sk- pattern)
+      gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+      # OpenAI / generic sk- API keys
+      gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+      # GitHub tokens (ghp_, gho_, ghs_, ghu_)
+      gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
+      # GitHub fine-grained PATs
+      gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+      # AWS access keys
+      gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+      # Bearer tokens in output
+      gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20,}/, "--- redacted credential at line " line " ---")
+      # Authorization headers with token values
+      gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+      # Generic private key blocks
+      gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
+      print
+    }' >&2
   fi
 }
 
 # Read output
 REVIEW_OUTPUT=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
 rm -f "$OUTPUT_FILE" "$STDERR_FILE"
+```
+
+### Step 4b: Redact Credentials from Output
+
+Before parsing or displaying, scrub any leaked credentials from the Codex
+output. Model responses may echo API keys, bearer tokens, or authorization
+headers found in the reviewed code.
+
+```bash
+# Redact credential patterns from REVIEW_OUTPUT line by line
+REVIEW_OUTPUT=$(printf '%s\n' "$REVIEW_OUTPUT" | awk '{
+  line = NR
+  if (in_pem) {
+    print "--- redacted credential at line " line " ---"
+    if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem=0
+    next
+  }
+  # OpenAI project-scoped keys (must precede generic sk- pattern)
+  gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+  # OpenAI / generic sk- API keys
+  gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+  # Bearer tokens in output
+  gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20,}/, "--- redacted credential at line " line " ---")
+  # Authorization headers with token values
+  gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+  # AWS secret keys
+  gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+  # GitHub tokens (ghp_, gho_, ghs_, ghu_, github_pat_)
+  gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
+  gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+  # PEM private key blocks (multi-line: BEGIN header, base64 body, END marker)
+  if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+    print "--- redacted credential at line " line " ---"
+    in_pem=1
+    next
+  }
+  print
+}')
 ```
 
 ### Step 5: Parse Findings

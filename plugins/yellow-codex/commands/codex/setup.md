@@ -38,7 +38,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-codex.sh"
 If the install script exits non-zero, print a warning with manual instructions
 and continue to Step 1:
 
-```
+```text
 [yellow-codex] Warning: codex installation failed. Install manually:
   npm install -g @openai/codex     (requires Node.js 22+)
   brew install --cask codex        (macOS)
@@ -142,14 +142,14 @@ fi
 
 If neither method is configured:
 
-```
+```text
 [yellow-codex] Warning: No authentication configured.
   Option 1: export OPENAI_API_KEY="sk-..." in ~/.zshrc
   Option 2: codex login (authenticates via ChatGPT)
 ```
 
-Never echo the actual API key value. Sanitize with:
-`sed 's/sk-[a-zA-Z0-9_-]*/***REDACTED***/g'`
+Never echo the actual API key value. If detected, replace output with:
+`--- redacted credential at line N ---`
 
 ### Step 3: Detect Codex Configuration
 
@@ -188,7 +188,7 @@ fi
 
 Display a summary table:
 
-```
+```text
 yellow-codex Setup Results
 ─────────────────────────────
 Prerequisites:  node [ok v22.x | missing] | jq [ok | missing (degraded)]
