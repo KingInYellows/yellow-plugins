@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
+set -eo pipefail
 
-set -e +o pipefail
+fatal() { echo "FATAL: $*" >&2; exit 1; }
 
 # Set up paths first
 bin_name="codacy-cli-v2"
@@ -37,7 +38,8 @@ version_file="$CODACY_CLI_V2_TMP_FOLDER/version.yaml"
 
 get_version_from_yaml() {
     if [ -f "$version_file" ]; then
-        local version=$(grep -o 'version: *"[^"]*"' "$version_file" | cut -d'"' -f2)
+        local version
+        version=$(grep -o 'version: *"[^"]*"' "$version_file" | cut -d'"' -f2)
         if [ -n "$version" ]; then
             echo "$version"
             return 0
@@ -49,13 +51,14 @@ get_version_from_yaml() {
 get_latest_version() {
     local response
     if [ -n "$GH_TOKEN" ]; then
-        response=$(curl -Lq --header "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest" 2>/dev/null)
+        response=$(curl -Lq --header "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
     else
-        response=$(curl -Lq "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest" 2>/dev/null)
+        response=$(curl -Lq "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
     fi
 
     handle_rate_limit "$response"
-    local version=$(echo "$response" | grep -m 1 tag_name | cut -d'"' -f4)
+    local version
+    version=$(echo "$response" | grep -m 1 tag_name | cut -d'"' -f4)
     echo "$version"
 }
 
@@ -71,7 +74,7 @@ download_file() {
 
     echo "Downloading from URL: ${url}"
     if command -v curl > /dev/null 2>&1; then
-        curl -# -LS "$url" -O
+        curl -f -# -LS "$url" -O
     elif command -v wget > /dev/null 2>&1; then
         wget "$url"
     else
@@ -115,6 +118,7 @@ fi
 if [ ! -f "$version_file" ] || [ "$1" = "update" ]; then
     echo "ℹ️  Fetching latest version..."
     version=$(get_latest_version)
+    [ -n "$version" ] || fatal "Could not determine latest Codacy CLI version from GitHub API"
     mkdir -p "$CODACY_CLI_V2_TMP_FOLDER"
     echo "version: \"$version\"" > "$version_file"
 fi
@@ -123,9 +127,8 @@ fi
 if [ -n "$CODACY_CLI_V2_VERSION" ]; then
     version="$CODACY_CLI_V2_VERSION"
 else
-    version=$(get_version_from_yaml)
+    version=$(get_version_from_yaml) || fatal "Could not read version from $version_file"
 fi
-
 
 # Set up version-specific paths
 bin_folder="${CODACY_CLI_V2_TMP_FOLDER}/${version}"
@@ -137,13 +140,8 @@ bin_path="$bin_folder"/"$bin_name"
 download_cli "$bin_folder" "$bin_path" "$version"
 chmod +x "$bin_path"
 
-run_command="$bin_path"
-if [ -z "$run_command" ]; then
-    fatal "Codacy cli v2 binary could not be found."
-fi
-
 if [ "$#" -eq 1 ] && [ "$1" = "download" ]; then
     echo "Codacy cli v2 download succeeded"
 else
-    eval "$run_command $*"
+    "$bin_path" "$@"
 fi
