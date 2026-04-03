@@ -65,6 +65,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   `## Stack Decomposition` section exists in the plan (produced by
   `/gt-stack-plan`). Without gt-workflow, falls back to inline `gt modify -m` +
   `gt submit --no-interactive` and stack features are unavailable.
+- **yellow-codex** — `/workflows:work` offers Codex rescue
+  (`codex-executor`) when tests fail during stack execution. Without
+  yellow-codex, the rescue option is silently omitted.
 - **yellow-review** — `/workflows:work` invokes `/review:pr` after submission;
   `/workflows:review` falls back to `/review:pr` redirect for PR
   number/URL/branch arguments. Without yellow-review, the redirect fallback

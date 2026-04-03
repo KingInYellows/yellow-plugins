@@ -197,6 +197,18 @@ Task(subagent_type="yellow-core:security-sentinel",
 
 Agent type names follow the pattern: `yellow-core:<agent-name>`.
 
+To spawn the optional Codex supplementary reviewer (requires yellow-codex):
+
+```
+Task(subagent_type="yellow-codex:codex-reviewer",
+     prompt="Review this PR for bugs, security issues, and quality problems.
+             Base branch: <base-ref>. PR title: <title>.")
+```
+
+The codex-reviewer runs in parallel with other agents and returns P1/P2/P3
+findings tagged with `[codex]` for convergence analysis. If yellow-codex is
+not installed, the agent spawn silently fails — no degradation to the review.
+
 ## GraphQL Scripts
 
 Located at `skills/pr-review-workflow/scripts/`:

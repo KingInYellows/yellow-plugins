@@ -56,6 +56,7 @@ command -v uv >/dev/null 2>&1 && printf 'uv:                 OK\n' || printf 'uv
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
 command -v gt >/dev/null 2>&1 && printf 'gt:                 OK (%s)\n' "$(gt --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
 command -v ruvector >/dev/null 2>&1 && printf 'ruvector:           OK\n' || printf 'ruvector:           NOT FOUND\n'
+command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
@@ -75,6 +76,7 @@ printf '\n=== Environment Variables ===\n'
 [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf 'DEVIN_SERVICE_USER_TOKEN:  set\n' || printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET\n'
 [ -n "${DEVIN_ORG_ID:-}" ] && printf 'DEVIN_ORG_ID:              set\n' || printf 'DEVIN_ORG_ID:              NOT SET\n'
 [ -n "${SEMGREP_APP_TOKEN:-}" ] && printf 'SEMGREP_APP_TOKEN:         set\n' || printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
+[ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
 [ -n "${EXA_API_KEY:-}" ] && printf 'EXA_API_KEY:               set\n' || printf 'EXA_API_KEY:               NOT SET\n'
 [ -n "${TAVILY_API_KEY:-}" ] && printf 'TAVILY_API_KEY:            set\n' || printf 'TAVILY_API_KEY:            NOT SET\n'
 [ -n "${PERPLEXITY_API_KEY:-}" ] && printf 'PERPLEXITY_API_KEY:        set\n' || printf 'PERPLEXITY_API_KEY:        NOT SET\n'
@@ -114,6 +116,7 @@ printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.graphite.yml" ] && printf '.graphite.yml:                      exists\n' || printf '.graphite.yml:                      missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf '.github/pull_request_template.md:   exists\n' || printf '.github/pull_request_template.md:   missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/composio-usage.json" ] && printf '.claude/composio-usage.json:        exists\n' || printf '.claude/composio-usage.json:        missing\n'
+[ -f ~/.codex/auth.json ] && printf '~/.codex/auth.json:                 exists\n' || printf '~/.codex/auth.json:                 missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
@@ -155,7 +158,7 @@ if [ -d "$plugin_cache" ]; then
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-core; do
+    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -308,6 +311,13 @@ Compute bundled source availability out of 5:
 - PARTIAL: Composio MCP tools visible but `jq` missing or usage counter missing
 - NEEDS SETUP: Composio MCP tools not visible in the current session
 
+**yellow-codex:**
+
+- READY: `codex` binary found in PATH AND version >= 0.118.0 AND
+  (`OPENAI_API_KEY` set OR `~/.codex/auth.json` exists)
+- PARTIAL: `codex` binary found AND version >= 0.118.0, but auth not configured
+- NEEDS SETUP: `codex` binary not found OR version < 0.118.0
+
 **yellow-core:**
 
 - READY: `python37_check` ok AND `~/.claude/yellow-statusline.py` exists AND
@@ -339,6 +349,7 @@ Marketplace Setup Dashboard
   yellow-browser-test  NEEDS SETUP     agent-browser missing
   yellow-docs          READY           git available, repo is a git repository
   yellow-composio      PARTIAL         MCP visible, usage counter missing
+  yellow-codex         PARTIAL         codex v0.118.0 found, OPENAI_API_KEY not set
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
 
   Summary: X ready, Y partial, Z need setup
@@ -409,7 +420,8 @@ tool in this fixed order:
 12. `browser-test:setup`
 13. `docs:setup`
 14. `composio:setup`
-15. `statusline:setup`
+15. `codex:setup`
+16. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 Only invoke setups for plugins the user selected. Use this mapping:
@@ -429,6 +441,7 @@ Only invoke setups for plugins the user selected. Use this mapping:
 - `yellow-browser-test` → `browser-test:setup`
 - `yellow-docs` → `docs:setup`
 - `yellow-composio` → `composio:setup`
+- `yellow-codex` → `codex:setup`
 - `yellow-core` → `statusline:setup`
 <!-- setup-all-plugin-command-map:end -->
 
