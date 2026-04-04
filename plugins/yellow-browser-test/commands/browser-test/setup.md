@@ -48,7 +48,7 @@ Before spawning app discovery, check if this project is a web application:
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 is_web=false
 if [ -f "$repo_top/package.json" ]; then
-  if grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server)"' "$repo_top/package.json" 2>/dev/null; then
+  if grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs)"' "$repo_top/package.json" 2>/dev/null; then
     is_web=true
   fi
 fi
@@ -57,9 +57,9 @@ printf 'is_web: %s\n' "$is_web"
 
 If `is_web` is `false`, use AskUserQuestion:
 
-> "This project doesn't appear to be a web application (no web framework
-> detected in package.json). Browser testing requires a web app with a dev
-> server."
+> "No web framework detected in package.json. Browser testing requires a web
+> app with a dev server. (Non-Node.js web apps like Django, Rails, or Go
+> servers won't be detected here — choose 'Continue anyway' for those.)"
 >
 > Options:
 > - "Continue anyway" — proceed to app discovery
