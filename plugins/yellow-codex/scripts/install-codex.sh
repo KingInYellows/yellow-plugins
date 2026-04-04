@@ -40,7 +40,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Semver comparison helper (POSIX-compatible) ---
+# Compare two semver strings. Returns 0 if $1 >= $2, 1 otherwise.
+# POSIX-compatible: no bash arrays, herestrings, or (( )) arithmetic.
 version_gte() {
   local left="$1" right="$2"
   local left_major left_minor left_patch
@@ -108,13 +109,15 @@ _current_node_major=""
 if command -v node >/dev/null 2>&1; then
   _current_node_major=$(node -e "console.log(process.versions.node.split('.')[0])" 2>/dev/null || true)
 fi
-if [ -z "$_current_node_major" ] || [ "$_current_node_major" -lt "$MIN_NODE_MAJOR" ] 2>/dev/null; then
+# Normalize non-numeric values to empty so the -z check catches them
+case "$_current_node_major" in ''|*[!0-9]*) _current_node_major="" ;; esac
+if [ -z "$_current_node_major" ] || [ "$_current_node_major" -lt "$MIN_NODE_MAJOR" ]; then
   if command -v fnm >/dev/null 2>&1; then
-    eval "$(fnm env 2>/dev/null)" 2>/dev/null
+    eval "$(fnm env 2>/dev/null)" || true
     fnm use "$MIN_NODE_MAJOR" 2>/dev/null || true
   elif [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
     # shellcheck disable=SC1091
-    . "${NVM_DIR:-$HOME/.nvm}/nvm.sh" 2>/dev/null
+    . "${NVM_DIR:-$HOME/.nvm}/nvm.sh" 2>/dev/null || true
     nvm use "$MIN_NODE_MAJOR" 2>/dev/null || true
   fi
 fi

@@ -159,7 +159,7 @@ if [ -d "$plugin_cache" ]; then
 import json, sys
 for p in sys.argv[1:]:
     try: print(json.load(open(p)).get('name',''))
-    except: pass
+    except Exception: pass
 " 2>/dev/null | sed '/^$/d' | LC_ALL=C sort -u)
   elif command -v jq >/dev/null 2>&1; then
     installed_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
