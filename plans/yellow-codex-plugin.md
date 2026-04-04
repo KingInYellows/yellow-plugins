@@ -95,7 +95,7 @@ A new `yellow-codex` marketplace plugin that:
 
 Create `plugins/yellow-codex/` with all required files:
 
-```
+```text
 plugins/yellow-codex/
   .claude-plugin/
     plugin.json
@@ -350,7 +350,7 @@ skills:
 
 **Spawning pattern** (from review:pr):
 
-```
+```text
 Task(subagent_type="yellow-codex:review:codex-reviewer",
      prompt="Review this PR for bugs, security issues, and quality...")
 ```
@@ -717,7 +717,7 @@ codex exec \
 | No auth (neither API key nor OAuth) | Setup warns; commands fail with clear message |
 | ChatGPT OAuth expired | Suggest `codex login` to re-authenticate |
 | `codex exec review` on empty diff | Detect empty diff before invoking, report "No changes to review" |
-| Codex timeout (5 min) | `timeout 300` returns exit 124; report and suggest smaller scope |
+| Codex timeout (5 min) | `timeout 300` may return exit 0 (Codex handles SIGTERM gracefully), 124 (child ignored SIGTERM), or 137 (killed by SIGKILL after `--kill-after`); see detailed guidance in Phase 3 Task 3.1 timeout handling section |
 | Rate limit (429) | Retry once with 5s backoff; if still 429, report and suggest waiting |
 | Codex output doesn't match schema | Fall back to `-o` plain text output; parse P1/P2/P3 with regex |
 | Large diff exceeds 128K token context | Pre-flight size check: estimate tokens (diff_bytes / 4), reject if > 100K tokens |

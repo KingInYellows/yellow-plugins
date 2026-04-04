@@ -147,12 +147,12 @@ strategy means overrides are surgical, not wholesale.
    cadences, different sensitivity levels, different audiences. Keeping them
    separate avoids a monolithic config that's hard to reason about.
 
-2. **Global-to-local merge by runner name.** First plugin in the ecosystem to
-   introduce this pattern. Merge is simple: match on `name`, local wins
-   entirely for that runner. No deep merge of individual fields within a
-   runner -- if local defines `ares`, its entire definition replaces the global
-   `ares`. `routing_rules` from local replace global wholesale (rules are a
-   coherent set, not independently mergeable).
+2. **Global-to-local merge by runner name (per-key).** First plugin in the
+   ecosystem to introduce this pattern. Merge is per-key by runner `name`:
+   local wins per-key for that runner. If local defines `ares`, its entire
+   definition replaces the global `ares`. `routing_rules` from local also
+   merge per-key by runner name (local wins per-key), consistent with the
+   top-level merge strategy.
 
 3. **Session-start hook delivery for routing rules.** The hook reads the
    resolved config and emits a compact `systemMessage` with the routing rules

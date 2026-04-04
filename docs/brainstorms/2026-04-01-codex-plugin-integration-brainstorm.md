@@ -58,7 +58,7 @@ logic contained within `yellow-codex`. This matches the proven pattern used by
 
 ### File Tree
 
-```
+```text
 plugins/yellow-codex/
   .claude-plugin/
     plugin.json
@@ -183,18 +183,17 @@ allowed-tools:
    ```
 
 5. **Check Codex configuration:**
-   - Detect `~/.codex/config.json` or `~/.codex/config.yaml` if Codex uses a
-     config file
+   - Detect `~/.codex/config.toml` if Codex uses a config file
    - Report model preference, approval mode, and any custom settings
 
 6. **Report results:**
-   ```
+   ```text
    yellow-codex Setup Results
    ==============================
    Prerequisites:  node [ok v22.x] | jq [ok|missing (degraded)]
    Codex CLI:      installed (v1.x.x) | not installed
    OpenAI Auth:    ok | failed | not configured
-   Config:         default | custom (~/.codex/config.json)
+   Config:         default | custom (~/.codex/config.toml)
    ==============================
    Setup complete. Run /codex:review to test.
    ```
@@ -241,9 +240,10 @@ allowed-tools:
    git diff "${BASE}...HEAD" > "$DIFF_FILE"
 
    # Invoke Codex in non-interactive mode
-   codex --approval-mode full-auto \
-     --quiet \
-     --model codex-mini \
+   codex exec review \
+     --full-auto \
+     --sandbox workspace-write \
+     --model gpt-5.4-mini \
      "Review the following code diff for bugs, security issues, and quality problems. \
       Report each finding as: **[P1|P2|P3] category -- file:line** \
       Finding: <issue> Fix: <suggestion>. \
@@ -348,7 +348,7 @@ allowed-tools:
    ```
 
 3. **Report summary:**
-   ```
+   ```text
    yellow-codex Status
    ==============================
    Running processes: N
@@ -390,10 +390,10 @@ tools:
 
 **Integration with review:pr:**
 
-The `review:pr` command discovers `codex-reviewer` via ToolSearch at runtime.
-If found, it is added to the agent selection pool in Step 4 (Adaptive Agent
-Selection) as an optional supplementary reviewer. It runs in parallel with
-other selected agents in Step 5 (Pass 1). Its findings are merged into the
+The `review:pr` command explicitly includes `codex-reviewer` as an optional
+supplementary reviewer during Step 4 (Adaptive Agent Selection) via the
+Task-based subagent selection mechanism. It runs in parallel with other
+selected agents in Step 5 (Pass 1). Its findings are merged into the
 aggregated results in Step 6 alongside findings from built-in agents.
 
 ### `codex-executor` Agent
@@ -480,21 +480,23 @@ user-invokable: false
 
 ```bash
 # Review mode (read-only analysis)
-codex --approval-mode full-auto \
-  --quiet \
-  --model codex-mini \
+codex exec review \
+  --full-auto \
+  --sandbox workspace-write \
+  --model gpt-5.4-mini \
   "<prompt>"
 
 # Suggest mode (proposes changes, does not apply)
-codex --approval-mode suggest \
-  --quiet \
-  --model codex-mini \
+codex exec review \
+  --sandbox workspace-write \
+  --model gpt-5.4-mini \
   "<prompt>"
 
 # Full-auto mode (applies changes -- use only with guardrails)
-codex --approval-mode full-auto \
-  --quiet \
-  --model codex-mini \
+codex exec review \
+  --full-auto \
+  --sandbox workspace-write \
+  --model gpt-5.4-mini \
   "<prompt>"
 ```
 
@@ -544,7 +546,7 @@ CODEX_OUTPUT=$(timeout 300 codex --approval-mode full-auto \
 
 When passing context to Codex, follow this structure:
 
-```
+```text
 Project conventions (from CLAUDE.md):
 <first 2000 chars of CLAUDE.md>
 
@@ -597,11 +599,11 @@ The integration follows the existing cross-plugin agent pattern used by
 `review:pr` for `yellow-core` agents (security-sentinel, architecture-strategist,
 etc.):
 
-1. **Detection (Step 3c or new Step 3d):**
+1. **Selection (Step 4 -- Adaptive Agent Selection):**
+   ```text
+   Task(subagent_type="yellow-codex:codex-reviewer")
    ```
-   ToolSearch("codex-reviewer")
-   ```
-   If not found: skip Codex review path silently (graceful degradation).
+   If plugin not installed: skip Codex review path silently (graceful degradation).
 
 2. **Selection (Step 4):**
    Add `codex-reviewer` to the agent pool as an optional supplementary reviewer.
@@ -660,7 +662,7 @@ The integration is triggered when the work loop encounters a failure:
 
 All Codex invocations follow a standard context injection protocol:
 
-```
+```text
 [CLAUDE.md] -> truncated to 2000 chars
 [Plan file] -> if referenced, truncated to 5000 chars
 [PR metadata] -> title, body, file list, line count
@@ -897,9 +899,9 @@ No keys are stored by the plugin -- the user manages keys in their shell profile
 
 ### Cross-Plugin Coordination
 
-- **Agent discovery mechanism:** How does `review:pr` discover `codex-reviewer`?
-  Current plan: ToolSearch. But Task tool subagent discovery may work differently
-  -- verify with existing cross-plugin patterns (yellow-core agents in review:pr).
+- **Agent discovery mechanism:** `review:pr` includes `codex-reviewer` via the
+  Task-based subagent selection mechanism during Step 4 (Adaptive Agent Selection),
+  consistent with existing cross-plugin patterns (yellow-core agents in review:pr).
 - **Finding deduplication:** When Codex and another agent flag the same issue,
   how do we deduplicate? Current plan: tag with source and use convergence
   analysis, but need concrete implementation.

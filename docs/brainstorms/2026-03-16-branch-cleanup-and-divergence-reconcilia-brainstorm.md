@@ -72,6 +72,7 @@ that the user may not realize exist.
 ### 1. Category-based confirmation over per-branch or single-confirm
 
 Each non-empty category gets its own AskUserQuestion with options:
+
 - "Clean up N branches" (batch action)
 - "Review individually" (per-branch confirmation)
 - "Skip this category"
@@ -84,6 +85,7 @@ review.
 
 Pushing code belongs in `/smart-submit` or `gt submit`. The cleanup command
 flags these branches as a reminder but does not offer to push. This avoids:
+
 - Bypassing the audit agents in `/smart-submit`
 - Accidentally pushing WIP, debug code, or experiments
 - Overlapping with `/smart-submit`'s submission responsibility
@@ -91,6 +93,7 @@ flags these branches as a reminder but does not offer to push. This avoids:
 ### 3. Standalone command, not an extension of `/gt-sync`
 
 `/gt-sync` and `/gt-cleanup` have different purposes:
+
 - `/gt-sync` = sync trunk + restack + clean merged (routine, frequent)
 - `/gt-cleanup` = audit all branches + delete stale + reconcile diverged (periodic, thorough)
 

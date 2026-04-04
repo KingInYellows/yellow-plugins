@@ -1,4 +1,6 @@
-# Feature: `/worktree-cleanup` Command
+# Feature: `/worktree:cleanup` Command
+
+> **Status: Implemented** — This plan has been implemented. Retained for historical context.
 
 ## Problem Statement
 
@@ -34,23 +36,23 @@ and worktrees for already-merged branches cluttering the repo.
 
 ## Proposed Solution
 
-Create `/worktree-cleanup` in yellow-core as a standalone command following
+Create `/worktree:cleanup` in yellow-core as a standalone command following
 `/gt-cleanup`'s phased architecture. Add Phase 6 to `/gt-cleanup` that offers
-to invoke `/worktree-cleanup` via `Skill` tool with graceful degradation.
+to invoke `/worktree:cleanup` via `Skill` tool with graceful degradation.
 
-**Ownership boundary**: `/worktree-cleanup` removes worktrees only. It does NOT
+**Ownership boundary**: `/worktree:cleanup` removes worktrees only. It does NOT
 delete branches. If orphaned branches remain after worktree removal, it suggests
 running `/gt-cleanup` to handle them. This avoids overlapping authority.
 
 ## Implementation Plan
 
-### Phase 1: Create `/worktree-cleanup` command
+### Phase 1: Create `/worktree:cleanup` command
 
-- [ ] 1.1: Create `plugins/yellow-core/commands/worktree-cleanup.md`
+- [ ] 1.1: Create `plugins/yellow-core/commands/worktree/cleanup.md`
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** yellow-core commands use subdirectory namespacing: `commands/workflows/`,
-> `commands/statusline/`, `commands/setup/`. A flat `commands/worktree-cleanup.md`
+> `commands/statusline/`, `commands/setup/`. A flat `commands/worktree/cleanup.md`
 > breaks this convention. Consider `commands/worktree/cleanup.md` if future worktree
 > commands are anticipated — but flat is acceptable since gt-workflow uses flat naming
 > (`gt-cleanup.md`, `gt-sync.md`). Either works; be intentional about the choice.
@@ -60,7 +62,7 @@ running `/gt-cleanup` to handle them. This avoids overlapping authority.
 
 ```yaml
 ---
-name: worktree-cleanup
+name: worktree:cleanup
 description: 'Scan git worktrees, evaluate staleness, and remove stale worktrees with safeguards'
 argument-hint: '[--dry-run]'
 allowed-tools:
@@ -208,7 +210,7 @@ per-worktree prompting. Prompt categories (5, 6, 7) use AskUserQuestion.
 **Category 1 — Missing directory (auto):**
 
 ```bash
-git worktree prune
+git worktree prune --expire now
 ```
 
 This cleans up all stale admin entries in one shot. Report count pruned.
@@ -326,7 +328,7 @@ Details:
   Failed:   <path> — <error reason>
 ```
 
-Run `git worktree prune` as final step to clean up any remaining admin entries.
+Run `git worktree prune --expire now` as final step to clean up any remaining admin entries.
 
 <!-- deepen-plan: external -->
 > **Research:** `git worktree prune` is **safe to run unconditionally**. It only
@@ -385,27 +387,27 @@ If `WT_COUNT` > 1, use AskUserQuestion:
 You have $((WT_COUNT - 1)) git worktree(s). Would you like to scan and
 clean them up too?
 
-1. Yes — run /worktree-cleanup
+1. Yes — run /worktree:cleanup
 2. No — done
 \```
 
 If the user chooses "Yes":
 
 \```
-Invoke the Skill tool with `skill: "worktree-cleanup"`.
+Invoke the Skill tool with `skill: "worktree:cleanup"`.
 \```
 
 If the Skill call fails (yellow-core not installed or command not found):
 
 \```
-⚠️  /worktree-cleanup not available. Install yellow-core:
+⚠️  /worktree:cleanup not available. Install yellow-core:
     /plugin marketplace add KingInYellows/yellow-plugins yellow-core
 \```
 
 If `--dry-run` was passed to gt-cleanup, forward it:
 
 \```
-Invoke the Skill tool with `skill: "worktree-cleanup"` and `args: "--dry-run"`.
+Invoke the Skill tool with `skill: "worktree:cleanup"` and `args: "--dry-run"`.
 \```
 ```
 
@@ -415,7 +417,7 @@ Add to the existing success criteria list:
 ```
 - Phase 6 offers worktree cleanup when worktrees exist
 - Graceful degradation when yellow-core is not installed
-- --dry-run flag forwarded to worktree-cleanup
+- --dry-run flag forwarded to worktree:cleanup
 ```
 
 ### Phase 3: Register and Validate
@@ -426,7 +428,7 @@ Commands in `plugins/yellow-core/commands/` are auto-discovered — no
 plugin.json registration needed. Verify with:
 
 ```bash
-ls plugins/yellow-core/commands/worktree-cleanup.md
+ls plugins/yellow-core/commands/worktree/cleanup.md
 ```
 
 - [ ] 3.2: Run validators
@@ -437,7 +439,7 @@ pnpm validate:schemas
 
 - [ ] 3.3: Update yellow-core CLAUDE.md
 
-Add `/worktree-cleanup` to the Commands list (currently 7, becomes 8).
+Add `/worktree:cleanup` to the Commands list (currently 7, becomes 8).
 
 ### Phase 4: Changeset and Submit
 
@@ -449,12 +451,12 @@ Add `/worktree-cleanup` to the Commands list (currently 7, becomes 8).
 
 ### Files to Create
 
-- `plugins/yellow-core/commands/worktree-cleanup.md` — New command (est. ~300 lines)
+- `plugins/yellow-core/commands/worktree/cleanup.md` — New command (est. ~300 lines)
 
 ### Files to Modify
 
 - `plugins/gt-workflow/commands/gt-cleanup.md` — Add Phase 6 (~30 lines), add `Skill` to allowed-tools
-- `plugins/yellow-core/CLAUDE.md` — Add `/worktree-cleanup` to commands list
+- `plugins/yellow-core/CLAUDE.md` — Add `/worktree:cleanup` to commands list
 
 ### No Dependencies to Add
 
@@ -469,7 +471,7 @@ MCP servers, no new npm packages, no new scripts.
 | Current worktree (`$PWD`) | Excluded from removal candidates |
 | Locked worktree | Display-only, suggest `git worktree unlock` |
 | Detached HEAD | Separate category, always prompt, cannot check merge status |
-| Missing directory (Devin temp) | Auto-prune via `git worktree prune` |
+| Missing directory (Devin temp) | Auto-prune via `git worktree prune --expire now` |
 | Cross-filesystem (WSL/Windows) | Use absolute paths, warn if removal fails |
 | Worktree with submodules | Single `--force` sufficient (not double); warn user |
 | Race condition (modified after scan) | Catch removal error, log as failed, continue |
@@ -478,7 +480,7 @@ MCP servers, no new npm packages, no new scripts.
 | Zero worktrees beyond main | Early exit: "No worktrees to clean up." |
 | 50+ worktrees | Batch cap of 15 for individual review categories |
 | Worktree for same branch as another | Remove worktree only, branch unaffected |
-| Corrupted worktree (broken `.git` file) | `git worktree remove` fails; offer `git worktree repair` then retry, or manual `rm -rf` + `git worktree prune` |
+| Corrupted worktree (broken `.git` file) | `git worktree remove` fails; offer `git worktree repair` then retry, or manual `rm -rf` + `git worktree prune --expire now` |
 | Directory deleted externally | Porcelain shows `prunable` field; auto-prune in Category 1 |
 
 <!-- deepen-plan: external -->
@@ -496,7 +498,7 @@ MCP servers, no new npm packages, no new scripts.
 
 The existing `cmd_cleanup()` in `worktree-manager.sh` remains as-is. It serves
 as a quick, non-interactive cleanup option via the `git-worktree` skill. The
-new `/worktree-cleanup` command is the smart, interactive alternative with
+new `/worktree:cleanup` command is the smart, interactive alternative with
 classification and safeguards. No deprecation needed — they serve different use
 cases (quick-and-dirty via skill vs. careful audit via command).
 
@@ -512,10 +514,10 @@ cases (quick-and-dirty via skill vs. careful audit via command).
 - GitHub API used only when `gh` is available and local state is ambiguous
 - Content fencing on all git output displayed in prompts
 - Batch cap of 15 for individual review
-- `git worktree prune` runs as final cleanup step
+- `git worktree prune --expire now` runs as final cleanup step
 - gt-cleanup Phase 6 offers worktree cleanup when worktrees > 1
 - gt-cleanup Phase 6 degrades gracefully when yellow-core not installed
-- gt-cleanup forwards `--dry-run` to worktree-cleanup
+- gt-cleanup forwards `--dry-run` to worktree:cleanup
 - Prerequisite validation runs before any interactive prompts
 
 ## References

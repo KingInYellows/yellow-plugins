@@ -1,5 +1,7 @@
 # Feature: `/gt-cleanup` — Branch Cleanup and Divergence Reconciliation
 
+> **Status: Implemented** — This plan has been implemented. Retained for historical context.
+
 ## Problem Statement
 
 Over time, local git branches accumulate: orphaned branches with no remote,

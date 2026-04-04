@@ -1,5 +1,7 @@
 # Feature: Layered Runner Targets Configuration for yellow-ci
 
+> **Status: Implemented** — This plan has been implemented. Retained for historical context.
+
 ## Overview
 
 Add a runner targets configuration system to yellow-ci that persists org-specific
@@ -333,6 +335,8 @@ Three-layer config system:
   - This is additive — if no config exists, behavior is unchanged
 
 ### Phase 3: Session-Start Hook Enhancement
+
+> **Note:** This phase is already implemented in `plugins/yellow-ci/hooks/scripts/session-start.sh` (routing_cache block, lines ~37-43).
 
 - [ ] 3.1: Update `plugins/yellow-ci/hooks/scripts/session-start.sh`
   - After the early-exit checks (lines 31-44) and before the cache check

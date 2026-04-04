@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
+set -Eeuo pipefail
 
 fatal() { echo "FATAL: $*" >&2; exit 1; }
 
@@ -23,7 +23,7 @@ case "$arch" in
   ;;
 esac
 
-if [ -z "$CODACY_CLI_V2_TMP_FOLDER" ]; then
+if [ -z "${CODACY_CLI_V2_TMP_FOLDER:-}" ]; then
     if [ "$(uname)" = "Linux" ]; then
         CODACY_CLI_V2_TMP_FOLDER="$HOME/.cache/codacy/codacy-cli-v2"
     elif [ "$(uname)" = "Darwin" ]; then
@@ -50,7 +50,7 @@ get_version_from_yaml() {
 
 get_latest_version() {
     local response
-    if [ -n "$GH_TOKEN" ]; then
+    if [ -n "${GH_TOKEN:-}" ]; then
         response=$(curl -Lq --header "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
     else
         response=$(curl -Lq "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
@@ -109,13 +109,13 @@ download_cli() {
 }
 
 # Warn if CODACY_CLI_V2_VERSION is set and update is requested
-if [ -n "$CODACY_CLI_V2_VERSION" ] && [ "$1" = "update" ]; then
+if [ -n "${CODACY_CLI_V2_VERSION:-}" ] && [ "${1:-}" = "update" ]; then
     echo "⚠️  Warning: Performing update with forced version $CODACY_CLI_V2_VERSION"
     echo "    Unset CODACY_CLI_V2_VERSION to use the latest version"
 fi
 
 # Ensure version.yaml exists and is up to date
-if [ ! -f "$version_file" ] || [ "$1" = "update" ]; then
+if [ ! -f "$version_file" ] || [ "${1:-}" = "update" ]; then
     echo "ℹ️  Fetching latest version..."
     version=$(get_latest_version)
     [ -n "$version" ] || fatal "Could not determine latest Codacy CLI version from GitHub API"
@@ -124,7 +124,7 @@ if [ ! -f "$version_file" ] || [ "$1" = "update" ]; then
 fi
 
 # Set the version to use
-if [ -n "$CODACY_CLI_V2_VERSION" ]; then
+if [ -n "${CODACY_CLI_V2_VERSION:-}" ]; then
     version="$CODACY_CLI_V2_VERSION"
 else
     version=$(get_version_from_yaml) || fatal "Could not read version from $version_file"

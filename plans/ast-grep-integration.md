@@ -1,5 +1,7 @@
 # Feature: AST-Grep Integration Across Yellow-Plugins Ecosystem
 
+> **Status: Implemented** — This plan has been implemented. Retained for historical context.
+
 ## Problem Statement
 
 AST-Grep installation fails on most developer machines because the ast-grep MCP
@@ -214,11 +216,11 @@ vs. Grep.
 
   **Lines 237-238:** Update ast-grep classification to remove
   `python313_check` requirement. Change from:
-  ```
+  ```text
   ast-grep counts only when ToolSearch match present AND ast-grep OK AND uv OK AND python313_check is ok
   ```
   To:
-  ```
+  ```text
   ast-grep counts only when ToolSearch match present AND ast-grep OK AND uv OK
   ```
 
@@ -240,17 +242,17 @@ vs. Grep.
   File: `plugins/yellow-research/CLAUDE.md`
 
   Update the Prerequisites section to replace:
-  ```
+  ```text
   - Python >= 3.13 — hard requirement from ast-grep-mcp's pyproject.toml
   ```
   With:
-  ```
+  ```text
   - `uv` manages Python 3.13 automatically via `uvx --python 3.13` — no system
     Python upgrade needed. Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
   ```
 
   Update the ast-grep MCP description:
-  ```
+  ```text
   ### ast-grep — No API key (requires `ast-grep` binary and `uv`)
   ```
 

@@ -173,7 +173,7 @@ Two complementary fixes:
      endpoint (which uses `ViewOrgSessions` — known to work).
   2. Extract `pull_requests` array from the session response.
   3. If PRs exist in the current repo, offer via AskUserQuestion:
-     ```
+     ```text
      API message failed (403 — ManageOrgSessions may be missing).
 
      This session has PR #N in this repo. Devin monitors PR comments
@@ -230,7 +230,7 @@ Two complementary fixes:
 
   In Step 5e (remediation choice, around line 371), add a new option:
 
-  ```
+  ```text
   Options:
   - Fix locally — Commit and push fixes via Graphite
   - Message Devin — Send fix instructions to session
@@ -282,7 +282,7 @@ Two complementary fixes:
   In Step 5f Option 2 (line 473-475), when API messaging fails with 403, instead
   of just offering "Fix locally", also offer "Comment on PR" as an alternative:
 
-  ```
+  ```text
   Failed to send message to Devin session {id}: 403 Forbidden
   (ManageOrgSessions permission may be missing)
 
@@ -299,7 +299,7 @@ Two complementary fixes:
 
   Add note about PR comment fallback (Known Limitations section starts at
   line 122):
-  ```
+  ```text
   - **PR comment fallback** — When API messaging fails (403), review feedback
     can be posted as PR comments with @devin prefix. Requires gh CLI auth and
     Devin's GitHub integration enabled on the repo.
