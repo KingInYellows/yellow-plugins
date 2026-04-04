@@ -56,17 +56,17 @@ get_latest_version() {
         response=$(curl -fsSL --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 1 --retry-all-errors "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
     fi
 
-    handle_rate_limit "$response"
     local version
     version=$(echo "$response" | grep -m 1 tag_name | cut -d'"' -f4)
     echo "$version"
 }
 
-handle_rate_limit() {
-    local response="$1"
-    if echo "$response" | grep -q "API rate limit exceeded"; then
-          fatal "Error: GitHub API rate limit exceeded. Please try again later"
-    fi
+validate_version() {
+    local ver="$1"
+    case "$ver" in
+        v[0-9]*.[0-9]*.[0-9]*|[0-9]*.[0-9]*.[0-9]*) ;;
+        *) fatal "Invalid Codacy CLI version format: $ver" ;;
+    esac
 }
 
 download_file() {
@@ -132,6 +132,8 @@ else
     version=$(get_version_from_yaml) || fatal "Could not read version from $version_file"
 fi
 
+validate_version "$version"
+
 # Set up version-specific paths
 bin_folder="${CODACY_CLI_V2_TMP_FOLDER}/${version}"
 
@@ -142,7 +144,7 @@ bin_path="$bin_folder"/"$bin_name"
 download_cli "$bin_folder" "$bin_path" "$version"
 chmod +x "$bin_path"
 
-if [ "$#" -eq 1 ] && [ "$1" = "download" ]; then
+if [ "$#" -eq 1 ] && { [ "$1" = "download" ] || [ "$1" = "update" ]; }; then
     echo "Codacy cli v2 download succeeded"
 else
     "$bin_path" "$@"

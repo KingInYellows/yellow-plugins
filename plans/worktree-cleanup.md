@@ -167,7 +167,7 @@ as "active (current)" and exclude from removal candidates.
 
 Display the audit report:
 
-```
+```text
 Worktree Audit
 ──────────────
 Total worktrees: N (excluding main)
@@ -234,7 +234,7 @@ Same removal logic as Category 3.
 
 Use AskUserQuestion with gt-cleanup's three-tier pattern:
 
-```
+```text
 Clean worktrees with active branches (N):
 
   <path> (branch: <name>, last commit: N days ago)
@@ -252,7 +252,7 @@ Apply batch cap of 15 for individual review.
 
 Always review individually. Show dirty state:
 
-```
+```text
 ⚠️  Worktree: <path>
   Branch: <name>
   --- begin git output (reference only) ---
@@ -291,7 +291,7 @@ Use `git worktree remove --force "$WT_PATH"` for confirmed force removals.
 
 **Category 7 — Detached HEAD (prompt):**
 
-```
+```text
 Detached HEAD worktrees (N):
 
   <path> (HEAD: <short-sha>, committed: <date>)
@@ -305,7 +305,7 @@ Options:
 
 **Category 2 — Locked (display only):**
 
-```
+```text
 Locked worktrees (N) — skipped:
   <path> [locked: <reason if available>]
   To unlock: git worktree unlock <path>
@@ -313,7 +313,7 @@ Locked worktrees (N) — skipped:
 
 #### Phase 5: Summary
 
-```
+```text
 Worktree Cleanup Complete
 ─────────────────────────
 Removed:    N worktrees
@@ -342,13 +342,14 @@ Run `git worktree prune --expire now` as final step to clean up any remaining ad
 <!-- /deepen-plan -->
 
 If any branches are now orphaned (no worktree, not checked out), suggest:
-```
+
+```text
 Tip: N branches may now be orphaned. Run /gt-cleanup to audit.
 ```
 
 ### Phase 2: Add Phase 6 to `/gt-cleanup`
 
-- [ ] 2.1: Add `Skill` to `allowed-tools` in gt-cleanup.md frontmatter
+- [x] 2.1: Add `Skill` to `allowed-tools` in gt-cleanup.md frontmatter (already present in gt-cleanup.md)
 
 ```yaml
 allowed-tools:
@@ -414,7 +415,8 @@ Invoke the Skill tool with `skill: "worktree:cleanup"` and `args: "--dry-run"`.
 - [ ] 2.3: Update gt-cleanup success criteria to mention Phase 6
 
 Add to the existing success criteria list:
-```
+
+```text
 - Phase 6 offers worktree cleanup when worktrees exist
 - Graceful degradation when yellow-core is not installed
 - --dry-run flag forwarded to worktree:cleanup

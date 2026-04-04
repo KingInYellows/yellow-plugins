@@ -301,13 +301,13 @@ allowed-tools:
 
    ```bash
    codex exec \
-     -a never \
-     -s workspace-write \
+     -a suggest \
+     -s read-only \
      -m gpt-5.4-mini \
      "$TASK_DESCRIPTION"
    ```
 
-   - `never` approval mode: Codex proposes changes but does not apply them
+   - `suggest` approval mode: Codex proposes changes but does not apply them
    - Capture all proposed file edits and explanations
 
 4. **Present results:**
