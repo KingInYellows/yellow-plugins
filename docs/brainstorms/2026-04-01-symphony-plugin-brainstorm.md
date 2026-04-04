@@ -163,8 +163,8 @@ distinguish Symphony-managed issues from manually-triggered OpenClaw sessions.
 
 ### DECISION-8: WORKFLOW.md location
 
-**RESOLVED → A: Repo-root `SYMPHONY.md`.** Upstream convention;
-version-controlled with code. The Claude Code `/symphony:config` command
+**RESOLVED → A: Repo-root `SYMPHONY.md`.** Chosen for namespace clarity (upstream
+uses `WORKFLOW.md`); version-controlled with code. The Claude Code `/symphony:config` command
 validates and edits this file.
 
 ## Integration Points (Revised)

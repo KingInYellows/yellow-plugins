@@ -106,14 +106,14 @@ yellow-ci's runner-health command. Config stored in
 > since all 6 commands are thin SSH wrappers (each under 20 lines), implementing
 > them together is lower risk than maintaining a partial release.
 
-
 - [ ] 2.1: Write `commands/symphony/setup.md`
   - **Prereq checks (before any AskUserQuestion):**
     - `ssh` binary exists (hard)
     - `jq` exists (soft — warn, degrade gracefully)
     - `.claude/yellow-symphony.local.md` exists OR wizard creates it
   - **SSH validation:**
-    `timeout 10 ssh -i "$ssh_key" -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=3 user@host 'echo OK'`
+    - Normalize ssh_key before SSH calls: `ssh_key="${ssh_key/#\~/$HOME}"`
+    - `timeout 10 ssh -i "$ssh_key" -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=3 user@host 'echo OK'`
   - **Daemon check:** `ssh ... 'openclaw symphony status'`
 
 <!-- deepen-plan: codebase -->
@@ -179,7 +179,8 @@ yellow-ci's runner-health command. Config stored in
   - If present: parse YAML front matter, validate required fields using upstream
     nested key structure (subset — unknown keys ignored per Symphony convention):
     - `tracker.kind` (must be `linear`), `tracker.project_slug` (Linear project
-      slug), `tracker.active_states` (array of Linear status names)
+      slug), `tracker.active_states` (array of Linear status names),
+      `tracker.terminal_states` (non-empty array of Linear status names)
     - `polling.interval_ms` (integer, >= 10000)
     - `agent.max_concurrent_agents` (integer, >= 1)
     - `workspace.root` (path)
@@ -231,7 +232,7 @@ yellow-ci's runner-health command. Config stored in
 
 - [ ] 2.6: Write `commands/symphony/logs.md`
   - Argument: issue ID (e.g., `ENG-123`)
-  - Validate issue ID before SSH: `^[A-Z]{1,10}-[0-9]{1,10}$` (length-bounded)
+  - Validate issue ID before SSH: `^[A-Z]{2,5}-[0-9]{1,6}$` (repo-standard Linear format)
   - SSH to daemon (with `ServerAliveInterval=60` for longer transfers):
     `timeout 30 ssh ... -o ServerAliveInterval=60 "$daemon_ctl logs ENG-123 --tail 100"`
   - Tail N lines directly (`tail` already handles short files safely)
@@ -347,8 +348,8 @@ yellow-ci's runner-health command. Config stored in
   has correct permissions (`600`/`400`). Key content is never logged or displayed.
 - **Command injection via daemon_ctl**: The `daemon_ctl` config value is used in
   SSH remote commands. The setup wizard must validate it against an allowlist
-  regex: `^[a-z][a-z0-9 _/-]{0,63}$` (lowercase alphanumeric, spaces, hyphens,
-  underscores, forward slashes). Commands use double-quoted `"$daemon_ctl ..."`
+  regex: `^[a-z][a-z0-9 _-]{0,63}$` (lowercase alphanumeric, spaces, hyphens,
+  underscores). Commands use double-quoted `"$daemon_ctl ..."`
   to preserve word boundaries (not `eval`). Each subcommand (pause, status, etc.)
   is passed as a separate SSH call rather than chained with `&&` in a single
   remote command string, reducing the injection surface.
