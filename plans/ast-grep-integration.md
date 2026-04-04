@@ -1,6 +1,6 @@
 # Feature: AST-Grep Integration Across Yellow-Plugins Ecosystem
 
-> **Status: Implemented** — This plan has been implemented. Retained for historical context.
+> **Status: Implemented (archived)** — Historical record of delivered work. Unchecked items below were deprioritized or absorbed into other work.
 
 ## Problem Statement
 

@@ -51,9 +51,9 @@ get_version_from_yaml() {
 get_latest_version() {
     local response
     if [ -n "${GH_TOKEN:-}" ]; then
-        response=$(curl -Lq --header "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
+        response=$(curl -fsSL --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 1 --retry-all-errors --header "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
     else
-        response=$(curl -Lq "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
+        response=$(curl -fsSL --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 1 --retry-all-errors "https://api.github.com/repos/codacy/codacy-cli-v2/releases/latest") || fatal "Failed to reach GitHub API"
     fi
 
     handle_rate_limit "$response"
@@ -74,9 +74,9 @@ download_file() {
 
     echo "Downloading from URL: ${url}"
     if command -v curl > /dev/null 2>&1; then
-        curl -f -# -LS "$url" -O
+        curl -f -# -LS --connect-timeout 10 --max-time 120 --retry 3 --retry-delay 1 --retry-all-errors "$url" -O
     elif command -v wget > /dev/null 2>&1; then
-        wget "$url"
+        wget --timeout=30 --tries=3 "$url"
     else
         fatal "Error: Could not find curl or wget, please install one."
     fi
@@ -104,6 +104,8 @@ download_cli() {
         url="https://github.com/codacy/codacy-cli-v2/releases/download/${version}/${remote_file}"
 
         download "$url" "$bin_folder"
+        # NOTE: codacy-cli-v2 releases do not publish checksums or signatures.
+        # Integrity relies on HTTPS + GitHub's CDN. Track upstream for checksum support.
         tar xzfv "${bin_folder}/${remote_file}" -C "${bin_folder}"
     fi
 }

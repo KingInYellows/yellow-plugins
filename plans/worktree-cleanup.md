@@ -32,7 +32,7 @@ and worktrees for already-merged branches cluttering the repo.
   5-phase branch audit with 6 categories, batch/individual/skip UX, GitHub API
   enrichment, content fencing. No worktree awareness whatsoever.
 - **Live state on this repo**: Stale `worktree-agent-*` branches, an orphaned Codex
-  worktree at `/mnt/c/Users/brads/.codex/worktrees/92b3/yellow-plugins` (detached HEAD).
+  worktree at `/mnt/c/Users/<username>/.codex/worktrees/<id>/yellow-plugins` (detached HEAD).
 
 ## Proposed Solution
 
@@ -52,10 +52,10 @@ running `/gt-cleanup` to handle them. This avoids overlapping authority.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** yellow-core commands use subdirectory namespacing: `commands/workflows/`,
-> `commands/statusline/`, `commands/setup/`. A flat `commands/worktree/cleanup.md`
-> breaks this convention. Consider `commands/worktree/cleanup.md` if future worktree
-> commands are anticipated — but flat is acceptable since gt-workflow uses flat naming
-> (`gt-cleanup.md`, `gt-sync.md`). Either works; be intentional about the choice.
+> `commands/statusline/`, `commands/setup/`. The namespaced `commands/worktree/cleanup.md`
+> follows this convention and is preferred if future worktree subcommands are anticipated.
+> A flat `commands/worktree-cleanup.md` is also acceptable since gt-workflow uses flat
+> naming (`gt-cleanup.md`, `gt-sync.md`). Either works; be intentional about the choice.
 <!-- /deepen-plan -->
 
 **Frontmatter:**
@@ -191,7 +191,7 @@ Category 6 — Dirty (N):
   ⚠️  .worktrees/wip (branch: feat/wip, 3 uncommitted files, 2 unpushed commits)
 
 Category 7 — Detached HEAD (N):
-  /mnt/c/Users/brads/.codex/worktrees/92b3/yellow-plugins (HEAD: abc1234)
+  /mnt/c/Users/<username>/.codex/worktrees/<id>/yellow-plugins (HEAD: abc1234)
 ```
 
 Use absolute paths for worktrees outside the repo tree. Use relative paths

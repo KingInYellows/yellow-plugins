@@ -298,12 +298,16 @@ allowed-tools:
    - Relevant file paths mentioned in the task
 
 3. **Invoke Codex in sandbox mode:**
+
    ```bash
-   codex --approval-mode suggest \
-     --model codex-mini \
+   codex exec \
+     -a never \
+     -s workspace-write \
+     -m gpt-5.4-mini \
      "$TASK_DESCRIPTION"
    ```
-   - `suggest` mode: Codex proposes changes but does not apply them
+
+   - `never` approval mode: Codex proposes changes but does not apply them
    - Capture all proposed file edits and explanations
 
 4. **Present results:**
@@ -529,9 +533,10 @@ Codex CLI outputs to stdout. Key patterns:
 
 ```bash
 # Capture Codex output with timeout
-CODEX_OUTPUT=$(timeout 300 codex --approval-mode full-auto \
+CODEX_OUTPUT=$(timeout 300 codex exec \
+  -a full-auto \
   --quiet \
-  --model codex-mini \
+  -m gpt-5.4-mini \
   "$PROMPT" 2>&1) || {
   codex_exit=$?
   if [ "$codex_exit" -eq 124 ]; then
@@ -601,7 +606,7 @@ etc.):
 
 1. **Selection (Step 4 -- Adaptive Agent Selection):**
    ```text
-   Task(subagent_type="yellow-codex:codex-reviewer")
+   Task(subagent_type="yellow-codex:review:codex-reviewer")
    ```
    If plugin not installed: skip Codex review path silently (graceful degradation).
 
@@ -614,7 +619,7 @@ etc.):
      review, or only for large PRs?" (preference persisted in `.claude/codex-config.json`)
 
 3. **Execution (Step 5):**
-   Spawn via Task tool with `subagent_type: "yellow-codex:codex-reviewer"`.
+   Spawn via Task tool with `subagent_type: "yellow-codex:review:codex-reviewer"`.
    Pass: diff, title, body, CLAUDE.md, file list.
    Runs in parallel with all other selected agents.
 

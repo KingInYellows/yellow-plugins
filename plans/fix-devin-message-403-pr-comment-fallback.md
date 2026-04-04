@@ -60,7 +60,7 @@ Two complementary fixes:
 > [Devin API Overview](https://docs.devin.ai/api-reference/overview.md)
 <!-- /deepen-plan -->
 
-2. **Add PR comment fallback** when API messaging fails. Devin automatically
+1. **Add PR comment fallback** when API messaging fails. Devin automatically
    responds to PR comments as long as the session hasn't been archived (per
    [Devin docs](https://docs.devin.ai/integrations/gh)). Comments prefixed with
    `@devin` ensure delivery even when mention-only filtering is enabled.
@@ -171,8 +171,8 @@ Two complementary fixes:
   **Logic flow:**
   1. After both org and enterprise return 403, fetch session details via the list
      endpoint (which uses `ViewOrgSessions` — known to work).
-  2. Extract `pull_requests` array from the session response.
-  3. If PRs exist in the current repo, offer via AskUserQuestion:
+  1. Extract `pull_requests` array from the session response.
+  1. If PRs exist in the current repo, offer via AskUserQuestion:
      ```text
      API message failed (403 — ManageOrgSessions may be missing).
 
@@ -184,12 +184,12 @@ Two complementary fixes:
      - Run /devin:setup — Check and fix permissions
      - Cancel
      ```
-  4. If "Comment on PR" chosen, use `gh pr comment`:
+  1. If "Comment on PR" chosen, use `gh pr comment`:
      ```bash
      gh pr comment "$PR_NUMBER" --body "$(printf '@devin %s' "$MESSAGE" | \
        sed 's/cog_[a-zA-Z0-9_-]*/***REDACTED***/g')"
      ```
-  5. If no PRs found on the session, skip the fallback and show the existing
+  1. If no PRs found on the session, skip the fallback and show the existing
      error with a note to run `/devin:setup`.
 
 <!-- deepen-plan: codebase -->
@@ -369,19 +369,19 @@ All changes are modifications to existing files (plus one changeset).
 
 1. `/devin:setup` reports `ManageOrgSessions` status (PASS/MISSING) separately
    from `ViewOrgSessions`
-2. `/devin:setup` provides specific remediation guidance when ManageOrgSessions
+1. `/devin:setup` provides specific remediation guidance when ManageOrgSessions
    is missing but ViewOrgSessions passes
-3. `/devin:message` offers PR comment fallback when both API endpoints return 403
+1. `/devin:message` offers PR comment fallback when both API endpoints return 403
    and the session has PRs in the current repo
-4. `/devin:review-prs` shows "Comment on PR" as a remediation option alongside
+1. `/devin:review-prs` shows "Comment on PR" as a remediation option alongside
    "Fix locally" and "Message Devin"
-5. `/devin:review-prs` auto-escalates from "Message Devin" to "Comment on PR"
+1. `/devin:review-prs` auto-escalates from "Message Devin" to "Comment on PR"
    when API messaging fails with 403
-6. PR comments are prefixed with `@devin` (at the start, no leading whitespace)
+1. PR comments are prefixed with `@devin` (at the start, no leading whitespace)
    to ensure delivery with mention-only filtering
-7. All PR comment bodies are sanitized for `cog_` token leakage before posting
-8. `pnpm validate:schemas` passes with no regressions
-9. Changeset included in PR
+1. All PR comment bodies are sanitized for `cog_` token leakage before posting
+1. `pnpm validate:schemas` passes with no regressions
+1. Changeset included in PR
 
 ## Edge Cases
 
