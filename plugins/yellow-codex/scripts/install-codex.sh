@@ -31,6 +31,8 @@ cleanup() {
     warning "Installation failed. Partial install may remain."
     if [ "${install_path:-global}" = "local" ]; then
       warning "To clean up: npm uninstall -g @openai/codex --prefix ~/.local"
+    elif [ "${install_path:-global}" = "npm-global" ]; then
+      warning "To clean up: npm uninstall -g @openai/codex --prefix ~/.npm-global"
     else
       warning "To clean up: npm uninstall -g @openai/codex"
     fi
@@ -38,23 +40,34 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- Semver comparison helper ---
+# --- Semver comparison helper (POSIX-compatible) ---
 version_gte() {
-  local i av bv
-  local -a a b
-  IFS='.' read -r -a a <<< "$1"
-  IFS='.' read -r -a b <<< "$2"
-  for ((i=0; i<${#b[@]}; i++)); do
-    av="${a[i]:-0}"
-    bv="${b[i]:-0}"
-    av="${av%%[^0-9]*}"
-    bv="${bv%%[^0-9]*}"
-    av="${av:-0}"
-    bv="${bv:-0}"
-    if ((av > bv)); then return 0; fi
-    if ((av < bv)); then return 1; fi
-  done
-  return 0
+  local left="$1" right="$2"
+  local left_major left_minor left_patch
+  local right_major right_minor right_patch
+
+  IFS='.' read -r left_major left_minor left_patch <<EOF
+$left
+EOF
+  IFS='.' read -r right_major right_minor right_patch <<EOF
+$right
+EOF
+
+  # Strip non-numeric suffixes (e.g., "3-beta" -> "3")
+  left_major="${left_major%%[^0-9]*}"; left_major="${left_major:-0}"
+  left_minor="${left_minor%%[^0-9]*}"; left_minor="${left_minor:-0}"
+  left_patch="${left_patch%%[^0-9]*}"; left_patch="${left_patch:-0}"
+  right_major="${right_major%%[^0-9]*}"; right_major="${right_major:-0}"
+  right_minor="${right_minor%%[^0-9]*}"; right_minor="${right_minor:-0}"
+  right_patch="${right_patch%%[^0-9]*}"; right_patch="${right_patch:-0}"
+
+  if [ "$left_major" -gt "$right_major" ]; then return 0; fi
+  if [ "$left_major" -lt "$right_major" ]; then return 1; fi
+  if [ "$left_minor" -gt "$right_minor" ]; then return 0; fi
+  if [ "$left_minor" -lt "$right_minor" ]; then return 1; fi
+  if [ "$left_patch" -gt "$right_patch" ]; then return 0; fi
+  if [ "$left_patch" -lt "$right_patch" ]; then return 1; fi
+  return 0  # equal
 }
 
 # --- Check if already installed ---
@@ -87,6 +100,22 @@ if [ "$os" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
     fi
   else
     warning "brew cask install failed — falling back to npm"
+  fi
+fi
+
+# --- Try activating Node via version manager if needed ---
+_current_node_major=""
+if command -v node >/dev/null 2>&1; then
+  _current_node_major=$(node -e "console.log(process.versions.node.split('.')[0])" 2>/dev/null || true)
+fi
+if [ -z "$_current_node_major" ] || [ "$_current_node_major" -lt "$MIN_NODE_MAJOR" ] 2>/dev/null; then
+  if command -v fnm >/dev/null 2>&1; then
+    eval "$(fnm env 2>/dev/null)" 2>/dev/null
+    fnm use "$MIN_NODE_MAJOR" 2>/dev/null || true
+  elif [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
+    # shellcheck disable=SC1091
+    . "${NVM_DIR:-$HOME/.nvm}/nvm.sh" 2>/dev/null
+    nvm use "$MIN_NODE_MAJOR" 2>/dev/null || true
   fi
 fi
 
@@ -129,8 +158,34 @@ printf '[yellow-codex] Installing @openai/codex via npm...\n'
 
 npm_output=""
 install_path="global"
+path_needs_update=false
 
-if npm_output=$(npm install -g @openai/codex 2>&1); then
+# Guard against fnm multishell ephemeral paths — install to ~/.npm-global instead
+npm_global_dir=$(npm prefix -g 2>/dev/null || true)
+if printf '%s' "$npm_global_dir" | grep -q 'fnm_multishells'; then
+  warning "fnm multishell detected — installing to ~/.npm-global to persist across sessions"
+  mkdir -p "${HOME}/.npm-global"
+  if npm_output=$(npm install -g @openai/codex --prefix "${HOME}/.npm-global" 2>&1); then
+    install_path="npm-global"
+    npm_bin="${HOME}/.npm-global/bin"
+    if ! printf '%s' "$PATH" | tr ':' '\n' | grep -qxF "$npm_bin"; then
+      path_needs_update=true
+      case "$(basename "${SHELL:-}")" in
+        zsh)  rc_file="${HOME}/.zshrc" ;;
+        bash) rc_file="${HOME}/.bashrc" ;;
+        *)    rc_file="${HOME}/.profile" ;;
+      esac
+      warning "${npm_bin} is not in PATH."
+      warning "Add this line to ${rc_file}:"
+      warning "  export PATH=\"${npm_bin}:\$PATH\""
+      warning "Then restart your shell or run: source ${rc_file}"
+      export PATH="${npm_bin}:${PATH}"
+    fi
+  else
+    printf '%s\n' "$npm_output" >&2
+    error "npm install to ~/.npm-global failed."
+  fi
+elif npm_output=$(npm install -g @openai/codex 2>&1); then
   true
 elif [ "$has_version_mgr" = "true" ]; then
   printf '%s\n' "$npm_output" >&2
@@ -195,6 +250,12 @@ if [ "$install_path" = "local" ]; then
     success "codex v${installed_version} installed to ~/.local/bin — restart your shell to use it"
   else
     success "codex v${installed_version} installed to ~/.local/bin (already in PATH)"
+  fi
+elif [ "$install_path" = "npm-global" ]; then
+  if [ "${path_needs_update:-false}" = "true" ]; then
+    success "codex v${installed_version} installed to ~/.npm-global/bin — restart your shell to use it"
+  else
+    success "codex v${installed_version} installed to ~/.npm-global/bin (persists across fnm sessions)"
   fi
 else
   success "codex v${installed_version} installed successfully (global binary in PATH)"

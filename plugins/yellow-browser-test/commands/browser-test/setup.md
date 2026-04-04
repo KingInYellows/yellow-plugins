@@ -43,6 +43,36 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-agent-browser.sh"
 
 If install fails, report error and suggest manual installation.
 
+### Step 2.5: Check for Web Application
+
+Before spawning app discovery, check if this project is a web application:
+
+```bash
+repo_top=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+is_web=false
+if [ -f "$repo_top/package.json" ]; then
+  if grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server)"' "$repo_top/package.json" 2>/dev/null; then
+    is_web=true
+  fi
+fi
+printf 'is_web: %s\n' "$is_web"
+```
+
+If `is_web` is `false`, use AskUserQuestion:
+
+> "This project doesn't appear to be a web application (no web framework
+> detected in package.json). Browser testing requires a web app with a dev
+> server."
+>
+> Options:
+> - "Continue anyway" — proceed to app discovery
+> - "Configure manually" — skip discovery, ask for dev server command and base URL
+> - "Skip" — exit setup
+
+If the user chooses "Skip", report "Setup skipped — run `/browser-test:setup`
+from within a web project." and stop. If "Configure manually", skip Step 3 and
+proceed to Step 6 (Review and Confirm Config) with user-provided values.
+
 ### Step 3: Run App Discovery
 
 Spawn the `app-discoverer` agent to analyze the codebase:

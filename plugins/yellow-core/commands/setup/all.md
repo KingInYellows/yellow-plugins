@@ -23,6 +23,10 @@ Run all local prerequisite, environment, config, and installation checks in one
 Bash call:
 
 ```bash
+# Snapshot tool paths upfront to avoid PATH drift in long scripts
+_gt=$(command -v gt 2>/dev/null || true)
+_gh=$(command -v gh 2>/dev/null || true)
+
 printf '=== Runtime ===\n'
 if command -v node >/dev/null 2>&1; then
   node_ver=$(node --version 2>/dev/null)
@@ -39,7 +43,7 @@ command -v git >/dev/null 2>&1 && printf 'git:                OK\n' || printf 'g
 command -v curl >/dev/null 2>&1 && printf 'curl:               OK\n' || printf 'curl:               NOT FOUND\n'
 command -v jq >/dev/null 2>&1 && printf 'jq:                 OK\n' || printf 'jq:                 NOT FOUND\n'
 command -v rg >/dev/null 2>&1 && printf 'rg:                 OK\n' || printf 'rg:                 NOT FOUND\n'
-command -v gh >/dev/null 2>&1 && printf 'gh:                 OK\n' || printf 'gh:                 NOT FOUND\n'
+[ -n "$_gh" ] && printf 'gh:                 OK\n' || printf 'gh:                 NOT FOUND\n'
 command -v ssh >/dev/null 2>&1 && printf 'ssh:                OK\n' || printf 'ssh:                NOT FOUND\n'
 command -v semgrep >/dev/null 2>&1 && printf 'semgrep:            OK\n' || printf 'semgrep:            NOT FOUND\n'
 command -v yq >/dev/null 2>&1 && printf 'yq:                 OK\n' || printf 'yq:                 NOT FOUND\n'
@@ -54,7 +58,7 @@ else
 fi
 command -v uv >/dev/null 2>&1 && printf 'uv:                 OK\n' || printf 'uv:                 NOT FOUND\n'
 command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' || printf 'agent-browser:      NOT FOUND\n'
-command -v gt >/dev/null 2>&1 && printf 'gt:                 OK (%s)\n' "$(gt --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
+[ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
 command -v ruvector >/dev/null 2>&1 && printf 'ruvector:           OK\n' || printf 'ruvector:           NOT FOUND\n'
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 
@@ -101,8 +105,8 @@ for path in "$HOME/.graphite_user_config" "${XDG_CONFIG_HOME:-$HOME/.config}/gra
   fi
 done
 [ -n "$auth_path" ] && printf 'graphite_auth:      present (%s)\n' "$auth_path" || printf 'graphite_auth:      missing\n'
-if command -v gt >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  trunk=$(gt trunk 2>/dev/null || true)
+if [ -n "$_gt" ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  trunk=$("$_gt" trunk 2>/dev/null || true)
   [ -n "$trunk" ] && printf 'gt_trunk:           %s\n' "$trunk" || printf 'gt_trunk:           UNAVAILABLE\n'
 else
   printf 'gt_trunk:           SKIPPED\n'
@@ -120,17 +124,21 @@ printf '\n=== Config Files ===\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
-  python3 - <<'PY'
+  python3 -c '
 import json, os
-path = os.path.expanduser('~/.claude/settings.json')
 try:
-    data = json.load(open(path))
-    print('statusLine_key:      present' if 'statusLine' in data else 'statusLine_key:      missing')
-    print(f"disableAllHooks:     {data.get('disableAllHooks', False)}")
+    d = json.load(open(os.path.expanduser("~/.claude/settings.json")))
+    sl = "present" if "statusLine" in d else "missing"
+    dh = d.get("disableAllHooks", False)
+    print(f"statusLine_key:      {sl}")
+    print(f"disableAllHooks:     {dh}")
 except Exception:
-    print('statusLine_key:      parse_error')
-    print('disableAllHooks:     unknown')
-PY
+    print("statusLine_key:      parse_error")
+    print("disableAllHooks:     unknown")
+' 2>/dev/null || {
+    printf 'statusLine_key:      parse_error\n'
+    printf 'disableAllHooks:     unknown\n'
+  }
 else
   printf 'statusLine_key:      missing\n'
   printf 'disableAllHooks:     unknown\n'
@@ -147,14 +155,16 @@ if [ -d "$plugin_cache" ]; then
   installed_plugins=""
   if command -v python3 >/dev/null 2>&1; then
     installed_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
-      | while IFS= read -r -d '' pj; do
-          python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('name',''))" "$pj" 2>/dev/null || true
-        done | sed '/^$/d' | LC_ALL=C sort -u)
+      | xargs -0 python3 -c "
+import json, sys
+for p in sys.argv[1:]:
+    try: print(json.load(open(p)).get('name',''))
+    except: pass
+" 2>/dev/null | sed '/^$/d' | LC_ALL=C sort -u)
   elif command -v jq >/dev/null 2>&1; then
     installed_plugins=$(find "$plugin_cache" -type f -path '*/.claude-plugin/plugin.json' -print0 2>/dev/null \
-      | while IFS= read -r -d '' pj; do
-          jq -r '.name // empty' "$pj" 2>/dev/null || true
-        done | sed '/^$/d' | LC_ALL=C sort -u)
+      | xargs -0 -I{} jq -r '.name // empty' {} 2>/dev/null \
+      | sed '/^$/d' | LC_ALL=C sort -u)
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
@@ -174,8 +184,8 @@ else
 fi
 
 printf '\n=== GitHub CLI Auth ===\n'
-if command -v gh >/dev/null 2>&1; then
-  gh auth status >/dev/null 2>&1 && printf 'gh_auth: OK\n' || printf 'gh_auth: NOT AUTHENTICATED\n'
+if [ -n "$_gh" ]; then
+  "$_gh" auth status >/dev/null 2>&1 && printf 'gh_auth: OK\n' || printf 'gh_auth: NOT AUTHENTICATED\n'
 else
   printf 'gh_auth: SKIPPED (gh not found)\n'
 fi
