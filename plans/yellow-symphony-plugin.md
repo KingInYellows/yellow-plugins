@@ -1,6 +1,6 @@
 # Feature: yellow-symphony — Thin Management Layer for Symphony Orchestration
 
-**Status:** Draft — not started
+**Status:** Draft -- not started
 
 ## Problem Statement
 
@@ -157,7 +157,11 @@ yellow-ci's runner-health command. Config stored in
 - [ ] 2.2: Write `commands/symphony/status.md`
   - Frontmatter: `model: haiku` (pure data retrieval)
   - Read config from `.claude/yellow-symphony.local.md`
-  - SSH to daemon: `timeout 10 ssh ... "$daemon_ctl status --json"`
+  - Define common SSH invocation (reused by all commands):
+    `ssh_cmd="timeout 10 ssh -i \"$ssh_key\" -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=3 \"$user@$host\""`
+  - SSH to daemon: `$ssh_cmd "$daemon_ctl status --json"` (stderr captured to
+    temp file via `2>ssh_stderr.tmp`; inspected on non-zero exit before fencing
+    stdout)
   - Fence output per Security Considerations
 
 <!-- deepen-plan: codebase -->
@@ -220,6 +224,7 @@ yellow-ci's runner-health command. Config stored in
 <!-- /deepen-plan -->
 
 - [ ] 2.4: Write `commands/symphony/pause.md`
+  - Frontmatter: `model: haiku` (pure data retrieval, same as status)
   - Read config, SSH to daemon (two separate calls for clarity):
     `ssh ... "$daemon_ctl pause"` then `ssh ... "$daemon_ctl status --json"`
   - Check pause exit code before querying status; report failure clearly
@@ -228,9 +233,11 @@ yellow-ci's runner-health command. Config stored in
     <20 lines; minor duplication is acceptable for trivial commands.
 
 - [ ] 2.5: Write `commands/symphony/resume.md`
+  - Frontmatter: `model: haiku` (mirror of pause.md)
   - Mirror of pause.md with `resume` subcommand
 
 - [ ] 2.6: Write `commands/symphony/logs.md`
+  - Frontmatter: `model: haiku` (pure data retrieval)
   - Argument: issue ID (e.g., `ENG-123`)
   - Validate issue ID before SSH: `^[A-Z]{2,5}-[0-9]{1,6}$` (repo-standard Linear format)
   - SSH to daemon (with `ServerAliveInterval=60` for longer transfers):
@@ -251,8 +258,10 @@ yellow-ci's runner-health command. Config stored in
   - Error handling patterns (SSH failure, daemon down, parse errors)
 
 - [ ] 3.2: Embed `SYMPHONY.md` starter template in `config.md` command
+  - Replaces brainstorm's standalone `SYMPHONY.md.example` deliverable —
+    embedding avoids introducing a `templates/` directory pattern that no
+    existing plugin uses
   - The `config` command scaffolds `SYMPHONY.md` via `Write` tool when missing
-    (no separate `templates/` directory — no existing plugin uses that pattern)
   - Starter YAML front matter with all fields, sensible defaults, inline
     comments
   - Markdown prompt template section with placeholder variables using
@@ -348,11 +357,14 @@ yellow-ci's runner-health command. Config stored in
   has correct permissions (`600`/`400`). Key content is never logged or displayed.
 - **Command injection via daemon_ctl**: The `daemon_ctl` config value is used in
   SSH remote commands. The setup wizard must validate it against an allowlist
-  regex: `^[a-z][a-z0-9 _-]{0,63}$` (lowercase alphanumeric, spaces, hyphens,
-  underscores). Commands use double-quoted `"$daemon_ctl ..."`
-  to preserve word boundaries (not `eval`). Each subcommand (pause, status, etc.)
-  is passed as a separate SSH call rather than chained with `&&` in a single
-  remote command string, reducing the injection surface.
+  regex: `^[a-z][a-z0-9 _/-]{0,63}$` (lowercase alphanumeric, spaces, hyphens,
+  underscores, forward slashes — aligned with
+  `docs/solutions/security-issues/ssh-daemon-command-dispatch-security-patterns.md`).
+  Commands use double-quoted `"$daemon_ctl ..."` to preserve word boundaries
+  (not `eval`); the config value is passed as a single quoted SSH remote command
+  string and the remote shell handles word splitting. Each subcommand (pause,
+  status, etc.) is passed as a separate SSH call rather than chained with `&&`
+  in a single remote command string, reducing the injection surface.
 - **Prompt injection**: Issue descriptions from Linear may contain adversarial
   content. Fencing requirements are documented in `symphony-conventions` skill.
   Enforcement is the OpenClaw plugin's responsibility, not this plugin's.
@@ -361,8 +373,9 @@ yellow-ci's runner-health command. Config stored in
   substitution per
   `docs/solutions/security-issues/shell-binary-downloader-security-patterns.md`.
 - **Config file exposure**: `.claude/yellow-symphony.local.md` contains SSH
-  host, user, and key path. The setup wizard's final report must advise: "If
-  this is a shared repository, add `.claude/*.local.md` to `.gitignore`."
+  host, user, and key path. The repo root `.gitignore` already excludes
+  `.claude/`, covering this file. For repos that track `.claude/`, the setup
+  wizard should warn: "Add `.claude/*.local.md` to `.gitignore`."
 - **Output fencing**: All daemon output (including logs that may contain
   attacker-controlled Linear issue content) is wrapped in `--- begin/end ---`
   fences with `(reference only)` advisory before LLM reasoning. Fencing wraps

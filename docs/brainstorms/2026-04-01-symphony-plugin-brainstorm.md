@@ -1,7 +1,7 @@
 # Symphony-Style Orchestration Plugin Brainstorm
 
 **Date:** 2026-04-01 (updated 2026-04-02)
-**Status:** Finalized — plan at [plans/yellow-symphony-plugin.md](../../plans/yellow-symphony-plugin.md)
+**Status:** Finalized -- plan at [plans/yellow-symphony-plugin.md](../../plans/yellow-symphony-plugin.md)
 **Approach:** Thin management layer over OpenClaw-hosted daemon (revised from full reimplementation)
 **Source:** OpenAI Symphony SPEC.md (Draft v1, language-agnostic)
 
@@ -214,6 +214,7 @@ agent dispatch, retry/reconciliation — all OpenClaw plugin responsibilities.
 | User edits SYMPHONY.md without validation        | Low    | Pre-commit hook (optional) or `/symphony:config` as primary edit path                            |
 | OpenClaw daemon down, no feedback in Claude Code | Medium | `/symphony:status` shows daemon health; recommend systemd alerting                               |
 | Prompt injection via issue descriptions          | High   | Document fencing requirement in symphony-conventions skill; enforcement is OpenClaw plugin's job |
+| OpenClaw plugin CLI contract defined unilaterally | High   | Plan defines assumed contract explicitly (Assumptions section); validate against OpenClaw spec when available; keep commands thin to minimize rewrite surface |
 
 ## Open Questions (Revised)
 
@@ -232,5 +233,6 @@ agent dispatch, retry/reconciliation — all OpenClaw plugin responsibilities.
    behaviors or stay loose?
 6. **Cross-repo workflow contracts:** Can one SYMPHONY.md reference another
    repo's config, or is it strictly per-repo?
-7. **Auth for status queries:** If OpenClaw exposes an HTTP API, what auth
-   mechanism? API key? mTLS? Bearer token from existing credentials?
+7. ~~**Auth for status queries:** If OpenClaw exposes an HTTP API, what auth
+   mechanism?~~ **RESOLVED -- N/A.** SSH transport chosen (Open Questions #1/#2);
+   no HTTP API.
