@@ -37,7 +37,7 @@ Symphony is a scheduler/runner and tracker _reader_ only -- ticket writes
 | Symphony Component       | OpenClaw Responsibility                                                  | Claude Code (yellow-symphony)                     |
 | ------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------- |
 | **Workflow Loader**      | Reads repo-local `SYMPHONY.md`, parses front matter + prompt at dispatch | `/symphony:config` validates the same schema      |
-| **Config Layer**         | Loads YAML front matter at runtime; full Symphony schema                 | Validates subset via bash `case`/`if`; no dynamic reload |
+| **Config Layer**         | Loads YAML front matter at runtime; full Symphony schema                 | Validates subset (`tracker.*`, `polling.*`, `agent.*`, `workspace.*`) via bash `case`/`if`; no dynamic reload |
 | **Issue Tracker Client** | Direct Linear API calls for poll/claim/update                            | yellow-linear MCP tools for status queries (optional) |
 | **Orchestrator**         | Core daemon: poll, claim, dispatch, concurrency, retry                   | `/symphony:status` queries state via SSH          |
 | **Workspace Manager**    | `git worktree` per issue on the VM                                       | Not involved — OpenClaw manages worktrees         |
@@ -57,6 +57,7 @@ would duplicate infrastructure for zero benefit. The Claude Code plugin becomes 
 remote management layer only.
 
 **Rejected alternatives:**
+
 - **Full reimplementation in Claude Code**: Duplicates OpenClaw infra, no
   persistent daemon support
 - **Sidecar alongside OpenClaw**: Doubles operational overhead (two services, two

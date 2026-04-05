@@ -113,7 +113,14 @@ yellow-ci's runner-health command. Config stored in
     - `.claude/yellow-symphony.local.md` exists OR wizard creates it
   - **SSH validation:**
     - Normalize ssh_key before SSH calls: `ssh_key="${ssh_key/#\~/$HOME}"`
-    - `timeout 10 ssh -i "$ssh_key" -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=3 user@host 'echo OK'`
+    - Validate connectivity:
+      ```bash
+      timeout 10 ssh -i "$ssh_key" \
+        -o StrictHostKeyChecking=accept-new \
+        -o BatchMode=yes \
+        -o ConnectTimeout=3 \
+        user@host 'echo OK'
+      ```
   - **Daemon check:** `ssh ... 'openclaw symphony status'`
 
 <!-- deepen-plan: codebase -->
@@ -378,9 +385,11 @@ yellow-ci's runner-health command. Config stored in
   wizard should warn: "Add `.claude/*.local.md` to `.gitignore`."
 - **Output fencing**: All daemon output (including logs that may contain
   attacker-controlled Linear issue content) is wrapped in `--- begin/end ---`
-  fences with `(reference only)` advisory before LLM reasoning. Fencing wraps
-  the entire raw SSH stdout; individual fields must not be extracted and
-  displayed outside the fence.
+  fences with `(reference only)` advisory before LLM reasoning. Always include
+  the full raw SSH stdout inside the fence. For commands that parse JSON
+  (e.g., `/symphony:status`), a parsed summary table may be shown outside the
+  fence only after strict JSON parsing succeeds. On parse failure, show fenced
+  raw output only — do not extract individual fields from unparseable output.
 
 ## Edge Cases
 
