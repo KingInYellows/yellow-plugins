@@ -86,12 +86,14 @@ mempalace init
 Use ToolSearch with query `"+mempalace"` to discover available MCP tools.
 
 Expected core tools (minimum 4 to confirm MCP is working):
+
 - `mcp__plugin_yellow-mempalace_mempalace__mempalace_status`
 - `mcp__plugin_yellow-mempalace_mempalace__mempalace_search`
 - `mcp__plugin_yellow-mempalace_mempalace__mempalace_list_wings`
 - `mcp__plugin_yellow-mempalace_mempalace__mempalace_add_drawer`
 
 If fewer than 4 tools found:
+
 - Check if mempalace version supports MCP: `mempalace --version`
 - If version < 3.0.0: "Upgrade with: pipx upgrade mempalace"
 - If version >= 3.0.0: "MCP server may have failed to start. Try restarting

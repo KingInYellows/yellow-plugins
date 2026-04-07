@@ -29,6 +29,7 @@ Browse and traverse the MemPalace structure to find memories by location.
 ## When to Use
 
 Trigger when the user wants to:
+
 - Browse the palace structure ("show wings", "list rooms", "what's in the palace")
 - Find connections between topics ("what connects auth and deployment?")
 - Navigate to specific areas ("show me the auth wing")
