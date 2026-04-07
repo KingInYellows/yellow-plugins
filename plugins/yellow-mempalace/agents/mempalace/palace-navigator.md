@@ -4,6 +4,7 @@ description: "Browse and traverse the palace structure — list wings, explore r
 model: inherit
 skills:
   - mempalace-conventions
+  - palace-protocol
 tools:
   - ToolSearch
   - Read
@@ -15,6 +16,7 @@ tools:
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_search
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_wing
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_room
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_hall
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_traverse
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_find_tunnels
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_graph_stats

@@ -58,10 +58,10 @@ compatibility.
 
 ### Step 2: Check palace initialization
 
-Check if a palace exists in the current project:
+Check if a palace exists:
 
 ```bash
-if [ -d ".mempalace" ] || mempalace status >/dev/null 2>&1; then
+if [ -d "$HOME/.mempalace" ] || mempalace status >/dev/null 2>&1; then
   printf '[yellow-mempalace] Palace: initialized\n'
   mempalace status 2>/dev/null | head -5
 else
@@ -71,14 +71,14 @@ fi
 
 If palace is NOT initialized, use AskUserQuestion:
 
-> "No palace found in this project. Initialize one now?"
+> "No palace found at ~/.mempalace/. Initialize one now?"
 >
-> Options: "Yes, initialize palace here" / "No, skip for now"
+> Options: "Yes, initialize palace" / "No, skip for now"
 
 If the user chooses **Yes**:
 
 ```bash
-mempalace init .
+mempalace init
 ```
 
 ### Step 3: Verify MCP tools
