@@ -1,0 +1,28 @@
+{
+  "name": "yellow-mempalace",
+  "version": "1.0.0",
+  "description": "Structured long-term memory with temporal knowledge graph via MemPalace",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-mempalace",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "knowledge-graph",
+    "ai-memory",
+    "mcp",
+    "chromadb"
+  ],
+  "mcpServers": {
+    "mempalace": {
+      "command": "mempalace",
+      "args": [
+        "mcp"
+      ],
+      "env": {}
+    }
+  }
+}

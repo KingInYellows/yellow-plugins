@@ -34,6 +34,7 @@ const COMMAND_PLUGIN_MAP = {
   'composio:setup': 'yellow-composio',
   'codex:setup': 'yellow-codex',
   'council:setup': 'yellow-council',
+  'mempalace:setup': 'yellow-mempalace',
   'statusline:setup': 'yellow-core',
 };
 
