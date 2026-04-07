@@ -5,7 +5,7 @@ Structured long-term memory with temporal knowledge graph via
 
 ## Prerequisites
 
-- Python 3.9+
+- Python 3.10+ (3.11+ recommended)
 - Claude Code with plugin support
 
 ## Quick Start

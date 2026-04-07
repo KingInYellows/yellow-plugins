@@ -123,7 +123,7 @@ printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf '.github/pull_request_template.md:   exists\n' || printf '.github/pull_request_template.md:   missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/composio-usage.json" ] && printf '.claude/composio-usage.json:        exists\n' || printf '.claude/composio-usage.json:        missing\n'
 [ -f ~/.codex/auth.json ] && printf '~/.codex/auth.json:                 exists\n' || printf '~/.codex/auth.json:                 missing\n'
-[ -n "$repo_top" ] && [ -d "$repo_top/.mempalace" ] && printf '.mempalace/:                        exists\n' || printf '.mempalace/:                        missing\n'
+[ -d "$HOME/.mempalace" ] && printf '~/.mempalace/:                      exists\n' || printf '~/.mempalace/:                      missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
@@ -341,8 +341,8 @@ Compute bundled source availability out of 6:
 **yellow-mempalace:**
 
 - READY: `python37_check` ok AND `mempalace` binary found in PATH AND
-  `.mempalace/` directory exists in project root
-- PARTIAL: `mempalace` binary found but `.mempalace/` not initialized
+  `.mempalace/` directory exists in user home (`~/.mempalace/`)
+- PARTIAL: `mempalace` binary found but `~/.mempalace/` not initialized
 - NEEDS SETUP: `mempalace` binary not found OR `python3` not available
 
 **yellow-core:**

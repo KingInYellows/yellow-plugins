@@ -39,13 +39,22 @@ If the user chooses **No**: report that mempalace is required and stop.
 
 ### Step 1: Validate prerequisites
 
-Check required tools:
+Check required tools and Python version:
 
 ```bash
-command -v python3 >/dev/null 2>&1 && printf '[yellow-mempalace] python3: ok (%s)\n' "$(python3 --version 2>/dev/null)" || printf '[yellow-mempalace] python3: MISSING (required)\n'
+if command -v python3 >/dev/null 2>&1; then
+  py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+  py_ok=$(python3 -c "import sys; print('ok' if sys.version_info >= (3, 10) else 'too_old')" 2>/dev/null)
+  printf '[yellow-mempalace] python3: %s (%s)\n' "$py_ok" "$py_ver"
+else
+  printf '[yellow-mempalace] python3: MISSING (required)\n'
+fi
 ```
 
 If python3 is missing: stop with error and install guidance.
+If python3 is below 3.10: warn that mempalace may fail to install due to
+onnxruntime/PyTorch requiring 3.10+. Recommend Python 3.11+ for best
+compatibility.
 
 ### Step 2: Check palace initialization
 
