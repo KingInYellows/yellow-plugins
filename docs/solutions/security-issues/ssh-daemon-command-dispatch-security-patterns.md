@@ -28,7 +28,11 @@ Plugin designs that dispatch commands over SSH to remote daemons introduce sever
 
 Sending `ssh user@host "cmd1 && cmd2 && cmd3"` treats the entire remote string as a shell expression. If any portion is derived from user input without strict validation, shell metacharacters (`;`, `|`, `$()`, backticks) enable command injection on the remote host.
 
-**Fix:** Use separate SSH calls per command, and validate the command prefix against an allowlist regex:
+**Fix:** Use separate SSH calls per command, and validate the command prefix against an allowlist regex.
+
+> **Portability note:** `timeout` is GNU coreutils; macOS ships without it.
+> In production scripts, detect `timeout` vs `gtimeout` first. These examples
+> use `timeout` directly for brevity.
 
 ```bash
 # Allowlist: lowercase alphanumeric, spaces, underscores, hyphens, slashes
@@ -37,6 +41,8 @@ ALLOWED_CMD_RE='^[a-z][a-z0-9 _/-]{0,63}$'
 
 run_remote() {
   local cmd="$1"
+  # Reject newlines — grep is line-by-line, so "ls\nrm -rf /" would pass
+  case "$cmd" in *$'\n'*|*$'\r'*) fatal "Command contains newlines: rejected" ;; esac
   printf '%s' "$cmd" | grep -qE "$ALLOWED_CMD_RE" || {
     fatal "Command rejected by allowlist: $cmd"
   }
@@ -116,11 +122,12 @@ ssh_output=$(timeout 10 ssh -i "$ssh_key" -o ConnectTimeout=5 \
 
 ## Prevention
 
+- [ ] Reject commands containing newlines before regex validation (grep is line-by-line)
 - [ ] Validate all SSH command strings against an allowlist regex before dispatch
 - [ ] Use separate SSH calls instead of `&&` chains
 - [ ] Always pass `-i "$ssh_key"` when the config stores a key path
 - [ ] Expand `~` in key paths before use: `ssh_key="${ssh_key/#\~/$HOME}"`
-- [ ] Wrap SSH calls with `timeout N` to prevent hangs on unreachable hosts
+- [ ] Wrap SSH calls with `timeout N` to prevent hangs (`gtimeout` on macOS without coreutils)
 - [ ] Add `.gitignore` entries for any file containing SSH connection details
 - [ ] Length-bound all user-facing regex validations with `{min,max}`
 - [ ] Handle host-key-changed scenario with detection and clear remediation steps
