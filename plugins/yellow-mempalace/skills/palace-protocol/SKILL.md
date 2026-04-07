@@ -61,6 +61,7 @@ On first interaction with the palace in a session:
 ## Content Filing Guidelines
 
 When adding content to the palace:
+
 - **Always store verbatim** — never summarize or compress before filing
 - **Choose the right wing** — match the primary domain (project, person, topic)
 - **Choose a specific room** — narrow topics get better retrieval

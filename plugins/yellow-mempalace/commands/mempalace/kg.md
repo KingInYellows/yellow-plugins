@@ -17,6 +17,7 @@ windows.
 ### Step 1: Parse arguments
 
 Extract action from `$ARGUMENTS`:
+
 - **query** `<entity>` `[--as-of YYYY-MM-DD]` — Look up entity relationships
 - **add** `<subject>` `<predicate>` `<object>` `[--from YYYY-MM-DD]` — Create
   a new fact

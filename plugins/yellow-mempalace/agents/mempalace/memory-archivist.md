@@ -30,6 +30,7 @@ Organize and file new memories into the MemPalace.
 ## When to Use
 
 Trigger when the user wants to:
+
 - Save a memory ("save this to the palace", "file this memory")
 - Record a decision ("record that we chose GraphQL over REST")
 - Add a fact to the knowledge graph ("add to KG: auth uses JWT")
