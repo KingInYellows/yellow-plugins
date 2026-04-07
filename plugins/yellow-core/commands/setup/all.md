@@ -68,7 +68,9 @@ if command -v python3 >/dev/null 2>&1; then
   printf 'python3:            OK (%s)\n' "$py_ver"
   py37=$(python3 -c "import sys; print('ok' if sys.version_info >= (3, 7) else 'too_old')" 2>/dev/null)
   py313=$(python3 -c "import sys; print('ok' if sys.version_info >= (3, 13) else 'too_old')" 2>/dev/null)
+  py310=$(python3 -c "import sys; print('ok' if sys.version_info >= (3, 10) else 'too_old')" 2>/dev/null)
   printf 'python37_check:     %s\n' "$py37"
+  printf 'python310_check:    %s\n' "$py310"
   printf 'python313_check:    %s\n' "$py313"
 else
   printf 'python3:            NOT FOUND\n'
@@ -340,10 +342,10 @@ Compute bundled source availability out of 6:
 
 **yellow-mempalace:**
 
-- READY: `python37_check` ok AND `mempalace` binary found in PATH AND
-  `.mempalace/` directory exists in user home (`~/.mempalace/`)
+- READY: `python310_check` ok AND `mempalace` binary found in PATH AND
+  `~/.mempalace/` directory exists
 - PARTIAL: `mempalace` binary found but `~/.mempalace/` not initialized
-- NEEDS SETUP: `mempalace` binary not found OR `python3` not available
+- NEEDS SETUP: `mempalace` binary not found OR `python310_check` not ok
 
 **yellow-core:**
 

@@ -4,6 +4,7 @@ description: "Organize and file new memories into the palace — add drawers, ma
 model: inherit
 skills:
   - mempalace-conventions
+  - palace-protocol
 tools:
   - ToolSearch
   - Read
