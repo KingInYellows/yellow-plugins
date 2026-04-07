@@ -18,6 +18,7 @@ and drawers.
 ### Step 1: Parse arguments
 
 Extract from `$ARGUMENTS`:
+
 - **path** (required): Directory to mine
 - **--mode** (optional): Mining mode — `projects` (default), `convos`, or
   `general`
@@ -57,6 +58,7 @@ mempalace mine "$PATH_ARG" --mode "${MODE:-projects}" 2>&1
 ```
 
 Mining modes:
+
 - **projects**: Code, documentation, notes — extracts decisions, patterns,
   architecture
 - **convos**: Claude/ChatGPT/Slack conversation exports — preserves dialogue
@@ -67,6 +69,7 @@ Mining modes:
 ### Step 5: Report results
 
 Show a summary of what was mined:
+
 - Drawers created
 - Wings populated
 - Rooms created

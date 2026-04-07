@@ -375,6 +375,7 @@ ships.
 
 <!-- deepen-plan: external -->
 > **Research:** Additional references from deep research:
+>
 > - [Penfield Labs critical analysis](https://penfieldlabs.substack.com/p/milla-jovovich-just-released-an-ai) — disputed benchmarks, AAAK lossiness, missing features
 > - [lhl/agentic-memory independent analysis](https://github.com/lhl/agentic-memory/blob/main/ANALYSIS-mempalace.md) — technical verification of claims
 > - [Dev.to technical walkthrough](https://dev.to/recca0120/mempalace-170-tokens-to-recall-everything-a-long-term-memory-system-for-ai-agents-2855) — Claude Code integration details

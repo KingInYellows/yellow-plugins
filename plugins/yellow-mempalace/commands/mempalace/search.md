@@ -15,6 +15,7 @@ Search for memories in the palace using semantic similarity.
 ### Step 1: Parse arguments
 
 Extract from `$ARGUMENTS`:
+
 - **query** (required): The search text (first unquoted argument or quoted
   string)
 - **--wing** (optional): Filter to a specific wing
@@ -41,6 +42,7 @@ Choose the most specific search tool based on provided filters:
 ### Step 4: Display results
 
 For each result, show:
+
 - Similarity score (as percentage)
 - Wing and room location
 - Content snippet (first 200 chars)

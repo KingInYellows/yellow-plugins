@@ -15,6 +15,7 @@ Browse the palace structure and discover connections between wings.
 ### Step 1: Parse arguments
 
 Extract from `$ARGUMENTS`:
+
 - **wing** (optional): Show rooms within a specific wing
 - **--tunnels** `<wingA>` `<wingB>` (optional): Find connections between two
   wings
