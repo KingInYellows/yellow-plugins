@@ -215,7 +215,7 @@ else
   cat >&2 <<'INSTRUCTIONS'
 Neither pipx nor pip found. Install mempalace manually using one of:
   pipx install mempalace          (recommended — install pipx: brew install pipx)
-  pip install mempalace           (requires Python 3.9+)
+  pip install mempalace           (requires Python 3.10+)
 Then re-run /mempalace:setup
 INSTRUCTIONS
   error "No supported package manager found for mempalace installation."
