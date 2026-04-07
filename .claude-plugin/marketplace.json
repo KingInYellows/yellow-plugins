@@ -170,6 +170,16 @@
       },
       "source": "./plugins/yellow-codex",
       "category": "development"
+    },
+    {
+      "name": "yellow-mempalace",
+      "description": "Structured long-term memory with temporal knowledge graph via MemPalace",
+      "version": "1.0.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-mempalace",
+      "category": "development"
     }
   ]
 }
