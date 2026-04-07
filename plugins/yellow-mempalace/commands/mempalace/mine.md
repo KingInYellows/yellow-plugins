@@ -30,25 +30,30 @@ with options: "Current project (.)", "Specify a path"
 ```bash
 if [ ! -d "$PATH_ARG" ]; then
   printf '[yellow-mempalace] Error: directory not found: %s\n' "$PATH_ARG"
+  exit 1
 fi
 ```
+
+If the directory is not found, report the error and stop.
 
 ### Step 3: Check palace initialization
 
 ```bash
 if ! mempalace status >/dev/null 2>&1; then
   printf '[yellow-mempalace] Palace not initialized. Run mempalace init first.\n'
+  exit 1
 fi
 ```
 
-If not initialized, use AskUserQuestion to offer `mempalace init .`.
+If not initialized, use AskUserQuestion to offer `mempalace init .`. If the
+user declines, stop.
 
 ### Step 4: Run mining
 
 Use the CLI directly (mining is a heavy batch operation better suited to CLI):
 
 ```bash
-mempalace mine "$PATH_ARG" --mode "$MODE" 2>&1
+mempalace mine "$PATH_ARG" --mode "${MODE:-projects}" 2>&1
 ```
 
 Mining modes:

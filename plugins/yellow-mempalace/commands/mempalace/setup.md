@@ -95,9 +95,8 @@ If fewer than 4 tools found:
 - Check if mempalace version supports MCP: `mempalace --version`
 - If version < 3.0.0: "Upgrade with: pipx upgrade mempalace"
 - If version >= 3.0.0: "MCP server may have failed to start. Try restarting
-  Claude Code. If `mempalace mcp` is not a valid subcommand, the MCP server
-  may need to be invoked as `python -m mempalace.mcp_server` — update
-  plugin.json accordingly."
+  Claude Code. Check that `mempalace mcp` runs without errors by running it
+  manually in a terminal."
 
 ### Step 4: Report summary
 
