@@ -1,7 +1,14 @@
+---
+title: Shell Binary Downloader Security Patterns
+date: 2026-04-03
+category: security-issues
+tags: [eval-injection, curl-fail, pipefail, exit-code-masking, cache-poisoning]
+components: [yellow-codacy]
+---
+
 # Shell Binary Downloader Security Patterns
 
-**Source:** PR #241 review (2026-04-03) — `.codacy/cli.sh`
-**Agents:** code-reviewer, security-sentinel, silent-failure-hunter
+Patterns discovered during multi-agent review of PR #241 (Codacy CLI shell wrapper `.codacy/cli.sh`).
 
 ## Context
 
@@ -51,7 +58,7 @@ Shell scripts that download and execute remote binaries are common in CLI tool w
 
 **Fix:** Define early: `fatal() { echo "FATAL: $*" >&2; exit 1; }`.
 
-## Checklist for Shell Binary Downloaders
+## Prevention
 
 - [ ] No `eval` — use `"$command" "$@"` for argument passing
 - [ ] `set -eo pipefail` (not `+o`)
@@ -62,3 +69,9 @@ Shell scripts that download and execute remote binaries are common in CLI tool w
 - [ ] Guard empty values before writing to cache/config files
 - [ ] Validate version strings against expected pattern
 - [ ] Verify checksums after download (SHA256)
+
+## Related Documentation
+
+- `docs/solutions/security-issues/ssh-daemon-command-dispatch-security-patterns.md` — overlapping SSH dispatch security patterns
+- `docs/solutions/code-quality/plugin-review-defensive-authoring-patterns.md` — defensive authoring for plugin commands
+- `docs/solutions/logic-errors/devin-review-prs-shell-and-api-bugs.md` — shell and API bug patterns
