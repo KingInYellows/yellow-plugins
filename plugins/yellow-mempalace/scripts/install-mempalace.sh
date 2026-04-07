@@ -153,9 +153,16 @@ os=$(uname -s)
 arch=$(uname -m)
 printf '[yellow-mempalace] Platform: %s/%s\n' "$os" "$arch"
 
-# --- Check Python 3.9+ is available ---
+# --- Check Python 3.10+ is available ---
 if ! command -v python3 >/dev/null 2>&1; then
-  error "Python 3 is required but not found. Install Python 3.9+ first."
+  error "Python 3 is required but not found. Install Python 3.10+ first."
+fi
+
+py_minor=$(python3 -c "import sys; print(sys.version_info.minor)" 2>/dev/null || echo "0")
+py_major=$(python3 -c "import sys; print(sys.version_info.major)" 2>/dev/null || echo "0")
+if [ "$py_major" -lt 3 ] || { [ "$py_major" -eq 3 ] && [ "$py_minor" -lt 10 ]; }; then
+  warning "Python 3.${py_minor} detected. mempalace requires 3.10+ (3.11+ recommended)."
+  warning "onnxruntime/PyTorch dependencies may fail to install on Python < 3.10."
 fi
 
 # --- Install mempalace ---

@@ -306,13 +306,23 @@ The authors published an April 2026 correction:
 - 100% with Haiku rerank not in public benchmark scripts
 
 ### Runtime Considerations
-- **Python dependency**: Requires Python 3.9+ and ChromaDB (heavy dependency tree)
+- **Python 3.10+ effective minimum**: README says 3.9+ but onnxruntime and
+  PyTorch transitive deps dropped 3.9 wheels. Python 3.11+ recommended.
 - **ChromaDB startup**: ~2-5 seconds cold start (vs ruvector's 300-1500ms)
+- **First-run model download**: ~80MB all-MiniLM-L6-v2 embedding model
+  downloaded on first use via sentence-transformers. Setup should pre-warm.
+- **stdio stdout contamination**: ChromaDB/sentence-transformers may emit log
+  messages to stdout, corrupting JSON-RPC stream. Well-implemented MCP SDK
+  should handle this, but library code may bypass it.
+- **Global palace only**: Palace is at `~/.mempalace/`, no MEMPALACE_DIR env
+  var documented for per-project palaces.
 - **Hook timeout**: 30s (vs ruvector's 1-3s) — heavier operations
 - **Storage size**: ChromaDB + SQLite will be larger than rvlite for equivalent content
 
 ### Security
-- Shell injection in hooks was reported (#110) — verify fix before plugin adoption
+- Shell injection in hooks (#110) — **still OPEN/UNFIXED** as of 2026-04-07
+- SESSION_ID from untrusted JSON used unsanitized in hook file paths — path
+  traversal vector
 - Hook scripts execute bash with 30s timeout — review attack surface
 
 ---
