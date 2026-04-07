@@ -7,10 +7,12 @@ with semantic search and a temporal knowledge graph for entity relationships.
 ## MCP Server
 
 - **mempalace** — Stdio transport via `mempalace mcp`
-- Storage: ChromaDB (vector embeddings) + SQLite (temporal KG) in `.mempalace/`
+- Storage: ChromaDB (vector embeddings) + SQLite (temporal KG) in `~/.mempalace/`
 - Lifecycle: starts on first MCP tool call, shuts down on session end
-- Cold start: 2-5 seconds on first call (ChromaDB initialization)
+- Cold start: 2-5 seconds on subsequent sessions; first-ever run downloads
+  the all-MiniLM-L6-v2 embedding model (~80MB) which can take longer
 - 19 MCP tools: search, navigation, knowledge graph, write, diary
+- Palace directory is `~/.mempalace/` (no env var override documented)
 
 ## Conventions
 
@@ -72,9 +74,14 @@ with semantic search and a temporal knowledge graph for entity relationships.
 ## Known Limitations
 
 - **No hooks** — save and pre-compact hooks deferred to future release
-- **ChromaDB cold start** — first MCP call takes 2-5 seconds
-- **Python dependency** — requires Python 3.9+ and ChromaDB
-- **Local-only** — palace data is per-developer (`.mempalace/` is gitignored)
+- **ChromaDB cold start** — first MCP call takes 2-5 seconds; first-ever run
+  downloads ~80MB embedding model
+- **Python 3.10+ required** — README says 3.9+ but onnxruntime/PyTorch
+  transitive deps effectively require 3.10; 3.11+ recommended
+- **stdio stdout risk** — ChromaDB/sentence-transformers may emit log messages
+  to stdout, corrupting JSON-RPC. If MCP fails, check for log contamination
+- **Global palace only** — palace is at `~/.mempalace/`, no per-project support
+  (no MEMPALACE_DIR env var documented)
 - **No AAAK compression** — the experimental lossy format is not used;
   all content stored verbatim
 
