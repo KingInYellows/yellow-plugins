@@ -18,8 +18,7 @@ Use ToolSearch with query `"+mempalace status"` to find the status tool.
 
 ### Step 2: Get palace status
 
-Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_status` with no
-parameters.
+Call the mempalace status tool (discover via ToolSearch) with no parameters.
 
 If the tool is unavailable or errors, fall back to CLI:
 
@@ -29,8 +28,7 @@ mempalace status 2>&1
 
 ### Step 3: Get knowledge graph stats
 
-Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_stats` with no
-parameters.
+Call the mempalace kg_stats tool (discover via ToolSearch) with no parameters.
 
 If unavailable, skip this section.
 

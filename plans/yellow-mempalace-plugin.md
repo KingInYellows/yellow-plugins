@@ -8,7 +8,7 @@ stores verbatim content in a navigable palace structure (wings/rooms/halls) with
 a temporal knowledge graph — complementing ruvector's real-time coding
 intelligence with cross-session, cross-project knowledge persistence.
 
-The plugin wraps mempalace's built-in MCP server (19 tools) and hooks system,
+The plugin wraps mempalace's built-in MCP server (22 tools) and hooks system,
 following established yellow-plugins conventions.
 
 **Research doc:** `docs/research/mempalace-memory-tool-vs-ruvector.md`
@@ -23,14 +23,14 @@ recall, conversation mining, and temporal fact tracking.
 ## Proposed Solution
 
 Build a standalone `yellow-mempalace` plugin following the established plugin
-conventions. The MCP server is the primary integration point (19 tools, stdio
+conventions. The MCP server is the primary integration point (22 tools, stdio
 transport). Hooks are deferred until mempalace's shell injection fix (#110)
 ships.
 
 ### Key Decisions
 
 1. **Standalone plugin** (not a ruvector bridge) — mempalace has enough surface
-   area (19 MCP tools, KG, mining) to justify its own plugin
+   area (22 MCP tools, KG, mining) to justify its own plugin
 2. **MCP-first** — the `python -m mempalace.mcp_server` stdio server is the
    canonical integration path
 3. **No hooks in Phase 1** — mempalace's hook system has a known shell injection

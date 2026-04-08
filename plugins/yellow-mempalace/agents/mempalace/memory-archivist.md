@@ -1,5 +1,5 @@
 ---
-name: yellow-mempalace:mempalace:memory-archivist
+name: mempalace-archivist
 description: "Organize and file new memories into the palace — add drawers, manage knowledge graph triples, check for duplicates, and write agent diary entries. Use when user wants to save a memory, record a decision, add a fact, or update the knowledge graph."
 model: inherit
 skills:
@@ -22,6 +22,29 @@ tools:
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_diary_write
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_diary_read
 ---
+
+<examples>
+<example>
+Context: User wants to save a decision for future reference.
+user: "Save to the palace that we chose GraphQL over REST for the new API"
+assistant: "I'll use the mempalace-archivist to file this decision into the palace."
+<commentary>Filing a decision maps to add_drawer in the appropriate wing/room.</commentary>
+</example>
+
+<example>
+Context: User wants to update an entity relationship in the knowledge graph.
+user: "We stopped using Redis for caching, update the KG"
+assistant: "I'll invalidate the old Redis fact and add the new caching approach."
+<commentary>Fact changes use kg_invalidate then kg_add to preserve temporal history.</commentary>
+</example>
+
+<example>
+Context: User wants to record a learning from the current session.
+user: "Write a diary entry about fixing the auth migration"
+assistant: "I'll write a diary entry capturing the session context."
+<commentary>Diary entries preserve session-level context for future recall.</commentary>
+</example>
+</examples>
 
 # Memory Archivist
 

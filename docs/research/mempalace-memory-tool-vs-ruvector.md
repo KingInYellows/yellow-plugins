@@ -112,7 +112,7 @@ Configuration via `.claude/settings.local.json`:
 | **Organization** | Hierarchical (wings/rooms/halls) | Flat (type labels: context/decision/project/code) |
 | **Content** | Verbatim (never summarized) | Structured learnings (context + insight + action) |
 | **Knowledge Graph** | Yes (temporal SQLite triples) | Yes (rvlite property graph) |
-| **MCP Tools** | 19 tools | 80+ tools |
+| **MCP Tools** | 22 tools | 80+ tools |
 | **Hook Count** | 2 (Save, PreCompact) | 5 (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, Stop) |
 | **Hook Style** | AI-directed (LLM organizes) | System-directed (passive capture) |
 | **Retrieval** | Filtered semantic search (wing/room/hall) | RRF (semantic + recency + frequency) |
@@ -169,7 +169,7 @@ Configuration via `.claude/settings.local.json`:
 │  │   PromptSubmit│        │   PreCompact     │   │
 │  │   PreToolUse  │        │                  │   │
 │  │   PostToolUse │        │ • MCP:           │   │
-│  │   Stop        │        │   19 tools       │   │
+│  │   Stop        │        │   22 tools       │   │
 │  │              │         │   (search, KG,   │   │
 │  │ • MCP:       │         │    navigate,     │   │
 │  │   80+ tools  │         │    diary)        │   │
@@ -284,7 +284,7 @@ This follows the existing cross-plugin composition pattern (Skill tool delegatio
 ### Recommended: Option A (Standalone Plugin)
 
 Reasons:
-- MemPalace has enough surface area (19 MCP tools, 2 hooks, CLI, KG) to justify its own plugin
+- MemPalace has enough surface area (22 MCP tools, 2 hooks, CLI, KG) to justify its own plugin
 - Independent release cycle — mempalace is 2 days old and will evolve rapidly
 - Users can install either or both without coupling
 - Optional cross-plugin bridge can be added later via skills
@@ -345,7 +345,7 @@ The authors published an April 2026 correction:
 9. **Conversation export pipeline** — mine Claude Code conversation exports into mempalace wings
 
 ### Integration Priority
-1. MCP server (biggest value, 19 tools, native Claude Code support)
+1. MCP server (biggest value, 22 tools, native Claude Code support)
 2. Setup command (pip install, init, verify)
 3. Search/navigate commands (palace-specific UX)
 4. Mining commands (import existing data)

@@ -63,7 +63,7 @@ subject --predicate--> object
 |-------|--------|
 | MCP tool not found | Run ToolSearch to discover tools; suggest `/mempalace:setup` |
 | MCP execution error | Report error; suggest checking `mempalace status` |
-| Palace not initialized | Suggest `mempalace init .` or `/mempalace:setup` |
+| Palace not initialized | Suggest `mempalace init` or `/mempalace:setup` |
 | Empty search results | Suggest broadening query or checking `/mempalace:status` |
 | Duplicate detected | Show existing drawer; ask user whether to proceed |
 

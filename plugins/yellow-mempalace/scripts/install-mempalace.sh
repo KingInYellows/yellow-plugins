@@ -140,12 +140,12 @@ if command -v mempalace >/dev/null 2>&1; then
 
   if [ -z "$upgraded_version" ]; then
     warning "mempalace '--version' returned unexpected value after upgrade: ${upgraded_version_output:-<empty>}"
-    exit 0
+    exit 2
   fi
 
   warning "mempalace ${upgraded_version:-${installed_version}} is below ${MIN_VERSION}."
   warning "Upgrade manually: pipx upgrade mempalace"
-  exit 0
+  exit 2
 fi
 
 # --- Detect platform ---
@@ -173,7 +173,7 @@ if command -v pipx >/dev/null 2>&1; then
   INSTALL_METHOD="pipx"
   printf '[yellow-mempalace] Installing mempalace via pipx (recommended)...\n'
   pipx_output=""
-  if ! pipx_output=$(pipx install mempalace 2>&1); then
+  if ! pipx_output=$(pipx install "mempalace>=${MIN_VERSION},<4.0.0" 2>&1); then
     printf '%s\n' "$pipx_output" >&2
     error "pipx install mempalace failed. Try manually: pipx install mempalace"
   fi
@@ -201,7 +201,7 @@ elif (command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 
   printf '[yellow-mempalace] Installing mempalace via %s...\n' "${pip_cmd[*]}"
 
   pip_output=""
-  if ! pip_output=$("${pip_cmd[@]}" install mempalace 2>&1); then
+  if ! pip_output=$("${pip_cmd[@]}" install "mempalace>=${MIN_VERSION},<4.0.0" 2>&1); then
     if printf '%s' "$pip_output" | grep -qi "externally-managed-environment"; then
       printf '%s\n' "$pip_output" >&2
       error "pip blocked by PEP 668. Install pipx first: brew install pipx or python3 -m pip install --user pipx"

@@ -40,13 +40,10 @@ If the directory is not found, report the error and stop.
 ### Step 3: Check palace initialization
 
 ```bash
-if ! mempalace status >/dev/null 2>&1; then
-  printf '[yellow-mempalace] Palace not initialized. Run mempalace init first.\n'
-  exit 1
-fi
+mempalace status >/dev/null 2>&1 || printf '[yellow-mempalace] Palace not initialized.\n'
 ```
 
-If not initialized, use AskUserQuestion to offer `mempalace init .`. If the
+If not initialized, use AskUserQuestion to offer `mempalace init`. If the
 user declines, stop.
 
 ### Step 4: Run mining
