@@ -1,5 +1,5 @@
 ---
-name: yellow-mempalace:mempalace:palace-navigator
+name: palace-navigator
 description: "Browse and traverse the palace structure — list wings, explore rooms, find cross-wing tunnels, and search memories by location. Use when user asks to browse palace, show wings, list rooms, find connections, or navigate the memory structure."
 model: inherit
 skills:
@@ -21,6 +21,22 @@ tools:
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_find_tunnels
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_graph_stats
 ---
+
+<examples>
+<example>
+Context: User wants to explore what's in the palace.
+user: "Show me what wings are in the palace"
+assistant: "I'll use the palace-navigator to list all wings with their drawer counts."
+<commentary>Top-level browsing starts with list_wings.</commentary>
+</example>
+
+<example>
+Context: User wants to find connections between two topics.
+user: "What connects the auth wing and the infrastructure wing?"
+assistant: "I'll search for tunnels between those two wings."
+<commentary>Cross-wing discovery uses find_tunnels to show shared rooms.</commentary>
+</example>
+</examples>
 
 # Palace Navigator
 

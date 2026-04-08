@@ -39,9 +39,9 @@ Structured long-term memory with temporal knowledge graph via
 | `/mempalace:kg <action>` | Knowledge graph: query, add, invalidate, timeline |
 | `/mempalace:navigate [wing]` | Browse palace structure, find tunnels |
 
-## MCP Tools (19)
+## MCP Tools (22)
 
-The plugin exposes 19 MCP tools via the mempalace server:
+The plugin exposes 22 MCP tools via the mempalace server:
 
 - **Read**: status, list_wings, list_rooms, get_taxonomy, get_aaak_spec
 - **Search**: search, search_wing, search_hall, search_room, check_duplicate

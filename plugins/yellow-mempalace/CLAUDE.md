@@ -11,7 +11,7 @@ with semantic search and a temporal knowledge graph for entity relationships.
 - Lifecycle: starts on first MCP tool call, shuts down on session end
 - Cold start: 2-5 seconds on subsequent sessions; first-ever run downloads
   the all-MiniLM-L6-v2 embedding model (~80MB) which can take longer
-- 19 MCP tools: search, navigation, knowledge graph, write, diary
+- 22 MCP tools: search, navigation, knowledge graph, write, diary
 - Palace directory is `~/.mempalace/` (no env var override documented)
 
 ## Conventions
