@@ -117,5 +117,5 @@ Status          : [Ready / Needs attention]
 If all checks pass: "Setup complete. Try `/mempalace:status` to see your
 palace overview."
 
-If palace not initialized: "Run `mempalace init .` to create a palace, then
+If palace not initialized: "Run `mempalace init` to create a palace, then
 `mempalace mine .` to index your project."
