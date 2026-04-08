@@ -22,7 +22,11 @@
       "args": [
         "mcp"
       ],
-      "env": {}
+      "env": {
+        "PYTHONWARNINGS": "ignore",
+        "TRANSFORMERS_VERBOSITY": "error",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
     }
   }
 }

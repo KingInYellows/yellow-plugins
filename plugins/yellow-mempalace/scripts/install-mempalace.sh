@@ -63,15 +63,11 @@ cleanup() {
   local exit_code=$?
   if [ $exit_code -ne 0 ] && [ -n "${INSTALL_METHOD:-}" ]; then
     case "${INSTALL_METHOD:-}" in
-      pipx|pip) ;;
+      pipx|pipx-upgrade) warning "To clean up: pipx uninstall mempalace" ;;
+      pip|pip-upgrade) warning "To clean up: pip uninstall mempalace" ;;
       *) return ;;
     esac
     warning "Installation failed. Partial install may remain."
-    if [ "${INSTALL_METHOD:-}" = "pipx" ]; then
-      warning "To clean up: pipx uninstall mempalace"
-    elif [ "${INSTALL_METHOD:-}" = "pip" ]; then
-      warning "To clean up: pip uninstall mempalace"
-    fi
   fi
 }
 trap cleanup EXIT

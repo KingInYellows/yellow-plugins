@@ -76,8 +76,8 @@ with semantic search and a temporal knowledge graph for entity relationships.
 - **No hooks** — save and pre-compact hooks deferred to future release
 - **ChromaDB cold start** — first MCP call takes 2-5 seconds; first-ever run
   downloads ~80MB embedding model
-- **Python 3.10+ required** — README says 3.9+ but onnxruntime/PyTorch
-  transitive deps effectively require 3.10; 3.11+ recommended
+- **Python 3.10+ required** — onnxruntime/PyTorch transitive deps
+  effectively require 3.10; 3.11+ recommended
 - **stdio stdout risk** — ChromaDB/sentence-transformers may emit log messages
   to stdout, corrupting JSON-RPC. If MCP fails, check for log contamination
 - **Global palace only** — palace is at `~/.mempalace/`, no per-project support
@@ -89,4 +89,4 @@ with semantic search and a temporal knowledge graph for entity relationships.
 
 - **Install:** `pipx install mempalace` or `/mempalace:setup`
 - **Upgrade:** `pipx upgrade mempalace`
-- **Uninstall:** `pipx uninstall mempalace`, delete `.mempalace/` directory
+- **Uninstall:** `pipx uninstall mempalace`, delete `~/.mempalace/` directory
