@@ -3,6 +3,7 @@ name: silent-failure-hunter
 description: "Silent failure and error handling analysis. Use when reviewing PRs that contain try-catch blocks, error handling, fallback logic, or any code that could potentially suppress errors to ensure failures are visible and actionable."
 model: inherit
 background: true
+memory: project
 tools:
   - Read
   - Grep

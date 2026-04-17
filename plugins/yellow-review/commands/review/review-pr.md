@@ -370,6 +370,10 @@ persona dispatch table above and use the pre-Wave-2 adaptive selection:
 - Cross-plugin via Task: `security-sentinel` (yellow-core),
   `architecture-strategist`, `performance-oracle`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`
+- Optional supplementary: `codex-reviewer` (yellow-codex) — when yellow-codex
+  is installed AND diff > 100 lines. Spawn via
+  `Task(subagent_type="yellow-codex:codex-reviewer", run_in_background=true)`.
+  If the agent is not found (yellow-codex not installed), skip silently.
 
 Same graceful-degradation guard applies. The legacy path is a rollback
 escape hatch only — it skips the confidence-rubric aggregation in Step 6.
@@ -393,8 +397,12 @@ Launch all selected agents EXCEPT `code-simplifier` in parallel via Task
 tool. **Each Task invocation MUST set `run_in_background: true`** — the
 review agents declare `background: true` in their frontmatter, but true
 parallelism also requires the spawning call to run in the background.
-Without this, the orchestrator blocks on each agent sequentially even when
-they are independent.
+Without this, the orchestrator blocks on each agent sequentially even
+when they are independent.
+
+After dispatch, wait for all agents via TaskOutput (or equivalent).
+Collect findings; log any failed agents with error reason. Do NOT
+proceed to Step 6 while any agent task is still `in_progress`.
 
 Each agent receives:
 
@@ -509,12 +517,8 @@ in sync with Step 6 sub-step 0 below — adding a Wave-2 conditional
 reviewer that emits prose without listing it in both places means its
 findings are dropped as malformed.
 
-**Wait gate:** Wait for all background agents to complete via TaskOutput /
-TaskList polling (or equivalent notification) before proceeding to Step 6.
-Do NOT begin aggregation while any agent task is still `in_progress` —
-doing so produces a partial findings set and silently drops late-returning
-findings. Log any failed agents with error reason. If zero agents succeed,
-abort with error.
+Wait for all dispatched agents. Log any failed agents with error reason.
+If zero agents succeed, abort with error.
 
 ### Step 6: Aggregate findings (confidence-rubric pipeline)
 
@@ -665,14 +669,9 @@ Risks section.
 
 ### Step 8: Pass 2 — Code Simplifier
 
-If Step 7 applied no fixes (all findings routed to Residual Actionable Work),
-skip this step — code-simplifier has nothing to review.
-
 Launch `code-simplifier` via Task
-(`subagent_type: "yellow-review:review:code-simplifier"`, `run_in_background: true`)
-on the now-modified code to review applied fixes for simplification
-opportunities. Wait for the task to complete (TaskOutput) before proceeding
-to Step 9. Normalize
+(`subagent_type: "yellow-review:review:code-simplifier"`) on the now-modified
+code to review applied fixes for simplification opportunities. Normalize
 the agent's prose return through Step 6 sub-step 0 first, which assigns
 `autofix_class: gated_auto` (the legacy default). Under Step 7's
 `safe_auto`-only auto-apply rule, simplifier findings therefore route to
