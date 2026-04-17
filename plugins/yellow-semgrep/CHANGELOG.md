@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes (small breaking config surface for MCP auth)
+
+- **`SEMGREP_APP_TOKEN` now read from `userConfig` by the MCP server.**
+  Migrated `mcpServers.semgrep.env.SEMGREP_APP_TOKEN` from shell env
+  interpolation (`${SEMGREP_APP_TOKEN}`) to Claude Code's native
+  `userConfig` (`${user_config.semgrep_app_token}`). The key is
+  sensitive and now prompts at plugin-enable time, stored in the system
+  keychain. This fixes the "MCP silently fails to start on fresh install
+  because the shell env var wasn't exported before launching Claude
+  Code" failure mode.
+- Curl-based REST calls in `/semgrep:*` commands continue to read the
+  shell `SEMGREP_APP_TOKEN` — keep both sources in sync or run
+  `/semgrep:setup`.
+
+### Migration (existing users)
+
+- Run `claude plugin update yellow-semgrep@yellow-plugins`. Claude Code
+  detects the new `userConfig` field and prompts for the token on next
+  plugin enable. Answer the prompt to migrate. The MCP will then start
+  correctly without a Claude Code restart.
+- If the prompt is skipped, the MCP will see an empty token and fail to
+  start. Fix by running `/semgrep:setup` or toggling the plugin.
+
 ## 2.0.0
 
 ### Major Changes

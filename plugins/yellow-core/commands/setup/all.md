@@ -97,7 +97,13 @@ elif grep -q '"devin_org_id"' "${HOME}/.claude/settings.json" 2>/dev/null; then
 else
   printf 'DEVIN_ORG_ID:              NOT SET\n'
 fi
-[ -n "${SEMGREP_APP_TOKEN:-}" ] && printf 'SEMGREP_APP_TOKEN:         set\n' || printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
+if [ -n "${SEMGREP_APP_TOKEN:-}" ]; then
+  printf 'SEMGREP_APP_TOKEN:         set (shell env)\n'
+elif grep -q '"semgrep_app_token"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+  printf 'SEMGREP_APP_TOKEN:         set (userConfig)\n'
+else
+  printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
+fi
 [ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
 [ -n "${EXA_API_KEY:-}" ] && printf 'EXA_API_KEY:               set\n' || printf 'EXA_API_KEY:               NOT SET\n'
 [ -n "${TAVILY_API_KEY:-}" ] && printf 'TAVILY_API_KEY:            set\n' || printf 'TAVILY_API_KEY:            NOT SET\n'
@@ -292,9 +298,18 @@ supported source."
 
 **yellow-semgrep:**
 
-- READY: `curl` OK AND `jq` OK AND `SEMGREP_APP_TOKEN` set AND `semgrep` OK
-- PARTIAL: `SEMGREP_APP_TOKEN` set but `semgrep` CLI is missing
-- NEEDS SETUP: token missing OR `curl` missing OR `jq` missing
+Token can come from either shell `SEMGREP_APP_TOKEN` (used by curl-based
+REST calls in commands) or the plugin's `userConfig.semgrep_app_token`
+(used by the MCP server via `${user_config.semgrep_app_token}`). Treat
+"set" as "configured via any supported source."
+
+- `token_ok` = shell `SEMGREP_APP_TOKEN` set OR
+  `"semgrep_app_token"` present in `~/.claude/settings.json` under
+  `pluginConfigs.yellow-semgrep.options`.
+- READY: `curl` OK AND `jq` OK AND `token_ok` AND `semgrep` OK.
+- PARTIAL: `token_ok` but `semgrep` CLI missing; or `semgrep` OK and
+  `curl`+`jq` OK but `token_ok` is false.
+- NEEDS SETUP: `curl` or `jq` missing.
 
 **yellow-research:**
 

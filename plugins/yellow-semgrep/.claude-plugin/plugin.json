@@ -1,6 +1,6 @@
 {
   "name": "yellow-semgrep",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
   "author": {
     "name": "KingInYellows",
@@ -16,6 +16,12 @@
     "remediation",
     "mcp"
   ],
+  "userConfig": {
+    "semgrep_app_token": {
+      "description": "Semgrep API token (sgp_ prefix). Must have Web API scope. Create at Semgrep Organization Settings > API Tokens. Stored in system keychain.",
+      "sensitive": true
+    }
+  },
   "mcpServers": {
     "semgrep": {
       "command": "semgrep",
@@ -23,7 +29,7 @@
         "mcp"
       ],
       "env": {
-        "SEMGREP_APP_TOKEN": "${SEMGREP_APP_TOKEN}"
+        "SEMGREP_APP_TOKEN": "${user_config.semgrep_app_token}"
       }
     }
   }
