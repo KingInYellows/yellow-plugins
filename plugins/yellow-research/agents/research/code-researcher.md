@@ -2,7 +2,7 @@
 name: code-researcher
 description: "Inline code research for active development. Use when user asks how to use a library, needs code examples, API patterns, or framework documentation. Routes to best source by query type; returns concise in-context synthesis without saving a file."
 model: inherit
-memory: true
+memory: project
 tools:
   - Read
   - Grep
