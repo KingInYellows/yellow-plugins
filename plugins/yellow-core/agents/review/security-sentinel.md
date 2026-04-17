@@ -1,6 +1,6 @@
 ---
 name: security-sentinel
-description: "Security audit specialist scanning for OWASP top 10 vulnerabilities, input validation issues, authentication/authorization flaws, hardcoded secrets, injection attacks, and XSS. Use when auditing code for security issues or reviewing changes that touch auth, input handling, or data access."
+description: "Active security vulnerability audit specialist (OWASP top 10, injection attacks, XSS, hardcoded secrets, auth/authz flaws). Use when auditing code for exploitable issues or reviewing changes that touch auth, input handling, or data access. For security tech debt (not active vulnerabilities), use security-debt-scanner (yellow-debt)."
 model: inherit
 background: true
 memory: project
