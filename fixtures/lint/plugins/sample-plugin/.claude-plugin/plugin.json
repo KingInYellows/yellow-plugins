@@ -1,0 +1,6 @@
+{
+  "name": "sample-plugin",
+  "version": "0.1.0",
+  "description": "Synthetic plugin used by scripts/test-lint-plugins.sh — not a real plugin.",
+  "author": "lint-fixture"
+}
