@@ -100,9 +100,19 @@ else
 fi
 
 printf '\n=== API Keys ===\n'
-[ -n "${EXA_API_KEY:-}" ]          && printf 'EXA_API_KEY:          set\n' || printf 'EXA_API_KEY:          NOT SET\n'
-[ -n "${TAVILY_API_KEY:-}" ]       && printf 'TAVILY_API_KEY:       set\n' || printf 'TAVILY_API_KEY:       NOT SET\n'
-[ -n "${PERPLEXITY_API_KEY:-}" ]   && printf 'PERPLEXITY_API_KEY:   set\n' || printf 'PERPLEXITY_API_KEY:   NOT SET\n'
+check_key() {
+  local env_name="$1" cfg_key="$2" label="$3"
+  if [ -n "${!env_name:-}" ]; then
+    printf '%-22s set (shell env)\n' "$label:"
+  elif grep -q "\"$cfg_key\"" "${HOME}/.claude/settings.json" 2>/dev/null; then
+    printf '%-22s set (userConfig)\n' "$label:"
+  else
+    printf '%-22s NOT SET\n' "$label:"
+  fi
+}
+check_key EXA_API_KEY exa_api_key EXA_API_KEY
+check_key TAVILY_API_KEY tavily_api_key TAVILY_API_KEY
+check_key PERPLEXITY_API_KEY perplexity_api_key PERPLEXITY_API_KEY
 ```
 
 `curl` and `jq` missing are informational warnings — they affect live testing
@@ -403,19 +413,27 @@ Adjust the MCP sources line based on how many MCP sources are ACTIVE:
 
 If any keys are `ABSENT`, `FORMAT INVALID`, or `INVALID`, show this block:
 
-```sh
-To enable missing providers, add to your shell profile (~/.zshrc or ~/.bashrc):
+```text
+To enable missing providers (recommended path, no restart required):
 
-  export EXA_API_KEY="..."          # Get key: https://exa.ai/
-  export TAVILY_API_KEY="..."       # Get key: https://tavily.com/
-  export PERPLEXITY_API_KEY="..."   # Get key: https://www.perplexity.ai/settings/api
+  Disable and re-enable yellow-research:
+    /plugin disable yellow-research
+    /plugin enable yellow-research
 
-Then:
-  source ~/.zshrc   (or ~/.bashrc)
-  Restart Claude Code for MCP servers to pick up the new keys.
+  Claude Code will prompt for each key. Dismiss the ones you don't need;
+  answer the ones you want. Keys are stored in the system keychain (or
+  ~/.claude/.credentials.json at 0600 perms on Linux).
 
-Note: Keys are passed to MCP servers at startup — a Claude Code restart is
-required after adding new keys. Never commit API keys to version control.
+Get keys:
+  EXA:        https://exa.ai/
+  Tavily:     https://tavily.com/
+  Perplexity: https://www.perplexity.ai/settings/api
+
+Never commit API keys to version control.
+
+(Fallback for power users who want a pure shell-env setup: add a per-MCP
+wrapper script — see plugins/yellow-morph/bin/start-morph.sh. Plugin.json
+no longer reads the shell *_API_KEY vars directly as of 1.4.0.)
 ```
 
 Only show the lines for keys that are absent or invalid (not all three if some

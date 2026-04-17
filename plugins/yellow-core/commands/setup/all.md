@@ -105,9 +105,19 @@ else
   printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
 fi
 [ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
-[ -n "${EXA_API_KEY:-}" ] && printf 'EXA_API_KEY:               set\n' || printf 'EXA_API_KEY:               NOT SET\n'
-[ -n "${TAVILY_API_KEY:-}" ] && printf 'TAVILY_API_KEY:            set\n' || printf 'TAVILY_API_KEY:            NOT SET\n'
-[ -n "${PERPLEXITY_API_KEY:-}" ] && printf 'PERPLEXITY_API_KEY:        set\n' || printf 'PERPLEXITY_API_KEY:        NOT SET\n'
+check_research_key() {
+  local env_name="$1" cfg_key="$2" label="$3"
+  if [ -n "${!env_name:-}" ]; then
+    printf '%-26s set (shell env)\n' "$label:"
+  elif grep -q "\"$cfg_key\"" "${HOME}/.claude/settings.json" 2>/dev/null; then
+    printf '%-26s set (userConfig)\n' "$label:"
+  else
+    printf '%-26s NOT SET\n' "$label:"
+  fi
+}
+check_research_key EXA_API_KEY exa_api_key EXA_API_KEY
+check_research_key TAVILY_API_KEY tavily_api_key TAVILY_API_KEY
+check_research_key PERPLEXITY_API_KEY perplexity_api_key PERPLEXITY_API_KEY
 
 printf '\n=== Repository State ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -313,19 +323,25 @@ REST calls in commands) or the plugin's `userConfig.semgrep_app_token`
 
 **yellow-research:**
 
+Each of the 3 API keys can come from either the shell env var or the
+plugin's `userConfig` (stored in the keychain). Treat "set" as
+"configured via any supported source."
+
 Compute bundled source availability out of 5:
 
-1. `EXA_API_KEY` set
-2. `TAVILY_API_KEY` set
-3. `PERPLEXITY_API_KEY` set
-4. Parallel Task tool visible via ToolSearch
+1. `EXA_API_KEY` set in shell env OR `"exa_api_key"` present in
+   `~/.claude/settings.json` under `pluginConfigs.yellow-research.options`.
+2. `TAVILY_API_KEY` set in shell env OR `"tavily_api_key"` present.
+3. `PERPLEXITY_API_KEY` set in shell env OR `"perplexity_api_key"`
+   present.
+4. Parallel Task tool visible via ToolSearch.
 5. ast-grep counts only when the exact ToolSearch match is present **and**
    `ast-grep` OK **and** `uv` OK (uv manages Python 3.13 transparently via
-   `--python 3.13` in plugin.json — no system Python check needed)
+   `--python 3.13` in plugin.json — no system Python check needed).
 
-- READY: all 5 bundled sources available
-- PARTIAL: 1-4 bundled sources available
-- NEEDS SETUP: 0 bundled sources available
+- READY: all 5 bundled sources available.
+- PARTIAL: 1-4 bundled sources available.
+- NEEDS SETUP: 0 bundled sources available.
 
 **yellow-linear:**
 
