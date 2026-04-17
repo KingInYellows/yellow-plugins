@@ -25,9 +25,21 @@ printf '=== Prerequisites ===\n'
 command -v curl >/dev/null 2>&1 && printf 'curl: ok\n' || printf 'curl: NOT FOUND\n'
 command -v jq  >/dev/null 2>&1 && printf 'jq:   ok\n' || printf 'jq:   NOT FOUND\n'
 
-printf '\n=== Environment ===\n'
-[ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf '%-28s set\n' 'DEVIN_SERVICE_USER_TOKEN:' || printf '%-28s NOT SET\n' 'DEVIN_SERVICE_USER_TOKEN:'
-[ -n "${DEVIN_ORG_ID:-}" ]            && printf '%-28s set\n' 'DEVIN_ORG_ID:' || printf '%-28s NOT SET\n' 'DEVIN_ORG_ID:'
+printf '\n=== Credentials ===\n'
+if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
+  printf '%-28s set (shell env)\n' 'DEVIN_SERVICE_USER_TOKEN:'
+elif grep -q '"devin_service_user_token"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+  printf '%-28s set (userConfig, keychain)\n' 'DEVIN_SERVICE_USER_TOKEN:'
+else
+  printf '%-28s NOT SET\n' 'DEVIN_SERVICE_USER_TOKEN:'
+fi
+if [ -n "${DEVIN_ORG_ID:-}" ]; then
+  printf '%-28s set (shell env)\n' 'DEVIN_ORG_ID:'
+elif grep -q '"devin_org_id"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+  printf '%-28s set (userConfig)\n' 'DEVIN_ORG_ID:'
+else
+  printf '%-28s NOT SET\n' 'DEVIN_ORG_ID:'
+fi
 ```
 
 If **any** of the following are true, report **all** that apply and stop (do not
@@ -35,8 +47,17 @@ continue to Step 2):
 
 - `curl` not found: "curl is required. Install via your system package manager."
 - `jq` not found: "jq is required. Install from [jqlang.github.io](https://jqlang.github.io/jq/download/)"
-- `DEVIN_SERVICE_USER_TOKEN` not set: show the Setup Instructions block below.
-- `DEVIN_ORG_ID` not set: show the Setup Instructions block below.
+- Neither shell env var nor userConfig set for `DEVIN_SERVICE_USER_TOKEN`:
+  show the Setup Instructions block below.
+- Neither shell env var nor userConfig set for `DEVIN_ORG_ID`: show the
+  Setup Instructions block below.
+
+Note: shell env vars take precedence over userConfig for command invocations
+(curl calls below read `$DEVIN_SERVICE_USER_TOKEN` directly). Configuring
+userConfig alone is sufficient for Claude Code to prompt the user at
+plugin-enable time and prevents the "missing env var" failure on fresh
+installs. Users who want shell-only should also set the export so other
+CLI tools and non-Claude sessions can use the same token.
 
 If all pass, continue to Step 2.
 

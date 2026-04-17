@@ -1,6 +1,6 @@
 {
   "name": "yellow-devin",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
@@ -16,6 +16,15 @@
     "orchestration",
     "ai-collaboration"
   ],
+  "userConfig": {
+    "devin_service_user_token": {
+      "description": "Devin V3 service user token (cog_ prefix). Create at Devin Enterprise Settings > Service Users. Stored in system keychain.",
+      "sensitive": true
+    },
+    "devin_org_id": {
+      "description": "Devin organization ID. Find at Devin Enterprise Settings > Organizations."
+    }
+  },
   "mcpServers": {
     "deepwiki": {
       "type": "http",

@@ -83,8 +83,20 @@ elif grep -q '"morph_api_key"' "${HOME}/.claude/settings.json" 2>/dev/null; then
 else
   printf 'MORPH_API_KEY:             NOT SET\n'
 fi
-[ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf 'DEVIN_SERVICE_USER_TOKEN:  set\n' || printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET\n'
-[ -n "${DEVIN_ORG_ID:-}" ] && printf 'DEVIN_ORG_ID:              set\n' || printf 'DEVIN_ORG_ID:              NOT SET\n'
+if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
+  printf 'DEVIN_SERVICE_USER_TOKEN:  set (shell env)\n'
+elif grep -q '"devin_service_user_token"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+  printf 'DEVIN_SERVICE_USER_TOKEN:  set (userConfig)\n'
+else
+  printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET\n'
+fi
+if [ -n "${DEVIN_ORG_ID:-}" ]; then
+  printf 'DEVIN_ORG_ID:              set (shell env)\n'
+elif grep -q '"devin_org_id"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+  printf 'DEVIN_ORG_ID:              set (userConfig)\n'
+else
+  printf 'DEVIN_ORG_ID:              NOT SET\n'
+fi
 [ -n "${SEMGREP_APP_TOKEN:-}" ] && printf 'SEMGREP_APP_TOKEN:         set\n' || printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
 [ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
 [ -n "${EXA_API_KEY:-}" ] && printf 'EXA_API_KEY:               set\n' || printf 'EXA_API_KEY:               NOT SET\n'
@@ -261,9 +273,22 @@ path" and rely on `/morph:status` for authoritative OFFLINE detection.
 
 **yellow-devin:**
 
-- READY: `curl` OK AND `jq` OK AND `DEVIN_SERVICE_USER_TOKEN` set AND
-  `DEVIN_ORG_ID` set
-- NEEDS SETUP: any READY condition not met
+Both credentials can live in either the shell env or the plugin's
+`userConfig` (stored in the keychain). Treat "set" as "configured via any
+supported source."
+
+- `token_ok` = shell `DEVIN_SERVICE_USER_TOKEN` set OR
+  `pluginConfigs.yellow-devin.options.devin_service_user_token` present in
+  `~/.claude/settings.json` (detection:
+  `grep -q '"devin_service_user_token"' ~/.claude/settings.json`).
+- `org_ok` = shell `DEVIN_ORG_ID` set OR
+  `pluginConfigs.yellow-devin.options.devin_org_id` present.
+
+- READY: `curl` OK AND `jq` OK AND `token_ok` AND `org_ok`.
+- PARTIAL: `curl` + `jq` OK but one or both credentials missing from every
+  source. Recommend answering the `userConfig` prompt or setting the shell
+  env vars.
+- NEEDS SETUP: `curl` or `jq` missing.
 
 **yellow-semgrep:**
 

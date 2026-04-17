@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.0
+
+### Minor Changes
+
+- **Adopt `userConfig` for credential entry.** `DEVIN_SERVICE_USER_TOKEN`
+  (sensitive) and `DEVIN_ORG_ID` are now declared as `userConfig` fields in
+  `plugin.json`. Claude Code prompts for them at plugin-enable time and
+  stores the token in the system keychain (or
+  `~/.claude/.credentials.json` at 0600 perms on Linux). Commands still
+  read the shell env vars for curl invocations, so existing shell-env
+  setups continue to work unchanged — userConfig is an additive UX
+  improvement, not a breaking change. `/setup:all` now classifies the
+  plugin READY when either source is present.
+
 ## 2.1.0
 
 ### Minor Changes
