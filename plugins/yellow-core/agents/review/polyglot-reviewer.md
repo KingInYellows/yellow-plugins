@@ -2,7 +2,8 @@
 name: polyglot-reviewer
 description: "Language-idiomatic code reviewer for TypeScript, Python, Rust, and Go. Ensures code follows language-specific best practices, idioms, and conventions. Use when reviewing code in multi-language codebases or checking language-specific patterns."
 model: inherit
-memory: true
+background: true
+memory: project
 tools:
   - Read
   - Grep
