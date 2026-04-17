@@ -178,7 +178,7 @@ Agents live in `agents/<category>/agent-name.md`:
 ---
 name: agent-name
 description: What the agent does and when it's useful.
-model: opus
+model: inherit
 ---
 
 ## Examples
@@ -201,7 +201,9 @@ You are an expert in [domain]. Your role is to [specific task].
 - Constraint 2
 ```
 
-Categories: `workflow`, `analysis`, `generation`, `review`, `automation`
+Pick a category folder that fits the agent's role; common ones in this
+monorepo include `review`, `research`, `workflow`, `scanners`, `testing`,
+and `ci` — vary by plugin domain.
 
 ## Agent Archetypes
 
@@ -213,7 +215,7 @@ Use this table when deciding which frontmatter fields a new agent needs.
 |---|:---:|:---:|:---:|:---:|:---:|
 | `name` | Yes | Yes | Yes | Yes | Yes |
 | `description` | Yes | Yes | Yes | Yes | Yes |
-| `model` (e.g. `inherit`, `haiku`, `opus`) | Yes | Yes | Yes | Yes | Yes |
+| `model` (e.g. `inherit`, `haiku`, `opus`) | Opt | Opt | Opt | Opt | Opt |
 | `background: true` (parallel spawn) | Yes | Yes | No | Opt | Opt |
 | `memory: project` (persistent learning) | Opt | No | Yes | Opt | Opt |
 | `skills` (shared conventions) | Opt | Yes (plugin-conventions) | Yes | Opt | Opt |
@@ -315,7 +317,9 @@ if [ ! -f "$RESULT" ]; then
 elif ! jq -e . "$RESULT" >/dev/null 2>&1; then
   report_failed "$AGENT_NAME" "result file is not valid JSON"
 elif ! STATUS=$(jq -er .status "$RESULT" 2>/dev/null); then
-  report_failed "$AGENT_NAME" "result file missing required \"status\" field"
+  # jq -er exits non-zero for both absent .status AND .status: null —
+  # both indicate a malformed agent output and are treated identically here
+  report_failed "$AGENT_NAME" "result file missing or null \"status\" field"
 elif [ "$STATUS" != "success" ]; then
   REASON=$(jq -r '.reason // "no reason given"' "$RESULT")
   report_failed "$AGENT_NAME" "$REASON"
