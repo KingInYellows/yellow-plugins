@@ -442,30 +442,38 @@ it at a Phase 1b checkpoint.
 
 2. Check test coverage meets project standards.
 
-3. For complex changes, run reviewer agents in parallel using Task tool:
+3. For complex changes, run reviewer agents in parallel using Task tool.
+   **Each Task invocation MUST set `run_in_background: true`** — the review
+   agents declare `background: true` in their frontmatter, but true parallelism
+   also requires the spawning call to run in the background. Wait for all
+   agents via TaskOutput before aggregating findings.
 
    ```
    Task: code-simplicity-reviewer
    Input: {changed_files, diff}
    Goal: Identify overly complex code, suggest simplifications
+   run_in_background: true
    ```
 
    ```
    Task: security-sentinel
    Input: {changed_files, diff}
    Goal: Find security vulnerabilities, unsafe patterns
+   run_in_background: true
    ```
 
    ```
    Task: performance-oracle
    Input: {changed_files, diff}
    Goal: Identify performance issues, optimization opportunities
+   run_in_background: true
    ```
 
    ```
    Task: polyglot-reviewer
    Input: {changed_files, diff}
    Goal: Check language-specific best practices, idioms
+   run_in_background: true
    ```
 
 4. Present agent findings summary:

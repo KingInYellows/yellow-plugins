@@ -2,7 +2,8 @@
 name: code-reviewer
 description: "General code review for correctness, CLAUDE.md compliance, and project conventions. Use when reviewing any PR for code quality, style violations, logic errors, or guideline adherence. Always selected during adaptive review."
 model: inherit
-memory: true
+background: true
+memory: project
 tools:
   - Read
   - Grep

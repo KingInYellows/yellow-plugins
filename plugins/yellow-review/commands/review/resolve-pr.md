@@ -103,10 +103,21 @@ tool with:
 - File path and line number
 - PR context (title, description)
 
-Launch all resolvers in parallel. Each agent reads context and edits files
-directly. Claude Code serializes concurrent Edit calls, but if multiple agents
-target overlapping file regions, later edits may fail. Review the aggregate diff
-in Step 5.
+Launch all resolvers in parallel. **Each Task invocation MUST set
+`run_in_background: true`** — `pr-comment-resolver` declares `background: true`
+in its frontmatter, but true parallelism also requires the spawning call to run
+in the background. Without this, the orchestrator blocks on each resolver
+sequentially even when they are independent.
+
+Each agent reads context and edits files directly. Claude Code serializes
+concurrent Edit calls, but if multiple agents target overlapping file regions,
+later edits may fail. Review the aggregate diff in Step 5.
+
+**Wait gate:** Before proceeding to Step 5, wait for all background resolver
+tasks to complete (e.g., via TaskOutput / TaskList polling, or equivalent
+notification). Do NOT proceed to commit, diff review, or thread resolution
+while any resolver task is still `in_progress` — doing so risks committing
+partial fixes and marking threads resolved prematurely.
 
 ### Step 5: Review Changes
 
