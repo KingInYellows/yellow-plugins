@@ -76,48 +76,42 @@ else
 fi
 
 printf '\n=== Environment Variables ===\n'
-if [ -n "${MORPH_API_KEY:-}" ]; then
-  printf 'MORPH_API_KEY:             set (shell env)\n'
-elif grep -q '"morph_api_key"' "${HOME}/.claude/settings.json" 2>/dev/null; then
-  printf 'MORPH_API_KEY:             set (userConfig)\n'
-else
-  printf 'MORPH_API_KEY:             NOT SET\n'
-fi
-if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
-  printf 'DEVIN_SERVICE_USER_TOKEN:  set (shell env)\n'
-elif grep -q '"devin_service_user_token"' "${HOME}/.claude/settings.json" 2>/dev/null; then
-  printf 'DEVIN_SERVICE_USER_TOKEN:  set (userConfig)\n'
-else
-  printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET\n'
-fi
-if [ -n "${DEVIN_ORG_ID:-}" ]; then
-  printf 'DEVIN_ORG_ID:              set (shell env)\n'
-elif grep -q '"devin_org_id"' "${HOME}/.claude/settings.json" 2>/dev/null; then
-  printf 'DEVIN_ORG_ID:              set (userConfig)\n'
-else
-  printf 'DEVIN_ORG_ID:              NOT SET\n'
-fi
-if [ -n "${SEMGREP_APP_TOKEN:-}" ]; then
-  printf 'SEMGREP_APP_TOKEN:         set (shell env)\n'
-elif grep -q '"semgrep_app_token"' "${HOME}/.claude/settings.json" 2>/dev/null; then
-  printf 'SEMGREP_APP_TOKEN:         set (userConfig)\n'
-else
-  printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
-fi
-[ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
-check_research_key() {
-  local env_name="$1" cfg_key="$2" label="$3"
+# has_userconfig <plugin-name> <option-name> — path-scoped check of
+# pluginConfigs.<plugin>.options.<option> in ~/.claude/settings.json.
+# Uses jq when available (exact path match, immune to false positives
+# from arbitrary strings elsewhere in the file); falls back to a two-step
+# grep that still requires the plugin name AND option name to appear.
+has_userconfig() {
+  local plugin="$1" option="$2"
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>&1
+  else
+    grep -q "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -q "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+check_key() {
+  local env_name="$1" plugin="$2" option="$3" label="$4"
   if [ -n "${!env_name:-}" ]; then
     printf '%-26s set (shell env)\n' "$label:"
-  elif grep -q "\"$cfg_key\"" "${HOME}/.claude/settings.json" 2>/dev/null; then
+  elif has_userconfig "$plugin" "$option"; then
     printf '%-26s set (userConfig)\n' "$label:"
   else
     printf '%-26s NOT SET\n' "$label:"
   fi
 }
-check_research_key EXA_API_KEY exa_api_key EXA_API_KEY
-check_research_key TAVILY_API_KEY tavily_api_key TAVILY_API_KEY
-check_research_key PERPLEXITY_API_KEY perplexity_api_key PERPLEXITY_API_KEY
+check_key MORPH_API_KEY              yellow-morph    morph_api_key             MORPH_API_KEY
+check_key DEVIN_SERVICE_USER_TOKEN   yellow-devin    devin_service_user_token  DEVIN_SERVICE_USER_TOKEN
+check_key DEVIN_ORG_ID               yellow-devin    devin_org_id              DEVIN_ORG_ID
+check_key SEMGREP_APP_TOKEN          yellow-semgrep  semgrep_app_token         SEMGREP_APP_TOKEN
+[ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
+check_key EXA_API_KEY         yellow-research exa_api_key         EXA_API_KEY
+check_key TAVILY_API_KEY      yellow-research tavily_api_key      TAVILY_API_KEY
+check_key PERPLEXITY_API_KEY  yellow-research perplexity_api_key  PERPLEXITY_API_KEY
 
 printf '\n=== Repository State ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)

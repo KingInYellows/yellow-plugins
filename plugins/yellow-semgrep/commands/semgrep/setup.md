@@ -145,6 +145,33 @@ Check `SEMGREP_APP_TOKEN` is set. Validate format matches `^sgp_[a-zA-Z0-9]{20,}
 Never echo the token value. Redact with
 `sed 's/sgp_[a-zA-Z0-9]*/***REDACTED***/g'`.
 
+**Dual-source note (2.1.0+):** The MCP server reads the token from
+`userConfig.semgrep_app_token` (keychain-backed). These setup-time curl
+calls and the `/semgrep:*` remediation commands still read the shell
+`SEMGREP_APP_TOKEN`. If your MCP is working (tools visible) but curl
+returns 401 here, you likely have userConfig set without the shell
+export — the two sources have drifted. Detect and warn:
+
+```bash
+if [ -z "${SEMGREP_APP_TOKEN:-}" ]; then
+  has_uc=1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e '.pluginConfigs."yellow-semgrep".options.semgrep_app_token // empty' \
+      "${HOME}/.claude/settings.json" >/dev/null 2>&1 || has_uc=0
+  else
+    grep -q '"yellow-semgrep"' "${HOME}/.claude/settings.json" 2>/dev/null \
+      && grep -q '"semgrep_app_token"' "${HOME}/.claude/settings.json" 2>/dev/null \
+      || has_uc=0
+  fi
+  if [ "$has_uc" = 1 ]; then
+    printf 'WARNING: MCP has userConfig but shell SEMGREP_APP_TOKEN is unset.\n'
+    printf '         /semgrep:fix, /semgrep:status, and this /semgrep:setup curl\n'
+    printf '         will return 401. Add to your shell profile:\n'
+    printf '           export SEMGREP_APP_TOKEN="<your-sgp-token>"\n'
+  fi
+fi
+```
+
 Hit `GET /api/v1/me` to validate Web API scope. Use the three-layer error check
 from the `semgrep-conventions` skill.
 

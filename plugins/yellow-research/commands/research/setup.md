@@ -100,11 +100,29 @@ else
 fi
 
 printf '\n=== API Keys ===\n'
+# Path-scoped userConfig lookup — uses jq for exact matching on
+# .pluginConfigs."yellow-research".options.<option>, falls back to a
+# two-step grep that still requires both the plugin name and option name
+# to appear (safer than a flat string grep which could match arbitrary
+# values elsewhere in settings.json).
+has_userconfig() {
+  local option="$1"
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg o "$option" \
+      '.pluginConfigs."yellow-research".options[$o] // empty' \
+      "$settings" >/dev/null 2>&1
+  else
+    grep -q '"yellow-research"' "$settings" 2>/dev/null \
+      && grep -q "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
 check_key() {
   local env_name="$1" cfg_key="$2" label="$3"
   if [ -n "${!env_name:-}" ]; then
     printf '%-22s set (shell env)\n' "$label:"
-  elif grep -q "\"$cfg_key\"" "${HOME}/.claude/settings.json" 2>/dev/null; then
+  elif has_userconfig "$cfg_key"; then
     printf '%-22s set (userConfig)\n' "$label:"
   else
     printf '%-22s NOT SET\n' "$label:"

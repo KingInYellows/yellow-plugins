@@ -26,19 +26,51 @@ command -v curl >/dev/null 2>&1 && printf 'curl: ok\n' || printf 'curl: NOT FOUN
 command -v jq  >/dev/null 2>&1 && printf 'jq:   ok\n' || printf 'jq:   NOT FOUND\n'
 
 printf '\n=== Credentials ===\n'
+# Path-scoped userConfig lookup. Prefer jq for exact matching; fall back to
+# grep of both the plugin name AND option name (less precise but better
+# than a flat string grep that could match arbitrary values).
+has_userconfig() {
+  local option="$1"
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg o "$option" \
+      '.pluginConfigs."yellow-devin".options[$o] // empty' \
+      "$settings" >/dev/null 2>&1
+  else
+    grep -q '"yellow-devin"' "$settings" 2>/dev/null \
+      && grep -q "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+
 if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
+  TOKEN_SRC=shell
   printf '%-28s set (shell env)\n' 'DEVIN_SERVICE_USER_TOKEN:'
-elif grep -q '"devin_service_user_token"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+elif has_userconfig devin_service_user_token; then
+  TOKEN_SRC=userconfig
   printf '%-28s set (userConfig, keychain)\n' 'DEVIN_SERVICE_USER_TOKEN:'
 else
+  TOKEN_SRC=none
   printf '%-28s NOT SET\n' 'DEVIN_SERVICE_USER_TOKEN:'
 fi
 if [ -n "${DEVIN_ORG_ID:-}" ]; then
   printf '%-28s set (shell env)\n' 'DEVIN_ORG_ID:'
-elif grep -q '"devin_org_id"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+elif has_userconfig devin_org_id; then
   printf '%-28s set (userConfig)\n' 'DEVIN_ORG_ID:'
 else
   printf '%-28s NOT SET\n' 'DEVIN_ORG_ID:'
+fi
+
+# Dual-source drift warning: /devin:* commands invoke curl with shell env.
+# If only userConfig is set, Claude Code Prompted for the token at plugin
+# enable and stored it in the keychain, but the curl commands will 401
+# because they read the shell env var which is empty.
+if [ "$TOKEN_SRC" = userconfig ] && [ -z "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
+  printf '\nWARNING: userConfig is set but shell DEVIN_SERVICE_USER_TOKEN is unset.\n'
+  printf '         /devin:* commands use curl directly and will return 401 until\n'
+  printf '         you also add:\n'
+  printf '           export DEVIN_SERVICE_USER_TOKEN="<your-cog-token>"\n'
+  printf '         to ~/.zshrc or ~/.bashrc.\n'
 fi
 ```
 
