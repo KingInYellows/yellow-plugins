@@ -30,21 +30,40 @@ unset MORPH_API_KEY_USERCONFIG
 : "${CLAUDE_PLUGIN_ROOT:?yellow-morph wrapper: CLAUDE_PLUGIN_ROOT is unset}"
 : "${CLAUDE_PLUGIN_DATA:?yellow-morph wrapper: CLAUDE_PLUGIN_DATA is unset}"
 
+# Defense in depth: Claude Code sets CLAUDE_PLUGIN_DATA to a path under the
+# user's home directory. If something else populated these vars with an
+# unexpected path (misconfiguration or compromised env), refuse to install —
+# we do not want `cp` / `npm ci` to write to e.g. /etc or /var.
+case "$CLAUDE_PLUGIN_DATA" in
+  "$HOME"/*|/tmp/*) ;;
+  *) printf 'yellow-morph: refusing install — CLAUDE_PLUGIN_DATA is not under $HOME or /tmp: %s\n' "$CLAUDE_PLUGIN_DATA" >&2; exit 1 ;;
+esac
+case "$CLAUDE_PLUGIN_ROOT" in
+  "$HOME"/*|/tmp/*|/usr/*|/opt/*) ;;
+  *) printf 'yellow-morph: refusing install — CLAUDE_PLUGIN_ROOT has unexpected prefix: %s\n' "$CLAUDE_PLUGIN_ROOT" >&2; exit 1 ;;
+esac
+
 MORPH_ENTRY="${CLAUDE_PLUGIN_DATA}/node_modules/@morphllm/morphmcp/dist/index.js"
 
 if [ ! -f "$MORPH_ENTRY" ]; then
   mkdir -p "$CLAUDE_PLUGIN_DATA"
-  # Copy the plugin's package.json so `npm install` has a manifest to act on.
+  # Copy both the manifest AND the committed lockfile so `npm ci` can do a
+  # deterministic, transitive-pinned install. Without the lockfile, npm
+  # falls back to lockfile-less resolution and silently installs whatever
+  # transitive versions the registry currently advertises — a supply-chain
+  # risk that defeats the point of pinning @morphllm/morphmcp.
   cp "${CLAUDE_PLUGIN_ROOT}/package.json" "${CLAUDE_PLUGIN_DATA}/package.json"
-  # Install. Emit progress to stderr so Claude Code shows it during the
-  # first-session delay instead of hanging the tool call silently.
+  cp "${CLAUDE_PLUGIN_ROOT}/package-lock.json" "${CLAUDE_PLUGIN_DATA}/package-lock.json"
+  # Install in a subshell that does NOT inherit MORPH_API_KEY — a malicious
+  # postinstall script in any transitive dep could otherwise exfiltrate the
+  # key before the real MCP server ever starts.
   printf 'yellow-morph: first-run install of @morphllm/morphmcp into %s...\n' \
     "$CLAUDE_PLUGIN_DATA" >&2
-  if ! (cd "$CLAUDE_PLUGIN_DATA" && npm install --no-audit --no-fund --loglevel=error) >&2; then
-    printf 'yellow-morph: npm install failed. Run /morph:setup to diagnose.\n' >&2
-    # Remove the copied manifest so the next session retries instead of
-    # seeing an out-of-sync state.
-    rm -f "${CLAUDE_PLUGIN_DATA}/package.json"
+  if ! (unset MORPH_API_KEY; cd "$CLAUDE_PLUGIN_DATA" && npm ci --no-audit --no-fund --loglevel=error) >&2; then
+    printf 'yellow-morph: npm ci failed. Run /morph:setup to diagnose.\n' >&2
+    # Remove the copied manifest+lockfile so the next session retries
+    # instead of seeing an out-of-sync state.
+    rm -f "${CLAUDE_PLUGIN_DATA}/package.json" "${CLAUDE_PLUGIN_DATA}/package-lock.json"
     exit 1
   fi
 fi

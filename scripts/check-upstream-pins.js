@@ -21,7 +21,11 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
+
+// Allowlist for npm package names: scope + name chars per npm-name-validator,
+// length capped at the registry's documented 214-char limit.
+const NPM_NAME_OK = /^(?:@[a-z0-9][a-z0-9._~-]{0,213}\/)?[a-z0-9][a-z0-9._~-]{0,213}$/i;
 
 const ROOT = path.resolve(__dirname, '..');
 const PLUGINS_DIR = path.join(ROOT, 'plugins');
@@ -77,10 +81,16 @@ function walkMcpServers(pluginJson, fn) {
 }
 
 function getNpmLatest(pkg) {
+  // Reject names that do not match the npm allowlist — prevents the name
+  // becoming a shell-injection vector if a plugin.json or package.json is
+  // ever crafted maliciously. execFileSync below avoids shell parsing, but
+  // belt-and-suspenders is cheap here.
+  if (typeof pkg !== 'string' || !NPM_NAME_OK.test(pkg)) return null;
   try {
-    const out = execSync(`npm view ${pkg} version --silent 2>/dev/null`, {
+    const out = execFileSync('npm', ['view', pkg, 'version', '--silent'], {
       encoding: 'utf8',
       timeout: 10000,
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     return out || null;
   } catch {
@@ -137,6 +147,7 @@ function main() {
           if (typeof rawVersion !== 'string') continue;
           // Skip ^X.Y.Z / ~X.Y.Z / workspace: / file: / git+ — we want exact only
           if (!/^\d+\.\d+\.\d+[A-Za-z0-9.+-]*$/.test(rawVersion)) continue;
+          if (!NPM_NAME_OK.test(name)) continue;
           report.npm.push({ plugin, serverName: '(package.json)', name, version: rawVersion });
         }
       } catch {

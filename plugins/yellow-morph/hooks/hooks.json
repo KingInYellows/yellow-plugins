@@ -4,7 +4,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "diff -q \"${CLAUDE_PLUGIN_ROOT}/package.json\" \"${CLAUDE_PLUGIN_DATA}/package.json\" >/dev/null 2>&1 || (mkdir -p \"${CLAUDE_PLUGIN_DATA}\" && cp \"${CLAUDE_PLUGIN_ROOT}/package.json\" \"${CLAUDE_PLUGIN_DATA}/package.json\" && cd \"${CLAUDE_PLUGIN_DATA}\" && npm install --no-audit --no-fund --loglevel=error) || rm -f \"${CLAUDE_PLUGIN_DATA}/package.json\""
+          "command": "case \"${CLAUDE_PLUGIN_DATA}\" in \"${HOME}\"/*|/tmp/*) : ;; *) exit 0 ;; esac; diff -q \"${CLAUDE_PLUGIN_ROOT}/package-lock.json\" \"${CLAUDE_PLUGIN_DATA}/package-lock.json\" >/dev/null 2>&1 || (mkdir -p \"${CLAUDE_PLUGIN_DATA}\" && cp \"${CLAUDE_PLUGIN_ROOT}/package.json\" \"${CLAUDE_PLUGIN_DATA}/package.json\" && cp \"${CLAUDE_PLUGIN_ROOT}/package-lock.json\" \"${CLAUDE_PLUGIN_DATA}/package-lock.json\" && cd \"${CLAUDE_PLUGIN_DATA}\" && env -u MORPH_API_KEY npm ci --no-audit --no-fund --loglevel=error) || rm -f \"${CLAUDE_PLUGIN_DATA}/package.json\" \"${CLAUDE_PLUGIN_DATA}/package-lock.json\""
         }
       ]
     }
