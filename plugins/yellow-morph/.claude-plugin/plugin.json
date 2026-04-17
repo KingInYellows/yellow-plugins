@@ -18,10 +18,10 @@
   },
   "mcpServers": {
     "morph": {
-      "command": "npx",
-      "args": ["-y", "@morphllm/morphmcp@0.8.165"],
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-morph.sh",
+      "args": [],
       "env": {
-        "MORPH_API_KEY": "${user_config.morph_api_key}",
+        "MORPH_API_KEY_USERCONFIG": "${user_config.morph_api_key}",
         "DISABLED_TOOLS": "github_codebase_search",
         "WORKSPACE_MODE": "true"
       }

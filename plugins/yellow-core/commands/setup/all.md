@@ -76,7 +76,13 @@ else
 fi
 
 printf '\n=== Environment Variables ===\n'
-[ -n "${MORPH_API_KEY:-}" ] && printf 'MORPH_API_KEY:             set\n' || printf 'MORPH_API_KEY:             NOT SET\n'
+if [ -n "${MORPH_API_KEY:-}" ]; then
+  printf 'MORPH_API_KEY:             set (shell env)\n'
+elif grep -q '"morph_api_key"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+  printf 'MORPH_API_KEY:             set (userConfig)\n'
+else
+  printf 'MORPH_API_KEY:             NOT SET\n'
+fi
 [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf 'DEVIN_SERVICE_USER_TOKEN:  set\n' || printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET\n'
 [ -n "${DEVIN_ORG_ID:-}" ] && printf 'DEVIN_ORG_ID:              set\n' || printf 'DEVIN_ORG_ID:              NOT SET\n'
 [ -n "${SEMGREP_APP_TOKEN:-}" ] && printf 'SEMGREP_APP_TOKEN:         set\n' || printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
@@ -235,9 +241,23 @@ as **NOT INSTALLED** and skip all other checks for that plugin.
 
 **yellow-morph:**
 
-- READY: `node18_check` ok AND `npx` OK AND `rg` OK AND `MORPH_API_KEY` set
-- PARTIAL: local prerequisites are satisfied but `MORPH_API_KEY` is NOT SET
-- NEEDS SETUP: any local prerequisite missing (`node18_check`, `npx`, or `rg`)
+The Morph API key can be supplied via either the plugin's `userConfig`
+prompt (stored in the system keychain, preferred) or a shell
+`MORPH_API_KEY` export (power-user fallback). Neither is visible to
+shell checks directly, so treat READY as "key is configured via *some*
+path" and rely on `/morph:status` for authoritative OFFLINE detection.
+
+- READY: `node18_check` ok AND `npx` OK AND `rg` OK AND either of:
+  (a) shell `MORPH_API_KEY` set, OR
+  (b) `pluginConfigs.yellow-morph.options.morph_api_key` present in
+      `~/.claude/settings.json` (userConfig was answered). Detection:
+      `grep -q '"morph_api_key"' ~/.claude/settings.json 2>/dev/null`.
+- PARTIAL: local prerequisites are satisfied but neither the shell env
+  var nor the userConfig option is detectable — the plugin will install
+  but the MCP server will not start. Recommend running `/morph:setup`
+  or answering the userConfig prompt at next plugin-enable.
+- NEEDS SETUP: any local prerequisite missing (`node18_check`, `npx`, or
+  `rg`).
 
 **yellow-devin:**
 
