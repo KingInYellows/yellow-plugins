@@ -443,43 +443,63 @@ it at a Phase 1b checkpoint.
 2. Check test coverage meets project standards.
 
 3. For complex changes, run reviewer agents in parallel using Task tool.
-   **Each Task invocation MUST set `run_in_background: true`** — the review
-   agents declare `background: true` in their frontmatter, but true parallelism
-   also requires the spawning call to run in the background. Wait for all
+
+   **3a. Create the per-run directory FIRST (before any Task spawn)** so
+   each agent receives a path to write its result file to. The directory
+   prevents collisions between concurrent workflow sessions:
+
+   ```bash
+   RUN_DIR=$(mktemp -d -t run-XXXXXXXX)
+   ```
+
+   **3b. Spawn agents in parallel.** Each Task invocation MUST set
+   `run_in_background: true` — the review agents declare `background: true`
+   in their frontmatter, but true parallelism also requires the spawning
+   call to run in the background. Pass `$RUN_DIR` to each agent so it can
+   write `$RUN_DIR/agent-result-<agent-name>.json` (see
+   `create-agent-skills` skill §Subagent Failure Convention). Wait for all
    agents via TaskOutput before aggregating findings.
 
    ```
    Task: code-simplicity-reviewer
-   Input: {changed_files, diff}
+   Input: {changed_files, diff, run_dir: $RUN_DIR}
    Goal: Identify overly complex code, suggest simplifications
    run_in_background: true
    ```
 
    ```
    Task: security-sentinel
-   Input: {changed_files, diff}
+   Input: {changed_files, diff, run_dir: $RUN_DIR}
    Goal: Find security vulnerabilities, unsafe patterns
    run_in_background: true
    ```
 
    ```
    Task: performance-oracle
-   Input: {changed_files, diff}
+   Input: {changed_files, diff, run_dir: $RUN_DIR}
    Goal: Identify performance issues, optimization opportunities
    run_in_background: true
    ```
 
    ```
    Task: polyglot-reviewer
-   Input: {changed_files, diff}
+   Input: {changed_files, diff, run_dir: $RUN_DIR}
    Goal: Check language-specific best practices, idioms
    run_in_background: true
    ```
 
-4. Present agent findings summary:
+4. Collect agent findings from `$RUN_DIR/agent-result-<agent-name>.json`
+   files. Each agent writes its result with a `status` and `findings`
+   before exiting. After TaskOutput completes, read each file. Agents with
+   missing files, invalid JSON, or `status != "success"` are logged as
+   failed and surfaced in the summary — not silently dropped.
+
+   Present the consolidated agent findings:
    - Critical issues (P1): Must fix before merge
    - Important issues (P2): Should fix now or create follow-up
    - Nice-to-have (P3): Optional improvements
+   - Failed agents (if any): agent name + failure reason, so the user knows
+     which concerns were NOT evaluated
 
 5. Address critical and important issues:
    - Fix P1 issues immediately
