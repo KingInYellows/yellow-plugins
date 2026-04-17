@@ -2,6 +2,7 @@
 name: devin-orchestrator
 description: Multi-step workflow orchestrator for Claude Code + Devin collaboration. Use when user wants a full plan-implement-review-fix cycle, says "orchestrate this with Devin", "have Devin implement my plan", or delegates a complex task that needs iterative refinement.
 model: inherit
+memory: project
 skills:
   - devin-workflows
 tools:
