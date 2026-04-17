@@ -22,12 +22,43 @@ cd "$ROOT" || exit 1
 errors=0
 warnings=0
 
+# When run inside GitHub Actions, also emit native ::warning::/::error::
+# annotations so findings surface in the PR UI instead of being buried in raw
+# job logs. Annotations go to stdout (where GitHub parses them); the human-
+# readable [lint-plugins] line continues to go to stderr unchanged.
+#
+# GitHub's workflow-command parser requires %, CR, and LF in the message
+# body to be URL-encoded, otherwise the annotation is truncated or malformed.
+# File paths get the same treatment for safety.
+ga_escape() {
+  printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk 'BEGIN{ORS=""} {if(NR>1) printf "%%0A"; print}'
+}
+
+emit_annotation() {
+  # $1=level (warning|error), $2=message
+  local level="$1" msg="$2" file escaped_file escaped_msg
+  [ "${GITHUB_ACTIONS:-}" = "true" ] || return 0
+  # grep -o returns 1 with no match; under set -e that would abort the script.
+  # Tolerate misses and let $file stay empty so we fall through to the
+  # unanchored annotation form below.
+  file=$(printf '%s' "$msg" | grep -oE 'plugins/[A-Za-z0-9._/-]+\.md' | head -1 || true)
+  escaped_msg=$(ga_escape "$msg")
+  if [ -n "$file" ]; then
+    escaped_file=$(ga_escape "$file")
+    printf '::%s file=%s::%s\n' "$level" "$escaped_file" "$escaped_msg"
+  else
+    printf '::%s::%s\n' "$level" "$escaped_msg"
+  fi
+}
+
 err() {
   printf '[lint-plugins] ERROR: %s\n' "$*" >&2
+  emit_annotation error "$*"
   errors=$((errors + 1))
 }
 warn() {
   printf '[lint-plugins] WARN:  %s\n' "$*" >&2
+  emit_annotation warning "$*"
   warnings=$((warnings + 1))
 }
 
