@@ -370,6 +370,10 @@ persona dispatch table above and use the pre-Wave-2 adaptive selection:
 - Cross-plugin via Task: `security-sentinel` (yellow-core),
   `architecture-strategist`, `performance-oracle`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`
+- Optional supplementary: `codex-reviewer` (yellow-codex) — when yellow-codex
+  is installed AND diff > 100 lines. Spawn via
+  `Task(subagent_type="yellow-codex:codex-reviewer", run_in_background=true)`.
+  If the agent is not found (yellow-codex not installed), skip silently.
 
 Same graceful-degradation guard applies. The legacy path is a rollback
 escape hatch only — it skips the confidence-rubric aggregation in Step 6.
@@ -390,7 +394,17 @@ pipeline (`review_pipeline: persona`, the default).
 ### Step 5: Pass 1 — Parallel Persona Dispatch
 
 Launch all selected agents EXCEPT `code-simplifier` in parallel via Task
-tool. Each agent receives:
+tool. **Each Task invocation MUST set `run_in_background: true`** — the
+review agents declare `background: true` in their frontmatter, but true
+parallelism also requires the spawning call to run in the background.
+Without this, the orchestrator blocks on each agent sequentially even
+when they are independent.
+
+After dispatch, wait for all agents via TaskOutput (or equivalent).
+Collect findings; log any failed agents with error reason. Do NOT
+proceed to Step 6 while any agent task is still `in_progress`.
+
+Each agent receives:
 
 1. Their persona file content (loaded automatically by Task)
 2. **Shared review context, fenced as untrusted.** PR title, body, and diff

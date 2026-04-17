@@ -78,19 +78,30 @@ research, analysis, and structured documentation.
 
 **Steps:**
 
-1. Launch research agents in parallel using Task tool:
+1. Launch research agents in parallel using Task tool. **Each Task invocation
+   MUST set `run_in_background: true`** — both research agents declare
+   `background: true` in their frontmatter, but the spawning call must also
+   run in the background so the two agents execute concurrently rather than
+   serially:
 
    ```
    Task: repo-research-analyst
    Input: {feature_description}
    Goal: Find relevant files, existing patterns, similar implementations
+   run_in_background: true
    ```
 
    ```
    Task: best-practices-researcher
    Input: {feature_description}
    Goal: Identify project conventions, architectural patterns, testing approaches
+   run_in_background: true
    ```
+
+   **Wait gate:** Before Step 2, wait for both background research tasks to
+   complete via TaskOutput (or equivalent). Do not proceed to "Collect
+   findings" while either agent is still running — the aggregation depends
+   on both outputs being available.
 
 2. Collect findings:
    - File paths that need modification
