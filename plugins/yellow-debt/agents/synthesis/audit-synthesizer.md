@@ -1,7 +1,7 @@
 ---
 name: audit-synthesizer
 description: "Merge scanner outputs, deduplicate findings, score severity, and generate reports. Use when synthesizing results from multiple debt scanners."
-model: inherit
+model: opus
 background: true
 skills:
   - debt-conventions
