@@ -5,12 +5,17 @@ on:
     paths:
       - 'plugins/**'
       - 'scripts/lint-plugins.sh'
+      - 'tests/lint-plugins.bats'
+      - 'fixtures/lint/**'
       - '.github/workflows/lint-plugins.yml'
   push:
     branches: [main]
     paths:
       - 'plugins/**'
       - 'scripts/lint-plugins.sh'
+      - 'tests/lint-plugins.bats'
+      - 'fixtures/lint/**'
+      - '.github/workflows/lint-plugins.yml'
 
 permissions:
   contents: read
@@ -26,6 +31,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Bats
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats
+
+      - name: Self-test lint script (fixture-based, Bats)
+        run: bats tests/lint-plugins.bats
 
       - name: Run plugin frontmatter and convention lint
         run: bash scripts/lint-plugins.sh
