@@ -3,7 +3,7 @@ name: research-conductor
 description: "Routes /research:deep queries across multiple MCP sources. Use when deep research needs multi-source investigation. Triages complexity and dispatches parallel fan-out -- simple queries try Ceramic first (keyword-tight) and fall back to Perplexity; moderate runs Ceramic plus 2-3 parallel sources; complex topics trigger full fan-out including Parallel Task MCP for async reports."
 model: inherit
 background: true
-memory: true
+memory: project
 tools:
   - Task
   - ToolSearch
