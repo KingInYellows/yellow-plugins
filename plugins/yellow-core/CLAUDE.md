@@ -51,12 +51,14 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (5)
+### Skills (7)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `create-agent-skills` — guidance for creating skills and agents
 - `git-worktree` — git worktree management for parallel development
-- `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
+- `memory-recall-pattern` — Recall-Before-Act pattern for ruvector at workflow start (internal)
+- `memory-remember-pattern` — Tiered-Remember-After-Act pattern for ruvector at workflow end (internal)
+- `morph-discovery-pattern` — Morph discovery + fallback at runtime via ToolSearch (internal)
 - `security-fencing` — canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files); single source of truth for the inlined `CRITICAL SECURITY RULES` block (internal)
 
 ### Optional Plugin Dependencies
@@ -87,9 +89,10 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ### MCP Tool Integration
 
-- **ruvector** — Recall past learnings at workflow start; tiered remember at
-  workflow end. Graceful skip if yellow-ruvector not installed. See
-  `mcp-integration-patterns` skill for canonical patterns.
+- **ruvector** — Recall past learnings at workflow start (see
+  `memory-recall-pattern` skill); tiered remember at workflow end (see
+  `memory-remember-pattern` skill). Graceful skip if yellow-ruvector not
+  installed.
 - **morph** — Preferred for file edits (>200 lines or 3+ non-contiguous
-  regions) and intent-based code search. Discovered via ToolSearch at runtime;
-  falls back to built-in tools silently.
+  regions) and intent-based code search. Discovered via ToolSearch at runtime
+  (see `morph-discovery-pattern` skill); falls back to built-in tools silently.
