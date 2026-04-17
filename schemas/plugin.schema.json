@@ -5,6 +5,38 @@
   "description": "Schema for Claude Code plugin.json files. Requires official fields (name, description, author) and allows optional metadata fields.",
   "type": "object",
   "required": ["name", "version", "description", "author"],
+  "definitions": {
+    "relativePath": {
+      "type": "string",
+      "pattern": "^\\./(?!.*\\.\\.)[A-Za-z0-9._/-]+/?$"
+    },
+    "pathOrPaths": {
+      "oneOf": [
+        { "$ref": "#/definitions/relativePath" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/definitions/relativePath" },
+          "minItems": 1
+        }
+      ]
+    },
+    "pathPathsOrInline": {
+      "oneOf": [
+        { "$ref": "#/definitions/relativePath" },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/definitions/relativePath" },
+              { "type": "object" }
+            ]
+          },
+          "minItems": 1
+        },
+        { "type": "object" }
+      ]
+    }
+  },
   "properties": {
     "name": {
       "type": "string",
@@ -100,26 +132,149 @@
       "description": "Searchable keywords in kebab-case."
     },
     "mcpServers": {
-      "type": "object",
-      "description": "MCP server configurations keyed by server name."
+      "$ref": "#/definitions/pathPathsOrInline",
+      "description": "MCP server configurations: relative path string, array of paths/inline objects, or inline object keyed by server name."
     },
     "hooks": {
-      "oneOf": [
-        {
-          "type": "string",
-          "description": "Path to hooks configuration file (legacy)."
-        },
-        {
-          "type": "object",
-          "description": "Inline hooks configuration keyed by event name (PreToolUse, PostToolUse, Stop, etc.)."
-        }
-      ],
-      "description": "Hooks configuration — inline object (preferred) or path to hooks file (string)."
+      "$ref": "#/definitions/pathPathsOrInline",
+      "description": "Hooks configuration: relative path string, array of paths/inline objects, or inline object keyed by event name (PreToolUse, PostToolUse, Stop, etc.)."
     },
     "outputStyles": {
-      "type": "string",
-      "pattern": "^(\\./)?(?!.*\\.\\.)[A-Za-z0-9._/-]+/?$",
-      "description": "Path to a directory of markdown output style files."
+      "$ref": "#/definitions/pathOrPaths",
+      "description": "Path or array of paths to markdown output style files/directories (replaces default ./output-styles/)."
+    },
+    "commands": {
+      "$ref": "#/definitions/pathOrPaths",
+      "description": "Path or array of paths to slash command markdown files/directories (replaces default ./commands/)."
+    },
+    "agents": {
+      "$ref": "#/definitions/pathOrPaths",
+      "description": "Path or array of paths to agent markdown files/directories (replaces default ./agents/)."
+    },
+    "skills": {
+      "$ref": "#/definitions/pathOrPaths",
+      "description": "Path or array of paths to skill directories containing SKILL.md (replaces default ./skills/)."
+    },
+    "lspServers": {
+      "$ref": "#/definitions/pathPathsOrInline",
+      "description": "LSP server configurations: relative path string, array of paths/inline objects, or inline object keyed by language/server name."
+    },
+    "monitors": {
+      "oneOf": [
+        { "$ref": "#/definitions/relativePath" },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "command", "description"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "description": "Identifier unique within the plugin."
+              },
+              "command": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Shell command run as a persistent background process."
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Short summary shown in the task panel and notifications."
+              },
+              "when": {
+                "type": "string",
+                "pattern": "^(always|on-skill-invoke:[A-Za-z0-9_-]+)$",
+                "description": "When the monitor starts: 'always' (default) or 'on-skill-invoke:<skill-name>'."
+              }
+            },
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      ],
+      "description": "Background monitor configurations: relative path string or inline array of monitor entries."
+    },
+    "userConfig": {
+      "type": "object",
+      "description": "Config keys prompted at install time. Values substituted as ${user_config.KEY} and exported as CLAUDE_PLUGIN_OPTION_<KEY> env vars. Each entry may declare type, label, description, default, required, sensitive.",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["string", "number", "boolean"]
+          },
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "default": {},
+          "required": { "type": "boolean" },
+          "sensitive": {
+            "type": "boolean",
+            "description": "Store value in OS keychain when true."
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "channels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["server"],
+        "properties": {
+          "server": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of an MCP server defined in this plugin's mcpServers."
+          },
+          "userConfig": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            },
+            "additionalProperties": {
+              "type": "object"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "minItems": 1,
+      "description": "Channel declarations for message injection (Telegram, Slack, Discord style). Each binds to an MCP server in this plugin."
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "description": "Plugin name (any version)."
+          },
+          {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "description": "Semver constraint such as ^1.2.0, ~2.1.0, or >=3.0.0."
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "minItems": 1,
+      "description": "Other plugins this plugin requires, optionally with semver version constraints."
     }
   },
   "additionalProperties": false
