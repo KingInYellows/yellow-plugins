@@ -92,7 +92,11 @@ ROOT_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
 
 mkdir -p "$DATA_DIR"
 cp "${ROOT_DIR}/package.json" "${DATA_DIR}/package.json"
-(cd "$DATA_DIR" && npm install --no-audit --no-fund --loglevel=error) 2>&1
+cp "${ROOT_DIR}/package-lock.json" "${DATA_DIR}/package-lock.json"
+# Use `npm ci` (not `npm install`) to match the wrapper and hook — this
+# enforces the committed lockfile so the same transitive deps land here,
+# in SessionStart, and on first tool invocation.
+(cd "$DATA_DIR" && env -u MORPH_API_KEY npm ci --no-audit --no-fund --loglevel=error) 2>&1
 ```
 
 On success: "morphmcp installed to ${DATA_DIR}/node_modules. First tool
