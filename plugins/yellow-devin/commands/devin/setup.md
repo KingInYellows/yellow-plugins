@@ -26,27 +26,29 @@ command -v curl >/dev/null 2>&1 && printf 'curl: ok\n' || printf 'curl: NOT FOUN
 command -v jq  >/dev/null 2>&1 && printf 'jq:   ok\n' || printf 'jq:   NOT FOUND\n'
 
 printf '\n=== Credentials ===\n'
-# Path-scoped userConfig lookup. Prefer jq for exact matching; fall back to
-# grep of both the plugin name AND option name (less precise but better
-# than a flat string grep that could match arbitrary values).
+# 2-arg has_userconfig: mirror the canonical definition in
+# plugins/yellow-core/commands/setup/all.md. Keep these in sync manually
+# — if you change one, change all copies (search for "has_userconfig()"
+# across plugins/). `grep -qF` (fixed-string) guards against regex
+# metacharacters sneaking into the search pattern.
 has_userconfig() {
-  local option="$1"
+  local plugin="$1" option="$2"
   local settings="${HOME}/.claude/settings.json"
   [ -r "$settings" ] || return 1
   if command -v jq >/dev/null 2>&1; then
-    jq -e --arg o "$option" \
-      '.pluginConfigs."yellow-devin".options[$o] // empty' \
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
       "$settings" >/dev/null 2>&1
   else
-    grep -q '"yellow-devin"' "$settings" 2>/dev/null \
-      && grep -q "\"$option\"" "$settings" 2>/dev/null
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
   fi
 }
 
 if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
   TOKEN_SRC=shell
   printf '%-28s set (shell env)\n' 'DEVIN_SERVICE_USER_TOKEN:'
-elif has_userconfig devin_service_user_token; then
+elif has_userconfig yellow-devin devin_service_user_token; then
   TOKEN_SRC=userconfig
   printf '%-28s set (userConfig, keychain)\n' 'DEVIN_SERVICE_USER_TOKEN:'
 else
@@ -55,7 +57,7 @@ else
 fi
 if [ -n "${DEVIN_ORG_ID:-}" ]; then
   printf '%-28s set (shell env)\n' 'DEVIN_ORG_ID:'
-elif has_userconfig devin_org_id; then
+elif has_userconfig yellow-devin devin_org_id; then
   printf '%-28s set (userConfig)\n' 'DEVIN_ORG_ID:'
 else
   printf '%-28s NOT SET\n' 'DEVIN_ORG_ID:'

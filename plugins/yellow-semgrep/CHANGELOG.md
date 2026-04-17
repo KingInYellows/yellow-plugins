@@ -1,20 +1,24 @@
 # Changelog
 
-## 2.1.0
+## [3.0.0] - 2026-04-17
 
-### Minor Changes (small breaking config surface for MCP auth)
+### Major Changes
 
-- **`SEMGREP_APP_TOKEN` now read from `userConfig` by the MCP server.**
-  Migrated `mcpServers.semgrep.env.SEMGREP_APP_TOKEN` from shell env
-  interpolation (`${SEMGREP_APP_TOKEN}`) to Claude Code's native
-  `userConfig` (`${user_config.semgrep_app_token}`). The key is
-  sensitive and now prompts at plugin-enable time, stored in the system
-  keychain. This fixes the "MCP silently fails to start on fresh install
+- **Breaking:** `SEMGREP_APP_TOKEN` now read from `userConfig` by the MCP
+  server. Migrated `mcpServers.semgrep.env.SEMGREP_APP_TOKEN` from shell
+  env interpolation (`${SEMGREP_APP_TOKEN}`) to Claude Code's native
+  `userConfig` (`${user_config.semgrep_app_token}`). The key is marked
+  sensitive and prompts at plugin-enable time, stored in the system
+  keychain. Fixes the "MCP silently fails to start on fresh install
   because the shell env var wasn't exported before launching Claude
   Code" failure mode.
 - Curl-based REST calls in `/semgrep:*` commands continue to read the
   shell `SEMGREP_APP_TOKEN` — keep both sources in sync or run
   `/semgrep:setup`.
+- `/semgrep:setup` Step 2 now accepts either source: shell
+  `SEMGREP_APP_TOKEN` **or** userConfig `semgrep_app_token`. When only
+  userConfig is configured, the curl-based connectivity probe is
+  skipped (shell env is the path of record for curl in this plugin).
 
 ### Migration (existing users)
 
@@ -24,6 +28,10 @@
   correctly without a Claude Code restart.
 - If the prompt is skipped, the MCP will see an empty token and fail to
   start. Fix by running `/semgrep:setup` or toggling the plugin.
+- Power users who maintained a pure shell-env setup can continue by
+  leaving userConfig unset **and** adding a wrapper script as the
+  `mcpServers.semgrep.command` (see yellow-morph's `bin/start-morph.sh`
+  for a reference pattern), but this path is unsupported in 3.0.0.
 
 ## 2.0.0
 

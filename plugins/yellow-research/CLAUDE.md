@@ -110,9 +110,11 @@ For the **ast-grep** MCP server (other servers have no system prerequisites):
 If any prerequisite is missing, the ast-grep MCP server still starts (lazy
 check) but tools will fail on invocation. Other servers are unaffected.
 
-## API Key Setup
+## Required Credentials
 
-Each key is declared as an optional `userConfig` field in `plugin.json`.
+Each of the three API keys (perplexity, tavily, exa) is **optional** — the
+plugin degrades gracefully when any are missing. Each key is declared as
+an optional sensitive `userConfig` field in `plugin.json`.
 On first enable (or after `claude plugin update yellow-research`), Claude
 Code prompts for each key. Answer the prompts for the sources you want;
 dismiss the others. Values are stored in the system keychain (or
@@ -122,7 +124,7 @@ substituted into each MCP's env block via
 key changes.
 
 If you prefer shell env vars, that path no longer feeds the MCPs as of
-1.4.0 (the plugin.json references `${user_config.*}`, not `${*_API_KEY}`).
+2.0.0 (the plugin.json references `${user_config.*}`, not `${*_API_KEY}`).
 Either answer the prompt or, for a fully shell-driven setup, add a thin
 wrapper per MCP (see `plugins/yellow-morph/bin/start-morph.sh` for a
 reference pattern).

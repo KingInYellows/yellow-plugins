@@ -100,29 +100,32 @@ else
 fi
 
 printf '\n=== API Keys ===\n'
-# Path-scoped userConfig lookup — uses jq for exact matching on
-# .pluginConfigs."yellow-research".options.<option>, falls back to a
-# two-step grep that still requires both the plugin name and option name
-# to appear (safer than a flat string grep which could match arbitrary
-# values elsewhere in settings.json).
+# 2-arg has_userconfig: mirror the canonical definition in
+# plugins/yellow-core/commands/setup/all.md. Keep these in sync manually
+# — if you change one, change all copies (search for "has_userconfig()"
+# across plugins/). `grep -qF` (fixed-string) guards against regex
+# metacharacters sneaking into the search pattern.
 has_userconfig() {
-  local option="$1"
+  local plugin="$1" option="$2"
   local settings="${HOME}/.claude/settings.json"
   [ -r "$settings" ] || return 1
   if command -v jq >/dev/null 2>&1; then
-    jq -e --arg o "$option" \
-      '.pluginConfigs."yellow-research".options[$o] // empty' \
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
       "$settings" >/dev/null 2>&1
   else
-    grep -q '"yellow-research"' "$settings" 2>/dev/null \
-      && grep -q "\"$option\"" "$settings" 2>/dev/null
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
   fi
 }
 check_key() {
-  local env_name="$1" cfg_key="$2" label="$3"
-  if [ -n "${!env_name:-}" ]; then
+  # `eval` for POSIX-compatible indirect expansion. bash/zsh-only ${!var}
+  # silently returns empty under dash, which would mis-classify every key.
+  local env_name="$1" cfg_key="$2" label="$3" env_val=""
+  eval "env_val=\${${env_name}:-}"
+  if [ -n "$env_val" ]; then
     printf '%-22s set (shell env)\n' "$label:"
-  elif has_userconfig "$cfg_key"; then
+  elif has_userconfig yellow-research "$cfg_key"; then
     printf '%-22s set (userConfig)\n' "$label:"
   else
     printf '%-22s NOT SET\n' "$label:"
@@ -451,7 +454,7 @@ Never commit API keys to version control.
 
 (Fallback for power users who want a pure shell-env setup: add a per-MCP
 wrapper script — see plugins/yellow-morph/bin/start-morph.sh. Plugin.json
-no longer reads the shell *_API_KEY vars directly as of 1.4.0.)
+no longer reads the shell *_API_KEY vars directly as of 2.0.0.)
 ```
 
 Only show the lines for keys that are absent or invalid (not all three if some

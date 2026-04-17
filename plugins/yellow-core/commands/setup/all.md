@@ -90,13 +90,20 @@ has_userconfig() {
       '.pluginConfigs[$p].options[$o] // empty' \
       "$settings" >/dev/null 2>&1
   else
-    grep -q "\"$plugin\"" "$settings" 2>/dev/null \
-      && grep -q "\"$option\"" "$settings" 2>/dev/null
+    # `grep -qF` (fixed-string) — values are literals at call sites but the
+    # -F flag protects against regex metacharacters if a future caller
+    # passes something unexpected.
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
   fi
 }
 check_key() {
-  local env_name="$1" plugin="$2" option="$3" label="$4"
-  if [ -n "${!env_name:-}" ]; then
+  # `eval` for POSIX-compatible indirect expansion. bash/zsh-only ${!var}
+  # silently returns empty under dash, causing every caller to fall through
+  # to the has_userconfig branch regardless of shell env presence.
+  local env_name="$1" plugin="$2" option="$3" label="$4" env_val=""
+  eval "env_val=\${${env_name}:-}"
+  if [ -n "$env_val" ]; then
     printf '%-26s set (shell env)\n' "$label:"
   elif has_userconfig "$plugin" "$option"; then
     printf '%-26s set (userConfig)\n' "$label:"

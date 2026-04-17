@@ -8,16 +8,17 @@ and this project adheres to
 
 ---
 
-## [1.4.0] - 2026-04-17
+## [2.0.0] - 2026-04-17
 
-### Minor Changes (small breaking config surface for MCP auth)
+### Major Changes
 
-- **All three API keys migrated to `userConfig`.** The perplexity, tavily,
-  and exa MCP servers now read their API keys from Claude Code's
-  `userConfig` (sensitive, keychain-backed) instead of shell env vars. The
-  three keys are declared **optional** — the plugin degrades gracefully
-  when any are missing, so skipping the prompts is valid for users who
-  only want a subset of research sources.
+- **Breaking:** all three API keys (`PERPLEXITY_API_KEY`,
+  `TAVILY_API_KEY`, `EXA_API_KEY`) migrated to `userConfig`. The
+  perplexity, tavily, and exa MCP servers now read their API keys from
+  Claude Code's `userConfig` (sensitive, keychain-backed) instead of
+  shell env vars. The three keys are declared **optional** — the plugin
+  degrades gracefully when any are missing, so skipping the prompts is
+  valid for users who only want a subset of research sources.
 
   Empirically verified behavior (MCP stdio probe, 2026-04-17): perplexity
   hard-fails at startup without `PERPLEXITY_API_KEY` (so its tools
