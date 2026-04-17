@@ -11,8 +11,8 @@ allowed-tools:
   - ToolSearch
   - mcp__context7__resolve-library-id
   - mcp__grep__searchGitHub
-  - mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
-  - mcp__filesystem-with-morph__warpgrep_codebase_search
+  - mcp__plugin_yellow-morph_morph__codebase_search
+  - mcp__filesystem-with-morph__codebase_search
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
   - mcp__plugin_yellow-research_ast-grep__find_code
 ---
@@ -337,10 +337,13 @@ Test call: mcp__grep__searchGitHub with query: "test", maxResults: 1
 **WarpGrep** (yellow-morph plugin preferred, global MCP fallback):
 
 ```text
-ToolSearch keyword: "warpgrep_codebase_search"
-Preferred tool name: mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
-Fallback tool name: mcp__filesystem-with-morph__warpgrep_codebase_search
+ToolSearch keyword: "codebase_search" (or "morph warpgrep" — same tool)
+Preferred tool name: mcp__plugin_yellow-morph_morph__codebase_search
+Fallback tool name: mcp__filesystem-with-morph__codebase_search
 Test call: <matched tool> with query: "README"
+Note: In morphmcp 0.8.165 the tool is named `codebase_search`. Older
+versions exposed it as `warpgrep_codebase_search`; that name no longer
+exists.
 ```
 
 Check for the plugin-namespaced tool first. If not found, fall back to the
