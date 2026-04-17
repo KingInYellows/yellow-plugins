@@ -3,7 +3,7 @@ name: diagram-architect
 description: "Context-aware Mermaid diagram generator — auto-selects diagram type from code analysis. Use when generating architecture, dependency, or sequence diagrams."
 model: inherit
 background: true
-memory: true
+memory: project
 skills:
   - docs-conventions
 tools:
