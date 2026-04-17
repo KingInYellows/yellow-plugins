@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-04-17
+
+### Changed (breaking)
+
+- **Config surface: `MORPH_API_KEY` now read from `userConfig`, not shell env.**
+  Claude Code prompts for the key at plugin-enable time and stores it in the
+  system keychain (or `~/.claude/.credentials.json` on minimal Linux). Fresh
+  installs no longer require a `MORPH_API_KEY` export before launching
+  Claude Code, and no longer require a Claude Code restart after setup.
+  Power-user fallback via shell env var lands in 1.2.0 once the wrapper
+  script is in place; for 1.1.0, answer the userConfig prompt on first
+  enable.
+- **MCP pin bumped from `@morphllm/morphmcp@0.8.110` to `0.8.165`** (55
+  versions of upstream fixes).
+
+### Fixed
+
+- **`edit_file` tool was silently disabled.** morphmcp disables `edit_file`
+  by default; the plugin had been setting the (non-existent)
+  `ENABLED_TOOLS` env var, which is silently ignored. Switched to
+  `DISABLED_TOOLS=github_codebase_search` so both `edit_file` and
+  `codebase_search` (the two tools the plugin advertises) are now actually
+  exposed.
+- **Tool name corrected: `warpgrep_codebase_search` → `codebase_search`.**
+  The `warpgrep_` prefix does not exist in morphmcp 0.8.165. References
+  updated across CLAUDE.md, README, `/morph:status`, and the
+  `mcp-integration-patterns` skill. The `MCP__plugin_yellow-morph_morph__edit_file`
+  and `mcp__plugin_yellow-morph_morph__codebase_search` names are what
+  agents should call going forward.
+
+### Migration
+
+- Existing users: run `claude plugin update yellow-morph@yellow-plugins`.
+  Claude Code detects the new `userConfig` field and prompts for the key on
+  next plugin enable. Answer the prompt to migrate.
+- If your prior setup relied on `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`,
+  agents invoking the old name will fail — update the call site to
+  `mcp__plugin_yellow-morph_morph__codebase_search`.
+
+---
+
 ## [1.0.0] - 2026-03-03
 
 ### Added

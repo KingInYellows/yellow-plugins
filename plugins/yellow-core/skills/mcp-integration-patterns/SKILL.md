@@ -231,7 +231,7 @@ tools silently when morph is not installed.
 1. Call ToolSearch("morph warpgrep")
 2. If found AND query is intent-based ("what calls this function?",
    "find similar patterns", "blast radius of this change"):
-   prefer morph warpgrep_codebase_search
+   prefer morph codebase_search (aka WarpGrep)
 3. If not found OR query is exact-match (specific string, regex):
    use built-in Grep
 4. No warning on fallback. No degradation message.
@@ -245,6 +245,15 @@ tools silently when morph is not installed.
   fast (sub-100ms), avoids coupling to morph package names.
 - **No hard dependency** — morph tools are never listed in command
   `allowed-tools`. Discovery happens at runtime.
+
+### Common Failure Mode
+
+If `ToolSearch("morph edit")` returns no results, the most common cause is
+that the yellow-morph plugin's `userConfig.morph_api_key` was not provided
+at plugin-enable time — the MCP server fails to start and no tools are
+registered. Suggest `/morph:setup` to the user, but do not block: fall back
+to built-in tools silently per the pattern above. This is an enhancement,
+not a dependency.
 
 ## Anti-Patterns
 
