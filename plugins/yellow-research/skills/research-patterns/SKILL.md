@@ -64,12 +64,21 @@ mkdir -p docs/research
 | ------------------------------ | -------------------------------- | ---------------------------- |
 | Library / framework docs       | Context7                         | EXA `get_code_context_exa`   |
 | Code examples, GitHub patterns | EXA `get_code_context_exa`       | GitHub grep                  |
+| Keyword-tight general web      | Ceramic `ceramic_search`         | EXA `web_search_exa`         |
 | Recent news, current events    | Perplexity `perplexity_search`   | Tavily `tavily_search`       |
 | Competitive / company research | EXA `company_research_exa`       | Perplexity                   |
 | Deep technical report          | Perplexity `perplexity_research` | Tavily `tavily_research`     |
 | AST / structural code patterns | ast-grep `find_code`             | ast-grep `find_code_by_rule` |
 | Long-horizon async report      | Parallel `createDeepResearch`    | EXA `deep_researcher_start`  |
 | Specific URL content           | EXA `crawling_exa`               | Tavily `tavily_extract`      |
+
+**Ceramic note:** Ceramic is a **lexical** search engine (English only,
+1–50-word keyword queries). Before sending a topic to `ceramic_search`,
+rewrite it into a concise keyword-form query — drop "how do I", "what is",
+filler words; keep proper nouns, technical terms, version numbers. See
+`https://docs.ceramic.ai/api/search/best-practices.md`. The Ceramic MCP at
+`https://mcp.ceramic.ai/mcp` authenticates via OAuth 2.1 (browser flow on
+first use) — same UX as Parallel Task, no API key in plugin.json.
 
 ## When to Compound Findings
 

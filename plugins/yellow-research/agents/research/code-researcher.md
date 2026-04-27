@@ -9,6 +9,7 @@ tools:
   - Glob
   - Bash
   - ToolSearch
+  - mcp__plugin_yellow-research_ceramic__ceramic_search
   - mcp__plugin_yellow-research_exa__get_code_context_exa
   - mcp__plugin_yellow-research_exa__web_search_exa
   - mcp__plugin_yellow-core_context7__resolve-library-id
@@ -35,7 +36,8 @@ Choose the best source based on query type:
 | AST/structural code patterns    | `mcp__plugin_yellow-research_ast-grep__find_code` / `mcp__plugin_yellow-research_ast-grep__find_code_by_rule` (ast-grep) |
 | GitHub code search              | `mcp__grep__searchGitHub`                                                                                                |
 | Recent releases, new APIs       | `mcp__plugin_yellow-research_perplexity__perplexity_search`                                                              |
-| General web                     | `mcp__plugin_yellow-research_exa__web_search_exa`                                                                        |
+| General web (keyword-tight)     | `mcp__plugin_yellow-research_ceramic__ceramic_search` (lexical; rewrite query first — see below)                         |
+| General web (semantic fallback) | `mcp__plugin_yellow-research_exa__web_search_exa`                                                                        |
 
 **Start with Context7** for any named library when the tool is available — it
 has official, up-to-date docs. If ToolSearch cannot find
@@ -45,6 +47,19 @@ available but returns no match, use
 `mcp__plugin_yellow-research_exa__get_code_context_exa` as the content fallback.
 If EXA returns nothing useful, use
 `mcp__plugin_yellow-research_exa__web_search_exa` as last resort.
+
+**For general web queries** (when no library is named and no code-context
+match exists), prefer `mcp__plugin_yellow-research_ceramic__ceramic_search`
+as the first hop — it is high-volume-friendly and significantly cheaper
+than EXA. Ceramic is a **lexical** search engine, so before calling it
+**rewrite the topic into a concise keyword-form query** (≤50 words, no
+conversational phrasing — drop "how do I", "what is", filler words; keep
+proper nouns, technical terms, version numbers). If `ceramic_search`
+returns no useful results, fall through to
+`mcp__plugin_yellow-research_exa__web_search_exa` (semantic). If Ceramic
+is unavailable in ToolSearch, skip directly to EXA without erroring. See
+`https://docs.ceramic.ai/api/search/best-practices.md` for the full
+lexical-search rationale.
 
 **For AST/structural code pattern queries**, first use ToolSearch to confirm
 `mcp__plugin_yellow-research_ast-grep__find_code` or

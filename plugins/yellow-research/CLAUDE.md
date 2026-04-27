@@ -1,6 +1,6 @@
 # yellow-research Plugin
 
-Deep research plugin with 5 bundled MCP servers. Three workflows:
+Deep research plugin with 6 bundled MCP servers. Three workflows:
 `/research:code` (inline, fast), `/research:deep` (multi-source, saved to
 `docs/research/`), and `/workflows:deepen-plan` (enrich plans with codebase +
 external research).
@@ -56,6 +56,27 @@ on invocation with "Command 'ast-grep' not found"; other servers unaffected.
 - `createTaskGroup` — Parallel enrichment for multiple items
 - `getResultMarkdown` — Retrieve completed research report
 - `getStatus` — Poll async task status before retrieving results
+
+### ceramic — OAuth 2.1 (auto-managed by Claude Code; first use opens browser)
+
+- `ceramic_search` — Lexical web search (~$0.05 per 1,000 queries on
+  pay-as-you-go; 20 QPS). English only, 1–50-word keyword queries.
+
+The Ceramic MCP at `https://mcp.ceramic.ai/mcp` authenticates via OAuth 2.1
+— **no API key in plugin.json**, same shape as `parallel`. Browser pops on
+first `ceramic_search` use; token cached and auto-refreshed thereafter.
+
+`CERAMIC_API_KEY` is a separate env var used **only** by the REST live-probe
+in `/research:setup` (`POST https://api.ceramic.ai/search`) — not by the MCP
+server. Get a REST key at `https://platform.ceramic.ai/keys` if you want
+that probe to run.
+
+Ceramic is **lexical**, not semantic — Perplexity/Tavily/EXA-neural still
+handle conversational queries and synthesis. The research-conductor and
+code-researcher agents rewrite topics into keyword form before calling
+`ceramic_search` and fall through to the existing providers when Ceramic is
+unavailable or returns no useful results. See
+`https://docs.ceramic.ai/api/search/best-practices.md`.
 
 ## Conventions
 
@@ -118,6 +139,7 @@ Add to `~/.zshrc`:
 export EXA_API_KEY="..."
 export TAVILY_API_KEY="..."
 export PERPLEXITY_API_KEY="..."
+export CERAMIC_API_KEY="..."   # optional — REST probe only; MCP uses OAuth
 ```
 
 Source or restart shell after setting. Keys are passed to MCP servers at startup

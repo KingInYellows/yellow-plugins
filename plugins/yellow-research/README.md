@@ -1,7 +1,7 @@
 # yellow-research
 
-Deep research plugin for Claude Code. Bundles Perplexity, Tavily, EXA,
-Parallel Task, and ast-grep MCP servers with three workflows:
+Deep research plugin for Claude Code. Bundles Ceramic, Perplexity, Tavily,
+EXA, Parallel Task, and ast-grep MCP servers with three workflows:
 
 - **`/research:code`** — Inline code research for active development
 - **`/research:deep`** — Multi-source deep research saved to `docs/research/`
@@ -30,12 +30,16 @@ Add to your shell config (`~/.zshrc` or `~/.bashrc`):
 export EXA_API_KEY="..."          # https://exa.ai/
 export TAVILY_API_KEY="..."       # https://tavily.com/
 export PERPLEXITY_API_KEY="..."   # https://www.perplexity.ai/settings/api
+export CERAMIC_API_KEY="..."      # https://platform.ceramic.ai/keys
+                                  # (REST live-probe only; the MCP uses OAuth)
 ```
 
 Restart Claude Code after setting keys.
 
-The **Parallel Task** server uses OAuth — Claude Code handles authentication
-automatically. You'll be prompted to authorize on first use (no API key needed).
+The **Parallel Task** and **Ceramic** servers use OAuth — Claude Code handles
+authentication automatically. You'll be prompted to authorize on first use
+(no API key needed). `CERAMIC_API_KEY` is optional and only powers the
+`/research:setup` REST live-probe.
 
 ## Usage
 
@@ -64,6 +68,7 @@ run `/compound` to add to institutional knowledge.
 
 | Server | Package | Purpose |
 |--------|---------|---------|
+| Ceramic | `mcp.ceramic.ai` | Lexical web search, ~$0.05/1K queries |
 | Perplexity | `@perplexity-ai/mcp-server` | Web-grounded research and reasoning |
 | Tavily | `tavily-mcp` | Fast web search and page extraction |
 | EXA | `exa-mcp-server` | Neural semantic search, code examples |
