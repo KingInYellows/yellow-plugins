@@ -78,11 +78,18 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   includes a `## Linear Issues` metadata section. Without yellow-linear, both
   features skip silently.
 
-### MCP Servers (1)
+### MCP Servers (2)
 
 - `context7` — up-to-date library documentation via
   [context7.com](https://context7.com). Third-party HTTP service; all agents
   work without it (used only for fetching live docs). No credentials are sent.
+- `ceramic` — lexical web search via Ceramic.ai
+  ([mcp.ceramic.ai](https://mcp.ceramic.ai/mcp)). Used by
+  `best-practices-researcher` as the primary general-web source, falling back
+  to built-in `WebSearch`. OAuth 2.1 (browser flow on first use, token
+  cached). No API key in plugin.json. The optional `CERAMIC_API_KEY` env var
+  is for the REST live-probe in `/research:setup` (yellow-research) — it
+  does not feed the MCP.
 
 ### MCP Tool Integration
 

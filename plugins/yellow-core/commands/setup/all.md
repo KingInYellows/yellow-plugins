@@ -84,6 +84,7 @@ printf '\n=== Environment Variables ===\n'
 [ -n "${EXA_API_KEY:-}" ] && printf 'EXA_API_KEY:               set\n' || printf 'EXA_API_KEY:               NOT SET\n'
 [ -n "${TAVILY_API_KEY:-}" ] && printf 'TAVILY_API_KEY:            set\n' || printf 'TAVILY_API_KEY:            NOT SET\n'
 [ -n "${PERPLEXITY_API_KEY:-}" ] && printf 'PERPLEXITY_API_KEY:        set\n' || printf 'PERPLEXITY_API_KEY:        NOT SET\n'
+[ -n "${CERAMIC_API_KEY:-}" ] && printf 'CERAMIC_API_KEY:           set\n' || printf 'CERAMIC_API_KEY:           NOT SET\n'
 
 printf '\n=== Repository State ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -253,7 +254,7 @@ as **NOT INSTALLED** and skip all other checks for that plugin.
 
 **yellow-research:**
 
-Compute bundled source availability out of 5:
+Compute bundled source availability out of 6:
 
 1. `EXA_API_KEY` set
 2. `TAVILY_API_KEY` set
@@ -262,9 +263,14 @@ Compute bundled source availability out of 5:
 5. ast-grep counts only when the exact ToolSearch match is present **and**
    `ast-grep` OK **and** `uv` OK (uv manages Python 3.13 transparently via
    `--python 3.13` in plugin.json — no system Python check needed)
+6. Ceramic MCP tool (`ceramic_search`) visible via ToolSearch.
+   `CERAMIC_API_KEY` is *not* required — the Ceramic MCP authenticates via
+   OAuth 2.1 (browser flow on first use). The env var only powers the REST
+   live-probe in `/research:setup`; ToolSearch visibility alone counts this
+   source as available.
 
-- READY: all 5 bundled sources available
-- PARTIAL: 1-4 bundled sources available
+- READY: all 6 bundled sources available
+- PARTIAL: 1-5 bundled sources available
 - NEEDS SETUP: 0 bundled sources available
 
 **yellow-linear:**
