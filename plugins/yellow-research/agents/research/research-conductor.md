@@ -46,12 +46,20 @@ with no synthesis needed. Classify as **Moderate** for everything in between.
 
 **Lexical-first prep** — Before any Ceramic call below, rewrite the topic
 into a concise keyword-form query (≤50 words, drop conversational phrasing,
-keep proper nouns and technical terms). Ceramic
+keep proper nouns and technical terms). Example rewrite:
+`"How do I configure Redis eviction in production?"` → `"Redis eviction
+policy production configuration"`. Ceramic
 (`mcp__plugin_yellow-research_ceramic__ceramic_search`) is a lexical search
 engine — keyword queries return tightly relevant results; conversational
 queries dilute the signal. The original topic is still passed to
 Perplexity/Tavily/EXA which handle natural language. See
 `https://docs.ceramic.ai/api/search/best-practices.md`.
+
+**Ceramic error handling** — for every Ceramic call below: missing
+`result.totalResults` is treated as 0 (fail closed); call-time errors
+(network, OAuth, 5xx) are treated as unavailable per the existing
+"Skip any source that is unavailable" rule below. Annotate failures as
+`[research-conductor] Ceramic call failed — falling back to <next-source>.`
 
 **Simple** — 1 well-defined aspect, quick answer needed:
 
@@ -63,6 +71,10 @@ Perplexity/Tavily/EXA which handle natural language. See
   Three is the threshold because lexical search is permissive on single
   hits — three confirms the keyword query found a real cluster, not a
   fluke match.
+- Terminator: if both Ceramic and Perplexity are unavailable or return
+  fewer than 3 combined results, stop and report:
+  `[research-conductor] Insufficient results for simple query — all sources exhausted. Narrow the topic or retry.`
+  Do not synthesize from zero results.
 
 **Moderate** — 2-3 aspects or medium depth:
 

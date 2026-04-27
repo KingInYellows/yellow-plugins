@@ -64,7 +64,10 @@ describeLive('ceramic.ai live REST contract', () => {
     const response = await fetch('https://api.ceramic.ai/search', {
       method: 'POST',
       headers: {
-        Authorization: 'Bearer cer_sk_invalid_key_for_test_only_xxxxxxxx',
+        // Intentionally NOT prefixed `cer_sk` to avoid secret-scanner false
+        // positives (TruffleHog/Gitleaks key off the prefix). Ceramic's auth
+        // path returns 401 for any invalid bearer regardless of format.
+        Authorization: 'Bearer invalid-test-key-xxxxxxxxxxxxxxxx',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ query: 'auth test' }),
@@ -104,10 +107,27 @@ describeLive('ceramic.ai live REST contract', () => {
     expect(body.status).toBe(400);
     expect(body.code).toBe('unsupported_parameter');
   });
-});
 
-describe.skipIf(RUN_LIVE && API_KEY)('ceramic.ai live REST contract (skipped)', () => {
-  it('skip placeholder — set RUN_LIVE=1 and CERAMIC_API_KEY to run', () => {
-    expect(true).toBe(true);
+  it('returns numeric totalResults even on sparse queries', async () => {
+    // Validates the response field the agent prose reads to decide fallback
+    // (`result.totalResults < 3`). If Ceramic ever renames or omits this
+    // field, the agents would silently fall through on every call. This test
+    // asserts the field is present and numeric for a deliberately rare query.
+    const response = await fetch('https://api.ceramic.ai/search', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query: 'xqzqkjf9283 nonexistent topic phrase' }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      result: { totalResults: number; results: unknown[] };
+    };
+    expect(typeof body.result.totalResults).toBe('number');
+    expect(Array.isArray(body.result.results)).toBe(true);
   });
 });

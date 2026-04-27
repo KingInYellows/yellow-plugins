@@ -71,7 +71,7 @@ run `/compound` to add to institutional knowledge.
 | Ceramic | `mcp.ceramic.ai` | Lexical web search, ~$0.05/1K queries |
 | Perplexity | `@perplexity-ai/mcp-server` | Web-grounded research and reasoning |
 | Tavily | `tavily-mcp` | Fast web search and page extraction |
-| EXA | `exa-mcp-server` | Neural semantic search, code examples |
+| EXA | `exa-mcp-server` | Neural web search, code examples |
 | Parallel Task | `task-mcp.parallel.ai` | Async long-horizon research reports |
 | ast-grep | `ast-grep-mcp` (via uvx) | AST-based structural code search |
 
@@ -80,9 +80,9 @@ run `/compound` to add to institutional knowledge.
 The `research-conductor` agent automatically selects sources based on topic
 complexity:
 
-- **Simple topics** → Single Perplexity query
-- **Moderate topics** → 2-3 parallel queries (Perplexity + Tavily or EXA)
-- **Complex topics** → Full fan-out: Perplexity + Tavily + async EXA + async Parallel Task
+- **Simple topics** → Ceramic first (keyword-tight); Perplexity fallback
+- **Moderate topics** → Ceramic + Perplexity + Tavily in parallel
+- **Complex topics** → Full fan-out: Ceramic + Perplexity + Tavily + async EXA + async Parallel Task
 
 ## Output Format
 

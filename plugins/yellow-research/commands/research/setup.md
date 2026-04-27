@@ -301,8 +301,12 @@ use ToolSearch-only).
 
 For each source below, follow this pattern:
 
-1. Call ToolSearch with the keyword shown. If the exact tool name is absent from
-   the results, record status as `UNAVAILABLE` and move to the next source.
+1. Call ToolSearch with the keyword shown. If the exact tool name is absent
+   from the results, record status as `UNAVAILABLE` and move to the next
+   source. If ToolSearch itself raises an exception (rather than returning a
+   non-matching result set), record status as `FAIL (ToolSearch error)` so
+   the operator can distinguish a tool genuinely not installed from a
+   transient session error.
 2. If the tool is found, invoke it with the minimal test arguments shown.
 3. If the call succeeds and returns a structured payload (object or array),
    record status as `ACTIVE` — even if the results array is empty.
@@ -412,7 +416,7 @@ API Keys (all optional — plugin degrades gracefully)
   EXA            SET         VALID     ACTIVE         ACTIVE
   Tavily         SET         VALID     ACTIVE         ACTIVE
   Perplexity     NOT SET     N/A       N/A            INACTIVE
-  Ceramic        SET         VALID     ACTIVE         ACTIVE
+  Ceramic REST   SET         VALID     ACTIVE         ACTIVE  (REST probe only)
 
 OAuth-authenticated MCP servers (no API key needed)
   Parallel Task  — Claude Code browser OAuth, prompted on first /research:deep use.
@@ -431,16 +435,22 @@ MCP Sources (no API key required — always available if plugin installed)
   Ceramic        (bundled)          ACTIVE (ToolSearch only — server reachability and OAuth state not verified)
 
 Capability summary:
-  /research:deep    PARTIAL (3/4 API sources — Perplexity inactive)
-  /research:code    PARTIAL (3/4 API sources — Perplexity inactive)
+  /research:deep    PARTIAL (2/3 API sources — Perplexity inactive)
+  /research:code    PARTIAL (2/3 API sources — Perplexity inactive)
   MCP sources:      6/7 available
 ```
 
-Adjust the capability summary based on how many keys are active (now four —
-EXA, Tavily, Perplexity, Ceramic):
+`CERAMIC_API_KEY` is intentionally NOT counted in the API-source total —
+the Ceramic MCP authenticates via OAuth and works without this key. The
+key only powers the REST live-probe above. Counting it would
+misrepresent research capability when a user has all three functional
+keys (EXA/Tavily/Perplexity) set.
 
-- 4 active: `FULL (4/4 API sources)`
-- 1-3 active: `PARTIAL (N/4 API sources)`
+Adjust the capability summary based on how many functional API keys are
+active (three — EXA, Tavily, Perplexity):
+
+- 3 active: `FULL (3/3 API sources)`
+- 1-2 active: `PARTIAL (N/3 API sources)`
 - 0 active: `MINIMAL (Parallel Task + Ceramic OAuth only — no API key sources)`
 
 Adjust the MCP sources line based on how many MCP sources are ACTIVE (now

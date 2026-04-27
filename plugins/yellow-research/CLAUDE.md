@@ -75,7 +75,7 @@ Ceramic is **lexical**, not semantic — Perplexity/Tavily/EXA-neural still
 handle conversational queries and synthesis. The research-conductor and
 code-researcher agents rewrite topics into keyword form before calling
 `ceramic_search` and fall through to the existing providers when Ceramic is
-unavailable or returns no useful results. See
+unavailable or returns `result.totalResults < 3`. See
 `https://docs.ceramic.ai/api/search/best-practices.md`.
 
 ## Conventions

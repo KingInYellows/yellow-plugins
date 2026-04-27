@@ -37,7 +37,7 @@ Choose the best source based on query type:
 | GitHub code search              | `mcp__grep__searchGitHub`                                                                                                |
 | Recent releases, new APIs       | `mcp__plugin_yellow-research_perplexity__perplexity_search`                                                              |
 | General web (keyword-tight)     | `mcp__plugin_yellow-research_ceramic__ceramic_search` (lexical; rewrite query first — see below)                         |
-| General web (semantic fallback) | `mcp__plugin_yellow-research_exa__web_search_exa`                                                                        |
+| General web (neural fallback)   | `mcp__plugin_yellow-research_exa__web_search_exa`                                                                        |
 
 **Start with Context7** for any named library when the tool is available — it
 has official, up-to-date docs. If ToolSearch cannot find
@@ -60,11 +60,19 @@ Example rewrite: `"How do I configure Redis eviction in production?"` →
 `"Redis eviction policy production configuration"`.
 
 If `ceramic_search` returns `result.totalResults < 3` results, fall
-through to `mcp__plugin_yellow-research_exa__web_search_exa` (semantic).
+through to `mcp__plugin_yellow-research_exa__web_search_exa` (neural).
+Three is the threshold because lexical search is permissive on single
+hits — three confirms the keyword query found a real cluster, not a
+fluke match. If `result.totalResults` is missing from the response shape,
+treat it as 0 and fall through (fail closed, not open).
+
 If Ceramic is unavailable in ToolSearch, skip directly to EXA without
 erroring, and annotate the response with
 `[code-researcher] Ceramic unavailable — using EXA directly.` so callers
-know which source was used. See
+know which source was used. If `ceramic_search` raises an exception or
+returns an error response (network error, OAuth failure, 5xx), treat it
+as unavailable — fall through to EXA and annotate:
+`[code-researcher] Ceramic call failed — using EXA directly.` See
 `https://docs.ceramic.ai/api/search/best-practices.md` for the full
 lexical-search rationale.
 
@@ -74,8 +82,8 @@ lexical-search rationale.
 ast-grep MCP is unavailable, skip directly to
 `mcp__plugin_yellow-research_exa__get_code_context_exa`, then
 `mcp__plugin_yellow-research_exa__web_search_exa`. If ast-grep is available but
-returns no useful matches, follow the same fallback chain and report that
-AST-level search was unavailable or inconclusive.
+returns 0 matches, follow the same fallback chain and report that AST-level
+search was inconclusive.
 
 ## Workflow
 
