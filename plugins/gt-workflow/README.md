@@ -95,7 +95,7 @@ orphaned, closed-PR, stale, and diverged branches.
 
 One-command repo sync, restack, and cleanup.
 
-- Syncs trunk via `gt repo sync`
+- Syncs trunk via `gt sync`
 - Restacks branches if needed
 - Reports conflicts clearly with resolution instructions
 - Cleans up merged branches

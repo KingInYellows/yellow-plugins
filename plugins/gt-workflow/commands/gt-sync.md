@@ -16,7 +16,7 @@ up merged PRs.
 Optional arguments:
 
 - `--no-delete` — Skip deleting merged branches by passing `--no-delete` through
-  to `gt repo sync` so it does not prompt for deletions
+  to `gt sync` so it does not prompt for deletions
 - `--force` — Restack even if the stack appears clean (still stopping at
   conflicts for manual resolution) instead of skipping Phase 2 when there are no
   divergence markers
@@ -51,16 +51,16 @@ Run Graphite repo sync to pull the latest trunk and identify merged branches.
 If `--no-delete` was passed:
 
 ```bash
-gt repo sync --no-delete
+gt sync --no-delete
 ```
 
 Otherwise:
 
 ```bash
-gt repo sync
+gt sync
 ```
 
-If `gt repo sync` fails (network error, authentication issue, etc.), report the
+If `gt sync` fails (network error, authentication issue, etc.), report the
 error to the user and stop. Do not proceed to restacking with stale state.
 
 This will:
