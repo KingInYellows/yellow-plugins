@@ -31,7 +31,7 @@ Graphite-native workflow commands for stacked PR development.
 | `gt commit create -m "msg"`  | Add a commit (deprecated, use `gt modify --commit`) |
 | `gt commit amend -m "msg"`   | Amend the current branch commit         |
 | `gt submit --no-interactive` | Push stack and create/update PRs        |
-| `gt repo sync`               | Fetch trunk, detect merged branches     |
+| `gt sync`                    | Fetch trunk, detect merged branches     |
 | `gt stack restack`           | Rebase stack on latest trunk            |
 | `gt log` / `gt log short`    | Visualize the stack                     |
 | `gt up` / `gt down`          | Navigate up/down the stack              |
