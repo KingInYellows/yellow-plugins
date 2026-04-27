@@ -3,7 +3,7 @@ name: doc-auditor
 description: "Documentation audit specialist — scan repos for doc gaps, staleness, and coverage. Use when auditing documentation health."
 model: inherit
 background: true
-memory: true
+memory: project
 skills:
   - docs-conventions
 tools:
