@@ -32,7 +32,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 3 agents, 5 commands, 1 skill                  |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                       | 2 commands, 1 MCP                              |
-| `yellow-research`     | Deep research with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                                | 2 agents, 4 commands, 1 skill, 5 MCPs          |
+| `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 1 skill, 6 MCPs          |
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 7 agents, 4 commands, 1 skill                  |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform   | 2 agents, 5 commands, 1 skill, 1 MCP           |
@@ -45,11 +45,13 @@ Nine plugins connect to MCP servers. Authentication requirements vary by server.
 | ----------------- | ---------- | ------------------------------------------------------------------- |
 | `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                |
 | `yellow-core`     | Context7   | Free (no key); optional API key for higher rate limits              |
+| `yellow-core`     | Ceramic    | OAuth (browser popup on first `ceramic_search` use)                 |
 | `yellow-chatprd`  | ChatPRD    | OAuth (browser popup on first use)                                  |
 | `yellow-devin`    | DeepWiki   | Free for public repos; `DEVIN_SERVICE_USER_TOKEN` for private repos |
 | `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                |
 | `yellow-linear`   | Linear     | OAuth (browser popup on first use)                                  |
 | `yellow-morph`    | Morph      | `MORPH_API_KEY` required                                            |
+| `yellow-research` | Ceramic    | OAuth (browser popup on first `ceramic_search` use)                 |
 | `yellow-research` | Perplexity | `PERPLEXITY_API_KEY` required                                       |
 | `yellow-research` | Tavily     | `TAVILY_API_KEY` required                                           |
 | `yellow-research` | EXA        | `EXA_API_KEY` required                                              |
