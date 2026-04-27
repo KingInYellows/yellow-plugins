@@ -53,12 +53,19 @@ sources and organize findings by importance.
   web queries. Ceramic is a **lexical** search engine (English only,
   1–50-word keyword queries), so before each call rewrite the topic into
   a concise keyword-form query — drop "how do I", "what is", filler words;
-  keep proper nouns, technical terms, version numbers. See
+  keep proper nouns, technical terms, version numbers. Example:
+  `"How do I configure Redis eviction in production?"` → `"Redis eviction
+  policy production configuration"`. See
   `https://docs.ceramic.ai/api/search/best-practices.md`.
-- **Fallback:** built-in `WebSearch` for queries that score thin on
-  Ceramic (loosely-related top hits, conversational queries that resist
-  keyword rewriting). Also: if `ceramic_search` is unavailable in
-  ToolSearch, skip to `WebSearch` directly.
+- **Fallback:** if `ceramic_search` returns `result.totalResults < 3` or
+  is unavailable in ToolSearch, fall through to built-in `WebSearch`.
+  Three is the threshold because lexical search is permissive on single
+  hits — three confirms the keyword query found a real cluster, not a
+  fluke match.
+- **Terminator:** if both Ceramic and `WebSearch` return fewer than 3
+  combined results, stop and report: "Insufficient web evidence for this
+  best-practices query — narrow the topic or supply explicit library
+  names." Do not synthesize from thin results.
 - **Single-URL content fetch:** built-in `WebFetch`. Ceramic has no
   fetch endpoint — keep `WebFetch` primary for "pull the content of
   this specific URL" tasks.

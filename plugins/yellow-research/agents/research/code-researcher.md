@@ -54,10 +54,17 @@ as the first hop — it is high-volume-friendly and significantly cheaper
 than EXA. Ceramic is a **lexical** search engine, so before calling it
 **rewrite the topic into a concise keyword-form query** (≤50 words, no
 conversational phrasing — drop "how do I", "what is", filler words; keep
-proper nouns, technical terms, version numbers). If `ceramic_search`
-returns no useful results, fall through to
-`mcp__plugin_yellow-research_exa__web_search_exa` (semantic). If Ceramic
-is unavailable in ToolSearch, skip directly to EXA without erroring. See
+proper nouns, technical terms, version numbers).
+
+Example rewrite: `"How do I configure Redis eviction in production?"` →
+`"Redis eviction policy production configuration"`.
+
+If `ceramic_search` returns `result.totalResults < 3` results, fall
+through to `mcp__plugin_yellow-research_exa__web_search_exa` (semantic).
+If Ceramic is unavailable in ToolSearch, skip directly to EXA without
+erroring, and annotate the response with
+`[code-researcher] Ceramic unavailable — using EXA directly.` so callers
+know which source was used. See
 `https://docs.ceramic.ai/api/search/best-practices.md` for the full
 lexical-search rationale.
 

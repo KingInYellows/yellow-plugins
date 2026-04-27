@@ -79,7 +79,7 @@ Then re-run /research:setup
 
 ### Step 1: Check Prerequisites and API Keys
 
-Run a single Bash call to check tools and all three env vars:
+Run a single Bash call to check tools and all four env vars:
 
 ```bash
 printf '=== Prerequisites ===\n'
@@ -157,14 +157,16 @@ if [ -n "$key" ]; then
 fi
 ```
 
-**Ceramic** (known `cer_sk` prefix observed in dashboard-issued keys; treat as
-heuristic since not stated in Ceramic docs):
+**Ceramic** (known `cer_sk` prefix observed in dashboard-issued keys; not
+stated in Ceramic docs but consistent across observed keys, so we enforce
+it — a missing prefix usually means a key was pasted into the wrong env
+var):
 
 ```bash
 key="${CERAMIC_API_KEY:-}"
 if [ -n "$key" ]; then
-  if ! printf '%s' "$key" | grep -qE '^[a-zA-Z0-9_-]{20,}$'; then
-    printf 'CERAMIC_API_KEY: FORMAT INVALID (expected 20+ alphanumeric/underscore/dash chars, no whitespace)\n'
+  if ! printf '%s' "$key" | grep -qE '^cer_sk[a-zA-Z0-9_-]{14,}$'; then
+    printf 'CERAMIC_API_KEY: FORMAT INVALID (expected cer_sk prefix + 14+ alphanumeric/underscore/dash chars, no whitespace)\n'
   else
     printf 'CERAMIC_API_KEY: FORMAT VALID\n'
   fi
@@ -469,7 +471,7 @@ Note: Keys are passed to MCP servers at startup — a Claude Code restart is
 required after adding new keys. Never commit API keys to version control.
 ```
 
-Only show the lines for keys that are absent or invalid (not all three if some
+Only show the lines for keys that are absent or invalid (not all four if some
 are already working).
 
 If ast-grep prerequisites are missing (`ast-grep` or `uv`), show this block:

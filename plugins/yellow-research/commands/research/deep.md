@@ -37,8 +37,8 @@ allowed-tools:
 
 # Deep Research
 
-Multi-source research saved to `docs/research/<slug>.md` using Perplexity,
-Tavily, EXA, Parallel Task, and ast-grep MCP.
+Multi-source research saved to `docs/research/<slug>.md` using Ceramic,
+Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP.
 
 ## Workflow
 

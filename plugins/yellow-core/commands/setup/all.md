@@ -194,12 +194,13 @@ fi
 
 ### Step 1.5: Session MCP Visibility (ToolSearch probes)
 
-Run four ToolSearch probes to capture current-session MCP visibility:
+Run five ToolSearch probes to capture current-session MCP visibility:
 
 - `list_user_organizations`
 - `list_teams`
 - `parallel__createDeepResearch`
 - `ast-grep__find_code`
+- `ceramic_search`
 
 Record whether these exact tools are present in the results:
 
@@ -207,6 +208,7 @@ Record whether these exact tools are present in the results:
 - `mcp__plugin_yellow-linear_linear__list_teams`
 - `mcp__plugin_yellow-research_parallel__createDeepResearch`
 - `mcp__plugin_yellow-research_ast-grep__find_code`
+- `mcp__plugin_yellow-research_ceramic__ceramic_search`
 
 ToolSearch reflects current-session visibility only. If a plugin was installed
 after the session started, the tool may remain invisible until Claude Code is
@@ -356,7 +358,7 @@ Marketplace Setup Dashboard
   yellow-morph         PARTIAL         Local tools ready, MORPH_API_KEY missing
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
-  yellow-research      PARTIAL         2/5 bundled sources available
+  yellow-research      PARTIAL         2/6 bundled sources available
   yellow-linear        READY           Linear MCP visible, Graphite available
   yellow-chatprd       PARTIAL         Config exists, MCP not visible this session
   yellow-debt          PARTIAL         Required tools ready, yellow-linear missing

@@ -52,11 +52,32 @@ describeLive('ceramic.ai live REST contract', () => {
 
     const first = body.result.results[0]!;
     expect(typeof first.title).toBe('string');
+    expect(first.title.length).toBeGreaterThan(0);
     expect(first.url).toMatch(/^https?:\/\//);
     expect(typeof first.description).toBe('string');
+    expect(first.description.length).toBeGreaterThan(0);
     expect(typeof body.result.searchMetadata.executionTime).toBe('number');
   });
 
+  it('rejects an invalid API key with 401 + Problem Details', async () => {
+    // Documented at https://docs.ceramic.ai/api-reference/error-codes.md
+    const response = await fetch('https://api.ceramic.ai/search', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer cer_sk_invalid_key_for_test_only_xxxxxxxx',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query: 'auth test' }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('content-type')).toMatch(
+      /application\/problem\+json/
+    );
+  });
+
+  // Documented at https://docs.ceramic.ai/api-reference/error-codes.md
   it('rejects an unsupported parameter with the documented 400 shape', async () => {
     const response = await fetch('https://api.ceramic.ai/search', {
       method: 'POST',

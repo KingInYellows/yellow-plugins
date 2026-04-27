@@ -1,10 +1,7 @@
 ---
 name: research-patterns
 user-invokable: false
-description:
-  Reference conventions for yellow-research plugin — slug naming, output format,
-  source selection, API key setup, graceful degradation, and when to compound
-  findings.
+description: "Reference conventions for yellow-research plugin — slug naming, output format, source selection, API key setup, graceful degradation, and when to compound findings."
 ---
 
 # Research Patterns
@@ -109,6 +106,8 @@ Add to `~/.zshrc` (or equivalent shell config):
 export EXA_API_KEY="your-key-here"
 export TAVILY_API_KEY="your-key-here"
 export PERPLEXITY_API_KEY="your-key-here"
+export CERAMIC_API_KEY="your-key-here"   # optional — REST live-probe only;
+                                         # Ceramic MCP itself uses OAuth
 ```
 
 Get keys from:
@@ -116,9 +115,11 @@ Get keys from:
 - EXA: https://exa.ai/
 - Tavily: https://tavily.com/
 - Perplexity: https://www.perplexity.ai/settings/api
+- Ceramic (optional): https://platform.ceramic.ai/keys
 
-The **Parallel Task** server uses OAuth (no API key needed). Claude Code handles
-authentication automatically — you'll be prompted to authorize on first use.
+The **Parallel Task** and **Ceramic** servers use OAuth (no API key needed).
+Claude Code handles authentication automatically — you'll be prompted to
+authorize on first use of each.
 
 After adding keys: source `~/.zshrc` and restart Claude Code.
 
@@ -139,6 +140,9 @@ Tool name: mcp__plugin_yellow-research_perplexity__...
 
 ToolSearch keyword: "parallel"
 Tool name: mcp__plugin_yellow-research_parallel__...
+
+ToolSearch keyword: "ceramic_search"
+Tool name: mcp__plugin_yellow-research_ceramic__ceramic_search
 
 ToolSearch keyword: "ast-grep__find_code"
 Tool name: mcp__plugin_yellow-research_ast-grep__find_code

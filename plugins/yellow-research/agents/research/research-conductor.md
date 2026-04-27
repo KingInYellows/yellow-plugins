@@ -1,6 +1,6 @@
 ---
 name: research-conductor
-description: "Routes /research:deep queries across multiple MCP sources. Use when deep research needs multi-source investigation. Triages complexity and dispatches parallel fan-out -- simple queries go to Perplexity alone; moderate to 2-3 parallel sources; complex topics trigger full fan-out including Parallel Task MCP for async reports."
+description: "Routes /research:deep queries across multiple MCP sources. Use when deep research needs multi-source investigation. Triages complexity and dispatches parallel fan-out -- simple queries try Ceramic first (keyword-tight) and fall back to Perplexity; moderate runs Ceramic plus 2-3 parallel sources; complex topics trigger full fan-out including Parallel Task MCP for async reports."
 model: inherit
 background: true
 memory: true
@@ -56,19 +56,22 @@ Perplexity/Tavily/EXA which handle natural language. See
 **Simple** — 1 well-defined aspect, quick answer needed:
 
 - First: `mcp__plugin_yellow-research_ceramic__ceramic_search` (with the
-  rewritten keyword query). If `result.totalResults > 0`, return Ceramic
+  rewritten keyword query). If `result.totalResults >= 3`, return Ceramic
   results.
 - Fallback: `mcp__plugin_yellow-research_perplexity__perplexity_reason`
-  if Ceramic is unavailable in ToolSearch, or if its result list is empty.
+  if Ceramic is unavailable in ToolSearch, or if `result.totalResults < 3`.
+  Three is the threshold because lexical search is permissive on single
+  hits — three confirms the keyword query found a real cluster, not a
+  fluke match.
 
 **Moderate** — 2-3 aspects or medium depth:
 
-- Lead source: `mcp__plugin_yellow-research_ceramic__ceramic_search`
-  (rewritten keyword query) — runs first.
-- 2-3 parallel Task calls to complementary sources alongside Ceramic:
+- Dispatch the following three Task calls **in parallel** (do not
+  serialize): `mcp__plugin_yellow-research_ceramic__ceramic_search` (with
+  the rewritten keyword query),
   `mcp__plugin_yellow-research_perplexity__perplexity_research` for
-  synthesis + `mcp__plugin_yellow-research_tavily__tavily_search` for
-  recent web. Union the result sets.
+  synthesis, and `mcp__plugin_yellow-research_tavily__tavily_search` for
+  recent web. Union the result sets and synthesize.
 
 **Code pattern queries** — When the topic involves finding specific code
 structures, API usage patterns, or AST-level analysis, use ast-grep tools:
