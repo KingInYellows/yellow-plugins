@@ -651,7 +651,7 @@ step 5. Phase 4 becomes a summary phase:
   after each item. This enables resume across sessions if context is exhausted.
 - **Checkpoints are safe stops:** At each checkpoint, all previous items are
   already submitted. Stopping mid-stack leaves the codebase in a clean state.
-- **Do not sync mid-stack:** Avoid `gt repo sync` or `gt stack restack` between
+- **Do not sync mid-stack:** Avoid `gt sync` or `gt stack restack` between
   items unless explicitly requested. Stacked PRs should be based on each other.
 - **Changeset strategy:** One changeset in the bottom branch covers the whole
   feature. Subsequent branches inherit it.
@@ -669,7 +669,7 @@ gt modify -m "feat: message"
 gt log short
 
 # Sync with trunk
-gt repo sync
+gt sync
 
 # Rebase stack
 gt upstack restack
@@ -681,5 +681,5 @@ gt submit --no-interactive
 gt commit amend -m "new message"
 
 # Continue after fixing conflicts
-gt repo sync --continue
+gt continue
 ```
