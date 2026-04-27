@@ -9,6 +9,7 @@ allowed-tools:
   - Glob
   - Bash
   - ToolSearch
+  - mcp__plugin_yellow-research_ceramic__ceramic_search
   - mcp__plugin_yellow-research_exa__get_code_context_exa
   - mcp__plugin_yellow-research_exa__web_search_exa
   - mcp__plugin_yellow-core_context7__resolve-library-id
@@ -23,8 +24,8 @@ allowed-tools:
 
 # Code Research
 
-Research code topics inline using EXA, Context7, GitHub, Perplexity, and ast-grep.
-Results are returned in-context — no file is saved.
+Research code topics inline using Ceramic, EXA, Context7, GitHub, Perplexity,
+and ast-grep. Results are returned in-context — no file is saved.
 
 ## Workflow
 
@@ -39,8 +40,10 @@ Check `$ARGUMENTS`:
 Delegate to the `code-researcher` agent with the topic from `$ARGUMENTS`.
 
 The agent will:
-- Route the query to the best source (Context7 for library docs, EXA for code
-  examples, GitHub grep for code search, Perplexity for recent info)
+- Route the query to the best source (Context7 for library docs, Ceramic
+  for keyword-tight general web, EXA for code examples and as semantic
+  fallback to Ceramic, GitHub grep for code search, Perplexity for recent
+  info)
 - Return a concise synthesized answer
 
 ### Step 3: Present

@@ -79,7 +79,7 @@ Then re-run /research:setup
 
 ### Step 1: Check Prerequisites and API Keys
 
-Run a single Bash call to check tools and all three env vars:
+Run a single Bash call to check tools and all four env vars:
 
 ```bash
 printf '=== Prerequisites ===\n'
@@ -103,11 +103,15 @@ printf '\n=== API Keys ===\n'
 [ -n "${EXA_API_KEY:-}" ]          && printf 'EXA_API_KEY:          set\n' || printf 'EXA_API_KEY:          NOT SET\n'
 [ -n "${TAVILY_API_KEY:-}" ]       && printf 'TAVILY_API_KEY:       set\n' || printf 'TAVILY_API_KEY:       NOT SET\n'
 [ -n "${PERPLEXITY_API_KEY:-}" ]   && printf 'PERPLEXITY_API_KEY:   set\n' || printf 'PERPLEXITY_API_KEY:   NOT SET\n'
+[ -n "${CERAMIC_API_KEY:-}" ]      && printf 'CERAMIC_API_KEY:      set\n' || printf 'CERAMIC_API_KEY:      NOT SET\n'
 ```
 
 `curl` and `jq` missing are informational warnings — they affect live testing
-only. Do not stop if they are absent. All three API keys are optional; if 0 are
-set, the command still completes successfully (showing all INACTIVE).
+only. Do not stop if they are absent. All four API keys are optional; if 0 are
+set, the command still completes successfully (showing all INACTIVE). Note that
+`CERAMIC_API_KEY` powers the REST-API live probe only — the Ceramic MCP server
+authenticates via OAuth 2.1 (browser flow on first use) and does NOT consume
+this env var.
 
 ### Step 2: Validate Format of Present Keys
 
@@ -149,6 +153,22 @@ if [ -n "$key" ]; then
     printf 'PERPLEXITY_API_KEY: FORMAT INVALID (expected pplx- prefix + 40+ alphanumeric/dash/underscore chars)\n'
   else
     printf 'PERPLEXITY_API_KEY: FORMAT VALID\n'
+  fi
+fi
+```
+
+**Ceramic** (known `cer_sk` prefix observed in dashboard-issued keys; not
+stated in Ceramic docs but consistent across observed keys, so we enforce
+it — a missing prefix usually means a key was pasted into the wrong env
+var):
+
+```bash
+key="${CERAMIC_API_KEY:-}"
+if [ -n "$key" ]; then
+  if ! printf '%s' "$key" | grep -qE '^cer_sk[a-zA-Z0-9_-]{14,}$'; then
+    printf 'CERAMIC_API_KEY: FORMAT INVALID (expected cer_sk prefix + 14+ alphanumeric/underscore/dash chars, no whitespace)\n'
+  else
+    printf 'CERAMIC_API_KEY: FORMAT VALID\n'
   fi
 fi
 ```
@@ -217,6 +237,19 @@ curl_exit=$?
 http_status=$(printf '%s' "$response" | tail -n1)
 ```
 
+**Ceramic** (REST endpoint, separate from the OAuth-authenticated MCP):
+
+```bash
+response=$(curl -s --connect-timeout 5 --max-time 5 \
+  -w "\n%{http_code}" \
+  -X POST "https://api.ceramic.ai/search" \
+  -H "Authorization: Bearer ${CERAMIC_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"test"}')
+curl_exit=$?
+http_status=$(printf '%s' "$response" | tail -n1)
+```
+
 After each probe, evaluate `$curl_exit` first, then `$http_status`. Apply this
 explicit decision tree for each provider:
 
@@ -247,7 +280,7 @@ and `provider_detail` are used in the results table. If body content must ever
 be shown for error context, redact key patterns first:
 
 ```bash
-sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9_-]*/***REDACTED***/g'
+sed 's/tvly-[a-zA-Z0-9_-]*/***REDACTED***/g; s/pplx-[a-zA-Z0-9_-]*/***REDACTED***/g; s/cer_sk[a-zA-Z0-9_-]*/***REDACTED***/g'
 ```
 
 Never display EXA response bodies at all — EXA keys have no known prefix and
@@ -262,13 +295,18 @@ If user skips testing: all format-valid keys show `PRESENT (untested)`.
 ### Step 3.5: MCP Source Health Checks
 
 This step runs unconditionally — MCP calls have no quota cost and require no
-user opt-in. Check each of the six MCP sources using a ToolSearch probe followed
-by a lightweight test call (except Parallel Task which uses ToolSearch-only).
+user opt-in. Check each of the seven MCP sources using a ToolSearch probe
+followed by a lightweight test call (except Parallel Task and Ceramic, which
+use ToolSearch-only).
 
 For each source below, follow this pattern:
 
-1. Call ToolSearch with the keyword shown. If the exact tool name is absent from
-   the results, record status as `UNAVAILABLE` and move to the next source.
+1. Call ToolSearch with the keyword shown. If the exact tool name is absent
+   from the results, record status as `UNAVAILABLE` and move to the next
+   source. If ToolSearch itself raises an exception (rather than returning a
+   non-matching result set), record status as `FAIL (ToolSearch error)` so
+   the operator can distinguish a tool genuinely not installed from a
+   transient session error.
 2. If the tool is found, invoke it with the minimal test arguments shown.
 3. If the call succeeds and returns a structured payload (object or array),
    record status as `ACTIVE` — even if the results array is empty.
@@ -337,9 +375,24 @@ pattern. Creating tasks has real compute cost and `getStatus` requires a valid
 task ID. If the tool appears in ToolSearch results, record status as
 `ACTIVE (ToolSearch only — server reachability not verified)`.
 
-Run all six ToolSearch probes. For sources that are found, run their test calls
-(except Parallel Task which uses ToolSearch-only). Record each source's status
-for the Step 4 report table.
+**Ceramic MCP** (bundled HTTP — lexical web search; OAuth 2.1 first-use):
+
+```text
+ToolSearch keyword: "ceramic_search"
+Tool name: mcp__plugin_yellow-research_ceramic__ceramic_search
+Test: ToolSearch probe only (a real search call burns 1 query; OAuth flow may
+also pop a browser on first use)
+```
+
+For Ceramic, a ToolSearch-only check is used. The Ceramic MCP at
+`https://mcp.ceramic.ai/mcp` authenticates via OAuth 2.1 (browser flow on
+first use, token cached and auto-refreshed thereafter — same UX as Parallel
+Task). If the tool appears in ToolSearch results, record status as
+`ACTIVE (ToolSearch only — server reachability and OAuth state not verified)`.
+
+Run all seven ToolSearch probes. For sources that are found, run their test
+calls (except Parallel Task and Ceramic, which use ToolSearch-only). Record
+each source's status for the Step 4 report table.
 
 Never stop on a per-source error — record the status and continue to the next
 source. A failing MCP source does not affect API key checks or overall command
@@ -363,10 +416,12 @@ API Keys (all optional — plugin degrades gracefully)
   EXA            SET         VALID     ACTIVE         ACTIVE
   Tavily         SET         VALID     ACTIVE         ACTIVE
   Perplexity     NOT SET     N/A       N/A            INACTIVE
+  Ceramic REST   SET         VALID     ACTIVE         ACTIVE  (REST probe only)
 
-Parallel Task server (OAuth)
-  No key required — authenticates via Claude Code browser OAuth automatically.
-  You'll be prompted to authorize in your browser on first /research:deep use.
+OAuth-authenticated MCP servers (no API key needed)
+  Parallel Task  — Claude Code browser OAuth, prompted on first /research:deep use.
+  Ceramic MCP    — Claude Code browser OAuth, prompted on first ceramic_search use.
+  (CERAMIC_API_KEY is for the REST live-probe above — the MCP uses OAuth.)
 
 MCP Sources (no API key required — always available if plugin installed)
   Source         Plugin             Status
@@ -377,24 +432,33 @@ MCP Sources (no API key required — always available if plugin installed)
   DeepWiki       yellow-devin       ACTIVE
   ast-grep       (bundled)          ACTIVE
   Parallel Task  (bundled)          ACTIVE (ToolSearch only — server reachability not verified)
+  Ceramic        (bundled)          ACTIVE (ToolSearch only — server reachability and OAuth state not verified)
 
 Capability summary:
   /research:deep    PARTIAL (2/3 API sources — Perplexity inactive)
   /research:code    PARTIAL (2/3 API sources — Perplexity inactive)
-  MCP sources:      5/6 available
+  MCP sources:      6/7 available
 ```
 
-Adjust the capability summary based on how many keys are active:
+`CERAMIC_API_KEY` is intentionally NOT counted in the API-source total —
+the Ceramic MCP authenticates via OAuth and works without this key. The
+key only powers the REST live-probe above. Counting it would
+misrepresent research capability when a user has all three functional
+keys (EXA/Tavily/Perplexity) set.
+
+Adjust the capability summary based on how many functional API keys are
+active (three — EXA, Tavily, Perplexity):
 
 - 3 active: `FULL (3/3 API sources)`
 - 1-2 active: `PARTIAL (N/3 API sources)`
-- 0 active: `MINIMAL (Parallel Task OAuth only — no API key sources)`
+- 0 active: `MINIMAL (Parallel Task + Ceramic OAuth only — no API key sources)`
 
-Adjust the MCP sources line based on how many MCP sources are ACTIVE:
+Adjust the MCP sources line based on how many MCP sources are ACTIVE (now
+seven — Context7, Grep, WarpGrep, DeepWiki, ast-grep, Parallel Task, Ceramic):
 
-- 6 active: `MCP sources: 6/6 available`
-- 1-5 active: `MCP sources: N/6 available`
-- 0 active: `MCP sources: 0/6 available — install plugins or configure MCPs`
+- 7 active: `MCP sources: 7/7 available`
+- 1-6 active: `MCP sources: N/7 available`
+- 0 active: `MCP sources: 0/7 available — install plugins or configure MCPs`
 
 ### Step 5: Setup Instructions (for absent or invalid keys)
 
@@ -406,6 +470,8 @@ To enable missing providers, add to your shell profile (~/.zshrc or ~/.bashrc):
   export EXA_API_KEY="..."          # Get key: https://exa.ai/
   export TAVILY_API_KEY="..."       # Get key: https://tavily.com/
   export PERPLEXITY_API_KEY="..."   # Get key: https://www.perplexity.ai/settings/api
+  export CERAMIC_API_KEY="..."      # Get key: https://platform.ceramic.ai/keys
+                                    # (REST API only — the Ceramic MCP uses OAuth)
 
 Then:
   source ~/.zshrc   (or ~/.bashrc)
@@ -415,7 +481,7 @@ Note: Keys are passed to MCP servers at startup — a Claude Code restart is
 required after adding new keys. Never commit API keys to version control.
 ```
 
-Only show the lines for keys that are absent or invalid (not all three if some
+Only show the lines for keys that are absent or invalid (not all four if some
 are already working).
 
 If ast-grep prerequisites are missing (`ast-grep` or `uv`), show this block:
@@ -447,13 +513,14 @@ To enable missing MCP sources:
   DeepWiki:   Install yellow-devin — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-devin)
   ast-grep:   Bundled — install prerequisites: ast-grep binary and uv (see above)
   Parallel:   Bundled — OAuth auto-managed; if FAIL, restart Claude Code
+  Ceramic:    Bundled — OAuth auto-managed on first ceramic_search use; if FAIL, restart Claude Code
 
 If a source shows FAIL (installed but test failed), try restarting Claude Code.
 ToolSearch results reflect session-start state — restart after installing new plugins.
 ```
 
-Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all six if
-some are already working).
+Only show the lines for MCP sources that are UNAVAILABLE or FAIL (not all seven
+if some are already working).
 
 ### Step 6: Next Steps
 

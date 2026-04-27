@@ -106,7 +106,8 @@ validators before finishing. For broader PR validation, the repo CI baseline is
 
 ## Security & Configuration Tips
 - Never commit credentials such as `DEVIN_SERVICE_USER_TOKEN`,
-  `DEVIN_ORG_ID`, `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, or `EXA_API_KEY`.
+  `DEVIN_ORG_ID`, `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `EXA_API_KEY`, or
+  `CERAMIC_API_KEY`.
 - When reporting credential findings, redact the value and only include file
   path, line number, and credential type.
 - Validate manifests, versions, and agent authoring locally before pushing.

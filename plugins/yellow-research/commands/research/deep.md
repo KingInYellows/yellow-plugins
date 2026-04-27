@@ -9,6 +9,7 @@ allowed-tools:
   - Task
   - AskUserQuestion
   - ToolSearch
+  - mcp__plugin_yellow-research_ceramic__ceramic_search
   - mcp__plugin_yellow-research_exa__web_search_exa
   - mcp__plugin_yellow-research_exa__web_search_advanced_exa
   - mcp__plugin_yellow-research_exa__crawling_exa
@@ -36,8 +37,8 @@ allowed-tools:
 
 # Deep Research
 
-Multi-source research saved to `docs/research/<slug>.md` using Perplexity,
-Tavily, EXA, Parallel Task, and ast-grep MCP.
+Multi-source research saved to `docs/research/<slug>.md` using Ceramic,
+Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP.
 
 ## Workflow
 

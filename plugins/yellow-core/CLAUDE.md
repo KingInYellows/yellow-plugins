@@ -77,6 +77,13 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   repair. `/workflows:plan` detects Linear issue context in brainstorm docs and
   includes a `## Linear Issues` metadata section. Without yellow-linear, both
   features skip silently.
+- **yellow-research** — `best-practices-researcher` prefers
+  `mcp__plugin_yellow-research_ceramic__ceramic_search` (lexical web search,
+  OAuth 2.1) as its primary general-web source when yellow-research is
+  installed. Detected via ToolSearch at runtime; falls back to built-in
+  `WebSearch` silently when yellow-research is absent. This avoids
+  duplicating the Ceramic MCP registration across plugins (single OAuth
+  session).
 
 ### MCP Servers (1)
 
