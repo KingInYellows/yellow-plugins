@@ -1,6 +1,6 @@
 ---
 name: morph-discovery-pattern
-description: "Morph discovery + fallback pattern — discover morph edit_file and warpgrep tools at runtime via ToolSearch, prefer them for large edits and intent-based search, silently fall back to built-in Edit/Grep when yellow-morph is not installed. Use when authoring agents that need efficient editing or semantic code search with graceful degradation."
+description: "Morph discovery + fallback pattern — discover edit_file and warpgrep at runtime via ToolSearch, prefer them for large edits and intent-based search, silently fall back to Edit/Grep when yellow-morph is missing. Use when authoring agents that edit files or run semantic searches."
 user-invokable: false
 ---
 
