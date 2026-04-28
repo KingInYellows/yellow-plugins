@@ -10,7 +10,10 @@
 #   0 — all checks pass
 #   1 — violations found
 
-set -euo pipefail
+# Note: -e omitted intentionally — checks accumulate errors and report a
+# summary at the end. With -e, any non-match grep would abort the entire
+# loop before subsequent files are checked.
+set -uo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
 if [ -z "$ROOT" ]; then
@@ -82,7 +85,8 @@ if [ -n "$known_skills" ]; then
   while IFS= read -r f; do
     fm=$(frontmatter "$f")
     # Extract lines like "  - skill-name" under a "skills:" key.
-    # State-machine assumes skills: appears before tools: (current convention).
+    # State machine: in_skills=1 between "skills:" and the next top-level key.
+    # Resets in_skills on any line starting with [a-zA-Z] (a new top-level key).
     in_skills=0
     name=""
     bare=""
