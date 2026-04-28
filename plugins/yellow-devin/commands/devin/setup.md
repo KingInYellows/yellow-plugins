@@ -25,9 +25,55 @@ printf '=== Prerequisites ===\n'
 command -v curl >/dev/null 2>&1 && printf 'curl: ok\n' || printf 'curl: NOT FOUND\n'
 command -v jq  >/dev/null 2>&1 && printf 'jq:   ok\n' || printf 'jq:   NOT FOUND\n'
 
-printf '\n=== Environment ===\n'
-[ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf '%-28s set\n' 'DEVIN_SERVICE_USER_TOKEN:' || printf '%-28s NOT SET\n' 'DEVIN_SERVICE_USER_TOKEN:'
-[ -n "${DEVIN_ORG_ID:-}" ]            && printf '%-28s set\n' 'DEVIN_ORG_ID:' || printf '%-28s NOT SET\n' 'DEVIN_ORG_ID:'
+printf '\n=== Credentials ===\n'
+# 2-arg has_userconfig: mirror the canonical definition in
+# plugins/yellow-core/commands/setup/all.md. Keep these in sync manually
+# — if you change one, change all copies (search for "has_userconfig()"
+# across plugins/). `grep -qF` (fixed-string) guards against regex
+# metacharacters sneaking into the search pattern.
+has_userconfig() {
+  local plugin="$1" option="$2"
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>&1
+  else
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+
+if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
+  TOKEN_SRC=shell
+  printf '%-28s set (shell env)\n' 'DEVIN_SERVICE_USER_TOKEN:'
+elif has_userconfig yellow-devin devin_service_user_token; then
+  TOKEN_SRC=userconfig
+  printf '%-28s set (userConfig, keychain)\n' 'DEVIN_SERVICE_USER_TOKEN:'
+else
+  TOKEN_SRC=none
+  printf '%-28s NOT SET\n' 'DEVIN_SERVICE_USER_TOKEN:'
+fi
+if [ -n "${DEVIN_ORG_ID:-}" ]; then
+  printf '%-28s set (shell env)\n' 'DEVIN_ORG_ID:'
+elif has_userconfig yellow-devin devin_org_id; then
+  printf '%-28s set (userConfig)\n' 'DEVIN_ORG_ID:'
+else
+  printf '%-28s NOT SET\n' 'DEVIN_ORG_ID:'
+fi
+
+# Dual-source drift warning: /devin:* commands invoke curl with shell env.
+# If only userConfig is set, Claude Code prompted for the token at plugin
+# enable and stored it in the keychain, but the curl commands will 401
+# because they read the shell env var which is empty.
+if [ "$TOKEN_SRC" = userconfig ] && [ -z "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
+  printf '\nWARNING: userConfig is set but shell DEVIN_SERVICE_USER_TOKEN is unset.\n'
+  printf '         /devin:* commands use curl directly and will return 401 until\n'
+  printf '         you also add:\n'
+  printf '           export DEVIN_SERVICE_USER_TOKEN="<your-cog-token>"\n'
+  printf '         to ~/.zshrc or ~/.bashrc.\n'
+fi
 ```
 
 If **any** of the following are true, report **all** that apply and stop (do not
@@ -35,8 +81,17 @@ continue to Step 2):
 
 - `curl` not found: "curl is required. Install via your system package manager."
 - `jq` not found: "jq is required. Install from [jqlang.github.io](https://jqlang.github.io/jq/download/)"
-- `DEVIN_SERVICE_USER_TOKEN` not set: show the Setup Instructions block below.
-- `DEVIN_ORG_ID` not set: show the Setup Instructions block below.
+- Neither shell env var nor userConfig set for `DEVIN_SERVICE_USER_TOKEN`:
+  show the Setup Instructions block below.
+- Neither shell env var nor userConfig set for `DEVIN_ORG_ID`: show the
+  Setup Instructions block below.
+
+Note: shell env vars take precedence over userConfig for command invocations
+(curl calls below read `$DEVIN_SERVICE_USER_TOKEN` directly). Configuring
+userConfig alone is sufficient for Claude Code to prompt the user at
+plugin-enable time and prevents the "missing env var" failure on fresh
+installs. Users who want shell-only should also set the export so other
+CLI tools and non-Claude sessions can use the same token.
 
 If all pass, continue to Step 2.
 

@@ -11,8 +11,8 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-core_context7__resolve-library-id
   - mcp__grep__searchGitHub
-  - mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
-  - mcp__filesystem-with-morph__warpgrep_codebase_search
+  - mcp__plugin_yellow-morph_morph__codebase_search
+  - mcp__filesystem-with-morph__codebase_search
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
   - mcp__plugin_yellow-research_ast-grep__find_code
 ---
@@ -100,9 +100,40 @@ else
 fi
 
 printf '\n=== API Keys ===\n'
-[ -n "${EXA_API_KEY:-}" ]          && printf 'EXA_API_KEY:          set\n' || printf 'EXA_API_KEY:          NOT SET\n'
-[ -n "${TAVILY_API_KEY:-}" ]       && printf 'TAVILY_API_KEY:       set\n' || printf 'TAVILY_API_KEY:       NOT SET\n'
-[ -n "${PERPLEXITY_API_KEY:-}" ]   && printf 'PERPLEXITY_API_KEY:   set\n' || printf 'PERPLEXITY_API_KEY:   NOT SET\n'
+# 2-arg has_userconfig: mirror the canonical definition in
+# plugins/yellow-core/commands/setup/all.md. Keep these in sync manually
+# — if you change one, change all copies (search for "has_userconfig()"
+# across plugins/). `grep -qF` (fixed-string) guards against regex
+# metacharacters sneaking into the search pattern.
+has_userconfig() {
+  local plugin="$1" option="$2"
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>&1
+  else
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+check_key() {
+  # `eval` for POSIX-compatible indirect expansion. bash/zsh-only ${!var}
+  # silently returns empty under dash, which would mis-classify every key.
+  local env_name="$1" cfg_key="$2" label="$3" env_val=""
+  eval "env_val=\${${env_name}:-}"
+  if [ -n "$env_val" ]; then
+    printf '%-22s set (shell env)\n' "$label:"
+  elif has_userconfig yellow-research "$cfg_key"; then
+    printf '%-22s set (userConfig)\n' "$label:"
+  else
+    printf '%-22s NOT SET\n' "$label:"
+  fi
+}
+check_key EXA_API_KEY exa_api_key EXA_API_KEY
+check_key TAVILY_API_KEY tavily_api_key TAVILY_API_KEY
+check_key PERPLEXITY_API_KEY perplexity_api_key PERPLEXITY_API_KEY
 ```
 
 `curl` and `jq` missing are informational warnings — they affect live testing
@@ -294,10 +325,13 @@ Test call: mcp__grep__searchGitHub with query: "test", maxResults: 1
 **WarpGrep** (yellow-morph plugin preferred, global MCP fallback):
 
 ```text
-ToolSearch keyword: "warpgrep_codebase_search"
-Preferred tool name: mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
-Fallback tool name: mcp__filesystem-with-morph__warpgrep_codebase_search
+ToolSearch keyword: "codebase_search" (or "morph warpgrep" — same tool)
+Preferred tool name: mcp__plugin_yellow-morph_morph__codebase_search
+Fallback tool name: mcp__filesystem-with-morph__codebase_search
 Test call: <matched tool> with query: "README"
+Note: In morphmcp 0.8.165 the tool is named `codebase_search`. Older
+versions exposed it as `warpgrep_codebase_search`; that name no longer
+exists.
 ```
 
 Check for the plugin-namespaced tool first. If not found, fall back to the
@@ -400,19 +434,27 @@ Adjust the MCP sources line based on how many MCP sources are ACTIVE:
 
 If any keys are `ABSENT`, `FORMAT INVALID`, or `INVALID`, show this block:
 
-```sh
-To enable missing providers, add to your shell profile (~/.zshrc or ~/.bashrc):
+```text
+To enable missing providers (recommended path, no restart required):
 
-  export EXA_API_KEY="..."          # Get key: https://exa.ai/
-  export TAVILY_API_KEY="..."       # Get key: https://tavily.com/
-  export PERPLEXITY_API_KEY="..."   # Get key: https://www.perplexity.ai/settings/api
+  Disable and re-enable yellow-research:
+    /plugin disable yellow-research
+    /plugin enable yellow-research
 
-Then:
-  source ~/.zshrc   (or ~/.bashrc)
-  Restart Claude Code for MCP servers to pick up the new keys.
+  Claude Code will prompt for each key. Dismiss the ones you don't need;
+  answer the ones you want. Keys are stored in the system keychain (or
+  ~/.claude/.credentials.json at 0600 perms on Linux).
 
-Note: Keys are passed to MCP servers at startup — a Claude Code restart is
-required after adding new keys. Never commit API keys to version control.
+Get keys:
+  EXA:        https://exa.ai/
+  Tavily:     https://tavily.com/
+  Perplexity: https://www.perplexity.ai/settings/api
+
+Never commit API keys to version control.
+
+(Fallback for power users who want a pure shell-env setup: add a per-MCP
+wrapper script — see plugins/yellow-morph/bin/start-morph.sh. Plugin.json
+no longer reads the shell *_API_KEY vars directly as of 2.0.0.)
 ```
 
 Only show the lines for keys that are absent or invalid (not all three if some

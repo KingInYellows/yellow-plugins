@@ -51,12 +51,13 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (4)
+### Skills (5)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `create-agent-skills` — guidance for creating skills and agents
 - `git-worktree` — git worktree management for parallel development
 - `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
+- `mcp-health-probe` — canonical three-state (OFFLINE / DEGRADED / HEALTHY) classification for `/<plugin>:status` commands that expose an MCP server (internal)
 
 ### Optional Plugin Dependencies
 

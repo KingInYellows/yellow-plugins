@@ -8,6 +8,39 @@ and this project adheres to
 
 ---
 
+## [2.0.0] - 2026-04-17
+
+### Major Changes
+
+- **Breaking:** all three API keys (`PERPLEXITY_API_KEY`,
+  `TAVILY_API_KEY`, `EXA_API_KEY`) migrated to `userConfig`. The
+  perplexity, tavily, and exa MCP servers now read their API keys from
+  Claude Code's `userConfig` (sensitive, keychain-backed) instead of
+  shell env vars. The three keys are declared **optional** — the plugin
+  degrades gracefully when any are missing, so skipping the prompts is
+  valid for users who only want a subset of research sources.
+
+  Empirically verified behavior (MCP stdio probe, 2026-04-17): perplexity
+  hard-fails at startup without `PERPLEXITY_API_KEY` (so its tools
+  disappear entirely); tavily and exa start without their keys but return
+  runtime errors on tool invocation. Either way, `/research:deep` and
+  `/research:code` continue to operate with whichever sources are
+  available.
+
+### Migration (existing users)
+
+- Run `claude plugin update yellow-research@yellow-plugins`. Claude Code
+  prompts for each key at plugin-enable time; dismiss any you don't want
+  stored. Answering preserves the keychain-backed experience; skipping
+  leaves the old shell-env path broken for that MCP (since plugin.json
+  now references `${user_config.*}`, not `${*_API_KEY}` shell vars).
+- Power users who prefer shell env vars can add a thin wrapper script
+  per MCP (see yellow-morph's `bin/start-morph.sh` for a pattern), but
+  for most users answering the userConfig prompt is the recommended
+  path.
+
+---
+
 ## [1.3.0] - 2026-03-10
 
 ### Minor Changes

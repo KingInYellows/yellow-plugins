@@ -1,6 +1,6 @@
 {
   "name": "yellow-research",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "description": "Deep research plugin with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
@@ -19,6 +19,20 @@
     "mcp"
   ],
   "outputStyles": "./output-styles",
+  "userConfig": {
+    "perplexity_api_key": {
+      "description": "Optional Perplexity API key. Get one at https://www.perplexity.ai/settings/api. Without a key, perplexity MCP will fail at startup and those tools are skipped — other sources (tavily, exa, parallel, ast-grep) continue to work. Stored in system keychain.",
+      "sensitive": true
+    },
+    "tavily_api_key": {
+      "description": "Optional Tavily API key. Get one at https://app.tavily.com. Tavily MCP starts without a key but tool calls return runtime errors — key required for actual searches. Stored in system keychain.",
+      "sensitive": true
+    },
+    "exa_api_key": {
+      "description": "Optional Exa API key. Get one at https://dashboard.exa.ai. Exa MCP starts without a key but tool calls return runtime errors — key required for actual searches. Stored in system keychain.",
+      "sensitive": true
+    }
+  },
   "mcpServers": {
     "perplexity": {
       "command": "npx",
@@ -27,7 +41,7 @@
         "@perplexity-ai/mcp-server@0.8.2"
       ],
       "env": {
-        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}",
+        "PERPLEXITY_API_KEY": "${user_config.perplexity_api_key}",
         "PERPLEXITY_TIMEOUT_MS": "${PERPLEXITY_TIMEOUT_MS:-600000}"
       }
     },
@@ -38,7 +52,7 @@
         "tavily-mcp@0.2.17"
       ],
       "env": {
-        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+        "TAVILY_API_KEY": "${user_config.tavily_api_key}"
       }
     },
     "exa": {
@@ -49,7 +63,7 @@
         "tools=web_search_exa,get_code_context_exa,company_research_exa,web_search_advanced_exa,crawling_exa,deep_researcher_start,deep_researcher_check"
       ],
       "env": {
-        "EXA_API_KEY": "${EXA_API_KEY}"
+        "EXA_API_KEY": "${user_config.exa_api_key}"
       }
     },
     "parallel": {

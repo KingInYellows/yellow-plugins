@@ -9,14 +9,14 @@ external research).
 
 All tool names follow `mcp__plugin_yellow-research_<server>__<tool>`.
 
-### perplexity — `PERPLEXITY_API_KEY`
+### perplexity — `userConfig.perplexity_api_key`
 
 - `perplexity_ask` — Quick factual answers
 - `perplexity_search` — Web-grounded search
 - `perplexity_research` — Deep multi-source research
 - `perplexity_reason` — Step-by-step reasoning
 
-### tavily — `TAVILY_API_KEY`
+### tavily — `userConfig.tavily_api_key`
 
 - `tavily_search` — Real-time web search
 - `tavily_extract` — Extract content from URLs
@@ -24,7 +24,7 @@ All tool names follow `mcp__plugin_yellow-research_<server>__<tool>`.
 - `tavily_map` — Structured site map
 - `tavily_research` — Deep research mode
 
-### exa — `EXA_API_KEY`
+### exa — `userConfig.exa_api_key`
 
 Default-on tools (enabled by EXA by default):
 
@@ -110,18 +110,24 @@ For the **ast-grep** MCP server (other servers have no system prerequisites):
 If any prerequisite is missing, the ast-grep MCP server still starts (lazy
 check) but tools will fail on invocation. Other servers are unaffected.
 
-## API Key Setup
+## Required Credentials
 
-Add to `~/.zshrc`:
+Each of the three API keys (perplexity, tavily, exa) is **optional** — the
+plugin degrades gracefully when any are missing. Each key is declared as
+an optional sensitive `userConfig` field in `plugin.json`.
+On first enable (or after `claude plugin update yellow-research`), Claude
+Code prompts for each key. Answer the prompts for the sources you want;
+dismiss the others. Values are stored in the system keychain (or
+`~/.claude/.credentials.json` at 0600 perms on minimal Linux) and
+substituted into each MCP's env block via
+`${user_config.<name>_api_key}` — no Claude Code restart needed when a
+key changes.
 
-```sh
-export EXA_API_KEY="..."
-export TAVILY_API_KEY="..."
-export PERPLEXITY_API_KEY="..."
-```
-
-Source or restart shell after setting. Keys are passed to MCP servers at startup
-— restart Claude Code after adding new keys.
+If you prefer shell env vars, that path no longer feeds the MCPs as of
+2.0.0 (the plugin.json references `${user_config.*}`, not `${*_API_KEY}`).
+Either answer the prompt or, for a fully shell-driven setup, add a thin
+wrapper per MCP (see `plugins/yellow-morph/bin/start-morph.sh` for a
+reference pattern).
 
 The **parallel** server uses OAuth — Claude Code handles authentication
 automatically (no API key needed). You'll be prompted to authorize on first use.
@@ -144,12 +150,12 @@ These external tools improve research quality but are not required:
   `/research:deep`. No API key required. Configure globally in Claude Code MCP
   settings.
 - **yellow-morph plugin** (preferred) — provides WarpGrep
-  (`mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`) for agentic
+  (`mcp__plugin_yellow-morph_morph__codebase_search`) for agentic
   codebase search. Replaces the global `filesystem-with-morph` MCP. When both
   are installed, yellow-morph's plugin-namespaced tool is preferred. Install:
   `/plugin marketplace add KingInYellows/yellow-plugins` (select yellow-morph)
 - **filesystem-with-morph MCP** (legacy) — provides WarpGrep
-  (`mcp__filesystem-with-morph__warpgrep_codebase_search`) for agentic codebase
+  (`mcp__filesystem-with-morph__codebase_search`) for agentic codebase
   and GitHub search. No API key required. Configure globally in Claude Code MCP
   settings. When yellow-morph is installed, prefer the plugin-namespaced tool
   instead.

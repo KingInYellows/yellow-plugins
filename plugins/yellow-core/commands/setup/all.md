@@ -76,14 +76,49 @@ else
 fi
 
 printf '\n=== Environment Variables ===\n'
-[ -n "${MORPH_API_KEY:-}" ] && printf 'MORPH_API_KEY:             set\n' || printf 'MORPH_API_KEY:             NOT SET\n'
-[ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf 'DEVIN_SERVICE_USER_TOKEN:  set\n' || printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET\n'
-[ -n "${DEVIN_ORG_ID:-}" ] && printf 'DEVIN_ORG_ID:              set\n' || printf 'DEVIN_ORG_ID:              NOT SET\n'
-[ -n "${SEMGREP_APP_TOKEN:-}" ] && printf 'SEMGREP_APP_TOKEN:         set\n' || printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
+# has_userconfig <plugin-name> <option-name> — path-scoped check of
+# pluginConfigs.<plugin>.options.<option> in ~/.claude/settings.json.
+# Uses jq when available (exact path match, immune to false positives
+# from arbitrary strings elsewhere in the file); falls back to a two-step
+# grep that still requires the plugin name AND option name to appear.
+has_userconfig() {
+  local plugin="$1" option="$2"
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>&1
+  else
+    # `grep -qF` (fixed-string) — values are literals at call sites but the
+    # -F flag protects against regex metacharacters if a future caller
+    # passes something unexpected.
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+check_key() {
+  # `eval` for POSIX-compatible indirect expansion. bash/zsh-only ${!var}
+  # silently returns empty under dash, causing every caller to fall through
+  # to the has_userconfig branch regardless of shell env presence.
+  local env_name="$1" plugin="$2" option="$3" label="$4" env_val=""
+  eval "env_val=\${${env_name}:-}"
+  if [ -n "$env_val" ]; then
+    printf '%-26s set (shell env)\n' "$label:"
+  elif has_userconfig "$plugin" "$option"; then
+    printf '%-26s set (userConfig)\n' "$label:"
+  else
+    printf '%-26s NOT SET\n' "$label:"
+  fi
+}
+check_key MORPH_API_KEY              yellow-morph    morph_api_key             MORPH_API_KEY
+check_key DEVIN_SERVICE_USER_TOKEN   yellow-devin    devin_service_user_token  DEVIN_SERVICE_USER_TOKEN
+check_key DEVIN_ORG_ID               yellow-devin    devin_org_id              DEVIN_ORG_ID
+check_key SEMGREP_APP_TOKEN          yellow-semgrep  semgrep_app_token         SEMGREP_APP_TOKEN
 [ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
-[ -n "${EXA_API_KEY:-}" ] && printf 'EXA_API_KEY:               set\n' || printf 'EXA_API_KEY:               NOT SET\n'
-[ -n "${TAVILY_API_KEY:-}" ] && printf 'TAVILY_API_KEY:            set\n' || printf 'TAVILY_API_KEY:            NOT SET\n'
-[ -n "${PERPLEXITY_API_KEY:-}" ] && printf 'PERPLEXITY_API_KEY:        set\n' || printf 'PERPLEXITY_API_KEY:        NOT SET\n'
+check_key EXA_API_KEY         yellow-research exa_api_key         EXA_API_KEY
+check_key TAVILY_API_KEY      yellow-research tavily_api_key      TAVILY_API_KEY
+check_key PERPLEXITY_API_KEY  yellow-research perplexity_api_key  PERPLEXITY_API_KEY
 
 printf '\n=== Repository State ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -235,37 +270,79 @@ as **NOT INSTALLED** and skip all other checks for that plugin.
 
 **yellow-morph:**
 
-- READY: `node18_check` ok AND `npx` OK AND `rg` OK AND `MORPH_API_KEY` set
-- PARTIAL: local prerequisites are satisfied but `MORPH_API_KEY` is NOT SET
-- NEEDS SETUP: any local prerequisite missing (`node18_check`, `npx`, or `rg`)
+The Morph API key can be supplied via either the plugin's `userConfig`
+prompt (stored in the system keychain, preferred) or a shell
+`MORPH_API_KEY` export (power-user fallback). Neither is visible to
+shell checks directly, so treat READY as "key is configured via *some*
+path" and rely on `/morph:status` for authoritative OFFLINE detection.
+
+- READY: `node18_check` ok AND `npx` OK AND `rg` OK AND either of:
+  (a) shell `MORPH_API_KEY` set, OR
+  (b) `pluginConfigs.yellow-morph.options.morph_api_key` present in
+      `~/.claude/settings.json` (userConfig was answered). Detection:
+      `grep -q '"morph_api_key"' ~/.claude/settings.json 2>/dev/null`.
+- PARTIAL: local prerequisites are satisfied but neither the shell env
+  var nor the userConfig option is detectable — the plugin will install
+  but the MCP server will not start. Recommend running `/morph:setup`
+  or answering the userConfig prompt at next plugin-enable.
+- NEEDS SETUP: any local prerequisite missing (`node18_check`, `npx`, or
+  `rg`).
 
 **yellow-devin:**
 
-- READY: `curl` OK AND `jq` OK AND `DEVIN_SERVICE_USER_TOKEN` set AND
-  `DEVIN_ORG_ID` set
-- NEEDS SETUP: any READY condition not met
+Both credentials can live in either the shell env or the plugin's
+`userConfig` (stored in the keychain). Treat "set" as "configured via any
+supported source."
+
+- `token_ok` = shell `DEVIN_SERVICE_USER_TOKEN` set OR
+  `pluginConfigs.yellow-devin.options.devin_service_user_token` present in
+  `~/.claude/settings.json` (detection:
+  `grep -q '"devin_service_user_token"' ~/.claude/settings.json`).
+- `org_ok` = shell `DEVIN_ORG_ID` set OR
+  `pluginConfigs.yellow-devin.options.devin_org_id` present.
+
+- READY: `curl` OK AND `jq` OK AND `token_ok` AND `org_ok`.
+- PARTIAL: `curl` + `jq` OK but one or both credentials missing from every
+  source. Recommend answering the `userConfig` prompt or setting the shell
+  env vars.
+- NEEDS SETUP: `curl` or `jq` missing.
 
 **yellow-semgrep:**
 
-- READY: `curl` OK AND `jq` OK AND `SEMGREP_APP_TOKEN` set AND `semgrep` OK
-- PARTIAL: `SEMGREP_APP_TOKEN` set but `semgrep` CLI is missing
-- NEEDS SETUP: token missing OR `curl` missing OR `jq` missing
+Token can come from either shell `SEMGREP_APP_TOKEN` (used by curl-based
+REST calls in commands) or the plugin's `userConfig.semgrep_app_token`
+(used by the MCP server via `${user_config.semgrep_app_token}`). Treat
+"set" as "configured via any supported source."
+
+- `token_ok` = shell `SEMGREP_APP_TOKEN` set OR
+  `"semgrep_app_token"` present in `~/.claude/settings.json` under
+  `pluginConfigs.yellow-semgrep.options`.
+- READY: `curl` OK AND `jq` OK AND `token_ok` AND `semgrep` OK.
+- PARTIAL: `token_ok` but `semgrep` CLI missing; or `semgrep` OK and
+  `curl`+`jq` OK but `token_ok` is false.
+- NEEDS SETUP: `curl` or `jq` missing.
 
 **yellow-research:**
 
+Each of the 3 API keys can come from either the shell env var or the
+plugin's `userConfig` (stored in the keychain). Treat "set" as
+"configured via any supported source."
+
 Compute bundled source availability out of 5:
 
-1. `EXA_API_KEY` set
-2. `TAVILY_API_KEY` set
-3. `PERPLEXITY_API_KEY` set
-4. Parallel Task tool visible via ToolSearch
+1. `EXA_API_KEY` set in shell env OR `"exa_api_key"` present in
+   `~/.claude/settings.json` under `pluginConfigs.yellow-research.options`.
+2. `TAVILY_API_KEY` set in shell env OR `"tavily_api_key"` present.
+3. `PERPLEXITY_API_KEY` set in shell env OR `"perplexity_api_key"`
+   present.
+4. Parallel Task tool visible via ToolSearch.
 5. ast-grep counts only when the exact ToolSearch match is present **and**
    `ast-grep` OK **and** `uv` OK (uv manages Python 3.13 transparently via
-   `--python 3.13` in plugin.json — no system Python check needed)
+   `--python 3.13` in plugin.json — no system Python check needed).
 
-- READY: all 5 bundled sources available
-- PARTIAL: 1-4 bundled sources available
-- NEEDS SETUP: 0 bundled sources available
+- READY: all 5 bundled sources available.
+- PARTIAL: 1-4 bundled sources available.
+- NEEDS SETUP: 0 bundled sources available.
 
 **yellow-linear:**
 

@@ -12,8 +12,10 @@ allowed-tools:
 
 # Set Up yellow-morph
 
-Verify prerequisites, configure MORPH_API_KEY, and verify MCP server
-connectivity.
+Verify prerequisites, confirm a Morph API key is configured (via plugin
+`userConfig` — the recommended path — or shell `MORPH_API_KEY` as fallback),
+pre-install `@morphllm/morphmcp` into the plugin data directory so the first
+tool call is instant, and verify API connectivity.
 
 ## Workflow
 
@@ -25,9 +27,9 @@ Run all prerequisite checks in a single Bash call:
 printf '=== Prerequisites ===\n'
 command -v rg   >/dev/null 2>&1 && printf 'ripgrep (rg):  OK\n' || printf 'ripgrep (rg):  NOT FOUND\n'
 command -v node >/dev/null 2>&1 && printf 'node:          OK (%s)\n' "$(node --version 2>/dev/null)" || printf 'node:          NOT FOUND\n'
-command -v npx  >/dev/null 2>&1 && printf 'npx:           OK\n' || printf 'npx:           NOT FOUND\n'
+command -v npm  >/dev/null 2>&1 && printf 'npm:           OK (%s)\n' "$(npm --version 2>/dev/null)" || printf 'npm:           NOT FOUND\n'
 printf '\n=== Environment ===\n'
-[ -n "${MORPH_API_KEY:-}" ] && printf '%-20s set (%s...)\n' 'MORPH_API_KEY:' "$(printf '%s' "$MORPH_API_KEY" | head -c 4)" || printf '%-20s NOT SET\n' 'MORPH_API_KEY:'
+[ -n "${MORPH_API_KEY:-}" ] && printf '%-28s set (%s...) — fallback path\n' 'MORPH_API_KEY (shell):' "$(printf '%s' "$MORPH_API_KEY" | head -c 4)" || printf '%-28s not set\n' 'MORPH_API_KEY (shell):'
 ```
 
 Collect **all** failures before stopping — report them together.
@@ -38,46 +40,83 @@ Stop conditions (after reporting all):
   https://github.com/BurntSushi/ripgrep#installation"
 - `node` not found: "Node.js 22.22.0 or later is required. Install from
   https://nodejs.org/"
-- `npx` not found: "npx is required (bundled with Node.js). Verify Node.js
+- `npm` not found: "npm is required (bundled with Node.js). Verify Node.js
   installation."
 - Node <22.22.0: "Node.js 22.22.0 or later is required. Current: vX.Y.Z. Please
   upgrade."
 
-Node version check: If node version is below 22.22.0, stop with: "Node.js
-22.22.0 or later is required. Current: vX.Y.Z. Please upgrade Node.js from
-https://nodejs.org/, then re-run /morph:setup."
+Shell `MORPH_API_KEY` not set is **not** a failure — the `userConfig` path
+(recommended) stores the key in the system keychain instead.
 
-`MORPH_API_KEY` not set is a warning, not a stop — continue to Step 2.
+### Step 2: Verify Morph API Key is Configured
 
-### Step 2: API Key Configuration
+The yellow-morph plugin reads its API key from `userConfig.morph_api_key`
+(prompted at plugin-enable time) with shell `MORPH_API_KEY` as a power-user
+fallback.
 
-If `MORPH_API_KEY` is not set:
+Use `ToolSearch` with query `"+morph edit_file"` to check whether the MCP
+server has started. If `mcp__plugin_yellow-morph_morph__edit_file` is
+visible, the key is configured and accepted — skip to Step 3.
 
-Ask via AskUserQuestion: "MORPH_API_KEY is not set. Do you have a Morph API
-key?"
+If the tool is NOT visible, the MCP server did not start. Ask via
+AskUserQuestion: "No Morph API key is configured. How would you like to
+provide one?"
 
-- **Yes, I have one** → "Please set it in your shell profile and restart Claude
-  Code:
+- **Answer the userConfig prompt (recommended)** → "Run
+  `/plugin disable yellow-morph` then `/plugin enable yellow-morph`.
+  Claude Code will prompt you for the key; it is stored in the system
+  keychain (or `~/.claude/.credentials.json` at 0600 perms on Linux). No
+  shell export and no Claude Code restart are required — the MCP server
+  picks up the new key when it starts on the next tool invocation. Get a
+  key at https://morphllm.com (free tier: 250K credits/month)."
+- **Export as shell env var (fallback, power users)** → "Add
+  `export MORPH_API_KEY=your-key-here` to `~/.zshrc` or `~/.bashrc`, then
+  **restart Claude Code**. This path is less ergonomic because it requires
+  the restart, but it continues to work for users who prefer shell-level
+  secrets management."
+- **Skip (I just want to check prereqs)** → Stop here. Privacy note
+  applies regardless: "Note: Morph tools send code to Morph's API servers.
+  Free/Starter tiers retain data for 90 days. See
+  https://morphllm.com/privacy"
 
-  ```bash
-  echo 'export MORPH_API_KEY=your-key-here' >> ~/.zshrc  # or ~/.bashrc
-  source ~/.zshrc
-  ```
+### Step 3: Pre-install morphmcp into the plugin data directory
 
-  Then re-run `/morph:setup` to verify." Show info: "Get a key at
-  https://morphllm.com — free tier includes 250K credits/month." Stop here
-  (cannot verify without key).
+The plugin ships a wrapper script that installs `@morphllm/morphmcp` on
+first invocation, but running the install during setup gives the user a
+visible progress indicator and surfaces install errors immediately rather
+than hanging the first tool call.
 
-- **No, I need one** → "Sign up at https://morphllm.com to get an API key. Free
-  tier includes 250K credits/month (200 requests/month)." Show privacy note:
-  "Note: Morph tools send code to Morph's API servers. Free/Starter tiers retain
-  data for 90 days. See https://morphllm.com/privacy" Stop here.
+```bash
+DATA_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/yellow-morph}"
+ROOT_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
 
-If `MORPH_API_KEY` is set: continue to Step 3.
+mkdir -p "$DATA_DIR"
+cp "${ROOT_DIR}/package.json" "${DATA_DIR}/package.json"
+cp "${ROOT_DIR}/package-lock.json" "${DATA_DIR}/package-lock.json"
+# Use `npm ci` (not `npm install`) to match the wrapper and hook — this
+# enforces the committed lockfile so the same transitive deps land here,
+# in SessionStart, and on first tool invocation.
+(cd "$DATA_DIR" && env -u MORPH_API_KEY npm ci --no-audit --no-fund --loglevel=error) 2>&1
+```
 
-### Step 3: Verify API Connectivity
+On success: "morphmcp installed to ${DATA_DIR}/node_modules. First tool
+call will be instant."
 
-Test API key with a minimal completion call:
+Handle install failures with actionable messages:
+
+- **Permission error writing ${DATA_DIR}**: "Cannot write to plugin data
+  directory. Check permissions: `ls -ld ${DATA_DIR}`."
+- **npm ENOSPC (disk full)**: "Disk full. Free space under ${DATA_DIR} and
+  retry."
+- **npm ECONNREFUSED / 403**: "Cannot reach the npm registry. Check
+  network / proxy settings (HTTP_PROXY, HTTPS_PROXY)."
+- **Other npm errors**: print the tail of npm output, suggest re-running
+  `/morph:setup` after fixing, and continue — the SessionStart hook and
+  wrapper script will retry on next session.
+
+### Step 4: Verify API Connectivity (optional — skipped without shell env)
+
+If shell `MORPH_API_KEY` is set, test connectivity:
 
 ```bash
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
@@ -94,25 +133,18 @@ else
 fi
 ```
 
-- **200**: API key valid. Continue to Step 4.
+- **200**: API key valid.
 - **401**: "API key is invalid. Check your MORPH_API_KEY value." Stop.
 - **403**: "API key is forbidden. Your account may be suspended." Stop.
 - **000 or empty**: "Cannot reach Morph API. Check network connectivity to
   api.morphllm.com." Stop.
-- **429**: "Rate limit exceeded. You may have exhausted your free tier credits."
-  Warn, continue.
+- **429**: "Rate limit exceeded. You may have exhausted your free tier
+  credits." Warn, continue.
 
-### Step 4: Verify MCP Package
-
-Check that the MCP package is accessible from the npm registry:
-
-```bash
-npm view @morphllm/morphmcp@0.8.110 version 2>/dev/null || echo "NPM_LOOKUP_FAILED"
-```
-
-- Version output (e.g., `0.8.110`): Package accessible. Continue to Step 5.
-- `NPM_LOOKUP_FAILED`: "Cannot query npm registry for @morphllm/morphmcp. Check
-  npm access." Warn, continue.
+If shell `MORPH_API_KEY` is not set but the MCP tool was visible in Step 2,
+skip this step — the userConfig key is not readable from the shell.
+Connectivity is implicitly verified by the MCP server having started with
+tools exposed.
 
 ### Step 5: Report
 
