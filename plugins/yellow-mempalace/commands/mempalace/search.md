@@ -4,6 +4,10 @@ description: "Search palace memories by semantic similarity with optional wing/r
 argument-hint: '<query> [--wing <wing>] [--room <room>] [--hall <hall>]'
 allowed-tools:
   - ToolSearch
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_wing
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_room
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_hall
 ---
 
 # Search Palace

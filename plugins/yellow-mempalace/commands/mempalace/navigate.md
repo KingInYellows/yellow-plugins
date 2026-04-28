@@ -4,6 +4,9 @@ description: "Browse palace structure — list wings, rooms, and traverse cross-
 argument-hint: '[wing] [--tunnels <wingA> <wingB>]'
 allowed-tools:
   - ToolSearch
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_list_wings
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_list_rooms
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_find_tunnels
 ---
 
 # Navigate Palace

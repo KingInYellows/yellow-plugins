@@ -26,7 +26,9 @@ success() {
 }
 
 extract_version() {
-  printf '%s\n' "$1" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true
+  # grep returns 1 when no version pattern matches — that's the empty-version
+  # signal callers handle below. Suppress only that exit code, not the input.
+  printf '%s\n' "$1" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || return 0
 }
 
 # Compare two semver strings. Returns 0 if $1 >= $2, 1 otherwise.
@@ -101,7 +103,7 @@ if command -v mempalace >/dev/null 2>&1; then
       pipx_output=""
       if ! pipx_output=$(pipx install --force mempalace 2>&1); then
         printf '%s\n' "$pipx_output" >&2
-        warning "pipx upgrade/install failed. Try manually: pipx upgrade mempalace"
+        error "pipx upgrade and pipx install --force both failed. Try manually: pipx upgrade mempalace"
       fi
     fi
   elif (command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1) \
@@ -119,11 +121,10 @@ if command -v mempalace >/dev/null 2>&1; then
     pip_upgrade_output=""
     if ! pip_upgrade_output=$("${pip_cmd[@]}" install --upgrade mempalace 2>&1); then
       printf '%s\n' "$pip_upgrade_output" >&2
-      warning "pip upgrade failed. Try manually: pip install --upgrade mempalace"
+      error "pip upgrade failed. Try manually: pip install --upgrade mempalace"
     fi
   else
-    warning "Cannot auto-upgrade — no pipx or pip found."
-    warning "Upgrade manually: pipx upgrade mempalace"
+    error "Cannot auto-upgrade — no pipx or pip found. Install pipx first: brew install pipx or python3 -m pip install --user pipx"
   fi
 
   # Re-check version after upgrade attempt

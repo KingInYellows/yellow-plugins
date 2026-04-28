@@ -6,10 +6,22 @@ user-invokable: false
 
 # Palace Protocol
 
-The Palace Protocol defines how agents should interact with MemPalace to
-maintain data integrity and get the best results.
+## What It Does
 
-## Wake-Up Sequence
+Defines how agents should interact with MemPalace to maintain data integrity
+and get the best results: wake-up sequence, core query-before-assert rules,
+memory stack layers, and tool selection guidance for search vs knowledge graph
+vs navigation.
+
+## When to Use
+
+Load when an agent needs to decide which mempalace tool fits the task, or at
+the start of a session that will draw from palace memory. Reference the
+"When to Use What" table to pick between search, KG, and navigation tools.
+
+## Usage
+
+### Wake-Up Sequence
 
 On first interaction with the palace in a session:
 
@@ -17,7 +29,7 @@ On first interaction with the palace in a session:
 2. Note the wing count, room count, and drawer count
 3. Use this context to scope subsequent queries
 
-## Core Rules
+### Core Rules
 
 1. **Query before asserting**: Never state facts about a person, project, or
    event without first querying the palace. Use `mempalace_search` or
@@ -32,7 +44,7 @@ On first interaction with the palace in a session:
 4. **Invalidate, don't delete**: When facts change, use `mempalace_kg_invalidate`
    to end validity rather than deleting. This preserves the temporal record.
 
-## Memory Stack (L0-L3)
+### Memory Stack (L0-L3)
 
 | Layer | Content | When Loaded | Token Budget |
 |-------|---------|-------------|-------------|
@@ -45,7 +57,7 @@ On first interaction with the palace in a session:
 - L2 is triggered by wing/room-scoped searches
 - L3 is triggered by unfiltered `mempalace_search`
 
-## When to Use What
+### When to Use What (Tool Selection)
 
 | Need | Tool | Why |
 |------|------|-----|
@@ -56,9 +68,9 @@ On first interaction with the palace in a session:
 | "What changed since January?" | `mempalace_kg_timeline` | Temporal history |
 | "How are X and Y connected?" | `mempalace_find_tunnels` | Cross-wing discovery |
 | "Save this decision" | `mempalace_add_drawer` | Verbatim storage |
-| "Update a fact" | `mempalace_kg_invalidate` + `kg_add` | Temporal fact management |
+| "Update a fact" | `mempalace_kg_invalidate` + `mempalace_kg_add` | Temporal fact management |
 
-## Content Filing Guidelines
+### Content Filing Guidelines
 
 When adding content to the palace:
 
