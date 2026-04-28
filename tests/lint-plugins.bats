@@ -129,3 +129,58 @@ run_lint_in_fixture() {
   [ "$status" -eq 0 ]
   [[ "$output" != *"ERROR"* ]]
 }
+
+# ============================================================================
+# Test 3: GitHub Actions annotation emission. When GITHUB_ACTIONS=true,
+# the script must emit ::warning::/::error:: lines to stdout (where the
+# Actions runner parses them). Runs without the env var must NOT emit them.
+# The "local" invocation explicitly unsets GITHUB_ACTIONS so this assertion
+# holds even when the test harness itself runs inside CI (where
+# GITHUB_ACTIONS is already exported as "true" for every step).
+# ============================================================================
+
+setup_annotations_fixture() {
+  mkdir "$TEST_TMP/actions"
+  cp -r "$FIXTURE_SRC/plugins" "$TEST_TMP/actions/plugins"
+  ( cd "$TEST_TMP/actions" \
+      && git init -q \
+      && git config user.email lint@example.invalid \
+      && git config user.name lint \
+      && git add . \
+      && git commit -q -m init >/dev/null )
+}
+
+@test "annotations: local run (GITHUB_ACTIONS unset) emits 0 annotations to stdout" {
+  setup_annotations_fixture
+  cd "$TEST_TMP/actions"
+  local_stdout=$(env -u GITHUB_ACTIONS bash "$LINT_SCRIPT" 2>/dev/null || true)
+  cd "$ROOT"
+  count=$(printf '%s' "$local_stdout" | grep -c '^::' || true)
+  [ "$count" -eq 0 ]
+}
+
+@test "annotations: GITHUB_ACTIONS=true emits ::warning:: lines to stdout" {
+  setup_annotations_fixture
+  cd "$TEST_TMP/actions"
+  ga_stdout=$(GITHUB_ACTIONS=true bash "$LINT_SCRIPT" 2>/dev/null || true)
+  cd "$ROOT"
+  count=$(printf '%s' "$ga_stdout" | grep -c '^::warning' || true)
+  [ "$count" -ge 1 ]
+}
+
+@test "annotations: GITHUB_ACTIONS=true emits ::error:: lines to stdout" {
+  setup_annotations_fixture
+  cd "$TEST_TMP/actions"
+  ga_stdout=$(GITHUB_ACTIONS=true bash "$LINT_SCRIPT" 2>/dev/null || true)
+  cd "$ROOT"
+  count=$(printf '%s' "$ga_stdout" | grep -c '^::error' || true)
+  [ "$count" -ge 1 ]
+}
+
+@test "annotations: GITHUB_ACTIONS=true emits file-anchored annotations" {
+  setup_annotations_fixture
+  cd "$TEST_TMP/actions"
+  ga_stdout=$(GITHUB_ACTIONS=true bash "$LINT_SCRIPT" 2>/dev/null || true)
+  cd "$ROOT"
+  [[ "$ga_stdout" == *"file=plugins/"* ]]
+}
