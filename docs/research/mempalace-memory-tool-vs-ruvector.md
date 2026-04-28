@@ -55,7 +55,7 @@ Applies the ancient **Method of Loci** to AI memory. Rather than summarizing con
 
 ---
 
-## 2. MCP Server — 19 Tools
+## 2. MCP Server — 22 Tools
 
 MemPalace ships with a built-in MCP server:
 ```bash

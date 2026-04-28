@@ -4,6 +4,8 @@ description: "Show palace overview including wings, rooms, drawers, and knowledg
 allowed-tools:
   - Bash
   - ToolSearch
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_status
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_stats
 ---
 
 # Palace Status

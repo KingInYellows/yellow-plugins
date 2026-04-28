@@ -239,7 +239,7 @@ ships.
 
 - [ ] 5.4: Write `README.md`
   - User-facing quickstart: install, init, mine, search
-  - Prerequisites (Python 3.9+)
+  - Prerequisites (Python 3.10+; 3.11+ recommended)
   - Available commands
   - MCP tools list
 
@@ -300,10 +300,10 @@ ships.
 ### Dependencies
 
 - `mempalace` (Python, pip/pipx) — the upstream CLI + MCP server
-- Python 3.9+ — runtime requirement
+- Python 3.10+ (3.11+ recommended) — runtime requirement
 - ChromaDB — installed as mempalace dependency (not standalone)
 
-### MCP Tools Available (19)
+### MCP Tools Available (22)
 
 **Read:** `status`, `list_wings`, `list_rooms`, `get_taxonomy`, `get_aaak_spec`
 **Search:** `search`, `search_wing`, `search_hall`, `search_room`, `check_duplicate`

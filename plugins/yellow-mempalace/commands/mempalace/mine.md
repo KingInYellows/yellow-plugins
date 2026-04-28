@@ -24,7 +24,7 @@ Extract from `$ARGUMENTS`:
   `general`
 
 If path is empty: use AskUserQuestion to ask "What directory should I mine?"
-with options: "Current project (.)", "Specify a path"
+with options: "Current project (.)", "Other" (free-text path entry).
 
 ### Step 2: Validate path
 

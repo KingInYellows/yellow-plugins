@@ -5,6 +5,10 @@ argument-hint: '<action> [args...]'
 allowed-tools:
   - ToolSearch
   - AskUserQuestion
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_query
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_add
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_invalidate
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_timeline
 ---
 
 # Knowledge Graph
