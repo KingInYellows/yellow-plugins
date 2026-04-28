@@ -379,6 +379,7 @@ Marketplace Setup Dashboard
   yellow-docs          READY           git available, repo is a git repository
   yellow-composio      PARTIAL         MCP visible, usage counter missing
   yellow-codex         PARTIAL         codex v0.118.0 found, OPENAI_API_KEY not set
+  yellow-mempalace     NEEDS SETUP     mempalace binary missing from PATH
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
 
   Summary: X ready, Y partial, Z need setup

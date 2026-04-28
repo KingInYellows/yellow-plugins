@@ -31,7 +31,7 @@ ships.
 
 1. **Standalone plugin** (not a ruvector bridge) — mempalace has enough surface
    area (22 MCP tools, KG, mining) to justify its own plugin
-2. **MCP-first** — the `python -m mempalace.mcp_server` stdio server is the
+2. **MCP-first** — the `mempalace mcp` stdio server is the
    canonical integration path
 3. **No hooks in Phase 1** — mempalace's hook system has a known shell injection
    vulnerability (#110). Defer hooks until the fix ships and is verified
@@ -90,13 +90,17 @@ ships.
       "mempalace": {
         "command": "mempalace",
         "args": ["mcp"],
-        "env": {}
+        "env": {
+          "PYTHONWARNINGS": "ignore",
+          "TRANSFORMERS_VERBOSITY": "error",
+          "TOKENIZERS_PARALLELISM": "false"
+        }
       }
     }
   }
   ```
-  Note: No hooks in Phase 1. No env vars needed (mempalace auto-discovers
-  palace in cwd or `~/.mempalace/`).
+  Note: No hooks in Phase 1. Env vars suppress log noise from
+  ChromaDB/sentence-transformers that would corrupt JSON-RPC over stdio.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** No existing plugin uses `"command": "python", "args": ["-m", ...]`.
@@ -122,7 +126,7 @@ ships.
   - Detect PEP 668 "externally-managed-environment" error
   - Verify binary in PATH after install
   - Smoke test: `mempalace --version`
-  - Verify MCP entrypoint: `mempalace mcp --help` or `python -m mempalace.mcp_server --help`
+  - Verify MCP entrypoint: `mempalace mcp --help`
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The install script should follow the exact pattern at

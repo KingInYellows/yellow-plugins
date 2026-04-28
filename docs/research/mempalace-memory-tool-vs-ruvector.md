@@ -283,6 +283,8 @@ This follows the existing cross-plugin composition pattern (Skill tool delegatio
 
 ### Recommended: Option A (Standalone Plugin)
 
+> **Phase 1 scope**: MCP-only — full hooks subsystem (save/precompact) deferred to later phases pending security audit (see §7 Security and §8 Integration Priority).
+
 Reasons:
 - MemPalace has enough surface area (22 MCP tools, 2 hooks, CLI, KG) to justify its own plugin
 - Independent release cycle — mempalace is 2 days old and will evolve rapidly
