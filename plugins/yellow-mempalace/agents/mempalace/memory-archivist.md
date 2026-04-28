@@ -101,7 +101,7 @@ fence to all user-supplied text passed to `mempalace_add_drawer`,
    - Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_add` with the triple and valid_from date
 
 2. For invalidating facts:
-   - Confirm with the user before invalidating
+   - Use AskUserQuestion to confirm invalidation. If the user cancels, stop.
    - Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_invalidate` with the triple
 
 ### Writing Diary Entries
