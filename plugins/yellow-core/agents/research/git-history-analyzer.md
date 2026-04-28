@@ -2,7 +2,8 @@
 name: git-history-analyzer
 description: 'Git archaeology specialist. Traces the origins and evolution of code changes. Use when investigating why code exists, identifying experts for code areas, or understanding change patterns.'
 model: inherit
-memory: true
+background: true
+memory: project
 tools:
   - Bash
   - Read

@@ -1,6 +1,7 @@
 ---
 "yellow-core": minor
 "yellow-review": minor
+"yellow-codex": patch
 "yellow-debt": patch
 ---
 
