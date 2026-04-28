@@ -1,3 +1,9 @@
+---
+title: 'Plugin Install Scripts Must Smoke-Test the MCP Entrypoint Subcommand'
+date: 2026-04-28
+category: 'code-quality'
+---
+
 # Plugin Install Scripts Must Smoke-Test the MCP Entrypoint Subcommand
 
 ## Summary
@@ -72,8 +78,8 @@ When authoring or auditing a plugin install script:
    script, the smoke test is missing.
 
 ```bash
-# Example check:
-jq -r '.mcpServers | to_entries[] | "\(.key): \(.value.command) \(.value.args | join(" "))"' plugins/<name>/.claude-plugin/plugin.json
+# Example check (the `// []` fallback handles servers with no `args` field):
+jq -r '.mcpServers | to_entries[] | "\(.key): \(.value.command) \((.value.args // []) | join(" "))"' plugins/<name>/.claude-plugin/plugin.json
 ```
 
 ## Generalization
