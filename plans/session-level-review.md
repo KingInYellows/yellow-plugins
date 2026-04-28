@@ -273,7 +273,7 @@ The user may run both. Session-level review should not re-run per-PR agents.
 
 ### Phase 5: Integration and Polish
 
-- [ ] 5.1: Add ruvector integration. Follow the canonical pattern from `mcp-integration-patterns` skill: recall at start with query prefix `"[session-review] "`, remember at end with tiered consent (P1 auto, P2 prompted). Graceful skip if ruvector not installed.
+- [ ] 5.1: Add ruvector integration. Follow the `memory-recall-pattern` skill for recall at start (query prefix `"[session-review] "`) and the `memory-remember-pattern` skill for tiered remember at end (P1 auto, P2 prompted). Graceful skip if ruvector not installed.
 
 - [ ] 5.2: Add error handling for all failure modes. Skill tool failure (review:pr redirect), plan file not found, plan file missing expected sections (skip that dimension with a warning), dirty working directory, `gt` command failures, Edit tool failures. Follow the graceful degradation pattern used throughout the plugin.
 

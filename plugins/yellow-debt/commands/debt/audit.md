@@ -142,7 +142,10 @@ After the bash block succeeds:
 
 1. Read `.debt/scanners-to-run.txt`.
 2. Launch one Task per scanner in parallel using subagent type
-   `yellow-debt:<scanner>-scanner`.
+   `yellow-debt:<scanner>-scanner`. **Each Task invocation MUST set
+   `run_in_background: true`** — scanner agents declare `background: true` in
+   their frontmatter, but true parallelism also requires the spawning call to
+   run in the background.
 3. Each scanner prompt should instruct the agent to read
    `.debt/file-list.txt`, write findings to
    `.debt/scanner-output/<scanner>-scanner.json`, and if
