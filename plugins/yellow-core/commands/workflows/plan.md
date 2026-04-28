@@ -78,19 +78,33 @@ research, analysis, and structured documentation.
 
 **Steps:**
 
-1. Launch research agents in parallel using Task tool:
+1. Launch research agents in parallel using Task tool. **Issue both Task
+   invocations in a single response** so they execute concurrently. **Each
+   Task invocation MUST set `run_in_background: true`** — both research
+   agents declare `background: true` in their frontmatter, but the spawning
+   call must also run in the background so the two agents execute concurrently
+   rather than serially:
 
    ```
    Task: repo-research-analyst
+   subagent_type: "yellow-core:repo-research-analyst"
    Input: {feature_description}
    Goal: Find relevant files, existing patterns, similar implementations
+   run_in_background: true
    ```
 
    ```
    Task: best-practices-researcher
+   subagent_type: "yellow-core:best-practices-researcher"
    Input: {feature_description}
    Goal: Identify project conventions, architectural patterns, testing approaches
+   run_in_background: true
    ```
+
+   **Wait gate:** Before Step 2, wait for both background research tasks to
+   complete via TaskOutput (or equivalent). Do not proceed to "Collect
+   findings" while either agent is still running — the aggregation depends
+   on both outputs being available.
 
 2. Collect findings:
    - File paths that need modification
@@ -115,9 +129,14 @@ research, analysis, and structured documentation.
 
    ```
    Task: spec-flow-analyzer
+   subagent_type: "yellow-core:spec-flow-analyzer"
    Input: {feature_description, research_findings}
    Goal: Validate completeness, identify edge cases, find missing requirements
+   run_in_background: true
    ```
+
+   **Wait gate:** Before Phase 4, wait for the spec-flow-analyzer task to
+   complete via TaskOutput.
 
 2. Review analyzer output for:
    - Missing acceptance criteria
