@@ -445,7 +445,11 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 8: Hook script basics (shebang, decision output, no set -e)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  if (
+    manifest.hooks &&
+    typeof manifest.hooks === 'object' &&
+    !Array.isArray(manifest.hooks)
+  ) {
     const DECISION_PROTOCOL_EVENTS = new Set([
       'PreToolUse',
       'PostToolUse',
