@@ -131,11 +131,20 @@ Apply selection rules from `pr-review-workflow` skill:
 
 ### Step 5: Pass 1 — Parallel Agent Review
 
-Launch all selected agents EXCEPT `code-simplifier` in parallel via Task tool.
-**Each Task invocation MUST set `run_in_background: true`** — the review
-agents declare `background: true` in their frontmatter, but true parallelism
-also requires the spawning call to run in the background. Without this, the
-orchestrator blocks on each agent sequentially even when they are independent.
+**Step 5a — Create the per-run directory FIRST (before any Task spawn)** so
+each agent receives a path to write its result file to. The per-run
+directory prevents collisions between concurrent PR review sessions:
+
+```bash
+RUN_DIR=$(mktemp -d -t review-pr-XXXXXXXX)
+```
+
+**Step 5b — Spawn agents in parallel.** Launch all selected agents EXCEPT
+`code-simplifier` via Task tool. **Each Task invocation MUST set
+`run_in_background: true`** — the review agents declare `background: true`
+in their frontmatter, but true parallelism also requires the spawning call
+to run in the background. Without this, the orchestrator blocks on each
+agent sequentially even when they are independent.
 
 Each agent receives:
 
@@ -143,9 +152,17 @@ Each agent receives:
 - PR title and body
 - Changed file list
 - CLAUDE.md contents
+- `$RUN_DIR` (so the agent can write `agent-result-<agent-name>.json` there)
 
-Wait for all agents via TaskOutput (or equivalent). Collect findings. Log any
-failed agents with error reason.
+Wait for all agents via TaskOutput (or equivalent). Collect findings using
+the **output-file convention** (see `create-agent-skills` skill §Subagent
+Failure Convention): each agent writes
+`$RUN_DIR/agent-result-<agent-name>.json` with a `status` and `findings`
+array before exiting. After each agent completes, read its result file.
+Agents whose file is missing, whose JSON is invalid, or whose
+`status != "success"` are logged as failed (with their `reason`) and
+surfaced in the user-visible summary as partial-success — do not silently
+drop them.
 
 If zero agents succeed, abort with error.
 

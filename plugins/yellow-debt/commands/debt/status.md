@@ -5,6 +5,7 @@ argument-hint: '[--json]'
 allowed-tools:
   - Bash
   - Read
+model: haiku
 ---
 
 # Technical Debt Status Command

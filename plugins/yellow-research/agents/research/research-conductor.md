@@ -1,7 +1,7 @@
 ---
 name: research-conductor
 description: "Routes /research:deep queries across multiple MCP sources. Use when deep research needs multi-source investigation. Triages complexity and dispatches parallel fan-out -- simple queries go to Perplexity alone; moderate to 2-3 parallel sources; complex topics trigger full fan-out including Parallel Task MCP for async reports."
-model: inherit
+model: opus
 background: true
 memory: project
 tools:
