@@ -6,14 +6,29 @@ user-invokable: false
 
 # MemPalace Conventions
 
-## MCP Tool Naming
+## What It Does
+
+Documents the integration conventions for the MemPalace MCP server: tool
+naming, palace structure terminology (wings/rooms/halls/tunnels), memory type
+classifiers, search filter patterns, knowledge graph triple format, error
+handling, graceful degradation, and input validation.
+
+## When to Use
+
+Load when authoring or maintaining mempalace commands and agents — anywhere
+you need the canonical MCP tool name, palace vocabulary, error-handling table,
+or input validation rules.
+
+## Usage
+
+### MCP Tool Naming
 
 All tools follow the pattern:
 `mcp__plugin_yellow-mempalace_mempalace__mempalace_<tool_name>`
 
 Example: `mcp__plugin_yellow-mempalace_mempalace__mempalace_search`
 
-## Palace Structure Terminology
+### Palace Structure Terminology
 
 | Term | Description | Example |
 |------|-------------|---------|
@@ -24,7 +39,7 @@ Example: `mcp__plugin_yellow-mempalace_mempalace__mempalace_search`
 | **Closet** | Summary pointing to original content | Compressed overview |
 | **Drawer** | Original verbatim content (never summarized) | Raw source text |
 
-## Memory Types (Halls)
+### Memory Types (Halls)
 
 | Hall | Purpose | Example Content |
 |------|---------|-----------------|
@@ -34,7 +49,7 @@ Example: `mcp__plugin_yellow-mempalace_mempalace__mempalace_search`
 | `hall_preferences` | Habits, opinions, likes | "Team prefers conventional commits" |
 | `hall_advice` | Recommendations and solutions | "Use pipx for Python tools to avoid PEP 668" |
 
-## Search Filter Patterns
+### Search Filter Patterns
 
 Narrow searches progressively for better results:
 1. **Unfiltered**: `mempalace_search` — broad search across entire palace
@@ -44,7 +59,7 @@ Narrow searches progressively for better results:
 
 Always prefer the most specific filter available.
 
-## Knowledge Graph Triple Format
+### Knowledge Graph Triple Format
 
 ```
 subject --predicate--> object
@@ -57,7 +72,7 @@ subject --predicate--> object
 - Use `kg_invalidate` to end a fact's validity (never delete)
 - Use `kg_timeline` for chronological entity history
 
-## Error Handling
+### Error Handling
 
 | Error | Action |
 |-------|--------|
@@ -67,7 +82,7 @@ subject --predicate--> object
 | Empty search results | Suggest broadening query or checking `/mempalace:status` |
 | Duplicate detected | Show existing drawer; ask user whether to proceed |
 
-## Graceful Degradation
+### Graceful Degradation
 
 - If MCP tools are unavailable: report clearly, suggest `/mempalace:setup`
 - If palace is empty: guide user to `/mempalace:mine` for initial indexing
@@ -75,7 +90,7 @@ subject --predicate--> object
   is normal
 - Never silently fail — always report the issue to the user
 
-## Input Validation
+### Input Validation
 
 - Search queries: strip HTML tags, max 1000 characters
 - Wing/room names: lowercase, alphanumeric with hyphens
