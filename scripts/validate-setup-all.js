@@ -33,6 +33,7 @@ const COMMAND_PLUGIN_MAP = {
   'docs:setup': 'yellow-docs',
   'composio:setup': 'yellow-composio',
   'codex:setup': 'yellow-codex',
+  'mempalace:setup': 'yellow-mempalace',
   'statusline:setup': 'yellow-core',
 };
 

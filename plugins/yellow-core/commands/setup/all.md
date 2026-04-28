@@ -61,13 +61,16 @@ command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' ||
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
 command -v ruvector >/dev/null 2>&1 && printf 'ruvector:           OK\n' || printf 'ruvector:           NOT FOUND\n'
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
+command -v mempalace >/dev/null 2>&1 && printf 'mempalace:          OK (%s)\n' "$(mempalace --version 2>/dev/null | head -n1)" || printf 'mempalace:          NOT FOUND\n'
 
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
   printf 'python3:            OK (%s)\n' "$py_ver"
   py37=$(python3 -c "import sys; print('ok' if sys.version_info >= (3, 7) else 'too_old')" 2>/dev/null)
   py313=$(python3 -c "import sys; print('ok' if sys.version_info >= (3, 13) else 'too_old')" 2>/dev/null)
+  py310=$(python3 -c "import sys; print('ok' if sys.version_info >= (3, 10) else 'too_old')" 2>/dev/null)
   printf 'python37_check:     %s\n' "$py37"
+  printf 'python310_check:    %s\n' "$py310"
   printf 'python313_check:    %s\n' "$py313"
 else
   printf 'python3:            NOT FOUND\n'
@@ -122,6 +125,7 @@ printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf '.github/pull_request_template.md:   exists\n' || printf '.github/pull_request_template.md:   missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/composio-usage.json" ] && printf '.claude/composio-usage.json:        exists\n' || printf '.claude/composio-usage.json:        missing\n'
 [ -f ~/.codex/auth.json ] && printf '~/.codex/auth.json:                 exists\n' || printf '~/.codex/auth.json:                 missing\n'
+[ -d "$HOME/.mempalace" ] && printf '~/.mempalace/:                      exists\n' || printf '~/.mempalace/:                      missing\n'
 [ -f ~/.claude/yellow-statusline.py ] && printf '~/.claude/yellow-statusline.py:     exists\n' || printf '~/.claude/yellow-statusline.py:     missing\n'
 
 if [ -f ~/.claude/settings.json ] && command -v python3 >/dev/null 2>&1; then
@@ -169,7 +173,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-core; do
+    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-mempalace yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -336,6 +340,13 @@ Compute bundled source availability out of 6:
 - PARTIAL: `codex` binary found AND version >= 0.118.0, but auth not configured
 - NEEDS SETUP: `codex` binary not found OR version < 0.118.0
 
+**yellow-mempalace:**
+
+- READY: `python310_check` ok AND `mempalace` binary found in PATH AND
+  `~/.mempalace/` directory exists
+- PARTIAL: `mempalace` binary found but `~/.mempalace/` not initialized
+- NEEDS SETUP: `mempalace` binary not found OR `python310_check` not ok
+
 **yellow-core:**
 
 - READY: `python37_check` ok AND `~/.claude/yellow-statusline.py` exists AND
@@ -439,7 +450,8 @@ tool in this fixed order:
 13. `docs:setup`
 14. `composio:setup`
 15. `codex:setup`
-16. `statusline:setup`
+16. `mempalace:setup`
+17. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 Only invoke setups for plugins the user selected. Use this mapping:
@@ -460,6 +472,7 @@ Only invoke setups for plugins the user selected. Use this mapping:
 - `yellow-docs` → `docs:setup`
 - `yellow-composio` → `composio:setup`
 - `yellow-codex` → `codex:setup`
+- `yellow-mempalace` → `mempalace:setup`
 - `yellow-core` → `statusline:setup`
 <!-- setup-all-plugin-command-map:end -->
 
