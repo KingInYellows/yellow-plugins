@@ -171,51 +171,63 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 5b: output styles directory (if present)
+  // Per schema, outputStyles may be a single path string or an array of path strings.
   if (manifest.outputStyles !== undefined) {
-    if (typeof manifest.outputStyles !== 'string') {
-      errors.push('outputStyles must be a string path');
-      logError('outputStyles must be a string path');
+    const stylePaths = Array.isArray(manifest.outputStyles)
+      ? manifest.outputStyles
+      : typeof manifest.outputStyles === 'string'
+        ? [manifest.outputStyles]
+        : null;
+    if (stylePaths === null) {
+      errors.push('outputStyles must be a string path or array of string paths');
+      logError('outputStyles must be a string path or array of string paths');
     } else {
-      const stylesDir = resolvePluginPath(manifest.outputStyles, pluginDir);
-      if (!stylesDir) {
-        errors.push(
-          `outputStyles path escapes plugin directory: ${manifest.outputStyles}`
-        );
-        logError(
-          `outputStyles path escapes plugin directory: ${manifest.outputStyles}`
-        );
-      } else if (!fs.existsSync(stylesDir)) {
-        errors.push(`outputStyles directory not found: ${manifest.outputStyles}`);
-        logError(`outputStyles directory not found: ${manifest.outputStyles}`);
-      } else if (!fs.statSync(stylesDir).isDirectory()) {
-        errors.push(
-          `outputStyles must point to a directory: ${manifest.outputStyles}`
-        );
-        logError(
-          `outputStyles must point to a directory: ${manifest.outputStyles}`
-        );
-      } else {
-        const styleFiles = fs
-          .readdirSync(stylesDir, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
-        if (styleFiles.length === 0) {
-          errors.push(
-            `outputStyles directory must contain at least one .md file: ${manifest.outputStyles}`
-          );
-          logError(
-            `outputStyles directory must contain at least one .md file: ${manifest.outputStyles}`
-          );
+      for (const stylePath of stylePaths) {
+        if (typeof stylePath !== 'string') {
+          errors.push('outputStyles entries must be string paths');
+          logError('outputStyles entries must be string paths');
+          continue;
+        }
+        const stylesDir = resolvePluginPath(stylePath, pluginDir);
+        if (!stylesDir) {
+          errors.push(`outputStyles path escapes plugin directory: ${stylePath}`);
+          logError(`outputStyles path escapes plugin directory: ${stylePath}`);
+        } else if (!fs.existsSync(stylesDir)) {
+          errors.push(`outputStyles directory not found: ${stylePath}`);
+          logError(`outputStyles directory not found: ${stylePath}`);
+        } else if (!fs.statSync(stylesDir).isDirectory()) {
+          errors.push(`outputStyles must point to a directory: ${stylePath}`);
+          logError(`outputStyles must point to a directory: ${stylePath}`);
         } else {
-          logSuccess(
-            `Output styles: ${manifest.outputStyles} (${styleFiles.length} file${styleFiles.length === 1 ? '' : 's'})`
-          );
+          const styleFiles = fs
+            .readdirSync(stylesDir, { withFileTypes: true })
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
+          if (styleFiles.length === 0) {
+            errors.push(
+              `outputStyles directory must contain at least one .md file: ${stylePath}`
+            );
+            logError(
+              `outputStyles directory must contain at least one .md file: ${stylePath}`
+            );
+          } else {
+            logSuccess(
+              `Output styles: ${stylePath} (${styleFiles.length} file${styleFiles.length === 1 ? '' : 's'})`
+            );
+          }
         }
       }
     }
   }
 
-  // RULE 6: Hook script existence (if hooks declared as inline object)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  // RULE 6: Hook script existence (if hooks declared as inline object).
+  // Skip when hooks is an array (the path-array form added by the extended
+  // schema) — array entries are paths/objects, not event-keyed, so the
+  // event-name validation below does not apply.
+  if (
+    manifest.hooks &&
+    typeof manifest.hooks === 'object' &&
+    !Array.isArray(manifest.hooks)
+  ) {
     const VALID_HOOK_EVENTS = [
       'PreToolUse',
       'PostToolUse',
@@ -312,8 +324,13 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist).
+  // Only meaningful for inline-object hooks; array form has no event keys.
+  if (
+    manifest.hooks &&
+    typeof manifest.hooks === 'object' &&
+    !Array.isArray(manifest.hooks)
+  ) {
     const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
     if (fs.existsSync(hooksJsonPath)) {
       try {
@@ -428,7 +445,11 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 8: Hook script basics (shebang, decision output, no set -e)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  if (
+    manifest.hooks &&
+    typeof manifest.hooks === 'object' &&
+    !Array.isArray(manifest.hooks)
+  ) {
     const DECISION_PROTOCOL_EVENTS = new Set([
       'PreToolUse',
       'PostToolUse',
