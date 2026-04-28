@@ -6,6 +6,26 @@ user-invokable: false
 
 # Security Fencing — Canonical Block for Untrusted-Content Agents
 
+## What It Does
+
+Provides the single source of truth for the `CRITICAL SECURITY RULES` block
+that review/scanner/analyst agents inline to defend against prompt injection
+from file content (source code, CI logs, workflow files, runner output).
+Defines two variants — a code variant for source-code-reading agents and a
+CI-artifact variant for log/workflow/runner-output agents — and enumerates
+the consumer roster.
+
+## When to Use
+
+Load when authoring or updating any agent that reads files containing
+content authored outside the agent's trust boundary. Reference this file to
+copy the canonical block verbatim (code variant) or to follow the authoring
+template (CI-artifact variant). Do NOT add `skills: [security-fencing]` to
+agent frontmatter at runtime — the block is inlined per agent until skill
+injection at scale is verified.
+
+## Usage
+
 This skill is the single source of truth for the `CRITICAL SECURITY RULES`
 block that review/scanner/analyst agents include to defend against prompt
 injection from file content. It is currently inlined in 25 agents across
