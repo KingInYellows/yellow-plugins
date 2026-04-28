@@ -78,7 +78,7 @@ fi
 printf '\n=== Environment Variables ===\n'
 if [ -n "${MORPH_API_KEY:-}" ]; then
   printf 'MORPH_API_KEY:             set (shell env)\n'
-elif grep -q '"morph_api_key"' "${HOME}/.claude/settings.json" 2>/dev/null; then
+elif grep -qE '"morph_api_key"[[:space:]]*:' "${HOME}/.claude/settings.json" 2>/dev/null; then
   printf 'MORPH_API_KEY:             set (userConfig)\n'
 else
   printf 'MORPH_API_KEY:             NOT SET\n'
@@ -247,16 +247,16 @@ prompt (stored in the system keychain, preferred) or a shell
 shell checks directly, so treat READY as "key is configured via *some*
 path" and rely on `/morph:status` for authoritative OFFLINE detection.
 
-- READY: `node18_check` ok AND `npx` OK AND `rg` OK AND either of:
+- READY: `node18_check` ok AND `npm` OK AND `rg` OK AND either of:
   (a) shell `MORPH_API_KEY` set, OR
   (b) `pluginConfigs.yellow-morph.options.morph_api_key` present in
       `~/.claude/settings.json` (userConfig was answered). Detection:
-      `grep -q '"morph_api_key"' ~/.claude/settings.json 2>/dev/null`.
+      `grep -qE '"morph_api_key"[[:space:]]*:' ~/.claude/settings.json 2>/dev/null`.
 - PARTIAL: local prerequisites are satisfied but neither the shell env
   var nor the userConfig option is detectable — the plugin will install
   but the MCP server will not start. Recommend running `/morph:setup`
   or answering the userConfig prompt at next plugin-enable.
-- NEEDS SETUP: any local prerequisite missing (`node18_check`, `npx`, or
+- NEEDS SETUP: any local prerequisite missing (`node18_check`, `npm`, or
   `rg`).
 
 **yellow-devin:**
@@ -367,7 +367,7 @@ Marketplace Setup Dashboard
   -------------------  -----------     ------------------------------------------
   gt-workflow          READY           Graphite auth detected, repo initialized
   yellow-ruvector      NEEDS SETUP     Global ruvector binary missing from PATH
-  yellow-morph         PARTIAL         Local tools ready, MORPH_API_KEY missing
+  yellow-morph         PARTIAL         Local tools ready, Morph API key not configured
   yellow-devin         NEEDS SETUP     DEVIN_SERVICE_USER_TOKEN not set
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
   yellow-research      PARTIAL         2/5 bundled sources available
@@ -511,7 +511,7 @@ If any plugins still need attention, list them with their final detail:
 
 ```text
 Still need attention:
-  yellow-morph — PARTIAL (MORPH_API_KEY not set)
+  yellow-morph — PARTIAL (Morph API key not configured)
   yellow-review — PARTIAL (yellow-core not installed)
 ```
 
