@@ -78,10 +78,10 @@ fi
 printf '\n=== Environment Variables ===\n'
 if [ -n "${MORPH_API_KEY:-}" ]; then
   printf 'MORPH_API_KEY:             set (shell env)\n'
-elif grep -qE '"morph_api_key"[[:space:]]*:' "${HOME}/.claude/settings.json" 2>/dev/null; then
+elif grep -qE '"morph_api_key"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
   printf 'MORPH_API_KEY:             set (userConfig)\n'
 else
-  printf 'MORPH_API_KEY:             NOT SET\n'
+  printf 'MORPH_API_KEY:             NOT SET (run /morph:setup if you configured via keychain)\n'
 fi
 [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf 'DEVIN_SERVICE_USER_TOKEN:  set\n' || printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET\n'
 [ -n "${DEVIN_ORG_ID:-}" ] && printf 'DEVIN_ORG_ID:              set\n' || printf 'DEVIN_ORG_ID:              NOT SET\n'

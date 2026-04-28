@@ -114,6 +114,13 @@ if needs_install; then
   fi
 fi
 
-# --- 3. Exec morphmcp. By this point the install lock (if we held one) is
-# released by the EXIT trap before exec runs.
+# --- 3. Release the install lock explicitly before exec. Bash's EXIT trap
+# does NOT fire when `exec` replaces the shell with another program — the
+# shell never "exits" in the sense that triggers EXIT. Without this manual
+# cleanup, an exec into a long-running morphmcp would leave $LOCK_DIR
+# behind for the entire session, blocking future upgrades.
+if [ "${LOCK_ACQUIRED:-0}" -eq 1 ]; then
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+  trap - EXIT INT TERM
+fi
 exec node "$MORPH_ENTRY" "$@"
