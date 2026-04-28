@@ -101,6 +101,9 @@ If the user chooses **Yes**:
 mempalace init
 ```
 
+If the user chooses **No, skip for now**: continue to Step 3 without
+initializing.
+
 ### Step 3: Verify MCP tools
 
 Use ToolSearch with query `"+mempalace"` to discover available MCP tools.

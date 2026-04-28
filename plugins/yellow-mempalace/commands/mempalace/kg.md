@@ -60,8 +60,9 @@ and report the created fact.
 Example: `/mempalace:kg add "auth-service" "uses" "JWT" --from 2026-03-15`
 
 **invalidate**: Use AskUserQuestion to confirm: "Invalidate the fact shown
-above?". On confirmation, call `mempalace_kg_invalidate` with subject,
-predicate, object.
+above?" with options "Yes, invalidate" and "No, cancel". If the user cancels,
+stop. On confirmation, call `mempalace_kg_invalidate` with subject, predicate,
+object.
 
 **timeline**: Call `mempalace_kg_timeline` with optional entity. Display
 chronological list of facts with validity periods.
