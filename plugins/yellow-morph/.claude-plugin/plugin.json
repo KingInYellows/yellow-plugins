@@ -26,5 +26,19 @@
         "WORKSPACE_MODE": "true"
       }
     }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/prewarm-morph.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }

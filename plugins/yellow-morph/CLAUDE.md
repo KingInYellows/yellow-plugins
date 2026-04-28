@@ -4,7 +4,9 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
 
 ## MCP Server
 
-- **morph** — Stdio transport via `npx @morphllm/morphmcp@0.8.165`
+- **morph** — Stdio transport via `bin/start-morph.sh`, which runs
+  `node @morphllm/morphmcp@0.8.165` from a per-user install in
+  `${CLAUDE_PLUGIN_DATA}/node_modules/`.
 - Requires a Morph API key configured via plugin `userConfig` (Claude Code
   prompts for it at plugin-enable time and stores it in the system keychain
   or `~/.claude/.credentials.json`). No shell `export MORPH_API_KEY` required,
@@ -12,8 +14,11 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
 - Tools: `mcp__plugin_yellow-morph_morph__edit_file`,
   `mcp__plugin_yellow-morph_morph__codebase_search`
 - Lifecycle: starts on first MCP tool call, shuts down on session end
-- First call may be slow (20-40s cold start on first npx download; subsequent
-  sessions use npm cache and start in seconds)
+- First-ever call may be slow (20-40s cold start: `npm ci` runs once to
+  install morphmcp into the plugin data dir). A SessionStart hook
+  (`hooks/scripts/prewarm-morph.sh`) runs the same install in parallel so
+  the wait usually happens at session start instead of on first MCP call.
+  Subsequent sessions reuse the cached install and start in seconds.
 
 ## Tool Preference Rules
 
