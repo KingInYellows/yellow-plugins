@@ -36,28 +36,32 @@ Use ToolSearch with query `"+mempalace kg"` to find KG tools.
 
 ### Step 3: Execute action
 
-**query**: Call `mempalace_kg_query` with entity and optional as_of date.
-Display relationships grouped by direction (outgoing/incoming) with validity
-windows.
+For `add` and `invalidate`, present the parsed triple inside reference-only
+fencing before calling AskUserQuestion:
 
-**add**: Call `mempalace_kg_add` with subject, predicate, object, and optional
-valid_from. Confirm the triple was created.
-
-Example: `/mempalace:kg add "auth-service" "uses" "JWT" --from 2026-03-15`
-
-**invalidate**: Call `mempalace_kg_invalidate` with subject, predicate, object.
-Before calling AskUserQuestion, present the triple as reference-only:
-
-```
+```text
 --- begin KG triple (reference only) ---
 subject: <subject>
 predicate: <predicate>
 object: <object>
+valid_from: <YYYY-MM-DD or omitted>   # add only
 --- end KG triple ---
 ```
 
-Use AskUserQuestion to confirm before invalidating: "Invalidate the fact shown
-above?"
+**query**: Call `mempalace_kg_query` with entity and optional as_of date.
+Display relationships grouped by direction (outgoing/incoming) with validity
+windows.
+
+**add**: Use AskUserQuestion to confirm: "Add this fact to the knowledge graph?
+Facts can only be invalidated, not deleted." with options "Yes, add" and "No,
+cancel". If the user cancels, stop. On confirmation, call `mempalace_kg_add`
+and report the created fact.
+
+Example: `/mempalace:kg add "auth-service" "uses" "JWT" --from 2026-03-15`
+
+**invalidate**: Use AskUserQuestion to confirm: "Invalidate the fact shown
+above?". On confirmation, call `mempalace_kg_invalidate` with subject,
+predicate, object.
 
 **timeline**: Call `mempalace_kg_timeline` with optional entity. Display
 chronological list of facts with validity periods.

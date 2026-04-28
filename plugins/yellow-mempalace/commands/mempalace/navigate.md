@@ -7,6 +7,7 @@ allowed-tools:
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_list_wings
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_list_rooms
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_find_tunnels
+  - mcp__plugin_yellow-mempalace_mempalace__mempalace_get_taxonomy
 ---
 
 # Navigate Palace
