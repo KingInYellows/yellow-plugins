@@ -64,7 +64,7 @@ else
 fi
 
 # Dual-source drift warning: /devin:* commands invoke curl with shell env.
-# If only userConfig is set, Claude Code Prompted for the token at plugin
+# If only userConfig is set, Claude Code prompted for the token at plugin
 # enable and stored it in the keychain, but the curl commands will 401
 # because they read the shell env var which is empty.
 if [ "$TOKEN_SRC" = userconfig ] && [ -z "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then

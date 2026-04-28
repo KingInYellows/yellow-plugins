@@ -6,10 +6,28 @@ user-invokable: false
 
 # MCP Health Probe
 
+## What It Does
+
+Defines the canonical three-state MCP health classification (OFFLINE /
+DEGRADED / HEALTHY) used by `/<plugin>:status` commands so the user can
+distinguish "the MCP server didn't start" from "the MCP started but the
+upstream API is failing." Extracted from yellow-morph's `/morph:status`
+and generalized for any plugin with an MCP + upstream HTTP API.
+
+## When to Use
+
+Load when authoring a `/<plugin>:status` command for a plugin whose MCP
+server depends on an upstream HTTP API (Morph, Semgrep, Perplexity, etc.).
+The skill defines the state machine, the classification table, and the
+canonical reference implementation so each status command behaves
+consistently.
+
+## Usage
+
 Three-state classification pattern for `/<plugin>:status` commands that
-expose an MCP server. Extracted from yellow-morph's `/morph:status` and
-generalized so any plugin with an MCP + upstream HTTP API can adopt the
-same UX.
+expose an MCP server. The skill body below covers the three states, the
+detection pattern, the classification table, the rationale, a reference
+implementation, and the anti-patterns to avoid.
 
 ## States
 
