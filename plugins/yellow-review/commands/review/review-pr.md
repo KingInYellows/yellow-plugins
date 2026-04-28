@@ -126,12 +126,17 @@ Apply selection rules from `pr-review-workflow` skill:
   `pattern-recognition-specialist`, `code-simplicity-reviewer`
 - Optional supplementary: `codex-reviewer` (yellow-codex) — when yellow-codex
   is installed AND diff > 100 lines. Spawn via
-  `Task(subagent_type="yellow-codex:codex-reviewer")`. If the agent is
-  not found (yellow-codex not installed), skip silently.
+  `Task(subagent_type="yellow-codex:codex-reviewer", run_in_background=true)`.
+  If the agent is not found (yellow-codex not installed), skip silently.
 
 ### Step 5: Pass 1 — Parallel Agent Review
 
 Launch all selected agents EXCEPT `code-simplifier` in parallel via Task tool.
+**Each Task invocation MUST set `run_in_background: true`** — the review
+agents declare `background: true` in their frontmatter, but true parallelism
+also requires the spawning call to run in the background. Without this, the
+orchestrator blocks on each agent sequentially even when they are independent.
+
 Each agent receives:
 
 - The PR diff (`git diff <baseRefName>...HEAD`)
@@ -139,7 +144,8 @@ Each agent receives:
 - Changed file list
 - CLAUDE.md contents
 
-Wait for all agents. Collect findings. Log any failed agents with error reason.
+Wait for all agents via TaskOutput (or equivalent). Collect findings. Log any
+failed agents with error reason.
 
 If zero agents succeed, abort with error.
 
