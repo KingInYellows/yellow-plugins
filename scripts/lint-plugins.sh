@@ -90,12 +90,17 @@ if [ -n "$known_skills" ]; then
     in_skills=0
     name=""
     bare=""
+    # Match list items under skills: tolerating 2 or 4 space indent (the two
+    # YAML styles used across this repo). Matching ANY leading whitespace
+    # would break the in_skills state machine because top-level keys are
+    # column-zero, but list items are indented — so we explicitly enumerate
+    # the accepted prefixes.
     while IFS= read -r line; do
       case "$line" in
         skills:*) in_skills=1 ;;
-        "  - "*)
+        "  - "*|"    - "*)
           if [ "$in_skills" = 1 ]; then
-            name=${line#"  - "}
+            name=$(printf '%s' "$line" | sed -E 's/^[[:space:]]+- //')
             # Strip possible plugin namespace prefix (yellow-core:foo → foo)
             bare=${name##*:}
             if ! printf '%s\n' "$known_skills" | grep -qxF "$bare"; then
