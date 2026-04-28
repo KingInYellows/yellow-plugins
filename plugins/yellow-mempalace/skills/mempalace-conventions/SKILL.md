@@ -68,9 +68,9 @@ subject --predicate--> object
   source_closet: reference to source
 ```
 
-- Use `kg_query` with `as_of` date to see point-in-time state
-- Use `kg_invalidate` to end a fact's validity (never delete)
-- Use `kg_timeline` for chronological entity history
+- Use `mempalace_kg_query` with `as_of` date to see point-in-time state
+- Use `mempalace_kg_invalidate` to end a fact's validity (never delete)
+- Use `mempalace_kg_timeline` for chronological entity history
 
 ### Error Handling
 

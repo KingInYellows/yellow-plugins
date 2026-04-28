@@ -53,7 +53,7 @@ On first interaction with the palace in a session:
 | **L2** | Room recall | On-demand (scoped search) | Variable |
 | **L3** | Deep semantic search | On-demand (cross-palace) | Variable |
 
-- L0+L1 are loaded via `mempalace wake-up` (~170 tokens total)
+- L0+L1 are loaded via `mempalace_status` (~170 tokens total)
 - L2 is triggered by wing/room-scoped searches
 - L3 is triggered by unfiltered `mempalace_search`
 

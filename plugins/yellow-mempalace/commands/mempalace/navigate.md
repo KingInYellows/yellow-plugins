@@ -32,14 +32,14 @@ Use ToolSearch with query `"+mempalace list"` to find navigation tools.
 ### Step 3: Execute navigation
 
 **No arguments (wing listing)**:
-Call `mempalace_list_wings`. Display each wing with drawer count.
+Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_list_wings`. Display each wing with drawer count.
 
 **Wing specified (room listing)**:
-Call `mempalace_list_rooms` with wing filter. Display rooms within that wing
+Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_list_rooms` with wing filter. Display rooms within that wing
 with drawer counts.
 
 **--tunnels (cross-wing connections)**:
-Call `mempalace_find_tunnels` with wing_a and wing_b. Display rooms that
+Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_find_tunnels` with wing_a and wing_b. Display rooms that
 appear in both wings, forming cross-domain connections.
 
 ### Step 4: Display results
