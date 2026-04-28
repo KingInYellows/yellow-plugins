@@ -96,28 +96,9 @@
       "description": "Plugin homepage URL."
     },
     "repository": {
-      "oneOf": [
-        {
-          "type": "string",
-          "format": "uri"
-        },
-        {
-          "type": "object",
-          "required": ["type", "url"],
-          "properties": {
-            "type": {
-              "type": "string",
-              "enum": ["git"]
-            },
-            "url": {
-              "type": "string",
-              "format": "uri"
-            }
-          },
-          "additionalProperties": false
-        }
-      ],
-      "description": "Source repository (string URL or object with type and url)."
+      "type": "string",
+      "format": "uri",
+      "description": "Source repository URL. Must be a plain URL string — Claude Code's remote validator rejects npm-style {type, url} objects."
     },
     "keywords": {
       "type": "array",
