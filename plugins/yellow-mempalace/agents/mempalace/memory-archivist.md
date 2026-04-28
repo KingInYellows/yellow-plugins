@@ -20,14 +20,13 @@ tools:
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_add
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_kg_invalidate
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_diary_write
-  - mcp__plugin_yellow-mempalace_mempalace__mempalace_diary_read
 ---
 
 <examples>
 <example>
 Context: User wants to save a decision for future reference.
 user: "Save to the palace that we chose GraphQL over REST for the new API"
-assistant: "I'll use the mempalace-archivist to file this decision into the palace."
+assistant: "I'll use the memory-archivist to file this decision into the palace."
 <commentary>Filing a decision maps to add_drawer in the appropriate wing/room.</commentary>
 </example>
 

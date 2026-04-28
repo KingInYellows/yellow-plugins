@@ -21,7 +21,7 @@ with semantic search and a temporal knowledge graph for entity relationships.
 - **Verbatim storage:** Always store content verbatim — never summarize or
   compress before filing into drawers
 - **Search narrowing:** Use wing/room/hall filters for better retrieval
-  (up to +34% precision over unfiltered search)
+  (up to +34% retrieval boost over unfiltered search)
 - **Temporal facts:** Use `kg_invalidate` to end validity, never delete facts
 - **Duplicate checking:** Call `check_duplicate` before `add_drawer`
 - **Graceful degradation:** All commands report clearly when MCP tools are

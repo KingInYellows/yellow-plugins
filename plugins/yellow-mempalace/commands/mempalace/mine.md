@@ -38,14 +38,24 @@ Do not proceed. If `--mode` is omitted, default to `projects`.
 
 ### Step 2: Validate path
 
+Each Bash tool call is a fresh subprocess — variables from Step 1 prose do not
+survive between calls. Substitute the actual parsed path inline (replacing
+`<resolved-path>` below) before running this block. Reject paths that begin
+with `-` (flag injection), or that contain `..` traversal segments:
+
 ```bash
+PATH_ARG="<resolved-path>"
+case "$PATH_ARG" in
+  -*) printf '[yellow-mempalace] Error: path may not start with -\n' >&2; exit 1 ;;
+  *..*) printf '[yellow-mempalace] Error: path may not contain ..\n' >&2; exit 1 ;;
+esac
 if [ ! -d "$PATH_ARG" ]; then
-  printf '[yellow-mempalace] Error: directory not found: %s\n' "$PATH_ARG"
+  printf '[yellow-mempalace] Error: directory not found: %s\n' "$PATH_ARG" >&2
   exit 1
 fi
 ```
 
-If the directory is not found, report the error and stop.
+If the directory is not found or rejected, stop.
 
 ### Step 3: Check palace initialization
 
@@ -58,10 +68,19 @@ user declines, stop.
 
 ### Step 4: Run mining
 
-Use the CLI directly (mining is a heavy batch operation better suited to CLI):
+Use the CLI directly (mining is a heavy batch operation better suited to CLI).
+Substitute the resolved path and validated mode inline. The `--` separator
+prevents `$PATH_ARG` from being parsed as a flag. Check the exit code; on
+non-zero, surface the full output and stop:
 
 ```bash
-mempalace mine "$PATH_ARG" --mode "${MODE:-projects}" 2>&1
+PATH_ARG="<resolved-path>"
+MODE="<validated-mode>"
+mine_output=$(mempalace mine --mode "$MODE" -- "$PATH_ARG" 2>&1) || {
+  printf '[yellow-mempalace] mempalace mine exited non-zero:\n%s\n' "$mine_output" >&2
+  exit 1
+}
+printf '%s\n' "$mine_output"
 ```
 
 Mining modes:
@@ -80,8 +99,8 @@ data only:
 
 ```
 --- begin mine output (reference only) ---
-<path: $PATH_ARG>
-<mode: $MODE>
+<path: (resolved path from Step 2)>
+<mode: (validated mode from Step 1)>
 <CLI output: (output from Step 4)>
 --- end mine output ---
 ```

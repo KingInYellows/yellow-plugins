@@ -4,25 +4,47 @@ set -Eeuo pipefail
 # install-mempalace.sh — Install or upgrade MemPalace CLI for yellow-mempalace plugin
 # Usage: bash install-mempalace.sh
 
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[0;33m'
-readonly NC='\033[0m'
-
 # Minimum version required for MCP server support
 readonly MIN_VERSION="3.0.0"
 
 error() {
-  printf '%bError: %s%b\n' "$RED" "$1" "$NC" >&2
+  printf '\033[0;31mError: %s\033[0m\n' "$1" >&2
   exit 1
 }
 
 warning() {
-  printf '%bWarning: %s%b\n' "$YELLOW" "$1" "$NC" >&2
+  printf '\033[0;33mWarning: %s\033[0m\n' "$1" >&2
 }
 
 success() {
-  printf '%b%s%b\n' "$GREEN" "$1" "$NC"
+  printf '\033[0;32m%s\033[0m\n' "$1"
+}
+
+# Run pip with the first available invocation: `python3 -m pip` > `pip3` > `pip`.
+# Returns 1 if no pip is available; otherwise propagates pip's exit code.
+# Prints the chosen invocation to PIP_CMD_USED for caller-facing messages.
+PIP_CMD_USED=""
+have_pip() {
+  if command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
+    PIP_CMD_USED="python3 -m pip"
+    return 0
+  elif command -v pip3 >/dev/null 2>&1; then
+    PIP_CMD_USED="pip3"
+    return 0
+  elif command -v pip >/dev/null 2>&1; then
+    PIP_CMD_USED="pip"
+    return 0
+  fi
+  return 1
+}
+
+run_pip() {
+  case "$PIP_CMD_USED" in
+    "python3 -m pip") python3 -m pip "$@" ;;
+    pip3) pip3 "$@" ;;
+    pip)  pip "$@" ;;
+    *) return 1 ;;
+  esac
 }
 
 extract_version() {
@@ -32,18 +54,17 @@ extract_version() {
 }
 
 # Compare two semver strings. Returns 0 if $1 >= $2, 1 otherwise.
-# POSIX-compatible: no bash arrays, herestrings, or (( )) arithmetic.
 version_gte() {
   local left="$1" right="$2"
   local left_major left_minor left_patch
   local right_major right_minor right_patch
 
-  IFS='.' read -r left_major left_minor left_patch <<EOF
+  IFS='.' read -r left_major left_minor left_patch <<__EOF_VERSION_LEFT__
 $left
-EOF
-  IFS='.' read -r right_major right_minor right_patch <<EOF
+__EOF_VERSION_LEFT__
+  IFS='.' read -r right_major right_minor right_patch <<__EOF_VERSION_RIGHT__
 $right
-EOF
+__EOF_VERSION_RIGHT__
 
   left_major="${left_major%%[^0-9]*}"; left_major="${left_major:-0}"
   left_minor="${left_minor%%[^0-9]*}"; left_minor="${left_minor:-0}"
@@ -76,7 +97,9 @@ trap cleanup EXIT
 
 # --- Check if already installed ---
 if command -v mempalace >/dev/null 2>&1; then
-  mp_version_output=$(mempalace --version 2>/dev/null || true)
+  if ! mp_version_output=$(mempalace --version 2>&1); then
+    error "mempalace binary found but '--version' exited non-zero. Output: ${mp_version_output:-<empty>}"
+  fi
   installed_version=$(extract_version "$mp_version_output")
   if [ -z "$installed_version" ]; then
     warning "mempalace is installed but '--version' returned: ${mp_version_output:-<empty>}"
@@ -106,20 +129,11 @@ if command -v mempalace >/dev/null 2>&1; then
         error "pipx upgrade and pipx install --force both failed. Try manually: pipx upgrade mempalace"
       fi
     fi
-  elif (command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1) \
-    || command -v pip3 >/dev/null 2>&1 \
-    || command -v pip >/dev/null 2>&1; then
+  elif have_pip; then
     INSTALL_METHOD="pip-upgrade"
-    if command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
-      pip_cmd=(python3 -m pip)
-    elif command -v pip3 >/dev/null 2>&1; then
-      pip_cmd=(pip3)
-    else
-      pip_cmd=(pip)
-    fi
-    printf '[yellow-mempalace] Upgrading mempalace via %s...\n' "${pip_cmd[*]}"
+    printf '[yellow-mempalace] Upgrading mempalace via %s...\n' "$PIP_CMD_USED"
     pip_upgrade_output=""
-    if ! pip_upgrade_output=$("${pip_cmd[@]}" install --upgrade mempalace 2>&1); then
+    if ! pip_upgrade_output=$(run_pip install --upgrade mempalace 2>&1); then
       printf '%s\n' "$pip_upgrade_output" >&2
       error "pip upgrade failed. Try manually: pip install --upgrade mempalace"
     fi
@@ -127,8 +141,10 @@ if command -v mempalace >/dev/null 2>&1; then
     error "Cannot auto-upgrade — no pipx or pip found. Install pipx first: brew install pipx or python3 -m pip install --user pipx"
   fi
 
-  # Re-check version after upgrade attempt
-  upgraded_version_output=$(mempalace --version 2>/dev/null || true)
+  # Re-check version after upgrade attempt — preserve exit code & stderr
+  if ! upgraded_version_output=$(mempalace --version 2>&1); then
+    error "mempalace '--version' exited non-zero after upgrade. Output: ${upgraded_version_output:-<empty>}"
+  fi
   upgraded_version=$(extract_version "$upgraded_version_output")
   if [ -n "$upgraded_version" ] && version_gte "$upgraded_version" "$MIN_VERSION"; then
     success "mempalace upgraded to ${upgraded_version} (>= ${MIN_VERSION})"
@@ -176,17 +192,8 @@ if command -v pipx >/dev/null 2>&1; then
   fi
 
 # Fall back to pip
-elif (command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1) \
-  || command -v pip3 >/dev/null 2>&1 \
-  || command -v pip >/dev/null 2>&1; then
+elif have_pip; then
   INSTALL_METHOD="pip"
-  if command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 2>&1; then
-    pip_cmd=(python3 -m pip)
-  elif command -v pip3 >/dev/null 2>&1; then
-    pip_cmd=(pip3)
-  else
-    pip_cmd=(pip)
-  fi
 
   if [ -n "${VIRTUAL_ENV:-}" ]; then
     warning "Active virtual environment detected at ${VIRTUAL_ENV}"
@@ -195,10 +202,10 @@ elif (command -v python3 >/dev/null 2>&1 && python3 -m pip --version >/dev/null 
   fi
 
   printf '[yellow-mempalace] pipx not found — falling back to pip.\n'
-  printf '[yellow-mempalace] Installing mempalace via %s...\n' "${pip_cmd[*]}"
+  printf '[yellow-mempalace] Installing mempalace via %s...\n' "$PIP_CMD_USED"
 
   pip_output=""
-  if ! pip_output=$("${pip_cmd[@]}" install "mempalace>=${MIN_VERSION},<4.0.0" 2>&1); then
+  if ! pip_output=$(run_pip install "mempalace>=${MIN_VERSION},<4.0.0" 2>&1); then
     if printf '%s' "$pip_output" | grep -qi "externally-managed-environment"; then
       printf '%s\n' "$pip_output" >&2
       error "pip blocked by PEP 668. Install pipx first: brew install pipx or python3 -m pip install --user pipx"
@@ -241,7 +248,9 @@ if ! command -v mempalace >/dev/null 2>&1; then
   error "mempalace not found in PATH after install. Check that your PATH includes the install location."
 fi
 
-mp_version_output=$(mempalace --version 2>/dev/null || true)
+if ! mp_version_output=$(mempalace --version 2>&1); then
+  error "mempalace binary found but '--version' exited non-zero. Output: ${mp_version_output:-<empty>}"
+fi
 installed_version=$(extract_version "$mp_version_output")
 if [ -z "$installed_version" ]; then
   error "mempalace binary found but '--version' returned: ${mp_version_output:-<empty>}"
@@ -250,6 +259,14 @@ fi
 if ! version_gte "$installed_version" "$MIN_VERSION"; then
   warning "mempalace ${installed_version} installed but MCP support requires >= ${MIN_VERSION}."
   warning "Upgrade with: pipx upgrade mempalace"
+fi
+
+# Smoke-test the MCP entrypoint that plugin.json will invoke. If this
+# subcommand is absent, the MCP server silently fails to start with no
+# diagnostics, leaving the user with 0 tools.
+if ! mempalace mcp --help >/dev/null 2>&1; then
+  warning "'mempalace mcp --help' failed — the MCP entrypoint may differ in this version."
+  warning "Verify plugin.json mcpServers.mempalace.command matches the installed CLI."
 fi
 
 success "mempalace ${installed_version} installed successfully via ${INSTALL_METHOD}"
