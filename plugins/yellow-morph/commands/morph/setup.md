@@ -8,6 +8,7 @@ allowed-tools:
   - Bash
   - Read
   - AskUserQuestion
+  - ToolSearch
 ---
 
 # Set Up yellow-morph

@@ -13,6 +13,7 @@ allowed-tools:
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-morph_morph__codebase_search
   - mcp__filesystem-with-morph__codebase_search
+  - mcp__filesystem-with-morph__warpgrep_codebase_search
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
   - mcp__plugin_yellow-research_ast-grep__find_code
 ---
@@ -339,15 +340,19 @@ Test call: mcp__grep__searchGitHub with query: "test", maxResults: 1
 ```text
 ToolSearch keyword: "codebase_search" (or "morph warpgrep" — same tool)
 Preferred tool name: mcp__plugin_yellow-morph_morph__codebase_search
-Fallback tool name: mcp__filesystem-with-morph__codebase_search
+Fallback tool name (current):  mcp__filesystem-with-morph__codebase_search
+Fallback tool name (legacy):   mcp__filesystem-with-morph__warpgrep_codebase_search
 Test call: <matched tool> with query: "README"
-Note: In morphmcp 0.8.165 the tool is named `codebase_search`. Older
-versions exposed it as `warpgrep_codebase_search`; that name no longer
-exists.
+Note: morphmcp 0.8.165 (and the yellow-morph plugin) name the tool
+`codebase_search`. A user's global `filesystem-with-morph` MCP may still
+be running an older morphmcp that exposes `warpgrep_codebase_search` —
+that legacy name is therefore listed as a final fallback so the command
+remains authorized to call it.
 ```
 
-Check for the plugin-namespaced tool first. If not found, fall back to the
-global MCP tool name. Report which variant is active.
+Check tools in this order: plugin-namespaced first, then the global MCP
+current name, then the global MCP legacy name. Report which variant is
+active.
 
 **DeepWiki** (yellow-devin plugin — AI-powered repo documentation):
 

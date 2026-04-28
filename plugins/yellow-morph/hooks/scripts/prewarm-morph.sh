@@ -35,6 +35,34 @@ if diff -q "${CLAUDE_PLUGIN_ROOT}/package-lock.json" \
 fi
 
 mkdir -p "$CLAUDE_PLUGIN_DATA" || json_exit "mkdir failed; skipping prewarm"
+
+# Acquire the same atomic mkdir-lock that bin/start-morph.sh uses so a
+# wrapper invocation that races us cannot run a second `npm ci` concurrently.
+# `npm ci` deletes node_modules before installing — concurrent runs corrupt
+# the install. Prewarm is purely an optimization, so if we cannot get the
+# lock within a few seconds we yield to the wrapper and exit.
+LOCK_DIR="${CLAUDE_PLUGIN_DATA}/.install.lock"
+LOCK_ACQUIRED=0
+for _i in 1 2 3 4 5; do
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    LOCK_ACQUIRED=1
+    trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+    break
+  fi
+  sleep 1
+done
+
+if [ "$LOCK_ACQUIRED" -eq 0 ]; then
+  json_exit "install lock held by another process; yielding to start-morph.sh"
+fi
+
+# Re-check under the lock — the wrapper or a previous prewarm may have
+# completed the install while we were waiting.
+if diff -q "${CLAUDE_PLUGIN_ROOT}/package-lock.json" \
+           "${CLAUDE_PLUGIN_DATA}/package-lock.json" >/dev/null 2>&1; then
+  json_exit
+fi
+
 cp "${CLAUDE_PLUGIN_ROOT}/package.json"      "${CLAUDE_PLUGIN_DATA}/package.json" \
   || json_exit "package.json copy failed; skipping prewarm"
 cp "${CLAUDE_PLUGIN_ROOT}/package-lock.json" "${CLAUDE_PLUGIN_DATA}/package-lock.json" \

@@ -16,9 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   system keychain (or `~/.claude/.credentials.json` on minimal Linux). Fresh
   installs no longer require a `MORPH_API_KEY` export before launching
   Claude Code, and no longer require a Claude Code restart after setup.
-  Power-user fallback via shell env var lands in 1.2.0 once the wrapper
-  script is in place; for 1.1.0, answer the userConfig prompt on first
-  enable.
+  Power-user fallback via a shell `MORPH_API_KEY` export is also supported
+  in 1.1.0 — `bin/start-morph.sh` resolves the userConfig value first, then
+  falls through to the shell env var when userConfig is empty.
 - **MCP pin bumped from `@morphllm/morphmcp@0.8.110` to `0.8.165`** (55
   versions of upstream fixes).
 
