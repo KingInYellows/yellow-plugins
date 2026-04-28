@@ -22,6 +22,8 @@
     "validate:marketplace": "node scripts/validate-marketplace.js",
     "validate:plugins": "node scripts/validate-plugin.js",
     "validate:setup-all": "node scripts/validate-setup-all.js",
+    "test:lint-plugins": "bats tests/lint-plugins.bats",
+    "lint:plugins": "bash scripts/lint-plugins.sh",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
     "release:check": "pnpm run validate:schemas && pnpm run validate:versions && pnpm run typecheck",
