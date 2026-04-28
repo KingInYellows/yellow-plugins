@@ -315,7 +315,9 @@ if [ ! -f "$RESULT" ]; then
 elif ! jq -e . "$RESULT" >/dev/null 2>&1; then
   report_failed "$AGENT_NAME" "result file is not valid JSON"
 elif ! STATUS=$(jq -er .status "$RESULT" 2>/dev/null); then
-  report_failed "$AGENT_NAME" "result file missing required \"status\" field"
+  # jq -er exits non-zero for both absent .status AND .status: null —
+  # both indicate a malformed agent output and are treated identically here
+  report_failed "$AGENT_NAME" "result file missing or null \"status\" field"
 elif [ "$STATUS" != "success" ]; then
   REASON=$(jq -r '.reason // "no reason given"' "$RESULT")
   report_failed "$AGENT_NAME" "$REASON"
