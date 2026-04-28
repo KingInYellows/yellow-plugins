@@ -445,7 +445,12 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 8: Hook script basics (shebang, decision output, no set -e)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  // Skip when hooks is an array (path-array form) — entries aren't event-keyed.
+  if (
+    manifest.hooks &&
+    typeof manifest.hooks === 'object' &&
+    !Array.isArray(manifest.hooks)
+  ) {
     const DECISION_PROTOCOL_EVENTS = new Set([
       'PreToolUse',
       'PostToolUse',
