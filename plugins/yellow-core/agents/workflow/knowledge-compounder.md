@@ -2,6 +2,8 @@
 name: knowledge-compounder
 description: 'Extract and document recently solved engineering problems using parallel subagents. Use when spawned by /workflows:compound to capture solutions, or after /review:pr to compound review findings into docs/solutions/ and MEMORY.md.'
 model: inherit
+background: true
+memory: project
 tools:
   - Task
   - Bash

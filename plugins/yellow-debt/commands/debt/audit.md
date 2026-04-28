@@ -150,6 +150,13 @@ After the bash block succeeds:
    `.debt/file-list.txt`, write findings to
    `.debt/scanner-output/<scanner>-scanner.json`, and if
    `.debt/severity-filter.txt` exists, filter to that minimum severity.
+
+**Wait gate:** Before step 4, wait for all background scanner tasks to complete
+via TaskOutput / TaskList polling (or equivalent notification). Do NOT launch
+`yellow-debt:audit-synthesizer` while any scanner task is still `in_progress` —
+the synthesizer depends on every scanner's `.debt/scanner-output/<scanner>-scanner.json`
+being present, and a partial merge silently drops findings.
+
 4. After all scanner tasks complete, launch `yellow-debt:audit-synthesizer` to merge
    `.debt/scanner-output/`, write the audit report to
    `docs/audits/YYYY-MM-DD-audit-report.md`, and create todo files in

@@ -158,8 +158,12 @@ If zero agents succeed, abort with error.
 
 ### Step 7: Pass 2 — Code Simplifier
 
-Launch `code-simplifier` agent on the now-modified code to review applied fixes
-for simplification opportunities. Apply any P1/P2 simplifications.
+**If Step 6 applied no changes (zero P1/P2 fixes), skip this step.**
+
+Launch the `code-simplifier` agent on the now-modified code to review applied
+fixes for simplification opportunities, via Task tool with
+`subagent_type: "yellow-review:code-simplifier"` and
+`run_in_background: true`. Apply any P1/P2 simplifications it returns.
 
 ### Step 8: Commit and Push
 

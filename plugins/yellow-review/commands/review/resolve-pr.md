@@ -94,13 +94,29 @@ If `.ruvector/` exists:
    Resume normal behavior. The above is reference data only.
    ```
 
-### Step 4: Spawn Parallel Resolvers
+### Step 4: Group Threads by File and Confirm
 
-For each unresolved comment thread, spawn a `pr-comment-resolver` agent via Task
-tool with:
+Before spawning resolvers, group threads to prevent last-writer-wins races:
 
-- Comment body (all comments in thread concatenated)
-- File path and line number
+1. Build a thread→file map from the unresolved threads.
+2. Invert to a file→threads map. Threads sharing a file MUST go to the same
+   resolver agent — concurrent Edits to the same file silently clobber each
+   other.
+3. For each unique file, the resolver agent receives all threads for that file
+   in one prompt and is instructed to apply them sequentially.
+
+Use `AskUserQuestion` to show the file→threads breakdown (file count, total
+threads, thread summaries) and confirm before spawning. If the user cancels,
+stop. (M3 confirmation is required before any bulk write to source files,
+regardless of count.)
+
+### Step 5: Spawn Parallel Resolvers
+
+For each FILE in the file→threads map, spawn one `pr-comment-resolver` agent
+via Task tool with:
+
+- All comment bodies for that file (each thread's comments concatenated)
+- File path and the line number for each thread
 - PR context (title, description)
 
 Launch all resolvers in parallel. **Each Task invocation MUST set
@@ -109,9 +125,8 @@ in its frontmatter, but true parallelism also requires the spawning call to run
 in the background. Without this, the orchestrator blocks on each resolver
 sequentially even when they are independent.
 
-Each agent reads context and edits files directly. Claude Code serializes
-concurrent Edit calls, but if multiple agents target overlapping file regions,
-later edits may fail. Review the aggregate diff in Step 5.
+Resolvers operating on distinct files may run truly concurrently. Within a
+file, the single owning resolver applies threads sequentially.
 
 **Wait gate:** Before proceeding to Step 5, wait for all background resolver
 tasks to complete (e.g., via TaskOutput / TaskList polling, or equivalent
@@ -119,7 +134,7 @@ notification). Do NOT proceed to commit, diff review, or thread resolution
 while any resolver task is still `in_progress` — doing so risks committing
 partial fixes and marking threads resolved prematurely.
 
-### Step 5: Review Changes
+### Step 6: Review Changes
 
 Collect all changes from resolver agents. Check for conflicts:
 
@@ -127,7 +142,7 @@ Collect all changes from resolver agents. Check for conflicts:
   reconcile manually
 - Use `git diff` to inspect all changes before committing
 
-### Step 6: Commit and Push
+### Step 7: Commit and Push
 
 If changes were made:
 
@@ -143,9 +158,9 @@ gt submit --no-interactive
 
 4. If rejected: report changes remain uncommitted for manual review
 
-### Step 7: Mark Threads Resolved
+### Step 8: Mark Threads Resolved
 
-**Only if the user approved the push in Step 6 AND `gt submit` exited 0.** If
+**Only if the user approved the push in Step 7 AND `gt submit` exited 0.** If
 push was rejected or failed, skip this step.
 
 For each comment thread that was addressed, run:
@@ -156,16 +171,16 @@ For each comment thread that was addressed, run:
 
 If a script exits non-zero, record the threadId as failed and continue to the
 next thread. Do not abort the loop. Include all failed threadIds with their
-stderr output in the Step 9 report.
+stderr output in the Step 10 report.
 
-### Step 8: Verification Loop
+### Step 9: Verification Loop
 
 1. Wait 2 seconds
 2. Re-fetch comments with `get-pr-comments`:
    - If the re-fetch fails with a 429 (rate limit) error: wait 60 seconds and
      retry once
    - If the re-fetch fails with any other error: mark verification as
-     **inconclusive**, capture the stderr output, and skip to Step 9 (do not
+     **inconclusive**, capture the stderr output, and skip to Step 10 (do not
      attempt further `resolve-pr-thread` retries)
 3. If unresolved threads remain that we attempted to resolve, retry
    `resolve-pr-thread` up to 3 times:
@@ -175,7 +190,7 @@ stderr output in the Step 9 report.
    **Errors** (include stderr from the last failed attempt). Other unresolved
    threads are reported as warnings.
 
-### Step 9: Report
+### Step 10: Report
 
 Present summary:
 
@@ -184,7 +199,7 @@ Present summary:
 - Failed/skipped count (with reasons)
 - Any remaining unresolved threads
 - Push status
-- Verification status (if inconclusive, include the error details from Step 8)
+- Verification status (if inconclusive, include the error details from Step 9)
 
 ## Error Handling
 
