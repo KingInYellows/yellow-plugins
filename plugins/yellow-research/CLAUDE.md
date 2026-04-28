@@ -166,12 +166,12 @@ These external tools improve research quality but are not required:
   `/research:deep`. No API key required. Configure globally in Claude Code MCP
   settings.
 - **yellow-morph plugin** (preferred) — provides WarpGrep
-  (`mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`) for agentic
+  (`mcp__plugin_yellow-morph_morph__codebase_search`) for agentic
   codebase search. Replaces the global `filesystem-with-morph` MCP. When both
   are installed, yellow-morph's plugin-namespaced tool is preferred. Install:
   `/plugin marketplace add KingInYellows/yellow-plugins` (select yellow-morph)
 - **filesystem-with-morph MCP** (legacy) — provides WarpGrep
-  (`mcp__filesystem-with-morph__warpgrep_codebase_search`) for agentic codebase
+  (`mcp__filesystem-with-morph__codebase_search`) for agentic codebase
   and GitHub search. No API key required. Configure globally in Claude Code MCP
   settings. When yellow-morph is installed, prefer the plugin-namespaced tool
   instead.

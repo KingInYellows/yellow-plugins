@@ -4,13 +4,21 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
 
 ## MCP Server
 
-- **morph** — Stdio transport via `npx @morphllm/morphmcp@0.8.110`
-- Requires `MORPH_API_KEY` environment variable (will not start without it)
+- **morph** — Stdio transport via `bin/start-morph.sh`, which runs
+  `node @morphllm/morphmcp@0.8.165` from a per-user install in
+  `${CLAUDE_PLUGIN_DATA}/node_modules/`.
+- Requires a Morph API key configured via plugin `userConfig` (Claude Code
+  prompts for it at plugin-enable time and stores it in the system keychain
+  or `~/.claude/.credentials.json`). No shell `export MORPH_API_KEY` required,
+  and no Claude Code restart needed after setup.
 - Tools: `mcp__plugin_yellow-morph_morph__edit_file`,
-  `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`
+  `mcp__plugin_yellow-morph_morph__codebase_search`
 - Lifecycle: starts on first MCP tool call, shuts down on session end
-- First call may be slow (20-40s cold start on first npx download; subsequent
-  sessions use npm cache and start in seconds)
+- First-ever call may be slow (20-40s cold start: `npm ci` runs once to
+  install morphmcp into the plugin data dir). A SessionStart hook
+  (`hooks/scripts/prewarm-morph.sh`) runs the same install in parallel so
+  the wait usually happens at session start instead of on first MCP call.
+  Subsequent sessions reuse the cached install and start in seconds.
 
 ## Tool Preference Rules
 
@@ -27,9 +35,9 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
   markers — the AI specifies what changes, morph handles the merge
 - Scales to 1,500-line files at 99.2% accuracy
 
-### warpgrep_codebase_search (WarpGrep) vs built-in Grep
+### codebase_search (WarpGrep) vs built-in Grep
 
-- Prefer `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` for
+- Prefer `mcp__plugin_yellow-morph_morph__codebase_search` for
   intent-based queries ("how does authentication work?", "find error handling
   for payment failures", "what calls this function?")
 - Continue using built-in Grep for exact pattern matching (regex, literal
@@ -52,7 +60,7 @@ When both yellow-morph and yellow-ruvector are installed:
 Routing rules:
 
 - Discovery query about unseen code →
-  `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search`
+  `mcp__plugin_yellow-morph_morph__codebase_search`
 - Recall query about past learning or similar pattern → ruvector tools
 - If ruvector is not installed → WarpGrep handles all code search
 
@@ -61,17 +69,18 @@ Routing rules:
 - If `mcp__plugin_yellow-morph_morph__edit_file` fails (API error, timeout,
   credits exhausted): fall back to built-in Edit tool. Note the fallback
   briefly.
-- If `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` fails: fall back
+- If `mcp__plugin_yellow-morph_morph__codebase_search` fails: fall back
   to built-in Grep. Note the fallback briefly.
-- If `MORPH_API_KEY` is not set: MCP server does not start. All workflows
-  continue with built-in tools. No error.
+- If no Morph API key is configured (userConfig not answered and no shell
+  `MORPH_API_KEY` fallback): MCP server does not start. All workflows continue
+  with built-in tools. No error. `/morph:status` reports `OFFLINE`.
 - Morph is an enhancement, never a dependency. No workflow should block on morph
   tool availability.
 
 ## Security and Privacy
 
 - **Data transmission:** Both `mcp__plugin_yellow-morph_morph__edit_file` and
-  `mcp__plugin_yellow-morph_morph__warpgrep_codebase_search` send code to
+  `mcp__plugin_yellow-morph_morph__codebase_search` send code to
   Morph's API servers (api.morphllm.com)
 - **Data retention:** Free/Starter tiers retain data for 90 days. Enterprise
   offers zero-data-retention (ZDR) mode.
@@ -97,7 +106,9 @@ do not apply.
 
 - ripgrep (`rg`) installed — required by WarpGrep for local search
 - Node.js 22.22.0 or later — required for MCP server via npx
-- `MORPH_API_KEY` environment variable — obtain from https://morphllm.com
+- Morph API key — answer the `userConfig` prompt at plugin-enable time
+  (obtain a key from https://morphllm.com). A shell `MORPH_API_KEY` export
+  remains supported as a fallback for power users.
 - Network egress to api.morphllm.com (port 443)
 
 ## Cost Considerations
