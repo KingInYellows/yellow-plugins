@@ -130,9 +130,20 @@ Then:
 
 Always structure your research as:
 
+**Phase 0: Skill Discovery**
+
+- Local `SKILL.md` files matched (project, user, and plugin scopes)
+- Patterns extracted ("Do" / "Don't" guidelines, templates, conventions)
+- Coverage assessment: comprehensive / partial / none — and which downstream
+  phases (1, 1.5, 2) were therefore skipped or run
+
+If Phase 0 coverage was **comprehensive**, deliver only this section plus the
+Sources list and stop — Phases 1, 1.5, and 2 are skipped by design.
+
 **Phase 1: Curated Knowledge**
 
-- What was found in skill-based knowledge sources
+- Context7 availability (present / absent) and what was retrieved if present;
+  fallback path taken if absent
 
 **Phase 1.5: Deprecation Check**
 
@@ -171,8 +182,11 @@ Always structure your research as:
 
 ## Source Hierarchy (Highest to Lowest Authority)
 
-1. **Skill-Based Knowledge:** Context7 MCP curated documentation (highest trust)
-2. **Official Documentation:** RFCs, official language/framework docs, API
+1. **Local SKILL.md Files:** Project, user, and plugin-level skills
+   (Phase 0 — highest trust; team-curated, codified patterns)
+2. **Curated Documentation:** Context7 MCP (Phase 1, when available) — official
+   library docs sourced from canonical upstream registries
+3. **Official Documentation:** RFCs, official language/framework docs, API
    references
 3. **Security Standards:** OWASP, NIST, CWE, security-specific guidelines
 4. **Community Consensus:** Surveys, GitHub stars/trends, package download stats
