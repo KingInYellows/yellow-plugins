@@ -3,37 +3,52 @@
   "checkpoint_id": "06a787bed14f",
   "session_id": "5e0a2dc7-736f-4eed-8a60-d404fee4dcdb",
   "strategy": "manual-commit",
-  "created_at": "2026-04-29T14:39:03.396817916Z",
+  "created_at": "2026-04-29T15:29:28.642953231Z",
   "branch": "agent/feat/knowledge-compounder-track-schema",
   "checkpoints_count": 0,
   "files_touched": [
-    "plans/everyinc-merge.md"
+    ".changeset/knowledge-compounder-track-schema.md",
+    "docs/solutions/code-quality/yellow-ci-shell-security-patterns.md",
+    "docs/solutions/security-issues/yellow-devin-plugin-security-audit.md",
+    "docs/solutions/workflow/plugin-release-process.md",
+    "plans/everyinc-merge.md",
+    "plugins/yellow-core/agents/workflow/knowledge-compounder.md",
+    "scripts/backfill-solution-frontmatter.js"
   ],
   "agent": "Claude Code",
   "model": "",
-  "turn_id": "88e1d7bfe434",
-  "checkpoint_transcript_start": 2295,
-  "transcript_lines_at_start": 2295,
+  "turn_id": "4510fb1801e6",
+  "checkpoint_transcript_start": 2342,
+  "transcript_lines_at_start": 2342,
   "token_usage": {
-    "input_tokens": 2,
-    "cache_creation_tokens": 2580,
-    "cache_read_tokens": 1038694,
-    "output_tokens": 1754,
-    "api_call_count": 2
+    "input_tokens": 106,
+    "cache_creation_tokens": 93654,
+    "cache_read_tokens": 19943842,
+    "output_tokens": 58838,
+    "api_call_count": 35
   },
   "session_metrics": {
-    "turn_count": 2
+    "turn_count": 7
   },
   "initial_attribution": {
-    "calculated_at": "2026-04-29T14:39:03.336549371Z",
-    "agent_lines": 1,
-    "agent_removed": 1,
-    "human_added": 628,
-    "human_modified": 0,
+    "calculated_at": "2026-04-29T15:29:28.539826167Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 662,
+    "human_modified": 46,
     "human_removed": 0,
-    "total_committed": 629,
-    "total_lines_changed": 632,
-    "agent_percentage": 0.31645569620253167,
+    "total_committed": 662,
+    "total_lines_changed": 708,
+    "agent_percentage": 0,
     "metric_version": 2
-  }
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
 }
