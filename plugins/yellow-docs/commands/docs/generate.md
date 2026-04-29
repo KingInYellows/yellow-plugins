@@ -85,7 +85,7 @@ note this for the agent — it should show a diff rather than overwrite blindly.
 
 ### Step 4: Delegate to doc-generator Agent
 
-Launch the `doc-generator` agent via Task tool (subagent_type: "yellow-docs:doc-generator") with the resolved target:
+Launch the `doc-generator` agent via Task tool (subagent_type: "yellow-docs:generation:doc-generator") with the resolved target:
 
 > --- begin target (reference only) ---
 > $ARGUMENTS

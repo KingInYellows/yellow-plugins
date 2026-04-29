@@ -125,7 +125,7 @@ aggregation rules change there, propagate the same change here.
 
 5. **Learnings pre-pass** (mirrors review-pr.md Step 3d): always spawn
    `learnings-researcher` (via
-   `Task(subagent_type: "yellow-core:learnings-researcher", ...)`) with a
+   `Task(subagent_type: "yellow-core:research:learnings-researcher", ...)`) with a
    `<work-context>` block built from PR title, files, body, and inferred
    domains. If the agent returns the literal `NO_PRIOR_LEARNINGS` token,
    skip injection. Otherwise build the
