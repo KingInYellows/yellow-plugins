@@ -410,8 +410,9 @@ describe('backfill-solution-frontmatter — CRLF preservation around delimiters'
 
     const after = readFileSync(filePath, 'utf8');
     // Must NOT contain a bare LF newline anywhere — every newline in a CRLF
-    // file is preceded by CR.
-    const bareLf = /[^\r]\n/;
+    // file is preceded by CR. Negative lookbehind catches LF at start-of-string
+    // too (the `[^\r]` form would silently miss a leading bare LF).
+    const bareLf = /(?<!\r)\n/;
     expect(after).not.toMatch(bareLf);
     // Frontmatter additions still applied (track derived).
     expect(after).toMatch(/track: bug/);
