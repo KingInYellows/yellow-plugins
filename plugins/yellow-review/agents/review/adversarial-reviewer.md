@@ -192,7 +192,7 @@ human judgment, not for automated fixing.
       "category": "adversarial",
       "file": "<repo-relative path>",
       "line": <int>,
-      "confidence": 0,
+      "confidence": 100,
       "autofix_class": "manual|advisory",
       "owner": "downstream-resolver|human",
       "requires_verification": true,

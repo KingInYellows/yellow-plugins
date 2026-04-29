@@ -139,8 +139,11 @@ fi
    ```
 
 9. Prepend this block to the Task prompt of `project-compliance-reviewer`,
-   `correctness-reviewer`, and `security-reviewer` (when selected) only. Do
-   not inject into other agents.
+   `correctness-reviewer`, `security-reviewer` (Wave 2 personas), and
+   `security-sentinel` (legacy fallback) when selected. Do not inject into
+   other agents. The `security-sentinel` entry preserves recall context in
+   `review_pipeline: legacy` mode where `security-reviewer` is not
+   dispatched and `correctness-reviewer` is absent.
 
 ### Step 3c: Discover enhanced tools (optional)
 
@@ -271,20 +274,20 @@ Spawn unconditionally:
 
 #### Conditional personas (selected from diff content)
 
-| Agent | subagent_type | Trigger |
-|-------|---------------|---------|
-| `reliability-reviewer` | `yellow-review:reliability-reviewer` | Diff contains I/O calls, async/await, queues, jobs, retries, timeouts, or external service interactions |
-| `adversarial-reviewer` | `yellow-review:adversarial-reviewer` | Diff > 200 changed lines (excluding tests/generated/lockfiles) OR diff touches auth, payments, data mutations, external APIs, trust-boundary code |
-| `security-reviewer` | `yellow-core:security-reviewer` | Diff touches auth, crypto, public endpoints, input handling, shell scripts, secrets/tokens |
-| `performance-reviewer` | `yellow-core:performance-reviewer` | Diff contains DB queries, data transforms, caching, async hot paths, OR gross line count > 500 |
-| `architecture-strategist` | `yellow-core:architecture-strategist` | Diff touches 10+ files across 3+ directories |
-| `pattern-recognition-specialist` | `yellow-core:pattern-recognition-specialist` | Diff introduces new directories or new file-type conventions; diff touches `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`, `plugin.json` (plugin-authoring convention checks) |
-| `code-simplicity-reviewer` | `yellow-core:code-simplicity-reviewer` | Gross line count > 300 |
-| `polyglot-reviewer` | `yellow-core:polyglot-reviewer` | Diff includes language-specific files where a generalist lens adds value (kept as a generalist fallback alongside the new specialist personas) |
-| `pr-test-analyzer` | `yellow-review:pr-test-analyzer` | PR contains files matching `*test*`, `*spec*`, `__tests__/*`, OR adds testable logic |
-| `comment-analyzer` | `yellow-review:comment-analyzer` | Diff contains `/**`, `"""`, `'''`, or doc-comment annotations; OR diff modifies `.md` documentation |
-| `type-design-analyzer` | `yellow-review:type-design-analyzer` | Files have extensions `.ts`, `.py`, `.rb`, `.go`, `.rs` AND diff contains type-shape keywords (`interface`, `type`, `class`, `struct`, `enum`, `model`, `dataclass`) |
-| `silent-failure-hunter` | `yellow-review:silent-failure-hunter` | Diff contains `try`/`catch`/`except`/`rescue`/`recover` OR fallback patterns (`\|\| null`, `?? undefined`, `or None`) |
+| Agent | subagent_type | Reviewer category | Trigger |
+|-------|---------------|-------------------|---------|
+| `reliability-reviewer` | `yellow-review:reliability-reviewer` | reliability | Diff contains I/O calls, async/await, queues, jobs, retries, timeouts, or external service interactions |
+| `adversarial-reviewer` | `yellow-review:adversarial-reviewer` | adversarial | Diff > 200 changed lines (excluding tests/generated/lockfiles) OR diff touches auth, payments, data mutations, external APIs, trust-boundary code |
+| `security-reviewer` | `yellow-core:security-reviewer` | security | Diff touches auth, crypto, public endpoints, input handling, shell scripts, secrets/tokens |
+| `performance-reviewer` | `yellow-core:performance-reviewer` | performance | Diff contains DB queries, data transforms, caching, async hot paths, OR gross line count > 500 |
+| `architecture-strategist` | `yellow-core:architecture-strategist` | architecture | Diff touches 10+ files across 3+ directories |
+| `pattern-recognition-specialist` | `yellow-core:pattern-recognition-specialist` | maintainability | Diff introduces new directories or new file-type conventions; diff touches `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`, `plugin.json` (plugin-authoring convention checks) |
+| `code-simplicity-reviewer` | `yellow-core:code-simplicity-reviewer` | maintainability | Gross line count > 300 |
+| `polyglot-reviewer` | `yellow-core:polyglot-reviewer` | correctness | Diff includes language-specific files where a generalist lens adds value (kept as a generalist fallback alongside the new specialist personas) |
+| `pr-test-analyzer` | `yellow-review:pr-test-analyzer` | testing | PR contains files matching `*test*`, `*spec*`, `__tests__/*`, OR adds testable logic |
+| `comment-analyzer` | `yellow-review:comment-analyzer` | documentation | Diff contains `/**`, `"""`, `'''`, or doc-comment annotations; OR diff modifies `.md` documentation |
+| `type-design-analyzer` | `yellow-review:type-design-analyzer` | types | Files have extensions `.ts`, `.py`, `.rb`, `.go`, `.rs` AND diff contains type-shape keywords (`interface`, `type`, `class`, `struct`, `enum`, `model`, `dataclass`) |
+| `silent-failure-hunter` | `yellow-review:silent-failure-hunter` | reliability | Diff contains `try`/`catch`/`except`/`rescue`/`recover` OR fallback patterns (`\|\| null`, `?? undefined`, `or None`) |
 
 #### Optional supplementary
 
@@ -314,7 +317,13 @@ When `yellow-plugins.local.md` sets `review_pipeline: legacy`, skip the
 persona dispatch table above and use the pre-Wave-2 adaptive selection:
 
 - Always include: `project-compliance-reviewer` (or its `code-reviewer`
-  deprecation stub for older installs)
+  deprecation stub for older installs), `correctness-reviewer`,
+  `maintainability-reviewer`. Without `correctness-reviewer` and
+  `maintainability-reviewer`, the legacy fallback would silently lose the
+  core territory the pre-Wave-2 `code-reviewer` covered (logic errors,
+  state bugs, dead code, premature abstraction) — `code-reviewer` is now a
+  no-op deprecation stub so projects activating the escape hatch must
+  retain that coverage from the persona reviewers directly.
 - Conditionally include: `pr-test-analyzer`, `comment-analyzer`,
   `type-design-analyzer`, `silent-failure-hunter`
 - Cross-plugin via Task: `security-sentinel` (yellow-core),
@@ -322,8 +331,10 @@ persona dispatch table above and use the pre-Wave-2 adaptive selection:
   `pattern-recognition-specialist`, `code-simplicity-reviewer`
 
 Same graceful-degradation guard applies. The legacy path is a rollback
-escape hatch only — it does not receive the learnings-researcher injection
-or the confidence-rubric aggregation in Step 6.
+escape hatch only — it skips the confidence-rubric aggregation in Step 6.
+Step 5 item 3 below skips the learnings-researcher injection when
+`review_pipeline: legacy`, even though Step 3d still runs the pre-pass
+(its output is discarded for the legacy path).
 
 ### Step 5: Pass 1 — Parallel Persona Dispatch
 
@@ -359,10 +370,16 @@ tool. Each agent receives:
    `<standards-paths>` block listing the applicable `CLAUDE.md` and
    `AGENTS.md` paths (these are repo-internal, not untrusted, but still
    sanitize for XML metacharacters).
-3. The learnings-context fenced block from Step 3d, when non-empty.
+3. The learnings-context fenced block from Step 3d, when non-empty —
+   **only when `review_pipeline` is not `legacy`**. The legacy path is the
+   pre-Wave-2 escape hatch and explicitly does not receive learnings
+   injection; for legacy mode, skip this item even though Step 3d already
+   computed the block.
 4. The ruvector recall context from Step 3b, when non-empty (only into
-   `project-compliance-reviewer`, `correctness-reviewer`, and
-   `security-reviewer` when dispatched).
+   `project-compliance-reviewer`, `correctness-reviewer`,
+   `security-reviewer`, and `security-sentinel` when dispatched —
+   `security-sentinel` covers the legacy fallback path where
+   `security-reviewer` is not dispatched).
 5. The morph WarpGrep availability note from Step 3c, when applicable
    (only into the four agents listed there).
 
@@ -414,8 +431,11 @@ trigger them:
   the `code-reviewer` deprecation stub.
 - yellow-core cross-plugin: `architecture-strategist`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`,
-  `polyglot-reviewer` (selected on cross-module / large / multi-language
-  diffs).
+  `polyglot-reviewer`, `security-reviewer`, `performance-reviewer`
+  (Wave 2 personas in `yellow-core` whose agent bodies still emit the
+  legacy `finding`/`fix` prose shape rather than the compact-return JSON
+  schema), `security-sentinel`, `performance-oracle` (legacy-fallback
+  audit variants dispatched when `review_pipeline: legacy`).
 
 The aggregator in Step 6 normalizes legacy prose findings into the
 structured schema by inferring `confidence: 75`, `autofix_class:
@@ -443,7 +463,8 @@ Apply the aggregation steps from
      and the `code-reviewer` deprecation stub.
    - yellow-core cross-plugin: `architecture-strategist`,
      `pattern-recognition-specialist`, `code-simplicity-reviewer`,
-     `polyglot-reviewer`.
+     `polyglot-reviewer`, `security-reviewer`, `performance-reviewer`,
+     `security-sentinel`, `performance-oracle`.
 
    **Convert these to the compact-return schema BEFORE Step 1 validation
    runs** — otherwise the validator drops them as malformed and every
@@ -506,7 +527,9 @@ Apply the aggregation steps from
    - ALL contributing reviewers are testing or maintainability
 
    When qualified: move out of primary findings into `testing_gaps` (if
-   testing) or `residual_risks` (if maintainability). Record the count.
+   ANY contributing reviewer is testing — testing wins on mixed sets so
+   the routing is deterministic) or `residual_risks` (otherwise — i.e.,
+   purely maintainability). Record the count.
 8. **Confidence gate.** Suppress findings below anchor 75. **Exception:**
    P0 findings at anchor 50+ survive. Record suppressed counts.
 9. **Partition the work.** Build three sets:
@@ -549,8 +572,14 @@ Risks section.
 
 Launch `code-simplifier` via Task
 (`subagent_type: "yellow-review:code-simplifier"`) on the now-modified
-code to review applied fixes for simplification opportunities. Apply any
-P0/P1 simplifications under the same rules as Step 7.
+code to review applied fixes for simplification opportunities. Normalize
+the agent's prose return through Step 6 sub-step 0 first, which assigns
+`autofix_class: gated_auto` (the legacy default). Under Step 7's
+`safe_auto`-only auto-apply rule, simplifier findings therefore route to
+the Residual Actionable Work section — they are NOT auto-applied. To
+auto-apply a simplifier finding, an orchestrator must explicitly mark it
+`safe_auto` based on its content (e.g., a no-op rename of a private
+helper); the default routing is human review.
 
 ### Step 9: Commit and Push
 

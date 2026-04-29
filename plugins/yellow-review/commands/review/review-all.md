@@ -95,8 +95,20 @@ aggregation rules change there, propagate the same change here.
    git fetch origin "<baseRefName>" --no-tags
    ```
 
-   Use `origin/<baseRefName>` as the diff base for this PR's reviewers. On
-   fetch failure, warn but continue.
+   Use `origin/<baseRefName>` as the diff base for this PR's reviewers.
+   When `git fetch` fails (transient network failure, missing
+   remote-tracking ref on a fresh clone), warn and run the same base-ref
+   fallback ladder as `review-pr.md` Step 3a:
+
+   1. Try `git rev-parse --verify "origin/<baseRefName>"` — if the
+      remote-tracking ref already exists locally, use `origin/<baseRefName>`
+      and continue.
+   2. Otherwise try `git rev-parse --verify "<baseRefName>"` — if a local
+      branch tracks the base, use `<baseRefName>` and continue.
+   3. If neither resolves, abort review of THIS PR (not the entire stack)
+      with `[review:all] Error: cannot resolve base ref for PR <PR#>` and
+      move on to the next PR. Do not let reviewers analyze a nonexistent
+      base ref or the wrong delta.
 
 3. **Optional ruvector recall** (mirrors review-pr.md Step 3b): when
    `.ruvector/` exists, build the recall query from PR body/title and

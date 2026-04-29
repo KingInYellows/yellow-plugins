@@ -154,7 +154,7 @@ strength determining whether to record automatically, prompt the user, or skip.
 
 | Plugin | Auto (high-signal) | Prompted (medium-signal) | Skip (low-signal) |
 |---|---|---|---|
-| yellow-review | P1 security/correctness findings | P2 design/performance findings | P3 style/nits |
+| yellow-review | P0/P1 security/correctness findings | P2 design/performance findings | P3 style/nits |
 | yellow-ci | Root cause identified | Workaround found | Status checks |
 | yellow-debt | Security debt patterns | Complexity/duplication hotspots | Minor style debt |
 | yellow-browser-test | Critical bugs (crash, data loss) | UI issues | Passing test summaries |

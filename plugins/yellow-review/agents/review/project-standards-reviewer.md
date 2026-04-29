@@ -165,7 +165,7 @@ outside the JSON block.
       "category": "project-standards",
       "file": "<repo-relative path>",
       "line": <int>,
-      "confidence": 0,
+      "confidence": 100,
       "autofix_class": "safe_auto|gated_auto|manual|advisory",
       "owner": "review-fixer|downstream-resolver|human|release",
       "requires_verification": true,

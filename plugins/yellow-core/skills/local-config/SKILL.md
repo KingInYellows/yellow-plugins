@@ -69,7 +69,7 @@ reviewer_set:
 |-------|------|---------|--------|
 | `review_pipeline` | `persona` \| `legacy` | `persona` | `legacy` falls back to pre-Wave-2 adaptive selection (no learnings pre-pass, no confidence rubric, no new personas). Use as escape hatch only. |
 | `review_depth` | `small` \| `medium` \| `large` | auto | Forces a depth tier regardless of computed diff size. `large` always invokes `adversarial-reviewer`; `small` skips it even on large diffs. |
-| `focus_areas` | array of strings | empty (= all) | Narrows reviewer set to those whose `category` matches one of the listed areas. Recognized areas: `security`, `correctness`, `reliability`, `performance`, `maintainability`, `project-compliance`, `project-standards`, `architecture`, `testing`, `documentation`, `types`. |
+| `focus_areas` | array of strings | empty (= all) | Narrows reviewer set to those whose `category` matches one of the listed areas. Recognized areas: `security`, `correctness`, `reliability`, `performance`, `maintainability`, `project-compliance`, `project-standards`, `architecture`, `testing`, `documentation`, `types`, `adversarial`. Always-on personas (`project-compliance-reviewer`, `correctness-reviewer`, `maintainability-reviewer`, `project-standards-reviewer`) survive the filter regardless of `focus_areas` — filtering them out would defeat the always-on contract. |
 | `reviewer_set.include` | array of agent names | empty | Additive — agents are spawned even if their conditional triggers don't fire. |
 | `reviewer_set.exclude` | array of agent names | empty | Subtractive — agents are skipped even if always-on or their triggers fire. Applied after `include`. |
 
@@ -123,7 +123,13 @@ exclude = config.reviewer_set.exclude ?? []
 
 # After computing the default reviewer set per Step 4 of review-pr.md:
 reviewer_set = (defaults ∪ include) \ exclude
-if focus_areas: reviewer_set = filter_by_category(reviewer_set, focus_areas)
+if focus_areas:
+  # Always-on personas survive the filter regardless of focus_areas; filtering
+  # them would defeat the always-on contract documented in
+  # plugins/yellow-review/commands/review/review-pr.md Step 4.
+  always_on = {project-compliance-reviewer, correctness-reviewer,
+               maintainability-reviewer, project-standards-reviewer}
+  reviewer_set = always_on ∪ filter_by_category(reviewer_set \ always_on, focus_areas)
 if review_pipeline == "legacy":
   use_legacy_dispatch(reviewer_set)
 else:
