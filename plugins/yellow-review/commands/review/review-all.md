@@ -124,20 +124,48 @@ aggregation rules change there, propagate the same change here.
    on a missing persona — log to stderr and continue.
 
 7. **Compact-return pass 1** (mirrors review-pr.md Step 5): launch all
-   selected agents in parallel except `code-simplifier`. Each persona
-   returns the structured JSON compact-return schema. Drop malformed
-   returns; record drop count.
+   selected agents in parallel except `code-simplifier`. Wave 2 persona
+   agents return the structured JSON compact-return schema. Pre-Wave-2
+   agents (`pr-test-analyzer`, `comment-analyzer`,
+   `type-design-analyzer`, `silent-failure-hunter`, the `code-reviewer`
+   deprecation stub, and the cross-plugin reviewers
+   `architecture-strategist`, `pattern-recognition-specialist`,
+   `code-simplicity-reviewer`, `polyglot-reviewer`) return legacy prose
+   format — do NOT drop these as malformed; they are normalized to
+   compact-return in Step 8 sub-step 0 before validation. Drop only
+   returns that fail validation after normalization; record drop count.
 
 8. **Aggregate findings** (mirrors review-pr.md Step 6): apply the
-   confidence-rubric pipeline — validate, dedup
-   (`file + line_bucket(line, ±3) + normalize(title)`), cross-reviewer
-   agreement promotion (50→75, 75→100), separate pre-existing, normalize
-   routing (most conservative wins), mode-aware demotion of
-   testing/maintainability advisory P2-P3, **confidence gate (suppress
-   below 75 except P0 ≥ 50)**, partition into safe_auto / residual /
-   advisory queues, sort. Run intent-verification quality gates (line
-   accuracy, protected-artifact filter, skim-FP check) before any P0/P1
-   surfaces.
+   confidence-rubric pipeline in this order:
+   1. **Normalize legacy prose returns** (mirrors review-pr.md Step 6
+      sub-step 0): for each pre-Wave-2 agent return in the prose format
+      (`**[P0|P1|P2|P3] category — file:line**` followed by `Finding:` /
+      `Fix:` lines), parse severity / category / file / line from the
+      bracket prefix, use the `Finding:` line as `title` and the `Fix:`
+      line as `suggested_fix` (null when absent), infer defaults
+      (`confidence: 75`, `autofix_class: gated_auto`, `owner:
+      downstream-resolver`, `requires_verification: true`,
+      `pre_existing: false`), and wrap in the top-level envelope
+      (`reviewer`, `findings`, `residual_risks`, `testing_gaps`) so it
+      enters validation indistinguishable from a structured return.
+   2. **Validate** (drop malformed after normalization).
+   3. **Dedup** (`file + line_bucket(line, ±3) + normalize(title)`); on
+      merge keep highest severity, highest anchor, note all reviewers,
+      and on `pre_existing` conflict keep `false` (treat as new).
+   4. **Cross-reviewer agreement promotion** (50→75, 75→100).
+   5. **Separate pre-existing** into a separate report section.
+   6. **Resolve disagreements** (annotate Reviewer column, keep most
+      conservative severity / autofix_class / owner).
+   7. **Normalize routing** (most conservative `autofix_class` and
+      `owner` wins).
+   8. **Mode-aware demotion** of testing/maintainability advisory P2/P3
+      into `testing_gaps` / `residual_risks`.
+   9. **Confidence gate** — suppress below 75 except P0 ≥ 50.
+   10. **Partition** into safe_auto / residual / advisory queues.
+   11. **Sort** (severity → anchor desc → file path → line).
+
+   Run intent-verification quality gates (line accuracy,
+   protected-artifact filter, skim-FP check) before any P0/P1 surfaces.
 
 9. **Apply fixes pass 1** (mirrors review-pr.md Step 7): apply only
    `safe_auto → review-fixer` findings with concrete `suggested_fix`
@@ -149,10 +177,16 @@ aggregation rules change there, propagate the same change here.
 
 11. **Commit + submit** (mirrors review-pr.md Step 9):
 
+    Show `git diff --stat` summary. Use `AskUserQuestion` to confirm:
+    "Push review fixes for PR #<PR#>?" On approval:
+
     ```bash
     gt modify -m "fix: address review findings from <reviewer-categories>"
     gt submit --no-interactive
     ```
+
+    If rejected: report changes remain uncommitted for manual review and
+    continue to the next PR (do not run Step 12 or Step 13 for this PR).
 
 12. **Resolve**: Fetch unresolved comments → run `/review:resolve` flow if
     any exist.

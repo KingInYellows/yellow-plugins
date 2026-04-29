@@ -32,7 +32,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
 
-### Agents (12)
+### Agents (13)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
