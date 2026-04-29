@@ -96,26 +96,31 @@ resolution, and sequential stack review. Graphite-native workflow.
 ## Cross-Plugin Agent References
 
 When conditions warrant, commands spawn these agents via Task tool (using
-`yellow-core:<name>` subagent_type):
+`yellow-core:<name>` subagent_type). The Wave 2 pipeline dispatches the
+calibrated reviewer variants; the legacy fallback (`review_pipeline:
+legacy` in `yellow-plugins.local.md`) keeps the deeper-audit variants.
 
-- `security-sentinel` — for auth, crypto, and shell script changes
+- `security-reviewer` — for auth, crypto, and shell-script changes (Wave 2
+  default; the deeper-audit `security-sentinel` is the legacy fallback)
 - `architecture-strategist` — for large (10+ file) cross-module changes
-- `performance-oracle` — for query-heavy or high-line-count PRs
-- `pattern-recognition-specialist` — for new pattern introductions and plugin
-  authoring convention checks
+- `performance-reviewer` — for query-heavy or high-line-count PRs (Wave 2
+  default; the deeper-audit `performance-oracle` is the legacy fallback)
+- `pattern-recognition-specialist` — for new pattern introductions and
+  plugin authoring convention checks
 - `code-simplicity-reviewer` — additional simplification pass for large PRs
 
 Optional supplementary agent via Task tool (using `yellow-codex:<name>`
 subagent_type):
 
-- `codex-reviewer` — parallel review when yellow-codex is installed AND diff >
-  100 lines. Tags findings with `[codex]`. Silently skipped when yellow-codex is
-  not installed.
+- `codex-reviewer` — parallel review when yellow-codex is installed AND
+  diff > 100 lines. Tags findings with `[codex]`. Silently skipped when
+  yellow-codex is not installed.
 
 yellow-review requires yellow-core for full review coverage. Without it,
-cross-plugin agents (security-sentinel, architecture-strategist,
-performance-oracle, pattern-recognition-specialist, code-simplicity-reviewer)
-silently degrade — only yellow-review's own agents run.
+cross-plugin agents (security-reviewer / security-sentinel,
+architecture-strategist, performance-reviewer / performance-oracle,
+pattern-recognition-specialist, code-simplicity-reviewer) silently
+degrade — only yellow-review's own agents run.
 
 ### MCP Tool Integration
 

@@ -72,10 +72,11 @@ gt track
 If `gt track` fails: warn "PR #X could not be adopted by Graphite. Proceeding
 with raw git." Continue in degraded mode.
 
-<!-- This block must mirror review-pr.md Steps 3a–6. When updating either
-     file, update both. The inline form below enumerates the same Wave 2
-     persona pipeline, learnings pre-pass, and confidence-rubric aggregation
-     as /review:pr; details remain canonical in review-pr.md. -->
+<!-- This block must mirror review-pr.md Steps 3a–9b. When updating
+     either file, update both. The inline form below enumerates the same
+     Wave 2 persona pipeline, learnings pre-pass, confidence-rubric
+     aggregation, knowledge compounding, and ruvector remember as
+     /review:pr; details remain canonical in review-pr.md. -->
 
 ### Step 4: Sequential Review Loop
 

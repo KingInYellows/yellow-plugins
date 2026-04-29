@@ -164,7 +164,7 @@ file is opt-in.
 
 ## Related
 
-- `RESEARCH/upstream-snapshots/<sha>/confidence-rubric.md` — the
+- `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md` — the
   confidence rubric that the persona pipeline uses for aggregation.
 - `plugins/yellow-review/commands/review/review-pr.md` — primary consumer
   of the config keys defined here.

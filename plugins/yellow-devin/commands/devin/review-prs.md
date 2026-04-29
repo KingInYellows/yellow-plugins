@@ -297,8 +297,9 @@ report-only:
 - Spawn yellow-core cross-plugin reviewers when the same trigger rules match
 
 Provide each reviewer with the PR diff, PR metadata, changed file list, and
-relevant `CLAUDE.md` context. Collect findings sorted by severity (P1 → P2 →
-P3).
+relevant `CLAUDE.md` context. Collect findings sorted by severity
+(P0 → P1 → P2 → P3) — P0 was added to the scale in the Wave 2 keystone for
+critical breakage and exploitable vulnerabilities.
 
 **Do not invoke `/review:pr` or `/review:resolve` directly in this phase.**
 Those commands may commit and push before the user chooses a remediation path.
@@ -390,7 +391,7 @@ Options:
 
 **Option 1 — Fix locally:**
 
-Apply concrete P1/P2 findings and actionable review comments now. Reuse the
+Apply concrete P0/P1/P2 findings and actionable review comments now. Reuse the
 yellow-review reviewer/resolver agents as needed, but only after the user has
 chosen this option. Initialize and maintain a deduplicated `CHANGED_FILES` array
 tracking every file modified during remediation:
@@ -435,7 +436,8 @@ explanation and are confident dismissal is appropriate.
 2. **Compose fix message** from review findings and actionable comments.
    Exclude items already determined to be likely false positives. Structure:
    - Start with a summary line: "Review found N issues in PR #{num}:"
-   - List P1 findings first, then P2, with file paths and descriptions
+   - List P0 findings first, then P1, then P2, with file paths and
+     descriptions
    - Truncate to 1949 characters at a word boundary to leave room for the
      truncation suffix (51 chars)
    - If truncated, append: "... (truncated — see PR comments for full details)"
@@ -516,7 +518,8 @@ automatically responds to PR comments as long as the session is not archived.
    - `@devin` must be the very first text in the comment (prefix match for
      mention-only filtering — no leading whitespace or newlines before it)
    - Summary line: "Review found N issues in PR #{num}:"
-   - P1 findings listed first, then P2, with file paths and line numbers
+   - P0 findings listed first, then P1, then P2, with file paths and
+     line numbers
    - Truncate at 4000 characters at a word boundary for readability (GitHub
      supports up to 65536 chars, but long comments reduce clarity)
    - If truncated, append: "... (truncated — see review agent output for full
@@ -602,7 +605,7 @@ Processed: 5 PRs from 3 Devin sessions
 - Commented on PR: 1 (#149)
 - Skipped: 1 (#151)
 
-Findings: 8 total (4 P1, 3 P2, 1 P3)
+Findings: 9 total (1 P0, 4 P1, 3 P2, 1 P3)
 Comments: 12 resolved, 3 false positives dismissed
 CI: 4/5 PRs passing
 ```

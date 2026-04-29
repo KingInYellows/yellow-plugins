@@ -63,8 +63,8 @@ review:pr
 
 The agent returns the literal token `NO_PRIOR_LEARNINGS` when its grep
 prefilter, frontmatter ranking, and full-read passes all surface no
-relevant matches. The orchestrator checks for this exact token on the
-first non-whitespace line of the agent's response:
+relevant matches. The orchestrator checks for **strict equality** on the
+**first non-whitespace line** of the agent's response:
 
 - **Match → skip injection** entirely. Reviewers run with no
   past-learnings context. Note "Past learnings: none found" in the
