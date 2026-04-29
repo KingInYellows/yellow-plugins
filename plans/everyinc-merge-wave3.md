@@ -10,7 +10,7 @@
 
 This plan decomposes Wave 3 of the EveryInc merge into **12 parallel feature branches**, each rooted at `main` after the Wave 2 keystone (`plans/everyinc-merge.md` PR #7) has merged. Branches are independent of each other (different files, no cross-dependencies) and can be developed and reviewed in parallel.
 
-All implementation task definitions (W3.1, W3.2, W3.3, W3.4, W3.5, W3.6, W3.7, W3.8, W3.10, W3.11, W3.12, W3.13b, W3.14, W3.15) live in `plans/everyinc-merge.md` under the "Wave 3" section. This file only specifies the parallel stack decomposition; do not duplicate task content here.
+All implementation task definitions (W3.1, W3.2, W3.3, W3.4, W3.5, W3.6, W3.7, W3.8, W3.9, W3.10, W3.11, W3.12, W3.13b, W3.14, W3.15) live in `plans/everyinc-merge.md` under the "Wave 3" section. This file only specifies the parallel stack decomposition; do not duplicate task content here.
 
 ## Implementation Plan
 

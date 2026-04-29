@@ -60,7 +60,7 @@ to a judge agent or aggregation step:
 # Strip markdown headers, bold, bullets from reviewer output before judge sees it
 # (sed pipeline — adapt as needed for specific formatting)
 NORMALIZED=$(printf '%s' "$REVIEWER_OUTPUT" \
-  | sed 's/^#{1,6} //g' \
+  | sed -E 's/^#{1,6} //g' \
   | sed 's/\*\*\([^*]*\)\*\*/\1/g' \
   | sed 's/^\s*[-*+] /- /g')
 ```

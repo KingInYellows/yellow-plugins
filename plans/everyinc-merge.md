@@ -133,8 +133,9 @@ Before each wave's implementation session begins:
   repos/EveryInc/compound-engineering-plugin/contents/<path>?ref=<sha>` and save
   to `RESEARCH/upstream-snapshots/<sha>/<path>`. Do not work from CHANGELOG
   summaries. (Resolves OQ-10.)
-- [ ] 0.3 Validate that the snapshotted file bodies are not larger than the
-  500-line Anthropic SKILL.md hard cap; if any exceed, plan a split.
+- [ ] 0.3 Validate that the snapshotted file bodies are within reasonable size;
+  the 500-line Anthropic SKILL.md guidance is a soft outer bound, not a hard
+  cap — do not split or compress files solely to hit a line count.
 - [ ] 0.4 Run `pnpm validate:schemas && pnpm test:unit` baseline before
   starting any edits. Record the green baseline.
 

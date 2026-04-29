@@ -113,7 +113,7 @@ passing to downstream agents. Reference: arxiv 2604.24118.
 
 - MEMORY.md: "Prompt Injection Defense Layering (2026)" entry
 - `docs/research/merge-plan-completeness-audit-april-2026.md` — source research (P2 annotation, AgentVisor + arxiv 2604.23887 findings)
-- `docs/solutions/security-issues/agent-workflow-security-patterns.md` — prior art: ROLP, AskUserQuestion gates, path traversal validation
+- `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — prior art: ROLP, AskUserQuestion gates, path traversal validation
 - `docs/solutions/security-issues/heredoc-delimiter-collision.md` — adjacent: injection via user-supplied heredoc content
 
 ## References

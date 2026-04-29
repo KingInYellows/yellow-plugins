@@ -51,10 +51,19 @@ To verify snapshot integrity against upstream at the locked SHA:
 
 ```bash
 SHA=e5b397c9d1883354f03e338dd00f98be3da39f9f
+# Portable SHA-256: prefer sha256sum (Linux), fall back to shasum -a 256 (macOS).
+if command -v sha256sum >/dev/null 2>&1; then
+  sha256() { sha256sum | cut -d' ' -f1; }
+elif command -v shasum >/dev/null 2>&1; then
+  sha256() { shasum -a 256 | cut -d' ' -f1; }
+else
+  echo "ERROR: neither sha256sum nor shasum is available" >&2
+  exit 1
+fi
 for f in $(find . -type f -name '*.md' ! -name MANIFEST.md); do
   rel=${f#./}
-  remote=$(gh api "repos/EveryInc/compound-engineering-plugin/contents/${rel#plugins/compound-engineering/}?ref=$SHA" -H "Accept: application/vnd.github.raw" | sha256sum | cut -d' ' -f1)
-  local=$(sha256sum "$f" | cut -d' ' -f1)
+  remote=$(gh api "repos/EveryInc/compound-engineering-plugin/contents/${rel#plugins/compound-engineering/}?ref=$SHA" -H "Accept: application/vnd.github.raw" | sha256)
+  local=$(sha256 < "$f")
   [ "$remote" = "$local" ] || echo "DRIFT: $rel"
 done
 ```

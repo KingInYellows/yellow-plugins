@@ -97,6 +97,6 @@ An adoption plan snapshotted before v3.0.0:
 
 ## Related Documentation
 
-- `plans/everyinc-merge.md` — the merge plan that surfaced this pattern (1670 lines, 17 PRs, April 2026 CE v3.3.1 baseline)
+- `plans/everyinc-merge.md` — the merge plan that surfaced this pattern (1732 lines, 19 PRs [7 backbone + 12 Wave 3], April 2026 CE v3.3.2 baseline)
 - `docs/research/merge-plan-completeness-audit-april-2026.md` — research pass that identified the CE v3.0.0–v3.3.1 drift window
 - MEMORY.md: "Upstream Concept-Fork Snapshotting Protocol" entry
