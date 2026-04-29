@@ -1,0 +1,39 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "97047c4db7ae",
+  "strategy": "manual-commit",
+  "branch": "agent/feat/review-pr-keystone-rewrite",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md",
+    "plugins/yellow-core/agents/research/learnings-researcher.md",
+    "plugins/yellow-core/skills/local-config/SKILL.md",
+    "plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md",
+    "plugins/yellow-devin/commands/devin/review-prs.md",
+    "plugins/yellow-review/CLAUDE.md",
+    "plugins/yellow-review/agents/review/adversarial-reviewer.md",
+    "plugins/yellow-review/agents/review/correctness-reviewer.md",
+    "plugins/yellow-review/agents/review/maintainability-reviewer.md",
+    "plugins/yellow-review/agents/review/project-compliance-reviewer.md",
+    "plugins/yellow-review/agents/review/project-standards-reviewer.md",
+    "plugins/yellow-review/agents/review/reliability-reviewer.md",
+    "plugins/yellow-review/commands/review/review-all.md",
+    "plugins/yellow-review/commands/review/review-pr.md",
+    "plugins/yellow-review/skills/pr-review-workflow/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/97/047c4db7ae/0/metadata.json",
+      "transcript": "/97/047c4db7ae/0/full.jsonl",
+      "content_hash": "/97/047c4db7ae/0/content_hash.txt",
+      "prompt": "/97/047c4db7ae/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 123,
+    "cache_creation_tokens": 117230,
+    "cache_read_tokens": 24844498,
+    "output_tokens": 41359,
+    "api_call_count": 65
+  }
+}

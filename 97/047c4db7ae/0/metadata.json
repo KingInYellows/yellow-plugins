@@ -1,0 +1,62 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "97047c4db7ae",
+  "session_id": "ebfed93b-8666-4192-be35-716544544bf9",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T16:56:27.690815512Z",
+  "branch": "agent/feat/review-pr-keystone-rewrite",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md",
+    "plugins/yellow-core/agents/research/learnings-researcher.md",
+    "plugins/yellow-core/skills/local-config/SKILL.md",
+    "plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md",
+    "plugins/yellow-devin/commands/devin/review-prs.md",
+    "plugins/yellow-review/CLAUDE.md",
+    "plugins/yellow-review/agents/review/adversarial-reviewer.md",
+    "plugins/yellow-review/agents/review/correctness-reviewer.md",
+    "plugins/yellow-review/agents/review/maintainability-reviewer.md",
+    "plugins/yellow-review/agents/review/project-compliance-reviewer.md",
+    "plugins/yellow-review/agents/review/project-standards-reviewer.md",
+    "plugins/yellow-review/agents/review/reliability-reviewer.md",
+    "plugins/yellow-review/commands/review/review-all.md",
+    "plugins/yellow-review/commands/review/review-pr.md",
+    "plugins/yellow-review/skills/pr-review-workflow/SKILL.md"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "510dd52df724",
+  "checkpoint_transcript_start": 838,
+  "transcript_lines_at_start": 838,
+  "token_usage": {
+    "input_tokens": 123,
+    "cache_creation_tokens": 117230,
+    "cache_read_tokens": 24844498,
+    "output_tokens": 41359,
+    "api_call_count": 65
+  },
+  "session_metrics": {
+    "turn_count": 8
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-29T16:56:27.610426455Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 123,
+    "human_modified": 79,
+    "human_removed": 0,
+    "total_committed": 123,
+    "total_lines_changed": 204,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
