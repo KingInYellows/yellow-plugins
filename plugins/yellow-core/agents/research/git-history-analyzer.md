@@ -10,6 +10,11 @@ tools:
   - Glob
 ---
 
+**Note: The current year is 2026.** Use this when interpreting commit dates,
+recent-vs-old contributor activity, and time-bounded queries (`--since='2 weeks
+ago'`, etc.).
+
+
 <examples>
 <example>
 Context: Developer investigating authentication module design decisions before refactoring.

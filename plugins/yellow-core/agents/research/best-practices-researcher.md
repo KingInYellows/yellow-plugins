@@ -27,6 +27,31 @@ sources and organize findings by importance.
 
 ## Research Methodology
 
+### Phase 0: Skill Discovery (Run First)
+
+Before going online or to MCP backends, check if curated knowledge already
+exists locally. Skills encode patterns the team has tested; they outrank
+generic external sources.
+
+1. Use `Glob` to discover available `SKILL.md` files in:
+   - `.claude/skills/**/SKILL.md`, `.codex/skills/**/SKILL.md`,
+     `.agents/skills/**/SKILL.md` (project-level)
+   - `~/.claude/skills/**/SKILL.md`, `~/.codex/skills/**/SKILL.md`,
+     `~/.agents/skills/**/SKILL.md` (user-level)
+   - `plugins/*/skills/**/SKILL.md` (yellow-plugins marketplace)
+2. Match the research topic to skill descriptions; read full content of
+   relevant skills. Common mappings: TypeScript/React patterns → frontend
+   skills; AI/agent design → `create-agent-skills`, `agent-development`;
+   plugin authoring → `plugin-structure`, `command-development`; documentation
+   → `docs-conventions`, `claude-md-improver`.
+3. Extract patterns: "Do" / "Don't" guidelines, code templates, conventions.
+4. Assess coverage:
+   - Skills give **comprehensive** guidance → summarize and deliver; skip
+     Phase 2 unless gaps remain.
+   - Skills give **partial** guidance → note what's covered, proceed to
+     Phase 1.5 + Phase 2 for gaps.
+   - **No relevant skills** → proceed to Phase 1.5 + Phase 2.
+
 ### Phase 1: Curated Knowledge Check
 
 1. **Check Available Skills:** First, use ToolSearch to detect whether

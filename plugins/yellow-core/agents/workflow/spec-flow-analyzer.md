@@ -34,6 +34,24 @@ implementation begins.
 
 **Before starting analysis:** Check if the input describes user-facing flows or feature behavior. If the input appears to be code, a diff, test output, or infrastructure config (not a specification), respond: 'Input does not appear to be a specification or user story. Please provide a feature description, acceptance criteria, or user journey to analyze.' After responding, stop. Do not proceed to Phase 1 or any other analysis.
 
+### Phase 0: Ground in the Codebase
+
+Before analyzing the spec in isolation, search the codebase for context. This
+prevents generic feedback and surfaces real constraints.
+
+1. Use `Grep` to find code related to the feature area — models, controllers,
+   services, routes, existing tests.
+2. Use `Glob` to find related features that may share patterns or integrate
+   with this one.
+3. Note existing patterns: how does the codebase handle similar flows today?
+   What conventions exist for error handling, auth, validation?
+
+This context shapes every subsequent phase. **Gaps are only gaps if the
+codebase doesn't already handle them.** If the codebase already has global
+error-handling middleware, don't flag missing per-route error handling as a
+gap. Reference specific existing files when noting "the codebase already
+handles X via …".
+
 ### Phase 1: Deep Flow Analysis
 
 - **Primary Happy Path**: The ideal, expected user flow

@@ -226,7 +226,7 @@ Before each wave's implementation session begins:
     bundled.
 
 - [ ] **W1.2 — Strip Bash from 13 reviewer agents; document codex-reviewer exception.**
-  (`minor` yellow-core, `minor` yellow-review, `patch` yellow-codex)
+  (`minor` yellow-core, `minor` yellow-review; **no change** to yellow-codex)
   - [ ] **Decision (2026-04-29):** Strip from 13 (yellow-core 7 + yellow-review 6); keep on
     `codex-reviewer` (yellow-codex 1) with explicit prose exception in agent body. Rationale:
     `codex-reviewer` is fundamentally a CLI-invocation agent (its core function is `codex exec
@@ -324,10 +324,10 @@ Before each wave's implementation session begins:
   - [ ] yellow-core: `minor` (agent splits add new files); rationale: read-only
     tool restriction + drifted agent repairs + new performance-reviewer +
     security-reviewer + security-lens.
-  - [ ] yellow-review: `minor` (read-only tool restriction); will become `major` in
+  - [ ] yellow-review: `patch` (untrusted-input fix); will become `major` in
     Wave 2 when code-reviewer is renamed.
   - [ ] yellow-research: `patch` (context7 reference removal).
-  - [ ] yellow-codex: `patch` (documented Bash exception for codex-reviewer; agent body modified, decision 2026-04-29).
+  - [ ] yellow-codex: **no version bump** — codex-reviewer keeps Bash with documented exception (decision 2026-04-29).
 
 ### Wave 2: Compound Loop Closure (keystone)
 
@@ -1760,7 +1760,7 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 - [x] 1. docs/everyinc-merge-plan (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/273)
 - [x] 2. chore/remove-context7-mcp (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/274 — *unbundle + repoint to user-level context7*)
 - [x] 3. chore/strip-bash-from-reviewers (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/275 — *13 stripped, codex-reviewer keeps Bash with documented exception*)
-- [ ] 4. refactor/repair-drifted-agents
+- [x] 4. refactor/repair-drifted-agents (in progress 2026-04-29; PR pending — *4 agents repaired with Phase 0 additions, performance + security each split into 2-3 specialized agents*)
 - [ ] 5. fix/pr-comment-fence-verify-and-validation
 - [ ] 6. feat/knowledge-compounder-track-schema
 - [ ] 7. feat/review-pr-keystone-rewrite
