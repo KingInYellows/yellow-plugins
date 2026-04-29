@@ -1,0 +1,72 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "2ce083f47d9c",
+  "session_id": "b2653939-6096-4b9d-9f11-96e1c0a9781e",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T05:33:34.668198306Z",
+  "branch": "agent/docs/everyinc-merge-plan",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "docs/brainstorms/2026-04-28-everyinc-capability-gap-brainstorm.md",
+    "docs/brainstorms/2026-04-28-everyinc-merge-brainstorm.md",
+    "docs/research/merge-plan-completeness-audit-april-2026.md",
+    "plans/everyinc-merge.md"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "e632ae57b05a",
+  "token_usage": {
+    "input_tokens": 8335,
+    "cache_creation_tokens": 452861,
+    "cache_read_tokens": 42510052,
+    "output_tokens": 199697,
+    "api_call_count": 170
+  },
+  "session_metrics": {
+    "turn_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-29T05:33:34.602182786Z",
+    "agent_lines": 2611,
+    "agent_removed": 0,
+    "human_added": 4340,
+    "human_modified": 101,
+    "human_removed": 0,
+    "total_committed": 7052,
+    "total_lines_changed": 7052,
+    "agent_percentage": 37.02495745887692,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 381,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2425,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/brainstorms/2026-04-28-everyinc-merge-completeness-audit-brainstorm.md": 381
+      }
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 734,
+      "user_lines_removed": 0,
+      "agent_lines_added": 2574,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "docs/brainstorms/2026-04-28-everyinc-merge-completeness-audit-brainstorm.md": 381,
+        "docs/solutions/code-quality/llm-as-judge-style-bias-dominance.md": 127,
+        "docs/solutions/code-quality/upstream-concept-fork-snapshot-protocol.md": 102,
+        "docs/solutions/security-issues/prompt-injection-defense-layering-2026.md": 124
+      }
+    }
+  ]
+}

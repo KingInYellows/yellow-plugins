@@ -3,7 +3,7 @@
   "checkpoint_id": "2ce083f47d9c",
   "strategy": "manual-commit",
   "branch": "agent/docs/everyinc-merge-plan",
-  "checkpoints_count": 0,
+  "checkpoints_count": 3,
   "files_touched": [
     "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/MANIFEST.md",
     "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-adversarial-reviewer.agent.md",
@@ -41,13 +41,19 @@
       "transcript": "/2c/e083f47d9c/0/full.jsonl",
       "content_hash": "/2c/e083f47d9c/0/content_hash.txt",
       "prompt": "/2c/e083f47d9c/0/prompt.txt"
+    },
+    {
+      "metadata": "/2c/e083f47d9c/1/metadata.json",
+      "transcript": "/2c/e083f47d9c/1/full.jsonl",
+      "content_hash": "/2c/e083f47d9c/1/content_hash.txt",
+      "prompt": "/2c/e083f47d9c/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 104,
-    "cache_creation_tokens": 442460,
-    "cache_read_tokens": 6479787,
-    "output_tokens": 67932,
-    "api_call_count": 42
+    "input_tokens": 8439,
+    "cache_creation_tokens": 895321,
+    "cache_read_tokens": 48989839,
+    "output_tokens": 267629,
+    "api_call_count": 212
   }
 }
