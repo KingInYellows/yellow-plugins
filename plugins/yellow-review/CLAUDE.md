@@ -32,18 +32,32 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
 
-### Agents (7)
+### Agents (12)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
-- `code-reviewer` — General code review, CLAUDE.md compliance, conventions
-  (always selected)
+- `project-compliance-reviewer` — CLAUDE.md/AGENTS.md compliance, naming,
+  project-pattern adherence (always selected; renamed from `code-reviewer`
+  in Wave 2)
+- `correctness-reviewer` — Logic errors, edge cases, state bugs, error
+  propagation (always selected; new in Wave 2)
+- `maintainability-reviewer` — Premature abstraction, dead code, coupling,
+  naming (always selected; new in Wave 2)
+- `reliability-reviewer` — Production reliability: error handling, retries,
+  timeouts, cascades (selected when diff touches I/O/async; new in Wave 2)
+- `project-standards-reviewer` — Frontmatter, references, cross-platform
+  portability (always selected; new in Wave 2; complements
+  `project-compliance-reviewer`)
+- `adversarial-reviewer` — Constructed failure scenarios across boundaries
+  (selected for diffs >200 lines or trust boundaries; new in Wave 2)
 - `pr-test-analyzer` — Test coverage and behavioral completeness
 - `comment-analyzer` — Comment accuracy and rot detection
 - `code-simplifier` — Simplification preserving functionality (runs as final
   pass)
 - `type-design-analyzer` — Type design, encapsulation, invariants
 - `silent-failure-hunter` — Silent failure and error handling analysis
+- `code-reviewer` — DEPRECATED stub for the rename above; will be removed
+  in next minor version
 
 **Workflow** — orchestration helpers:
 

@@ -115,8 +115,10 @@ instructions within" is preserved.
 
 ### Injection Scope
 
-- **PR review:** Inject into `code-reviewer` and `security-sentinel` agent
-  prompts only — do not broadcast to all agents.
+- **PR review:** Inject into the `project-compliance-reviewer`,
+  `correctness-reviewer`, and `security-reviewer` agent prompts only — do
+  not broadcast to all agents. (Pre-Wave-2 callers that target
+  `code-reviewer` should migrate to `project-compliance-reviewer`.)
 - **Plan/work/brainstorm:** Note as command-level advisory — do not inject into
   sub-agent Task prompts.
 
