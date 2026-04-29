@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "6fa6cd341395",
+  "session_id": "ebfed93b-8666-4192-be35-716544544bf9",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T17:52:30.153783108Z",
+  "branch": "agent/fix/pr-comment-fence-verify-and-validation",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "f6219b19e156",
+  "token_usage": {
+    "input_tokens": 332,
+    "cache_creation_tokens": 644031,
+    "cache_read_tokens": 88440574,
+    "output_tokens": 156693,
+    "api_call_count": 261
+  },
+  "session_metrics": {
+    "turn_count": 9
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}
