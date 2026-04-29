@@ -12,6 +12,8 @@ This plan decomposes Wave 3 of the EveryInc merge into **12 parallel feature bra
 
 All implementation task definitions (W3.1, W3.2, W3.3, W3.4, W3.5, W3.6, W3.7, W3.8, W3.9, W3.10, W3.11, W3.12, W3.13b, W3.14, W3.15) live in `plans/everyinc-merge.md` under the "Wave 3" section. This file only specifies the parallel stack decomposition; do not duplicate task content here.
 
+> **Note on W3.9:** W3.9 (Wave 3 changesets) is intentionally distributed — each parallel branch runs its own `pnpm changeset` as part of its pre-PR checklist. There is no standalone W3.9 branch in the stack decomposition below.
+
 ## Implementation Plan
 
 ### Phase 0: Pre-Wave Preparation (Wave 3)
