@@ -1,9 +1,11 @@
 {
   "cli_version": "0.5.6",
   "checkpoint_id": "0e5599fee94d",
+  "session_id": "ebfed93b-8666-4192-be35-716544544bf9",
   "strategy": "manual-commit",
+  "created_at": "2026-04-29T16:02:33.736503021Z",
   "branch": "agent/feat/review-pr-keystone-rewrite",
-  "checkpoints_count": 1,
+  "checkpoints_count": 0,
   "files_touched": [
     ".changeset/review-pr-keystone-rewrite.md",
     "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md",
@@ -26,25 +28,35 @@
     "plugins/yellow-review/skills/pr-review-workflow/SKILL.md",
     "plugins/yellow-ruvector/skills/memory-query/SKILL.md"
   ],
-  "sessions": [
-    {
-      "metadata": "/0e/5599fee94d/0/metadata.json",
-      "transcript": "/0e/5599fee94d/0/full.jsonl",
-      "content_hash": "/0e/5599fee94d/0/content_hash.txt",
-      "prompt": "/0e/5599fee94d/0/prompt.txt"
-    },
-    {
-      "metadata": "/0e/5599fee94d/1/metadata.json",
-      "transcript": "/0e/5599fee94d/1/full.jsonl",
-      "content_hash": "/0e/5599fee94d/1/content_hash.txt",
-      "prompt": "/0e/5599fee94d/1/prompt.txt"
-    }
-  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "712dbdf2b878",
   "token_usage": {
-    "input_tokens": 3051,
-    "cache_creation_tokens": 3743022,
-    "cache_read_tokens": 88373406,
-    "output_tokens": 343799,
-    "api_call_count": 293
-  }
+    "input_tokens": 114,
+    "cache_creation_tokens": 419317,
+    "cache_read_tokens": 21872068,
+    "output_tokens": 78005,
+    "api_call_count": 105
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-29T16:02:33.702138868Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 2198,
+    "human_modified": 216,
+    "human_removed": 0,
+    "total_committed": 2198,
+    "total_lines_changed": 2414,
+    "agent_percentage": 0,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
 }
