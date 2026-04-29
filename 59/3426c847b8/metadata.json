@@ -5,13 +5,7 @@
   "branch": "agent/fix/pr-comment-fence-verify-and-validation",
   "checkpoints_count": 0,
   "files_touched": [
-    ".changeset/fence-verify-and-w15-rule.md",
-    "plans/everyinc-merge.md",
-    "plugins/yellow-review/agents/workflow/pr-comment-resolver.md",
-    "plugins/yellow-review/commands/review/resolve-pr.md",
-    "plugins/yellow-review/skills/pr-review-workflow/SKILL.md",
-    "scripts/validate-agent-authoring.js",
-    "tests/integration/validate-agent-authoring-review-rule.test.ts"
+    "plans/everyinc-merge.md"
   ],
   "sessions": [
     {
@@ -22,10 +16,10 @@
     }
   ],
   "token_usage": {
-    "input_tokens": 15,
-    "cache_creation_tokens": 37929,
-    "cache_read_tokens": 6564385,
-    "output_tokens": 17906,
-    "api_call_count": 15
+    "input_tokens": 4,
+    "cache_creation_tokens": 464102,
+    "cache_read_tokens": 1372162,
+    "output_tokens": 4126,
+    "api_call_count": 4
   }
 }

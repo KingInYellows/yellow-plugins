@@ -3,43 +3,37 @@
   "checkpoint_id": "593426c847b8",
   "session_id": "5e0a2dc7-736f-4eed-8a60-d404fee4dcdb",
   "strategy": "manual-commit",
-  "created_at": "2026-04-29T06:30:28.387168889Z",
+  "created_at": "2026-04-29T13:42:23.98918819Z",
   "branch": "agent/fix/pr-comment-fence-verify-and-validation",
   "checkpoints_count": 0,
   "files_touched": [
-    "plans/everyinc-merge.md",
-    "plugins/yellow-review/agents/workflow/pr-comment-resolver.md",
-    "plugins/yellow-review/commands/review/resolve-pr.md",
-    "plugins/yellow-review/skills/pr-review-workflow/SKILL.md",
-    "scripts/validate-agent-authoring.js",
-    "tests/integration/validate-agent-authoring-review-rule.test.ts",
-    ".changeset/fence-verify-and-w15-rule.md"
+    "plans/everyinc-merge.md"
   ],
   "agent": "Claude Code",
   "model": "",
   "turn_id": "375b0be82324",
-  "checkpoint_transcript_start": 1754,
-  "transcript_lines_at_start": 1754,
+  "checkpoint_transcript_start": 1979,
+  "transcript_lines_at_start": 1979,
   "token_usage": {
-    "input_tokens": 15,
-    "cache_creation_tokens": 37929,
-    "cache_read_tokens": 6564385,
-    "output_tokens": 17906,
-    "api_call_count": 15
+    "input_tokens": 4,
+    "cache_creation_tokens": 464102,
+    "cache_read_tokens": 1372162,
+    "output_tokens": 4126,
+    "api_call_count": 4
   },
   "session_metrics": {
     "turn_count": 1
   },
   "initial_attribution": {
-    "calculated_at": "2026-04-29T06:30:28.330073901Z",
-    "agent_lines": 329,
-    "agent_removed": 7,
-    "human_added": 0,
+    "calculated_at": "2026-04-29T13:42:23.925201138Z",
+    "agent_lines": 1,
+    "agent_removed": 1,
+    "human_added": 327,
     "human_modified": 0,
     "human_removed": 0,
-    "total_committed": 329,
-    "total_lines_changed": 336,
-    "agent_percentage": 100,
+    "total_committed": 328,
+    "total_lines_changed": 334,
+    "agent_percentage": 0.5988023952095809,
     "metric_version": 2
   }
 }
