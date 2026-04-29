@@ -29,17 +29,20 @@ TypeScript, Python, Rust, and Go.
 
 ## Agents
 
-### Review (7)
+### Review (10)
 
-| Agent                              | Description                                      |
-| ---------------------------------- | ------------------------------------------------ |
-| `code-simplicity-reviewer`         | YAGNI enforcement, simplification                |
-| `security-sentinel`                | Security audit, OWASP, secrets scanning          |
-| `performance-oracle`               | Bottlenecks, algorithmic complexity, scalability |
-| `architecture-strategist`          | Architectural compliance, design patterns        |
-| `polyglot-reviewer`                | Language-idiomatic review for TS/Py/Rust/Go      |
-| `test-coverage-analyst`            | Test quality, coverage gaps, edge cases          |
-| `pattern-recognition-specialist`   | Anti-patterns, duplication, naming drift         |
+| Agent                              | Description                                                                                |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| `code-simplicity-reviewer`         | YAGNI enforcement, simplification                                                          |
+| `security-sentinel`                | Security audit, OWASP, secrets scanning                                                    |
+| `security-reviewer`                | Review-time exploitable security vulnerabilities (companion to `security-sentinel`)        |
+| `security-lens`                    | Plan-level security architect for planning documents and architecture proposals            |
+| `performance-oracle`               | Bottlenecks, algorithmic complexity, scalability                                           |
+| `performance-reviewer`             | Review-time runtime performance with anchored confidence rubric (companion to `performance-oracle`) |
+| `architecture-strategist`          | Architectural compliance, design patterns                                                  |
+| `polyglot-reviewer`                | Language-idiomatic review for TS/Py/Rust/Go                                                |
+| `test-coverage-analyst`            | Test quality, coverage gaps, edge cases                                                    |
+| `pattern-recognition-specialist`   | Anti-patterns, duplication, naming drift                                                   |
 
 ### Research (3)
 
