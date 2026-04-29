@@ -27,9 +27,36 @@ sources and organize findings by importance.
 
 ## Research Methodology
 
+### Phase 0: Skill Discovery (Run First)
+
+Before going online or to MCP backends, check if curated knowledge already
+exists locally. Skills encode patterns the team has tested; they outrank
+generic external sources.
+
+1. Use `Glob` to discover available `SKILL.md` files in:
+   - `.claude/skills/**/SKILL.md`, `.codex/skills/**/SKILL.md`,
+     `.agents/skills/**/SKILL.md` (project-level)
+   - `~/.claude/skills/**/SKILL.md`, `~/.codex/skills/**/SKILL.md`,
+     `~/.agents/skills/**/SKILL.md` (user-level)
+   - `plugins/*/skills/**/SKILL.md` (yellow-plugins marketplace)
+2. Match the research topic to skill descriptions by reading their frontmatter
+   and headings (e.g., AI/agent topics may be covered by skills with names
+   containing 'agent', 'skill', or 'plugin'; documentation topics by skills
+   covering README or markdown patterns). Do not assume specific skill names
+   exist — discover them via Glob.
+3. Extract patterns: "Do" / "Don't" guidelines, code templates, conventions.
+4. Assess coverage:
+   - Skills give **comprehensive** guidance → summarize and deliver; skip
+     Phase 1, Phase 1.5, and Phase 2 unless gaps remain (the skill-derived
+     answer is sufficient and the curated/external lookups would add no
+     value).
+   - Skills give **partial** guidance → note what's covered, proceed to
+     Phase 1 + Phase 1.5 + Phase 2 for gaps.
+   - **No relevant skills** → proceed to Phase 1 + Phase 1.5 + Phase 2.
+
 ### Phase 1: Curated Knowledge Check
 
-1. **Check Available Skills:** First, use ToolSearch to detect whether
+1. **Check Context7 Availability:** Use ToolSearch to detect whether
    user-level Context7 is installed (`mcp__context7__resolve-library-id`). If
    present, prefer it for official documentation lookup; if absent, fall
    through to WebSearch / WebFetch on authoritative domains. Context7 is a
@@ -103,9 +130,20 @@ Then:
 
 Always structure your research as:
 
+**Phase 0: Skill Discovery**
+
+- Local `SKILL.md` files matched (project, user, and plugin scopes)
+- Patterns extracted ("Do" / "Don't" guidelines, templates, conventions)
+- Coverage assessment: comprehensive / partial / none — and which downstream
+  phases (1, 1.5, 2) were therefore skipped or run
+
+If Phase 0 coverage was **comprehensive**, deliver only this section plus the
+Sources list and stop — Phases 1, 1.5, and 2 are skipped by design.
+
 **Phase 1: Curated Knowledge**
 
-- What was found in skill-based knowledge sources
+- Context7 availability (present / absent) and what was retrieved if present;
+  fallback path taken if absent
 
 **Phase 1.5: Deprecation Check**
 
@@ -144,12 +182,15 @@ Always structure your research as:
 
 ## Source Hierarchy (Highest to Lowest Authority)
 
-1. **Skill-Based Knowledge:** Context7 MCP curated documentation (highest trust)
-2. **Official Documentation:** RFCs, official language/framework docs, API
+1. **Local SKILL.md Files:** Project, user, and plugin-level skills
+   (Phase 0 — highest trust; team-curated, codified patterns)
+2. **Curated Documentation:** Context7 MCP (Phase 1, when available) — official
+   library docs sourced from canonical upstream registries
+3. **Official Documentation:** RFCs, official language/framework docs, API
    references
-3. **Security Standards:** OWASP, NIST, CWE, security-specific guidelines
-4. **Community Consensus:** Surveys, GitHub stars/trends, package download stats
-5. **Expert Blogs:** Recognized practitioners (with verification from other
+4. **Security Standards:** OWASP, NIST, CWE, security-specific guidelines
+5. **Community Consensus:** Surveys, GitHub stars/trends, package download stats
+6. **Expert Blogs:** Recognized practitioners (with verification from other
    sources)
 
 ## Research Tools
