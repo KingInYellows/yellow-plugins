@@ -149,9 +149,12 @@ aggregation rules change there, propagate the same change here.
       (`reviewer`, `findings`, `residual_risks`, `testing_gaps`) so it
       enters validation indistinguishable from a structured return.
    2. **Validate** (drop malformed after normalization).
-   3. **Dedup** (`file + line_bucket(line, ±3) + normalize(title)`); on
-      merge keep highest severity, highest anchor, note all reviewers,
-      and on `pre_existing` conflict keep `false` (treat as new).
+   3. **Dedup** (`normalize(file) + line_bucket(line, ±3) + normalize(title)`);
+      on merge keep highest severity, highest anchor, note all reviewers,
+      and on `pre_existing` conflict keep `false` (treat as new). Parity
+      rule with `review-pr.md` Step 6.2 — `normalize(file)` ensures the
+      same finding matches across both pipelines regardless of OS path
+      separator.
    4. **Cross-reviewer agreement promotion** (50→75, 75→100).
    5. **Separate pre-existing** into a separate report section.
    6. **Resolve disagreements** (annotate Reviewer column, keep most

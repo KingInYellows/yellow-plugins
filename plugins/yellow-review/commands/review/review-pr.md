@@ -482,7 +482,11 @@ Apply the aggregation steps from
 2. **Deduplicate.** Fingerprint =
    `normalize(file) + line_bucket(line, ±3) + normalize(title)`. On match,
    merge: keep highest severity, keep highest anchor, note all reviewers
-   that flagged it.
+   that flagged it, and on `pre_existing` conflict keep `false` (treat as
+   new). Without the `pre_existing: false` tie-break, a finding that one
+   reviewer flagged as a new defect could be silently routed to the
+   "Pre-existing" section and dropped from the actionable queue. Parity
+   rule with `review-all.md` Step 8.3.
 3. **Cross-reviewer agreement promotion.** When 2+ independent reviewers
    flag the same fingerprint, promote anchor by one step:
    `50 → 75`, `75 → 100`, `100 → 100`. Note agreement in the Reviewer
