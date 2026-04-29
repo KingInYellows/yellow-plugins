@@ -1,0 +1,58 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "d31e3072d0f3",
+  "session_id": "5e0a2dc7-736f-4eed-8a60-d404fee4dcdb",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T06:24:44.03251623Z",
+  "branch": "agent/refactor/repair-drifted-agents",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "plans/everyinc-merge.md",
+    "plugins/yellow-core/agents/review/performance-reviewer.md",
+    "plugins/yellow-core/agents/review/security-reviewer.md",
+    "plugins/yellow-core/agents/review/security-lens.md",
+    "plugins/yellow-core/agents/review/performance-oracle.md",
+    "plugins/yellow-core/agents/review/security-sentinel.md",
+    "plugins/yellow-core/agents/research/best-practices-researcher.md",
+    "plugins/yellow-core/agents/research/git-history-analyzer.md",
+    "plugins/yellow-core/agents/workflow/spec-flow-analyzer.md",
+    "plugins/yellow-core/agents/research/repo-research-analyst.md",
+    ".changeset/repair-drifted-agents.md"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "375b0be82324",
+  "checkpoint_transcript_start": 1452,
+  "transcript_lines_at_start": 1452,
+  "token_usage": {
+    "input_tokens": 2584,
+    "cache_creation_tokens": 752754,
+    "cache_read_tokens": 4686337,
+    "output_tokens": 25141,
+    "api_call_count": 15
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-29T06:24:43.96964686Z",
+    "agent_lines": 583,
+    "agent_removed": 2,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 583,
+    "total_lines_changed": 585,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    }
+  ]
+}

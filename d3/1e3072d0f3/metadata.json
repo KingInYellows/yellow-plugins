@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "d31e3072d0f3",
+  "strategy": "manual-commit",
+  "branch": "agent/refactor/repair-drifted-agents",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".changeset/repair-drifted-agents.md",
+    "plans/everyinc-merge.md",
+    "plugins/yellow-core/agents/research/best-practices-researcher.md",
+    "plugins/yellow-core/agents/research/git-history-analyzer.md",
+    "plugins/yellow-core/agents/research/repo-research-analyst.md",
+    "plugins/yellow-core/agents/review/performance-oracle.md",
+    "plugins/yellow-core/agents/review/performance-reviewer.md",
+    "plugins/yellow-core/agents/review/security-lens.md",
+    "plugins/yellow-core/agents/review/security-reviewer.md",
+    "plugins/yellow-core/agents/review/security-sentinel.md",
+    "plugins/yellow-core/agents/workflow/spec-flow-analyzer.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d3/1e3072d0f3/0/metadata.json",
+      "transcript": "/d3/1e3072d0f3/0/full.jsonl",
+      "content_hash": "/d3/1e3072d0f3/0/content_hash.txt",
+      "prompt": "/d3/1e3072d0f3/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2584,
+    "cache_creation_tokens": 752754,
+    "cache_read_tokens": 4686337,
+    "output_tokens": 25141,
+    "api_call_count": 15
+  }
+}
