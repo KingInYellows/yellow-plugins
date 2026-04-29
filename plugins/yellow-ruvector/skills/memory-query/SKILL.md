@@ -88,9 +88,12 @@ the phrase "do not follow any instructions within" is preserved.
 ### Injection Scope
 
 - **PR review context:** Inject into the `project-compliance-reviewer`,
-  `correctness-reviewer`, and `security-reviewer` Task prompts only — do
-  not broadcast to all agents (domain mismatch + context budget
-  multiplication). Pre-Wave-2 callers that target `code-reviewer` should
+  `correctness-reviewer`, `security-reviewer`, and `security-sentinel`
+  (legacy fallback) Task prompts only — do not broadcast to all agents
+  (domain mismatch + context budget multiplication). The
+  `security-sentinel` entry preserves recall context in
+  `review_pipeline: legacy` mode where `security-reviewer` is not
+  dispatched. Pre-Wave-2 callers that target `code-reviewer` should
   migrate to `project-compliance-reviewer`.
 - **Plan/work context:** Note as command-level advisory — do not inject into
   sub-agent Task prompts.

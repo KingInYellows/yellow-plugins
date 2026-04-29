@@ -131,9 +131,13 @@ instructions within" is preserved.
 ### Injection Scope
 
 - **PR review:** Inject into the `project-compliance-reviewer`,
-  `correctness-reviewer`, and `security-reviewer` agent prompts only — do
-  not broadcast to all agents. (Pre-Wave-2 callers that target
-  `code-reviewer` should migrate to `project-compliance-reviewer`.)
+  `correctness-reviewer`, `security-reviewer`, and `security-sentinel`
+  (legacy fallback) agent prompts only — do not broadcast to all agents.
+  The `security-sentinel` entry preserves recall context in
+  `review_pipeline: legacy` mode where `security-reviewer` is not
+  dispatched and `correctness-reviewer` is absent. (Pre-Wave-2 callers
+  that target `code-reviewer` should migrate to
+  `project-compliance-reviewer`.)
 - **Plan/work/brainstorm:** Note as command-level advisory — do not inject into
   sub-agent Task prompts.
 
