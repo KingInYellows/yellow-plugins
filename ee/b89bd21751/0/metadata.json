@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "eeb89bd21751",
+  "session_id": "ebfed93b-8666-4192-be35-716544544bf9",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T17:57:23.919759387Z",
+  "branch": "agent/feat/review-pr-keystone-rewrite",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "f6219b19e156",
+  "token_usage": {
+    "input_tokens": 359,
+    "cache_creation_tokens": 665155,
+    "cache_read_tokens": 102815086,
+    "output_tokens": 166741,
+    "api_call_count": 288
+  },
+  "session_metrics": {
+    "turn_count": 9
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "eeb89bd21751",
+  "strategy": "manual-commit",
+  "branch": "agent/feat/review-pr-keystone-rewrite",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/ee/b89bd21751/0/metadata.json",
+      "transcript": "/ee/b89bd21751/0/full.jsonl",
+      "content_hash": "/ee/b89bd21751/0/content_hash.txt",
+      "prompt": "/ee/b89bd21751/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 359,
+    "cache_creation_tokens": 665155,
+    "cache_read_tokens": 102815086,
+    "output_tokens": 166741,
+    "api_call_count": 288
+  }
+}
