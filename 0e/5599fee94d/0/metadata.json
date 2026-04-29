@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "0e5599fee94d",
+  "session_id": "5e0a2dc7-736f-4eed-8a60-d404fee4dcdb",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T16:02:27.043025503Z",
+  "branch": "agent/feat/review-pr-keystone-rewrite",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "plugins/yellow-review/agents/review/code-reviewer.md",
+    "plugins/yellow-review/skills/pr-review-workflow/SKILL.md"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "4510fb1801e6",
+  "token_usage": {
+    "input_tokens": 2937,
+    "cache_creation_tokens": 3323705,
+    "cache_read_tokens": 66501338,
+    "output_tokens": 265794,
+    "api_call_count": 188
+  },
+  "session_metrics": {
+    "turn_count": 8
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-29T16:02:26.944744873Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 2307,
+    "human_modified": 107,
+    "human_removed": 0,
+    "total_committed": 2307,
+    "total_lines_changed": 2523,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}

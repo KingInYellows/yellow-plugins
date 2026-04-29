@@ -1,0 +1,362 @@
+/yellow-core:workflows:review
+
+---
+
+<task-notification>
+<task-id>a41c9c0b210796f42</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-kinginyellow-projects-yellow-plugins/b746a5eb-a5b9-4f32-b56a-2929e08e4286/tasks/a41c9c0b210796f42.output</output-file>
+<status>completed</status>
+<summary>Agent "Silent failure hunt PR #278" completed</summary>
+<result>I have everything I need. Here are the findings:
+
+---
+
+**[P2] silent-failure — scripts/backfill-solution-frontmatter.js:282-288**
+Finding: `fs.writeFileSync` is called with no try/catch. A write failure (permissions error, disk full, read-only mount) is an unhandled exception that bubbles up as an uncaught Node.js error with no entry in `RESULTS.errors` and no structured exit. The summary line `errors: 0` is printed to stdout before the crash, so any CI log scraper that checks only the summary sees a clean run.
+Fix: Wrap the `writeFileSync` call in a try/catch that pushes to `RESULTS.errors` and returns, mirroring the pattern already used for `readEntry`.
+
+---
+
+**[P2] silent-failure — scripts/backfill-solution-frontmatter.js:243-246 (idempotency: empty-value bypass)**
+Finding: The "already complete" short-circuit checks field presence with `fmHasField` (regex `^key\s*:`), not field value. A file with `problem:` on a line by itself (empty value) or `problem: ''` passes the completeness gate, skips all derivation, and gets counted as `alreadyComplete`. The same applies to `track:` with an empty value. The script's idempotency claim holds structurally but silently accepts corrupt/empty field values as complete.
+
+--- code begin (reference only) ---
+if (hasTrack &amp;&amp; hasProblem &amp;&amp; hasTags) {
+  RESULTS.alreadyComplete.push(path.relative(ROOT, filePath));
+  return;
+}
+--- code end ---
+
+Fix: After `fmHasField` returns true, call `fmGetScalar` and verify the result is non-null/non-empty before treating the field as present. Otherwise flag for review.
+
+---
+
+**[P2] silent-failure — scripts/backfill-solution-frontmatter.js:353-358 (--check exit code ordering)**
+Finding: The `--check` exit-2 branch is evaluated after the error exit-1 branch. That part is correct. However, when there are both errors AND modified files, the script exits 1 (errors) without ever reaching the `--check` exit. This means `--check` in CI will exit 1 (generic error) rather than exit 2 (needs changes) — callers that distinguish these codes (e.g., `if [ $? -eq 2 ]`) will silently misclassify a run that had both write errors and needed changes as a plain error rather than a "changes needed" failure. The comment in the header says `--check` exits non-zero if any file would change, but the actual exit code is 1 not 2 in this mixed case. This is an undocumented behavior gap.
+Fix: Document the precedence explicitly, or — if `--check` should always take priority — move the check-mode branch before the errors branch.
+
+---
+
+**[P2] silent-failure — scripts/backfill-solution-frontmatter.js:291-300 (walkSolutions no error handling)**
+Finding: `fs.readdirSync(SOLUTIONS_DIR)` and `fs.readdirSync(subDir)` inside `walkSolutions` are uncaught. A permission error on any subdirectory (e.g., a symlinked subdirectory that is broken or unreadable) throws synchronously, bypassing `RESULTS.errors` entirely and producing no summary output. The process exits with an unstructured Node.js stack trace.
+Fix: Wrap both `readdirSync` calls in try/catch blocks; push to `RESULTS.errors` and either skip the directory or abort with a clean message.
+
+---
+
+**[P2] silent-failure — scripts/backfill-solution-frontmatter.js:37-40 (unconstrained SOLUTIONS_DIR)**
+Finding: `SOLUTIONS_DIR` is resolved via `path.resolve(ROOT, process.env.SOLUTIONS_DIR)`. There is no validation that the resulting path stays within `ROOT`. Setting `SOLUTIONS_DIR=../../etc` or any absolute path would silently point the script at an arbitrary directory tree and write modified frontmatter into those files (in apply mode). This is especially risky when run in CI where the env var might be injected.
+Fix: After resolving, assert `SOLUTIONS_DIR.startsWith(ROOT + path.sep)` and exit 1 with an error message if the resolved path escapes the project root. (A test fixture pointing at a temp dir outside the tree is a legitimate use, so at minimum warn loudly.)
+
+---
+
+**[P3] silent-failure — scripts/backfill-solution-frontmatter.js:105-108 (folded-scalar parser swallows empty result silently)**
+Finding: The folded scalar parser in `fmGetScalar` returns `null` when `collected.join(' ').trim()` is empty. The caller in `deriveProblem` treats `null` as "not found" and proceeds to the next source. But a folded `title:` with only whitespace-indented lines (a malformed but structurally present field) would silently skip the title and fall through to the body paragraph, producing a less accurate `problem` value with no warning logged.
+Fix: Log a debug/warning when a recognized key (`title`, `problem`, `symptom`) is present in the frontmatter but yields an empty value after folded parsing.
+
+---
+
+**[P3] silent-failure — plugins/yellow-core/agents/workflow/knowledge-compounder.md: "Split" path, no stop instruction**
+Finding: The Context Budget Precheck section documents three AskUserQuestion options: "Write single file", "Split into N files", and "Cancel". The "Cancel" option has an explicit stop instruction ("stop without writing"). The "Split" option gives a mechanical instruction ("invoke the Solution Extractor again with a `--split` flag"), but there is no explicit instruction for what the agent should do if the Solution Extractor invocation fails or if the split produces zero sections. An agent continuing after a failed split would write no files but also report no error.
+Fix: Add an explicit failure branch: "If the split invocation fails or produces no output files, stop and report the error to the user rather than proceeding."
+
+---
+
+Summary: Found 0 complete silent swallows, **4 P2 inadequate/misleading handlers** (write errors untrapped, empty-value idempotency bypass, `--check` exit-code shadowing, `walkSolutions` uncaught throws), **1 P2 path-traversal / scope escape**, and **2 P3 minor issues** (folded scalar empty-value fall-through, missing stop instruction in agent split path). Total: 5 P2, 2 P3.</result>
+<usage><total_tokens>41182</total_tokens><tool_uses>2</tool_uses><duration_ms>46412</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a01c4f17de75e50c5</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-kinginyellow-projects-yellow-plugins/b746a5eb-a5b9-4f32-b56a-2929e08e4286/tasks/a01c4f17de75e50c5.output</output-file>
+<status>completed</status>
+<summary>Agent "Test coverage for PR #278" completed</summary>
+<result>I have everything needed. Here are the findings.
+
+---
+
+## Coverage Findings for PR #278
+
+### Summary
+
+`scripts/backfill-solution-frontmatter.js` is 361 lines with 9 distinct functions and 3 operating modes. Zero tests exist for it. The script is nominated for CI use (`--check` mode) and is described as idempotent by design — both of those properties require test verification before the script is trustworthy as a gate.
+
+---
+
+**[P1] test-coverage — scripts/backfill-solution-frontmatter.js:116**
+Finding: `deriveTrack` security-issues marker branch has no test. The changeset explicitly calls this "the most error-prone heuristic" and documents one real case (`yellow-devin-plugin-security-audit.md`) where it fired correctly. A regex or marker-list change would silently auto-assign `track: bug` to knowledge-track audit entries with no CI signal.
+Fix: Fixture: a `security-issues/` entry whose title contains "pre-implementation" — assert `RESULTS.flaggedForReview` length is 1 and `RESULTS.modified` is empty. Companion fixture: a `security-issues/` entry with no markers — assert it is classified `track: bug`.
+
+**[P1] test-coverage — scripts/backfill-solution-frontmatter.js:353**
+Finding: `--check` exit-code contract is untested. The changeset proposes wiring this as a CI gate (`node scripts/backfill-solution-frontmatter.js --check`). The script exits 2 when files would change and 0 when the tree is complete. If the exit-code logic regresses (e.g., someone changes `process.exit(2)` to `process.exit(1)` or removes the guard), CI would either stop gating or produce confusing exit codes — with no test to catch it.
+Fix: Two cases: (1) run `--check` against a fixture tree with a file missing `track` — assert exit code is 2; (2) run `--check` against a complete tree — assert exit code is 0.
+
+**[P1] test-coverage — scripts/backfill-solution-frontmatter.js:209**
+Finding: `injectFrontmatter` YAML placement is untested. The function inserts new keys after the `category:` line. If `category:` is absent it falls back to appending at end. The YAML it emits must round-trip as valid frontmatter (single-quoted `problem:`, YAML list for `tags:`). A quoting bug (e.g., unescaped apostrophe in a problem string) would produce malformed YAML written to disk in apply mode.
+Fix: Unit-level test: call `injectFrontmatter` directly (export it, or test via the script CLI on a temp file) with a `problem` value containing a single quote (`it's broken`) and assert the output parses without error and the written file contains the escaped form `it''s broken`.
+
+---
+
+**[P2] test-coverage — scripts/backfill-solution-frontmatter.js:142**
+Finding: `deriveProblem` 4-step priority chain is only exercised by the real `docs/solutions/` tree (51 files, none synthetic). The `symptom`-wins and `first-paragraph`-wins paths have no explicit test. The truncation boundary at 120 chars (slice to 117 + `...`) also has no boundary test.
+Fix: Four fixture frontmatter strings — one with `problem:`, one with `symptom:`, one with only `title:`, one with neither (body paragraph only) — assert the correct `source` field and that a 125-char value is truncated to exactly 120 chars with trailing `...`.
+
+**[P2] test-coverage — scripts/backfill-solution-frontmatter.js:9 (idempotency)**
+Finding: The changeset states "re-running the script reports zero changes (idempotency verified)" but this was verified by a manual dry-run, not a repeatable test. A future change to `fmHasField` or `processEntry` could break idempotency silently, causing double-injection on re-run.
+Fix: Apply-mode run against a fixture tree → assert `RESULTS.modified.length &gt; 0`; run again against the same (now-modified) tree → assert `RESULTS.modified.length === 0` and `RESULTS.alreadyComplete.length` equals the original file count.
+
+**[P2] test-coverage — scripts/backfill-solution-frontmatter.js:83**
+Finding: `fmGetScalar` folded-scalar path (`&gt;` or `|` as the value) is a distinct code branch (lines 91–107) with its own line-collection loop. It is not exercised by any test. A regression here would silently yield `null` for `title` or `symptom` fields written with YAML block scalars, falling through to the lower-priority `deriveProblem` sources.
+Fix: Fixture frontmatter with `title: &gt;` followed by two indented lines — assert `fmGetScalar` returns the joined text, not `null`.
+
+---
+
+**[P3] test-coverage — scripts/backfill-solution-frontmatter.js:70**
+Finding: `readEntry` throws on missing frontmatter and the error is caught into `RESULTS.errors`. No test verifies that a file without `---` delimiters lands in errors and does not cause an uncaught exception or a write.
+Fix: Single fixture `.md` with no frontmatter — assert `RESULTS.errors.length === 1` and no file was written.
+
+**[P3] test-coverage — scripts/backfill-solution-frontmatter.js:291**
+Finding: `walkSolutions` only recurses one level deep (category subdirectory → files). No test confirms that files at the category root or nested two levels deep are correctly ignored. If someone adds a `docs/solutions/README.md` or a two-level-deep path, the walker silently skips or errors on them.
+Fix: Add a `README.md` at the `SOLUTIONS_DIR` root and a nested `security-issues/sub/file.md` to a fixture tree — assert neither appears in any results bucket.
+
+---
+
+## Concrete Test File Outline
+
+`/home/kinginyellow/projects/yellow-plugins/tests/integration/backfill-solution-frontmatter.test.ts`
+
+```
+--- code begin (reference only) ---
+// Pattern mirrors validate-agent-authoring-review-rule.test.ts:
+// spawn the script as a child process via execFileSync,
+// parameterize target dir via SOLUTIONS_DIR env var.
+
+function runBackfill(solutionsDir: string, args: string[] = []): RunResult
+
+describe('backfill-solution-frontmatter', () =&gt; {
+  // helper: writeFixture(dir, category, slug, frontmatter, body)
+
+  describe('deriveTrack — security-issues marker', () =&gt; {
+    it('flags entry with "pre-implementation" in title for manual review')
+    it('flags entry with "audit" in first paragraph for manual review')
+    it('auto-assigns bug to security-issues entry with no markers')
+  })
+
+  describe('--check mode exit codes', () =&gt; {
+    it('exits 2 when files would change')
+    it('exits 0 on a fully-complete tree')
+  })
+
+  describe('injectFrontmatter', () =&gt; {
+    it('inserts after category: line')
+    it('escapes single quotes in problem value')
+    it('produces parseable YAML')
+  })
+
+  describe('deriveProblem priority chain', () =&gt; {
+    it('prefers existing problem: field')
+    it('falls back to symptom:')
+    it('falls back to title:')
+    it('falls back to first body paragraph')
+    it('truncates at 120 chars with ellipsis')
+  })
+
+  describe('idempotency', () =&gt; {
+    it('second apply run produces 0 modifications')
+  })
+
+  describe('fmGetScalar folded scalar', () =&gt; {
+    it('joins indented lines under &gt; block scalar')
+  })
+
+  describe('error handling', () =&gt; {
+    it('records files without frontmatter in errors bucket')
+  })
+})
+--- code end ---
+```
+
+---
+
+**Found: 3 P1, 3 P2, 2 P3 issues. Coverage: 0/4 critical paths tested** (`deriveTrack` security branch, `--check` exit codes, `injectFrontmatter` correctness, idempotency). The `SOLUTIONS_DIR` env-var hook is already present in the script, so the test harness can follow the exact same temp-dir + child-process pattern used by `/home/kinginyellow/projects/yellow-plugins/tests/integration/validate-agent-authoring-review-rule.test.ts` without any script changes.</result>
+<usage><total_tokens>24933</total_tokens><tool_uses>6</tool_uses><duration_ms>66854</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a3e3595a9f8f4bc85</task-id>
+<tool-use-id>toolu_01SoFUovaQs63dQHom2RmkEM</tool-use-id>
+<output-file>/tmp/claude-1000/-home-kinginyellow-projects-yellow-plugins/b746a5eb-a5b9-4f32-b56a-2929e08e4286/tasks/a3e3595a9f8f4bc85.output</output-file>
+<status>completed</status>
+<summary>Agent "Code review for PR #278" completed</summary>
+<result>Now I have all the information needed. Here are the findings:
+
+---
+
+**[P1] correctness — scripts/backfill-solution-frontmatter.js:37-40**
+Finding: `SOLUTIONS_DIR` is constructed via `path.resolve(ROOT, process.env.SOLUTIONS_DIR)` with no validation. A value like `../../etc` resolves to an absolute path outside the repo tree. The script then reads and writes all `.md` files it finds there with no subsequent containment check. In CI with `--check` this is read-only, but in apply mode it can overwrite arbitrary files on disk.
+Fix: After resolving `SOLUTIONS_DIR`, assert it starts with `ROOT + path.sep` and call `process.exit(1)` with a component-prefixed error if not:
+
+```
+--- code begin (reference only) ---
+if (!SOLUTIONS_DIR.startsWith(ROOT + path.sep)) {
+  console.error('[backfill-solution-frontmatter] Error: SOLUTIONS_DIR resolves outside repo root');
+  process.exit(1);
+}
+--- code end ---
+```
+
+---
+
+**[P2] correctness — scripts/backfill-solution-frontmatter.js:905-910**
+Finding: `readEntry()` throws `'missing frontmatter'` for files that have no YAML front matter block (e.g., the two legacy files before they were manually patched in this very PR). Those errors are silently collected in `RESULTS.errors` and the script exits 1 only after processing the full tree — but in `--check` mode the error is printed and then a `process.exit(1)` fires at the error-reporting block (line 345-351), which means `CHECK_MODE &amp;&amp; modified &gt; 0` (line 353) is never reached. That ordering is correct. However, any future file without frontmatter added mid-run causes `process.exit(1)` in check mode, which is the right signal for CI but the error message only says `missing frontmatter` with no actionable guidance. Additionally, the function catches the `fs.readFileSync` `ENOENT`/`EACCES` errors under the same generic handler — these are distinct root causes.
+Fix: Distinguish I/O errors from parse errors: catch `fs.readFileSync` separately, or at least prefix messages: `[backfill-solution-frontmatter] Error reading &lt;file&gt;: &lt;msg&gt;` vs `…: missing frontmatter`.
+
+---
+
+**[P2] correctness — scripts/backfill-solution-frontmatter.js:977-1002 (deriveProblem)**
+Finding: `fmGetScalar` extracts multi-line YAML titles by matching only the first line of a block-scalar title (e.g., `title:\n  'foo\n  bar'` returns only `foo` because the regex `^title\s*:\s*(.+)$` stops at end-of-line). This produces truncated-without-`...` `problem` values. Three files in the backfill output confirm this: `wsl2-crlf-pr-merge-unblocking.md` gets `'Unblocking stuck PRs: CRLF git conflicts, mergeStateStatus, and multi-round'` (sentence fragment), and `yellow-linear-plugin-pr-review-fixes.md` gets `'21 unresolved PR review threads from 3 automated reviewers (Gemini, CodeAnt,'` (mid-list truncation). The values are not flagged for review and are silently accepted.
+Fix: After the inline-scalar extraction, detect whether the value is a partial multi-line title (no `&gt;` or `|` fold indicator but the next line is indented) and join continuation lines. Alternatively, add a post-derivation check: if the derived problem string ends without punctuation and is near 80 characters, flag it for manual review rather than writing the fragment.
+
+---
+
+**[P2] maintainability — plugins/yellow-core/agents/workflow/knowledge-compounder.md:356-357**
+Finding: The sentence "The threshold is configurable via `KC_CONTEXT_BUDGET` env var; document this in the backfill script README" is a dangling TODO in the agent prose. There is no README for `scripts/backfill-solution-frontmatter.js`, no `KC_CONTEXT_BUDGET` entry in the plugin's CLAUDE.md environment variable section, and no mention in the yellow-core CLAUDE.md. Any operator who wants to tune the budget has nowhere to look except the agent body itself.
+Fix: Either add a `KC_CONTEXT_BUDGET=200` entry to yellow-core's CLAUDE.md "Environment Variables" section, or replace the dangling sentence with an inline note: "Set `KC_CONTEXT_BUDGET` env var (default: 200) to adjust the threshold." Remove the forward reference to a non-existent README.
+
+---
+
+**[P2] correctness — plugins/yellow-core/agents/workflow/knowledge-compounder.md:350**
+Finding: The AskUserQuestion option label reads "Split into N files (one per major Subagent section)" where `N` is a literal placeholder. At runtime the agent has already computed `$ASSEMBLED_LINES`, but the section count from the Solution Extractor is not established at this point in the prose. The LLM will substitute a guess or leave `N` literally in the button label. Per MEMORY.md: "AskUserQuestion button labels like 'Submit reason'... do NOT open a free-text input field" — here the concern is the opposite: the label misinforms the user about how many files will be produced.
+Fix: Change the button label to `"Split into multiple files (one per major section)"` — drop the `N` — and have the agent compute and state the concrete count in the question body prose, not in the button label.
+
+---
+
+**[P2] correctness — docs/solutions/security-issues/yellow-devin-plugin-security-audit.md:~line 28-30 (post-backfill)**
+Finding: A double blank line appears between the closing `--&gt;` of the backfill HTML comment and the `# Yellow-Devin Plugin Security Audit` heading. This is cosmetic but inconsistent with every other solution doc in the tree (all have exactly one blank line between frontmatter/comment block and the first heading).
+Fix: Remove one of the two blank lines after the closing `--&gt;`.
+
+---
+
+**[P3] maintainability — scripts/backfill-solution-frontmatter.js:1126-1136 (walkSolutions)**
+Finding: `walkSolutions` reads only the first level of subdirectories under `SOLUTIONS_DIR`. This is intentional and matches the current two-level `&lt;category&gt;/&lt;slug&gt;.md` structure. However, the function silently skips `.md` files placed directly in `SOLUTIONS_DIR` root (not in a category subdirectory) without any warning. If a stray file lands there it is silently ignored rather than flagged.
+Fix: After the directory loop, add a check for root-level `.md` files and log a warning: `[backfill-solution-frontmatter] Warning: skipping root-level file &lt;name&gt; (expected category subdirectory)`.
+
+---
+
+**[P3] style — scripts/backfill-solution-frontmatter.js:79-81 (fmHasField)**
+Finding: The regex `new RegExp('^${key}\\s*:', 'm')` uses an unescaped key value in a `RegExp` constructor. For the known keys (`track`, `problem`, `tags`) this poses no risk, but the function is exported as a general utility. If the key ever contains regex metacharacters (e.g., `problem.type`) it would silently become a partial match.
+Fix: Escape the key: `` key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&amp;') `` inside the `RegExp` constructor. Low urgency for the current call sites, but worth doing for defensive correctness.
+
+---
+
+Found **1 P1, 4 P2, 2 P3** issues.
+
+**Summary of the most consequential items:**
+- The `SOLUTIONS_DIR` env-var path-traversal (P1) is the only correctness risk outside the project's own docs tree.
+- The multi-line title truncation (P2) has already materialized in three backfilled files with sentence-fragment `problem` values — the learnings-researcher BM25 ranking these docs are designed to feed will get noisy signals from those fragments.
+- The `KC_CONTEXT_BUDGET` dangling TODO (P2) leaves the env var undiscoverable without reading the agent source.
+
+The M3 confirmation gate, category/slug validation, AMEND_EXISTING path-traversal guards, and existing security fencing in the knowledge-compounder are all intact and unaffected by the additive changes. The 48 bulk frontmatter changes are mechanically consistent (single-quoted scalars, YAML list syntax correct, no trailing whitespace observed).</result>
+<usage><total_tokens>54170</total_tokens><tool_uses>23</tool_uses><duration_ms>210369</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a43f8b82c3bab556f</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-kinginyellow-projects-yellow-plugins/b746a5eb-a5b9-4f32-b56a-2929e08e4286/tasks/a43f8b82c3bab556f.output</output-file>
+<status>completed</status>
+<summary>Agent "Pattern check PR #278" completed</summary>
+<result>I now have enough data for a complete analysis. Here are the findings:
+
+---
+
+**[P2] heuristic-correctness — docs/solutions/workflow/wsl2-crlf-pr-merge-unblocking.md**
+Finding: Assigned `track: knowledge` but content is a specific incident (WSL2 CRLF files blocked multiple PR merges, root causes enumerated, concrete fix applied). The classification table in knowledge-compounder.md explicitly calls this out: "workflow → knowledge UNLESS the entry documents a specific incident that was resolved → bug." This entry meets the override condition.
+Fix: Change `track: knowledge` to `track: bug`.
+
+---
+
+**[P2] heuristic-correctness — docs/solutions/security-issues/shell-binary-downloader-security-patterns.md**
+Finding: Assigned `track: bug` (security-issues default), but the entry's own framing is "Patterns discovered during multi-agent review of PR #241" with sections titled "Patterns Found" and "Prevention". It documents reusable patterns, not a specific defect that was found and fixed in a single incident. This is structurally a knowledge-track entry, analogous to `yellow-devin-plugin-security-audit.md` which was manually overridden for the same reason.
+Fix: Change `track: bug` to `track: knowledge`. Add a backfill-note comment explaining the override, matching the precedent set for `yellow-devin-plugin-security-audit.md`.
+
+---
+
+**[P1] truncated-problem-field — docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md:5**
+Finding: The `problem` field is mid-sentence truncated:
+
+```
+--- code begin (reference only) ---
+problem: 'VS Code diagnostics: ''Attribute user-invocable is not supported'' and'
+--- code end ---
+```
+
+The sentence ends with "and" — it was cut during backfill. The `learnings-researcher` (W2.1) will use this field for BM25 retrieval; a truncated value that ends with a conjunction is effectively useless as a search signal and will produce misleading relevance scores.
+Fix: Complete the problem statement, e.g.: `'VS Code diagnostics: ''Attribute user-invocable is not supported'' and multi-line description: silently truncated by Claude Code parser'`
+
+---
+
+**[P1] truncated-problem-field — docs/solutions/security-issues/yellow-linear-plugin-pr-review-fixes.md**
+Finding: Same truncation pattern:
+
+```
+--- code begin (reference only) ---
+problem: '21 unresolved PR review threads from 3 automated reviewers (Gemini, CodeAnt,'
+--- code end ---
+```
+
+Cut mid-list. Both this and the `skill-frontmatter` case are the only two truncated `problem` values found (the `mcp-bundled-server-tool-naming` entry uses `...` which is at least intentional ellipsis notation). A sentence that ends with a trailing comma is a parse-failure signal, not a keyword query.
+Fix: Complete or rephrase: `'21 unresolved PR threads from Gemini, CodeAnt, and Copilot reviewers; missing $ARGUMENTS, weak regex, no C1 validation'`
+
+---
+
+**[P2] field-ordering-drift — docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md:183**
+Finding: In this file, `track` and `problem` were appended AFTER a multi-line `components:` block, which places them below many other fields instead of immediately after `category:`. All other backfilled files position `track` directly after `category:`. This file is the only one where the insertion point was post-`components`.
+
+```
+--- code begin (reference only) ---
+components:
+  - plugins/yellow-debt/commands/debt/sync.md
+  ...
+track: knowledge
+problem: 'Claude Code Command Authoring: Anti-Patterns and Fixes'
+---
+--- code end ---
+```
+
+Fix: Move `track:` and `problem:` to immediately follow the `category:` line, consistent with all other 47 entries.
+
+---
+
+**[P2] double-blank-line — docs/solutions/security-issues/yellow-devin-plugin-security-audit.md**
+Finding: Two consecutive blank lines appear between the closing `--&gt;` of the backfill-note comment and the `# Yellow-Devin Plugin Security Audit` heading. Every other solution doc uses a single blank line between frontmatter/comment and the H1. Minor but inconsistent with the rest of the tree.
+Fix: Remove one blank line.
+
+---
+
+**[P3] tags-format-mixed — docs/solutions/ (multiple files, pre-existing)**
+Finding: The sweep did not normalize `tags:` list style. Flow style (`tags: [tag1, tag2]`) coexists with block style (`tags:\n  - tag`). The PR introduced new block-style `tags:` in entries that previously had no tags (e.g., `cross-plugin-documentation-correctness.md`, `hook-set-e-and-json-exit-pattern.md`), but left existing flow-style entries untouched. This is pre-existing drift the PR partially touched. 12 files use flow style; the rest use block. Since the PR is a sweep, this was a reasonable call not to fix — but worth noting.
+Fix: Out-of-scope for this PR; track separately as a normalization task if `learnings-researcher` requires consistent format.
+
+---
+
+**[P3] env-var-naming — KC_CONTEXT_BUDGET**
+Finding: The new env var `KC_CONTEXT_BUDGET` uses the prefix `KC_` (likely "Knowledge Compounder"), which is not established elsewhere in the codebase. Other yellow-core scripts use no plugin-specific prefix for their env vars (`SOLUTIONS_DIR` in the same backfill script, `MEMORY_PATH` in knowledge-compounder). It is not wrong, but it is novel. The name also does not appear in `plugin.json` `userConfig`, CLAUDE.md, or any README, so it is effectively undiscoverable.
+Fix: Either document `KC_CONTEXT_BUDGET` in yellow-core's CLAUDE.md under a "Configurable Env Vars" section, or rename it to `KNOWLEDGE_COMPOUNDER_CONTEXT_BUDGET` to match the descriptor-style naming of `SOLUTIONS_DIR`.
+
+---
+
+**Sweep boundary (docs/research/):** All 7 `docs/research/*.md` files have no YAML frontmatter at all — they use inline `**Date:**` prose. These files are outside `docs/solutions/` and were correctly excluded from the backfill scope. They document a different content type (research/feasibility studies) and do not warrant the same `track:`/`problem:` schema. No action needed on this PR, but if the `learnings-researcher` agent is intended to index research docs, a future PR should establish a separate frontmatter convention for that directory.
+
+---
+
+**Consistent findings:** Field ordering (track after category) is correct in all 47 non-anomalous files. YAML single-quote escaping via doubled single-quotes is consistent. The `--dry-run` / `--check` flag style matches `sync-manifests.js` and `validate-versions.js` exactly. The script's `SOLUTIONS_DIR` env var override for test isolation is a clean pattern.</result>
+<usage><total_tokens>45729</total_tokens><tool_uses>34</tool_uses><duration_ms>187611</duration_ms></usage>
+</task-notification>

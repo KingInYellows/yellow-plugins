@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "0e5599fee94d",
+  "strategy": "manual-commit",
+  "branch": "agent/feat/review-pr-keystone-rewrite",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "plugins/yellow-review/agents/review/code-reviewer.md",
+    "plugins/yellow-review/skills/pr-review-workflow/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0e/5599fee94d/0/metadata.json",
+      "transcript": "/0e/5599fee94d/0/full.jsonl",
+      "content_hash": "/0e/5599fee94d/0/content_hash.txt",
+      "prompt": "/0e/5599fee94d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 2937,
+    "cache_creation_tokens": 3323705,
+    "cache_read_tokens": 66501338,
+    "output_tokens": 265794,
+    "api_call_count": 188
+  }
+}
