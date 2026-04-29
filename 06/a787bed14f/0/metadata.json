@@ -3,52 +3,37 @@
   "checkpoint_id": "06a787bed14f",
   "session_id": "5e0a2dc7-736f-4eed-8a60-d404fee4dcdb",
   "strategy": "manual-commit",
-  "created_at": "2026-04-29T14:38:01.970565776Z",
+  "created_at": "2026-04-29T14:39:03.396817916Z",
   "branch": "agent/feat/knowledge-compounder-track-schema",
   "checkpoints_count": 0,
   "files_touched": [
-    "plugins/yellow-core/agents/workflow/knowledge-compounder.md",
-    "scripts/backfill-solution-frontmatter.js",
-    "docs/solutions/code-quality/yellow-ci-shell-security-patterns.md",
-    "docs/solutions/workflow/plugin-release-process.md",
-    "docs/solutions/security-issues/yellow-devin-plugin-security-audit.md",
-    ".changeset/knowledge-compounder-track-schema.md",
     "plans/everyinc-merge.md"
   ],
   "agent": "Claude Code",
   "model": "",
   "turn_id": "88e1d7bfe434",
-  "checkpoint_transcript_start": 2033,
-  "transcript_lines_at_start": 2033,
+  "checkpoint_transcript_start": 2295,
+  "transcript_lines_at_start": 2295,
   "token_usage": {
-    "input_tokens": 22,
-    "cache_creation_tokens": 489523,
-    "cache_read_tokens": 8497073,
-    "output_tokens": 24282,
-    "api_call_count": 18
+    "input_tokens": 2,
+    "cache_creation_tokens": 2580,
+    "cache_read_tokens": 1038694,
+    "output_tokens": 1754,
+    "api_call_count": 2
   },
   "session_metrics": {
     "turn_count": 2
   },
   "initial_attribution": {
-    "calculated_at": "2026-04-29T14:38:01.907312708Z",
-    "agent_lines": 529,
-    "agent_removed": 3,
-    "human_added": 100,
+    "calculated_at": "2026-04-29T14:39:03.336549371Z",
+    "agent_lines": 1,
+    "agent_removed": 1,
+    "human_added": 628,
     "human_modified": 0,
     "human_removed": 0,
     "total_committed": 629,
     "total_lines_changed": 632,
-    "agent_percentage": 84.17721518987342,
+    "agent_percentage": 0.31645569620253167,
     "metric_version": 2
-  },
-  "prompt_attributions": [
-    {
-      "checkpoint_number": 1,
-      "user_lines_added": 0,
-      "user_lines_removed": 0,
-      "agent_lines_added": 0,
-      "agent_lines_removed": 0
-    }
-  ]
+  }
 }
