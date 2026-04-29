@@ -112,11 +112,13 @@ function fmHasField(fmRaw, key) {
 // derivation. Distinct from fmHasField, which only checks key presence.
 function fmHasNonEmptyField(fmRaw, key) {
   if (!fmHasField(fmRaw, key)) return false;
-  const value = fmGetScalar(fmRaw, key);
-  if (value && value.trim().length > 0) return true;
-  // For list-style keys (tags), check the parser explicitly.
+  // For list-style keys (tags), check the parser explicitly. fmGetScalar
+  // returns the raw inline string (e.g. '[]' for `tags: []`, 2 chars) which
+  // would pass a length check below and short-circuit the parser fallback,
+  // letting empty tag lists masquerade as "already complete".
   if (key === 'tags') return parseTagsList(fmRaw).length > 0;
-  return false;
+  const value = fmGetScalar(fmRaw, key);
+  return value !== null && value.trim().length > 0;
 }
 
 function escapeRe(s) {
@@ -254,14 +256,15 @@ function deriveProblem(fmRaw, body) {
 }
 
 function deriveTags(fmRaw, category) {
-  // If `tags:` already exists with at least one entry, leave it alone.
-  if (fmHasField(fmRaw, 'tags')) {
-    const existing = parseTagsList(fmRaw);
-    if (existing.length > 0) return null; // no change needed
-  }
+  // If `tags:` already exists, never inject. Two cases:
+  //   - At least one parseable entry: leave it alone.
+  //   - Zero parseable items (bare `tags:`, `tags: []`, malformed list):
+  //     do NOT inject a second `tags:` block — that would produce duplicate
+  //     YAML keys. Operator must expand the existing key by hand.
+  if (fmHasField(fmRaw, 'tags')) return null;
 
-  // Seed minimum tags from the category as a fallback. Operators
-  // should expand by hand.
+  // Seed minimum tags from the category as a fallback when the key is
+  // missing entirely. Operators should expand by hand.
   return [category];
 }
 
@@ -401,7 +404,13 @@ function processEntry(filePath) {
   }
 
   const newFm = injectFrontmatter(parsed.fmRaw, additions);
-  const newText = `---\n${newFm}\n---\n${parsed.body}`;
+  // Preserve the original line ending around the `---` delimiters so a CRLF
+  // file does not produce mixed line endings. injectFrontmatter already
+  // preserves CRLF inside the frontmatter body, and `parsed.body` retains its
+  // original endings — only the delimiter newlines need explicit handling.
+  const lineEndingMatch = parsed.full.match(/\r?\n/);
+  const lineEnding = lineEndingMatch ? lineEndingMatch[0] : '\n';
+  const newText = `---${lineEnding}${newFm}${lineEnding}---${lineEnding}${parsed.body}`;
 
   if (!DRY_RUN && !CHECK_MODE) {
     // Atomic write: write to a sibling temp file, then rename. A partial
