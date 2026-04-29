@@ -1125,7 +1125,7 @@ Before each wave's implementation session begins:
 | `plugins/yellow-research/commands/research/{code,setup}.md` | W1 | Remove context7 |
 | `plugins/yellow-research/CLAUDE.md` | W1 | Remove context7 optional-dep |
 | `plugins/yellow-review/agents/review/{code-reviewer (→W2.5),code-simplifier,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md` | W1 | Strip Bash from `tools:` |
-| `plugins/yellow-codex/agents/review/codex-reviewer.md` | W1 | Strip Bash |
+| `plugins/yellow-codex/agents/review/codex-reviewer.md` | W1 | Document Bash exception (KEEPS Bash; agent body adds "Tool Surface — Documented Bash Exception" section explaining `codex exec` rationale) |
 | `plugins/yellow-review/agents/workflow/pr-comment-resolver.md` | W1 | Untrusted-input fencing |
 | `plugins/yellow-core/agents/workflow/knowledge-compounder.md` | W2.0a | track/tags/problem schema; context budget precheck |
 | `plugins/yellow-debt/agents/scanners/{ai-pattern,architecture,complexity,duplication,security-debt}-scanner.md` | W3.13b | Confidence calibration + failure_scenario field |
