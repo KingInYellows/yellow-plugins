@@ -1,0 +1,52 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "a1321d0ad7b9",
+  "session_id": "5e0a2dc7-736f-4eed-8a60-d404fee4dcdb",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T05:49:43.111975424Z",
+  "branch": "agent/chore/remove-context7-mcp",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".changeset/unbundle-context7-mcp.md",
+    "docs/mcp-tool-naming-verification.md",
+    "plans/everyinc-merge.md",
+    "plugins/yellow-core/.claude-plugin/plugin.json",
+    "plugins/yellow-core/CLAUDE.md",
+    "plugins/yellow-core/README.md",
+    "plugins/yellow-core/agents/research/best-practices-researcher.md",
+    "plugins/yellow-core/commands/statusline/setup.md",
+    "plugins/yellow-research/CLAUDE.md",
+    "plugins/yellow-research/README.md",
+    "plugins/yellow-research/agents/research/code-researcher.md",
+    "plugins/yellow-research/commands/research/code.md",
+    "plugins/yellow-research/commands/research/setup.md",
+    "plugins/yellow-research/skills/research-patterns/SKILL.md"
+  ],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "b1ef198db746",
+  "checkpoint_transcript_start": 591,
+  "transcript_lines_at_start": 591,
+  "token_usage": {
+    "input_tokens": 76,
+    "cache_creation_tokens": 73977,
+    "cache_read_tokens": 9363224,
+    "output_tokens": 35162,
+    "api_call_count": 33
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-29T05:49:43.078583549Z",
+    "agent_lines": 0,
+    "agent_removed": 0,
+    "human_added": 76,
+    "human_modified": 77,
+    "human_removed": 0,
+    "total_committed": 76,
+    "total_lines_changed": 153,
+    "agent_percentage": 0,
+    "metric_version": 2
+  }
+}

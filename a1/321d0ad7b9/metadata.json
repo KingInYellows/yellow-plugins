@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "a1321d0ad7b9",
+  "strategy": "manual-commit",
+  "branch": "agent/chore/remove-context7-mcp",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".changeset/unbundle-context7-mcp.md",
+    "docs/mcp-tool-naming-verification.md",
+    "plans/everyinc-merge.md",
+    "plugins/yellow-core/.claude-plugin/plugin.json",
+    "plugins/yellow-core/CLAUDE.md",
+    "plugins/yellow-core/README.md",
+    "plugins/yellow-core/agents/research/best-practices-researcher.md",
+    "plugins/yellow-core/commands/statusline/setup.md",
+    "plugins/yellow-research/CLAUDE.md",
+    "plugins/yellow-research/README.md",
+    "plugins/yellow-research/agents/research/code-researcher.md",
+    "plugins/yellow-research/commands/research/code.md",
+    "plugins/yellow-research/commands/research/setup.md",
+    "plugins/yellow-research/skills/research-patterns/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/a1/321d0ad7b9/0/metadata.json",
+      "transcript": "/a1/321d0ad7b9/0/full.jsonl",
+      "content_hash": "/a1/321d0ad7b9/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 76,
+    "cache_creation_tokens": 73977,
+    "cache_read_tokens": 9363224,
+    "output_tokens": 35162,
+    "api_call_count": 33
+  }
+}
