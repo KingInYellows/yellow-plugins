@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "18afa31d69df",
+  "strategy": "manual-commit",
+  "branch": "agent/chore/strip-bash-from-reviewers",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".changeset/strip-bash-from-reviewers.md",
+    "plans/everyinc-merge.md",
+    "plugins/yellow-codex/agents/review/codex-reviewer.md",
+    "plugins/yellow-core/agents/review/architecture-strategist.md",
+    "plugins/yellow-core/agents/review/code-simplicity-reviewer.md",
+    "plugins/yellow-core/agents/review/pattern-recognition-specialist.md",
+    "plugins/yellow-core/agents/review/performance-oracle.md",
+    "plugins/yellow-core/agents/review/polyglot-reviewer.md",
+    "plugins/yellow-core/agents/review/security-sentinel.md",
+    "plugins/yellow-core/agents/review/test-coverage-analyst.md",
+    "plugins/yellow-review/agents/review/code-reviewer.md",
+    "plugins/yellow-review/agents/review/code-simplifier.md",
+    "plugins/yellow-review/agents/review/comment-analyzer.md",
+    "plugins/yellow-review/agents/review/pr-test-analyzer.md",
+    "plugins/yellow-review/agents/review/silent-failure-hunter.md",
+    "plugins/yellow-review/agents/review/type-design-analyzer.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/18/afa31d69df/0/metadata.json",
+      "transcript": "/18/afa31d69df/0/full.jsonl",
+      "content_hash": "/18/afa31d69df/0/content_hash.txt",
+      "prompt": ""
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 18,
+    "cache_creation_tokens": 958548,
+    "cache_read_tokens": 5099248,
+    "output_tokens": 24312,
+    "api_call_count": 18
+  }
+}
