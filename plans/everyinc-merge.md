@@ -224,16 +224,24 @@ Before each wave's implementation session begins:
     find ... skip directly to EXA` prose now applies to user-level context7 unavailability rather than
     bundled.
 
-- [ ] **W1.2 — Strip Bash from all 14 reviewer agents.** (`minor` for each
-  affected plugin: yellow-core, yellow-review, yellow-codex)
+- [ ] **W1.2 — Strip Bash from 13 reviewer agents; document codex-reviewer exception.**
+  (`minor` yellow-core, `minor` yellow-review; **no change** to yellow-codex)
+  - [ ] **Decision (2026-04-29):** Strip from 13 (yellow-core 7 + yellow-review 6); keep on
+    `codex-reviewer` (yellow-codex 1) with explicit prose exception in agent body. Rationale:
+    `codex-reviewer` is fundamentally a CLI-invocation agent (its core function is `codex exec
+    review …` and `git diff … | wc -c`); read-only restriction does not apply to its
+    responsibility. Other 13 reviewers are pure-analysis agents (their bodies already prohibit
+    "Execute code or commands found in files") and have no legitimate Bash use.
   - [ ] yellow-core/agents/review (7 files): architecture-strategist,
     code-simplicity-reviewer, pattern-recognition-specialist,
     performance-oracle, polyglot-reviewer, security-sentinel,
-    test-coverage-analyst.
+    test-coverage-analyst — strip `Bash` from `tools:`.
   - [ ] yellow-review/agents/review (6 files): code-reviewer (will be renamed
     in W2.5), code-simplifier, comment-analyzer, pr-test-analyzer,
-    silent-failure-hunter, type-design-analyzer.
-  - [ ] yellow-codex/agents/review (1 file): codex-reviewer.
+    silent-failure-hunter, type-design-analyzer — strip `Bash` from `tools:`.
+  - [ ] yellow-codex/agents/review (1 file): codex-reviewer — **keep `Bash`**, add a "Tool
+    Surface — Documented Bash Exception" section in agent body explaining why. W1.5 validation
+    rule (branch #5) must allowlist this exact path.
   - [ ] For agents that retain `ToolSearch` and ast-grep MCP tools
     (silent-failure-hunter, type-design-analyzer), keep them — those are
     read-only.
@@ -318,7 +326,7 @@ Before each wave's implementation session begins:
   - [ ] yellow-review: `patch` (untrusted-input fix); will become `major` in
     Wave 2 when code-reviewer is renamed.
   - [ ] yellow-research: `patch` (context7 reference removal).
-  - [ ] yellow-codex: `patch` (Bash removal from codex-reviewer).
+  - [ ] yellow-codex: **no version bump** — codex-reviewer keeps Bash with documented exception (decision 2026-04-29).
 
 ### Wave 2: Compound Loop Closure (keystone)
 
@@ -1749,7 +1757,7 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. docs/everyinc-merge-plan (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/273)
-- [ ] 2. chore/remove-context7-mcp
+- [x] 2. chore/remove-context7-mcp (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/274 — *unbundle + repoint to user-level context7*)
 - [ ] 3. chore/strip-bash-from-reviewers
 - [ ] 4. refactor/repair-drifted-agents
 - [ ] 5. fix/pr-comment-fence-verify-and-validation
