@@ -2,9 +2,20 @@
 title: Shell Binary Downloader Security Patterns
 date: 2026-04-03
 category: security-issues
+track: knowledge
+problem: 'Shell binary downloader patterns (curl + checksum + cache) are reusable across plugins; document defenses against eval-injection, exit-code masking, and cache poisoning'
 tags: [eval-injection, curl-fail, pipefail, exit-code-masking, cache-poisoning]
 components: [yellow-codacy]
 ---
+
+<!--
+backfill note (2026-04-29 W2.0a review): manually classified as `track: knowledge`
+rather than the security-issues default of `track: bug`. This entry documents
+*reusable patterns* discovered during a multi-agent review of PR #241, not a
+specific defect that was found and fixed. Same shape as
+`yellow-devin-plugin-security-audit.md` (also overridden to knowledge during
+the W2.0a review pass).
+-->
 
 # Shell Binary Downloader Security Patterns
 

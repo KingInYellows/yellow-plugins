@@ -2,6 +2,8 @@
 title: "Brainstorm-Orchestrator Agent Authoring Patterns — Review Findings from PR #45"
 date: 2026-02-23
 category: code-quality
+track: knowledge
+problem: 'Brainstorm-Orchestrator Agent Authoring Patterns — Review Findings from PR #45'
 tags:
   - agent-authoring
   - brainstorm-orchestrator

@@ -2,6 +2,10 @@
 title: 'Structured Filename Glob Counting Bugs'
 date: 2026-02-25
 category: 'logic-errors'
+track: bug
+problem: 'Structured Filename Glob Counting Bugs'
+tags:
+  - logic-errors
 ---
 
 # Structured Filename Glob Counting Bugs

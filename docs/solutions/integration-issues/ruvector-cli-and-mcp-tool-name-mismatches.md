@@ -1,6 +1,8 @@
 ---
 title: 'ruvector CLI commands and MCP tool names were fictitious'
 category: integration-issues
+track: knowledge
+problem: 'ruvector CLI commands and MCP tool names were fictitious'
 date: 2026-02-18
 tags:
   - ruvector

@@ -2,6 +2,8 @@
 title: Stale Env Var Docs and Prose Count Drift in Top-Level README
 date: 2026-03-01
 category: code-quality
+track: knowledge
+problem: 'Stale Env Var Docs and Prose Count Drift in Top-Level README'
 tags: [pr-review, documentation, env-vars, devin, readme, resolve-pr-parallel, file-ownership]
 severity: minor
 component: README.md

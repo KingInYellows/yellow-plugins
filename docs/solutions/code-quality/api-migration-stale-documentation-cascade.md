@@ -2,6 +2,8 @@
 title: 'API Migration Stale Documentation Cascade'
 date: 2026-03-03
 category: 'code-quality'
+track: knowledge
+problem: 'API Migration Stale Documentation Cascade'
 tags:
   - api-migration
   - stale-documentation

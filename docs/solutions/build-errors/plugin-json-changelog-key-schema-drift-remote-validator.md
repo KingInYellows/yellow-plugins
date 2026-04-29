@@ -1,6 +1,8 @@
 ---
 title: "Claude Code Plugin Validator Rejects Unknown changelog Key in plugin.json"
 category: build-errors
+track: bug
+problem: 'Claude Code Plugin Validator Rejects Unknown changelog Key in plugin.json'
 tags:
   - plugin-manifest
   - schema-validation

@@ -2,6 +2,8 @@
 title: "Stale Plan Documents Committed After Implementation"
 date: "2026-03-07"
 category: "code-quality"
+track: knowledge
+problem: 'Stale Plan Documents Committed After Implementation'
 tags:
   - stale-documentation
   - plan-docs

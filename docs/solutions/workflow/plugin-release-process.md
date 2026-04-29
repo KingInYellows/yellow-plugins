@@ -1,3 +1,23 @@
+---
+title: 'Plugin Release Process — Version Bumps Required for Distribution'
+date: 2026-03-11
+category: workflow
+track: bug
+problem: 'Merged plugin features are invisible to other installations until a deliberate version bump and release are cut'
+tags:
+  - release
+  - version-management
+  - marketplace
+  - changesets
+  - distribution
+  - workflow
+severity: P1
+components:
+  - .changeset/
+  - scripts/sync-manifests.js
+  - .claude-plugin/marketplace.json
+---
+
 # Plugin Release Process — Version Bumps Required for Distribution
 
 **Date:** 2026-03-11

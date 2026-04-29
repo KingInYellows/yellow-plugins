@@ -1,6 +1,8 @@
 ---
 title: 'Duplicate PR Link Comments in linear-pr-linker Agent'
 category: logic-errors
+track: bug
+problem: 'linear-pr-linker agent creates duplicate ''PR linked: ...'' comments on Linear'
 tags:
   - linear-plugin
   - agent-tools

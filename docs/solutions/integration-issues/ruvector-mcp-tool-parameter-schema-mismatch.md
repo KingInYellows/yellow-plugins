@@ -2,6 +2,8 @@
 title: 'ruvector MCP Tool Parameter Schema Mismatch'
 date: 2026-02-24
 category: integration-issues
+track: knowledge
+problem: 'ruvector MCP Tool Parameter Schema Mismatch'
 tags:
   - ruvector
   - mcp-tools

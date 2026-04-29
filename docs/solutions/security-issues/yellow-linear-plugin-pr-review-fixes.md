@@ -2,6 +2,8 @@
 title:
   'Yellow-Linear Plugin PR Review Resolution: 21 Automated Reviewer Comments'
 category: security-issues
+track: bug
+problem: '21 unresolved PR threads from automated reviewers (Gemini, CodeAnt, Copilot) on yellow-linear plugin: missing $ARGUMENTS, weak regex, no C1 validation'
 tags:
   - pr-review
   - plugin-validation

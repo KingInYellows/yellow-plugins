@@ -2,6 +2,8 @@
 title: Setup-All Classification Block and Probe List Must Stay in Sync
 date: 2026-04-26
 category: code-quality
+track: knowledge
+problem: 'Setup-All Classification Block and Probe List Must Stay in Sync'
 tags: [agent-authoring, setup, classification, probe, coupling, plugin-authoring]
 components: [yellow-core]
 pr: '#265'

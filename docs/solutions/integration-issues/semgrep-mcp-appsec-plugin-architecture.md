@@ -2,6 +2,8 @@
 title: "yellow-semgrep: Hybrid MCP + REST API Plugin for Automated Finding Remediation"
 date: "2026-03-03"
 category: integration-issues
+track: knowledge
+problem: 'yellow-semgrep: Hybrid MCP + REST API Plugin for Automated Finding Remediation'
 tags:
   - semgrep
   - sast

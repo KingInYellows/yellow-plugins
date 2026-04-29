@@ -1,6 +1,8 @@
 ---
 title: "Plugin Review Defensive Authoring Patterns"
 category: code-quality
+track: knowledge
+problem: 'Plugin Review Defensive Authoring Patterns'
 date: 2026-03-10
 tags:
   - plugin-authoring

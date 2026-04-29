@@ -1,6 +1,8 @@
 ---
 title: 'Yellow-Devin Plugin Security Audit: Pre-Implementation Threat Analysis'
 category: security-issues
+track: knowledge
+problem: 'Pre-implementation threat model for the yellow-devin plugin: 21 security concerns across 6 categories before any code shipped'
 tags:
   - security-audit
   - devin-integration
@@ -15,6 +17,15 @@ module: plugins/yellow-devin
 date: 2026-02-10
 status: audit
 ---
+
+<!--
+backfill note (2026-04-29 W2.0a): manually classified as `track: knowledge`
+rather than the security-issues default of `track: bug`. This is a
+*pre-implementation threat model*, not a post-fix bug write-up — the audit
+identified concerns *before* any code was written. The heuristic in
+scripts/backfill-solution-frontmatter.js correctly flagged it for manual
+review via the "audit" / "pre-implementation" marker check.
+-->
 
 # Yellow-Devin Plugin Security Audit
 
