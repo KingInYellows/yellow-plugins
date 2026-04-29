@@ -321,10 +321,10 @@ Tool name: mcp__context7__resolve-library-id
 Test call: mcp__context7__resolve-library-id with libraryName: "react"
 ```
 
-If the user-level Context7 MCP is not installed, the probe records `INACTIVE` and
-the install hint is `/plugin install context7@upstash` (or per Claude Code MCP
-settings UI). yellow-core no longer bundles context7 (removed 2026-04-29 to avoid
-the dual-OAuth pop-up issue).
+If the user-level Context7 MCP is not installed, the probe records
+`UNAVAILABLE` and the install hint is `/plugin install context7@upstash`
+(or per Claude Code MCP settings UI). yellow-core no longer bundles
+context7 (removed 2026-04-29 to avoid the dual-OAuth pop-up issue).
 
 **Grep MCP** (global — GitHub code pattern search):
 
