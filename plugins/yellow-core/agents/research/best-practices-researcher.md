@@ -47,14 +47,16 @@ generic external sources.
 3. Extract patterns: "Do" / "Don't" guidelines, code templates, conventions.
 4. Assess coverage:
    - Skills give **comprehensive** guidance → summarize and deliver; skip
-     Phase 2 unless gaps remain.
+     Phase 1, Phase 1.5, and Phase 2 unless gaps remain (the skill-derived
+     answer is sufficient and the curated/external lookups would add no
+     value).
    - Skills give **partial** guidance → note what's covered, proceed to
      Phase 1 + Phase 1.5 + Phase 2 for gaps.
    - **No relevant skills** → proceed to Phase 1 + Phase 1.5 + Phase 2.
 
 ### Phase 1: Curated Knowledge Check
 
-1. **Check Available Skills:** First, use ToolSearch to detect whether
+1. **Check Context7 Availability:** Use ToolSearch to detect whether
    user-level Context7 is installed (`mcp__context7__resolve-library-id`). If
    present, prefer it for official documentation lookup; if absent, fall
    through to WebSearch / WebFetch on authoritative domains. Context7 is a

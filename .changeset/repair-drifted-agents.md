@@ -8,7 +8,7 @@ Brings 4 research/workflow agents to parity with upstream EveryInc patterns (loc
 
 - **`best-practices-researcher`** — added Phase 0 skill discovery step; now checks `.claude/skills/`, `~/.claude/skills/`, and `plugins/*/skills/` for curated knowledge before going to MCP/web. Skill-based guidance outranks generic external sources.
 - **`repo-research-analyst`** — added Phase 0 Technology & Infrastructure Scan with manifest-to-ecosystem mapping table, monorepo detection, deployment / API surface / data layer detection (each conditional on what 0.1 finds). Grounds all subsequent research in a known stack.
-- **`git-history-analyzer`** — added "Note: The current year is 2026" preamble for time-based query interpretation.
+- **`git-history-analyzer`** — added a "do not assume a hardcoded year" preamble that instructs the agent to call `date '+%Y-%m-%d'` to dynamically resolve the current date for time-based query interpretation, avoiding hardcoded-year drift.
 - **`spec-flow-analyzer`** — added Phase 0 codebase grounding step before the existing 4 phases. "Gaps are only gaps if the codebase doesn't already handle them" — reduces generic feedback in spec reviews.
 - **`performance-oracle`** — added "Role Split" section pointing to new `performance-reviewer` companion. Oracle stays as the deep analyzer (algorithmic complexity, scaling projections, benchmarking guidance); reviewer handles review-time confidence-calibrated findings.
 - **`security-sentinel`** — added "Role Split" section pointing to new `security-reviewer` (review-time code) and `security-lens` (plan-level architect). Sentinel stays as the broad OWASP-Top-10 audit agent.
