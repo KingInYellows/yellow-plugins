@@ -132,7 +132,7 @@ aggregation rules change there, propagate the same change here.
    `architecture-strategist`, `pattern-recognition-specialist`,
    `code-simplicity-reviewer`, `polyglot-reviewer`) return legacy prose
    format — do NOT drop these as malformed; they are normalized to
-   compact-return in Step 8 sub-step 0 before validation. Drop only
+   compact-return in Step 8 sub-step 1 before validation. Drop only
    returns that fail validation after normalization; record drop count.
 
 8. **Aggregate findings** (mirrors review-pr.md Step 6): apply the
@@ -170,9 +170,11 @@ aggregation rules change there, propagate the same change here.
    Run intent-verification quality gates (line accuracy,
    protected-artifact filter, skim-FP check) before any P0/P1 surfaces.
 
-9. **Apply fixes pass 1** (mirrors review-pr.md Step 7): apply only
-   `safe_auto → review-fixer` findings with concrete `suggested_fix`
-   sequentially via Edit.
+9. **Apply fixes pass 1** (mirrors review-pr.md Step 7): for surviving
+   **P0/P1** findings with `autofix_class: safe_auto → review-fixer` and a
+   concrete `suggested_fix`, apply sequentially via Edit. P2/P3 findings
+   are not auto-applied here — they go through the resolve-PR flow at
+   Step 12 instead. Parity rule with `review-pr.md` Step 7.
 
 10. **Code simplifier pass 2** (mirrors review-pr.md Step 8): launch
     `code-simplifier` on the now-modified code; apply P0/P1
@@ -204,9 +206,11 @@ aggregation rules change there, propagate the same change here.
 
 14. **Knowledge compounding** (mirrors review-pr.md Step 9a + 9b):
     automatic — when P0/P1/P2 findings exist, spawn
-    `knowledge-compounder` and (when ruvector is available) record the
-    learning with proper deduplication. On failure, log a warning and
-    continue.
+    `knowledge-compounder`. When ruvector is available, record per-finding
+    using the same tiered-remember rules as `review-pr.md` Step 9b: **auto**
+    record P0/P1, **prompted** record P2 (via `AskUserQuestion` with default
+    yes), **skip** P3 entirely. Apply proper deduplication. On failure, log
+    a warning and continue.
 
 ### Step 5: Final Summary
 
