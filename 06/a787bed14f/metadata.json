@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "06a787bed14f",
+  "strategy": "manual-commit",
+  "branch": "agent/feat/knowledge-compounder-track-schema",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".changeset/knowledge-compounder-track-schema.md",
+    "docs/solutions/code-quality/yellow-ci-shell-security-patterns.md",
+    "docs/solutions/security-issues/yellow-devin-plugin-security-audit.md",
+    "docs/solutions/workflow/plugin-release-process.md",
+    "plans/everyinc-merge.md",
+    "plugins/yellow-core/agents/workflow/knowledge-compounder.md",
+    "scripts/backfill-solution-frontmatter.js"
+  ],
+  "sessions": [
+    {
+      "metadata": "/06/a787bed14f/0/metadata.json",
+      "transcript": "/06/a787bed14f/0/full.jsonl",
+      "content_hash": "/06/a787bed14f/0/content_hash.txt",
+      "prompt": "/06/a787bed14f/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 489523,
+    "cache_read_tokens": 8497073,
+    "output_tokens": 24282,
+    "api_call_count": 18
+  }
+}
