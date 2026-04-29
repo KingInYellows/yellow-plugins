@@ -193,7 +193,14 @@ function collectIndentedContinuation(fmRaw, key) {
 }
 
 function stripWrappingQuotes(s) {
-  return s.replace(/^['"]|['"]$/g, '');
+  // Detect single-quoted form before stripping so we can decode YAML's
+  // `''` → `'` escape convention. Without this, a value like
+  // `title: 'It''s broken'` round-trips through fmGetScalar →
+  // injectFrontmatter as `It''''s broken` (re-escape doubles already-escaped
+  // apostrophes), corrupting the derived `problem` field.
+  const isSingleQuoted = s.length >= 2 && s.startsWith("'") && s.endsWith("'");
+  const stripped = s.replace(/^['"]|['"]$/g, '');
+  return isSingleQuoted ? stripped.replace(/''/g, "'") : stripped;
 }
 
 function deriveCategory(filePath) {
@@ -388,17 +395,33 @@ function processEntry(filePath) {
   const tags = deriveTags(parsed.fmRaw, category);
   if (tags !== null) additions.tags = tags;
 
-  // If derivation produced no additions (e.g., all keys present-but-empty
-  // and we don't double-inject), there is nothing to do. Flag for review
-  // rather than counting as modified — a present-but-empty field is a
-  // sign of operator action needed, not a clean state.
-  if (Object.keys(additions).length === 0) {
+  // Flag any required field that is present-but-empty BEFORE checking the
+  // additions count. Otherwise a file with (e.g.) empty `problem:` and no
+  // `track:` would inject only `track`, report as `modified`, and ship with
+  // an unresolved empty `problem` — the manual-review gate must trigger
+  // whenever a required field would remain incomplete after this run,
+  // regardless of whether other additions were made.
+  const presentButEmpty = [];
+  if (hasTrackKey && !hasTrack) presentButEmpty.push('track');
+  if (hasProblemKey && !hasProblem) presentButEmpty.push('problem');
+  if (presentButEmpty.length > 0) {
     RESULTS.flaggedForReview.push({
       file: path.relative(ROOT, filePath),
       category,
       reason:
-        'present-but-empty-fields: track/problem keys exist but have no ' +
-        'value, and the gate prevents double-injection. Set values manually.',
+        `present-but-empty-fields:${presentButEmpty.join(',')}: ` +
+        'required keys exist but have no value, and the gate prevents ' +
+        'double-injection. Set values manually.',
+    });
+    return;
+  }
+
+  // If derivation produced no additions, there is nothing to do.
+  if (Object.keys(additions).length === 0) {
+    RESULTS.flaggedForReview.push({
+      file: path.relative(ROOT, filePath),
+      category,
+      reason: 'no-additions-derivable: all required keys present and tags unchanged.',
     });
     return;
   }

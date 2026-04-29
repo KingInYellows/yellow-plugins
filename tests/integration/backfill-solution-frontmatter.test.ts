@@ -156,6 +156,21 @@ describe('backfill-solution-frontmatter — --check exit code contract', () => {
 
     expect(status).toBe(0);
   });
+
+  it('exits 3 when entries are flagged for manual review (security-issues with audit marker)', () => {
+    writeEntry(
+      tmpRoot,
+      'security-issues',
+      'audit-flagged',
+      `title: 'Threat-model audit of payment flow'\ncategory: security-issues\ndate: 2026-04-29\ntags: [audit]`,
+      '\nThis is a threat-model audit of the payment flow.\n'
+    );
+
+    const { status, stdout } = runScript(tmpRoot, ['--check']);
+
+    expect(status).toBe(3);
+    expect(stdout).toMatch(/flagged for manual review/);
+  });
 });
 
 describe('backfill-solution-frontmatter — injectFrontmatter placement', () => {
