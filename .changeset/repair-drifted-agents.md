@@ -2,7 +2,7 @@
 "yellow-core": minor
 ---
 
-Repair 6 drifted research/review agents and split performance + security into specialized roles
+Repair 4 drifted research/workflow agents, modify 2 review agents, and split performance + security into specialized roles
 
 Brings 4 research/workflow agents to parity with upstream EveryInc patterns (locked at `compound-engineering-v3.3.2`, SHA `e5b397c9d1883354f03e338dd00f98be3da39f9f`) and splits the deep-analyzer agents `performance-oracle` and `security-sentinel` into multi-role agent families:
 
