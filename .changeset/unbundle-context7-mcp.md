@@ -1,6 +1,6 @@
 ---
-"yellow-core": minor
-"yellow-research": minor
+"yellow-core": patch
+"yellow-research": patch
 ---
 
 Unbundle context7 MCP from yellow-core; repoint yellow-research callers to user-level
