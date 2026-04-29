@@ -85,10 +85,24 @@ If the fetch fails (network error, missing remote): log
 the locally cached <baseRefName>` to stderr and continue. Do not abort —
 review value with a stale base is still high.
 
-Use `origin/<baseRefName>` as the diff base in Step 5 reviewer prompts:
+Use `origin/<baseRefName>` as the diff base in Step 5 reviewer prompts.
+When the fetch failed AND the remote-tracking ref is absent locally
+(fresh clone, renamed remote, transient network issue), fall back to the
+local `<baseRefName>` if it exists; otherwise abort the review with
+`[review:pr] Error: no usable base ref (origin/<baseRefName> and
+<baseRefName> both absent)` so reviewers do not diff against `HEAD~`
+silently:
 
 ```bash
-DIFF_BASE="origin/<baseRefName>"
+if git rev-parse --verify --quiet "origin/<baseRefName>" >/dev/null; then
+  DIFF_BASE="origin/<baseRefName>"
+elif git rev-parse --verify --quiet "<baseRefName>" >/dev/null; then
+  DIFF_BASE="<baseRefName>"
+  printf '[review:pr] Warning: origin/<baseRefName> unavailable; falling back to local <baseRefName>\n' >&2
+else
+  printf '[review:pr] Error: no usable base ref (origin/<baseRefName> and <baseRefName> both absent)\n' >&2
+  exit 1
+fi
 ```
 
 ### Step 3b: Query institutional memory (optional)
@@ -389,13 +403,27 @@ malformed value, wrong type), drop the entire return. Record drop count in
 Coverage.
 
 Pre-Wave-2 agents that have not been migrated to compact-return yet
-(`pr-test-analyzer`, `comment-analyzer`, `code-simplifier`,
-`type-design-analyzer`, `silent-failure-hunter` and the `code-reviewer`
-deprecation stub) continue to use the legacy prose finding format. The
-aggregator in Step 6 normalizes legacy prose findings into the structured
-schema by inferring `confidence: 75`, `autofix_class: gated_auto`,
-`owner: downstream-resolver`, and `requires_verification: true` defaults
-when fields are absent.
+continue to use the legacy prose finding format. This list is exhaustive
+across the dispatch table — both yellow-review's own agents AND the
+yellow-core / cross-plugin reviewers that Step 4 may dispatch must be
+normalized, otherwise their findings are silently dropped on diffs that
+trigger them:
+
+- yellow-review own: `pr-test-analyzer`, `comment-analyzer`,
+  `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`, and
+  the `code-reviewer` deprecation stub.
+- yellow-core cross-plugin: `architecture-strategist`,
+  `pattern-recognition-specialist`, `code-simplicity-reviewer`,
+  `polyglot-reviewer` (selected on cross-module / large / multi-language
+  diffs).
+
+The aggregator in Step 6 normalizes legacy prose findings into the
+structured schema by inferring `confidence: 75`, `autofix_class:
+gated_auto`, `owner: downstream-resolver`, `requires_verification: true`,
+and `pre_existing: false` defaults when fields are absent. Keep this list
+in sync with Step 6 sub-step 0 below — adding a Wave-2 conditional
+reviewer that emits prose without listing it in both places means its
+findings are dropped as malformed.
 
 Wait for all dispatched agents. Log any failed agents with error reason.
 If zero agents succeed, abort with error.
@@ -404,6 +432,36 @@ If zero agents succeed, abort with error.
 
 Apply the aggregation steps from
 `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md` in order:
+
+0. **Normalize legacy prose returns.** Pre-Wave-2 agents emit findings
+   as the legacy prose format (`**[P0|P1|P2|P3] category — file:line**`
+   followed by `Finding:` / `Fix:` lines), not the structured JSON
+   schema. The exhaustive list (must match Step 5 above):
+
+   - yellow-review own: `pr-test-analyzer`, `comment-analyzer`,
+     `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`,
+     and the `code-reviewer` deprecation stub.
+   - yellow-core cross-plugin: `architecture-strategist`,
+     `pattern-recognition-specialist`, `code-simplicity-reviewer`,
+     `polyglot-reviewer`.
+
+   **Convert these to the compact-return schema BEFORE Step 1 validation
+   runs** — otherwise the validator drops them as malformed and every
+   legacy reviewer's findings are silently lost. For each prose finding:
+   - Parse severity from the bracket (`P0`/`P1`/`P2`/`P3`)
+   - Parse `category` from the prefix word
+   - Parse `file:line` from the trailing token
+   - Use the `Finding:` line as `title` and the `Fix:` line as
+     `suggested_fix` (null when absent)
+   - Infer defaults: `confidence: 75`, `autofix_class: gated_auto`,
+     `owner: downstream-resolver`, `requires_verification: true`,
+     `pre_existing: false`
+   - Wrap each agent's converted findings in the top-level envelope
+     (`reviewer`, `findings`, `residual_risks`, `testing_gaps`) so it
+     enters Step 1 indistinguishable from a structured return.
+
+   Returns that already conform to the structured schema pass through
+   this step unchanged.
 
 1. **Validate.** Drop malformed returns. Required fields:
    - **Top-level required:** `reviewer`, `findings`, `residual_risks`,
