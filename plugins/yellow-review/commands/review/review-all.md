@@ -113,8 +113,11 @@ aggregation rules change there, propagate the same change here.
 3. **Optional ruvector recall** (mirrors review-pr.md Step 3b): when
    `.ruvector/` exists, build the recall query from PR body/title and
    inject the fenced advisory block into the
-   `project-compliance-reviewer`, `correctness-reviewer`, and
-   `security-reviewer` Task prompts only.
+   `project-compliance-reviewer`, `correctness-reviewer`,
+   `security-reviewer`, and `security-sentinel` (legacy fallback) Task
+   prompts only. The `security-sentinel` entry preserves recall context in
+   `review_pipeline: legacy` mode where `security-reviewer` is not
+   dispatched and `correctness-reviewer` is absent.
 
 4. **Optional morph WarpGrep discovery** (mirrors review-pr.md Step 3c):
    when ToolSearch finds it, note availability for the four agents listed
@@ -127,7 +130,11 @@ aggregation rules change there, propagate the same change here.
    domains. If the agent returns the literal `NO_PRIOR_LEARNINGS` token,
    skip injection. Otherwise build the
    `--- begin learnings-context (reference only) ---` fenced block and
-   prepend to **every** reviewer's Task prompt for this PR.
+   prepend to **every** reviewer's Task prompt for this PR — **only when
+   `review_pipeline` is not `legacy`**. The legacy path is the pre-Wave-2
+   escape hatch and explicitly does not receive learnings injection; for
+   legacy mode, skip injection even though the pre-pass already computed
+   the block.
 
 6. **Tiered persona dispatch** (mirrors review-pr.md Step 4): always-on
    personas + conditional personas + graceful-degradation guard. Read
@@ -189,8 +196,13 @@ aggregation rules change there, propagate the same change here.
    Step 12 instead. Parity rule with `review-pr.md` Step 7.
 
 10. **Code simplifier pass 2** (mirrors review-pr.md Step 8): launch
-    `code-simplifier` on the now-modified code; apply P0/P1
-    simplifications.
+    `code-simplifier` on the now-modified code. Normalize its prose
+    return through the Step 8 aggregation, which assigns
+    `autofix_class: gated_auto` by default; under Step 9's
+    `safe_auto`-only auto-apply rule, simplifier findings therefore route
+    to the Residual Actionable Work section and are **NOT** auto-applied
+    unless an orchestrator explicitly reclassifies a specific finding as
+    `safe_auto`. Parity rule with `review-pr.md` Step 8.
 
 11. **Commit + submit** (mirrors review-pr.md Step 9):
 
