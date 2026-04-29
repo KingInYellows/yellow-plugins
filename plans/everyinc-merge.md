@@ -1760,7 +1760,7 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 - [x] 1. docs/everyinc-merge-plan (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/273)
 - [x] 2. chore/remove-context7-mcp (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/274 — *unbundle + repoint to user-level context7*)
 - [x] 3. chore/strip-bash-from-reviewers (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/275 — *13 stripped, codex-reviewer keeps Bash with documented exception*)
-- [x] 4. refactor/repair-drifted-agents (in progress 2026-04-29; PR pending — *4 agents repaired with Phase 0 additions, performance + security each split into 2-3 specialized agents*)
+- [ ] 4. refactor/repair-drifted-agents (in progress 2026-04-29; PR pending — *4 agents repaired with Phase 0 additions, performance + security each split into 2-3 specialized agents*)
 - [ ] 5. fix/pr-comment-fence-verify-and-validation
 - [ ] 6. feat/knowledge-compounder-track-schema
 - [ ] 7. feat/review-pr-keystone-rewrite
