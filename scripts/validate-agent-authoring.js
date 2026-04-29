@@ -159,12 +159,17 @@ for (const filePath of agentFiles) {
     continue;
   }
 
+  // Derive plugin name from the path relative to PLUGINS_DIR so the validator
+  // works with VALIDATE_PLUGINS_DIR fixture trees that are not under a
+  // literal `.../plugins/...` ancestor directory.
+  const relPath = path.relative(PLUGINS_DIR, filePath);
+  const relSegments = relPath.split(path.sep);
+  const pluginName = relSegments[0];
+
   const name = parseScalar(frontmatter, 'name');
   if (!name) {
     errors.push(`${relative(filePath)}: missing agent name`);
   } else {
-    const segments = filePath.split(path.sep);
-    const pluginName = segments[segments.indexOf('plugins') + 1];
     pluginAgents.add(`${pluginName}:${name}`);
   }
 
@@ -180,21 +185,22 @@ for (const filePath of agentFiles) {
     }
 
     // W1.5 — Rule X: review/ agents must be read-only (no Bash, Write, Edit)
-    // unless explicitly allowlisted with a documented exception. Compute
-    // the path RELATIVE to PLUGINS_DIR before searching for `agents` —
-    // checking the absolute path would false-fire on hosts whose ancestor
-    // directory names happen to contain `agents` (e.g.,
-    // `/home/user/agents/project/...`).
-    const relPath = path.relative(PLUGINS_DIR, filePath);
-    const relSegments = relPath.split(path.sep);
+    // unless explicitly allowlisted with a documented exception. Reuse the
+    // PLUGINS_DIR-relative path computed above. Tool comparison is
+    // case-insensitive so lowercase variants (e.g., `bash`) cannot bypass
+    // the security check.
     const agentsIdx = relSegments.indexOf('agents');
     const isReviewAgent =
       agentsIdx >= 0 && relSegments[agentsIdx + 1] === 'review';
     if (isReviewAgent) {
       const pluginsRel = relSegments.join('/');
       if (!REVIEW_AGENT_ALLOWLIST.has(pluginsRel)) {
-        const violations = REVIEW_AGENT_DENIED_TOOLS.filter((t) =>
-          tools.includes(t)
+        const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
+          t.toLowerCase()
+        );
+        const toolsLower = tools.map((t) => t.toLowerCase());
+        const violations = REVIEW_AGENT_DENIED_TOOLS.filter((_, i) =>
+          toolsLower.includes(deniedLower[i])
         );
         if (violations.length > 0) {
           errors.push(
