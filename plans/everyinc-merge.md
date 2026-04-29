@@ -1760,8 +1760,8 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 - [x] 1. docs/everyinc-merge-plan (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/273)
 - [x] 2. chore/remove-context7-mcp (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/274 — *unbundle + repoint to user-level context7*)
 - [x] 3. chore/strip-bash-from-reviewers (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/275 — *13 stripped, codex-reviewer keeps Bash with documented exception*)
-- [ ] 4. refactor/repair-drifted-agents (in progress 2026-04-29; PR pending — *4 agents repaired with Phase 0 additions, performance + security each split into 2-3 specialized agents*)
-- [ ] 5. fix/pr-comment-fence-verify-and-validation
+- [x] 4. refactor/repair-drifted-agents (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/276 — *4 agents repaired with Phase 0 additions, performance + security each split into 2-3 specialized agents*)
+- [x] 5. fix/pr-comment-fence-verify-and-validation (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/277 — *fence parity verified vs CE PR #490 (yellow stronger), resolve-pr Step 4 fence-on-spawn rule, validate-agent-authoring W1.5 Rule X added with codex-reviewer allowlist + 5 vitest fixtures. **Wave 1 complete.***)
 - [ ] 6. feat/knowledge-compounder-track-schema
 - [ ] 7. feat/review-pr-keystone-rewrite
 
