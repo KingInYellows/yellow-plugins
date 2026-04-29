@@ -15,8 +15,10 @@ EXA, Parallel Task, and ast-grep MCP servers with three workflows:
 
 Then enable `yellow-research` from the plugin list.
 
-**Optional:** Install the `yellow-core` plugin for Context7 library docs
-support in `/research:code`. If absent, the code-researcher falls back to EXA.
+**Optional:** Install the user-level `context7` MCP for library-docs support
+in `/research:code` (`/plugin install context7@upstash`). If absent, the
+code-researcher falls back to EXA. Install the `yellow-core` plugin for the
+`repo-research-analyst` agent.
 
 **ast-grep:** The ast-grep MCP server requires the `ast-grep` binary. Run
 `/research:setup` which offers to install it automatically via npm. Or install

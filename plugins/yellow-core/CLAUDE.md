@@ -85,11 +85,19 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   duplicating the Ceramic MCP registration across plugins (single OAuth
   session).
 
-### MCP Servers (1)
+### MCP Servers (0)
 
-- `context7` — up-to-date library documentation via
-  [context7.com](https://context7.com). Third-party HTTP service; all agents
-  work without it (used only for fetching live docs). No credentials are sent.
+yellow-core no longer bundles any MCP servers. Previously it shipped
+`context7` as a bundled HTTP MCP, but that caused dual-registration issues
+when users also had context7 at user level. Per CE PR #486 (2026-04-03)
+parity, the bundled entry has been removed.
+
+**Recommended user-level MCP:** `context7` — up-to-date library documentation
+via [context7.com](https://context7.com). Install once at user level
+(`/plugin install context7@upstash` or via Claude Code MCP settings); all
+yellow-core and yellow-research agents that benefit from it (e.g.,
+`best-practices-researcher`, `code-researcher`) detect availability via
+ToolSearch and gracefully fall through to WebSearch / EXA when absent.
 
 ### MCP Tool Integration
 

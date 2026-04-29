@@ -12,8 +12,8 @@ tools:
   - mcp__plugin_yellow-research_ceramic__ceramic_search
   - mcp__plugin_yellow-research_exa__get_code_context_exa
   - mcp__plugin_yellow-research_exa__web_search_exa
-  - mcp__plugin_yellow-core_context7__resolve-library-id
-  - mcp__plugin_yellow-core_context7__query-docs
+  - mcp__context7__resolve-library-id
+  - mcp__context7__query-docs
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-research_perplexity__perplexity_search
   - mcp__plugin_yellow-research_ast-grep__find_code
@@ -31,7 +31,7 @@ Choose the best source based on query type:
 
 | Query Type                      | Primary Tool                                                                                                             |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Library/framework docs          | `mcp__plugin_yellow-core_context7__resolve-library-id` → `mcp__plugin_yellow-core_context7__query-docs` (Context7)       |
+| Library/framework docs          | `mcp__context7__resolve-library-id` → `mcp__context7__query-docs` (Context7 — user-level MCP, install separately)       |
 | Code examples, patterns, GitHub | `mcp__plugin_yellow-research_exa__get_code_context_exa`                                                                  |
 | AST/structural code patterns    | `mcp__plugin_yellow-research_ast-grep__find_code` / `mcp__plugin_yellow-research_ast-grep__find_code_by_rule` (ast-grep) |
 | GitHub code search              | `mcp__grep__searchGitHub`                                                                                                |
@@ -40,8 +40,10 @@ Choose the best source based on query type:
 | General web (neural fallback)   | `mcp__plugin_yellow-research_exa__web_search_exa`                                                                        |
 
 **Start with Context7** for any named library when the tool is available — it
-has official, up-to-date docs. If ToolSearch cannot find
-`mcp__plugin_yellow-core_context7__resolve-library-id`, skip directly to
+has official, up-to-date docs. **Context7 is a user-level optional MCP** since
+2026-04 (yellow-core no longer bundles it; install once at user level via
+`/plugin install context7@upstash` to enable). If ToolSearch cannot find
+`mcp__context7__resolve-library-id`, skip directly to
 `mcp__plugin_yellow-research_exa__get_code_context_exa`. If Context7 is
 available but returns no match, use
 `mcp__plugin_yellow-research_exa__get_code_context_exa` as the content fallback.

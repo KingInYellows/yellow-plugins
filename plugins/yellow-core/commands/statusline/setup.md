@@ -104,11 +104,13 @@ From the Step 1 output, build two Python dicts:
 
 ```python
 DETECTED_PLUGINS = {
-    "yellow-core": ["context7"],
-    "yellow-research": ["perplexity", "tavily", "exa", "parallel"],
+    "yellow-research": ["perplexity", "tavily", "exa", "parallel", "ceramic"],
     # ... only what was actually detected in Step 1
 }
 ```
+
+Note: yellow-core no longer bundles any MCP servers (previously context7 was
+bundled; removed 2026-04-29 per CE PR #486 parity).
 
 **ENV_REQUIREMENTS** — Only for command-type servers that have env var
 dependencies. Map server name to the full list of required env vars:
@@ -368,7 +370,6 @@ Yellow Plugins Statusline — Preview
 Detected plugins:
   Plugin            MCP Servers                    Status
   ----------------  ----------------------------   ------
-  yellow-core       context7 (HTTP)                OK
   yellow-research   perplexity, tavily, exa, ...   3/4 keys set
   ...
 
