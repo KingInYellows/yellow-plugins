@@ -14,17 +14,20 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Plugin Components
 
-### Agents (13)
+### Agents (16)
 
 **Review** — parallel code review specialists:
 
 - `code-simplicity-reviewer` — YAGNI enforcement, simplification
 - `security-sentinel` — security audit, OWASP, secrets scanning
 - `performance-oracle` — bottlenecks, algorithmic complexity, scalability
+- `performance-reviewer` — review-time runtime performance with anchored confidence rubric (companion to `performance-oracle`)
 - `architecture-strategist` — architectural compliance, design patterns
 - `polyglot-reviewer` — language-idiomatic review for TS/Py/Rust/Go
 - `test-coverage-analyst` — full test suite audits, coverage gaps, strategy
 - `pattern-recognition-specialist` — anti-patterns, duplication, naming drift
+- `security-reviewer` — review-time exploitable security vulnerabilities (companion to `security-sentinel`)
+- `security-lens` — plan-level security architect for planning documents and architecture proposals
 
 **Research** — codebase and external research:
 

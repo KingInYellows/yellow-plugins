@@ -39,18 +39,18 @@ generic external sources.
    - `~/.claude/skills/**/SKILL.md`, `~/.codex/skills/**/SKILL.md`,
      `~/.agents/skills/**/SKILL.md` (user-level)
    - `plugins/*/skills/**/SKILL.md` (yellow-plugins marketplace)
-2. Match the research topic to skill descriptions; read full content of
-   relevant skills. Common mappings: TypeScript/React patterns → frontend
-   skills; AI/agent design → `create-agent-skills`, `agent-development`;
-   plugin authoring → `plugin-structure`, `command-development`; documentation
-   → `docs-conventions`, `claude-md-improver`.
+2. Match the research topic to skill descriptions by reading their frontmatter
+   and headings (e.g., AI/agent topics may be covered by skills with names
+   containing 'agent', 'skill', or 'plugin'; documentation topics by skills
+   covering README or markdown patterns). Do not assume specific skill names
+   exist — discover them via Glob.
 3. Extract patterns: "Do" / "Don't" guidelines, code templates, conventions.
 4. Assess coverage:
    - Skills give **comprehensive** guidance → summarize and deliver; skip
      Phase 2 unless gaps remain.
    - Skills give **partial** guidance → note what's covered, proceed to
-     Phase 1.5 + Phase 2 for gaps.
-   - **No relevant skills** → proceed to Phase 1.5 + Phase 2.
+     Phase 1 + Phase 1.5 + Phase 2 for gaps.
+   - **No relevant skills** → proceed to Phase 1 + Phase 1.5 + Phase 2.
 
 ### Phase 1: Curated Knowledge Check
 
