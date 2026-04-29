@@ -20,10 +20,12 @@
  * uses `docs/solutions/` under the repo root.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 const SCRIPT = resolve(__dirname, '..', '..', 'scripts', 'backfill-solution-frontmatter.js');
 
@@ -36,7 +38,6 @@ interface RunResult {
 function runScript(solutionsDir: string, args: string[] = []): RunResult {
   // Use spawnSync so we always capture both stdout and stderr regardless of
   // exit code. execFileSync drops stderr on success.
-  const { spawnSync } = require('node:child_process') as typeof import('node:child_process');
   const result = spawnSync('node', [SCRIPT, ...args], {
     env: { ...process.env, SOLUTIONS_DIR: solutionsDir },
     encoding: 'utf8',

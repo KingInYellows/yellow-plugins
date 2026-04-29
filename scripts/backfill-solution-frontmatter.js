@@ -31,6 +31,7 @@
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -43,7 +44,7 @@ const SOLUTIONS_DIR = path.resolve(
 // system temp directory. The temp-dir exception is for vitest fixtures that
 // build synthetic solution trees under /tmp/yellow-* — see
 // tests/integration/backfill-solution-frontmatter.test.ts.
-const TMP_PREFIX = require('os').tmpdir();
+const TMP_PREFIX = os.tmpdir();
 if (
   !SOLUTIONS_DIR.startsWith(ROOT + path.sep) &&
   !SOLUTIONS_DIR.startsWith(TMP_PREFIX + path.sep)
