@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "73dcf443cd92",
+  "strategy": "manual-commit",
+  "branch": "agent/fix/pr-comment-fence-verify-and-validation",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/73/dcf443cd92/0/metadata.json",
+      "transcript": "/73/dcf443cd92/0/full.jsonl",
+      "content_hash": "/73/dcf443cd92/0/content_hash.txt",
+      "prompt": "/73/dcf443cd92/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 133,
+    "cache_creation_tokens": 202457,
+    "cache_read_tokens": 14145681,
+    "output_tokens": 49807,
+    "api_call_count": 109
+  }
+}
