@@ -12,8 +12,8 @@ allowed-tools:
   - mcp__plugin_yellow-research_ceramic__ceramic_search
   - mcp__plugin_yellow-research_exa__get_code_context_exa
   - mcp__plugin_yellow-research_exa__web_search_exa
-  - mcp__plugin_yellow-core_context7__resolve-library-id
-  - mcp__plugin_yellow-core_context7__query-docs
+  - mcp__context7__resolve-library-id
+  - mcp__context7__query-docs
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-research_perplexity__perplexity_search
   - mcp__plugin_yellow-research_ast-grep__find_code
@@ -24,8 +24,9 @@ allowed-tools:
 
 # Code Research
 
-Research code topics inline using Ceramic, EXA, Context7, GitHub, Perplexity,
-and ast-grep. Results are returned in-context — no file is saved.
+Research code topics inline using Ceramic, EXA, GitHub, Perplexity, ast-grep,
+and Context7 (user-level optional MCP — install via `/plugin install context7@upstash`).
+Results are returned in-context — no file is saved.
 
 ## Workflow
 

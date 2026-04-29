@@ -59,7 +59,7 @@ mkdir -p docs/research
 
 | Query Type                     | Primary Source                   | Secondary                    |
 | ------------------------------ | -------------------------------- | ---------------------------- |
-| Library / framework docs       | Context7                         | EXA `get_code_context_exa`   |
+| Library / framework docs       | Context7 (user-level MCP)        | EXA `get_code_context_exa`   |
 | Code examples, GitHub patterns | EXA `get_code_context_exa`       | GitHub grep                  |
 | Keyword-tight general web      | Ceramic `ceramic_search`         | EXA `web_search_exa`         |
 | Recent news, current events    | Perplexity `perplexity_search`   | Tavily `tavily_search`       |

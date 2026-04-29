@@ -10,8 +10,8 @@ tools:
   - Glob
   - Grep
   - ToolSearch
-  - mcp__plugin_yellow-core_context7__resolve-library-id
-  - mcp__plugin_yellow-core_context7__query-docs
+  - mcp__context7__resolve-library-id
+  - mcp__context7__query-docs
   - mcp__plugin_yellow-research_ceramic__ceramic_search
 ---
 
@@ -29,8 +29,12 @@ sources and organize findings by importance.
 
 ### Phase 1: Curated Knowledge Check
 
-1. **Check Available Skills:** Use Context7 MCP to search for official
-   documentation and curated knowledge
+1. **Check Available Skills:** First, use ToolSearch to detect whether
+   user-level Context7 is installed (`mcp__context7__resolve-library-id`). If
+   present, prefer it for official documentation lookup; if absent, fall
+   through to WebSearch / WebFetch on authoritative domains. Context7 is a
+   user-level optional MCP since 2026-04 — yellow-core no longer bundles it
+   to avoid the dual-install OAuth pop-up problem.
 2. **Query Format:** Use specific library/framework names and version
    information
 3. **Priority Sources:** Official docs, API references, migration guides
