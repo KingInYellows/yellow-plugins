@@ -188,9 +188,9 @@ Sources list and stop — Phases 1, 1.5, and 2 are skipped by design.
    library docs sourced from canonical upstream registries
 3. **Official Documentation:** RFCs, official language/framework docs, API
    references
-3. **Security Standards:** OWASP, NIST, CWE, security-specific guidelines
-4. **Community Consensus:** Surveys, GitHub stars/trends, package download stats
-5. **Expert Blogs:** Recognized practitioners (with verification from other
+4. **Security Standards:** OWASP, NIST, CWE, security-specific guidelines
+5. **Community Consensus:** Surveys, GitHub stars/trends, package download stats
+6. **Expert Blogs:** Recognized practitioners (with verification from other
    sources)
 
 ## Research Tools
