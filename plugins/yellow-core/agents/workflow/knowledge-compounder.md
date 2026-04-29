@@ -335,7 +335,7 @@ the user via AskUserQuestion before writing:
 
 ```bash
 GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-ASSEMBLED_LINES="$(printf '%s' "$ASSEMBLED_BODY" | /usr/bin/wc -l)"
+ASSEMBLED_LINES="$(printf '%s' "$ASSEMBLED_BODY" | wc -l)"
 CONTEXT_BUDGET_THRESHOLD="${KC_CONTEXT_BUDGET:-200}"
 ```
 

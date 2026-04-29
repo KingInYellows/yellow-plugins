@@ -179,7 +179,11 @@ function collectIndentedContinuation(fmRaw, key) {
     }
     // Stop on next top-level key (column-0, ends with `:`) or block-list marker.
     if (/^\S/.test(line) && !line.match(/^\s*-/)) break;
-    if (line.match(/^\s*-\s/)) break;
+    // List-item match: dash followed by whitespace OR by non-whitespace.
+    // The looser pattern catches malformed `  -item` (no space after dash)
+    // which would otherwise be incorrectly collected as a scalar
+    // continuation, producing corrupted `problem` field derivations.
+    if (line.match(/^\s*-(\s|\S)/)) break;
     if (line.trim() === '') break;
     collected.push(line.replace(/^\s+/, ''));
   }
@@ -292,6 +296,13 @@ function injectFrontmatter(fmRaw, additions) {
   // Insert new fields after the existing `category:` line. Some legacy
   // entries use `problem_type:` instead of `category:` — fall back to that,
   // then to end of frontmatter as a last resort.
+  // Detect and preserve the original line ending. Splitting on /\r?\n/
+  // and rejoining with `\n` would silently convert CRLF frontmatter to
+  // LF while leaving the rest of the file with CRLF — producing mixed
+  // line endings (a known WSL2 / Windows hazard, see
+  // docs/solutions/workflow/wsl2-crlf-pr-merge-unblocking.md).
+  const lineEndingMatch = fmRaw.match(/\r?\n/);
+  const lineEnding = lineEndingMatch ? lineEndingMatch[0] : '\n';
   const lines = fmRaw.split(/\r?\n/);
   const categoryIdx = lines.findIndex((l) => /^category\s*:/.test(l));
   const problemTypeIdx = lines.findIndex((l) => /^problem_type\s*:/.test(l));
@@ -312,7 +323,7 @@ function injectFrontmatter(fmRaw, additions) {
     newLines.push(...tagsBlock);
   }
   lines.splice(insertIdx, 0, ...newLines);
-  return lines.join('\n');
+  return lines.join(lineEnding);
 }
 
 function processEntry(filePath) {
@@ -393,9 +404,22 @@ function processEntry(filePath) {
   const newText = `---\n${newFm}\n---\n${parsed.body}`;
 
   if (!DRY_RUN && !CHECK_MODE) {
+    // Atomic write: write to a sibling temp file, then rename. A partial
+    // write (disk full, kill -9, permission flip mid-write) leaves the
+    // original file untouched rather than truncated. Same-directory temp
+    // ensures rename(2) is atomic on every supported filesystem.
+    const tmpPath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
     try {
-      fs.writeFileSync(filePath, newText, 'utf8');
+      fs.writeFileSync(tmpPath, newText, 'utf8');
+      fs.renameSync(tmpPath, filePath);
     } catch (err) {
+      // Best-effort cleanup of the temp file if it exists.
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch (_) {
+        // ignore — the rename either succeeded (no temp left) or never
+        // created the temp; either way nothing to do.
+      }
       RESULTS.errors.push({
         file: filePath,
         error: `write failed: ${err.code || err.message}`,
@@ -521,6 +545,20 @@ function main() {
       '\n[check] Files would be modified. Run without --check to apply.'
     );
     process.exit(2);
+  }
+
+  // --check must also fail when entries need manual review. Otherwise an
+  // entry flagged for ambiguous track classification (e.g., a security-
+  // issues doc that may be an audit/threat-model rather than a bug fix)
+  // silently passes the gate and the unresolved frontmatter ships with
+  // the PR.
+  if (CHECK_MODE && RESULTS.flaggedForReview.length > 0) {
+    console.log(
+      `\n[check] ${RESULTS.flaggedForReview.length} entries flagged for ` +
+        `manual review. Resolve their classification (e.g., set track: ` +
+        `knowledge for audit/threat-model docs) before proceeding.`
+    );
+    process.exit(3);
   }
 }
 
