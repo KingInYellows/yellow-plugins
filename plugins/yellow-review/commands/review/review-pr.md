@@ -143,7 +143,8 @@ fi
    `security-sentinel` (legacy fallback) when selected. Do not inject into
    other agents. The `security-sentinel` entry preserves recall context in
    `review_pipeline: legacy` mode where `security-reviewer` is not
-   dispatched and `correctness-reviewer` is absent.
+   dispatched (the security audit role falls to `security-sentinel` in
+   legacy mode).
 
 ### Step 3c: Discover enhanced tools (optional)
 
@@ -335,6 +336,16 @@ escape hatch only — it skips the confidence-rubric aggregation in Step 6.
 Step 5 item 3 below skips the learnings-researcher injection when
 `review_pipeline: legacy`, even though Step 3d still runs the pre-pass
 (its output is discarded for the legacy path).
+
+**Aggregation trade-off in legacy mode (deliberate).** Because legacy
+runs the always-on persona reviewers (`correctness-reviewer`,
+`maintainability-reviewer`) alongside the pre-Wave-2 cross-plugin agents
+but skips the dedup / cross-reviewer-promotion / confidence-gate
+pipeline, the report can be noisier (overlapping findings across
+personas surface as separate items, not merged). This is intentional —
+legacy is the "show me everything raw" rollback, not a noise-reduction
+mode. Projects that want noise reduction should stay on the persona
+pipeline (`review_pipeline: persona`, the default).
 
 ### Step 5: Pass 1 — Parallel Persona Dispatch
 
@@ -561,6 +572,15 @@ Before reporting any P0 or P1 finding:
 For surviving P0/P1 findings with `autofix_class: safe_auto` and a
 non-null `suggested_fix`: apply sequentially using Edit tool. Review each
 change for correctness before proceeding to next.
+
+**Severity gate is deliberate.** P2 / P3 `safe_auto` findings are NOT
+auto-applied even though the reviewer marked them safe — they route to
+the Residual Actionable Work section. Wave 2 chose the conservative gate
+(P0/P1 only) because P2/P3 findings tend to be style or maintenance
+preferences where the cost of churn from auto-applied changes can
+outweigh the fix value. To auto-apply a P2 `safe_auto` finding, an
+orchestrator must promote it to P1 based on additional evidence; the
+default is human review.
 
 For `gated_auto`/`manual` findings: do not apply automatically. List in
 the Residual Actionable Work section of the report.
