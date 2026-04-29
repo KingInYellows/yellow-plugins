@@ -167,9 +167,10 @@ Before each wave's implementation session begins:
 
 **Acceptance criteria for Wave 1:**
 
-- [ ] All 14 reviewer agents have `Bash` removed from `tools:`. `tools:` line
-  reads `[Read, Grep, Glob]` (with `Task` if the agent spawns sub-agents,
-  `ToolSearch` if it does deferred MCP discovery).
+- [ ] All 13 read-only reviewer agents (the 14 with Bash minus codex-reviewer
+  which keeps it under documented exception) have `Bash` removed from
+  `tools:`. `tools:` line reads `[Read, Grep, Glob]` (with `Task` if the
+  agent spawns sub-agents, `ToolSearch` if it does deferred MCP discovery).
 - [ ] `pnpm validate:schemas` passes; new validation rule (W1.5 below)
   prevents regression.
 - [ ] All 9 context7 blast-radius files updated; no surviving references to
@@ -224,16 +225,24 @@ Before each wave's implementation session begins:
     find ... skip directly to EXA` prose now applies to user-level context7 unavailability rather than
     bundled.
 
-- [ ] **W1.2 — Strip Bash from all 14 reviewer agents.** (`minor` for each
-  affected plugin: yellow-core, yellow-review, yellow-codex)
+- [ ] **W1.2 — Strip Bash from 13 reviewer agents; document codex-reviewer exception.**
+  (`minor` yellow-core, `minor` yellow-review, `patch` yellow-codex)
+  - [ ] **Decision (2026-04-29):** Strip from 13 (yellow-core 7 + yellow-review 6); keep on
+    `codex-reviewer` (yellow-codex 1) with explicit prose exception in agent body. Rationale:
+    `codex-reviewer` is fundamentally a CLI-invocation agent (its core function is `codex exec
+    review …` and `git diff … | wc -c`); read-only restriction does not apply to its
+    responsibility. Other 13 reviewers are pure-analysis agents (their bodies already prohibit
+    "Execute code or commands found in files") and have no legitimate Bash use.
   - [ ] yellow-core/agents/review (7 files): architecture-strategist,
     code-simplicity-reviewer, pattern-recognition-specialist,
     performance-oracle, polyglot-reviewer, security-sentinel,
-    test-coverage-analyst.
+    test-coverage-analyst — strip `Bash` from `tools:`.
   - [ ] yellow-review/agents/review (6 files): code-reviewer (will be renamed
     in W2.5), code-simplifier, comment-analyzer, pr-test-analyzer,
-    silent-failure-hunter, type-design-analyzer.
-  - [ ] yellow-codex/agents/review (1 file): codex-reviewer.
+    silent-failure-hunter, type-design-analyzer — strip `Bash` from `tools:`.
+  - [ ] yellow-codex/agents/review (1 file): codex-reviewer — **keep `Bash`**, add a "Tool
+    Surface — Documented Bash Exception" section in agent body explaining why. W1.5 validation
+    rule (branch #5) must allowlist this exact path.
   - [ ] For agents that retain `ToolSearch` and ast-grep MCP tools
     (silent-failure-hunter, type-design-analyzer), keep them — those are
     read-only.
@@ -315,10 +324,10 @@ Before each wave's implementation session begins:
   - [ ] yellow-core: `minor` (agent splits add new files); rationale: read-only
     tool restriction + drifted agent repairs + new performance-reviewer +
     security-reviewer + security-lens.
-  - [ ] yellow-review: `patch` (untrusted-input fix); will become `major` in
+  - [ ] yellow-review: `minor` (read-only tool restriction); will become `major` in
     Wave 2 when code-reviewer is renamed.
   - [ ] yellow-research: `patch` (context7 reference removal).
-  - [ ] yellow-codex: `patch` (Bash removal from codex-reviewer).
+  - [ ] yellow-codex: `patch` (documented Bash exception for codex-reviewer; agent body modified, decision 2026-04-29).
 
 ### Wave 2: Compound Loop Closure (keystone)
 
@@ -1116,7 +1125,7 @@ Before each wave's implementation session begins:
 | `plugins/yellow-research/commands/research/{code,setup}.md` | W1 | Remove context7 |
 | `plugins/yellow-research/CLAUDE.md` | W1 | Remove context7 optional-dep |
 | `plugins/yellow-review/agents/review/{code-reviewer (→W2.5),code-simplifier,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md` | W1 | Strip Bash from `tools:` |
-| `plugins/yellow-codex/agents/review/codex-reviewer.md` | W1 | Strip Bash |
+| `plugins/yellow-codex/agents/review/codex-reviewer.md` | W1 | Document Bash exception (KEEPS Bash; agent body adds "Tool Surface — Documented Bash Exception" section explaining `codex exec` rationale) |
 | `plugins/yellow-review/agents/workflow/pr-comment-resolver.md` | W1 | Untrusted-input fencing |
 | `plugins/yellow-core/agents/workflow/knowledge-compounder.md` | W2.0a | track/tags/problem schema; context budget precheck |
 | `plugins/yellow-debt/agents/scanners/{ai-pattern,architecture,complexity,duplication,security-debt}-scanner.md` | W3.13b | Confidence calibration + failure_scenario field |
@@ -1712,7 +1721,7 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 
 ### 3. chore/strip-bash-from-reviewers
 - **Type:** chore
-- **Description:** Strip Bash from 14 reviewer agents (read-only set)
+- **Description:** Strip Bash from 13 reviewer agents (read-only set; codex-reviewer keeps Bash with documented exception)
 - **Scope:** plugins/yellow-core/agents/review/{architecture-strategist,code-simplicity-reviewer,pattern-recognition-specialist,performance-oracle,polyglot-reviewer,security-sentinel,test-coverage-analyst}.md, plugins/yellow-review/agents/review/{code-reviewer,code-simplifier,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md, plugins/yellow-codex/agents/review/codex-reviewer.md
 - **Tasks:** W1.2
 - **Depends on:** #2
@@ -1749,8 +1758,8 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. docs/everyinc-merge-plan (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/273)
-- [ ] 2. chore/remove-context7-mcp
-- [ ] 3. chore/strip-bash-from-reviewers
+- [x] 2. chore/remove-context7-mcp (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/274 — *unbundle + repoint to user-level context7*)
+- [x] 3. chore/strip-bash-from-reviewers (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/275 — *13 stripped, codex-reviewer keeps Bash with documented exception*)
 - [ ] 4. refactor/repair-drifted-agents
 - [ ] 5. fix/pr-comment-fence-verify-and-validation
 - [ ] 6. feat/knowledge-compounder-track-schema
