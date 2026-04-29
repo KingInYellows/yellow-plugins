@@ -1,0 +1,20 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "9ec4eb2dd649",
+  "session_id": "ebc43df8-e53e-4f87-82a5-543493f422ef",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T21:28:15.846050742Z",
+  "branch": "agent/feat/knowledge-compounder-track-schema-v2",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "",
+  "turn_id": "322d5e9d1188",
+  "token_usage": {
+    "input_tokens": 3277,
+    "cache_creation_tokens": 202410,
+    "cache_read_tokens": 4820427,
+    "output_tokens": 27763,
+    "api_call_count": 46
+  }
+}

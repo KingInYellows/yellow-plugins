@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "9ec4eb2dd649",
+  "strategy": "manual-commit",
+  "branch": "agent/feat/knowledge-compounder-track-schema-v2",
+  "checkpoints_count": 1,
+  "files_touched": null,
+  "sessions": [
+    {
+      "metadata": "/9e/c4eb2dd649/0/metadata.json",
+      "transcript": "/9e/c4eb2dd649/0/full.jsonl",
+      "content_hash": "/9e/c4eb2dd649/0/content_hash.txt",
+      "prompt": "/9e/c4eb2dd649/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 3277,
+    "cache_creation_tokens": 202410,
+    "cache_read_tokens": 4820427,
+    "output_tokens": 27763,
+    "api_call_count": 46
+  }
+}
