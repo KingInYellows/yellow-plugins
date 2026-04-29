@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "7c58985ff529",
+  "strategy": "manual-commit",
+  "branch": "agent/fix/pr-comment-fence-verify-and-validation",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".changeset/unbundle-context7-mcp.md",
+    ".codacy/cli.sh",
+    "plugins/gt-workflow/hooks/check-commit-message.sh",
+    "plugins/gt-workflow/hooks/check-git-push.sh",
+    "plugins/yellow-browser-test/scripts/install-agent-browser.sh",
+    "plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh",
+    "plugins/yellow-ci/hooks/scripts/session-start.sh",
+    "plugins/yellow-codex/scripts/install-codex.sh",
+    "plugins/yellow-core/skills/git-worktree/scripts/worktree-manager.sh",
+    "plugins/yellow-debt/hooks/scripts/session-start.sh",
+    "plugins/yellow-debt/lib/validate.sh",
+    "plugins/yellow-research/scripts/install-ast-grep.sh",
+    "plugins/yellow-review/skills/pr-review-workflow/scripts/get-pr-comments",
+    "plugins/yellow-review/skills/pr-review-workflow/scripts/resolve-pr-thread",
+    "plugins/yellow-review/tests/mocks/gh",
+    "plugins/yellow-ruvector/hooks/scripts/post-tool-use.sh",
+    "plugins/yellow-ruvector/hooks/scripts/pre-tool-use.sh",
+    "plugins/yellow-ruvector/hooks/scripts/session-start.sh",
+    "plugins/yellow-ruvector/hooks/scripts/stop.sh",
+    "plugins/yellow-ruvector/hooks/scripts/user-prompt-submit.sh",
+    "plugins/yellow-semgrep/scripts/install-semgrep.sh",
+    "scripts/ci/release-tags.sh",
+    "scripts/export-ci-metrics.sh",
+    "scripts/validate-marketplace.js",
+    "scripts/validate-plugin.js",
+    "tools/install.cjs",
+    "tools/lint.cjs",
+    "tools/run.cjs",
+    "tools/test.cjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/7c/58985ff529/0/metadata.json",
+      "transcript": "/7c/58985ff529/0/full.jsonl",
+      "content_hash": "/7c/58985ff529/0/content_hash.txt",
+      "prompt": "/7c/58985ff529/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 307,
+    "cache_creation_tokens": 366623,
+    "cache_read_tokens": 54196095,
+    "output_tokens": 128992,
+    "api_call_count": 264
+  }
+}
