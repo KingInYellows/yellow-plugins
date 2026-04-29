@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "2ce083f47d9c",
+  "strategy": "manual-commit",
+  "branch": "agent/docs/everyinc-merge-plan",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/MANIFEST.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-adversarial-reviewer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-best-practices-researcher.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-correctness-reviewer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-git-history-analyzer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-learnings-researcher.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-maintainability-reviewer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-performance-oracle.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-performance-reviewer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-pr-comment-resolver.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-project-standards-reviewer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-reliability-reviewer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-repo-research-analyst.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-security-lens-reviewer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-security-reviewer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-security-sentinel.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-spec-flow-analyzer.agent.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/skills/ce-code-review/SKILL.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/skills/ce-compound/SKILL.md",
+    "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/skills/ce-resolve-pr-feedback/SKILL.md",
+    "docs/brainstorms/2026-04-28-everyinc-capability-gap-brainstorm.md",
+    "docs/brainstorms/2026-04-28-everyinc-merge-brainstorm.md",
+    "docs/brainstorms/2026-04-28-everyinc-merge-completeness-audit-brainstorm.md",
+    "docs/research/merge-plan-completeness-audit-april-2026.md",
+    "docs/solutions/code-quality/llm-as-judge-style-bias-dominance.md",
+    "docs/solutions/code-quality/upstream-concept-fork-snapshot-protocol.md",
+    "docs/solutions/security-issues/prompt-injection-defense-layering-2026.md",
+    "plans/everyinc-merge-wave3.md",
+    "plans/everyinc-merge.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/2c/e083f47d9c/0/metadata.json",
+      "transcript": "/2c/e083f47d9c/0/full.jsonl",
+      "content_hash": "/2c/e083f47d9c/0/content_hash.txt",
+      "prompt": "/2c/e083f47d9c/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 104,
+    "cache_creation_tokens": 442460,
+    "cache_read_tokens": 6479787,
+    "output_tokens": 67932,
+    "api_call_count": 42
+  }
+}

@@ -1,0 +1,5 @@
+/yellow-core:workflows:work '/home/kinginyellow/projects/yellow-plugins/plans/everyinc-merge.md'
+
+---
+
+I think your reccomended path is the way to go, just make sure we are prepared to execute all of the work laid out in the plan!
