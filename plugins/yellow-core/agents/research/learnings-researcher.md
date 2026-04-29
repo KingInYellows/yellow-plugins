@@ -248,10 +248,9 @@ break the contract).
 ## Integration
 
 Invoked by:
-- `/yellow-review:review:pr` Step 3d — pre-pass before reviewer dispatch
-- `/yellow-core:workflows:plan` — informs plan with institutional knowledge
-- `/yellow-core:workflows:brainstorm` — surfaces prior decisions during
-  ideation
+- `/review:pr` Step 3d — pre-pass before reviewer dispatch
+- `/workflows:plan` — informs plan with institutional knowledge
+- `/workflows:brainstorm` — surfaces prior decisions during ideation
 - Standalone via `Task` with `subagent_type: "yellow-core:learnings-researcher"`
 
 Output is consumed as fenced advisory prose — no downstream caller parses

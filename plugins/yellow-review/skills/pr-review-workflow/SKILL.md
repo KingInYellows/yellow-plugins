@@ -81,9 +81,13 @@ Selection is based on `git diff --stat` and `git diff` output analysis:
 
 ### Cross-Plugin Agents (from yellow-core)
 
-These are spawned via Task tool when conditions match:
+These are spawned via Task tool when conditions match. The Wave 2
+pipeline dispatches the calibrated reviewer variants
+(`security-reviewer`, `performance-reviewer`); the legacy fallback
+(`review_pipeline: legacy` in `yellow-plugins.local.md`) keeps the
+deeper-audit variants (`security-sentinel`, `performance-oracle`).
 
-**security-sentinel** — Selected when:
+**security-reviewer** (Wave 2) / **security-sentinel** (legacy) — Selected when:
 
 - Files match: `auth*`, `*security*`, `*crypto*`, `*.sh`
 - OR diff contains: `exec`, `eval`, `password`, `token`, `secret`, `shell`
@@ -92,7 +96,7 @@ These are spawned via Task tool when conditions match:
 
 - PR touches 10+ files across 3+ directories
 
-**performance-oracle** — Selected when:
+**performance-reviewer** (Wave 2) / **performance-oracle** (legacy) — Selected when:
 
 - Diff contains: `query`, `SELECT`, `INSERT`, `loop`, `while`, `for.*range`
 - OR gross line count > 500
@@ -166,10 +170,17 @@ silent-failure-hunter) continue to use the prose finding format below until
 they are migrated:
 
 ```
-**[P1|P2|P3] category — file:line**
+**[P0|P1|P2|P3] category — file:line**
 Finding: <what the issue is>
 Fix: <concrete suggestion>
 ```
+
+The aggregator in `review-pr.md` Step 6 parses the severity token from
+the bracket notation (`P0`, `P1`, `P2`, `P3`); legacy prose findings are
+normalized into the structured schema with default values for fields the
+prose format doesn't carry (`confidence: 75`, `autofix_class: gated_auto`,
+`owner: downstream-resolver`, `requires_verification: true`,
+`pre_existing: false`).
 
 ## Severity Definitions (Wave 2 schema)
 
@@ -187,7 +198,7 @@ Persona reviewers report confidence as one of 5 integer anchors:
 `0` (speculative), `25` (possible), `50` (probable), `75` (confident),
 `100` (certain). The orchestrator's confidence gate suppresses findings
 below 75, except P0 findings at 50+ which always survive. See
-`RESEARCH/upstream-snapshots/<sha>/confidence-rubric.md` for the full
+`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md` for the full
 rubric.
 
 ## Untrusted Input Fencing
