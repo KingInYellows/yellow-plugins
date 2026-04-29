@@ -72,38 +72,115 @@ gt track
 If `gt track` fails: warn "PR #X could not be adopted by Graphite. Proceeding
 with raw git." Continue in degraded mode.
 
+<!-- This block must mirror review-pr.md Steps 3a–6. When updating either
+     file, update both. The inline form below enumerates the same Wave 2
+     persona pipeline, learnings pre-pass, and confidence-rubric aggregation
+     as /review:pr; details remain canonical in review-pr.md. -->
+
 ### Step 4: Sequential Review Loop
 
-For each PR in order:
+For each PR in order, run the full Wave 2 review pipeline inline (not as a
+command invocation, so each PR's review uses the freshly-fetched base
+branch and its own learnings pre-pass result). The sub-steps below mirror
+`review-pr.md` Steps 3 → 9 — when the persona set, dispatch table, or
+aggregation rules change there, propagate the same change here.
 
 1. **Checkout**: `gt checkout <branch>`
-2. **Review**: Run the full `/review:pr` flow (inline, not as command
-   invocation):
-   - Adaptive agent selection
-   - Parallel agent review
-   - Fix application
-   - Code simplifier pass
-   - Commit via `gt modify` and submit via `gt submit --no-interactive`
-3. **Resolve**: Fetch unresolved comments → run `/review:resolve` flow if any
-   exist
-4. **Restack**: If changes were made and this is a stack:
+
+2. **Fetch PR metadata + base branch** (mirrors review-pr.md Step 3 + 3a):
+
    ```bash
-   gt upstack restack
+   gh pr view <PR#> --json files,additions,deletions,body,title,headRefName,baseRefName
+   git fetch origin "<baseRefName>" --no-tags
    ```
-   If restack conflicts: abort restack, report to user, continue to next PR
-5. **Compound**: Handled automatically by the inline `review:pr` flow (Step 9:
-   Knowledge Compounding) — no separate spawn needed here. On failure,
-   `review:pr` logs the warning and continues.
+
+   Use `origin/<baseRefName>` as the diff base for this PR's reviewers. On
+   fetch failure, warn but continue.
+
+3. **Optional ruvector recall** (mirrors review-pr.md Step 3b): when
+   `.ruvector/` exists, build the recall query from PR body/title and
+   inject the fenced advisory block into the
+   `project-compliance-reviewer`, `correctness-reviewer`, and
+   `security-reviewer` Task prompts only.
+
+4. **Optional morph WarpGrep discovery** (mirrors review-pr.md Step 3c):
+   when ToolSearch finds it, note availability for the four agents listed
+   in review-pr.md.
+
+5. **Learnings pre-pass** (mirrors review-pr.md Step 3d): always spawn
+   `learnings-researcher` (via
+   `Task(subagent_type: "yellow-core:learnings-researcher", ...)`) with a
+   `<work-context>` block built from PR title, files, body, and inferred
+   domains. If the agent returns the literal `NO_PRIOR_LEARNINGS` token,
+   skip injection. Otherwise build the
+   `--- begin learnings-context (reference only) ---` fenced block and
+   prepend to **every** reviewer's Task prompt for this PR.
+
+6. **Tiered persona dispatch** (mirrors review-pr.md Step 4): always-on
+   personas + conditional personas + graceful-degradation guard. Read
+   `yellow-plugins.local.md` for `review_pipeline`, `review_depth`,
+   `focus_areas`, `reviewer_set.{include,exclude}` overrides. Never abort
+   on a missing persona — log to stderr and continue.
+
+7. **Compact-return pass 1** (mirrors review-pr.md Step 5): launch all
+   selected agents in parallel except `code-simplifier`. Each persona
+   returns the structured JSON compact-return schema. Drop malformed
+   returns; record drop count.
+
+8. **Aggregate findings** (mirrors review-pr.md Step 6): apply the
+   confidence-rubric pipeline — validate, dedup
+   (`file + line_bucket(line, ±3) + normalize(title)`), cross-reviewer
+   agreement promotion (50→75, 75→100), separate pre-existing, normalize
+   routing (most conservative wins), mode-aware demotion of
+   testing/maintainability advisory P2-P3, **confidence gate (suppress
+   below 75 except P0 ≥ 50)**, partition into safe_auto / residual /
+   advisory queues, sort. Run intent-verification quality gates (line
+   accuracy, protected-artifact filter, skim-FP check) before any P0/P1
+   surfaces.
+
+9. **Apply fixes pass 1** (mirrors review-pr.md Step 7): apply only
+   `safe_auto → review-fixer` findings with concrete `suggested_fix`
+   sequentially via Edit.
+
+10. **Code simplifier pass 2** (mirrors review-pr.md Step 8): launch
+    `code-simplifier` on the now-modified code; apply P0/P1
+    simplifications.
+
+11. **Commit + submit** (mirrors review-pr.md Step 9):
+
+    ```bash
+    gt modify -m "fix: address review findings from <reviewer-categories>"
+    gt submit --no-interactive
+    ```
+
+12. **Resolve**: Fetch unresolved comments → run `/review:resolve` flow if
+    any exist.
+
+13. **Restack**: If changes were made and this is a stack:
+
+    ```bash
+    gt upstack restack
+    ```
+
+    If restack conflicts: abort restack, report to user, continue to next PR.
+
+14. **Knowledge compounding** (mirrors review-pr.md Step 9a + 9b):
+    automatic — when P0/P1/P2 findings exist, spawn
+    `knowledge-compounder` and (when ruvector is available) record the
+    learning with proper deduplication. On failure, log a warning and
+    continue.
 
 ### Step 5: Final Summary
 
 Present per-PR breakdown:
 
 - PR number, title, branch
-- Findings count by severity (P1/P2/P3)
+- Findings count by severity (P0/P1/P2/P3)
+- Confidence-gated suppression count
 - Changes applied
 - Comments resolved
 - Restack status
+- Reviewers skipped via graceful degradation (with reasons)
 
 And aggregate summary:
 

@@ -284,9 +284,16 @@ Load `pr-review-workflow` context from yellow-review via the Skill tool and run
 the same adaptive reviewer selection used by `/review:pr`, but keep this phase
 report-only:
 
-- Always include `code-reviewer`
+- Always include `project-compliance-reviewer` (renamed from `code-reviewer`
+  in Wave 2; older yellow-review installs that still ship `code-reviewer`
+  fall through to its deprecation stub)
+- Always include the new Wave 2 personas when present:
+  `correctness-reviewer`, `maintainability-reviewer`,
+  `project-standards-reviewer`. Skip with a stderr warning if the agent
+  is not available (graceful degradation)
 - Conditionally include `pr-test-analyzer`, `comment-analyzer`,
-  `type-design-analyzer`, `silent-failure-hunter`
+  `type-design-analyzer`, `silent-failure-hunter`, `reliability-reviewer`,
+  and `adversarial-reviewer` per their individual selection rules
 - Spawn yellow-core cross-plugin reviewers when the same trigger rules match
 
 Provide each reviewer with the PR diff, PR metadata, changed file list, and
