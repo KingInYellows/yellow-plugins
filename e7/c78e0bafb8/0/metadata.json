@@ -1,0 +1,23 @@
+{
+  "cli_version": "0.5.6",
+  "checkpoint_id": "e7c78e0bafb8",
+  "session_id": "d5c35051-7036-48d6-a166-783959c5ceaa",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-29T19:41:11.590125449Z",
+  "branch": "agent/feat/review-pr-keystone-rewrite",
+  "checkpoints_count": 1,
+  "files_touched": [],
+  "agent": "Claude Code",
+  "model": "claude-opus-4-7[1m]",
+  "turn_id": "e047c8b22d2b",
+  "token_usage": {
+    "input_tokens": 220,
+    "cache_creation_tokens": 285657,
+    "cache_read_tokens": 33547772,
+    "output_tokens": 89015,
+    "api_call_count": 196
+  },
+  "session_metrics": {
+    "turn_count": 3
+  }
+}
