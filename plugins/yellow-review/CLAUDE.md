@@ -125,7 +125,7 @@ degrade — only yellow-review's own agents run.
 ### MCP Tool Integration
 
 - **ruvector** — Recall past learnings at workflow start; tiered remember at
-  workflow end (Auto for P1 findings, Prompted for P2). Graceful skip if
+  workflow end (Auto for P0/P1 findings, Prompted for P2). Graceful skip if
   yellow-ruvector not installed.
 - **morph** — Preferred for intent-based code search (blast radius, callers,
   similar patterns) in review agents. Discovered via ToolSearch at runtime;
