@@ -2,6 +2,8 @@
 title: "Setup command binary auto-install pattern"
 date: 2026-03-09
 category: workflow
+track: knowledge
+problem: 'Setup command binary auto-install pattern'
 tags:
   - setup
   - install-scripts

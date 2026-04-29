@@ -1,6 +1,8 @@
 ---
 title: 'MCP bundled server tool naming and plugin authoring patterns from yellow-research'
 category: integration-issues
+track: knowledge
+problem: 'Agents and commands reference wrong MCP tool names for bundled servers; tool calls fail at runtime. Compounded when t...'
 date: 2026-02-21
 tags:
   - mcp

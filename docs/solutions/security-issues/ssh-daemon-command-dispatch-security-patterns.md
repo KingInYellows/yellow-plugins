@@ -2,6 +2,8 @@
 title: SSH Daemon Command Dispatch Security Patterns
 date: 2026-04-04
 category: security-issues
+track: bug
+problem: 'SSH Daemon Command Dispatch Security Patterns'
 tags: [ssh, command-injection, daemon, remote-execution, regex-validation]
 components: [yellow-symphony]
 ---

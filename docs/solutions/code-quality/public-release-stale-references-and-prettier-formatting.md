@@ -1,6 +1,8 @@
 ---
 title: 'Public Release Cleanup: Stale Doc References and Prettier Metadata Formatting'
 category: code-quality
+track: knowledge
+problem: 'Public Release Cleanup: Stale Doc References and Prettier Metadata Formatting'
 date: 2026-02-18
 tags:
   - public-release

@@ -9,6 +9,8 @@ symptoms:
 tags: [parallel-agents, todo-resolution, multi-agent, conflict-prevention, orchestration]
 related_prs: ["#37"]
 date: "2026-02-22"
+track: knowledge
+problem: 'File-Based Agent Grouping for Parallel Todo Resolution Without Edit Conflicts'
 ---
 
 # File-Based Agent Grouping for Parallel Todo Resolution Without Edit Conflicts

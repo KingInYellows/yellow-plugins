@@ -2,6 +2,10 @@
 title: 'Heredoc Delimiter Collision with User-Supplied Input'
 date: 2026-02-26
 category: 'security-issues'
+track: bug
+problem: 'Heredoc Delimiter Collision with User-Supplied Input'
+tags:
+  - security-issues
 ---
 
 # Heredoc Delimiter Collision with User-Supplied Input

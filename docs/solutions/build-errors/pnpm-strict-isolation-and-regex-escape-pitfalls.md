@@ -2,6 +2,8 @@
 title: "pnpm strict isolation MODULE_NOT_FOUND and semver regex metacharacter escaping"
 date: 2026-02-24
 category: build-errors
+track: bug
+problem: 'pnpm strict isolation MODULE_NOT_FOUND and semver regex metacharacter escaping'
 tags:
   - pnpm
   - strict-isolation

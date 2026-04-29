@@ -1,6 +1,8 @@
 ---
 title: 'Automated Bot Review False Positives: Skills Preloading and Tooling Misconceptions'
 category: code-quality
+track: knowledge
+problem: 'Automated Bot Review False Positives: Skills Preloading and Tooling Misconceptions'
 date: 2026-03-08
 tags:
   - automated-review

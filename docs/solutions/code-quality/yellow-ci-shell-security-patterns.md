@@ -1,3 +1,21 @@
+---
+title: 'Yellow-CI Shell Security Patterns — Reference Implementation'
+date: 2026-02-16
+category: code-quality
+track: knowledge
+problem: 'Production-grade shell security patterns from yellow-ci that should be replicated across other plugins'
+tags:
+  - shell
+  - security
+  - validation
+  - patterns
+  - yellow-ci
+  - plugin-authoring
+status: reference-implementation
+components:
+  - plugins/yellow-ci
+---
+
 # Yellow-CI Shell Security Patterns — Reference Implementation
 
 **Category:** Code Quality **Plugin:** yellow-ci **Date:** 2026-02-16

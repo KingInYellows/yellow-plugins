@@ -1,6 +1,8 @@
 ---
 title: 'Yellow-Ruvector Plugin Security and Code Quality Hardening'
 category: 'security-issues'
+track: bug
+problem: 'Yellow-Ruvector Plugin Security and Code Quality Hardening'
 tags:
   - shell-security
   - path-traversal

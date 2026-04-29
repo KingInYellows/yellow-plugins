@@ -2,6 +2,8 @@
 title: "CI Path Filter Too Narrow and Per-Plugin Tags Never Pushed"
 date: "2026-03-03"
 category: "workflow"
+track: knowledge
+problem: 'CI Path Filter Too Narrow and Per-Plugin Tags Never Pushed'
 tags:
   - github-actions
   - path-filters
