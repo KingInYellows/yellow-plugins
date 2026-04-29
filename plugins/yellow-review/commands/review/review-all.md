@@ -149,7 +149,9 @@ aggregation rules change there, propagate the same change here.
    `type-design-analyzer`, `silent-failure-hunter`, the `code-reviewer`
    deprecation stub, and the cross-plugin reviewers
    `architecture-strategist`, `pattern-recognition-specialist`,
-   `code-simplicity-reviewer`, `polyglot-reviewer`) return legacy prose
+   `code-simplicity-reviewer`, `polyglot-reviewer`, `security-reviewer`,
+   `performance-reviewer`, `security-sentinel`, `performance-oracle`)
+   return legacy prose
    format — do NOT drop these as malformed; they are normalized to
    compact-return in Step 8 sub-step 1 before validation. Drop only
    returns that fail validation after normalization; record drop count.
