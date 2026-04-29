@@ -144,3 +144,11 @@ Fix tool names in Phase 2 or as a follow-up PR:
    in yellow-devin
 5. Replace `mcp__plugin_linear_linear__` with
    `mcp__plugin_yellow-linear_linear__` in yellow-chatprd (cross-plugin refs)
+
+---
+
+## Update 2026-04-29
+
+**yellow-core no longer bundles context7 as a plugin MCP.** Per CE PR #486 parity (and to avoid the dual-OAuth-pop-up issue when users have context7 installed both at user level and bundled in yellow-core), the `mcpServers.context7` block was removed from `plugins/yellow-core/.claude-plugin/plugin.json`. References under `mcp__plugin_yellow-core_context7__*` no longer exist; live yellow-research callers (`code-researcher`, `/research:code`, `/research:setup`, `best-practices-researcher`) now reference user-level `mcp__context7__*` tool names with ToolSearch availability checks and EXA fallback. Install user-level context7 via `/plugin install context7@upstash` to retain library-doc lookup capability.
+
+This change supersedes the "Expected prefix: `mcp__plugin_yellow-core_context7__`" line above. Other MCPs in this verification document remain at their bundled prefixes.

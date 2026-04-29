@@ -184,29 +184,45 @@ Before each wave's implementation session begins:
 
 **Tasks:**
 
-- [ ] **W1.1 — Remove context7 MCP and clean up references.** (`patch`
+- [ ] **W1.1 — Unbundle context7 MCP, repoint yellow-research callers to user-level.** (`patch`
   yellow-core, `patch` yellow-research)
-  - [ ] Remove `mcpServers` block from
-    `plugins/yellow-core/.claude-plugin/plugin.json` (lines 20–25).
-  - [ ] Remove context7 tools from `tools:` in
-    `plugins/yellow-core/agents/research/best-practices-researcher.md`
-    (lines 13–14: `mcp__plugin_yellow-core_context7__resolve-library-id`,
-    `mcp__plugin_yellow-core_context7__query-docs`).
-  - [ ] Remove context7 references from
-    `plugins/yellow-core/commands/statusline/setup.md` (lines 107, 371).
-  - [ ] Remove context7 description from
-    `plugins/yellow-core/CLAUDE.md` (lines 90–92) and
-    `plugins/yellow-core/README.md` (line 71).
-  - [ ] Remove context7 from `plugins/yellow-research/agents/research/code-researcher.md`
-    `tools:` (lines 15–16) and body routing (lines 34, 44). **Note: this file
-    lives in yellow-research, not yellow-core as the brainstorm states.**
-  - [ ] Remove context7 from `plugins/yellow-research/commands/research/code.md`
-    `allowed-tools:` (lines 15–16) and from
-    `plugins/yellow-research/commands/research/setup.md` (lines 12, 320–321).
-  - [ ] Remove context7 from `plugins/yellow-research/CLAUDE.md` optional-deps
-    section (lines 156–157).
-  - [ ] Verify `code-researcher` body still routes coherently to remaining
-    sources (Exa, Perplexity, ast-grep, etc.) without context7.
+  - [ ] **Decision (2026-04-29):** Option chosen is *unbundle but keep callers wired to user-level context7*.
+    Rationale: context7 itself is valuable for library docs; the dual-install OAuth/namespace problem
+    (CE PR #486) only requires unbundling. Users who want context7 install it once at user level
+    (standard `/plugin install context7@upstash` flow) and `mcp__context7__*` tool names register globally.
+  - [ ] Remove `mcpServers` block from `plugins/yellow-core/.claude-plugin/plugin.json` (yellow-core no
+    longer claims context7 as a bundled MCP).
+  - [ ] In `plugins/yellow-core/agents/research/best-practices-researcher.md`: drop bundled tool refs
+    (`mcp__plugin_yellow-core_context7__*`); the body's Phase 1 should fall back to ToolSearch-detection
+    of user-level `mcp__context7__resolve-library-id` and `mcp__context7__query-docs`, with WebSearch as
+    final fallback. Skills-first parity (W1.3) takes priority for full body rewrite; this PR is the
+    minimal tool-list edit.
+  - [ ] Update `plugins/yellow-core/commands/statusline/setup.md`: remove yellow-core from the
+    `DETECTED_PLUGINS` example and from the preview output table — yellow-core no longer ships an MCP.
+  - [ ] Update `plugins/yellow-core/CLAUDE.md`: change `MCP Servers (1)` → `MCP Servers (0)`; replace the
+    context7 entry with a note recommending user-level context7 install.
+  - [ ] Update `plugins/yellow-core/README.md`: remove the bundled context7 row from MCP Servers table;
+    reference user-level install instead.
+  - [ ] In `plugins/yellow-research/agents/research/code-researcher.md`: repoint context7 tool refs from
+    `mcp__plugin_yellow-core_context7__*` to user-level `mcp__context7__*` (lines 15-16, body lines
+    34/42-46). Add a ToolSearch availability check at routing time — if user-level context7 not found,
+    fall through to EXA `get_code_context_exa` (existing behavior preserved by the `If ToolSearch cannot
+    find ... skip directly to EXA` prose).
+  - [ ] In `plugins/yellow-research/commands/research/code.md`: repoint `allowed-tools:` (lines 15-16) to
+    user-level names.
+  - [ ] In `plugins/yellow-research/commands/research/setup.md`: repoint `allowed-tools` (line 12),
+    update the Context7 probe block (lines 316-322) to detect user-level form, update the example
+    output and preview text (lines 429, 457, 509) to reflect that context7 is a user-level
+    optional MCP rather than a yellow-core bundled one.
+  - [ ] In `plugins/yellow-research/CLAUDE.md` (lines 156-157) and `plugins/yellow-research/README.md`
+    (line 18): update the yellow-core optional-dep entry — context7 is now installed at user level
+    (`/plugin install context7@upstash`), not bundled inside yellow-core.
+  - [ ] In `plugins/yellow-research/skills/research-patterns/SKILL.md` (line 62): the source-routing
+    table entry for "Library / framework docs → Context7" stays — but add a parenthetical noting
+    "(user-level MCP, install separately)".
+  - [ ] Verify `code-researcher` body still routes coherently after the repoint; the `ToolSearch cannot
+    find ... skip directly to EXA` prose now applies to user-level context7 unavailability rather than
+    bundled.
 
 - [ ] **W1.2 — Strip Bash from all 14 reviewer agents.** (`minor` for each
   affected plugin: yellow-core, yellow-review, yellow-codex)
@@ -1729,5 +1745,15 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 - **Tasks:** W2.1, W2.2, W2.3, W2.4, W2.5, W2.6, W2.7, W2.8, W2.9
 - **Depends on:** #6
 - **Notes:** Keystone PR. Bumps yellow-review MAJOR (rename); yellow-core minor. Includes graceful-degradation guard so future agent additions are atomic.
+
+## Stack Progress
+<!-- Updated by workflows:work. Do not edit manually. -->
+- [x] 1. docs/everyinc-merge-plan (completed 2026-04-29; PR https://app.graphite.com/github/pr/KingInYellows/yellow-plugins/273)
+- [ ] 2. chore/remove-context7-mcp
+- [ ] 3. chore/strip-bash-from-reviewers
+- [ ] 4. refactor/repair-drifted-agents
+- [ ] 5. fix/pr-comment-fence-verify-and-validation
+- [ ] 6. feat/knowledge-compounder-track-schema
+- [ ] 7. feat/review-pr-keystone-rewrite
 
 

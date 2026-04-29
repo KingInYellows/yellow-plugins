@@ -9,7 +9,7 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_yellow-core_context7__resolve-library-id
+  - mcp__context7__resolve-library-id
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-morph_morph__warpgrep_codebase_search
   - mcp__filesystem-with-morph__warpgrep_codebase_search
@@ -313,13 +313,18 @@ For each source below, follow this pattern:
 4. If the call throws an exception, returns an explicit error object, `null`, or
    a non-structured response, record status as `FAIL`.
 
-**Context7** (yellow-core plugin — library docs and code examples):
+**Context7** (user-level optional MCP — library docs and code examples):
 
 ```text
 ToolSearch keyword: "resolve-library-id"
-Tool name: mcp__plugin_yellow-core_context7__resolve-library-id
-Test call: mcp__plugin_yellow-core_context7__resolve-library-id with libraryName: "react"
+Tool name: mcp__context7__resolve-library-id
+Test call: mcp__context7__resolve-library-id with libraryName: "react"
 ```
+
+If the user-level Context7 MCP is not installed, the probe records
+`UNAVAILABLE` and the install hint is `/plugin install context7@upstash`
+(or per Claude Code MCP settings UI). yellow-core no longer bundles
+context7 (removed 2026-04-29 to avoid the dual-OAuth pop-up issue).
 
 **Grep MCP** (global — GitHub code pattern search):
 
@@ -423,16 +428,16 @@ OAuth-authenticated MCP servers (no API key needed)
   Ceramic MCP    — Claude Code browser OAuth, prompted on first ceramic_search use.
   (CERAMIC_API_KEY is for the REST live-probe above — the MCP uses OAuth.)
 
-MCP Sources (no API key required — always available if plugin installed)
-  Source         Plugin             Status
-  -----------    ---------------    --------
-  Context7       yellow-core        ACTIVE
-  Grep MCP       (global)           ACTIVE
-  WarpGrep       (global)           UNAVAILABLE
-  DeepWiki       yellow-devin       ACTIVE
-  ast-grep       (bundled)          ACTIVE
-  Parallel Task  (bundled)          ACTIVE (ToolSearch only — server reachability not verified)
-  Ceramic        (bundled)          ACTIVE (ToolSearch only — server reachability and OAuth state not verified)
+MCP Sources (no API key required — always available if plugin/MCP installed)
+  Source         Plugin / source       Status
+  -----------    -------------------   --------
+  Context7       (user-level MCP)      ACTIVE
+  Grep MCP       (global)              ACTIVE
+  WarpGrep       (global)              UNAVAILABLE
+  DeepWiki       yellow-devin          ACTIVE
+  ast-grep       (bundled)             ACTIVE
+  Parallel Task  (bundled)             ACTIVE (ToolSearch only — server reachability not verified)
+  Ceramic        (bundled)             ACTIVE (ToolSearch only — server reachability and OAuth state not verified)
 
 Capability summary:
   /research:deep    PARTIAL (2/3 API sources — Perplexity inactive)
@@ -506,7 +511,7 @@ If any MCP sources are `UNAVAILABLE` or `FAIL`, show this block:
 ```text
 To enable missing MCP sources:
 
-  Context7:   Install yellow-core — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-core)
+  Context7:   Install at user level — /plugin install context7@upstash (no plugin namespace; gives mcp__context7__*)
   Grep MCP:   Configure grep MCP globally in Claude Code MCP settings
   WarpGrep:   Install yellow-morph — /plugin marketplace add KingInYellows/yellow-plugins (select yellow-morph)
               Or configure filesystem-with-morph MCP globally in Claude Code MCP settings

@@ -66,9 +66,16 @@ TypeScript, Python, Rust, and Go.
 
 ## MCP Servers
 
-| Server   | URL                            | Auth          |
-| -------- | ------------------------------ | ------------- |
-| Context7 | `https://mcp.context7.com/mcp` | None (public) |
+yellow-core does not bundle any MCP servers. Agents that benefit from
+external library documentation (`best-practices-researcher`) detect
+user-level Context7 (`mcp__context7__*`) at runtime via ToolSearch and fall
+back to `WebSearch` when it is absent. Install Context7 at user level if
+you want richer library docs:
+
+```sh
+# At user level (recommended) — single OAuth, no plugin-namespace conflict:
+/plugin install context7@upstash
+```
 
 ## License
 
