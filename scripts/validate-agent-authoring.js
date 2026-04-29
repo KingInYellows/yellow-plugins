@@ -6,7 +6,29 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const PLUGINS_DIR = path.join(ROOT, 'plugins');
+// Allow tests to point the validator at a fixture tree by setting
+// VALIDATE_PLUGINS_DIR. Production runs leave it unset and use plugins/.
+const PLUGINS_DIR = process.env.VALIDATE_PLUGINS_DIR
+  ? path.resolve(process.env.VALIDATE_PLUGINS_DIR)
+  : path.join(ROOT, 'plugins');
+
+// W1.5 rule: review/ agents must be read-only.
+// Any agent at plugins/<name>/agents/review/<file>.md must not list Bash,
+// Write, or Edit in its `tools:` set. Reviewers analyze; they do not act.
+// This containment limits the blast radius of prompt-injection attempts in
+// the untrusted PR diff and comment text reviewers consume.
+const REVIEW_AGENT_DENIED_TOOLS = ['Bash', 'Write', 'Edit'];
+
+// Documented exceptions to the read-only rule. Each entry must be a
+// plugins-relative POSIX path. Any exception requires a "Tool Surface —
+// Documented … Exception" section in the agent body explaining why the
+// containment is dropped and bounding legitimate use.
+const REVIEW_AGENT_ALLOWLIST = new Set([
+  // codex-reviewer invokes the codex CLI binary as its core function; read-
+  // only restriction would break the agent. See agent body for rationale.
+  // Decision recorded in plans/everyinc-merge.md W1.2 (2026-04-29).
+  'yellow-codex/agents/review/codex-reviewer.md',
+]);
 
 const colors = {
   reset: '\x1b[0m',
@@ -137,12 +159,17 @@ for (const filePath of agentFiles) {
     continue;
   }
 
+  // Derive plugin name from the path relative to PLUGINS_DIR so the validator
+  // works with VALIDATE_PLUGINS_DIR fixture trees that are not under a
+  // literal `.../plugins/...` ancestor directory.
+  const relPath = path.relative(PLUGINS_DIR, filePath);
+  const relSegments = relPath.split(path.sep);
+  const pluginName = relSegments[0];
+
   const name = parseScalar(frontmatter, 'name');
   if (!name) {
     errors.push(`${relative(filePath)}: missing agent name`);
   } else {
-    const segments = filePath.split(path.sep);
-    const pluginName = segments[segments.indexOf('plugins') + 1];
     pluginAgents.add(`${pluginName}:${name}`);
   }
 
@@ -155,6 +182,37 @@ for (const filePath of agentFiles) {
     const tools = parseList(frontmatter, 'tools');
     if (tools.length === 0) {
       errors.push(`${relative(filePath)}: missing or empty "tools:" list`);
+    }
+
+    // W1.5 — Rule X: review/ agents must be read-only (no Bash, Write, Edit)
+    // unless explicitly allowlisted with a documented exception. Reuse the
+    // PLUGINS_DIR-relative path computed above. Tool comparison is
+    // case-insensitive so lowercase variants (e.g., `bash`) cannot bypass
+    // the security check.
+    const agentsIdx = relSegments.indexOf('agents');
+    const isReviewAgent =
+      agentsIdx >= 0 && relSegments[agentsIdx + 1] === 'review';
+    if (isReviewAgent) {
+      const pluginsRel = relSegments.join('/');
+      if (!REVIEW_AGENT_ALLOWLIST.has(pluginsRel)) {
+        const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
+          t.toLowerCase()
+        );
+        const toolsLower = tools.map((t) => t.toLowerCase());
+        const violations = REVIEW_AGENT_DENIED_TOOLS.filter((_, i) =>
+          toolsLower.includes(deniedLower[i])
+        );
+        if (violations.length > 0) {
+          errors.push(
+            `${relative(filePath)}: review/ agent must not include ` +
+              `${violations.join(', ')} in "tools:" — reviewers are ` +
+              `read-only (W1.5 rule). To document a justified exception, ` +
+              `add the plugins-relative path to REVIEW_AGENT_ALLOWLIST in ` +
+              `scripts/validate-agent-authoring.js and add a "Tool ` +
+              `Surface — Documented Exception" section to the agent body.`
+          );
+        }
+      }
     }
 
     const skills = new Set(parseList(frontmatter, 'skills'));

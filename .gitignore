@@ -92,3 +92,6 @@ temp/
 
 # Local worktree tracking
 .worktrees/
+
+# Entire AI tool per-developer config (telemetry, settings, logs)
+.entire/
