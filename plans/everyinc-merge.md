@@ -167,9 +167,10 @@ Before each wave's implementation session begins:
 
 **Acceptance criteria for Wave 1:**
 
-- [ ] All 14 reviewer agents have `Bash` removed from `tools:`. `tools:` line
-  reads `[Read, Grep, Glob]` (with `Task` if the agent spawns sub-agents,
-  `ToolSearch` if it does deferred MCP discovery).
+- [ ] All 13 read-only reviewer agents (the 14 with Bash minus codex-reviewer
+  which keeps it under documented exception) have `Bash` removed from
+  `tools:`. `tools:` line reads `[Read, Grep, Glob]` (with `Task` if the
+  agent spawns sub-agents, `ToolSearch` if it does deferred MCP discovery).
 - [ ] `pnpm validate:schemas` passes; new validation rule (W1.5 below)
   prevents regression.
 - [ ] All 9 context7 blast-radius files updated; no surviving references to
@@ -1720,7 +1721,7 @@ The work is structured as **7 linear backbone PRs (Phase 0 prep + Wave 1 + Wave 
 
 ### 3. chore/strip-bash-from-reviewers
 - **Type:** chore
-- **Description:** Strip Bash from 14 reviewer agents (read-only set)
+- **Description:** Strip Bash from 13 reviewer agents (read-only set; codex-reviewer keeps Bash with documented exception)
 - **Scope:** plugins/yellow-core/agents/review/{architecture-strategist,code-simplicity-reviewer,pattern-recognition-specialist,performance-oracle,polyglot-reviewer,security-sentinel,test-coverage-analyst}.md, plugins/yellow-review/agents/review/{code-reviewer,code-simplifier,comment-analyzer,pr-test-analyzer,silent-failure-hunter,type-design-analyzer}.md, plugins/yellow-codex/agents/review/codex-reviewer.md
 - **Tasks:** W1.2
 - **Depends on:** #2
