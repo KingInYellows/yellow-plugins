@@ -318,6 +318,106 @@ describe('backfill-solution-frontmatter — empty-value idempotency bypass', () 
   });
 });
 
+describe('backfill-solution-frontmatter — empty tags list bypass', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-backfill-emptytags-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('does NOT count `tags: []` as already-complete (parser must beat scalar length)', () => {
+    // Regression for PR #278 round-2 thread 1: fmGetScalar returns the literal
+    // string "[]" for `tags: []`, which would pass a length>0 check and make
+    // the scalar-first code path short-circuit parseTagsList. The fix reorders
+    // the function so the parser is consulted first for list-style keys.
+    writeEntry(
+      tmpRoot,
+      'logic-errors',
+      'empty-tags-list',
+      `title: 'Empty Tags'\ncategory: logic-errors\ntrack: bug\nproblem: 'something'\ndate: 2026-04-29\ntags: []`
+    );
+
+    const { status, stdout } = runScript(tmpRoot);
+
+    expect(status).toBe(0);
+    // Must NOT be silently classified as already-complete.
+    expect(stdout).not.toMatch(/already complete:\s*1/);
+  });
+});
+
+describe('backfill-solution-frontmatter — deriveTags duplicate-key guard', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-backfill-dedup-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('does NOT inject a second `tags:` block when the key already exists with zero parseable items', () => {
+    // Regression for PR #278 round-2 threads 2 & 3: a bare `tags:` (no list
+    // items) used to fall through deriveTags to `return [category]`, producing
+    // duplicate `tags:` YAML keys. The fix returns null whenever the key is
+    // present, regardless of parseable item count.
+    const filePath = writeEntry(
+      tmpRoot,
+      'workflow',
+      'bare-tags',
+      `title: 'Bare Tags'\ncategory: workflow\ndate: 2026-04-29\ntags:`,
+      '\nA pattern without list items.\n'
+    );
+
+    runScript(tmpRoot);
+
+    const after = readFileSync(filePath, 'utf8');
+    // Frontmatter must contain exactly one `tags:` line (the original empty
+    // one), never a second injected block.
+    const fmEnd = after.indexOf('\n---\n', 4);
+    const fm = after.slice(4, fmEnd);
+    const tagsLines = fm.split('\n').filter((l) => /^tags\s*:/.test(l));
+    expect(tagsLines.length).toBe(1);
+  });
+});
+
+describe('backfill-solution-frontmatter — CRLF preservation around delimiters', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-backfill-crlf-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('preserves CRLF line endings around the `---` delimiters when input is CRLF', () => {
+    // Regression for PR #278 round-2 thread 4: processEntry hardcoded `\n`
+    // for the `---` delimiter newlines, which would mix LF delimiters into a
+    // CRLF file. The fix detects the line ending from the original text and
+    // uses it consistently.
+    const dir = join(tmpRoot, 'logic-errors');
+    mkdirSync(dir, { recursive: true });
+    const filePath = join(dir, 'crlf-entry.md');
+    // Manually construct CRLF content (writeEntry uses LF).
+    const crlf = (s: string) => s.replace(/\n/g, '\r\n');
+    writeFileSync(
+      filePath,
+      crlf(`---\ntitle: 'CRLF Entry'\ncategory: logic-errors\ndate: 2026-04-29\ntags: [crlf]\n---\n\nBody.\n`),
+      'utf8'
+    );
+
+    runScript(tmpRoot);
+
+    const after = readFileSync(filePath, 'utf8');
+    // Must NOT contain a bare LF newline anywhere — every newline in a CRLF
+    // file is preceded by CR.
+    const bareLf = /[^\r]\n/;
+    expect(after).not.toMatch(bareLf);
+    // Frontmatter additions still applied (track derived).
+    expect(after).toMatch(/track: bug/);
+  });
+});
+
 describe('backfill-solution-frontmatter — error handling', () => {
   let tmpRoot: string;
   beforeEach(() => {
