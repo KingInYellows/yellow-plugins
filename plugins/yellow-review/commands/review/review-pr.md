@@ -180,7 +180,7 @@ relevant to this PR.
 
    ```
    Task(
-     subagent_type: "yellow-core:learnings-researcher",
+     subagent_type: "yellow-core:research:learnings-researcher",
      description: "Past learnings pre-pass",
      prompt: "<work-context block from step 1>"
    )
@@ -267,34 +267,34 @@ Spawn unconditionally:
 
 | Agent | subagent_type | Reviewer category |
 |-------|---------------|-------------------|
-| `project-compliance-reviewer` | `yellow-review:project-compliance-reviewer` | project-compliance |
-| `correctness-reviewer` | `yellow-review:correctness-reviewer` | correctness |
-| `maintainability-reviewer` | `yellow-review:maintainability-reviewer` | maintainability |
-| `project-standards-reviewer` | `yellow-review:project-standards-reviewer` | project-standards |
+| `project-compliance-reviewer` | `yellow-review:review:project-compliance-reviewer` | project-compliance |
+| `correctness-reviewer` | `yellow-review:review:correctness-reviewer` | correctness |
+| `maintainability-reviewer` | `yellow-review:review:maintainability-reviewer` | maintainability |
+| `project-standards-reviewer` | `yellow-review:review:project-standards-reviewer` | project-standards |
 | `learnings-researcher` (already ran in Step 3d as the pre-pass; output is injected, not re-dispatched) | n/a | n/a |
 
 #### Conditional personas (selected from diff content)
 
 | Agent | subagent_type | Reviewer category | Trigger |
 |-------|---------------|-------------------|---------|
-| `reliability-reviewer` | `yellow-review:reliability-reviewer` | reliability | Diff contains I/O calls, async/await, queues, jobs, retries, timeouts, or external service interactions |
-| `adversarial-reviewer` | `yellow-review:adversarial-reviewer` | adversarial | Diff > 200 changed lines (excluding tests/generated/lockfiles) OR diff touches auth, payments, data mutations, external APIs, trust-boundary code |
-| `security-reviewer` | `yellow-core:security-reviewer` | security | Diff touches auth, crypto, public endpoints, input handling, shell scripts, secrets/tokens |
-| `performance-reviewer` | `yellow-core:performance-reviewer` | performance | Diff contains DB queries, data transforms, caching, async hot paths, OR gross line count > 500 |
-| `architecture-strategist` | `yellow-core:architecture-strategist` | architecture | Diff touches 10+ files across 3+ directories |
-| `pattern-recognition-specialist` | `yellow-core:pattern-recognition-specialist` | maintainability | Diff introduces new directories or new file-type conventions; diff touches `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`, `plugin.json` (plugin-authoring convention checks) |
-| `code-simplicity-reviewer` | `yellow-core:code-simplicity-reviewer` | maintainability | Gross line count > 300 |
-| `polyglot-reviewer` | `yellow-core:polyglot-reviewer` | correctness | Diff includes language-specific files where a generalist lens adds value (kept as a generalist fallback alongside the new specialist personas) |
-| `pr-test-analyzer` | `yellow-review:pr-test-analyzer` | testing | PR contains files matching `*test*`, `*spec*`, `__tests__/*`, OR adds testable logic |
-| `comment-analyzer` | `yellow-review:comment-analyzer` | documentation | Diff contains `/**`, `"""`, `'''`, or doc-comment annotations; OR diff modifies `.md` documentation |
-| `type-design-analyzer` | `yellow-review:type-design-analyzer` | types | Files have extensions `.ts`, `.py`, `.rb`, `.go`, `.rs` AND diff contains type-shape keywords (`interface`, `type`, `class`, `struct`, `enum`, `model`, `dataclass`) |
-| `silent-failure-hunter` | `yellow-review:silent-failure-hunter` | reliability | Diff contains `try`/`catch`/`except`/`rescue`/`recover` OR fallback patterns (`\|\| null`, `?? undefined`, `or None`) |
+| `reliability-reviewer` | `yellow-review:review:reliability-reviewer` | reliability | Diff contains I/O calls, async/await, queues, jobs, retries, timeouts, or external service interactions |
+| `adversarial-reviewer` | `yellow-review:review:adversarial-reviewer` | adversarial | Diff > 200 changed lines (excluding tests/generated/lockfiles) OR diff touches auth, payments, data mutations, external APIs, trust-boundary code |
+| `security-reviewer` | `yellow-core:review:security-reviewer` | security | Diff touches auth, crypto, public endpoints, input handling, shell scripts, secrets/tokens |
+| `performance-reviewer` | `yellow-core:review:performance-reviewer` | performance | Diff contains DB queries, data transforms, caching, async hot paths, OR gross line count > 500 |
+| `architecture-strategist` | `yellow-core:review:architecture-strategist` | architecture | Diff touches 10+ files across 3+ directories |
+| `pattern-recognition-specialist` | `yellow-core:review:pattern-recognition-specialist` | maintainability | Diff introduces new directories or new file-type conventions; diff touches `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`, `plugin.json` (plugin-authoring convention checks) |
+| `code-simplicity-reviewer` | `yellow-core:review:code-simplicity-reviewer` | maintainability | Gross line count > 300 |
+| `polyglot-reviewer` | `yellow-core:review:polyglot-reviewer` | correctness | Diff includes language-specific files where a generalist lens adds value (kept as a generalist fallback alongside the new specialist personas) |
+| `pr-test-analyzer` | `yellow-review:review:pr-test-analyzer` | testing | PR contains files matching `*test*`, `*spec*`, `__tests__/*`, OR adds testable logic |
+| `comment-analyzer` | `yellow-review:review:comment-analyzer` | documentation | Diff contains `/**`, `"""`, `'''`, or doc-comment annotations; OR diff modifies `.md` documentation |
+| `type-design-analyzer` | `yellow-review:review:type-design-analyzer` | types | Files have extensions `.ts`, `.py`, `.rb`, `.go`, `.rs` AND diff contains type-shape keywords (`interface`, `type`, `class`, `struct`, `enum`, `model`, `dataclass`) |
+| `silent-failure-hunter` | `yellow-review:review:silent-failure-hunter` | reliability | Diff contains `try`/`catch`/`except`/`rescue`/`recover` OR fallback patterns (`\|\| null`, `?? undefined`, `or None`) |
 
 #### Optional supplementary
 
 | Agent | subagent_type | Trigger |
 |-------|---------------|---------|
-| `codex-reviewer` | `yellow-codex:codex-reviewer` | yellow-codex installed AND gross line count > 100 |
+| `codex-reviewer` | `yellow-codex:review:codex-reviewer` | yellow-codex installed AND gross line count > 100 |
 
 #### Graceful-degradation guard (mandatory)
 
@@ -591,7 +591,7 @@ Risks section.
 ### Step 8: Pass 2 — Code Simplifier
 
 Launch `code-simplifier` via Task
-(`subagent_type: "yellow-review:code-simplifier"`) on the now-modified
+(`subagent_type: "yellow-review:review:code-simplifier"`) on the now-modified
 code to review applied fixes for simplification opportunities. Normalize
 the agent's prose return through Step 6 sub-step 0 first, which assigns
 `autofix_class: gated_auto` (the legacy default). Under Step 7's
@@ -621,7 +621,7 @@ gt submit --no-interactive
 If no P0, P1, or P2 findings were reported, skip this step.
 
 Otherwise, spawn the `knowledge-compounder` agent via Task
-(`subagent_type: "yellow-core:knowledge-compounder"`) with all P0/P1/P2
+(`subagent_type: "yellow-core:workflow:knowledge-compounder"`) with all P0/P1/P2
 findings from this review wrapped in injection fencing. Format findings as
 a markdown table (Severity | Reviewer | File | Title | Suggested fix):
 

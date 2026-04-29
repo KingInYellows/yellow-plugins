@@ -24,8 +24,8 @@ rules). Wave 2 split the responsibility:
 
 ## Migration
 
-Any caller passing `subagent_type: "yellow-review:code-reviewer"` should
-update to `subagent_type: "yellow-review:project-compliance-reviewer"` —
+Any caller passing `subagent_type: "yellow-review:review:code-reviewer"` should
+update to `subagent_type: "yellow-review:review:project-compliance-reviewer"` —
 the closest one-for-one replacement for the rename. If your invocation
 covered general logic-error review, you likely want `correctness-reviewer`
 in addition.
