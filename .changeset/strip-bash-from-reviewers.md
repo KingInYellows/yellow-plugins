@@ -1,6 +1,7 @@
 ---
 "yellow-core": minor
 "yellow-review": minor
+"yellow-codex": patch
 ---
 
 Strip Bash from 13 reviewer agents; document codex-reviewer exception
