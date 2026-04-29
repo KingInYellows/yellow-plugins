@@ -21,7 +21,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 
 const VALIDATOR = resolve(__dirname, '..', '..', 'scripts', 'validate-agent-authoring.js');
 
@@ -55,7 +55,7 @@ function writeAgent(
   body: string
 ): void {
   const fullPath = join(pluginsDir, pluginRelative);
-  const dir = fullPath.replace(/\/[^/]+$/, '');
+  const dir = dirname(fullPath);
   mkdirSync(dir, { recursive: true });
   writeFileSync(fullPath, body, 'utf8');
 }

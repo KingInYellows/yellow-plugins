@@ -180,16 +180,18 @@ for (const filePath of agentFiles) {
     }
 
     // W1.5 — Rule X: review/ agents must be read-only (no Bash, Write, Edit)
-    // unless explicitly allowlisted with a documented exception.
-    const segments = filePath.split(path.sep);
-    const agentsIdx = segments.indexOf('agents');
+    // unless explicitly allowlisted with a documented exception. Compute
+    // the path RELATIVE to PLUGINS_DIR before searching for `agents` —
+    // checking the absolute path would false-fire on hosts whose ancestor
+    // directory names happen to contain `agents` (e.g.,
+    // `/home/user/agents/project/...`).
+    const relPath = path.relative(PLUGINS_DIR, filePath);
+    const relSegments = relPath.split(path.sep);
+    const agentsIdx = relSegments.indexOf('agents');
     const isReviewAgent =
-      agentsIdx >= 0 && segments[agentsIdx + 1] === 'review';
+      agentsIdx >= 0 && relSegments[agentsIdx + 1] === 'review';
     if (isReviewAgent) {
-      const pluginsRel = path
-        .relative(PLUGINS_DIR, filePath)
-        .split(path.sep)
-        .join('/');
+      const pluginsRel = relSegments.join('/');
       if (!REVIEW_AGENT_ALLOWLIST.has(pluginsRel)) {
         const violations = REVIEW_AGENT_DENIED_TOOLS.filter((t) =>
           tools.includes(t)
