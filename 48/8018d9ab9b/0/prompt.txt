@@ -1,0 +1,99 @@
+/yellow-review:review:review-all in graphite stack 273 to 279
+
+---
+
+Continue review-all of PRs 273-279
+
+---
+
+<task-notification>
+<task-id>ad1a73d117a5720d4</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-kinginyellow-projects-yellow-plugins/d5c35051-7036-48d6-a166-783959c5ceaa/tasks/ad1a73d117a5720d4.output</output-file>
+<status>completed</status>
+<summary>Agent "Review PR #273 new docs only" completed</summary>
+<result>I have all the information needed. Here is the complete findings report.
+
+---
+
+## Review Findings: PR #273 (agent/docs/everyinc-merge-plan)
+
+**Line count confirmed:** `plans/everyinc-merge.md` is exactly 1733 lines. PR count is 7 backbone + 12 Wave 3 = 19 total. Both match the backbone plan's own claim at line 1678.
+
+---
+
+### P2 Issues
+
+**[P2] stale-line-count — docs/solutions/code-quality/upstream-concept-fork-snapshot-protocol.md:100**
+Finding: The "Related Documentation" entry reads "1732 lines, 19 PRs" but `wc -l` confirms 1733 lines. The PR count (19) is correct; only the line count is off by one.
+Fix: Change `1732 lines` to `1733 lines`.
+
+**[P2] missing-release-row — docs/solutions/code-quality/upstream-concept-fork-snapshot-protocol.md:79–83**
+Finding: The CE version table jumps from v3.2.0 (April 26) directly to v3.3.1 (April 28), skipping v3.3.0. The prose at line 21 explicitly names v3.3.0 as one of the releases shipped. The table also does not include v3.3.2, which is the locked SHA used as the plan's actual baseline (mentioned at line 100 and in `plans/everyinc-merge.md:1680`). A reader using the table as a canonical release history would not see v3.3.0 or v3.3.2.
+Fix: Add a v3.3.0 row (content: patch between v3.2.0 and v3.3.1 — exact changes can be stated as "minor fixes" if not known, or the row added as a placeholder). Add a v3.3.2 row noting it is the locked plan baseline SHA.
+
+**[P2] stale-PR-count — docs/brainstorms/2026-04-28-everyinc-merge-completeness-audit-brainstorm.md:318–319 and docs/research/merge-plan-completeness-audit-april-2026.md:17,23**
+Finding: The completeness-audit brainstorm states "6 backbone PRs (#1–#6) + 11 parallel Wave 3 PRs (#7–#17) + 1 addition (#18…) = 18 total PRs." The research doc uses "Wave 3 PR #18" for `plugin-contract-reviewer`. Both reflect a snapshot before W2.0a was extracted as its own backbone PR #6 (pushing the keystone to #7 and all Wave 3 numbers up by one). The final plan has 7 backbone PRs and calls plugin-contract-reviewer Wave 3 branch #12 (absolute PR #19). A reader cross-referencing these brainstorms against the plan will hit conflicting numbers.
+Fix: Add a one-line note at the top of each brainstorm document, e.g., "Note: PR numbering below was revised; see `plans/everyinc-merge.md` Stack Decomposition for authoritative numbering. W2.0a was later split out as backbone PR #6, making the keystone PR #7 and total 19 PRs." Alternatively, update the counts in-place.
+
+---
+
+### P3 Issues
+
+**[P3] stale-line-count-in-research-doc — docs/research/merge-plan-completeness-audit-april-2026.md:6 and docs/brainstorms/2026-04-28-everyinc-merge-completeness-audit-brainstorm.md header**
+Finding: Both docs cite `plans/everyinc-merge.md` as "1670 lines" (the length at the time the audit was done). The final file is 1733 lines. This is an expected snapshot artifact, but a future reader auditing these files could be confused.
+Fix: Consider a one-liner acknowledgment such as "line count reflects plan state at time of audit; current plan is longer."
+
+**[P3] W3.9-orphan — plans/everyinc-merge-wave3.md:13**
+Finding: Line 13 lists W3.9 in the canonical task list ("All implementation task definitions…W3.9…live in `plans/everyinc-merge.md`"), but no Wave 3 branch in the stack decomposition has `Tasks: W3.9`. The completeness-audit brainstorm at line 322 explains this as intentional ("folded into the last Wave 3 PR per convention"), but wave3.md itself says nothing about this. Without that note, W3.9 appears to be unassigned.
+Fix: Add a brief note in wave3.md's overview (e.g., after line 13): "W3.9 (Wave 3 changesets) is distributed — each parallel branch runs its own `pnpm changeset` as part of its pre-PR checklist; it is not a standalone branch."
+
+**[P3] docs-solutions-count-drift — plans/everyinc-merge.md:33,354,395,1269,1291,1591**
+Finding: Multiple lines claim "`docs/solutions/` (48 files across 6 categories)." After this PR adds three new solution docs, the count is 51. The 48 figure was accurate as the pre-PR baseline and is internally consistent within the plan body, but the Stack Decomposition section (which commits those 3 new docs) does not update the count. A post-merge reader will see 51 files but the plan says 48.
+Fix: Update the 48 → 51 in at least the Stack Decomposition prose (line 1685 scope note), or add "48 files at plan authoring; 51 after PR #1 docs land" as a parenthetical at first occurrence.
+
+---
+
+**Found 0 P1, 2 P2, 3 P3 issues.**
+
+All solution doc frontmatter (`title`, `date`, `category`, `track`, `tags`, `problem`, `components`) is present and correctly formatted in all three new `docs/solutions/` files. Cross-references that point to existing files (`yellow-ruvector-plugin-multi-agent-code-review.md`, `heredoc-delimiter-collision.md`, `merge-plan-completeness-audit-april-2026.md`) resolve correctly. The `learnings-researcher-pre-pass-pattern.md` reference in `llm-as-judge-style-bias-dominance.md` is absent (correctly not yet created — it is a W2.9 deliverable). Wave item numbering (W1.1–W1.6, W2.0a, W2.1–W2.9, W3.1–W3.15) is internally consistent in the backbone plan; W3.13a is correctly noted as relocated to W2.0a with no orphaned reference.</result>
+<usage><total_tokens>58930</total_tokens><tool_uses>63</tool_uses><duration_ms>301222</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>ad8d8de94d22cca5a</task-id>
+<tool-use-id>REDACTED</tool-use-id>
+<output-file>/tmp/claude-1000/-home-kinginyellow-projects-yellow-plugins/d5c35051-7036-48d6-a166-783959c5ceaa/tasks/ad8d8de94d22cca5a.output</output-file>
+<status>completed</status>
+<summary>Agent "Quick review PR #274 code changes" completed</summary>
+<result>The review is complete. Here are the findings:
+
+---
+
+**Check 1 — `mcpServers` block removed:** Confirmed. `jq '.mcpServers' plugins/yellow-core/.claude-plugin/plugin.json` returns `null`. Clean.
+
+**Check 2 — Stale `mcp__plugin_yellow-core_context7__` references:** All 13 removed lines are gone. No surviving additions of the old prefix. Clean.
+
+**Check 3 — CLAUDE.md / README.md consistency:** The new "Required user-level MCP" guidance correctly lands in yellow-research (CLAUDE.md and README.md) and yellow-core (CLAUDE.md and README.md both updated). Internally consistent.
+
+**Check 4 — `best-practices-researcher` tool list:** Updated to `mcp__context7__resolve-library-id` / `mcp__context7__query-docs` with ToolSearch detection prose added. Working.
+
+**Check 5 — Statusline/setup probe updates:** yellow-research's `/research:setup` correctly repoints the Context7 probe to `mcp__context7__resolve-library-id` with an `UNAVAILABLE` path and install hint. yellow-core's `/statusline:setup` drops yellow-core from `DETECTED_PLUGINS` and removes the example statusline row for it.
+
+---
+
+**P2 — Opportunistic `ceramic` addition in `DETECTED_PLUGINS` example — `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-core/commands/statusline/setup.md:107`**
+Finding: The PR adds `"ceramic"` to the `DETECTED_PLUGINS` example dict for `yellow-research`. The old main branch value was `["perplexity", "tavily", "exa", "parallel"]`. Ceramic was not in the example before this PR, and this change is unrelated to the context7 unbundle. The `DETECTED_PLUGINS` example is a template that the LLM fills in from Step 1 detection, so it is low-risk, but the scope creep is unexplained and could confuse readers about whether this represents a structural change.
+Fix: Either revert the ceramic addition to a separate PR, or add a comment in the diff explaining this is a pre-existing probe that was already in yellow-research's setup.md but was missing from the statusline example.
+
+**P3 — yellow-core `/statusline:setup` has no user-level Context7 probe after removal — `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-core/commands/statusline/setup.md`**
+Finding: yellow-research's `/research:setup` correctly adds a ToolSearch probe for user-level `mcp__context7__resolve-library-id`. yellow-core's `/statusline:setup` only adds a note that context7 was removed; it has no corresponding probe or status row for user-level context7. Users who run `/statusline:setup` will not get any visibility into whether their user-level context7 is active.
+Fix: Add a user-level context7 ToolSearch probe to the statusline setup Step 2 (e.g., a `"context7"` key in `DETECTED_PLUGINS` under a new `"(user-level)"` label, or a note to check it separately). This is low-priority since `/research:setup` covers it, but the gap exists.
+
+---
+
+Found 0 P1, 1 P2, 1 P3 issues. The core unbundle work — plugin.json removal, tool-name repoints across all 5 affected files, and documentation updates — is correct and complete.</result>
+<usage><total_tokens>36388</total_tokens><tool_uses>30</tool_uses><duration_ms>135234</duration_ms></usage>
+</task-notification>
