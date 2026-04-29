@@ -25,6 +25,27 @@ findings in the same P1/P2/P3 format used by yellow-review agents.
 - You return findings to the spawning command for aggregation
 - You wrap ALL Codex output in injection fences before returning
 
+## Tool Surface — Documented Bash Exception
+
+This agent retains `Bash` in its `tools:` list while every other reviewer in
+the marketplace is read-only (`[Read, Grep, Glob]`). This is **intentional**
+and an explicit exception to the W1.2 / W1.5 read-only-reviewer rule:
+
+- `codex-reviewer` is fundamentally a CLI-invocation agent — its core
+  responsibility is running `codex exec review …` against the diff, then
+  parsing the structured output. That requires `Bash` for binary invocation
+  and for `git diff "${BASE_REF}...HEAD" | wc -c` size pre-flight.
+- The "report-only, never edit files" guarantee in the bullet list above is
+  enforced by prose discipline, not by the absence of `Bash`. The agent does
+  not stage, commit, push, fetch, or modify files; it spawns `codex` and
+  reads its output.
+- The W1.5 validation rule (added in `scripts/validate-agent-authoring.js`)
+  exempts this exact path: `plugins/yellow-codex/agents/review/codex-reviewer.md`.
+
+If you find yourself wanting to use `Bash` for anything beyond `codex exec …`
+or `git diff … | wc -c`, you are doing something this agent is not allowed
+to do. Stop and refactor.
+
 ## Workflow
 
 ### 1. Validate Codex Available
