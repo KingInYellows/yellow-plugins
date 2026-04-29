@@ -1,6 +1,8 @@
 ---
 title: 'Devin review-prs Command: Shell and API Composition Bugs'
 category: logic-errors
+track: bug
+problem: 'Devin review-prs Command: Shell and API Composition Bugs'
 tags:
   - sed-regex
   - curl-fallback

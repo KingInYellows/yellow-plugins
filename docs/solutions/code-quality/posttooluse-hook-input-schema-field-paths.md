@@ -2,6 +2,10 @@
 title: 'PostToolUse Hook Input Schema Field Paths'
 date: 2026-02-25
 category: 'code-quality'
+track: knowledge
+problem: 'PostToolUse Hook Input Schema Field Paths'
+tags:
+  - code-quality
 ---
 
 # PostToolUse Hook Input Schema Field Paths

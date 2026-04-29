@@ -1,6 +1,8 @@
 ---
 title: 'Multi-Agent Re-Review: False Positive Detection & Diminishing Returns'
 category: code-quality
+track: knowledge
+problem: 'Re-review agents flag previously-fixed code as bugs; 38% false positive rate in round 2'
 date: 2026-02-16
 tags:
   - multi-agent-review

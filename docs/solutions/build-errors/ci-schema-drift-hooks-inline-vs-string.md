@@ -1,6 +1,8 @@
 ---
 title: 'CI schema drift — local plugin schema requires string hooks, plugins use inline objects'
 category: build-errors
+track: bug
+problem: 'CI schema drift — local plugin schema requires string hooks, plugins use inline objects'
 date: 2026-02-21
 tags:
   - ci

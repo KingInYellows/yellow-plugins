@@ -2,6 +2,10 @@
 title: 'Hook set -e Causes Unexpected Exit Before JSON Output'
 date: 2026-02-26
 category: 'code-quality'
+track: knowledge
+problem: 'Hook set -e Causes Unexpected Exit Before JSON Output'
+tags:
+  - code-quality
 ---
 
 # Hook set -e Causes Unexpected Exit Before JSON Output

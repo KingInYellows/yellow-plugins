@@ -2,6 +2,8 @@
 title: "Session-Level Review Command Patterns"
 date: 2026-03-20
 category: code-quality
+track: knowledge
+problem: 'Session-Level Review Command Patterns'
 tags: [review, commands, git, graphite, delegation, stacks]
 components: [yellow-core]
 ---

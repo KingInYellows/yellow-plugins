@@ -1,6 +1,8 @@
 ---
 title: 'Claude Code plugin manifest validation errors on install'
 category: build-errors
+track: bug
+problem: 'Claude Code plugin manifest validation errors on install'
 date: 2026-02-18
 tags:
   - claude-code

@@ -2,6 +2,8 @@
 title: "CI Workflow Consolidation Regressions"
 date: "2026-03-10"
 category: "workflow"
+track: knowledge
+problem: 'CI Workflow Consolidation Regressions'
 tags:
   - github-actions
   - workflow-consolidation

@@ -2,6 +2,8 @@
 title: "Silent Failures in Changeset-Based Release Pipeline"
 date: "2026-03-03"
 category: "workflow"
+track: knowledge
+problem: 'Silent Failures in Changeset-Based Release Pipeline'
 tags:
   - changesets
   - github-actions

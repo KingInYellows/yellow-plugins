@@ -2,6 +2,10 @@
 title: 'Cross-Plugin Documentation Correctness: Commands and Credentials'
 date: 2026-02-25
 category: 'code-quality'
+track: knowledge
+problem: 'Cross-Plugin Documentation Correctness: Commands and Credentials'
+tags:
+  - code-quality
 ---
 
 # Cross-Plugin Documentation Correctness: Commands and Credentials

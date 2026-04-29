@@ -3,6 +3,8 @@ title:
   'Unblocking stuck PRs: CRLF git conflicts, mergeStateStatus, and multi-round
   conflict resolution'
 category: workflow
+track: bug
+problem: 'WSL2-introduced CRLF line endings block GitHub PR merges with mergeStateStatus DIRTY; multi-round conflict resolution required'
 date: 2026-02-17
 tags:
   - git

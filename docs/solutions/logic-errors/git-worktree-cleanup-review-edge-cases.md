@@ -2,6 +2,8 @@
 title: Git Worktree Cleanup Command — Review Edge Cases
 date: 2026-03-20
 category: logic-errors
+track: bug
+problem: 'Git Worktree Cleanup Command — Review Edge Cases'
 tags: [git-worktree, porcelain-parsing, detached-HEAD, grep-matching, classification-priority]
 components: [yellow-core/commands/worktree/cleanup.md, gt-workflow/commands/gt-cleanup.md]
 ---

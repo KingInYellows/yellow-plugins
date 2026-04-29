@@ -1,6 +1,8 @@
 ---
 title: "Cross-Plugin Integration Review Consistency"
 category: code-quality
+track: knowledge
+problem: 'Cross-Plugin Integration Review Consistency'
 date: 2026-04-02
 tags:
   - credential-redaction
