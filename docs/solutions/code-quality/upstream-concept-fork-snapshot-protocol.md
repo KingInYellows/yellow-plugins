@@ -81,7 +81,7 @@ audit for the gap period before any Wave begins.
 | v3.2.0 | 2026-04-26 | LFG rubric replaced by best-judgment; artifact paths `.context/` → `/tmp` |
 | v3.3.0 | 2026-04-27 | Patch release between v3.2.0 and v3.3.1 (minor fixes; not directly load-bearing for the merge plan) |
 | v3.3.1 | 2026-04-28 | Reviewer queuing fix when subagent slots filled (#716) |
-| v3.3.2 | 2026-04-28 | Locked SHA `e5b397c9d1883354f03e338dd00f98be3da39f9f` — snapshot baseline used by `plans/everyinc-merge.md` |
+| v3.3.2 | 2026-04-29 | Locked SHA `e5b397c9d1883354f03e338dd00f98be3da39f9f` — snapshot baseline used by `plans/everyinc-merge.md` (date matches `MANIFEST.md`) |
 
 An adoption plan snapshotted before v3.0.0:
 - Uses deprecated command aliases (`/plugin/workflow:plan`, `ce:review`) instead of canonical post-rename forms

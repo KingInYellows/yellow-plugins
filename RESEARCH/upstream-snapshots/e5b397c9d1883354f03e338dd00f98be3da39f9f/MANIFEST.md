@@ -62,7 +62,11 @@ else
 fi
 for f in $(find . -type f -name '*.md' ! -name MANIFEST.md); do
   rel=${f#./}
-  remote=$(gh api "repos/EveryInc/compound-engineering-plugin/contents/${rel#plugins/compound-engineering/}?ref=$SHA" -H "Accept: application/vnd.github.raw" | sha256)
+  # $rel already matches the GitHub Contents API path (e.g.
+  # `plugins/compound-engineering/agents/ce-adversarial-reviewer.agent.md`)
+  # — do NOT strip the `plugins/compound-engineering/` prefix; the upstream
+  # repo is a monorepo with the CE plugin at that path.
+  remote=$(gh api "repos/EveryInc/compound-engineering-plugin/contents/${rel}?ref=$SHA" -H "Accept: application/vnd.github.raw" | sha256)
   local=$(sha256 < "$f")
   [ "$remote" = "$local" ] || echo "DRIFT: $rel"
 done
