@@ -14,7 +14,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Plugin Components
 
-### Agents (16)
+### Agents (17)
 
 **Review** — parallel code review specialists:
 
@@ -34,6 +34,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `repo-research-analyst` — repository structure, conventions
 - `best-practices-researcher` — external docs, community standards
 - `git-history-analyzer` — git archaeology, change history
+- `learnings-researcher` — searches `docs/solutions/` for past learnings
+  relevant to a PR diff or planning context (Wave 2 keystone pre-pass)
 
 **Workflow** — planning and analysis:
 
@@ -54,11 +56,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (4)
+### Skills (5)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `create-agent-skills` — guidance for creating skills and agents
 - `git-worktree` — git worktree management for parallel development
+- `local-config` — yellow-plugins.local.md per-project config schema (internal)
 - `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
 
 ### Optional Plugin Dependencies

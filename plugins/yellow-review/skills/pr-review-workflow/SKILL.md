@@ -24,14 +24,38 @@ yellow-review plugin's commands and agents.
 
 ## Adaptive Agent Selection
 
-### Always Selected
+### Always Selected (Wave 2 persona pipeline)
 
-- `code-reviewer` — runs on every PR
+- `project-compliance-reviewer` — CLAUDE.md compliance, naming, project
+  conventions (renamed from `code-reviewer` in Wave 2)
+- `correctness-reviewer` — logic errors, edge cases, state bugs
+- `maintainability-reviewer` — premature abstraction, dead code, coupling
+- `project-standards-reviewer` — frontmatter, references, portability
 - `code-simplifier` — runs as final pass after fixes applied
+
+### Pre-Pass (always)
+
+- `learnings-researcher` (yellow-core) — runs before reviewer dispatch;
+  surfaces matching `docs/solutions/` entries as advisory context. Returns
+  `NO_PRIOR_LEARNINGS` when no matches; orchestrator skips injection in
+  that case.
 
 ### Conditional Selection
 
 Selection is based on `git diff --stat` and `git diff` output analysis:
+
+**reliability-reviewer** — Selected when:
+
+- Diff contains: I/O calls (`fetch`, `requests.`, `axios`, `http.`), DB
+  queries, retry/backoff/timeout keywords, async/await, queues, jobs,
+  background workers
+- OR PR touches network, external-service, or async-handler code
+
+**adversarial-reviewer** — Selected when:
+
+- Diff is large (>200 changed lines, excluding tests/generated/lockfiles)
+- OR diff touches auth, payments, data mutations, external APIs, or
+  trust-boundary code
 
 **pr-test-analyzer** — Selected when:
 
@@ -57,9 +81,13 @@ Selection is based on `git diff --stat` and `git diff` output analysis:
 
 ### Cross-Plugin Agents (from yellow-core)
 
-These are spawned via Task tool when conditions match:
+These are spawned via Task tool when conditions match. The Wave 2
+pipeline dispatches the calibrated reviewer variants
+(`security-reviewer`, `performance-reviewer`); the legacy fallback
+(`review_pipeline: legacy` in `yellow-plugins.local.md`) keeps the
+deeper-audit variants (`security-sentinel`, `performance-oracle`).
 
-**security-sentinel** — Selected when:
+**security-reviewer** (Wave 2) / **security-sentinel** (legacy) — Selected when:
 
 - Files match: `auth*`, `*security*`, `*crypto*`, `*.sh`
 - OR diff contains: `exec`, `eval`, `password`, `token`, `secret`, `shell`
@@ -68,7 +96,7 @@ These are spawned via Task tool when conditions match:
 
 - PR touches 10+ files across 3+ directories
 
-**performance-oracle** — Selected when:
+**performance-reviewer** (Wave 2) / **performance-oracle** (legacy) — Selected when:
 
 - Diff contains: `query`, `SELECT`, `INSERT`, `loop`, `while`, `for.*range`
 - OR gross line count > 500
@@ -99,27 +127,79 @@ Binary files show `-` in numstat and are excluded.
 
 ### Size Tiers
 
-- **Small** (< 100 lines): code-reviewer + code-simplifier only
-- **Medium** (100-500 lines): + conditional agents based on content
+- **Small** (< 100 lines): always-on persona set + code-simplifier
+- **Medium** (100–500 lines): + conditional agents based on content
 - **Large** (> 500 lines): all applicable agents including cross-plugin
+  agents and `adversarial-reviewer`
 
 ## Finding Output Format
 
-All agents use this consistent format:
+Wave 2 persona reviewers (`correctness-reviewer`,
+`maintainability-reviewer`, `reliability-reviewer`,
+`project-standards-reviewer`, `project-compliance-reviewer`,
+`adversarial-reviewer`) return structured JSON per the compact-return
+schema. The orchestrator aggregates and presents them as pipe-delimited
+tables.
+
+```json
+{
+  "reviewer": "<name>",
+  "findings": [
+    {
+      "title": "<short actionable summary>",
+      "severity": "P0|P1|P2|P3",
+      "category": "<reviewer category>",
+      "file": "<repo-relative path>",
+      "line": 42,
+      "confidence": 75,
+      "autofix_class": "safe_auto|gated_auto|manual|advisory",
+      "owner": "review-fixer|downstream-resolver|human|release",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "<one-sentence concrete fix or null>"
+    }
+  ],
+  "residual_risks": [],
+  "testing_gaps": []
+}
+```
+
+Existing yellow-review agents that pre-date the keystone (pr-test-analyzer,
+comment-analyzer, code-simplifier, type-design-analyzer,
+silent-failure-hunter) continue to use the prose finding format below until
+they are migrated:
 
 ```
-**[P1|P2|P3] category — file:line**
+**[P0|P1|P2|P3] category — file:line**
 Finding: <what the issue is>
 Fix: <concrete suggestion>
 ```
 
-## Severity Definitions
+The aggregator in `review-pr.md` Step 6 parses the severity token from
+the bracket notation (`P0`, `P1`, `P2`, `P3`); legacy prose findings are
+normalized into the structured schema with default values for fields the
+prose format doesn't carry (`confidence: 75`, `autofix_class: gated_auto`,
+`owner: downstream-resolver`, `requires_verification: true`,
+`pre_existing: false`).
 
-- **P1**: Correctness bug, security vulnerability, or data loss risk. Must fix
-  before merge.
-- **P2**: Quality issue, maintainability concern, or convention violation.
+## Severity Definitions (Wave 2 schema)
+
+- **P0**: Critical breakage, exploitable vulnerability, data loss /
+  corruption. Must fix before merge.
+- **P1**: High-impact defect likely hit in normal usage, breaking contract.
   Should fix.
-- **P3**: Style suggestion, minor improvement, or nitpick. Consider fixing.
+- **P2**: Moderate issue with meaningful downside (edge case, perf
+  regression, maintainability trap). Fix if straightforward.
+- **P3**: Low-impact, narrow scope, minor improvement. User's discretion.
+
+## Confidence Anchors
+
+Persona reviewers report confidence as one of 5 integer anchors:
+`0` (speculative), `25` (possible), `50` (probable), `75` (confident),
+`100` (certain). The orchestrator's confidence gate suppresses findings
+below 75, except P0 findings at 50+ which always survive. See
+`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md` for the full
+rubric.
 
 ## Untrusted Input Fencing
 
