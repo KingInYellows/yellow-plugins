@@ -1,5 +1,74 @@
 # Changelog
 
+## 1.5.1
+
+### Patch Changes
+
+- [`f22272d`](https://github.com/KingInYellows/yellow-plugins/commit/f22272d391a466840ef6b398a83e8d233b755694)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Update
+  CHANGELOG migration text to runtime-current 3-segment subagent_type form +
+  document non-interactive cache-refresh workaround
+
+  Two small docs/maintenance fixes:
+  1. **CHANGELOG migration text:** `plugins/yellow-core/CHANGELOG.md` and
+     `plugins/yellow-review/CHANGELOG.md` had migration notes citing the legacy
+     2-segment `subagent_type: "yellow-review:code-reviewer"` form. The repo's
+     runtime expects 3-segment as of PRs #288/#290. The validator's INFO note
+     flagged these for future hard-fail. Updated both migration snippets to the
+     3-segment form (`yellow-review:review:code-reviewer`) so the migration text
+     stays accurate and the INFO warnings clear.
+  2. **CONTRIBUTING.md cache-refresh note:** added a "Manual cache refresh for
+     non-interactive sessions" subsection covering the rsync workaround when
+     `/plugin marketplace update` (TUI-only) isn't available — e.g., background
+     agents or Remote Control sessions verifying a freshly-merged
+     `chore: version packages` release. The loop hardens against path-traversal
+     via plugin name and version (allowlist regex), uses `sort -V` instead of
+     lexicographic `ls | tail -1` so `1.10.x` is correctly preferred over
+     `1.9.x`, requires `set -euo pipefail` plus `command -v` prereq checks, and
+     surfaces `cp` failures rather than silently skipping rsync.
+
+  No code changes; documentation-only patches.
+
+- [`7fe5d9d`](https://github.com/KingInYellows/yellow-plugins/commit/7fe5d9dc3b445ac94146afe68f3943fb8161087b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix
+  `learnings-researcher` empty-result sentinel violation + defense-in-depth on
+  the keystone check
+
+  The `learnings-researcher` agent's empty-result protocol requires
+  `NO_PRIOR_LEARNINGS` to be the **first non-whitespace line** of the response.
+  In practice the agent was emitting a "thinking out loud" scan-summary
+  paragraph before the sentinel — flipping the keystone's Step 3d.4
+  strict-equality check from "empty → skip injection" to "non-empty → inject as
+  learnings", which delivered useless prose to all 4–9 dispatched reviewers per
+  `/review:pr` invocation.
+
+  Two-sided fix:
+  1. **`plugins/yellow-core/agents/research/learnings-researcher.md`** — tighten
+     the empty-result protocol with explicit anti-pattern guidance (forbidden
+     prose-before-token, no thinking-out-loud, no closing remarks) and a
+     self-check checklist before emission. The agent-side contract is unchanged
+     (token must still be first non-whitespace line); the spec just makes the
+     LLM-compliance bar harder to miss.
+  2. **`plugins/yellow-review/commands/review/review-pr.md`** Step 3d.4 —
+     replace the strict "first non-whitespace line equals literal token" check
+     with two-condition empty-result detection:
+     - **(a)** the token appears on its own line anywhere in the response (regex
+       `(?m)^\s*NO_PRIOR_LEARNINGS\s*$`), AND
+     - **(b)** the response does NOT contain a `## Past Learnings` heading
+       (regex `(?m)^##\s+Past\s+Learnings\s*$`).
+
+     When both hold → skip injection (the original fix intent — tolerate LLM
+     thinking-out-loud preamble before the sentinel). When only (a) holds
+     (token + findings heading both present) → contract violation; log a
+     warning, strip the sentinel line, and treat the response as non-empty so
+     findings are not silently dropped. The `## Past Learnings` heading
+     dominance ensures the relaxation never masks the "combined sentinel with
+     findings" anti-pattern the agent body forbids.
+
+  Together the two changes mean Wave 3 PR reviews will get clean empty-result
+  handling immediately, with a robust safety net that preserves findings even
+  when an agent-side regression combines the sentinel with real findings.
+
 ## 1.5.0
 
 ### Minor Changes
@@ -175,10 +244,10 @@
     cross-platform tool selection by the new `project-standards-reviewer`.
   - **Migration:** Callers passing
     `subagent_type: "yellow-review:review:code-reviewer"` should update to
-    `"yellow-review:review:project-compliance-reviewer"`. A deprecation stub
-    is left at the old path for one minor version — third-party installs
-    that reference the old name continue to function (with a deprecation
-    log line) until the stub is removed.
+    `"yellow-review:review:project-compliance-reviewer"`. A deprecation stub is
+    left at the old path for one minor version — third-party installs that
+    reference the old name continue to function (with a deprecation log line)
+    until the stub is removed.
   - **New persona reviewers** (all read-only, `tools: [Read, Grep, Glob]`):
     `correctness-reviewer`, `maintainability-reviewer`, `reliability-reviewer`,
     `project-standards-reviewer`, `adversarial-reviewer`. Each returns the

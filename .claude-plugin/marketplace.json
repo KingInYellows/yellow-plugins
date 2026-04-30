@@ -24,7 +24,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.5.0",
+      "version": "1.5.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -64,7 +64,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "author": {
         "name": "KingInYellows"
       },
