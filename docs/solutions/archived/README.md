@@ -10,7 +10,7 @@ skill (`/yellow-core:compound-lifecycle`).
 
 `archived/` mirrors the live catalog's subdirectory layout:
 
-```
+```text
 docs/solutions/archived/<original-category>/<slug>.md
 ```
 
@@ -25,12 +25,14 @@ was written.
 `docs/solutions/` entries are referenced from external systems (Linear
 issues, Slack threads, PR descriptions). Deleting and relying on git
 history breaks every external link. Archiving keeps the file present
-and citable, just out of the live `learnings-researcher` search path.
+and citable. The intent is for archived entries to remain out of the
+live `learnings-researcher` search path, though that exclusion is not
+yet implemented (see below).
 
-The `learnings-researcher` agent excludes `docs/solutions/archived/**`
-from its default search by glob. To intentionally pull from archive
-(forensics, "what was the older advice?"), pass an explicit
-`include_archived: true` hint or query the path directly.
+The `learnings-researcher` agent searches `docs/solutions/` broadly
+and does not currently exclude `docs/solutions/archived/**` by default.
+To intentionally search archived entries, query the path directly
+(e.g., `Grep -r ... docs/solutions/archived/`).
 
 ## How to restore an archived entry
 
@@ -43,7 +45,8 @@ collapsed two entries that should have stayed separate — restore by:
    over-claimed scope
 4. Open a `chore: restore docs/solutions entry` PR with rationale
 
-The `compound-lifecycle` skill will not auto-re-archive a manually
-restored entry within 30 days of the restore date — it checks
-`updated:` and skips entries where `updated:` is more recent than
-`stale_date:` would have been.
+To prevent a restored entry from being immediately re-flagged as
+stale, bump its `updated:` frontmatter field to today's date after
+restoring. The skill's composite staleness score weights
+`days_since_modified` (via `updated:` or file mtime), so a freshly
+updated entry will score below the stale threshold on the next run.

@@ -33,7 +33,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                       | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 1 skill, 6 MCPs          |
-| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 14 agents, 4 commands, 1 skill                  |
+| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 14 agents, 4 commands, 1 skill                 |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform   | 2 agents, 5 commands, 1 skill, 1 MCP           |
 
@@ -57,6 +57,23 @@ Eight plugins connect to MCP servers. Authentication requirements vary by server
 | `yellow-research` | ast-grep   | No API key — requires local `ast-grep` binary                       |
 | `yellow-ruvector` | ruvector   | Local stdio — no auth required                                      |
 | `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                        |
+
+### Context7 (user-level MCP)
+
+Provides up-to-date library documentation for LLMs. Works without an API key but
+with lower rate limits.
+
+**Free (no key):** Works out of the box. The plugin connects to
+`https://mcp.context7.com/mcp` with no configuration needed.
+
+**Free API key (higher rate limits):** Create an account at
+[context7.com/dashboard](https://context7.com/dashboard) and generate an API key
+(format: `ctx7sk_...`). Then configure it in your Claude Code settings:
+
+```bash
+# In Claude Code, run /mcp → select context7 → edit config → add header:
+# "headers": { "CONTEXT7_API_KEY": "ctx7sk_your_key_here" }
+```
 
 ### DeepWiki & Devin (yellow-devin)
 

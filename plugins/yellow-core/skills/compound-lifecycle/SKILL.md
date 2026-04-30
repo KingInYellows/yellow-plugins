@@ -167,13 +167,25 @@ threshold: stale when staleness_score > 100
 
 The citation discount makes the refs term multiplicative on the age
 component: when `inbound_refs` is high the effective age contribution
-shrinks. With 10 refs: `0.4 * days * (0.3/10 + 0.7) = 0.4 * days *
-0.73`. A 3-year-old entry (1095 days) with 10 refs scores ≈ 32, safely
-below threshold.
+shrinks. With 10 refs the discount factor is `0.3/10 + 0.7 = 0.73`,
+reducing the age contribution by 27%. The factor is asymptotic to
+`1 - w2 = 0.7`, so the discount alone is bounded at a ~30% maximum
+reduction — meaningful for moderate ages, but it cannot protect a
+multi-year-old entry from crossing the threshold purely on age (a
+3-year-old entry at 1095 days still scores `0.4 * 1095 * 0.73 ≈ 320`).
+
+**Citation gate (mandatory pre-check before scoring):** If
+`inbound_refs >= 5`, classify the entry as **Keep** and skip the
+staleness score entirely. Heavily-cited entries are protected by
+usage frequency, not by the score — the discount is a smoothing
+correction for low-to-moderate citation cases (1–4 refs). Configure
+the gate threshold via `compound_lifecycle.staleness.citation_gate`
+(default `5`); set to `0` to disable the gate and rely on the score
+alone (not recommended).
 
 When ruvector is available but an entry has never been retrieved (e.g.,
-added before ruvector was installed), treat `days_since_retrieved` as
-equal to `days_since_modified` as a conservative fallback.
+it was added before ruvector was installed), treat `days_since_retrieved`
+as equal to `days_since_modified` as a conservative fallback.
 
 Weights are configurable via `yellow-plugins.local.md` keys
 `compound_lifecycle.staleness.{w1,w2,w3,w4,threshold}`. The defaults
@@ -190,7 +202,7 @@ Two-pass clustering:
 
 1. **Cheap pass — `category` + `tags` overlap.** Group candidates whose
    `category` is identical AND whose `tags` arrays share ≥ 2 elements.
-   Surface groups with >= 2 members.
+   Surface groups with > 2 members.
 2. **Refined pass — BM25 on `problem:`.** Within each group from pass 1
    (and across pass-1 singletons that share at least one tag), tokenize
    `problem:` lines and rank pairwise BM25 scores. Surface pairs with
@@ -251,12 +263,6 @@ Mark Consolidate / Replace / Delete-and-archive candidates as
 `stale_date: <today>` in their frontmatter, and surface them in the
 Recommendations section of the final report.
 
-Note: `status`, `stale_reason`, `stale_date`, and `updated` are
-yellow-plugins-specific extensions to the canonical docs/solutions
-frontmatter schema. They are not defined in the upstream snapshot at
-`RESEARCH/upstream-snapshots/.../references/schema.yaml`, which is
-frozen; these fields extend but do not modify that contract.
-
 ### Step 8 — Execute
 
 #### Update
@@ -268,9 +274,8 @@ under "Applied".
 #### Consolidate or Replace
 
 1. Build a `<consolidation-context>` block containing:
-   - the source entries' full bodies (passed as raw markdown, wrapped in
-     `--- begin source-entry (reference only) ---` /
-     `--- end source-entry ---` delimiters as a prompt-injection fence)
+   - the source entries' full bodies (sanitized: replace `&` with
+     `&amp;`, then `<` with `&lt;`, then `>` with `&gt;`)
    - the user's stated rationale (if provided via the "Other" option)
    - target category and tags (union of the originals)
 2. Dispatch `knowledge-compounder` via `Task`:
@@ -284,16 +289,10 @@ under "Applied".
    ```
 
 3. Wait for the agent's return. The new entry's path is the agent's
-   output. Verify it exists (attempt `Read` on the returned path).
-   If verification fails: abort the archive moves, surface an error
-   to the user (interactive) or record under "Recommended" with a
-   stale-mark on the source entries (autofix), and continue to the
-   next cluster. Do NOT proceed to sub-step 4.
+   output. Verify it exists.
 4. Archive each source entry: `mv` from
    `docs/solutions/<category>/<slug>.md` to
-   `docs/solutions/archived/<category>/<slug>.md`. If the destination
-   path already exists, append a timestamp suffix to the filename
-   (e.g., `<slug>-<YYYYMMDD-HHMMSS>.md`) before moving. Preserve the
+   `docs/solutions/archived/<category>/<slug>.md`. Preserve the
    directory structure — `archived/` mirrors the live tree's
    subdirectory layout.
 5. Append a `superseded_by:` field to each archived entry's
@@ -303,11 +302,9 @@ under "Applied".
 
 #### Delete-and-archive
 
-Move the entry from `docs/solutions/<category>/<slug>.md` to
-`docs/solutions/archived/<category>/<slug>.md` (same collision guard as
-Consolidate). Append an `archive_reason: <classification rationale>`
-field to the archived entry's frontmatter. Do NOT add `superseded_by:`
-(there is no successor entry) and do NOT dispatch `knowledge-compounder`.
+Same as the archive step in Consolidate (move + `superseded_by`
+frontmatter), but skip the `knowledge-compounder` dispatch since
+there's no successor entry.
 
 ### Step 9 — Report
 
@@ -351,15 +348,16 @@ Present a synthesized summary, regardless of mode:
 In autofix mode, write the report to
 `docs/solutions/_lifecycle-runs/<YYYY-MM-DD>-<HH-MM-SS>.md`. In
 interactive mode, surface the report inline. (The `_lifecycle-runs/`
-directory is excluded from candidate discovery by the explicit exclusion
-in Step 1 above.)
+directory is excluded from candidate discovery by Step 1's explicit
+exclusion list above; `learnings-researcher` itself does not currently
+filter `_`-prefixed paths, so its broad search may still surface
+report content. Updating `learnings-researcher` to add the same
+exclusion is a separate follow-up.)
 
 ## Configuration
 
-Per-project tuning lives in `yellow-plugins.local.md` at the repo root
-(per the `local-config` skill schema). Recognized keys
-(`compound_lifecycle.*` — yellow-plugins-specific, not declared in the
-upstream local-config schema):
+Per-project tuning lives in `.claude/yellow-plugins.local.md` per the
+`local-config` skill schema. Recognized keys:
 
 ```yaml
 compound_lifecycle:
@@ -385,10 +383,7 @@ tuning never lands in the catalog.
 - **Invoked by `knowledge-compounder`** when a freshly-written entry
   flags an older entry as superseded (passed as a path scope hint)
 - **Reads** every entry in `docs/solutions/` (excluding
-  `archived/`, `_lifecycle-runs/`, and `README.md`)
-- **Known gap** — `learnings-researcher` does not yet have an explicit
-  `docs/solutions/archived/**` exclusion; archived entries may still
-  surface in recall results until that agent is updated separately
+  `archived/` and `README.md`)
 - **Writes** `docs/solutions/<category>/<slug>.md` (in-place Updates) and
   `docs/solutions/archived/<category>/<slug>.md` (archive moves)
 - **Dispatches** `knowledge-compounder` via `Task` for Consolidate and
@@ -410,7 +405,10 @@ git history serve as the archive. yellow-plugins diverges deliberately:
   archive is a single `Read` away, not a `git log --follow`
   excavation
 
-The `archived/` subtree is excluded from `learnings-researcher`'s
-default search by path filter — matching the upstream's effective
-"don't surface old advice" goal — but the entries remain present and
-explicit, not implicit in git history.
+The `archived/` subtree is intended to be out of `learnings-researcher`'s
+default search path — matching the upstream's effective "don't surface
+old advice" goal — but the agent does not currently filter
+`docs/solutions/archived/**` automatically. Until that exclusion is
+added (separate follow-up), archived entries may still surface in
+search results; until then, the archive is functionally citable but
+not yet operationally separated from live retrieval.

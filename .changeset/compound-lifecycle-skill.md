@@ -54,8 +54,11 @@ default search by glob — the live catalog stays clean.
 **Per-project tuning** via `yellow-plugins.local.md`'s
 `compound_lifecycle.staleness.{w1,w2,w3,w4,threshold}` and
 `compound_lifecycle.overlap.{bm25_percentile,cosine_review,
-cosine_high_confidence}` keys (forward-declared in the `local-config`
-skill schema; no schema migration needed).
+cosine_high_confidence}` keys. These are yellow-plugins-specific
+extensions and are not yet declared in the `local-config` skill schema;
+they parse silently under the schema's graceful-degradation rule (no
+validation is performed). A formal schema entry can be added in a
+follow-up if validation becomes desirable.
 
 **Autofix mode** for scheduled background runs: applies unambiguous
 Updates only; marks Consolidate / Replace / Delete-and-archive as
