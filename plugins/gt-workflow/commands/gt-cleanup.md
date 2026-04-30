@@ -178,7 +178,7 @@ For each branch:
 
 ```bash
 gh pr list --repo "$REPO" \
-  --head "$BRANCH_NAME" --state all --json state --limit 100
+  --head "$BRANCH_NAME" --state all --json state,mergedAt --limit 100
 ```
 
 **Do NOT suppress stderr.** Add a `sleep 0.2` between lookups to avoid
@@ -192,7 +192,11 @@ triggering GitHub secondary rate limits. If `gh pr list` fails:
 
 Parse the result:
 - If **all** PRs have state `CLOSED` or `MERGED`: branch is a **Closed PR**
-  candidate.
+  candidate. Additionally, if **any** of the closed-state PRs has
+  `mergedAt: null` (closed without landing — could be queue-ejected, abandoned,
+  or cancelled), tag the branch as `closed_not_merged=true` for use in
+  Phase 4. PRs with state `MERGED` always have a non-null `mergedAt` and do
+  not trigger this tag.
 - If **any** PR has state `OPEN`: branch has an active PR — exclude from
   **Closed PR** and **Stale** categories.
 - If **no PRs** found: not a closed-PR candidate (may still be stale).
@@ -313,8 +317,18 @@ Where `<action>` is:
 
 **If "Delete all" or "Sync all" is chosen:**
 
+For the **Closed PR** category specifically: if any branches in the
+deletion set have `closed_not_merged=true`, prepend the data-loss warning
+with a count notice. This surfaces queue-ejected, abandoned, or cancelled
+PRs that would otherwise look identical to merged PRs:
+
+```
+N of these branches had PRs closed without merging (may be queue-ejected,
+abandoned, or cancelled). Verify before proceeding.
+```
+
 For deletion categories, if any branches have unique commits not on trunk,
-display a data-loss warning before executing:
+display the data-loss warning before executing:
 
 ```
 ⚠️  N branches have commits not on trunk:
@@ -379,6 +393,12 @@ Options:
 1. <Delete/Sync> this branch
 2. Skip
 ```
+
+For branches in the Closed PR category with `closed_not_merged=true`, replace
+the `PR status:` line with `closed (no merge — verify before deleting)` to
+make the unmerged-close state visible at the per-branch confirmation point.
+The existing AskUserQuestion serves as the confirmation step — no extra
+prompt is needed.
 
 Execute the chosen action with the same error handling as batch mode.
 
