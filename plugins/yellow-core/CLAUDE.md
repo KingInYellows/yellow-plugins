@@ -56,7 +56,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (6)
+### Skills (7)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `compound-lifecycle` — audit, refresh, and consolidate `docs/solutions/`
@@ -64,6 +64,10 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   and AskUserQuestion-gated consolidation hand-off; archives superseded
   entries to `docs/solutions/archived/` rather than deleting them
 - `create-agent-skills` — guidance for creating skills and agents
+- `debugging` — systematic root-cause debugging with causal-chain gate,
+  prediction-for-uncertain-links hypothesis testing, three-failed-attempts
+  smart escalation, and conditional defense-in-depth/post-mortem; routes to
+  `gt submit` / `/yellow-core:workflows:brainstorm` / `/yellow-core:workflows:compound`
 - `git-worktree` — git worktree management for parallel development
 - `local-config` — yellow-plugins.local.md per-project config schema (internal)
 - `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)

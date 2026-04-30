@@ -2,16 +2,17 @@
 
 **Date:** 2026-04-28 (decomposition split 2026-04-29; reconciled 2026-04-30)
 **Source plan:** `plans/everyinc-merge.md` (backbone — must merge to `main` before this plan runs)
-**Status:** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 shipped via PR #287; item #12 shipped via PR #293; phase-0 snapshots + plan reconciliation shipped via PR #300. **10 parallel branches remain** (items #4 and #12 are both done; the runway is fully unblocked).
+**Status:** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 shipped via PR #287; item #12 shipped via PR #293; phase-0 snapshots + plan reconciliation shipped via PR #300; **item #6 shipped via PR #296** (`ce3a5d7`, merged 2026-04-30). **9 parallel branches remain** (items #4, #6, and #12 are done; the runway is fully unblocked).
 
 ## Reconciliation 2026-04-30
 
-After the backbone merged, two of the 12 stack items already changed state:
+After the backbone merged, three of the 12 stack items already changed state:
 
 - **Item #4 (`fix/git-worktree-and-local-config-expansion`, W3.4 + W3.6) — DONE.** Shipped via PR #287 as a Wave 3 trial (`bb5855e` on `main`). Not on the parallel-runway anymore.
+- **Item #6 (`feat/compound-lifecycle-skill`, W3.10) — DONE.** Shipped via PR #296 (merged 2026-04-30 as `ce3a5d7` on `main`). Adds `plugins/yellow-core/skills/compound-lifecycle/SKILL.md`. Not on the parallel-runway anymore.
 - **Item #12 (`feat/plugin-contract-reviewer`, W3.15) — DONE.** Shipped via PR #293 (squash-merged 2026-04-30 as `f3985d8` on `main`). Adds `plugins/yellow-review/agents/review/plugin-contract-reviewer.md` (~241 lines), wires the dispatch table in `review-pr.md` and `review-all.md`, and ships its own changeset. Item #5 (`feat/agent-native-reviewers`) — when it lands — should add its three new personas alongside the now-merged plugin-contract-reviewer in the dispatch table.
 
-**Effective parallel branch count for this wave:** **10 branches.** Items #4 and #12 are accounted for outside the parallel-runway.
+**Effective parallel branch count for this wave:** **9 branches.** Items #4, #6, and #12 are accounted for outside the parallel-runway.
 
 **CE upstream SHA:** unchanged (`e5b397c9d1883354f03e338dd00f98be3da39f9f` / `compound-engineering-v3.3.2`). No new releases to incorporate.
 
@@ -51,7 +52,7 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 <!-- stack-topology: parallel -->
 <!-- stack-trunk: main -->
 
-**Original count:** 12 parallel branches from `main`. **As of 2026-04-30 reconciliation:** item #4 is DONE (PR #287); item #12 is IN FLIGHT (PR #293). Active runway is **10 branches**. Each remaining branch is independent (no cross-branch file overlap) and can be developed, reviewed, and merged in any order. Branch creation is just-in-time per `/workflows:work` Phase 1b parallel topology.
+**Original count:** 12 parallel branches from `main`. **As of 2026-04-30 reconciliation:** items #4, #6, and #12 are DONE (PRs #287, #296, #293). Active runway is **9 branches**. Each remaining branch is independent (no cross-branch file overlap) and can be developed, reviewed, and merged in any order. Branch creation is just-in-time per `/workflows:work` Phase 1b parallel topology.
 
 ### 1. feat/ce-debug-skill
 - **Type:** feat
@@ -90,12 +91,13 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 - **Depends on:** (backbone merged)
 - **Notes:** plugin-dev plugin does not currently exist (16 plugins present). Decide at execution time: create plugin-dev OR adopt skills under yellow-core. The decision affects changeset (plugin-dev minor initial release vs yellow-core minor).
 
-### 6. feat/compound-lifecycle-skill
+### 6. feat/compound-lifecycle-skill — **DONE (PR #296, merged 2026-04-30 as `ce3a5d7`)**
 - **Type:** feat
 - **Description:** compound-lifecycle skill — staleness detection, overlap detection, archive-don't-delete consolidation
 - **Scope:** NEW plugins/yellow-core/skills/compound-lifecycle/SKILL.md, NEW docs/solutions/archived/
 - **Tasks:** W3.10
 - **Depends on:** (backbone merged)
+- **Status:** Shipped. Skill file present at `plugins/yellow-core/skills/compound-lifecycle/SKILL.md` on `main`.
 
 ### 7. feat/yellow-debt-confidence-calibration
 - **Type:** feat
@@ -145,3 +147,18 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 ## Migration & Rollback
 
 Per-component reverts: each Wave 3 PR is independent; reverting one does not affect others. Backbone (`plans/everyinc-merge.md`) must remain merged.
+
+## Stack Progress
+<!-- Updated by workflows:work. Do not edit manually. -->
+- [ ] 1. feat/ce-debug-skill
+- [ ] 2. feat/yellow-docs-doc-review
+- [ ] 3. feat/resolve-pr-cluster-and-actionability
+- [x] 4. fix/git-worktree-and-local-config-expansion (completed 2026-04-30 via PR #287)
+- [ ] 5. feat/agent-native-reviewers
+- [x] 6. feat/compound-lifecycle-skill (completed 2026-04-30 via PR #296)
+- [ ] 7. feat/yellow-debt-confidence-calibration
+- [ ] 8. feat/ideation-skill
+- [ ] 9. feat/cross-vendor-session-history
+- [ ] 10. feat/optimize-skill
+- [ ] 11. docs/yellow-codex-and-composio-research
+- [x] 12. feat/plugin-contract-reviewer (completed 2026-04-30 via PR #293)

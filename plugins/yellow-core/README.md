@@ -66,6 +66,7 @@ TypeScript, Python, Rust, and Go.
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `compound-lifecycle`  | Audit, refresh, and consolidate `docs/solutions/` with composite-scored staleness detection, BM25+cosine overlap clustering, and archive superseded entries       |
 | `create-agent-skills` | Guidance for creating skills and agents                                                                                                                           |
+| `debugging`           | Systematic root-cause debugging with causal-chain gate, prediction-for-uncertain-links hypotheses, three-failed-attempts smart escalation, and conditional defense-in-depth |
 | `git-worktree`        | Git worktree management for parallel development                                                                                                                  |
 
 ## MCP Servers

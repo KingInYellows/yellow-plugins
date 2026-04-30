@@ -26,7 +26,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
 | `yellow-chatprd`      | ChatPRD MCP integration with document management and Linear bridging                                        | 4 agents, 6 commands, 1 skill, 1 MCP           |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 8 commands, 2 skills, 1 hook         |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 8 commands, 6 skills               |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 8 commands, 7 skills               |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 3 agents, 5 commands, 1 skill                  |
@@ -260,7 +260,7 @@ yellow-plugins/
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
 │   ├── yellow-chatprd/        # ChatPRD integration (4 agents, 6 commands, 1 skill, 1 MCP)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 8 commands, 2 skills, 1 hook)
-│   ├── yellow-core/           # Dev toolkit (17 agents, 8 commands, 6 skills)
+│   ├── yellow-core/           # Dev toolkit (17 agents, 8 commands, 7 skills)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)
 │   ├── yellow-docs/           # Documentation (3 agents, 5 commands, 1 skill)
