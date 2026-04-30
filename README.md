@@ -39,13 +39,11 @@ Add the marketplace, then install individual plugins:
 
 ## MCP Servers & Authentication
 
-Nine plugins connect to MCP servers. Authentication requirements vary by server.
+Eight plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                |
 | ----------------- | ---------- | ------------------------------------------------------------------- |
 | `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                |
-| `yellow-core`     | Context7   | Free (no key); optional API key for higher rate limits              |
-| `yellow-core`     | Ceramic    | OAuth (browser popup on first `ceramic_search` use)                 |
 | `yellow-chatprd`  | ChatPRD    | OAuth (browser popup on first use)                                  |
 | `yellow-devin`    | DeepWiki   | Free for public repos; `DEVIN_SERVICE_USER_TOKEN` for private repos |
 | `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                |
@@ -59,23 +57,6 @@ Nine plugins connect to MCP servers. Authentication requirements vary by server.
 | `yellow-research` | ast-grep   | No API key — requires local `ast-grep` binary                       |
 | `yellow-ruvector` | ruvector   | Local stdio — no auth required                                      |
 | `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                        |
-
-### Context7 (yellow-core)
-
-Provides up-to-date library documentation for LLMs. Works without an API key but
-with lower rate limits.
-
-**Free (no key):** Works out of the box. The plugin connects to
-`https://mcp.context7.com/mcp` with no configuration needed.
-
-**Free API key (higher rate limits):** Create an account at
-[context7.com/dashboard](https://context7.com/dashboard) and generate an API key
-(format: `ctx7sk_...`). Then configure it in your Claude Code settings:
-
-```bash
-# In Claude Code, run /mcp → select context7 → edit config → add header:
-# "headers": { "CONTEXT7_API_KEY": "ctx7sk_your_key_here" }
-```
 
 ### DeepWiki & Devin (yellow-devin)
 

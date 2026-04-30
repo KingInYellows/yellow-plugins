@@ -31,7 +31,7 @@ yellow-core integration before reviewing real PRs.
 
 ## Agents
 
-### Review (12)
+### Review (13)
 
 | Agent                          | Description                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -41,6 +41,7 @@ yellow-core integration before reviewing real PRs.
 | `reliability-reviewer`         | Production reliability: error handling, retries, timeouts, cascades (conditional; new in Wave 2)             |
 | `project-standards-reviewer`   | Frontmatter, references, cross-platform portability (always selected; new in Wave 2)                         |
 | `adversarial-reviewer`         | Constructed failure scenarios across boundaries (conditional; new in Wave 2)                                 |
+| `plugin-contract-reviewer`     | Breaking changes to plugin public surface — subagent_type / command / skill / MCP-tool renames, manifest field changes, hook contract changes (conditional; new in Wave 3) |
 | `pr-test-analyzer`             | Test coverage and behavioral completeness                                                                    |
 | `comment-analyzer`             | Comment accuracy and rot detection                                                                           |
 | `code-simplifier`              | Simplification preserving functionality (final pass)                                                         |
