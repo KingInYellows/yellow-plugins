@@ -42,4 +42,10 @@ detection rules.
 
 Note: README.md and the plugin CLAUDE.md "Agents (N)" line had not been
 caught up to the Wave 2 persona additions (was 7, should have been 13);
-this PR brings both to 14 in lockstep with the new agent.
+this PR brings both to 14 in lockstep with the new agent. Also catches
+up the yellow-core README row (was `13 agents, 7 commands, 4 skills, 2
+MCPs`; should be `17 agents, 8 commands, 5 skills, 0 MCPs` per
+yellow-core's current on-disk contents — confirmed by directly counting
+`plugins/yellow-core/{agents,commands,skills}` and inspecting
+`plugins/yellow-core/.claude-plugin/plugin.json`'s empty `mcpServers`
+block).

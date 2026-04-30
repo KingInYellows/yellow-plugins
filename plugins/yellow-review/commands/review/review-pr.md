@@ -322,13 +322,13 @@ Spawn unconditionally:
 | `performance-reviewer` | `yellow-core:review:performance-reviewer` | performance | Diff contains DB queries, data transforms, caching, async hot paths, OR gross line count > 500 |
 | `architecture-strategist` | `yellow-core:review:architecture-strategist` | architecture | Diff touches 10+ files across 3+ directories |
 | `pattern-recognition-specialist` | `yellow-core:review:pattern-recognition-specialist` | maintainability | Diff introduces new directories or new file-type conventions; diff touches `agents/*.md`, `commands/*.md`, `skills/*/SKILL.md`, `plugin.json` (plugin-authoring convention checks) |
+| `plugin-contract-reviewer` | `yellow-review:review:plugin-contract-reviewer` | plugin-contract | Diff touches `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`, `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or `plugins/*/hooks/` (sister to `pattern-recognition-specialist`; see agent body for surface definitions) |
 | `code-simplicity-reviewer` | `yellow-core:review:code-simplicity-reviewer` | maintainability | Gross line count > 300 |
 | `polyglot-reviewer` | `yellow-core:review:polyglot-reviewer` | correctness | Diff includes language-specific files where a generalist lens adds value (kept as a generalist fallback alongside the new specialist personas) |
 | `pr-test-analyzer` | `yellow-review:review:pr-test-analyzer` | testing | PR contains files matching `*test*`, `*spec*`, `__tests__/*`, OR adds testable logic |
 | `comment-analyzer` | `yellow-review:review:comment-analyzer` | documentation | Diff contains `/**`, `"""`, `'''`, or doc-comment annotations; OR diff modifies `.md` documentation |
 | `type-design-analyzer` | `yellow-review:review:type-design-analyzer` | types | Files have extensions `.ts`, `.py`, `.rb`, `.go`, `.rs` AND diff contains type-shape keywords (`interface`, `type`, `class`, `struct`, `enum`, `model`, `dataclass`) |
 | `silent-failure-hunter` | `yellow-review:review:silent-failure-hunter` | reliability | Diff contains `try`/`catch`/`except`/`rescue`/`recover` OR fallback patterns (`\|\| null`, `?? undefined`, `or None`) |
-| `plugin-contract-reviewer` | `yellow-review:review:plugin-contract-reviewer` | plugin-contract | Diff touches `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`, `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or `plugins/*/hooks/`. Detects breaking changes to plugin public surface (subagent_type renames, command/skill/MCP-tool renames, manifest field changes, hook contract changes). Sister to `pattern-recognition-specialist` — pattern-rec catches new convention drift, plugin-contract catches breaks to existing surface. |
 
 #### Optional supplementary
 
@@ -438,7 +438,7 @@ tool. Each agent receives:
 
 Each persona reviewer returns JSON matching the **extended compact-return
 schema below** (yellow-plugins keystone adds `category` to the upstream
-9-field schema documented in
+10-field schema documented in
 `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`;
 the upstream file is the canonical source for aggregation rules but not
 for the schema itself):
@@ -467,12 +467,11 @@ for the schema itself):
 ```
 
 `plugin-contract-reviewer` extends this schema with two optional
-per-finding fields: `breaking_change_class` (`name-rename | signature-change
-| removal | semantics-change`) and `migration_path` (concrete remediation
-string or `null`). The validator in Step 6.1 accepts these as optional
-extensions; other reviewers omit them. The orchestrator carries them
-through aggregation and surfaces them in the Step 10 report when
-present.
+per-finding fields: `breaking_change_class` and `migration_path`. See
+the agent body for enum values and semantics. The validator in Step
+6.1 accepts these as optional extensions; other reviewers omit them.
+The orchestrator carries them through aggregation and surfaces them in
+the Step 10 report when present.
 
 When a return fails compact-return validation (missing top-level field,
 malformed value, wrong type), drop the entire return. Record drop count in
@@ -554,35 +553,36 @@ Apply the aggregation steps from
      `owner ∈ {review-fixer, downstream-resolver, human, release}`,
      `confidence ∈ {0, 25, 50, 75, 100}`, `line` positive int,
      `pre_existing`/`requires_verification` boolean.
-   - Note: `category` is a yellow-plugins extension to the upstream 9-field
+   - Note: `category` is a yellow-plugins extension to the upstream 10-field
      schema documented in
      `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`.
      Returns missing it are dropped here; do not silently accept.
    - **Optional extensions** (do NOT drop the finding when absent):
      `breaking_change_class ∈ {name-rename, signature-change, removal,
-     semantics-change}` and `migration_path` (string or null). Both are
-     emitted only by `plugin-contract-reviewer`. Other reviewers omit
-     them. When `breaking_change_class` is present, validate it is one of
-     the four enum values; drop the finding (not the whole return) when
-     the value is malformed.
-   - **Drop-granularity asymmetry (intentional).** Required-field
-     violations drop the WHOLE return (the reviewer's entire output is
-     malformed and unsafe to merge). Optional-extension violations drop
-     only the affected finding (the rest of the return is well-formed
-     and useful). Future extensions should follow the same pattern:
-     required = whole-return drop, optional = single-finding drop.
+     semantics-change}` and `migration_path` (string or null). Emitted
+     only by `plugin-contract-reviewer`; see the agent body for
+     definitions. When `breaking_change_class` is present and not one
+     of the four enum values, **strip both extension fields from the
+     finding and keep the rest of the finding** rather than dropping
+     it entirely — a contract finding without classification is more
+     useful than no finding at all. Required-field violations still
+     drop the WHOLE return (the reviewer's entire output is malformed
+     and unsafe to merge).
    - Record drop count, separately for compact-return base-schema drops
-     and plugin-contract extension drops, so an unexpected fifth
-     `breaking_change_class` value (or any future-added enum) surfaces in
-     Coverage as a discrete signal rather than being absorbed into the
-     general drop count.
+     and plugin-contract extension strips, so an unexpected
+     `breaking_change_class` value surfaces in Coverage as a discrete
+     signal rather than being absorbed into the general drop count.
 2. **Deduplicate.** Fingerprint =
    `normalize(file) + line_bucket(line, ±3) + normalize(title)`. On match,
    merge: keep highest severity, keep highest anchor, note all reviewers
    that flagged it, and on `pre_existing` conflict keep `false` (treat as
    new). Without the `pre_existing: false` tie-break, a finding that one
    reviewer flagged as a new defect could be silently routed to the
-   "Pre-existing" section and dropped from the actionable queue. Parity
+   "Pre-existing" section and dropped from the actionable queue. When
+   one participant carries `breaking_change_class`/`migration_path` and
+   the other does not, **preserve the extension fields from the
+   contract-bearing finding in the merged result** so the Step 10
+   Plugin Contract Changes table does not lose classification. Parity
    rule with `review-all.md` Step 8.3.
 3. **Cross-reviewer agreement promotion.** When 2+ independent reviewers
    flag the same fingerprint, promote anchor by one step:
@@ -772,14 +772,19 @@ NO_PRIOR_LEARNINGS.)
 ### Residual Actionable Work
 - <file:line> — <title> — <route>
 
-### Plugin Contract Changes (when plugin-contract-reviewer ran AND produced findings)
-| # | File | Change | Class | Migration Path |
-|---|------|--------|-------|----------------|
-| 1 | <repo-relative path> | <one-line change description> | <name-rename \| signature-change \| removal \| semantics-change> | <concrete migration path or null> |
+### Plugin Contract Changes
 
-(Replace the placeholder row above with actual findings. Omit the entire
-section when `plugin-contract-reviewer` did not run or produced zero
-findings — do NOT emit the placeholder row literally.)
+When `plugin-contract-reviewer` produced one or more findings, emit a
+table with columns: `# | File | Change | Class | Migration Path`. Class
+is one of `name-rename | signature-change | removal | semantics-change`.
+Migration Path is a concrete remediation string or `null`. Omit the
+entire section when `plugin-contract-reviewer` did not run or produced
+zero findings AND the plugin-contract extension-strip count is zero.
+When the extension-strip count is nonzero but no contract findings made
+it through, emit the section with only an explanatory note: "N
+finding(s) had `breaking_change_class` stripped — see Coverage" so a
+reader can distinguish "no contract changes detected" from "contract
+findings were produced but extension classification was malformed."
 
 ### Coverage
 - Reviewers run: <list>
@@ -787,7 +792,7 @@ findings — do NOT emit the placeholder row literally.)
 - Findings suppressed at confidence < 75: <count>
 - Findings demoted to soft-bucket: <count>
 - Compact-return validation drops (base schema): <count>
-- Plugin-contract extension drops (malformed `breaking_change_class`): <count or omit when zero>
+- Plugin-contract extension strips (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
 
 ### Verdict
