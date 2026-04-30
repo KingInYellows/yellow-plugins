@@ -328,6 +328,7 @@ Spawn unconditionally:
 | `comment-analyzer` | `yellow-review:review:comment-analyzer` | documentation | Diff contains `/**`, `"""`, `'''`, or doc-comment annotations; OR diff modifies `.md` documentation |
 | `type-design-analyzer` | `yellow-review:review:type-design-analyzer` | types | Files have extensions `.ts`, `.py`, `.rb`, `.go`, `.rs` AND diff contains type-shape keywords (`interface`, `type`, `class`, `struct`, `enum`, `model`, `dataclass`) |
 | `silent-failure-hunter` | `yellow-review:review:silent-failure-hunter` | reliability | Diff contains `try`/`catch`/`except`/`rescue`/`recover` OR fallback patterns (`\|\| null`, `?? undefined`, `or None`) |
+| `plugin-contract-reviewer` | `yellow-review:review:plugin-contract-reviewer` | plugin-contract | Diff touches `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`, `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or `plugins/*/hooks/`. Detects breaking changes to plugin public surface (subagent_type renames, command/skill/MCP-tool renames, manifest field changes, hook contract changes). Sister to `pattern-recognition-specialist` — pattern-rec catches new convention drift, plugin-contract catches breaks to existing surface. |
 
 #### Optional supplementary
 
@@ -465,6 +466,14 @@ for the schema itself):
 }
 ```
 
+`plugin-contract-reviewer` extends this schema with two optional
+per-finding fields: `breaking_change_class` (`name-rename | signature-change
+| removal | semantics-change`) and `migration_path` (concrete remediation
+string or `null`). The validator in Step 6.1 accepts these as optional
+extensions; other reviewers omit them. The orchestrator carries them
+through aggregation and surfaces them in the Step 10 report when
+present.
+
 When a return fails compact-return validation (missing top-level field,
 malformed value, wrong type), drop the entire return. Record drop count in
 Coverage.
@@ -549,7 +558,24 @@ Apply the aggregation steps from
      schema documented in
      `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`.
      Returns missing it are dropped here; do not silently accept.
-   - Record drop count.
+   - **Optional extensions** (do NOT drop the finding when absent):
+     `breaking_change_class ∈ {name-rename, signature-change, removal,
+     semantics-change}` and `migration_path` (string or null). Both are
+     emitted only by `plugin-contract-reviewer`. Other reviewers omit
+     them. When `breaking_change_class` is present, validate it is one of
+     the four enum values; drop the finding (not the whole return) when
+     the value is malformed.
+   - **Drop-granularity asymmetry (intentional).** Required-field
+     violations drop the WHOLE return (the reviewer's entire output is
+     malformed and unsafe to merge). Optional-extension violations drop
+     only the affected finding (the rest of the return is well-formed
+     and useful). Future extensions should follow the same pattern:
+     required = whole-return drop, optional = single-finding drop.
+   - Record drop count, separately for compact-return base-schema drops
+     and plugin-contract extension drops, so an unexpected fifth
+     `breaking_change_class` value (or any future-added enum) surfaces in
+     Coverage as a discrete signal rather than being absorbed into the
+     general drop count.
 2. **Deduplicate.** Fingerprint =
    `normalize(file) + line_bucket(line, ±3) + normalize(title)`. On match,
    merge: keep highest severity, keep highest anchor, note all reviewers
@@ -746,12 +772,22 @@ NO_PRIOR_LEARNINGS.)
 ### Residual Actionable Work
 - <file:line> — <title> — <route>
 
+### Plugin Contract Changes (when plugin-contract-reviewer ran AND produced findings)
+| # | File | Change | Class | Migration Path |
+|---|------|--------|-------|----------------|
+| 1 | <repo-relative path> | <one-line change description> | <name-rename \| signature-change \| removal \| semantics-change> | <concrete migration path or null> |
+
+(Replace the placeholder row above with actual findings. Omit the entire
+section when `plugin-contract-reviewer` did not run or produced zero
+findings — do NOT emit the placeholder row literally.)
+
 ### Coverage
 - Reviewers run: <list>
 - Reviewers skipped (graceful degradation): <list with reasons>
 - Findings suppressed at confidence < 75: <count>
 - Findings demoted to soft-bucket: <count>
-- Compact-return validation drops: <count>
+- Compact-return validation drops (base schema): <count>
+- Plugin-contract extension drops (malformed `breaking_change_class`): <count or omit when zero>
 - Past learnings: <"none found" | "N injected">
 
 ### Verdict

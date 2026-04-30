@@ -30,6 +30,7 @@
 | `skills/ce-code-review/SKILL.md` | W2.3, W2.4 | Confidence rubric extraction (tier definitions, FP suppression thresholds, intent-verification format, compact-return schema). 891 lines — extract rubric only. |
 | `skills/ce-compound/SKILL.md` | W2.0a | Track schema (`track: bug|knowledge`, `tags`, `problem`) + context budget precheck pattern. 546 lines — extract schema/precheck only. |
 | `skills/ce-resolve-pr-feedback/SKILL.md` | W1.4 | Resolve-pr fence and resolver-task wiring reference; W3.3 (cluster + actionability) reference for parallel run. |
+| `plugins/compound-engineering/agents/ce-api-contract-reviewer.agent.md` | W3.15 | Source for `plugin-contract-reviewer.md` — adapted from REST-API focus to plugin-contract focus (subagent_type, command/skill/MCP-tool renames, manifest/hook contract changes). Preserves the breaking-change classification framework, drops REST-specific examples. Fetched 2026-04-30 (W3.15 PR). |
 
 ## Wave 3 fetches not in this manifest
 
@@ -42,7 +43,7 @@ The following CE files inform Wave 3 tasks (W3.1, W3.2, W3.5, W3.10, W3.11, W3.1
 - `skills/ce-ideate/` (W3.11)
 - `agents/ce-session-historian.agent.md` (W3.12)
 - `skills/ce-optimize/` incl. `schema.yaml` and `README.md` (W3.14)
-- `agents/ce-api-contract-reviewer.agent.md` (W3.15 — adapted to plugin-contract focus)
+- ~~`agents/ce-api-contract-reviewer.agent.md` (W3.15 — adapted to plugin-contract focus)~~ — **fetched 2026-04-30**, see Snapshot Map above
 - `skills/ce-worktree/` (W3.4 reference)
 
 ## Verification
