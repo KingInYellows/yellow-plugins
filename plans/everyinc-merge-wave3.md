@@ -2,17 +2,20 @@
 
 **Date:** 2026-04-28 (decomposition split 2026-04-29; reconciled 2026-04-30)
 **Source plan:** `plans/everyinc-merge.md` (backbone — must merge to `main` before this plan runs)
-**Status:** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 shipped via PR #287; item #12 shipped via PR #293; phase-0 snapshots + plan reconciliation shipped via PR #300; **item #6 shipped via PR #296** (`ce3a5d7`, merged 2026-04-30). **9 parallel branches remain** (items #4, #6, and #12 are done; the runway is fully unblocked).
+**Status:** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 shipped via PR #287; item #6 shipped via PR #296; item #12 shipped via PR #293; phase-0 snapshots + plan reconciliation shipped via PR #300. **Sweep 2026-04-30 evening:** items #1, #3, and #11 shipped via PRs #306 (`cc3d1f9`), #307 (`39e5d7a`), and #308 (`9826330`). **6 parallel branches remain** (items #4, #6, #12, #1, #3, and #11 are done).
 
 ## Reconciliation 2026-04-30
 
-After the backbone merged, three of the 12 stack items already changed state:
+After the backbone merged, six of the 12 stack items already changed state:
 
+- **Item #1 (`feat/ce-debug-skill`, W3.1) — DONE.** Shipped via PR #306 (squash-merged 2026-04-30 as `cc3d1f9` on `main`). Adds `plugins/yellow-core/skills/debugging/SKILL.md` (5-phase root-cause workflow with causal-chain gate). Not on the parallel-runway anymore.
+- **Item #3 (`feat/resolve-pr-cluster-and-actionability`, W3.3) — DONE.** Shipped via PR #307 (squash-merged 2026-04-30 as `39e5d7a` on `main`). Adds Step 3c (actionability filter) + Step 3d (file+region clustering with transitive merge) to `/yellow-review:resolve`; updates `pr-comment-resolver` agent input contract; adds `resolve_pr.cluster_line_distance` to local-config schema. Not on the parallel-runway anymore.
 - **Item #4 (`fix/git-worktree-and-local-config-expansion`, W3.4 + W3.6) — DONE.** Shipped via PR #287 as a Wave 3 trial (`bb5855e` on `main`). Not on the parallel-runway anymore.
 - **Item #6 (`feat/compound-lifecycle-skill`, W3.10) — DONE.** Shipped via PR #296 (merged 2026-04-30 as `ce3a5d7` on `main`). Adds `plugins/yellow-core/skills/compound-lifecycle/SKILL.md`. Not on the parallel-runway anymore.
+- **Item #11 (`docs/yellow-codex-and-composio-research`, W3.7 + W3.8) — DONE.** Shipped via PR #308 (squash-merged 2026-04-30 as `9826330` on `main`). Adds `docs/research/yellow-codex-expansion.md` (YES on codex-reviewer learnings integration; YES Option-B on adversarial codex command) and `docs/research/yellow-composio-expansion.md` (NO-GO direct expansion; YES-GO opt-in W3.14 adapter). Research-only — implementation deferred. Not on the parallel-runway anymore.
 - **Item #12 (`feat/plugin-contract-reviewer`, W3.15) — DONE.** Shipped via PR #293 (squash-merged 2026-04-30 as `f3985d8` on `main`). Adds `plugins/yellow-review/agents/review/plugin-contract-reviewer.md` (~241 lines), wires the dispatch table in `review-pr.md` and `review-all.md`, and ships its own changeset. Item #5 (`feat/agent-native-reviewers`) — when it lands — should add its three new personas alongside the now-merged plugin-contract-reviewer in the dispatch table.
 
-**Effective parallel branch count for this wave:** **9 branches.** Items #4, #6, and #12 are accounted for outside the parallel-runway.
+**Effective parallel branch count for this wave:** **6 branches.** Items #1, #3, #4, #6, #11, and #12 are accounted for outside the parallel-runway.
 
 **CE upstream SHA:** unchanged (`e5b397c9d1883354f03e338dd00f98be3da39f9f` / `compound-engineering-v3.3.2`). No new releases to incorporate.
 
@@ -52,14 +55,15 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 <!-- stack-topology: parallel -->
 <!-- stack-trunk: main -->
 
-**Original count:** 12 parallel branches from `main`. **As of 2026-04-30 reconciliation:** items #4, #6, and #12 are DONE (PRs #287, #296, #293). Active runway is **9 branches**. Each remaining branch is independent (no cross-branch file overlap) and can be developed, reviewed, and merged in any order. Branch creation is just-in-time per `/workflows:work` Phase 1b parallel topology.
+**Original count:** 12 parallel branches from `main`. **As of 2026-04-30 evening sweep:** items #1, #3, #4, #6, #11, and #12 are DONE (PRs #306, #307, #287, #296, #308, #293). Active runway is **6 branches**. Each remaining branch is independent (no cross-branch file overlap) and can be developed, reviewed, and merged in any order. Branch creation is just-in-time per `/workflows:work` Phase 1b parallel topology.
 
-### 1. feat/ce-debug-skill
+### 1. feat/ce-debug-skill — **DONE (PR #306, merged 2026-04-30 as `cc3d1f9`)**
 - **Type:** feat
 - **Description:** ce-debug analog skill — test-first systematic debugging, causal chain tracing
 - **Scope:** NEW plugins/yellow-core/skills/debugging/SKILL.md
 - **Tasks:** W3.1
 - **Depends on:** (backbone merged)
+- **Status:** Shipped. Skill file present at `plugins/yellow-core/skills/debugging/SKILL.md` on `main`. Adapted from upstream EveryInc/compound-engineering ce-debug at locked SHA `e5b397c9`. 5-phase workflow with causal-chain gate, prediction-for-uncertain-links, smart escalation, and conditional defense-in-depth/post-mortem.
 
 ### 2. feat/yellow-docs-doc-review
 - **Type:** feat
@@ -68,12 +72,13 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 - **Tasks:** W3.2
 - **Depends on:** (backbone merged)
 
-### 3. feat/resolve-pr-cluster-and-actionability
+### 3. feat/resolve-pr-cluster-and-actionability — **DONE (PR #307, merged 2026-04-30 as `39e5d7a`)**
 - **Type:** feat
 - **Description:** resolve-pr cross-invocation cluster analysis + actionability filter (CE PRs #480, #461)
-- **Scope:** plugins/yellow-review/commands/review/resolve-pr.md
+- **Scope:** plugins/yellow-review/commands/review/resolve-pr.md, plugins/yellow-review/agents/workflow/pr-comment-resolver.md (input contract), plugins/yellow-core/skills/local-config/SKILL.md (`resolve_pr.cluster_line_distance` schema key)
 - **Tasks:** W3.3
 - **Depends on:** (backbone merged)
+- **Status:** Shipped. Step 3c (actionability filter — drops bare LGTM/thanks/+1/looks-good/nice/nit threads via case-insensitive single-line regex) and Step 3d (file+region clustering with transitive ≤10-line merge OR range overlap, tunable via local-config) are live. Step 4 dispatches one resolver per cluster with literal `subagent_type: "yellow-review:workflow:pr-comment-resolver"` and an M3 spawn-cap AskUserQuestion gate. Resolver agent input contract updated to cluster envelope; `CONFLICT:` sentinel added for contradiction reporting reconciled in Step 5.
 
 ### 4. fix/git-worktree-and-local-config-expansion — **DONE (PR #287, merged 2026-04-30)**
 - **Type:** fix
@@ -128,12 +133,13 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 - **Tasks:** W3.14
 - **Depends on:** (backbone merged)
 
-### 11. docs/yellow-codex-and-composio-research
+### 11. docs/yellow-codex-and-composio-research — **DONE (PR #308, merged 2026-04-30 as `9826330`)**
 - **Type:** docs
 - **Description:** yellow-codex + yellow-composio expansion research reports (no implementation, research-level deliverable only)
 - **Scope:** NEW docs/research/yellow-codex-expansion.md, NEW docs/research/yellow-composio-expansion.md
 - **Tasks:** W3.7, W3.8
 - **Depends on:** (backbone merged)
+- **Status:** Shipped. Two reports landed on `main`. Recommendations: (a) **YES** integrate `learnings-researcher` advisory into `codex-reviewer` via optional `--advisory` flag; (b) **YES (Option B)** ship `/codex:adversarial-investigate` as a separate command rather than a flag on `/codex:rescue`; (c) **NO-GO** for direct yellow-composio expansion; (d) **YES-GO** for opt-in W3.14 ce-optimize adapter behind `execution.environment: composio-workbench`. 4 additional codex expansion opportunities deferred for future planning. Implementation deferred to post-Wave-3 follow-up PRs.
 
 ### 12. feat/plugin-contract-reviewer — **DONE (PR #293, merged 2026-04-30 as `f3985d8`)**
 - **Type:** feat
@@ -150,9 +156,9 @@ Per-component reverts: each Wave 3 PR is independent; reverting one does not aff
 
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
-- [ ] 1. feat/ce-debug-skill
+- [x] 1. feat/ce-debug-skill (completed 2026-04-30 via PR #306)
 - [ ] 2. feat/yellow-docs-doc-review
-- [ ] 3. feat/resolve-pr-cluster-and-actionability
+- [x] 3. feat/resolve-pr-cluster-and-actionability (completed 2026-04-30 via PR #307)
 - [x] 4. fix/git-worktree-and-local-config-expansion (completed 2026-04-30 via PR #287)
 - [ ] 5. feat/agent-native-reviewers
 - [x] 6. feat/compound-lifecycle-skill (completed 2026-04-30 via PR #296)
@@ -160,5 +166,5 @@ Per-component reverts: each Wave 3 PR is independent; reverting one does not aff
 - [ ] 8. feat/ideation-skill
 - [ ] 9. feat/cross-vendor-session-history
 - [ ] 10. feat/optimize-skill
-- [ ] 11. docs/yellow-codex-and-composio-research
+- [x] 11. docs/yellow-codex-and-composio-research (completed 2026-04-30 via PR #308)
 - [x] 12. feat/plugin-contract-reviewer (completed 2026-04-30 via PR #293)
