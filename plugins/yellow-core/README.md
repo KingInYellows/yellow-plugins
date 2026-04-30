@@ -62,10 +62,11 @@ TypeScript, Python, Rust, and Go.
 
 ## Skills
 
-| Skill                 | Description                                      |
-| --------------------- | ------------------------------------------------ |
-| `create-agent-skills` | Guidance for creating skills and agents          |
-| `git-worktree`        | Git worktree management for parallel development |
+| Skill                 | Description                                                                                                                                                       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `compound-lifecycle`  | Audit, refresh, and consolidate `docs/solutions/` with composite-scored staleness detection, BM25+cosine overlap clustering, and archive superseded entries       |
+| `create-agent-skills` | Guidance for creating skills and agents                                                                                                                           |
+| `git-worktree`        | Git worktree management for parallel development                                                                                                                  |
 
 ## MCP Servers
 

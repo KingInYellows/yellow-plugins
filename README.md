@@ -26,14 +26,14 @@ Add the marketplace, then install individual plugins:
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
 | `yellow-chatprd`      | ChatPRD MCP integration with document management and Linear bridging                                        | 4 agents, 6 commands, 1 skill, 1 MCP           |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 8 commands, 2 skills, 1 hook         |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 8 commands, 5 skills, 0 MCPs        |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 8 commands, 6 skills               |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 3 agents, 5 commands, 1 skill                  |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                       | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 1 skill, 6 MCPs          |
-| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 14 agents, 4 commands, 1 skill                  |
+| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 14 agents, 4 commands, 1 skill                 |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform   | 2 agents, 5 commands, 1 skill, 1 MCP           |
 
@@ -57,6 +57,23 @@ Eight plugins connect to MCP servers. Authentication requirements vary by server
 | `yellow-research` | ast-grep   | No API key — requires local `ast-grep` binary                       |
 | `yellow-ruvector` | ruvector   | Local stdio — no auth required                                      |
 | `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                        |
+
+### Context7 (user-level MCP)
+
+Provides up-to-date library documentation for LLMs. Works without an API key but
+with lower rate limits.
+
+**Free (no key):** Works out of the box. The plugin connects to
+`https://mcp.context7.com/mcp` with no configuration needed.
+
+**Free API key (higher rate limits):** Create an account at
+[context7.com/dashboard](https://context7.com/dashboard) and generate an API key
+(format: `ctx7sk_...`). Then configure it in your Claude Code settings:
+
+```bash
+# In Claude Code, run /mcp → select context7 → edit config → add header:
+# "headers": { "CONTEXT7_API_KEY": "ctx7sk_your_key_here" }
+```
 
 ### DeepWiki & Devin (yellow-devin)
 
@@ -243,7 +260,7 @@ yellow-plugins/
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
 │   ├── yellow-chatprd/        # ChatPRD integration (4 agents, 6 commands, 1 skill, 1 MCP)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 8 commands, 2 skills, 1 hook)
-│   ├── yellow-core/           # Dev toolkit (17 agents, 8 commands, 5 skills, 0 MCPs)
+│   ├── yellow-core/           # Dev toolkit (17 agents, 8 commands, 6 skills)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)
 │   ├── yellow-docs/           # Documentation (3 agents, 5 commands, 1 skill)
