@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: "DEPRECATED — renamed to project-compliance-reviewer. This stub keeps third-party installs that reference yellow-review:code-reviewer working for one minor version. Use when an external command still passes subagent_type yellow-review:code-reviewer; replace it with yellow-review:project-compliance-reviewer."
+description: "DEPRECATED — renamed to project-compliance-reviewer. This stub keeps third-party installs that reference yellow-review:review:code-reviewer working for one minor version. Use when an external command still passes subagent_type yellow-review:review:code-reviewer; replace it with yellow-review:review:project-compliance-reviewer."
 model: inherit
 tools:
   - Read
@@ -24,8 +24,8 @@ rules). Wave 2 split the responsibility:
 
 ## Migration
 
-Any caller passing `subagent_type: "yellow-review:code-reviewer"` should
-update to `subagent_type: "yellow-review:project-compliance-reviewer"` —
+Any caller passing `subagent_type: "yellow-review:review:code-reviewer"` should
+update to `subagent_type: "yellow-review:review:project-compliance-reviewer"` —
 the closest one-for-one replacement for the rename. If your invocation
 covered general logic-error review, you likely want `correctness-reviewer`
 in addition.
@@ -44,7 +44,7 @@ When invoked, this stub:
   "reviewer": "code-reviewer",
   "findings": [],
   "residual_risks": [
-    "DEPRECATED: yellow-review:code-reviewer is a stub. Re-invoke as yellow-review:project-compliance-reviewer (CLAUDE.md compliance) and/or yellow-review:correctness-reviewer (general logic bugs). This stub will be removed in the next minor version of yellow-review."
+    "DEPRECATED: yellow-review:review:code-reviewer is a stub. Re-invoke as yellow-review:review:project-compliance-reviewer (CLAUDE.md compliance) and/or yellow-review:review:correctness-reviewer (general logic bugs). This stub will be removed in the next minor version of yellow-review."
   ],
   "testing_gaps": []
 }

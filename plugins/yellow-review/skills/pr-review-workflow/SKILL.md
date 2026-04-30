@@ -303,16 +303,22 @@ commits on one branch. Push via `gt submit --no-interactive`.
 To spawn cross-plugin agents from yellow-review commands, use the Task tool:
 
 ```
-Task(subagent_type="yellow-core:security-sentinel",
+Task(subagent_type="yellow-core:review:security-reviewer",
      prompt="Review these files for security issues: <file-list>")
 ```
 
-Agent type names follow the pattern: `yellow-core:<agent-name>`.
+Agent type names follow the pattern: `<plugin>:<dir>:<agent-name>` —
+three segments (plugin id, agent directory under
+`plugins/<plugin>/agents/`, agent name from frontmatter). The example
+above resolves to `plugins/yellow-core/agents/review/security-reviewer.md`.
+`security-reviewer` is the Wave 2 default; the deeper-audit
+`security-sentinel` is the legacy fallback (use the `review_pipeline:
+legacy` opt-in to dispatch it instead).
 
 To spawn the optional Codex supplementary reviewer (requires yellow-codex):
 
 ```
-Task(subagent_type="yellow-codex:codex-reviewer",
+Task(subagent_type="yellow-codex:review:codex-reviewer",
      prompt="Review this PR for bugs, security issues, and quality problems.
              Base branch: <base-ref>. PR title: <title>.")
 ```

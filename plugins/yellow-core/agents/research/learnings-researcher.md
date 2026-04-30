@@ -251,7 +251,7 @@ Invoked by:
 - `/review:pr` Step 3d — pre-pass before reviewer dispatch
 - `/workflows:plan` — informs plan with institutional knowledge
 - `/workflows:brainstorm` — surfaces prior decisions during ideation
-- Standalone via `Task` with `subagent_type: "yellow-core:learnings-researcher"`
+- Standalone via `Task` with `subagent_type: "yellow-core:research:learnings-researcher"`
 
 Output is consumed as fenced advisory prose — no downstream caller parses
 specific field labels — so prioritize distilled, actionable takeaways over

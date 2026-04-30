@@ -127,7 +127,7 @@ again, or run /workflows:plan to generate a more detailed plan."
 Launch via Task tool:
 
 ```text
-subagent_type: yellow-core:repo-research-analyst
+subagent_type: yellow-core:research:repo-research-analyst
 prompt: "Validate this development plan against the actual codebase. Find
 relevant existing code, patterns, file paths, and dependencies that confirm
 or challenge the proposed approach. Identify gaps where the plan references
@@ -182,7 +182,7 @@ If no `## Overview` section exists, use the first 500 characters of the plan.
 Launch via Task tool:
 
 ```text
-subagent_type: yellow-research:research-conductor
+subagent_type: yellow-research:research:research-conductor
 prompt: "Research these specific questions to fill gaps in a development
 plan. The codebase has already been checked — focus on external knowledge:
 library docs, community patterns, best practices, and prior art.

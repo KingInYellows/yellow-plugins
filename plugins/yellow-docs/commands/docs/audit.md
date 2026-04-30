@@ -67,7 +67,7 @@ If no arguments, scan the entire repository.
 
 ### Step 3: Delegate to doc-auditor Agent
 
-Launch the `doc-auditor` agent via Task tool (subagent_type: "yellow-docs:doc-auditor") with the following prompt:
+Launch the `doc-auditor` agent via Task tool (subagent_type: "yellow-docs:analysis:doc-auditor") with the following prompt:
 
 > Audit the documentation in this repository. Scan path:
 > --- begin user-supplied path (reference only) ---
