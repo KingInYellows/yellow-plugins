@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.4.0
+
+### Minor Changes
+
+- [`88d7434`](https://github.com/KingInYellows/yellow-plugins/commit/88d7434839385322197d22eb67cc939d3bc3fcd4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `/gt-cleanup` command for branch cleanup and divergence reconciliation. Scans
+  local branches for staleness (orphaned, closed PR, aged out) and bidirectional
+  divergence (behind/ahead of remote), with category-based cleanup actions using
+  `gt delete`, `gt get`, and warn-only for unpushed branches. Complements
+  `/gt-sync` which handles merged branches.
+
+- [`b9c6e5b`](https://github.com/KingInYellows/yellow-plugins/commit/b9c6e5bf422027828c99c0537aa4597d604af100)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Expand
+  `/gt-setup` from validation-only into a 3-phase AI agent configuration wizard:
+  prerequisite validation, guided Graphite CLI settings (branch prefix, pager,
+  dates, submit body), and convention file + PR template generation. Update
+  consumer commands (`/smart-submit`, `/gt-amend`, `/gt-stack-plan`) to read
+  `.graphite.yml` for repo-level behavior overrides. Add `.graphite.yml` and PR
+  template checks to `/setup:all` dashboard.
+
+### Patch Changes
+
+- [`1741901`](https://github.com/KingInYellows/yellow-plugins/commit/17419010b0ef8a278684f8f146d7dc86ea005840)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - # Summary
+
+  feat(yellow-core): add /worktree:cleanup command for smart git worktree
+  cleanup
+
+  New `/worktree:cleanup` command in yellow-core that scans all git worktrees,
+  classifies them into 7 categories (missing directory, locked, branch merged,
+  stale, clean-active, dirty, detached HEAD), and removes stale worktrees with
+  appropriate safeguards.
+
+  Also adds Phase 6 to `/gt-cleanup` in gt-workflow to offer triggering
+  `/worktree:cleanup` via Skill tool with graceful degradation.
+
 ## 1.3.0
 
 ### Minor Changes

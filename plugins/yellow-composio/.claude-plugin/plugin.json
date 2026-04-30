@@ -1,6 +1,6 @@
 {
   "name": "yellow-composio",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Optional Composio accelerator for batch workflows with usage tracking",
   "author": {
     "name": "KingInYellows",
@@ -9,5 +9,11 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-composio",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": ["composio", "batch-processing", "workbench", "usage-tracking", "mcp"]
+  "keywords": [
+    "composio",
+    "batch-processing",
+    "workbench",
+    "usage-tracking",
+    "mcp"
+  ]
 }

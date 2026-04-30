@@ -1,6 +1,6 @@
 {
   "name": "gt-workflow",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Graphite-native workflow commands for stacked PR development. Provides smart commit-and-submit with parallel audit agents, stack planning, sync, and navigation — all through the gt CLI.",
   "author": {
     "name": "KingInYellows",
