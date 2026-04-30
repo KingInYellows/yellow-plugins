@@ -176,12 +176,23 @@ aggregation rules change there, propagate the same change here.
       `pre_existing: false`), and wrap in the top-level envelope
       (`reviewer`, `findings`, `residual_risks`, `testing_gaps`) so it
       enters validation indistinguishable from a structured return.
-   2. **Validate** (drop malformed after normalization).
+   2. **Validate** (drop malformed after normalization). Optional
+      per-finding extensions emitted only by `plugin-contract-reviewer`
+      (`breaking_change_class` and `migration_path`) are accepted; when
+      `breaking_change_class` is present and not one of `name-rename |
+      signature-change | removal | semantics-change`, **strip both
+      extension fields and keep the rest of the finding** (single-finding
+      extension strip, not whole-return drop). Required-field violations
+      still drop the WHOLE return. Track extension-strip count separately.
+      Parity rule with `review-pr.md` Step 6.1.
    3. **Dedup** (`normalize(file) + line_bucket(line, ±3) + normalize(title)`);
       on merge keep highest severity, highest anchor, note all reviewers,
-      and on `pre_existing` conflict keep `false` (treat as new). Parity
-      rule with `review-pr.md` Step 6.2 — `normalize(file)` ensures the
-      same finding matches across both pipelines regardless of OS path
+      and on `pre_existing` conflict keep `false` (treat as new). When
+      one participant carries `breaking_change_class`/`migration_path`
+      and the other does not, preserve the extension fields from the
+      contract-bearing finding in the merged result. Parity rule with
+      `review-pr.md` Step 6.2 — `normalize(file)` ensures the same
+      finding matches across both pipelines regardless of OS path
       separator.
    4. **Cross-reviewer agreement promotion** (50→75, 75→100).
    5. **Separate pre-existing** into a separate report section.
@@ -256,6 +267,12 @@ Present per-PR breakdown:
 - Comments resolved
 - Restack status
 - Reviewers skipped via graceful degradation (with reasons)
+- Plugin contract changes (when `plugin-contract-reviewer` produced
+  one or more findings): table with columns `# | File | Change | Class
+  | Migration Path` per the review-pr.md Step 10 template. Omit when
+  the reviewer did not run or produced zero findings AND the
+  plugin-contract extension-strip count is zero. Parity rule with
+  `review-pr.md` Step 10.
 
 And aggregate summary:
 

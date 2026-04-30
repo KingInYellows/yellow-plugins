@@ -32,7 +32,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
 
-### Agents (13)
+### Agents (14)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
@@ -50,6 +50,14 @@ resolution, and sequential stack review. Graphite-native workflow.
   `project-compliance-reviewer`)
 - `adversarial-reviewer` — Constructed failure scenarios across boundaries
   (selected for diffs >200 lines or trust boundaries; new in Wave 2)
+- `plugin-contract-reviewer` — Breaking changes to plugin public surface
+  (subagent_type renames, command/skill/MCP-tool renames, manifest field
+  changes, hook contract changes); selected when diff touches
+  `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`,
+  `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or
+  `plugins/*/hooks/`. Sister to `pattern-recognition-specialist`
+  (yellow-core) — pattern-rec catches new convention drift,
+  plugin-contract catches breaks to existing surface. New in Wave 3.
 - `pr-test-analyzer` — Test coverage and behavioral completeness
 - `comment-analyzer` — Comment accuracy and rot detection
 - `code-simplifier` — Simplification preserving functionality (runs as final
