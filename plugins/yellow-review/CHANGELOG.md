@@ -1,5 +1,124 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- [#293](https://github.com/KingInYellows/yellow-plugins/pull/293)
+  [`f3985d8`](https://github.com/KingInYellows/yellow-plugins/commit/f3985d833c968d9a0d4407cf94809565259db5b5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `plugin-contract-reviewer` agent to detect breaking changes to plugin public
+  surface
+
+  Introduces `plugins/yellow-review/agents/review/plugin-contract-reviewer.md` —
+  a Wave 3 conditional persona reviewer (per W3.15) that flags breaking changes
+  to a plugin's contract: `subagent_type` renames, command/skill name renames,
+  MCP tool renames (the `mcp__plugin_<plugin>_<server>__<tool>` formula),
+  `plugin.json` schema field changes, hook output contract changes, and
+  frontmatter field renames or semantics changes.
+
+  Wired into `review:pr`'s Step 4 conditional dispatch table with auto-detection
+  on `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`,
+  `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, and
+  `plugins/*/hooks/`. Sister to `pattern-recognition-specialist` (yellow-core):
+  pattern-rec catches new convention drift; plugin-contract catches breaks to
+  existing public surface.
+
+  The agent extends the Wave 2 compact-return schema with two optional
+  per-finding fields:
+  - `breaking_change_class`:
+    `name-rename | signature-change | removal | semantics-change`
+  - `migration_path`: concrete remediation string (deprecation stub,
+    backwards-compat shim, version bump, etc.) or `null` when no migration is
+    feasible
+
+  The keystone validator in Step 6.1 accepts these as optional extensions; other
+  reviewers omit them. Step 10 surfaces them in a new "Plugin Contract Changes"
+  section when present.
+
+  Read-only tools (`Read`, `Grep`, `Glob`) per Wave 1 reviewer rule. Adapted
+  from upstream `EveryInc/compound-engineering-plugin`'s
+  `ce-api-contract-reviewer` (snapshotted at locked SHA
+  `e5b397c9d1883354f03e338dd00f98be3da39f9f`) — preserves the breaking-change
+  classification framework, drops REST-API examples, adds plugin-specific
+  detection rules.
+
+  Note: README.md and the plugin CLAUDE.md "Agents (N)" line had not been caught
+  up to the Wave 2 persona additions (was 7, should have been 13); this PR
+  brings both to 14 in lockstep with the new agent. Also catches up the
+  yellow-core README row (was `13 agents, 7 commands, 4 skills, 2 MCPs`; should
+  be `17 agents, 8 commands, 5 skills, 0 MCPs` per yellow-core's current on-disk
+  contents — confirmed by directly counting
+  `plugins/yellow-core/{agents,commands,skills}` and inspecting
+  `plugins/yellow-core/.claude-plugin/plugin.json`'s empty `mcpServers` block).
+
+### Patch Changes
+
+- [`f22272d`](https://github.com/KingInYellows/yellow-plugins/commit/f22272d391a466840ef6b398a83e8d233b755694)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Update
+  CHANGELOG migration text to runtime-current 3-segment subagent_type form +
+  document non-interactive cache-refresh workaround
+
+  Two small docs/maintenance fixes:
+  1. **CHANGELOG migration text:** `plugins/yellow-core/CHANGELOG.md` and
+     `plugins/yellow-review/CHANGELOG.md` had migration notes citing the legacy
+     2-segment `subagent_type: "yellow-review:code-reviewer"` form. The repo's
+     runtime expects 3-segment as of PRs #288/#290. The validator's INFO note
+     flagged these for future hard-fail. Updated both migration snippets to the
+     3-segment form (`yellow-review:review:code-reviewer`) so the migration text
+     stays accurate and the INFO warnings clear.
+  2. **CONTRIBUTING.md cache-refresh note:** added a "Manual cache refresh for
+     non-interactive sessions" subsection covering the rsync workaround when
+     `/plugin marketplace update` (TUI-only) isn't available — e.g., background
+     agents or Remote Control sessions verifying a freshly-merged
+     `chore: version packages` release. The loop hardens against path-traversal
+     via plugin name and version (allowlist regex), uses `sort -V` instead of
+     lexicographic `ls | tail -1` so `1.10.x` is correctly preferred over
+     `1.9.x`, requires `set -euo pipefail` plus `command -v` prereq checks, and
+     surfaces `cp` failures rather than silently skipping rsync.
+
+  No code changes; documentation-only patches.
+
+- [`7fe5d9d`](https://github.com/KingInYellows/yellow-plugins/commit/7fe5d9dc3b445ac94146afe68f3943fb8161087b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix
+  `learnings-researcher` empty-result sentinel violation + defense-in-depth on
+  the keystone check
+
+  The `learnings-researcher` agent's empty-result protocol requires
+  `NO_PRIOR_LEARNINGS` to be the **first non-whitespace line** of the response.
+  In practice the agent was emitting a "thinking out loud" scan-summary
+  paragraph before the sentinel — flipping the keystone's Step 3d.4
+  strict-equality check from "empty → skip injection" to "non-empty → inject as
+  learnings", which delivered useless prose to all 4–9 dispatched reviewers per
+  `/review:pr` invocation.
+
+  Two-sided fix:
+  1. **`plugins/yellow-core/agents/research/learnings-researcher.md`** — tighten
+     the empty-result protocol with explicit anti-pattern guidance (forbidden
+     prose-before-token, no thinking-out-loud, no closing remarks) and a
+     self-check checklist before emission. The agent-side contract is unchanged
+     (token must still be first non-whitespace line); the spec just makes the
+     LLM-compliance bar harder to miss.
+  2. **`plugins/yellow-review/commands/review/review-pr.md`** Step 3d.4 —
+     replace the strict "first non-whitespace line equals literal token" check
+     with two-condition empty-result detection:
+     - **(a)** the token appears on its own line anywhere in the response (regex
+       `(?m)^\s*NO_PRIOR_LEARNINGS\s*$`), AND
+     - **(b)** the response does NOT contain a `## Past Learnings` heading
+       (regex `(?m)^##\s+Past\s+Learnings\s*$`).
+
+     When both hold → skip injection (the original fix intent — tolerate LLM
+     thinking-out-loud preamble before the sentinel). When only (a) holds
+     (token + findings heading both present) → contract violation; log a
+     warning, strip the sentinel line, and treat the response as non-empty so
+     findings are not silently dropped. The `## Past Learnings` heading
+     dominance ensures the relaxation never masks the "combined sentinel with
+     findings" anti-pattern the agent body forbids.
+
+  Together the two changes mean Wave 3 PR reviews will get clean empty-result
+  handling immediately, with a robust safety net that preserves findings even
+  when an agent-side regression combines the sentinel with real findings.
+
 ## 2.0.0
 
 ### Major Changes
@@ -17,10 +136,10 @@
     cross-platform tool selection by the new `project-standards-reviewer`.
   - **Migration:** Callers passing
     `subagent_type: "yellow-review:review:code-reviewer"` should update to
-    `"yellow-review:review:project-compliance-reviewer"`. A deprecation stub
-    is left at the old path for one minor version — third-party installs
-    that reference the old name continue to function (with a deprecation
-    log line) until the stub is removed.
+    `"yellow-review:review:project-compliance-reviewer"`. A deprecation stub is
+    left at the old path for one minor version — third-party installs that
+    reference the old name continue to function (with a deprecation log line)
+    until the stub is removed.
   - **New persona reviewers** (all read-only, `tools: [Read, Grep, Glob]`):
     `correctness-reviewer`, `maintainability-reviewer`, `reliability-reviewer`,
     `project-standards-reviewer`, `adversarial-reviewer`. Each returns the
