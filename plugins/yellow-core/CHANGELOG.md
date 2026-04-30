@@ -174,11 +174,15 @@
     by the new `correctness-reviewer`; frontmatter / portability /
     cross-platform tool selection by the new `project-standards-reviewer`.
   - **Migration:** Callers passing
-    `subagent_type: "yellow-review:code-reviewer"` should update to
-    `"yellow-review:project-compliance-reviewer"`. A deprecation stub is left at
-    the old path for one minor version — third-party installs that reference the
-    old name continue to function (with a deprecation log line) until the stub
-    is removed.
+    `subagent_type: "yellow-review:review:code-reviewer"` should update to
+    `"yellow-review:review:project-compliance-reviewer"`. A deprecation stub
+    is left at the old path for one minor version — third-party installs
+    that reference the old name continue to function (with a deprecation
+    log line) until the stub is removed. (The original migration note
+    used the 2-segment forms `"yellow-review:code-reviewer"` and
+    `"yellow-review:project-compliance-reviewer"`, which predated the
+    runtime's 3-segment migration; both have been updated above to their
+    current 3-segment equivalents per PRs #288 / #290.)
   - **New persona reviewers** (all read-only, `tools: [Read, Grep, Glob]`):
     `correctness-reviewer`, `maintainability-reviewer`, `reliability-reviewer`,
     `project-standards-reviewer`, `adversarial-reviewer`. Each returns the

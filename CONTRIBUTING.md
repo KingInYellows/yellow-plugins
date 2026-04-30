@@ -234,6 +234,44 @@ fixed, users can run `/plugin marketplace update` to fetch the latest. Version
 bumps are still worth doing — they will be retroactively effective once the bug
 is fixed.
 
+### Manual cache refresh for non-interactive sessions
+
+`/plugin marketplace update` requires the Claude Code TUI and is not
+available over Remote Control / non-interactive sessions. If you need to
+refresh the locally-cached plugin content without a TUI (e.g., a
+background agent verifying a freshly-merged `chore: version packages`
+release), rsync the marketplace clone over the cache:
+
+```bash
+MARKETPLACE=~/.claude/plugins/marketplaces/yellow-plugins/plugins
+CACHE=~/.claude/plugins/cache/yellow-plugins
+for plugin_dir in "$MARKETPLACE"/*/; do
+  plugin=$(basename "$plugin_dir")
+  mp_ver=$(jq -r '.version // ""' "$plugin_dir/.claude-plugin/plugin.json")
+  [ -z "$mp_ver" ] && continue
+  target="$CACHE/$plugin/$mp_ver"
+  if [ ! -d "$target" ]; then
+    # New version dir for a fresh chore: version packages bump —
+    # seed from the most recent existing version dir's structure.
+    existing=$(ls -d "$CACHE/$plugin"/*/ 2>/dev/null | tail -1)
+    [ -n "$existing" ] && cp -r "$existing" "$target"
+  fi
+  [ -d "$target" ] && rsync -a --delete "$plugin_dir/" "$target/"
+done
+```
+
+After the rsync, run `/reload-plugins` in your session so the runtime
+re-reads the registry.
+
+The rsync uses `--delete`, which removes any cache-only files not present
+in the marketplace clone. For a fresh post-`chore: version packages`
+state where the cache has no existing version dir to seed from (e.g.,
+brand-new plugin install), the loop has nothing to copy structure from;
+in that case an interactive `/plugin marketplace update` is still
+required to initialize the versioned directory. The rsync shortcut is
+for the common case where the directory already exists but its contents
+are stale.
+
 ## Coding Standards
 
 ### TypeScript
