@@ -171,6 +171,19 @@ for (const filePath of agentFiles) {
     errors.push(`${relative(filePath)}: missing agent name`);
   } else {
     pluginAgents.add(`${pluginName}:${name}`);
+    // Claude Code's Task registry resolves cross-plugin agents by the
+    // three-segment plugin:directory:name form. For an agent file at
+    // `<pluginName>/agents/<dir>/<name>.md`, the runtime dispatch form
+    // is `<pluginName>:<dir>:<name>`. Both forms are registered so
+    // existing 2-segment callers continue to validate, but the
+    // markdown-scan loop below emits a warning when a 2-segment hit has
+    // an available 3-segment equivalent — turning silent runtime
+    // failures into loud CI signal for new code.
+    const agentsIdx = relSegments.indexOf('agents');
+    if (agentsIdx >= 0 && relSegments.length > agentsIdx + 2) {
+      const dir = relSegments[agentsIdx + 1];
+      pluginAgents.add(`${pluginName}:${dir}:${name}`);
+    }
   }
 
   const hasAllowedTools = /^allowed-tools:/m.test(frontmatter);
@@ -234,6 +247,20 @@ for (const filePath of agentFiles) {
   }
 }
 
+// Map plugin:name → plugin:dir:name (when unambiguous). Used to suggest
+// the 3-segment form to authors who wrote a 2-segment dispatch.
+const twoToThreeSegment = new Map();
+for (const ref of pluginAgents) {
+  const parts = ref.split(':');
+  if (parts.length !== 3) continue;
+  const twoSeg = `${parts[0]}:${parts[2]}`;
+  if (twoToThreeSegment.has(twoSeg)) {
+    twoToThreeSegment.set(twoSeg, null); // ambiguous
+  } else {
+    twoToThreeSegment.set(twoSeg, ref);
+  }
+}
+
 for (const filePath of markdownFiles) {
   const content = fs.readFileSync(filePath, 'utf8');
   for (const match of content.matchAll(pluginSubagentPattern)) {
@@ -246,6 +273,19 @@ for (const filePath of markdownFiles) {
       errors.push(
         `${relative(filePath)}: subagent_type "${subagentType}" does not match any declared plugin agent`
       );
+      continue;
+    }
+    // The 2-segment form remains valid (transitional) but the runtime
+    // requires 3-segment. Warn when a 2-segment hit has an unambiguous
+    // 3-segment equivalent so authors update before the runtime fails.
+    const segments = subagentType.split(':');
+    if (segments.length === 2) {
+      const suggestion = twoToThreeSegment.get(subagentType);
+      if (suggestion) {
+        logInfo(
+          `${relative(filePath)}: subagent_type "${subagentType}" uses the legacy 2-segment form — runtime expects "${suggestion}" (3-segment). Update before this CI gate becomes hard-fail.`
+        );
+      }
     }
   }
 }
