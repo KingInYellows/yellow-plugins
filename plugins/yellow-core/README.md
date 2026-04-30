@@ -52,13 +52,14 @@ TypeScript, Python, Rust, and Go.
 | `best-practices-researcher` | External docs, community standards |
 | `git-history-analyzer`      | Git archaeology, change history    |
 
-### Workflow (3)
+### Workflow (4)
 
 | Agent                    | Description                                                    |
 | ------------------------ | -------------------------------------------------------------- |
 | `spec-flow-analyzer`     | User flow analysis, gap identification                         |
 | `brainstorm-orchestrator` | Iterative brainstorm dialogue with research integration       |
 | `knowledge-compounder`   | Extract and document solved problems to compound knowledge     |
+| `session-historian`      | Cross-vendor session search across Claude Code (local JSONL), Devin (REST API via MCP), and Codex (local directory-per-session); BM25 + optional ruvector cosine + recency fused via Reciprocal Rank Fusion; secret redaction (AWS keys, GitHub tokens, API keys, JWTs, PEM blocks) before excerpts are returned |
 
 ## Skills
 
@@ -68,6 +69,7 @@ TypeScript, Python, Rust, and Go.
 | `create-agent-skills` | Guidance for creating skills and agents                                                                                                                           |
 | `debugging`           | Systematic root-cause debugging with causal-chain gate, prediction-for-uncertain-links hypotheses, three-failed-attempts smart escalation, and conditional defense-in-depth |
 | `git-worktree`        | Git worktree management for parallel development                                                                                                                  |
+| `session-history`     | Cross-vendor session-history user surface — dispatches the `session-historian` agent against Claude Code + Devin + Codex backends with availability detection and graceful degradation per backend |
 
 ## MCP Servers
 

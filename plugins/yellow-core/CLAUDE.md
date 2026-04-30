@@ -14,7 +14,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Plugin Components
 
-### Agents (17)
+### Agents (18)
 
 **Review** — parallel code review specialists:
 
@@ -42,6 +42,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `spec-flow-analyzer` — user flow analysis, gap identification
 - `brainstorm-orchestrator` — iterative brainstorm dialogue with research integration
 - `knowledge-compounder` — extract and document solved problems to docs/solutions/ and MEMORY.md
+- `session-historian` — cross-vendor session search across Claude Code (local
+  JSONL), Devin (REST API via MCP), and Codex (local
+  directory-per-session). BM25 + optional ruvector cosine + recency fused
+  via Reciprocal Rank Fusion. Secret redaction (AWS keys, GitHub tokens,
+  API keys, JWTs, PEM blocks) before excerpts are returned
 
 ### Commands (8)
 
@@ -56,7 +61,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (7)
+### Skills (8)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `compound-lifecycle` — audit, refresh, and consolidate `docs/solutions/`
@@ -71,6 +76,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `git-worktree` — git worktree management for parallel development
 - `local-config` — yellow-plugins.local.md per-project config schema (internal)
 - `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
+- `session-history` — cross-vendor session-history user surface — dispatches
+  the `session-historian` agent against Claude Code + Devin + Codex
+  backends with availability detection and graceful degradation per backend
 
 ### Optional Plugin Dependencies
 

@@ -163,8 +163,8 @@ Per-component reverts: each Wave 3 PR is independent; reverting one does not aff
 - [ ] 5. feat/agent-native-reviewers
 - [x] 6. feat/compound-lifecycle-skill (completed 2026-04-30 via PR #296)
 - [ ] 7. feat/yellow-debt-confidence-calibration
-- [ ] 8. feat/ideation-skill
-- [ ] 9. feat/cross-vendor-session-history
-- [ ] 10. feat/optimize-skill
+- [x] 8. feat/ideation-skill (completed 2026-04-30 via PR #310)
+- [x] 9. feat/cross-vendor-session-history (completed 2026-04-30 via PR #312)
+- [x] 10. feat/optimize-skill (completed 2026-04-30 via PR #311)
 - [x] 11. docs/yellow-codex-and-composio-research (completed 2026-04-30 via PR #308)
 - [x] 12. feat/plugin-contract-reviewer (completed 2026-04-30 via PR #293)
