@@ -65,6 +65,8 @@ reviewer_set:
 stack: [ts, py, rust, go]                 # default: auto-detect from repo
 agent_native_focus: true | false          # default: false
 confidence_threshold: 0..100              # default: 75
+resolve_pr:
+  cluster_line_distance: 10               # default: 10 (positive integer)
 ---
 ```
 
@@ -77,6 +79,7 @@ land in separate Wave 3 PRs:
 | `stack`                | `polyglot-reviewer`, `review:pr` Step 4 dispatch | Pending W3 polyglot scoping. Until then: documented but ignored. |
 | `agent_native_focus`   | `review:pr` Step 4 dispatch (forces W3.5 reviewers) | Pending W3.5 (`agent-native-reviewers` branch). Until then: documented but ignored. |
 | `confidence_threshold` | `review:pr` aggregation gate, `audit-synthesizer` | Pending W3.13b (`yellow-debt-confidence-calibration` branch). Until then: documented but ignored. |
+| `resolve_pr.cluster_line_distance` | `review:resolve` Step 3d cluster threshold | Acted on by `review:resolve` (W3.3). Invalid values (non-integer, ≤ 0) emit a warning to stderr and fall back to the default 10. |
 
 Authors may set Wave 3 keys today without breaking Wave 2 consumers — the
 graceful-degradation rule (unknown keys emit a warning but do not abort)
@@ -94,6 +97,7 @@ means the file remains valid forward-and-backward.
 | `stack` | array of `ts` \| `py` \| `rust` \| `go` | auto-detect | Forces language-specific reviewer behavior. When set, `polyglot-reviewer` (when triggered) scopes to listed languages and skips non-matching files. Auto-detect uses repo root signals: `package.json` → `ts`, `pyproject.toml`/`requirements.txt` → `py`, `Cargo.toml` → `rust`, `go.mod` → `go`. Multi-stack repos may set this explicitly to scope review to a subset. Acted on by W3-pending consumers (see status table). |
 | `agent_native_focus` | boolean | `false` | When `true`, always invokes the W3.5 agent-native reviewer triplet (`cli-readiness-reviewer`, `agent-cli-readiness-reviewer`, `agent-native-reviewer`) regardless of whether the diff touches `plugins/*/agents/`, `plugins/*/skills/`, or `plugins/*/commands/`. Useful for repos that author Claude Code plugins but house plugin code outside the standard `plugins/` layout. Acted on by W3.5 (pending). |
 | `confidence_threshold` | integer 0–100 | `75` | Override the Wave 2 confidence aggregation gate used by `review:pr` and `audit-synthesizer`. Values below `75` surface more findings (more false positives, fewer missed issues); values above `75` suppress more (fewer false positives, more missed issues). Set above `100` to suppress all findings (effectively a dry-run). Acted on by W3.13b (pending). |
+| `resolve_pr.cluster_line_distance` | positive integer | `10` | Cluster threshold for `review:resolve` Step 3d. Adjacent threads on the same file with line distance ≤ this value merge into a single resolver task (transitive merge). Larger values cluster more aggressively (fewer resolvers, broader edits per agent); smaller values keep clusters tighter. Invalid values (non-integer, ≤ 0) emit a warning to stderr and fall back to the default. |
 
 ### Example: tighten review for a security-critical project
 
