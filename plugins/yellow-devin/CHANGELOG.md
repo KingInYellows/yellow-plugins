@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.1
+
+### Patch Changes
+
+- [`9c01fbf`](https://github.com/KingInYellows/yellow-plugins/commit/9c01fbf4f95973bdeab77a67eb4b68d62d0bdc29)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix 403 error
+  when sending messages to Devin sessions by adding ManageOrgSessions permission
+  probe to setup and PR comment fallback to message/review-prs commands
+
 ## 2.1.0
 
 ### Minor Changes
