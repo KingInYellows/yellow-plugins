@@ -44,13 +44,14 @@ TypeScript, Python, Rust, and Go.
 | `test-coverage-analyst`            | Test quality, coverage gaps, edge cases                                                    |
 | `pattern-recognition-specialist`   | Anti-patterns, duplication, naming drift                                                   |
 
-### Research (3)
+### Research (4)
 
-| Agent                       | Description                        |
-| --------------------------- | ---------------------------------- |
-| `repo-research-analyst`     | Repository structure, conventions  |
-| `best-practices-researcher` | External docs, community standards |
-| `git-history-analyzer`      | Git archaeology, change history    |
+| Agent                       | Description                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| `repo-research-analyst`     | Repository structure, conventions                                                            |
+| `best-practices-researcher` | External docs, community standards                                                           |
+| `git-history-analyzer`      | Git archaeology, change history                                                              |
+| `learnings-researcher`      | Searches `docs/solutions/` for past learnings relevant to a PR diff or planning context      |
 
 ### Workflow (3)
 
@@ -68,6 +69,7 @@ TypeScript, Python, Rust, and Go.
 | `create-agent-skills` | Guidance for creating skills and agents                                                                                                                           |
 | `debugging`           | Systematic root-cause debugging with causal-chain gate, prediction-for-uncertain-links hypotheses, three-failed-attempts smart escalation, and conditional defense-in-depth |
 | `git-worktree`        | Git worktree management for parallel development                                                                                                                  |
+| `ideation`            | Generate 3 grounded approaches with the Toulmin warrant contract (evidence + linking principle + idea), filtered through MIDAS three-phase generation, then route the chosen approach into `brainstorm-orchestrator` via Task |
 
 ## MCP Servers
 
