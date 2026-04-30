@@ -1,5 +1,5 @@
 ---
-"gt-workflow": patch
+"gt-workflow": minor
 ---
 
 Add two platform-level guards motivated by the Graphite merge-queue research:

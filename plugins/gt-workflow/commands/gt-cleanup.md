@@ -311,21 +311,25 @@ Options:
 3. Skip this category
 ```
 
+For the **Closed PR** category specifically, the per-branch `<context>`
+must distinguish merged PRs from PRs closed without merging — when
+`closed_not_merged=true` for a branch, render the PR state as
+`closed (no merge — verify before deleting)` instead of `closed`. This
+surfaces queue-ejected, abandoned, or cancelled PRs at the decision
+point, before the user commits to "Delete all". Additionally, if **any** branches in the category
+have `closed_not_merged=true`, append a one-line summary above the
+Options block:
+
+```
+Note: M of N branches had PRs closed without merging (may be queue-ejected,
+abandoned, or cancelled).
+```
+
 Where `<action>` is:
 - "Delete" for orphaned, closed PR, stale (via `gt delete`)
 - "Sync" for behind remote (via `gt get`)
 
 **If "Delete all" or "Sync all" is chosen:**
-
-For the **Closed PR** category specifically: if any branches in the
-deletion set have `closed_not_merged=true`, prepend the data-loss warning
-with a count notice. This surfaces queue-ejected, abandoned, or cancelled
-PRs that would otherwise look identical to merged PRs:
-
-```
-N of these branches had PRs closed without merging (may be queue-ejected,
-abandoned, or cancelled). Verify before proceeding.
-```
 
 For deletion categories, if any branches have unique commits not on trunk,
 display the data-loss warning before executing:
