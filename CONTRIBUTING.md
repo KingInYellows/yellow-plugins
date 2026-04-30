@@ -289,8 +289,13 @@ for plugin_dir in "$MARKETPLACE"/*/; do
     # No version dir yet for this plugin (brand-new install or post
     # `chore: version packages` bump). Seed from the highest existing
     # semver dir's structure — `sort -V` handles 1.10 > 1.9 correctly,
-    # which `ls | tail -1` would not.
-    existing=$(ls -d "$CACHE/$plugin"/*/ 2>/dev/null | sort -V | tail -1)
+    # which `ls | tail -1` would not. The trailing `|| true` is required
+    # under `set -euo pipefail`: when no version dirs exist yet, `ls`
+    # exits non-zero, `pipefail` propagates that through the pipeline,
+    # and `set -e` would abort the entire script. With `|| true`,
+    # `existing` becomes empty and the `[ -n "$existing" ]` guard below
+    # skips the seed-copy as intended.
+    existing=$(ls -d "$CACHE/$plugin"/*/ 2>/dev/null | sort -V | tail -1) || true
     if [ -n "$existing" ]; then
       cp -r -- "$existing" "$target" || {
         printf '[cache-refresh] Error: failed to seed %s from %s\n' "$target" "$existing" >&2
