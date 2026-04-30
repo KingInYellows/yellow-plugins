@@ -262,6 +262,10 @@ CACHE=~/.claude/plugins/cache/yellow-plugins
 }
 
 for plugin_dir in "$MARKETPLACE"/*/; do
+  # Skip non-plugin dirs (e.g., `.DS_Store`, partial clones) before any
+  # jq invocation — `set -euo pipefail` would otherwise abort the loop on
+  # the first non-plugin directory.
+  [ -f "$plugin_dir/.claude-plugin/plugin.json" ] || continue
   plugin=$(basename "$plugin_dir")
   # Allowlist plugin name (kebab-case [a-z0-9-]) so a directory named
   # `..` or `foo$(rm)` cannot reach path construction below.

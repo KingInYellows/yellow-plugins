@@ -136,7 +136,11 @@ work. All agent and command markdown must comply before merging.
 5. **Agent frontmatter tools key:** Use `tools:` in agent frontmatter. Do not
    use `allowed-tools:`.
 6. **Subagent references must resolve:** Any `subagent_type` reference to a
-   plugin agent must match a declared `plugin-name:agent-name` pair.
+   plugin agent must use the 3-segment form
+   `plugin-name:subdir:agent-name` (e.g., `yellow-review:review:correctness-reviewer`)
+   matching the agent file's `name:` frontmatter field. The validator at
+   `scripts/validate-agent-authoring.js` registers both forms but warns on
+   2-segment usage; the runtime only resolves 3-segment.
 7. **Command file path resolution:** Markdown commands must not source plugin
    files through `BASH_SOURCE`; use `${CLAUDE_PLUGIN_ROOT}` or a concrete script
    path instead.
