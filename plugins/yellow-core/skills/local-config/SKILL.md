@@ -49,19 +49,38 @@ existence.
 Frontmatter-only is the typical shape; a markdown body is optional and
 used only by humans (commands ignore the body).
 
-### Schema (Wave 2 minimum)
+### Schema
 
 ```yaml
 ---
-# review:pr / review:all behavior overrides
+# review:pr / review:all behavior overrides (Wave 2 keys)
 review_pipeline: persona | legacy        # default: persona (Wave 2 default)
 review_depth: small | medium | large     # default: auto-detect from diff size
 focus_areas: [security, correctness, ...]  # default: all areas
 reviewer_set:
   include: [<agent-name>, ...]            # additional agents to spawn beyond defaults
   exclude: [<agent-name>, ...]            # agents to skip
+
+# Wave 3 keys (documented; consumer adoption tracked per-key below)
+stack: [ts, py, rust, go]                 # default: auto-detect from repo
+agent_native_focus: true | false          # default: false
+confidence_threshold: 0..100              # default: 75
 ---
 ```
+
+**Consumer adoption status (Wave 3 keys):** the keys are valid frontmatter
+today and parsers do not warn on them, but the commands that act on them
+land in separate Wave 3 PRs:
+
+| Key                    | Acted on by                        | Status |
+|------------------------|------------------------------------|--------|
+| `stack`                | `polyglot-reviewer`, `review:pr` Step 4 dispatch | Pending W3 polyglot scoping. Until then: documented but ignored. |
+| `agent_native_focus`   | `review:pr` Step 4 dispatch (forces W3.5 reviewers) | Pending W3.5 (`agent-native-reviewers` branch). Until then: documented but ignored. |
+| `confidence_threshold` | `review:pr` aggregation gate, `audit-synthesizer` | Pending W3.13b (`yellow-debt-confidence-calibration` branch). Until then: documented but ignored. |
+
+Authors may set Wave 3 keys today without breaking Wave 2 consumers — the
+graceful-degradation rule (unknown keys emit a warning but do not abort)
+means the file remains valid forward-and-backward.
 
 ### Field reference
 
@@ -72,6 +91,9 @@ reviewer_set:
 | `focus_areas` | array of strings | empty (= all) | Narrows reviewer set to those whose `category` matches one of the listed areas. Recognized areas: `security`, `correctness`, `reliability`, `performance`, `maintainability`, `project-compliance`, `project-standards`, `architecture`, `testing`, `documentation`, `types`, `adversarial`. Always-on personas (`project-compliance-reviewer`, `correctness-reviewer`, `maintainability-reviewer`, `project-standards-reviewer`) survive the filter regardless of `focus_areas` — filtering them out would defeat the always-on contract. |
 | `reviewer_set.include` | array of agent names | empty | Additive — agents are spawned even if their conditional triggers don't fire. |
 | `reviewer_set.exclude` | array of agent names | empty | Subtractive — agents are skipped even if always-on or their triggers fire. Applied after `include`. |
+| `stack` | array of `ts` \| `py` \| `rust` \| `go` | auto-detect | Forces language-specific reviewer behavior. When set, `polyglot-reviewer` (when triggered) scopes to listed languages and skips non-matching files. Auto-detect uses repo root signals: `package.json` → `ts`, `pyproject.toml`/`requirements.txt` → `py`, `Cargo.toml` → `rust`, `go.mod` → `go`. Multi-stack repos may set this explicitly to scope review to a subset. Acted on by W3-pending consumers (see status table). |
+| `agent_native_focus` | boolean | `false` | When `true`, always invokes the W3.5 agent-native reviewer triplet (`cli-readiness-reviewer`, `agent-cli-readiness-reviewer`, `agent-native-reviewer`) regardless of whether the diff touches `plugins/*/agents/`, `plugins/*/skills/`, or `plugins/*/commands/`. Useful for repos that author Claude Code plugins but house plugin code outside the standard `plugins/` layout. Acted on by W3.5 (pending). |
+| `confidence_threshold` | integer 0–100 | `75` | Override the Wave 2 confidence aggregation gate used by `review:pr` and `audit-synthesizer`. Values below `75` surface more findings (more false positives, fewer missed issues); values above `75` suppress more (fewer false positives, more missed issues). Set above `100` to suppress all findings (effectively a dry-run). Acted on by W3.13b (pending). |
 
 ### Example: tighten review for a security-critical project
 
@@ -148,19 +170,32 @@ else:
   → `exclude` wins; emit a warning naming the conflicting agent.
 - `review_pipeline` values other than `persona` / `legacy` → fall back to
   `persona` and emit a warning.
+- `stack` entries other than `ts` / `py` / `rust` / `go` → drop the
+  unknown entry, emit a warning naming it. An empty array after dropping
+  unknowns falls back to auto-detection.
+- `agent_native_focus` non-boolean values → fall back to `false` and
+  emit a warning. Common mistake: quoting the value (`"true"`) — YAML
+  parses that as a string, not a boolean.
+- `confidence_threshold` outside `0..100` → clamp to the range and emit
+  a warning. Non-integer values fall back to the default (`75`).
 
-### Wave 3 expansion (preview)
+### Example: TypeScript-focused plugin repo with strict gating
 
-The Wave 3 plan adds these keys (deferred until Wave 3 lands):
+```yaml
+---
+review_pipeline: persona
+review_depth: large
+focus_areas: [security, correctness, project-compliance]
+stack: [ts]
+agent_native_focus: true
+confidence_threshold: 60
+---
+```
 
-| Field | Type | Default | Effect |
-|-------|------|---------|--------|
-| `stack` | array of strings | auto-detect | Force language-specific reviewer behavior, e.g., `[ts, py]`. |
-| `agent_native_focus` | boolean | `false` | When `true`, always invoke the agent-native reviewers from W3.5 regardless of triggers. |
-| `confidence_threshold` | int | `75` | Override the Wave 2 confidence gate. Lower values surface more findings; raise above `100` to suppress everything. |
-
-These are documented here for forward visibility; Wave 2 commands ignore
-them.
+Effect, once Wave 3 consumers land: `polyglot-reviewer` scopes to
+TypeScript only, the W3.5 agent-native reviewer triplet is always
+invoked, and the confidence gate fires earlier (60 vs. default 75) so
+borderline findings surface for human review.
 
 ## Migration
 
