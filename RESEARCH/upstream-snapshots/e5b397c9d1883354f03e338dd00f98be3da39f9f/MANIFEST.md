@@ -3,9 +3,20 @@
 **Source repo:** `EveryInc/compound-engineering-plugin`
 **Locked SHA:** `e5b397c9d1883354f03e338dd00f98be3da39f9f`
 **Release tag at SHA:** `compound-engineering-v3.3.2` (released 2026-04-29)
-**Fetched:** 2026-04-29
-**Fetched by:** `/yellow-core:workflows:work` Phase 0 for `plans/everyinc-merge.md` backbone (Wave 1 + Wave 2 prep + keystone)
-**Cap policy:** `>500 line` files in this snapshot tree are reference-only; we are not porting them whole. Two files exceed: `skills/ce-code-review/SKILL.md` (891) and `skills/ce-compound/SKILL.md` (546). For both, only specific sub-patterns are extracted.
+**Fetched:** 2026-04-29 (Wave 1+2); extended 2026-04-30 with Wave 3 references
+**Fetched by:** `/yellow-core:workflows:work` Phase 0 for `plans/everyinc-merge.md` backbone (Wave 1 + Wave 2 prep + keystone); extended 2026-04-30 for `plans/everyinc-merge-wave3.md` Phase 0.2.
+**Cap policy:** `>500 line` files in this snapshot tree are reference-only; we are not porting them whole. Files exceeding the cap (extract sub-patterns only):
+
+| File | Lines | Extraction policy |
+|---|---|---|
+| `skills/ce-code-review/SKILL.md` | 891 | Confidence rubric only (W2.3/W2.4) — already extracted in backbone. |
+| `skills/ce-compound/SKILL.md` | 546 | Track schema + context-budget precheck only (W2.0a) — already extracted in backbone. |
+| `skills/ce-compound-refresh/SKILL.md` | 703 | W3.10 — extract staleness/overlap detection patterns only. |
+| `skills/ce-optimize/SKILL.md` | 659 | W3.14 — extract LLM-as-judge pipeline + schema only. |
+| `skills/ce-agent-native-architecture/references/mobile-patterns.md` | 871 | W3.5 — reference-only; mobile patterns out of scope for yellow-plugins. |
+| `skills/ce-agent-native-architecture/references/shared-workspace-architecture.md` | 680 | W3.5 — extract workspace boundaries pattern only. |
+| `skills/ce-agent-native-architecture/references/agent-native-testing.md` | 582 | W3.5 — reference-only; informs but does not drive yellow agent-native reviewers. |
+| `skills/ce-agent-native-architecture/references/mcp-tool-design.md` | 506 | W3.5 — extract MCP tool design heuristics only. |
 
 ## Snapshot → yellow-plugins task map
 
@@ -30,21 +41,25 @@
 | `skills/ce-code-review/SKILL.md` | W2.3, W2.4 | Confidence rubric extraction (tier definitions, FP suppression thresholds, intent-verification format, compact-return schema). 891 lines — extract rubric only. |
 | `skills/ce-compound/SKILL.md` | W2.0a | Track schema (`track: bug|knowledge`, `tags`, `problem`) + context budget precheck pattern. 546 lines — extract schema/precheck only. |
 | `skills/ce-resolve-pr-feedback/SKILL.md` | W1.4 | Resolve-pr fence and resolver-task wiring reference; W3.3 (cluster + actionability) reference for parallel run. |
-| `plugins/compound-engineering/agents/ce-api-contract-reviewer.agent.md` | W3.15 | Source for `plugin-contract-reviewer.md` — adapted from REST-API focus to plugin-contract focus (subagent_type, command/skill/MCP-tool renames, manifest/hook contract changes). Preserves the breaking-change classification framework, drops REST-specific examples. Fetched 2026-04-30 (W3.15 PR). |
-
-## Wave 3 fetches not in this manifest
-
-The following CE files inform Wave 3 tasks (W3.1, W3.2, W3.5, W3.10, W3.11, W3.12, W3.14, W3.15) and will be fetched into `RESEARCH/upstream-snapshots/<sha>/` during Wave 3's separate Phase 0 (committed in the first PR of `plans/everyinc-merge-wave3.md`):
-
-- `skills/ce-debug/` (W3.1)
-- `skills/ce-doc-review/SKILL.md` + `agents/ce-coherence-reviewer.agent.md`, `ce-design-lens-reviewer.agent.md`, `ce-feasibility-reviewer.agent.md`, `ce-product-lens-reviewer.agent.md`, `ce-scope-guardian-reviewer.agent.md`, `ce-adversarial-document-reviewer.agent.md` (W3.2)
-- `agents/ce-cli-readiness-reviewer.agent.md`, `ce-cli-agent-readiness-reviewer.agent.md`, `ce-agent-native-reviewer.agent.md`, `skills/ce-agent-native-architecture/`, `skills/ce-agent-native-audit/` (W3.5)
-- `skills/ce-compound-refresh/` (W3.10)
-- `skills/ce-ideate/` (W3.11)
-- `agents/ce-session-historian.agent.md` (W3.12)
-- `skills/ce-optimize/` incl. `schema.yaml` and `README.md` (W3.14)
-- ~~`agents/ce-api-contract-reviewer.agent.md` (W3.15 — adapted to plugin-contract focus)~~ — **fetched 2026-04-30**, see Snapshot Map above
-- `skills/ce-worktree/` (W3.4 reference)
+| `skills/ce-debug/` (4 files) | W3.1 | Authoring reference for `plugins/yellow-core/skills/debugging/SKILL.md`. SKILL + 3 references (anti-patterns, defense-in-depth, investigation-techniques). |
+| `skills/ce-doc-review/` (8 files) | W3.2 | Authoring reference for `plugins/yellow-docs/agents/review/{coherence,design-lens,feasibility,product-lens,scope-guardian,security-lens,adversarial-document}-reviewer.md` + new `/docs:review` command. SKILL + 7 references. |
+| `agents/ce-coherence-reviewer.agent.md` | W3.2 | Persona authoring reference. |
+| `agents/ce-design-lens-reviewer.agent.md` | W3.2 | Persona authoring reference. |
+| `agents/ce-feasibility-reviewer.agent.md` | W3.2 | Persona authoring reference. |
+| `agents/ce-product-lens-reviewer.agent.md` | W3.2 | Persona authoring reference. |
+| `agents/ce-scope-guardian-reviewer.agent.md` | W3.2 | Persona authoring reference. |
+| `agents/ce-adversarial-document-reviewer.agent.md` | W3.2 | Persona authoring reference. |
+| `agents/ce-cli-readiness-reviewer.agent.md` | W3.5 | Persona authoring reference for `plugins/yellow-review/agents/review/cli-readiness-reviewer.md`. |
+| `agents/ce-cli-agent-readiness-reviewer.agent.md` | W3.5 | Persona authoring reference for `plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md`. |
+| `agents/ce-agent-native-reviewer.agent.md` | W3.5 | Persona authoring reference for `plugins/yellow-review/agents/review/agent-native-reviewer.md`. |
+| `skills/ce-agent-native-architecture/` (15 files) | W3.5 | Skill authoring reference. SKILL + 14 reference docs. 4 reference docs exceed 500 lines (see cap policy). |
+| `skills/ce-agent-native-audit/SKILL.md` | W3.5 | Skill authoring reference for agent-native-audit. |
+| `skills/ce-compound-refresh/` (5 files) | W3.10 | Authoring reference for `plugins/yellow-core/skills/compound-lifecycle/SKILL.md`. SKILL (703 lines, extract policy above) + 4 helpers (assets/resolution-template, references/schema.yaml, references/yaml-schema, scripts/validate-frontmatter.py). |
+| `skills/ce-ideate/` (4 files) | W3.11 | Authoring reference for `plugins/yellow-core/skills/ideation/SKILL.md`. SKILL + 3 references (post-ideation-workflow, universal-ideation, web-research-cache). |
+| `agents/ce-session-historian.agent.md` | W3.12 | Authoring reference for `plugins/yellow-core/agents/workflow/session-historian.md`. |
+| `skills/ce-optimize/` (12 files) | W3.14 | Authoring reference for `plugins/yellow-core/skills/optimize/SKILL.md` + `schema.yaml`. SKILL (659 lines, extract policy above) + README + 7 references + 3 scripts. |
+| `agents/ce-api-contract-reviewer.agent.md` | W3.15 | Source for `plugins/yellow-review/agents/review/plugin-contract-reviewer.md` (PR #293, merged 2026-04-30) — adapted from REST-API focus to plugin-contract focus (subagent_type, command/skill/MCP-tool renames, manifest/hook contract changes). Preserves the breaking-change classification framework, drops REST-specific examples. |
+| `skills/ce-worktree/` (2 files) | W3.4 reference | Reference for `plugins/yellow-core/skills/git-worktree/SKILL.md` (already shipped via PR #287). SKILL + scripts/worktree-manager.sh. |
 
 ## Verification
 

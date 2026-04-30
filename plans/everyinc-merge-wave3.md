@@ -1,8 +1,21 @@
 # Feature: EveryInc/Compound-Engineering Selective Merge — Wave 3 (Parallel)
 
-**Date:** 2026-04-28 (decomposition split 2026-04-29)
+**Date:** 2026-04-28 (decomposition split 2026-04-29; reconciled 2026-04-30)
 **Source plan:** `plans/everyinc-merge.md` (backbone — must merge to `main` before this plan runs)
-**Status:** Deferred. Run after the backbone (PRs #1–#7 in the source plan) merges to `main`.
+**Status:** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 already shipped via PR #287. Item #12 is in flight via PR #293. **10 parallel branches remain** (items #4 and #12 are accounted for outside the parallel-runway).
+
+## Reconciliation 2026-04-30
+
+After the backbone merged, two of the 12 stack items already changed state:
+
+- **Item #4 (`fix/git-worktree-and-local-config-expansion`, W3.4 + W3.6) — DONE.** Shipped via PR #287 as a Wave 3 trial (`bb5855e` on `main`). Not on the parallel-runway anymore.
+- **Item #12 (`feat/plugin-contract-reviewer`, W3.15) — IN FLIGHT.** Implemented on `agent/feat/plugin-contract-reviewer` and submitted as PR #293 (OPEN, MERGEABLE, mergeStateStatus UNSTABLE = CI failing-not-required). Adds `plugins/yellow-review/agents/review/plugin-contract-reviewer.md` (~241 lines), wires the dispatch table in `review-pr.md` and `review-all.md`, and ships its own changeset. Not on the parallel-runway — already running. Monitor and merge separately; if it merges before some of the 10 parallel branches start, reviewer dispatch may need re-syncing in those branches that touch `review-pr.md` or `review-all.md` (notably item #5 `feat/agent-native-reviewers`).
+
+**Effective parallel branch count for this wave:** **10 branches.** Items #4 and #12 are accounted for outside the parallel-runway.
+
+**CE upstream SHA:** unchanged (`e5b397c9d1883354f03e338dd00f98be3da39f9f` / `compound-engineering-v3.3.2`). No new releases to incorporate.
+
+**Wave 3 upstream snapshots:** Fetched 2026-04-30 into `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/` (62 files: agents/ce-{coherence,design-lens,feasibility,product-lens,scope-guardian,adversarial-document,cli-readiness,cli-agent-readiness,agent-native,session-historian,api-contract}-reviewer.agent.md and skills/{ce-debug,ce-doc-review,ce-agent-native-architecture,ce-agent-native-audit,ce-compound-refresh,ce-ideate,ce-optimize,ce-worktree}/). MANIFEST.md updated with task map + cap policy for the 6 newly-fetched files >500 lines.
 
 ---
 
@@ -20,20 +33,12 @@ All implementation task definitions (W3.1, W3.2, W3.3, W3.4, W3.5, W3.6, W3.7, W
 
 Before starting the parallel stack:
 
-- [ ] 0.1 Re-fetch the latest `EveryInc/compound-engineering-plugin` `main` SHA. If it has advanced beyond the backbone's locked SHA (`e5b397c9d1883354f03e338dd00f98be3da39f9f` / `compound-engineering-v3.3.2`), check `gh api repos/EveryInc/compound-engineering-plugin/releases?per_page=10` for new releases and review their changes for impact on Wave 3 tasks. Lock a new SHA for this wave.
-- [ ] 0.2 Fetch upstream snapshots for Wave 3 tasks not already snapshotted in the backbone. Required additions (committed in PR #1 below):
-  - `skills/ce-debug/` (W3.1)
-  - `skills/ce-doc-review/SKILL.md` + agents `ce-coherence-reviewer`, `ce-design-lens-reviewer`, `ce-feasibility-reviewer`, `ce-product-lens-reviewer`, `ce-scope-guardian-reviewer`, `ce-adversarial-document-reviewer` (W3.2)
-  - Agents `ce-cli-readiness-reviewer`, `ce-cli-agent-readiness-reviewer`, `ce-agent-native-reviewer`; skills `ce-agent-native-architecture/`, `ce-agent-native-audit/` (W3.5)
-  - `skills/ce-compound-refresh/` (W3.10)
-  - `skills/ce-ideate/` (W3.11)
-  - `agents/ce-session-historian.agent.md` (W3.12)
-  - `skills/ce-optimize/` incl. `schema.yaml` and `README.md` (W3.14)
-  - `agents/ce-api-contract-reviewer.agent.md` (W3.15 — adapted to plugin-contract focus)
-  - `skills/ce-worktree/` (W3.4 reference)
-- [ ] 0.3 Validate snapshot bodies are reasonable; flag any > 500 lines for extract-only treatment (per user feedback 2026-04-29: file size is content-driven, not capped — 500 is a soft outer bound).
-- [ ] 0.4 Run `pnpm validate:schemas && pnpm test:unit` baseline on `main` after backbone merges. Record green baseline.
+- [x] 0.1 Re-fetch the latest `EveryInc/compound-engineering-plugin` `main` SHA. **2026-04-30:** Unchanged at `e5b397c9d1883354f03e338dd00f98be3da39f9f` / `compound-engineering-v3.3.2`. No new releases to incorporate.
+- [x] 0.2 Fetch upstream snapshots for Wave 3 tasks not already snapshotted in the backbone. **2026-04-30:** Done — 62 files fetched into `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/`. See `MANIFEST.md` for the full snapshot→task map. Will be committed in PR #1 of this wave (with associated MANIFEST.md update).
+- [x] 0.3 Validate snapshot bodies are reasonable; flag any > 500 lines for extract-only treatment. **2026-04-30:** 6 newly-fetched files exceed 500 lines (`ce-compound-refresh/SKILL.md` 703, `ce-optimize/SKILL.md` 659, and 4 `ce-agent-native-architecture/references/` files at 506–871). All flagged in MANIFEST.md cap-policy table with extract-only treatment.
+- [x] 0.4 Run `pnpm validate:schemas && pnpm test:unit` baseline on `main` after backbone merges. **2026-04-30:** Green on fresh `origin/main` checkout — `All plugins passed validation` (64 agents, 240 markdown files); `Test Files 1 passed (1) / Tests 3 passed (3)`.
 - [ ] 0.5 Read the source plan's "Wave 3" section in full so the implementation context is loaded.
+- [ ] 0.6 **Watch PR #293 (item #12).** It is OPEN/MERGEABLE/UNSTABLE. Once merged, audit the 10 parallel branches that haven't started yet for any references to `code-reviewer` dispatch wiring in `review-pr.md`/`review-all.md`; the keystone-shipped wiring may need a small follow-up to add the new persona alongside item #5's agent-native reviewers.
 
 For full task content, see `plans/everyinc-merge.md` "Wave 3: P1 Adoptions (reviewed by Wave 2 pipeline)" section.
 
@@ -46,7 +51,7 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 <!-- stack-topology: parallel -->
 <!-- stack-trunk: main -->
 
-12 parallel branches from `main`. Each is independent (no cross-branch file overlap) and can be developed, reviewed, and merged in any order. Branch creation is just-in-time per `/workflows:work` Phase 1b parallel topology.
+**Original count:** 12 parallel branches from `main`. **As of 2026-04-30 reconciliation:** item #4 is DONE (PR #287); item #12 is IN FLIGHT (PR #293). Active runway is **10 branches**. Each remaining branch is independent (no cross-branch file overlap) and can be developed, reviewed, and merged in any order. Branch creation is just-in-time per `/workflows:work` Phase 1b parallel topology.
 
 ### 1. feat/ce-debug-skill
 - **Type:** feat
@@ -69,12 +74,13 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 - **Tasks:** W3.3
 - **Depends on:** (backbone merged)
 
-### 4. fix/git-worktree-and-local-config-expansion
+### 4. fix/git-worktree-and-local-config-expansion — **DONE (PR #287, merged 2026-04-30)**
 - **Type:** fix
 - **Description:** git-worktree mise/direnv auto-trust + .git is-a-file detection; yellow-plugins.local.md schema expansion (full keys)
 - **Scope:** plugins/yellow-core/skills/git-worktree/SKILL.md, plugins/yellow-core/skills/local-config/SKILL.md (extends from backbone PR #7)
 - **Tasks:** W3.4, W3.6
 - **Depends on:** (backbone merged)
+- **Status:** Shipped as Wave 3 trial via PR #287 (commit `bb5855e`). Not on the parallel-runway. Task tracker entries #579–#582 confirm completion + review pass.
 
 ### 5. feat/agent-native-reviewers
 - **Type:** feat
@@ -127,13 +133,14 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 - **Tasks:** W3.7, W3.8
 - **Depends on:** (backbone merged)
 
-### 12. feat/plugin-contract-reviewer
+### 12. feat/plugin-contract-reviewer — **IN FLIGHT (PR #293, OPEN/MERGEABLE/UNSTABLE)**
 - **Type:** feat
 - **Description:** plugin-contract-reviewer agent — detect breaking changes to plugin public surface (subagent_type, command/skill/MCP tool names, manifest fields, hook contracts); auto-invoked when diff touches plugins/* manifests or component frontmatter
 - **Scope:** NEW plugins/yellow-review/agents/review/plugin-contract-reviewer.md, plugins/yellow-review/commands/review/review-pr.md (dispatch-table wiring with auto-detection on plugin file paths)
 - **Tasks:** W3.15
 - **Depends on:** (backbone merged)
 - **Notes:** Renamed from CE `ce-api-contract-reviewer`; adapted from REST-API focus to Claude Code plugin-contract focus. Output schema extends Wave 2 reviewer schema with `breaking_change_class` and `migration_path` fields.
+- **Status:** Already implemented on `agent/feat/plugin-contract-reviewer` and submitted as PR #293 (2 commits: `bac329c feat(yellow-review): add plugin-contract-reviewer agent (W3.15)`, `1322157 fix(yellow-review): address review findings`). PR is OPEN/MERGEABLE/UNSTABLE (CI failing-not-required). Branch needs `gt restack` against current `main` (it predates PRs #294, #295). Upstream snapshot `agents/ce-api-contract-reviewer.agent.md` is now fetched and committed in this Wave 3 phase-0 PR for posterity.
 
 ## Migration & Rollback
 
