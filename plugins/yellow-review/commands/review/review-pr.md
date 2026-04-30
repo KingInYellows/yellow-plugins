@@ -188,13 +188,52 @@ relevant to this PR.
 
 3. Wait for the agent's return.
 
-4. **Empty-result handling.** If the **first non-whitespace line** of the
-   response equals the literal token `NO_PRIOR_LEARNINGS` (the agent's
-   empty-result sentinel), skip injection entirely and proceed to Step 4.
-   Note the absence in the final report's Coverage section: "Past
-   learnings: none found in docs/solutions/". Strict equality on the
-   first non-whitespace line is the contract — do not match on substring,
-   prefix-after-whitespace, or paraphrase.
+4. **Empty-result handling.** Empty-result detection is two-condition,
+   to tolerate LLM thinking-out-loud preamble without silently dropping
+   findings when the agent violates the "don't combine sentinel with
+   findings" anti-pattern:
+
+   - **Condition (a):** the response contains the literal token
+     `NO_PRIOR_LEARNINGS` as a complete line on its own anywhere in the
+     output (regex `(?m)^\s*NO_PRIOR_LEARNINGS\s*$`).
+   - **Condition (b):** the response does NOT contain a `## Past
+     Learnings` heading (regex `(?m)^##\s+Past\s+Learnings\s*$`).
+     This heading is the agent's non-empty-result format marker and
+     dominates: when present, the response is non-empty regardless of
+     whether the sentinel token also appears.
+
+   **Both conditions hold → skip injection.** Note the absence in the
+   final report's Coverage section: "Past learnings: none found in
+   docs/solutions/".
+
+   **Only (a) holds (token present AND findings heading present) →
+   contract violation.** The agent body forbids combining the
+   sentinel with findings; if it happens anyway, log
+   `[review:pr] Warning: learnings-researcher response combined
+   NO_PRIOR_LEARNINGS sentinel with findings — contract violation;
+   treating as non-empty (preserving findings)` to stderr, strip the
+   sentinel line(s) AND any immediately-following empty-result
+   advisory paragraph (the `(advisory) docs/solutions/ scanned for:
+   ...` block, if present) from the response, and proceed to Step 5
+   with the stripped response as non-empty. Never silently drop
+   findings on a contract violation.
+
+   **No sentinel token found ((a) is false, regardless of (b)) →
+   non-empty.** Treat as non-empty per Step 5 below. This branch
+   covers both the normal non-empty return (heading present, no token)
+   and the malformed/empty response edge case (no token, no heading) —
+   both route identically since absence of the sentinel means the
+   response is not the empty-result format.
+
+   Substring matches inside prose (`...is this NO_PRIOR_LEARNINGS?...`)
+   and paraphrases (`No prior learnings`, `none found`) still do NOT
+   count for condition (a) — only a literal line-aligned match.
+
+   This orchestrator-side check is more forgiving than the agent's
+   strict-first-line contract by design (tolerates thinking-out-loud
+   preamble), but the dominance of the `## Past Learnings` heading
+   prevents the relaxation from masking the "combined sentinel with
+   findings" anti-pattern.
 
 5. **Non-empty handling.** When `learnings-researcher` returns findings,
    build a fenced advisory block:

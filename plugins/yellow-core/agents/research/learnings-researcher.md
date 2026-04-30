@@ -199,7 +199,8 @@ current code. List `<file:line> — <claim> — <observed reality>`.)
 returned: `Additional candidates not surfaced: N. Highest skipped: <title>`.)
 ```
 
-When **no** relevant learnings are found:
+When **no** relevant learnings are found, return EXACTLY this — nothing
+before, nothing else:
 
 ```
 NO_PRIOR_LEARNINGS
@@ -210,9 +211,35 @@ capturing with /workflows:compound after it lands — the absence is itself
 useful signal.
 ```
 
-The literal `NO_PRIOR_LEARNINGS` token on its own line at the top is the
-contract: orchestrators check for this token and skip the injection block.
-Never combine the token with prose findings.
+The literal `NO_PRIOR_LEARNINGS` token must be the **first non-whitespace
+line of your entire response**. Orchestrators may tolerate leading prose
+as a recovery safety net, but the agent contract requires token-first.
+Never combine the sentinel with a `## Past Learnings` findings heading —
+the two output formats are mutually exclusive.
+
+**Forbidden in the empty-result response — these all violate the
+contract:**
+
+- ❌ Scan-summary prose before the token (e.g., "I scanned the catalog.
+  No entry matched..."). The contract requires token-first; do not
+  emit preamble.
+- ❌ "Thinking out loud" or methodology recap (e.g., "The closest
+  candidates are X and Y, but neither rises to a strong match..."). The
+  advisory after the token is the only place for that — and it must be
+  brief.
+- ❌ Closing remarks or hedging (e.g., "Hope this helps", "Let me know
+  if you'd like a deeper search"). The orchestrator is the consumer,
+  not a human.
+- ❌ Combining the empty-result token with any non-zero findings list
+  (i.e., a `## Past Learnings` heading + numbered finding entries
+  alongside the sentinel). The two output formats are mutually
+  exclusive.
+- ❌ Paraphrases (`No prior learnings`, `none found`, `NO PRIOR
+  LEARNINGS` with underscores replaced by spaces) — the token is a
+  literal string match.
+
+When in doubt, prefer the literal token + a single short advisory
+sentence over any longer explanation.
 
 ## Efficiency rules
 
@@ -241,9 +268,27 @@ Never combine the token with prose findings.
 When grep returns zero candidates, when ranking surfaces no strong or
 moderate matches, or when every candidate fails the conflict check (claims
 contradict current code without resolution), return the `NO_PRIOR_LEARNINGS`
-sentinel exactly as shown above. The orchestrator depends on the literal
-token — do not paraphrase it (`No prior learnings`, `none found`, etc. all
-break the contract).
+sentinel exactly as shown in the **Output Format** section above. The
+agent contract requires the token as the **first non-whitespace line** —
+do not paraphrase it (`No prior learnings`, `none found`, etc.) and do
+not put any prose, scan summary, or methodology recap before it.
+Orchestrators may tolerate leading prose as a recovery safety net, but
+relying on that tolerance violates the contract.
+
+**Self-check before emitting an empty-result response:**
+
+1. Is the first non-whitespace line of my response *exactly*
+   `NO_PRIOR_LEARNINGS`? If not, revise the response so it is — do
+   not emit a response with prose before this line.
+2. Is the response a single token line followed by one brief advisory
+   paragraph? If longer, trim the advisory to one sentence about what
+   was scanned.
+3. Did I include any "I scanned the catalog. No entry matched..."
+   prose as a separate paragraph? That belongs in the advisory's
+   `<keyword list>` slot, not as preamble before the token.
+4. Does my response contain BOTH `NO_PRIOR_LEARNINGS` AND a `## Past
+   Learnings` heading? That is a contract violation — pick one
+   format only.
 
 ## Integration
 

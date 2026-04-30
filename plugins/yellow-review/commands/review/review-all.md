@@ -127,8 +127,15 @@ aggregation rules change there, propagate the same change here.
    `learnings-researcher` (via
    `Task(subagent_type: "yellow-core:research:learnings-researcher", ...)`) with a
    `<work-context>` block built from PR title, files, body, and inferred
-   domains. If the agent returns the literal `NO_PRIOR_LEARNINGS` token,
-   skip injection. Otherwise build the
+   domains. Apply the two-condition detection from review-pr.md Step 3d.4:
+   **(a)** response contains `NO_PRIOR_LEARNINGS` as a complete line
+   (regex `(?m)^\s*NO_PRIOR_LEARNINGS\s*$`) AND **(b)** response does NOT
+   contain a `## Past Learnings` heading (regex
+   `(?m)^##\s+Past\s+Learnings\s*$`) → both hold, skip injection. Only
+   (a) holds → contract violation: log warning, strip sentinel line(s)
+   AND any immediately-following advisory paragraph, treat as non-empty.
+   No sentinel token → non-empty. (See review-pr.md Step 3d.4 for full
+   algorithm.) Otherwise build the
    `--- begin learnings-context (reference only) ---` fenced block and
    prepend to **every** reviewer's Task prompt for this PR — **only when
    `review_pipeline` is not `legacy`**. The legacy path is the pre-Wave-2
