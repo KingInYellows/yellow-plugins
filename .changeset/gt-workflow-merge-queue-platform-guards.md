@@ -11,14 +11,14 @@ Add two platform-level guards motivated by the Graphite merge-queue research:
   `gh api graphql` to query `repository.mergeQueue.url`. Fail-open on any
   error (`COULD NOT CHECK`) so setup is never blocked.
 - `gt-cleanup` now distinguishes "closed without merging" from "merged" in
-  the Closed PR category. When any closed PR has `merged: false` (queue
-  ejection, abandoned PR, or any close-without-land), the branch is tagged
-  and a count warning appears in "Delete all" mode, plus a per-branch
-  `closed (no merge — verify before deleting)` line in "Review individually"
-  mode. The authoritative signal is the `merged` boolean (not `mergedAt`,
-  which can be transiently null due to GitHub REST propagation lag). Updates
-  the existing `gh pr list --json` call to request `state,mergedAt,merged` —
-  no new API requests.
+  the Closed PR category. When any PR for the branch has `state == "CLOSED"`
+  (queue ejection, abandoned PR, or any close-without-land — `gh pr list`
+  represents merged PRs as `state == "MERGED"`, so `CLOSED` is by itself
+  unambiguous), the branch is tagged and a count warning appears in
+  "Delete all" mode, plus a per-branch `closed (no merge — verify before
+  deleting)` line in "Review individually" mode. Adds `mergedAt` to the
+  existing `gh pr list --json` call (requested set is `state,mergedAt`)
+  for display use only — no new API requests.
 
 Both changes apply to **all** Graphite users, not just users of Graphite's
 optional merge queue. No new dependencies. No breaking changes.

@@ -29,10 +29,10 @@ This is an imperfect signal — a stale/unused queue config could still register
 
 ### Change 2 — `gt-cleanup` closed-not-merged guard
 
-Add `mergedAt` and `merged` to the existing `gh pr list --json` call (so the call requests `state,mergedAt,merged`). Tag any branch in the Closed PR category whose closed PRs include any with `merged: false` as `closed-not-merged`. The authoritative signal is the `merged` boolean (`pull_request.merged`), not `mergedAt`: GitHub's REST API has a known propagation lag where a freshly-merged PR can transiently show `mergedAt: null` while `merged: true`. Gating on `merged == false` eliminates that false-positive window. Surface the result in two places:
+Add `mergedAt` to the existing `gh pr list --json` call (so the call requests `state,mergedAt`). Tag any branch in the Closed PR category whose PR set includes any with `state == "CLOSED"` as `closed-not-merged`. `gh pr list --json` (GraphQL-backed) represents merged PRs with `state == "MERGED"` and closed-without-merging PRs with `state == "CLOSED"`, so the state enum alone is unambiguous — no `merged` boolean check is needed. The propagation-lag concern documented in `merge-queue-closed-pr-null-mergedat-detection.md` applies to per-PR REST calls (`gh api repos/.../pulls/{number}`) where `merged: bool` is exposed; `gh pr list --json` does not accept a `merged` field at all (valid fields include `state`, `mergedAt`, `mergedBy`, `mergeCommit`, `closed`, `closedAt`, but not a standalone `merged`). `mergedAt` is requested for display use (timestamp shown in per-branch detail), not for classification. Surface the result in two places:
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** The `--json state,mergedAt` pattern is already established in `plugins/yellow-core/commands/worktree/cleanup.md` and `plugins/yellow-linear/commands/linear/sync-all.md`. Change 2 extends that pattern by also requesting `merged` and using it as the authoritative signal — see `docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection.md` for the propagation-lag rationale.
+> **Codebase:** The `--json state,mergedAt` pattern is already established in `plugins/yellow-core/commands/worktree/cleanup.md` and `plugins/yellow-linear/commands/linear/sync-all.md`. Change 2 follows existing conventions exactly — no new pattern is being introduced here.
 <!-- /deepen-plan -->
 
 - **"Delete all" mode:** prepend the existing data-loss warning with a count line: "N of these branches had PRs closed without merging (may be queue-ejected, abandoned, or cancelled)."
@@ -58,8 +58,8 @@ No `queue-ejected` label reading. No new API calls. One extra JSON field in an e
 
 ### Phase 2: gt-cleanup closed-not-merged guard
 
-- [ ] **2.1** Update the `gh pr list` invocation in Phase 2.4 of `plugins/gt-workflow/commands/gt-cleanup.md` (line 180-182): change `--json state` to `--json state,mergedAt,merged`. Both fields are needed: `mergedAt` for surfacing the timestamp where useful, and `merged` (boolean) as the authoritative signal that survives REST propagation lag.
-- [ ] **2.2** Update the parse-and-classify logic in Phase 2.4 with a concrete jq pipeline (so the LLM-as-runtime does not infer the parse): when classifying as "Closed PR" candidate (all PRs `CLOSED` or `MERGED`), additionally check whether any `state == CLOSED` PR has `merged: false`. If so, set a `closed_not_merged=true` flag on the branch. Also explicitly exclude `[gone]`-tracked branches from the PR Status Lookups gate so the tag does not fire on branches already routed to `/gt-sync`.
+- [ ] **2.1** Update the `gh pr list` invocation in Phase 2.4 of `plugins/gt-workflow/commands/gt-cleanup.md` (line 180-182): change `--json state` to `--json state,mergedAt`. `mergedAt` is for display only (timestamp shown in per-branch detail). `gh pr list --json` does not accept a `merged` field, so classification relies on the `state` enum directly.
+- [ ] **2.2** Update the parse-and-classify logic in Phase 2.4 with a concrete jq pipeline (so the LLM-as-runtime does not infer the parse): when classifying as "Closed PR" candidate (all PRs `CLOSED` or `MERGED`), additionally check whether any PR has `state == "CLOSED"` (since `gh pr list` represents merged PRs as `state == "MERGED"`, `CLOSED` alone is the closed-without-merging signal). If so, set a `closed_not_merged=true` flag on the branch. Also explicitly exclude `[gone]`-tracked branches from the PR Status Lookups gate so the tag does not fire on branches already routed to `/gt-sync`.
 - [ ] **2.3** Update Phase 4 "Delete all" path for the Closed PR category: if any branches have `closed_not_merged=true`, prepend the existing data-loss warning block with: `N of these branches had PRs closed without merging (may be queue-ejected, abandoned, or cancelled). Verify before proceeding.`
 - [ ] **2.4** Update Phase 4 "Review individually" path: for each `closed_not_merged=true` branch, add a `PR status: closed (no merge — verify before deleting)` line to the per-branch detail block (between the existing "Unique commits" and "Age" lines).
 
@@ -140,8 +140,8 @@ Note the `--jq '.data.repository.mergeQueue.url // empty'` filter: returns the U
 
 - **`gh api graphql` returns malformed JSON or partial data:** the `--jq` filter falls through to empty string, treated as "not configured." Acceptable — fail-open is the documented stance.
 - **Repo has merge queue configured but it's stale/unused:** WARNING fires anyway. The text says "may produce" not "will produce" — acceptable false-positive given the disable link is one click.
-- **Branch has a closed PR with `merged: false` but the user genuinely wants to delete (e.g., they ran an experiment):** the warning is informational. Existing AskUserQuestion gives them the choice. No new blocking step.
-- **Multiple PRs per branch (rare but possible):** the classification rule is "any closed PR with `merged: false`" — a single non-merged close is enough to flag. Conservative.
+- **Branch has a PR with `state == "CLOSED"` but the user genuinely wants to delete (e.g., they ran an experiment):** the warning is informational. Existing AskUserQuestion gives them the choice. No new blocking step.
+- **Multiple PRs per branch (rare but possible):** the classification rule is "any PR with `state == "CLOSED"`" — a single non-merged close is enough to flag. Conservative.
 - **CRLF on WSL2:** these are command `.md` edits, not new shell scripts. No CRLF stripping needed beyond normal commit hygiene.
 - **`gt-cleanup` rate-limit branch:** if the existing rate-limit fallback has already marked PR-data as incomplete, the `closed_not_merged` flag is also incomplete. Document that the warning depends on PR data being fetched successfully.
 
