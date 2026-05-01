@@ -154,9 +154,16 @@ state:
 
 ### 4. PR Status Lookups
 
-For branches that have an upstream (not orphaned), check PR status to determine:
+For branches that have an upstream **and** whose track status does NOT contain
+`[gone]` (so: not orphaned and not already routed to the merged-branch hint),
+check PR status to determine:
 - Whether the branch belongs in the **Closed PR** category
 - Whether the branch should be excluded from the **Stale** category (has open PR)
+
+`[gone]`-tracked branches are skipped here on purpose — they were already
+classified in Section 3 Step 2 and belong to `/gt-sync`, so any
+`closed_not_merged` tagging on them would be display-dead and only burn API
+quota.
 
 If there are more than 20 branches to check, show a progress indicator:
 
@@ -174,11 +181,23 @@ if [ -z "$REPO" ]; then
 fi
 ```
 
-For each branch:
+For each branch, run `gh pr list` and parse with jq. The authoritative signal
+for "PR landed" is the `pull_request.merged` boolean, not `mergedAt`:
+GitHub's REST API has a known propagation lag where a freshly-merged PR can
+briefly show `mergedAt: null` while `merged: true`. Gating on
+`merged == false` eliminates that false-positive window. Use this concrete
+pipeline so the runtime does not have to infer the parse:
 
 ```bash
-gh pr list --repo "$REPO" \
-  --head "$BRANCH_NAME" --state all --json state,mergedAt,merged --limit 100
+PR_JSON=$(gh pr list --repo "$REPO" \
+  --head "$BRANCH_NAME" --state all --json state,mergedAt,merged --limit 100)
+
+PR_COUNT=$(printf '%s' "$PR_JSON" | jq 'length')
+HAS_OPEN=$(printf '%s' "$PR_JSON" | jq 'any(.[]; .state == "OPEN")')
+ALL_TERMINAL=$(printf '%s' "$PR_JSON" \
+  | jq 'length > 0 and all(.[]; .state == "CLOSED" or .state == "MERGED")')
+CLOSED_NOT_MERGED=$(printf '%s' "$PR_JSON" \
+  | jq 'any(.[]; .state == "CLOSED" and (.merged // false) == false)')
 ```
 
 **Do NOT suppress stderr.** Add a `sleep 0.2` between lookups to avoid
@@ -190,20 +209,16 @@ triggering GitHub secondary rate limits. If `gh pr list` fails:
   continue with categories that don't require PR data (orphaned, diverged,
   behind, ahead).
 
-Parse the result:
-- If **all** PRs have state `CLOSED` or `MERGED`: branch is a **Closed PR**
-  candidate. Additionally, if **any** of the closed-state PRs has
-  `merged: false` (i.e. the PR was closed without landing — could be
-  queue-ejected, abandoned, or cancelled), tag the branch as
-  `closed_not_merged=true` for use in Phase 4. The authoritative signal is
-  the `merged` boolean (`pull_request.merged`), not `mergedAt`: GitHub's
-  REST API has a known propagation lag where a freshly-merged PR can briefly
-  show `mergedAt: null` while `merged: true`. Gating on `merged == false`
-  eliminates that false-positive window. PRs with state `MERGED` always have
-  `merged: true` and do not trigger this tag.
-- If **any** PR has state `OPEN`: branch has an active PR — exclude from
-  **Closed PR** and **Stale** categories.
-- If **no PRs** found: not a closed-PR candidate (may still be stale).
+Then classify:
+
+- `HAS_OPEN == true`: branch has an active PR — exclude from **Closed PR**
+  and **Stale** categories.
+- `ALL_TERMINAL == true`: branch is a **Closed PR** candidate. If
+  `CLOSED_NOT_MERGED == true` (any closed-state PR has `merged: false` —
+  could be queue-ejected, abandoned, or cancelled), additionally tag the
+  branch as `closed_not_merged=true` for use in Phase 4. PRs with state
+  `MERGED` always have `merged: true` and never trigger this tag.
+- `PR_COUNT == 0`: not a closed-PR candidate (may still be stale).
 
 ### 5. Staleness Check
 
