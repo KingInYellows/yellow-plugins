@@ -104,7 +104,11 @@ printf '\n=== Convention Files ===\n'
 printf '\n=== Merge Queue Compatibility ===\n'
 # Capture stderr from gh probes so failure diagnostics survive (vs silent 2>/dev/null).
 mq_err_log=$(mktemp 2>/dev/null) || mq_err_log=""
-if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+# No `gh auth status` precheck: it exits non-zero if ANY known host has stale
+# auth, which produces false COULD NOT CHECK results on multi-host setups
+# (gh.com + ghe.example.com). Let `gh repo view` be the auth probe — it's
+# scoped to the current repo's host and its stderr is captured below.
+if command -v gh >/dev/null 2>&1; then
   repo_nwo=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>"${mq_err_log:-/dev/null}")
   repo_view_status=$?
   if [ "$repo_view_status" -ne 0 ]; then
@@ -134,13 +138,13 @@ if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
       fi
       printf 'gh_native_queue:  COULD NOT CHECK (gh api graphql failed)\n'
     elif [ -n "$mq_check" ]; then
-      printf 'gh_native_queue:  WARNING (configured)\n'
+      printf 'gh_native_queue:  WARNING (configured — disable at https://github.com/%s/settings/branches)\n' "$repo_nwo"
     else
       printf 'gh_native_queue:  ok (not configured)\n'
     fi
   fi
 else
-  printf 'gh_native_queue:  COULD NOT CHECK (gh not authenticated or not installed)\n'
+  printf 'gh_native_queue:  COULD NOT CHECK (gh not installed)\n'
 fi
 [ -n "$mq_err_log" ] && rm -f "$mq_err_log"
 ```

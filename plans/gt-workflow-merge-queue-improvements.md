@@ -29,10 +29,10 @@ This is an imperfect signal — a stale/unused queue config could still register
 
 ### Change 2 — `gt-cleanup` closed-not-merged guard
 
-Add `mergedAt` to the existing `gh pr list --json` call. Tag any branch in the Closed PR category whose closed PRs include any with `mergedAt: null` as `closed-not-merged`. Surface this in two places:
+Add `mergedAt` and `merged` to the existing `gh pr list --json` call (so the call requests `state,mergedAt,merged`). Tag any branch in the Closed PR category whose closed PRs include any with `merged: false` as `closed-not-merged`. The authoritative signal is the `merged` boolean (`pull_request.merged`), not `mergedAt`: GitHub's REST API has a known propagation lag where a freshly-merged PR can transiently show `mergedAt: null` while `merged: true`. Gating on `merged == false` eliminates that false-positive window. Surface the result in two places:
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** The `--json state,mergedAt` pattern and `mergedAt: null` semantic check are already established in `plugins/yellow-core/commands/worktree/cleanup.md` and `plugins/yellow-linear/commands/linear/sync-all.md`. Change 2 follows existing conventions exactly — no new pattern is being introduced here.
+> **Codebase:** The `--json state,mergedAt` pattern is already established in `plugins/yellow-core/commands/worktree/cleanup.md` and `plugins/yellow-linear/commands/linear/sync-all.md`. Change 2 extends that pattern by also requesting `merged` and using it as the authoritative signal — see `docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection.md` for the propagation-lag rationale.
 <!-- /deepen-plan -->
 
 - **"Delete all" mode:** prepend the existing data-loss warning with a count line: "N of these branches had PRs closed without merging (may be queue-ejected, abandoned, or cancelled)."
@@ -44,7 +44,7 @@ No `queue-ejected` label reading. No new API calls. One extra JSON field in an e
 
 ### Phase 1: gt-setup native queue advisory
 
-- [ ] **1.1** Append a new `=== Trunk Protection ===` section to the Phase 1 Bash block in `plugins/gt-workflow/commands/gt-setup.md` (between current "Convention Files" and the Step 2 interpretation).
+- [ ] **1.1** Append a new `=== Merge Queue Compatibility ===` section to the Phase 1 Bash block in `plugins/gt-workflow/commands/gt-setup.md` (between current "Convention Files" and the Step 2 interpretation).
 - [ ] **1.2** Implement the GraphQL detection. Use `gh api graphql` with a query for `repository(owner, name) { mergeQueue { url } }`. Repo identifier comes from `gh repo view --json nameWithOwner -q .nameWithOwner` (same idiom already used in `gt-cleanup` line 170). Fail-open on any non-zero exit, missing auth, or parse error.
 - [ ] **1.3** Emit one of three lines based on result. Use **one space** after the colon to match the surrounding 16-char alignment zone (`=== Repository ===` and `=== Convention Files ===` sections):
   - Queue detected: `gh_native_queue: WARNING — GitHub native merge queue is configured for this repo. Graphite and GitHub native queue are incompatible; running both causes CI restarts and may produce out-of-order merges. Disable at: https://github.com/<repo>/settings/branches`
@@ -52,14 +52,14 @@ No `queue-ejected` label reading. No new API calls. One extra JSON field in an e
   - Could not check: `gh_native_queue: COULD NOT CHECK (gh auth or API unavailable)`
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** Two distinct column-alignment zones exist in `gt-setup.md` Phase 1 — Prerequisites/Auth use 15-char keys (`gt:`, `mcp_server:`, `jq:`, `yq:`), Repository/Convention use 16-char keys (`git_repo:`, `repo_config:`, `gt_trunk:`, `auth_config:`, `graphite_yml:`, `pr_template:`). The new `=== Trunk Protection ===` section sits between Convention Files and Step 2, so it should match the 16-char zone. Key `gh_native_queue` (15 chars) + `:` + one space = 17, slightly long but visually consistent. Original draft had two spaces (total 18) — corrected here. Precedent: `yellow-review/commands/review/setup.md:28` uses `gh_auth: ok` for similar GitHub-related diagnostics.
+> **Codebase:** Two distinct column-alignment zones exist in `gt-setup.md` Phase 1 — Prerequisites/Auth use 15-char keys (`gt:`, `mcp_server:`, `jq:`, `yq:`), Repository/Convention use 16-char keys (`git_repo:`, `repo_config:`, `gt_trunk:`, `auth_config:`, `graphite_yml:`, `pr_template:`). The new `=== Merge Queue Compatibility ===` section sits between Convention Files and Step 2, so it should match the 16-char zone. Key `gh_native_queue` (15 chars) + `:` + one space = 17, slightly long but visually consistent. Original draft had two spaces (total 18) — corrected here. Precedent: `yellow-review/commands/review/setup.md:28` uses `gh_auth: ok` for similar GitHub-related diagnostics.
 <!-- /deepen-plan -->
 - [ ] **1.4** Update Step 2 interpretation: add `gh_native_queue` WARNING to the Warnings list, with the consequence statement and disable link. Soft advisory only — never blocks.
 
 ### Phase 2: gt-cleanup closed-not-merged guard
 
-- [ ] **2.1** Update the `gh pr list` invocation in Phase 2.4 of `plugins/gt-workflow/commands/gt-cleanup.md` (line 180-182): change `--json state` to `--json state,mergedAt`.
-- [ ] **2.2** Update the parse-and-classify logic in Phase 2.4: when classifying as "Closed PR" candidate (all PRs `CLOSED` or `MERGED`), additionally check whether any `state == CLOSED` PR has `mergedAt: null`. If so, set a `closed_not_merged=true` flag on the branch.
+- [ ] **2.1** Update the `gh pr list` invocation in Phase 2.4 of `plugins/gt-workflow/commands/gt-cleanup.md` (line 180-182): change `--json state` to `--json state,mergedAt,merged`. Both fields are needed: `mergedAt` for surfacing the timestamp where useful, and `merged` (boolean) as the authoritative signal that survives REST propagation lag.
+- [ ] **2.2** Update the parse-and-classify logic in Phase 2.4 with a concrete jq pipeline (so the LLM-as-runtime does not infer the parse): when classifying as "Closed PR" candidate (all PRs `CLOSED` or `MERGED`), additionally check whether any `state == CLOSED` PR has `merged: false`. If so, set a `closed_not_merged=true` flag on the branch. Also explicitly exclude `[gone]`-tracked branches from the PR Status Lookups gate so the tag does not fire on branches already routed to `/gt-sync`.
 - [ ] **2.3** Update Phase 4 "Delete all" path for the Closed PR category: if any branches have `closed_not_merged=true`, prepend the existing data-loss warning block with: `N of these branches had PRs closed without merging (may be queue-ejected, abandoned, or cancelled). Verify before proceeding.`
 - [ ] **2.4** Update Phase 4 "Review individually" path: for each `closed_not_merged=true` branch, add a `PR status: closed (no merge — verify before deleting)` line to the per-branch detail block (between the existing "Unique commits" and "Age" lines).
 
@@ -88,7 +88,7 @@ No `queue-ejected` label reading. No new API calls. One extra JSON field in an e
 ### Detection Snippet (Phase 1.2)
 
 ```bash
-printf '\n=== Trunk Protection ===\n'
+printf '\n=== Merge Queue Compatibility ===\n'
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   repo_nwo=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
   if [ -n "$repo_nwo" ]; then
@@ -140,8 +140,8 @@ Note the `--jq '.data.repository.mergeQueue.url // empty'` filter: returns the U
 
 - **`gh api graphql` returns malformed JSON or partial data:** the `--jq` filter falls through to empty string, treated as "not configured." Acceptable — fail-open is the documented stance.
 - **Repo has merge queue configured but it's stale/unused:** WARNING fires anyway. The text says "may produce" not "will produce" — acceptable false-positive given the disable link is one click.
-- **Branch has a closed PR with `mergedAt: null` but the user genuinely wants to delete (e.g., they ran an experiment):** the warning is informational. Existing AskUserQuestion gives them the choice. No new blocking step.
-- **Multiple PRs per branch (rare but possible):** the classification rule is "any closed PR with `mergedAt: null`" — single null is enough to flag. Conservative.
+- **Branch has a closed PR with `merged: false` but the user genuinely wants to delete (e.g., they ran an experiment):** the warning is informational. Existing AskUserQuestion gives them the choice. No new blocking step.
+- **Multiple PRs per branch (rare but possible):** the classification rule is "any closed PR with `merged: false`" — a single non-merged close is enough to flag. Conservative.
 - **CRLF on WSL2:** these are command `.md` edits, not new shell scripts. No CRLF stripping needed beyond normal commit hygiene.
 - **`gt-cleanup` rate-limit branch:** if the existing rate-limit fallback has already marked PR-data as incomplete, the `closed_not_merged` flag is also incomplete. Document that the warning depends on PR data being fetched successfully.
 
