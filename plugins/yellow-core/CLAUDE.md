@@ -56,7 +56,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (8)
+### Skills (9)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `compound-lifecycle` — audit, refresh, and consolidate `docs/solutions/`
@@ -76,6 +76,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   security/auth/data-migration domains
 - `local-config` — yellow-plugins.local.md per-project config schema (internal)
 - `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
+- `optimize` — run a metric-driven optimization pass with parallel candidate
+  variants and an LLM-as-judge analytic rubric. Two-run order-swap recovers
+  positional-bias variance; per-criterion scoring (1-5) outperforms holistic;
+  style-bias self-check flags rationale drift. Optional `knowledge-compounder`
+  hand-off writes the winner to `docs/solutions/optimizations/`
 
 ### Optional Plugin Dependencies
 
