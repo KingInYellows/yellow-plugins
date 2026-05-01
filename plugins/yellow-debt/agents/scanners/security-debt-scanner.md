@@ -81,10 +81,11 @@ Return top 50 findings max, ranked by severity × confidence. Write results to
 `.debt/scanner-output/security-debt-scanner.json` per the v2.0 schema in
 `debt-conventions`.
 
-Every finding requires a concrete `failure_scenario` (one to two sentences:
-trigger → execution path → user-visible or operational outcome). Security debt
-scenarios should name the attack vector (e.g., "credential in git history is
-fetched by a forked PR's CI runner and used to enumerate S3 buckets within
-seconds"). When no concrete scenario can be constructed, emit `null` rather
-than fabricating speculation — the synthesizer treats `null` as a downgrade
-signal.
+Every finding must include the `failure_scenario` field (string or null).
+Prefer a concrete scenario when possible (one to two sentences: trigger →
+execution path → user-visible or operational outcome); security debt scenarios
+should name the attack vector (e.g., "credential in git history is fetched by
+a forked PR's CI runner and used to enumerate S3 buckets within seconds").
+Emit `null` only when no specific failure can be constructed — do not fabricate
+speculation. The synthesizer applies a +0.05 confidence-gate bump to
+compensate for null scenarios.

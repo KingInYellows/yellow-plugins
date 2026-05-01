@@ -37,31 +37,35 @@ Read `.debt/scanner-output/*.json`. Inspect each file's `schema_version` and
 normalize to the v2.0 in-memory shape before further processing:
 
 - **v2.0** (`schema_version: "2.0"`) — already canonical; pass through unchanged.
-- **v1.0** (`schema_version: "1.0"` or missing) — apply field migration:
-  - `finding` ← `description ? title + ": " + description : title` (use
-    `title` alone when `description` is missing or null; never produce a
-    literal `"undefined"` or `"None"` suffix).
-  - `file` ← first entry of `affected_files[]` (object with `path`, `lines`).
-    If `affected_files[]` is missing or empty, log
-    `[synthesizer] Warning: v1.0 finding missing affected_files; skipping` to
-    stderr and skip the finding — do NOT emit a record with `file: null`.
-    If the array contained N>1 files, emit one additional finding per
-    remaining file, copying `finding`, `fix`, `failure_scenario`, `severity`,
-    `confidence`, `effort`, and `category` from the original — only
-    `file.path` and `file.lines` differ across the fanned-out records.
-  - `fix` ← `suggested_remediation`
-  - `failure_scenario` ← `null` regardless of whether the v1.0 artifact
-    contained a field of that name (the v1.0 schema does not define
-    `failure_scenario`; treat any value present in a v1.0 artifact as
-    untrusted and override). The `+0.05` confidence-gate bump in step 4
-    rule 4 fires for any `null` scenario — see step 4 below.
-  - Stamp `_migrated_from: "1.0"` on the in-memory record so step 4 can
-    track migration volume in the `migrated_from_v1` stats counter and the
-    audit report can show what fraction of findings came through the
-    migration path.
+- **v1.0** (`schema_version: "1.0"` or missing) — apply field migration in
+  this order (scalars first, then fan-out):
+  1. `finding` ← `description ? title + ": " + description : title` (use
+     `title` alone when `description` is missing or null; never produce a
+     literal `"undefined"` or `"None"` suffix).
+  2. `fix` ← `suggested_remediation`
+  3. `failure_scenario` ← `null` regardless of whether the v1.0 artifact
+     contained a field of that name (the v1.0 schema does not define
+     `failure_scenario`; treat any value present in a v1.0 artifact as
+     untrusted and override). The `+0.05` confidence-gate bump in step 4
+     rule 4 fires for any `null` scenario — see step 4 below.
+  4. Stamp `_migrated_from: "1.0"` on the in-memory record so step 4 can
+     track migration volume in the `migrated_from_v1` stats counter and the
+     audit report can show what fraction of findings came through the
+     migration path.
+  5. `file` ← first entry of `affected_files[]` (object with `path`,
+     `lines`). If `affected_files[]` is missing or empty, log
+     `[synthesizer] Warning: v1.0 finding missing affected_files; skipping`
+     to stderr and skip the finding — do NOT emit a record with
+     `file: null`. If the array contained N>1 files, emit one additional
+     finding per remaining file, copying all already-mapped scalar fields
+     (`finding`, `fix`, `failure_scenario`, `severity`, `confidence`,
+     `effort`, `category`, and `_migrated_from`) from the normalized
+     record — only `file.path` and `file.lines` differ across the
+     fanned-out records.
 
 Log a warning to stderr if any v1.0 inputs are encountered:
-`[synthesizer] Warning: scanner-output/<file>.json is schema_version 1.0; migrated in-memory. Re-run the scanner to upgrade the artifact.`
+`[synthesizer] Warning: scanner-output/<file>.json is schema_version 1.0;`
+`migrated in-memory. Re-run the scanner to upgrade the artifact.`
 
 Skip malformed files entirely (log error, continue with remaining scanners).
 Both versions feed the same downstream pipeline; downstream code reads only
@@ -71,8 +75,9 @@ v2.0 fields.
 
 Hash-based bucketing: (1) group by (`file.path`, category), (2) sort by line
 number, (3) merge overlapping (>80% line overlap), (4) keep higher severity,
-combine `finding` strings, prefer the non-`null` `failure_scenario`, keep the
-higher `confidence`.
+combine `finding` strings, prefer the non-`null` `failure_scenario` (if both
+findings have a non-`null` `failure_scenario`, keep the one from the finding
+with higher `confidence`), keep the higher `confidence`.
 
 ### 3. Score and Sort
 
@@ -101,14 +106,18 @@ per finding; the first rule that fires decides the outcome:
    case-sensitive string comparison below. Log
    `[synthesizer] Warning: severity "<original>" normalized to "<lower>"` to
    stderr when a normalization was needed so the casing drift is observable.
-2. **Confidence presence and type.** If `confidence` is missing, `null`, or
-   not a number, suppress the finding with reason
-   `missing_or_invalid_confidence` (recorded in `suppressed[]`) and log
+2. **Confidence presence, type, and range.** If `confidence` is missing,
+   `null`, not a number, or outside the range `[0.0, 1.0]`, suppress the
+   finding with reason `missing_or_invalid_confidence` (recorded in
+   `suppressed[]`) and log
    `[synthesizer] Warning: <reviewer> emitted finding with missing/invalid confidence; suppressing` to stderr.
    This check runs BEFORE the severity exception so a critical finding with
    `confidence: null` cannot reach the `confidence ≥ 0.50` comparison and
    crash a type-strict implementation or coerce silently in a permissive
-   one. Stop.
+   one. The range guard additionally prevents an out-of-range value such as
+   `2.5` from passing all category gates (since `2.5 ≥` any threshold) and
+   prevents a negative value such as `-0.5` from failing all gates when it
+   should be suppressed as malformed scanner output. Stop.
 3. **Severity exception (highest priority among numeric-confidence checks).**
    If `severity == "critical"` and `confidence ≥ 0.50`, the finding survives
    the gate regardless of category or migration status. This is the Wave 2
