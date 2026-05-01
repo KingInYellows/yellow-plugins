@@ -53,13 +53,14 @@ TypeScript, Python, Rust, and Go.
 | `git-history-analyzer`      | Git archaeology, change history                                                              |
 | `learnings-researcher`      | Searches `docs/solutions/` for past learnings relevant to a PR diff or planning context      |
 
-### Workflow (3)
+### Workflow (4)
 
 | Agent                    | Description                                                    |
 | ------------------------ | -------------------------------------------------------------- |
 | `spec-flow-analyzer`     | User flow analysis, gap identification                         |
 | `brainstorm-orchestrator` | Iterative brainstorm dialogue with research integration       |
 | `knowledge-compounder`   | Extract and document solved problems to compound knowledge     |
+| `session-historian`      | Cross-vendor session search across Claude Code (local JSONL), Devin (REST API via MCP), and Codex (local directory-per-session); BM25 + optional ruvector cosine + recency fused via Reciprocal Rank Fusion; secret redaction (AWS keys, GitHub tokens, API keys, JWTs, PEM blocks) before excerpts are returned |
 
 ## Skills
 
@@ -71,6 +72,7 @@ TypeScript, Python, Rust, and Go.
 | `git-worktree`        | Git worktree management for parallel development                                                                                                                  |
 | `ideation`            | Generate 3 grounded approaches with the Toulmin warrant contract (evidence + linking principle + idea), filtered through MIDAS three-phase generation, then route the chosen approach into `brainstorm-orchestrator` via Task |
 | `optimize`            | Metric-driven optimization with parallel candidate variants and an LLM-as-judge analytic rubric (per-criterion 1-5 scoring + two-run order-swap + style-bias self-check); optional `knowledge-compounder` hand-off writes the winner to `docs/solutions/optimizations/` |
+| `session-history`     | Cross-vendor session-history user surface — dispatches the `session-historian` agent against Claude Code + Devin + Codex backends with availability detection and graceful degradation per backend |
 
 ## MCP Servers
 
