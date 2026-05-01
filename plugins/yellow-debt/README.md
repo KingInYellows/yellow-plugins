@@ -67,7 +67,7 @@ Run a comprehensive or targeted technical debt audit.
 **Output:**
 
 - Audit report at `docs/audits/YYYY-MM-DD-audit-report.md`
-- Todo files at `todos/debt/NNN-pending-SEVERITY-slug.md`
+- Todo files at `todos/debt/NNN-pending-SEVERITY-slug-HASH.md`
 
 ### `/debt:triage [--category <name>] [--priority <level>]`
 
@@ -184,9 +184,13 @@ from v1.0 `suggested_remediation`).]
 ```
 
 **Schema mapping:** the on-disk `affected_files` array key is intentionally
-retained for backward compatibility with `debt-fixer.md` Step 3; see the
-"v2.0 → todo frontmatter mapping" table in `audit-synthesizer.md` Step 7
-for the full v2.0 (in-memory) → frontmatter (on-disk) mapping.
+retained for backward compatibility with `debt-fixer.md` Step 3 — the v2.0
+in-memory `file: { path, lines }` is written to disk as
+`affected_files: \n  - <path>:<lines>` (single-element array). For all other
+v2.0 → on-disk field mappings (`finding`, `fix`, `failure_scenario`,
+`confidence`, `category`, `severity`/`priority`), see the canonical
+"v2.0 → todo frontmatter mapping" table in
+`agents/synthesis/audit-synthesizer.md` Step 7.
 
 ## State Machine
 

@@ -1,5 +1,5 @@
 ---
-"yellow-debt": minor
+"yellow-debt": major
 ---
 
 # Scanner output schema v2.0 — failure_scenario field, audit-synthesizer
