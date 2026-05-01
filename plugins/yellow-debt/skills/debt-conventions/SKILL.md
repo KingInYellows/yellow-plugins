@@ -513,13 +513,18 @@ no `.debt/scanner-output/*.json` files older than 30 days remain in active
 project trees.
 
 **Internal sentinel (`_migrated_from`):** During Step 1 normalization, the
-synthesizer attaches `_migrated_from: "1.0"` to each v1.0-derived in-memory
-record. This stamp is consumed by Step 4 rule 4 (the missing-failure-scenario
-bump) and by the `migrated_from_v1` stats counter; it is NOT written to
-disk and is NOT part of the v2.0 schema. Scanner authors do not emit it;
-it exists only inside one synthesizer run. When the dual-read window
-closes (see TODO above), this sentinel is removed from the codebase
-entirely.
+synthesizer attaches `_migrated_from: "1.0"` to **every** v1.0-derived
+in-memory record — both the original and any siblings produced by the
+multi-file fan-out (when v1.0 `affected_files[]` contains N>1 entries, the
+synthesizer emits N records and stamps every one). The
+`stats.migrated_from_v1` counter increments per stamped record (not per
+source artifact), so a v1.0 finding fanned across 5 files counts as 5
+migrated records — matching the siblings' independent confidence-gate
+evaluations downstream. The stamp is consumed by Step 4 rule 4a (the
+migration-window bump) and is NOT written to disk and NOT part of the v2.0
+schema. Scanner authors do not emit it; it exists only inside one
+synthesizer run. When the dual-read window closes (see TODO above), this
+sentinel is removed from the codebase entirely.
 
 ### Confidence Out of Range
 
