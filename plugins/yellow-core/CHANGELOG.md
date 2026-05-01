@@ -1,5 +1,343 @@
 # Changelog
 
+## 1.7.0
+
+### Minor Changes
+
+- [#312](https://github.com/KingInYellows/yellow-plugins/pull/312)
+  [`a2486f1`](https://github.com/KingInYellows/yellow-plugins/commit/a2486f10988be214bed4207e1e2a2170b78ea0ed)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  cross-vendor `session-history` skill + `session-historian` agent (W3.12) —
+  search prior sessions across Claude Code, Devin, and Codex with hybrid query
+  and secret redaction
+
+  Introduces:
+  - `plugins/yellow-core/skills/session-history/SKILL.md` (user-invokable as
+    `/yellow-core:session-history`) — user surface, query parsing, backend
+    availability detection, dispatch to `session-historian`, result table
+    rendering.
+  - `plugins/yellow-core/agents/workflow/session-historian.md`
+    (`tools: [Read, Grep, Glob, Bash, Task, ToolSearch]`) — per-backend session
+    discovery + extraction, BM25/cosine/RRF fusion scoring, secret redaction,
+    structured output schema with V3 Devin lineage fields.
+
+  Adapted from upstream `EveryInc/compound-engineering-plugin`
+  `ce-session-historian` agent at locked SHA
+  `e5b397c9d1883354f03e338dd00f98be3da39f9f`.
+
+  **Three backends with graceful degradation:**
+
+  | Backend     | Source                                                 | Availability check                                                                                                                                                                         |
+  | ----------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | Claude Code | `~/.claude/projects/<encoded-cwd>/*.jsonl`             | Filesystem read (always, unless directory missing)                                                                                                                                         |
+  | Devin       | `mcp__plugin_yellow-devin_devin__devin_session_search` | `ToolSearch` for the MCP tool; fall back to `devin-orchestrator` if absent                                                                                                                 |
+  | Codex       | `~/.codex/sessions/<YYYY/MM/DD>/<session-uuid>/`       | Filesystem read of the directory (CLAUDE.md only documents `~/.codex/auth.json` and `~/.codex/config.toml`; sessions path lives in `plugins/yellow-codex/commands/codex/status.md` Step 3) |
+
+  Encoded CWD: `printf '%s' "$PWD" | sed 's|/|-|g'` — replaces every `/` with
+  `-` (the leading slash becomes a leading hyphen). For
+  `/home/user/projects/foo` the encoded form is `-home-user-projects-foo`.
+  Matches Claude Code's actual on-disk encoding for
+  `~/.claude/projects/<encoded-cwd>/`.
+
+  Backend unavailable: log
+  `[session-history] Warning: <vendor> backend unavailable, skipping` to stderr
+  once and continue with available backends. **Never** fail the whole run on a
+  single backend's missing prerequisites.
+
+  **Hybrid query algorithm (BM25 + optional cosine + recency, fused via RRF):**
+  1. **BM25 component (always)** — token-frequency scoring on parsed topic
+     keywords against each session's text via `grep -ci`. Sum across keywords
+     normalized by `1 + log(1 + session_length_bytes)` so 1 MB sessions don't
+     dominate 100 KB ones.
+  2. **Cosine component (optional, when ruvector is installed)** — call
+     `mcp__plugin_yellow-ruvector_ruvector__hooks_recall(query, top_k=5)` and
+     use the result's `score` field. Skip the entire component if ruvector is
+     unavailable; do not error.
+  3. **Recency boost** — multiplier `1.0 - (days_old / scan_window_days)`,
+     floored at 0.1. Recent sessions outrank equally-relevant older ones.
+  4. **Reciprocal Rank Fusion** — `RRF(d) = sum( 1 / (60 + rank(d)) )` per
+     component (k=60 standard default), then
+     `final_score = RRF * recency_boost`. Disparate component scales (BM25
+     magnitudes vs cosine 0–1) merge cleanly via rank rather than raw score.
+
+  **Per-message-turn chunking** preserves
+  `{session_id, vendor, timestamp, role, tool_calls}` metadata. Token-based
+  chunking would fragment tool calls and lose attribution.
+
+  **Devin V3 lineage support** (per source-plan research note on April 2026
+  Devin API update): captures `parent_session_id`, `child_session_ids`, and
+  `is_advanced` fields; returns as `lineage: {parent, children, is_advanced}` in
+  result records. Improves "what did we decide about X" queries by surfacing
+  related sub-sessions rather than just the top-level session.
+
+  **Secret redaction (mandatory, runs in agent before any output):**
+
+  | Pattern                                                      | Replacement   |
+  | ------------------------------------------------------------ | ------------- |
+  | `AKIA[0-9A-Z]{16}`                                           | `[AWS_KEY]`   |
+  | `ghp_[A-Za-z0-9]{36}` / `github_pat_[A-Za-z0-9_]+`           | `[GH_TOKEN]`  |
+  | `sk-[A-Za-z0-9]{20,}` / `sk-ant-[A-Za-z0-9-]{20,}`           | `[API_KEY]`   |
+  | `eyJ[A-Za-z0-9_=-]+\.eyJ[A-Za-z0-9_=-]+\.[A-Za-z0-9_.+/=-]*` | `[JWT]`       |
+  | `-----BEGIN [A-Z ]+-----[\s\S]+?-----END [A-Z ]+-----`       | `[PEM_BLOCK]` |
+
+  Redaction runs unconditionally — never skip "because the user is the only
+  person who will see this." Memory persists, transcripts get exported, and once
+  a credential leaks into a `compound` write it lives forever. Each result row
+  includes `secrets_redacted: <N>` when redactions occurred.
+
+  **Yellow-plugins divergence from upstream:**
+  - **Cursor → Devin substitution.** Upstream's `ce-session-historian` covered
+    Claude Code + Codex + Cursor. Yellow-plugins replaces Cursor with Devin
+    because the yellow-devin plugin already exposes a Devin MCP, and Devin
+    sessions are the highest-density source of long-form decisions in this
+    workflow. Cursor support can be added later if a use case emerges.
+  - **Single-agent body, no helper extraction skills.** Upstream delegates JSONL
+    extraction to `ce-session-inventory` and `ce-session-extract` skills (~1100
+    lines combined). yellow-core ships a single agent that does inline
+    filtering. The ~300-line agent body fits in one context, and the extraction
+    commands are short enough to inline without a helper skill.
+  - **Hybrid scoring is explicit.** Upstream is keyword-only with judgment-
+    based ranking. yellow-plugins specifies BM25 + optional cosine + RRF fusion
+    per the source-plan research note (Cursor semantic search; Pinecone
+    hybrid-search studies; ~12% retrieval accuracy recovery on coding
+    transcripts).
+  - **Secret redaction in agent (not skill).** Putting redaction in the agent
+    makes it impossible to forget — the skill only sees the agent's
+    already-redacted output. Upstream documents redaction patterns in prose;
+    yellow-plugins makes it a mandatory step in the methodology.
+
+  **Methodology preserved from upstream:**
+  - Step 1: scope + backend availability detection
+  - Step 2: per-backend keyword filter (`grep -c`) before deep extract
+  - Step 3: bounded deep-dive (top 5 per backend, top 8 across)
+  - Step 4: per-message-turn extraction (head:200 default, tail:50 conditional
+    when session terminated mid-investigation)
+  - Step 5: redact + score
+  - Step 6: honest reporting (zero results gets a one-sentence diagnostic;
+    partial extraction gets `partial_extraction: true`)
+
+  **Acceptance criterion satisfied:** when invoked from a project with Claude
+  Code transcripts present, the skill returns timestamped per-vendor results
+  merged by relevance, each tagged with source vendor and secrets-redacted.
+  Devin and Codex backends gracefully skip when unavailable.
+
+  Discoverable via auto-discovery from
+  `plugins/yellow-core/skills/session-history/SKILL.md` and
+  `plugins/yellow-core/agents/workflow/session-historian.md` — no `plugin.json`
+  registration required.
+
+  **Plan reconciliation:** flips Wave 3 items #8 (PR #310), #9 (this PR), #10
+  (PR #311) to DONE in `plans/everyinc-merge-wave3.md` Stack Progress section.
+  Items #2, #5, #7 remain on the runway.
+
+- [#310](https://github.com/KingInYellows/yellow-plugins/pull/310)
+  [`d7f36fa`](https://github.com/KingInYellows/yellow-plugins/commit/d7f36fa695a158667d241079386d68a0e7ae98bb)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add `ideation`
+  skill (W3.11) — generate 3 grounded approaches with the Toulmin warrant
+  contract and route the chosen approach into `brainstorm-orchestrator`
+
+  Introduces `plugins/yellow-core/skills/ideation/SKILL.md` (user-invokable as
+  `/yellow-core:ideation`) for solution-space exploration before requirements
+  dialogue. Adapted from upstream `EveryInc/compound-engineering-plugin`
+  `ce-ideate` skill at locked SHA `e5b397c9d1883354f03e338dd00f98be3da39f9f`,
+  re-shaped around the MIDAS three-phase pattern + Toulmin warrant contract
+  researched in the source plan.
+
+  **Six phases:**
+  1. **Subject gate** — identifiability check on `<problem_statement>`. Vague
+     inputs (quality/category words like "improvements", "things to fix")
+     trigger one `AskUserQuestion` with three options (Specify / Surprise me /
+     Cancel). Threshold heuristic: <10 words AND no domain noun → ask; otherwise
+     accept.
+  2. **Free generation (no gate)** — 5–7 candidates across six framing biases
+     (pain, inversion, reframing, leverage, cross-domain analogy, constraint-
+     flipping). Frames are starting lenses, not constraints. Optional one-shot
+     `Grep` grounding when the input mentions an existing file.
+  3. **Warrant filtration (Toulmin contract)** — every survivor carries
+     `[EVIDENCE: direct|external|reasoned|SPECULATIVE]` +
+     `[WARRANT: linking principle]` + `[IDEA: one sentence]`. Empty `[EVIDENCE]`
+     slot → rejected. `[SPECULATIVE]` is valid only when strict-warrant mode is
+     **off** (see below). Filter to 3 strongest survivors.
+  4. **Warrant-guided extension** — each survivor gets a **next step** (smallest
+     testable action) and an **open question** (highest-uncertainty unknown) so
+     the brainstorm hand-off lands with concrete dialogue starting points, not
+     just an idea.
+  5. **Ranked selection** — surface the 3 survivors via `AskUserQuestion`. User
+     may pick "Other" with custom text to override (skill routes that text into
+     brainstorm directly).
+  6. **Hand-off** — spawn `brainstorm-orchestrator` via `Task` with literal
+     3-segment `subagent_type: "yellow-core:workflow:brainstorm-orchestrator"`
+     (avoids the LLM-guesses-2-segment regression from PR #289). Graceful
+     degradation: if the spawn fails, surface the chosen approach + warrant +
+     next step + open question in plain markdown for manual paste.
+
+  **Strict-warrant mode (domain-aware default):**
+  - **Off** for feature ideation, DX, refactoring, docs, performance —
+    speculation is allowed because cross-domain analogies often start
+    speculative and gain evidence in brainstorm.
+  - **On** for security, auth, encryption, data migration, schema changes,
+    payments, PII — speculation in these domains has higher cost (a speculative
+    auth approach that misses a known attack pattern can ship a real CVE).
+
+  Detection is keyword-based (case-insensitive) on `<problem_statement>`. User
+  override via `--strict-warrant` / `--no-strict-warrant` flag in `$ARGUMENTS`.
+  Conflicting flags resolve left-to-right (last-flag-wins), and the resolution
+  is reported in one line so the user can correct.
+
+  **Yellow-plugins divergence from upstream:**
+  - **No `references/` subdirectory** — upstream splits universal-ideation,
+    post-ideation-workflow, and web-research-cache into separate files totaling
+    ~1100 lines. yellow-core skills consistently use a single SKILL.md, so the
+    methodology is folded inline at ~270 lines. The surprise-me
+    deeper-exploration mode, V15 web-research cache, V17 scratch-checkpoints,
+    and full Phase 6 menu (Save/Refine/Open in Proof) are out of scope for this
+    initial pass — they can be added later if the team adopts ideation as a
+    primary entry point.
+  - **Toulmin contract is new** — upstream's `direct: / external: / reasoned:`
+    warrant tags map onto Toulmin's evidence slot, but yellow-core also requires
+    an explicit `[WARRANT]` slot (linking principle) and `[IDEA]` slot, and
+    permits `[SPECULATIVE]` as an explicit fourth evidence type rather than
+    silently allowing weakly-grounded ideas through.
+  - **Three survivors, not 5–7** — upstream targets 25–30 survivors after
+    dedupe; yellow-core targets 3 because the next step is a hand-off to a
+    blocking `AskUserQuestion`, not a markdown artifact.
+  - **No persistence** — upstream writes `docs/ideation/<topic>.md`; yellow-core
+    treats the conversation as the artifact and lets the brainstorm output
+    (`docs/brainstorms/<date>-<topic>-brainstorm.md`) carry the chosen approach
+    forward. Persistence can be added later if a use case emerges.
+
+  **Methodology preserved from upstream:**
+  - Six framing biases (pain / inversion / reframing / leverage / analogy /
+    constraint-flipping) — kept verbatim because the framing taxonomy is the
+    durable insight; the dispatch architecture around it is what changed.
+  - Subject-identifiability gate as Phase 0 — kept because vague subjects
+    produce scattered ideation regardless of the rest of the workflow.
+  - Warrant-required generation rule — kept; this is the quality mechanism.
+
+  **Hand-off semantics:** ideation answers "what are the strongest options worth
+  exploring"; brainstorm answers "what does the chosen option mean precisely".
+  Different jobs, different tools — the skill explicitly does not continue
+  requirements dialogue after the spawn.
+
+  Discoverable via auto-discovery from
+  `plugins/yellow-core/skills/ideation/SKILL.md` — no `plugin.json` registration
+  required.
+
+- [#311](https://github.com/KingInYellows/yellow-plugins/pull/311)
+  [`9cb0f32`](https://github.com/KingInYellows/yellow-plugins/commit/9cb0f32b924a3cd6e5f4dc0444a790e74c5f4a7d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add `optimize`
+  skill (W3.14) — metric-driven optimization with parallel candidate variants
+  and LLM-as-judge analytic rubric
+
+  Introduces `plugins/yellow-core/skills/optimize/SKILL.md` (user-invokable as
+  `/yellow-core:optimize`) plus
+  `plugins/yellow-core/skills/optimize/schema.yaml` defining the optimization
+  spec format. Adapted from upstream `EveryInc/compound-engineering-plugin`
+  `ce-optimize` skill at locked SHA `e5b397c9d1883354f03e338dd00f98be3da39f9f` —
+  extract-only treatment from the 659-line upstream + 7 reference files.
+
+  **Five phases (each fits in a single conversation context):**
+  1. **Spec resolution** — read or scaffold the optimization spec; validate
+     against `schema.yaml` (required: `optimization_target`,
+     `measurement_criteria` with 2-5 entries; optional with defaults:
+     `success_threshold` (3.5), `parallel_count` (2; range 2-5), `judge_runs`
+     (2; range 1-3), and others). Path A: spec file path. Path B:
+     `AskUserQuestion` 3-question scaffold flow. Echo + confirm gate before
+     running.
+  2. **Research pre-pass (optional)** — dispatch `best-practices-researcher` (or
+     `research-conductor` if yellow-research installed) for prior art on the
+     optimization target. Summary fenced as `<external_research>` and included
+     in each generator's prompt. Graceful degradation — if both researchers
+     unavailable, log warning and proceed.
+  3. **Parallel candidate generation** — spawn `parallel_count`
+     `general-purpose` Task agents in a single message. Each agent receives
+     `<external_research>` and produces ONE variant in a fenced code block.
+     Default `candidate_generation_prompt` requires meaningful design difference
+     (not micro-tweaks). Single retry on timeout/missing-fence; drop on second
+     failure with `parallel_count - 1` survivors.
+  4. **LLM-as-judge with order-swap** — judge runs `judge_runs` times (default
+     2). Run 1 in spec order; run 2 reversed (the order-swap that catches
+     positional bias). Each judge run returns per-candidate records with
+     `criterion_scores` (1-5 integer per criterion), `weighted_score`,
+     `rationale`, and **`style_bias_check: bool`** (judge self-flags when style
+     influenced score independently of substance). Sanity checks: warn if 50%+
+     records flag style bias, warn if any candidate's per-criterion scores
+     diverge by >2 points between runs.
+  5. **Rank & hand-off** — average scores across runs; surface ranked list via
+     `AskUserQuestion`. If `knowledge_compound: true` AND winner clears
+     `success_threshold`, spawn `knowledge-compounder` via Task to write
+     `docs/solutions/optimizations/<spec-name>.md`. Otherwise surface the chosen
+     variant and exit cleanly.
+
+  **`judge_telemetry` schema (output)** documented in `schema.yaml`:
+  `{candidate_id, run_index, criterion_scores, weighted_score, rationale, style_bias_check}`.
+  Stored in conversation context only — no on-disk persistence by default
+  (yellow-plugins divergence; see below).
+
+  **Yellow-plugins divergence from upstream:**
+  - **No on-disk persistence by default.** Upstream `ce-optimize` writes to
+    `.context/compound-engineering/ce-optimize/<spec-name>/` for crash-safety
+    across multi-hour runs (CP-0 through CP-5 mandatory checkpoints, append-
+    only experiment log, per-experiment `result.yaml` markers, strategy digest).
+    Yellow-plugins runs are typically <30 minutes — the upstream's multi-hour
+    optimization loops don't apply here. Conversation context holds candidates
+    and judge_telemetry. The `knowledge_compound: true` path is the durable
+    persistence option. Add disk persistence later if a use case actually needs
+    it; YAGNI until then.
+  - **No worktree-based experiments.** Upstream uses
+    `scripts/experiment-worktree.sh` to run each candidate in an isolated git
+    worktree. Yellow-plugins skill operates entirely in-context — Task agents
+    produce text variants the user later applies. Worktree experiments can be
+    added in a follow-up if the optimization targets expand to file-based
+    variants requiring isolated runtime measurement.
+  - **Single SKILL.md, no `references/` subdirectory.** Upstream splits
+    methodology into 5 reference files (`usage-guide.md`,
+    `experiment-prompt-template.md`, `judge-prompt-template.md`,
+    `optimize-spec-schema.yaml`, `experiment-log-schema.yaml`); yellow-core
+    skills consistently use a single SKILL.md, so methodology is folded inline.
+    Schema lives in a sibling `schema.yaml` because YAML schemas are parsed
+    differently than markdown.
+  - **Three-tier metric (`hard` / `judge` + `degenerate_gates`) collapsed to
+    judge-only.** Upstream supports both hard scalar metrics (from a measurement
+    command) and LLM-as-judge. Yellow-plugins ships judge-only for the initial
+    pass — hard-metric integration requires a measurement- harness convention
+    that doesn't exist yet in yellow-plugins. Spec authors who need hard metrics
+    can extend the schema in a follow-up.
+  - **No multi-iteration optimization loop.** Upstream runs hypothesis-
+    generation → batch-experiments → strategy-digest → next-batch over multiple
+    iterations. Yellow-plugins ships single-batch only — the user picks a winner
+    from one batch. Multi-iteration loops can be added if the team finds
+    single-batch insufficient.
+
+  **Methodology preserved (and extended) from upstream:**
+  - **Two-run order-swap as judge default** — single-run judges show wide
+    inter-rater reliability variance across random seeds, and a substantial
+    fraction of pairwise rankings invert between runs. Upstream defaults to 1
+    run; yellow-plugins defaults to 2 because the cost is small and the variance
+    is large. See `plans/everyinc-merge.md` W3.14 for the underlying citations.
+  - **Per-criterion analytic rubric, not holistic** — per-criterion rubrics
+    produce more reliable inter-rater agreement than holistic scoring across
+    evaluation studies. Both upstream and yellow-plugins support this;
+    yellow-plugins makes it the only mode. The exact ICC figures cited in the
+    source-plan research note are calibration approximations, not load-bearing
+    constants.
+  - **`style_bias_check` self-flag** is **new in yellow-plugins** — added per
+    the source-plan research note
+    (`amend the W3.14 judge_telemetry to include style_bias_check: <bool>`).
+    Surfaces when judges trained on style-coupled preference data bias toward
+    longer/better-formatted candidates regardless of substance. The skill warns
+    the user when 50%+ of records flag this; the user decides whether to
+    normalize style and rerun.
+
+  **Acceptance criterion satisfied:** the skill spec validates a synthetic
+  2-candidate experiment shape and the documented Phase 3 judge prompt produces
+  ranked output with scores and rationale per the schema.
+
+  Discoverable via auto-discovery from
+  `plugins/yellow-core/skills/optimize/SKILL.md` — no `plugin.json` registration
+  required. `schema.yaml` is loaded at runtime from the same directory via the
+  skill's relative path reference.
+
 ## 1.6.0
 
 ### Minor Changes
