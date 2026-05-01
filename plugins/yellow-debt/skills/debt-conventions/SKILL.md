@@ -136,9 +136,11 @@ suppressed findings becoming todos):
 {
   "stats": {
     "suppressed_by_confidence_gate": 12,
-    "suppressed_by_missing_or_invalid_confidence": 0,
+    "suppressed_by_missing_confidence": 0,
+    "suppressed_by_out_of_range_confidence": 0,
     "survived_severity_exception": 2,
-    "migrated_from_v1": 4
+    "migrated_from_v1": 4,
+    "files_skipped_malformed": 0
   },
   "suppressed": [
     {
@@ -158,15 +160,18 @@ Stats fields:
 - `suppressed_by_confidence_gate`: count of findings that fell below the
   category gate (or category-gate + 0.05 bump where applicable) — only
   Rule 5 (below_category_gate) suppressions
-- `suppressed_by_missing_or_invalid_confidence`: count of findings
-  suppressed by Rule 2 because `confidence` was missing, `null`, or not a
-  number (a scanner bug, not calibration drift); tracked separately so
-  operators can distinguish scanner-output quality issues from calibration
-  drift
+- `suppressed_by_missing_confidence`: count of findings suppressed by Rule 2
+  because `confidence` was missing, `null`, or not a number (a scanner bug,
+  not calibration drift)
+- `suppressed_by_out_of_range_confidence`: count of findings suppressed by
+  Rule 2b because `confidence` was numeric but outside [0.0, 1.0] (a
+  distinct scanner bug class — e.g., scanner emitting `1.5` or `-0.1`)
 - `survived_severity_exception`: count of `critical` findings that passed
   the gate via the P0-at-anchor-50 exception
 - `migrated_from_v1`: count of findings normalized from v1.0 artifacts in
   the synthesizer's Step 1 dual-read
+- `files_skipped_malformed`: count of `.debt/scanner-output/*.json` files
+  that failed to parse and were skipped at Step 1 (with a logged warning)
 
 `suppressed[]` entry shape:
 
@@ -177,11 +182,12 @@ Stats fields:
 - `confidence`: original confidence value
 - `gate_threshold`: the threshold the finding failed (post-bump if
   applicable) when `reason` is `below_category_gate:<category>`; `null`
-  or omitted when `reason` is `missing_or_invalid_confidence` because no
-  threshold comparison was performed
+  or omitted when `reason` is `missing_or_invalid_confidence` or
+  `out_of_range_confidence` because no threshold comparison was performed
 - `reason`: one of `below_category_gate:<category>` (failed gate
-  comparison; `gate_threshold` populated) or
-  `missing_or_invalid_confidence` (`gate_threshold` null/omitted)
+  comparison; `gate_threshold` populated), `missing_or_invalid_confidence`
+  (Rule 2; `gate_threshold` null/omitted), or `out_of_range_confidence`
+  (Rule 2b; `gate_threshold` null/omitted)
 
 Step 7 of the synthesizer iterates ONLY over the surviving findings list
 when generating todo files; entries in `suppressed[]` are NEVER promoted
