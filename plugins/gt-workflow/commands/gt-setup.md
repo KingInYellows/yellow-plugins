@@ -100,6 +100,53 @@ done
 printf '\n=== Convention Files ===\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.graphite.yml" ] && printf 'graphite_yml:   present\n' || printf 'graphite_yml:   not found\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.github/pull_request_template.md" ] && printf 'pr_template:    present\n' || printf 'pr_template:    not found\n'
+
+printf '\n=== Merge Queue Compatibility ===\n'
+# Capture stderr from gh probes so failure diagnostics survive (vs silent 2>/dev/null).
+mq_err_log=$(mktemp 2>/dev/null) || mq_err_log=""
+# No `gh auth status` precheck: it exits non-zero if ANY known host has stale
+# auth, which produces false COULD NOT CHECK results on multi-host setups
+# (gh.com + ghe.example.com). Let `gh repo view` be the auth probe — it's
+# scoped to the current repo's host and its stderr is captured below.
+if command -v gh >/dev/null 2>&1; then
+  repo_nwo=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>"${mq_err_log:-/dev/null}")
+  repo_view_status=$?
+  if [ "$repo_view_status" -ne 0 ]; then
+    if [ -n "$mq_err_log" ] && [ -s "$mq_err_log" ]; then
+      printf '[gt-workflow] Warning: gh repo view failed (exit %d): %s\n' "$repo_view_status" "$(head -c 200 "$mq_err_log" | tr '\n' ' ')" >&2
+    else
+      printf '[gt-workflow] Warning: gh repo view failed (exit %d)\n' "$repo_view_status" >&2
+    fi
+    printf 'gh_native_queue:  COULD NOT CHECK (gh repo view failed)\n'
+  elif [ -z "$repo_nwo" ]; then
+    printf 'gh_native_queue:  COULD NOT CHECK (gh repo view returned no name)\n'
+  else
+    repo_owner="${repo_nwo%/*}"
+    repo_name="${repo_nwo#*/}"
+    [ -n "$mq_err_log" ] && : > "$mq_err_log"  # truncate before next probe
+    # shellcheck disable=SC2016  # $owner/$name are GraphQL variable refs, not shell vars — intentionally literal in single quotes
+    mq_check=$(gh api graphql -f query='
+      query($owner:String!,$name:String!){
+        repository(owner:$owner,name:$name){ mergeQueue { url } }
+      }' -f owner="$repo_owner" -f name="$repo_name" --jq 'if .data.repository == null then error("repo null") else (.data.repository.mergeQueue | if . != null then "configured" else empty end) end' 2>"${mq_err_log:-/dev/null}")
+    mq_status=$?
+    if [ "$mq_status" -ne 0 ]; then
+      if [ -n "$mq_err_log" ] && [ -s "$mq_err_log" ]; then
+        printf '[gt-workflow] Warning: merge queue check failed (gh api graphql): %s\n' "$(head -c 200 "$mq_err_log" | tr '\n' ' ')" >&2
+      else
+        printf '[gt-workflow] Warning: merge queue check failed (gh api graphql)\n' >&2
+      fi
+      printf 'gh_native_queue:  COULD NOT CHECK (gh api graphql failed)\n'
+    elif [ -n "$mq_check" ]; then
+      printf 'gh_native_queue:  WARNING (configured — disable at https://github.com/%s/settings/branches)\n' "$repo_nwo"
+    else
+      printf 'gh_native_queue:  ok (not configured)\n'
+    fi
+  fi
+else
+  printf 'gh_native_queue:  COULD NOT CHECK (gh not installed)\n'
+fi
+[ -n "$mq_err_log" ] && rm -f "$mq_err_log"
 ```
 
 ### Step 2: Interpret Results
@@ -119,6 +166,8 @@ If any hard-stop failures exist, stop here. Do not proceed to Phase 2.
 - `mcp_server` UPGRADE NEEDED: "Graphite MCP server requires gt v1.6.7+. The `gt mcp` stdio server registered in plugin.json will fail to start and Graphite MCP tools will be unavailable until you upgrade. Run `npm i -g @withgraphite/graphite-cli@latest` to upgrade, then re-run `/gt-setup`. All CLI-based commands (`/smart-submit`, `/gt-sync`, etc.) continue to work without MCP."
 - `mcp_server` SKIPPED or UNKNOWN: note accordingly.
 - `yq` NOT FOUND: "yq (kislyuk variant) is optional but recommended. Without it, consumer commands (`/smart-submit`, `/gt-stack-plan`, `/gt-amend`) will use hardcoded defaults instead of `.graphite.yml` settings. Install with: `pip install yq`"
+- `gh_native_queue` WARNING (configured): "GitHub native merge queue is configured for this repo. Graphite and GitHub native merge queue are incompatible — running both causes Graphite to restart CI on queued commits and may produce out-of-order merges. To disable: open https://github.com/<owner>/<repo>/settings/branches, edit the branch protection rule for your trunk branch, and uncheck **Require merge queue**. Setup proceeds, but the warning will repeat each time you run `/gt-setup` until resolved."
+- `gh_native_queue` COULD NOT CHECK: informational only — but **not necessarily safe to ignore**. The parenthetical reason in the output line indicates which probe failed (gh missing/unauthenticated, `gh repo view`, or `gh api graphql`); the captured stderr is appended to the `[gt-workflow] Warning:` line on failure to aid debugging. Three documented false-negative paths exist for the `repository.mergeQueue { url }` proxy: (1) the GitHub token lacks the admin scope needed to read merge queue config, (2) the repository is not visible to the token, (3) merge queue is configured but `mergeQueue.url` is null. Any of these can produce COULD NOT CHECK or even a misleading `ok (not configured)` while the queue is actually active. If your token is scope-limited (e.g., a CI/automation token), re-run `/gt-setup` with an admin-scoped token before relying on the result. Setup itself proceeds normally; the proxy is fail-open by design.
 
 ### Step 3: Validation Report
 
@@ -133,6 +182,7 @@ yq:            ready (or: not found — optional)
 Auth:          detected
 Repository:    initialized (trunk: <branch>)
 MCP Server:    available (or: unavailable — gt < 1.6.7)
+Merge Queue:   ok (or: WARNING — native queue active / COULD NOT CHECK)
 
 Proceeding to AI agent configuration...
 ```

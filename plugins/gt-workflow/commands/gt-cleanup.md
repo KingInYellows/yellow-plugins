@@ -154,9 +154,16 @@ state:
 
 ### 4. PR Status Lookups
 
-For branches that have an upstream (not orphaned), check PR status to determine:
+For branches that have an upstream **and** whose track status does NOT contain
+`[gone]` (so: not orphaned and not already routed to the merged-branch hint),
+check PR status to determine:
 - Whether the branch belongs in the **Closed PR** category
 - Whether the branch should be excluded from the **Stale** category (has open PR)
+
+`[gone]`-tracked branches are skipped here on purpose — they were already
+classified in Section 3 Step 2 and belong to `/gt-sync`, so any
+`closed_not_merged` tagging on them would be display-dead and only burn API
+quota.
 
 If there are more than 20 branches to check, show a progress indicator:
 
@@ -174,11 +181,34 @@ if [ -z "$REPO" ]; then
 fi
 ```
 
-For each branch:
+For each branch, run `gh pr list` and parse with jq. `gh pr list --json`
+exposes the GraphQL `state` enum directly (`OPEN | CLOSED | MERGED`) — a
+merged PR has `state == "MERGED"`, **not** `CLOSED`. So `state == "CLOSED"`
+is by itself unambiguous evidence of "closed without landing"; no separate
+`merged` boolean check is needed. (The propagation-lag concern documented in
+`docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection.md`
+applies to `gh api repos/{owner}/{repo}/pulls/{number}` per-PR REST calls,
+where `merged: bool` is exposed; `gh pr list --json` does not accept a
+`merged` field — only `state`, `mergedAt`, `mergedBy`, `mergeCommit`,
+`closed`, `closedAt`, etc. — so the GraphQL `state` enum is the correct
+authority here.)
+
+`mergedAt` is also requested for display use (e.g., "merged at <timestamp>"
+in per-branch detail), but is not used for classification.
+
+Use this concrete jq pipeline so the runtime does not have to infer the
+parse:
 
 ```bash
-gh pr list --repo "$REPO" \
-  --head "$BRANCH_NAME" --state all --json state --limit 100
+PR_JSON=$(gh pr list --repo "$REPO" \
+  --head "$BRANCH_NAME" --state all --json state,mergedAt --limit 100)
+
+PR_COUNT=$(printf '%s' "$PR_JSON" | jq 'length')
+HAS_OPEN=$(printf '%s' "$PR_JSON" | jq 'any(.[]; .state == "OPEN")')
+ALL_TERMINAL=$(printf '%s' "$PR_JSON" \
+  | jq 'length > 0 and all(.[]; .state == "CLOSED" or .state == "MERGED")')
+CLOSED_NOT_MERGED=$(printf '%s' "$PR_JSON" \
+  | jq 'any(.[]; .state == "CLOSED")')
 ```
 
 **Do NOT suppress stderr.** Add a `sleep 0.2` between lookups to avoid
@@ -190,12 +220,17 @@ triggering GitHub secondary rate limits. If `gh pr list` fails:
   continue with categories that don't require PR data (orphaned, diverged,
   behind, ahead).
 
-Parse the result:
-- If **all** PRs have state `CLOSED` or `MERGED`: branch is a **Closed PR**
-  candidate.
-- If **any** PR has state `OPEN`: branch has an active PR — exclude from
-  **Closed PR** and **Stale** categories.
-- If **no PRs** found: not a closed-PR candidate (may still be stale).
+Then classify:
+
+- `HAS_OPEN == true`: branch has an active PR — exclude from **Closed PR**
+  and **Stale** categories.
+- `ALL_TERMINAL == true`: branch is a **Closed PR** candidate. If
+  `CLOSED_NOT_MERGED == true` (any PR has `state == "CLOSED"` — meaning
+  closed without landing, which could be queue-ejected, abandoned, or
+  cancelled), additionally tag the branch as `closed_not_merged=true` for
+  use in Phase 4. PRs that landed have `state == "MERGED"` and never
+  trigger this tag.
+- `PR_COUNT == 0`: not a closed-PR candidate (may still be stale).
 
 ### 5. Staleness Check
 
@@ -307,6 +342,20 @@ Options:
 3. Skip this category
 ```
 
+For the **Closed PR** category specifically, the per-branch `<context>`
+must distinguish merged PRs from PRs closed without merging — when
+`closed_not_merged=true` for a branch, render the PR state as
+`closed (no merge — verify before deleting)` instead of `closed`. This
+surfaces queue-ejected, abandoned, or cancelled PRs at the decision
+point, before the user commits to "Delete all". Additionally, if **any** branches in the category
+have `closed_not_merged=true`, append a one-line summary above the
+Options block:
+
+```
+Note: M of N branches had PRs closed without merging (may be queue-ejected,
+abandoned, or cancelled).
+```
+
 Where `<action>` is:
 - "Delete" for orphaned, closed PR, stale (via `gt delete`)
 - "Sync" for behind remote (via `gt get`)
@@ -314,7 +363,7 @@ Where `<action>` is:
 **If "Delete all" or "Sync all" is chosen:**
 
 For deletion categories, if any branches have unique commits not on trunk,
-display a data-loss warning before executing:
+display the data-loss warning before executing:
 
 ```
 ⚠️  N branches have commits not on trunk:
@@ -379,6 +428,12 @@ Options:
 1. <Delete/Sync> this branch
 2. Skip
 ```
+
+For branches in the Closed PR category with `closed_not_merged=true`, replace
+the `PR status:` line with `closed (no merge — verify before deleting)` to
+make the unmerged-close state visible at the per-branch confirmation point.
+The existing AskUserQuestion serves as the confirmation step — no extra
+prompt is needed.
 
 Execute the chosen action with the same error handling as batch mode.
 
