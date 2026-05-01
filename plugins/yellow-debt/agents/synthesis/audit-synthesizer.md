@@ -230,7 +230,7 @@ on-disk frontmatter as follows:
 | -------------------- | ---------------------------- | ------------------------------------------- |
 | `file.path`          | `affected_files[0]` prefix   | `affected_files: \n  - <file.path>:<file.lines>` (single-element array) |
 | `file.lines`         | `affected_files[0]` suffix   | (combined with path above)                  |
-| `finding`            | H1 title + `## Finding` body | Direct (see README todo template for example) |
+| `finding`            | H1 title + `## Finding` body, `title:` and `description:` frontmatter | H1 + `## Finding` body: full `finding` string. `title:` frontmatter: first 72 chars of `finding` (single-line, used by `/debt:sync` Step 8a → Linear issue title). `description:` frontmatter: full `finding` string (used by `/debt:sync` Step 8a → Linear issue body). The frontmatter copies are denormalized for `yq` access in `debt-fixer.md` and `sync.md`; the H1/body copy is canonical for human reviewers. |
 | `fix`                | `## Fix` body                | Direct body text                          |
 | `failure_scenario`   | `## Failure Scenario` body   | Empty body when scanner emitted `null`      |
 | `confidence`         | `confidence:` frontmatter    | Float 0.0–1.0, written as-is                |
@@ -238,9 +238,12 @@ on-disk frontmatter as follows:
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
 | (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
-This mapping preserves the existing `debt-fixer.md` scope-validator
-(`yq -r '.affected_files[]'` at line 57) without changes — the fixer reads
-the on-disk frontmatter, not the in-memory v2.0 record.
+This mapping preserves both downstream consumers without code changes:
+the `debt-fixer.md` scope-validator (`yq -r '.affected_files[]'`) reads the
+v1.0-style array key, and the `/debt:sync` command (`yq -r '.title'`,
+`yq -r '.description'`) reads the denormalized title/description copies of
+the `finding` field. The fixer and sync command both read on-disk
+frontmatter, not the in-memory v2.0 record.
 
 **CRITICAL SECURITY - Slug Derivation**:
 

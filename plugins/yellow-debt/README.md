@@ -147,6 +147,8 @@ category: complexity
 severity: high
 effort: small
 confidence: 0.85
+title: 'High Cyclomatic Complexity in UserService'
+description: 'High Cyclomatic Complexity in UserService'
 scanner: complexity-scanner
 audit_date: '2026-02-13'
 affected_files:
@@ -184,11 +186,14 @@ from v1.0 `suggested_remediation`).]
 ```
 
 **Schema mapping:** the on-disk `affected_files` array key is intentionally
-retained for backward compatibility with `debt-fixer.md` Step 3 — the v2.0
-in-memory `file: { path, lines }` is written to disk as
-`affected_files: \n  - <path>:<lines>` (single-element array). For all other
-v2.0 → on-disk field mappings (`finding`, `fix`, `failure_scenario`,
-`confidence`, `category`, `severity`/`priority`), see the canonical
+retained for backward compatibility with `debt-fixer.md` Step 3, and the
+`title:` (truncated `finding`) + `description:` (full `finding`)
+denormalized copies are written for backward compatibility with
+`commands/debt/sync.md` Step 8a. The v2.0 in-memory `file: { path, lines }`
+is written to disk as `affected_files: \n  - <path>:<lines>`
+(single-element array). For all other v2.0 → on-disk field mappings
+(`finding`, `fix`, `failure_scenario`, `confidence`, `category`,
+`severity`/`priority`, `title`, `description`), see the canonical
 "v2.0 → todo frontmatter mapping" table in
 `agents/synthesis/audit-synthesizer.md` Step 7.
 
