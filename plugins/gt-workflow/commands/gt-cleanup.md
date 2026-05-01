@@ -178,7 +178,7 @@ For each branch:
 
 ```bash
 gh pr list --repo "$REPO" \
-  --head "$BRANCH_NAME" --state all --json state,mergedAt --limit 100
+  --head "$BRANCH_NAME" --state all --json state,mergedAt,merged --limit 100
 ```
 
 **Do NOT suppress stderr.** Add a `sleep 0.2` between lookups to avoid
@@ -193,10 +193,14 @@ triggering GitHub secondary rate limits. If `gh pr list` fails:
 Parse the result:
 - If **all** PRs have state `CLOSED` or `MERGED`: branch is a **Closed PR**
   candidate. Additionally, if **any** of the closed-state PRs has
-  `mergedAt: null` (closed without landing — could be queue-ejected, abandoned,
-  or cancelled), tag the branch as `closed_not_merged=true` for use in
-  Phase 4. PRs with state `MERGED` always have a non-null `mergedAt` and do
-  not trigger this tag.
+  `merged: false` (i.e. the PR was closed without landing — could be
+  queue-ejected, abandoned, or cancelled), tag the branch as
+  `closed_not_merged=true` for use in Phase 4. The authoritative signal is
+  the `merged` boolean (`pull_request.merged`), not `mergedAt`: GitHub's
+  REST API has a known propagation lag where a freshly-merged PR can briefly
+  show `mergedAt: null` while `merged: true`. Gating on `merged == false`
+  eliminates that false-positive window. PRs with state `MERGED` always have
+  `merged: true` and do not trigger this tag.
 - If **any** PR has state `OPEN`: branch has an active PR — exclude from
   **Closed PR** and **Stale** categories.
 - If **no PRs** found: not a closed-PR candidate (may still be stale).
