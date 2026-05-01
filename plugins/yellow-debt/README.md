@@ -146,6 +146,7 @@ priority: p2
 category: complexity
 severity: high
 effort: small
+confidence: 0.85
 scanner: complexity-scanner
 audit_date: '2026-02-13'
 affected_files:
@@ -162,18 +163,30 @@ content_hash: 'a3f2b1c4'
 
 [Description of the issue]
 
+## Failure Scenario
+
+[One-to-two-sentence concrete production failure: trigger → execution path →
+user-visible or operational outcome. Sourced from the scanner's
+`failure_scenario` field (v2.0 schema). Empty if the scanner emitted `null`.]
+
 ## Context
 
 [Code snippet]
 
-## Suggested Remediation
+## Fix
 
-[How to fix it]
+[How to fix it. Sourced from the scanner's `fix` field (v2.0 schema; renamed
+from v1.0 `suggested_remediation`).]
 
 ## Effort Estimate
 
 **Small** (30min-2hr): Extract 2-3 methods, flatten nesting.
 ```
+
+**Schema mapping:** the on-disk `affected_files` array key is intentionally
+retained for backward compatibility with `debt-fixer.md` Step 3; see the
+"v2.0 → todo frontmatter mapping" table in `audit-synthesizer.md` Step 7
+for the full v2.0 (in-memory) → frontmatter (on-disk) mapping.
 
 ## State Machine
 
