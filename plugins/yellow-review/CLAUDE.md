@@ -21,7 +21,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ## Plugin Components
 
-### Commands (4)
+### Commands (5)
 
 - `/review:setup` — Validate GitHub, jq, Graphite, and optional yellow-core
   integration before reviewing PRs
@@ -31,6 +31,8 @@ resolution, and sequential stack review. Graphite-native workflow.
   GraphQL
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
+- `/review:sweep` — Wrapper that runs `/review:pr` then `/review:resolve` on
+  the same PR with a user-confirmed boundary gate between them
 
 ### Agents (14)
 
@@ -96,6 +98,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   order (base → tip). Best before submitting a stack for review.
 - **`/review:all scope=all`** — Batch-review all your open non-draft PRs. Best
   for catching up on review backlog.
+- **`/review:sweep`** — Run `/review:pr` then `/review:resolve` sequentially
+  on a single PR. Best when you want both an AI review pass and cleanup of
+  any open bot/human comment threads in one invocation.
 - **`/workflows:review`** (yellow-core) — Session-level review against a plan
   file. Evaluates plan adherence, cross-PR coherence, and scope drift.
   Complementary to `/review:pr` (per-PR code quality) — use both for full

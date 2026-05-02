@@ -28,6 +28,7 @@ yellow-core integration before reviewing real PRs.
 | `/review:pr`      | Adaptive multi-agent review of a single PR with automatic fix application |
 | `/review:resolve` | Parallel resolution of unresolved PR review comments                      |
 | `/review:all`     | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
+| `/review:sweep`   | Run `/review:pr` then `/review:resolve` on the same PR in one invocation  |
 
 ## Agents
 
