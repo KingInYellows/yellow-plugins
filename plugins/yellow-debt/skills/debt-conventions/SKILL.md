@@ -154,8 +154,10 @@ suppressed findings becoming todos):
 
 Stats fields:
 
-- `suppressed_by_confidence_gate`: count of findings that fell below the
-  category gate (or category-gate + 0.05 bump where applicable)
+- `suppressed_by_confidence_gate`: count of findings that did not survive
+  the confidence-gating stage — includes findings that fell below the
+  category gate (or category-gate + 0.05 bump where applicable) AND
+  findings suppressed for `missing_or_invalid_confidence`
 - `survived_severity_exception`: count of `critical` findings that passed
   the gate via the P0-at-anchor-50 exception
 - `migrated_from_v1`: count of findings normalized from v1.0 artifacts in
@@ -169,9 +171,12 @@ Stats fields:
 - `file`: original `file` object with `path` and `lines`
 - `confidence`: original confidence value
 - `gate_threshold`: the threshold the finding failed (post-bump if
-  applicable)
-- `reason`: one of `below_category_gate:<category>` or
-  `missing_or_invalid_confidence`
+  applicable) when `reason` is `below_category_gate:<category>`; `null`
+  or omitted when `reason` is `missing_or_invalid_confidence` because no
+  threshold comparison was performed
+- `reason`: one of `below_category_gate:<category>` (failed gate
+  comparison; `gate_threshold` populated) or
+  `missing_or_invalid_confidence` (`gate_threshold` null/omitted)
 
 Step 7 of the synthesizer iterates ONLY over the surviving findings list
 when generating todo files; entries in `suppressed[]` are NEVER promoted
