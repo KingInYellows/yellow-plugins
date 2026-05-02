@@ -80,11 +80,12 @@ Return top 50 findings max, ranked by severity × confidence. Write results to
 `.debt/scanner-output/architecture-scanner.json` per the v2.0 schema in
 `debt-conventions`.
 
-Every finding requires a concrete `failure_scenario` (one to two sentences:
-trigger → execution path → user-visible or operational outcome). Architecture
-scenarios should name the specific change that triggers cascading rework
-(e.g., "swapping the in-process cache for Redis requires editing 14 files
-across 3 layers because UI components import the cache module directly,
-extending the migration from a 2-day spike to a 2-week project"). When no
-concrete scenario can be constructed, emit `null` — the synthesizer treats
-`null` as a downgrade signal.
+Every finding must include the `failure_scenario` field (string or null).
+Prefer a concrete scenario when possible (one to two sentences: trigger →
+execution path → user-visible or operational outcome); emit `null` only when
+no specific failure can be constructed — the synthesizer treats `null` as a
+downgrade signal. Architecture scenarios should name the specific change that
+triggers cascading rework (e.g., "swapping the in-process cache for Redis
+requires editing 14 files across 3 layers because UI components import the
+cache module directly, extending the migration from a 2-day spike to a
+2-week project").

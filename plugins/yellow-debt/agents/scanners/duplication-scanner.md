@@ -99,11 +99,12 @@ Return top 50 findings max, ranked by severity × confidence. Write results to
 `.debt/scanner-output/duplication-scanner.json` per the v2.0 schema in
 `debt-conventions`.
 
-Every finding requires a concrete `failure_scenario` (one to two sentences:
-trigger → execution path → user-visible or operational outcome). Duplication
-scenarios should name the divergence-driven failure (e.g., "the validation
-helper is copied across 4 endpoints; a security patch fixes the canonical
-copy and the email-verification copy but misses the signup and password-reset
-copies, leaving two endpoints exploitable for 11 days until the next
-audit"). When no concrete scenario can be constructed, emit `null` — the
-synthesizer treats `null` as a downgrade signal.
+Every finding must include the `failure_scenario` field (string or null).
+Prefer a concrete scenario when possible (one to two sentences: trigger →
+execution path → user-visible or operational outcome). Duplication scenarios
+should name the divergence-driven failure (e.g., "the validation helper is
+copied across 4 endpoints; a security patch fixes the canonical copy and the
+email-verification copy but misses the signup and password-reset copies,
+leaving two endpoints exploitable for 11 days until the next audit"). Emit
+`null` only when no specific failure can be constructed — the synthesizer
+treats `null` as a downgrade signal.

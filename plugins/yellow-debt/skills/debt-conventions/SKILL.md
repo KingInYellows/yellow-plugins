@@ -54,7 +54,9 @@ All scanner agents MUST produce output matching this JSON schema:
 
 - `schema_version`: "2.0" for new findings; v1.0 inputs accepted by
   `audit-synthesizer` during the transition window (see "Schema Migration"
-  below)
+  below for closure conditions, the `_migrated_from` internal sentinel, and
+  the +0.05 missing-failure-scenario bump applied to migrated v1.0 records
+  AND to v2.0 records that emit `failure_scenario: null`)
 - `status`: "success" | "partial" | "error"
 - `category`: "ai-pattern" | "complexity" | "duplication" | "architecture" |
   "security-debt"
@@ -103,6 +105,87 @@ discrete reviewer-anchor judgments.
 **Severity exception:** A `critical` finding at `confidence ≥ 0.50` survives
 the gate (mirrors the Wave 2 P0-at-anchor-50 exception). The synthesizer
 records this as `survived_severity_exception` in stats.
+
+**Missing-failure-scenario bump (+0.05):** When a finding is stamped
+`_migrated_from: "1.0"` (a v1.0 artifact normalized at synthesizer Step 1)
+OR has `failure_scenario == null` (any v2.0 record that legitimately could
+not construct a concrete scenario), the category threshold is raised by
++0.05 for that finding only — `security-debt`/`architecture` 0.80 → 0.85,
+`complexity`/`duplication` 0.70 → 0.75, `ai-pattern` 0.60 → 0.65. The bump
+compensates for the missing concrete-failure signal. See
+`audit-synthesizer.md` Step 4 rule 4 for evaluation order.
+
+**Diffray caveat:** The upstream `confidence-rubric.md` "Comparable
+benchmarks" section explicitly disclaims those values as adoption
+authority and notes that raw LLM-reported confidence is systematically
+over-confident across all frontier models without temperature/Platt-scale
+calibration. yellow-debt's table above takes Diffray as a reference point
+only; the per-row rationale column documents each divergence (e.g.,
+`architecture` at 0.80 is intentionally stricter than Diffray's
+`logic/correctness` 0.70 because structural rework cost is higher than
+logic-bug cost).
+
+### Synthesizer Report Stats Schema
+
+`audit-synthesizer` writes its audit report with a `stats` object capturing
+gate calibration data, plus a `suppressed[]` array preserving findings that
+were gated out (so reviewers can audit gate calibration without the
+suppressed findings becoming todos):
+
+```json
+{
+  "stats": {
+    "suppressed_by_confidence_gate": 12,
+    "suppressed_by_missing_or_invalid_confidence": 0,
+    "survived_severity_exception": 2,
+    "migrated_from_v1": 4
+  },
+  "suppressed": [
+    {
+      "finding_id": "<sha256(category:file.path:file.lines):0..7>",
+      "category": "security-debt",
+      "file": { "path": "src/auth.ts", "lines": "45-89" },
+      "confidence": 0.72,
+      "gate_threshold": 0.80,
+      "reason": "below_category_gate:security-debt"
+    }
+  ]
+}
+```
+
+Stats fields:
+
+- `suppressed_by_confidence_gate`: count of findings that fell below the
+  category gate (or category-gate + 0.05 bump where applicable) — only
+  Rule 5 (below_category_gate) suppressions
+- `suppressed_by_missing_or_invalid_confidence`: count of findings
+  suppressed by Rule 2 because `confidence` was missing, `null`, or not a
+  number (a scanner bug, not calibration drift); tracked separately so
+  operators can distinguish scanner-output quality issues from calibration
+  drift
+- `survived_severity_exception`: count of `critical` findings that passed
+  the gate via the P0-at-anchor-50 exception
+- `migrated_from_v1`: count of findings normalized from v1.0 artifacts in
+  the synthesizer's Step 1 dual-read
+
+`suppressed[]` entry shape:
+
+- `finding_id`: synthesis-stable identifier — SHA256 of
+  `<category>:<file.path>:<file.lines>`, first 8 hex chars
+- `category`: original finding category
+- `file`: original `file` object with `path` and `lines`
+- `confidence`: original confidence value
+- `gate_threshold`: the threshold the finding failed (post-bump if
+  applicable) when `reason` is `below_category_gate:<category>`; `null`
+  or omitted when `reason` is `missing_or_invalid_confidence` because no
+  threshold comparison was performed
+- `reason`: one of `below_category_gate:<category>` (failed gate
+  comparison; `gate_threshold` populated) or
+  `missing_or_invalid_confidence` (`gate_threshold` null/omitted)
+
+Step 7 of the synthesizer iterates ONLY over the surviving findings list
+when generating todo files; entries in `suppressed[]` are NEVER promoted
+to todos.
 
 ### Severity Rubric
 
@@ -283,6 +366,52 @@ Return top 50 findings max, ranked by severity × confidence. Write results to
 strings, required `failure_scenario` string-or-null).
 ```
 
+**Note on `security-debt-scanner` divergence:** The `security-debt-scanner`
+intentionally extends the `## Security and Fencing Rules` section with a
+credential-value-exclusion paragraph (defense-in-depth: never include the
+literal credential value in evidence quotes). This is the only sanctioned
+deviation from the structure-template above; other scanners must NOT add
+supplemental rules to that section.
+
+### Category-Specific Failure Scenario Framing
+
+`failure_scenario` values are category-specific. The same null-emit fallback
+rule applies to every scanner ("when no concrete scenario can be constructed,
+emit `null`"), but the *positive* framing differs by debt class. Each scanner's
+"Output Requirements" section keeps its one-sentence framing instruction; this
+subsection is the canonical reference for the worked examples and the null-emit
+fallback rule shared across all five.
+
+**Null-emit fallback (canonical, applies to all 5 scanners):** When no concrete
+scenario can be constructed, emit `null` rather than fabricating speculation —
+the synthesizer treats `null` as a downgrade signal (see "Confidence Rubric —
+Category Thresholds" §Missing-failure-scenario bump above).
+
+**Per-category framing examples:**
+
+- **`ai-pattern`** — frame around the maintenance failure that the debt
+  enables. Example: "a future engineer reads the 40% comment-to-code ratio,
+  trusts a stale comment claiming the function is idempotent, ships a retry
+  handler that double-charges users."
+- **`architecture`** — name the specific change that triggers cascading
+  rework. Example: "swapping the in-process cache for Redis requires
+  editing 14 files across 3 layers because UI components import the cache
+  module directly, extending the migration from a 2-day spike to a 2-week
+  project."
+- **`complexity`** — name the specific change that the complexity makes
+  risky. Example: "an engineer adds a feature flag check inside a 300-line
+  function with 6 nested branches, intends it to bypass step 2 only, but
+  the conditional short-circuits step 5 too because the early-return logic
+  is implicit — the flag silently disables auditing."
+- **`duplication`** — name the divergence-driven failure. Example: "the
+  validation helper is copied across 4 endpoints; a security patch fixes
+  the canonical copy and the email-verification copy but misses the signup
+  and password-reset copies, leaving two endpoints exploitable for 11 days
+  until the next audit."
+- **`security-debt`** — name the attack vector. Example: "credential in
+  git history is fetched by a forked PR's CI runner and used to enumerate
+  S3 buckets within seconds."
+
 ## Error Handling
 
 ### Invalid Status Values
@@ -357,6 +486,14 @@ do not break re-runs.
 **Remediation**: Update new or modified scanner agents to emit v2.0. Leave
 older artifact files untouched — the synthesizer normalizes them in-memory.
 
+<!-- TODO(PR3): Remove the dual-read normalization (synthesizer Step 1
+v1.0 branch), the `_migrated_from` stamp, and the migrated-v1 arm of the
++0.05 bump once /workflows:brainstorm validates that gitignored-artifact
+dual-read is YAGNI for yellow-debt. The v2.0-null arm of the +0.05 bump
+is permanent calibration and must remain. See
+docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md
+for the decision rule. -->
+
 ### Schema Migration (v1.0 → v2.0)
 
 Breaking changes from v1.0:
@@ -374,6 +511,15 @@ The `audit-synthesizer` performs this normalization in-memory when it reads a
 The transition window remains open until all scanners on `main` emit v2.0 and
 no `.debt/scanner-output/*.json` files older than 30 days remain in active
 project trees.
+
+**Internal sentinel (`_migrated_from`):** During Step 1 normalization, the
+synthesizer attaches `_migrated_from: "1.0"` to each v1.0-derived in-memory
+record. This stamp is consumed by Step 4 rule 4 (the missing-failure-scenario
+bump) and by the `migrated_from_v1` stats counter; it is NOT written to
+disk and is NOT part of the v2.0 schema. Scanner authors do not emit it;
+it exists only inside one synthesizer run. When the dual-read window
+closes (see TODO above), this sentinel is removed from the codebase
+entirely.
 
 ### Confidence Out of Range
 

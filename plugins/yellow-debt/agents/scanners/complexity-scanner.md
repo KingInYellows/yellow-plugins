@@ -99,12 +99,12 @@ Return top 50 findings max, ranked by severity × confidence. Write results to
 `.debt/scanner-output/complexity-scanner.json` per the v2.0 schema in
 `debt-conventions`.
 
-Every finding requires a concrete `failure_scenario` (one to two sentences:
-trigger → execution path → user-visible or operational outcome). Complexity
-scenarios should name the specific change that the complexity makes risky
-(e.g., "an engineer adds a feature flag check inside a 300-line function with
-6 nested branches, intends it to bypass step 2 only, but the conditional
-short-circuits step 5 too because the early-return logic is implicit — the
-flag silently disables auditing"). When no concrete scenario can be
-constructed, emit `null` — the synthesizer treats `null` as a downgrade
-signal.
+Every finding must include the `failure_scenario` field (string or null).
+Prefer a concrete scenario when possible (one to two sentences: trigger →
+execution path → user-visible or operational outcome). Complexity scenarios
+should name the specific change that the complexity makes risky (e.g., "an
+engineer adds a feature flag check inside a 300-line function with 6 nested
+branches, intends it to bypass step 2 only, but the conditional short-circuits
+step 5 too because the early-return logic is implicit — the flag silently
+disables auditing"). Emit `null` only when no specific failure can be
+constructed — the synthesizer treats `null` as a downgrade signal.

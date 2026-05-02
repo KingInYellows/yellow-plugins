@@ -37,31 +37,37 @@ Read `.debt/scanner-output/*.json`. Inspect each file's `schema_version` and
 normalize to the v2.0 in-memory shape before further processing:
 
 - **v2.0** (`schema_version: "2.0"`) — already canonical; pass through unchanged.
-- **v1.0** (`schema_version: "1.0"` or missing) — apply field migration:
-  - `finding` ← `description ? title + ": " + description : title` (use
-    `title` alone when `description` is missing or null; never produce a
-    literal `"undefined"` or `"None"` suffix).
-  - `file` ← first entry of `affected_files[]` (object with `path`, `lines`).
-    If `affected_files[]` is missing or empty, log
-    `[synthesizer] Warning: v1.0 finding missing affected_files; skipping` to
-    stderr and skip the finding — do NOT emit a record with `file: null`.
-    If the array contained N>1 files, emit one additional finding per
-    remaining file, copying `finding`, `fix`, `failure_scenario`, `severity`,
-    `confidence`, `effort`, and `category` from the original — only
-    `file.path` and `file.lines` differ across the fanned-out records.
-  - `fix` ← `suggested_remediation`
-  - `failure_scenario` ← `null` regardless of whether the v1.0 artifact
-    contained a field of that name (the v1.0 schema does not define
-    `failure_scenario`; treat any value present in a v1.0 artifact as
-    untrusted and override). The `+0.05` confidence-gate bump in step 4
-    rule 4 fires for any `null` scenario — see step 4 below.
-  - Stamp `_migrated_from: "1.0"` on the in-memory record so step 4 can
-    track migration volume in the `migrated_from_v1` stats counter and the
-    audit report can show what fraction of findings came through the
-    migration path.
+- **v1.0** (`schema_version: "1.0"` or missing) — apply field migration in
+  this order (scalars first, then fan-out):
+  1. `finding` ← `description ? title + ": " + description : title` (use
+     `title` alone when `description` is missing or null; never produce a
+     literal `"undefined"` or `"None"` suffix).
+  2. `fix` ← `suggested_remediation`
+  3. `failure_scenario` ← `null` regardless of whether the v1.0 artifact
+     contained a field of that name (the v1.0 schema does not define
+     `failure_scenario`; treat any value present in a v1.0 artifact as
+     untrusted and override). The `+0.05` confidence-gate bump in step 4
+     rule 4 fires for any `null` scenario — see step 4 below.
+  4. Stamp `_migrated_from: "1.0"` on the in-memory record AND
+     **increment `stats.migrated_from_v1` by 1**. The counter tracks
+     migration volume so the audit report can show what fraction of
+     findings came through the migration path; without the explicit
+     increment instruction the counter would always report 0 even when
+     v1.0 inputs were normalized.
+  5. `file` ← first entry of `affected_files[]` (object with `path`,
+     `lines`). If `affected_files[]` is missing or empty, log
+     `[synthesizer] Warning: v1.0 finding missing affected_files; skipping`
+     to stderr and skip the finding — do NOT emit a record with
+     `file: null`. If the array contained N>1 files, emit one additional
+     finding per remaining file, copying all already-mapped scalar fields
+     (`finding`, `fix`, `failure_scenario`, `severity`, `confidence`,
+     `effort`, `category`, and `_migrated_from`) from the normalized
+     record — only `file.path` and `file.lines` differ across the
+     fanned-out records.
 
 Log a warning to stderr if any v1.0 inputs are encountered:
-`[synthesizer] Warning: scanner-output/<file>.json is schema_version 1.0; migrated in-memory. Re-run the scanner to upgrade the artifact.`
+`[synthesizer] Warning: scanner-output/<file>.json is schema_version 1.0;`
+`migrated in-memory. Re-run the scanner to upgrade the artifact.`
 
 Skip malformed files entirely (log error, continue with remaining scanners).
 Both versions feed the same downstream pipeline; downstream code reads only
@@ -71,8 +77,9 @@ v2.0 fields.
 
 Hash-based bucketing: (1) group by (`file.path`, category), (2) sort by line
 number, (3) merge overlapping (>80% line overlap), (4) keep higher severity,
-combine `finding` strings, prefer the non-`null` `failure_scenario`, keep the
-higher `confidence`.
+combine `finding` strings, prefer the non-`null` `failure_scenario` (if both
+findings have a non-`null` `failure_scenario`, keep the one from the finding
+with higher `confidence`), keep the higher `confidence`.
 
 ### 3. Score and Sort
 
@@ -101,20 +108,30 @@ per finding; the first rule that fires decides the outcome:
    case-sensitive string comparison below. Log
    `[synthesizer] Warning: severity "<original>" normalized to "<lower>"` to
    stderr when a normalization was needed so the casing drift is observable.
-2. **Confidence presence and type.** If `confidence` is missing, `null`, or
-   not a number, suppress the finding with reason
-   `missing_or_invalid_confidence` (recorded in `suppressed[]`) and log
+2. **Confidence presence, type, and range.** If `confidence` is missing,
+   `null`, not a number, or outside the range `[0.0, 1.0]`, suppress the
+   finding with reason `missing_or_invalid_confidence` (recorded in
+   `suppressed[]`) and log
    `[synthesizer] Warning: <reviewer> emitted finding with missing/invalid confidence; suppressing` to stderr.
    This check runs BEFORE the severity exception so a critical finding with
    `confidence: null` cannot reach the `confidence ≥ 0.50` comparison and
    crash a type-strict implementation or coerce silently in a permissive
-   one. Stop.
+   one. The range guard additionally prevents an out-of-range value such as
+   `2.5` from passing all category gates (since `2.5 ≥` any threshold) and
+   prevents a negative value such as `-0.5` from failing all gates when it
+   should be suppressed as malformed scanner output. Stop.
 3. **Severity exception (highest priority among numeric-confidence checks).**
    If `severity == "critical"` and `confidence ≥ 0.50`, the finding survives
    the gate regardless of category or migration status. This is the Wave 2
    P0-at-anchor-50 exception
    (`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`).
-   Stop; do not apply step 4 or step 5.
+   **Increment `stats.survived_severity_exception` by 1** for each finding
+   that exits via this rule (so the counter matches what is documented in
+   the stats schema below — without this, the counter is always 0 and gate
+   bypasses are invisible to operators). Stop; do not apply rule 4 or
+   rule 5 (the inner per-finding evaluation rules — Step 4 and Step 5 of
+   the outer workflow are different scopes and remain part of the same
+   pipeline).
 4. **Missing-failure-scenario bump.** If the finding is stamped
    `_migrated_from: "1.0"` OR has `failure_scenario == null`, add `+0.05` to
    the category threshold for this finding only. The bump compensates for
@@ -173,6 +190,16 @@ Create `docs/audits/YYYY-MM-DD-audit-report.md`:
 - Confidence-gate stats (suppressed counts per category, severity-exception
   survivors, migrated-v1 count)
 - Hotspot files
+- **Sibling-group section** — for every distinct `_group_id` value present
+  in the surviving findings, render the group's findings together (e.g.,
+  `### Sibling group <id> — <category> finding spanning N files` followed
+  by a list of the per-file findings). This is the consumer of the
+  `_group_id` sentinel stamped in Step 1's v1.0 fan-out: a v1.0 record
+  with N>1 `affected_files` entries produces N sibling findings sharing
+  one `_group_id`, and grouping them in the report lets reviewers see the
+  cross-file scope of the original detection. Findings with no
+  `_group_id` (v2.0 native or v1.0 single-file) appear inline in the
+  category breakdown above and are NOT duplicated in this section.
 - Next steps (`/debt:triage`)
 
 ### 7. Generate Todo Files
@@ -209,6 +236,7 @@ on-disk frontmatter as follows:
 | `confidence`         | `confidence:` frontmatter    | Float 0.0–1.0, written as-is                |
 | `category`           | `category:` frontmatter      | Direct                                      |
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
+| (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
 This mapping preserves the existing `debt-fixer.md` scope-validator
 (`yq -r '.affected_files[]'` at line 57) without changes — the fixer reads
@@ -217,9 +245,15 @@ the on-disk frontmatter, not the in-memory v2.0 record.
 **CRITICAL SECURITY - Slug Derivation**:
 
 ```bash
-# The Bash block runs in a fresh subprocess. Derive $finding from the JSON
-# record FIRST in this same block; do not assume any variable from prose
-# context is set in the shell environment.
+# The Bash block runs in a fresh subprocess. The LLM agent iterates over
+# the surviving-findings JSON array; for each iteration it must export
+# `$record` (the single in-memory finding object as a JSON string) and
+# `$id`/`$severity`/`$content_hash` (the synthesizer-assigned per-finding
+# fields) into the shell environment BEFORE invoking this block — variables
+# from prose context are NOT inherited automatically by a fresh subprocess.
+# Derive $finding from $record FIRST in this same block as a sanity check
+# (a missing $record will produce empty $finding and the whitelist below
+# will reject the empty slug, surfacing the missing-input bug loudly):
 finding=$(printf '%s' "$record" | jq -r '.finding')
 
 # Lowercase, replace special chars, truncate, validate.

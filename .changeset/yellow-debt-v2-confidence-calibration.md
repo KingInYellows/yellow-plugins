@@ -1,8 +1,9 @@
 ---
-"yellow-debt": minor
+"yellow-debt": major
 ---
 
-Scanner output schema v2.0 — failure_scenario field, audit-synthesizer
+# Scanner output schema v2.0 — failure_scenario field, audit-synthesizer
+
 confidence-rubric gate, dual-read v1.0/v2.0 transition window (W3.13b)
 
 Bumps `debt-conventions/SKILL.md` from `schema_version: "1.0"` to `"2.0"` and
@@ -36,5 +37,7 @@ guidance in their Output Requirements sections. The yellow-debt README todo
 template gains a `## Failure Scenario` section so triage reviewers see the
 production-impact framing alongside the debt description.
 
-This is a breaking change to the on-disk JSON contract; the dual-read window
-keeps existing artifacts working while scanners migrate to v2.0.
+Schema evolution: scanner output is renamed v1.0 → v2.0 with field renames and
+a new required failure_scenario field. The audit-synthesizer's dual-read
+transition window normalizes v1.0 inputs in-memory, so existing scanner outputs
+continue to work without modification during the transition window.
