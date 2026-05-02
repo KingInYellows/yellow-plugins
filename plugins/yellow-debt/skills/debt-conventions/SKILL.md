@@ -136,6 +136,7 @@ suppressed findings becoming todos):
 {
   "stats": {
     "suppressed_by_confidence_gate": 12,
+    "suppressed_by_missing_or_invalid_confidence": 0,
     "survived_severity_exception": 2,
     "migrated_from_v1": 4
   },
@@ -154,10 +155,14 @@ suppressed findings becoming todos):
 
 Stats fields:
 
-- `suppressed_by_confidence_gate`: count of findings that did not survive
-  the confidence-gating stage — includes findings that fell below the
-  category gate (or category-gate + 0.05 bump where applicable) AND
-  findings suppressed for `missing_or_invalid_confidence`
+- `suppressed_by_confidence_gate`: count of findings that fell below the
+  category gate (or category-gate + 0.05 bump where applicable) — only
+  Rule 5 (below_category_gate) suppressions
+- `suppressed_by_missing_or_invalid_confidence`: count of findings
+  suppressed by Rule 2 because `confidence` was missing, `null`, or not a
+  number (a scanner bug, not calibration drift); tracked separately so
+  operators can distinguish scanner-output quality issues from calibration
+  drift
 - `survived_severity_exception`: count of `critical` findings that passed
   the gate via the P0-at-anchor-50 exception
 - `migrated_from_v1`: count of findings normalized from v1.0 artifacts in
