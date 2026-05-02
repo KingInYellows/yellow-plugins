@@ -161,8 +161,11 @@ Record gate stats:
 ```json
 "stats": {
   "suppressed_by_confidence_gate": 12,
+  "suppressed_by_missing_confidence": 0,
+  "suppressed_by_out_of_range_confidence": 0,
   "survived_severity_exception": 2,
-  "migrated_from_v1": 4
+  "migrated_from_v1": 4,
+  "files_skipped_malformed": 0
 }
 ```
 
@@ -182,7 +185,9 @@ Preserve all other states (ready, in-progress, complete, deferred).
 
 ### 6. Generate Audit Report
 
-Create `docs/audits/YYYY-MM-DD-audit-report.md`:
+Create `docs/audits/YYYY-MM-DD-HHMMSS-audit-report.md` (the HHMMSS suffix
+prevents same-day rerun clobber — see fix #14; matches the path documented
+in `audit.md` Step 4 and the README's Output section):
 
 - Executive summary (debt score, findings, effort)
 - Scanner status table (✓/✗, counts, duration)
@@ -237,6 +242,8 @@ on-disk frontmatter as follows:
 | `category`           | `category:` frontmatter      | Direct                                      |
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
 | (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
+| `_audit_run` (in-memory sentinel)    | `audit_run:` frontmatter     | Captured `AUDIT_RUN_TS` from Step 6 (`YYYY-MM-DD-HHMMSS`) — links the todo back to the specific audit-report file. Stamped on every in-memory finding before this step (see fix #21) |
+| `_audit_commit` (in-memory sentinel) | `audit_commit:` frontmatter  | Captured `AUDIT_COMMIT` (git SHA from Step 6, or the literal `unknown` if `git rev-parse HEAD` failed) — pins the line cites to a reproducible HEAD. Stamped on every in-memory finding before this step |
 
 This mapping preserves both downstream consumers without code changes:
 the `debt-fixer.md` scope-validator (`yq -r '.affected_files[]'`) reads the
