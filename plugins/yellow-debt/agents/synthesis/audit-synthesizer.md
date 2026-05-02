@@ -48,10 +48,12 @@ normalize to the v2.0 in-memory shape before further processing:
      `failure_scenario`; treat any value present in a v1.0 artifact as
      untrusted and override). The `+0.05` confidence-gate bump in step 4
      rule 4 fires for any `null` scenario — see step 4 below.
-  4. Stamp `_migrated_from: "1.0"` on the in-memory record so step 4 can
-     track migration volume in the `migrated_from_v1` stats counter and the
-     audit report can show what fraction of findings came through the
-     migration path.
+  4. Stamp `_migrated_from: "1.0"` on the in-memory record AND
+     **increment `stats.migrated_from_v1` by 1**. The counter tracks
+     migration volume so the audit report can show what fraction of
+     findings came through the migration path; without the explicit
+     increment instruction the counter would always report 0 even when
+     v1.0 inputs were normalized.
   5. `file` ← first entry of `affected_files[]` (object with `path`,
      `lines`). If `affected_files[]` is missing or empty, log
      `[synthesizer] Warning: v1.0 finding missing affected_files; skipping`
@@ -126,8 +128,10 @@ per finding; the first rule that fires decides the outcome:
    **Increment `stats.survived_severity_exception` by 1** for each finding
    that exits via this rule (so the counter matches what is documented in
    the stats schema below — without this, the counter is always 0 and gate
-   bypasses are invisible to operators). Stop; do not apply step 4 or
-   step 5.
+   bypasses are invisible to operators). Stop; do not apply rule 4 or
+   rule 5 (the inner per-finding evaluation rules — Step 4 and Step 5 of
+   the outer workflow are different scopes and remain part of the same
+   pipeline).
 4. **Missing-failure-scenario bump.** If the finding is stamped
    `_migrated_from: "1.0"` OR has `failure_scenario == null`, add `+0.05` to
    the category threshold for this finding only. The bump compensates for
