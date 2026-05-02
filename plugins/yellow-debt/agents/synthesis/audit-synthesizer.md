@@ -123,7 +123,11 @@ per finding; the first rule that fires decides the outcome:
    the gate regardless of category or migration status. This is the Wave 2
    P0-at-anchor-50 exception
    (`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`).
-   Stop; do not apply step 4 or step 5.
+   **Increment `stats.survived_severity_exception` by 1** for each finding
+   that exits via this rule (so the counter matches what is documented in
+   the stats schema below — without this, the counter is always 0 and gate
+   bypasses are invisible to operators). Stop; do not apply step 4 or
+   step 5.
 4. **Missing-failure-scenario bump.** If the finding is stamped
    `_migrated_from: "1.0"` OR has `failure_scenario == null`, add `+0.05` to
    the category threshold for this finding only. The bump compensates for
@@ -227,9 +231,15 @@ the on-disk frontmatter, not the in-memory v2.0 record.
 **CRITICAL SECURITY - Slug Derivation**:
 
 ```bash
-# The Bash block runs in a fresh subprocess. Derive $finding from the JSON
-# record FIRST in this same block; do not assume any variable from prose
-# context is set in the shell environment.
+# The Bash block runs in a fresh subprocess. The LLM agent iterates over
+# the surviving-findings JSON array; for each iteration it must export
+# `$record` (the single in-memory finding object as a JSON string) and
+# `$id`/`$severity`/`$content_hash` (the synthesizer-assigned per-finding
+# fields) into the shell environment BEFORE invoking this block — variables
+# from prose context are NOT inherited automatically by a fresh subprocess.
+# Derive $finding from $record FIRST in this same block as a sanity check
+# (a missing $record will produce empty $finding and the whitelist below
+# will reject the empty slug, surfacing the missing-input bug loudly):
 finding=$(printf '%s' "$record" | jq -r '.finding')
 
 # Lowercase, replace special chars, truncate, validate.
