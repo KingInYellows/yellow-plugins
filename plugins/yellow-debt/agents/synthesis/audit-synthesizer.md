@@ -190,6 +190,16 @@ Create `docs/audits/YYYY-MM-DD-audit-report.md`:
 - Confidence-gate stats (suppressed counts per category, severity-exception
   survivors, migrated-v1 count)
 - Hotspot files
+- **Sibling-group section** — for every distinct `_group_id` value present
+  in the surviving findings, render the group's findings together (e.g.,
+  `### Sibling group <id> — <category> finding spanning N files` followed
+  by a list of the per-file findings). This is the consumer of the
+  `_group_id` sentinel stamped in Step 1's v1.0 fan-out: a v1.0 record
+  with N>1 `affected_files` entries produces N sibling findings sharing
+  one `_group_id`, and grouping them in the report lets reviewers see the
+  cross-file scope of the original detection. Findings with no
+  `_group_id` (v2.0 native or v1.0 single-file) appear inline in the
+  category breakdown above and are NOT duplicated in this section.
 - Next steps (`/debt:triage`)
 
 ### 7. Generate Todo Files
