@@ -149,7 +149,7 @@ After the bash block succeeds:
    `.debt/severity-filter.txt` exists, filter to that minimum severity.
 4. After all scanner tasks complete, launch `yellow-debt:audit-synthesizer` to merge
    `.debt/scanner-output/`, write the audit report to
-   `docs/audits/YYYY-MM-DD-audit-report.md`, and create todo files in
+   `docs/audits/YYYY-MM-DD-HHMMSS-audit-report.md`, and create todo files in
    `todos/debt/`.
 
 ## Example Usage

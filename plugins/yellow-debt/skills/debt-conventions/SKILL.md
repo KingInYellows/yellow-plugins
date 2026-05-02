@@ -171,7 +171,7 @@ Stats fields:
 - `migrated_from_v1`: count of findings normalized from v1.0 artifacts in
   the synthesizer's Step 1 dual-read
 - `files_skipped_malformed`: count of `.debt/scanner-output/*.json` files
-  that failed to parse and were skipped at Step 1 (with a logged warning)
+  that failed to parse and were skipped at Step 1 (with a logged error)
 
 `suppressed[]` entry shape:
 
