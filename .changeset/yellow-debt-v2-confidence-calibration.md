@@ -3,6 +3,7 @@
 ---
 
 # Scanner output schema v2.0 — failure_scenario field, audit-synthesizer
+
 confidence-rubric gate, dual-read v1.0/v2.0 transition window (W3.13b)
 
 Bumps `debt-conventions/SKILL.md` from `schema_version: "1.0"` to `"2.0"` and

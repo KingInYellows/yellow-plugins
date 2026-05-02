@@ -218,6 +218,7 @@ on-disk frontmatter as follows:
 | `confidence`         | `confidence:` frontmatter    | Float 0.0–1.0, written as-is                |
 | `category`           | `category:` frontmatter      | Direct                                      |
 | `severity`           | `severity:` and `priority:`  | `severity` direct; `priority` mapped: critical→p1, high→p2, medium→p3, low→p4 |
+| (synthesizer-derived) | `scanner:` frontmatter      | Set to the originating scanner agent's `scanner` field from the v2.0 record's source `.debt/scanner-output/<scanner>.json` (e.g., `complexity-scanner`); enables filtering and provenance in the README todo template |
 
 This mapping preserves the existing `debt-fixer.md` scope-validator
 (`yq -r '.affected_files[]'` at line 57) without changes — the fixer reads
