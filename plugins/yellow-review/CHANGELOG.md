@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.3.0
+
+### Minor Changes
+
+- [#304](https://github.com/KingInYellows/yellow-plugins/pull/304)
+  [`459a43d`](https://github.com/KingInYellows/yellow-plugins/commit/459a43d50528d12eca093fd572e2c26722aa4a0b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `/review:sweep` wrapper command
+
+  Run `/review:pr` followed by `/review:resolve` on the same PR in one
+  invocation — adaptive multi-agent code review with autonomous fixes, then
+  parallel resolution of all open bot and human reviewer comment threads.
+
+  Because the `Skill` tool surfaces no machine-readable exit status from invoked
+  commands, the wrapper uses an `AskUserQuestion` between the two steps as the
+  failure-boundary signal: if the user confirms `/review:pr` completed cleanly,
+  the resolve step runs; otherwise it is skipped.
+
+  Pure orchestration — no logic added to `/review:pr` or `/review:resolve`, both
+  of which remain invokable directly when only one half of the sequence is
+  needed.
+
 ## 2.2.0
 
 ### Minor Changes
