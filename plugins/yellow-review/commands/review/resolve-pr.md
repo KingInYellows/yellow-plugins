@@ -128,7 +128,7 @@ sequentially even when they are independent.
 Resolvers operating on distinct files may run truly concurrently. Within a
 file, the single owning resolver applies threads sequentially.
 
-**Wait gate:** Before proceeding to Step 5, wait for all background resolver
+**Wait gate:** Before proceeding to Step 6, wait for all background resolver
 tasks to complete (e.g., via TaskOutput / TaskList polling, or equivalent
 notification). Do NOT proceed to commit, diff review, or thread resolution
 while any resolver task is still `in_progress` — doing so risks committing
