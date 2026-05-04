@@ -120,10 +120,6 @@ Codex agent.)
   invocation via `opencode session delete <id>`, but if the cleanup itself
   fails (rare), sessions accumulate. Periodic manual `opencode session list`
   audit is recommended.
-- **Major OpenCode upgrades trigger SQLite migration.** First invocation after
-  a major version bump (e.g., 1.1.x → 1.14.x) can take 2–5 minutes. Run
-  `opencode run "test"` once interactively after upgrading before invoking
-  `/council`.
 - **Gemini workspace trust.** In untrusted directories, `--approval-mode plan`
   is overridden to `default` unless `--skip-trust` is also passed.
   yellow-council always passes `--skip-trust` for non-interactive use.

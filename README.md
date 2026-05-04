@@ -29,7 +29,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                  | 3 agents, 4 commands, 1 skill                  |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                          | 2 commands, 1 skill, 1 MCP                     |
 | `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 8 commands, 7 skills               |
-| `yellow-council`      | On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel             | 2 agents, 2 commands, 1 skill                  |
+| `yellow-council`      | On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel             | 2 agents, 1 command, 1 skill                   |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 3 agents, 5 commands, 1 skill                  |
