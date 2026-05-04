@@ -1,5 +1,7 @@
 # Feature: Ruvector + Morph Ecosystem Integration
 
+> **Status: Implemented (PR #124, merged)** — Cross-plugin recall/remember + morph discovery integration shipped (`0a7f87ec`).
+
 ## Overview
 
 Systematically integrate ruvector (memory recall/remember) and morph
@@ -617,29 +619,29 @@ discovered at runtime via ToolSearch.
 
 For each modified command:
 
-- [ ] Run with `.ruvector/` present — recall step fires, results injected
-- [ ] Run with `.ruvector/` absent — recall step silently skipped
-- [ ] Run with ruvector not installed (rename binary) — ToolSearch returns
+- [x] Run with `.ruvector/` present — recall step fires, results injected
+- [x] Run with `.ruvector/` absent — recall step silently skipped
+- [x] Run with ruvector not installed (rename binary) — ToolSearch returns
   nothing, command works normally
-- [ ] Run with morph installed — ToolSearch finds morph tools, prefers them
+- [x] Run with morph installed — ToolSearch finds morph tools, prefers them
   for large files
-- [ ] Run with morph not installed — ToolSearch returns nothing, built-in
+- [x] Run with morph not installed — ToolSearch returns nothing, built-in
   tools used silently
 
 ### Hook Verification
 
-- [ ] `npx ruvector hooks verify` passes after plugin.json updates
-- [ ] PreToolUse hooks fire on Edit/Write/Read/Glob/Grep/Bash/Task
-- [ ] Sensitive file paths (`.env`, `*.key`) are NOT tracked by Read hook
-- [ ] PostToolUse now catches MultiEdit in addition to Edit/Write/Bash
-- [ ] No duplicate signals after settings.json hooks removed
-- [ ] Trajectory tracking recorded in session-start and stop
+- [x] `npx ruvector hooks verify` passes after plugin.json updates
+- [x] PreToolUse hooks fire on Edit/Write/Read/Glob/Grep/Bash/Task
+- [x] Sensitive file paths (`.env`, `*.key`) are NOT tracked by Read hook
+- [x] PostToolUse now catches MultiEdit in addition to Edit/Write/Bash
+- [x] No duplicate signals after settings.json hooks removed
+- [x] Trajectory tracking recorded in session-start and stop
 
 ### Config Verification
 
-- [ ] With no `.claude/yellow-ruvector.local.md` — all features enabled
-- [ ] With config file disabling tracking — Read/Glob/Grep tracking skipped
-- [ ] With invalid YAML in config — falls back to all-enabled, stderr warning
+- [x] With no `.claude/yellow-ruvector.local.md` — all features enabled
+- [x] With config file disabling tracking — Read/Glob/Grep tracking skipped
+- [x] With invalid YAML in config — falls back to all-enabled, stderr warning
 
 ## Acceptance Criteria
 

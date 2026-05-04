@@ -1,5 +1,7 @@
 # Feature: yellow-composio Plugin
 
+> **Status: Implemented (PR #237, merged)** — v1.0 shipped at `plugins/yellow-composio/`. Cross-plugin consumer integration (yellow-review, yellow-semgrep, yellow-linear) and rate-limit header forwarding remain deferred to v1.1+/v2 per Open Questions.
+
 ## Problem Statement
 
 Composio is configured at the user level as a Claude.ai MCP connector
@@ -87,7 +89,7 @@ optionally use Composio tools when available. No agents in v1.
 
 ### Phase 1: Plugin Scaffold
 
-- [ ] 1.1: Create directory structure
+- [x] 1.1: Create directory structure
   ```
   plugins/yellow-composio/
     .claude-plugin/plugin.json
@@ -103,7 +105,7 @@ optionally use Composio tools when available. No agents in v1.
       SKILL.md
   ```
 
-- [ ] 1.2: Create `package.json` (version source of truth)
+- [x] 1.2: Create `package.json` (version source of truth)
   ```json
   {
     "name": "yellow-composio",
@@ -113,13 +115,13 @@ optionally use Composio tools when available. No agents in v1.
   }
   ```
 
-- [ ] 1.3: Create `.claude-plugin/plugin.json` -- No `mcpServers` field (tools
+- [x] 1.3: Create `.claude-plugin/plugin.json` -- No `mcpServers` field (tools
   come from Claude's native connector). Fields: name, version, description,
   author, homepage, repository, license, keywords.
 
-- [ ] 1.4: Create `.gitattributes` (standard boilerplate)
+- [x] 1.4: Create `.gitattributes` (standard boilerplate)
 
-- [ ] 1.5: Register in `.claude-plugin/marketplace.json`
+- [x] 1.5: Register in `.claude-plugin/marketplace.json`
   ```json
   {
     "name": "yellow-composio",
@@ -133,7 +135,7 @@ optionally use Composio tools when available. No agents in v1.
 
 ### Phase 2: Setup Command
 
-- [ ] 2.1: Create `/composio:setup` command at `commands/composio/setup.md`
+- [x] 2.1: Create `/composio:setup` command at `commands/composio/setup.md`
 
   Frontmatter:
   ```yaml
@@ -208,7 +210,7 @@ optionally use Composio tools when available. No agents in v1.
 
 ### Phase 3: Status Command
 
-- [ ] 3.1: Create `/composio:status` command at `commands/composio/status.md`
+- [x] 3.1: Create `/composio:status` command at `commands/composio/status.md`
 
   Frontmatter:
   ```yaml
@@ -256,7 +258,7 @@ optionally use Composio tools when available. No agents in v1.
 
 ### Phase 4: Composio Patterns Skill
 
-- [ ] 4.1: Create `composio-patterns` skill at
+- [x] 4.1: Create `composio-patterns` skill at
   `skills/composio-patterns/SKILL.md`
 
   Frontmatter:
@@ -334,17 +336,17 @@ optionally use Composio tools when available. No agents in v1.
 
 ### Phase 5: Plugin Documentation
 
-- [ ] 5.1: Create `CLAUDE.md` (agent-facing)
+- [x] 5.1: Create `CLAUDE.md` (agent-facing)
   Sections: Plugin description, Composio MCP tools (not bundled -- native
   connector), Tool reference, Graceful degradation, Plugin components, Usage
   tracking, Security notes, Known limitations.
 
-- [ ] 5.2: Create `README.md` (human-facing)
+- [x] 5.2: Create `README.md` (human-facing)
   Sections: Installation, Quick Start, Commands table, Prerequisites
   (Composio account + MCP server configured), How It Works (optional
   accelerator model), License.
 
-- [ ] 5.3: Create `CHANGELOG.md`
+- [x] 5.3: Create `CHANGELOG.md`
   ```markdown
   # Changelog
 
@@ -358,10 +360,10 @@ optionally use Composio tools when available. No agents in v1.
 
 ### Phase 6: Validation and Release Prep
 
-- [ ] 6.1: Run `pnpm validate:schemas` to validate plugin.json and marketplace
-- [ ] 6.2: Run `node scripts/validate-agent-authoring.js` (should pass -- no
+- [x] 6.1: Run `pnpm validate:schemas` to validate plugin.json and marketplace
+- [x] 6.2: Run `node scripts/validate-agent-authoring.js` (should pass -- no
   agents in v1)
-- [ ] 6.3: Create changeset via `pnpm changeset` (minor -- new plugin)
+- [x] 6.3: Create changeset via `pnpm changeset` (minor -- new plugin)
 
 ## Technical Specifications
 

@@ -1,5 +1,7 @@
 # Feature: Ceramic.ai as Default Research Backend
 
+> **Status: Implemented (PR #265, merged)** — Retained for historical context. Codebase line-number drift annotations below remain accurate to the post-merge `main`.
+
 ## Problem Statement
 
 Today, all external research in `yellow-plugins` flows through three paid
@@ -147,7 +149,7 @@ Key design decisions (operator-confirmed defaults from
 
 ### Phase 1: Verification (one probe)
 
-- [ ] **1.1** Verify the Ceramic HTTP MCP accepts `Authorization` from
+- [x] **1.1** Verify the Ceramic HTTP MCP accepts `Authorization` from
   the `mcpServers.ceramic.env` block. Drop the JSON block into a local
   `.claude/settings.local.json`, restart Claude Code, run
   `mcp__plugin_<scratch>_ceramic__ceramic_search` once with a trivial
@@ -170,7 +172,7 @@ Key design decisions (operator-confirmed defaults from
 
 ### Phase 2: yellow-research (primary migration)
 
-- [ ] **2.1** Add `mcpServers.ceramic` block to
+- [x] **2.1** Add `mcpServers.ceramic` block to
   `plugins/yellow-research/.claude-plugin/plugin.json` (after the
   `parallel` block at line 55).
 
@@ -181,7 +183,7 @@ Key design decisions (operator-confirmed defaults from
 > — no `env` block, no `headers` block. The `parallel` block at
 > `:55-58` is the canonical template (it also uses OAuth).
 <!-- /deepen-plan -->
-- [ ] **2.2** Update `agents/research/code-researcher.md`:
+- [x] **2.2** Update `agents/research/code-researcher.md`:
   - `tools:` add `mcp__plugin_yellow-research_ceramic__ceramic_search`
     (line 8-22 region).
   - Source Routing table at lines 25-45: add "General web (keyword-
@@ -189,7 +191,7 @@ Key design decisions (operator-confirmed defaults from
   - Fall-through chain at lines 47-54: insert Ceramic between Context7
     and EXA.
   - Add the LLM-rewrite prep sentence before the Ceramic call.
-- [ ] **2.3** Update `agents/research/research-conductor.md`:
+- [x] **2.3** Update `agents/research/research-conductor.md`:
   - `tools:` add the same Ceramic tool (lines 8-34).
   - Triage ladder at lines 26-43: Ceramic becomes the lead source for
     Simple and Moderate tiers, joins Complex as a sixth parallel call.
@@ -204,7 +206,7 @@ Key design decisions (operator-confirmed defaults from
 > SKILL.md source matrix to update is at `skills/research-patterns/SKILL.md:63-72`.
 <!-- /deepen-plan -->
 
-- [ ] **2.4** Update `commands/research/setup.md`:
+- [x] **2.4** Update `commands/research/setup.md`:
   - `CERAMIC_API_KEY` set/format check alongside existing five at lines
     80-160.
   - Optional live probe with the same 5-second curl pattern as EXA at
@@ -213,20 +215,20 @@ Key design decisions (operator-confirmed defaults from
   - Dashboard row at lines 360-385 (note: Ceramic is API-key-based, so
     it goes in the "API Keys" subtable not the "MCP Sources" subtable).
   - Setup-instructions block update at lines 404-415.
-- [ ] **2.5** Update `commands/research/code.md` and
+- [x] **2.5** Update `commands/research/code.md` and
   `commands/research/deep.md` `allowed-tools:` lists with the new MCP
   tool name (one line each).
-- [ ] **2.6** Update `skills/research-patterns/SKILL.md` source matrix.
+- [x] **2.6** Update `skills/research-patterns/SKILL.md` source matrix.
   Important: do **not** introduce another multi-line description — see
   `RESEARCH/01 §4` gap 1.
-- [ ] **2.7** Update `plugins/yellow-research/CLAUDE.md`: add Ceramic to
+- [x] **2.7** Update `plugins/yellow-research/CLAUDE.md`: add Ceramic to
   the API-key setup section.
-- [ ] **2.8** Update `plugins/yellow-research/README.md` install
+- [x] **2.8** Update `plugins/yellow-research/README.md` install
   instructions to mention `CERAMIC_API_KEY`.
 
 ### Phase 3: yellow-core (secondary migration)
 
-- [ ] **3.1** Add `mcpServers.ceramic` block to
+- [x] **3.1** Add `mcpServers.ceramic` block to
   `plugins/yellow-core/.claude-plugin/plugin.json` (after the existing
   `context7` block at lines 14-17). Note: this becomes yellow-core's
   second MCP entry.
@@ -237,7 +239,7 @@ Key design decisions (operator-confirmed defaults from
 > existing HTTP MCPs in the repo (parallel, context7) — no `env`
 > block (per the OAuth finding above).
 <!-- /deepen-plan -->
-- [ ] **3.2** Update `agents/research/best-practices-researcher.md`:
+- [x] **3.2** Update `agents/research/best-practices-researcher.md`:
   - `tools:` add `mcp__plugin_yellow-core_ceramic__ceramic_search`
     (line 7-14 region).
   - Workflow at lines 35-43: "Phase 2: Research & Synthesis" leads with
@@ -248,9 +250,9 @@ Key design decisions (operator-confirmed defaults from
   - `WebFetch` stays primary for single-URL content fetches — Ceramic
     has no fetch endpoint.
   - Add the LLM-rewrite prep sentence.
-- [ ] **3.3** Update `plugins/yellow-core/CLAUDE.md` — note that
+- [x] **3.3** Update `plugins/yellow-core/CLAUDE.md` — note that
   `best-practices-researcher` honours `CERAMIC_API_KEY`.
-- [ ] **3.4** Update `commands/setup/all.md`:
+- [x] **3.4** Update `commands/setup/all.md`:
   - Lines 79-86: add `CERAMIC_API_KEY` set/NOT-SET probe.
   - Lines 254-269: update yellow-research classification block to "6
     bundled sources" with Ceramic as point 6, adjust READY/PARTIAL/
@@ -258,43 +260,43 @@ Key design decisions (operator-confirmed defaults from
 
 ### Phase 4: Cross-plugin coordination
 
-- [ ] **4.1** Append `CERAMIC_API_KEY` to the never-commit list in
+- [x] **4.1** Append `CERAMIC_API_KEY` to the never-commit list in
   `AGENTS.md:108-109` (alongside the existing four entries).
-- [ ] **4.2** Update root `README.md` to mention Ceramic in the
+- [x] **4.2** Update root `README.md` to mention Ceramic in the
   yellow-research feature list.
-- [ ] **4.3** Optional (cosmetic): mention Ceramic in
+- [x] **4.3** Optional (cosmetic): mention Ceramic in
   `.claude-plugin/marketplace.json` description for yellow-research.
 
 ### Phase 5: Quality
 
-- [ ] **5.1** Add `tests/integration/ceramic.test.ts` (the
+- [x] **5.1** Add `tests/integration/ceramic.test.ts` (the
   `tests/integration/` dir is currently empty per `RESEARCH/01 §4` gap
   7). Vitest test gated on `RUN_LIVE=1` AND `CERAMIC_API_KEY`. One
   positive test (Phase 2 Probe 1 query: `"California rental laws"`,
   assert `result.totalResults > 0`); one negative test (`CERAMIC_API_KEY=`
   empty → assert agent skip behavior).
-- [ ] **5.2** Run `pnpm validate:schemas` — must pass after manifest
+- [x] **5.2** Run `pnpm validate:schemas` — must pass after manifest
   edits.
-- [ ] **5.3** Run `pnpm validate:setup-all` — must pass after the
+- [x] **5.3** Run `pnpm validate:setup-all` — must pass after the
   setup/all.md classification edits.
-- [ ] **5.4** Run `pnpm validate:agents` — must pass after agent
+- [x] **5.4** Run `pnpm validate:agents` — must pass after agent
   frontmatter edits.
-- [ ] **5.5** Add a `.changeset/<auto>.md` entry at `minor` for both
+- [x] **5.5** Add a `.changeset/<auto>.md` entry at `minor` for both
   yellow-research and yellow-core.
-- [ ] **5.6** Manual smoke: `/research:setup` shows new Ceramic row
+- [x] **5.6** Manual smoke: `/research:setup` shows new Ceramic row
   ACTIVE; `/research:code` and `/research:deep` use the new tool first
   on a test query.
 
 ### Phase 6: Submit
 
-- [ ] **6.1** Commit-by-commit per the Phase 4 brief. Conventional
+- [x] **6.1** Commit-by-commit per the Phase 4 brief. Conventional
   commits — `feat(yellow-research): add Ceramic MCP backend` etc. One
   logical change per commit.
-- [ ] **6.2** Open a **draft** PR on branch `ceramic-integration`.
+- [x] **6.2** Open a **draft** PR on branch `ceramic-integration`.
   Title `feat: Ceramic.ai as default research backend`. PR body
   enumerates touched files (see Technical Details below) and the
   validation commands run.
-- [ ] **6.3** Do not merge, do not force-push, do not modify any branch
+- [x] **6.3** Do not merge, do not force-push, do not modify any branch
   other than `ceramic-integration`.
 
 ## Technical Details

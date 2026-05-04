@@ -1,5 +1,7 @@
 # Feature: `/statusline:setup` Command for Yellow Plugins
 
+> **Status: Implemented (PR #105, merged)** — Adaptive statusline command shipped (`84f1b801`). Upstream `statusLine` in plugin.json proposal remains out of scope.
+
 ## Problem Statement
 
 Users of the yellow-plugins ecosystem have no at-a-glance visibility into their
@@ -80,7 +82,7 @@ generates a tailored Python statusline script, previews it, and installs it into
 The setup command will generate this script. We need to design the template that
 gets written to `~/.claude/yellow-statusline.py`.
 
-- [ ] 2.1: Design the segment functions
+- [x] 2.1: Design the segment functions
   - `segment_model(data)` — Show model display name (e.g., `Opus`)
   - `segment_git(data)` — Branch name + staged/modified counts
     from `git status --porcelain`
@@ -93,21 +95,21 @@ gets written to `~/.claude/yellow-statusline.py`.
     0=normal, 1=warning, 2=critical
   - Each function wrapped in try/except for error isolation
 
-- [ ] 2.2: Design the layout engine
+- [x] 2.2: Design the layout engine
   - Collect all segment results
   - If max(alert_levels) == 0: render single line with all segments joined by ` | `
   - If max(alert_levels) > 0: Line 1 = primary segments, Line 2 = alert details
   - Alert details: which MCP servers are unhealthy
     (with setup command hint), context warning, git dirty count
 
-- [ ] 2.3: Design the caching layer
+- [x] 2.3: Design the caching layer
   - Git cache: `~/.claude/yellow-sl-git` with 5s TTL
   - MCP cache: `~/.claude/yellow-sl-mcp` with 30s TTL
   - Resolve via `os.path.expanduser("~/.claude")`
   - Use `os.path.getmtime()` for TTL checks — no dependencies
   - Stable filenames (not PID-based) since each run is a new process
 
-- [ ] 2.4: Design color system
+- [x] 2.4: Design color system
   - Respect `NO_COLOR` env var and `TERM=dumb`
   - Use 16-color ANSI codes for maximum compatibility:
     - Green (`\033[32m`) for healthy/normal
@@ -120,7 +122,7 @@ gets written to `~/.claude/yellow-statusline.py`.
 
 The command markdown will instruct Claude to follow these steps:
 
-- [ ] 3.1: Step 1 — Check prerequisites
+- [x] 3.1: Step 1 — Check prerequisites
   - Verify Python 3 is available: `python3 --version`
   - Check `~/.claude/` directory exists
   - Check if `~/.claude/yellow-statusline.py` already exists
@@ -128,7 +130,7 @@ The command markdown will instruct Claude to follow these steps:
   - Check if `disableAllHooks` is true in settings (statusline won't work)
   - Single Bash call for all checks
 
-- [ ] 3.2: Step 2 — Detect installed plugins
+- [x] 3.2: Step 2 — Detect installed plugins
   - Scan `~/.claude/plugins/cache/` for directories containing yellow-plugin manifests
   - For each found plugin, read `.claude-plugin/plugin.json`
   - Extract `mcpServers` object (keys = server names, values = config)
@@ -136,14 +138,14 @@ The command markdown will instruct Claude to follow these steps:
   - Build the `DETECTED_PLUGINS` dict and `ENV_REQUIREMENTS` dict
   - Single Bash call using `find` + `python3 -c` inline
 
-- [ ] 3.3: Step 3 — Generate the Python script
+- [x] 3.3: Step 3 — Generate the Python script
   - Use Write tool to create `~/.claude/yellow-statusline.py`
   - Embed the detected plugins as a baked-in `DETECTED_PLUGINS` dict
   - Embed the env var requirements as `ENV_REQUIREMENTS` dict
   - Include all segment functions, layout engine, caching, and color system
   - Set executable permission
 
-- [ ] 3.4: Step 4 — Preview
+- [x] 3.4: Step 4 — Preview
   - Show the user:
     - Which plugins were detected (table)
     - Which segments are included
@@ -151,14 +153,14 @@ The command markdown will instruct Claude to follow these steps:
     - Mock rendering of alert state (2 lines)
   - If existing statusline config found, show current config and warn
 
-- [ ] 3.5: Step 5 — Confirm and install
+- [x] 3.5: Step 5 — Confirm and install
   - AskUserQuestion: "Install this statusline?" with options:
     - "Yes, install" / "No, cancel" / (if existing) "Replace existing"
   - On confirm: merge `statusLine` into `~/.claude/settings.json`
   - Use `python3 -c` to safely merge JSON (read, update key, write back)
   - Preserve all existing settings (enabledPlugins, permissions, etc.)
 
-- [ ] 3.6: Step 6 — Validate and report
+- [x] 3.6: Step 6 — Validate and report
   - Read back `~/.claude/settings.json` to verify `statusLine` key
   - Read back `~/.claude/yellow-statusline.py` to verify it exists
   - Report success with next steps:
@@ -175,7 +177,7 @@ The command markdown will instruct Claude to follow these steps:
 - [x] 4.2: Update `plugins/yellow-core/README.md`
   - Add `/statusline:setup` to commands table
 
-- [ ] 4.3: Optionally bump `plugins/yellow-core/.claude-plugin/plugin.json` version
+- [x] 4.3: Optionally bump `plugins/yellow-core/.claude-plugin/plugin.json` version
 
 ## Technical Specifications
 
