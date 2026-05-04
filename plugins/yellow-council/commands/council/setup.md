@@ -28,7 +28,7 @@ for tool in bash timeout jq mktemp awk sed grep; do
 done
 printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep)\n'
 
-# Bash version check (need 4.3+ for wait "$pid" per-process exit codes)
+# Bash version check (need 4.3+ for ${BASH_VERSINFO[N]} array indexing, associative arrays, and ${var^} capitalization used in council.md)
 BASH_VERSION_OK="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
 case "$BASH_VERSION_OK" in
   4.[3-9]*|4.[1-9][0-9]*|[5-9].*|[1-9][0-9].*)
@@ -133,6 +133,32 @@ fi
 Print a one-line summary:
 
 ```bash
+# Re-detect each CLI inline — each Bash block is a fresh subprocess so
+# variables from Steps 2-4 do not survive here.
+READY_COUNT=0
+
+if command -v gemini >/dev/null 2>&1; then
+  GEMINI_STATUS="installed"
+  READY_COUNT=$((READY_COUNT + 1))
+else
+  GEMINI_STATUS="missing"
+fi
+
+if command -v opencode >/dev/null 2>&1; then
+  OPENCODE_STATUS="installed"
+  READY_COUNT=$((READY_COUNT + 1))
+else
+  OPENCODE_STATUS="missing"
+fi
+
+if [ -d "${HOME}/.claude/plugins/cache/yellow-codex" ] || \
+   [ -d "$(git rev-parse --show-toplevel 2>/dev/null)/plugins/yellow-codex" ]; then
+  CODEX_STATUS="installed"
+  READY_COUNT=$((READY_COUNT + 1))
+else
+  CODEX_STATUS="missing"
+fi
+
 printf '\n[yellow-council] Setup summary:\n'
 printf '  Required: bash 4.3+, timeout, jq — verified\n'
 printf '  Reviewers: %d of 3 available (Gemini=%s, OpenCode=%s, Codex=%s)\n' \

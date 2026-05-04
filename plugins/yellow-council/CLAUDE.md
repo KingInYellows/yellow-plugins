@@ -14,7 +14,7 @@ and never auto-commits. The user decides what to do with the verdicts.
 
 ## Required Environment
 
-- **Bash 4.3+** — for `wait "$pid"` per-process exit code capture
+- **Bash 4.3+** — for associative arrays and `${var^}` case-conversion used in `/council` orchestration
 - **GNU coreutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`, `grep`
 - **`jq`** — required for OpenCode JSON event stream parsing
 - **External CLIs (user-installed; soft-skipped if missing):**
