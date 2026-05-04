@@ -219,7 +219,6 @@ Expected tools (fully qualified):
 - `mcp__plugin_yellow-semgrep_semgrep__semgrep_rule_schema`
 - `mcp__plugin_yellow-semgrep_semgrep__get_supported_languages`
 - `mcp__plugin_yellow-semgrep_semgrep__semgrep_scan_supply_chain`
-- `mcp__plugin_yellow-semgrep_semgrep__semgrep_whoami`
 
 Count discovered tools. If fewer than 2 core tools
 (`mcp__plugin_yellow-semgrep_semgrep__semgrep_scan`,
