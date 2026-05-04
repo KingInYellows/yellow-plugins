@@ -29,7 +29,7 @@ done
 printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep)\n'
 
 # Bash version check (need 4.3+ for wait "$pid" per-process exit codes)
-BASH_VERSION_OK=$(bash -c 'echo "$BASH_VERSINFO[0]"').'$(bash -c 'echo "$BASH_VERSINFO[1]"')'
+BASH_VERSION_OK="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
 case "$BASH_VERSION_OK" in
   4.[3-9]*|4.[1-9][0-9]*|[5-9].*|[1-9][0-9].*)
     printf '[yellow-council] bash: ok (%s)\n' "$BASH_VERSION_OK" ;;
