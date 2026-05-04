@@ -88,14 +88,45 @@ than hanging the first tool call.
 ```bash
 DATA_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/yellow-morph}"
 ROOT_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
+LOCK_DIR="${DATA_DIR}/.install.lock"
 
 mkdir -p "$DATA_DIR"
-cp "${ROOT_DIR}/package.json" "${DATA_DIR}/package.json"
-cp "${ROOT_DIR}/package-lock.json" "${DATA_DIR}/package-lock.json"
-# Use `npm ci` (not `npm install`) to match the wrapper and hook — this
-# enforces the committed lockfile so the same transitive deps land here,
-# in SessionStart, and on first tool invocation.
-(cd "$DATA_DIR" && env -u MORPH_API_KEY npm ci --no-audit --no-fund --loglevel=error) 2>&1
+
+# Acquire the same atomic mkdir-lock used by bin/start-morph.sh and the
+# SessionStart prewarm hook. `npm ci` deletes node_modules before installing,
+# so two concurrent runs against the same DATA_DIR corrupt the install.
+# 20 retries × 1s = 20s budget, matching start-morph.sh.
+LOCK_ACQUIRED=0
+for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    LOCK_ACQUIRED=1
+    trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
+    break
+  fi
+  sleep 1
+done
+
+if [ "$LOCK_ACQUIRED" -eq 0 ]; then
+  printf 'yellow-morph: timed out (20s) waiting for install lock at %s\n' "$LOCK_DIR"
+  printf 'yellow-morph: another install may be running, or a stale lock — cleanup: rmdir %s\n' "$LOCK_DIR"
+  exit 1
+fi
+
+# Re-check under the lock — the wrapper or prewarm hook may have already
+# completed the install while we were waiting for the lock.
+MORPH_ENTRY="${DATA_DIR}/node_modules/@morphllm/morphmcp/dist/index.js"
+if ! diff -q "${ROOT_DIR}/package-lock.json" "${DATA_DIR}/package-lock.json" >/dev/null 2>&1 \
+   || [ ! -f "$MORPH_ENTRY" ]; then
+  cp "${ROOT_DIR}/package.json" "${DATA_DIR}/package.json"
+  cp "${ROOT_DIR}/package-lock.json" "${DATA_DIR}/package-lock.json"
+  # Use `npm ci` (not `npm install`) to enforce the committed lockfile so the
+  # same transitive deps land here as in SessionStart and the wrapper.
+  # Unset MORPH_API_KEY in the subshell — postinstall scripts must not see it.
+  (cd "$DATA_DIR" && env -u MORPH_API_KEY npm ci --no-audit --no-fund --loglevel=error) 2>&1
+fi
+
+rmdir "$LOCK_DIR" 2>/dev/null || true
+trap - EXIT INT TERM
 ```
 
 On success: "morphmcp installed to ${DATA_DIR}/node_modules. First tool

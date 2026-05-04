@@ -22,6 +22,7 @@
       "args": [],
       "env": {
         "MORPH_API_KEY_USERCONFIG": "${user_config.morph_api_key}",
+        "MORPH_API_KEY": "${MORPH_API_KEY:-}",
         "DISABLED_TOOLS": "github_codebase_search",
         "WORKSPACE_MODE": "true"
       }

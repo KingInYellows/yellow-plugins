@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tool name corrected: `warpgrep_codebase_search` → `codebase_search`.**
   The `warpgrep_` prefix does not exist in morphmcp 0.8.165. References
   updated across CLAUDE.md, README, `/morph:status`, and the
-  `mcp-integration-patterns` skill. The `MCP__plugin_yellow-morph_morph__edit_file`
+  `mcp-integration-patterns` skill. The `mcp__plugin_yellow-morph_morph__edit_file`
   and `mcp__plugin_yellow-morph_morph__codebase_search` names are what
   agents should call going forward.
 

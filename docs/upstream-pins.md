@@ -24,7 +24,7 @@ or hook it into CI as a non-blocking advisory.
 
 | Plugin           | Package                          | Pinned   | Registry | Notes                                                                   |
 | ---------------- | -------------------------------- | -------- | -------- | ----------------------------------------------------------------------- |
-| yellow-morph     | `@morphllm/morphmcp`             | `0.8.165`| npm      | Bumped 2026-04-17 from 0.8.110. No public changelog; verify empirically. |
+| yellow-morph     | `@morphllm/morphmcp`             | `0.8.165`| npm      | Bumped 2026-04-17 from 0.8.110. No public changelog; verify empirically. **Pin tracked in `plugins/yellow-morph/package.json` deps (wrapper-based); NOT in `plugin.json` args.** |
 | yellow-research  | `@perplexity-ai/mcp-server`      | `0.8.2`  | npm      | Perplexity MCP. Requires `PERPLEXITY_API_KEY`.                          |
 | yellow-research  | `tavily-mcp`                     | `0.2.17` | npm      | Tavily research MCP. Requires `TAVILY_API_KEY`.                         |
 | yellow-research  | `exa-mcp-server`                 | `3.1.8`  | npm      | Exa MCP. Requires `EXA_API_KEY`. Tool whitelist passed as positional arg.|
@@ -39,6 +39,11 @@ When bumping a pin:
    install the new version in a disposable workspace and compare
    `tools/list` + env-var surface vs the prior pin.
 2. Update the pin in the plugin's `.claude-plugin/plugin.json` `args` array.
+   **Exception — wrapper-based plugins (e.g., yellow-morph):** the version pin
+   lives in `plugins/<name>/package.json` (under `dependencies`) and
+   `plugins/<name>/package-lock.json`. Run `npm install @scope/pkg@X.Y.Z` inside
+   the plugin directory to update both files. The `plugin.json` `args` array
+   invokes the wrapper script and does NOT contain the package version.
 3. Update the matching row in this file.
 4. Bump the plugin's `version` (minor for behavior-preserving bumps, major
    for breaking changes in the MCP's tool surface).

@@ -98,12 +98,17 @@ function getNpmLatest(pkg) {
   }
 }
 
-// Sum (major*10000 + minor*100 + patch) difference as a crude drift score.
+// Lexicographic semver drift score: compares major, minor, patch independently.
+// Returns positive when latest is newer, negative when pinned is ahead, 0 when equal.
+// Each component is weighted separately so large patch numbers (e.g. 165) do not
+// overflow into the minor component weight.
 function driftScore(pinned, latest) {
   const parse = (v) => v.split('.').map((s) => parseInt(s, 10) || 0);
   const [pM, pm, pp] = parse(pinned);
   const [lM, lm, lp] = parse(latest);
-  return lM * 10000 + lm * 100 + lp - (pM * 10000 + pm * 100 + pp);
+  if (lM !== pM) return (lM - pM) * 1000000;
+  if (lm !== pm) return (lm - pm) * 1000;
+  return lp - pp;
 }
 
 function main() {

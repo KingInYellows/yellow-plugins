@@ -81,17 +81,22 @@ if [ -n "${MORPH_API_KEY:-}" ]; then
     printf 'API status: %s\n' "$HTTP_CODE"
   fi
 else
-  printf 'API status: skipped (no shell MORPH_API_KEY; MCP tools loaded so userConfig is set)\n'
+  printf 'API status: skipped (probe not possible — key is in keychain, not accessible to bash)\n'
 fi
 ```
 
 - **200**: API reachable and authenticated — **HEALTHY**
-- **401**: API key invalid — **DEGRADED**
-- **429**: Rate limit exceeded — credits may be exhausted — **DEGRADED**
-- **UNREACHABLE / other**: **DEGRADED**
-- **Skipped (userConfig-only)**: treat as **HEALTHY** since the MCP server
-  authenticates at startup; if the key were bad, the MCP tools would be
-  absent (OFFLINE).
+- **401**: API key invalid — **DEGRADED** (only reachable when `MORPH_API_KEY`
+  is exported in the shell environment)
+- **429**: Rate limit exceeded — credits may be exhausted — **DEGRADED** (only
+  reachable when `MORPH_API_KEY` is exported in the shell environment)
+- **UNREACHABLE / other**: **DEGRADED** (only reachable when `MORPH_API_KEY` is
+  exported in the shell environment)
+- **Skipped (userConfig-only)**: **HEALTHY (probe skipped — key in keychain,
+  not accessible to bash)**. The status command cannot detect invalid keys,
+  exhausted credits, or API outages for keychain-backed installs. To probe the
+  API directly, temporarily export your key in the shell:
+  `export MORPH_API_KEY=<your-key>` and re-run `/morph:status`.
 
 ### Step 4: Report
 
@@ -105,7 +110,7 @@ Environment
   MORPH_WARP_GREP_TIMEOUT   30000 ms
 
 API
-  Status                    200 (HEALTHY) | 401 (DEGRADED) | skipped (HEALTHY)
+  Status                    200 (HEALTHY) | 401 (DEGRADED) | skipped (HEALTHY — probe skipped)
 
 MCP Tools
   mcp__plugin_yellow-morph_morph__edit_file       available | not loaded
@@ -119,8 +124,9 @@ Overall: HEALTHY | DEGRADED | OFFLINE
 | MCP tools | API probe                | State      |
 | --------- | ------------------------ | ---------- |
 | not loaded| (not run)                | OFFLINE    |
-| loaded    | 200 or skipped           | HEALTHY    |
-| loaded    | 401 / 429 / unreachable  | DEGRADED   |
+| loaded    | 200                      | HEALTHY    |
+| loaded    | skipped (keychain path)  | HEALTHY (probe skipped) |
+| loaded    | 401 / 429 / unreachable  | DEGRADED (shell env path only) |
 
 For each state, print a "What to do" next-step block so the user has a
 concrete action to take.

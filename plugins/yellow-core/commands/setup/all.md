@@ -253,8 +253,8 @@ path" and rely on `/morph:status` for authoritative OFFLINE detection.
 - READY: `node18_check` ok AND `npm` OK AND `rg` OK AND either of:
   (a) shell `MORPH_API_KEY` set, OR
   (b) `pluginConfigs.yellow-morph.options.morph_api_key` present in
-      `~/.claude/settings.json` (userConfig was answered). Detection:
-      `grep -qE '"morph_api_key"[[:space:]]*:' ~/.claude/settings.json 2>/dev/null`.
+      `~/.claude/.credentials.json` (userConfig was answered). Detection:
+      `grep -qE '"morph_api_key"[[:space:]]*:' ~/.claude/.credentials.json 2>/dev/null`.
 - PARTIAL: local prerequisites are satisfied but neither the shell env
   var nor the userConfig option is detectable — the plugin will install
   but the MCP server will not start. Recommend running `/morph:setup`
