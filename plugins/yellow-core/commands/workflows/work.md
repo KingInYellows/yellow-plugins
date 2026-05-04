@@ -451,7 +451,7 @@ it at a Phase 1b checkpoint.
    also requires the spawning call to run in the background. Wait for all
    agents via TaskOutput before aggregating findings.
 
-   ```
+   ```text
    Task: code-simplicity-reviewer
    subagent_type: "yellow-core:code-simplicity-reviewer"
    Input: {changed_files, diff}
@@ -459,7 +459,7 @@ it at a Phase 1b checkpoint.
    run_in_background: true
    ```
 
-   ```
+   ```text
    Task: security-sentinel
    subagent_type: "yellow-core:security-sentinel"
    Input: {changed_files, diff}
@@ -467,7 +467,7 @@ it at a Phase 1b checkpoint.
    run_in_background: true
    ```
 
-   ```
+   ```text
    Task: performance-oracle
    subagent_type: "yellow-core:performance-oracle"
    Input: {changed_files, diff}
@@ -475,7 +475,7 @@ it at a Phase 1b checkpoint.
    run_in_background: true
    ```
 
-   ```
+   ```text
    Task: polyglot-reviewer
    subagent_type: "yellow-core:polyglot-reviewer"
    Input: {changed_files, diff}

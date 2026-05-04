@@ -85,7 +85,7 @@ research, analysis, and structured documentation.
    call must also run in the background so the two agents execute concurrently
    rather than serially:
 
-   ```
+   ```text
    Task: repo-research-analyst
    subagent_type: "yellow-core:repo-research-analyst"
    Input: {feature_description}
@@ -93,7 +93,7 @@ research, analysis, and structured documentation.
    run_in_background: true
    ```
 
-   ```
+   ```text
    Task: best-practices-researcher
    subagent_type: "yellow-core:best-practices-researcher"
    Input: {feature_description}
@@ -127,7 +127,7 @@ research, analysis, and structured documentation.
 
 1. Run specification flow analyzer:
 
-   ```
+   ```text
    Task: spec-flow-analyzer
    subagent_type: "yellow-core:spec-flow-analyzer"
    Input: {feature_description, research_findings}

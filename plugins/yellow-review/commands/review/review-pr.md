@@ -163,7 +163,13 @@ If zero agents succeed, abort with error.
 Launch the `code-simplifier` agent on the now-modified code to review applied
 fixes for simplification opportunities, via Task tool with
 `subagent_type: "yellow-review:code-simplifier"` and
-`run_in_background: true`. Apply any P1/P2 simplifications it returns.
+`run_in_background: true`.
+
+**Wait gate:** Before proceeding to Step 8, wait for the background
+simplifier task to complete via TaskOutput (or equivalent). Do NOT proceed to
+Step 8 while the task is still in_progress.
+
+Apply any P1/P2 simplifications it returns.
 
 ### Step 8: Commit and Push
 
