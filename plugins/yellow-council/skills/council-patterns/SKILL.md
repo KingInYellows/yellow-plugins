@@ -114,9 +114,11 @@ BEFORE writing to `docs/council/<file>.md`:
   else if (line ~ /Authorization: [A-Za-z0-9 ._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
   else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
   # PEM private key block — multi-line state machine
-  if (line ~ /^-----BEGIN [A-Z ]+PRIVATE KEY-----$/) in_pem = 1
+  # NOTE: test the ORIGINAL line ($0) for BEGIN/END so the redaction-replacement
+  # of `line` does not blind the END check (otherwise in_pem never resets).
+  if ($0 ~ /^-----BEGIN [A-Z ]+PRIVATE KEY-----$/) in_pem = 1
   if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
-  if (line ~ /^-----END [A-Z ]+PRIVATE KEY-----$/) in_pem = 0
+  if ($0 ~ /^-----END [A-Z ]+PRIVATE KEY-----$/) in_pem = 0
   print line
 }
 ```
@@ -324,10 +326,12 @@ timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
     "<full-pack-prompt>" \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 CLI_EXIT=$?
-SESSION_ID=$(jq -r 'first(.part.snapshot.sessionID // empty)' "$OUTPUT_FILE" 2>/dev/null)
+SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.sessionID' "$OUTPUT_FILE" 2>/dev/null | head -1)
 ASSISTANT_TEXT=$(jq -r 'select(.type=="text") | .part.text' "$OUTPUT_FILE" | tr -d '\000')
-[ -n "$SESSION_ID" ] && opencode session delete "$SESSION_ID" 2>/dev/null \
-  || printf '[opencode-reviewer] Warning: failed to delete session %s\n' "$SESSION_ID" >&2
+if [ -n "$SESSION_ID" ]; then
+  opencode session delete "$SESSION_ID" \
+    || printf '[opencode-reviewer] Warning: failed to delete session %s\n' "$SESSION_ID" >&2
+fi
 ```
 - `--format json`: structured event stream
 - `--variant high`: default reasoning effort (`max` is significantly slower; reserve)

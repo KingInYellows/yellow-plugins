@@ -10,6 +10,8 @@ allowed-tools:
   - Task
   - AskUserQuestion
   - Write
+skills:
+  - council-patterns
 ---
 
 # /council — Cross-Lineage Code Review
