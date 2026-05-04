@@ -229,9 +229,11 @@ awk '
   else if (line ~ /Bearer [A-Za-z0-9._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
   else if (line ~ /Authorization: [A-Za-z0-9 ._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
   else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
-  if (line ~ /^-----BEGIN [A-Z ]+PRIVATE KEY-----$/) in_pem = 1
+  # Test ORIGINAL $0 for BEGIN/END — `line` is overwritten by the redaction
+  # replacement above, so testing `line` for END would never reset in_pem.
+  if ($0 ~ /^-----BEGIN [A-Z ]+PRIVATE KEY-----$/) in_pem = 1
   if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
-  if (line ~ /^-----END [A-Z ]+PRIVATE KEY-----$/) in_pem = 0
+  if ($0 ~ /^-----END [A-Z ]+PRIVATE KEY-----$/) in_pem = 0
   print line
 }
 ' "$TEXT_FILE" > "$REDACTED_FILE"

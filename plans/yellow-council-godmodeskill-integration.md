@@ -439,16 +439,17 @@ Pack must include: mode, task, context blocks, required output schema. Codex's e
 **Gemini (direct bash):**
 ```bash
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  gemini "<prompt>" \
+  gemini -p "<prompt>" --approval-mode plan --skip-trust -o text \
   >"$OUTPUT_FILE" 2>"$STDERR_FILE" &
 ```
 With stdin context:
 ```bash
 ( printf '%s\n\n' "$context_block"; printf '%s' "$prompt" ) | \
   timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  gemini >"$OUTPUT_FILE" 2>"$STDERR_FILE" &
+  gemini -p "<prompt>" --approval-mode plan --skip-trust -o text \
+  >"$OUTPUT_FILE" 2>"$STDERR_FILE" &
 ```
-**Do NOT use `--yolo` / `--approval-mode yolo`** (issue #13561 — still prompts in some cases; safety risk for read-only review). **Do NOT use `-o json`** in V1 (issue #9009 — was broken; spike-verify before any V2 use).
+**`-p` / `--prompt` is REQUIRED** for non-interactive mode in v0.40+; positional `gemini "<prompt>"` defaults to TUI and hangs in non-TTY contexts (verified 2026-05-04 spike). **Do NOT use `--yolo` / `--approval-mode yolo`** (issue #13561 — still prompts in some cases; safety risk for read-only review). Use `-o text` for V1 — `-o json` was fixed in v0.40+ per issue #9009, but the structured-output schema is not yet stable; defer to V2. See `docs/spikes/gemini-cli-output-format-2026-05-04.md`.
 
 **OpenCode (direct bash):**
 ```bash
