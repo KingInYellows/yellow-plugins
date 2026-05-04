@@ -153,7 +153,7 @@ case $CLI_EXIT in
     printf '[opencode-reviewer] CLI timed out at %ds (exit %d)\n' "${COUNCIL_TIMEOUT:-600}" "$CLI_EXIT" >&2
     printf 'verdict=TIMEOUT\n'
     printf 'confidence=N/A\n'
-    printf 'summary=OpenCode timed out at %ds. Council ran without OpenCode's verdict.\n' "${COUNCIL_TIMEOUT:-600}"
+    printf "summary=OpenCode timed out at %ds. Council ran without OpenCode's verdict.\n" "${COUNCIL_TIMEOUT:-600}"
     [ -n "$SESSION_ID" ] && opencode session delete "$SESSION_ID" 2>/dev/null
     rm -f "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0
