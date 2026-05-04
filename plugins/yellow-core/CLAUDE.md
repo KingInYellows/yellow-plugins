@@ -61,7 +61,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (10)
+### Skills (11)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `compound-lifecycle` — audit, refresh, and consolidate `docs/solutions/`
@@ -86,6 +86,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   positional-bias variance; per-criterion scoring (1-5) outperforms holistic;
   style-bias self-check flags rationale drift. Optional `knowledge-compounder`
   hand-off writes the winner to `docs/solutions/optimizations/`
+- `security-fencing` — canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files); single source of truth for the inlined `CRITICAL SECURITY RULES` block (internal)
 - `session-history` — cross-vendor session-history user surface — dispatches
   the `session-historian` agent against Claude Code + Devin + Codex
   backends with availability detection and graceful degradation per backend

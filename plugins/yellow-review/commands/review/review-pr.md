@@ -372,7 +372,7 @@ persona dispatch table above and use the pre-Wave-2 adaptive selection:
   `pattern-recognition-specialist`, `code-simplicity-reviewer`
 - Optional supplementary: `codex-reviewer` (yellow-codex) — when yellow-codex
   is installed AND diff > 100 lines. Spawn via
-  `Task(subagent_type="yellow-codex:codex-reviewer", run_in_background=true)`.
+  `Task(subagent_type="yellow-codex:review:codex-reviewer", run_in_background=true)`.
   If the agent is not found (yellow-codex not installed), skip silently.
 
 Same graceful-degradation guard applies. The legacy path is a rollback

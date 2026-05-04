@@ -203,6 +203,144 @@ You are an expert in [domain]. Your role is to [specific task].
 
 Categories: `workflow`, `analysis`, `generation`, `review`, `automation`
 
+## Agent Archetypes
+
+Use this table when deciding which frontmatter fields a new agent needs.
+"Yes" means the field is required for the archetype to behave correctly;
+"Opt" means optional / depends on scope.
+
+| Field | Reviewer | Scanner | Orchestrator | Research | Analyst |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `name` | Yes | Yes | Yes | Yes | Yes |
+| `description` | Yes | Yes | Yes | Yes | Yes |
+| `model` (e.g. `inherit`, `haiku`, `opus`) | Yes | Yes | Yes | Yes | Yes |
+| `background: true` (parallel spawn) | Yes | Yes | No | Opt | Opt |
+| `memory: project` (persistent learning) | Opt | No | Yes | Opt | Opt |
+| `skills` (shared conventions) | Opt | Yes (plugin-conventions) | Yes | Opt | Opt |
+| `tools` (whitelist) | Read/Grep/Glob/Bash | Read/Grep/Glob/Bash/Write | Task/AskUserQuestion/... | WebSearch/WebFetch/... | Read/Grep/Glob |
+| Include `security-fencing` block | Yes | Yes | No | Opt (if scraping content) | Opt |
+
+**Archetype quick guide:**
+
+- **Reviewer** — finds issues in a given diff/file set and reports findings.
+  Always spawned in parallel. Never edits files directly.
+- **Scanner** — like Reviewer but more systematic across a whole codebase;
+  writes findings to structured output files.
+- **Orchestrator** — multi-step workflow coordinator that spawns other
+  agents via Task. Prompts the user, makes decisions, does not parallelize
+  with peers.
+- **Research** — investigates an open question by consulting external
+  sources (WebSearch, WebFetch, MCP research tools) and/or the codebase.
+- **Analyst** — focused investigation of an existing artifact (plan, PR,
+  doc). Usually reads only; produces a report.
+
+**Critical:** The `memory:` field takes a **scope string**, NOT a boolean.
+Valid values: `memory: user`, `memory: project`, `memory: local`. Writing
+`memory: true` is the common wrong form — it may be a no-op.
+
+## Subagent Failure Convention (Output-File Pattern)
+
+When an orchestrator spawns a subagent via the Task tool, the Task tool's
+return value is not always reliable for distinguishing partial success
+from complete failure (see
+[GitHub Issue #24181](https://github.com/anthropics/claude-code/issues/24181)).
+A formal structured-failure payload has been proposed upstream
+([Issue #25818](https://github.com/anthropics/claude-code/issues/25818))
+but is not yet shipped.
+
+**Community-adopted workaround: the output-file convention.**
+
+### For subagent authors
+
+Instruct the subagent (in its system prompt or spawning prompt) to write a
+structured result file before exiting:
+
+```json
+{
+  "agent": "security-sentinel",
+  "status": "success",
+  "findings": [
+    { "severity": "P1", "file": "src/auth.ts", "line": 42, "finding": "..." }
+  ]
+}
+```
+
+Or on failure:
+
+```json
+{
+  "agent": "security-sentinel",
+  "status": "failed",
+  "reason": "timeout analyzing src/auth.ts after 60s",
+  "partial_findings": []
+}
+```
+
+Write the file to a path the orchestrator provides. Orchestrators MUST scope
+result files to a per-run directory so concurrent sessions cannot collide
+(e.g., two review sessions running on different PRs at the same time). The
+canonical path is:
+
+```
+${TMPDIR:-/tmp}/<run-dir>/agent-result-<agent-name>.json
+```
+
+where `<run-dir>` is a unique directory the orchestrator creates at the
+start of the run (see orchestrator example below) and passes to each agent
+via the spawn prompt.
+
+### For orchestrator authors
+
+1. Create a unique run directory at the start of the workflow:
+
+   ```bash
+   # Uses $TMPDIR (or /tmp). Avoids CLAUDE_PLUGIN_DATA — not a
+   # documented Claude Code runtime env var; rely on the OS tempdir instead.
+   RUN_DIR=$(mktemp -d -t run-XXXXXXXX)
+   ```
+
+2. Pass `$RUN_DIR` to each spawned agent so the agent writes to
+   `$RUN_DIR/agent-result-<agent-name>.json`.
+
+3. After the Task call returns, read the result file rather than relying on
+   the Task return value. Treat `status: "success"` as the only signal that
+   the agent completed its work — `status: "failed"`, missing file, or
+   invalid JSON all indicate incomplete work that the orchestrator should
+   surface.
+
+```bash
+RESULT="$RUN_DIR/agent-result-${AGENT_NAME}.json"
+if [ ! -f "$RESULT" ]; then
+  report_failed "$AGENT_NAME" "result file missing"
+elif ! jq -e . "$RESULT" >/dev/null 2>&1; then
+  report_failed "$AGENT_NAME" "result file is not valid JSON"
+elif ! STATUS=$(jq -er .status "$RESULT" 2>/dev/null); then
+  # jq -er exits non-zero for both absent .status AND .status: null —
+  # both indicate a malformed agent output and are treated identically here
+  report_failed "$AGENT_NAME" "result file missing or null \"status\" field"
+elif [ "$STATUS" != "success" ]; then
+  REASON=$(jq -r '.reason // "no reason given"' "$RESULT")
+  report_failed "$AGENT_NAME" "$REASON"
+else
+  # process findings from "$RESULT"
+  :
+fi
+```
+
+The two-stage check (`jq -e .` for JSON validity, then `jq -er .status` for
+field presence) avoids the misleading "not valid JSON" diagnosis when the
+file parses correctly but `.status` is null or absent.
+
+4. Clean up `$RUN_DIR` at the end of the workflow, or leave it in place
+   when retaining result files aids post-run debugging.
+
+### Why files and not stdout
+
+Stdout parsing is unreliable — the Task tool may suppress trailing output,
+agents may emit unstructured prose alongside the JSON, and context
+truncation can drop the final line. Files are durable and can be read
+even if the agent crashes mid-execution.
+
 ## Creating New Skills
 
 ### Step 1: Choose Type
@@ -300,79 +438,8 @@ Before submitting a skill:
 8. **Over-abstraction** — Prefer specific, focused skills over generic
    frameworks
 
-## Quick Reference
+## Quick Reference and Plugin Settings
 
-**Create command:**
-
-```bash
-cat > .claude/commands/my-cmd.md << 'EOF'
----
-name: my-cmd
-description: Does X. Use when Y.
----
-
-# My Command
-
-Instructions here.
-EOF
-```
-
-**Create skill:**
-
-```bash
-mkdir -p .claude/skills/my-skill
-cat > .claude/skills/my-skill/SKILL.md << 'EOF'
----
-name: my-skill
-description: Does X. Use when Y.
----
-
-# My Skill
-
-Instructions here.
-EOF
-```
-
-**Test invocation:**
-
-```bash
-/my-skill arg1 arg2
-```
-
-## Plugin Settings Pattern
-
-Plugins can read user-specific configuration from
-`.claude/<plugin-name>.local.md`:
-
-**File Location:** `.claude/<plugin-name>.local.md`
-
-**Format:** YAML frontmatter + optional markdown notes
-
-**Security:** Never store credentials — reference env var names only (e.g.,
-`$MY_TOKEN`)
-
-**Example:**
-
-```yaml
----
-schema: 1
-devServer:
-  command: 'npm run dev'
-  port: 3000
-auth:
-  credentials:
-    email: '$BROWSER_TEST_EMAIL'
-    password: '$BROWSER_TEST_PASSWORD'
----
-# Notes
-Optional markdown content for user reference.
-```
-
-**Best Practices:**
-
-- Provide sensible defaults if settings file is missing
-- Document supported settings in plugin's CLAUDE.md
-- Use `schema: 1` for future versioning support
-- Settings files are gitignored by `.local.md` convention
-
-**Reference:** See `yellow-browser-test` plugin for working example.
+Copy-paste templates for new commands, skills, and the plugin-settings
+pattern (`.claude/<plugin-name>.local.md`) live in
+[`references/quick-reference.md`](./references/quick-reference.md).
