@@ -124,7 +124,7 @@ If `dropped_count > 0`, report:
   ...
 ```
 
-If all threads are dropped, exit successfully with a "no actionable comments" message — do NOT proceed to Steps 3d / 4 / 5 / 6 / 7 / 8. (Steps 5 and 8 are skipped because they would `git diff` against an unchanged tree and re-fetch comments that were just classified as non-actionable — both produce misleading output.)
+If all threads are dropped, exit successfully with a "no actionable comments" message — do NOT proceed to Steps 3d / 4 / 5 / 6 / 7 / 8. (Steps 6 and 8 are skipped because Step 6 would `git diff` against an unchanged tree and Step 8 would re-fetch comments that were just classified as non-actionable — both produce misleading output.)
 
 ### Step 3d: Cluster comments by file+region
 
