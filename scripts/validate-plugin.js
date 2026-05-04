@@ -18,8 +18,26 @@
 
 const fs = require('fs');
 const path = require('path');
+const Ajv = require('ajv');
+const addFormats = require('ajv-formats');
 
 const PROJECT_ROOT = process.cwd();
+
+// Load and compile the plugin schema once at module init. The schema is the
+// authoritative shape contract — pre-2026-05-05 the script only enforced a
+// subset of constraints via manual imperative checks; the AJV pass below is
+// what actually catches additionalProperties violations, relativePath
+// pattern violations, and other declarative constraints.
+const ajv = addFormats(new Ajv({ allErrors: true, strict: false }));
+const PLUGIN_SCHEMA_PATH = path.resolve(__dirname, '..', 'schemas', 'plugin.schema.json');
+let validateAgainstSchema;
+try {
+  const pluginSchema = JSON.parse(fs.readFileSync(PLUGIN_SCHEMA_PATH, 'utf-8'));
+  validateAgainstSchema = ajv.compile(pluginSchema);
+} catch (schemaErr) {
+  console.error(`✗ ERROR: failed to load plugin.schema.json: ${schemaErr.message}`);
+  process.exit(1);
+}
 
 /**
  * Resolve a hook command to a script path within the plugin directory.
@@ -105,10 +123,15 @@ function validatePlugin(pluginDir) {
 
   console.log(`\n${colors.cyan}Validating plugin: ${dirName}${colors.reset}`);
 
-  // RULE 1: Required fields (official format: name, description, author)
+  // RULE 1: Required fields (official format: name, version, description, author)
   if (!manifest.name || typeof manifest.name !== 'string') {
     errors.push('Missing required field: "name"');
     logError('Missing required field: "name"');
+  }
+
+  if (!manifest.version || typeof manifest.version !== 'string') {
+    errors.push('Missing required field: "version"');
+    logError('Missing required field: "version"');
   }
 
   if (!manifest.description || typeof manifest.description !== 'string') {
@@ -219,10 +242,26 @@ function validatePlugin(pluginDir) {
     }
   }
 
+  // RULE 5c: hooks must be an inline object — Claude Code's remote validator
+  // rejects path-string and array forms (per docs/solutions/build-errors/
+  // claude-code-plugin-manifest-validation-errors.md). The local schema's
+  // pathPathsOrInline definition tolerates them so authors don't get a CI
+  // error before they get a remote-install error, but we want to fail
+  // closed: an array-form hooks (including the empty-array `hooks: []`
+  // bypass that previously skipped RULE 6/7/8 entirely) is not shippable.
+  if (Array.isArray(manifest.hooks)) {
+    errors.push(
+      'hooks must be an inline JSON object — array form passes local schema but is rejected by Claude Code remote validator'
+    );
+    logError(
+      'hooks: [...] (array form) is not supported by Claude Code remote validator — use inline object form'
+    );
+  }
+
   // RULE 6: Hook script existence (if hooks declared as inline object).
-  // Skip when hooks is an array (the path-array form added by the extended
-  // schema) — array entries are paths/objects, not event-keyed, so the
-  // event-name validation below does not apply.
+  // Skip when hooks is an array (handled by RULE 5c above) — array entries
+  // are paths/objects, not event-keyed, so the event-name validation below
+  // does not apply.
   if (
     manifest.hooks &&
     typeof manifest.hooks === 'object' &&
@@ -453,6 +492,7 @@ function validatePlugin(pluginDir) {
     const DECISION_PROTOCOL_EVENTS = new Set([
       'PreToolUse',
       'PostToolUse',
+      'SessionStart',
       'Stop',
     ]);
 
@@ -511,6 +551,22 @@ function validatePlugin(pluginDir) {
           }
         }
       }
+    }
+  }
+
+  // RULE 9: AJV schema validation. Until 2026-05-05 the local script never
+  // ran the JSON Schema — every constraint added to schemas/plugin.schema.json
+  // (additionalProperties:false, relativePath pattern, definitions block,
+  // propertyNames patterns) was inert at CI time. Run AJV now so declarative
+  // schema constraints are actually enforced. Manual rules above stay because
+  // they catch things the schema can't (filesystem existence, hook script
+  // contents, drift between plugin.json hooks and hooks/hooks.json).
+  if (!validateAgainstSchema(manifest)) {
+    for (const err of validateAgainstSchema.errors || []) {
+      const where = err.instancePath || '/';
+      const message = `${where} ${err.message ?? 'failed schema validation'}`;
+      errors.push(`Schema: ${message}`);
+      logError(`Schema: ${message}`);
     }
   }
 
