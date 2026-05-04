@@ -111,8 +111,8 @@ all platform interactions (better pagination, dedup, triage mutations).
 
 - **SAST only** — SCA/dependency findings not supported in v1
 - **REST API rate limit** — ~60 requests/minute; batch operations add 1s delays
-- **`semgrep_whoami` does not work with API tokens** — only OAuth JWTs; plugin
-  uses REST `GET /api/v1/me` for validation
+- **Token validation uses REST `GET /api/v1/me`** — the built-in MCP server
+  does not expose a `whoami` tool; REST is authoritative for token status
 - **MCP tool names must be verified** — actual names may differ; `/semgrep:setup`
   verifies them
 - **No webhook/push support** — finding status is polled, not pushed

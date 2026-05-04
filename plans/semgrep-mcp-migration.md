@@ -1,6 +1,11 @@
 # Feature: Migrate semgrep MCP from deprecated standalone to built-in subcommand
 
-> **Status**: Phases 1 and 3 complete. Outstanding work: tool name validation (Phase 1.2) and documentation updates (Phase 4).
+> **Status**: ✅ Complete. All phases shipped. Runtime tool name verification
+> against semgrep v1.154.0 confirmed 7 of 8 expected tools match; the
+> built-in MCP server does not expose `semgrep_whoami`, so it has been
+> removed from the expected tool list in `setup.md`, `CLAUDE.md`, and
+> `README.md` (token validation uses REST `GET /api/v1/me`, which already
+> handled this case).
 
 ## Problem Statement
 
@@ -68,26 +73,23 @@ All endpoints (`/api/v1/me`, `/deployments`, `/deployments/{slug}/findings`,
   }
   ```
 
-- [ ] **1.2:** Verify tool name compatibility
-  - Install semgrep >= 1.146.0 locally
-  - Run `semgrep mcp` and compare available tool names against expected list
-  - Expected tools in current code:
-    - `semgrep_scan`
-    - `semgrep_findings`
-    - `semgrep_scan_with_custom_rule`
-    - `get_abstract_syntax_tree`
-    - `semgrep_rule_schema`
-    - `get_supported_languages`
-    - `semgrep_scan_supply_chain`
-    - `semgrep_whoami`
-  - If tool names differ, update all references across commands/agents/skills
+- [x] **1.2:** Verify tool name compatibility
+  - ✅ Verified against semgrep v1.154.0 via MCP `tools/list` over stdio
+  - ✅ 7 of 8 expected tools confirmed: `semgrep_scan`, `semgrep_findings`,
+    `semgrep_scan_with_custom_rule`, `get_abstract_syntax_tree`,
+    `semgrep_rule_schema`, `get_supported_languages`, `semgrep_scan_supply_chain`
+  - ✅ `semgrep_whoami` is NOT exposed by the built-in MCP server — removed
+    from expected list in `setup.md` Step 5 and from "Provides:" in `CLAUDE.md`
+  - ✅ Stale `semgrep_whoami does not work with API tokens` bullets in
+    `CLAUDE.md` and `README.md` updated to reflect that the tool no longer
+    exists; REST `GET /api/v1/me` remains the validation path
 
-### Phase 2: Setup Command — Version Check & MCP Verification
+### Phase 2: Setup Command — Version Check & MCP Verification ✅ COMPLETE
 
-- [ ] **2.1:** Add minimum version constant to setup.md
-  - `MIN_SEMGREP_VERSION="1.146.0"` (required for `semgrep mcp` subcommand)
+- [x] **2.1:** Add minimum version constant to setup.md
+  - ✅ `MIN_SEMGREP_VERSION="1.146.0"` present in `setup.md` Step 0
 
-- [ ] **2.2:** Add version comparison after semgrep install/detection (between
+- [x] **2.2:** Add version comparison after semgrep install/detection (between
   current Step 0 and Step 1)
   ```bash
   installed=$(semgrep --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
@@ -104,11 +106,10 @@ All endpoints (`/api/v1/me`, `/deployments`, `/deployments/{slug}/findings`,
   - If version is below minimum: warn that MCP tools won't work, suggest upgrade
   - If version is at/above minimum: proceed normally
 
-- [ ] **2.3:** Update Step 5 (Verify MCP Tools) to give better diagnostics
-  - If MCP tools not found AND semgrep version < minimum: "Upgrade semgrep to
-    v1.146.0+ for MCP support: `pipx upgrade semgrep`"
-  - If MCP tools not found AND semgrep version >= minimum: "MCP server failed
-    to start. Check SEMGREP_APP_TOKEN and try restarting Claude Code."
+- [x] **2.3:** Update Step 5 (Verify MCP Tools) to give better diagnostics
+  - ✅ Step 5 routes diagnostics by version: < 1.146.0 → suggest upgrade;
+    >= 1.146.0 → check `SEMGREP_APP_TOKEN` and restart; not installed →
+    re-run `/semgrep:setup`
 
 ### Phase 3: Install Script — Minimum Version ✅ COMPLETE
 
@@ -124,19 +125,23 @@ All endpoints (`/api/v1/me`, `/deployments`, `/deployments/{slug}/findings`,
   - ✅ If installed but below `MIN_VERSION`, offers to upgrade
   - ✅ Early exit only if version is >= minimum
 
-### Phase 4: Documentation & Conventions
+### Phase 4: Documentation & Conventions ✅ COMPLETE
 
-- [ ] **4.1:** Update `CLAUDE.md` MCP Servers section
-  - Change "Local stdio server via `uvx semgrep-mcp`" to
-    "Built-in MCP server via `semgrep mcp` (requires v1.146.0+)"
+- [x] **4.1:** Update `CLAUDE.md` MCP Servers section
+  - ✅ Now reads "Built-in MCP server via `semgrep mcp` (requires v1.146.0+)"
+  - ✅ "Provides:" tool list updated to drop `semgrep_whoami`
 
-- [ ] **4.2:** Update `README.md` prerequisites/setup section
+- [x] **4.2:** Update `README.md` prerequisites/setup section
+  - ✅ Stale `semgrep_whoami` limitation bullet replaced with REST validation note
 
-- [ ] **4.3:** Update `semgrep-conventions` SKILL.md if any tool names changed
+- [x] **4.3:** Update `semgrep-conventions` SKILL.md if any tool names changed
+  - ✅ No `semgrep_whoami` references in SKILL.md — no edit needed
 
-- [ ] **4.4:** Update setup.md Step 5 expected tool list if names differ
+- [x] **4.4:** Update setup.md Step 5 expected tool list if names differ
+  - ✅ `semgrep_whoami` removed from the expected MCP tool list
 
-- [ ] **4.5:** Update CHANGELOG.md with migration entry
+- [x] **4.5:** Update CHANGELOG.md with migration entry
+  - ✅ "yellow-semgrep MCP migration" entry already present
 
 ## Technical Details
 
