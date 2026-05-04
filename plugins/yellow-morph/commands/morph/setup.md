@@ -1,8 +1,6 @@
 ---
 name: morph:setup
-description:
-  'Check prerequisites and configure Morph API key. Use when first installing
-  the plugin, when morph tools fail, or to verify API connectivity.'
+description: "Check prerequisites and configure Morph API key. Use when first installing the plugin, when morph tools fail, or to verify API connectivity."
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -30,7 +28,7 @@ command -v rg   >/dev/null 2>&1 && printf 'ripgrep (rg):  OK\n' || printf 'ripgr
 command -v node >/dev/null 2>&1 && printf 'node:          OK (%s)\n' "$(node --version 2>/dev/null)" || printf 'node:          NOT FOUND\n'
 command -v npm  >/dev/null 2>&1 && printf 'npm:           OK (%s)\n' "$(npm --version 2>/dev/null)" || printf 'npm:           NOT FOUND\n'
 printf '\n=== Environment ===\n'
-[ -n "${MORPH_API_KEY:-}" ] && printf '%-28s set (%s...) — fallback path\n' 'MORPH_API_KEY (shell):' "$(printf '%s' "$MORPH_API_KEY" | head -c 4)" || printf '%-28s not set\n' 'MORPH_API_KEY (shell):'
+[ -n "${MORPH_API_KEY:-}" ] && printf '%-28s set — fallback path\n' 'MORPH_API_KEY (shell):' || printf '%-28s not set\n' 'MORPH_API_KEY (shell):'
 ```
 
 Collect **all** failures before stopping — report them together.

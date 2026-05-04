@@ -1,8 +1,6 @@
 ---
 name: morph:status
-description: "Show Morph API health and MCP server state. Use when morph tools
-  seem slow, to verify connectivity, or to check tool availability. Note: API
-  health check consumes one API request (counts against rate limits)."
+description: "Show Morph API health and MCP server state. Use when morph tools seem slow, to verify connectivity, or to check tool availability. Note: API health check consumes one API request (counts against rate limits)."
 argument-hint: ''
 allowed-tools:
   - Bash

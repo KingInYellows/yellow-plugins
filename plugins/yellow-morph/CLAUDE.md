@@ -126,5 +126,7 @@ do not apply.
 - WarpGrep timeout: 30s default (configurable via MORPH_WARP_GREP_TIMEOUT env
   var)
 - edit_file is not suitable for non-code files (configs, markdown, YAML)
-- First npx download may take 20-40s; subsequent sessions use npm cache
+- First install may take 20-40s (`npm ci` installs `@morphllm/morphmcp` into
+  `${CLAUDE_PLUGIN_DATA}/node_modules/`); subsequent sessions reuse the cached
+  install
 - Code is sent to Morph's API — not suitable for air-gapped environments
