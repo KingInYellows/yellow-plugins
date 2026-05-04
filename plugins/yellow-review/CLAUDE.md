@@ -9,7 +9,11 @@ resolution, and sequential stack review. Graphite-native workflow.
   `git push` or `gh pr create`
 - Use conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`,
   `chore:`
-- Agents report findings — they do NOT edit files directly
+- Agents report findings — they do NOT edit project files directly. The
+  `memory: project` frontmatter auto-enables Read/Write/Edit per Claude Code
+  docs (so agents can persist learnings to `.claude/agent-memory/<name>/`),
+  but the prompt-level "report findings only" rule remains in force; the
+  orchestrating command applies all fixes
 - Orchestrating commands apply fixes sequentially to avoid conflicts
 - All shell scripts follow POSIX security patterns (quoted variables, input
   validation, `set -eu`)
