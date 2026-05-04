@@ -201,3 +201,111 @@ means the LLM has no probe result to evaluate at classification time — the
 criterion silently misfires on every run. See
 [setup-classification-probe-coupling.md](./setup-classification-probe-coupling.md)
 for the full pattern.
+
+---
+
+## Update — 2026-05-04
+
+### Plugin Count, Command Count, and Directory Tree Drift (PRs #328–#330)
+
+The entire yellow-council PR stack (3 PRs) carried a consistent internal
+contradiction: the README Plugins table claimed "2 commands" for
+yellow-council while `plugins/yellow-council/CLAUDE.md` reported
+"Commands (1)". Separately, the Project Structure directory tree in the root
+README was never updated when yellow-council was added to `marketplace.json`
+and the Plugins table.
+
+This is a distinct failure mode from the MCP-count drift documented above.
+MCP counts are per-plugin server enumerations; this is about:
+
+1. **Plugins table row counts** (agents/commands/skills per plugin row)
+   drifting from actual filesystem contents
+2. **Project Structure directory tree** not gaining new entries when plugins
+   are added to the marketplace table
+
+Both fail silently — no CI check enforces consistency between prose counts
+and the filesystem.
+
+#### Why This Recurs
+
+When a plugin is scaffolded and added to the marketplace table, the author
+updates:
+- `marketplace.json` (required for install to work)
+- The Plugins table in README (usually done)
+
+But commonly misses:
+- The Project Structure tree block (visual directory listing)
+- Per-row counts (commands, agents, skills) which must match `ls plugins/<name>/commands/ | wc -l`
+
+The tree and the counts have no single source of truth and no CI enforcement,
+so they lag indefinitely.
+
+#### Rule: Treat Every Plugin Add or Command/Agent/Skill Add as a README Operation
+
+Any PR that adds a plugin OR adds/removes a command, agent, or skill inside
+an existing plugin must run the following before opening for review:
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+PLUGIN="yellow-council"   # substitute affected plugin name
+
+# Check Plugins table row for this plugin
+grep -A3 "$PLUGIN" "$GIT_ROOT/README.md" | grep -E 'commands|agents|skills'
+
+# Check filesystem counts
+echo "commands: $(ls "$GIT_ROOT/plugins/$PLUGIN/commands/" 2>/dev/null | wc -l)"
+echo "agents:   $(ls "$GIT_ROOT/plugins/$PLUGIN/agents/"   2>/dev/null | wc -l)"
+echo "skills:   $(ls "$GIT_ROOT/plugins/$PLUGIN/skills/"   2>/dev/null | wc -l)"
+
+# Check that Project Structure tree mentions the plugin
+grep "$PLUGIN" "$GIT_ROOT/README.md"
+```
+
+Any mismatch between the filesystem counts and the table counts is a required
+fix before the PR is merged.
+
+#### CI Enforcement Script Skeleton
+
+Add `scripts/check-readme-count.js` to enforce this automatically:
+
+```js
+// scripts/check-readme-count.js
+// Asserts: (1) README plugin count matches plugins/ directory count
+// (2) Every Plugins table row has a Project Structure tree entry
+// (3) Per-plugin row counts match filesystem
+
+import { readdirSync, readFileSync } from 'fs';
+import { join } from 'path';
+
+const ROOT = new URL('..', import.meta.url).pathname;
+const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
+const pluginDirs = readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })
+  .filter(d => d.isDirectory())
+  .map(d => d.name);
+
+let failed = false;
+
+for (const plugin of pluginDirs) {
+  // Check that Project Structure section mentions the plugin
+  if (!readme.includes(plugin)) {
+    console.error(`[check-readme-count] Project Structure tree missing: ${plugin}`);
+    failed = true;
+  }
+  // Per-subdir count check (commands, agents, skills)
+  for (const subdir of ['commands', 'agents', 'skills']) {
+    let count = 0;
+    try { count = readdirSync(join(ROOT, 'plugins', plugin, subdir)).length; } catch {}
+    // Extract claimed count from Plugins table row (heuristic — adapt to actual table format)
+    const rowMatch = readme.match(new RegExp(`${plugin}[^\\n]*\\b(\\d+)\\s+${subdir}`));
+    if (rowMatch && parseInt(rowMatch[1], 10) !== count) {
+      console.error(`[check-readme-count] ${plugin}: README claims ${rowMatch[1]} ${subdir}, found ${count}`);
+      failed = true;
+    }
+  }
+}
+
+if (failed) process.exit(1);
+console.log('[check-readme-count] ok');
+```
+
+Add to `package.json` scripts: `"check:readme": "node scripts/check-readme-count.js"` and invoke in CI alongside `validate:schemas`.
