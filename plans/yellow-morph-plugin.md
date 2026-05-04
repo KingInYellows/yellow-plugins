@@ -1,5 +1,7 @@
 # Feature: yellow-morph Plugin — Morph Fast Apply and WarpGrep Integration
 
+> **Status: Implemented (PR #115, merged)** — Plugin shipped at `plugins/yellow-morph/`. Subsequent hardening: SessionStart hook + npx fix (`5ed0fa49`), userConfig migration (`46e02ebb`), dual-bootstrap + diagnostics (`7fc202d6`), security review (`b97b2470`), `npm ci` consistency (`504f5fc8`). v2 considerations remain deferred.
+
 ## Overview
 
 Create a new `yellow-morph` plugin that brings Morph-LLM's Fast Apply (code
@@ -92,35 +94,35 @@ When morph tools fail at runtime (API error, timeout, credits exhausted):
 
 ### Phase 1: Plugin Scaffold
 
-- [ ] **1.1:** Create plugin directory structure
-- [ ] **1.2:** Write `.claude-plugin/plugin.json` with MCP server configuration
-- [ ] **1.3:** Write `.gitattributes` (LF enforcement)
-- [ ] **1.4:** Write `package.json` (minimal metadata)
-- [ ] **1.5:** Write `CHANGELOG.md` (initial 1.0.0 release)
+- [x] **1.1:** Create plugin directory structure
+- [x] **1.2:** Write `.claude-plugin/plugin.json` with MCP server configuration
+- [x] **1.3:** Write `.gitattributes` (LF enforcement)
+- [x] **1.4:** Write `package.json` (minimal metadata)
+- [x] **1.5:** Write `CHANGELOG.md` (initial 1.0.0 release)
 
 ### Phase 2: Core Documentation
 
-- [ ] **2.1:** Write `CLAUDE.md` — source of truth for tool preference, domain
+- [x] **2.1:** Write `CLAUDE.md` — source of truth for tool preference, domain
   separation, and graceful degradation
-- [ ] **2.2:** Write `README.md` — user-facing documentation
+- [x] **2.2:** Write `README.md` — user-facing documentation
 
 ### Phase 3: Commands
 
-- [ ] **3.1:** Write `commands/morph/setup.md` — prerequisites, API key,
+- [x] **3.1:** Write `commands/morph/setup.md` — prerequisites, API key,
   verification
-- [ ] **3.2:** Write `commands/morph/status.md` — API health, MCP state
+- [x] **3.2:** Write `commands/morph/status.md` — API health, MCP state
 
 ### Phase 4: Cross-Plugin Hints
 
-- [ ] **4.1:** Add "Optional Enhancement: yellow-morph" to
+- [x] **4.1:** Add "Optional Enhancement: yellow-morph" to
   `plugins/yellow-core/CLAUDE.md`
-- [ ] **4.2:** Add "Optional Enhancement: yellow-morph" to
+- [x] **4.2:** Add "Optional Enhancement: yellow-morph" to
   `plugins/yellow-review/CLAUDE.md`
-- [ ] **4.3:** Add "Optional Enhancement: yellow-morph" to
+- [x] **4.3:** Add "Optional Enhancement: yellow-morph" to
   `plugins/yellow-debt/CLAUDE.md`
-- [ ] **4.4:** Add "Optional Enhancement: yellow-morph" to
+- [x] **4.4:** Add "Optional Enhancement: yellow-morph" to
   `plugins/yellow-ci/CLAUDE.md`
-- [ ] **4.5:** Update `plugins/yellow-research/CLAUDE.md` to reference
+- [x] **4.5:** Update `plugins/yellow-research/CLAUDE.md` to reference
   yellow-morph as alternative to global `filesystem-with-morph` MCP
 
 <!-- deepen-plan: codebase -->
@@ -154,7 +156,7 @@ When morph tools fail at runtime (API error, timeout, credits exhausted):
 
 ### Phase 5: Marketplace Registration
 
-- [ ] **5.1:** Add yellow-morph entry to `.claude-plugin/marketplace.json`
+- [x] **5.1:** Add yellow-morph entry to `.claude-plugin/marketplace.json`
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The `validate-marketplace.js` script (lines 229-249) verifies
@@ -166,8 +168,8 @@ When morph tools fail at runtime (API error, timeout, credits exhausted):
 
 ### Phase 6: Validation
 
-- [ ] **6.1:** Run `pnpm validate:schemas` to verify all JSON schemas pass
-- [ ] **6.2:** Verify morph MCP server starts correctly with a test API key
+- [x] **6.1:** Run `pnpm validate:schemas` to verify all JSON schemas pass
+- [x] **6.2:** Verify morph MCP server starts correctly with a test API key
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** `pnpm validate:schemas` runs two scripts sequentially:

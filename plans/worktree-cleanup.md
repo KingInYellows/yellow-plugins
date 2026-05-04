@@ -48,7 +48,7 @@ running `/gt-cleanup` to handle them. This avoids overlapping authority.
 
 ### Phase 1: Create `/worktree:cleanup` command
 
-- [ ] 1.1: Create `plugins/yellow-core/commands/worktree/cleanup.md`
+- [x] 1.1: Create `plugins/yellow-core/commands/worktree/cleanup.md`
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** yellow-core commands use subdirectory namespacing: `commands/workflows/`,
@@ -358,7 +358,7 @@ allowed-tools:
   - Skill
 ```
 
-- [ ] 2.2: Add Phase 6 after the existing Phase 5 summary
+- [x] 2.2: Add Phase 6 after the existing Phase 5 summary
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Three cross-plugin Skill invocation patterns exist. The gt-cleanup
@@ -412,7 +412,7 @@ Invoke the Skill tool with `skill: "worktree:cleanup"` and `args: "--dry-run"`.
 \```
 ```
 
-- [ ] 2.3: Update gt-cleanup success criteria to mention Phase 6
+- [x] 2.3: Update gt-cleanup success criteria to mention Phase 6
 
 Add to the existing success criteria list:
 
@@ -424,7 +424,7 @@ Add to the existing success criteria list:
 
 ### Phase 3: Register and Validate
 
-- [ ] 3.1: Verify the new command is discoverable by Claude Code
+- [x] 3.1: Verify the new command is discoverable by Claude Code
 
 Commands in `plugins/yellow-core/commands/` are auto-discovered — no
 plugin.json registration needed. Verify with:
@@ -433,21 +433,21 @@ plugin.json registration needed. Verify with:
 ls plugins/yellow-core/commands/worktree/cleanup.md
 ```
 
-- [ ] 3.2: Run validators
+- [x] 3.2: Run validators
 
 ```bash
 pnpm validate:schemas
 ```
 
-- [ ] 3.3: Update yellow-core CLAUDE.md
+- [x] 3.3: Update yellow-core CLAUDE.md
 
 Add `/worktree:cleanup` to the Commands list (currently 7, becomes 8).
 
 ### Phase 4: Changeset and Submit
 
-- [ ] 4.1: Create changeset for yellow-core (minor — new command)
-- [ ] 4.2: Create changeset for gt-workflow (patch — Phase 6 addition)
-- [ ] 4.3: Submit via `/smart-submit`
+- [x] 4.1: Create changeset for yellow-core (minor — new command)
+- [x] 4.2: Create changeset for gt-workflow (patch — Phase 6 addition)
+- [x] 4.3: Submit via `/smart-submit`
 
 ## Technical Details
 

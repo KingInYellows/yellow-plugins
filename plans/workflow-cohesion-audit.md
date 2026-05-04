@@ -1,5 +1,7 @@
 # Workflow Cohesion Audit: Implementation Plan
 
+> **Status: Implemented (PR #108, merged)** — Mechanical fixes shipped (`73a416c0`).
+
 ## Problem Statement
 
 The yellow-plugins monorepo has 11 plugins that evolved independently. While each
@@ -33,18 +35,18 @@ addresses all findings from the workflow cohesion brainstorm.
 
 These can all be done in a single PR. No cascading effects.
 
-- [ ] 1.1: Replace `gt commit create` with `gt modify -c` in `workflows:work`
+- [x] 1.1: Replace `gt commit create` with `gt modify -c` in `workflows:work`
   - File: `plugins/yellow-core/commands/workflows/work.md`
   - Lines: 183, 292, 320, 382, 406 (5 occurrences)
   - Also replace in `plugins/gt-workflow/commands/smart-submit.md` lines 66, 229
 
-- [ ] 1.2: Fix `workflows:work` missing argument guard
+- [x] 1.2: Fix `workflows:work` missing argument guard
   - File: `plugins/yellow-core/commands/workflows/work.md`
   - Line ~37: `cat "#$ARGUMENTS"` crashes if no argument provided
   - Add guard: if `$ARGUMENTS` is empty, use `AskUserQuestion` to request plan
     file path (match `gt-stack-plan` pattern)
 
-- [ ] 1.3: Add execute permissions to yellow-ruvector hook scripts
+- [x] 1.3: Add execute permissions to yellow-ruvector hook scripts
   - Files: `plugins/yellow-ruvector/hooks/scripts/`
     - `user-prompt-submit.sh`
     - `session-start.sh`
@@ -53,7 +55,7 @@ These can all be done in a single PR. No cascading effects.
   - Run: `chmod +x` on all four scripts
   - Note: `lib/validate.sh` stays at 644 (sourced, not executed)
 
-- [ ] 1.4: Add non-git plugin disclaimers to CLAUDE.md files
+- [x] 1.4: Add non-git plugin disclaimers to CLAUDE.md files
   - Files:
     - `plugins/yellow-chatprd/CLAUDE.md`
     - `plugins/yellow-browser-test/CLAUDE.md`
@@ -65,7 +67,7 @@ These can all be done in a single PR. No cascading effects.
 
 This is the highest-impact change. 5 other fixes depend on it.
 
-- [ ] 2.1: Convert `workflows:review` to a thin redirect
+- [x] 2.1: Convert `workflows:review` to a thin redirect
   - File: `plugins/yellow-core/commands/workflows/review.md`
   - Replace body with:
     - Parse `$ARGUMENTS` (PR number, URL, or branch name)
@@ -74,19 +76,19 @@ This is the highest-impact change. 5 other fixes depend on it.
     - Invoke `/review:pr` with the parsed argument
   - Keep the same frontmatter name so existing references work
 
-- [ ] 2.2: Update yellow-core CLAUDE.md component listing
+- [x] 2.2: Update yellow-core CLAUDE.md component listing
   - File: `plugins/yellow-core/CLAUDE.md`
   - Update `workflows:review` entry to note it redirects to `review:pr`
   - Add cross-plugin dependency on yellow-review (optional, degrades gracefully)
 
-- [ ] 2.3: Fix `workflows:plan` broken review option
+- [x] 2.3: Fix `workflows:plan` broken review option
   - File: `plugins/yellow-core/commands/workflows/plan.md`
   - Line 334: Change "Review the plan (/workflows:review plans/<name>.md)" to
     a plan critique option (e.g., run spec-flow-analyzer on the plan) since
     review commands expect PRs, not markdown files
   - Remove the broken `/workflows:review` option for plan files
 
-- [ ] 2.4: Update `test-coverage-analyst` description
+- [x] 2.4: Update `test-coverage-analyst` description
   - File: `plugins/yellow-core/agents/review/test-coverage-analyst.md`
   - Update description to clarify: "For full test suite audits, not PR reviews.
     For PR-scoped test analysis, see pr-test-analyzer (yellow-review)."
@@ -94,7 +96,7 @@ This is the highest-impact change. 5 other fixes depend on it.
 
 ### Phase 3: Rewire `workflows:work` Phase 4 (depends on Phase 2)
 
-- [ ] 3.1: Delegate Phase 4 submit to `/smart-submit`
+- [x] 3.1: Delegate Phase 4 submit to `/smart-submit`
   - File: `plugins/yellow-core/commands/workflows/work.md`
   - Replace Phase 4 "Ship It" raw `gt stack submit` with invocation of
     `/smart-submit`
@@ -103,7 +105,7 @@ This is the highest-impact change. 5 other fixes depend on it.
   - Add fallback: if gt-workflow plugin not installed, fall back to
     `gt submit --no-interactive`
 
-- [ ] 3.2: Add review-after-submit step in `workflows:work`
+- [x] 3.2: Add review-after-submit step in `workflows:work`
   - File: `plugins/yellow-core/commands/workflows/work.md`
   - After the submit step, add a new Phase 5 "Review":
     - Get the PR URL from `gt submit` output or `gh pr view --json url`
@@ -111,7 +113,7 @@ This is the highest-impact change. 5 other fixes depend on it.
     - Graceful degradation: if yellow-review not installed, skip with note
   - This replaces the fragile ruvector CLAUDE.md injection
 
-- [ ] 3.3: Remove review mandate from yellow-ruvector CLAUDE.md
+- [x] 3.3: Remove review mandate from yellow-ruvector CLAUDE.md
   - File: `plugins/yellow-ruvector/CLAUDE.md`
   - Lines 124-130: Remove the instruction to invoke `/workflows:review` after
     `gt stack submit` in `/workflows:work`
@@ -120,13 +122,13 @@ This is the highest-impact change. 5 other fixes depend on it.
 
 ### Phase 4: Workflow Handoff Improvements (independent, can parallelize)
 
-- [ ] 4.1: Improve brainstorm->plan handoff (W1)
+- [x] 4.1: Improve brainstorm->plan handoff (W1)
   - File: `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md`
   - After writing the brainstorm file, output the exact suggested command:
     `/workflows:plan docs/brainstorms/<date>-<slug>-brainstorm.md`
   - Verify this is already happening (may have been fixed in current session)
 
-- [ ] 4.2: Connect `gt-stack-plan` to `workflows:plan` (W4)
+- [x] 4.2: Connect `gt-stack-plan` to `workflows:plan` (W4)
   - File: `plugins/yellow-core/commands/workflows/plan.md`
   - In Phase 5 post-generation options, add:
     "Decompose into stacked PRs (/gt-stack-plan plans/<name>.md)"
@@ -134,7 +136,7 @@ This is the highest-impact change. 5 other fixes depend on it.
   - Accept a plan file path as optional input alongside feature descriptions
   - When given a plan file, derive stack items from the plan's phases/tasks
 
-- [ ] 4.3: Document submit path differences (W5)
+- [x] 4.3: Document submit path differences (W5)
   - File: `plugins/gt-workflow/CLAUDE.md` or a shared skill
   - Add guidance: `/smart-submit` for ad-hoc commits (audit + commit + submit);
     `/workflows:work` for plan-driven implementation (structured phases +
@@ -142,14 +144,14 @@ This is the highest-impact change. 5 other fixes depend on it.
 
 ### Phase 5: Agent Clarity Improvements (independent)
 
-- [ ] 5.1: Clarify code-simplifier temporal role (A1)
+- [x] 5.1: Clarify code-simplifier temporal role (A1)
   - File: `plugins/yellow-review/agents/review/code-simplifier.md`
   - Update description to emphasize it is a "pass-2 post-fix simplification
     check" that runs after other review agents have applied fixes
   - Add note: "For pre-fix complexity analysis, see code-simplicity-reviewer
     (yellow-core)"
 
-- [ ] 5.2: Rename inline agents in gt-workflow (A3)
+- [x] 5.2: Rename inline agents in gt-workflow (A3)
   - Files:
     - `plugins/gt-workflow/commands/smart-submit.md`
     - `plugins/gt-workflow/commands/gt-amend.md`
@@ -162,16 +164,16 @@ This is the highest-impact change. 5 other fixes depend on it.
 
 ### Phase 6: Verify and Document
 
-- [ ] 6.1: Verify hook startup latency
+- [x] 6.1: Verify hook startup latency
   - Manually test: install all 3 SessionStart plugins, measure actual startup
   - Determine if Claude Code runs hooks sequentially or in parallel
   - If sequential and >5s, consider reducing individual timeouts from 3s to 2s
 
-- [ ] 6.2: Update README agent/command counts
+- [x] 6.2: Update README agent/command counts
   - Files: root `README.md`, all plugin `README.md` and `CLAUDE.md` files
   - Ensure counts reflect any changes made in Phases 1-5
 
-- [ ] 6.3: Run validation suite
+- [x] 6.3: Run validation suite
   - `pnpm validate:schemas` to verify all manifests still valid
   - Manual smoke test of the full pipeline:
     brainstorm -> plan -> work -> smart-submit -> review:pr

@@ -127,7 +127,7 @@ Three-layer config system:
 
 ### Phase 1: Config Schema and Resolution Library
 
-- [ ] 1.1: Create `plugins/yellow-ci/schemas/runner-targets.schema.json`
+- [x] 1.1: Create `plugins/yellow-ci/schemas/runner-targets.schema.json`
   - JSON Schema defining: `schema` (integer, required), `runner_targets` (array),
     `routing_rules` (string array)
   - Runner target object: `name` (required, DNS-safe regex), `type` (enum:
@@ -153,7 +153,7 @@ Three-layer config system:
 > document but implementing validation via shell functions for runtime use.
 <!-- /deepen-plan -->
 
-- [ ] 1.2: Create `plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh`
+- [x] 1.2: Create `plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh`
   - Shell function `resolve_runner_targets()` that:
     1. Resolves global path: `${XDG_CONFIG_HOME:-$HOME/.config}/yellow-ci/runner-targets.yaml`
     2. Resolves local path: `.claude/yellow-ci-runner-targets.yaml`
@@ -188,7 +188,7 @@ Three-layer config system:
 > misparse. Document this format constraint in the schema.
 <!-- /deepen-plan -->
 
-- [ ] 1.3: Add validation functions to `plugins/yellow-ci/hooks/scripts/lib/validate.sh`
+- [x] 1.3: Add validation functions to `plugins/yellow-ci/hooks/scripts/lib/validate.sh`
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Pre-existing inconsistency found: `CLAUDE.md` and `/ci:setup`
@@ -209,7 +209,7 @@ Three-layer config system:
 
 ### Phase 2: Setup Command
 
-- [ ] 2.1: Create `plugins/yellow-ci/commands/ci/setup-runner-targets.md`
+- [x] 2.1: Create `plugins/yellow-ci/commands/ci/setup-runner-targets.md`
   - New command: `/ci:setup-runner-targets`
   - `allowed-tools`: Bash, Read, Write, AskUserQuestion
   - `model: sonnet`
@@ -314,7 +314,7 @@ Three-layer config system:
   - Ask next steps: `/ci:setup-self-hosted` (optimize runs-on assignments),
     `/ci:lint-workflows` (check workflows), `Done`
 
-- [ ] 2.2: Register command in `plugins/yellow-ci/.claude-plugin/plugin.json`
+- [x] 2.2: Register command in `plugins/yellow-ci/.claude-plugin/plugin.json`
   - No plugin.json changes needed — commands are auto-discovered from
     `commands/` directory
 
@@ -325,10 +325,10 @@ Three-layer config system:
 > require explicit `plugin.json` registration. No manifest changes needed.
 <!-- /deepen-plan -->
 
-- [ ] 2.3: Update `/ci:setup` (Step 7 report) to offer `/ci:setup-runner-targets`
+- [x] 2.3: Update `/ci:setup` (Step 7 report) to offer `/ci:setup-runner-targets`
   as a next-step option alongside `/ci:setup-self-hosted`
 
-- [ ] 2.4: Update `/ci:setup-self-hosted` to check for runner targets config
+- [x] 2.4: Update `/ci:setup-self-hosted` to check for runner targets config
   - At the start of Step 4 (before spawning runner-assignment agent): if
     runner targets config exists, include the merged config in the fenced
     inventory context passed to the agent
@@ -338,7 +338,7 @@ Three-layer config system:
 
 > **Note:** This phase is already implemented in `plugins/yellow-ci/hooks/scripts/session-start.sh` (routing_cache block, lines ~37-43).
 
-- [ ] 3.1: Update `plugins/yellow-ci/hooks/scripts/session-start.sh`
+- [x] 3.1: Update `plugins/yellow-ci/hooks/scripts/session-start.sh`
   - After the early-exit checks (lines 31-44) and before the cache check
     (line 46), add a routing summary read:
     ```bash
@@ -392,7 +392,7 @@ Three-layer config system:
 
 ### Phase 4: Runner-Assignment Agent Enhancement
 
-- [ ] 4.1: Update `plugins/yellow-ci/agents/ci/runner-assignment.md`
+- [x] 4.1: Update `plugins/yellow-ci/agents/ci/runner-assignment.md`
   - Add new Step 2b after "Parse Runner Inventory" (Step 2):
 
     **Step 2b: Load Runner Targets Config (Optional)**
@@ -466,7 +466,7 @@ Three-layer config system:
     Pools: ares (jit_ephemeral), atlas (jit_ephemeral), gh-vm (persistent)
     ```
 
-- [ ] 4.2: Update the `ci:setup-self-hosted` command to pass runner targets
+- [x] 4.2: Update the `ci:setup-self-hosted` command to pass runner targets
   - In Step 4, after building the fenced inventory JSON, check for merged
     runner targets:
     ```bash
@@ -488,7 +488,7 @@ Three-layer config system:
 
 ### Phase 5: Documentation and Integration
 
-- [ ] 5.1: Update `plugins/yellow-ci/CLAUDE.md`
+- [x] 5.1: Update `plugins/yellow-ci/CLAUDE.md`
   - Add `/ci:setup-runner-targets` to Commands section (9 total)
   - Add "Runner Targets Configuration" section under Configuration:
     ```
@@ -513,22 +513,22 @@ Three-layer config system:
     Resolution: local → global → merge by runner name → routing_rules replace wholesale.
     ```
 
-- [ ] 5.2: Update `plugins/yellow-ci/skills/ci-conventions/SKILL.md`
+- [x] 5.2: Update `plugins/yellow-ci/skills/ci-conventions/SKILL.md`
   - Add runner targets config schema documentation
   - Add resolution logic documentation
   - Add `preferred_selector` interaction with existing label-set logic
 
-- [ ] 5.3: Update `plugins/yellow-ci/README.md`
+- [x] 5.3: Update `plugins/yellow-ci/README.md`
   - Add `/ci:setup-runner-targets` to command list
   - Add runner targets configuration section
 
-- [ ] 5.4: Update `plugins/yellow-ci/skills/ci-conventions/references/linter-rules.md`
+- [x] 5.4: Update `plugins/yellow-ci/skills/ci-conventions/references/linter-rules.md`
   - Add note to W06 and W07 that runner targets config can enhance these rules
     (actual implementation deferred to follow-up)
 
 ### Phase 6: Quality
 
-- [ ] 6.1: Manual testing checklist
+- [x] 6.1: Manual testing checklist
   - Run `/ci:setup-runner-targets` with interactive wizard (create global config)
   - Run `/ci:setup-runner-targets` with import path (paste YAML block)
   - Run `/ci:setup-runner-targets` with API-seeded template
@@ -541,7 +541,7 @@ Three-layer config system:
   - Test validation: provide invalid YAML, invalid runner names, oversized
     file
 
-- [ ] 6.2: Changeset
+- [x] 6.2: Changeset
   - Run `pnpm changeset` — minor bump for yellow-ci (new command)
 
 ## Technical Specifications

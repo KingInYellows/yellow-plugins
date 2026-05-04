@@ -1,5 +1,7 @@
 # P3 Remediation: gt-setup AI Agent Wizard
 
+> **Status: Partially Implemented** — P3-2 shipped (`gt: BROKEN` text confirmed in `gt-setup.md`). P3-4 and P3-5 removals shipped (no `Retry failed settings` or 3-option `Show diff` flow remain). **Outstanding:** P3-1 (yq exit-code stderr warning across `smart-submit.md`/`gt-amend.md`/`gt-stack-plan.md`) — current code still uses bare `2>/dev/null || true`. Required changeset for the wizard PR was added separately during PR #228 cycle.
+
 ## Overview
 
 Address P3 review suggestions from the gt-setup wizard PR and add the required
@@ -16,17 +18,17 @@ changeset for CI. These are minor refinements — no new functionality.
   from the field being absent). Pattern: check yq exit code, warn if non-zero,
   then fall through to defaults. Keep `|| true` to avoid breaking the flow.
 
-- [ ] **P3-2: gt --version masks a broken binary.** In `gt-setup.md` Step 1,
+- [x] **P3-2: gt --version masks a broken binary.** In `gt-setup.md` Step 1,
   `gt --version 2>/dev/null` hides crash output. Capture the exit code: if
   non-zero AND output is empty, show `gt: BROKEN (exited with code N)` instead
   of `gt: ok (version unknown)`.
 
-- [ ] **P3-4: Remove retry-on-failure AskUserQuestion in Phase 2 Step 7.** The
+- [x] **P3-4: Remove retry-on-failure AskUserQuestion in Phase 2 Step 7.** The
   retry loop after `gt user` failures is over-engineered — users can re-run
   `/gt-setup`. Remove the AskUserQuestion with "Retry failed settings" option.
   Keep the per-command status summary (Applied/Failed/Skipped).
 
-- [ ] **P3-5: Remove "Show diff" branch in Phase 3 Step 9.** Simplify the
+- [x] **P3-5: Remove "Show diff" branch in Phase 3 Step 9.** Simplify the
   existing-file flow from 3 options (Update/Show diff/Skip) to 2 options
   (Update/Skip). The user can read the file separately.
 
@@ -43,7 +45,7 @@ changeset for CI. These are minor refinements — no new functionality.
 
 ### Required (1 item)
 
-- [ ] **Changeset: create `.changeset/gt-setup-ai-agent-wizard.md`.** CI blocks
+- [x] **Changeset: create `.changeset/gt-setup-ai-agent-wizard.md`.** CI blocks
   merge without it. Select `minor` for `gt-workflow` (new feature: wizard) and
   `patch` for `yellow-core` (setup:all classification tweak).
 

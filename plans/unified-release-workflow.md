@@ -1,5 +1,7 @@
 # Feature: Unified Release Workflow
 
+> **Status: Implemented (PR #160, merged)** — Single-workflow release pipeline shipped (`8edd8def`).
+
 ## Problem Statement
 
 The release pipeline uses two workflows connected by a tag-push handoff:
@@ -90,22 +92,22 @@ notification. Drop redundant full validation from the publish phase (keep only
 
 ### Pre-work: Unblock Current Release
 
-- [ ] 0.1: Enable "Allow GitHub Actions to create and approve pull requests"
+- [x] 0.1: Enable "Allow GitHub Actions to create and approve pull requests"
   in repo Settings > Actions > General > Workflow permissions
-- [ ] 0.2: Re-run failed workflow: `gh run rerun 22787746813 --failed`
-- [ ] 0.3: Merge the Version Packages PR once it's created
-- [ ] 0.4: Confirm `publish-release.yml` triggers and completes successfully
-- [ ] 0.5: Verify no stale `changeset-release/main` branch remains
+- [x] 0.2: Re-run failed workflow: `gh run rerun 22787746813 --failed`
+- [x] 0.3: Merge the Version Packages PR once it's created
+- [x] 0.4: Confirm `publish-release.yml` triggers and completes successfully
+- [x] 0.5: Verify no stale `changeset-release/main` branch remains
 
 ### Phase 1: Unified Workflow
 
-- [ ] 1.1: Add preflight job to `version-packages.yml`
+- [x] 1.1: Add preflight job to `version-packages.yml`
   - Test `GITHUB_TOKEN` PR creation permission via GitHub API
   - Fail fast with `::error::` annotation explaining the fix
   - Example: `gh api repos/$GITHUB_REPOSITORY/pulls --method HEAD` or check
     token permissions via response headers
 
-- [ ] 1.2: Add `workflow_dispatch` trigger to `version-packages.yml`
+- [x] 1.2: Add `workflow_dispatch` trigger to `version-packages.yml`
   - Optional `force_publish` boolean input (default false)
   - When true, skip phase detection and go straight to publish path
   - When false (or on push trigger), use `changesets/action` `published` output
@@ -119,7 +121,7 @@ notification. Drop redundant full validation from the publish phase (keep only
 > job output directly, avoiding the conditional complexity.
 <!-- /deepen-plan -->
 
-- [ ] 1.3: Add conditional publish jobs after the existing `changesets/action` step
+- [x] 1.3: Add conditional publish jobs after the existing `changesets/action` step
   - **`validate-release`** (if `published == true`): Run `pnpm validate:versions`
     only (sub-second, meaningful guard against version drift)
   - **`build-artifacts`** (needs validate-release): Generate release notes,
@@ -152,30 +154,30 @@ notification. Drop redundant full validation from the publish phase (keep only
 > (currently `@v4`).
 <!-- /deepen-plan -->
 
-- [ ] 1.4: Pin all third-party actions to commit SHAs
+- [x] 1.4: Pin all third-party actions to commit SHAs
   - `actions/checkout` — already pinned in version-packages.yml, carry over
   - `softprops/action-gh-release` — currently `@v1`, pin to SHA
   - `actions/upload-artifact`, `actions/download-artifact` — pin to SHA
   - `pnpm/action-setup`, `actions/setup-node` — pin to SHA
 
-- [ ] 1.5: Keep `cancel-in-progress: false`
+- [x] 1.5: Keep `cancel-in-progress: false`
   - Prevents partial PR state and mid-publish cancellation
   - At current merge frequency, queue buildup is not a concern
 
 ### Phase 2: Cleanup
 
-- [ ] 2.1: Delete `.github/workflows/publish-release.yml`
+- [x] 2.1: Delete `.github/workflows/publish-release.yml`
   - The unified workflow's `workflow_dispatch` with `force_publish` covers
     the manual-release-from-tag use case
   - Ship deletion in the same PR as the unified workflow (atomic cutover)
 
-- [ ] 2.2: Update `release-tags.sh` comments
+- [x] 2.2: Update `release-tags.sh` comments
   - Remove references to `publish-release.yml` being triggered
   - Update the `echo` on the final line that says "publish-release.yml will
     be triggered"
   - Keep all tag logic intact (per-plugin tags, catalog tag, duplicate guard)
 
-- [ ] 2.3: Update documentation
+- [x] 2.3: Update documentation
   - `.github/releases.md` — rewrite to reflect single-workflow architecture,
     add `workflow_dispatch` recovery procedure, fix stale Node 20 reference
   - `docs/operations/release-checklist.md` — update workflow references
@@ -193,11 +195,11 @@ notification. Drop redundant full validation from the publish phase (keep only
 
 ### Phase 3: Quality
 
-- [ ] 3.1: Test with `workflow_dispatch` after deployment
+- [x] 3.1: Test with `workflow_dispatch` after deployment
   - Trigger a manual run to verify Phase 1 (version PR) path works
   - Trigger with `force_publish: true` to verify Phase 2 (publish) path works
 
-- [ ] 3.2: Validate end-to-end on next real changeset
+- [x] 3.2: Validate end-to-end on next real changeset
   - Push a changeset to main, verify Version PR is created
   - Merge Version PR, verify tags + GitHub Release are created
 

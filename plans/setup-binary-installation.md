@@ -1,5 +1,7 @@
 # Feature: Setup Binary Auto-Installation
 
+> **Status: Implemented (PR #152, merged)** — Auto-install for semgrep CLI and ast-grep binary shipped (`1c183f35`).
+
 ## Problem Statement
 
 The plugin setup workflow (`semgrep:setup`, `research:setup`, `setup:all`)
@@ -102,7 +104,7 @@ free through delegation to the individual setup commands.
 
 ### Phase 1: Install Scripts
 
-- [ ] **1.1:** Create `plugins/yellow-semgrep/scripts/install-semgrep.sh`
+- [x] **1.1:** Create `plugins/yellow-semgrep/scripts/install-semgrep.sh`
 
   Follow ruvector `install.sh` conventions:
   - `set -Eeuo pipefail`
@@ -145,7 +147,7 @@ free through delegation to the individual setup commands.
   Then re-run /semgrep:setup
   ```
 
-- [ ] **1.2:** Create `plugins/yellow-research/scripts/install-ast-grep.sh`
+- [x] **1.2:** Create `plugins/yellow-research/scripts/install-ast-grep.sh`
 
   Same conventions as 1.1. Simpler logic since npm is always available:
 
@@ -190,7 +192,7 @@ free through delegation to the individual setup commands.
 
 ### Phase 2: Setup Command Integration
 
-- [ ] **2.1:** Modify `plugins/yellow-semgrep/commands/semgrep/setup.md`
+- [x] **2.1:** Modify `plugins/yellow-semgrep/commands/semgrep/setup.md`
 
   Add a new **Step 0: Install semgrep CLI** before the existing Step 1.
 
@@ -221,7 +223,7 @@ free through delegation to the individual setup commands.
 > Suggested pattern: separate the loop into two checks, or use a flag variable.
 <!-- /deepen-plan -->
 
-- [ ] **2.2:** Modify `plugins/yellow-research/commands/research/setup.md`
+- [x] **2.2:** Modify `plugins/yellow-research/commands/research/setup.md`
 
   Add a new **Step 0: Install ast-grep** before the existing Step 1.
 
@@ -240,19 +242,19 @@ free through delegation to the individual setup commands.
 
 ### Phase 3: Validation and Documentation
 
-- [ ] **3.1:** Update `plugins/yellow-semgrep/CLAUDE.md`
+- [x] **3.1:** Update `plugins/yellow-semgrep/CLAUDE.md`
 
   Add note under "Required CLI Tools" that `/semgrep:setup` now offers to
   install the semgrep CLI if missing.
 
-- [ ] **3.2:** Update `plugins/yellow-research/CLAUDE.md`
+- [x] **3.2:** Update `plugins/yellow-research/CLAUDE.md`
 
   Add note under "Prerequisites" that `/research:setup` now offers to install
   `ast-grep` if missing.
 
-- [ ] **3.3:** Run `pnpm validate:schemas` to verify no frontmatter regressions
+- [x] **3.3:** Run `pnpm validate:schemas` to verify no frontmatter regressions
 
-- [ ] **3.4:** Manual test matrix
+- [x] **3.4:** Manual test matrix
 
   Test each entry point with binary present and absent:
 
@@ -318,14 +320,14 @@ free through delegation to the individual setup commands.
 
 ## Acceptance Criteria
 
-- [ ] Running `/semgrep:setup` when semgrep is missing prompts to install
-- [ ] Running `/research:setup` when ast-grep is missing prompts to install
-- [ ] Declining install shows manual instructions and setup continues
-- [ ] Accepting install runs the correct package manager and verifies
-- [ ] `/setup:all` triggers install prompts during delegated setup (no double-prompt)
-- [ ] Both scripts are idempotent (no-op when binary already present)
-- [ ] Failed installs warn and continue (never block the setup flow)
-- [ ] `pnpm validate:schemas` passes
+- [x] Running `/semgrep:setup` when semgrep is missing prompts to install
+- [x] Running `/research:setup` when ast-grep is missing prompts to install
+- [x] Declining install shows manual instructions and setup continues
+- [x] Accepting install runs the correct package manager and verifies
+- [x] `/setup:all` triggers install prompts during delegated setup (no double-prompt)
+- [x] Both scripts are idempotent (no-op when binary already present)
+- [x] Failed installs warn and continue (never block the setup flow)
+- [x] `pnpm validate:schemas` passes
 
 ## References
 

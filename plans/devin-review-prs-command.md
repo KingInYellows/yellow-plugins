@@ -1,5 +1,7 @@
 # Feature: `/devin:review-prs` Command
 
+> **Status: Implemented (PR #200, merged)** — Command shipped at `plugins/yellow-devin/commands/devin/review-prs.md`. v2 open questions remain deferred per Open Questions section.
+
 ## Problem Statement
 
 When Devin works on tasks in a repository, it creates PRs that need human
@@ -56,22 +58,22 @@ A new `/devin:review-prs` composition command in yellow-devin that:
 
 ### Phase 1: Command File
 
-- [ ] 1.1: Create command at
+- [x] 1.1: Create command at
   `plugins/yellow-devin/commands/devin/review-prs.md`
-- [ ] 1.2: Define frontmatter with correct `allowed-tools` list
-- [ ] 1.3: Write workflow steps (detailed below)
+- [x] 1.2: Define frontmatter with correct `allowed-tools` list
+- [x] 1.3: Write workflow steps (detailed below)
 
 ### Phase 2: Documentation Updates
 
-- [ ] 2.1: Update `plugins/yellow-devin/CLAUDE.md` — add command to list
+- [x] 2.1: Update `plugins/yellow-devin/CLAUDE.md` — add command to list
   (Commands 8 → 9), add to "When to Use What" table
-- [ ] 2.2: Update `plugins/yellow-devin/commands/devin/README.md` — add row to
+- [x] 2.2: Update `plugins/yellow-devin/commands/devin/README.md` — add row to
   command table
 
 ### Phase 3: Validation and Changeset
 
-- [ ] 3.1: Run `pnpm validate:schemas` to verify command passes validation
-- [ ] 3.2: Run `pnpm changeset` — minor bump for yellow-devin (new command)
+- [x] 3.1: Run `pnpm validate:schemas` to verify command passes validation
+- [x] 3.2: Run `pnpm changeset` — minor bump for yellow-devin (new command)
 
 ## Technical Specifications
 
