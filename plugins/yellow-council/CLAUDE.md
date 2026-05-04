@@ -142,12 +142,12 @@ Codex agent.)
   per session to refresh auth state before invoking `/council`. If the hang
   persists, the gemini-reviewer agent's timeout (default 600s) will catch it
   and report TIMEOUT — council still produces a partial-result report.
-- **OpenCode major-version upgrades trigger a one-time SQLite migration**
+- **OpenCode large minor-version jumps trigger a one-time SQLite migration**
   (2–5 minutes). After running `opencode upgrade` from v1.1.x to v1.14+, the
   next `opencode run` invocation performs a database migration that may
-  exceed the council's `COUNCIL_TIMEOUT` (default 600s). Run `opencode run
-  "test"` once interactively after each major upgrade before relying on the
-  agent for time-bounded invocations.
+  exceed the council's `COUNCIL_TIMEOUT` (default 600s). Run
+  `opencode run "test"` once interactively after each upgrade before relying
+  on the agent for time-bounded invocations.
 - **Single-shot V1.** No multi-round iterative review. V2 will add `--round 2`
   for follow-up consultations and `/council fleet *` subcommands for persistent
   session management.

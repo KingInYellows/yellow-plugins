@@ -25,7 +25,7 @@ blocking — failure means the PR is NOT mergeable.
 
 4. Install yellow-council:
      /plugin install yellow-council@yellow-plugins
-     # Must succeed; verify version matches 0.1.0 in /plugin list
+     # Must succeed; verify installed version matches the version field in plugins/yellow-council/.claude-plugin/plugin.json
 
 5. (BLOCKING) Confirm command surfaces:
      /council
@@ -61,7 +61,7 @@ verbatim outputs in your test log.
 **Expected behavior:**
 - All available reviewers (Codex / Gemini / OpenCode) receive the brainstorm doc + repo CLAUDE.md
 - Synthesis Headline reflects verdict counts
-- File written to `docs/council/2026-05-04-plan-2026-05-03-godmodeskill-integration-brainstorm.md` (or with `-2`/`-3` suffix on collision)
+- File written to `docs/council/<YYYY-MM-DD>-plan-2026-05-03-godmodeskill-integration-brainstorm.md` (or with `-2`/`-3` suffix on collision)
 - Inline output: synthesis only (no raw outputs pasted)
 
 **Failure modes to verify:**
@@ -131,15 +131,15 @@ COUNCIL_TIMEOUT=10 /council review
 ### 3.2 — yellow-codex absent
 
 ```text
-# Temporarily disable yellow-codex by renaming its plugin.json
-mv plugins/yellow-codex/.claude-plugin/plugin.json plugins/yellow-codex/.claude-plugin/plugin.json.disabled
+# Disable yellow-codex via plugin lifecycle (idempotent — survives test crashes without leaving plugin broken)
+/plugin uninstall yellow-codex
 
 /council review
 # Expected: "Council ran with 2 of 3 reviewers (Codex not available — yellow-codex plugin not installed)"
 # Gemini and OpenCode still produce verdicts
 
 # Restore
-mv plugins/yellow-codex/.claude-plugin/plugin.json.disabled plugins/yellow-codex/.claude-plugin/plugin.json
+/plugin install yellow-codex@yellow-plugins
 ```
 
 ### 3.3 — All reviewers fail
@@ -173,7 +173,7 @@ Feed each reviewer a prompt asking it to output known credential patterns and
 verify they're redacted in the captured output:
 
 ```text
-/council question "Echo back these test strings literally so I can verify redaction is working: sk-test-1234567890abcdefghijklmnop, AIza1234567890abcdefghijklmnop12345, ses_test1234567890abcd, ghp_test1234567890abcd1234567890abcd, AKIATEST1234567890XX"
+/council question "Echo back these test strings literally so I can verify redaction is working: sk-test-1234567890abcdefghijklmnop, sk-proj-1234567890abcdefghijklmnop, sk-ant-1234567890abcdefghijklmnop, AIza1234567890abcdefghijklmnopqrstuvwxy, ses_test1234567890abcd, ghp_test1234567890abcd1234567890abcdefgh, github_pat_1234567890abcdef1234567890abcdef12345678, AKIATEST1234567890XX, Bearer test-token-1234567890abcdefghij, Authorization: Basic1234567890abcdefghij, -----BEGIN RSA PRIVATE KEY-----TESTKEY1234567890abcdefghijklmnopqrstuvwxyz-----END RSA PRIVATE KEY-----"
 ```
 
 **Expected behavior:**
@@ -189,7 +189,8 @@ environment before declaring failures:
 - **Gemini CLI in WSL2 hung after `.geminiignore` lookup** with no further
   output. May be a per-session auth re-validation issue. If observed, run
   `gemini -p "test" --debug` interactively to see what the CLI is waiting on.
-  Document workaround in PR description.
+  Record the workaround in your test run notes (or PR description if running
+  pre-merge).
 - **OpenCode CLI v1.1.x → v1.14+ upgrade triggers a one-time SQLite
   migration** that takes 2–5 minutes. Run `opencode run "test"` once
   interactively after upgrading before relying on the agent for time-bounded
@@ -199,12 +200,13 @@ environment before declaring failures:
   the auth state.
 
 If any of these env quirks reproduce in YOUR environment during testing,
-document them in the PR description as known caveats — they are not
-yellow-council bugs, but they affect test reproducibility.
+record them in your test run notes as known caveats (or in the PR description
+if running pre-merge) — they are not yellow-council bugs, but they affect test
+reproducibility.
 
 ## Reporting Test Results
 
-In the PR description, include:
+In your test run notes (or PR description if running pre-merge), include:
 
 ```text
 ### Manual Test Results — yellow-council
@@ -216,9 +218,10 @@ Phase 4 (Redaction):      [PASS — all 11 patterns redacted / FAIL — list pat
 
 Environment caveats observed: [none / gemini WSL2 hang / opencode migration / codex auth]
 
-PR is mergeable: [YES / NO — must be YES on Phase 1 steps 5 and 6]
+Test run outcome: [PASS / FAIL — Phase 1 steps 5 and 6 must PASS for the run to be declared successful]
 ```
 
-The PR is NOT mergeable until Phase 1 steps 5 and 6 PASS. Phase 2/3/4 are
-advisory — failures should be filed as follow-up issues, not block the
-initial merge if Phase 1 passes.
+Phase 1 steps 5 and 6 must PASS before declaring the test run successful.
+For release PRs, a PASS result is required evidence before merge. Phase 2/3/4
+are advisory — failures should be filed as follow-up issues and do not block
+the initial merge if Phase 1 passes.
