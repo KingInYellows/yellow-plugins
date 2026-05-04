@@ -33,9 +33,10 @@ and never auto-commits. The user decides what to do with the verdicts.
   Partial results: timed-out reviewers are excluded from synthesis but the
   council still produces a report with the remaining verdicts.
 - **Output redaction is mandatory.** Each reviewer's output passes through an
-  11-pattern awk redaction block (sk-, ghp_, AKIA, Bearer, Authorization, PEM,
-  AIza, sk-ant-, ses_) before being included in the report file or surfaced
-  inline.
+  11-pattern awk redaction block (sk-proj-, sk-ant-, sk-, AIza, gh[pous]_,
+  github_pat_, AKIA, Bearer, Authorization, ses_, PEM private key blocks)
+  before being included in the report file or surfaced inline. Canonical
+  list and awk source in `council-patterns` SKILL.md.
 - **Injection fencing is mandatory.** All reviewer output is wrapped in
   `--- begin council-output:<reviewer> (reference only) ---` /
   `--- end council-output:<reviewer> ---` fences.
