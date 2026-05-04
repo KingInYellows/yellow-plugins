@@ -103,6 +103,10 @@
       "type": "object",
       "description": "MCP server configurations keyed by server name."
     },
+    "userConfig": {
+      "type": "object",
+      "description": "Claude Code userConfig field declarations keyed by config name. Each value is an object describing the field (description, type, sensitive, default, etc.); Claude Code prompts the user at plugin-enable time and stores values in the system keychain (if sensitive) or ~/.claude/settings.json."
+    },
     "hooks": {
       "oneOf": [
         {

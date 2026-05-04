@@ -19,9 +19,9 @@
 
 'use strict';
 
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
 
 // Allowlist for npm package names: scope + name chars per npm-name-validator,
 // length capped at the registry's documented 214-char limit.
