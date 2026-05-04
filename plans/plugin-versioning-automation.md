@@ -1,6 +1,10 @@
 # Feature: Plugin Versioning Automation
 
-> **Status: Implemented** — Unified `version-packages.yml` workflow shipped (later refactored into single-workflow release pipeline via PR #160). Three-way sync via `scripts/sync-manifests.js`, catalog versioning via `scripts/catalog-version.js`, `validate-versions.js` for CI.
+> **Status: Implemented (PR `#118`, merged)** — Unified `version-packages.yml`
+> workflow shipped via PR #118 (`feat(versioning): automate plugin version bump
+> pipeline`), later refactored into the single-workflow release pipeline via
+> PR #160. Three-way sync via `scripts/sync-manifests.js`, catalog versioning
+> via `scripts/catalog-version.js`, `validate-versions.js` for CI.
 
 ## Overview
 
