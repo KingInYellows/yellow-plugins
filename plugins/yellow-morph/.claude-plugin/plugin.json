@@ -1,6 +1,6 @@
 {
   "name": "yellow-morph",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
   "author": {
     "name": "KingInYellows",
@@ -9,7 +9,13 @@
   "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-morph",
   "repository": "https://github.com/KingInYellows/yellow-plugins",
   "license": "MIT",
-  "keywords": ["code-editing", "code-search", "fast-apply", "warpgrep", "morph"],
+  "keywords": [
+    "code-editing",
+    "code-search",
+    "fast-apply",
+    "warpgrep",
+    "morph"
+  ],
   "userConfig": {
     "morph_api_key": {
       "description": "Morph API key (get one at https://morphllm.com — free tier 250K credits/month). Stored in system keychain or ~/.claude/.credentials.json.",
