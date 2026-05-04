@@ -654,8 +654,11 @@ Follow yellow-devin's pattern exactly:
    strings — always use `jq --arg` / `jq --argjson`
 5. **No curl -v or --trace:** Would leak Authorization headers
 6. **Metrics off:** Pass `--metrics off` to all `semgrep scan` invocations
-7. **`semgrep_whoami` limitation:** Does NOT work with API tokens (`sgp_`
-   prefix). Use REST `GET /api/v1/me` exclusively for token validation.
+7. **Token validation uses REST `GET /api/v1/me`:** The built-in `semgrep mcp`
+   server (v1.146.0+) does not expose a `whoami` tool, so REST is the only
+   path for token validation. Historically, the standalone `semgrep-mcp`
+   package's `semgrep_whoami` tool worked only with OAuth JWTs (not `sgp_`
+   API tokens), which is why REST was already the correct choice.
 8. **MCP tool name verification:** Must verify tool names empirically with
    ToolSearch after install — do not hardcode assumed names
 
