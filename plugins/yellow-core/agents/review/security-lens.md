@@ -7,6 +7,10 @@ tools:
   - Read
   - Grep
   - Glob
+disallowedTools:
+  - Write
+  - Edit
+  - MultiEdit
 ---
 
 You are a security architect evaluating whether a planning document accounts

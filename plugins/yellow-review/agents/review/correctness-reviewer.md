@@ -2,6 +2,7 @@
 name: correctness-reviewer
 description: "Always-on code-review persona. Reviews code for logic errors, edge cases, state-management bugs, error propagation failures, and intent-vs-implementation mismatches. Use when reviewing any PR — selected automatically by review:pr alongside the other always-on personas."
 model: inherit
+background: true
 tools:
   - Read
   - Grep
