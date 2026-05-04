@@ -30,11 +30,16 @@ and atomic file write conventions.
 
 ## Workflow
 
+> **Subshell isolation:** Each `bash` block below runs as a fresh subprocess.
+> Variables, functions, and `cd` do not persist across blocks. Each block that
+> needs `GIT_ROOT`, `MODE`, or `REST` re-derives those values from
+> `$CLAUDE_PROJECT_DIR` / `$ARGUMENTS` / git at the top of that block.
+
 ### Step 1: Pre-flight prerequisites
 
 ```bash
 # Required system tools
-for tool in bash timeout jq mktemp awk sed grep; do
+for tool in bash git timeout jq mktemp awk sed grep; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf '[council] Error: required tool "%s" not found\n' "$tool" >&2
     exit 1
@@ -108,7 +113,16 @@ For each mode:
 - Pack: `## Task: plan` + `### Planning Document` + content + `### Repo Conventions` + truncated CLAUDE.md (first 4K chars).
 
 **`review` mode:** Optional `--base <ref>` flag.
-- Default `BASE_REF`: `git merge-base HEAD "origin/$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null | sed 's|.*/||' || echo 'main')"`
+- Default `BASE_REF`:
+  ```bash
+  UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)
+  if [ -n "$UPSTREAM" ]; then
+    BASE_BRANCH=$(printf '%s\n' "$UPSTREAM" | sed 's|.*/||')
+  else
+    BASE_BRANCH="main"
+  fi
+  BASE_REF=$(git merge-base HEAD "origin/${BASE_BRANCH}")
+  ```
 - Get diff: `git diff "${BASE_REF}...HEAD"`
 - If diff exceeds 200K bytes: apply truncation algorithm (see skill — `git diff --stat` + first 200 lines + marker).
 - Per changed file: `git diff --name-only "${BASE_REF}...HEAD"` then read each file capped at 4K chars.
@@ -240,6 +254,12 @@ Construct the synthesis report as a single markdown string (`SYNTHESIS_MD`).
 Use the skill's `build_slug` and `build_target_path` helpers:
 
 ```bash
+# Re-derive state — each bash block runs in a fresh subprocess
+MODE=$(printf '%s' "$ARGUMENTS" | awk '{print $1}')
+REST=$(printf '%s' "$ARGUMENTS" | sed -E 's/^[^ ]+ *//')
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Error: not in a git repository\n' >&2; exit 1; }
+cd "$GIT_ROOT"
+
 # For plan mode with a file path: use filename stem
 # For other modes / text input: use first N words of input
 case "$MODE" in
@@ -260,10 +280,11 @@ esac
 
 SLUG=$(build_slug "$SLUG_BASE")
 REPORT_PATH=$(build_target_path "$MODE" "$SLUG") || exit 1
+REPORT_PATH_ABS="${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}"
 
 # Ensure docs/council/ directory exists
-mkdir -p "$(dirname "$REPORT_PATH")" || {
-  printf '[council] Error: cannot create %s\n' "$(dirname "$REPORT_PATH")" >&2
+mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
+  printf '[council] Error: cannot create %s\n' "$(dirname "$REPORT_PATH_ABS")" >&2
   exit 1
 }
 ```
@@ -299,13 +320,13 @@ done
 Per MEMORY.md "M3 before bulk writes — no threshold," every file write must
 be gated by AskUserQuestion. Show the user:
 
-- Resolved `$REPORT_PATH`
+- Resolved `$REPORT_PATH` (repo-relative path shown to user)
 - Headline summary (one line)
 - Two-line synthesis preview
 
 Use `AskUserQuestion` with these options:
 
-> "Save council report to `<REPORT_PATH>`?"
+> "Save council report to `<REPORT_PATH>`?" (show repo-relative path)
 >
 > Options:
 > - "Save report (Recommended)" — write the file and proceed
@@ -331,7 +352,7 @@ brainstorm-orchestrator pattern):
 
 ```text
 Use the Write tool with:
-  file_path = $REPORT_PATH (absolute path)
+  file_path = $REPORT_PATH_ABS  (absolute path: "${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}")
   content = $REPORT_CONTENT
 ```
 
@@ -341,8 +362,8 @@ file). No mktemp + mv staging; no `.gitignore` additions needed.
 After the Write tool succeeds, verify:
 
 ```bash
-if [ ! -f "$REPORT_PATH" ]; then
-  printf '[council] Error: file write reported success but file not found at %s\n' "$REPORT_PATH" >&2
+if [ ! -f "$REPORT_PATH_ABS" ]; then
+  printf '[council] Error: file write reported success but file not found at %s\n' "$REPORT_PATH_ABS" >&2
   exit 1
 fi
 
