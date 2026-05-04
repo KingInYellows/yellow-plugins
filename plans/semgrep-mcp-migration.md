@@ -2,10 +2,14 @@
 
 > **Status**: ✅ Complete. All phases shipped. Runtime tool name verification
 > against semgrep v1.154.0 confirmed 7 of 8 expected tools match; the
-> built-in MCP server does not expose `semgrep_whoami`, so it has been
-> removed from the expected tool list in `setup.md`, `CLAUDE.md`, and
-> `README.md` (token validation uses REST `GET /api/v1/me`, which already
-> handled this case).
+> built-in MCP server does not expose `semgrep_whoami`. The expected tool
+> list (which only existed in `setup.md` Step 5 and `CLAUDE.md`'s
+> "Provides:" bullet) has been pruned to 7 tools. `README.md` and
+> `CLAUDE.md` "Known Limitations" entries that referenced the now-absent
+> `whoami` tool were rewritten to point to REST `GET /api/v1/me`, which
+> already handled token validation. Note: `plans/yellow-semgrep-plugin.md`
+> contains a sibling stale `semgrep_whoami` reference (line 657) — left
+> for cleanup in the parent plan-status-updates PR.
 
 ## Problem Statement
 
