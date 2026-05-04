@@ -1,5 +1,11 @@
 ## What We're Building
 
+> **Historical record (2026-05-04).** This document is the pre-verification
+> audit of the `semgrep-mcp-migration` plan. The runtime verification step
+> (Phase 1.2) has since been completed — see the same PR that introduces
+> this doc for the closing changes. The "1 item genuinely remaining"
+> framing below describes state at audit time, not current state.
+
 A completion audit for the `semgrep-mcp-migration` plan. The migration replaced
 the deprecated `uvx semgrep-mcp` standalone package with the built-in
 `semgrep mcp` subcommand (available in semgrep v1.146.0+). This document
@@ -26,7 +32,10 @@ The plan requires: install semgrep >= 1.146.0 locally, run `semgrep mcp`, and
 confirm that the 8 tool names exposed by the built-in MCP server match the
 names referenced throughout the plugin.
 
-Expected tool names currently hard-coded in commands, agents, and setup.md:
+Expected tool names hard-coded in `setup.md` Step 5 (the only file that
+listed all 8 by name; `CLAUDE.md` listed them in its "Provides:" bullet,
+but `commands/` and `agents/` reference individual tools by their MCP
+prefix at point-of-use rather than via a central list):
 
 - `semgrep_scan`
 - `semgrep_findings`

@@ -129,8 +129,8 @@ Layer 3: LIFECYCLE (write state)  → REST API for triage mutations
 - **REST API rate limit** — ~60 requests/minute; batch operations add 1s delays
 - **Token validation uses REST `GET /api/v1/me`** — the built-in MCP server
   does not expose a `whoami` tool; REST is authoritative for token status
-- **MCP tool names must be verified** — actual names may differ from expected;
-  `/semgrep:setup` verifies them via ToolSearch
+- **MCP tool names verified against semgrep v1.154.0** — 7 tools confirmed
+  match expected; `/semgrep:setup` re-verifies at install time via ToolSearch
 - **No webhook/push support** — finding status is polled, not pushed
 - **Pagination limit** — REST API defaults to `page_size=100`; large finding
   sets require multiple requests
