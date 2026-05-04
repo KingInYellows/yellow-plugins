@@ -1,0 +1,31 @@
+name: Lint Plugins
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/**'
+      - 'scripts/lint-plugins.sh'
+      - '.github/workflows/lint-plugins.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/**'
+      - 'scripts/lint-plugins.sh'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-plugins-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Run plugin frontmatter and convention lint
+        run: bash scripts/lint-plugins.sh
