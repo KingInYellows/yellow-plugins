@@ -1,6 +1,6 @@
 {
   "name": "yellow-research",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Deep research plugin with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
   "author": {
     "name": "KingInYellows",
