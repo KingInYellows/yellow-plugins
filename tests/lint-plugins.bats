@@ -21,7 +21,9 @@ setup() {
 }
 
 teardown() {
-  rm -rf "$TEST_TMP"
+  # TEST_TMP may be unset if `setup` skipped before mktemp; guard the rm so
+  # it does not silently expand to `rm -rf ""`.
+  [ -n "${TEST_TMP:-}" ] && rm -rf "$TEST_TMP"
 }
 
 # Helper: build a git-initialized fixture tree under $TEST_TMP/<subdir>
@@ -37,7 +39,10 @@ run_lint_in_fixture() {
       && git add . \
       && git commit -q -m init >/dev/null )
   cd "$TEST_TMP/$subdir"
-  run bash "$LINT_SCRIPT"
+  # bats-core >= 1.5.0 captures only stdout in $output; lint-plugins.sh writes
+  # findings to stderr via err()/warn(). Merge streams so $output assertions
+  # see the actual error/warning text.
+  run bash "$LINT_SCRIPT" 2>&1
   cd "$ROOT"
 }
 
@@ -124,7 +129,8 @@ run_lint_in_fixture() {
       && git add . \
       && git commit -q -m init >/dev/null )
   cd "$TEST_TMP/clean"
-  run bash "$LINT_SCRIPT"
+  # Merge stderr into $output (see run_lint_in_fixture for rationale).
+  run bash "$LINT_SCRIPT" 2>&1
   cd "$ROOT"
   [ "$status" -eq 0 ]
   [[ "$output" != *"ERROR"* ]]
