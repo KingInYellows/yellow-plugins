@@ -517,8 +517,8 @@ in sync with Step 6 sub-step 0 below — adding a Wave-2 conditional
 reviewer that emits prose without listing it in both places means its
 findings are dropped as malformed.
 
-Wait for all dispatched agents. Log any failed agents with error reason.
-If zero agents succeed, abort with error.
+If zero agents succeed (every dispatched Task returned a failure status
+or no result file), abort with error before Step 6.
 
 ### Step 6: Aggregate findings (confidence-rubric pipeline)
 
