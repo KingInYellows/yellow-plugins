@@ -48,7 +48,7 @@ run_lint_in_fixture() {
   # bats-core >= 1.5.0 captures only stdout in $output; lint-plugins.sh writes
   # findings to stderr via err()/warn(). Merge streams so $output assertions
   # see the actual error/warning text.
-  run bash "$LINT_SCRIPT" 2>&1
+  run env -u GITHUB_ACTIONS bash "$LINT_SCRIPT" 2>&1
   cd "$ROOT"
 }
 
@@ -136,7 +136,7 @@ run_lint_in_fixture() {
       && git commit -q -m init >/dev/null )
   cd "$TEST_TMP/clean"
   # Merge stderr into $output (see run_lint_in_fixture for rationale).
-  run bash "$LINT_SCRIPT" 2>&1
+  run env -u GITHUB_ACTIONS bash "$LINT_SCRIPT" 2>&1
   cd "$ROOT"
   [ "$status" -eq 0 ]
   [[ "$output" != *"ERROR"* ]]
