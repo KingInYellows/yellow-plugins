@@ -772,5 +772,5 @@ The brainstorm listed 7 open questions. Research outcomes:
 
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. agent/feat/yellow-council-scaffold-and-spikes (PR #328, completed 2026-05-04)
-- [ ] 2. agent/feat/yellow-council-core-implementation
-- [ ] 3. agent/feat/yellow-council-polish-and-tests
+- [x] 2. agent/feat/yellow-council-core-implementation (PR #329, completed 2026-05-04)
+- [x] 3. agent/feat/yellow-council-polish-and-tests (PR #TBD, completed 2026-05-04)
