@@ -1,6 +1,8 @@
 # Feature: Improve gt-setup with AI Agent Configuration Wizard
 
-> **Status: Implemented (PR #228, merged)** — gt-setup wizard shipped (`b9c6e5bf`). Non-interactive (CI) execution remains explicitly out of scope per Edge Cases.
+> **Status: Implemented (PR #228, merged)** — gt-setup wizard shipped
+> (`b9c6e5bf`). Non-interactive (CI) execution remains explicitly out of
+> scope per Edge Cases.
 
 ## Problem Statement
 

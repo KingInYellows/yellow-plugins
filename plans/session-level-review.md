@@ -1,6 +1,7 @@
 # Feature: Session-Level Review for workflows:review
 
-> **Status: Implemented (PR #230, merged)** — `/workflows:review` shipped at `plugins/yellow-core/commands/workflows/review.md`.
+> **Status: Implemented (PR #230, merged)** — `/workflows:review` shipped
+> at `plugins/yellow-core/commands/workflows/review.md`.
 
 ## Overview
 

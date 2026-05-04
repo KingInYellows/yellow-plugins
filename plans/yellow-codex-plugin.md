@@ -1,6 +1,9 @@
 # Feature: yellow-codex Plugin — OpenAI Codex CLI Wrapper
 
-> **Status: Implemented (PR #239, merged)** — Plugin shipped at `plugins/yellow-codex/`. Subsequent fixes: PEM-block redaction (`723b777d`), bot review comments (`a674bf2e`), `background: true` frontmatter (`525ccf12`).
+> **Status: Implemented (PR #239, merged)** — Plugin shipped at
+> `plugins/yellow-codex/`. Subsequent fixes: PEM-block redaction
+> (`723b777d`), bot review comments (`a674bf2e`), `background: true`
+> frontmatter (`525ccf12`).
 
 ## Problem Statement
 

@@ -1,6 +1,10 @@
 # Feature: yellow-morph Plugin — Morph Fast Apply and WarpGrep Integration
 
-> **Status: Implemented (PR #115, merged)** — Plugin shipped at `plugins/yellow-morph/`. Subsequent hardening: SessionStart hook + npx fix (`5ed0fa49`), userConfig migration (`46e02ebb`), dual-bootstrap + diagnostics (`7fc202d6`), security review (`b97b2470`), `npm ci` consistency (`504f5fc8`). v2 considerations remain deferred.
+> **Status: Implemented (PR #115, merged)** — Plugin shipped at
+> `plugins/yellow-morph/`. Subsequent hardening: SessionStart hook + npx fix
+> (`5ed0fa49`), userConfig migration (`46e02ebb`), dual-bootstrap +
+> diagnostics (`7fc202d6`), security review (`b97b2470`), `npm ci`
+> consistency (`504f5fc8`). v2 considerations remain deferred.
 
 ## Overview
 

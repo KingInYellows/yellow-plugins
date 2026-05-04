@@ -1,6 +1,8 @@
 # Feature: MCP Health Checks in /research:setup + /workflows:deepen-plan
 
-> **Status: Implemented (PR #107, merged)** — `/research:setup` enhancements + `/workflows:deepen-plan` command shipped (`dee1a4a2`). Follow-up review fixes: `2373f303`.
+> **Status: Implemented (PR #107, merged)** — `/research:setup`
+> enhancements + `/workflows:deepen-plan` command shipped (`dee1a4a2`).
+> Follow-up review fixes: `2373f303`.
 
 ## Problem Statement
 

@@ -1,6 +1,12 @@
 # P3 Remediation: gt-setup AI Agent Wizard
 
-> **Status: Partially Implemented** — P3-2 shipped (`gt: BROKEN` text confirmed in `gt-setup.md`). P3-4 and P3-5 removals shipped (no `Retry failed settings` or 3-option `Show diff` flow remain). **Outstanding:** P3-1 (yq exit-code stderr warning across `smart-submit.md`/`gt-amend.md`/`gt-stack-plan.md`) — current code still uses bare `2>/dev/null || true`. Required changeset for the wizard PR was added separately during PR #228 cycle.
+> **Status: Partially Implemented** — P3-2 shipped (`gt: BROKEN` text
+> confirmed in `gt-setup.md`). P3-4 and P3-5 removals shipped (no `Retry
+> failed settings` or 3-option `Show diff` flow remain). **Outstanding:**
+> P3-1 (yq exit-code stderr warning across
+> `smart-submit.md`/`gt-amend.md`/`gt-stack-plan.md`) — current code still
+> uses bare `2>/dev/null || true`. Required changeset for the wizard PR
+> was added separately during PR #228 cycle.
 
 ## Overview
 

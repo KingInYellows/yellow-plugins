@@ -1,6 +1,8 @@
 # Feature: `/devin:review-prs` Command
 
-> **Status: Implemented (PR #200, merged)** — Command shipped at `plugins/yellow-devin/commands/devin/review-prs.md`. v2 open questions remain deferred per Open Questions section.
+> **Status: Implemented (PR #200, merged)** — Command shipped at
+> `plugins/yellow-devin/commands/devin/review-prs.md`. v2 open questions
+> remain deferred per Open Questions section.
 
 ## Problem Statement
 

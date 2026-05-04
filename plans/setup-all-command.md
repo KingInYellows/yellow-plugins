@@ -1,6 +1,8 @@
 # Feature: `setup:all` — Unified Plugin Setup Orchestrator
 
-> **Status: Implemented (PR #130, merged)** — Retained for historical context. Subsequent refactor in commit `463e5916` split setup-all validation helpers.
+> **Status: Implemented (PR #130, merged)** — Retained for historical
+> context. Subsequent refactor in commit `463e5916` split setup-all
+> validation helpers.
 
 ## Problem Statement
 

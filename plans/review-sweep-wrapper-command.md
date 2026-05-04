@@ -1,6 +1,8 @@
 # Feature: `/review:sweep` — Wrapper Command Chaining `/review:pr` → `/review:resolve`
 
-> **Status: Implemented (PR #304, merged)** — Command shipped at `plugins/yellow-review/commands/review/sweep.md`. Subsequent hardening: rounds 2+3+bot threads (`459a43d5`).
+> **Status: Implemented (PR #304, merged)** — Command shipped at
+> `plugins/yellow-review/commands/review/sweep.md`. Subsequent hardening:
+> rounds 2+3+bot threads (`459a43d5`).
 
 ## Problem Statement
 

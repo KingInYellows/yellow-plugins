@@ -1,6 +1,8 @@
 # Feature: Ceramic.ai as Default Research Backend
 
-> **Status: Implemented (PR #265, merged)** — Retained for historical context. Codebase line-number drift annotations below remain accurate to the post-merge `main`.
+> **Status: Implemented (PR #265, merged)** — Retained for historical
+> context. Codebase line-number drift annotations below remain accurate
+> to the post-merge `main`.
 
 ## Problem Statement
 

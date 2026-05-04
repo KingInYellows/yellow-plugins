@@ -1,6 +1,8 @@
 # Feature: `/statusline:setup` Command for Yellow Plugins
 
-> **Status: Implemented (PR #105, merged)** — Adaptive statusline command shipped (`84f1b801`). Upstream `statusLine` in plugin.json proposal remains out of scope.
+> **Status: Implemented (PR #105, merged)** — Adaptive statusline command
+> shipped (`84f1b801`). Upstream `statusLine` in plugin.json proposal
+> remains out of scope.
 
 ## Problem Statement
 

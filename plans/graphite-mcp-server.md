@@ -1,6 +1,8 @@
 # Feature: Bundle Graphite MCP Server in gt-workflow
 
-> **Status: Implemented (PR #154, merged)** — All 4 implementation steps shipped (`mcpServers.graphite` block, `/gt-setup` version check, CLAUDE.md MCP integration section, changeset).
+> **Status: Implemented (PR #154, merged)** — All 4 implementation steps
+> shipped (`mcpServers.graphite` block, `/gt-setup` version check,
+> CLAUDE.md MCP integration section, changeset).
 
 ## Overview
 
