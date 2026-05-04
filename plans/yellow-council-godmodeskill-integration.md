@@ -766,3 +766,10 @@ The brainstorm listed 7 open questions. Research outcomes:
 - **Scope:** plugins/yellow-council/commands/council/council.md (refinements), plugins/yellow-council/agents/review/*.md (refinements), plugins/yellow-council/skills/council-patterns/SKILL.md (refinements based on smoke tests), README.md (root — plugin count update), plugins/yellow-council/CLAUDE.md (Known Limitations expansion)
 - **Tasks:** 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10
 - **Depends on:** #2
+
+## Stack Progress
+
+<!-- Updated by workflows:work. Do not edit manually. -->
+- [x] 1. agent/feat/yellow-council-scaffold-and-spikes (PR #328, completed 2026-05-04)
+- [ ] 2. agent/feat/yellow-council-core-implementation
+- [ ] 3. agent/feat/yellow-council-polish-and-tests
