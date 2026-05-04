@@ -1,6 +1,9 @@
 # Feature: Fix Devin Message 403 + PR Comment Fallback
 
-> **Status: Implemented** — `Step 3b: Probe ManageOrgSessions` shipped in `plugins/yellow-devin/commands/devin/setup.md:136`. `gh pr comment` PR-comment fallback shipped in `message.md` and `review-prs.md`.
+> **Status: Implemented (PR #216, merged)** —
+> `Step 3b: Probe ManageOrgSessions` shipped in
+> `plugins/yellow-devin/commands/devin/setup.md:136`. `gh pr comment`
+> PR-comment fallback shipped in `message.md` and `review-prs.md`.
 
 ## Problem Statement
 

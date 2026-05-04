@@ -1,6 +1,9 @@
 # Feature: yellow-composio Plugin
 
-> **Status: Implemented (PR #237, merged)** — v1.0 shipped at `plugins/yellow-composio/`. Cross-plugin consumer integration (yellow-review, yellow-semgrep, yellow-linear) and rate-limit header forwarding remain deferred to v1.1+/v2 per Open Questions.
+> **Status: Implemented (PR #237, merged)** — v1.0 shipped at
+> `plugins/yellow-composio/`. Cross-plugin consumer integration
+> (yellow-review, yellow-semgrep, yellow-linear) and rate-limit header
+> forwarding remain deferred to v1.1+/v2 per Open Questions.
 
 ## Problem Statement
 

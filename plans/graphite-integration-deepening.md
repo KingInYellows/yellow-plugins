@@ -1,6 +1,11 @@
 # Feature: Deepen Graphite Integration Across Yellow-Plugins
 
-> **Status: Implemented** — `workflows:work` is now stack-aware (parses `## Stack Decomposition` + `<!-- stack-topology: -->` metadata, dispatches stack execution loop). `gt-stack-plan` no longer pre-creates scaffold commits. Remaining `git push` references are intentional documented exceptions (e.g., devin degraded-mode in `review-prs.md:419-422`).
+> **Status: Implemented (PRs #162, #163, #164, all merged)** —
+> `workflows:work` is now stack-aware (parses `## Stack Decomposition` +
+> `<!-- stack-topology: -->` metadata, dispatches stack execution loop).
+> `gt-stack-plan` no longer pre-creates scaffold commits. Remaining
+> `git push` references are intentional documented exceptions (e.g., devin
+> degraded-mode in `review-prs.md:419-422`).
 
 ## Overview
 

@@ -1,6 +1,7 @@
 # Feature: Ruvector + Morph Ecosystem Integration
 
-> **Status: Implemented (PR #124, merged)** — Cross-plugin recall/remember + morph discovery integration shipped (`0a7f87ec`).
+> **Status: Implemented (PR #124, merged)** — Cross-plugin recall/remember
+> + morph discovery integration shipped (`0a7f87ec`).
 
 ## Overview
 

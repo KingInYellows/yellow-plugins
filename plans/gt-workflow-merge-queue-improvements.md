@@ -1,6 +1,8 @@
 # Feature: gt-workflow Merge Queue Improvements
 
-> **Status: Implemented (PR #305, merged)** — Native queue advisory + closed-not-merged guard shipped via `2a3eec79`. Subsequent review-finding fixes: `69d59ca4`, `b051863c`, `18f9ba1f`, `24c4aee5`, `278c1d8b`.
+> **Status: Implemented (PR #305, merged)** — Native queue advisory +
+> closed-not-merged guard shipped via `2a3eec79`. Subsequent review-finding
+> fixes: `69d59ca4`, `b051863c`, `18f9ba1f`, `24c4aee5`, `278c1d8b`.
 
 ## Problem Statement
 

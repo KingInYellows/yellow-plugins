@@ -1,6 +1,10 @@
 # Feature: ChatPRD Plugin Expansion (v1.2.0 + v1.3.0)
 
-> **Status: Implemented (PR #117, merged)** — v1.3.0 shipped via `d865bab5`. All 4 expansion agents present at `plugins/yellow-chatprd/agents/workflow/` (document-assistant, document-reviewer, linear-prd-bridge, project-dashboard). Plugin version is 1.3.0.
+> **Status: Implemented (PR #117, merged)** — v1.3.0 shipped via
+> `d865bab5`. All 4 expansion agents present at
+> `plugins/yellow-chatprd/agents/workflow/` (document-assistant,
+> document-reviewer, linear-prd-bridge, project-dashboard). Plugin version
+> is 1.3.0.
 
 ## Problem Statement
 
@@ -150,6 +154,7 @@ informed by Phase 1 experience.
      personal filter."
 
 **Acceptance criteria:**
+
 - [x] `$ARGUMENTS` containing a project name routes to `list_project_documents`
 - [x] Default (no arguments) routes to `list_organization_documents`
 - [x] "my drafts" / "personal docs" routes to `list_documents`
@@ -187,6 +192,7 @@ informed by Phase 1 experience.
    suggest the `document-reviewer` agent." (Prepares for Phase 2 discoverability.)
 
 **Acceptance criteria:**
+
 - [x] Agent detects listing mode from natural language
 - [x] Agent uses correct MCP tool for each mode
 - [x] Handoff to document-reviewer is mentioned (future-proofs for Phase 2)
@@ -263,6 +269,7 @@ Mirror the same related-specs pattern:
 <!-- /deepen-plan -->
 
 **Acceptance criteria:**
+
 - [x] Related specs appear in Linear issue descriptions when available
 - [x] Graceful degradation when document has no project association
 - [x] 5-second timeout prevents latency regression
@@ -318,6 +325,7 @@ Mirror the same related-specs pattern:
    ```
 
 **Acceptance criteria:**
+
 - [x] Listing tool selection guide documents all three tools with when-to-use
 - [x] Error mapping covers new tool failure cases
 - [x] Related-specs pattern is documented for reuse
@@ -362,6 +370,7 @@ Mirror the same related-specs pattern:
 <!-- /deepen-plan -->
 
 **Acceptance criteria:**
+
 - [x] Both plugin.json and package.json show `1.2.0`
 - [x] CHANGELOG follows Keep a Changelog format with `---` separators
 - [x] CLAUDE.md accurately reflects enhanced capabilities
@@ -504,6 +513,7 @@ allowed-tools:
 - If document exceeds 5000 words, summarize each section before comparison
 
 **Acceptance criteria:**
+
 - [x] Agent finds and fetches documents by title/query
 - [x] Template matching uses tiered approach (metadata -> heuristic -> user -> general)
 - [x] Review output classifies sections as missing/thin/adequate
@@ -623,6 +633,7 @@ allowed-tools:
 - Suppress `list_chats` failures silently (supplementary data only)
 
 **Acceptance criteria:**
+
 - [x] Agent resolves project by name with disambiguation
 - [x] Zero-documents case handled with starter suggestions
 - [x] Documents categorized by type
@@ -685,6 +696,7 @@ allowed-tools:
 every step -- the command works identically without yellow-devin installed.
 
 **Acceptance criteria:**
+
 - [x] Only triggers for technical templates (TDD, API Documentation)
 - [x] DeepWiki tools discovered dynamically, not in static allowed-tools
 - [x] Graceful degradation: missing plugin, empty wiki, API error
@@ -732,6 +744,7 @@ every step -- the command works identically without yellow-devin installed.
    `get_user_profile` on demand if absent.
 
 **Acceptance criteria:**
+
 - [x] Profile displayed at start of setup flow
 - [x] Free plan warning shown when applicable
 - [x] Profile check failure does not block setup
@@ -761,6 +774,7 @@ every step -- the command works identically without yellow-devin installed.
 `search_documents` response. Run in parallel, not sequentially.
 
 **Acceptance criteria:**
+
 - [x] `search_chats` called alongside `search_documents` in parallel
 - [x] Chat results mentioned as supplementary context only
 - [x] Failures silently suppressed
@@ -853,6 +867,7 @@ every step -- the command works identically without yellow-devin installed.
    format. Commands should check presence and re-fetch if absent.
 
 **Acceptance criteria:**
+
 - [x] Review patterns documented with severity levels and matching algorithm
 - [x] Dashboard formatting conventions specified
 - [x] `get_user_profile` error mapping added
@@ -903,6 +918,7 @@ every step -- the command works identically without yellow-devin installed.
 <!-- /deepen-plan -->
 
 **Acceptance criteria:**
+
 - [x] Both plugin.json and package.json show `1.3.0`
 - [x] CHANGELOG follows Keep a Changelog format with `---` separators
 - [x] CLAUDE.md accurately documents all 4 agents
