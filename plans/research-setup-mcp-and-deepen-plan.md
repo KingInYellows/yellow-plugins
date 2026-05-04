@@ -1,5 +1,9 @@
 # Feature: MCP Health Checks in /research:setup + /workflows:deepen-plan
 
+> **Status: Implemented (PR #107, merged)** — `/research:setup`
+> enhancements + `/workflows:deepen-plan` command shipped (`dee1a4a2`).
+> Follow-up review fixes: `2373f303`.
+
 ## Problem Statement
 
 The yellow-research plugin has two gaps:
@@ -46,7 +50,7 @@ writes it back in-place after M3 confirmation.
 
 ### Phase 1: Extend /research:setup with MCP Health Checks
 
-- [ ] **1.1: Add ToolSearch and MCP tools to allowed-tools frontmatter**
+- [x] **1.1: Add ToolSearch and MCP tools to allowed-tools frontmatter**
 
   Add to frontmatter `allowed-tools`:
   ```yaml
@@ -57,7 +61,7 @@ writes it back in-place after M3 confirmation.
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
   ```
 
-- [ ] **1.2: Add new Step 3.5 — MCP Health Checks**
+- [x] **1.2: Add new Step 3.5 — MCP Health Checks**
 
   Insert between existing Step 3 (Optional Live API Testing) and Step 4
   (Report Results). This step runs unconditionally — MCP calls have no quota
@@ -90,7 +94,7 @@ writes it back in-place after M3 confirmation.
   is no per-call timeout parameter like curl's `--connect-timeout`. If a call
   hangs, Claude Code's internal timeout applies.
 
-- [ ] **1.3: Extend Step 4 status table with MCP Sources section**
+- [x] **1.3: Extend Step 4 status table with MCP Sources section**
 
   Add after the "Parallel Task server (OAuth)" block:
 
@@ -109,7 +113,7 @@ writes it back in-place after M3 confirmation.
   **Capability summary update:** Keep the existing `N/3 sources` line for API
   keys. Add a new line: `MCP sources: 3/4 available`.
 
-- [ ] **1.4: Add MCP setup instructions to Step 5**
+- [x] **1.4: Add MCP setup instructions to Step 5**
 
   When an MCP source is `UNAVAILABLE`, show install instructions:
 
@@ -123,7 +127,7 @@ writes it back in-place after M3 confirmation.
   When status is `FAIL`: "Source is installed but test call failed. Try
   restarting Claude Code."
 
-- [ ] **1.5: Update Error Handling table**
+- [x] **1.5: Update Error Handling table**
 
   Add rows:
   ```
@@ -132,7 +136,7 @@ writes it back in-place after M3 confirmation.
   | MCP test call empty result  | "[source] FAIL — tool returned no data." | Record, continue |
   ```
 
-- [ ] **1.6: Update Step 3 prompt text**
+- [x] **1.6: Update Step 3 prompt text**
 
   Current text says "1 small call per present key." Since MCP checks now run
   unconditionally after Step 3 regardless of user choice, update the prompt
@@ -141,7 +145,7 @@ writes it back in-place after M3 confirmation.
 
 ### Phase 2: Create /workflows:deepen-plan Command
 
-- [ ] **2.1: Create command file with frontmatter**
+- [x] **2.1: Create command file with frontmatter**
 
   File: `plugins/yellow-research/commands/workflows/deepen-plan.md`
 
@@ -166,7 +170,7 @@ writes it back in-place after M3 confirmation.
   `plan`, `work`, `brainstorm`, `review`, `compound`; yellow-research adds
   `deepen-plan`. Claude Code resolves commands by `name:` field, not directory.
 
-- [ ] **2.2: Step 1 — Validate and read plan file**
+- [x] **2.2: Step 1 — Validate and read plan file**
 
   If `$ARGUMENTS` is empty:
   1. Run `ls plans/*.md 2>/dev/null` via Bash.
@@ -182,7 +186,7 @@ writes it back in-place after M3 confirmation.
   2. Read the file. If it does not exist, stop: "Plan file not found at
      [path]. Available plans:" and list `plans/*.md`.
 
-- [ ] **2.3: Step 2 — Check for existing annotations (idempotency)**
+- [x] **2.3: Step 2 — Check for existing annotations (idempotency)**
 
   Grep for `<!-- deepen-plan:` in the plan content.
 
@@ -194,7 +198,7 @@ writes it back in-place after M3 confirmation.
   4. If Continue: strip all content between `<!-- deepen-plan: ... -->` and
      `<!-- /deepen-plan -->` markers (inclusive) before proceeding.
 
-- [ ] **2.4: Step 3 — Auto-extract research queries**
+- [x] **2.4: Step 3 — Auto-extract research queries**
 
   Parse the plan for these sections (in order of priority):
   - `## Problem Statement` / `## Overview`
@@ -213,7 +217,7 @@ writes it back in-place after M3 confirmation.
   Step 6 and report "Plan sections too sparse for research enrichment. Add
   more detail with /workflows:plan first."
 
-- [ ] **2.5: Step 4 — Codebase research (repo-research-analyst)**
+- [x] **2.5: Step 4 — Codebase research (repo-research-analyst)**
 
   Launch via Agent tool:
   ```
@@ -229,7 +233,7 @@ writes it back in-place after M3 confirmation.
   Collect findings: file paths confirmed/corrected, existing patterns found,
   dependency issues identified, gaps where codebase has no answer.
 
-- [ ] **2.6: Step 5 — External research (research-conductor)**
+- [x] **2.6: Step 5 — External research (research-conductor)**
 
   Shape queries from Step 3 to focus on gaps not answered by Step 4.
   Remove queries that codebase research fully resolved.
@@ -248,7 +252,7 @@ writes it back in-place after M3 confirmation.
   Collect findings: external references, best practices, library docs,
   community patterns.
 
-- [ ] **2.7: Step 6 — Annotate plan inline**
+- [x] **2.7: Step 6 — Annotate plan inline**
 
   For each finding, identify the most relevant plan section and insert an
   annotation block after the relevant paragraph:
@@ -277,7 +281,7 @@ writes it back in-place after M3 confirmation.
   If annotation count is 0 after both agents run: skip write, report "Both
   agents ran but produced no actionable findings. Plan unchanged at [path]."
 
-- [ ] **2.8: Step 7 — M3 confirmation and write**
+- [x] **2.8: Step 7 — M3 confirmation and write**
 
   Show via AskUserQuestion:
   ```
@@ -294,7 +298,7 @@ writes it back in-place after M3 confirmation.
   If Cancel: stop with "No changes made to [path]."
   If Yes: write the annotated plan back to the same path using Write tool.
 
-- [ ] **2.9: Step 8 — Next steps**
+- [x] **2.9: Step 8 — Next steps**
 
   Show via AskUserQuestion:
   ```
@@ -307,7 +311,7 @@ writes it back in-place after M3 confirmation.
   - "Review the enriched plan"
   - "Done"
 
-- [ ] **2.10: Add Error Handling table**
+- [x] **2.10: Add Error Handling table**
 
   ```
   | Error | Message | Action |
@@ -325,18 +329,18 @@ writes it back in-place after M3 confirmation.
 
 ### Phase 3: Integration and Documentation
 
-- [ ] **3.1: Update yellow-research CLAUDE.md**
+- [x] **3.1: Update yellow-research CLAUDE.md**
 
   Add `/workflows:deepen-plan` to the Commands section.
   Add `yellow-core` to Optional Dependencies with note about
   `repo-research-analyst`.
   Update "When to Use What" section.
 
-- [ ] **3.2: Update yellow-research README.md**
+- [x] **3.2: Update yellow-research README.md**
 
   Add command to the command listing. Update component counts.
 
-- [ ] **3.3: Register command in plugin.json if needed**
+- [x] **3.3: Register command in plugin.json if needed**
 
   Check if yellow-research's plugin.json needs a commands entry for
   `workflows/deepen-plan.md`. (Most plugins auto-discover from directory
@@ -374,19 +378,19 @@ writes it back in-place after M3 confirmation.
 
 ## Acceptance Criteria
 
-- [ ] `/research:setup` displays all 7 sources (3 API + 4 MCP) in a unified table
-- [ ] Each MCP source gets a real ToolSearch + test call probe, not just a listing
-- [ ] MCP failures are graceful — per-source FAIL/UNAVAILABLE, never abort
-- [ ] MCP install instructions appear for UNAVAILABLE sources
-- [ ] `/workflows:deepen-plan plans/foo.md` reads, enriches, and writes the plan
-- [ ] Empty $ARGUMENTS lists available plans and prompts user to pick
-- [ ] Invalid/missing paths produce clear error messages
-- [ ] Codebase research runs before external; external queries are narrowed by gaps
-- [ ] Annotations use idempotent `<!-- deepen-plan: source -->` markers
-- [ ] Re-running strips old annotations before re-enriching
-- [ ] M3 confirmation shows annotation summary before writing
-- [ ] Cancel at M3 produces "No changes made" and stops
-- [ ] Falls back gracefully if yellow-core or research MCPs unavailable
+- [x] `/research:setup` displays all 7 sources (3 API + 4 MCP) in a unified table
+- [x] Each MCP source gets a real ToolSearch + test call probe, not just a listing
+- [x] MCP failures are graceful — per-source FAIL/UNAVAILABLE, never abort
+- [x] MCP install instructions appear for UNAVAILABLE sources
+- [x] `/workflows:deepen-plan plans/foo.md` reads, enriches, and writes the plan
+- [x] Empty $ARGUMENTS lists available plans and prompts user to pick
+- [x] Invalid/missing paths produce clear error messages
+- [x] Codebase research runs before external; external queries are narrowed by gaps
+- [x] Annotations use idempotent `<!-- deepen-plan: source -->` markers
+- [x] Re-running strips old annotations before re-enriching
+- [x] M3 confirmation shows annotation summary before writing
+- [x] Cancel at M3 produces "No changes made" and stops
+- [x] Falls back gracefully if yellow-core or research MCPs unavailable
 
 ## Edge Cases
 

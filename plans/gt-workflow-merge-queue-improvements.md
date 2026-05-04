@@ -1,5 +1,9 @@
 # Feature: gt-workflow Merge Queue Improvements
 
+> **Status: Implemented (PR #305, merged)** — Native queue advisory +
+> closed-not-merged guard shipped via `2a3eec79`. Subsequent review-finding
+> fixes: `69d59ca4`, `b051863c`, `18f9ba1f`, `24c4aee5`, `278c1d8b`.
+
 ## Problem Statement
 
 The Graphite merge-queue research (`docs/research/graphite-merge-queue-stacked-prs-coding-agents.md`) surfaced two platform-level gaps in the existing `gt-workflow` plugin that affect every Graphite user — not just users of Graphite's optional merge queue:
@@ -44,9 +48,9 @@ No `queue-ejected` label reading. No new API calls. One extra JSON field in an e
 
 ### Phase 1: gt-setup native queue advisory
 
-- [ ] **1.1** Append a new `=== Merge Queue Compatibility ===` section to the Phase 1 Bash block in `plugins/gt-workflow/commands/gt-setup.md` (between current "Convention Files" and the Step 2 interpretation).
-- [ ] **1.2** Implement the GraphQL detection. Use `gh api graphql` with a query for `repository(owner, name) { mergeQueue { url } }`. Repo identifier comes from `gh repo view --json nameWithOwner -q .nameWithOwner` (same idiom already used in `gt-cleanup` line 170). Fail-open on any non-zero exit, missing auth, or parse error.
-- [ ] **1.3** Emit one of three lines based on result. Use **one space** after the colon to match the surrounding 16-char alignment zone (`=== Repository ===` and `=== Convention Files ===` sections):
+- [x] **1.1** Append a new `=== Merge Queue Compatibility ===` section to the Phase 1 Bash block in `plugins/gt-workflow/commands/gt-setup.md` (between current "Convention Files" and the Step 2 interpretation).
+- [x] **1.2** Implement the GraphQL detection. Use `gh api graphql` with a query for `repository(owner, name) { mergeQueue { url } }`. Repo identifier comes from `gh repo view --json nameWithOwner -q .nameWithOwner` (same idiom already used in `gt-cleanup` line 170). Fail-open on any non-zero exit, missing auth, or parse error.
+- [x] **1.3** Emit one of three lines based on result. Use **one space** after the colon to match the surrounding 16-char alignment zone (`=== Repository ===` and `=== Convention Files ===` sections):
   - Queue detected: `gh_native_queue: WARNING — GitHub native merge queue is configured for this repo. Graphite and GitHub native queue are incompatible; running both causes CI restarts and may produce out-of-order merges. Disable at: https://github.com/<repo>/settings/branches`
   - Queue not detected: `gh_native_queue: ok (not configured)`
   - Could not check: `gh_native_queue: COULD NOT CHECK (gh auth or API unavailable)`
@@ -54,25 +58,25 @@ No `queue-ejected` label reading. No new API calls. One extra JSON field in an e
 <!-- deepen-plan: codebase -->
 > **Codebase:** Two distinct column-alignment zones exist in `gt-setup.md` Phase 1 — Prerequisites/Auth use 15-char keys (`gt:`, `mcp_server:`, `jq:`, `yq:`), Repository/Convention use 16-char keys (`git_repo:`, `repo_config:`, `gt_trunk:`, `auth_config:`, `graphite_yml:`, `pr_template:`). The new `=== Merge Queue Compatibility ===` section sits between Convention Files and Step 2, so it should match the 16-char zone. Key `gh_native_queue` (15 chars) + `:` + one space = 17, slightly long but visually consistent. Original draft had two spaces (total 18) — corrected here. Precedent: `yellow-review/commands/review/setup.md:28` uses `gh_auth: ok` for similar GitHub-related diagnostics.
 <!-- /deepen-plan -->
-- [ ] **1.4** Update Step 2 interpretation: add `gh_native_queue` WARNING to the Warnings list, with the consequence statement and disable link. Soft advisory only — never blocks.
+- [x] **1.4** Update Step 2 interpretation: add `gh_native_queue` WARNING to the Warnings list, with the consequence statement and disable link. Soft advisory only — never blocks.
 
 ### Phase 2: gt-cleanup closed-not-merged guard
 
-- [ ] **2.1** Update the `gh pr list` invocation in Phase 2.4 of `plugins/gt-workflow/commands/gt-cleanup.md` (line 180-182): change `--json state` to `--json state,mergedAt`. `mergedAt` is for display only (timestamp shown in per-branch detail). `gh pr list --json` does not accept a `merged` field, so classification relies on the `state` enum directly.
-- [ ] **2.2** Update the parse-and-classify logic in Phase 2.4 with a concrete jq pipeline (so the LLM-as-runtime does not infer the parse): when classifying as "Closed PR" candidate (all PRs `CLOSED` or `MERGED`), additionally check whether any PR has `state == "CLOSED"` (since `gh pr list` represents merged PRs as `state == "MERGED"`, `CLOSED` alone is the closed-without-merging signal). If so, set a `closed_not_merged=true` flag on the branch. Also explicitly exclude `[gone]`-tracked branches from the PR Status Lookups gate so the tag does not fire on branches already routed to `/gt-sync`.
-- [ ] **2.3** Update Phase 4 "Delete all" path for the Closed PR category: if any branches have `closed_not_merged=true`, prepend the existing data-loss warning block with: `N of these branches had PRs closed without merging (may be queue-ejected, abandoned, or cancelled). Verify before proceeding.`
-- [ ] **2.4** Update Phase 4 "Review individually" path: for each `closed_not_merged=true` branch, add a `PR status: closed (no merge — verify before deleting)` line to the per-branch detail block (between the existing "Unique commits" and "Age" lines).
+- [x] **2.1** Update the `gh pr list` invocation in Phase 2.4 of `plugins/gt-workflow/commands/gt-cleanup.md` (line 180-182): change `--json state` to `--json state,mergedAt`. `mergedAt` is for display only (timestamp shown in per-branch detail). `gh pr list --json` does not accept a `merged` field, so classification relies on the `state` enum directly.
+- [x] **2.2** Update the parse-and-classify logic in Phase 2.4 with a concrete jq pipeline (so the LLM-as-runtime does not infer the parse): when classifying as "Closed PR" candidate (all PRs `CLOSED` or `MERGED`), additionally check whether any PR has `state == "CLOSED"` (since `gh pr list` represents merged PRs as `state == "MERGED"`, `CLOSED` alone is the closed-without-merging signal). If so, set a `closed_not_merged=true` flag on the branch. Also explicitly exclude `[gone]`-tracked branches from the PR Status Lookups gate so the tag does not fire on branches already routed to `/gt-sync`.
+- [x] **2.3** Update Phase 4 "Delete all" path for the Closed PR category: if any branches have `closed_not_merged=true`, prepend the existing data-loss warning block with: `N of these branches had PRs closed without merging (may be queue-ejected, abandoned, or cancelled). Verify before proceeding.`
+- [x] **2.4** Update Phase 4 "Review individually" path: for each `closed_not_merged=true` branch, add a `PR status: closed (no merge — verify before deleting)` line to the per-branch detail block (between the existing "Unique commits" and "Age" lines).
 
 ### Phase 3: Quality
 
-- [ ] **3.1** Manual smoke test on a real repo:
+- [x] **3.1** Manual smoke test on a real repo:
   - Run `/gt-setup` on a repo with no native queue → confirm `gh_native_queue: ok (not configured)`.
   - Run `/gt-setup` on a repo with native queue enabled → confirm the WARNING line appears with the disable link.
   - Run `/gt-setup` with `gh` unauthenticated → confirm `COULD NOT CHECK` line, setup continues without blocking.
   - Run `/gt-cleanup` with a closed-not-merged PR present → confirm the warning appears in both Delete-all and Review-individually paths.
-- [ ] **3.2** Run `pnpm validate:schemas` to confirm both edited command files still validate.
-- [ ] **3.3** Run `pnpm changeset` and select `patch` for `gt-workflow` (additive, non-breaking).
-- [ ] **3.4** Update `plugins/gt-workflow/CLAUDE.md` only if the changes affect the documented command behavior contract (likely just `gt-cleanup`'s "Closed PR" classification description). Skip if no contract change.
+- [x] **3.2** Run `pnpm validate:schemas` to confirm both edited command files still validate.
+- [x] **3.3** Run `pnpm changeset` and select `patch` for `gt-workflow` (additive, non-breaking).
+- [x] **3.4** Update `plugins/gt-workflow/CLAUDE.md` only if the changes affect the documented command behavior contract (likely just `gt-cleanup`'s "Closed PR" classification description). Skip if no contract change.
 
 ## Technical Details
 

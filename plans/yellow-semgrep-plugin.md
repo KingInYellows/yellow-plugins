@@ -1,5 +1,7 @@
 # Feature: yellow-semgrep Plugin — Automated Semgrep Finding Remediation
 
+> **Status: Implemented (PR #122, merged)** — Plugin shipped at `plugins/yellow-semgrep/`. Subsequent: MCP migration to built-in subcommand (PR #155), `SEMGREP_APP_TOKEN` userConfig migration (`6254fcad`).
+
 ## Overview
 
 Build a Claude Code plugin that automates the remediation lifecycle for Semgrep
@@ -75,49 +77,49 @@ triage mutations).
 
 ### Phase 1: Scaffolding (Foundation)
 
-- [ ] **1.1:** Create plugin directory structure
-- [ ] **1.2:** Write `plugin.json` manifest with MCP server registration
-- [ ] **1.3:** Write `package.json` (minimal 4-field pattern)
-- [ ] **1.4:** Write `CLAUDE.md` with conventions, component list, security rules
-- [ ] **1.5:** Register in marketplace.json
+- [x] **1.1:** Create plugin directory structure
+- [x] **1.2:** Write `plugin.json` manifest with MCP server registration
+- [x] **1.3:** Write `package.json` (minimal 4-field pattern)
+- [x] **1.4:** Write `CLAUDE.md` with conventions, component list, security rules
+- [x] **1.5:** Register in marketplace.json
 
 ### Phase 2: Skill (Shared Infrastructure)
 
-- [ ] **2.1:** Write `skills/semgrep-conventions/SKILL.md` — overview, when to
+- [x] **2.1:** Write `skills/semgrep-conventions/SKILL.md` — overview, when to
   load, convention summary
-- [ ] **2.2:** Write `skills/semgrep-conventions/references/triage-states.md` —
+- [x] **2.2:** Write `skills/semgrep-conventions/references/triage-states.md` —
   MCP ↔ REST enum mapping table
-- [ ] **2.3:** Write `skills/semgrep-conventions/references/api-reference.md` —
+- [x] **2.3:** Write `skills/semgrep-conventions/references/api-reference.md` —
   REST endpoints, auth headers, rate limits, pagination, error codes
-- [ ] **2.4:** Write `skills/semgrep-conventions/references/fix-patterns.md` —
+- [x] **2.4:** Write `skills/semgrep-conventions/references/fix-patterns.md` —
   fix-strategy decision tree, autofix vs LLM criteria, language-specific
   syntax checks
 
 ### Phase 3: Commands (Core Implementation)
 
-- [ ] **3.1:** Write `commands/semgrep/setup.md` — token validation, deployment
+- [x] **3.1:** Write `commands/semgrep/setup.md` — token validation, deployment
   slug detection, prerequisite checks, config caching
-- [ ] **3.2:** Write `commands/semgrep/status.md` — findings dashboard by triage
+- [x] **3.2:** Write `commands/semgrep/status.md` — findings dashboard by triage
   state and severity
-- [ ] **3.3:** Write `commands/semgrep/scan.md` — local scan with comparison to
+- [x] **3.3:** Write `commands/semgrep/scan.md` — local scan with comparison to
   platform findings
-- [ ] **3.4:** Write `commands/semgrep/fix.md` — single-finding fix lifecycle
-- [ ] **3.5:** Write `commands/semgrep/fix-batch.md` — iterative batch fix with
+- [x] **3.4:** Write `commands/semgrep/fix.md` — single-finding fix lifecycle
+- [x] **3.5:** Write `commands/semgrep/fix-batch.md` — iterative batch fix with
   approval between each
 
 ### Phase 4: Agents (Specialist Workers)
 
-- [ ] **4.1:** Write `agents/semgrep/finding-fixer.md` — deterministic autofix
+- [x] **4.1:** Write `agents/semgrep/finding-fixer.md` — deterministic autofix
   first, LLM fallback
-- [ ] **4.2:** Write `agents/semgrep/scan-verifier.md` — post-fix re-scan and
+- [x] **4.2:** Write `agents/semgrep/scan-verifier.md` — post-fix re-scan and
   regression detection
 
 ### Phase 5: Quality & Documentation
 
-- [ ] **5.1:** Write `README.md` — installation, quick start, env vars
-- [ ] **5.2:** Run `pnpm validate:schemas` to verify plugin and marketplace
-- [ ] **5.3:** Verify MCP tool names with ToolSearch after plugin install
-- [ ] **5.4:** Manually test `/semgrep:setup` with a real `SEMGREP_APP_TOKEN`
+- [x] **5.1:** Write `README.md` — installation, quick start, env vars
+- [x] **5.2:** Run `pnpm validate:schemas` to verify plugin and marketplace
+- [x] **5.3:** Verify MCP tool names with ToolSearch after plugin install
+- [x] **5.4:** Manually test `/semgrep:setup` with a real `SEMGREP_APP_TOKEN`
 
 ## Technical Specifications
 
@@ -652,8 +654,11 @@ Follow yellow-devin's pattern exactly:
    strings — always use `jq --arg` / `jq --argjson`
 5. **No curl -v or --trace:** Would leak Authorization headers
 6. **Metrics off:** Pass `--metrics off` to all `semgrep scan` invocations
-7. **`semgrep_whoami` limitation:** Does NOT work with API tokens (`sgp_`
-   prefix). Use REST `GET /api/v1/me` exclusively for token validation.
+7. **Token validation uses REST `GET /api/v1/me`:** The built-in `semgrep mcp`
+   server (v1.146.0+) does not expose a `whoami` tool, so REST is the only
+   path for token validation. Historically, the standalone `semgrep-mcp`
+   package's `semgrep_whoami` tool worked only with OAuth JWTs (not `sgp_`
+   API tokens), which is why REST was already the correct choice.
 8. **MCP tool name verification:** Must verify tool names empirically with
    ToolSearch after install — do not hardcode assumed names
 

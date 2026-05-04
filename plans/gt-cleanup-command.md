@@ -66,8 +66,8 @@ category (acted upon or skipped), remove it from subsequent categories.
 
 ### Phase 1: Command File
 
-- [ ] 1.1: Create `plugins/gt-workflow/commands/gt-cleanup.md`
-- [ ] 1.2: Frontmatter:
+- [x] 1.1: Create `plugins/gt-workflow/commands/gt-cleanup.md`
+- [x] 1.2: Frontmatter:
   ```yaml
   ---
   name: gt-cleanup
@@ -78,46 +78,46 @@ category (acted upon or skipped), remove it from subsequent categories.
     - AskUserQuestion
   ---
   ```
-- [ ] 1.3: Document optional flags with explicit bash parsing:
+- [x] 1.3: Document optional flags with explicit bash parsing:
   - `--stale-days N` — override 30-day default (bash `case` block, not prose)
   - `--dry-run` — scan and report only, no actions
 
 ### Phase 2: Prerequisites (command body)
 
-- [ ] 2.1: Phase 0 in the command: validate `gt`, `gh`, `git` available
-- [ ] 2.2: Confirm `gh auth status` succeeds (needed for PR status lookups)
-- [ ] 2.3: Confirm inside a git work tree (`git rev-parse --is-inside-work-tree`)
-- [ ] 2.4: Identify trunk branch (`gt trunk`) and current branch (`git branch --show-current`)
-- [ ] 2.5: All prerequisite checks BEFORE any AskUserQuestion (per defensive
+- [x] 2.1: Phase 0 in the command: validate `gt`, `gh`, `git` available
+- [x] 2.2: Confirm `gh auth status` succeeds (needed for PR status lookups)
+- [x] 2.3: Confirm inside a git work tree (`git rev-parse --is-inside-work-tree`)
+- [x] 2.4: Identify trunk branch (`gt trunk`) and current branch (`git branch --show-current`)
+- [x] 2.5: All prerequisite checks BEFORE any AskUserQuestion (per defensive
   authoring pattern: validation before interaction)
 
 ### Phase 3: Branch Scan Logic
 
-- [ ] 3.1: Run `git fetch --prune` to ensure remote-tracking refs are current
-- [ ] 3.2: Enumerate all local branches excluding trunk and current branch:
+- [x] 3.1: Run `git fetch --prune` to ensure remote-tracking refs are current
+- [x] 3.2: Enumerate all local branches excluding trunk and current branch:
   ```bash
   git for-each-ref --format='%(refname:short) %(upstream) %(upstream:track) %(authordate:unix)' refs/heads/
   ```
-- [ ] 3.3: Parse into data structure with: branch name, upstream ref, track
+- [x] 3.3: Parse into data structure with: branch name, upstream ref, track
   status (`[gone]`, `[ahead N]`, `[behind N]`, `[ahead N, behind M]`), author
   date unix timestamp
-- [ ] 3.4: Classify into categories using priority order (1-6). Once classified,
+- [x] 3.4: Classify into categories using priority order (1-6). Once classified,
   a branch does not appear in subsequent categories.
-- [ ] 3.5: For category 2 (closed PR), batch PR status lookups:
+- [x] 3.5: For category 2 (closed PR), batch PR status lookups:
   - For each branch with a remote upstream, check
     `gh pr list --search "head:BRANCH" --json state --limit 10`
   - If ANY PR is `OPEN`, exclude from closed-PR category entirely
   - Add progress indicator if > 20 branches ("Checking PR status 12/47...")
   - Do NOT suppress stderr on `gh pr list` (anti-pattern #13)
-- [ ] 3.6: For category 3 (stale), cross-reference PR state: exclude branches
+- [x] 3.6: For category 3 (stale), cross-reference PR state: exclude branches
   with any open PR
-- [ ] 3.7: For category 1 (orphaned), check for unique commits:
+- [x] 3.7: For category 1 (orphaned), check for unique commits:
   `git log --oneline $(gt trunk)..BRANCH | wc -l` — if > 0, flag as
   "has N unique commits" for the review-individually flow
 
 ### Phase 4: Report and Category Actions
 
-- [ ] 4.1: Display the full categorized report before any actions:
+- [x] 4.1: Display the full categorized report before any actions:
   ```
   Branch Audit
   ────────────
@@ -131,12 +131,12 @@ category (acted upon or skipped), remove it from subsequent categories.
   ────────────────────────────
   Total:                    17 branches (excl. trunk + current)
   ```
-- [ ] 4.2: If `--dry-run`, stop here. Print "Dry run — no actions taken."
-- [ ] 4.3: If all categories empty, print "Nothing to clean up." and exit.
-- [ ] 4.4: If merged branches detected during scan (upstream `[gone]` + merged
+- [x] 4.2: If `--dry-run`, stop here. Print "Dry run — no actions taken."
+- [x] 4.3: If all categories empty, print "Nothing to clean up." and exit.
+- [x] 4.4: If merged branches detected during scan (upstream `[gone]` + merged
   into trunk), print: "Note: N merged branches detected. Run `/gt-sync` to
   clean those."
-- [ ] 4.5: Walk through each non-empty actionable category (1, 2, 3, 5) with
+- [x] 4.5: Walk through each non-empty actionable category (1, 2, 3, 5) with
   AskUserQuestion:
   ```
   Category: Orphaned (no remote) — 3 branches
@@ -149,18 +149,18 @@ category (acted upon or skipped), remove it from subsequent categories.
   2. Review individually
   3. Skip this category
   ```
-- [ ] 4.6: For "Review individually", apply batch cap of 15 branches. If count
+- [x] 4.6: For "Review individually", apply batch cap of 15 branches. If count
   exceeds 15, offer "Process all / First 15 only / Cancel". Show per branch:
   name, last commit date, last commit message (one line), unique commit count,
   PR status if applicable.
-- [ ] 4.7: For warn-only categories (4, 6), display without AskUserQuestion:
+- [x] 4.7: For warn-only categories (4, 6), display without AskUserQuestion:
   ```
   Ahead of remote (3 branches — no action, use /smart-submit to push):
     feat/wip-auth (3 commits ahead)
     feat/experiment (1 commit ahead)
     fix/local-only (2 commits ahead)
   ```
-- [ ] 4.8: For behind-remote (category 5) actions via `gt get`:
+- [x] 4.8: For behind-remote (category 5) actions via `gt get`:
   - If current branch has uncommitted changes (`git status --porcelain`), skip
     sync for current branch with note "skipped (uncommitted changes)"
   - Wrap each `gt get BRANCH` in error handling
@@ -168,21 +168,21 @@ category (acted upon or skipped), remove it from subsequent categories.
 
 ### Phase 5: Error Handling
 
-- [ ] 5.1: `gt delete` failure: log branch name + error, skip, continue with
+- [x] 5.1: `gt delete` failure: log branch name + error, skip, continue with
   remaining branches. Include in summary as "failed".
-- [ ] 5.2: `gt delete` on non-Graphite branch: if error contains "not tracked",
+- [x] 5.2: `gt delete` on non-Graphite branch: if error contains "not tracked",
   fall back to `git branch -d BRANCH` (lowercase -d, safe delete that refuses
   if unmerged). If that also fails, skip and report.
-- [ ] 5.3: `gt get` conflict: check exit code, report "sync failed — conflicts"
+- [x] 5.3: `gt get` conflict: check exit code, report "sync failed — conflicts"
   for that branch, skip and continue with remaining categories.
-- [ ] 5.4: `gh pr list` failure mid-scan: report error, skip PR-status-dependent
+- [x] 5.4: `gh pr list` failure mid-scan: report error, skip PR-status-dependent
   categories (2 and 3 may be incomplete), warn user.
-- [ ] 5.5: All branch names must be properly quoted in all bash invocations
+- [x] 5.5: All branch names must be properly quoted in all bash invocations
   (handle spaces, special chars).
 
 ### Phase 6: Summary Report
 
-- [ ] 6.1: Output final summary:
+- [x] 6.1: Output final summary:
   ```
   Cleanup Complete
   ────────────────
@@ -200,11 +200,11 @@ category (acted upon or skipped), remove it from subsequent categories.
 
 ### Phase 7: Registration
 
-- [ ] 7.1: Update `plugins/gt-workflow/CLAUDE.md` — add `/gt-cleanup` to
+- [x] 7.1: Update `plugins/gt-workflow/CLAUDE.md` — add `/gt-cleanup` to
   commands list
-- [ ] 7.2: Update `plugins/gt-workflow/README.md` — add command documentation
-- [ ] 7.3: Run `pnpm changeset` — minor bump for gt-workflow (new command)
-- [ ] 7.4: Run `pnpm validate:schemas` to verify
+- [x] 7.2: Update `plugins/gt-workflow/README.md` — add command documentation
+- [x] 7.3: Run `pnpm changeset` — minor bump for gt-workflow (new command)
+- [x] 7.4: Run `pnpm validate:schemas` to verify
 
 ## Technical Details
 

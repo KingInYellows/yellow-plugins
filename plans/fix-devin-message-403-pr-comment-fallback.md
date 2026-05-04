@@ -1,5 +1,10 @@
 # Feature: Fix Devin Message 403 + PR Comment Fallback
 
+> **Status: Implemented (PR #216, merged)** —
+> `Step 3b: Probe ManageOrgSessions` shipped in
+> `plugins/yellow-devin/commands/devin/setup.md:136`. `gh pr comment`
+> PR-comment fallback shipped in `message.md` and `review-prs.md`.
+
 ## Problem Statement
 
 The `/devin:review-prs` and `/devin:message` commands fail with 403 on both
@@ -79,7 +84,7 @@ Two complementary fixes:
 
 ### Phase 1: Setup Permission Probe
 
-- [ ] **1.1: Add Step 3b to `setup.md` — probe ManageOrgSessions**
+- [x] **1.1: Add Step 3b to `setup.md` — probe ManageOrgSessions**
 
   File: `plugins/yellow-devin/commands/devin/setup.md`
 
@@ -124,7 +129,7 @@ Two complementary fixes:
 > setup run will not trigger rate limiting even at aggressive thresholds.
 <!-- /deepen-plan -->
 
-- [ ] **1.2: Update Step 5 report table to show ManageOrgSessions status**
+- [x] **1.2: Update Step 5 report table to show ManageOrgSessions status**
 
   Add a row to the "Permissions (required)" section:
 
@@ -134,7 +139,7 @@ Two complementary fixes:
     ManageOrgSessions (message)  [OK | MISSING]
   ```
 
-- [ ] **1.3: Add ManageOrgSessions-specific remediation guidance**
+- [x] **1.3: Add ManageOrgSessions-specific remediation guidance**
 
   When `ViewOrgSessions` is OK but `ManageOrgSessions` is MISSING:
 
@@ -153,14 +158,14 @@ Two complementary fixes:
 
   When both are MISSING, merge into the existing combined remediation block.
 
-- [ ] **1.4: Remove the stale assumption comment**
+- [x] **1.4: Remove the stale assumption comment**
 
   Delete or rewrite `setup.md` lines 94-96 that say ManageOrgSessions "cannot be
   probed non-destructively". It can now, via the dummy-session POST.
 
 ### Phase 2: PR Comment Fallback in message.md
 
-- [ ] **2.1: Add PR-aware fallback after 403 failure in `message.md`**
+- [x] **2.1: Add PR-aware fallback after 403 failure in `message.md`**
 
   File: `plugins/yellow-devin/commands/devin/message.md`
 
@@ -224,7 +229,7 @@ Two complementary fixes:
 
 ### Phase 3: PR Comment Fallback in review-prs.md
 
-- [ ] **3.1: Add "Comment on PR" as 4th remediation option**
+- [x] **3.1: Add "Comment on PR" as 4th remediation option**
 
   File: `plugins/yellow-devin/commands/devin/review-prs.md`
 
@@ -250,7 +255,7 @@ Two complementary fixes:
 > "Comment on PR" provides a middle ground for terminal sessions.
 <!-- /deepen-plan -->
 
-- [ ] **3.2: Implement "Comment on PR" option (new Option 2b)**
+- [x] **3.2: Implement "Comment on PR" option (new Option 2b)**
 
   Compose the comment from review findings using the same structure as the
   message composer (Step 5f Option 2, item 2), but:
@@ -277,7 +282,7 @@ Two complementary fixes:
 > correct. Ensure no heredoc or variable expansion adds leading whitespace.
 <!-- /deepen-plan -->
 
-- [ ] **3.3: Add 403 auto-escalation from "Message Devin" to "Comment on PR"**
+- [x] **3.3: Add 403 auto-escalation from "Message Devin" to "Comment on PR"**
 
   In Step 5f Option 2 (line 473-475), when API messaging fails with 403, instead
   of just offering "Fix locally", also offer "Comment on PR" as an alternative:
@@ -295,7 +300,7 @@ Two complementary fixes:
 
 ### Phase 4: Testing & Documentation
 
-- [ ] **4.1: Update CLAUDE.md Known Limitations**
+- [x] **4.1: Update CLAUDE.md Known Limitations**
 
   Add note about PR comment fallback (Known Limitations section starts at
   line 122):
@@ -305,7 +310,7 @@ Two complementary fixes:
     Devin's GitHub integration enabled on the repo.
   ```
 
-- [ ] **4.2: Update devin-workflows skill API reference**
+- [x] **4.2: Update devin-workflows skill API reference**
 
   In `skills/devin-workflows/api-reference.md`, add a "PR Comment Fallback"
   section documenting:
@@ -316,7 +321,7 @@ Two complementary fixes:
   - Requirement: gh CLI authenticated, Devin GitHub integration on repo
   - Token sanitization applied before posting
 
-- [ ] **4.3: Create changeset**
+- [x] **4.3: Create changeset**
 
   ```bash
   pnpm changeset
@@ -331,7 +336,7 @@ Two complementary fixes:
 > omitted this step.
 <!-- /deepen-plan -->
 
-- [ ] **4.4: Validate with `pnpm validate:schemas`**
+- [x] **4.4: Validate with `pnpm validate:schemas`**
 
   Run validators to ensure no frontmatter or manifest regressions.
 

@@ -1,5 +1,12 @@
 # Feature: Deepen Graphite Integration Across Yellow-Plugins
 
+> **Status: Implemented (PRs #162, #163, #164, all merged)** —
+> `workflows:work` is now stack-aware (parses `## Stack Decomposition` +
+> `<!-- stack-topology: -->` metadata, dispatches stack execution loop).
+> `gt-stack-plan` no longer pre-creates scaffold commits. Remaining
+> `git push` references are intentional documented exceptions (e.g., devin
+> degraded-mode in `review-prs.md:419-422`).
+
 ## Overview
 
 Eliminate residual `git push` for branch operations, make `workflows:work`
@@ -179,13 +186,13 @@ file uses the same format but is standalone rather than appended to a plan.
 > needed to register the new file -- placing it in the directory is sufficient.
 <!-- /deepen-plan -->
 
-- [ ] 1.1: Create output style `plugins/gt-workflow/output-styles/stack-decomposition.md`
+- [x] 1.1: Create output style `plugins/gt-workflow/output-styles/stack-decomposition.md`
   defining the structured format above with examples for linear, parallel, and
   mixed topologies
-- [ ] 1.2: Update `plugins/gt-workflow/output-styles/stack-plan.md` to reference
+- [x] 1.2: Update `plugins/gt-workflow/output-styles/stack-plan.md` to reference
   the new decomposition format (the visual tree format for confirmation display
   stays; the decomposition section format is the new contract)
-- [ ] 1.3: Add format documentation to `plugins/gt-workflow/CLAUDE.md` in a new
+- [x] 1.3: Add format documentation to `plugins/gt-workflow/CLAUDE.md` in a new
   `## Stack Decomposition Format` section explaining the contract between
   gt-stack-plan and workflows:work
 
@@ -201,25 +208,25 @@ file uses the same format but is standalone rather than appended to a plan.
 > the mapping table." No other internal Phase 3 refs in Phase 1 or Phase 2.
 <!-- /deepen-plan -->
 
-- [ ] 2.1: Remove Phase 3 (Create Branches) from
+- [x] 2.1: Remove Phase 3 (Create Branches) from
   `plugins/gt-workflow/commands/gt-stack-plan.md` -- delete lines 181-230
   (branch creation, verification, stack display, issue mapping output).
   Preserve and update `## Success Criteria` at lines 232-238
-- [ ] 2.2: Move Linear issue mapping table into `## Stack Decomposition` output
+- [x] 2.2: Move Linear issue mapping table into `## Stack Decomposition` output
   (each item gets a `Linear:` field) instead of terminal output in Phase 3
-- [ ] 2.3: Update Phase 2 confirmation prompt (lines ~157-177): remove "Create
+- [x] 2.3: Update Phase 2 confirmation prompt (lines ~157-177): remove "Create
   these branches now (Recommended)" option. New options: "Save to plan /
   Adjust / Cancel". If plan file path was provided as argument, "Save to plan"
   appends `## Stack Decomposition` to that file. If standalone invocation,
   write to `.gt-stack-plan.md`.
-- [ ] 2.4: Handle re-runs: if `## Stack Decomposition` already exists in the
+- [x] 2.4: Handle re-runs: if `## Stack Decomposition` already exists in the
   plan file, replace it (don't duplicate). Use Edit tool to find and replace
   the section.
-- [ ] 2.5: Remove internal references to Phase 3 in Phase 1 (e.g., "used in
+- [x] 2.5: Remove internal references to Phase 3 in Phase 1 (e.g., "used in
   Phase 3" at line ~47) and Phase 2
-- [ ] 2.6: Update `plugins/gt-workflow/CLAUDE.md` command reference to reflect
+- [x] 2.6: Update `plugins/gt-workflow/CLAUDE.md` command reference to reflect
   the new behavior (no branch creation, plan-only output)
-- [ ] 2.7: Update `plugins/gt-workflow/README.md` gt-stack-plan description
+- [x] 2.7: Update `plugins/gt-workflow/README.md` gt-stack-plan description
 
 ### Phase 3: Stack-Aware workflows:work (PR 3, depends on PR 2)
 
@@ -234,17 +241,17 @@ file uses the same format but is standalone rather than appended to a plan.
 > plan files -- this introduces a novel write-back concern.
 <!-- /deepen-plan -->
 
-- [ ] 3.1: Add stack detection in Phase 1 of `plugins/yellow-core/commands/workflows/work.md`.
+- [x] 3.1: Add stack detection in Phase 1 of `plugins/yellow-core/commands/workflows/work.md`.
   After reading the plan file, check for `## Stack Decomposition` section. If
   present, parse it into structured data: item number, branch name, type,
   description, scope, tasks, depends-on, linear ID, topology, trunk branch.
-- [ ] 3.2: Add stack progress tracking. After completing each stack item, write
+- [x] 3.2: Add stack progress tracking. After completing each stack item, write
   a `## Stack Progress` section to the plan file:
   ```markdown
   ## Stack Progress
   <!-- Updated by workflows:work. Do not edit manually. -->
   - [x] 1. feat/branch-slug-one (completed 2026-03-10)
-  - [ ] 2. feat/branch-slug-two
+  - [x] 2. feat/branch-slug-two
   ```
   On resume (re-invocation with same plan file), read this section and skip
   completed items. Cross-reference with `gt log short` to verify branches exist.
@@ -260,7 +267,7 @@ file uses the same format but is standalone rather than appended to a plan.
 > See: https://graphite.com/docs/command-reference
 <!-- /deepen-plan -->
 
-- [ ] 3.3: Implement stack execution loop in Phase 2 (Execute). For each
+- [x] 3.3: Implement stack execution loop in Phase 2 (Execute). For each
   incomplete stack item, bottom-up:
   1. Create branch: `gt create "<branch-name>"` (for linear topology, this
      creates on top of the previous branch; for parallel, checkout trunk first
@@ -274,20 +281,20 @@ file uses the same format but is standalone rather than appended to a plan.
   8. Present checkpoint: "Item N of M complete. [Continue to next / Revise
      remaining / Stop here]" via AskUserQuestion. Include a "Continue all
      remaining" option to skip future checkpoints.
-- [ ] 3.4: Adapt Phase 3 (Quality Check) for stack mode. Run lightweight checks
+- [x] 3.4: Adapt Phase 3 (Quality Check) for stack mode. Run lightweight checks
   per item (tests only). Full review agent suite runs only on the final item
   or when explicitly requested at a checkpoint.
-- [ ] 3.5: Adapt Phase 4 (Ship It) for stack mode. In single-branch mode,
+- [x] 3.5: Adapt Phase 4 (Ship It) for stack mode. In single-branch mode,
   delegate to `/smart-submit` as before. In stack mode, submission happens
   per-item in 3.3 step 6, so Phase 4 becomes a summary: list all submitted
   PRs, show stack with `gt log short`, sync Linear if applicable.
-- [ ] 3.6: Add error handling for `gt create` failures mid-stack. If branch
+- [x] 3.6: Add error handling for `gt create` failures mid-stack. If branch
   creation fails: stop, report which items succeeded, show stack state via
   `gt log short`, and ask user how to proceed.
-- [ ] 3.7: Handle the no-decomposition case: if `## Stack Decomposition` is
+- [x] 3.7: Handle the no-decomposition case: if `## Stack Decomposition` is
   absent, execute exactly as today (single branch). Zero behavioral change
   for existing plans.
-- [ ] 3.8: Update the `## Safety` or `## Guidelines` section at the bottom of
+- [x] 3.8: Update the `## Safety` or `## Guidelines` section at the bottom of
   work.md to document the stack execution model and its constraints.
 
 ### Phase 4: Update workflows:plan Post-Generation (PR 4, depends on PR 2)
@@ -299,15 +306,15 @@ file uses the same format but is standalone rather than appended to a plan.
 > updating option descriptions to clarify the plan-only behavior.
 <!-- /deepen-plan -->
 
-- [ ] 4.1: Update Phase 5 (Post-Generation) in
+- [x] 4.1: Update Phase 5 (Post-Generation) in
   `plugins/yellow-core/commands/workflows/plan.md`. When the plan has a
   `## Linear Issues` section, promote "Decompose into stacked PRs" to option 1
   (already the case). Clarify that this invokes the repurposed gt-stack-plan
   which enriches the plan file -- no branches are created.
-- [ ] 4.2: Update option descriptions to reflect the new flow:
+- [x] 4.2: Update option descriptions to reflect the new flow:
   - "Decompose into stacked PRs (`/gt-stack-plan`)" -- adds `## Stack Decomposition` to the plan
   - "Start implementation (`/workflows:work`)" -- if decomposition exists, executes bottom-up
-- [ ] 4.3: Consider adding a combined option: "Decompose and start working" that
+- [x] 4.3: Consider adding a combined option: "Decompose and start working" that
   chains `/gt-stack-plan` then `/workflows:work` automatically. Implement only
   if the Skill tool supports chaining cleanly; otherwise document as a
   two-step manual flow.
@@ -317,7 +324,7 @@ file uses the same format but is standalone rather than appended to a plan.
 Branch-push `git push` references migrated to `gt submit --no-interactive` (or
 annotated as operator procedures):
 
-- [ ] 5.1: **CONTRIBUTING.md** line 215 -- emergency release procedure. Replace
+- [x] 5.1: **CONTRIBUTING.md** line 215 -- emergency release procedure. Replace
   `git push` with `gt submit --no-interactive`. Keep `git push --tags` on
   line 218 (tag push, legitimate). Add note: "For emergency pushes outside
   Graphite, disable the hook temporarily or push from a terminal outside
@@ -331,13 +338,13 @@ annotated as operator procedures):
 > confirmed by content inspection.
 <!-- /deepen-plan -->
 
-- [ ] 5.2: **docs/operations/runbook.md** -- 9 branch-push references across
+- [x] 5.2: **docs/operations/runbook.md** -- 9 branch-push references across
   remediation sections (lines 227, 275, 329, 754, 1041, 1046, 1292, 1317,
   1339). Replace each with `gt submit --no-interactive` where the procedure
   is a normal branch push. For emergency/operator procedures that bypass
   normal workflow (revert on main, fork sync), add annotation:
   "Operator procedure -- runs outside Claude Code via terminal."
-- [ ] 5.3: **docs/operations/git-auth.md** -- Add callout at top:
+- [x] 5.3: **docs/operations/git-auth.md** -- Add callout at top:
   ```
   > **Note:** This repository uses Graphite for all branch pushes. The `git push`
   > commands below demonstrate git authentication mechanics. For the development
@@ -345,38 +352,38 @@ annotated as operator procedures):
   ```
   Leave all examples as-is. For rollback procedures (lines 299-371), add
   inline annotation: "Operator procedure."
-- [ ] 5.4: **.github/releases.md** -- Lines 793, 829: replace `git push origin
+- [x] 5.4: **.github/releases.md** -- Lines 793, 829: replace `git push origin
   main` with `gt submit --no-interactive` for version-mismatch and test-failure
   fix procedures. Leave all tag-push references (lines 33, 89, 111, 560, 670,
   677, 687, 723, 797, 799) untouched. Line 834 (`git push origin v1.2.3
   --force`): leave as-is (tag force-push).
-- [ ] 5.5: **docs/cli/publish.md** -- Lines 314, 371: replace branch-push
+- [x] 5.5: **docs/cli/publish.md** -- Lines 314, 371: replace branch-push
   references with `gt submit --no-interactive`.
-- [ ] 5.6: **docs/marketplace-quickstart.md** -- Line 133: replace `git push
+- [x] 5.6: **docs/marketplace-quickstart.md** -- Line 133: replace `git push
   origin main` with `gt submit --no-interactive`.
-- [ ] 5.7: **docs/plugin-template.md** -- Line 524: replace `git push &&
+- [x] 5.7: **docs/plugin-template.md** -- Line 524: replace `git push &&
   git push --tags` with `gt submit --no-interactive && git push --tags`
   (keep tag push).
-- [ ] 5.8: **docs/solutions/workflow/wsl2-crlf-pr-merge-unblocking.md** --
+- [x] 5.8: **docs/solutions/workflow/wsl2-crlf-pr-merge-unblocking.md** --
   Line 151: this is a solution doc (historical). Per decision, leave as-is.
   Actually, this is an operational fix procedure, not a retrospective.
   Replace with `gt submit --no-interactive`.
-- [ ] 5.9: **docs/operations/release-checklist.md** -- Lines 810, 1172: verify
+- [x] 5.9: **docs/operations/release-checklist.md** -- Lines 810, 1172: verify
   these are tag pushes (likely legitimate). If tag push, leave as-is. If
   branch push, migrate.
-- [ ] 5.10: **docs/operations/versioning.md** -- Line 56: already annotated as
+- [x] 5.10: **docs/operations/versioning.md** -- Line 56: already annotated as
   intentional tag push. Leave as-is. Verify the annotation is clear.
 
 ### Phase 6: Plugin Meta Updates (Independent PR, off trunk)
 
-- [ ] 6.1: Update `plugins/gt-workflow/CLAUDE.md` -- Add section on stack
+- [x] 6.1: Update `plugins/gt-workflow/CLAUDE.md` -- Add section on stack
   decomposition format, update command descriptions, document the new
   plan-only behavior of gt-stack-plan
-- [ ] 6.2: Update `plugins/gt-workflow/README.md` -- Reflect the new gt-stack-plan
+- [x] 6.2: Update `plugins/gt-workflow/README.md` -- Reflect the new gt-stack-plan
   behavior and the stack-aware workflows:work integration
-- [ ] 6.3: Update `plugins/yellow-core/CLAUDE.md` -- Document the stack-aware
+- [x] 6.3: Update `plugins/yellow-core/CLAUDE.md` -- Document the stack-aware
   workflows:work capability and its dependency on gt-workflow plugin
-- [ ] 6.4: Verify `check-git-push.sh` hook behavior -- Confirm it blocks only
+- [x] 6.4: Verify `check-git-push.sh` hook behavior -- Confirm it blocks only
   branch pushes, not tag pushes. If it blocks tag pushes, document this as
   intentional (tag pushes happen outside Claude Code). Do NOT modify the hook
   unless explicitly requested.
