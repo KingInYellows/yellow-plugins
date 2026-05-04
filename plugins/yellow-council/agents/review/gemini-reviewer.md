@@ -125,7 +125,7 @@ case $CLI_EXIT in
     printf '[gemini-reviewer] CLI timed out at %ds (exit %d)\n' "${COUNCIL_TIMEOUT:-600}" "$CLI_EXIT" >&2
     printf 'verdict=TIMEOUT\n'
     printf 'confidence=N/A\n'
-    printf 'summary=Gemini timed out at %ds. Council ran without Gemini's verdict.\n' "${COUNCIL_TIMEOUT:-600}"
+    printf "summary=Gemini timed out at %ds. Council ran without Gemini's verdict.\n" "${COUNCIL_TIMEOUT:-600}"
     rm -f "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0
     ;;
