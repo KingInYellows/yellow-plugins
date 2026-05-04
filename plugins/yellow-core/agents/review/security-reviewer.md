@@ -2,7 +2,7 @@
 name: security-reviewer
 description: "Conditional review persona for exploitable security vulnerabilities. Use when reviewing PRs that touch auth middleware, public endpoints, user input handling, or permission checks — adds anchored confidence calibration on top of security-sentinel's broad audit."
 model: inherit
-memory: true
+memory: project
 tools:
   - Read
   - Grep
