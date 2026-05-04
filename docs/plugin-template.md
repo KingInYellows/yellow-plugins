@@ -234,10 +234,7 @@ MIT
     "changelog": "https://github.com/username/repo/blob/main/plugins/my-plugin/CHANGELOG.md",
     "examples": "https://github.com/username/repo/tree/main/plugins/my-plugin/examples"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/username/repo.git"
-  },
+  "repository": "https://github.com/username/repo",
   "lifecycle": {
     "install": "scripts/install.sh",
     "uninstall": "scripts/uninstall.sh"

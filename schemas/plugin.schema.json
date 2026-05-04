@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kingin-yellows.dev/schemas/plugin.schema.json",
   "title": "Claude Code Plugin Manifest Schema",
-  "description": "Schema for Claude Code plugin.json files. Requires official fields (name, description, author) and allows optional metadata fields.",
+  "description": "Schema for Claude Code plugin.json files. Requires official fields (name, version, description, author) and allows optional metadata fields.",
   "type": "object",
   "required": ["name", "version", "description", "author"],
   "definitions": {
@@ -122,7 +122,7 @@
     },
     "outputStyles": {
       "$ref": "#/definitions/pathOrPaths",
-      "description": "Path or array of paths to markdown output style files/directories (replaces default ./output-styles/)."
+      "description": "Path or array of paths to directories containing markdown output style files (replaces default ./output-styles/). validate-plugin.js requires each path to resolve to an existing directory containing at least one .md file."
     },
     "commands": {
       "$ref": "#/definitions/pathOrPaths",
@@ -199,7 +199,7 @@
             "description": "Store value in OS keychain when true."
           }
         },
-        "additionalProperties": true
+        "additionalProperties": false
       }
     },
     "channels": {
@@ -215,15 +215,31 @@
           },
           "userConfig": {
             "type": "object",
+            "description": "Channel-scoped config keys (same shape as top-level userConfig). Each entry may declare type, label, description, default, required, sensitive.",
             "propertyNames": {
               "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
             },
             "additionalProperties": {
-              "type": "object"
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": ["string", "number", "boolean"]
+                },
+                "label": { "type": "string" },
+                "description": { "type": "string" },
+                "default": {},
+                "required": { "type": "boolean" },
+                "sensitive": {
+                  "type": "boolean",
+                  "description": "Store value in OS keychain when true."
+                }
+              },
+              "additionalProperties": false
             }
           }
         },
-        "additionalProperties": true
+        "additionalProperties": false
       },
       "minItems": 1,
       "description": "Channel declarations for message injection (Telegram, Slack, Discord style). Each binds to an MCP server in this plugin."
