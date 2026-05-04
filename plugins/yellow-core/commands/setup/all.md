@@ -175,7 +175,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-core; do
+    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -361,6 +361,15 @@ Compute bundled source availability out of 6:
 - PARTIAL: `codex` binary found AND version >= 0.118.0, but auth not configured
 - NEEDS SETUP: `codex` binary not found OR version < 0.118.0
 
+**yellow-council:**
+
+- READY: `bash` >= 4.3 AND `timeout` AND `jq` AND
+  (`gemini` >= 0.40 OR `opencode` >= 1.14 OR yellow-codex installed)
+- PARTIAL: required system tools present, but only 0 of 3 reviewer CLIs
+  installed (Gemini, OpenCode, Codex via yellow-codex) — council can run but
+  with degraded coverage
+- NEEDS SETUP: required system tools missing (`bash`, `timeout`, `jq`)
+
 **yellow-core:**
 
 - READY: `python37_check` ok AND `~/.claude/yellow-statusline.py` exists AND
@@ -464,7 +473,8 @@ tool in this fixed order:
 13. `docs:setup`
 14. `composio:setup`
 15. `codex:setup`
-16. `statusline:setup`
+16. `council:setup`
+17. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 Only invoke setups for plugins the user selected. Use this mapping:
@@ -485,6 +495,7 @@ Only invoke setups for plugins the user selected. Use this mapping:
 - `yellow-docs` → `docs:setup`
 - `yellow-composio` → `composio:setup`
 - `yellow-codex` → `codex:setup`
+- `yellow-council` → `council:setup`
 - `yellow-core` → `statusline:setup`
 <!-- setup-all-plugin-command-map:end -->
 

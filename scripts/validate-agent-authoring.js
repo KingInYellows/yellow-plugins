@@ -28,6 +28,13 @@ const REVIEW_AGENT_ALLOWLIST = new Set([
   // only restriction would break the agent. See agent body for rationale.
   // Decision recorded in plans/everyinc-merge.md W1.2 (2026-04-29).
   'yellow-codex/agents/review/codex-reviewer.md',
+  // gemini-reviewer and opencode-reviewer wrap external CLIs (gemini, opencode)
+  // for the on-demand cross-lineage council. Same containment rationale as
+  // codex-reviewer: Bash is required for binary invocation; read-only contract
+  // is enforced via prose discipline + explicit prompt design. See plan
+  // plans/yellow-council-godmodeskill-integration.md (2026-05-04).
+  'yellow-council/agents/review/gemini-reviewer.md',
+  'yellow-council/agents/review/opencode-reviewer.md',
 ]);
 
 const colors = {

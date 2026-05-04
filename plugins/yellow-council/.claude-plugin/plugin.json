@@ -1,0 +1,22 @@
+{
+  "name": "yellow-council",
+  "version": "0.1.0",
+  "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-council",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "council",
+    "multi-llm",
+    "code-review",
+    "cross-lineage",
+    "gemini",
+    "opencode",
+    "codex",
+    "advisory"
+  ]
+}
