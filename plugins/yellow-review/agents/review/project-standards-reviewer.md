@@ -2,6 +2,7 @@
 name: project-standards-reviewer
 description: "Always-on code-review persona. Audits changes against the project's own CLAUDE.md and AGENTS.md standards — frontmatter rules, reference inclusion, naming conventions, cross-platform portability, and tool-selection policies. Use when reviewing any PR — selected automatically by review:pr alongside the other always-on personas; complements project-compliance-reviewer (general convention adherence)."
 model: inherit
+background: true
 tools:
   - Read
   - Grep

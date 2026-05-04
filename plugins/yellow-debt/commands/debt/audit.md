@@ -142,22 +142,26 @@ After the bash block succeeds:
 
 1. Read `.debt/scanners-to-run.txt`.
 2. Launch one Task per scanner in parallel using subagent type
-   `yellow-debt:<scanner>-scanner`. **Each Task invocation MUST set
-   `run_in_background: true`** — scanner agents declare `background: true` in
-   their frontmatter, but true parallelism also requires the spawning call to
-   run in the background.
+   `yellow-debt:scanners:<scanner>-scanner` (the agents live at
+   `plugins/yellow-debt/agents/scanners/<scanner>-scanner.md`; the runtime
+   resolves only the three-segment `plugin:dir:name` form). **Each Task
+   invocation MUST set `run_in_background: true`** — scanner agents declare
+   `background: true` in their frontmatter, but true parallelism also
+   requires the spawning call to run in the background.
 3. Each scanner prompt should instruct the agent to read
    `.debt/file-list.txt`, write findings to
    `.debt/scanner-output/<scanner>-scanner.json`, and if
    `.debt/severity-filter.txt` exists, filter to that minimum severity.
-
-**Wait gate:** Before step 4, wait for all background scanner tasks to complete
-via TaskOutput / TaskList polling (or equivalent notification). Do NOT launch
-`yellow-debt:audit-synthesizer` while any scanner task is still `in_progress` —
-the synthesizer depends on every scanner's `.debt/scanner-output/<scanner>-scanner.json`
-being present, and a partial merge silently drops findings.
-
-4. After all scanner tasks complete, launch `yellow-debt:audit-synthesizer` to merge
+4. **Wait gate (mandatory).** Before launching the synthesizer, wait for ALL
+   scanner tasks to complete via TaskOutput polling (or equivalent
+   notification). Do NOT proceed to step 5 while any scanner task is still
+   `in_progress` — the synthesizer reads `.debt/scanner-output/` files that
+   in-progress scanners have not yet written, producing empty or partial
+   audit reports. On scanner failure (non-zero exit, timeout, missing
+   output file), log `[audit] Warning: <scanner> failed — proceeding with
+   partial results` and apply the existing `>50% scanner failure = abort`
+   threshold defined elsewhere in this command.
+5. After all scanner tasks complete, launch `yellow-debt:synthesis:audit-synthesizer` to merge
    `.debt/scanner-output/`, write the audit report to
    `docs/audits/YYYY-MM-DD-audit-report.md`, and create todo files in
    `todos/debt/`.

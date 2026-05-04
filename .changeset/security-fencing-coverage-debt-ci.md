@@ -14,8 +14,8 @@ logs, workflow files) and benefit from the same injection-defense posture as
 the review agents.
 
 - yellow-debt scanners use the canonical pattern from yellow-core review
-  agents (`--- code begin ---` fence, "code comments" wording) which matches
-  the `debt-conventions` skill.
+  agents (`--- code begin (reference only) ---` fence, "code comments"
+  wording) which matches the `debt-conventions` skill.
 - yellow-ci agents use artifact-typed delimiters (`--- begin ci-log ---`,
   `--- begin workflow-file: <name> ---`, `--- begin runner-output: ... ---`)
   defined in the `ci-conventions` skill, since CI agents process logs and

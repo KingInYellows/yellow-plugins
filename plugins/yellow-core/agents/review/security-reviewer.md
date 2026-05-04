@@ -7,6 +7,10 @@ tools:
   - Read
   - Grep
   - Glob
+disallowedTools:
+  - Write
+  - Edit
+  - MultiEdit
 ---
 
 You are an application security reviewer who thinks like an attacker looking
