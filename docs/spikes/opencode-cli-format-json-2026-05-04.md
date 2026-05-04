@@ -55,7 +55,7 @@ Concatenate all `text` events for the full response. Multiple `text` events can 
 
 **Session ID extraction (jq):**
 ```bash
-SESSION_ID=$(jq -r 'first(.part.snapshot.sessionID // empty)' "$OUTPUT_FILE" 2>/dev/null)
+SESSION_ID=$(jq -r 'first(.sessionID // empty)' "$OUTPUT_FILE" 2>/dev/null)
 ```
 
 ## Recommended yellow-council Invocation
@@ -72,7 +72,7 @@ timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
 CLI_EXIT=$?
 
 # Extract session ID for cleanup
-SESSION_ID=$(jq -r 'first(.part.snapshot.sessionID // empty)' "$OUTPUT_FILE" 2>/dev/null)
+SESSION_ID=$(jq -r 'first(.sessionID // empty)' "$OUTPUT_FILE" 2>/dev/null)
 
 # Check for error events FIRST (jq stops on first hit, fast)
 ERROR_MSG=$(jq -r 'select(.type=="error") | .error.data.message' "$OUTPUT_FILE" 2>/dev/null | head -1)

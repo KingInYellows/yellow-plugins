@@ -29,12 +29,12 @@ done
 printf '[yellow-council] system tools: ok (bash, timeout, jq, mktemp, awk, sed, grep)\n'
 
 # Bash version check (need 4.3+ for ${BASH_VERSINFO[N]} array indexing, associative arrays, and ${var^} capitalization used in council.md)
-BASH_VERSION_OK="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
-case "$BASH_VERSION_OK" in
+BASH_VER="${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
+case "$BASH_VER" in
   4.[3-9]*|4.[1-9][0-9]*|[5-9].*|[1-9][0-9].*)
-    printf '[yellow-council] bash: ok (%s)\n' "$BASH_VERSION_OK" ;;
+    printf '[yellow-council] bash: ok (%s)\n' "$BASH_VER" ;;
   *)
-    printf '[yellow-council] Error: bash 4.3+ required, found %s\n' "$BASH_VERSION_OK" >&2
+    printf '[yellow-council] Error: bash 4.3+ required, found %s\n' "$BASH_VER" >&2
     exit 1 ;;
 esac
 ```
@@ -43,13 +43,16 @@ esac
 
 ```bash
 if command -v gemini >/dev/null 2>&1; then
-  GEMINI_VERSION=$(gemini --version 2>/dev/null | head -1)
-  printf '[yellow-council] gemini: ok (%s)\n' "$GEMINI_VERSION"
+  # npm-packaged CLIs may prefix output (e.g. `@google/gemini-cli/0.40.1 linux-x64 node-v22.11.0`)
+  # and may emit to stderr; extract bare semver to keep the case match version-format-agnostic.
+  GEMINI_RAW=$(gemini --version 2>&1 | head -1)
+  GEMINI_VERSION=$(printf '%s' "$GEMINI_RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  printf '[yellow-council] gemini: ok (%s)\n' "${GEMINI_VERSION:-$GEMINI_RAW}"
   case "$GEMINI_VERSION" in
     0.40.*|0.4[1-9].*|0.[5-9][0-9].*|[1-9].*)
       printf '[yellow-council] gemini version: compatible (>=0.40)\n' ;;
     *)
-      printf '[yellow-council] gemini version: WARNING — %s may be too old. Recommend v0.40+ for council use.\n' "$GEMINI_VERSION" ;;
+      printf '[yellow-council] gemini version: WARNING — %s may be too old. Recommend v0.40+ for council use.\n' "${GEMINI_VERSION:-$GEMINI_RAW}" ;;
   esac
 else
   printf '[yellow-council] gemini: NOT INSTALLED\n'
@@ -87,13 +90,15 @@ If user chooses **No, I'll install manually**: print install instructions and ex
 
 ```bash
 if command -v opencode >/dev/null 2>&1; then
-  OPENCODE_VERSION=$(opencode --version 2>/dev/null | head -1)
-  printf '[yellow-council] opencode: ok (%s)\n' "$OPENCODE_VERSION"
+  # Same prefix/stderr robustness as gemini — extract bare semver before case match.
+  OPENCODE_RAW=$(opencode --version 2>&1 | head -1)
+  OPENCODE_VERSION=$(printf '%s' "$OPENCODE_RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  printf '[yellow-council] opencode: ok (%s)\n' "${OPENCODE_VERSION:-$OPENCODE_RAW}"
   case "$OPENCODE_VERSION" in
     1.1[4-9].*|1.[2-9][0-9].*|[2-9].*|[1-9][0-9].*)
       printf '[yellow-council] opencode version: compatible (>=1.14)\n' ;;
     *)
-      printf '[yellow-council] opencode version: WARNING — %s may be too old. Recommend v1.14+ for council use.\n' "$OPENCODE_VERSION" ;;
+      printf '[yellow-council] opencode version: WARNING — %s may be too old. Recommend v1.14+ for council use.\n' "${OPENCODE_VERSION:-$OPENCODE_RAW}" ;;
   esac
 else
   printf '[yellow-council] opencode: NOT INSTALLED\n'
@@ -109,7 +114,12 @@ If opencode is not installed, ask via AskUserQuestion:
 If user chooses **Yes, install via curl**:
 
 ```bash
-curl -fsSL https://opencode.ai/install | bash
+# Download to a temp file so the user can inspect before execution
+TMP_INSTALLER="$(mktemp)"
+trap 'rm -f "$TMP_INSTALLER"' EXIT
+curl -fsSL https://opencode.ai/install -o "$TMP_INSTALLER"
+printf '[yellow-council] Installer downloaded to %s — inspect with: bat %s\n' "$TMP_INSTALLER" "$TMP_INSTALLER"
+bash "$TMP_INSTALLER"
 ```
 
 Then prompt the user to source their shell profile or open a new terminal so the binary is on PATH.
@@ -120,7 +130,7 @@ yellow-codex is an optional cross-plugin dependency. yellow-council reuses its
 `codex-reviewer` agent when present; otherwise the Codex leg is soft-skipped.
 
 ```bash
-if [ -d "${HOME}/.claude/plugins/cache/yellow-codex" ] || [ -d "$(git rev-parse --show-toplevel 2>/dev/null)/plugins/yellow-codex" ]; then
+if [ -d "${HOME}/.claude/plugins/cache/yellow-codex" ]; then
   printf '[yellow-council] yellow-codex: ok (Codex leg available via Task spawn)\n'
 else
   printf '[yellow-council] yellow-codex: NOT INSTALLED — Codex leg will be skipped.\n'
@@ -151,8 +161,7 @@ else
   OPENCODE_STATUS="missing"
 fi
 
-if [ -d "${HOME}/.claude/plugins/cache/yellow-codex" ] || \
-   [ -d "$(git rev-parse --show-toplevel 2>/dev/null)/plugins/yellow-codex" ]; then
+if [ -d "${HOME}/.claude/plugins/cache/yellow-codex" ]; then
   CODEX_STATUS="installed"
   READY_COUNT=$((READY_COUNT + 1))
 else

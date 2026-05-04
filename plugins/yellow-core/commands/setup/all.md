@@ -61,6 +61,8 @@ command -v agent-browser >/dev/null 2>&1 && printf 'agent-browser:      OK\n' ||
 [ -n "$_gt" ] && printf 'gt:                 OK (%s)\n' "$("$_gt" --version 2>/dev/null | head -n1)" || printf 'gt:                 NOT FOUND\n'
 command -v ruvector >/dev/null 2>&1 && printf 'ruvector:           OK\n' || printf 'ruvector:           NOT FOUND\n'
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
+command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
+command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
 
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
@@ -365,10 +367,11 @@ Compute bundled source availability out of 6:
 
 - READY: `bash` >= 4.3 AND `timeout` AND `jq` AND
   (`gemini` >= 0.40 OR `opencode` >= 1.14 OR yellow-codex installed)
-- PARTIAL: required system tools present, but only 0 of 3 reviewer CLIs
-  installed (Gemini, OpenCode, Codex via yellow-codex) — council can run but
-  with degraded coverage
-- NEEDS SETUP: required system tools missing (`bash`, `timeout`, `jq`)
+- PARTIAL: required system tools present AND at least 1 of 3 reviewer CLIs
+  installed (Gemini, OpenCode, Codex via yellow-codex) — council can run with
+  reduced coverage
+- NEEDS SETUP: required system tools missing (`bash`, `timeout`, `jq`) OR
+  system tools present but 0 of 3 reviewer CLIs installed
 
 **yellow-core:**
 

@@ -14,7 +14,13 @@ inline.
 ### Required external CLIs
 
 - **Gemini CLI** — `npm install -g @google/gemini-cli` (v0.40+)
-- **OpenCode CLI** — `curl -fsSL https://opencode.ai/install | bash` (v1.14+)
+- **OpenCode CLI** — download-then-execute (v1.14+):
+  ```bash
+  TMP_INSTALLER="$(mktemp)" && trap 'rm -f "$TMP_INSTALLER"' EXIT
+  curl -fsSL https://opencode.ai/install -o "$TMP_INSTALLER"
+  # Optionally inspect: bat "$TMP_INSTALLER"
+  bash "$TMP_INSTALLER"
+  ```
 - **Codex CLI (optional)** — install `yellow-codex` plugin for Codex coverage.
   Without it, the council runs with 2 of 3 reviewers.
 
