@@ -138,6 +138,27 @@ notification). Do NOT proceed to commit, diff review, or thread resolution
 while any resolver task is still `in_progress` — doing so risks committing
 partial fixes and marking threads resolved prematurely.
 
+**CONFLICT sentinel check (mandatory):** After all resolver tasks complete,
+scan each resolver's TaskOutput for a leading `CONFLICT:` prefix on the first
+non-empty line. `pr-comment-resolver` emits this sentinel when threads in the
+same file cluster contradict each other (e.g., one thread asks to rename X,
+another asks to keep X) and intentionally does not apply edits in that case.
+
+For each resolver that returned a `CONFLICT:` sentinel:
+
+1. Extract the conflict description and the affected `threadIds` from the
+   resolver's per-thread table.
+2. Use `AskUserQuestion` to surface the conflict, presenting the resolver's
+   description and the conflicting comment bodies. Ask the user to choose
+   how to proceed (e.g., apply one thread's fix, apply the other, edit
+   manually, or skip).
+3. The conflicted threadIds MUST be excluded from the resolved-thread list
+   in Step 8 — they remain unresolved on GitHub regardless of whether the
+   commit in Step 7 includes other resolvers' fixes.
+
+Do NOT proceed to Step 7 (commit) for any conflicted file cluster until the
+user has decided. Threads from non-conflicting resolvers may proceed normally.
+
 ### Step 6: Review Changes
 
 Collect all changes from resolver agents. Check for conflicts:
@@ -167,7 +188,13 @@ gt submit --no-interactive
 **Only if the user approved the push in Step 7 AND `gt submit` exited 0.** If
 push was rejected or failed, skip this step.
 
-For each comment thread that was addressed, run:
+**Skip threads flagged in Step 5's CONFLICT sentinel check.** Conflicted
+threads were not applied by the resolver and the user has not directed an
+override path; marking them resolved on GitHub would silently dismiss
+unresolved feedback. Include the skipped threadIds in the Step 10 report.
+
+For each comment thread that was addressed (and not flagged as conflicted),
+run:
 
 ```bash
 "${CLAUDE_PLUGIN_ROOT}/skills/pr-review-workflow/scripts/resolve-pr-thread" "<threadId>"

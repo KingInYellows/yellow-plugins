@@ -3,7 +3,6 @@ name: pattern-recognition-specialist
 description: "Code pattern analysis specialist detecting anti-patterns, naming convention violations, duplication, and inconsistency across codebases. Use when reviewing PRs that introduce new patterns, new directories, new file type conventions, checking codebase consistency, or when changes touch agents/*.md, commands/*.md, skills/*/SKILL.md, or plugin.json files (plugin authoring convention checks)."
 model: inherit
 background: true
-memory: project
 tools:
   - Read
   - Grep

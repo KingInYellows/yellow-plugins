@@ -3,7 +3,6 @@ name: code-simplicity-reviewer
 description: "YAGNI enforcement and simplification analysis (pre-fix pass). Use when running full review passes to ensure code is minimal, removing unnecessary abstractions, premature optimizations, and unused features. For post-fix simplification, see code-simplifier (yellow-review)."
 model: inherit
 background: true
-memory: project
 tools:
   - Read
   - Grep
