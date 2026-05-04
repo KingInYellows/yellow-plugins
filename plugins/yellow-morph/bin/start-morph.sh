@@ -29,98 +29,54 @@ unset MORPH_API_KEY_USERCONFIG
 # If neither userConfig nor shell MORPH_API_KEY is set, morphmcp will emit
 # its own warning and exit — we don't duplicate that error path here.
 
-# --- 2. Ensure morphmcp is installed in the persistent data directory.
+# --- 2. Source install primitives and ensure morphmcp is installed.
 : "${CLAUDE_PLUGIN_ROOT:?yellow-morph wrapper: CLAUDE_PLUGIN_ROOT is unset}"
-: "${CLAUDE_PLUGIN_DATA:?yellow-morph wrapper: CLAUDE_PLUGIN_DATA is unset}"
+# shellcheck source=../lib/install-morphmcp.sh
+. "${CLAUDE_PLUGIN_ROOT}/lib/install-morphmcp.sh"
 
-# Defense in depth: Claude Code sets CLAUDE_PLUGIN_DATA to a path under the
-# user's home directory. If something else populated these vars with an
-# unexpected path (misconfiguration or compromised env), refuse to install —
-# we do not want `cp` / `npm ci` to write to e.g. /etc or /var.
-#
-# `${HOME:-/__unset__}` sentinel — an unset HOME would otherwise expand to
-# `/*`, matching ANY absolute path and bypassing the check entirely. The
-# sentinel is a path that cannot match any real CLAUDE_PLUGIN_DATA value.
-case "$CLAUDE_PLUGIN_DATA" in
-  "${HOME:-/__unset__}"/*|/tmp/*) ;;
-  *) printf 'yellow-morph: refusing install — CLAUDE_PLUGIN_DATA is not under $HOME or /tmp: %s\n' "$CLAUDE_PLUGIN_DATA" >&2; exit 1 ;;
-esac
-case "$CLAUDE_PLUGIN_ROOT" in
-  "${HOME:-/__unset__}"/*|/tmp/*|/usr/*|/opt/*) ;;
-  *) printf 'yellow-morph: refusing install — CLAUDE_PLUGIN_ROOT has unexpected prefix: %s\n' "$CLAUDE_PLUGIN_ROOT" >&2; exit 1 ;;
-esac
+yellow_morph_validate_paths || exit 1
 
-MORPH_ENTRY="${CLAUDE_PLUGIN_DATA}/node_modules/@morphllm/morphmcp/dist/index.js"
-LOCK_DIR="${CLAUDE_PLUGIN_DATA}/.install.lock"
-
-# Reinstall when the entry file is missing OR the persistent install
-# diverges from CLAUDE_PLUGIN_ROOT (e.g., after a plugin version bump).
-# Without the lockfile check, an upgraded morphmcp pin would run only on
-# next session unless the SessionStart prewarm hook caught it — and a
-# failed prewarm (network blip, timeout) would silently leave the user
-# on the stale install.
-needs_install() {
-  [ ! -f "$MORPH_ENTRY" ] && return 0
-  ! diff -q "${CLAUDE_PLUGIN_ROOT}/package-lock.json" \
-            "${CLAUDE_PLUGIN_DATA}/package-lock.json" >/dev/null 2>&1
-}
-
-if needs_install; then
+LOCK_ACQUIRED=0
+if yellow_morph_needs_install; then
   mkdir -p "$CLAUDE_PLUGIN_DATA"
 
-  # Acquire an atomic mkdir-lock to serialize against the SessionStart
-  # prewarm hook. `npm ci` deletes node_modules before installing, so two
-  # concurrent runs against the same target would corrupt the install.
-  # mkdir is atomic across POSIX systems (no flock dependency).
-  LOCK_ACQUIRED=0
-  for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-    if mkdir "$LOCK_DIR" 2>/dev/null; then
-      LOCK_ACQUIRED=1
-      trap 'rmdir "$LOCK_DIR" 2>/dev/null || true' EXIT INT TERM
-      break
-    fi
-    sleep 1
-  done
-
-  if [ "$LOCK_ACQUIRED" -eq 0 ]; then
-    printf 'yellow-morph: timed out (20s) waiting for install lock at %s\n' "$LOCK_DIR" >&2
-    printf 'yellow-morph: another install may be running, or a stale lock\n' >&2
-    printf 'yellow-morph: needs manual cleanup: rmdir %s\n' "$LOCK_DIR" >&2
+  # 20s budget — synchronous correctness gate. If we can't acquire after
+  # 20s the prior holder is either still installing or stuck; the lib's
+  # stale-PID recovery covers crashed holders. A live holder finishing
+  # within ~20s is the common case.
+  if ! yellow_morph_acquire_install_lock 20; then
+    printf 'yellow-morph: timed out (20s) waiting for install lock at %s\n' \
+      "${CLAUDE_PLUGIN_DATA}/.install.lock" >&2
+    printf 'yellow-morph: another install may be running, or the lock is\n' >&2
+    printf 'yellow-morph: held by an unkillable process — manual cleanup:\n' >&2
+    printf 'yellow-morph:   rmdir %s\n' "${CLAUDE_PLUGIN_DATA}/.install.lock" >&2
     exit 1
   fi
+  LOCK_ACQUIRED=1
+  trap 'yellow_morph_release_install_lock' EXIT INT TERM
 
   # Re-check under the lock — the prewarm hook may have completed the
-  # install while we were waiting, in which case we have nothing to do.
-  if needs_install; then
-    # Copy both the manifest AND the committed lockfile so `npm ci` can do a
-    # deterministic, transitive-pinned install. Without the lockfile, npm
-    # falls back to lockfile-less resolution and silently installs whatever
-    # transitive versions the registry currently advertises — a supply-chain
-    # risk that defeats the point of pinning @morphllm/morphmcp.
-    cp "${CLAUDE_PLUGIN_ROOT}/package.json" "${CLAUDE_PLUGIN_DATA}/package.json"
-    cp "${CLAUDE_PLUGIN_ROOT}/package-lock.json" "${CLAUDE_PLUGIN_DATA}/package-lock.json"
-    # Install in a subshell that does NOT inherit MORPH_API_KEY — a malicious
-    # postinstall script in any transitive dep could otherwise exfiltrate the
-    # key before the real MCP server ever starts.
+  # install while we were waiting, in which case there is nothing to do.
+  if yellow_morph_needs_install; then
     printf 'yellow-morph: installing @morphllm/morphmcp into %s...\n' \
       "$CLAUDE_PLUGIN_DATA" >&2
-    if ! (unset MORPH_API_KEY; cd "$CLAUDE_PLUGIN_DATA" && npm ci --no-audit --no-fund --loglevel=error) >&2; then
+    if ! yellow_morph_do_install >&2; then
       printf 'yellow-morph: npm ci failed. Run /morph:setup to diagnose.\n' >&2
-      # Remove the copied manifest+lockfile so the next session retries
-      # instead of seeing an out-of-sync state.
-      rm -f "${CLAUDE_PLUGIN_DATA}/package.json" "${CLAUDE_PLUGIN_DATA}/package-lock.json"
+      yellow_morph_cleanup_failed_install
       exit 1
     fi
   fi
 fi
 
-# --- 3. Release the install lock explicitly before exec. Bash's EXIT trap
-# does NOT fire when `exec` replaces the shell with another program — the
-# shell never "exits" in the sense that triggers EXIT. Without this manual
-# cleanup, an exec into a long-running morphmcp would leave $LOCK_DIR
-# behind for the entire session, blocking future upgrades.
-if [ "${LOCK_ACQUIRED:-0}" -eq 1 ]; then
-  rmdir "$LOCK_DIR" 2>/dev/null || true
+# --- 3. Release the install lock explicitly before exec. Bash's EXIT
+# trap does NOT fire when `exec` replaces the shell with another program —
+# the shell never "exits" in the sense that triggers EXIT. Without this
+# manual cleanup, an exec into a long-running morphmcp would leave the
+# lock dir behind for the entire session, blocking future upgrades.
+if [ "$LOCK_ACQUIRED" -eq 1 ]; then
+  yellow_morph_release_install_lock
   trap - EXIT INT TERM
 fi
+
+MORPH_ENTRY="${CLAUDE_PLUGIN_DATA}/node_modules/@morphllm/morphmcp/dist/index.js"
 exec node "$MORPH_ENTRY" "$@"
