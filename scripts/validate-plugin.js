@@ -54,6 +54,39 @@ function resolvePluginPath(inputPath, pluginDir) {
 }
 
 /**
+ * Count .md files under `dir` recursively (skipping symlinks). Used by
+ * validatePathOrPathsDir to accept the standard nested layouts:
+ *   skills/<name>/SKILL.md
+ *   commands/<category>/<name>.md
+ *   agents/<category>/<name>.md
+ * Symlinked entries are skipped to match the symlink-rejection policy in
+ * resolvePluginPath / validatePathFile (PR #343).
+ */
+function countMarkdownRecursive(dir) {
+  let count = 0;
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+/**
  * Validate a path field that must point to an existing file (not a directory).
  * Used for fields like lspServers and monitors that reference config files.
  * @param {string} fieldName  - Field name for error messages (e.g. 'lspServers')
@@ -112,19 +145,22 @@ function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
       errors.push(`${fieldName} must point to a directory: ${p}`);
       logError(`${fieldName} must point to a directory: ${p}`);
     } else {
-      const mdFiles = fs
-        .readdirSync(resolved, { withFileTypes: true })
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
-      if (mdFiles.length === 0) {
+      // Walk the directory recursively to find any .md files. The 'skills'
+      // field uses SKILL.md files inside per-skill subdirectories; 'commands'
+      // and 'agents' commonly group .md files into category subdirectories
+      // (e.g. setup/all.md, research/best-practices-researcher.md). A
+      // single-level readdirSync misses both layouts and false-rejects them.
+      const mdCount = countMarkdownRecursive(resolved);
+      if (mdCount === 0) {
         errors.push(
-          `${fieldName} directory must contain at least one .md file: ${p}`
+          `${fieldName} directory must contain at least one .md file (recursively): ${p}`
         );
         logError(
-          `${fieldName} directory must contain at least one .md file: ${p}`
+          `${fieldName} directory must contain at least one .md file (recursively): ${p}`
         );
       } else {
         logSuccess(
-          `${fieldName}: ${p} (${mdFiles.length} file${mdFiles.length === 1 ? '' : 's'})`
+          `${fieldName}: ${p} (${mdCount} file${mdCount === 1 ? '' : 's'})`
         );
       }
     }

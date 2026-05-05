@@ -28,7 +28,8 @@
     },
     "relativePath": {
       "type": "string",
-      "pattern": "^\\./(?!.*\\.\\.)[A-Za-z0-9._/-]+/?$"
+      "description": "Plugin-relative path. The leading './' is optional — both './foo' and 'foo' are accepted to match the runtime validator (which uses path.resolve and accepts both forms).",
+      "pattern": "^(?:\\./)?(?!.*\\.\\.)[A-Za-z0-9._/-]+/?$"
     },
     "pathOrPaths": {
       "oneOf": [

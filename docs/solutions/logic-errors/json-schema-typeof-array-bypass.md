@@ -37,6 +37,7 @@ Two independent patterns, same underlying failure mode:
 ## Fix
 
 **Rule 8 guard (validate-plugin.js):**
+
 ```js
 // Before
 if (typeof manifest.hooks === 'object') { ... }
@@ -46,6 +47,7 @@ if (typeof manifest.hooks === 'object' && !Array.isArray(manifest.hooks)) { ... 
 ```
 
 **JSON Schema oneOf branches:**
+
 ```json
 {
   "type": "object",
