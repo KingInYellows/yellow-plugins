@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.5.0
+
+### Minor Changes
+
+- [#255](https://github.com/KingInYellows/yellow-plugins/pull/255)
+  [`3b4025e`](https://github.com/KingInYellows/yellow-plugins/commit/3b4025e8c1af062223ea8db4bf6b067f439156c6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Enable true
+  parallel execution for multi-agent review sessions
+
+  Add `background: true` to 13 review agents (7 in yellow-core/agents/review, 6
+  in yellow-review/agents/review) plus `best-practices-researcher` and update
+  orchestrator commands (review-pr.md, resolve-pr.md, work.md, audit.md) to
+  explicitly require `run_in_background: true` on each Task invocation.
+  Frontmatter flag alone is insufficient — the spawning call must also run in
+  the background for agents to run concurrently rather than serially. Also
+  correct invalid `memory: true` to `memory: project` (the field requires a
+  scope string: `user` / `project` / `local`).
+
 ## 2.4.0
 
 ### Minor Changes
