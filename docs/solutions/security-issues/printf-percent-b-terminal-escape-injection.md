@@ -1,3 +1,9 @@
+---
+title: 'printf `%b` in Colored Output Helpers Enables Terminal Escape Injection'
+date: 2026-04-28
+category: 'security-issues'
+---
+
 # printf `%b` in Colored Output Helpers Enables Terminal Escape Injection
 
 ## Summary
@@ -57,7 +63,7 @@ Two consequences:
 - The format string is a static literal — no caller controls what `%b` sees.
 - `$1` flows through `%s`, which prints bytes verbatim without escape
   interpretation. A malicious version string `\033[red]ERR\033[0m` is shown
-  as the literal seven-character sequence, not a color change.
+  as the literal text sequence, not a color change.
 
 The named-constant variables (`RED`, `GREEN`, `YELLOW`, `NC`) become unused
 after this fix; remove them to silence shellcheck SC2034.
