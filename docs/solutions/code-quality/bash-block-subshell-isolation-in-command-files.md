@@ -191,3 +191,95 @@ Add to command file review checklist:
 - `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` — Section 15
   covers the variable-survival angle of this same root cause (PR #74)
 - MEMORY.md: "**$VAR in bash code blocks (from PR #74)**" entry in Command File Anti-Patterns
+
+---
+
+## Update — 2026-05-04
+
+### Status / Summary Blocks Are the Most Common Site of Cross-Block Variable Loss (PRs #328–#330)
+
+Yellow-council's `setup.md` (Step 5 summary block) referenced
+`$READY_COUNT`, `$GEMINI_STATUS`, `$OPENCODE_STATUS`, and `$CODEX_STATUS` —
+all of which were meant to be assigned in Steps 2–4. Because each step runs
+as a separate Bash tool call (a fresh subprocess), all four variables are
+unset in Step 5. The summary block silently printed "0 of 3 reviewers ready /
+NOT READY" regardless of actual install state.
+
+Five reviewers flagged this in the same wave. It is the single most common
+concretization of the cross-block isolation bug: **setup/install command files
+almost always have a final summary step that consolidates status across prior
+steps, and that summary step always runs in a fresh subprocess.**
+
+#### Concretization: the setup summary anti-pattern
+
+```bash
+# Step 2 — fresh subprocess
+GEMINI_STATUS="ok"
+echo "gemini: $GEMINI_STATUS"
+
+# Step 3 — fresh subprocess
+OPENCODE_STATUS="ok"
+echo "opencode: $OPENCODE_STATUS"
+
+# Step 5 — DIFFERENT fresh subprocess; $GEMINI_STATUS and $OPENCODE_STATUS are unset
+READY_COUNT=0
+[ "$GEMINI_STATUS"  = "ok" ] && READY_COUNT=$((READY_COUNT + 1))   # always false
+[ "$OPENCODE_STATUS" = "ok" ] && READY_COUNT=$((READY_COUNT + 1))  # always false
+printf '%d of 3 reviewers ready\n' "$READY_COUNT"                   # always "0 of 3"
+```
+
+#### Three fixes, in order of preference
+
+**Fix A: Re-derive inline in the summary block**
+
+Each prior step writes a sentinel file (e.g., `touch /tmp/gemini-ok`) and the
+summary block checks for the files' existence:
+
+```bash
+# Step 2
+command -v gemini >/dev/null 2>&1 && touch /tmp/.council-gemini-ok || rm -f /tmp/.council-gemini-ok
+
+# Step 5 — re-derive from sentinel files
+READY_COUNT=0
+GEMINI_STATUS="NOT READY";  [ -f /tmp/.council-gemini-ok  ] && { GEMINI_STATUS="ok";  READY_COUNT=$((READY_COUNT + 1)); }
+OPENCODE_STATUS="NOT READY"; [ -f /tmp/.council-opencode-ok ] && { OPENCODE_STATUS="ok"; READY_COUNT=$((READY_COUNT + 1)); }
+printf 'gemini:   %s\nopencode:  %s\n%d of 3 ready\n' \
+  "$GEMINI_STATUS" "$OPENCODE_STATUS" "$READY_COUNT"
+```
+
+**Fix B: Persist to a state file and source it**
+
+```bash
+# Step 2
+STATE_FILE="/tmp/.council-setup-state.env"
+GEMINI_STATUS="ok"
+printf 'GEMINI_STATUS=%s\n' "$GEMINI_STATUS" >> "$STATE_FILE"
+
+# Step 5
+STATE_FILE="/tmp/.council-setup-state.env"
+[ -f "$STATE_FILE" ] && . "$STATE_FILE"
+# $GEMINI_STATUS, $OPENCODE_STATUS now available
+```
+
+**Fix C: Consolidate all steps into one Bash block**
+
+If the steps are fast and do not require separate user interaction between
+them, merge Steps 2–5 into a single Bash block. This is the simplest fix when
+the intermediate steps produce no output the user needs to act on.
+
+#### Detection
+
+When reviewing a multi-step setup or install command file, run:
+
+```bash
+# Find variables used in a later bash block that are set in an earlier one
+# (heuristic: look for variables referenced in "summary" or "Step N" blocks
+# where N > the step that sets them)
+rg 'READY_COUNT|_STATUS|INSTALLED_COUNT' plugins/ --include='*.md'
+```
+
+Checklist question: "Does any bash block in this file reference a variable
+that was only assigned in a prior code block (not the current one)?"
+
+If yes: apply Fix A (sentinel files), Fix B (state file), or Fix C (merge
+blocks) as appropriate.
