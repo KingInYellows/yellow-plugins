@@ -102,6 +102,7 @@ OUTPUT_FILE=$(mktemp /tmp/council-opencode-out-XXXXXX.json)
 STDERR_FILE=$(mktemp /tmp/council-opencode-err-XXXXXX.txt)
 
 # Write the pack to PACK_FILE here from your spawn prompt content
+[ -s "$PACK_FILE" ] || { printf '[opencode-reviewer] Error: empty pack file\n' >&2; exit 1; }
 
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
   opencode run \
@@ -124,6 +125,12 @@ if grep -q 'sqlite-migration' "$STDERR_FILE" 2>/dev/null; then
   printf '[opencode-reviewer] This typically takes 2-5 minutes; council results delayed.\n' >&2
   # If we timed out due to migration, surface that explicitly
   if [ "$CLI_EXIT" -eq 124 ] || [ "$CLI_EXIT" -eq 137 ]; then
+    # Best-effort session cleanup: a partial JSONL stream may already contain
+    # a sessionID even though the run timed out mid-migration. Skipping
+    # cleanup here would leak that session — exactly the accumulation the
+    # later cleanup is CRITICAL about preventing.
+    SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.sessionID' "$OUTPUT_FILE" 2>/dev/null | head -1)
+    [ -n "$SESSION_ID" ] && opencode session delete "$SESSION_ID" 2>/dev/null
     printf 'verdict=TIMEOUT\n'
     printf 'confidence=N/A\n'
     printf 'summary=OpenCode performing one-time SQLite migration; timed out at %ds. Run "opencode run test" interactively once, then retry.\n' "${COUNCIL_TIMEOUT:-600}"

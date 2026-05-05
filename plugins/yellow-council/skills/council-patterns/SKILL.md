@@ -230,11 +230,16 @@ build_slug() {
     | sed 's/-\{2,\}/-/g; s/^-//; s/-$//' \
     | cut -c1-40 \
     | sed 's/-$//')
-  # Validate; sha256 fallback for empty
+  # Validate; portable hash fallback for empty/invalid slug.
+  # sha256sum is GNU coreutils only — macOS uses shasum; cksum is POSIX.
   if printf '%s' "$slug" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$'; then
     printf '%s' "$slug"
-  else
+  elif command -v sha256sum >/dev/null 2>&1; then
     printf '%s' "$raw" | sha256sum | cut -d' ' -f1 | cut -c1-16
+  elif command -v shasum >/dev/null 2>&1; then
+    printf '%s' "$raw" | shasum -a 256 | cut -d' ' -f1 | cut -c1-16
+  else
+    printf '%s' "$raw" | cksum | awk '{printf "%x", $1}'
   fi
 }
 

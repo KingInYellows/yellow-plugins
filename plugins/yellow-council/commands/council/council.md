@@ -113,19 +113,47 @@ For each mode:
 - Pack: `## Task: plan` + `### Planning Document` + content + `### Repo Conventions` + truncated CLAUDE.md (first 4K chars).
 
 **`review` mode:** Optional `--base <ref>` flag.
-- Default `BASE_REF`:
+- Parse `--base` from `$REST` first; fall through to upstream-tracking
+  default only when the flag is absent. An invalid or non-existent ref must
+  fail loudly rather than silently falling back, otherwise the advertised
+  flag would be non-functional.
   ```bash
-  UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)
-  if [ -n "$UPSTREAM" ]; then
-    BASE_BRANCH=$(printf '%s\n' "$UPSTREAM" | sed 's|.*/||')
+  EXPLICIT_BASE=""
+  # shellcheck disable=SC2086
+  set -- $REST
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --base)
+        [ -n "$2" ] || { printf '[council] Error: --base requires a ref argument\n' >&2; exit 1; }
+        EXPLICIT_BASE="$2"
+        shift 2
+        ;;
+      *) shift ;;
+    esac
+  done
+
+  if [ -n "$EXPLICIT_BASE" ]; then
+    git rev-parse --verify --quiet "$EXPLICIT_BASE" >/dev/null || {
+      printf '[council] Error: --base ref "%s" does not exist\n' "$EXPLICIT_BASE" >&2
+      exit 1
+    }
+    BASE_REF=$(git merge-base HEAD "$EXPLICIT_BASE") || {
+      printf '[council] Error: cannot resolve merge-base with %s\n' "$EXPLICIT_BASE" >&2
+      exit 1
+    }
   else
-    printf '[council] Warning: no upstream tracking branch — falling back to origin/main\n' >&2
-    BASE_BRANCH="main"
+    UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)
+    if [ -n "$UPSTREAM" ]; then
+      BASE_BRANCH=$(printf '%s\n' "$UPSTREAM" | sed 's|.*/||')
+    else
+      printf '[council] Warning: no upstream tracking branch — falling back to origin/main\n' >&2
+      BASE_BRANCH="main"
+    fi
+    BASE_REF=$(git merge-base HEAD "origin/${BASE_BRANCH}") || {
+      printf '[council] Error: cannot resolve merge-base with origin/%s — fetch the remote or pass --base <ref>\n' "$BASE_BRANCH" >&2
+      exit 1
+    }
   fi
-  BASE_REF=$(git merge-base HEAD "origin/${BASE_BRANCH}") || {
-    printf '[council] Error: cannot resolve merge-base with origin/%s — fetch the remote or pass --base <ref>\n' "$BASE_BRANCH" >&2
-    exit 1
-  }
   ```
 - Get diff: `git diff "${BASE_REF}...HEAD"`
 - If diff exceeds 200K bytes: apply truncation algorithm (see skill — `git diff --stat` + first 200 lines + marker).
@@ -184,9 +212,17 @@ findings_block_begin
 findings_block_end
 ```
 
-Parse each return value into structured data:
+Parse each return value into structured data. The function expects four
+associative arrays declared in the same shell context — `REVIEWER_VERDICTS`,
+`REVIEWER_CONFIDENCES`, `REVIEWER_SUMMARIES`, `REVIEWER_FENCED_PATHS`,
+`REVIEWER_FINDINGS` — keyed by reviewer name (`codex`, `gemini`, `opencode`).
+Steps 5, 7, 8, and 9 read these arrays, so all of Step 4–9 must run in a
+single bash session (or be re-derived per block):
 
 ```bash
+declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_SUMMARIES \
+           REVIEWER_FENCED_PATHS REVIEWER_FINDINGS
+
 parse_reviewer_return() {
   local reviewer_output="$1"
   local reviewer_name="$2"
@@ -196,8 +232,12 @@ parse_reviewer_return() {
   summary=$(printf '%s' "$reviewer_output" | grep -m1 '^summary=' | sed 's/^summary=//')
   fenced_path=$(printf '%s' "$reviewer_output" | grep -m1 '^fenced_output_path=' | sed 's/^fenced_output_path=//')
   findings=$(printf '%s' "$reviewer_output" | awk '/^findings_block_begin$/{flag=1;next} /^findings_block_end$/{flag=0} flag')
+  REVIEWER_VERDICTS[$reviewer_name]=$verdict
+  REVIEWER_CONFIDENCES[$reviewer_name]=$confidence
+  REVIEWER_SUMMARIES[$reviewer_name]=$summary
+  REVIEWER_FENCED_PATHS[$reviewer_name]=$fenced_path
+  REVIEWER_FINDINGS[$reviewer_name]=$findings
   printf '[%s] verdict=%s confidence=%s\n' "$reviewer_name" "$verdict" "$confidence"
-  # store in associative arrays for synthesis
 }
 ```
 
