@@ -1,6 +1,6 @@
 {
   "name": "yellow-codex",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
   "author": {
     "name": "KingInYellows",
