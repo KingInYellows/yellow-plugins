@@ -291,6 +291,23 @@ where `$RUN_DIR` is a unique directory the orchestrator creates at the
 start of the run (see orchestrator example below) and passes to each agent
 via the spawn prompt.
 
+**Atomic write semantics.** Agents MUST write to a `.tmp` filename first,
+then `mv` to the final `.json` filename. POSIX rename is atomic with
+respect to concurrent readers on the same filesystem, so the orchestrator
+sees either the complete result file or no file at all — never a partial
+write. The orchestrator MUST glob only `*.json`, never `*.tmp`. Sequence:
+
+```bash
+RESULT_TMP="$RUN_DIR/agent-result-${AGENT_NAME}.tmp"
+RESULT_FINAL="$RUN_DIR/agent-result-${AGENT_NAME}.json"
+printf '%s\n' "$JSON_PAYLOAD" > "$RESULT_TMP" && mv "$RESULT_TMP" "$RESULT_FINAL"
+```
+
+If the agent crashes between the `>` and the `mv`, the orchestrator finds
+no `.json` file and treats the agent as failed — the partial `.tmp` is
+invisible. Lock files are unnecessary because each agent owns a unique
+filename.
+
 ### For orchestrator authors
 
 1. Create a unique run directory at the start of the workflow:
@@ -298,11 +315,23 @@ via the spawn prompt.
    ```bash
    # Uses $TMPDIR (or /tmp). Avoids CLAUDE_PLUGIN_DATA — not a
    # documented Claude Code runtime env var; rely on the OS tempdir instead.
-   RUN_DIR=$(mktemp -d -t run-XXXXXXXX)
+   RUN_DIR=$(mktemp -d -t run-XXXXXXXX) && printf '%s\n' "$RUN_DIR"
    ```
 
-2. Pass `$RUN_DIR` to each spawned agent so the agent writes to
-   `$RUN_DIR/agent-result-<agent-name>.json`.
+   Capture the printed path. Bash variables do NOT survive across
+   separate Bash tool calls in command files (each call is a fresh
+   subprocess), so the orchestrator must substitute the literal path
+   value into subsequent Task input prompts rather than referencing
+   `$RUN_DIR` by name. If `mktemp` fails (disk full, permission
+   denied) the captured path is empty — error out before spawning
+   agents; an empty `run_dir` causes every agent to write to a
+   non-existent path and silently appear "failed".
+
+2. Pass the **literal path** (not the variable name) to each spawned
+   agent so the agent writes to
+   `<run_dir>/agent-result-<agent-name>.tmp` then atomically renames
+   to `<run_dir>/agent-result-<agent-name>.json`. The agent owns the
+   `.tmp` → `.json` rename; the orchestrator only reads `.json`.
 
 3. After the Task call returns, read the result file rather than relying on
    the Task return value. Treat `status: "success"` as the only signal that
@@ -341,8 +370,13 @@ The two-stage check (`jq -e .` for JSON validity, then `jq -er .status` for
 field presence) avoids the misleading "not valid JSON" diagnosis when the
 file parses correctly but `.status` is null or absent.
 
-1. Clean up `$RUN_DIR` at the end of the workflow, or leave it in place
-   when retaining result files aids post-run debugging.
+1. Clean up the run directory at the end of the workflow:
+   `rm -rf "<literal mktemp path>"`. Result files may contain diff
+   excerpts including secrets or credentials; retention in `/tmp` is a
+   data-residue risk on multi-user or long-lived machines. Skip cleanup
+   only when explicitly retaining files for post-run debugging, and
+   document the retention in the orchestrator's user-visible output
+   (so the user knows where the residue lives).
 
 ### Why files and not stdout
 
