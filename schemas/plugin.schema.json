@@ -224,7 +224,7 @@
               "command": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Shell command run as a persistent background process. SECURITY: ${user_config.KEY} substitutions are untrusted shell arguments — they MUST be wrapped in quotes (single quotes preferred for literal interpolation). NEVER write `command: \"some-binary ${user_config.KEY}\"` — always `command: \"some-binary '${user_config.KEY}'\"` or, better, use an argument-array form via a wrapper script that reads the config from the environment. The userConfigEntry.default constraint (string-only when type=string) plus this quoting requirement together prevent a malicious default from injecting shell into command."
+                "description": "Shell command run as a persistent background process. SECURITY: ${user_config.KEY} substitutions are untrusted shell arguments. SAFE PATTERN: Pass values to a wrapper script via environment variables (e.g., ${CLAUDE_PLUGIN_OPTION_KEY}). UNSAFE PATTERN: Direct interpolation into the command string is vulnerable to shell injection; even single-quoting '${user_config.KEY}' can be bypassed if the value contains a single quote. The userConfigEntry.default constraint helps mitigate malicious defaults, but does not protect against user-supplied values."
               },
               "description": {
                 "type": "string",

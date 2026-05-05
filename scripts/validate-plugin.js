@@ -169,9 +169,19 @@ function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
       logError(`${fieldName} path is a symlink which is not permitted: ${p}`);
       continue;
     }
+    if (stat.isFile()) {
+      // Schema's relativePath allows pointing directly at a .md file.
+      if (!p.endsWith('.md')) {
+        errors.push(`${fieldName} file path must end with .md: ${p}`);
+        logError(`${fieldName} file path must end with .md: ${p}`);
+      } else {
+        logSuccess(`${fieldName}: ${p}`);
+      }
+      continue;
+    }
     if (!stat.isDirectory()) {
-      errors.push(`${fieldName} must point to a directory: ${p}`);
-      logError(`${fieldName} must point to a directory: ${p}`);
+      errors.push(`${fieldName} must point to a .md file or a directory: ${p}`);
+      logError(`${fieldName} must point to a .md file or a directory: ${p}`);
       continue;
     }
     // Walk the directory recursively to find any .md files. The 'skills'

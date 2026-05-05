@@ -413,8 +413,9 @@ Each agent receives:
    Wrap them in delimiters before interpolation. Sanitize on every
    interpolated value, in this exact order:
    1. **Literal-delimiter substitution (REQUIRED — fence-breakout defense).**
-      Replace any occurrence of `--- begin pr-context` or `--- end pr-context`
-      in the value with `[ESCAPED] begin pr-context` or
+      Replace any occurrence of `--- begin pr-context (reference only) ---` or
+      `--- end pr-context ---` in the value with
+      `[ESCAPED] begin pr-context (reference only)` or
       `[ESCAPED] end pr-context` respectively. Without this step, a diff or
       body containing the closing delimiter on its own line terminates the
       fence early and the reader interprets trailing attacker content as
