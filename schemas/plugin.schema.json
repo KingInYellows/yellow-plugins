@@ -28,13 +28,13 @@
     },
     "relativeDir": {
       "type": "string",
-      "description": "Plugin-relative directory path. The leading './' is optional and the trailing '/' is optional. Path segments must not contain '.' (so file paths like './foo.md' are rejected — use relativeFile for those). Examples: './agents', './agents/', 'output-styles'.",
-      "pattern": "^(?:\\./)?(?!.*\\.\\.)(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+/?$"
+      "description": "Plugin-relative directory path. The leading './' is optional. A trailing '/' is optional when no segment contains '.', and is required when any segment does (so dir paths like './output.styles/' or './v2.0-agents/' must end in '/' to disambiguate from file paths like './foo.md'). Examples: './agents', './agents/', './output.styles/', 'output-styles'.",
+      "pattern": "^(?:\\./)?(?!.*\\.\\.)(?:(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+/?|(?:[A-Za-z0-9._-]+/)+)$"
     },
     "relativeFile": {
       "type": "string",
-      "description": "Plugin-relative file path. The leading './' is optional. Must end in an extension '.<ext>'. Examples: './hooks/hooks.json', './.lsp.json'.",
-      "pattern": "^(?:\\./)?(?!.*\\.\\.)(?:[A-Za-z0-9_-]+/)*\\.?[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+      "description": "Plugin-relative file path. The leading './' is optional. Must end in an extension '.<ext>' (so directory paths are rejected). Examples: './hooks/hooks.json', './.lsp.json', './hooks/v2.config.json'.",
+      "pattern": "^(?:\\./)?(?!.*\\.\\.)[A-Za-z0-9._/-]+\\.[A-Za-z0-9]+$"
     },
     "dirOrDirs": {
       "description": "A single directory path or array of directory paths.",
