@@ -72,8 +72,12 @@ get_repo_root() {
 #   - linked worktree (any)    : "/abs/.git"     (absolute)
 #   - git < 2.5                : "--git-common-dir" (echoed back unchanged)
 get_main_repo_root() {
-    common=$(git rev-parse --git-common-dir 2>/dev/null) \
-        || error "git rev-parse --git-common-dir failed (not in a git repository?)"
+    # Capture stdout+stderr together: on success $common is the common dir;
+    # on failure it carries git's diagnostic, which we surface in the error
+    # message so corrupt-repo / permission failures aren't silent "not a repo".
+    if ! common=$(git rev-parse --git-common-dir 2>&1); then
+        error "git rev-parse --git-common-dir failed: ${common:-unknown}"
+    fi
 
     case "$common" in
         --*)
@@ -196,23 +200,15 @@ link_ruvector_db() {
     # by git worktree add. Aborting here leaves an orphan worktree the user
     # may not notice. Degraded state (worktree without symlink) is recoverable
     # via `worktree-manager.sh copy-env <name>` — surface that path explicitly.
-    if ! ln -s -- "$_lrd_target" "$_lrd_link"; then
+    #
+    # No `--` separator: POSIX `ln` does not specify it and BSD/macOS `ln`
+    # rejects it. Both paths originate from git/validate_name and cannot
+    # begin with `-`, so the separator is unnecessary.
+    if ! ln -s "$_lrd_target" "$_lrd_link"; then
         warning "Failed to create .ruvector symlink at ${_lrd_link}; worktree usable without ruvector. Retry: worktree-manager.sh copy-env <name>"
         return 0
     fi
     info "Linked .ruvector -> ${_lrd_target}"
-}
-
-# Remove a worktree's .ruvector symlink before git-worktree-remove. Uses
-# `rm --` (no -r, no -f, no trailing slash) on a confirmed [ -L ] entry — the
-# only POSIX-safe way to delete a symlink without risking traversal into the
-# target. Failure does NOT abort the cleanup loop.
-cleanup_ruvector_link() {
-    _crl_link="$1/.ruvector"
-
-    if [ -L "$_crl_link" ]; then
-        rm -- "$_crl_link" || warning "Failed to remove .ruvector symlink at ${_crl_link}"
-    fi
 }
 
 # Create worktree
@@ -369,12 +365,10 @@ cmd_cleanup() {
             continue
         fi
 
-        # Remove .ruvector symlink first — defensive; git's remove_dir_recurse
-        # uses lstat+unlink so it would not follow the symlink, but explicit
-        # pre-removal keeps cleanup auditable and bypass-safe.
-        cleanup_ruvector_link "$path"
-
-        # Remove worktree
+        # Remove worktree. git's internal remove_dir_recurse uses lstat+unlink
+        # so the .ruvector symlink is unlinked (never followed) as part of the
+        # directory walk. On failure (dirty/locked worktree, no --force), the
+        # whole tree is left intact so the worktree remains functional.
         info "Removing: ${path}"
         git worktree remove "$path" || warning "Failed to remove: ${path}"
     done

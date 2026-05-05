@@ -283,29 +283,22 @@ non-empty `$BRANCH_NAME`, append it:
 "`.
 Skip empty branch names (Cat 3 — Detached HEAD has no branch).
 
-### `.ruvector` symlink pre-removal (inline before every `git worktree remove`)
+### `.ruvector` symlink: rely on git's lstat+unlink (no pre-removal)
 
 The yellow-core `worktree-manager.sh` injects `${worktree}/.ruvector ->
 ${main}/.ruvector` at worktree creation so the ruvector MCP server reaches
-the project's shared DB. Before every `git worktree remove` invocation below
-(Cat 3, 4, 5, 6, 7 — NOT the `git worktree prune` in Cat 2, which operates
-on admin metadata only), inline the symlink-removal step:
+the project's shared DB. **No explicit pre-removal of the symlink is
+needed.** `git worktree remove` walks the worktree via
+`dir.c::remove_dir_recurse`, which uses `lstat()` + `unlink()` per entry —
+symlinks are unlinked, never followed into the main `.ruvector/`. This
+behavior has been stable since git 2.17.
 
-```bash
-[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"
-```
-
-The check + removal MUST be inlined at each call site. Each Bash tool
-invocation in this command is a fresh subprocess; shell function
-definitions do not survive between blocks (see CLAUDE.md
-"Functions don't survive bash blocks (from PR #259)" — same root cause).
-Defining a `remove_ruvector_link` helper in one block and calling it from
-another silently no-ops, defeating the safety contract.
-
-POSIX-safe: `rm` without `-r` or `-f` on a `[ -L ]`-confirmed entry
-removes the link, never traverses into the main repo's `.ruvector/`. The
-canonical implementation lives in `worktree-manager.sh::cleanup_ruvector_link`
-— keep the inlined logic in sync with that helper.
+A pre-removal step would be actively harmful: if `git worktree remove`
+fails (dirty/locked worktree, no `--force`), pre-removing the symlink
+would leave the worktree intact but with its `.ruvector/` already gone,
+silently breaking ruvector inside an active worktree. Letting git own the
+removal means failure is atomic — either the whole tree (including the
+symlink) is gone, or nothing is.
 
 ### Category 1 — Locked (display only)
 
@@ -348,39 +341,37 @@ Same three-tier pattern as Category 7 below. For individual review, show the
 commit info with content fencing. Apply batch cap of 15.
 
 **"Remove all" with dirty entries**: When the user selects "Remove all" for
-Category 3, check each entry's dirty-state annotation. For each entry, run
-`[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"` first. For
-entries annotated as dirty, use `git worktree remove --force "$WT_PATH"`.
-For clean entries, use `git worktree remove "$WT_PATH"`.
+Category 3, check each entry's dirty-state annotation. For entries annotated
+as dirty, use `git worktree remove --force "$WT_PATH"`. For clean entries,
+use `git worktree remove "$WT_PATH"`. The `.ruvector` symlink is unlinked
+by git as part of the directory walk — no separate step.
 
 **Dirty detached HEAD handling**: Since detached HEAD worktrees are checked
 before Category 6 (Dirty), they may have uncommitted changes. For each
 detached HEAD worktree, check `git -C "$WT_PATH" status --porcelain`. If
 non-empty, annotate the prompt with "(dirty — N uncommitted files)" and use
 `git worktree remove --force "$WT_PATH"` instead of the no-flag version.
-Always warn the user about dirty state before confirming removal. Always run
-`[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"` in the same
-bash block immediately before the removal command.
+Always warn the user about dirty state before confirming removal.
 
 ### Category 4 — Branch merged (auto-remove)
 
 For each worktree in this category, attempt removal:
 
 ```bash
-[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"
 git worktree remove "$WT_PATH" 2>&1
 ```
 
 If removal fails (modifications detected despite our earlier check — race
 condition), log the worktree as failed with the error reason and continue to
-the next. Never abort the batch.
+the next. Never abort the batch. The `.ruvector` symlink is unlinked by
+git's directory walk on success, and stays intact on failure (so the still-
+present worktree remains usable).
 
 ### Category 5 — Stale (auto-remove or prompt)
 
 If `GH_AVAILABLE` was true during classification (PR status verified): same
-auto-removal logic as Category 4 — for each entry, in one bash block run
-`[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"` followed by
-`git worktree remove "$WT_PATH"`, logging failures without aborting.
+auto-removal logic as Category 4 — for each entry run `git worktree remove
+"$WT_PATH"`, logging failures without aborting.
 
 If `GH_AVAILABLE` was false during classification (worktrees were reclassified
 as Cat 7 per the table): these worktrees appear under Category 7 instead and
@@ -413,7 +404,6 @@ Options:
 If the user confirms force removal:
 
 ```bash
-[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"
 git worktree remove --force "$WT_PATH" 2>&1
 ```
 
@@ -437,15 +427,11 @@ Options:
 3. Skip
 ```
 
-If "Remove all" is chosen, for each worktree run
-`[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"` then
-`git worktree remove "$WT_PATH"` in the same bash block. If "Review
-individually" is chosen, apply a batch cap of 15. If the category has
-more than 15 worktrees, use AskUserQuestion: "This category has N
-worktrees. How do you want to proceed?" with options "Process all N" /
-"First 15 only" / "Cancel". For each individual removal, inline the
-symlink check `[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"`
-in the same bash block as the removal command.
+If "Remove all" is chosen, for each worktree run `git worktree remove
+"$WT_PATH"`. If "Review individually" is chosen, apply a batch cap of 15.
+If the category has more than 15 worktrees, use AskUserQuestion: "This
+category has N worktrees. How do you want to proceed?" with options
+"Process all N" / "First 15 only" / "Cancel".
 
 For each individual review:
 
@@ -538,9 +524,9 @@ Details:
 - Content fencing on all git output displayed in prompts
 - Batch cap of 15 for individual review
 - `git worktree prune` runs as final cleanup step
-- `.ruvector` symlink removed via inline
-  `[ -L "$WT_PATH/.ruvector" ] && rm -- "$WT_PATH/.ruvector"` immediately
-  before every `git worktree remove` call (Cat 3, 4, 5, 6, 7), in the same
-  bash block — never followed into the main repo's `.ruvector/`
+- `.ruvector` symlink unlinked by git's `lstat`+`unlink` directory walk on
+  successful `git worktree remove` (Cat 3, 4, 5, 6, 7) — never followed
+  into the main repo's `.ruvector/`. Failed removes leave both the worktree
+  and its symlink intact
 - Prerequisite validation runs before any interactive prompts
 - Orphaned branch hint displayed when applicable

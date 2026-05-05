@@ -811,7 +811,9 @@ jobs:
           clean: true
 
       - name: Install bats
-        run: sudo apt-get update -qq && sudo apt-get install -y bats
+        # Pin via npm: ubuntu 22.04 apt ships bats 1.2.1 which lacks the
+        # bats_require_minimum_version helper (>=1.5.0) used in this repo.
+        run: sudo npm install -g bats@1.11.0
 
       - name: Run yellow-core git-worktree bats suite (required)
         run: bats plugins/yellow-core/skills/git-worktree/tests/
@@ -821,7 +823,9 @@ jobs:
         run: |
           set -uo pipefail
           STATUS=0
-          for d in plugins/*/tests; do
+          # Both top-level and nested test dirs (yellow-core's bats suite
+          # lives under skills/git-worktree/tests/, not at the plugin root).
+          for d in plugins/*/tests plugins/*/skills/*/tests; do
             [ -d "$d" ] || continue
             echo "::group::bats $d"
             bats "$d" || STATUS=$?

@@ -11,7 +11,11 @@ setup() {
 
     REPO="$(mktemp -d)"
     cd "$REPO"
-    git init --quiet --initial-branch=main
+    # `git init -b/--initial-branch` is git>=2.28; the script under test only
+    # requires git>=2.5 (--git-common-dir). Use the portable form so the test
+    # suite matches the script's documented minimum.
+    git init --quiet
+    git symbolic-ref HEAD refs/heads/main
     git config user.email test@example.com
     git config user.name "Test"
     printf 'placeholder\n' > README.md
@@ -41,6 +45,9 @@ init_ruvector() {
 @test "create: main .ruvector missing — no symlink, warning to stderr (AC-2)" {
     run sh "$SCRIPT" create feature-y
     [ "$status" -eq 0 ]
+    # Assert no symlink at all (`-L` would also catch a dangling link, which
+    # `-e` would miss because `-e` follows the link target).
+    [ ! -L "$REPO/.worktrees/feature-y/.ruvector" ]
     [ ! -e "$REPO/.worktrees/feature-y/.ruvector" ]
     echo "$output" | grep -qi 'main .ruvector/ not found'
 }

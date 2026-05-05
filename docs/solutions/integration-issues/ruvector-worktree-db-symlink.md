@@ -71,13 +71,13 @@ during worktree creation. Three new helpers in `worktree-manager.sh`:
 - `link_ruvector_db()` — idempotent: skips on existing symlink (`info`),
   skips on existing real directory (`warning`, preserves user's isolated
   DB), skips when main has no `.ruvector/` (no dangling links).
-- `cleanup_ruvector_link()` — `[ -L ] && rm --` (no `-r`, no `-f`, no
-  trailing slash) before `git worktree remove`. POSIX-safe; cannot
-  follow into the main DB.
+No explicit cleanup helper is needed: `git worktree remove` walks the
+worktree via `dir.c::remove_dir_recurse`, which uses `lstat()` + `unlink()`
+per entry — symlinks are unlinked, never followed into the main DB.
 
-`commands/worktree/cleanup.md` (the separate 508-line LLM cleanup command)
-gains a `remove_ruvector_link` helper called before every
-`git worktree remove` invocation across categories 3, 4, 5, 6, 7.
+`commands/worktree/cleanup.md` (the separate LLM cleanup command) issues
+plain `git worktree remove` invocations across categories 3, 4, 5, 6, 7
+and relies on the same lstat+unlink behavior.
 
 ## Footguns to avoid
 
@@ -119,7 +119,7 @@ avoid simultaneous Claude Code sessions with active memory writes against
 the same project. Revisit if/when ruvector source confirms SQLite WAL
 mode (which would already provide cross-process write safety).
 
-## Why explicit pre-removal in cleanup is kept
+## Why no explicit pre-removal in cleanup
 
 `git worktree remove` uses `dir.c::remove_dir_recurse` internally, which
 calls `lstat()` + `unlink()` per entry — symlinks are never followed
@@ -128,18 +128,14 @@ consistent since git 2.17 (commit cc73385) across Linux and macOS,
 because git uses its own POSIX C `lstat`/`unlink`, not the platform's
 `rm`. Gitignored symlinks also do not block removal.
 
-So explicit pre-removal of the symlink in `cleanup_ruvector_link` is
-**defensive only, not required for safety.** It is kept anyway because:
-
-1. The `lstat`/`unlink` behavior is not documented in user-facing git
-   docs — derivable only from source. A future git refactor could
-   theoretically change it.
-2. It keeps cleanup auditable independent of git internals.
-3. It handles bypass cases — if a user invokes `git worktree remove`
-   directly without going through `worktree-manager.sh cleanup` or
-   `/yellow-core:worktree:cleanup`, the symlink is still removed by
-   git's directory traversal, but having explicit logic in our cleanup
-   paths means the failure mode is predictable.
+The earlier design pre-removed the symlink "defensively" before calling
+`git worktree remove`, but that introduced a real bug: when removal
+failed (dirty/locked worktree, no `--force`), the worktree was left in
+place but its `.ruvector` symlink was already gone — silently breaking
+ruvector inside an active worktree (PR #366 review feedback). Letting
+git own the unlink makes the cleanup atomic: success removes the whole
+tree (symlink included), failure leaves the whole tree (symlink included)
+so the worktree remains usable.
 
 ## Security analysis
 
