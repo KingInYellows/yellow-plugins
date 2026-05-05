@@ -1,5 +1,46 @@
 # Changelog
 
+All notable changes to this plugin are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [2.0.0] - 2026-04-17
+
+### Major Changes
+
+- **Breaking:** all three API keys (`PERPLEXITY_API_KEY`,
+  `TAVILY_API_KEY`, `EXA_API_KEY`) migrated to `userConfig`. The
+  perplexity, tavily, and exa MCP servers now read their API keys from
+  Claude Code's `userConfig` (sensitive, keychain-backed) instead of
+  shell env vars. The three keys are declared **optional** — the plugin
+  degrades gracefully when any are missing, so skipping the prompts is
+  valid for users who only want a subset of research sources.
+
+  Empirically verified behavior (MCP stdio probe, 2026-04-17): perplexity
+  hard-fails at startup without `PERPLEXITY_API_KEY` (so its tools
+  disappear entirely); tavily and exa start without their keys but return
+  runtime errors on tool invocation. Either way, `/research:deep` and
+  `/research:code` continue to operate with whichever sources are
+  available.
+
+### Migration (existing users)
+
+- Run `claude plugin update yellow-research@yellow-plugins`. Claude Code
+  prompts for each key at plugin-enable time; dismiss any you don't want
+  stored. Answering preserves the keychain-backed experience; skipping
+  leaves the old shell-env path broken for that MCP (since plugin.json
+  now references `${user_config.*}`, not `${*_API_KEY}` shell vars).
+- Power users who prefer shell env vars can add a thin wrapper script
+  per MCP (see yellow-morph's `bin/start-morph.sh` for a pattern), but
+  for most users answering the userConfig prompt is the recommended
+  path.
+
+---
+
 ## 1.4.2
 
 ### Patch Changes
@@ -40,30 +81,7 @@
   The code-simplicity-reviewer vs code-simplifier pair already had clear
   pre-fix/post-fix trigger clauses — no change needed there.
 
-## 1.4.1
-
-### Patch Changes
-
-- [`4d034f2`](https://github.com/KingInYellows/yellow-plugins/commit/4d034f26117da84d15707094fe8970210ad76bee)
-  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - yellow-morph:
-  migrate Morph API key from shell `MORPH_API_KEY` to plugin `userConfig`
-  (Claude Code prompts at plugin-enable time and stores in the system keychain).
-  Shell `MORPH_API_KEY` remains supported as a power-user fallback. Ship
-  `bin/start-morph.sh` wrapper and a SessionStart prewarm hook that install
-  `@morphllm/morphmcp@0.8.165` into `${CLAUDE_PLUGIN_DATA}` — serialized via an
-  atomic `mkdir`-lock so wrapper and hook cannot run concurrent `npm ci`. Fix
-  `ENABLED_TOOLS` no-op (morphmcp ignores it; switch to
-  `DISABLED_TOOLS=github_codebase_search`). Correct WarpGrep tool name from the
-  non-existent `warpgrep_codebase_search` to `codebase_search`.
-
-  yellow-core: update `setup:all` classification probe so yellow-morph is
-  detected via the renamed `codebase_search` tool, and refresh the
-  mcp-integration-patterns skill to reference the new tool name.
-
-  yellow-research: rename the `filesystem-with-morph` global MCP probe in
-  `/research:setup` to `codebase_search` (current name), with
-  `warpgrep_codebase_search` retained in `allowed-tools` as a backward-
-  compatibility hedge for users still on an older global MCP version.
+---
 
 ## 1.4.0
 
@@ -208,14 +226,6 @@
 
   Roll back by re-adding the `mcpServers.context7` block to
   `plugins/yellow-core/.claude-plugin/plugin.json` and reverting the tool-name
-  repoints in yellow-research.
-
-All notable changes to this plugin are documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ---
 
 ## [1.3.0] - 2026-03-10

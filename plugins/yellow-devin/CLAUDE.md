@@ -4,12 +4,23 @@ Devin.AI integration for multi-agent workflows — delegate tasks, research
 codebases via DeepWiki, orchestrate plan-implement-review chains. Targets
 **Devin V3 API** with service user authentication.
 
-## Required Environment Variables
+## Required Credentials
 
-- **`DEVIN_SERVICE_USER_TOKEN`** — Service user credential (`cog_` prefix).
-  Create at: Enterprise Settings > Service Users.
-- **`DEVIN_ORG_ID`** — Organization ID for all API paths. Find at: Enterprise
-  Settings > Organizations.
+The plugin reads two credentials. Each can come from **either** the plugin
+`userConfig` (recommended — prompted at plugin-enable time, stored in the
+system keychain for the sensitive token) **or** a shell environment variable
+(fallback for power users and CI):
+
+- **`devin_service_user_token`** / **`DEVIN_SERVICE_USER_TOKEN`** — service
+  user credential (`cog_` prefix). Create at: Devin Enterprise Settings >
+  Service Users.
+- **`devin_org_id`** / **`DEVIN_ORG_ID`** — organization ID for all API
+  paths. Find at: Devin Enterprise Settings > Organizations.
+
+Commands read the shell env vars directly. `/devin:setup` detects whichever
+source is configured and reports which is active. Setting userConfig avoids
+the "restart Claude Code after exporting a variable" dance that shell-only
+setups require.
 
 ## Required Permissions
 

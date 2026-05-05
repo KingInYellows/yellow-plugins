@@ -254,7 +254,12 @@ path" and rely on `/morph:status` for authoritative OFFLINE detection.
   (a) shell `MORPH_API_KEY` set, OR
   (b) `pluginConfigs.yellow-morph.options.morph_api_key` present in
       `~/.claude/.credentials.json` (userConfig was answered). Detection:
-      `grep -qE '"morph_api_key"[[:space:]]*:' ~/.claude/.credentials.json 2>/dev/null`.
+      classification derives from the `MORPH_API_KEY` row already produced
+      by Step 1 — if it shows `set (shell env)` or `set (userConfig)`,
+      condition (b) is satisfied. Do NOT re-run a bare grep here; the
+      Step 1 output is the authoritative source and uses path-scoped
+      detection (`pluginConfigs.<plugin>.options.<key>`) rather than an
+      unscoped string match.
 - PARTIAL: local prerequisites are satisfied but neither the shell env
   var nor the userConfig option is detectable — the plugin will install
   but the MCP server will not start. Recommend running `/morph:setup`

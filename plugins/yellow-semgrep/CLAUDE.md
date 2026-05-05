@@ -5,11 +5,24 @@ AppSec Platform, apply fixes (deterministic autofix first, LLM fallback),
 verify via re-scan, and update triage state. Targets **SAST findings** via a
 hybrid MCP + REST API architecture.
 
-## Required Environment Variables
+## Required Credentials
 
-- **`SEMGREP_APP_TOKEN`** — Semgrep API token (`sgp_` prefix). Must have
-  **Web API** scope (not CI scope). Create at: Organization Settings > API
-  Tokens.
+- **`semgrep_app_token`** (userConfig — **primary**, used by the MCP
+  server) and **`SEMGREP_APP_TOKEN`** (shell env — used by the curl-based
+  REST calls in `/semgrep:*` commands). Both hold the same token
+  (`sgp_` prefix, **Web API** scope, create at Semgrep Organization
+  Settings > API Tokens).
+
+  Claude Code prompts for `semgrep_app_token` at plugin-enable time and
+  stores it in the system keychain (or `~/.claude/.credentials.json` at
+  0600 perms on minimal Linux). The userConfig value is substituted into
+  the MCP server's environment via `${user_config.semgrep_app_token}` in
+  `plugin.json` — so the MCP starts correctly in the same session,
+  without a Claude Code restart.
+
+  Commands that run curl directly (`/semgrep:status`, `/semgrep:fix`,
+  etc.) still read the shell `SEMGREP_APP_TOKEN`. Keep both sources in
+  sync (or use `/semgrep:setup` to help).
 
 ## Required CLI Tools
 
@@ -26,7 +39,12 @@ hybrid MCP + REST API architecture.
   - Provides: `semgrep_scan`, `semgrep_findings`, `get_abstract_syntax_tree`,
     `semgrep_scan_with_custom_rule`, `semgrep_rule_schema`,
     `get_supported_languages`, `semgrep_scan_supply_chain`, `semgrep_whoami`
-  - Auth: `SEMGREP_APP_TOKEN` passed via env var
+  - Auth: `userConfig.semgrep_app_token` is the source of truth — Claude
+    Code injects it into the MCP process environment via
+    `${user_config.semgrep_app_token}` in `plugin.json`. The shell
+    `SEMGREP_APP_TOKEN` env var is **not** read by the MCP server (only
+    by the curl-based `/semgrep:*` REST commands). Run `/semgrep:setup`
+    to keep both sources in sync if you also use those commands.
   - Note: MCP tools are read-only for triage state. Triage mutations use the
     REST API directly.
   - Migration: The standalone `semgrep-mcp` PyPI package was archived Oct 2025.

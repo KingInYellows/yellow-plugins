@@ -102,3 +102,7 @@ temp/
 
 # RuVector intelligence data
 .claude/statusline.sh
+
+# Codex CLI per-developer state (sessions, cache, settings) — generated
+# locally by the Codex CLI; not part of the marketplace artifact.
+.codex/

@@ -141,23 +141,121 @@ fi
 
 See `semgrep-conventions` skill for the `validate_token` pattern.
 
-Check `SEMGREP_APP_TOKEN` is set. Validate format matches `^sgp_[a-zA-Z0-9]{20,}$`.
-Never echo the token value. Redact with
-`sed 's/sgp_[a-zA-Z0-9]*/***REDACTED***/g'`.
-
-Hit `GET /api/v1/me` to validate Web API scope. Use the three-layer error check
-from the `semgrep-conventions` skill.
+Check that the token is configured via **either** shell `SEMGREP_APP_TOKEN`
+or `userConfig.semgrep_app_token`. The MCP server reads the userConfig
+value; the curl-based REST calls in this setup script and in the
+`/semgrep:*` remediation commands read the shell env var. If only
+userConfig is configured, skip the curl probe — the MCP's successful
+startup (tool visibility) is an implicit credential validation.
 
 ```bash
+# Mirror the 2-arg has_userconfig helper used in /setup:all. Kept in
+# sync manually — see plugins/yellow-core/commands/setup/all.md for the
+# canonical definition.
+has_userconfig() {
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+
+have_uc=0
+if has_userconfig yellow-semgrep semgrep_app_token; then have_uc=1; fi
+
+if [ -z "${SEMGREP_APP_TOKEN:-}" ] && [ "$have_uc" = 0 ]; then
+  printf 'ERROR: no Semgrep token configured.\n' >&2
+  printf '  Option 1 (recommended): /plugin disable yellow-semgrep and\n' >&2
+  printf '  re-enable to answer the userConfig prompt (keychain-backed).\n' >&2
+  printf '  Option 2 (fallback): export SEMGREP_APP_TOKEN="<your-sgp-token>"\n' >&2
+  printf '  in ~/.zshrc or ~/.bashrc, then source it.\n' >&2
+  exit 1
+fi
+
+if [ "$have_uc" = 1 ] && [ -z "${SEMGREP_APP_TOKEN:-}" ]; then
+  printf 'WARNING: MCP has userConfig but shell SEMGREP_APP_TOKEN is unset.\n'
+  printf '         /semgrep:fix, /semgrep:status, and this /semgrep:setup\n'
+  printf '         curl probe will return 401. Add to your shell profile:\n'
+  printf '           export SEMGREP_APP_TOKEN="<your-sgp-token>"\n'
+  printf '         Skipping the curl-based connectivity probe since the\n'
+  printf '         MCP is the path of record when only userConfig is set.\n'
+  printf 'Token format validation: skipped (userConfig-only).\n'
+  SKIP_CURL_PROBE=1
+else
+  SKIP_CURL_PROBE=0
+fi
+```
+
+If `SEMGREP_APP_TOKEN` **is** set, validate format matches
+`^sgp_[a-zA-Z0-9]{20,}$`. Never echo the token value. Redact with
+`sed 's/sgp_[a-zA-Z0-9]*/***REDACTED***/g'`.
+
+Hit `GET /api/v1/me` to validate Web API scope — but **only if**
+`$SKIP_CURL_PROBE = 0`. Otherwise, report the token as validated via
+MCP startup and continue to Step 3. Use the three-layer error check
+from the `semgrep-conventions` skill when the probe runs.
+
+```bash
+# Each Bash block runs in a fresh subprocess — the SKIP_CURL_PROBE flag
+# set in the Step 2 detection block does NOT survive across blocks. Without
+# re-detection, a userConfig-only setup (have_uc=1, SEMGREP_APP_TOKEN unset)
+# would default SKIP_CURL_PROBE to 0 and curl `/me` with an empty Bearer
+# token, returning a misleading 401 immediately after Step 2 reported the
+# userConfig-only flow as valid. Re-detect the source before defaulting.
+has_userconfig() {
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+
+# If SKIP_CURL_PROBE was carried over from Step 2's Bash invocation, honor
+# it. Otherwise re-detect: have_uc + empty shell var ⇒ skip the probe.
+if [ -z "${SKIP_CURL_PROBE:-}" ]; then
+  if has_userconfig yellow-semgrep semgrep_app_token \
+      && [ -z "${SEMGREP_APP_TOKEN:-}" ]; then
+    SKIP_CURL_PROBE=1
+  else
+    SKIP_CURL_PROBE=0
+  fi
+fi
 SEMGREP_API="https://semgrep.dev/api/v1"
 
-response=$(curl -s --connect-timeout 5 --max-time 15 \
-  -w "\n%{http_code}" \
-  -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
-  "${SEMGREP_API}/me")
-curl_exit=$?
-http_status="${response##*$'\n'}"
-body="${response%$'\n'*}"
+if [ "$SKIP_CURL_PROBE" = 0 ]; then
+  response=$(curl -s --connect-timeout 5 --max-time 15 \
+    -w "\n%{http_code}" \
+    -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
+    "${SEMGREP_API}/me")
+  curl_exit=$?
+  http_status="${response##*$'\n'}"
+  body="${response%$'\n'*}"
+fi
 ```
 
 Handle errors per skill patterns:
@@ -169,15 +267,51 @@ Handle errors per skill patterns:
 
 ### Step 3: Detect Deployment Slug
 
+If `SKIP_CURL_PROBE=1`, skip the REST call entirely:
+
 ```bash
-response=$(curl -s --connect-timeout 5 --max-time 15 \
-  -w "\n%{http_code}" \
-  -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
-  "${SEMGREP_API}/deployments")
+# Each Bash block is a fresh subprocess — re-detect SKIP_CURL_PROBE the
+# same way Step 2's curl-probe block does, so a userConfig-only setup
+# correctly skips the deployment-slug REST call instead of issuing one
+# with an empty Bearer token.
+has_userconfig() {
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    return $?
+  else
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+if [ -z "${SKIP_CURL_PROBE:-}" ]; then
+  if has_userconfig yellow-semgrep semgrep_app_token \
+      && [ -z "${SEMGREP_APP_TOKEN:-}" ]; then
+    SKIP_CURL_PROBE=1
+  else
+    SKIP_CURL_PROBE=0
+  fi
+fi
+SEMGREP_API="https://semgrep.dev/api/v1"
+
+if [ "$SKIP_CURL_PROBE" = 1 ]; then
+  DEPLOYMENT_SLUG=""
+  printf '[yellow-semgrep] Deployment slug not detected — only userConfig is set; '
+  printf 'add `export SEMGREP_APP_TOKEN=...` to your shell rc if you need REST-API features.\n'
+else
+  response=$(curl -s --connect-timeout 5 --max-time 15 \
+    -w "\n%{http_code}" \
+    -H "Authorization: Bearer $SEMGREP_APP_TOKEN" \
+    "${SEMGREP_API}/deployments")
+fi
 ```
 
-Parse the `deployments` array. If empty: "No Semgrep deployments found for this
-token."
+When the curl branch runs, parse the `deployments` array. If empty: "No Semgrep
+deployments found for this token."
 
 If multiple deployments returned, present AskUserQuestion:
 - "Multiple Semgrep deployments found. Which one should this plugin use?"
@@ -249,6 +383,15 @@ Semgrep CLI:  {semgrep --version output}
 MCP Tools:    {count} tools verified
 ─────────────────────────────
 Setup complete. Run /semgrep:status to see findings.
+```
+
+If `SKIP_CURL_PROBE=1` (userConfig-only mode), replace the Deployment line with:
+
+```text
+Deployment:   not detected (userConfig-only mode — shell SEMGREP_APP_TOKEN unset)
+              REST-API features (deployment slug, findings API) are unavailable.
+              To enable: add `export SEMGREP_APP_TOKEN="<your-sgp-token>"` to
+              ~/.zshrc or ~/.bashrc and re-run /semgrep:setup.
 ```
 
 If any step had a warning (e.g., no git remote, fewer MCP tools than expected),

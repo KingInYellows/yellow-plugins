@@ -10,7 +10,6 @@ allowed-tools:
   - mcp__grep__searchGitHub
   - mcp__plugin_yellow-morph_morph__codebase_search
   - mcp__filesystem-with-morph__codebase_search
-  - mcp__filesystem-with-morph__warpgrep_codebase_search
   - mcp__plugin_yellow-devin_deepwiki__read_wiki_structure
   - mcp__plugin_yellow-research_ast-grep__find_code
 ---
@@ -98,10 +97,60 @@ else
 fi
 
 printf '\n=== API Keys ===\n'
-[ -n "${EXA_API_KEY:-}" ]          && printf 'EXA_API_KEY:          set\n' || printf 'EXA_API_KEY:          NOT SET\n'
-[ -n "${TAVILY_API_KEY:-}" ]       && printf 'TAVILY_API_KEY:       set\n' || printf 'TAVILY_API_KEY:       NOT SET\n'
-[ -n "${PERPLEXITY_API_KEY:-}" ]   && printf 'PERPLEXITY_API_KEY:   set\n' || printf 'PERPLEXITY_API_KEY:   NOT SET\n'
-[ -n "${CERAMIC_API_KEY:-}" ]      && printf 'CERAMIC_API_KEY:      set\n' || printf 'CERAMIC_API_KEY:      NOT SET\n'
+# 2-arg has_userconfig: mirror the canonical definition in
+# plugins/yellow-core/commands/setup/all.md. Keep these in sync manually
+# — if you change one, change all copies (search for "has_userconfig()"
+# across plugins/). `grep -qF` (fixed-string) guards against regex
+# metacharacters sneaking into the search pattern.
+has_userconfig() {
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+check_key() {
+  # `eval` for POSIX-compatible indirect expansion. bash/zsh-only ${!var}
+  # silently returns empty under dash, which would mis-classify every key.
+  local env_name="$1" cfg_key="$2" label="$3" env_val=""
+  local has_env=0 has_cfg=0
+  eval "env_val=\${${env_name}:-}"
+  [ -n "$env_val" ] && has_env=1
+  has_userconfig yellow-research "$cfg_key" && has_cfg=1
+
+  if [ $has_env -eq 1 ] && [ $has_cfg -eq 1 ]; then
+    printf '%-22s set (both shell & userConfig)\n' "$label:"
+  elif [ $has_env -eq 1 ]; then
+    printf '%-22s set (shell env only — MCP WILL FAIL: plugin 2.0.0 reads userConfig, not shell env)\n' "$label:"
+  elif [ $has_cfg -eq 1 ]; then
+    printf '%-22s set (userConfig only)\n' "$label:"
+  else
+    printf '%-22s NOT SET\n' "$label:"
+  fi
+}
+check_key EXA_API_KEY exa_api_key EXA_API_KEY
+check_key TAVILY_API_KEY tavily_api_key TAVILY_API_KEY
+check_key PERPLEXITY_API_KEY perplexity_api_key PERPLEXITY_API_KEY
+# Ceramic uses OAuth in the MCP — userConfig has no ceramic_api_key entry.
+# The CERAMIC_API_KEY shell var only powers the REST-API live probe in Step 3.
+if [ -n "${CERAMIC_API_KEY:-}" ]; then
+  printf '%-22s set (shell env — REST probe only; MCP uses OAuth)\n' 'CERAMIC_API_KEY:'
+else
+  printf '%-22s NOT SET (REST probe will be skipped; MCP OAuth path unaffected)\n' 'CERAMIC_API_KEY:'
+fi
 ```
 
 `curl` and `jq` missing are informational warnings — they affect live testing
@@ -194,58 +243,190 @@ If user skips, proceed to Step 4 with all format-valid keys marked
 **EXA:**
 
 ```bash
-response=$(curl -s --connect-timeout 5 --max-time 5 \
-  -w "\n%{http_code}" \
-  -X POST "https://api.exa.ai/search" \
-  -H "x-api-key: ${EXA_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"query":"test","numResults":1}')
-curl_exit=$?
-http_status=$(printf '%s' "$response" | tail -n1)
+# `has_userconfig` was defined in Step 1's bash block, but each ```bash``` block
+# in a command file runs in a fresh subprocess — the function is undefined here.
+# Re-define inline so the SKIP_CURL_PROBE check below is reliable.
+has_userconfig() {
+  # Mirror the canonical Step-1 definition. Surface jq parse errors
+  # (exit >= 2) instead of silently treating a corrupted settings.json
+  # as "credential absent" — otherwise users see "NOT SET" for keys
+  # that are actually configured and get instructed to re-enter them.
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+
+# Skip curl probe when key is userConfig-only — shell env is empty so the
+# token would not be visible here; the MCP reads it directly from userConfig.
+# Note: exa MCP @ 3.1.8 starts without a key and only fails at tool invocation,
+# so MCP startup does NOT validate this credential — we only know the key is
+# stored in the keychain.
+SKIP_CURL_PROBE=0
+[ -z "${EXA_API_KEY:-}" ] && has_userconfig yellow-research exa_api_key && SKIP_CURL_PROBE=1
+if [ $SKIP_CURL_PROBE -eq 1 ]; then
+  provider_status="PRESENT (keychain — MCP starts without credential validation)"
+  provider_detail="Shell env empty; key present in userConfig. Run an exa tool call to validate."
+else
+  response=$(curl -s --connect-timeout 5 --max-time 5 \
+    -w "\n%{http_code}" \
+    -X POST "https://api.exa.ai/search" \
+    -H "x-api-key: ${EXA_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{"query":"test","numResults":1}')
+  curl_exit=$?
+  http_status=$(printf '%s' "$response" | tail -n1)
+fi
 ```
 
 **Tavily:**
 
 ```bash
-# Build body safely — key format already validated as [a-zA-Z0-9_-]+
-if command -v jq >/dev/null 2>&1; then
-  tavily_body=$(jq -n --arg k "${TAVILY_API_KEY}" '{"api_key":$k,"query":"test","max_results":1}')
+# Re-define has_userconfig inline (separate Bash block = fresh subprocess).
+has_userconfig() {
+  # Mirror the canonical Step-1 definition. Surface jq parse errors
+  # (exit >= 2) instead of silently treating a corrupted settings.json
+  # as "credential absent" — otherwise users see "NOT SET" for keys
+  # that are actually configured and get instructed to re-enter them.
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+
+# Skip curl probe when key is userConfig-only — MCP reads it from userConfig.
+# Note: tavily MCP @ 0.2.17 starts without a key and only fails at tool
+# invocation, so MCP startup does NOT validate this credential.
+SKIP_CURL_PROBE=0
+[ -z "${TAVILY_API_KEY:-}" ] && has_userconfig yellow-research tavily_api_key && SKIP_CURL_PROBE=1
+if [ $SKIP_CURL_PROBE -eq 1 ]; then
+  provider_status="PRESENT (keychain — MCP starts without credential validation)"
+  provider_detail="Shell env empty; key present in userConfig. Run a tavily tool call to validate."
 else
-  tavily_body=$(printf '{"api_key":"%s","query":"test","max_results":1}' "${TAVILY_API_KEY}")
+  # Build body safely — key format already validated as [a-zA-Z0-9_-]+
+  if command -v jq >/dev/null 2>&1; then
+    tavily_body=$(jq -n --arg k "${TAVILY_API_KEY}" '{"api_key":$k,"query":"test","max_results":1}')
+  else
+    tavily_body=$(printf '{"api_key":"%s","query":"test","max_results":1}' "${TAVILY_API_KEY}")
+  fi
+  response=$(curl -s --connect-timeout 5 --max-time 5 \
+    -w "\n%{http_code}" \
+    -X POST "https://api.tavily.com/search" \
+    -H "Content-Type: application/json" \
+    -d "$tavily_body")
+  curl_exit=$?
+  http_status=$(printf '%s' "$response" | tail -n1)
 fi
-response=$(curl -s --connect-timeout 5 --max-time 5 \
-  -w "\n%{http_code}" \
-  -X POST "https://api.tavily.com/search" \
-  -H "Content-Type: application/json" \
-  -d "$tavily_body")
-curl_exit=$?
-http_status=$(printf '%s' "$response" | tail -n1)
 ```
 
 **Perplexity:**
 
 ```bash
-response=$(curl -s --connect-timeout 5 --max-time 5 \
-  -w "\n%{http_code}" \
-  -X POST "https://api.perplexity.ai/chat/completions" \
-  -H "Authorization: Bearer ${PERPLEXITY_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"sonar","messages":[{"role":"user","content":"hi"}],"max_tokens":1}')
-curl_exit=$?
-http_status=$(printf '%s' "$response" | tail -n1)
+# Re-define has_userconfig inline (separate Bash block = fresh subprocess).
+has_userconfig() {
+  # Mirror the canonical Step-1 definition. Surface jq parse errors
+  # (exit >= 2) instead of silently treating a corrupted settings.json
+  # as "credential absent" — otherwise users see "NOT SET" for keys
+  # that are actually configured and get instructed to re-enter them.
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+
+# Skip curl probe when key is userConfig-only — MCP reads it from userConfig.
+# Note: perplexity MCP @ 0.8.2 hard-fails at startup without a valid key
+# (tools disappear entirely), so MCP startup IS a credential signal here.
+SKIP_CURL_PROBE=0
+[ -z "${PERPLEXITY_API_KEY:-}" ] && has_userconfig yellow-research perplexity_api_key && SKIP_CURL_PROBE=1
+if [ $SKIP_CURL_PROBE -eq 1 ]; then
+  # Tentative classification — the MCP-startup validation claim only holds
+  # if Step 3.5 actually confirms the perplexity tools are visible. If
+  # Step 3.5 finds the perplexity MCP UNAVAILABLE (e.g., npm/node failure
+  # or a malformed key that triggered a startup crash), upgrade the
+  # final report to clarify that the credential's validity was NOT
+  # confirmed by MCP startup. Use the literal "userConfig only" status
+  # in the meantime; Step 4 reconciles against Step 3.5's MCP-visibility
+  # result before printing the unified table.
+  provider_status="PRESENT (userConfig only — pending MCP-visibility confirmation)"
+  provider_detail="Shell env empty; key present in userConfig. Perplexity MCP hard-fails at startup without a valid key, so a successful Step 3.5 visibility check upgrades this to PRESENT (validated via MCP startup). If Step 3.5 reports the MCP UNAVAILABLE, leave this status as-is and append: 'MCP did not load — credential validity unconfirmed.'"
+else
+  response=$(curl -s --connect-timeout 5 --max-time 5 \
+    -w "\n%{http_code}" \
+    -X POST "https://api.perplexity.ai/chat/completions" \
+    -H "Authorization: Bearer ${PERPLEXITY_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{"model":"sonar","messages":[{"role":"user","content":"hi"}],"max_tokens":1}')
+  curl_exit=$?
+  http_status=$(printf '%s' "$response" | tail -n1)
+fi
 ```
 
 **Ceramic** (REST endpoint, separate from the OAuth-authenticated MCP):
 
+Ceramic has no userConfig entry — the MCP authenticates via OAuth, and the
+`CERAMIC_API_KEY` shell var only powers this REST probe. If the env is unset,
+mark it absent and skip; do not call `has_userconfig` (no userConfig path
+exists for this credential).
+
 ```bash
-response=$(curl -s --connect-timeout 5 --max-time 5 \
-  -w "\n%{http_code}" \
-  -X POST "https://api.ceramic.ai/search" \
-  -H "Authorization: Bearer ${CERAMIC_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{"query":"test"}')
-curl_exit=$?
-http_status=$(printf '%s' "$response" | tail -n1)
+if [ -z "${CERAMIC_API_KEY:-}" ]; then
+  provider_status="ABSENT"
+  provider_detail="CERAMIC_API_KEY not in shell env (REST probe skipped). MCP OAuth path unaffected."
+  curl_exit=0
+  http_status="000"
+else
+  response=$(curl -s --connect-timeout 5 --max-time 5 \
+    -w "\n%{http_code}" \
+    -X POST "https://api.ceramic.ai/search" \
+    -H "Authorization: Bearer ${CERAMIC_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d '{"query":"test"}')
+  curl_exit=$?
+  http_status=$(printf '%s' "$response" | tail -n1)
+fi
 ```
 
 After each probe, evaluate `$curl_exit` first, then `$http_status`. Apply this
@@ -337,19 +518,15 @@ Test call: mcp__grep__searchGitHub with query: "test", maxResults: 1
 ```text
 ToolSearch keyword: "codebase_search" (or "morph warpgrep" — same tool)
 Preferred tool name: mcp__plugin_yellow-morph_morph__codebase_search
-Fallback tool name (current):  mcp__filesystem-with-morph__codebase_search
-Fallback tool name (legacy):   mcp__filesystem-with-morph__warpgrep_codebase_search
+Fallback tool name: mcp__filesystem-with-morph__codebase_search
 Test call: <matched tool> with query: "README"
-Note: morphmcp 0.8.165 (and the yellow-morph plugin) name the tool
-`codebase_search`. A user's global `filesystem-with-morph` MCP may still
-be running an older morphmcp that exposes `warpgrep_codebase_search` —
-that legacy name is therefore listed as a final fallback so the command
-remains authorized to call it.
+Note: In morphmcp 0.8.165 the tool is named `codebase_search`. Older
+versions exposed it as `warpgrep_codebase_search`; that name no longer
+exists.
 ```
 
-Check tools in this order: plugin-namespaced first, then the global MCP
-current name, then the global MCP legacy name. Report which variant is
-active.
+Check for the plugin-namespaced tool first. If not found, fall back to the
+global MCP tool name. Report which variant is active.
 
 **DeepWiki** (yellow-devin plugin — AI-powered repo documentation):
 
@@ -457,7 +634,30 @@ misrepresent research capability when a user has all three functional
 keys (EXA/Tavily/Perplexity) set.
 
 Adjust the capability summary based on how many functional API keys are
-active (three — EXA, Tavily, Perplexity):
+active (three — EXA, Tavily, Perplexity). A key counts as **active** when
+its Step 3 status is any of:
+
+- `ACTIVE` — live-tested and confirmed working.
+- `PRESENT (validated via MCP startup — userConfig only)` — Perplexity
+  hard-fails at startup without a valid key; reach this status only after
+  Step 3.5 confirms the MCP tools are visible. Promote
+  `PRESENT (userConfig only — pending MCP-visibility confirmation)` to this
+  label when Step 3.5 reports perplexity ACTIVE; otherwise keep the
+  pending label and append "MCP did not load — credential validity
+  unconfirmed."
+- `PRESENT (keychain — MCP starts without credential validation)` — exa /
+  tavily start without validating; key is stored and reachable to the MCP
+  but not yet confirmed valid. Still counts as active for capability-summary
+  purposes (the user-visible MCP tools work; first invocation will surface
+  any auth problem).
+- `PRESENT (untested)` — key was present and format-valid; user opted out of
+  live testing.
+
+`PRESENT (userConfig only — pending MCP-visibility confirmation)` does NOT
+count as active until Step 3.5 promotes it; if Step 3.5 finds the MCP
+UNAVAILABLE, treat the key as inactive for the summary.
+
+Counts:
 
 - 3 active: `FULL (3/3 API sources)`
 - 1-2 active: `PARTIAL (N/3 API sources)`
@@ -474,21 +674,31 @@ seven — Context7, Grep, WarpGrep, DeepWiki, ast-grep, Parallel Task, Ceramic):
 
 If any keys are `ABSENT`, `FORMAT INVALID`, or `INVALID`, show this block:
 
-```sh
-To enable missing providers, add to your shell profile (~/.zshrc or ~/.bashrc):
+```text
+To enable missing providers (recommended path, no restart required):
 
-  export EXA_API_KEY="..."          # Get key: https://exa.ai/
-  export TAVILY_API_KEY="..."       # Get key: https://tavily.com/
-  export PERPLEXITY_API_KEY="..."   # Get key: https://www.perplexity.ai/settings/api
-  export CERAMIC_API_KEY="..."      # Get key: https://platform.ceramic.ai/keys
-                                    # (REST API only — the Ceramic MCP uses OAuth)
+  Disable and re-enable yellow-research:
+    /plugin disable yellow-research
+    /plugin enable yellow-research
 
-Then:
-  source ~/.zshrc   (or ~/.bashrc)
-  Restart Claude Code for MCP servers to pick up the new keys.
+  Optional shell-only env (no userConfig prompt — it gates the REST live-probe
+  in this command, not the MCP):
+    export CERAMIC_API_KEY="..."    # Get key: https://platform.ceramic.ai/keys
 
-Note: Keys are passed to MCP servers at startup — a Claude Code restart is
-required after adding new keys. Never commit API keys to version control.
+  Claude Code will prompt for each key. Dismiss the ones you don't need;
+  answer the ones you want. Keys are stored in the system keychain (or
+  ~/.claude/.credentials.json at 0600 perms on Linux).
+
+Get keys:
+  EXA:        https://exa.ai/
+  Tavily:     https://tavily.com/
+  Perplexity: https://www.perplexity.ai/settings/api
+
+Never commit API keys to version control.
+
+(Fallback for power users who want a pure shell-env setup: add a per-MCP
+wrapper script — see plugins/yellow-morph/bin/start-morph.sh. Plugin.json
+no longer reads the shell *_API_KEY vars directly as of 2.0.0.)
 ```
 
 Only show the lines for keys that are absent or invalid (not all four if some
