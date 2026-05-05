@@ -121,6 +121,7 @@ the table rows. Do not trust a count written in a previous version of the file.
 ### resolve-pr-parallel File Grouping
 
 Before spawning agents, always run file-ownership analysis:
+
 - Map each comment to its target file(s)
 - Group comments sharing any file into the same agent
 - Only parallelize across non-overlapping file sets

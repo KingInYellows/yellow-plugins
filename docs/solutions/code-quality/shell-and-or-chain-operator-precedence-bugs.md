@@ -43,7 +43,7 @@ failed.
 When `$SESSION_ID` is set and `opencode session delete` fails (e.g., session
 already gone, network error), the failure's stderr is silenced by
 `2>/dev/null`. The `||` is triggered by the non-zero exit code — so the
-warning *does* fire, but the original error message is gone. The operator
+warning _does_ fire, but the original error message is gone. The operator
 can only see "cleanup failed" with no diagnostic information.
 
 Combined effect: the chain misreports in both the "empty variable" and "actual

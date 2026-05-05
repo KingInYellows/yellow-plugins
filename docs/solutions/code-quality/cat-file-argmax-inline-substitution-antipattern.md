@@ -124,6 +124,7 @@ rg '\$\(cat ' plugins/ --include='*.md' \
 ```
 
 When reviewing shell code that passes large file content:
+
 1. Check whether the delivery path is stdin (`< file`), file-path flag
    (`--file`), or inline substitution (`$(cat file)`)
 2. If inline substitution: check the budget comments — any claim that it

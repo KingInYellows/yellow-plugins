@@ -73,6 +73,7 @@ only for the output value, not for the guard condition itself.
 ```
 
 Key changes:
+
 - All state-transition tests use `$0` directly, not `line`
 - The END-marker test now correctly sees the original input and resets `in_pem`
 - `line` is derived from `in_pem` after it may have changed, covering
@@ -101,6 +102,7 @@ rg -n --glob 'plugins/*/skills/*/SKILL.md' --glob 'plugins/*/agents/**/*.md' \
 ```
 
 When reviewing any multi-line redaction state machine in awk:
+
 - Confirm every state-transition condition uses `$0`, not a derived variable
 - Confirm the END-marker test can never match the redaction placeholder string
 

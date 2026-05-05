@@ -230,7 +230,7 @@ printf '%d of 3 reviewers ready\n' "$READY_COUNT"                   # always "0 
 
 #### Three fixes, in order of preference
 
-**Fix A: Re-derive inline in the summary block**
+##### Fix A: Re-derive inline in the summary block
 
 Each prior step writes a sentinel file (e.g., `touch /tmp/gemini-ok`) and the
 summary block checks for the files' existence:
@@ -251,7 +251,7 @@ printf 'gemini:   %s\nopencode:  %s\n%d of 3 ready\n' \
   "$GEMINI_STATUS" "$OPENCODE_STATUS" "$READY_COUNT"
 ```
 
-**Fix B: Persist to a state file and source it**
+##### Fix B: Persist to a state file and source it
 
 ```bash
 # Step 2
@@ -265,7 +265,7 @@ STATE_FILE="/tmp/.council-setup-state.env"
 # $GEMINI_STATUS, $OPENCODE_STATUS now available
 ```
 
-**Fix C: Consolidate all steps into one Bash block**
+##### Fix C: Consolidate all steps into one Bash block
 
 If the steps are fast and do not require separate user interaction between
 them, merge Steps 2–5 into a single Bash block. This is the simplest fix when

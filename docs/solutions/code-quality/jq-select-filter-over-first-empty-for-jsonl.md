@@ -64,6 +64,7 @@ SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.se
 ```
 
 The `select()` version:
+
 - Emits zero output for lines that lack the field (no error — field absence evaluates to `null` then filters out cleanly)
 - Emits the field value for every line that has it
 - `head -1` takes the first match, consistent with the original intent; omit it to collect all matches
@@ -101,6 +102,7 @@ rg "jq.*2>/dev/null.*\\.\\w+\\.\\w+" plugins/ --include='*.md'
 ```
 
 When reviewing jq expressions that read JSONL files:
+
 1. If the expression uses `first()`: verify the input is a JSON array, not a
    JSONL stream. For JSONL, use `select()` + `head -1` instead. `first()` errors
    when zero lines match — which is a silent failure when `2>/dev/null` is also
