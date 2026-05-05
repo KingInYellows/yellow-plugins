@@ -71,13 +71,19 @@ during worktree creation. Three new helpers in `worktree-manager.sh`:
 - `link_ruvector_db()` — idempotent: skips on existing symlink (`info`),
   skips on existing real directory (`warning`, preserves user's isolated
   DB), skips when main has no `.ruvector/` (no dangling links).
-No explicit cleanup helper is needed: `git worktree remove` walks the
-worktree via `dir.c::remove_dir_recurse`, which uses `lstat()` + `unlink()`
-per entry — symlinks are unlinked, never followed into the main DB.
+- `unlink_ruvector_link()` / `restore_ruvector_link()` — paired helpers in
+  `worktree-manager.sh::cmd_cleanup`. The first does `[ -L ] && rm --` (no
+  `-r`, no `-f`, no trailing slash; POSIX-safe; cannot follow into the main
+  DB) and echoes the captured target. The second restores the symlink if
+  `git worktree remove` then fails for OTHER reasons, so the still-present
+  worktree stays functional.
 
-`commands/worktree/cleanup.md` (the separate LLM cleanup command) issues
-plain `git worktree remove` invocations across categories 3, 4, 5, 6, 7
-and relies on the same lstat+unlink behavior.
+`commands/worktree/cleanup.md` (the separate LLM cleanup command) inlines
+the same pre-remove + restore-on-failure block at every no-`--force`
+callsite (Cat 3 clean, Cat 4, Cat 5, Cat 7). For `--force` callsites
+(Cat 3 dirty, Cat 6) no dance is needed — `git worktree remove --force`
+skips the untracked-files check and unlinks the symlink as part of its
+directory walk.
 
 ## Footguns to avoid
 
@@ -119,23 +125,34 @@ avoid simultaneous Claude Code sessions with active memory writes against
 the same project. Revisit if/when ruvector source confirms SQLite WAL
 mode (which would already provide cross-process write safety).
 
-## Why no explicit pre-removal in cleanup
+## Why pre-remove + restore-on-failure (and why `--force` paths skip the dance)
 
-`git worktree remove` uses `dir.c::remove_dir_recurse` internally, which
-calls `lstat()` + `unlink()` per entry — symlinks are never followed
-(see https://github.com/git/git/blob/master/dir.c). Behavior has been
-consistent since git 2.17 (commit cc73385) across Linux and macOS,
-because git uses its own POSIX C `lstat`/`unlink`, not the platform's
-`rm`. Gitignored symlinks also do not block removal.
+`git worktree remove` (no `--force`) refuses to remove a worktree that
+contains untracked files: `fatal: '<path>' contains modified or untracked
+files`. The `**/.ruvector/` gitignore pattern (with trailing slash) only
+matches directories, not symlinks-to-directories — so the injected
+`.ruvector` symlink falls under "untracked file" from git's perspective
+and would block every removal. The symlink MUST be pre-removed.
 
-The earlier design pre-removed the symlink "defensively" before calling
-`git worktree remove`, but that introduced a real bug: when removal
-failed (dirty/locked worktree, no `--force`), the worktree was left in
-place but its `.ruvector` symlink was already gone — silently breaking
-ruvector inside an active worktree (PR #366 review feedback). Letting
-git own the unlink makes the cleanup atomic: success removes the whole
-tree (symlink included), failure leaves the whole tree (symlink included)
-so the worktree remains usable.
+But pre-removing alone introduces a separate bug: when `git worktree
+remove` then fails for OTHER reasons (dirty/locked worktree, no
+`--force`), the worktree is left in place with its `.ruvector` symlink
+already gone — silently breaking ruvector inside an active worktree (PR
+\#366, Codex P1 review feedback). The fix: capture the link target
+before unlinking, and `ln -s` it back if the removal exits non-zero. This
+keeps cleanup atomic from the user's point of view — either the whole
+tree (symlink included) is gone, or the whole tree (symlink included)
+remains usable.
+
+For `--force` paths (`git worktree remove --force`) the dance is
+unnecessary. `--force` skips the untracked-files check, and git's
+`dir.c::remove_dir_recurse` walks the worktree using `lstat()` +
+`unlink()` per entry — symlinks are unlinked, never followed (stable
+since git 2.17, commit cc73385, across Linux and macOS, because git uses
+its own POSIX C `lstat`/`unlink`, not the platform's `rm`).
+
+POSIX-safety on the `rm` side: `rm` without `-r`/`-f` on a `[ -L
+]`-confirmed entry can never traverse the link target.
 
 ## Security analysis
 

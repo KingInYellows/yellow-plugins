@@ -211,6 +211,39 @@ link_ruvector_db() {
     info "Linked .ruvector -> ${_lrd_target}"
 }
 
+# Pre-remove the worktree's .ruvector symlink before `git worktree remove`.
+# Required: git refuses to remove a worktree containing untracked files,
+# and the standard `**/.ruvector/` gitignore pattern (trailing slash) only
+# matches directories, not symlinks-to-directories. Without this pre-removal,
+# `git worktree remove` fails with "contains modified or untracked files".
+#
+# Echoes the link target on stdout (empty if no symlink) so callers can
+# restore the link via `ln -s` if `git worktree remove` then fails for
+# OTHER reasons (dirty/locked, no --force) — keeping the still-present
+# worktree functional. This is what Codex's PR #366 P1 asked for: the
+# unlink is no longer terminal on failure.
+unlink_ruvector_link() {
+    _crl_link="$1/.ruvector"
+    if [ -L "$_crl_link" ]; then
+        _crl_target=$(readlink "$_crl_link" 2>/dev/null) || _crl_target=
+        rm -- "$_crl_link" || warning "Failed to remove .ruvector symlink at ${_crl_link}"
+        printf '%s' "$_crl_target"
+    fi
+}
+
+# Restore a previously-unlinked .ruvector symlink. Best-effort: skips if
+# target is empty, worktree dir is gone (full removal succeeded), or a
+# replacement symlink/file is already present.
+restore_ruvector_link() {
+    _rrl_path="$1"
+    _rrl_target="$2"
+    [ -n "$_rrl_target" ] || return 0
+    [ -d "$_rrl_path" ] || return 0
+    [ ! -e "$_rrl_path/.ruvector" ] && [ ! -L "$_rrl_path/.ruvector" ] || return 0
+    ln -s "$_rrl_target" "$_rrl_path/.ruvector" \
+        || warning "Could not restore .ruvector symlink at ${_rrl_path}/.ruvector"
+}
+
 # Create worktree
 cmd_create() {
     branch_name="$1"
@@ -365,12 +398,18 @@ cmd_cleanup() {
             continue
         fi
 
-        # Remove worktree. git's internal remove_dir_recurse uses lstat+unlink
-        # so the .ruvector symlink is unlinked (never followed) as part of the
-        # directory walk. On failure (dirty/locked worktree, no --force), the
-        # whole tree is left intact so the worktree remains functional.
+        # Pre-remove the .ruvector symlink (git refuses worktrees with
+        # untracked files; the symlink isn't covered by `.ruvector/`
+        # trailing-slash patterns). Capture the target so we can restore
+        # the link if `git worktree remove` then fails for other reasons —
+        # leaves the worktree functional rather than partially-broken.
+        saved_ruvector_target=$(unlink_ruvector_link "$path")
+
         info "Removing: ${path}"
-        git worktree remove "$path" || warning "Failed to remove: ${path}"
+        if ! git worktree remove "$path"; then
+            warning "Failed to remove: ${path}"
+            restore_ruvector_link "$path" "$saved_ruvector_target"
+        fi
     done
 
     # Remove .worktrees directory if empty
