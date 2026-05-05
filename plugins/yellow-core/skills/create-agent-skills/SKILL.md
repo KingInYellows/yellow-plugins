@@ -254,23 +254,21 @@ but is not yet shipped.
 
 ### When the convention applies
 
-The output-file convention is for orchestrators that spawn agents
-emitting **unstructured prose** — security-sentinel, performance-oracle,
-code-simplicity-reviewer, polyglot-reviewer in `/workflows:work` Phase 3
-are the canonical examples. Prose stdout cannot be deterministically
-parsed for partial-failure signals; the file-based result + `status`
-field gives the orchestrator a structural failure signal independent of
-the Task return value.
+Use this convention for orchestrators spawning **prose-emitting**
+agents — `/workflows:work` Phase 3 reviewers are canonical. Prose
+stdout cannot be deterministically parsed for partial-failure
+signals; the file-based result + `status` field is the structural
+signal.
 
-Orchestrators whose spawned agents return **structured JSON** per a
-documented compact-return schema (e.g., `/review:pr` Step 5, where each
-reviewer emits a 10-field JSON object validated against a schema in the
-command file itself) do NOT need this convention. Structured returns
-already give the orchestrator a deterministic failure signal — malformed
-or missing schema fields cause the entire return to be dropped at the
-aggregation step. Layering file-based collection on top would only
-duplicate the signal and adds an empty-glob silent-regression risk if
-any spawned agent isn't updated to write a result file.
+Skip when every spawned agent returns strict structured JSON validated
+against a documented schema. `/review:pr` Step 5 is the canonical
+compact-return JSON case: reviewers emit schema-bound findings through
+TaskOutput, so adding `$RUN_DIR` there would duplicate the return
+contract.
+
+If an orchestrator mixes compact-return agents with prose emitters, use
+this convention only for the prose emitters or split those emitters into
+a workflow that can enforce file-backed results.
 
 The convention's scope, in one line: **prose-emitting orchestrators
 need it; compact-return-JSON orchestrators don't.**

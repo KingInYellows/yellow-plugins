@@ -3,6 +3,8 @@
 'yellow-review': patch
 ---
 
+# Documentation Sync
+
 Doc sync against PR #260 review findings — refresh stale references and
 add Subagent Failure Convention scope clarification.
 
@@ -14,8 +16,9 @@ add Subagent Failure Convention scope clarification.
   project-compliance-reviewer, project-standards-reviewer,
   reliability-reviewer, adversarial-reviewer, plugin-contract-reviewer)
   added since the original count plus 3 yellow-core additions
-  (security-lens, security-reviewer, performance-reviewer) account for
-  the 11-file delta.
+  (security-lens, security-reviewer, performance-reviewer) — 10 net
+  additions — minus 1 for the `code-reviewer.md` Wave-2 deprecation
+  stub now excluded from the count, account for the **9-file delta**.
 - **Add machine-verifiable count one-liner** (`rg -l 'CRITICAL SECURITY
   RULES' plugins/ --type md | grep -v 'security-fencing/SKILL.md' |
   grep -v 'CLAUDE.md' | wc -l`) so future drift is self-correcting.
