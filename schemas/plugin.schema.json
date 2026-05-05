@@ -16,7 +16,9 @@
         },
         "label": { "type": "string" },
         "description": { "type": "string" },
-        "default": {},
+        "default": {
+          "description": "Default value. Must match the declared `type` (string|number|boolean). Constrained via allOf below to prevent a string default containing shell metacharacters from being interpolated unsafely into monitor.command via ${user_config.KEY}."
+        },
         "required": { "type": "boolean" },
         "sensitive": {
           "type": "boolean",
@@ -24,7 +26,25 @@
           "description": "Store value in OS keychain when true."
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "string" } }, "required": ["type"] },
+          "then": { "properties": { "default": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "number" } }, "required": ["type"] },
+          "then": { "properties": { "default": { "type": "number" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "boolean" } }, "required": ["type"] },
+          "then": { "properties": { "default": { "type": "boolean" } } }
+        },
+        {
+          "if": { "not": { "required": ["type"] } },
+          "then": { "properties": { "default": { "type": "string" } } }
+        }
+      ]
     },
     "relativeDir": {
       "type": "string",
@@ -204,7 +224,7 @@
               "command": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Shell command run as a persistent background process. ${user_config.KEY} substitutions must be quoted in the script — they are untrusted shell arguments."
+                "description": "Shell command run as a persistent background process. SECURITY: ${user_config.KEY} substitutions are untrusted shell arguments. SAFE PATTERN: Pass values to a wrapper script via environment variables (e.g., ${CLAUDE_PLUGIN_OPTION_KEY}). UNSAFE PATTERN: Direct interpolation into the command string is vulnerable to shell injection; even single-quoting '${user_config.KEY}' can be bypassed if the value contains a single quote. The userConfigEntry.default constraint helps mitigate malicious defaults, but does not protect against user-supplied values."
               },
               "description": {
                 "type": "string",
