@@ -390,7 +390,13 @@ pipeline (`review_pipeline: persona`, the default).
 ### Step 5: Pass 1 — Parallel Persona Dispatch
 
 Launch all selected agents EXCEPT `code-simplifier` in parallel via Task
-tool. Each agent receives:
+tool. **Each Task invocation MUST set `run_in_background: true`** — the
+review agents declare `background: true` in their frontmatter, but true
+parallelism also requires the spawning call to run in the background.
+Without this, the orchestrator blocks on each agent sequentially even when
+they are independent.
+
+Each agent receives:
 
 1. Their persona file content (loaded automatically by Task)
 2. **Shared review context, fenced as untrusted.** PR title, body, and diff
@@ -503,8 +509,12 @@ in sync with Step 6 sub-step 0 below — adding a Wave-2 conditional
 reviewer that emits prose without listing it in both places means its
 findings are dropped as malformed.
 
-Wait for all dispatched agents. Log any failed agents with error reason.
-If zero agents succeed, abort with error.
+**Wait gate:** Wait for all background agents to complete via TaskOutput /
+TaskList polling (or equivalent notification) before proceeding to Step 6.
+Do NOT begin aggregation while any agent task is still `in_progress` —
+doing so produces a partial findings set and silently drops late-returning
+findings. Log any failed agents with error reason. If zero agents succeed,
+abort with error.
 
 ### Step 6: Aggregate findings (confidence-rubric pipeline)
 
@@ -655,9 +665,14 @@ Risks section.
 
 ### Step 8: Pass 2 — Code Simplifier
 
+If Step 7 applied no fixes (all findings routed to Residual Actionable Work),
+skip this step — code-simplifier has nothing to review.
+
 Launch `code-simplifier` via Task
-(`subagent_type: "yellow-review:review:code-simplifier"`) on the now-modified
-code to review applied fixes for simplification opportunities. Normalize
+(`subagent_type: "yellow-review:review:code-simplifier"`, `run_in_background: true`)
+on the now-modified code to review applied fixes for simplification
+opportunities. Wait for the task to complete (TaskOutput) before proceeding
+to Step 9. Normalize
 the agent's prose return through Step 6 sub-step 0 first, which assigns
 `autofix_class: gated_auto` (the legacy default). Under Step 7's
 `safe_auto`-only auto-apply rule, simplifier findings therefore route to

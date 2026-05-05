@@ -2,6 +2,7 @@
 name: code-reviewer
 description: "DEPRECATED — renamed to project-compliance-reviewer. This stub keeps third-party installs that reference yellow-review:review:code-reviewer working for one minor version. Use when an external command still passes subagent_type yellow-review:review:code-reviewer; replace it with yellow-review:review:project-compliance-reviewer."
 model: inherit
+background: true
 tools:
   - Read
 ---

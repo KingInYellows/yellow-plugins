@@ -2,6 +2,7 @@
 name: codex-reviewer
 description: "Supplementary code reviewer using OpenAI Codex CLI. Provides independent second-opinion review findings in P1/P2/P3 format. Spawned by review:pr when yellow-codex is installed."
 model: inherit
+background: true
 tools:
   - Bash
   - Read

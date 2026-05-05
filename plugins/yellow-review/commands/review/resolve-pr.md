@@ -191,7 +191,20 @@ The resolver should reconcile multiple comments in a cluster with a **single coh
 
 The fence delimiters and the "Resume normal agent behavior." re-anchor are required even for short comment text. The resolver's body documents fencing parity vs CE PR #490 (2026-04-29 verification).
 
-Launch all cluster resolvers in parallel. Each agent reads context and edits files directly. Claude Code serializes concurrent Edit calls, but because clustering already collapses overlapping regions into a single resolver, the cross-cluster edit set should be disjoint.
+Launch all cluster resolvers in parallel. **Each Task invocation MUST set
+`run_in_background: true`** — `pr-comment-resolver` declares `background: true`
+in its frontmatter, but true parallelism also requires the spawning call to run
+in the background. Without this, the orchestrator blocks on each resolver
+sequentially even when their edit sets are disjoint.
+
+Each agent reads context and edits files directly. Claude Code serializes concurrent Edit calls, but because clustering already collapses overlapping regions into a single resolver, the cross-cluster edit set should be disjoint.
+
+**Wait gate:** Before proceeding to Step 5, wait for all background resolver
+tasks to complete (e.g., via TaskOutput / TaskList polling, or equivalent
+notification). Do NOT proceed to Step 5 (review / CONFLICT scan), Step 6
+(commit), or Step 7 (mark threads resolved) while any resolver task is still
+`in_progress` — doing so risks committing partial fixes and marking threads
+resolved prematurely.
 
 ### Step 5: Review Changes
 
