@@ -86,6 +86,8 @@ FENCE_NAMES=("pr-context" "cluster-comments" "pr-thread" "conversation-context")
 
 sanitize_for_fence() {
   local content="$1"
+  # NOTE: fence names must not contain sed metacharacters (/, \, ., *, [, &).
+  # All names in FENCE_NAMES above use only [a-z0-9-] and are safe.
   for fence_name in "${FENCE_NAMES[@]}"; do
     # Replace both begin and end delimiter variants
     content="$(printf '%s' "$content" \
@@ -106,8 +108,11 @@ For higher assurance, scrub any line matching the delimiter format:
 
 ```bash
 sanitize_all_fence_delimiters() {
-  # Replace any line that is exactly '--- <word(s)> ---' (the fence format)
-  sed 's/^--- [a-zA-Z][a-zA-Z0-9 _-]* ---$/[fenced: redacted]/g'
+  # Replace any line that is exactly '--- <word(s)> ---' (the fence format).
+  # `tr -d '\r'` strips CR first so CRLF-terminated input from GitHub API
+  # responses still matches the end-of-line anchor (P1: greptile).
+  # `[[:space:]]*$` tolerates trailing whitespace LLMs ignore (medium: gemini).
+  tr -d '\r' | sed 's/^--- [a-zA-Z][a-zA-Z0-9 _-]* ---[[:space:]]*$/[fenced: redacted]/g'
 }
 
 SAFE_BODY="$(printf '%s' "$RAW_BODY" | sanitize_all_fence_delimiters)"

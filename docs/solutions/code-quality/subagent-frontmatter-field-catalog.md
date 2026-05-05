@@ -104,7 +104,7 @@ Only `worktree` is officially documented as of May 2026. Values like `strict`, `
 ```yaml
 # Review agent that must not edit files:
 memory: project
-disallowedTools: Write, Edit, MultiEdit
+disallowedTools: [Write, Edit, MultiEdit]
 ```
 
 PR #255 audit found ~10 agents in yellow-review and yellow-core carrying `memory: project` without this guard. All were documented as "report findings only / Do NOT edit any files" — the expanded write permission existed silently at runtime for every one. Cross-validated by 4 reviewers (adversarial, security, correctness, plugin-contract).
@@ -123,7 +123,9 @@ The `background: true` frontmatter flag declares the agent is concurrent-eligibl
 
 ```bash
 # For each agent name the orchestrator claims is background-enabled:
-grep -l 'background: true' plugins/<name>/agents/<agent-name>.md
+# Prints filenames that are MISSING the flag (actionable output).
+# -L = files NOT matching, -E = extended regex (tolerates YAML whitespace variation).
+grep -LE 'background:[[:space:]]*true' plugins/<name>/agents/<agent-name>.md
 ```
 
 Absence of output is a false claim in the orchestrator prose, not a minor doc inconsistency — it means those agents silently serialize and the stated parallelism guarantee is broken.
@@ -185,7 +187,7 @@ The `plugin-directory-name` is the directory name (e.g., `yellow-research`), NOT
 
 - **`description` single-line rule:** Folded scalars silently truncate — the parser reads only the first line. This is confirmed parser behavior (GH #10504), not a subtle edge case. Every folded-scalar description passes YAML validation but delivers a broken routing signal.
 - **Plugin subagents silently drop three fields:** `permissionMode`, `mcpServers`, and `hooks` are no-ops when shipped from a plugin. Reviewing a plugin PR that adds any of these is reviewing dead frontmatter unless the agent is later moved to user/project scope.
-- **`memory:` is a tool expansion:** Adding `memory: project` to an agent advertised as read-only silently grants Read/Write/Edit. The "read-only contract" exists only in the system prompt — the runtime grant is real. Fix: add `disallowedTools: Write, Edit, MultiEdit` to enforce the prose contract at the runtime layer.
+- **`memory:` is a tool expansion:** Adding `memory: project` to an agent advertised as read-only silently grants Read/Write/Edit. The "read-only contract" exists only in the system prompt — the runtime grant is real. Fix: add `disallowedTools: [Write, Edit, MultiEdit]` to enforce the prose contract at the runtime layer.
 - **`memory: true` is invalid:** Boolean form silently does nothing. Use `user`/`project`/`local` strings.
 - **`background: true` requires `run_in_background: true` on the spawn call:** Frontmatter alone does not parallelize — the Task call is the deciding factor.
 - **Orchestrator prose about `background: true` completeness is not self-verifying:** A command file can state "all N agents are background-enabled" while only a subset actually carry the flag. Grep each named agent after any batch migration to confirm.
@@ -254,7 +256,7 @@ model: haiku
 background: true
 effort: low
 maxTurns: 10
-disallowedTools: Write, Edit
+disallowedTools: [Write, Edit]
 tools: Read, Bash, Glob
 ---
 ```
