@@ -342,10 +342,11 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 5c: Path existence for commands, agents, skills, mcpServers,
-  // lspServers, and monitors. These fields accept pathOrPaths
+  // lspServers, monitors, and hooks. These fields accept pathOrPaths
   // (commands/agents/skills) or pathPathsOrInline (mcpServers/lspServers/
-  // monitors). Validate only the string-path forms; inline objects are
-  // structurally accepted by JSON Schema and need no filesystem check here.
+  // monitors/hooks). Validate only the string-path forms; inline objects
+  // are structurally accepted by JSON Schema and need no filesystem check
+  // here.
   for (const field of ['commands', 'agents', 'skills']) {
     if (manifest[field] !== undefined && typeof manifest[field] !== 'object') {
       // non-object = string or array of strings → validate as directory paths
@@ -384,6 +385,17 @@ function validatePlugin(pluginDir) {
   } else if (Array.isArray(manifest.monitors)) {
     for (const p of manifest.monitors.filter((v) => typeof v === 'string')) {
       validatePathFile('monitors', p, pluginDir, errors);
+    }
+  }
+  // hooks uses pathPathsOrInline — string/array entries point to hooks.json
+  // config files. The inline-object form is handled by RULES 6/7/8 below;
+  // those rules short-circuit on the !Array.isArray guard, so path-string
+  // and path-array forms would otherwise pass with no existence check.
+  if (manifest.hooks !== undefined && typeof manifest.hooks === 'string') {
+    validatePathFile('hooks', manifest.hooks, pluginDir, errors);
+  } else if (Array.isArray(manifest.hooks)) {
+    for (const p of manifest.hooks.filter((v) => typeof v === 'string')) {
+      validatePathFile('hooks', p, pluginDir, errors);
     }
   }
 
