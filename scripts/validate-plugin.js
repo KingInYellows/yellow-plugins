@@ -16,6 +16,14 @@
  *   2 - Plugin not found
  */
 
+// NOTE: JSON Schema validation (AJV) runs separately via validate-schemas.js /
+// `pnpm validate:schemas`. This script enforces additional rules not expressible
+// in JSON Schema: path existence, directory structure, .md file presence, hook
+// script sanity, and hooks.json drift. Always run both together via
+// `pnpm validate:schemas` — running this script alone does not catch schema
+// shape violations in fields like monitors, channels, userConfig, and
+// dependencies.
+
 const fs = require('fs');
 const path = require('path');
 
@@ -39,10 +47,158 @@ function resolveHookScriptPath(command, pluginDir) {
 function resolvePluginPath(inputPath, pluginDir) {
   const normalized = path.resolve(pluginDir, inputPath);
   const pluginRoot = path.resolve(pluginDir);
-  if (normalized.startsWith(pluginRoot + path.sep)) {
+  if (normalized === pluginRoot || normalized.startsWith(pluginRoot + path.sep)) {
     return normalized;
   }
   return null;
+}
+
+/**
+ * Count .md files under `dir` recursively (skipping symlinks). Used by
+ * validatePathOrPathsDir to accept the standard nested layouts:
+ *   skills/<name>/SKILL.md
+ *   commands/<category>/<name>.md
+ *   agents/<category>/<name>.md
+ * Symlinked entries are skipped to match the symlink-rejection policy in
+ * resolvePluginPath / validatePathFile (PR #343).
+ */
+function countMarkdownRecursive(dir) {
+  let count = 0;
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * Validate a path field that must point to an existing file (not a directory).
+ * Used for fields like lspServers and monitors that reference config files.
+ * @param {string} fieldName  - Field name for error messages (e.g. 'lspServers')
+ * @param {string} filePath   - Single path string to validate
+ * @param {string} pluginDir  - Absolute plugin root directory
+ * @param {string[]} errors   - Error array to push into
+ */
+function validatePathFile(fieldName, filePath, pluginDir, errors) {
+  const resolved = resolvePluginPath(filePath, pluginDir);
+  if (!resolved) {
+    errors.push(`${fieldName} path escapes plugin directory: ${filePath}`);
+    logError(`${fieldName} path escapes plugin directory: ${filePath}`);
+  } else if (!fs.existsSync(resolved)) {
+    errors.push(`${fieldName} file not found: ${filePath}`);
+    logError(`${fieldName} file not found: ${filePath}`);
+  } else if (fs.statSync(resolved).isDirectory()) {
+    errors.push(`${fieldName} must point to a file, not a directory: ${filePath}`);
+    logError(`${fieldName} must point to a file, not a directory: ${filePath}`);
+  } else {
+    logSuccess(`${fieldName}: ${filePath}`);
+  }
+}
+
+/**
+ * Validate a pathOrPaths field that must point to a directory containing .md files.
+ * @param {string} fieldName  - Field name for error messages (e.g. 'commands')
+ * @param {*}      fieldValue - Raw manifest value (string | string[] | other)
+ * @param {string} pluginDir  - Absolute plugin root directory
+ * @param {string[]} errors   - Error array to push into
+ */
+function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
+  const paths = Array.isArray(fieldValue)
+    ? fieldValue
+    : typeof fieldValue === 'string'
+      ? [fieldValue]
+      : null;
+  if (paths === null) {
+    errors.push(`${fieldName} must be a string path or array of string paths`);
+    logError(`${fieldName} must be a string path or array of string paths`);
+    return;
+  }
+  for (const p of paths) {
+    if (typeof p !== 'string') {
+      errors.push(`${fieldName} entries must be string paths`);
+      logError(`${fieldName} entries must be string paths`);
+      continue;
+    }
+    const resolved = resolvePluginPath(p, pluginDir);
+    if (!resolved) {
+      errors.push(`${fieldName} path escapes plugin directory: ${p}`);
+      logError(`${fieldName} path escapes plugin directory: ${p}`);
+    } else if (!fs.existsSync(resolved)) {
+      errors.push(`${fieldName} directory not found: ${p}`);
+      logError(`${fieldName} directory not found: ${p}`);
+    } else if (!fs.statSync(resolved).isDirectory()) {
+      errors.push(`${fieldName} must point to a directory: ${p}`);
+      logError(`${fieldName} must point to a directory: ${p}`);
+    } else {
+      // Walk the directory recursively to find any .md files. The 'skills'
+      // field uses SKILL.md files inside per-skill subdirectories; 'commands'
+      // and 'agents' commonly group .md files into category subdirectories
+      // (e.g. setup/all.md, research/best-practices-researcher.md). A
+      // single-level readdirSync misses both layouts and false-rejects them.
+      const mdCount = countMarkdownRecursive(resolved);
+      if (mdCount === 0) {
+        errors.push(
+          `${fieldName} directory must contain at least one .md file (recursively): ${p}`
+        );
+        logError(
+          `${fieldName} directory must contain at least one .md file (recursively): ${p}`
+        );
+      } else {
+        logSuccess(
+          `${fieldName}: ${p} (${mdCount} file${mdCount === 1 ? '' : 's'})`
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Collect inline-form hook entries from either the top-level inline-object
+ * form or the array form (which may mix path strings and inline objects).
+ * Returns a merged event-keyed dict where each event maps to the
+ * concatenated entries arrays from all inline-object sources. Path-string
+ * entries are ignored (file existence is enforced separately by RULE 5c).
+ *
+ * The schema's fileFilesOrInline allows array items to be inline event-keyed
+ * configs (e.g. [{"PreToolUse": [...]}]), and those inline objects need to
+ * be subjected to RULES 6/7/8 just like the top-level inline-object form.
+ *
+ * @param {*} hooks - manifest.hooks raw value
+ * @returns {Object} event-keyed dict (possibly empty)
+ */
+function collectInlineHooks(hooks) {
+  const sources =
+    hooks && typeof hooks === 'object' && !Array.isArray(hooks)
+      ? [hooks]
+      : Array.isArray(hooks)
+        ? hooks.filter(
+            (v) => v && typeof v === 'object' && !Array.isArray(v)
+          )
+        : [];
+  const merged = {};
+  for (const source of sources) {
+    for (const [event, entries] of Object.entries(source)) {
+      if (!Array.isArray(entries)) continue;
+      if (!merged[event]) merged[event] = [];
+      merged[event].push(...entries);
+    }
+  }
+  return merged;
 }
 
 const colors = {
@@ -170,52 +326,79 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 5b: output styles directory (if present)
-  if (manifest.outputStyles !== undefined) {
-    if (typeof manifest.outputStyles !== 'string') {
-      errors.push('outputStyles must be a string path');
-      logError('outputStyles must be a string path');
-    } else {
-      const stylesDir = resolvePluginPath(manifest.outputStyles, pluginDir);
-      if (!stylesDir) {
-        errors.push(
-          `outputStyles path escapes plugin directory: ${manifest.outputStyles}`
-        );
-        logError(
-          `outputStyles path escapes plugin directory: ${manifest.outputStyles}`
-        );
-      } else if (!fs.existsSync(stylesDir)) {
-        errors.push(`outputStyles directory not found: ${manifest.outputStyles}`);
-        logError(`outputStyles directory not found: ${manifest.outputStyles}`);
-      } else if (!fs.statSync(stylesDir).isDirectory()) {
-        errors.push(
-          `outputStyles must point to a directory: ${manifest.outputStyles}`
-        );
-        logError(
-          `outputStyles must point to a directory: ${manifest.outputStyles}`
-        );
-      } else {
-        const styleFiles = fs
-          .readdirSync(stylesDir, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
-        if (styleFiles.length === 0) {
-          errors.push(
-            `outputStyles directory must contain at least one .md file: ${manifest.outputStyles}`
-          );
-          logError(
-            `outputStyles directory must contain at least one .md file: ${manifest.outputStyles}`
-          );
-        } else {
-          logSuccess(
-            `Output styles: ${manifest.outputStyles} (${styleFiles.length} file${styleFiles.length === 1 ? '' : 's'})`
-          );
-        }
+  // RULE 5b/5c: Path existence for outputStyles, commands, agents, skills,
+  // mcpServers, lspServers, monitors, and hooks. The schema narrows these
+  // into two type-distinct shapes:
+  //   - dirOrDirs        (outputStyles/commands/agents/skills) → directory paths
+  //   - fileFilesOrInline (mcpServers/hooks/lspServers/monitors) → file paths
+  //                                                                or inline objects
+  // The validator therefore only enforces filesystem existence: directory
+  // checks via validatePathOrPathsDir (recursive .md count, accepts the
+  // standard nested layouts), file checks via validatePathFile. Inline
+  // objects are structurally accepted by JSON Schema and need no
+  // filesystem check here.
+  for (const field of ['outputStyles', 'commands', 'agents', 'skills']) {
+    if (manifest[field] !== undefined && typeof manifest[field] === 'string') {
+      // string form — single directory path
+      validatePathOrPathsDir(field, manifest[field], pluginDir, errors);
+    } else if (Array.isArray(manifest[field])) {
+      // array form — only string entries are filesystem-checked here;
+      // any non-string entries would be a schema violation caught by AJV.
+      const stringPaths = manifest[field].filter((v) => typeof v === 'string');
+      if (stringPaths.length > 0) {
+        validatePathOrPathsDir(field, stringPaths, pluginDir, errors);
       }
     }
   }
+  // mcpServers uses pathPathsOrInline — string/array entries point to JSON
+  // config files, not directories. Inline-object form (keyed by server name)
+  // is structurally validated by JSON Schema and needs no filesystem check.
+  if (manifest.mcpServers !== undefined && typeof manifest.mcpServers === 'string') {
+    validatePathFile('mcpServers', manifest.mcpServers, pluginDir, errors);
+  } else if (Array.isArray(manifest.mcpServers)) {
+    for (const p of manifest.mcpServers.filter((v) => typeof v === 'string')) {
+      validatePathFile('mcpServers', p, pluginDir, errors);
+    }
+  }
+  // lspServers uses pathPathsOrInline — paths point to JSON config files, not
+  // directories, so use file-existence check (not directory + .md check).
+  if (manifest.lspServers !== undefined && typeof manifest.lspServers === 'string') {
+    validatePathFile('lspServers', manifest.lspServers, pluginDir, errors);
+  } else if (Array.isArray(manifest.lspServers)) {
+    for (const p of manifest.lspServers.filter((v) => typeof v === 'string')) {
+      validatePathFile('lspServers', p, pluginDir, errors);
+    }
+  }
+  // monitors uses pathPathsOrInline — when declared as a path string it points
+  // to a config file; inline array entries are objects validated by JSON Schema.
+  if (manifest.monitors !== undefined && typeof manifest.monitors === 'string') {
+    validatePathFile('monitors', manifest.monitors, pluginDir, errors);
+  } else if (Array.isArray(manifest.monitors)) {
+    for (const p of manifest.monitors.filter((v) => typeof v === 'string')) {
+      validatePathFile('monitors', p, pluginDir, errors);
+    }
+  }
+  // hooks uses pathPathsOrInline — string/array entries point to hooks.json
+  // config files. The inline-object form is handled by RULES 6/7/8 below;
+  // those rules short-circuit on the !Array.isArray guard, so path-string
+  // and path-array forms would otherwise pass with no existence check.
+  if (manifest.hooks !== undefined && typeof manifest.hooks === 'string') {
+    validatePathFile('hooks', manifest.hooks, pluginDir, errors);
+  } else if (Array.isArray(manifest.hooks)) {
+    for (const p of manifest.hooks.filter((v) => typeof v === 'string')) {
+      validatePathFile('hooks', p, pluginDir, errors);
+    }
+  }
 
-  // RULE 6: Hook script existence (if hooks declared as inline object)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  // RULES 6/7/8 operate on inline event-keyed hook configs. The
+  // fileFilesOrInline schema permits these as either the top-level
+  // inline-object form OR as inline objects mixed inside an array form,
+  // so collectInlineHooks merges both into a single event-keyed dict.
+  const inlineHooks = collectInlineHooks(manifest.hooks);
+  const hasInlineHooks = Object.keys(inlineHooks).length > 0;
+
+  // RULE 6: Hook script existence (if hooks declared as inline object).
+  if (hasInlineHooks) {
     const VALID_HOOK_EVENTS = [
       'PreToolUse',
       'PostToolUse',
@@ -233,7 +416,7 @@ function validatePlugin(pluginDir) {
       'PreCompact',
     ];
 
-    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
+    for (const [eventName, hookEntries] of Object.entries(inlineHooks)) {
       // Validate event name
       if (!VALID_HOOK_EVENTS.includes(eventName)) {
         logWarning(
@@ -312,8 +495,10 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist).
+  // Operates on the merged inline-hooks dict so array-form inline objects
+  // are also drift-checked against hooks.json.
+  if (hasInlineHooks) {
     const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
     if (fs.existsSync(hooksJsonPath)) {
       try {
@@ -321,7 +506,7 @@ function validatePlugin(pluginDir) {
           fs.readFileSync(hooksJsonPath, 'utf-8')
         );
         const hooksJsonHooks = hooksJson.hooks || {};
-        const manifestHooks = manifest.hooks;
+        const manifestHooks = inlineHooks;
         let driftFound = false;
 
         // Compare event names
@@ -428,14 +613,14 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 8: Hook script basics (shebang, decision output, no set -e)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  if (hasInlineHooks) {
     const DECISION_PROTOCOL_EVENTS = new Set([
       'PreToolUse',
       'PostToolUse',
       'Stop',
     ]);
 
-    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
+    for (const [eventName, hookEntries] of Object.entries(inlineHooks)) {
       if (!Array.isArray(hookEntries)) continue;
 
       for (const entry of hookEntries) {
@@ -540,8 +725,10 @@ if (require.main === module) {
       : path.join(PROJECT_ROOT, manifestPath);
     const pluginRoot = path.dirname(path.dirname(fullManifest));
     pluginArg = pluginRoot;
-    // Validate resolved path is within project root
-    if (!pluginRoot.startsWith(PROJECT_ROOT)) {
+    // Validate resolved path is within project root.
+    // Must use path.sep boundary to prevent sibling-directory bypass:
+    // a path like /projects-evil/x would otherwise pass when PROJECT_ROOT=/projects.
+    if (pluginRoot !== PROJECT_ROOT && !pluginRoot.startsWith(PROJECT_ROOT + path.sep)) {
       logError(`--plugin path escapes project root: ${manifestPath}`);
       process.exit(2);
     }

@@ -1,0 +1,83 @@
+{
+  "name": "extended-example",
+  "version": "2.1.0",
+  "description": "Extended plugin manifest example exercising all optional component path, monitor, channel, dependency, lspServer, and userConfig fields supported by the schema.",
+  "author": {
+    "name": "KingInYellows",
+    "email": "dev@example.com",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": ["example", "extended", "schema-coverage"],
+  "skills": ["./skills/", "./extra-skills/"],
+  "commands": "./commands/",
+  "agents": ["./agents/", "./vendored-agents/"],
+  "outputStyles": "./styles/",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": {
+    "telegram": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/servers/telegram",
+      "args": ["--mode", "stream"]
+    }
+  },
+  "lspServers": "./.lsp.json",
+  "monitors": [
+    {
+      "name": "deploy-status",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/poll-deploy.sh '${user_config.api_endpoint}'",
+      "description": "Deployment status changes"
+    },
+    {
+      "name": "error-log",
+      "command": "tail -F ./logs/error.log",
+      "description": "Application error log",
+      "when": "on-skill-invoke:debug"
+    }
+  ],
+  "userConfig": {
+    "api_endpoint": {
+      "type": "string",
+      "label": "API endpoint",
+      "description": "Your team's API endpoint",
+      "required": true,
+      "sensitive": false
+    },
+    "api_token": {
+      "type": "string",
+      "label": "API token",
+      "description": "API authentication token",
+      "required": true,
+      "sensitive": true
+    },
+    "timeout_ms": {
+      "type": "number",
+      "label": "Request timeout",
+      "default": 5000,
+      "sensitive": false
+    }
+  },
+  "channels": [
+    {
+      "server": "telegram",
+      "userConfig": {
+        "bot_token": {
+          "type": "string",
+          "description": "Telegram bot token",
+          "sensitive": true
+        },
+        "owner_id": {
+          "type": "string",
+          "description": "Your Telegram user ID",
+          "sensitive": false
+        }
+      }
+    }
+  ],
+  "dependencies": [
+    "helper-lib",
+    { "name": "secrets-vault", "version": "~2.1.0" },
+    { "name": "metrics-collector", "version": "^1.0.0" }
+  ]
+}

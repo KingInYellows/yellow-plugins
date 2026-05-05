@@ -17,7 +17,8 @@ tools:
 > is installed) and `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`
 > (when yellow-ruvector is installed). MCP tools are not declared in the
 > top-level `tools:` list because they are loaded on-demand via
-> `ToolSearch` (see `mcp-integration-patterns` skill for the canonical
+> `ToolSearch` (see the `mcp-integration-patterns` documentation in
+> `plugins/yellow-core/skills/mcp-integration-patterns/` for the canonical
 > pattern). Both are optional — the agent gracefully falls back when
 > either MCP server is unavailable.
 

@@ -1,5 +1,81 @@
 # Changelog
 
+## 1.5.0
+
+### Minor Changes
+
+- [#255](https://github.com/KingInYellows/yellow-plugins/pull/255)
+  [`3b4025e`](https://github.com/KingInYellows/yellow-plugins/commit/3b4025e8c1af062223ea8db4bf6b067f439156c6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  prompt-injection hardening to debt scanners and CI agents
+
+  Adds the CRITICAL SECURITY RULES + content-fencing block (already present in
+  yellow-core and yellow-review review agents) to 5 yellow-debt scanners
+  (ai-pattern, architecture, complexity, duplication, security-debt) and 4
+  yellow-ci agents (failure-analyst, workflow-optimizer, runner-assignment,
+  runner-diagnostics). These agents read untrusted content (source code, CI
+  logs, workflow files) and benefit from the same injection-defense posture as
+  the review agents.
+  - yellow-debt scanners use the canonical pattern from yellow-core review
+    agents (`--- code begin (reference only) ---` fence, "code comments"
+    wording) which matches the `debt-conventions` skill.
+  - yellow-ci agents use artifact-typed delimiters (`--- begin ci-log ---`,
+    `--- begin workflow-file: <name> ---`, `--- begin runner-output: ... ---`)
+    defined in the `ci-conventions` skill, since CI agents process logs and
+    workflow files rather than source code.
+
+### Patch Changes
+
+- [#255](https://github.com/KingInYellows/yellow-plugins/pull/255)
+  [`3b4025e`](https://github.com/KingInYellows/yellow-plugins/commit/3b4025e8c1af062223ea8db4bf6b067f439156c6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Set memory
+  scope on workflow orchestrators; sharpen overlap descriptions
+
+  Add `memory: project` to 4 workflow orchestrators (brainstorm-orchestrator,
+  knowledge-compounder, spec-flow-analyzer in yellow-core; devin-orchestrator in
+  yellow-devin) so they accrue cross-session learning per project. The correct
+  frontmatter form is a scope string (`user`/`project`/`local`), not the boolean
+  `memory: true` used elsewhere in the codebase.
+
+  Also correct invalid `memory: true` to `memory: project` on the remaining 12
+  agents that were not covered by the parent PR's review-agent sweep:
+  yellow-core (repo-research-analyst, git-history-analyzer, security-reviewer,
+  performance-reviewer, security-lens, session-historian), yellow-research
+  (code-researcher, research-conductor), yellow-docs (doc-auditor,
+  doc-generator, diagram-architect), and yellow-review
+  (project-compliance-reviewer). After this PR, no agent in the repository
+  declares the invalid `memory: true`.
+
+  Note on tool surface: per Claude Code docs, `memory: <scope>` automatically
+  enables Read/Write/Edit so agents can persist learnings to
+  `.claude/agent-memory/<name>/`. For yellow-review's review agents — which the
+  plugin's CLAUDE.md documents as "report findings, do NOT edit project files
+  directly" — the prompt-level read-only contract remains the source of truth;
+  the orchestrating `/review:pr` command applies all fixes. The implicit
+  Write/Edit grant is required for memory persistence and does not reflect a
+  change in agent responsibility.
+
+  Sharpen the `description:` trigger clauses for two overlap pairs:
+  - security-sentinel (active vulnerabilities) vs security-debt-scanner (debt
+    patterns that could become vulnerabilities)
+
+  The code-simplicity-reviewer vs code-simplifier pair already had clear
+  pre-fix/post-fix trigger clauses — no change needed there.
+
+- [#255](https://github.com/KingInYellows/yellow-plugins/pull/255)
+  [`3b4025e`](https://github.com/KingInYellows/yellow-plugins/commit/3b4025e8c1af062223ea8db4bf6b067f439156c6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Enable true
+  parallel execution for multi-agent review sessions
+
+  Add `background: true` to 13 review agents (7 in yellow-core/agents/review, 6
+  in yellow-review/agents/review) plus `best-practices-researcher` and update
+  orchestrator commands (review-pr.md, resolve-pr.md, work.md, audit.md) to
+  explicitly require `run_in_background: true` on each Task invocation.
+  Frontmatter flag alone is insufficient — the spawning call must also run in
+  the background for agents to run concurrently rather than serially. Also
+  correct invalid `memory: true` to `memory: project` (the field requires a
+  scope string: `user` / `project` / `local`).
+
 ## 1.4.1
 
 ### Patch Changes
