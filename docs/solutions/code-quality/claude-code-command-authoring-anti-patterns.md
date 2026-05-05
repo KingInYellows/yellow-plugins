@@ -825,6 +825,85 @@ When reviewing command markdown files, scan for:
 
 ---
 
+## Update — 2026-05-01
+
+### 20. LLM Step Ordering Bug: Null-Check Must Fire Before the Comparison It Guards
+
+When an LLM agent executes ordered steps from prose, a null/type check placed
+AFTER the comparison it guards causes correctness failures that are invisible
+in the happy path.
+
+**Concrete instance from PR #316** (`feat(yellow-debt): scanner output schema
+v2.0 with confidence-rubric calibration`): The audit-synthesizer Step 4
+specified a 5-step deterministic evaluation order:
+
+1. Severity normalization
+2. Severity exception — compare `confidence ≥ 0.50` for critical findings
+3. Confidence presence/type check (suppress if null/missing/non-numeric)
+4. Migrated-v1.0 `+0.05` bump
+5. Category gate
+
+Step 3 (null/type check) ran after Step 2 (the comparison). A critical finding
+with `confidence: null` reaches Step 2 before the check. In a type-strict
+runtime (Python): `None >= 0.50` → `TypeError` (crash). In a
+type-coercing runtime (JavaScript): `null >= 0.50` → `false` — finding is
+suppressed, but the reason logged is "below threshold" instead of "missing
+confidence". Both outcomes mask the actual data quality problem.
+
+**WRONG ordering:**
+
+```text
+Step 2: If severity is critical AND confidence ≥ 0.50: apply exception
+Step 3: If confidence is null/missing/non-numeric: suppress
+```
+
+**RIGHT ordering:**
+
+```text
+Step 2: If confidence is null/missing/non-numeric: suppress (emit warning, stop)
+Step 3: If severity is critical AND confidence ≥ 0.50: apply exception
+```
+
+The corrected sequence ensures confidence is guaranteed numeric before any
+comparison uses it.
+
+**Rule:** Any step that compares a value must be guarded by a presence/type
+check on that value in an EARLIER step. In review, ask: "What if this field
+is null?" and trace through each step in order. A `correctness-reviewer`
+adversarial trace asking "what if `confidence: null`?" through each step
+catches this class of bug.
+
+**General pattern:** "Validate before use" applies at the step-prose level, not
+just at the bash code level. A null-check written as step prose after a
+comparison step that references the same value is as broken as a null-check
+written after a dereference in code.
+
+**Companion finding (same PR):** The synthesizer had a stale forward-reference:
+Step 1 said "step 5 can distinguish migrated v1.0 inputs" but the consumer was
+actually Step 4 rule 4. After step renumbering or rule renaming, audit ALL
+forward-references by searching for step numbers in the document. A
+`codex-reviewer` caught this at confidence 0.95.
+
+**Rule:** After any step renumbering, run:
+
+```bash
+grep -in 'step [0-9][0-9]*' plugins/<name>/agents/<file>.md
+```
+
+(`-i` makes the match case-insensitive — portable to BSD grep on macOS,
+unlike GNU's `\|` BRE alternation extension which silently returns zero
+results on macOS.)
+Verify each cross-reference resolves to the correct step after renaming.
+
+---
+
+**Prevention checklist additions (for the pre-PR checklist in this doc):**
+
+- [ ] For each step that compares a field value: is there an earlier step that checks presence/type?
+- [ ] After step renumbering: do all forward-references (`"see step N"`, `"step N rule M"`) still resolve correctly?
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2
