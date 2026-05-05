@@ -208,12 +208,23 @@ if [ "$TOKEN_SRC" = shell ]; then
   fi
 
   printf '%-18s valid (cog_ prefix confirmed, length ok)\n' 'Token format:'
-else
-  # TOKEN_SRC=userconfig: format was validated at plugin enable time (keychain).
+elif [ "$TOKEN_SRC" = userconfig ]; then
+  # Format was validated at plugin enable time (keychain).
   # Shell var is empty — skip shell-side format check to avoid false "format invalid".
   printf '%-18s stored in userConfig (Claude Code keychain) — format already validated\n' \
     'DEVIN_SERVICE_USER_TOKEN:'
   printf '%-18s at plugin enable. Skipping shell-side format check.\n' ''
+else
+  # TOKEN_SRC=none — credential is missing entirely. Step 1's stop
+  # condition is a prose instruction; this branch enforces it in Bash so
+  # an LLM that ran Steps 1+2 in the same invocation can't fall through
+  # and print a false "stored in userConfig" message.
+  printf 'ERROR: DEVIN_SERVICE_USER_TOKEN is not set in the shell or in userConfig.\n' >&2
+  printf '       Configure it via one of:\n' >&2
+  printf '         - /plugin disable yellow-devin && /plugin enable yellow-devin (answer the userConfig prompt)\n' >&2
+  printf '         - export DEVIN_SERVICE_USER_TOKEN="cog_..." in ~/.zshrc or ~/.bashrc\n' >&2
+  printf '       See the Setup Instructions block at the bottom of this command for full details.\n' >&2
+  exit 1
 fi
 ```
 
@@ -236,10 +247,21 @@ if [ "$ORG_SRC" = shell ]; then
   fi
 
   printf '%-18s valid (%s)\n' 'Org ID format:' "$org"
-else
-  # ORG_SRC=userconfig: stored in keychain, shell var is empty — skip format check.
+elif [ "$ORG_SRC" = userconfig ]; then
+  # Stored in keychain, shell var is empty — skip format check.
   printf '%-18s stored in userConfig (Claude Code keychain) — skipping shell-side format check.\n' \
     'DEVIN_ORG_ID:'
+else
+  # ORG_SRC=none — credential is missing entirely. Same enforcement as
+  # the TOKEN_SRC=none branch above; prevents an LLM that proceeded past
+  # Step 1's stop condition from printing a false "stored in userConfig"
+  # message for a credential that does not exist.
+  printf 'ERROR: DEVIN_ORG_ID is not set in the shell or in userConfig.\n' >&2
+  printf '       Configure it via one of:\n' >&2
+  printf '         - /plugin disable yellow-devin && /plugin enable yellow-devin (answer the userConfig prompt)\n' >&2
+  printf '         - export DEVIN_ORG_ID="..." in ~/.zshrc or ~/.bashrc\n' >&2
+  printf '       See the Setup Instructions block at the bottom of this command for full details.\n' >&2
+  exit 1
 fi
 ```
 
