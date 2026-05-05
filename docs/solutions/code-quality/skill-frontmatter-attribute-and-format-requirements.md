@@ -293,3 +293,50 @@ special characters predictably.
 - `docs/solutions/code-quality/automated-bot-review-false-positives.md`:
   Bot false positives on frontmatter patterns
 - Memory: `Plugin Authoring Quality Rules` section updated with new rules
+
+---
+
+## Update — 2026-05-04
+
+### `user-invokable: false` Must Be Present, Not Just Correctly Spelled (PRs #328–#330)
+
+Five reviewers across PRs #328–#330 (yellow-council Wave-2 review) flagged a
+skill missing the `user-invokable: false` field entirely. Prior MEMORY.md and
+this doc documented the correct spelling (`user-invokable` with **k**), but
+not the requirement that the field must be present for internal skills.
+
+**The gap:** The peer pattern — `codex-patterns`, `pr-review-workflow`,
+`debt-conventions` — all carry `user-invokable: false` for internal skills.
+Without the field, Claude Code's frontmatter parser applies an undefined
+default, and CI tooling (including automated reviewers) flags the omission.
+
+**Rule:** Every internal SKILL.md (one not intended for direct user invocation)
+MUST include `user-invokable: false` in its frontmatter, regardless of whether
+the skill has any other frontmatter.
+
+**Minimum valid frontmatter for an internal skill:**
+
+```yaml
+---
+name: council-patterns
+description: "Shared redaction and pack conventions for council reviewers. Use when authoring or updating a council reviewer agent."
+user-invokable: false
+---
+```
+
+**Detection:**
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+# List internal skills missing the user-invokable field entirely
+grep -rL 'user-invokable' "$GIT_ROOT/plugins/"*/skills/*/SKILL.md
+```
+
+Any file returned by this command is missing the field and should be audited:
+if it is an internal skill, add `user-invokable: false`; if it is intended for
+user invocation, add `user-invokable: true` explicitly for clarity.
+
+**On-touch rule extension:** When any SKILL.md is modified (even for unrelated
+changes), confirm `user-invokable:` is present AND correctly spelled. The
+existing on-touch check for description format now has a sibling check for
+field presence.
