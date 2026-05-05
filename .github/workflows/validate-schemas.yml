@@ -606,9 +606,11 @@ jobs:
             # Exclusions: "permissionScopes" literal; JSON userConfig field
             # declarations (lines ending in `: {` are object-typed field
             # openings, not secret values); ${user_config.*} template
-            # references (substituted at runtime, not literal secrets).
+            # references (substituted at runtime, not literal secrets);
+            # `"description":` lines (documentation prose mentioning "token"
+            # or "API key" describing what the field is, not its value).
             SENSITIVE=$(grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --include="*.json" \
-              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{user_config\.' \
+              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{user_config\.|"description":' \
               || true)
             if [ -n "$SENSITIVE" ]; then
               echo "$SENSITIVE"

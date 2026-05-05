@@ -134,7 +134,7 @@ check_key() {
   if [ $has_env -eq 1 ] && [ $has_cfg -eq 1 ]; then
     printf '%-22s set (both shell & userConfig)\n' "$label:"
   elif [ $has_env -eq 1 ]; then
-    printf '%-22s set (shell env only — MCP may fail)\n' "$label:"
+    printf '%-22s set (shell env only — MCP WILL FAIL: plugin 2.0.0 reads userConfig, not shell env)\n' "$label:"
   elif [ $has_cfg -eq 1 ]; then
     printf '%-22s set (userConfig only)\n' "$label:"
   else
@@ -334,8 +334,16 @@ has_userconfig() {
 SKIP_CURL_PROBE=0
 [ -z "${PERPLEXITY_API_KEY:-}" ] && has_userconfig yellow-research perplexity_api_key && SKIP_CURL_PROBE=1
 if [ $SKIP_CURL_PROBE -eq 1 ]; then
-  provider_status="PRESENT (validated via MCP startup — userConfig only)"
-  provider_detail="Shell env empty; key present in userConfig. Perplexity MCP would not have started without a valid key."
+  # Tentative classification — the MCP-startup validation claim only holds
+  # if Step 3.5 actually confirms the perplexity tools are visible. If
+  # Step 3.5 finds the perplexity MCP UNAVAILABLE (e.g., npm/node failure
+  # or a malformed key that triggered a startup crash), upgrade the
+  # final report to clarify that the credential's validity was NOT
+  # confirmed by MCP startup. Use the literal "userConfig only" status
+  # in the meantime; Step 4 reconciles against Step 3.5's MCP-visibility
+  # result before printing the unified table.
+  provider_status="PRESENT (userConfig only — pending MCP-visibility confirmation)"
+  provider_detail="Shell env empty; key present in userConfig. Perplexity MCP hard-fails at startup without a valid key, so a successful Step 3.5 visibility check upgrades this to PRESENT (validated via MCP startup). If Step 3.5 reports the MCP UNAVAILABLE, leave this status as-is and append: 'MCP did not load — credential validity unconfirmed.'"
 else
   response=$(curl -s --connect-timeout 5 --max-time 5 \
     -w "\n%{http_code}" \
@@ -578,7 +586,30 @@ misrepresent research capability when a user has all three functional
 keys (EXA/Tavily/Perplexity) set.
 
 Adjust the capability summary based on how many functional API keys are
-active (three — EXA, Tavily, Perplexity):
+active (three — EXA, Tavily, Perplexity). A key counts as **active** when
+its Step 3 status is any of:
+
+- `ACTIVE` — live-tested and confirmed working.
+- `PRESENT (validated via MCP startup — userConfig only)` — Perplexity
+  hard-fails at startup without a valid key; reach this status only after
+  Step 3.5 confirms the MCP tools are visible. Promote
+  `PRESENT (userConfig only — pending MCP-visibility confirmation)` to this
+  label when Step 3.5 reports perplexity ACTIVE; otherwise keep the
+  pending label and append "MCP did not load — credential validity
+  unconfirmed."
+- `PRESENT (keychain — MCP starts without credential validation)` — exa /
+  tavily start without validating; key is stored and reachable to the MCP
+  but not yet confirmed valid. Still counts as active for capability-summary
+  purposes (the user-visible MCP tools work; first invocation will surface
+  any auth problem).
+- `PRESENT (untested)` — key was present and format-valid; user opted out of
+  live testing.
+
+`PRESENT (userConfig only — pending MCP-visibility confirmation)` does NOT
+count as active until Step 3.5 promotes it; if Step 3.5 finds the MCP
+UNAVAILABLE, treat the key as inactive for the summary.
+
+Counts:
 
 - 3 active: `FULL (3/3 API sources)`
 - 1-2 active: `PARTIAL (N/3 API sources)`

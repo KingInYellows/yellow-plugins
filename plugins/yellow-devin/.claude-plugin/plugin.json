@@ -23,7 +23,7 @@
     },
     "devin_org_id": {
       "description": "Devin organization ID. Find at Devin Enterprise Settings > Organizations.",
-      "sensitive": true
+      "sensitive": false
     }
   },
   "mcpServers": {

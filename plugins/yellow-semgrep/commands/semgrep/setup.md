@@ -209,11 +209,42 @@ MCP startup and continue to Step 3. Use the three-layer error check
 from the `semgrep-conventions` skill when the probe runs.
 
 ```bash
-# SKIP_CURL_PROBE default 0 = fail-closed (probe runs when unset).
-# If Step 2 detection ran in a separate Bash invocation, the variable
-# is unset here; without the default, the probe would silently skip
-# and no connectivity check would run.
-SKIP_CURL_PROBE="${SKIP_CURL_PROBE:-0}"
+# Each Bash block runs in a fresh subprocess — the SKIP_CURL_PROBE flag
+# set in the Step 2 detection block does NOT survive across blocks. Without
+# re-detection, a userConfig-only setup (have_uc=1, SEMGREP_APP_TOKEN unset)
+# would default SKIP_CURL_PROBE to 0 and curl `/me` with an empty Bearer
+# token, returning a misleading 401 immediately after Step 2 reported the
+# userConfig-only flow as valid. Re-detect the source before defaulting.
+has_userconfig() {
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+
+# If SKIP_CURL_PROBE was carried over from Step 2's Bash invocation, honor
+# it. Otherwise re-detect: have_uc + empty shell var ⇒ skip the probe.
+if [ -z "${SKIP_CURL_PROBE:-}" ]; then
+  if has_userconfig yellow-semgrep semgrep_app_token \
+      && [ -z "${SEMGREP_APP_TOKEN:-}" ]; then
+    SKIP_CURL_PROBE=1
+  else
+    SKIP_CURL_PROBE=0
+  fi
+fi
 SEMGREP_API="https://semgrep.dev/api/v1"
 
 if [ "$SKIP_CURL_PROBE" = 0 ]; then
@@ -239,9 +270,32 @@ Handle errors per skill patterns:
 If `SKIP_CURL_PROBE=1`, skip the REST call entirely:
 
 ```bash
-# Each Bash block is a fresh subprocess — re-establish the same
-# fail-closed default and the API URL used for the curl branch.
-SKIP_CURL_PROBE="${SKIP_CURL_PROBE:-0}"
+# Each Bash block is a fresh subprocess — re-detect SKIP_CURL_PROBE the
+# same way Step 2's curl-probe block does, so a userConfig-only setup
+# correctly skips the deployment-slug REST call instead of issuing one
+# with an empty Bearer token.
+has_userconfig() {
+  local plugin="$1" option="$2" jq_exit
+  local settings="${HOME}/.claude/settings.json"
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
+      '.pluginConfigs[$p].options[$o] // empty' \
+      "$settings" >/dev/null 2>/dev/null
+    return $?
+  else
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
+}
+if [ -z "${SKIP_CURL_PROBE:-}" ]; then
+  if has_userconfig yellow-semgrep semgrep_app_token \
+      && [ -z "${SEMGREP_APP_TOKEN:-}" ]; then
+    SKIP_CURL_PROBE=1
+  else
+    SKIP_CURL_PROBE=0
+  fi
+fi
 SEMGREP_API="https://semgrep.dev/api/v1"
 
 if [ "$SKIP_CURL_PROBE" = 1 ]; then

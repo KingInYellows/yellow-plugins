@@ -86,11 +86,20 @@ Step 4: Report with next steps
 
 ### Classification table
 
-| MCP tools | API probe                | State     |
-| --------- | ------------------------ | --------- |
-| not loaded| (not run)                | OFFLINE   |
-| loaded    | 200 or skipped           | HEALTHY   |
-| loaded    | 401 / 403 / 429 / error  | DEGRADED  |
+| MCP tools | API probe                | Startup validates credential? | State              |
+| --------- | ------------------------ | ----------------------------- | ------------------ |
+| not loaded| (not run)                | n/a                           | OFFLINE            |
+| loaded    | 200                      | n/a                           | HEALTHY            |
+| loaded    | skipped (userConfig-only)| yes (e.g., perplexity)        | HEALTHY            |
+| loaded    | skipped (userConfig-only)| no  (e.g., exa, tavily)       | PRESENT (untested) |
+| loaded    | 401 / 403 / 429 / error  | n/a                           | DEGRADED           |
+
+The "Startup validates credential?" column captures whether the MCP server
+hard-fails at startup when the credential is missing or invalid (so tool
+visibility is itself a credential-validation signal). MCPs that defer
+validation to first tool invocation (exa @ 3.1.8, tavily @ 0.2.17 at the
+time of writing) should report `PRESENT (untested)` rather than HEALTHY
+when the API probe is skipped — the credential is stored but unverified.
 
 ### Why this shape
 

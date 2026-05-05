@@ -3,7 +3,6 @@
 "yellow-research": major
 "yellow-devin": minor
 "yellow-core": minor
-"yellow-morph": minor
 ---
 
 Roll out userConfig-based credential storage across five plugins, replacing
@@ -27,11 +26,10 @@ or augmenting shell environment variable lookups with Claude Code userConfig.
 
 - **yellow-core** (additive): New `mcp-health-probe` skill defining a
   canonical three-state MCP health classification (OFFLINE / DEGRADED /
-  HEALTHY) for `/<plugin>:status` commands. New `mcp-integration-patterns`
-  skill. The `/core:setup` env-variable dashboard gains a `check_key()`
-  helper that reports shell env vs userConfig state per credential.
-
-- **yellow-morph** (additive): New `bin/start-morph.sh` wrapper resolves
-  `MORPH_API_KEY` from `userConfig` first, shell env as fallback, and
-  performs a deterministic `npm ci` install of `@morphllm/morphmcp` on
-  first run. New `/morph:setup` and `/morph:status` commands.
+  HEALTHY) for `/<plugin>:status` commands. The existing
+  `mcp-integration-patterns` skill is split into three focused sub-skills
+  for narrower auto-invocation: `memory-recall-pattern`,
+  `memory-remember-pattern`, and `morph-discovery-pattern`. The umbrella
+  `mcp-integration-patterns` skill is retained until consumers migrate.
+  The `/setup:all` env-variable dashboard gains a `check_key()` helper
+  that reports shell env vs userConfig state per credential.
