@@ -16,6 +16,14 @@
  *   2 - Plugin not found
  */
 
+// NOTE: JSON Schema validation (AJV) runs separately via validate-schemas.js /
+// `pnpm validate:schemas`. This script enforces additional rules not expressible
+// in JSON Schema: path existence, directory structure, .md file presence, hook
+// script sanity, and hooks.json drift. Always run both together via
+// `pnpm validate:schemas` — running this script alone does not catch schema
+// shape violations in fields like monitors, channels, userConfig, and
+// dependencies.
+
 const fs = require('fs');
 const path = require('path');
 
@@ -39,10 +47,88 @@ function resolveHookScriptPath(command, pluginDir) {
 function resolvePluginPath(inputPath, pluginDir) {
   const normalized = path.resolve(pluginDir, inputPath);
   const pluginRoot = path.resolve(pluginDir);
-  if (normalized.startsWith(pluginRoot + path.sep)) {
+  if (normalized === pluginRoot || normalized.startsWith(pluginRoot + path.sep)) {
     return normalized;
   }
   return null;
+}
+
+/**
+ * Validate a path field that must point to an existing file (not a directory).
+ * Used for fields like lspServers and monitors that reference config files.
+ * @param {string} fieldName  - Field name for error messages (e.g. 'lspServers')
+ * @param {string} filePath   - Single path string to validate
+ * @param {string} pluginDir  - Absolute plugin root directory
+ * @param {string[]} errors   - Error array to push into
+ */
+function validatePathFile(fieldName, filePath, pluginDir, errors) {
+  const resolved = resolvePluginPath(filePath, pluginDir);
+  if (!resolved) {
+    errors.push(`${fieldName} path escapes plugin directory: ${filePath}`);
+    logError(`${fieldName} path escapes plugin directory: ${filePath}`);
+  } else if (!fs.existsSync(resolved)) {
+    errors.push(`${fieldName} file not found: ${filePath}`);
+    logError(`${fieldName} file not found: ${filePath}`);
+  } else if (fs.statSync(resolved).isDirectory()) {
+    errors.push(`${fieldName} must point to a file, not a directory: ${filePath}`);
+    logError(`${fieldName} must point to a file, not a directory: ${filePath}`);
+  } else {
+    logSuccess(`${fieldName}: ${filePath}`);
+  }
+}
+
+/**
+ * Validate a pathOrPaths field that must point to a directory containing .md files.
+ * @param {string} fieldName  - Field name for error messages (e.g. 'commands')
+ * @param {*}      fieldValue - Raw manifest value (string | string[] | other)
+ * @param {string} pluginDir  - Absolute plugin root directory
+ * @param {string[]} errors   - Error array to push into
+ */
+function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
+  const paths = Array.isArray(fieldValue)
+    ? fieldValue
+    : typeof fieldValue === 'string'
+      ? [fieldValue]
+      : null;
+  if (paths === null) {
+    errors.push(`${fieldName} must be a string path or array of string paths`);
+    logError(`${fieldName} must be a string path or array of string paths`);
+    return;
+  }
+  for (const p of paths) {
+    if (typeof p !== 'string') {
+      errors.push(`${fieldName} entries must be string paths`);
+      logError(`${fieldName} entries must be string paths`);
+      continue;
+    }
+    const resolved = resolvePluginPath(p, pluginDir);
+    if (!resolved) {
+      errors.push(`${fieldName} path escapes plugin directory: ${p}`);
+      logError(`${fieldName} path escapes plugin directory: ${p}`);
+    } else if (!fs.existsSync(resolved)) {
+      errors.push(`${fieldName} directory not found: ${p}`);
+      logError(`${fieldName} directory not found: ${p}`);
+    } else if (!fs.statSync(resolved).isDirectory()) {
+      errors.push(`${fieldName} must point to a directory: ${p}`);
+      logError(`${fieldName} must point to a directory: ${p}`);
+    } else {
+      const mdFiles = fs
+        .readdirSync(resolved, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
+      if (mdFiles.length === 0) {
+        errors.push(
+          `${fieldName} directory must contain at least one .md file: ${p}`
+        );
+        logError(
+          `${fieldName} directory must contain at least one .md file: ${p}`
+        );
+      } else {
+        logSuccess(
+          `${fieldName}: ${p} (${mdFiles.length} file${mdFiles.length === 1 ? '' : 's'})`
+        );
+      }
+    }
+  }
 }
 
 const colors = {
@@ -171,51 +257,99 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 5b: output styles directory (if present)
+  // Per schema, outputStyles may be a single path string or an array of path strings.
   if (manifest.outputStyles !== undefined) {
-    if (typeof manifest.outputStyles !== 'string') {
-      errors.push('outputStyles must be a string path');
-      logError('outputStyles must be a string path');
+    const stylePaths = Array.isArray(manifest.outputStyles)
+      ? manifest.outputStyles
+      : typeof manifest.outputStyles === 'string'
+        ? [manifest.outputStyles]
+        : null;
+    if (stylePaths === null) {
+      errors.push('outputStyles must be a string path or array of string paths');
+      logError('outputStyles must be a string path or array of string paths');
     } else {
-      const stylesDir = resolvePluginPath(manifest.outputStyles, pluginDir);
-      if (!stylesDir) {
-        errors.push(
-          `outputStyles path escapes plugin directory: ${manifest.outputStyles}`
-        );
-        logError(
-          `outputStyles path escapes plugin directory: ${manifest.outputStyles}`
-        );
-      } else if (!fs.existsSync(stylesDir)) {
-        errors.push(`outputStyles directory not found: ${manifest.outputStyles}`);
-        logError(`outputStyles directory not found: ${manifest.outputStyles}`);
-      } else if (!fs.statSync(stylesDir).isDirectory()) {
-        errors.push(
-          `outputStyles must point to a directory: ${manifest.outputStyles}`
-        );
-        logError(
-          `outputStyles must point to a directory: ${manifest.outputStyles}`
-        );
-      } else {
-        const styleFiles = fs
-          .readdirSync(stylesDir, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
-        if (styleFiles.length === 0) {
-          errors.push(
-            `outputStyles directory must contain at least one .md file: ${manifest.outputStyles}`
-          );
-          logError(
-            `outputStyles directory must contain at least one .md file: ${manifest.outputStyles}`
-          );
+      for (const stylePath of stylePaths) {
+        if (typeof stylePath !== 'string') {
+          errors.push('outputStyles entries must be string paths');
+          logError('outputStyles entries must be string paths');
+          continue;
+        }
+        const stylesDir = resolvePluginPath(stylePath, pluginDir);
+        if (!stylesDir) {
+          errors.push(`outputStyles path escapes plugin directory: ${stylePath}`);
+          logError(`outputStyles path escapes plugin directory: ${stylePath}`);
+        } else if (!fs.existsSync(stylesDir)) {
+          errors.push(`outputStyles directory not found: ${stylePath}`);
+          logError(`outputStyles directory not found: ${stylePath}`);
+        } else if (!fs.statSync(stylesDir).isDirectory()) {
+          errors.push(`outputStyles must point to a directory: ${stylePath}`);
+          logError(`outputStyles must point to a directory: ${stylePath}`);
         } else {
-          logSuccess(
-            `Output styles: ${manifest.outputStyles} (${styleFiles.length} file${styleFiles.length === 1 ? '' : 's'})`
-          );
+          const styleFiles = fs
+            .readdirSync(stylesDir, { withFileTypes: true })
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
+          if (styleFiles.length === 0) {
+            errors.push(
+              `outputStyles directory must contain at least one .md file: ${stylePath}`
+            );
+            logError(
+              `outputStyles directory must contain at least one .md file: ${stylePath}`
+            );
+          } else {
+            logSuccess(
+              `Output styles: ${stylePath} (${styleFiles.length} file${styleFiles.length === 1 ? '' : 's'})`
+            );
+          }
         }
       }
     }
   }
 
-  // RULE 6: Hook script existence (if hooks declared as inline object)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  // RULE 5c: Path existence for commands, agents, skills, and lspServers.
+  // These fields accept pathOrPaths (commands/agents/skills) or
+  // pathPathsOrInline (lspServers). Validate only the string-path forms;
+  // inline objects are structurally accepted by JSON Schema and need no
+  // filesystem check here.
+  for (const field of ['commands', 'agents', 'skills']) {
+    if (manifest[field] !== undefined && typeof manifest[field] !== 'object') {
+      // non-object = string or array of strings → validate as directory paths
+      validatePathOrPathsDir(field, manifest[field], pluginDir, errors);
+    } else if (Array.isArray(manifest[field])) {
+      // array may mix path strings and inline objects — validate only strings
+      const stringPaths = manifest[field].filter((v) => typeof v === 'string');
+      if (stringPaths.length > 0) {
+        validatePathOrPathsDir(field, stringPaths, pluginDir, errors);
+      }
+    }
+  }
+  // lspServers uses pathPathsOrInline — paths point to JSON config files, not
+  // directories, so use file-existence check (not directory + .md check).
+  if (manifest.lspServers !== undefined && typeof manifest.lspServers === 'string') {
+    validatePathFile('lspServers', manifest.lspServers, pluginDir, errors);
+  } else if (Array.isArray(manifest.lspServers)) {
+    for (const p of manifest.lspServers.filter((v) => typeof v === 'string')) {
+      validatePathFile('lspServers', p, pluginDir, errors);
+    }
+  }
+  // monitors uses pathPathsOrInline — when declared as a path string it points
+  // to a config file; inline array entries are objects validated by JSON Schema.
+  if (manifest.monitors !== undefined && typeof manifest.monitors === 'string') {
+    validatePathFile('monitors', manifest.monitors, pluginDir, errors);
+  } else if (Array.isArray(manifest.monitors)) {
+    for (const p of manifest.monitors.filter((v) => typeof v === 'string')) {
+      validatePathFile('monitors', p, pluginDir, errors);
+    }
+  }
+
+  // RULE 6: Hook script existence (if hooks declared as inline object).
+  // Skip when hooks is an array (the path-array form added by the extended
+  // schema) — array entries are paths/objects, not event-keyed, so the
+  // event-name validation below does not apply.
+  if (
+    manifest.hooks &&
+    typeof manifest.hooks === 'object' &&
+    !Array.isArray(manifest.hooks)
+  ) {
     const VALID_HOOK_EVENTS = [
       'PreToolUse',
       'PostToolUse',
@@ -312,8 +446,13 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist).
+  // Only meaningful for inline-object hooks; array form has no event keys.
+  if (
+    manifest.hooks &&
+    typeof manifest.hooks === 'object' &&
+    !Array.isArray(manifest.hooks)
+  ) {
     const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
     if (fs.existsSync(hooksJsonPath)) {
       try {
@@ -428,7 +567,11 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 8: Hook script basics (shebang, decision output, no set -e)
-  if (manifest.hooks && typeof manifest.hooks === 'object') {
+  if (
+    manifest.hooks &&
+    typeof manifest.hooks === 'object' &&
+    !Array.isArray(manifest.hooks)
+  ) {
     const DECISION_PROTOCOL_EVENTS = new Set([
       'PreToolUse',
       'PostToolUse',
@@ -540,8 +683,10 @@ if (require.main === module) {
       : path.join(PROJECT_ROOT, manifestPath);
     const pluginRoot = path.dirname(path.dirname(fullManifest));
     pluginArg = pluginRoot;
-    // Validate resolved path is within project root
-    if (!pluginRoot.startsWith(PROJECT_ROOT)) {
+    // Validate resolved path is within project root.
+    // Must use path.sep boundary to prevent sibling-directory bypass:
+    // a path like /projects-evil/x would otherwise pass when PROJECT_ROOT=/projects.
+    if (pluginRoot !== PROJECT_ROOT && !pluginRoot.startsWith(PROJECT_ROOT + path.sep)) {
       logError(`--plugin path escapes project root: ${manifestPath}`);
       process.exit(2);
     }
