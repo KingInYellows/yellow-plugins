@@ -247,12 +247,28 @@ If user skips, proceed to Step 4 with all format-valid keys marked
 # in a command file runs in a fresh subprocess — the function is undefined here.
 # Re-define inline so the SKIP_CURL_PROBE check below is reliable.
 has_userconfig() {
-  local plugin="$1" option="$2"
+  # Mirror the canonical Step-1 definition. Surface jq parse errors
+  # (exit >= 2) instead of silently treating a corrupted settings.json
+  # as "credential absent" — otherwise users see "NOT SET" for keys
+  # that are actually configured and get instructed to re-enter them.
+  local plugin="$1" option="$2" jq_exit
   local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] && command -v jq >/dev/null 2>&1 \
-    && jq -e --arg p "$plugin" --arg o "$option" \
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
       '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>&1
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
 }
 
 # Skip curl probe when key is userConfig-only — shell env is empty so the
@@ -282,12 +298,28 @@ fi
 ```bash
 # Re-define has_userconfig inline (separate Bash block = fresh subprocess).
 has_userconfig() {
-  local plugin="$1" option="$2"
+  # Mirror the canonical Step-1 definition. Surface jq parse errors
+  # (exit >= 2) instead of silently treating a corrupted settings.json
+  # as "credential absent" — otherwise users see "NOT SET" for keys
+  # that are actually configured and get instructed to re-enter them.
+  local plugin="$1" option="$2" jq_exit
   local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] && command -v jq >/dev/null 2>&1 \
-    && jq -e --arg p "$plugin" --arg o "$option" \
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
       '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>&1
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
 }
 
 # Skip curl probe when key is userConfig-only — MCP reads it from userConfig.
@@ -320,12 +352,28 @@ fi
 ```bash
 # Re-define has_userconfig inline (separate Bash block = fresh subprocess).
 has_userconfig() {
-  local plugin="$1" option="$2"
+  # Mirror the canonical Step-1 definition. Surface jq parse errors
+  # (exit >= 2) instead of silently treating a corrupted settings.json
+  # as "credential absent" — otherwise users see "NOT SET" for keys
+  # that are actually configured and get instructed to re-enter them.
+  local plugin="$1" option="$2" jq_exit
   local settings="${HOME}/.claude/settings.json"
-  [ -r "$settings" ] && command -v jq >/dev/null 2>&1 \
-    && jq -e --arg p "$plugin" --arg o "$option" \
+  [ -r "$settings" ] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e --arg p "$plugin" --arg o "$option" \
       '.pluginConfigs[$p].options[$o] // empty' \
-      "$settings" >/dev/null 2>&1
+      "$settings" >/dev/null 2>/dev/null
+    jq_exit=$?
+    if [ "$jq_exit" -ge 2 ]; then
+      printf '[has_userconfig] Warning: jq could not parse %s (exit %d)\n' \
+        "$settings" "$jq_exit" >&2
+    fi
+    return "$jq_exit"
+  else
+    printf '[has_userconfig] Warning: jq not installed; using fixed-string grep fallback (may produce false positives)\n' >&2
+    grep -qF "\"$plugin\"" "$settings" 2>/dev/null \
+      && grep -qF "\"$option\"" "$settings" 2>/dev/null
+  fi
 }
 
 # Skip curl probe when key is userConfig-only — MCP reads it from userConfig.
