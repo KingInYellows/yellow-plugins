@@ -88,13 +88,14 @@ scope is clarified in the SKILL.md.
 
 - [ ] 1.1: Mirror `validate-agent-authoring-review-rule.test.ts`
       structure. Create `tests/integration/validate-plugin.test.ts`
-      with `mkdtempSync` per test, `execFileSync` of
+      with `mkdtempSync` per test, `spawnSync` of
       `node scripts/validate-plugin.js` against the temp dir, and
       assertions on exit code + stderr.
 - [ ] 1.2: Add fixture coverage for **current** behavior before
       changing anything (regression net): valid manifest passes,
-      invalid name fails, missing version fails, hooks-string
-      anti-pattern logs warning, hooks-inline-object passes.
+      invalid name fails, missing version is allowed (only
+      invalid-format fails), hooks-string anti-pattern logs warning,
+      hooks-inline-object passes.
 - [ ] 1.3: Extract `hasInlineHooks(manifest)` predicate at module
       scope (lines 226, 329, 449 currently duplicated). Replace
       three call sites.
@@ -259,24 +260,28 @@ prose-instruction form.
       to `create-agent-skills/SKILL.md`. New paragraph in the
       §Subagent Failure Convention section:
 
-      > **When the convention applies.** Orchestrators that spawn
-      > agents emitting unstructured prose (e.g., `work.md`
-      > Phase 3 reviewers). Orchestrators whose spawned agents
-      > return structured JSON per a compact-return schema
-      > (e.g., `review-pr.md` Step 5) can rely on schema
-      > validation to detect partial failures; the file-based
-      > RUN_DIR pattern is unnecessary there and would only
-      > duplicate the signal.
+  ```text
+  **When the convention applies.** Orchestrators that spawn
+  agents emitting unstructured prose (e.g., `work.md`
+  Phase 3 reviewers). Orchestrators whose spawned agents
+  return structured JSON per a compact-return schema
+  (e.g., `review-pr.md` Step 5) can rely on schema
+  validation to detect partial failures; the file-based
+  RUN_DIR pattern is unnecessary there and would only
+  duplicate the signal.
+  ```
 
 - [ ] 4.6: **Add comment block to `review-pr.md` Step 5**
       explaining the architectural choice:
 
-      > Step 5 collects findings via TaskOutput because each
-      > reviewer emits compact-return JSON per the schema in
-      > this file. The Subagent Failure Convention's
-      > file-based RUN_DIR pattern (see `create-agent-skills`
-      > SKILL.md §Subagent Failure Convention) is reserved for
-      > prose-emitting orchestrators like `work.md` Phase 3.
+  ```text
+  Step 5 collects findings via TaskOutput because each
+  reviewer emits compact-return JSON per the schema in
+  this file. The Subagent Failure Convention's
+  file-based RUN_DIR pattern (see `create-agent-skills`
+  SKILL.md §Subagent Failure Convention) is reserved for
+  prose-emitting orchestrators like `work.md` Phase 3.
+  ```
 
 - [ ] 4.7: Update `create-agent-skills/SKILL.md` Subagent Failure
       Convention to use the atomic-write `.tmp` → `mv`
@@ -458,20 +463,30 @@ stacks on the previous via Graphite (`gt`); the entire stack ultimately
 merges into `main` once PR #260 lands.
 
 ### 1. agent/fix/pr260-validator-hardening
+
 - **Type:** fix
 - **Description:** array-form hooks bypass + helper extraction + fixture test harness
-- **Scope:** scripts/validate-plugin.js, tests/integration/validate-plugin.test.ts, .changeset/pr260-validator-hardening.md
+- **Scope:** scripts/validate-plugin.js,
+  tests/integration/validate-plugin.test.ts,
+  .changeset/pr260-validator-hardening.md
 - **Tasks:** 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13
 - **Depends on:** (none — base of stack; parent branch: docs/subagent-conventions)
 
 ### 2. agent/feat/pr260-schema-tightening
+
 - **Type:** feat
 - **Description:** tighten userConfig/pathPathsOrInline, add semver custom keyword, fix example
-- **Scope:** schemas/plugin.schema.json, examples/plugin-extended.example.json, packages/infrastructure/src/validation/keywords/semverRange.ts, packages/infrastructure/src/validation/ajvFactory.ts, tests/integration/example-files-schema.test.ts, .changeset/pr260-schema-tightening.md
+- **Scope:** schemas/plugin.schema.json,
+  examples/plugin-extended.example.json,
+  packages/infrastructure/src/validation/keywords/semverRange.ts,
+  packages/infrastructure/src/validation/ajvFactory.ts,
+  tests/integration/example-files-schema.test.ts,
+  .changeset/pr260-schema-tightening.md
 - **Tasks:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10
 - **Depends on:** #1
 
 ### 3. agent/fix/pr260-work-rundir-hardening
+
 - **Type:** fix
 - **Description:** RUN_DIR shell-variable isolation + atomic .tmp→mv writes + cleanup
 - **Scope:** plugins/yellow-core/commands/workflows/work.md, .changeset/pr260-rundir-hardening.md
@@ -479,8 +494,13 @@ merges into `main` once PR #260 lands.
 - **Depends on:** #2
 
 ### 4. agent/docs/pr260-doc-sync
+
 - **Type:** docs
 - **Description:** refresh security-fencing count, scope clarification, quick-ref fix
-- **Scope:** plugins/yellow-core/skills/security-fencing/SKILL.md, plugins/yellow-core/skills/create-agent-skills/SKILL.md, plugins/yellow-core/skills/create-agent-skills/references/quick-reference.md, plugins/yellow-review/commands/review/review-pr.md, .changeset/pr260-doc-sync.md
+- **Scope:** plugins/yellow-core/skills/security-fencing/SKILL.md,
+  plugins/yellow-core/skills/create-agent-skills/SKILL.md,
+  plugins/yellow-core/skills/create-agent-skills/references/quick-reference.md,
+  plugins/yellow-review/commands/review/review-pr.md,
+  .changeset/pr260-doc-sync.md
 - **Tasks:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9
 - **Depends on:** #3

@@ -79,7 +79,10 @@ function resolveHookScriptPath(command, pluginDir) {
 function resolvePluginPath(inputPath, pluginDir) {
   const normalized = path.resolve(pluginDir, inputPath);
   const pluginRoot = path.resolve(pluginDir);
-  if (normalized === pluginRoot || normalized.startsWith(pluginRoot + path.sep)) {
+  if (
+    normalized === pluginRoot ||
+    normalized.startsWith(pluginRoot + path.sep)
+  ) {
     return normalized;
   }
   return null;
@@ -277,9 +280,7 @@ function collectInlineHooks(hooks) {
     hooks && typeof hooks === 'object' && !Array.isArray(hooks)
       ? [hooks]
       : Array.isArray(hooks)
-        ? hooks.filter(
-            (v) => v && typeof v === 'object' && !Array.isArray(v)
-          )
+        ? hooks.filter((v) => v && typeof v === 'object' && !Array.isArray(v))
         : [];
   const merged = {};
   for (const source of sources) {
@@ -336,9 +337,37 @@ function addError(errors, message) {
  */
 function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
   if (!fs.existsSync(scriptPath)) {
+    addError(errors, `Hook script not found for ${eventName}: ${scriptPath}`);
+    return;
+  }
+  // Use lstatSync (not statSync) so symlinks are detected before following.
+  // A symlink could point outside the plugin directory and bypass the
+  // resolvePluginPath boundary check — reject symlinks outright (same policy
+  // as resolvePluginPath and validatePathOrPathsDir). Also reject directories:
+  // a malformed hook entry like "bash ." resolves to a directory and would
+  // throw a confusing EISDIR from readFileSync; make it a hard error instead
+  // of a warning so the manifest fails validation.
+  let lstat;
+  try {
+    lstat = fs.lstatSync(scriptPath);
+  } catch (lstatErr) {
     addError(
       errors,
-      `Hook script not found for ${eventName}: ${scriptPath}`
+      `Hook script not accessible for ${eventName}: ${scriptPath} (${lstatErr.message})`
+    );
+    return;
+  }
+  if (lstat.isSymbolicLink()) {
+    addError(
+      errors,
+      `Hook script path is a symlink which is not permitted for ${eventName}: ${scriptPath}`
+    );
+    return;
+  }
+  if (!lstat.isFile()) {
+    addError(
+      errors,
+      `Hook script must point to a file, not a directory or special file for ${eventName}: ${scriptPath}`
     );
     return;
   }
@@ -349,16 +378,9 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
       `Hook script not readable: ${scriptPath} (check file permissions)`
     );
   }
-  try {
-    const mode = fs.statSync(scriptPath).mode;
-    if ((mode & 0o111) === 0) {
-      logWarning(
-        `Hook script not executable: ${scriptPath} (check file permissions)`
-      );
-    }
-  } catch (statErr) {
+  if ((lstat.mode & 0o111) === 0) {
     logWarning(
-      `Cannot inspect hook script mode: ${scriptPath} (${statErr.message})`
+      `Hook script not executable: ${scriptPath} (check file permissions)`
     );
   }
 
@@ -366,9 +388,7 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
   try {
     content = fs.readFileSync(scriptPath, 'utf-8');
   } catch (readErr) {
-    logWarning(
-      `Cannot read hook script: ${scriptPath} (${readErr.message})`
-    );
+    logWarning(`Cannot read hook script: ${scriptPath} (${readErr.message})`);
     return;
   }
 
@@ -391,7 +411,9 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
   }
 
   if (
-    /^\s*set\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(content)
+    /^\s*set\s+(?:[^#\n]*?\s)?(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
+      content
+    )
   ) {
     logWarning(
       `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
@@ -538,7 +560,10 @@ function validatePlugin(pluginDir) {
   // mcpServers uses pathPathsOrInline — string/array entries point to JSON
   // config files, not directories. Inline-object form (keyed by server name)
   // is structurally validated by JSON Schema and needs no filesystem check.
-  if (manifest.mcpServers !== undefined && typeof manifest.mcpServers === 'string') {
+  if (
+    manifest.mcpServers !== undefined &&
+    typeof manifest.mcpServers === 'string'
+  ) {
     validatePathFile('mcpServers', manifest.mcpServers, pluginDir, errors);
   } else if (Array.isArray(manifest.mcpServers)) {
     for (const p of manifest.mcpServers.filter((v) => typeof v === 'string')) {
@@ -547,7 +572,10 @@ function validatePlugin(pluginDir) {
   }
   // lspServers uses pathPathsOrInline — paths point to JSON config files, not
   // directories, so use file-existence check (not directory + .md check).
-  if (manifest.lspServers !== undefined && typeof manifest.lspServers === 'string') {
+  if (
+    manifest.lspServers !== undefined &&
+    typeof manifest.lspServers === 'string'
+  ) {
     validatePathFile('lspServers', manifest.lspServers, pluginDir, errors);
   } else if (Array.isArray(manifest.lspServers)) {
     for (const p of manifest.lspServers.filter((v) => typeof v === 'string')) {
@@ -556,7 +584,10 @@ function validatePlugin(pluginDir) {
   }
   // monitors uses pathPathsOrInline — when declared as a path string it points
   // to a config file; inline array entries are objects validated by JSON Schema.
-  if (manifest.monitors !== undefined && typeof manifest.monitors === 'string') {
+  if (
+    manifest.monitors !== undefined &&
+    typeof manifest.monitors === 'string'
+  ) {
     validatePathFile('monitors', manifest.monitors, pluginDir, errors);
   } else if (Array.isArray(manifest.monitors)) {
     for (const p of manifest.monitors.filter((v) => typeof v === 'string')) {
@@ -646,9 +677,7 @@ function validatePlugin(pluginDir) {
     const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
     if (fs.existsSync(hooksJsonPath)) {
       try {
-        const hooksJson = JSON.parse(
-          fs.readFileSync(hooksJsonPath, 'utf-8')
-        );
+        const hooksJson = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
         const hooksJsonHooks = hooksJson.hooks || {};
         const manifestHooks = inlineHooks;
         let driftFound = false;
@@ -689,11 +718,7 @@ function validatePlugin(pluginDir) {
             driftFound = true;
           }
 
-          for (
-            let i = 0;
-            i < Math.min(mEntries.length, jEntries.length);
-            i++
-          ) {
+          for (let i = 0; i < Math.min(mEntries.length, jEntries.length); i++) {
             const mEntry = mEntries[i] || {};
             const jEntry = jEntries[i] || {};
 
@@ -715,11 +740,7 @@ function validatePlugin(pluginDir) {
               );
               driftFound = true;
             }
-            for (
-              let j = 0;
-              j < Math.min(mHooks.length, jHooks.length);
-              j++
-            ) {
+            for (let j = 0; j < Math.min(mHooks.length, jHooks.length); j++) {
               if (mHooks[j].command !== jHooks[j].command) {
                 logWarning(
                   `hooks.json command drift for ${event}[${i}].hooks[${j}]: ` +
@@ -809,7 +830,10 @@ if (require.main === module) {
     // Validate resolved path is within project root.
     // Must use path.sep boundary to prevent sibling-directory bypass:
     // a path like /projects-evil/x would otherwise pass when PROJECT_ROOT=/projects.
-    if (pluginRoot !== PROJECT_ROOT && !pluginRoot.startsWith(PROJECT_ROOT + path.sep)) {
+    if (
+      pluginRoot !== PROJECT_ROOT &&
+      !pluginRoot.startsWith(PROJECT_ROOT + path.sep)
+    ) {
       logError(`--plugin path escapes project root: ${manifestPath}`);
       process.exit(2);
     }

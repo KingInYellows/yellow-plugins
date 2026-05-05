@@ -279,7 +279,10 @@ describe('validate-plugin baseline (regression net)', () => {
   });
 
   it('passes valid outputStyles directory with .md files', () => {
-    writeOutputStyleDir(pluginDir, 'output-styles', ['default.md', 'compact.md']);
+    writeOutputStyleDir(pluginDir, 'output-styles', [
+      'default.md',
+      'compact.md',
+    ]);
     writePluginManifest(pluginDir, {
       ...VALID_BASE_MANIFEST,
       outputStyles: './output-styles',
@@ -354,22 +357,35 @@ describe('validate-plugin PR-A new behaviors', () => {
     expect(stderr).toMatch(/escapes plugin directory|outside-plugin/);
   });
 
-  it('passes array-form hooks with object items (mcpServers-style inline objects)', () => {
-    // Object items in the array form are passed through (same as inline-object form).
-    // The test verifies they do not trip the path-script checks.
+  it('errors when array-form hooks contain an object item with a bash command referencing a missing script (PR-A: recursion into event-keyed array items)', () => {
+    // Previously the validator skipped object items in the array form entirely
+    // (the array-form bypass). collectInlineHooks now merges event-keyed objects
+    // found in array entries into the same inline-hooks dict that RULES 6/8 iterate,
+    // so a bash command referencing a missing script inside an array-form object
+    // item must produce a validation error — not silently pass.
     writePluginManifest(pluginDir, {
       ...VALID_BASE_MANIFEST,
       hooks: [
         {
           PreToolUse: [
-            { matcher: '*', hooks: [{ type: 'command', command: 'echo noop' }] },
+            {
+              matcher: '*',
+              hooks: [
+                {
+                  type: 'command',
+                  command: 'bash ./hooks/scripts/nonexistent-array-object.sh',
+                },
+              ],
+            },
           ],
         },
       ],
     });
-    const { status } = runValidator(pluginDir);
-    // Object array items are not script paths — should pass without error.
-    expect(status).toBe(0);
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /nonexistent-array-object\.sh|Hook script not found/
+    );
   });
 
   it('errors when string-form hooks reference a non-existent file (PR-A: resolvePluginPath check)', () => {

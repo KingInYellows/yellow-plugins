@@ -2,6 +2,8 @@
 "yellow-core": patch
 ---
 
+# Validator Hardening
+
 Harden `scripts/validate-plugin.js` and add the first integration test
 suite for the validator (`tests/integration/validate-plugin.test.ts`):
 
