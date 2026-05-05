@@ -248,8 +248,11 @@ cmd_create() {
     # Copy .env files
     copy_env_files "$repo_root" "$worktree_path"
 
-    # Link main repo's .ruvector/ so MCP server and hooks reach the shared DB
-    main_root=$(get_main_repo_root)
+    # Link main repo's .ruvector/ so MCP server and hooks reach the shared DB.
+    # `|| exit 1` is required: dash's `set -e` does not propagate failures from
+    # command substitutions inside assignments, so without this an empty
+    # main_root would silently link to /.ruvector.
+    main_root=$(get_main_repo_root) || exit 1
     link_ruvector_db "$main_root" "$worktree_path"
 
     success "Created worktree: ${WORKTREE_DIR}/${branch_name}"
@@ -329,8 +332,9 @@ cmd_copy_env() {
 
     copy_env_files "$repo_root" "$worktree_path"
 
-    # Repair missing ruvector symlink for retroactive worktree fixups
-    main_root=$(get_main_repo_root)
+    # Repair missing ruvector symlink for retroactive worktree fixups.
+    # See cmd_create for why `|| exit 1` is required (dash command-sub gotcha).
+    main_root=$(get_main_repo_root) || exit 1
     link_ruvector_db "$main_root" "$worktree_path"
 
     success "Copied .env files to ${name}"
