@@ -887,7 +887,7 @@ forward-references by searching for step numbers in the document. A
 **Rule:** After any step renumbering, run:
 
 ```bash
-grep -in 'step [0-9]' plugins/<name>/agents/<file>.md
+grep -in 'step [0-9][0-9]*' plugins/<name>/agents/<file>.md
 ```
 
 (`-i` makes the match case-insensitive — portable to BSD grep on macOS,
