@@ -170,6 +170,16 @@
       },
       "source": "./plugins/yellow-codex",
       "category": "development"
+    },
+    {
+      "name": "yellow-council",
+      "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
+      "version": "0.1.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-council",
+      "category": "development"
     }
   ]
 }
