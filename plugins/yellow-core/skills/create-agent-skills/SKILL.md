@@ -178,7 +178,7 @@ Agents live in `agents/<category>/agent-name.md`:
 ---
 name: agent-name
 description: What the agent does and when it's useful.
-model: claude-opus-4-6
+model: opus
 ---
 
 ## Examples

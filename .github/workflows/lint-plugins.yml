@@ -5,12 +5,17 @@ on:
     paths:
       - 'plugins/**'
       - 'scripts/lint-plugins.sh'
+      - 'scripts/validate-plugin.js'
+      - 'schemas/plugin.schema.json'
       - '.github/workflows/lint-plugins.yml'
   push:
     branches: [main]
     paths:
       - 'plugins/**'
       - 'scripts/lint-plugins.sh'
+      - 'scripts/validate-plugin.js'
+      - 'schemas/plugin.schema.json'
+      - '.github/workflows/lint-plugins.yml'
 
 permissions:
   contents: read

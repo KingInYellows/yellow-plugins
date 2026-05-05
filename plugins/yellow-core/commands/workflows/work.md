@@ -465,7 +465,7 @@ it at a Phase 1b checkpoint.
 
    ```text
    Task: code-simplicity-reviewer
-   subagent_type: "yellow-core:code-simplicity-reviewer"
+   subagent_type: "yellow-core:review:code-simplicity-reviewer"
    Input: {changed_files, diff, run_dir: $RUN_DIR}
    Goal: Identify overly complex code, suggest simplifications
    run_in_background: true
@@ -473,7 +473,7 @@ it at a Phase 1b checkpoint.
 
    ```text
    Task: security-sentinel
-   subagent_type: "yellow-core:security-sentinel"
+   subagent_type: "yellow-core:review:security-sentinel"
    Input: {changed_files, diff, run_dir: $RUN_DIR}
    Goal: Find security vulnerabilities, unsafe patterns
    run_in_background: true
@@ -481,7 +481,7 @@ it at a Phase 1b checkpoint.
 
    ```text
    Task: performance-oracle
-   subagent_type: "yellow-core:performance-oracle"
+   subagent_type: "yellow-core:review:performance-oracle"
    Input: {changed_files, diff, run_dir: $RUN_DIR}
    Goal: Identify performance issues, optimization opportunities
    run_in_background: true
@@ -489,7 +489,7 @@ it at a Phase 1b checkpoint.
 
    ```text
    Task: polyglot-reviewer
-   subagent_type: "yellow-core:polyglot-reviewer"
+   subagent_type: "yellow-core:review:polyglot-reviewer"
    Input: {changed_files, diff, run_dir: $RUN_DIR}
    Goal: Check language-specific best practices, idioms
    run_in_background: true

@@ -35,8 +35,10 @@ warn() {
 }
 
 # Extract frontmatter (between first --- and second ---) for a given file.
+# `\r?` tolerates CRLF endings on files newly authored from WSL2 — the repo
+# normalizes to LF on commit but a fresh file may slip through pre-commit.
 frontmatter() {
-  awk 'BEGIN{c=0} /^---$/{c++; if(c==2)exit; next} c==1{print}' "$1"
+  awk 'BEGIN{c=0} /^---\r?$/{c++; if(c==2)exit; next} c==1{print}' "$1"
 }
 
 # --- Check 1: every agent has name + description + tools ---
@@ -97,7 +99,24 @@ if [ -n "$known_skills" ]; then
     # the accepted prefixes.
     while IFS= read -r line; do
       case "$line" in
-        skills:*) in_skills=1 ;;
+        skills:*)
+          in_skills=1
+          # Inline flow-sequence form: `skills: [foo, bar]` on a single line.
+          # The block-sequence state machine below never sees these items, so
+          # extract them here. Detect by the presence of a `[` after `skills:`.
+          inline_body=$(printf '%s' "$line" | sed -E 's/^skills:[[:space:]]*\[//; s/\][[:space:]]*$//')
+          if [ "$inline_body" != "$line" ]; then
+            IFS=',' read -ra _items <<< "$inline_body"
+            for _item in "${_items[@]}"; do
+              _bare=$(printf '%s' "$_item" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+              _bare=${_bare##*:}
+              if [ -n "$_bare" ] && ! printf '%s\n' "$known_skills" | grep -qxF "$_bare"; then
+                err "agent $f references unknown skill (inline): $_bare"
+              fi
+            done
+            in_skills=0
+          fi
+          ;;
         "  - "*|"    - "*)
           if [ "$in_skills" = 1 ]; then
             name=$(printf '%s' "$line" | sed -E 's/^[[:space:]]+- //')
