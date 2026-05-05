@@ -21,7 +21,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 
 ## Plugin Components
 
-### Commands (4)
+### Commands (5)
 
 - `/review:setup` — Validate GitHub, jq, Graphite, and optional yellow-core
   integration before reviewing PRs
@@ -31,19 +31,43 @@ resolution, and sequential stack review. Graphite-native workflow.
   GraphQL
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
+- `/review:sweep` — Wrapper that runs `/review:pr` then `/review:resolve` on
+  the same PR with a user-confirmed boundary gate between them
 
-### Agents (7)
+### Agents (14)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
-- `code-reviewer` — General code review, CLAUDE.md compliance, conventions
-  (always selected)
+- `project-compliance-reviewer` — CLAUDE.md/AGENTS.md compliance, naming,
+  project-pattern adherence (always selected; renamed from `code-reviewer`
+  in Wave 2)
+- `correctness-reviewer` — Logic errors, edge cases, state bugs, error
+  propagation (always selected; new in Wave 2)
+- `maintainability-reviewer` — Premature abstraction, dead code, coupling,
+  naming (always selected; new in Wave 2)
+- `reliability-reviewer` — Production reliability: error handling, retries,
+  timeouts, cascades (selected when diff touches I/O/async; new in Wave 2)
+- `project-standards-reviewer` — Frontmatter, references, cross-platform
+  portability (always selected; new in Wave 2; complements
+  `project-compliance-reviewer`)
+- `adversarial-reviewer` — Constructed failure scenarios across boundaries
+  (selected for diffs >200 lines or trust boundaries; new in Wave 2)
+- `plugin-contract-reviewer` — Breaking changes to plugin public surface
+  (subagent_type renames, command/skill/MCP-tool renames, manifest field
+  changes, hook contract changes); selected when diff touches
+  `plugins/*/.claude-plugin/plugin.json`, `plugins/*/agents/**/*.md`,
+  `plugins/*/commands/**/*.md`, `plugins/*/skills/**/SKILL.md`, or
+  `plugins/*/hooks/`. Sister to `pattern-recognition-specialist`
+  (yellow-core) — pattern-rec catches new convention drift,
+  plugin-contract catches breaks to existing surface. New in Wave 3.
 - `pr-test-analyzer` — Test coverage and behavioral completeness
 - `comment-analyzer` — Comment accuracy and rot detection
 - `code-simplifier` — Simplification preserving functionality (runs as final
   pass)
 - `type-design-analyzer` — Type design, encapsulation, invariants
 - `silent-failure-hunter` — Silent failure and error handling analysis
+- `code-reviewer` — DEPRECATED stub for the rename above; will be removed
+  in next minor version
 
 **Workflow** — orchestration helpers:
 
@@ -74,6 +98,9 @@ resolution, and sequential stack review. Graphite-native workflow.
   order (base → tip). Best before submitting a stack for review.
 - **`/review:all scope=all`** — Batch-review all your open non-draft PRs. Best
   for catching up on review backlog.
+- **`/review:sweep`** — Run `/review:pr` then `/review:resolve` sequentially
+  on a single PR. Best when you want both an AI review pass and cleanup of
+  any open bot/human comment threads in one invocation.
 - **`/workflows:review`** (yellow-core) — Session-level review against a plan
   file. Evaluates plan adherence, cross-PR coherence, and scope drift.
   Complementary to `/review:pr` (per-PR code quality) — use both for full
@@ -82,31 +109,37 @@ resolution, and sequential stack review. Graphite-native workflow.
 ## Cross-Plugin Agent References
 
 When conditions warrant, commands spawn these agents via Task tool (using
-`yellow-core:<name>` subagent_type):
+the three-segment `yellow-core:<dir>:<name>` subagent_type — e.g.
+`yellow-core:review:security-reviewer`). The Wave 2 pipeline dispatches the
+calibrated reviewer variants; the legacy fallback (`review_pipeline:
+legacy` in `yellow-plugins.local.md`) keeps the deeper-audit variants.
 
-- `security-sentinel` — for auth, crypto, and shell script changes
+- `security-reviewer` — for auth, crypto, and shell-script changes (Wave 2
+  default; the deeper-audit `security-sentinel` is the legacy fallback)
 - `architecture-strategist` — for large (10+ file) cross-module changes
-- `performance-oracle` — for query-heavy or high-line-count PRs
-- `pattern-recognition-specialist` — for new pattern introductions and plugin
-  authoring convention checks
+- `performance-reviewer` — for query-heavy or high-line-count PRs (Wave 2
+  default; the deeper-audit `performance-oracle` is the legacy fallback)
+- `pattern-recognition-specialist` — for new pattern introductions and
+  plugin authoring convention checks
 - `code-simplicity-reviewer` — additional simplification pass for large PRs
 
-Optional supplementary agent via Task tool (using `yellow-codex:<name>`
-subagent_type):
+Optional supplementary agent via Task tool (using the three-segment
+`yellow-codex:review:codex-reviewer` subagent_type):
 
-- `codex-reviewer` — parallel review when yellow-codex is installed AND diff >
-  100 lines. Tags findings with `[codex]`. Silently skipped when yellow-codex is
-  not installed.
+- `codex-reviewer` — parallel review when yellow-codex is installed AND
+  diff > 100 lines. Tags findings with `[codex]`. Silently skipped when
+  yellow-codex is not installed.
 
 yellow-review requires yellow-core for full review coverage. Without it,
-cross-plugin agents (security-sentinel, architecture-strategist,
-performance-oracle, pattern-recognition-specialist, code-simplicity-reviewer)
-silently degrade — only yellow-review's own agents run.
+cross-plugin agents (security-reviewer / security-sentinel,
+architecture-strategist, performance-reviewer / performance-oracle,
+pattern-recognition-specialist, code-simplicity-reviewer) silently
+degrade — only yellow-review's own agents run.
 
 ### MCP Tool Integration
 
 - **ruvector** — Recall past learnings at workflow start; tiered remember at
-  workflow end (Auto for P1 findings, Prompted for P2). Graceful skip if
+  workflow end (Auto for P0/P1 findings, Prompted for P2). Graceful skip if
   yellow-ruvector not installed.
 - **morph** — Preferred for intent-based code search (blast radius, callers,
   similar patterns) in review agents. Discovered via ToolSearch at runtime;

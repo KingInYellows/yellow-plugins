@@ -251,6 +251,108 @@ When starting feature work:
 3. Copies .env files automatically
 4. Starts feature work in worktree
 
+## Auto-Trust mise/direnv After Worktree Creation
+
+If your project uses [mise](https://mise.jdx.dev/) (`.mise.toml`,
+`.tool-versions`) or [direnv](https://direnv.net/) (`.envrc`), the new
+worktree directory starts **untrusted** — the tool refuses to load
+configs until the user explicitly opts in. This breaks the principle of
+least surprise: you create a worktree, `cd` in, and tooling silently
+fails to load.
+
+The fix is to auto-trust the new worktree directory at creation time.
+The manager script handles common cases; the patterns below show how to
+do it explicitly when needed (e.g., a CI runner creating a throwaway
+worktree).
+
+**mise:**
+
+```bash
+# After: worktree-manager.sh create feature-auth
+cd .worktrees/feature-auth
+
+# Trust the worktree's mise config
+mise trust 2>/dev/null || true
+
+# Or trust without cd (mise --cwd is supported on recent versions)
+mise --cwd .worktrees/feature-auth trust 2>/dev/null || true
+```
+
+**direnv:**
+
+```bash
+# direnv requires both `allow` and a load on entry
+cd .worktrees/feature-auth
+direnv allow 2>/dev/null || true
+
+# Or non-interactively
+direnv allow .worktrees/feature-auth 2>/dev/null || true
+```
+
+**Suppress on absent tools:** `2>/dev/null || true` keeps the trust step
+quiet when neither mise nor direnv is installed. Do **not** drop the
+redirect — without it, missing-binary stderr leaks into worktree
+creation logs.
+
+**Why this is per-worktree:** mise and direnv key trust on the absolute
+path of the directory containing the config. A worktree at
+`.worktrees/feature-auth/` is a different absolute path from the main
+repo, even when the `.mise.toml` content is identical.
+
+## `.git`-Is-a-File Detection (Submodule and Worktree Cases)
+
+In a normal repo, `.git` is a directory. But in two important cases it
+is a **plain file** containing a `gitdir: <path>` pointer:
+
+1. **Inside a submodule:** the submodule's `.git` is a file pointing at
+   `<superproject>/.git/modules/<submodule-name>`.
+2. **Inside an existing worktree:** the worktree's `.git` is a file
+   pointing at `<main-repo>/.git/worktrees/<worktree-name>`.
+
+Naive scripts that do `[ -d .git ]` to detect a git repo will misclassify
+both cases as "not a git repo" and fail in confusing ways.
+
+**Detection pattern:**
+
+```bash
+# Correct: handles both directory and file forms
+is_git_repo() {
+    [ -e .git ] && git rev-parse --git-dir >/dev/null 2>&1
+}
+
+# Or check the type explicitly
+git_dir_kind() {
+    if [ -d .git ]; then
+        echo "directory"   # main repo
+    elif [ -f .git ]; then
+        # Read the gitdir pointer to know whether it's a worktree or submodule
+        case "$(head -n 1 .git)" in
+            "gitdir: "*/.git/worktrees/*) echo "worktree" ;;
+            "gitdir: "*/.git/modules/*)   echo "submodule" ;;
+            "gitdir: "*)                  echo "linked" ;;
+            *)                            echo "unknown" ;;
+        esac
+    else
+        echo "none"
+    fi
+}
+```
+
+**Worktree creation inside a submodule:** Avoid creating a worktree
+**inside** a directory whose `.git` is the submodule pointer file —
+`git worktree add` from a submodule treats the submodule's gitdir as
+the parent, which lands the new worktree under
+`<superproject>/.git/modules/<sub>/worktrees/`, far from where users
+expect. Always run worktree commands from the **superproject root**, or
+explicitly pass `-C <superproject-root>` to `git worktree add`.
+
+**Why this matters for the manager script:** the helper resolves
+`get_repo_root` via `git rev-parse --show-toplevel`, which already
+returns the correct top-level whether `.git` is a file or directory.
+But any caller that pre-checks `[ -d .git ]` before invoking the helper
+will short-circuit incorrectly. Use `git rev-parse --git-dir` (which
+handles both forms) instead.
+
 ## Troubleshooting
 
 See [troubleshooting.md](troubleshooting.md) for common issues and solutions.

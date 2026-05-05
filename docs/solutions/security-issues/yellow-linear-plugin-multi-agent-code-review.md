@@ -3,6 +3,8 @@ title:
   'Yellow-Linear Plugin Multi-Agent Code Review: Security, Architecture &
   Quality Hardening'
 category: security-issues
+track: bug
+problem: 'Missing C1 validation before API writes, weak issue ID regex, no $ARGUMENTS input sanitization, CRLF line endings, ag...'
 tags:
   - plugin-quality
   - security-hardening

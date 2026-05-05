@@ -20,27 +20,25 @@ This skill is the single source of truth for debt assessment across the plugin.
 
 ## Usage
 
-### Scanner Output Schema (v1.0)
+### Scanner Output Schema (v2.0)
 
 All scanner agents MUST produce output matching this JSON schema:
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "scanner": "complexity-scanner",
   "status": "success",
-  "timestamp": "2026-02-13T10:30:00Z",
+  "timestamp": "2026-05-01T10:30:00Z",
   "findings": [
     {
       "category": "complexity",
       "severity": "high",
       "effort": "small",
-      "title": "High Cyclomatic Complexity in UserService",
-      "description": "Function processUserRegistration has complexity 23 (threshold: 15)...",
-      "affected_files": [
-        { "path": "src/services/user-service.ts", "lines": "45-89" }
-      ],
-      "suggested_remediation": "Extract guard clauses and split into...",
+      "finding": "Function processUserRegistration in UserService has cyclomatic complexity 23 (threshold: 15) due to nested validation branches.",
+      "file": { "path": "src/services/user-service.ts", "lines": "45-89" },
+      "fix": "Extract validation guards into pure functions and split the registration flow into two methods.",
+      "failure_scenario": "A new validation rule lands in a branch that already mixes auth, throttling, and email checks; the engineer misses one path, production registrations succeed without throttle enforcement, and the abuse signal degrades silently.",
       "confidence": 0.85
     }
   ],
@@ -54,15 +52,57 @@ All scanner agents MUST produce output matching this JSON schema:
 
 **Field Constraints**:
 
-- `schema_version`: Always "1.0" (for forward compatibility)
+- `schema_version`: "2.0" for new findings; v1.0 inputs accepted by
+  `audit-synthesizer` during the transition window (see "Schema Migration"
+  below)
 - `status`: "success" | "partial" | "error"
 - `category`: "ai-pattern" | "complexity" | "duplication" | "architecture" |
   "security-debt"
 - `severity`: "critical" | "high" | "medium" | "low"
 - `effort`: "quick" | "small" | "medium" | "large"
 - `confidence`: 0.0-1.0 (how confident the scanner is in this finding)
-- `affected_files`: Array with minimum 1 item
-- `lines`: Format "start-end" (e.g., "45-89")
+- `finding`: Single string combining what was detected and why it matters
+  (replaces v1.0 `title` + `description`; one to three sentences)
+- `file`: Single object `{ path, lines }` (replaces v1.0 `affected_files[]`;
+  if multiple files share a finding, emit one finding per file)
+- `lines`: Format "start-end" (e.g., "45-89") or a single line ("45")
+- `fix`: Concrete remediation prose (replaces v1.0 `suggested_remediation`)
+- `failure_scenario`: One to two sentences naming a specific production failure
+  the debt enables — the trigger, the execution path, and the user-visible or
+  operational outcome. Not generic risk language ("could be hard to maintain"),
+  not speculation ("might cause bugs"). If no concrete scenario can be
+  constructed, set to `null` and the synthesizer applies the same `+0.05`
+  confidence-gate bump used for migrated v1.0 records (see
+  `audit-synthesizer.md` Step 4, rule 4). The bump compensates for the
+  missing concrete-failure signal regardless of whether `null` came from a
+  v1.0 migration or a v2.0 scanner that chose not to fabricate. Borrowed
+  from the upstream `ce-adversarial-reviewer` failure-scenario framing.
+
+### Confidence Rubric — Category Thresholds (v2.0)
+
+`audit-synthesizer` applies category-specific confidence gates after dedup and
+before todo generation. Findings below the gate are suppressed (recorded in
+stats as `suppressed_by_confidence_gate`) but never silently dropped from the
+audit report.
+
+| Category                 | Gate (`confidence ≥`) | Rationale                                          |
+| ------------------------ | --------------------- | -------------------------------------------------- |
+| `security-debt`          | 0.80                  | False positives waste triage time on critical path |
+| `architecture`           | 0.80                  | Structural fixes are expensive — avoid speculation |
+| `complexity`             | 0.70                  | Heuristic detection has known noise                |
+| `duplication`            | 0.70                  | Similar-but-not-identical code needs evidence      |
+| `ai-pattern`             | 0.60                  | Style-class debt; lower stakes per false positive  |
+
+Thresholds adapted from Diffray industry calibration (see
+`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`
+"Comparable benchmarks"). The Wave 2 review-pr keystone uses integer anchors
+(0/25/50/75/100) over the same conceptual range; yellow-debt retains the v1.0
+float scale because scanners produce continuous heuristic confidence, not
+discrete reviewer-anchor judgments.
+
+**Severity exception:** A `critical` finding at `confidence ≥ 0.50` survives
+the gate (mirrors the Wave 2 P0-at-anchor-50 exception). The synthesizer
+records this as `survived_severity_exception` in stats.
 
 ### Severity Rubric
 
@@ -205,8 +245,7 @@ All scanner agents should follow this minimal structure (~40 lines):
 ```markdown
 ---
 name: <category>-scanner
-description:
-  '<category> analysis. Use when auditing code for <specific patterns>.'
+description: "<category> analysis. Use when auditing code for <specific patterns>."
 model: inherit
 skills:
   - debt-conventions
@@ -223,11 +262,13 @@ tools:
 You are a <category> detection specialist. Reference the `debt-conventions`
 skill for:
 
-- JSON output schema and validation
+- JSON output schema (v2.0) and validation
 - Severity scoring (Critical/High/Medium/Low)
 - Effort estimation (Quick/Small/Medium/Large)
 - Safety rules (prompt injection fencing)
 - Path validation requirements
+- `failure_scenario` framing (concrete trigger → path → outcome; `null`
+  permitted when no concrete scenario can be constructed)
 
 ## Detection Heuristics
 
@@ -237,7 +278,9 @@ skill for:
 ## Output Requirements
 
 Return top 50 findings max, ranked by severity × confidence. Write results to
-`.debt/scanner-output/<category>-scanner.json` per schema above.
+`.debt/scanner-output/<category>-scanner.json` per the v2.0 schema in the
+`debt-conventions` skill (single `file` object, flat `finding` and `fix`
+strings, required `failure_scenario` string-or-null).
 ```
 
 ## Error Handling
@@ -306,10 +349,31 @@ All shell scripts must use LF (Unix) line endings, not CRLF (Windows).
 
 ### Schema Version Mismatch
 
-Scanner output must use `"schema_version": "1.0"` for forward compatibility.
+Scanner output should use `"schema_version": "2.0"` (current). The
+`audit-synthesizer` accepts both 1.0 and 2.0 during the transition window
+(see "Schema Migration" below) so older `.debt/scanner-output/*.json` files
+do not break re-runs.
 
-**Remediation**: Update scanner agent to use current schema version from this
-skill.
+**Remediation**: Update new or modified scanner agents to emit v2.0. Leave
+older artifact files untouched — the synthesizer normalizes them in-memory.
+
+### Schema Migration (v1.0 → v2.0)
+
+Breaking changes from v1.0:
+
+| v1.0 field              | v2.0 field          | Migration                                                          |
+| ----------------------- | ------------------- | ------------------------------------------------------------------ |
+| `title`                 | `finding`           | `description ? title + ": " + description : title` — use `title` alone when `description` is null or missing; never produce a literal `"undefined"` or `"None"` suffix |
+| `description`           | `finding`           | Merged into `finding`                                              |
+| `affected_files[]`      | `file`              | Take first array entry; if `null`/empty/missing, log warning and skip the finding; if N>1, emit one additional finding per remaining file copying all other fields including `_migrated_from: "1.0"` so each sibling receives the Step 4 +0.05 confidence bump |
+| `suggested_remediation` | `fix`               | Direct rename                                                      |
+| _(new)_                 | `failure_scenario`  | v1.0 inputs default to `null` (synthesizer flags as upgradeable)   |
+
+The `audit-synthesizer` performs this normalization in-memory when it reads a
+`schema_version: "1.0"` artifact; scanner authors do not need migration code.
+The transition window remains open until all scanners on `main` emit v2.0 and
+no `.debt/scanner-output/*.json` files older than 30 days remain in active
+project trees.
 
 ### Confidence Out of Range
 
@@ -317,13 +381,27 @@ skill.
 
 **Remediation**: Clamp values: `confidence = Math.max(0, Math.min(1, value))`
 
-### Missing Affected Files
+### Missing File Field
 
-Every finding MUST include at least one entry in `affected_files` array with
-`path` and `lines` fields.
+Every finding MUST include a `file` object with `path` and `lines` fields. If a
+single debt pattern affects multiple files, emit one finding per file rather
+than packing them into one entry — this keeps dedup, todo generation, and
+hotspot scoring deterministic.
 
-**Remediation**: Ensure scanner agents populate this field with actual file
-locations.
+**Remediation**: Ensure scanner agents populate `file.path` and `file.lines`
+on every emitted finding.
+
+### Missing failure_scenario
+
+`failure_scenario` is required (string or `null`). When the scanner cannot
+construct a concrete production failure (trigger → path → outcome), emit
+`null` rather than fabricating speculation. The synthesizer treats `null`
+scenarios as a signal that the finding may be advisory-only.
+
+**Remediation**: Reference the upstream `ce-adversarial-reviewer` framing
+(`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/agents/ce-adversarial-reviewer.agent.md`)
+when authoring scenarios — describe a specific trigger, the execution path
+through the diffed code, and the user-visible or operational outcome.
 
 ### Validation References
 

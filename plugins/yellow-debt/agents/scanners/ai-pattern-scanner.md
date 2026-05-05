@@ -70,5 +70,15 @@ Follow all security and fencing rules from the `debt-conventions` skill.
 ## Output Requirements
 
 Return top 50 findings max, ranked by severity × confidence. Write results to
-`.debt/scanner-output/ai-pattern-scanner.json` per schema in debt-conventions
-skill.
+`.debt/scanner-output/ai-pattern-scanner.json` per the v2.0 schema in
+`debt-conventions`.
+
+Every finding must include the `failure_scenario` field (string or null).
+Prefer a concrete scenario when possible (one to two sentences: trigger →
+execution path → user-visible or operational outcome); emit `null` only when
+no specific failure can be constructed. AI-pattern debt rarely produces a
+runtime failure on its own — frame the scenario around the maintenance failure
+that the debt enables (e.g., "a future engineer reads the 40% comment-to-code
+ratio, trusts a stale comment claiming the function is idempotent, ships a
+retry handler that double-charges users"). The synthesizer treats `null` as a
+downgrade signal.

@@ -2,6 +2,8 @@
 title: Agent Prose Fallback Thresholds Are a Silent-Failure Anti-Pattern
 date: 2026-04-26
 category: code-quality
+track: knowledge
+problem: 'Agent Prose Fallback Thresholds Are a Silent-Failure Anti-Pattern'
 tags: [agent-authoring, fallback, threshold, llm-behavior, plugin-authoring, research]
 components: [yellow-research]
 pr: '#265'

@@ -2,6 +2,8 @@
 title: 'Agent Migration Audit Patterns'
 date: 2026-02-25
 category: 'code-quality'
+track: knowledge
+problem: 'Agent Migration Audit Patterns'
 tags:
   - agent-authoring
   - refactoring

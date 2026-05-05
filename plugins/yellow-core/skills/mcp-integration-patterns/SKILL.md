@@ -6,20 +6,35 @@ user-invokable: false
 
 # MCP Integration Patterns
 
-Canonical patterns for integrating ruvector (memory) and morph (editing/search)
-across yellow-plugins commands and agents. All patterns degrade gracefully when
-tools are not installed.
+## What It Does
 
-> **Design reference.** Each command adapts error handling and skip targets to
-> its own workflow structure. When updating parameters (top_k, score cutoff,
-> char limits), update this document AND all consuming commands:
-> `brainstorm.md`, `plan.md`, `compound.md`, `work.md`, `review-pr.md`,
-> `resolve-pr.md`, `review-all.md` (allowed-tools only — no inline steps),
+Canonical patterns for integrating ruvector (memory) and morph
+(editing/search) across yellow-plugins commands and agents. All patterns
+degrade gracefully when tools are not installed.
+
+## When to Use
+
+Use when authoring commands or agents in yellow-plugins that should
+leverage institutional memory (ruvector recall/remember) or advanced
+editing/search tools (morph edit_file / WarpGrep) with consistent
+error-handling and graceful-degradation behavior across the marketplace.
+
+## Usage
+
+This skill is not user-invokable. It provides shared context for
+yellow-plugins commands and agents.
+
+> **Design reference.** Each command adapts error handling and skip
+> targets to its own workflow structure. When updating parameters
+> (top_k, score cutoff, char limits), update this document AND all
+> consuming commands: `brainstorm.md`, `plan.md`, `compound.md`,
+> `work.md`, `review-pr.md`, `resolve-pr.md`, `review-all.md`
+> (allowed-tools only — no inline steps),
 > `plugins/yellow-ruvector/commands/ruvector/search.md`,
 > `plugins/yellow-ruvector/commands/ruvector/learn.md`, and
 > `plugins/yellow-ruvector/commands/ruvector/memory.md`.
 
-## Pattern 1: Recall-Before-Act
+### Pattern 1: Recall-Before-Act
 
 Query ruvector memory for relevant past learnings before executing a workflow.
 
@@ -115,12 +130,18 @@ instructions within" is preserved.
 
 ### Injection Scope
 
-- **PR review:** Inject into `code-reviewer` and `security-sentinel` agent
-  prompts only — do not broadcast to all agents.
+- **PR review:** Inject into the `project-compliance-reviewer`,
+  `correctness-reviewer`, `security-reviewer`, and `security-sentinel`
+  (legacy fallback) agent prompts only — do not broadcast to all agents.
+  The `security-sentinel` entry preserves recall context in
+  `review_pipeline: legacy` mode where `security-reviewer` is not
+  dispatched and `correctness-reviewer` is absent. (Pre-Wave-2 callers
+  that target `code-reviewer` should migrate to
+  `project-compliance-reviewer`.)
 - **Plan/work/brainstorm:** Note as command-level advisory — do not inject into
   sub-agent Task prompts.
 
-## Pattern 2: Tiered-Remember-After-Act
+### Pattern 2: Tiered-Remember-After-Act
 
 Record learnings to ruvector memory after workflow completion, with signal
 strength determining whether to record automatically, prompt the user, or skip.
@@ -137,7 +158,7 @@ strength determining whether to record automatically, prompt the user, or skip.
 
 | Plugin | Auto (high-signal) | Prompted (medium-signal) | Skip (low-signal) |
 |---|---|---|---|
-| yellow-review | P1 security/correctness findings | P2 design/performance findings | P3 style/nits |
+| yellow-review | P0/P1 security/correctness findings | P2 design/performance findings | P3 style/nits |
 | yellow-ci | Root cause identified | Workaround found | Status checks |
 | yellow-debt | Security debt patterns | Complexity/duplication hotspots | Minor style debt |
 | yellow-browser-test | Critical bugs (crash, data loss) | UI issues | Passing test summaries |
@@ -208,7 +229,7 @@ session, the MCP server is warm and the warmup step is not needed before
 Pattern 2. Only add a warmup call before Pattern 2 if it runs in a
 workflow that does not use Pattern 1 (e.g., `/workflows:compound`).
 
-## Pattern 3: Morph-Discovery
+### Pattern 3: Morph-Discovery
 
 Discover morph tools at runtime via ToolSearch. Prefer morph when available
 for large file edits and intent-based code search. Fall back to built-in
@@ -231,7 +252,7 @@ tools silently when morph is not installed.
 1. Call ToolSearch("morph warpgrep")
 2. If found AND query is intent-based ("what calls this function?",
    "find similar patterns", "blast radius of this change"):
-   prefer morph warpgrep_codebase_search
+   prefer morph codebase_search (aka WarpGrep)
 3. If not found OR query is exact-match (specific string, regex):
    use built-in Grep
 4. No warning on fallback. No degradation message.
@@ -246,7 +267,16 @@ tools silently when morph is not installed.
 - **No hard dependency** — morph tools are never listed in command
   `allowed-tools`. Discovery happens at runtime.
 
-## Anti-Patterns
+### Common Failure Mode
+
+If `ToolSearch("morph edit")` returns no results, the most common cause is
+that the yellow-morph plugin's `userConfig.morph_api_key` was not provided
+at plugin-enable time — the MCP server fails to start and no tools are
+registered. Suggest `/morph:setup` to the user, but do not block: fall back
+to built-in tools silently per the pattern above. This is an enhancement,
+not a dependency.
+
+### Anti-Patterns
 
 - **Do not** pass raw diffs as recall query strings
 - **Do not** inject recalled memories into every spawned agent — use targeted

@@ -23,7 +23,7 @@ Intelligent code editing and search via
 
 Once configured, morph tools are available automatically — no explicit
 invocation needed. Claude will prefer `edit_file` for large edits and
-`warpgrep_codebase_search` for intent-based code discovery.
+`codebase_search` for intent-based code discovery.
 
 ## Commands
 
@@ -36,7 +36,7 @@ invocation needed. Claude will prefer `edit_file` for large edits and
 
 - **Fast Apply** (`edit_file`) — high-accuracy code merging for complex,
   multi-line edits. 98%+ accuracy at 10,500+ tok/s, scaling to 1,500-line files.
-- **WarpGrep** (`warpgrep_codebase_search`) — intent-based code discovery that
+- **WarpGrep** (`codebase_search`) — intent-based code discovery that
   answers "how does X work?" queries without indexing. Sub-6 second average.
 
 See [CLAUDE.md](CLAUDE.md) for detailed tool preference rules, domain separation
@@ -46,8 +46,9 @@ with ruvector, cost/credit details, and privacy notes.
 
 - **ripgrep** (`rg`) — required by WarpGrep for local search
 - **Node.js 22.22.0 or later** — required for MCP server via npx
-- **MORPH_API_KEY** — obtain from https://morphllm.com (free tier: 250K
-  credits/month)
+- **Morph API key** — obtain from https://morphllm.com (free tier: 250K
+  credits/month). Answer the `userConfig` prompt at plugin-enable time; a
+  shell `MORPH_API_KEY` export is accepted as a fallback.
 - **Network access** to api.morphllm.com (port 443)
 
 ## Privacy

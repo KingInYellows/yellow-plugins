@@ -1,6 +1,8 @@
 ---
 title: 'Parallel Multi-Agent Code Review and Resolution Pipeline'
 category: code-quality
+track: knowledge
+problem: 'Parallel Multi-Agent Code Review and Resolution Pipeline'
 date: 2026-02-14
 tags:
   - multi-agent-workflow

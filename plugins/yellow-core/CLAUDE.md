@@ -14,29 +14,39 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Plugin Components
 
-### Agents (13)
+### Agents (18)
 
 **Review** — parallel code review specialists:
 
 - `code-simplicity-reviewer` — YAGNI enforcement, simplification
 - `security-sentinel` — security audit, OWASP, secrets scanning
 - `performance-oracle` — bottlenecks, algorithmic complexity, scalability
+- `performance-reviewer` — review-time runtime performance with anchored confidence rubric (companion to `performance-oracle`)
 - `architecture-strategist` — architectural compliance, design patterns
 - `polyglot-reviewer` — language-idiomatic review for TS/Py/Rust/Go
 - `test-coverage-analyst` — full test suite audits, coverage gaps, strategy
 - `pattern-recognition-specialist` — anti-patterns, duplication, naming drift
+- `security-reviewer` — review-time exploitable security vulnerabilities (companion to `security-sentinel`)
+- `security-lens` — plan-level security architect for planning documents and architecture proposals
 
 **Research** — codebase and external research:
 
 - `repo-research-analyst` — repository structure, conventions
 - `best-practices-researcher` — external docs, community standards
 - `git-history-analyzer` — git archaeology, change history
+- `learnings-researcher` — searches `docs/solutions/` for past learnings
+  relevant to a PR diff or planning context (Wave 2 keystone pre-pass)
 
 **Workflow** — planning and analysis:
 
 - `spec-flow-analyzer` — user flow analysis, gap identification
 - `brainstorm-orchestrator` — iterative brainstorm dialogue with research integration
 - `knowledge-compounder` — extract and document solved problems to docs/solutions/ and MEMORY.md
+- `session-historian` — cross-vendor session search across Claude Code (local
+  JSONL), Devin (REST API via MCP), and Codex (local
+  directory-per-session). BM25 + optional ruvector cosine + recency fused
+  via Reciprocal Rank Fusion. Secret redaction (AWS keys, GitHub tokens,
+  API keys, JWTs, PEM blocks) before excerpts are returned
 
 ### Commands (8)
 
@@ -51,12 +61,34 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (4)
+### Skills (10)
 
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
+- `compound-lifecycle` — audit, refresh, and consolidate `docs/solutions/`
+  with composite-scored staleness detection, BM25+cosine overlap clustering,
+  and AskUserQuestion-gated consolidation hand-off; archives superseded
+  entries to `docs/solutions/archived/` rather than deleting them
 - `create-agent-skills` — guidance for creating skills and agents
+- `debugging` — systematic root-cause debugging with causal-chain gate,
+  prediction-for-uncertain-links hypothesis testing, three-failed-attempts
+  smart escalation, and conditional defense-in-depth/post-mortem; routes to
+  `gt submit` / `/yellow-core:workflows:brainstorm` / `/yellow-core:workflows:compound`
 - `git-worktree` — git worktree management for parallel development
+- `ideation` — generate 3 grounded approaches to a soft problem using the
+  Toulmin warrant contract (evidence + linking principle + idea), filtered
+  through MIDAS three-phase generation, then route the chosen approach into
+  `brainstorm-orchestrator` via Task. Strict-warrant mode auto-engages for
+  security/auth/data-migration domains
+- `local-config` — yellow-plugins.local.md per-project config schema (internal)
 - `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
+- `optimize` — run a metric-driven optimization pass with parallel candidate
+  variants and an LLM-as-judge analytic rubric. Two-run order-swap recovers
+  positional-bias variance; per-criterion scoring (1-5) outperforms holistic;
+  style-bias self-check flags rationale drift. Optional `knowledge-compounder`
+  hand-off writes the winner to `docs/solutions/optimizations/`
+- `session-history` — cross-vendor session-history user surface — dispatches
+  the `session-historian` agent against Claude Code + Devin + Codex
+  backends with availability detection and graceful degradation per backend
 
 ### Optional Plugin Dependencies
 
@@ -85,11 +117,19 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   duplicating the Ceramic MCP registration across plugins (single OAuth
   session).
 
-### MCP Servers (1)
+### MCP Servers (0)
 
-- `context7` — up-to-date library documentation via
-  [context7.com](https://context7.com). Third-party HTTP service; all agents
-  work without it (used only for fetching live docs). No credentials are sent.
+yellow-core no longer bundles any MCP servers. Previously it shipped
+`context7` as a bundled HTTP MCP, but that caused dual-registration issues
+when users also had context7 at user level. Per CE PR #486 (2026-04-03)
+parity, the bundled entry has been removed.
+
+**Recommended user-level MCP:** `context7` — up-to-date library documentation
+via [context7.com](https://context7.com). Install once at user level
+(`/plugin install context7@upstash` or via Claude Code MCP settings); all
+yellow-core and yellow-research agents that benefit from it (e.g.,
+`best-practices-researcher`, `code-researcher`) detect availability via
+ToolSearch and gracefully fall through to WebSearch / EXA when absent.
 
 ### MCP Tool Integration
 

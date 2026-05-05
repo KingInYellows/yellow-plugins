@@ -6,7 +6,29 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const PLUGINS_DIR = path.join(ROOT, 'plugins');
+// Allow tests to point the validator at a fixture tree by setting
+// VALIDATE_PLUGINS_DIR. Production runs leave it unset and use plugins/.
+const PLUGINS_DIR = process.env.VALIDATE_PLUGINS_DIR
+  ? path.resolve(process.env.VALIDATE_PLUGINS_DIR)
+  : path.join(ROOT, 'plugins');
+
+// W1.5 rule: review/ agents must be read-only.
+// Any agent at plugins/<name>/agents/review/<file>.md must not list Bash,
+// Write, or Edit in its `tools:` set. Reviewers analyze; they do not act.
+// This containment limits the blast radius of prompt-injection attempts in
+// the untrusted PR diff and comment text reviewers consume.
+const REVIEW_AGENT_DENIED_TOOLS = ['Bash', 'Write', 'Edit'];
+
+// Documented exceptions to the read-only rule. Each entry must be a
+// plugins-relative POSIX path. Any exception requires a "Tool Surface —
+// Documented … Exception" section in the agent body explaining why the
+// containment is dropped and bounding legitimate use.
+const REVIEW_AGENT_ALLOWLIST = new Set([
+  // codex-reviewer invokes the codex CLI binary as its core function; read-
+  // only restriction would break the agent. See agent body for rationale.
+  // Decision recorded in plans/everyinc-merge.md W1.2 (2026-04-29).
+  'yellow-codex/agents/review/codex-reviewer.md',
+]);
 
 const colors = {
   reset: '\x1b[0m',
@@ -137,13 +159,31 @@ for (const filePath of agentFiles) {
     continue;
   }
 
+  // Derive plugin name from the path relative to PLUGINS_DIR so the validator
+  // works with VALIDATE_PLUGINS_DIR fixture trees that are not under a
+  // literal `.../plugins/...` ancestor directory.
+  const relPath = path.relative(PLUGINS_DIR, filePath);
+  const relSegments = relPath.split(path.sep);
+  const pluginName = relSegments[0];
+
   const name = parseScalar(frontmatter, 'name');
   if (!name) {
     errors.push(`${relative(filePath)}: missing agent name`);
   } else {
-    const segments = filePath.split(path.sep);
-    const pluginName = segments[segments.indexOf('plugins') + 1];
     pluginAgents.add(`${pluginName}:${name}`);
+    // Claude Code's Task registry resolves cross-plugin agents by the
+    // three-segment plugin:directory:name form. For an agent file at
+    // `<pluginName>/agents/<dir>/<name>.md`, the runtime dispatch form
+    // is `<pluginName>:<dir>:<name>`. Both forms are registered so
+    // existing 2-segment callers continue to validate, but the
+    // markdown-scan loop below emits a warning when a 2-segment hit has
+    // an available 3-segment equivalent — turning silent runtime
+    // failures into loud CI signal for new code.
+    const agentsIdx = relSegments.indexOf('agents');
+    if (agentsIdx >= 0 && relSegments.length > agentsIdx + 2) {
+      const dir = relSegments[agentsIdx + 1];
+      pluginAgents.add(`${pluginName}:${dir}:${name}`);
+    }
   }
 
   const hasAllowedTools = /^allowed-tools:/m.test(frontmatter);
@@ -155,6 +195,37 @@ for (const filePath of agentFiles) {
     const tools = parseList(frontmatter, 'tools');
     if (tools.length === 0) {
       errors.push(`${relative(filePath)}: missing or empty "tools:" list`);
+    }
+
+    // W1.5 — Rule X: review/ agents must be read-only (no Bash, Write, Edit)
+    // unless explicitly allowlisted with a documented exception. Reuse the
+    // PLUGINS_DIR-relative path computed above. Tool comparison is
+    // case-insensitive so lowercase variants (e.g., `bash`) cannot bypass
+    // the security check.
+    const agentsIdx = relSegments.indexOf('agents');
+    const isReviewAgent =
+      agentsIdx >= 0 && relSegments[agentsIdx + 1] === 'review';
+    if (isReviewAgent) {
+      const pluginsRel = relSegments.join('/');
+      if (!REVIEW_AGENT_ALLOWLIST.has(pluginsRel)) {
+        const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
+          t.toLowerCase()
+        );
+        const toolsLower = tools.map((t) => t.toLowerCase());
+        const violations = REVIEW_AGENT_DENIED_TOOLS.filter((_, i) =>
+          toolsLower.includes(deniedLower[i])
+        );
+        if (violations.length > 0) {
+          errors.push(
+            `${relative(filePath)}: review/ agent must not include ` +
+              `${violations.join(', ')} in "tools:" — reviewers are ` +
+              `read-only (W1.5 rule). To document a justified exception, ` +
+              `add the plugins-relative path to REVIEW_AGENT_ALLOWLIST in ` +
+              `scripts/validate-agent-authoring.js and add a "Tool ` +
+              `Surface — Documented Exception" section to the agent body.`
+          );
+        }
+      }
     }
 
     const skills = new Set(parseList(frontmatter, 'skills'));
@@ -176,6 +247,20 @@ for (const filePath of agentFiles) {
   }
 }
 
+// Map plugin:name → plugin:dir:name (when unambiguous). Used to suggest
+// the 3-segment form to authors who wrote a 2-segment dispatch.
+const twoToThreeSegment = new Map();
+for (const ref of pluginAgents) {
+  const parts = ref.split(':');
+  if (parts.length !== 3) continue;
+  const twoSeg = `${parts[0]}:${parts[2]}`;
+  if (twoToThreeSegment.has(twoSeg)) {
+    twoToThreeSegment.set(twoSeg, null); // ambiguous
+  } else {
+    twoToThreeSegment.set(twoSeg, ref);
+  }
+}
+
 for (const filePath of markdownFiles) {
   const content = fs.readFileSync(filePath, 'utf8');
   for (const match of content.matchAll(pluginSubagentPattern)) {
@@ -188,6 +273,19 @@ for (const filePath of markdownFiles) {
       errors.push(
         `${relative(filePath)}: subagent_type "${subagentType}" does not match any declared plugin agent`
       );
+      continue;
+    }
+    // The 2-segment form remains valid (transitional) but the runtime
+    // requires 3-segment. Warn when a 2-segment hit has an unambiguous
+    // 3-segment equivalent so authors update before the runtime fails.
+    const segments = subagentType.split(':');
+    if (segments.length === 2) {
+      const suggestion = twoToThreeSegment.get(subagentType);
+      if (suggestion) {
+        logInfo(
+          `${relative(filePath)}: subagent_type "${subagentType}" uses the legacy 2-segment form — runtime expects "${suggestion}" (3-segment). Update before this CI gate becomes hard-fail.`
+        );
+      }
     }
   }
 }

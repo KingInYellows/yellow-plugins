@@ -65,7 +65,7 @@ If the `debt-conventions` skill is unavailable, this rule still applies.
 
    When quoting evidence for credential findings, NEVER include the credential value. Include: (a) file path, (b) line number, (c) credential type (e.g., 'AWS Access Key ID', 'GitHub PAT', 'High-Entropy Base64 String'), (d) entropy score if computed, (e) verification status ('verified active', 'verified invalid', or 'unverified'). Format: `--- redacted [TYPE] (entropy: N.N, VERIFICATION) at [FILE]:L[N] ---`. Public format prefixes (e.g., `AKIA`, `ghp_`, `sk_live_`) may be included in the type description, for example: `[AWS Access Key ID starting with AKIA]`.
 
-   Credentials in code are the highest priority findings. Flag with category `security-debt`, severity `critical`, and add in description: 'IMMEDIATE ACTION REQUIRED: This finding requires credential rotation, not just code fix.'
+   Credentials in code are the highest priority findings. Flag with category `security-debt`, severity `critical`, and prefix the `finding` string with: 'IMMEDIATE ACTION REQUIRED: This finding requires credential rotation, not just code fix.' The `failure_scenario` should describe the concrete leak path (e.g., 'Credential is committed to git history; any past or future repo clone — including Dependabot CI runners and forked PRs — exfiltrates the live key').
 
 2. **Missing input validation at system boundaries** → High to Medium
 
@@ -78,5 +78,14 @@ If the `debt-conventions` skill is unavailable, this rule still applies.
 ## Output Requirements
 
 Return top 50 findings max, ranked by severity × confidence. Write results to
-`.debt/scanner-output/security-debt-scanner.json` per schema in debt-conventions
-skill.
+`.debt/scanner-output/security-debt-scanner.json` per the v2.0 schema in
+`debt-conventions`.
+
+Every finding must include the `failure_scenario` field (string or null).
+Prefer a concrete scenario when possible (one to two sentences: trigger →
+execution path → user-visible or operational outcome); security debt scenarios
+should name the attack vector (e.g., "credential in git history is fetched by
+a forked PR's CI runner and used to enumerate S3 buckets within seconds").
+Emit `null` only when no specific failure can be constructed — do not fabricate
+speculation. The synthesizer applies a +0.05 confidence-gate bump to
+compensate for null scenarios.

@@ -1,0 +1,186 @@
+# Optimization spec schema for `/yellow-core:optimize`
+#
+# Users author a YAML file matching this schema and pass its path to the
+# skill: `/yellow-core:optimize path/to/spec.yaml`. The skill validates the
+# spec against this schema before running. Validation failures abort with a
+# specific field-level error rather than running on a malformed spec.
+#
+# This is a documentation schema — fields are described, not formally
+# enforced by a parser. The skill validates by checking field presence and
+# basic types in the SKILL.md Phase 0.
+
+# ============================================================================
+# REQUIRED FIELDS
+# ============================================================================
+
+required_fields:
+
+  optimization_target:
+    type: string
+    description: |
+      What is being varied. Three accepted shapes:
+        - File path: "plugins/yellow-core/agents/research/best-practices-researcher.md"
+        - Prompt template: "the system prompt for review-pr Step 5 aggregation"
+        - Config key: "yellow-plugins.local.md key resolve_pr.cluster_line_distance"
+      The skill passes this string to candidate generators and to the judge
+      so they share the same target frame.
+
+  measurement_criteria:
+    type: array
+    description: |
+      Per-criterion analytic rubric. The judge scores each candidate on each
+      criterion separately (1-5 integer), then computes a weighted score.
+      Analytic rubrics produce more reliable inter-rater agreement than
+      holistic scoring across evaluation studies. Provide 2-5 criteria;
+      more dilutes signal, fewer collapses to holistic.
+    items:
+      name:
+        type: string
+        description: "Short identifier, lowercase kebab-case (e.g., 'instruction-clarity')"
+      definition:
+        type: string
+        description: |
+          One to three sentences explaining what the criterion measures and
+          what would distinguish a 5/5 from a 1/5. Concrete examples beat
+          abstract qualities.
+      weight:
+        type: number
+        default: 1.0
+        description: "Per-criterion weight. Weights need not sum to 1.0; the skill normalizes by total weight."
+
+# ============================================================================
+# OPTIONAL FIELDS
+# ============================================================================
+
+optional_fields:
+
+  success_threshold:
+    type: number
+    default: 3.5
+    description: |
+      Minimum weighted score (1-5 scale) for the run to be reported as
+      'successful'. The skill still surfaces all candidates ranked even
+      when no candidate clears the threshold — the threshold only
+      affects the report verb. Optional because the default of 3.5 is a
+      reasonable mid-rubric anchor for most optimization runs.
+
+  parallel_count:
+    type: integer
+    default: 2
+    min: 2
+    max: 5
+    description: |
+      Number of candidate variants to generate in parallel. Two is the
+      minimum because comparing one candidate against the baseline is not
+      ranking. Five is the cap because judge cost grows linearly and
+      parallel Task dispatch above five strains the harness. Optional
+      because the default of 2 is the cheapest meaningful comparison.
+
+  research_pre_pass:
+    type: boolean
+    default: true
+    description: |
+      When true, the skill invokes `best-practices-researcher` (or
+      `research-conductor` if yellow-research is installed) before
+      candidate generation, and includes the research summary in each
+      generator's prompt. Set to false to skip — useful when the
+      optimization target is so codebase-internal that external research
+      adds noise.
+
+  judge_runs:
+    type: integer
+    default: 2
+    min: 1
+    max: 3
+    description: |
+      Number of judge passes. The default of 2 runs the judge twice with
+      candidate order swapped on the second pass — this is the
+      cost-effective minimum that catches positional bias (single-run
+      judges have 0.167-1.00 inter-rater reliability across seeds; two-run
+      order-swap recovers most of the variance for ~2x the cost).
+      Set to 1 only for cheap pilots where you do not yet trust the rubric.
+
+  knowledge_compound:
+    type: boolean
+    default: false
+    description: |
+      When true and the winning candidate clears `success_threshold`, the
+      skill spawns `knowledge-compounder` via Task to write the winning
+      approach + rationale + per-criterion scores to
+      `docs/solutions/optimizations/<spec-name>.md`. Off by default —
+      compounding mid-experiment pollutes the catalog with non-durable
+      findings.
+
+  candidate_generation_prompt:
+    type: string
+    description: |
+      Optional override for the candidate-generator prompt. When omitted,
+      the skill uses a generic "produce one variant of <optimization_target>
+      that improves <measurement_criteria>" prompt. Override when the
+      target requires specific framing (e.g., "produce a variant that uses
+      a different JSON schema" rather than open-ended improvement).
+
+# ============================================================================
+# OUTPUT SCHEMA — judge_telemetry
+# ============================================================================
+# The skill writes per-judge-run records in this shape. Stored in conversation
+# context, not on disk (yellow-plugins divergence from upstream — see
+# SKILL.md "Persistence" section). Each record is one row.
+
+judge_telemetry:
+  candidate_id:
+    type: string
+    description: "Candidate identifier (e.g., 'A', 'B', 'C')"
+
+  run_index:
+    type: integer
+    description: "Which judge pass produced this record (1 or 2). Records from different runs of the same candidate are aggregated by averaging."
+
+  criterion_scores:
+    type: object
+    description: "Map of criterion-name -> score (1-5 integer). One entry per criterion in measurement_criteria."
+
+  weighted_score:
+    type: number
+    description: "sum(score * weight) / sum(weights). Range 1.0-5.0."
+
+  rationale:
+    type: string
+    description: "One to three sentences explaining the score. Cite specific candidate behavior, not general qualities."
+
+  style_bias_check:
+    type: boolean
+    description: |
+      Set to true when the judge noted that the score might be influenced
+      by writing style (verbosity, formatting, tone) rather than
+      substantive quality. The skill prompts the judge for this check on
+      every record — if 50%+ of records flag style bias, the skill
+      surfaces a warning above the ranked list and recommends rerunning
+      with style normalization.
+
+# ============================================================================
+# EXAMPLE — minimal hard-metric-style spec
+# ============================================================================
+# This block is illustrative; remove it from your own spec file.
+
+example:
+  optimization_target: "plugins/yellow-core/agents/research/best-practices-researcher.md system prompt"
+  measurement_criteria:
+    - name: source-citation-density
+      definition: |
+        Count of distinct external sources cited per 100 words of output.
+        5/5 cites 3+ distinct authoritative sources with publication
+        dates; 1/5 cites zero sources or only the agent's training data.
+      weight: 1.5
+    - name: actionable-summary
+      definition: |
+        Whether the summary ends with concrete next steps the requesting
+        agent can act on. 5/5 has a "Recommended next steps" section
+        with specific files/commands; 1/5 ends with a vague summary
+        paragraph.
+      weight: 1.0
+  success_threshold: 4.0
+  parallel_count: 3
+  research_pre_pass: true
+  judge_runs: 2
+  knowledge_compound: true

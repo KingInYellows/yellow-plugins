@@ -1,6 +1,8 @@
 ---
 title: 'AJV CLI v8 strict mode rejects format keywords without ajv-formats'
 category: build-errors
+track: bug
+problem: 'AJV CLI v8 strict mode rejects format keywords without ajv-formats'
 date: 2026-02-17
 tags:
   - ajv

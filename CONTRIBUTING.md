@@ -234,6 +234,92 @@ fixed, users can run `/plugin marketplace update` to fetch the latest. Version
 bumps are still worth doing — they will be retroactively effective once the bug
 is fixed.
 
+### Manual cache refresh for non-interactive sessions
+
+`/plugin marketplace update` requires the Claude Code TUI and is not
+available over Remote Control / non-interactive sessions. If you need to
+refresh the locally-cached plugin content without a TUI (e.g., a
+background agent verifying a freshly-merged `chore: version packages`
+release), rsync the marketplace clone over the cache:
+
+```bash
+set -euo pipefail
+
+command -v rsync >/dev/null 2>&1 || {
+  printf '[cache-refresh] Error: rsync required\n' >&2
+  exit 1
+}
+command -v jq >/dev/null 2>&1 || {
+  printf '[cache-refresh] Error: jq required\n' >&2
+  exit 1
+}
+
+MARKETPLACE=~/.claude/plugins/marketplaces/yellow-plugins/plugins
+CACHE=~/.claude/plugins/cache/yellow-plugins
+[ -d "$MARKETPLACE" ] || {
+  printf '[cache-refresh] Error: MARKETPLACE not found: %s\n' "$MARKETPLACE" >&2
+  exit 1
+}
+
+for plugin_dir in "$MARKETPLACE"/*/; do
+  # Skip non-plugin dirs (e.g., `.DS_Store`, partial clones) before any
+  # jq invocation — `set -euo pipefail` would otherwise abort the loop on
+  # the first non-plugin directory.
+  [ -f "$plugin_dir/.claude-plugin/plugin.json" ] || continue
+  plugin=$(basename "$plugin_dir")
+  # Allowlist plugin name (kebab-case [a-z0-9-]) so a directory named
+  # `..` or `foo$(rm)` cannot reach path construction below.
+  case "$plugin" in
+    *[!a-z0-9-]* | '' | -* | *-)
+      printf '[cache-refresh] Skipping unsafe plugin name: %s\n' "$plugin" >&2
+      continue
+      ;;
+  esac
+  mp_ver=$(jq -r '.version // ""' "$plugin_dir/.claude-plugin/plugin.json")
+  # Allowlist version: reject empty, traversal sequences, hidden-file
+  # leading dot, or hyphen-prefixed values that rsync/cp could read as flags.
+  case "$mp_ver" in
+    '' | */* | *..* | .* | -*)
+      printf '[cache-refresh] Skipping invalid version %s for %s\n' "$mp_ver" "$plugin" >&2
+      continue
+      ;;
+  esac
+  target="$CACHE/$plugin/$mp_ver"
+  if [ ! -d "$target" ]; then
+    # No version dir yet for this plugin (brand-new install or post
+    # `chore: version packages` bump). Seed from the highest existing
+    # semver dir's structure — `sort -V` handles 1.10 > 1.9 correctly,
+    # which `ls | tail -1` would not. The trailing `|| true` is required
+    # under `set -euo pipefail`: when no version dirs exist yet, `ls`
+    # exits non-zero, `pipefail` propagates that through the pipeline,
+    # and `set -e` would abort the entire script. With `|| true`,
+    # `existing` becomes empty and the `[ -n "$existing" ]` guard below
+    # skips the seed-copy as intended.
+    existing=$(ls -d "$CACHE/$plugin"/*/ 2>/dev/null | sort -V | tail -1) || true
+    if [ -n "$existing" ]; then
+      cp -r -- "$existing" "$target" || {
+        printf '[cache-refresh] Error: failed to seed %s from %s\n' "$target" "$existing" >&2
+        continue
+      }
+    fi
+  fi
+  [ -d "$target" ] && rsync -a --delete -- "$plugin_dir/" "$target/"
+done
+```
+
+After the rsync, run `/reload-plugins` in your session so the runtime
+re-reads the registry.
+
+The rsync uses `--delete`, which removes any cache-only files not present
+in the marketplace clone. The seed-copy fallback only fires when no prior
+version directory exists under `$CACHE/$plugin/` (brand-new install or
+wiped cache); when no prior version is available to seed from, the loop
+skips that plugin and an interactive `/plugin marketplace update` is
+still required to initialize the versioned directory. The shortcut
+covers the common case where a prior version directory already exists
+(from a previous install or seed copy) but its contents are stale after
+a version bump.
+
 ## Coding Standards
 
 ### TypeScript

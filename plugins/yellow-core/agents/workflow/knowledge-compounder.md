@@ -291,9 +291,101 @@ if [ -f "$GIT_ROOT/docs/solutions/$CATEGORY/$SLUG.md" ]; then
 fi
 ```
 
+#### Frontmatter Schema (W2.0a track classification)
+
+New entries MUST include the following frontmatter fields in addition to the
+existing `title`, `date`, `category`, `components`:
+
+```yaml
+---
+title: '<short title>'
+date: YYYY-MM-DD
+category: <category enum>
+track: <bug | knowledge>          # NEW: classifies the entry
+problem: <one-line problem statement>  # NEW: keyword-rich, ~80 chars
+tags: [<tag1>, <tag2>, ...]       # existing — ensure non-empty (3+ tags)
+components: [...]                  # existing
+---
+```
+
+**Track classification rules:**
+
+| Source category | Default track | Override condition |
+|---|---|---|
+| `logic-errors` | `bug` | — |
+| `security-issues` | `bug` | If title contains "audit", "threat model", or "pre-implementation review" → `knowledge` |
+| `build-errors` | `bug` | — |
+| `code-quality` | `knowledge` | If the entry documents a specific defect that was fixed → `bug` |
+| `workflow` | `knowledge` | If the entry documents a specific incident that was resolved → `bug` |
+| `integration-issues` | `knowledge` | If a tool/MCP failed catastrophically and was fixed → `bug` |
+
+When in doubt: `bug` if there was a specific incident being remembered;
+`knowledge` if it's a pattern or guideline being documented for future work.
+
+**`problem` field:** one-line, ~80 characters, keyword-rich. The
+`learnings-researcher` agent (W2.1, lands in branch #7) will use BM25 / dense
+retrieval over `problem` + `tags` + `title` for relevance ranking. Keep it
+specific: not "auth issue" but "session token leaks via URL parameter on OAuth
+callback".
+
+#### Context Budget Precheck (CE ce-compound v2.39.0 pattern)
+
+Before writing the resolved Solution doc, count the assembled content's line
+count. If it exceeds the configurable threshold (default 200 lines), prompt
+the user via AskUserQuestion before writing:
+
+```bash
+GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+ASSEMBLED_LINES="$(printf '%s' "$ASSEMBLED_BODY" | wc -l)"
+CONTEXT_BUDGET_THRESHOLD="${KC_CONTEXT_BUDGET:-200}"
+```
+
+If `$ASSEMBLED_LINES` > `$CONTEXT_BUDGET_THRESHOLD`, ask via AskUserQuestion.
+The question body must include the concrete `$ASSEMBLED_LINES` value and the
+concrete section count `$SECTION_COUNT` (computed by counting top-level
+`##` headings in the assembled body) so the user knows exactly what they
+are choosing between. Button labels stay generic — AskUserQuestion does not
+substitute variables in labels:
+
+> Question body:
+> "The resolved solution doc is `$ASSEMBLED_LINES` lines (threshold is
+> `$CONTEXT_BUDGET_THRESHOLD`), spanning `$SECTION_COUNT` major sections.
+> Write as a single file, split into one file per section, or cancel?"
+>
+> Options:
+> - "Write single file (recommended for cohesive narratives)"
+> - "Split into multiple files (one per major section)"
+> - "Cancel"
+
+The `$CONTEXT_BUDGET_THRESHOLD` is configurable via the `KC_CONTEXT_BUDGET`
+env var (default: 200). Override at invocation time; not currently exposed in
+`plugin.json` `userConfig` (operators set it ad-hoc when working on a
+particularly large compound).
+
+If user selects "Split":
+
+1. Invoke the Solution Extractor again with a `--split` flag.
+2. Write each section as a separate `<slug>-<part>.md` file with a shared
+   `series:` frontmatter field referencing the parent slug.
+3. **If the split invocation fails or produces zero output sections**, stop
+   immediately and report to the user: `[knowledge-compounder] Error: split
+   invocation produced no sections. No files written. Manual intervention
+   required.` Do NOT silently fall back to single-file write.
+
+If user selects "Cancel", stop without writing.
+
 Write to `$GIT_ROOT/docs/solutions/$CATEGORY/$FINAL_SLUG.md` using standard
-template: frontmatter (title, date, category, tags, components), then sections:
-Problem, Root Cause, Fix, Prevention, Related Documentation.
+template: frontmatter (title, date, category, **track, problem**, tags,
+components), then sections:
+
+- **Bug track:** Problem, Symptoms, What Didn't Work, Solution, Why This
+  Works, Prevention.
+- **Knowledge track:** Context, Guidance, Why This Matters, When to Apply,
+  Examples.
+
+The category-to-track default mapping above sets the default; override only
+with explicit user confirmation when the entry doesn't fit the category's
+default track.
 
 After Write, verify:
 ```bash

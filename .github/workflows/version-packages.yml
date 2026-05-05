@@ -41,7 +41,11 @@ jobs:
   # ==========================================================================
   version-or-publish:
     name: Version or Publish
-    runs-on: [self-hosted, pool:ares]
+    # Release pipeline exception: this workflow runs on GitHub-hosted runners
+    # rather than the self-hosted pool:ares default. Release workflows benefit
+    # from the higher availability + cleaner credential isolation of
+    # GitHub-hosted runners, and this matches the notify job below.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     outputs:
@@ -188,7 +192,8 @@ jobs:
   # ==========================================================================
   build-and-release:
     name: Build and Release
-    runs-on: [self-hosted, pool:ares]
+    # Release pipeline exception — see version-or-publish for rationale.
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [version-or-publish]
     environment: production

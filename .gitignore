@@ -43,6 +43,10 @@ node_modules/
 **/node_modules/
 package-lock.json
 yarn.lock
+# Exception: plugins that install external MCP binaries at runtime commit
+# their lockfile so `npm ci` pins the full transitive dependency tree
+# (supply-chain guarantee). Add new plugins here as they adopt the pattern.
+!plugins/yellow-morph/package-lock.json
 
 # Build outputs (Task I1.T1: pnpm workspace)
 dist/
@@ -92,3 +96,9 @@ temp/
 
 # Local worktree tracking
 .worktrees/
+
+# Entire AI tool per-developer config (telemetry, settings, logs)
+.entire/
+
+# RuVector intelligence data
+.claude/statusline.sh

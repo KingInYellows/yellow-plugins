@@ -1,6 +1,9 @@
 {
   "name": "yellow-morph",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep"
+  "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
+  "dependencies": {
+    "@morphllm/morphmcp": "0.8.165"
+  }
 }

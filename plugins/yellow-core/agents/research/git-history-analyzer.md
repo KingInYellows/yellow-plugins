@@ -10,6 +10,12 @@ tools:
   - Glob
 ---
 
+**Note: Determine the current date with `date '+%Y-%m-%d'` (Bash) at the start
+of any time-bounded analysis.** Use the resulting date when interpreting
+commit dates, recent-vs-old contributor activity, and `--since='2 weeks ago'`
+windows. Do not assume a hardcoded year.
+
+
 <examples>
 <example>
 Context: Developer investigating authentication module design decisions before refactoring.

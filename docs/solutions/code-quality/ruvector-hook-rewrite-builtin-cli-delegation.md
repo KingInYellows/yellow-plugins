@@ -1,6 +1,8 @@
 ---
 title: "ruvector hooks rewritten to delegate to built-in CLI hooks"
 category: code-quality
+track: knowledge
+problem: 'ruvector hooks rewritten to delegate to built-in CLI hooks'
 date: 2026-02-18
 tags:
   - ruvector

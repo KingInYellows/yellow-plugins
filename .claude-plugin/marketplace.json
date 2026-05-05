@@ -14,7 +14,7 @@
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "1.3.0",
+      "version": "1.5.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -24,7 +24,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.4.1",
+      "version": "1.7.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -44,7 +44,7 @@
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
-      "version": "2.1.0",
+      "version": "2.1.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -64,7 +64,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "1.2.0",
+      "version": "2.3.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -84,7 +84,7 @@
     {
       "name": "yellow-browser-test",
       "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -94,7 +94,7 @@
     {
       "name": "yellow-debt",
       "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
-      "version": "1.2.0",
+      "version": "1.4.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -114,7 +114,7 @@
     {
       "name": "yellow-composio",
       "description": "Optional Composio accelerator for batch workflows with usage tracking",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -124,7 +124,7 @@
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
-      "version": "1.3.0",
+      "version": "1.4.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -134,7 +134,7 @@
     {
       "name": "yellow-morph",
       "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -144,7 +144,7 @@
     {
       "name": "yellow-semgrep",
       "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -154,7 +154,7 @@
     {
       "name": "yellow-docs",
       "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -164,7 +164,7 @@
     {
       "name": "yellow-codex",
       "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "KingInYellows"
       },

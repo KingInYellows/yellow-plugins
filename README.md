@@ -26,26 +26,24 @@ Add the marketplace, then install individual plugins:
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
 | `yellow-chatprd`      | ChatPRD MCP integration with document management and Linear bridging                                        | 4 agents, 6 commands, 1 skill, 1 MCP           |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 8 commands, 2 skills, 1 hook         |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 13 agents, 7 commands, 4 skills, 2 MCPs        |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 8 commands, 7 skills               |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 3 agents, 5 commands, 1 skill                  |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                       | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 1 skill, 6 MCPs          |
-| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 7 agents, 4 commands, 1 skill                  |
+| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 14 agents, 4 commands, 1 skill                 |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform   | 2 agents, 5 commands, 1 skill, 1 MCP           |
 
 ## MCP Servers & Authentication
 
-Nine plugins connect to MCP servers. Authentication requirements vary by server.
+Eight plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                |
 | ----------------- | ---------- | ------------------------------------------------------------------- |
 | `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                |
-| `yellow-core`     | Context7   | Free (no key); optional API key for higher rate limits              |
-| `yellow-core`     | Ceramic    | OAuth (browser popup on first `ceramic_search` use)                 |
 | `yellow-chatprd`  | ChatPRD    | OAuth (browser popup on first use)                                  |
 | `yellow-devin`    | DeepWiki   | Free for public repos; `DEVIN_SERVICE_USER_TOKEN` for private repos |
 | `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                |
@@ -60,7 +58,7 @@ Nine plugins connect to MCP servers. Authentication requirements vary by server.
 | `yellow-ruvector` | ruvector   | Local stdio — no auth required                                      |
 | `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                        |
 
-### Context7 (yellow-core)
+### Context7 (user-level MCP)
 
 Provides up-to-date library documentation for LLMs. Works without an API key but
 with lower rate limits.
@@ -262,14 +260,14 @@ yellow-plugins/
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
 │   ├── yellow-chatprd/        # ChatPRD integration (4 agents, 6 commands, 1 skill, 1 MCP)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 8 commands, 2 skills, 1 hook)
-│   ├── yellow-core/           # Dev toolkit (13 agents, 7 commands, 4 skills, 2 MCPs)
+│   ├── yellow-core/           # Dev toolkit (17 agents, 8 commands, 7 skills)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)
 │   ├── yellow-docs/           # Documentation (3 agents, 5 commands, 1 skill)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
 │   ├── yellow-research/       # Deep research (2 agents, 4 commands, 1 skill, 6 MCPs)
-│   ├── yellow-review/         # PR review (7 agents, 4 commands, 1 skill)
+│   ├── yellow-review/         # PR review (14 agents, 4 commands, 1 skill)
 │   ├── yellow-ruvector/       # Vector memory (2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP)
 │   └── yellow-semgrep/        # Semgrep remediation (2 agents, 5 commands, 1 skill, 1 MCP)
 ├── packages/                  # Validation tooling (domain, infrastructure, cli)

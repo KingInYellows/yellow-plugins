@@ -603,7 +603,13 @@ jobs:
             echo "::endgroup::"
 
             echo "::group::Scanning for secrets in manifests"
-            SENSITIVE=$(grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --include="*.json" | grep -v '"permissionScopes"' || true)
+            # Exclusions: "permissionScopes" literal; JSON userConfig field
+            # declarations (lines ending in `: {` are object-typed field
+            # openings, not secret values); ${user_config.*} template
+            # references (substituted at runtime, not literal secrets).
+            SENSITIVE=$(grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --include="*.json" \
+              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{user_config\.' \
+              || true)
             if [ -n "$SENSITIVE" ]; then
               echo "$SENSITIVE"
               echo "::error::Potential sensitive data found in manifest files"

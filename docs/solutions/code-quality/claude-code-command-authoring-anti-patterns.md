@@ -1,5 +1,8 @@
 ---
 title: "Claude Code Command Authoring: Anti-Patterns and Fixes"
+category: code-quality
+track: knowledge
+problem: 'Anti-patterns from 4 cross-plugin commands (PR #35) review: 15 P1 + 14 P2 across argument handling, prompt injection fencing, and tool-prerequisite gating'
 problem_type: code-quality
 tags:
   - claude-code-commands

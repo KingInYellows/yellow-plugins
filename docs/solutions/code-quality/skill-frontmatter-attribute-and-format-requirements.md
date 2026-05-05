@@ -1,6 +1,8 @@
 ---
 title: 'Skill and Agent Frontmatter Attribute Name and Format Requirements'
 category: code-quality
+track: knowledge
+problem: 'Wrong skill/agent frontmatter attribute spelling (user-invocable vs user-invokable) and unsupported YAML folded scalar in description silently truncates parser output'
 tags: [claude-code, skill, agent, frontmatter, yaml, plugin-authoring]
 module: plugins (all)
 symptom:
