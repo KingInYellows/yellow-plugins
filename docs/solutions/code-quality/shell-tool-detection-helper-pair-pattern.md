@@ -4,8 +4,6 @@ date: 2026-04-28
 category: 'code-quality'
 ---
 
-# `have_X` + `run_X` Helper Pair for Multi-Variant Tool Detection
-
 ## Summary
 
 Shell scripts that probe for a tool with multiple acceptable invocations
@@ -101,20 +99,17 @@ fi
 - Tool has 2+ valid invocations and the script calls it from 2+ locations.
 - The chosen variant is needed for user-facing messages (not just internal
   dispatch).
-- The script is bash (not POSIX sh) — the `case` dispatcher uses bash-style
-  pattern matching but is portable to any POSIX-ish shell with light edits.
+- The helper pair itself is portable: `command -v`, `case` with quoted
+  patterns containing spaces (`"python3 -m pip")`), and plain function
+  syntax are all POSIX. No bashisms appear in the Pattern code above.
 
 ## When Not to Use
 
 - Single call site: inline the detection.
-- Pure POSIX scripts that need to avoid bash arrays and cannot use
-  `mapfile` (bash-only) — keep the inline `if/elif` chain at each call site
-  rather than introducing the helper pair. Note: POSIX `case` itself supports
-  quoted patterns with spaces (`"python3 -m pip")`), so the dispatcher
-  pattern is portable; the constraint is the caller-side array ergonomics,
-  not `case` syntax.
 - The chosen tokens vary in number across variants AND callers need
   programmatic access to the token list (rare; usually messages suffice).
+  In that case the token-array protocol — bash-only via `mapfile`, or split
+  command/args variables for POSIX — is the right shape, not this helper pair.
 
 ## Detection
 

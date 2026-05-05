@@ -4,8 +4,6 @@ date: 2026-04-28
 category: 'security-issues'
 ---
 
-# printf `%b` in Colored Output Helpers Enables Terminal Escape Injection
-
 ## Summary
 
 Shell helper functions like `error()`, `warning()`, and `success()` commonly

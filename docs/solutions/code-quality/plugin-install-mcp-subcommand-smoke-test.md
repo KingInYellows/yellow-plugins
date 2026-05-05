@@ -4,8 +4,6 @@ date: 2026-04-28
 category: 'code-quality'
 ---
 
-# Plugin Install Scripts Must Smoke-Test the MCP Entrypoint Subcommand
-
 ## Summary
 
 Plugins that bundle an MCP server in `plugin.json` declare a `command` (or
@@ -55,8 +53,12 @@ on failure so install still succeeds for users who can fix it manually:
 # Smoke-test the MCP entrypoint that plugin.json will invoke. If this
 # subcommand is absent, the MCP server silently fails to start with no
 # diagnostics, leaving the user with 0 tools.
-MCP_CHECK=$(mempalace mcp --help 2>&1)
-if [ $? -ne 0 ]; then
+#
+# Inline the command substitution into the `if` condition. The two-step
+# `var=$(cmd); if [ $? -ne 0 ]` form silently aborts under `set -e` on
+# the failing assignment — the warning never fires. `if ! var=$(cmd)`
+# suppresses errexit for the assignment and works under either mode.
+if ! MCP_CHECK=$(mempalace mcp --help 2>&1); then
   printf '[install-mempalace] Warning: "mempalace mcp --help" failed — MCP entrypoint may differ in this version.\n' >&2
   printf '[install-mempalace] Output: %s\n' "$MCP_CHECK" >&2
   printf '[install-mempalace] Verify plugin.json mcpServers.mempalace.command matches the installed CLI.\n' >&2
