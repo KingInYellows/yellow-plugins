@@ -49,12 +49,11 @@ comment-analyzer, security, adversarial roles).
 ## Why This Matters
 
 Agents that review large pack files (diffs, concatenated source) approach the
-100K budget by design. Any pack over ~128KB will either:
-- Silently truncate the argument (kernel clips at `MAX_ARG_STRLEN`)
-- Cause `E2BIG` / argument-too-long error, crashing the review step
+100K budget by design. Any pack over ~128KB will exceed kernel limits and cause
+`execve` to fail with `E2BIG` (argument-too-long), crashing the review step.
 
-Because the failure mode is silent truncation, the reviewer may produce a
-result that covers only part of the pack without any error surfacing.
+Because the failure surfaces as a hard error rather than a graceful fallback,
+the review step aborts entirely — no partial result is returned.
 
 ## Key Insight
 
@@ -82,18 +81,32 @@ timeout 120 gemini --prompt-file "$PACK_FILE"
 File-path flags pass the path as an argument (a few hundred bytes) and the
 tool reads the file internally — no argument size limit applies.
 
-### Option C: process substitution with explicit stdin flag
+### Option C: build a temp file safely when `--prompt-file` is available
+
+When the tool supports `--prompt-file` and a system prompt must be prepended,
+write the combined content to the temp file without any command substitution.
+Use a process group to stream both parts directly — no `$(cat ...)` in
+argument position:
 
 ```bash
 timeout 120 gemini -p "$(cat "$PACK_FILE")"   # WRONG — still hits limit
 
-# If -p must be used and the tool doesn't have --prompt-file:
-# split: write prompt to temp file, then pass path
+# RIGHT — process group streams both parts into the temp file;
+# $(cat ...) never appears as a shell argument
 PROMPT_TMP=$(mktemp)
-printf '%s\n%s' "$SYSTEM_PROMPT" "$(cat "$PACK_FILE")" > "$PROMPT_TMP"
+{
+  printf '%s\n' "$SYSTEM_PROMPT"
+  cat "$PACK_FILE"
+} > "$PROMPT_TMP"
 timeout 120 gemini --prompt-file "$PROMPT_TMP"
 rm -f "$PROMPT_TMP"
 ```
+
+Note: `printf` is a bash builtin and is not subject to the kernel-level
+`execve` `MAX_ARG_STRLEN` limit for the system prompt string alone. The
+problem arises when `$(cat "$PACK_FILE")` is expanded as an argument —
+avoid that regardless of which command receives it, because future refactors
+may replace the builtin with an external command.
 
 ### Remove the misleading comment
 
@@ -106,7 +119,7 @@ instead.
 ```bash
 # Find inline $(cat ...) passed as a command argument (not in assignments)
 rg '\$\(cat ' plugins/ --include='*.md' \
-  | grep -v '^\s*[A-Z_]*=' \
+  | grep -Ev '^[[:space:]]*[A-Z_]*=' \
   | grep -v '# .*read from'
 ```
 

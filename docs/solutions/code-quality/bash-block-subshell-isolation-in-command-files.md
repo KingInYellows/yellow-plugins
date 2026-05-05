@@ -237,7 +237,11 @@ summary block checks for the files' existence:
 
 ```bash
 # Step 2
-command -v gemini >/dev/null 2>&1 && touch /tmp/.council-gemini-ok || rm -f /tmp/.council-gemini-ok
+if command -v gemini >/dev/null 2>&1; then
+  touch /tmp/.council-gemini-ok
+else
+  rm -f /tmp/.council-gemini-ok
+fi
 
 # Step 5 — re-derive from sentinel files
 READY_COUNT=0

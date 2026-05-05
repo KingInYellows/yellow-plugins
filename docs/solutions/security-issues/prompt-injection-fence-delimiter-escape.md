@@ -18,7 +18,7 @@ components:
 Yellow-council wraps each reviewer's output in named fence tags before
 presenting it to the orchestrator:
 
-```
+```text
 --- begin council-output:gemini ---
 [reviewer output here]
 --- end council-output:gemini ---
@@ -94,7 +94,7 @@ tags, strip or escape any line that matches the closing delimiter pattern:
 ```bash
 # Escape any line that would close the fence prematurely
 SAFE_OUTPUT=$(printf '%s\n' "$RAW_OUTPUT" \
-  | sed 's/^--- end council-output:/<!-- redacted fence-close: /')
+  | sed 's/^--- end council-output:.*$/[redacted: fence-close tag removed]/')
 ```
 
 Then wrap `$SAFE_OUTPUT` in the fence tags. This is deterministic and does
@@ -133,6 +133,7 @@ rg 'begin council-output|end council-output' plugins/ --include='*.md' \
 ```
 
 When reviewing any agent that wraps untrusted LLM output in named delimiters:
+
 1. Confirm the delimiter cannot be reproduced verbatim by the fenced model
 2. If the delimiter is static and human-readable: flag as vulnerable to
    pre-plant and require one of the three mitigations above

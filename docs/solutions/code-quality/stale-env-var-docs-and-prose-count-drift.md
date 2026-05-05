@@ -230,10 +230,12 @@ and the filesystem.
 
 When a plugin is scaffolded and added to the marketplace table, the author
 updates:
+
 - `marketplace.json` (required for install to work)
 - The Plugins table in README (usually done)
 
 But commonly misses:
+
 - The Project Structure tree block (visual directory listing)
 - Per-row counts (commands, agents, skills) which must match `ls plugins/<name>/commands/ | wc -l`
 
@@ -277,7 +279,8 @@ Add `scripts/check-readme-count.js` to enforce this automatically:
 import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+// Node 22+ — import.meta.dirname is the script's own directory, cross-platform safe
+const ROOT = join(import.meta.dirname, '..');
 const readme = readFileSync(join(ROOT, 'README.md'), 'utf8');
 const pluginDirs = readdirSync(join(ROOT, 'plugins'), { withFileTypes: true })
   .filter(d => d.isDirectory())
@@ -294,13 +297,24 @@ for (const plugin of pluginDirs) {
   // Per-subdir count check (commands, agents, skills)
   for (const subdir of ['commands', 'agents', 'skills']) {
     let count = 0;
-    try { count = readdirSync(join(ROOT, 'plugins', plugin, subdir)).length; } catch {}
+    try { count = readdirSync(join(ROOT, 'plugins', plugin, subdir)).filter(f => f.endsWith('.md')).length; } catch {}
     // Extract claimed count from Plugins table row (heuristic — adapt to actual table format)
     const rowMatch = readme.match(new RegExp(`${plugin}[^\\n]*\\b(\\d+)\\s+${subdir}`));
     if (rowMatch && parseInt(rowMatch[1], 10) !== count) {
       console.error(`[check-readme-count] ${plugin}: README claims ${rowMatch[1]} ${subdir}, found ${count}`);
       failed = true;
     }
+  }
+}
+
+// Inverse check: every plugin row in the README Plugins table must have a real directory
+const tablePluginRegex = /^\|\s*`([^`]+)`\s*\|/gm;
+let tableMatch;
+while ((tableMatch = tablePluginRegex.exec(readme)) !== null) {
+  const tablePlugin = tableMatch[1];
+  if (!pluginDirs.includes(tablePlugin)) {
+    console.error(`[check-readme-count] README lists missing plugin directory: ${tablePlugin}`);
+    failed = true;
   }
 }
 

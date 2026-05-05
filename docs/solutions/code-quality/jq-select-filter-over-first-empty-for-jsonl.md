@@ -3,7 +3,7 @@ title: Use jq select() Not first(expr // empty) for JSONL Field Extraction
 date: 2026-05-04
 category: code-quality
 track: bug
-problem: jq first(.field // empty) emits per-line errors on JSONL streams where most lines lack the field, producing unpredictable output even with 2>/dev/null
+problem: jq first(.field // empty) on a JSONL stream errors when no line contains the field (empty generator), and 2>/dev/null silences genuine parse errors alongside it, producing unpredictable silent failures
 tags: [jq, jsonl, select, first, shell, command-authoring, silent-failure, extraction]
 components:
   - plugins/yellow-council/agents/review/opencode-reviewer.md
@@ -22,35 +22,40 @@ SESSION_ID=$(jq -r 'first(.part.snapshot.sessionID // empty)' "$OUTPUT_FILE" 2>/
 
 On a real JSONL stream, most lines are progress events, log entries, or other
 structured objects that do not have `.part.snapshot.sessionID`. For each such
-line, jq processes the expression `.part.snapshot.sessionID // empty` and
-finds the field absent. `first(... // empty)` emits no output for those lines
-but also generates a jq-internal error per line. The `2>/dev/null` suppresses
-all errors — including genuine parse failures — making the failure invisible.
+line, jq evaluates `.part.snapshot.sessionID` as `null`, and `// empty`
+converts that to `empty` — cleanly, without error. So the expression is
+not error-prone per line.
 
-When many lines lack the field, jq's behavior under `first()` with an empty
-generator becomes implementation-dependent. In practice the result is either:
-- An empty string (session ID appears unset even when it exists later in the file)
-- Partial output from a line where the field exists but error recovery is off
+The actual failure mode is different: if **no** line in the file contains the
+field, the generator inside `first()` produces zero outputs. `first()` with an
+empty generator emits a jq error (`null (null) has no keys` or similar, depending
+on jq version) and exits non-zero. The `2>/dev/null` suppresses that error
+alongside genuine JSONL parse failures on malformed lines, making both failure
+modes invisible. `SESSION_ID` is silently set to empty even when the field does
+exist further in the file or when the file itself is corrupt.
 
-The `2>/dev/null` then guarantees no diagnostic is surfaced when things go
-wrong. The command silently returns empty and the session cleanup / session
-reference step silently no-ops.
+A second, subtler problem: `first()` returns only one value. If the caller
+later needs all matching session IDs (e.g., for multi-session cleanup), the
+pattern silently drops all but the first without any indication that more
+matches were available.
 
 ## Key Insight
 
-**`select(.field != null)` omits non-matching lines cleanly without erroring.**
-Pair it with `| head -1` to take the first match. This is the idiomatic jq
-pattern for "find the first line in a JSONL stream that has a field."
+**`select(.field != null)` omits non-matching lines cleanly and emits the
+field value for every matching line.** Pair it with `| head -1` to take the
+first match, or omit `head -1` to collect all matches. This is the idiomatic
+jq pattern for "find lines in a JSONL stream that have a field."
 
-`first(expr // empty)` is designed for in-memory JSON arrays, not streaming
-JSONL. On JSONL input it processes the entire file as a sequence of values and
-the `first()` semantics interact poorly with a generator that produces zero
-outputs on most inputs.
+`first(expr // empty)` works correctly when at least one line matches, but
+errors when zero lines match (empty generator). It also returns only one value,
+hiding the availability of additional matches. `select()` avoids both problems:
+it never errors on field absence and naturally produces all matches, letting
+the caller decide how many to consume.
 
 ## Fix
 
 ```bash
-# WRONG: first() + empty on JSONL — per-line errors, unpredictable output
+# WRONG: first() + empty on JSONL — errors when no line matches, hides all-matches case
 SESSION_ID=$(jq -r 'first(.part.snapshot.sessionID // empty)' "$OUTPUT_FILE" 2>/dev/null)
 
 # CORRECT: select() filter skips non-matching lines without error
@@ -59,11 +64,11 @@ SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.se
 ```
 
 The `select()` version:
-- Emits zero output for lines that lack the field (no error)
-- Emits the field value for lines that have it
-- `head -1` takes the first match, consistent with the original intent
+- Emits zero output for lines that lack the field (no error — field absence evaluates to `null` then filters out cleanly)
+- Emits the field value for every line that has it
+- `head -1` takes the first match, consistent with the original intent; omit it to collect all matches
 - `2>/dev/null` is still appropriate to suppress genuine parse errors on
-  malformed lines, but it no longer suppresses structural field-absence errors
+  malformed JSONL lines; unlike the `first()` pattern, there are no empty-generator errors for it to accidentally hide
 
 ### Nested field path variant
 
@@ -97,10 +102,12 @@ rg "jq.*2>/dev/null.*\\.\\w+\\.\\w+" plugins/ --include='*.md'
 
 When reviewing jq expressions that read JSONL files:
 1. If the expression uses `first()`: verify the input is a JSON array, not a
-   JSONL stream. For JSONL, use `select()` + `head -1` instead.
-2. If `2>/dev/null` is present: confirm that the suppressed errors are only
-   line-parse failures, not field-absence errors from `// empty` on mismatched
-   lines.
+   JSONL stream. For JSONL, use `select()` + `head -1` instead. `first()` errors
+   when zero lines match — which is a silent failure when `2>/dev/null` is also
+   present.
+2. If `2>/dev/null` is present: confirm it is only suppressing genuine JSONL
+   parse errors (malformed JSON lines). If `first(... // empty)` is also present,
+   it may also be silencing the empty-generator error, masking a real failure.
 
 ## Prevention
 

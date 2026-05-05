@@ -3,7 +3,7 @@ title: Shell && / || Chain Operator-Precedence Bugs in Guard-Then-Act Patterns
 date: 2026-05-04
 category: code-quality
 track: bug
-problem: "[ -n \"$VAR\" ] && cmd 2>/dev/null || warn fires the warning when $VAR is empty AND silently swallows cmd failures when $VAR is set"
+problem: "Guard-then-act && / || chains misfire on empty guards and silence errors"
 tags: [shell, operator-precedence, bash, guard, error-handling, silent-failure, command-authoring]
 components:
   - plugins/yellow-council/agents/review/opencode-reviewer.md
@@ -16,7 +16,9 @@ components:
 Yellow-council's opencode reviewer used this inline chain for session cleanup:
 
 ```bash
-[ -n "$SESSION_ID" ] && opencode session delete "$SESSION_ID" 2>/dev/null || warn "cleanup failed"
+[ -n "$SESSION_ID" ] && \
+  opencode session delete "$SESSION_ID" 2>/dev/null || \
+  warn "cleanup failed"
 ```
 
 This chain has two independent failure modes:
@@ -26,7 +28,7 @@ This chain has two independent failure modes:
 Shell operator precedence: `&&` and `||` are left-associative and equal
 precedence. The chain parses as:
 
-```
+```bash
 ( [ -n "$SESSION_ID" ] && opencode session delete "$SESSION_ID" 2>/dev/null ) || warn "..."
 ```
 
@@ -53,6 +55,7 @@ error" cases, and the two cases are indistinguishable from the warning message.
 only for cmd failure.** The `||` binds to the entire left side, not just `cmd`.
 
 The `&&`/`||` inline chain is safe only when:
+
 1. The guard condition is the first thing that can fail, AND
 2. Either branch of `||` is the correct response to ANY left-side failure,
    including guard failures
@@ -69,7 +72,8 @@ branch semantics.
 # CORRECT: explicit if guard separates "not set" from "delete failed"
 if [ -n "$SESSION_ID" ]; then
   if ! opencode session delete "$SESSION_ID" 2>/dev/null; then
-    printf '[opencode-reviewer] Warning: session cleanup failed for %s\n' "$SESSION_ID" >&2
+    printf '[opencode-reviewer] Warning: session cleanup failed for %s\n' \
+      "$SESSION_ID" >&2
   fi
 fi
 ```
@@ -104,8 +108,9 @@ Checklist question when reviewing shell guards:
 
 ## Prevention
 
-- [ ] Guard-then-act-then-warn patterns always use `if [ ... ]; then cmd; else warn; fi`
-      — never inline `[ ... ] && cmd || warn`
+- [ ] Guard-then-act-then-warn patterns use `if guard; then cmd || warn; fi`
+      — warn only when the command fails, not when the guard is empty/unset;
+      never inline `[ ... ] && cmd || warn`
 - [ ] `2>/dev/null` is never placed between the action and its `||` error
       handler — if stderr is suppressed, the handler must not claim it observed
       an error

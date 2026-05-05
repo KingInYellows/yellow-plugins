@@ -95,7 +95,8 @@ simultaneously.
 rg -n 'in_pem\b' plugins/ --include='*.md' | grep -v 'in_pem = 0' | head -20
 
 # Structural check: any awk block where line= appears before if (line ~
-grep -n 'line = ' plugins/*/skills/*/SKILL.md plugins/*/agents/**/*.md 2>/dev/null \
+rg -n --glob 'plugins/*/skills/*/SKILL.md' --glob 'plugins/*/agents/**/*.md' \
+  'line = ' \
   | grep -A2 'in_pem\|redact'
 ```
 
