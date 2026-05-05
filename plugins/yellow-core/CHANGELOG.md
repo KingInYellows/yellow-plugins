@@ -1,5 +1,65 @@
 # Changelog
 
+## 1.12.0
+
+### Minor Changes
+
+- [`01cc4c0`](https://github.com/KingInYellows/yellow-plugins/commit/01cc4c0246115a5bd3a60d26b956eed90626456b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document agent
+  archetypes and subagent failure convention
+
+  Extends `plugins/yellow-core/skills/create-agent-skills/SKILL.md` with two new
+  sections:
+  1. **Agent Archetypes** — a table mapping frontmatter fields to archetype
+     (Reviewer / Scanner / Orchestrator / Research / Analyst) so authors can see
+     at a glance which fields are required for which agent type. Flags the
+     common `memory: true` mistake (correct form is a scope string).
+  2. **Subagent Failure Convention (Output-File Pattern)** — documents the
+     community-adopted workaround for unreliable Task tool return values (GitHub
+     Issues #24181, #25818): orchestrators create a per-run directory via
+     `RUN_DIR=$(mktemp -d -t run-XXXXXXXX)` and pass it to each spawned agent,
+     which writes a structured JSON result to
+     `$RUN_DIR/agent-result-<agent>.json`. Orchestrators read the file rather
+     than relying on stdout parsing. (`CLAUDE_PLUGIN_DATA` is not a documented
+     Claude Code runtime variable and must not be used for this pattern.)
+
+  Wires the convention into the review-pr.md (Step 5 Pass 1) and work.md (Phase
+  3 step 4) orchestrators so multi-agent sessions can distinguish
+  partial-success from complete failure and surface failed agents in the
+  user-visible summary.
+
+### Patch Changes
+
+- [`01cc4c0`](https://github.com/KingInYellows/yellow-plugins/commit/01cc4c0246115a5bd3a60d26b956eed90626456b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add deliberate
+  model routing and per-repo plugin lint script
+
+  **Model routing** — set explicit models on 5 agents/commands where the default
+  `inherit` is wasteful or insufficient:
+  - `model: haiku` on pure display/status commands (`debt:status`,
+    `semgrep:status`) — matches precedent in `ci:status`. Low reasoning needs
+    don't require Sonnet-level inference.
+  - `model: opus` on heavy-reasoning agents: `architecture-strategist` (SOLID /
+    coupling analysis), `research-conductor` (multi-source synthesis),
+    `audit-synthesizer` (cross-scanner merging with severity scoring).
+
+  Caveats documented in the plan:
+  - GitHub Issue #14863 — verify Haiku + `tool_reference` block support in
+    current Claude Code version; affected agents only use Bash/Skill/
+    AskUserQuestion so low risk.
+  - GitHub Issue #29768 — model inheritance bug; setting `model:` explicitly
+    (not relying on inherit) avoids this.
+
+  **Plugin lint script** — introduces `scripts/lint-plugins.sh`, a shell-only
+  lint that validates agent frontmatter (name/description/tools), flags the
+  `memory: true` mistake (correct form is a scope string), and verifies skill
+  references resolve to an existing SKILL.md. Wired into CI via
+  `.github/workflows/lint-plugins.yml`.
+
+  The lint currently reports 0 errors and 0 warnings — all `memory: true`
+  occurrences were migrated to valid scope strings in prior stack PRs (#253 and
+  #255), so this lint lands clean on day one.
+
 ## 1.11.0
 
 ### Minor Changes

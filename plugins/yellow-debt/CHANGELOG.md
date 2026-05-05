@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.6.0
+
+### Minor Changes
+
+- [`01cc4c0`](https://github.com/KingInYellows/yellow-plugins/commit/01cc4c0246115a5bd3a60d26b956eed90626456b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  prompt-injection hardening to debt scanners and CI agents
+
+  Adds the CRITICAL SECURITY RULES + content-fencing block (already present in
+  yellow-core and yellow-review review agents) to 5 yellow-debt scanners
+  (ai-pattern, architecture, complexity, duplication, security-debt) and 4
+  yellow-ci agents (failure-analyst, workflow-optimizer, runner-assignment,
+  runner-diagnostics). These agents read untrusted content (source code, CI
+  logs, workflow files) and benefit from the same injection-defense posture as
+  the review agents.
+  - yellow-debt scanners use the canonical pattern from yellow-core review
+    agents (`--- code begin ---` fence, "code comments" wording) which matches
+    the `debt-conventions` skill.
+  - yellow-ci agents use artifact-typed delimiters (`--- begin ci-log ---`,
+    `--- begin workflow-file: <name> ---`, `--- begin runner-output: ... ---`)
+    defined in the `ci-conventions` skill, since CI agents process logs and
+    workflow files rather than source code.
+
+### Patch Changes
+
+- [`01cc4c0`](https://github.com/KingInYellows/yellow-plugins/commit/01cc4c0246115a5bd3a60d26b956eed90626456b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add deliberate
+  model routing and per-repo plugin lint script
+
+  **Model routing** — set explicit models on 5 agents/commands where the default
+  `inherit` is wasteful or insufficient:
+  - `model: haiku` on pure display/status commands (`debt:status`,
+    `semgrep:status`) — matches precedent in `ci:status`. Low reasoning needs
+    don't require Sonnet-level inference.
+  - `model: opus` on heavy-reasoning agents: `architecture-strategist` (SOLID /
+    coupling analysis), `research-conductor` (multi-source synthesis),
+    `audit-synthesizer` (cross-scanner merging with severity scoring).
+
+  Caveats documented in the plan:
+  - GitHub Issue #14863 — verify Haiku + `tool_reference` block support in
+    current Claude Code version; affected agents only use Bash/Skill/
+    AskUserQuestion so low risk.
+  - GitHub Issue #29768 — model inheritance bug; setting `model:` explicitly
+    (not relying on inherit) avoids this.
+
+  **Plugin lint script** — introduces `scripts/lint-plugins.sh`, a shell-only
+  lint that validates agent frontmatter (name/description/tools), flags the
+  `memory: true` mistake (correct form is a scope string), and verifies skill
+  references resolve to an existing SKILL.md. Wired into CI via
+  `.github/workflows/lint-plugins.yml`.
+
+  The lint currently reports 0 errors and 0 warnings — all `memory: true`
+  occurrences were migrated to valid scope strings in prior stack PRs (#253 and
+  #255), so this lint lands clean on day one.
+
 ## 1.5.0
 
 ### Minor Changes
