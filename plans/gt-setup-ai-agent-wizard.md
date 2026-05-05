@@ -1,5 +1,9 @@
 # Feature: Improve gt-setup with AI Agent Configuration Wizard
 
+> **Status: Implemented (PR #228, merged)** — gt-setup wizard shipped
+> (`b9c6e5bf`). Non-interactive (CI) execution remains explicitly out of
+> scope per Edge Cases.
+
 ## Problem Statement
 
 ### Current Pain Points
@@ -298,29 +302,29 @@ Changes:
 
 #### 4.1: Manual testing checklist
 
-- [ ] Fresh setup: no `.graphite.yml`, no PR template — full wizard runs
-- [ ] Re-run: `.graphite.yml` exists with matching values — shows "already
+- [x] Fresh setup: no `.graphite.yml`, no PR template — full wizard runs
+- [x] Re-run: `.graphite.yml` exists with matching values — shows "already
   configured", offers Skip
-- [ ] Re-run: `.graphite.yml` exists with different values — shows diff, offers
+- [x] Re-run: `.graphite.yml` exists with different values — shows diff, offers
   Update
-- [ ] Re-run: malformed `.graphite.yml` — warns, offers Overwrite
-- [ ] `gt user` command failure mid-wizard — shows partial summary, offers retry
-- [ ] Branch prefix validation: rejects `../../etc`, spaces, empty string
-- [ ] Branch prefix with trailing `/` — normalized correctly
-- [ ] Pager prompt: disable → verify `gt user pager` reflects change
-- [ ] Pager prompt: keep → verify no change
-- [ ] `smart-submit` reads `submit.draft: true` — creates draft PR
-- [ ] `smart-submit` reads `audit.agents: 1` — spawns 1 agent instead of 3
-- [ ] `smart-submit` reads `branch.prefix: "agent/"` — branch name starts with
+- [x] Re-run: malformed `.graphite.yml` — warns, offers Overwrite
+- [x] `gt user` command failure mid-wizard — shows partial summary, offers retry
+- [x] Branch prefix validation: rejects `../../etc`, spaces, empty string
+- [x] Branch prefix with trailing `/` — normalized correctly
+- [x] Pager prompt: disable → verify `gt user pager` reflects change
+- [x] Pager prompt: keep → verify no change
+- [x] `smart-submit` reads `submit.draft: true` — creates draft PR
+- [x] `smart-submit` reads `audit.agents: 1` — spawns 1 agent instead of 3
+- [x] `smart-submit` reads `branch.prefix: "agent/"` — branch name starts with
   `agent/`
-- [ ] `gt-stack-plan` reads `branch.prefix` — decomposition uses prefixed names
-- [ ] `gt-amend` reads `audit.agents: 2` — spawns 2 agents
-- [ ] `yq` missing + `.graphite.yml` exists — consumers warn to stderr, use
+- [x] `gt-stack-plan` reads `branch.prefix` — decomposition uses prefixed names
+- [x] `gt-amend` reads `audit.agents: 2` — spawns 2 agents
+- [x] `yq` missing + `.graphite.yml` exists — consumers warn to stderr, use
   defaults
-- [ ] `yq` missing — gt-setup Phase 3 still generates file with warning
-- [ ] WSL2: generated files have LF line endings (no CRLF)
-- [ ] `setup:all` shows `.graphite.yml` in config files section
-- [ ] `setup:all` classification reflects PARTIAL when `.graphite.yml` missing
+- [x] `yq` missing — gt-setup Phase 3 still generates file with warning
+- [x] WSL2: generated files have LF line endings (no CRLF)
+- [x] `setup:all` shows `.graphite.yml` in config files section
+- [x] `setup:all` classification reflects PARTIAL when `.graphite.yml` missing
 
 #### 4.2: Update gt-workflow CLAUDE.md
 

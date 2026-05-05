@@ -1,5 +1,8 @@
 # Feature: Session-Level Review for workflows:review
 
+> **Status: Implemented (PR #230, merged)** — `/workflows:review` shipped
+> at `plugins/yellow-core/commands/workflows/review.md`.
+
 ## Overview
 
 Transform `workflows:review` from a thin redirect to `review:pr` into a
@@ -138,7 +141,7 @@ The user may run both. Session-level review should not re-run per-PR agents.
 
 ### Phase 1: Command Foundation
 
-- [ ] 1.1: Replace the redirect in `plugins/yellow-core/commands/workflows/review.md` with new command structure. Update frontmatter: name, description, argument-hint, allowed-tools (Bash, Read, Write, Edit, Glob, Grep, Task, AskUserQuestion, ToolSearch, Skill, ruvector MCP tools). Keep backwards-compatible redirect logic for PR number/URL/branch arguments.
+- [x] 1.1: Replace the redirect in `plugins/yellow-core/commands/workflows/review.md` with new command structure. Update frontmatter: name, description, argument-hint, allowed-tools (Bash, Read, Write, Edit, Glob, Grep, Task, AskUserQuestion, ToolSearch, Skill, ruvector MCP tools). Keep backwards-compatible redirect logic for PR number/URL/branch arguments.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The frontmatter must use `allowed-tools:` (not `tools:` — that
@@ -151,15 +154,15 @@ The user may run both. Session-level review should not re-run per-PR agents.
 > commands.
 <!-- /deepen-plan -->
 
-- [ ] 1.2: Implement argument disambiguation. Parse `$ARGUMENTS`: if file exists on disk → session-level review mode; if numeric or URL or branch name → redirect to `review:pr` via Skill tool; if empty → auto-detect session context. Detection order: (1) find most recent `plans/*.md` modified in last 24h, (2) check Graphite stack via `gt log short --no-interactive`, (3) fall back to current branch redirect.
+- [x] 1.2: Implement argument disambiguation. Parse `$ARGUMENTS`: if file exists on disk → session-level review mode; if numeric or URL or branch name → redirect to `review:pr` via Skill tool; if empty → auto-detect session context. Detection order: (1) find most recent `plans/*.md` modified in last 24h, (2) check Graphite stack via `gt log short --no-interactive`, (3) fall back to current branch redirect.
 
-- [ ] 1.3: Implement session context loading. Read plan file, extract: `## Acceptance Criteria` section, `## Stack Decomposition` section (if present), `## Implementation Plan` tasks, `## Technical Specifications` scope (files to modify/create). For stacked sessions, map stack items to PR branches. For single-branch sessions, get the current branch's PR.
+- [x] 1.3: Implement session context loading. Read plan file, extract: `## Acceptance Criteria` section, `## Stack Decomposition` section (if present), `## Implementation Plan` tasks, `## Technical Specifications` scope (files to modify/create). For stacked sessions, map stack items to PR branches. For single-branch sessions, get the current branch's PR.
 
-- [ ] 1.4: Add prerequisite checks. Verify clean working directory (`git status --porcelain`), verify `gh` and `gt` are available, verify at least one open PR exists for the session. If any check fails, report error and exit.
+- [x] 1.4: Add prerequisite checks. Verify clean working directory (`git status --porcelain`), verify `gh` and `gt` are available, verify at least one open PR exists for the session. If any check fails, report error and exit.
 
 ### Phase 2: Review Dimensions
 
-- [ ] 2.1: Implement plan adherence analysis. Gather the combined diff across all session branches (`git diff main...<branch>` for each). Compare acceptance criteria from the plan against the diff — for each criterion, classify as: met (evidence in diff), unmet (no evidence), or partially met. For unmet criteria, check if there is a plausible justification (e.g., criterion was about docs and docs exist but weren't in the diff). Report unmet criteria as P1 findings with suggested implementation tasks.
+- [x] 2.1: Implement plan adherence analysis. Gather the combined diff across all session branches (`git diff main...<branch>` for each). Compare acceptance criteria from the plan against the diff — for each criterion, classify as: met (evidence in diff), unmet (no evidence), or partially met. For unmet criteria, check if there is a plausible justification (e.g., criterion was about docs and docs exist but weren't in the diff). Report unmet criteria as P1 findings with suggested implementation tasks.
 
 <!-- deepen-plan: external -->
 > **Research:** The "Rubric Is All You Need" paper (arXiv 2503.23989v1)
@@ -172,7 +175,7 @@ The user may run both. Session-level review should not re-run per-PR agents.
 > rather than holistically for more reliable adherence checking.
 <!-- /deepen-plan -->
 
-- [ ] 2.2: Implement scope drift detection. Compare files changed in the combined diff against files listed in the plan's `## Technical Specifications` (Files to Modify, Files to Create) and `## Stack Decomposition` Scope fields. Files changed but not in the plan are candidates for drift. For each candidate: AI-classify as "justified divergence" (necessary consequence of implementation — e.g., updating a lock file, fixing a discovered bug) or "unintentional drift" (gold-plating, tangent feature). Justified divergences are P3 (informational). Unintentional drift is P2 (reported for user attention, not auto-fixed — reverting code is dangerous).
+- [x] 2.2: Implement scope drift detection. Compare files changed in the combined diff against files listed in the plan's `## Technical Specifications` (Files to Modify, Files to Create) and `## Stack Decomposition` Scope fields. Files changed but not in the plan are candidates for drift. For each candidate: AI-classify as "justified divergence" (necessary consequence of implementation — e.g., updating a lock file, fixing a discovered bug) or "unintentional drift" (gold-plating, tangent feature). Justified divergences are P3 (informational). Unintentional drift is P2 (reported for user attention, not auto-fixed — reverting code is dangerous).
 
 <!-- deepen-plan: external -->
 > **Research:** CodeRabbit and Qodo provide related "ticket misalignment"
@@ -186,7 +189,7 @@ The user may run both. Session-level review should not re-run per-PR agents.
 > See: [CodeRabbit PR Validation](https://docs.coderabbit.ai/changelog)
 <!-- /deepen-plan -->
 
-- [ ] 2.3: Implement cross-PR coherence analysis. For stacked PRs only (skip for single-branch sessions). Gather diffs for each branch separately. Analyze for: (a) naming inconsistency — exported symbols that follow different conventions across branches; (b) pattern divergence — same problem solved differently in different PRs (e.g., error handling, validation); (c) import chain integrity — types/functions exported by branch N correctly imported by branch N+1 in a linear stack. Report inconsistencies as P1 (broken imports/contracts) or P2 (naming/pattern drift).
+- [x] 2.3: Implement cross-PR coherence analysis. For stacked PRs only (skip for single-branch sessions). Gather diffs for each branch separately. Analyze for: (a) naming inconsistency — exported symbols that follow different conventions across branches; (b) pattern divergence — same problem solved differently in different PRs (e.g., error handling, validation); (c) import chain integrity — types/functions exported by branch N correctly imported by branch N+1 in a linear stack. Report inconsistencies as P1 (broken imports/contracts) or P2 (naming/pattern drift).
 
 <!-- deepen-plan: external -->
 > **Research:** No existing tool (Graphite, ghstack, Sapling, spr, git-town)
@@ -210,11 +213,11 @@ The user may run both. Session-level review should not re-run per-PR agents.
 > synthesis, confirming this is entirely new territory.
 <!-- /deepen-plan -->
 
-- [ ] 2.4: Structure findings output. Each finding uses the standard format from `pr-review-workflow` skill: `**[P1|P2|P3] dimension -- file:line** Finding: <issue> Fix: <suggestion>`. Dimensions are: `plan-adherence`, `scope-drift`, `cross-pr-coherence`. Collect all findings into a sorted list (P1 first).
+- [x] 2.4: Structure findings output. Each finding uses the standard format from `pr-review-workflow` skill: `**[P1|P2|P3] dimension -- file:line** Finding: <issue> Fix: <suggestion>`. Dimensions are: `plan-adherence`, `scope-drift`, `cross-pr-coherence`. Collect all findings into a sorted list (P1 first).
 
 ### Phase 3: Autonomous Fix Loop
 
-- [ ] 3.1: Implement P1 fix application. For each P1 finding with a concrete fix suggestion: (a) determine target branch from the finding's file path and stack mapping; (b) if not on the target branch, `gt checkout <branch>`; (c) apply fix via Edit tool; (d) run a targeted test if applicable (`pnpm test` or equivalent scoped to changed files). Track which branch has uncommitted changes.
+- [x] 3.1: Implement P1 fix application. For each P1 finding with a concrete fix suggestion: (a) determine target branch from the finding's file path and stack mapping; (b) if not on the target branch, `gt checkout <branch>`; (c) apply fix via Edit tool; (d) run a targeted test if applicable (`pnpm test` or equivalent scoped to changed files). Track which branch has uncommitted changes.
 
 <!-- deepen-plan: external -->
 > **Research:** The Claude Code agent harness (arXiv 2603.05344v3) uses layered
@@ -227,7 +230,7 @@ The user may run both. Session-level review should not re-run per-PR agents.
 > (snapshot/rollback pattern from SWE-CI).
 <!-- /deepen-plan -->
 
-- [ ] 3.2: Implement commit-and-submit for fixes. After all P1 fixes on a branch are applied: `gt modify -m "fix: address session review findings"` then `gt submit --no-interactive`. If the session spans multiple branches, repeat per branch. After all branches are submitted, `gt upstack restack` if any base branch in a linear stack was modified.
+- [x] 3.2: Implement commit-and-submit for fixes. After all P1 fixes on a branch are applied: `gt modify -m "fix: address session review findings"` then `gt submit --no-interactive`. If the session spans multiple branches, repeat per branch. After all branches are submitted, `gt upstack restack` if any base branch in a linear stack was modified.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The `gt modify` + `gt submit --no-interactive` pattern is
@@ -241,13 +244,13 @@ The user may run both. Session-level review should not re-run per-PR agents.
 > left on the last-touched branch. Follow this convention.
 <!-- /deepen-plan -->
 
-- [ ] 3.3: Implement re-review cycle. After Phase 2 fixes are applied, re-run the three review dimensions (tasks 2.1-2.3) on the updated diffs. Compare new issue count to previous: if P1 count decreased, continue to cycle 2 if max cycles not reached; if P1 count did not decrease (fixes created as many problems as they solved), stop. Max 2 review-fix cycles total.
+- [x] 3.3: Implement re-review cycle. After Phase 2 fixes are applied, re-run the three review dimensions (tasks 2.1-2.3) on the updated diffs. Compare new issue count to previous: if P1 count decreased, continue to cycle 2 if max cycles not reached; if P1 count did not decrease (fixes created as many problems as they solved), stop. Max 2 review-fix cycles total.
 
-- [ ] 3.4: Implement loop termination and summary. After the final cycle, collect all findings across all cycles. For each finding, record status: `Fixed` (applied and verified in re-review), `Reported` (P2/P3, not auto-fixed), `Persisted` (P1 that could not be fixed after 2 cycles). This data feeds the output phase.
+- [x] 3.4: Implement loop termination and summary. After the final cycle, collect all findings across all cycles. For each finding, record status: `Fixed` (applied and verified in re-review), `Reported` (P2/P3, not auto-fixed), `Persisted` (P1 that could not be fixed after 2 cycles). This data feeds the output phase.
 
 ### Phase 4: Output and Persistence
 
-- [ ] 4.1: Implement inline summary table. Print a structured table to the terminal:
+- [x] 4.1: Implement inline summary table. Print a structured table to the terminal:
   ```
   Session Review: N issues found, M fixed (K cycles)
 
@@ -258,7 +261,7 @@ The user may run both. Session-level review should not re-run per-PR agents.
   ```
   Include a verdict line: "Session is clean" (0 issues), "All issues resolved" (all fixed), or "N issues remain — review recommended" (unfixed P1/P2).
 
-- [ ] 4.2: Implement persistent review document. When any P1 or P2 issues were found, write a review doc to `docs/reviews/YYYY-MM-DD-<plan-slug>-session-review.md`. Content: session metadata (plan file, branches, cycles), full findings with fix details, drift classification rationale, final status. Create `docs/reviews/` directory if it doesn't exist. Leave the file unstaged (user decides whether to commit).
+- [x] 4.2: Implement persistent review document. When any P1 or P2 issues were found, write a review doc to `docs/reviews/YYYY-MM-DD-<plan-slug>-session-review.md`. Content: session metadata (plan file, branches, cycles), full findings with fix details, drift classification rationale, final status. Create `docs/reviews/` directory if it doesn't exist. Leave the file unstaged (user decides whether to commit).
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Use `mkdir -p docs/reviews || { printf '[session-review] Error:
@@ -269,19 +272,19 @@ The user may run both. Session-level review should not re-run per-PR agents.
 > inconsistent with codebase conventions.
 <!-- /deepen-plan -->
 
-- [ ] 4.3: Update `plugins/yellow-core/CLAUDE.md` to reflect the new `workflows:review` behavior. Change the description from "redirects to /review:pr" to the new session-level review description. Update the "When to Use What" guidance in yellow-review's CLAUDE.md to differentiate session-level review from per-PR review.
+- [x] 4.3: Update `plugins/yellow-core/CLAUDE.md` to reflect the new `workflows:review` behavior. Change the description from "redirects to /review:pr" to the new session-level review description. Update the "When to Use What" guidance in yellow-review's CLAUDE.md to differentiate session-level review from per-PR review.
 
 ### Phase 5: Integration and Polish
 
-- [ ] 5.1: Add ruvector integration. Follow the canonical pattern from `mcp-integration-patterns` skill: recall at start with query prefix `"[session-review] "`, remember at end with tiered consent (P1 auto, P2 prompted). Graceful skip if ruvector not installed.
+- [x] 5.1: Add ruvector integration. Follow the canonical pattern from `mcp-integration-patterns` skill: recall at start with query prefix `"[session-review] "`, remember at end with tiered consent (P1 auto, P2 prompted). Graceful skip if ruvector not installed.
 
-- [ ] 5.2: Add error handling for all failure modes. Skill tool failure (review:pr redirect), plan file not found, plan file missing expected sections (skip that dimension with a warning), dirty working directory, `gt` command failures, Edit tool failures. Follow the graceful degradation pattern used throughout the plugin.
+- [x] 5.2: Add error handling for all failure modes. Skill tool failure (review:pr redirect), plan file not found, plan file missing expected sections (skip that dimension with a warning), dirty working directory, `gt` command failures, Edit tool failures. Follow the graceful degradation pattern used throughout the plugin.
 
-- [ ] 5.3: Add context budget management. For large sessions (5+ PRs), the combined diff may exceed context. Mitigate by: (a) using `git diff --stat` first for scope drift (file-level, not line-level); (b) only reading full diffs for files flagged by the stat pass; (c) for cross-PR coherence, focus on exported symbols and imports rather than full file contents.
+- [x] 5.3: Add context budget management. For large sessions (5+ PRs), the combined diff may exceed context. Mitigate by: (a) using `git diff --stat` first for scope drift (file-level, not line-level); (b) only reading full diffs for files flagged by the stat pass; (c) for cross-PR coherence, focus on exported symbols and imports rather than full file contents.
 
-- [ ] 5.4: Validate the command with `pnpm validate:schemas` to ensure frontmatter is valid. Test argument disambiguation paths manually (plan file, PR number, empty args).
+- [x] 5.4: Validate the command with `pnpm validate:schemas` to ensure frontmatter is valid. Test argument disambiguation paths manually (plan file, PR number, empty args).
 
-- [ ] 5.5: Create changeset via `pnpm changeset` — declare a `minor` bump for `yellow-core` (new command capability). This is required per project CLAUDE.md; CI blocks PRs that modify `plugins/*/` without a `.changeset/*.md` file.
+- [x] 5.5: Create changeset via `pnpm changeset` — declare a `minor` bump for `yellow-core` (new command capability). This is required per project CLAUDE.md; CI blocks PRs that modify `plugins/*/` without a `.changeset/*.md` file.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Every PR modifying a plugin must include a changeset (per

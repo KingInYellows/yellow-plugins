@@ -1,5 +1,9 @@
 # Feature: `/review:sweep` — Wrapper Command Chaining `/review:pr` → `/review:resolve`
 
+> **Status: Implemented (PR #304, merged)** — Command shipped at
+> `plugins/yellow-review/commands/review/sweep.md`. Subsequent hardening:
+> rounds 2+3+bot threads (`459a43d5`).
+
 ## Problem Statement
 
 After running `/review:pr` on a PR, users still need to manually invoke
@@ -74,18 +78,18 @@ keeping the wrapper at ~50 lines.
 
 ### Phase 1: Foundation
 
-- [ ] **1.1** Create `plugins/yellow-review/commands/review/sweep.md` with
+- [x] **1.1** Create `plugins/yellow-review/commands/review/sweep.md` with
   frontmatter:
   - `name: review:sweep`
   - `description:` single-line "Use when..." trigger clause
   - `allowed-tools: Bash, Skill, AskUserQuestion`
   - `argument-hint: [pr-number | github-url | branch-name | (empty for current branch)]`
-- [ ] **1.2** Add the standard "What it does" + "When to use" prose at top of
+- [x] **1.2** Add the standard "What it does" + "When to use" prose at top of
   body (matches existing review command style).
 
 ### Phase 2: Implementation
 
-- [ ] **2.1** Arg-parsing block (mirror `review-pr.md` lines 31–40):
+- [x] **2.1** Arg-parsing block (mirror `review-pr.md` lines 31–40):
   - If `$ARGUMENTS` numeric → use as PR#.
   - Else if matches `github.com.*\/pull\/[0-9]+` → extract PR#.
   - Else if non-empty → treat as branch name, run
@@ -97,9 +101,9 @@ keeping the wrapper at ~50 lines.
 <!-- deepen-plan: codebase -->
 > **Codebase:** Original draft used `gh pr list --head "$BRANCH" --json number -q '.[0].number'` for the branch case. The actual `review-pr.md` (lines 31–40) uses `gh pr view "$ARGUMENTS" --json number -q .number` — passes the branch name directly to `gh pr view`. The simpler form is what reviewers expect to see and is what the wrapped command uses, so the wrapper should mirror it exactly. Plan corrected above.
 <!-- /deepen-plan -->
-- [ ] **2.2** Invoke `/review:pr <PR#>` via the `Skill` tool with
+- [x] **2.2** Invoke `/review:pr <PR#>` via the `Skill` tool with
   `skill: "review:pr"` and `args: "<PR#>"`. Wait for completion.
-- [ ] **2.3** `AskUserQuestion` boundary gate:
+- [x] **2.3** `AskUserQuestion` boundary gate:
   - Question: `"/review:pr finished. Did it complete cleanly (review
     succeeded, fixes pushed or not needed)? Proceed to resolve open comment
     threads on PR #<PR#>?"`
@@ -111,35 +115,35 @@ keeping the wrapper at ~50 lines.
     prompt-injection surface that prose-driven intent parsing on user-typed
     text creates, the `Other` option was dropped before merge. The Edge
     Cases section below has been updated to match.
-- [ ] **2.4** On `Stop`: print `[review:sweep] Resolve step skipped. Re-run
+- [x] **2.4** On `Stop`: print `[review:sweep] Resolve step skipped. Re-run
   /review:resolve <PR#> manually when ready.` Exit 0.
-- [ ] **2.5** On `Proceed`: invoke `/review:resolve <PR#>` via the `Skill`
+- [x] **2.5** On `Proceed`: invoke `/review:resolve <PR#>` via the `Skill`
   tool with `skill: "review:resolve"` and `args: "<PR#>"`.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Original draft incorrectly used `skill: "review:resolve-pr"`. The actual frontmatter `name:` field at `plugins/yellow-review/commands/review/resolve-pr.md:2` is `review:resolve` (the file is named `resolve-pr.md` but the slash command name is `review:resolve`). Using `review:resolve-pr` would silently fail to invoke the skill. Plan corrected above. **This is a hard requirement — the implementor must use `skill: "review:resolve"` exactly.**
 <!-- /deepen-plan -->
-- [ ] **2.6** Final summary block: PR number, review-pr outcome (as reported
+- [x] **2.6** Final summary block: PR number, review-pr outcome (as reported
   by user at boundary), resolve-pr outcome (echo Skill summary or "no
   threads found" if applicable).
 
 ### Phase 3: Quality
 
-- [ ] **3.1** Ensure no `Bash` block references variables defined in another
+- [x] **3.1** Ensure no `Bash` block references variables defined in another
   block (functions don't survive bash blocks — re-define in each, per memory
   rule). Slug regex check on PR#: `^[0-9]+$`.
-- [ ] **3.2** Confirm `allowed-tools` lists every tool used in body (Skill,
+- [x] **3.2** Confirm `allowed-tools` lists every tool used in body (Skill,
   AskUserQuestion, Bash). Run `pnpm validate:plugins`.
-- [ ] **3.3** Add a changeset: `pnpm changeset` → minor bump for
+- [x] **3.3** Add a changeset: `pnpm changeset` → minor bump for
   yellow-review (new command = additive change).
-- [ ] **3.4** Update `plugins/yellow-review/CLAUDE.md` — current text reads
+- [x] **3.4** Update `plugins/yellow-review/CLAUDE.md` — current text reads
   "Commands (4)" with each command listed by name. Bump to "Commands (5)"
   and add a description line for `/review:sweep`.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Confirmed: `plugins/yellow-review/CLAUDE.md` enumerates the four current commands (`/review:setup`, `/review:pr`, `/review:resolve`, `/review:all`) and prefixes the section with "Commands (4)". Both the count and the enumeration must be updated atomically — count drift is a known anti-pattern in this repo (see MEMORY.md "Multi-file MCP count drift"). No `output-styles` directory entries need updating; that surface is shared across commands.
 <!-- /deepen-plan -->
-- [ ] **3.5** Update `plugins/yellow-review/README.md` (or top-level docs) to
+- [x] **3.5** Update `plugins/yellow-review/README.md` (or top-level docs) to
   mention `/review:sweep` alongside `/review:pr` and `/review:resolve`.
 
 ## Technical Details

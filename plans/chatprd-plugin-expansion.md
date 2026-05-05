@@ -1,5 +1,11 @@
 # Feature: ChatPRD Plugin Expansion (v1.2.0 + v1.3.0)
 
+> **Status: Implemented (PR #117, merged)** — v1.3.0 shipped via
+> `d865bab5`. All 4 expansion agents present at
+> `plugins/yellow-chatprd/agents/workflow/` (document-assistant,
+> document-reviewer, linear-prd-bridge, project-dashboard). Plugin version
+> is 1.3.0.
+
 ## Problem Statement
 
 The yellow-chatprd plugin uses only 8 of the 13 available ChatPRD MCP tools,
@@ -148,11 +154,12 @@ informed by Phase 1 experience.
      personal filter."
 
 **Acceptance criteria:**
-- [ ] `$ARGUMENTS` containing a project name routes to `list_project_documents`
-- [ ] Default (no arguments) routes to `list_organization_documents`
-- [ ] "my drafts" / "personal docs" routes to `list_documents`
-- [ ] All three modes produce consistent output formatting
-- [ ] Error table covers new tool failure cases
+
+- [x] `$ARGUMENTS` containing a project name routes to `list_project_documents`
+- [x] Default (no arguments) routes to `list_organization_documents`
+- [x] "my drafts" / "personal docs" routes to `list_documents`
+- [x] All three modes produce consistent output formatting
+- [x] Error table covers new tool failure cases
 
 #### Task 1.2: Update Document-Assistant Agent for Three Listing Modes
 
@@ -185,9 +192,10 @@ informed by Phase 1 experience.
    suggest the `document-reviewer` agent." (Prepares for Phase 2 discoverability.)
 
 **Acceptance criteria:**
-- [ ] Agent detects listing mode from natural language
-- [ ] Agent uses correct MCP tool for each mode
-- [ ] Handoff to document-reviewer is mentioned (future-proofs for Phase 2)
+
+- [x] Agent detects listing mode from natural language
+- [x] Agent uses correct MCP tool for each mode
+- [x] Handoff to document-reviewer is mentioned (future-proofs for Phase 2)
 
 #### Task 1.3: Enrich Linear Bridge with Related Specs
 
@@ -261,10 +269,11 @@ Mirror the same related-specs pattern:
 <!-- /deepen-plan -->
 
 **Acceptance criteria:**
-- [ ] Related specs appear in Linear issue descriptions when available
-- [ ] Graceful degradation when document has no project association
-- [ ] 5-second timeout prevents latency regression
-- [ ] Source document is excluded from related specs list
+
+- [x] Related specs appear in Linear issue descriptions when available
+- [x] Graceful degradation when document has no project association
+- [x] 5-second timeout prevents latency regression
+- [x] Source document is excluded from related specs list
 
 #### Task 1.4: Update Conventions Skill
 
@@ -316,9 +325,10 @@ Mirror the same related-specs pattern:
    ```
 
 **Acceptance criteria:**
-- [ ] Listing tool selection guide documents all three tools with when-to-use
-- [ ] Error mapping covers new tool failure cases
-- [ ] Related-specs pattern is documented for reuse
+
+- [x] Listing tool selection guide documents all three tools with when-to-use
+- [x] Error mapping covers new tool failure cases
+- [x] Related-specs pattern is documented for reuse
 
 #### Task 1.5: Version Bump and Metadata Updates
 
@@ -360,9 +370,10 @@ Mirror the same related-specs pattern:
 <!-- /deepen-plan -->
 
 **Acceptance criteria:**
-- [ ] Both plugin.json and package.json show `1.2.0`
-- [ ] CHANGELOG follows Keep a Changelog format with `---` separators
-- [ ] CLAUDE.md accurately reflects enhanced capabilities
+
+- [x] Both plugin.json and package.json show `1.2.0`
+- [x] CHANGELOG follows Keep a Changelog format with `---` separators
+- [x] CLAUDE.md accurately reflects enhanced capabilities
 
 ---
 
@@ -502,12 +513,13 @@ allowed-tools:
 - If document exceeds 5000 words, summarize each section before comparison
 
 **Acceptance criteria:**
-- [ ] Agent finds and fetches documents by title/query
-- [ ] Template matching uses tiered approach (metadata -> heuristic -> user -> general)
-- [ ] Review output classifies sections as missing/thin/adequate
-- [ ] Improvement suggestions require M3 confirmation
-- [ ] TOCTOU re-fetch before any update_document call
-- [ ] Large document handling (>5000 words) via summarization
+
+- [x] Agent finds and fetches documents by title/query
+- [x] Template matching uses tiered approach (metadata -> heuristic -> user -> general)
+- [x] Review output classifies sections as missing/thin/adequate
+- [x] Improvement suggestions require M3 confirmation
+- [x] TOCTOU re-fetch before any update_document call
+- [x] Large document handling (>5000 words) via summarization
 
 #### Task 2.2: Build Project-Dashboard Agent
 
@@ -621,12 +633,13 @@ allowed-tools:
 - Suppress `list_chats` failures silently (supplementary data only)
 
 **Acceptance criteria:**
-- [ ] Agent resolves project by name with disambiguation
-- [ ] Zero-documents case handled with starter suggestions
-- [ ] Documents categorized by type
-- [ ] Coverage gaps identified against common project template
-- [ ] Conversations count from `list_chats` included (graceful on failure)
-- [ ] Actions section offers drill-down and creation paths
+
+- [x] Agent resolves project by name with disambiguation
+- [x] Zero-documents case handled with starter suggestions
+- [x] Documents categorized by type
+- [x] Coverage gaps identified against common project template
+- [x] Conversations count from `list_chats` included (graceful on failure)
+- [x] Actions section offers drill-down and creation paths
 
 #### Task 2.3: Add DeepWiki Context to `/chatprd:create`
 
@@ -683,11 +696,12 @@ allowed-tools:
 every step -- the command works identically without yellow-devin installed.
 
 **Acceptance criteria:**
-- [ ] Only triggers for technical templates (TDD, API Documentation)
-- [ ] DeepWiki tools discovered dynamically, not in static allowed-tools
-- [ ] Graceful degradation: missing plugin, empty wiki, API error
-- [ ] User can decline repo context injection
-- [ ] Repository name extracted from git remote automatically
+
+- [x] Only triggers for technical templates (TDD, API Documentation)
+- [x] DeepWiki tools discovered dynamically, not in static allowed-tools
+- [x] Graceful degradation: missing plugin, empty wiki, API error
+- [x] User can decline repo context injection
+- [x] Repository name extracted from git remote automatically
 
 #### Task 2.4: Add User Profile to `/chatprd:setup`
 
@@ -730,10 +744,11 @@ every step -- the command works identically without yellow-devin installed.
    `get_user_profile` on demand if absent.
 
 **Acceptance criteria:**
-- [ ] Profile displayed at start of setup flow
-- [ ] Free plan warning shown when applicable
-- [ ] Profile check failure does not block setup
-- [ ] Subscription status optionally stored in workspace config
+
+- [x] Profile displayed at start of setup flow
+- [x] Free plan warning shown when applicable
+- [x] Profile check failure does not block setup
+- [x] Subscription status optionally stored in workspace config
 
 #### Task 2.5: Wire Chat Tools into Existing Agents
 
@@ -759,10 +774,11 @@ every step -- the command works identically without yellow-devin installed.
 `search_documents` response. Run in parallel, not sequentially.
 
 **Acceptance criteria:**
-- [ ] `search_chats` called alongside `search_documents` in parallel
-- [ ] Chat results mentioned as supplementary context only
-- [ ] Failures silently suppressed
-- [ ] Primary search flow unaffected by chat tool latency
+
+- [x] `search_chats` called alongside `search_documents` in parallel
+- [x] Chat results mentioned as supplementary context only
+- [x] Failures silently suppressed
+- [x] Primary search flow unaffected by chat tool latency
 
 #### Task 2.6: Update Conventions Skill for Phase 2
 
@@ -851,10 +867,11 @@ every step -- the command works identically without yellow-devin installed.
    format. Commands should check presence and re-fetch if absent.
 
 **Acceptance criteria:**
-- [ ] Review patterns documented with severity levels and matching algorithm
-- [ ] Dashboard formatting conventions specified
-- [ ] `get_user_profile` error mapping added
-- [ ] Subscription status documented as optional config field
+
+- [x] Review patterns documented with severity levels and matching algorithm
+- [x] Dashboard formatting conventions specified
+- [x] `get_user_profile` error mapping added
+- [x] Subscription status documented as optional config field
 
 #### Task 2.7: Version Bump and Metadata Updates
 
@@ -901,12 +918,13 @@ every step -- the command works identically without yellow-devin installed.
 <!-- /deepen-plan -->
 
 **Acceptance criteria:**
-- [ ] Both plugin.json and package.json show `1.3.0`
-- [ ] CHANGELOG follows Keep a Changelog format with `---` separators
-- [ ] CLAUDE.md accurately documents all 4 agents
-- [ ] README.md Agents table updated to show all 4 agents
-- [ ] "When to Use What" table updated
-- [ ] Cross-plugin dependencies section includes yellow-devin
+
+- [x] Both plugin.json and package.json show `1.3.0`
+- [x] CHANGELOG follows Keep a Changelog format with `---` separators
+- [x] CLAUDE.md accurately documents all 4 agents
+- [x] README.md Agents table updated to show all 4 agents
+- [x] "When to Use What" table updated
+- [x] Cross-plugin dependencies section includes yellow-devin
 
 ## Technical Specifications
 

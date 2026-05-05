@@ -1,5 +1,11 @@
 # Feature: Plugin Versioning Automation
 
+> **Status: Implemented (PR `#118`, merged)** — Unified `version-packages.yml`
+> workflow shipped via PR #118 (`feat(versioning): automate plugin version bump
+> pipeline`), later refactored into the single-workflow release pipeline via
+> PR #160. Three-way sync via `scripts/sync-manifests.js`, catalog versioning
+> via `scripts/catalog-version.js`, `validate-versions.js` for CI.
+
 ## Overview
 
 Automate the version bump pipeline for the yellow-plugins monorepo so that
@@ -342,24 +348,24 @@ that modify plugin files without a `.changeset/*.md` file.
 
 Once all phases are merged, verify with these tests:
 
-- [ ] **Test 1 (blocking enforcement):** Open a PR that modifies
+- [x] **Test 1 (blocking enforcement):** Open a PR that modifies
   `plugins/yellow-core/commands/review.md` with no `.changeset/*.md` file.
   CI `changeset-check` job should fail with `::error::` message. PR cannot merge.
 
-- [ ] **Test 2 (passing with changeset):** Add a `.changeset/test.md` with a
+- [x] **Test 2 (passing with changeset):** Add a `.changeset/test.md` with a
   `patch` bump for `yellow-core`. CI `changeset-check` should pass.
 
-- [ ] **Test 3 (Version Packages PR creation):** Merge the PR from Test 2 to
+- [x] **Test 3 (Version Packages PR creation):** Merge the PR from Test 2 to
   `main`. Within minutes, `version-packages.yml` should open a PR titled
   "chore: version packages" with `yellow-core` bumped to `1.1.1`, `plugin.json`
   and `marketplace.json` updated.
 
-- [ ] **Test 4 (tags and release):** Merge the "Version Packages" PR. Verify:
+- [x] **Test 4 (tags and release):** Merge the "Version Packages" PR. Verify:
   - Git tag `yellow-core@1.1.1` exists.
   - Root catalog tag `v<root-version>` exists.
   - `publish-release.yml` fires and creates a GitHub Release.
 
-- [ ] **Test 5 (three-way consistency):** `pnpm validate:versions` passes on
+- [x] **Test 5 (three-way consistency):** `pnpm validate:versions` passes on
   the final state of `main`.
 
 ---
