@@ -118,6 +118,7 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 - **Notes:** Breaking schema change (v1.0 → v2.0). Synthesizer must dual-read during transition.
 
 ### 8. feat/ideation-skill — **DONE (PR #310, merged 2026-05-01 as `d7f36fa`)**
+
 - **Type:** feat
 - **Description:** ideation skill with Toulmin warrant contract + MIDAS three-phase model; routes selected approach to brainstorm-orchestrator via Task
 - **Scope:** NEW plugins/yellow-core/skills/ideation/SKILL.md
@@ -126,6 +127,7 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 - **Status:** Shipped. Skill file present at `plugins/yellow-core/skills/ideation/SKILL.md` on `main` (~320 lines after review fixes). Six-phase flow (subject gate → free generation → warrant filter → extension → ranked selection → hand-off) with `[EVIDENCE]`/`[WARRANT]`/`[IDEA]` Toulmin slots. Strict-warrant mode auto-engages on multi-word security patterns (`api token`, `auth token`, `bearer token`, `oauth`, `jwt`, etc.) — NOT bare `token` after PR feedback. Phase 4 uses paginated `AskUserQuestion` (top-2 + Cancel + Other; third candidate via Other follow-up) to stay under the 4-option cap.
 
 ### 9. feat/cross-vendor-session-history — **DONE (PR #312, merged 2026-05-01 as `a2486f1`)**
+
 - **Type:** feat
 - **Description:** cross-vendor session-historian (Claude Code + Devin + Codex backends) with hybrid query (BM25 + cosine + RRF) + secret redaction
 - **Scope:** NEW plugins/yellow-core/skills/session-history/SKILL.md, NEW plugins/yellow-core/agents/workflow/session-historian.md
@@ -134,6 +136,7 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 - **Status:** Shipped. CWD encoding correctly produces leading-hyphen form (`-home-user-projects-foo`) — `sed 's|/|-|g'`, NOT `s|^/||; s|/|-|g`. Codex `find -mindepth 4 -maxdepth 4` enumerates `YYYY/MM/DD/<session-uuid>/` leaves. Hybrid query: BM25 + optional cosine via ruvector, fused via RRF (k=60), then post-RRF recency multiplier — recency is applied exactly once. Empty `$CURRENT_SESSION_ID` no longer drains results (conditional grep -v). Secret redaction covers AWS (AKIA/ASIA), GitHub, GitLab, Slack, OpenAI (sk-/sk-ant-/sk-proj-), Google, JWT, PEM. Devin V3 lineage capped at 10 children with `children_truncated`/`children_total` metadata.
 
 ### 10. feat/optimize-skill — **DONE (PR #311, merged 2026-05-01 as `9cb0f32`)**
+
 - **Type:** feat
 - **Description:** ce-optimize analog — LLM-as-judge with parallel experiments, schema.yaml, two-run order-swap, judge_telemetry schema
 - **Scope:** NEW plugins/yellow-core/skills/optimize/SKILL.md, NEW plugins/yellow-core/skills/optimize/schema.yaml
