@@ -82,7 +82,10 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   prediction-for-uncertain-links hypothesis testing, three-failed-attempts
   smart escalation, and conditional defense-in-depth/post-mortem; routes to
   `gt submit` / `/yellow-core:workflows:brainstorm` / `/yellow-core:workflows:compound`
-- `git-worktree` — git worktree management for parallel development
+- `git-worktree` — git worktree management for parallel development;
+  injects a `.ruvector/` symlink into new worktrees so the ruvector MCP
+  server reaches the shared project DB instead of silently no-op'ing on
+  a missing directory
 - `ideation` — generate 3 grounded approaches to a soft problem using the
   Toulmin warrant contract (evidence + linking principle + idea), filtered
   through MIDAS three-phase generation, then route the chosen approach into

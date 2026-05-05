@@ -795,6 +795,43 @@ jobs:
           fi
 
   # ============================================================================
+  # PLUGIN SHELL TESTS (bats) — blocking for yellow-core, advisory for others
+  # ============================================================================
+  plugin-shell-tests:
+    name: Plugin Shell Tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    timeout-minutes: 5
+    needs: [validate-schemas]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
+
+      - name: Install bats
+        run: sudo apt-get update -qq && sudo apt-get install -y bats
+
+      - name: Run yellow-core git-worktree bats suite (required)
+        run: bats plugins/yellow-core/skills/git-worktree/tests/
+
+      - name: Run other plugins' bats suites (advisory)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          STATUS=0
+          for d in plugins/*/tests; do
+            [ -d "$d" ] || continue
+            echo "::group::bats $d"
+            bats "$d" || STATUS=$?
+            echo "::endgroup::"
+          done
+          if [ $STATUS -ne 0 ]; then
+            echo "::warning::One or more advisory bats suites failed. Track as follow-up; not blocking this PR."
+          fi
+
+  # ============================================================================
   # AGGREGATE METRICS AND REPORT
   # ============================================================================
   report-metrics:
@@ -813,6 +850,7 @@ jobs:
         security-audit,
         build,
         changeset-check,
+        plugin-shell-tests,
       ]
 
     steps:
@@ -904,6 +942,7 @@ jobs:
         security-audit,
         build,
         changeset-check,
+        plugin-shell-tests,
       ]
 
     steps:
@@ -916,6 +955,7 @@ jobs:
              [ "${{ needs.integration-tests.result }}" == "success" ] && \
              [ "${{ needs.contract-drift.result }}" == "success" ] && \
              [ "${{ needs.security-audit.result }}" == "success" ] && \
+             [ "${{ needs.plugin-shell-tests.result }}" == "success" ] && \
              { [ "${{ needs.build.result }}" == "success" ] || [ "${{ needs.build.result }}" == "skipped" ]; } && \
              { [ "${{ needs.changeset-check.result }}" == "success" ] || [ "${{ needs.changeset-check.result }}" == "skipped" ]; }; then
             echo "::notice::✅ All CI validation checks passed"
@@ -929,6 +969,7 @@ jobs:
             echo "Integration Tests: ${{ needs.integration-tests.result }}"
             echo "Contract Drift: ${{ needs.contract-drift.result }}"
             echo "Security Audit: ${{ needs.security-audit.result }}"
+            echo "Plugin Shell Tests: ${{ needs.plugin-shell-tests.result }}"
             echo "Build (main only): ${{ needs.build.result }}"
             echo "Changeset Required: ${{ needs.changeset-check.result }}"
             exit 1

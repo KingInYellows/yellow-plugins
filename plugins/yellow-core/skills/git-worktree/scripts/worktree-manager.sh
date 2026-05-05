@@ -55,54 +55,164 @@ info() {
     printf '%s%s%s\n' "$BLUE" "$1" "$NC"
 }
 
-# Get repository root
+# Get repository root (worktree-relative — returns the worktree root when run
+# inside a worktree, not the main repo root). Use get_main_repo_root for the
+# main repo path.
 get_repo_root() {
     git rev-parse --show-toplevel 2>/dev/null || error "Not in a git repository"
 }
 
-# Ensure .worktrees directory exists
-ensure_worktree_dir() {
-    repo_root="$1"
-    worktree_path="${repo_root}/${WORKTREE_DIR}"
+# Get the MAIN repo root (not a worktree root, not the .git dir). Required for
+# operations that must point at the main repo from any worktree (e.g. the
+# .ruvector symlink target). Requires git >= 2.5 (--git-common-dir).
+#
+# git rev-parse --git-common-dir is asymmetric:
+#   - main repo root           : ".git"          (literal, relative)
+#   - main repo subdirectory   : "../../.git"    (relative)
+#   - linked worktree (any)    : "/abs/.git"     (absolute)
+#   - git < 2.5                : "--git-common-dir" (echoed back unchanged)
+get_main_repo_root() {
+    common=$(git rev-parse --git-common-dir 2>/dev/null) \
+        || error "git rev-parse --git-common-dir failed (not in a git repository?)"
 
-    if [ ! -d "$worktree_path" ]; then
-        mkdir -p "$worktree_path"
+    case "$common" in
+        --*)
+            error "git >= 2.5 required for --git-common-dir; got: ${common}"
+            ;;
+        .git)
+            printf '%s' "$PWD"
+            ;;
+        */.git)
+            # Absolute (worktree) or relative-with-slash (subdir) — strip /.git.
+            # Resolve via cd to handle the relative case uniformly.
+            stripped="${common%/.git}"
+            case "$stripped" in
+                /*) printf '%s' "$stripped" ;;
+                *)
+                    resolved=$(cd "$stripped" 2>/dev/null && pwd) \
+                        || error "could not resolve git common dir: ${common}"
+                    printf '%s' "$resolved"
+                    ;;
+            esac
+            ;;
+        *)
+            # Bare repo or unusual setup; resolve as-is via cd
+            resolved=$(cd "$common" 2>/dev/null && pwd) \
+                || error "could not resolve git common dir: ${common}"
+            printf '%s' "$resolved"
+            ;;
+    esac
+}
+
+# Ensure .worktrees directory exists.
+# POSIX sh has no `local`; use unique variable names to avoid clobbering
+# globals in callers (e.g. cmd_create's `worktree_path`).
+ensure_worktree_dir() {
+    _ewd_root="$1"
+    _ewd_dir="${_ewd_root}/${WORKTREE_DIR}"
+
+    if [ ! -d "$_ewd_dir" ]; then
+        mkdir -p "$_ewd_dir"
         info "Created ${WORKTREE_DIR}/ directory"
     fi
 }
 
-# Ensure .worktrees is in .gitignore
+# Ensure .worktrees is in .gitignore.
+# Same naming discipline as ensure_worktree_dir.
 ensure_gitignore() {
-    repo_root="$1"
-    gitignore="${repo_root}/.gitignore"
+    _eg_root="$1"
+    _eg_file="${_eg_root}/.gitignore"
 
-    if [ ! -f "$gitignore" ]; then
-        echo "${WORKTREE_DIR}/" > "$gitignore"
+    if [ ! -f "$_eg_file" ]; then
+        echo "${WORKTREE_DIR}/" > "$_eg_file"
         success "Created .gitignore with ${WORKTREE_DIR}/"
         return
     fi
 
-    if ! grep -qF "${WORKTREE_DIR}/" "$gitignore"; then
-        echo "${WORKTREE_DIR}/" >> "$gitignore"
+    if ! grep -qF "${WORKTREE_DIR}/" "$_eg_file"; then
+        echo "${WORKTREE_DIR}/" >> "$_eg_file"
         success "Added ${WORKTREE_DIR}/ to .gitignore"
     fi
 }
 
-# Copy .env files from main repo to worktree (skip symlinks)
+# Copy .env files from main repo to worktree (skip symlinks).
+# Same naming discipline as ensure_worktree_dir / link_ruvector_db: namespaced
+# prefixes so no caller's globals get clobbered (POSIX sh has no `local`).
 copy_env_files() {
-    repo_root="$1"
-    target_path="$2"
+    _cef_root="$1"
+    _cef_target="$2"
 
     # Find all .env* files in repo root, skip symlinks to prevent leaking external files
-    for env_file in "${repo_root}"/.env*; do
-        if [ -f "$env_file" ] && [ ! -L "$env_file" ]; then
-            filename=$(basename "$env_file")
-            cp -- "$env_file" "${target_path}/${filename}"
-            info "Copied ${filename}"
-        elif [ -L "$env_file" ]; then
-            warning "Skipping symlink: $(basename "$env_file")"
+    for _cef_file in "${_cef_root}"/.env*; do
+        if [ -f "$_cef_file" ] && [ ! -L "$_cef_file" ]; then
+            _cef_name=$(basename "$_cef_file")
+            cp -- "$_cef_file" "${_cef_target}/${_cef_name}"
+            info "Copied ${_cef_name}"
+        elif [ -L "$_cef_file" ]; then
+            warning "Skipping symlink: $(basename "$_cef_file")"
         fi
     done
+}
+
+# Link the main repo's .ruvector/ into a worktree so the ruvector MCP server
+# (RUVECTOR_STORAGE_PATH=${PWD}/.ruvector/) reaches the project DB instead of a
+# missing directory. Idempotent.
+#
+# Skips with info if a symlink already exists.
+# Skips with warning if a real .ruvector/ directory exists (preserves user's
+# intentional isolated DB if they bypassed worktree-manager.sh).
+# Skips with warning if main has no .ruvector/ yet (no dangling links).
+link_ruvector_db() {
+    _lrd_main="$1"
+    _lrd_wt="$2"
+    _lrd_link="${_lrd_wt}/.ruvector"
+    _lrd_target="${_lrd_main}/.ruvector"
+
+    if [ -L "$_lrd_link" ]; then
+        # [ -L ] is true for both live and dangling symlinks. [ -e ] follows
+        # the link; false → dangling. Repair by removing the stale link and
+        # falling through to recreate (so copy-env actually fixes things).
+        if [ ! -e "$_lrd_link" ]; then
+            warning "Removing dangling .ruvector symlink at ${_lrd_link} (target no longer exists)"
+            rm -- "$_lrd_link" || {
+                warning "Could not remove dangling symlink at ${_lrd_link}; leaving as-is"
+                return 0
+            }
+        else
+            info "ruvector DB symlink already present in worktree"
+            return 0
+        fi
+    fi
+    if [ -e "$_lrd_link" ] && [ ! -L "$_lrd_link" ]; then
+        warning "Worktree has a real .ruvector/ directory; skipping symlink (this worktree uses an isolated DB)"
+        return 0
+    fi
+    if [ ! -d "$_lrd_target" ]; then
+        warning "Main .ruvector/ not found at ${_lrd_target}; skipping symlink (initialize ruvector first, then run copy-env)"
+        return 0
+    fi
+
+    # Use warning (not error) on ln failure: the worktree was already created
+    # by git worktree add. Aborting here leaves an orphan worktree the user
+    # may not notice. Degraded state (worktree without symlink) is recoverable
+    # via `worktree-manager.sh copy-env <name>` — surface that path explicitly.
+    if ! ln -s -- "$_lrd_target" "$_lrd_link"; then
+        warning "Failed to create .ruvector symlink at ${_lrd_link}; worktree usable without ruvector. Retry: worktree-manager.sh copy-env <name>"
+        return 0
+    fi
+    info "Linked .ruvector -> ${_lrd_target}"
+}
+
+# Remove a worktree's .ruvector symlink before git-worktree-remove. Uses
+# `rm --` (no -r, no -f, no trailing slash) on a confirmed [ -L ] entry — the
+# only POSIX-safe way to delete a symlink without risking traversal into the
+# target. Failure does NOT abort the cleanup loop.
+cleanup_ruvector_link() {
+    _crl_link="$1/.ruvector"
+
+    if [ -L "$_crl_link" ]; then
+        rm -- "$_crl_link" || warning "Failed to remove .ruvector symlink at ${_crl_link}"
+    fi
 }
 
 # Create worktree
@@ -137,6 +247,10 @@ cmd_create() {
 
     # Copy .env files
     copy_env_files "$repo_root" "$worktree_path"
+
+    # Link main repo's .ruvector/ so MCP server and hooks reach the shared DB
+    main_root=$(get_main_repo_root)
+    link_ruvector_db "$main_root" "$worktree_path"
 
     success "Created worktree: ${WORKTREE_DIR}/${branch_name}"
     info "Switch to it: cd ${worktree_path}"
@@ -214,6 +328,11 @@ cmd_copy_env() {
     fi
 
     copy_env_files "$repo_root" "$worktree_path"
+
+    # Repair missing ruvector symlink for retroactive worktree fixups
+    main_root=$(get_main_repo_root)
+    link_ruvector_db "$main_root" "$worktree_path"
+
     success "Copied .env files to ${name}"
 }
 
@@ -245,6 +364,11 @@ cmd_cleanup() {
         if [ "$path" = "$repo_root" ]; then
             continue
         fi
+
+        # Remove .ruvector symlink first — defensive; git's remove_dir_recurse
+        # uses lstat+unlink so it would not follow the symlink, but explicit
+        # pre-removal keeps cleanup auditable and bypass-safe.
+        cleanup_ruvector_link "$path"
 
         # Remove worktree
         info "Removing: ${path}"
