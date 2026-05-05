@@ -890,7 +890,9 @@ forward-references by searching for step numbers in the document. A
 grep -in 'step [0-9]' plugins/<name>/agents/<file>.md
 ```
 
-(`-i` makes the match case-insensitive — portable to BSD grep on macOS, unlike GNU's `\|` BRE alternation extension which silently returns zero results on macOS.)
+(`-i` makes the match case-insensitive — portable to BSD grep on macOS,
+unlike GNU's `\|` BRE alternation extension which silently returns zero
+results on macOS.)
 Verify each cross-reference resolves to the correct step after renaming.
 
 ---

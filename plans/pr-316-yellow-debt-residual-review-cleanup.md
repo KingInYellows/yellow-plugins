@@ -52,7 +52,7 @@ The new docs/solutions entries from compound should land before PR1 so the code 
 ### Phase 0: Preconditions
 
 - [ ] 0.1 PR #316's P1 round (`90a00da`) lands on `main`. PR1 of this plan rebases onto that merge SHA.
-- [ ] 0.2 PR0 (compound docs) merges to `main`. The 3 untracked files on the merge-queue worktree (`docs/solutions/code-quality/multi-doc-schema-rename-drift.md`, `dual-read-migration-window-gitignored-artifacts.md`, the amended `claude-code-command-authoring-anti-patterns.md`) plus the MEMORY.md additions ship as one commit.
+- [ ] 0.2 PR0 (compound docs) merges to `main`. The 3 untracked files on the merge-queue worktree (`docs/solutions/code-quality/multi-doc-schema-rename-drift.md`, `dual-read-migration-window-gitignored-artifacts.md`, the amended `claude-code-command-authoring-anti-patterns.md`) ship as one commit, alongside this plan file. The MEMORY.md cluster heading is deferred to a follow-up (see PR0 Notes).
 - [ ] 0.3 Verify the failed pre-existing validation in `plugins/yellow-core/agents/workflow/session-historian.md` (refers to skill "mcp-integration-patterns" without `skills:` preload) is being addressed by another PR — out-of-scope for this plan.
 
 ### Phase 1: PR0 — Compound knowledge docs (separate commit on a new branch)
@@ -62,7 +62,8 @@ The new docs/solutions entries from compound should land before PR1 so the code 
   - NEW `docs/solutions/code-quality/multi-doc-schema-rename-drift.md` (already written, untracked)
   - NEW `docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md` (already written, untracked)
   - MODIFIED `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` (already amended)
-  - MODIFIED `MEMORY.md` (cluster heading + 3 pointer lines, already added)
+  - NEW `plans/pr-316-yellow-debt-residual-review-cleanup.md` (this plan file)
+  - DEFERRED: `MEMORY.md` cluster heading + 3 pointer lines — moved to a follow-up so PR0 stays scoped to `docs/solutions/` knowledge captures.
 - [ ] 1.3 Conventional-commit message: `docs(solutions): capture PR #316 review learnings — schema-rename drift, dual-read YAGNI, null-check ordering`
 - [ ] 1.4 No changeset (docs-only, marketplace plugins untouched).
 - [ ] 1.5 `gt submit --no-interactive`.
@@ -179,7 +180,8 @@ None. PR1 is purely documentation. PR2 is internal bash robustness. PR3 (if it l
 
 - [ ] Two new files exist at `docs/solutions/code-quality/{multi-doc-schema-rename-drift,dual-read-migration-window-gitignored-artifacts}.md` with `track: knowledge` frontmatter.
 - [ ] `claude-code-command-authoring-anti-patterns.md` has a new `## Update — 2026-05-01` section covering null-check ordering.
-- [ ] `MEMORY.md` has a new cluster heading "Schema Migration & Cross-Doc Consistency Patterns (from PR #316)" with 3 pointer lines, each ≤150 chars.
+- [ ] `plans/pr-316-yellow-debt-residual-review-cleanup.md` (this plan) ships in the same commit so reviewers can see the stack context.
+- DEFERRED to a follow-up commit: `MEMORY.md` cluster heading "Schema Migration & Cross-Doc Consistency Patterns (from PR #316)" with 3 pointer lines, each ≤150 chars. Tracked separately so PR0 stays scoped to `docs/solutions/` captures.
 
 ### PR1 (cross-doc cleanup)
 
@@ -205,7 +207,7 @@ None. PR1 is purely documentation. PR2 is internal bash robustness. PR3 (if it l
 
 ## Edge Cases & Error Handling
 
-- **PR0 conflicts with concurrent merges to MEMORY.md:** MEMORY.md is high-traffic. Rebase and re-resolve if conflicts; the new cluster heading is independent of other clusters so conflicts should be trivial.
+- **MEMORY.md conflicts (deferred follow-up):** when the deferred MEMORY.md cluster heading is added in a follow-up commit, MEMORY.md is high-traffic — rebase and re-resolve if conflicts; the new cluster heading is independent of other clusters so conflicts should be trivial.
 - **PR1 task 2.16 (group_id fan-out)** introduces a new field on the in-memory record. Verify it doesn't collide with any v2.0 reserved field name. Add to SKILL.md schema example.
 - **PR2 task 3.2 consolidated jq @sh:** verify the variant of yq/jq installed on CI runners and dev machines. Per MEMORY.md, the `kislyuk/yq` vs `mikefarah/yq` variant check applies to yq; for jq the tool is uniform but `@sh` filter requires jq 1.6+. Run `jq --version` on the CI runner.
 - **PR2 task 3.3 portable sha256:** `command -v sha256sum` must be evaluated in a subshell that doesn't pollute the outer shell. The pipeline form `(command -v ... && sha256sum || shasum -a 256)` works in bash and zsh. Verify on macOS with no GNU coreutils installed.
@@ -222,7 +224,7 @@ None. PR1 is purely documentation. PR2 is internal bash robustness. PR3 (if it l
   - `docs/solutions/code-quality/multi-doc-schema-rename-drift.md`
   - `docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md`
   - `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` (Update — 2026-05-01)
-- **Project memory:** `MEMORY.md` cluster "Schema Migration & Cross-Doc Consistency Patterns (from PR #316)"
+- **Project memory (deferred):** `MEMORY.md` cluster "Schema Migration & Cross-Doc Consistency Patterns (from PR #316)" — to be added in a follow-up commit, not in PR0.
 - **Similar precedent:** PR #275 `chore: strip Bash from 13 reviewer agents` (same scope: prose changes across multiple agents/skills, no runtime behavior change)
 
 ## Stack Decomposition
@@ -236,10 +238,10 @@ The work is structured as **3 PRs** (PR0 prerequisite + PR1 + PR2) with PR3 as a
 
 - **Type:** docs
 - **Description:** Land the 3 compound knowledge docs + MEMORY.md cluster from this session's compound work.
-- **Scope:** docs/solutions/code-quality/multi-doc-schema-rename-drift.md (NEW), docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md (NEW), docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md (MODIFIED), MEMORY.md (MODIFIED)
+- **Scope:** docs/solutions/code-quality/multi-doc-schema-rename-drift.md (NEW), docs/solutions/code-quality/dual-read-migration-window-gitignored-artifacts.md (NEW), docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md (MODIFIED), plans/pr-316-yellow-debt-residual-review-cleanup.md (NEW, this plan).
 - **Tasks:** 1.1–1.5
 - **Depends on:** (none)
-- **Notes:** No changeset (docs-only).
+- **Notes:** No changeset (docs-only). MEMORY.md cluster heading is deferred to a follow-up commit so PR0 stays scoped to `docs/solutions/` knowledge captures.
 
 ### 2. chore/pr-316-cross-doc-cleanup (PR1)
 
@@ -272,7 +274,7 @@ The work is structured as **3 PRs** (PR0 prerequisite + PR1 + PR2) with PR3 as a
 
 <!-- Updated by workflows:work. Do not edit manually. -->
 
-- [x] 1. docs/pr-316-review-learnings (PR0) — completed 2026-05-01 via PR #318 (`268a12a` on `agent/docs/pr-316-review-learnings`)
-- [x] 2. chore/pr-316-cross-doc-cleanup (PR1) — completed 2026-05-01 via PR #319 (`29db942` on `agent/chore/pr-316-cross-doc-cleanup`); 16 of 17 tasks done (skipped 2.15 — false-premise finding)
-- [x] 3. fix/pr-316-bash-hardening (PR2) — completed 2026-05-01 via PR #320 (`b40371e` on `agent/fix/pr-316-bash-hardening`)
+- [ ] 1. docs/pr-316-review-learnings (PR0) — open as PR #318 on `agent/docs/pr-316-review-learnings`; mark complete and record the merge SHA when it lands on `main`.
+- [ ] 2. chore/pr-316-cross-doc-cleanup (PR1) — open as PR #319 on `agent/chore/pr-316-cross-doc-cleanup`; depends on PR0 merging first. 16 of 17 tasks drafted (skipped 2.15 — false-premise finding). Mark complete and record the merge SHA when it lands.
+- [ ] 3. fix/pr-316-bash-hardening (PR2) — open as PR #320 on `agent/fix/pr-316-bash-hardening`; depends on PR1. Mark complete and record the merge SHA when it lands.
 - [ ] 4. (gated) refactor/pr-316-dual-read-removal (PR3) — deferred; requires `/workflows:brainstorm` per plan Phase 4
