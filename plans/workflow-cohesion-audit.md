@@ -1,6 +1,6 @@
 # Workflow Cohesion Audit: Implementation Plan
 
-> **Status: Implemented (PR #108, merged)** — Mechanical fixes shipped (`73a416c0`).
+> **Status: Implemented (PR #108, merged)** — Mechanical fixes shipped.
 
 ## Problem Statement
 

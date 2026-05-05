@@ -511,6 +511,7 @@ Three-layer config system:
     ```
 
     Resolution: local → global → merge by runner name → routing_rules replace wholesale.
+
     ```
 
 - [x] 5.2: Update `plugins/yellow-ci/skills/ci-conventions/SKILL.md`

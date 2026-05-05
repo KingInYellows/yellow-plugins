@@ -1,6 +1,6 @@
 # Feature: Unified Release Workflow
 
-> **Status: Implemented (PR #160, merged)** — Single-workflow release pipeline shipped (`8edd8def`).
+> **Status: Implemented (PR #160, merged)** — Single-workflow release pipeline shipped.
 
 ## Problem Statement
 

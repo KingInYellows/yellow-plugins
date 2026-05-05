@@ -1,6 +1,6 @@
 # Feature: Setup Binary Auto-Installation
 
-> **Status: Implemented (PR #152, merged)** — Auto-install for semgrep CLI and ast-grep binary shipped (`1c183f35`).
+> **Status: Implemented (PR #152, merged)** — Auto-install for semgrep CLI and ast-grep binary shipped.
 
 ## Problem Statement
 
