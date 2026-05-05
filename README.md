@@ -1,8 +1,8 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 14 plugins for Git workflows, code
-review, CI, research, testing, documentation, code editing, and security
-remediation.
+Personal Claude Code plugin marketplace — 17 plugins for Git workflows, code
+review, CI, research, testing, documentation, code editing, security
+remediation, and cross-lineage code council.
 
 ## Requirements
 
@@ -26,7 +26,10 @@ Add the marketplace, then install individual plugins:
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
 | `yellow-chatprd`      | ChatPRD MCP integration with document management and Linear bridging                                        | 4 agents, 6 commands, 1 skill, 1 MCP           |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 8 commands, 2 skills, 1 hook         |
+| `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                  | 3 agents, 4 commands, 1 skill                  |
+| `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                          | 2 commands, 1 skill, 1 MCP                     |
 | `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 8 commands, 7 skills               |
+| `yellow-council`      | On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel             | 2 agents, 1 command, 1 skill                   |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 3 agents, 5 commands, 1 skill                  |
@@ -39,12 +42,13 @@ Add the marketplace, then install individual plugins:
 
 ## MCP Servers & Authentication
 
-Eight plugins connect to MCP servers. Authentication requirements vary by server.
+Nine plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                |
 | ----------------- | ---------- | ------------------------------------------------------------------- |
 | `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                |
 | `yellow-chatprd`  | ChatPRD    | OAuth (browser popup on first use)                                  |
+| `yellow-composio` | Composio   | User-configured — `X-API-Key` header via `claude mcp add --transport http` |
 | `yellow-devin`    | DeepWiki   | Free for public repos; `DEVIN_SERVICE_USER_TOKEN` for private repos |
 | `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                |
 | `yellow-linear`   | Linear     | OAuth (browser popup on first use)                                  |
