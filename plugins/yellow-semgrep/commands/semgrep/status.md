@@ -6,6 +6,7 @@ allowed-tools:
   - Bash
   - Skill
   - AskUserQuestion
+model: haiku
 ---
 
 # Semgrep Findings Dashboard

@@ -530,8 +530,13 @@ in sync with Step 6 sub-step 0 below — adding a Wave-2 conditional
 reviewer that emits prose without listing it in both places means its
 findings are dropped as malformed.
 
-Wait for all dispatched agents. Log any failed agents with error reason.
-If zero agents succeed, abort with error.
+After all dispatched Tasks return, log any agent that returned a failure
+status or no result file with `agent name + failure reason` and surface
+those entries in the user-visible summary alongside successful findings —
+matching the "Failed agents (if any)" bullet in `/workflows:work` Phase 3
+so reviewers can see which concerns were NOT evaluated. Partial failures
+do not block Step 6; only the total-failure case (every dispatched Task
+failed) aborts with error before Step 6.
 
 ### Step 6: Aggregate findings (confidence-rubric pipeline)
 

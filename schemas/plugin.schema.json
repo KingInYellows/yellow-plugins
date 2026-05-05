@@ -180,32 +180,32 @@
       "description": "Searchable keywords in kebab-case."
     },
     "mcpServers": {
-      "$ref": "#/definitions/fileFilesOrInline",
-      "description": "MCP server configurations: relative file path, array of paths/inline objects, or inline object keyed by server name."
+      "description": "MCP server configurations: relative file path, array of paths/inline objects, or inline object keyed by server name.",
+      "allOf": [{ "$ref": "#/definitions/fileFilesOrInline" }]
     },
     "hooks": {
-      "$ref": "#/definitions/fileFilesOrInline",
-      "description": "Hooks configuration: relative file path, array of paths/inline objects, or inline object keyed by event name (PreToolUse, PostToolUse, Stop, etc.)."
+      "description": "Hooks configuration: relative file path, array of paths/inline objects, or inline object keyed by event name (PreToolUse, PostToolUse, Stop, etc.).",
+      "allOf": [{ "$ref": "#/definitions/fileFilesOrInline" }]
     },
     "outputStyles": {
-      "$ref": "#/definitions/dirOrDirs",
-      "description": "Directory or array of directories containing markdown output style files (replaces default ./output-styles/)."
+      "description": "Directory or array of directories containing markdown output style files (replaces default ./output-styles/).",
+      "allOf": [{ "$ref": "#/definitions/dirOrDirs" }]
     },
     "commands": {
-      "$ref": "#/definitions/dirOrDirs",
-      "description": "Directory or array of directories containing slash command markdown files (replaces default ./commands/)."
+      "description": "Directory or array of directories containing slash command markdown files (replaces default ./commands/).",
+      "allOf": [{ "$ref": "#/definitions/dirOrDirs" }]
     },
     "agents": {
-      "$ref": "#/definitions/dirOrDirs",
-      "description": "Directory or array of directories containing agent markdown files (replaces default ./agents/)."
+      "description": "Directory or array of directories containing agent markdown files (replaces default ./agents/).",
+      "allOf": [{ "$ref": "#/definitions/dirOrDirs" }]
     },
     "skills": {
-      "$ref": "#/definitions/dirOrDirs",
-      "description": "Directory or array of directories containing per-skill SKILL.md subdirectories (replaces default ./skills/)."
+      "description": "Directory or array of directories containing per-skill SKILL.md subdirectories (replaces default ./skills/).",
+      "allOf": [{ "$ref": "#/definitions/dirOrDirs" }]
     },
     "lspServers": {
-      "$ref": "#/definitions/fileFilesOrInline",
-      "description": "LSP server configurations: relative file path, array of paths/inline objects, or inline object keyed by language/server name."
+      "description": "LSP server configurations: relative file path, array of paths/inline objects, or inline object keyed by language/server name.",
+      "allOf": [{ "$ref": "#/definitions/fileFilesOrInline" }]
     },
     "monitors": {
       "oneOf": [
