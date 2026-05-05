@@ -342,11 +342,15 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 5c: Path existence for commands, agents, skills, mcpServers,
-  // lspServers, monitors, and hooks. These fields accept pathOrPaths
-  // (commands/agents/skills) or pathPathsOrInline (mcpServers/lspServers/
-  // monitors/hooks). Validate only the string-path forms; inline objects
-  // are structurally accepted by JSON Schema and need no filesystem check
-  // here.
+  // lspServers, monitors, and hooks. The schema narrows these into two
+  // type-distinct shapes:
+  //   - dirOrDirs        (commands/agents/skills/outputStyles)   → directory paths
+  //   - fileFilesOrInline (mcpServers/hooks/lspServers/monitors) → file paths
+  //                                                                or inline objects
+  // The validator therefore only enforces filesystem existence: directory
+  // checks via validatePathOrPathsDir, file checks via validatePathFile.
+  // Inline objects are structurally accepted by JSON Schema and need no
+  // filesystem check here.
   for (const field of ['commands', 'agents', 'skills']) {
     if (manifest[field] !== undefined && typeof manifest[field] !== 'object') {
       // non-object = string or array of strings → validate as directory paths

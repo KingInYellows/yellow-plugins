@@ -26,29 +26,36 @@
       },
       "additionalProperties": false
     },
-    "relativePath": {
+    "relativeDir": {
       "type": "string",
-      "description": "Plugin-relative path. The leading './' is optional — both './foo' and 'foo' are accepted to match the runtime validator (which uses path.resolve and accepts both forms).",
-      "pattern": "^(?:\\./)?(?!.*\\.\\.)[A-Za-z0-9._/-]+/?$"
+      "description": "Plugin-relative directory path. The leading './' is optional and the trailing '/' is optional. Path segments must not contain '.' (so file paths like './foo.md' are rejected — use relativeFile for those). Examples: './agents', './agents/', 'output-styles'.",
+      "pattern": "^(?:\\./)?(?!.*\\.\\.)(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+/?$"
     },
-    "pathOrPaths": {
+    "relativeFile": {
+      "type": "string",
+      "description": "Plugin-relative file path. The leading './' is optional. Must end in an extension '.<ext>'. Examples: './hooks/hooks.json', './.lsp.json'.",
+      "pattern": "^(?:\\./)?(?!.*\\.\\.)(?:[A-Za-z0-9_-]+/)*\\.?[A-Za-z0-9_-]+\\.[A-Za-z0-9]+$"
+    },
+    "dirOrDirs": {
+      "description": "A single directory path or array of directory paths.",
       "oneOf": [
-        { "$ref": "#/definitions/relativePath" },
+        { "$ref": "#/definitions/relativeDir" },
         {
           "type": "array",
-          "items": { "$ref": "#/definitions/relativePath" },
+          "items": { "$ref": "#/definitions/relativeDir" },
           "minItems": 1
         }
       ]
     },
-    "pathPathsOrInline": {
+    "fileFilesOrInline": {
+      "description": "A single file path, an array mixing file paths and inline-object entries, or a single inline object.",
       "oneOf": [
-        { "$ref": "#/definitions/relativePath" },
+        { "$ref": "#/definitions/relativeFile" },
         {
           "type": "array",
           "items": {
             "oneOf": [
-              { "$ref": "#/definitions/relativePath" },
+              { "$ref": "#/definitions/relativeFile" },
               { "type": "object", "minProperties": 1 }
             ]
           },
@@ -153,36 +160,36 @@
       "description": "Searchable keywords in kebab-case."
     },
     "mcpServers": {
-      "$ref": "#/definitions/pathPathsOrInline",
-      "description": "MCP server configurations: relative path string, array of paths/inline objects, or inline object keyed by server name."
+      "$ref": "#/definitions/fileFilesOrInline",
+      "description": "MCP server configurations: relative file path, array of paths/inline objects, or inline object keyed by server name."
     },
     "hooks": {
-      "$ref": "#/definitions/pathPathsOrInline",
-      "description": "Hooks configuration: relative path string, array of paths/inline objects, or inline object keyed by event name (PreToolUse, PostToolUse, Stop, etc.)."
+      "$ref": "#/definitions/fileFilesOrInline",
+      "description": "Hooks configuration: relative file path, array of paths/inline objects, or inline object keyed by event name (PreToolUse, PostToolUse, Stop, etc.)."
     },
     "outputStyles": {
-      "$ref": "#/definitions/pathOrPaths",
-      "description": "Path or array of paths to markdown output style files/directories (replaces default ./output-styles/)."
+      "$ref": "#/definitions/dirOrDirs",
+      "description": "Directory or array of directories containing markdown output style files (replaces default ./output-styles/)."
     },
     "commands": {
-      "$ref": "#/definitions/pathOrPaths",
-      "description": "Path or array of paths to slash command markdown files/directories (replaces default ./commands/)."
+      "$ref": "#/definitions/dirOrDirs",
+      "description": "Directory or array of directories containing slash command markdown files (replaces default ./commands/)."
     },
     "agents": {
-      "$ref": "#/definitions/pathOrPaths",
-      "description": "Path or array of paths to agent markdown files/directories (replaces default ./agents/)."
+      "$ref": "#/definitions/dirOrDirs",
+      "description": "Directory or array of directories containing agent markdown files (replaces default ./agents/)."
     },
     "skills": {
-      "$ref": "#/definitions/pathOrPaths",
-      "description": "Path or array of paths to skill directories containing SKILL.md (replaces default ./skills/)."
+      "$ref": "#/definitions/dirOrDirs",
+      "description": "Directory or array of directories containing per-skill SKILL.md subdirectories (replaces default ./skills/)."
     },
     "lspServers": {
-      "$ref": "#/definitions/pathPathsOrInline",
-      "description": "LSP server configurations: relative path string, array of paths/inline objects, or inline object keyed by language/server name."
+      "$ref": "#/definitions/fileFilesOrInline",
+      "description": "LSP server configurations: relative file path, array of paths/inline objects, or inline object keyed by language/server name."
     },
     "monitors": {
       "oneOf": [
-        { "$ref": "#/definitions/relativePath" },
+        { "$ref": "#/definitions/relativeFile" },
         {
           "type": "array",
           "items": {
