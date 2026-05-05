@@ -5,11 +5,24 @@ AppSec Platform, apply fixes (deterministic autofix first, LLM fallback),
 verify via re-scan, and update triage state. Targets **SAST findings** via a
 hybrid MCP + REST API architecture.
 
-## Required Environment Variables
+## Required Credentials
 
-- **`SEMGREP_APP_TOKEN`** — Semgrep API token (`sgp_` prefix). Must have
-  **Web API** scope (not CI scope). Create at: Organization Settings > API
-  Tokens.
+- **`semgrep_app_token`** (userConfig — **primary**, used by the MCP
+  server) and **`SEMGREP_APP_TOKEN`** (shell env — used by the curl-based
+  REST calls in `/semgrep:*` commands). Both hold the same token
+  (`sgp_` prefix, **Web API** scope, create at Semgrep Organization
+  Settings > API Tokens).
+
+  Claude Code prompts for `semgrep_app_token` at plugin-enable time and
+  stores it in the system keychain (or `~/.claude/.credentials.json` at
+  0600 perms on minimal Linux). The userConfig value is substituted into
+  the MCP server's environment via `${user_config.semgrep_app_token}` in
+  `plugin.json` — so the MCP starts correctly in the same session,
+  without a Claude Code restart.
+
+  Commands that run curl directly (`/semgrep:status`, `/semgrep:fix`,
+  etc.) still read the shell `SEMGREP_APP_TOKEN`. Keep both sources in
+  sync (or use `/semgrep:setup` to help).
 
 ## Required CLI Tools
 

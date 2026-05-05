@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.2.0] - 2026-04-17
+
+### Minor Changes
+
+- **Adopt `userConfig` for credential entry.** `DEVIN_SERVICE_USER_TOKEN`
+  (sensitive) and `DEVIN_ORG_ID` (non-sensitive — IDs are not secrets)
+  are now declared as `userConfig` fields in `plugin.json`. Claude Code
+  prompts for them at plugin-enable time and stores the token in the
+  system keychain (or `~/.claude/.credentials.json` at 0600 perms on
+  Linux). Commands still read the shell env vars for curl invocations,
+  so existing shell-env setups continue to work unchanged — userConfig
+  is an additive UX improvement, not a breaking change. `/setup:all`
+  now classifies the plugin READY when either source is present.
+- `/devin:setup` now emits a dual-source drift WARNING when userConfig
+  is configured but the corresponding shell env var is empty, noting
+  that `/devin:*` curl-based commands will return 401 until the shell
+  export is also added.
+
+### Migration (existing users)
+
+- No action required for existing shell-env setups — they continue
+  working unchanged. `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`
+  shell exports are still read by all `/devin:*` commands.
+- Recommended for new installs: answer the userConfig prompt at plugin
+  enable so the token is keychain-backed and no shell export is
+  required. If you want the commands to work without also exporting
+  the shell env var, a thin wrapper / CLI bridge would be needed — see
+  yellow-morph's `bin/start-morph.sh` for a reference pattern. In this
+  release the two sources remain independent for backward compat.
+
 ## 2.1.1
 
 ### Patch Changes
