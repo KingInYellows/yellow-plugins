@@ -341,11 +341,11 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 5c: Path existence for commands, agents, skills, and lspServers.
-  // These fields accept pathOrPaths (commands/agents/skills) or
-  // pathPathsOrInline (lspServers). Validate only the string-path forms;
-  // inline objects are structurally accepted by JSON Schema and need no
-  // filesystem check here.
+  // RULE 5c: Path existence for commands, agents, skills, mcpServers,
+  // lspServers, and monitors. These fields accept pathOrPaths
+  // (commands/agents/skills) or pathPathsOrInline (mcpServers/lspServers/
+  // monitors). Validate only the string-path forms; inline objects are
+  // structurally accepted by JSON Schema and need no filesystem check here.
   for (const field of ['commands', 'agents', 'skills']) {
     if (manifest[field] !== undefined && typeof manifest[field] !== 'object') {
       // non-object = string or array of strings → validate as directory paths
@@ -356,6 +356,16 @@ function validatePlugin(pluginDir) {
       if (stringPaths.length > 0) {
         validatePathOrPathsDir(field, stringPaths, pluginDir, errors);
       }
+    }
+  }
+  // mcpServers uses pathPathsOrInline — string/array entries point to JSON
+  // config files, not directories. Inline-object form (keyed by server name)
+  // is structurally validated by JSON Schema and needs no filesystem check.
+  if (manifest.mcpServers !== undefined && typeof manifest.mcpServers === 'string') {
+    validatePathFile('mcpServers', manifest.mcpServers, pluginDir, errors);
+  } else if (Array.isArray(manifest.mcpServers)) {
+    for (const p of manifest.mcpServers.filter((v) => typeof v === 'string')) {
+      validatePathFile('mcpServers', p, pluginDir, errors);
     }
   }
   // lspServers uses pathPathsOrInline — paths point to JSON config files, not
