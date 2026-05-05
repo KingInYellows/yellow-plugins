@@ -286,7 +286,7 @@ describe('validate-plugin baseline (regression net)', () => {
     });
     const { status, stdout } = runValidator(pluginDir);
     expect(status).toBe(0);
-    expect(stdout).toMatch(/Output styles.*2 files/);
+    expect(stdout).toMatch(/outputStyles:.*2 files/);
   });
 
   it('errors when outputStyles directory is missing', () => {
@@ -324,7 +324,7 @@ describe('validate-plugin PR-A new behaviors', () => {
     rmSync(tmpRoot, { recursive: true, force: true });
   });
 
-  it('errors when array-form hooks reference a missing script (PR-A: RULE 6 array-element check)', () => {
+  it('errors when array-form hooks reference a missing script (PR-A: RULE 5c path-existence on array-string entries)', () => {
     writePluginManifest(pluginDir, {
       ...VALID_BASE_MANIFEST,
       hooks: ['./hooks/scripts/missing-array-script.sh'],

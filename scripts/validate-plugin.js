@@ -29,6 +29,38 @@ const path = require('path');
 
 const PROJECT_ROOT = process.cwd();
 
+// Canonical Claude Code hook events. Module-scope so VALID_HOOK_EVENTS.has()
+// is O(1) and the membership test is shared across rules instead of
+// re-allocated per validatePlugin call.
+const VALID_HOOK_EVENTS = new Set([
+  'PreToolUse',
+  'PostToolUse',
+  'PostToolUseFailure',
+  'PermissionRequest',
+  'UserPromptSubmit',
+  'Notification',
+  'Stop',
+  'SubagentStart',
+  'SubagentStop',
+  'SessionStart',
+  'SessionEnd',
+  'TeammateIdle',
+  'TaskCompleted',
+  'PreCompact',
+]);
+
+// Hook events whose scripts must emit a decision payload (JSON or exit-code
+// protocol). SessionStart is included because Claude Code blocks session
+// startup if a SessionStart hook exits without {"continue": true}; absence
+// of decision output is a soft warning here so authors notice before the
+// session-block manifests in production.
+const DECISION_PROTOCOL_EVENTS = new Set([
+  'PreToolUse',
+  'PostToolUse',
+  'Stop',
+  'SessionStart',
+]);
+
 /**
  * Resolve a hook command to a script path within the plugin directory.
  * Returns the resolved path, or null if the command is not a "bash <path>"
@@ -97,13 +129,11 @@ function countMarkdownRecursive(dir) {
 function validatePathFile(fieldName, filePath, pluginDir, errors) {
   const resolved = resolvePluginPath(filePath, pluginDir);
   if (!resolved) {
-    errors.push(`${fieldName} path escapes plugin directory: ${filePath}`);
-    logError(`${fieldName} path escapes plugin directory: ${filePath}`);
+    addError(errors, `${fieldName} path escapes plugin directory: ${filePath}`);
     return;
   }
   if (!fs.existsSync(resolved)) {
-    errors.push(`${fieldName} file not found: ${filePath}`);
-    logError(`${fieldName} file not found: ${filePath}`);
+    addError(errors, `${fieldName} file not found: ${filePath}`);
     return;
   }
   // Use lstatSync (not statSync) so symlinks are detected before they are
@@ -112,13 +142,17 @@ function validatePathFile(fieldName, filePath, pluginDir, errors) {
   // boundary check. Reject symlinks outright.
   const stat = fs.lstatSync(resolved);
   if (stat.isSymbolicLink()) {
-    errors.push(`${fieldName} path is a symlink which is not permitted: ${filePath}`);
-    logError(`${fieldName} path is a symlink which is not permitted: ${filePath}`);
+    addError(
+      errors,
+      `${fieldName} path is a symlink which is not permitted: ${filePath}`
+    );
     return;
   }
   if (stat.isDirectory()) {
-    errors.push(`${fieldName} must point to a file, not a directory: ${filePath}`);
-    logError(`${fieldName} must point to a file, not a directory: ${filePath}`);
+    addError(
+      errors,
+      `${fieldName} must point to a file, not a directory: ${filePath}`
+    );
     return;
   }
   logSuccess(`${fieldName}: ${filePath}`);
@@ -126,37 +160,46 @@ function validatePathFile(fieldName, filePath, pluginDir, errors) {
 
 /**
  * Validate a pathOrPaths field that must point to a directory containing .md files.
- * @param {string} fieldName  - Field name for error messages (e.g. 'commands')
- * @param {*}      fieldValue - Raw manifest value (string | string[] | other)
- * @param {string} pluginDir  - Absolute plugin root directory
- * @param {string[]} errors   - Error array to push into
+ * When `directoryOnly` is true, single-file `.md` paths are rejected — used
+ * for outputStyles where the field shape semantically requires a directory
+ * even though Anthropic's relativePath schema allows single .md files.
+ * @param {string}  fieldName     - Field name for error messages (e.g. 'commands')
+ * @param {*}       fieldValue    - Raw manifest value (string | string[] | other)
+ * @param {string}  pluginDir     - Absolute plugin root directory
+ * @param {string[]} errors       - Error array to push into
+ * @param {boolean} directoryOnly - When true, .md file paths produce an error
  */
-function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
+function validatePathOrPathsDir(
+  fieldName,
+  fieldValue,
+  pluginDir,
+  errors,
+  directoryOnly = false
+) {
   const paths = Array.isArray(fieldValue)
     ? fieldValue
     : typeof fieldValue === 'string'
       ? [fieldValue]
       : null;
   if (paths === null) {
-    errors.push(`${fieldName} must be a string path or array of string paths`);
-    logError(`${fieldName} must be a string path or array of string paths`);
+    addError(
+      errors,
+      `${fieldName} must be a string path or array of string paths`
+    );
     return;
   }
   for (const p of paths) {
     if (typeof p !== 'string') {
-      errors.push(`${fieldName} entries must be string paths`);
-      logError(`${fieldName} entries must be string paths`);
+      addError(errors, `${fieldName} entries must be string paths`);
       continue;
     }
     const resolved = resolvePluginPath(p, pluginDir);
     if (!resolved) {
-      errors.push(`${fieldName} path escapes plugin directory: ${p}`);
-      logError(`${fieldName} path escapes plugin directory: ${p}`);
+      addError(errors, `${fieldName} path escapes plugin directory: ${p}`);
       continue;
     }
     if (!fs.existsSync(resolved)) {
-      errors.push(`${fieldName} directory not found: ${p}`);
-      logError(`${fieldName} directory not found: ${p}`);
+      addError(errors, `${fieldName} directory not found: ${p}`);
       continue;
     }
     // lstatSync (not statSync): detect symlinks before following them. A
@@ -165,23 +208,33 @@ function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
     // paths past the resolvePluginPath boundary. Reject symlinks outright.
     const stat = fs.lstatSync(resolved);
     if (stat.isSymbolicLink()) {
-      errors.push(`${fieldName} path is a symlink which is not permitted: ${p}`);
-      logError(`${fieldName} path is a symlink which is not permitted: ${p}`);
+      addError(
+        errors,
+        `${fieldName} path is a symlink which is not permitted: ${p}`
+      );
       continue;
     }
     if (stat.isFile()) {
+      if (directoryOnly) {
+        addError(
+          errors,
+          `${fieldName} must point to a directory, not a file: ${p}`
+        );
+        continue;
+      }
       // Schema's relativePath allows pointing directly at a .md file.
       if (!p.endsWith('.md')) {
-        errors.push(`${fieldName} file path must end with .md: ${p}`);
-        logError(`${fieldName} file path must end with .md: ${p}`);
+        addError(errors, `${fieldName} file path must end with .md: ${p}`);
       } else {
         logSuccess(`${fieldName}: ${p}`);
       }
       continue;
     }
     if (!stat.isDirectory()) {
-      errors.push(`${fieldName} must point to a .md file or a directory: ${p}`);
-      logError(`${fieldName} must point to a .md file or a directory: ${p}`);
+      addError(
+        errors,
+        `${fieldName} must point to a .md file or a directory: ${p}`
+      );
       continue;
     }
     // Walk the directory recursively to find any .md files. The 'skills'
@@ -193,10 +246,8 @@ function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
     // the top-level lstatSync guard above.
     const mdCount = countMarkdownRecursive(resolved);
     if (mdCount === 0) {
-      errors.push(
-        `${fieldName} directory must contain at least one .md file (recursively): ${p}`
-      );
-      logError(
+      addError(
+        errors,
         `${fieldName} directory must contain at least one .md file (recursively): ${p}`
       );
     } else {
@@ -267,6 +318,89 @@ function logSuccess(message) {
 }
 
 /**
+ * Append a validation error and emit it to stderr atomically. Centralizes
+ * the prior errors.push + logError pair so the structured error returned to
+ * callers and the developer-facing log line never drift apart.
+ */
+function addError(errors, message) {
+  errors.push(message);
+  logError(message);
+}
+
+/**
+ * Apply RULE 6 (existence / readability / executable mode) and RULE 8
+ * (shebang / decision-output / set -e) to a single hook script path.
+ * Centralizes per-script-path checks so RULE 6 and RULE 8 cannot drift —
+ * previously the inline-object branch ran two separate loops over the same
+ * scripts. eventName is required for the DECISION_PROTOCOL_EVENTS gate.
+ */
+function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
+  if (!fs.existsSync(scriptPath)) {
+    addError(
+      errors,
+      `Hook script not found for ${eventName}: ${scriptPath}`
+    );
+    return;
+  }
+  try {
+    fs.accessSync(scriptPath, fs.constants.R_OK);
+  } catch (accessErr) {
+    logWarning(
+      `Hook script not readable: ${scriptPath} (check file permissions)`
+    );
+  }
+  try {
+    const mode = fs.statSync(scriptPath).mode;
+    if ((mode & 0o111) === 0) {
+      logWarning(
+        `Hook script not executable: ${scriptPath} (check file permissions)`
+      );
+    }
+  } catch (statErr) {
+    logWarning(
+      `Cannot inspect hook script mode: ${scriptPath} (${statErr.message})`
+    );
+  }
+
+  let content;
+  try {
+    content = fs.readFileSync(scriptPath, 'utf-8');
+  } catch (readErr) {
+    logWarning(
+      `Cannot read hook script: ${scriptPath} (${readErr.message})`
+    );
+    return;
+  }
+
+  const relPath = path.relative(pluginDir, scriptPath);
+
+  if (!content.startsWith('#!/')) {
+    logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
+  }
+
+  if (DECISION_PROTOCOL_EVENTS.has(eventName)) {
+    const hasJsonOutput =
+      /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
+    const hasExitCodeProtocol =
+      /exit\s+0/.test(content) && /exit\s+2/.test(content);
+    if (!hasJsonOutput && !hasExitCodeProtocol) {
+      logWarning(
+        `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`
+      );
+    }
+  }
+
+  if (
+    /^\s*set\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(content)
+  ) {
+    logWarning(
+      `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
+        'use "set -uo pipefail" instead'
+    );
+  }
+}
+
+/**
  * Validate a single plugin directory
  */
 function validatePlugin(pluginDir) {
@@ -303,39 +437,35 @@ function validatePlugin(pluginDir) {
 
   // RULE 1: Required fields (official format: name, description, author)
   if (!manifest.name || typeof manifest.name !== 'string') {
-    errors.push('Missing required field: "name"');
-    logError('Missing required field: "name"');
+    addError(errors, 'Missing required field: "name"');
   }
 
   if (!manifest.description || typeof manifest.description !== 'string') {
-    errors.push('Missing required field: "description"');
-    logError('Missing required field: "description"');
+    addError(errors, 'Missing required field: "description"');
   }
 
   if (!manifest.author) {
-    errors.push('Missing required field: "author"');
-    logError('Missing required field: "author"');
+    addError(errors, 'Missing required field: "author"');
   } else if (typeof manifest.author === 'object' && !manifest.author.name) {
-    errors.push('author.name is required');
-    logError('author.name is required');
+    addError(errors, 'author.name is required');
   }
 
   // RULE 2: Name matches directory
   if (manifest.name && manifest.name !== dirName) {
-    errors.push(
-      `Plugin name "${manifest.name}" does not match directory name "${dirName}"`
-    );
-    logError(
+    addError(
+      errors,
       `Plugin name "${manifest.name}" does not match directory name "${dirName}"`
     );
   }
 
-  // RULE 3: Version format (if present)
+  // RULE 3: Version format (if present). Push the more-informative message
+  // (with the MAJOR.MINOR.PATCH hint) into both the structured errors array
+  // and stderr — prior code dropped the hint from the errors array.
   if (manifest.version) {
     const semverPattern = /^[0-9]+\.[0-9]+\.[0-9]+$/;
     if (!semverPattern.test(manifest.version)) {
-      errors.push(`Invalid version format: ${manifest.version}`);
-      logError(
+      addError(
+        errors,
         `Invalid version format: ${manifest.version} (must be MAJOR.MINOR.PATCH)`
       );
     } else {
@@ -353,15 +483,13 @@ function validatePlugin(pluginDir) {
   // RULE 5: Keywords format (if present)
   if (manifest.keywords) {
     if (!Array.isArray(manifest.keywords)) {
-      errors.push('keywords must be an array');
-      logError('keywords must be an array');
+      addError(errors, 'keywords must be an array');
     } else {
       const invalidKeywords = manifest.keywords.filter(
         (kw) => typeof kw !== 'string'
       );
       if (invalidKeywords.length > 0) {
-        errors.push('All keywords must be strings');
-        logError('All keywords must be strings');
+        addError(errors, 'All keywords must be strings');
       }
     }
   }
@@ -377,16 +505,33 @@ function validatePlugin(pluginDir) {
   // standard nested layouts), file checks via validatePathFile. Inline
   // objects are structurally accepted by JSON Schema and need no
   // filesystem check here.
+  // outputStyles is directory-only: even though Anthropic's relativePath
+  // schema accepts a single .md file, the field's runtime semantics need a
+  // directory whose .md files are loaded as named output styles. The other
+  // dirOrDirs fields (commands/agents/skills) accept single .md files.
   for (const field of ['outputStyles', 'commands', 'agents', 'skills']) {
+    const directoryOnly = field === 'outputStyles';
     if (manifest[field] !== undefined && typeof manifest[field] === 'string') {
       // string form — single directory path
-      validatePathOrPathsDir(field, manifest[field], pluginDir, errors);
+      validatePathOrPathsDir(
+        field,
+        manifest[field],
+        pluginDir,
+        errors,
+        directoryOnly
+      );
     } else if (Array.isArray(manifest[field])) {
       // array form — only string entries are filesystem-checked here;
       // any non-string entries would be a schema violation caught by AJV.
       const stringPaths = manifest[field].filter((v) => typeof v === 'string');
       if (stringPaths.length > 0) {
-        validatePathOrPathsDir(field, stringPaths, pluginDir, errors);
+        validatePathOrPathsDir(
+          field,
+          stringPaths,
+          pluginDir,
+          errors,
+          directoryOnly
+        );
       }
     }
   }
@@ -437,30 +582,15 @@ function validatePlugin(pluginDir) {
   const inlineHooks = collectInlineHooks(manifest.hooks);
   const hasInlineHooks = Object.keys(inlineHooks).length > 0;
 
-  // RULE 6: Hook script existence (if hooks declared as inline object).
+  // RULES 6 + 8: Hook script existence + content checks (shebang, decision
+  // output, set -e). Both rules iterate the same scripts; folding them into a
+  // single pass via validateHookScriptPath eliminates duplicate filesystem
+  // I/O and removes the prior message drift between the two loops.
   if (hasInlineHooks) {
-    const VALID_HOOK_EVENTS = [
-      'PreToolUse',
-      'PostToolUse',
-      'PostToolUseFailure',
-      'PermissionRequest',
-      'UserPromptSubmit',
-      'Notification',
-      'Stop',
-      'SubagentStart',
-      'SubagentStop',
-      'SessionStart',
-      'SessionEnd',
-      'TeammateIdle',
-      'TaskCompleted',
-      'PreCompact',
-    ];
-
     for (const [eventName, hookEntries] of Object.entries(inlineHooks)) {
-      // Validate event name
-      if (!VALID_HOOK_EVENTS.includes(eventName)) {
+      if (!VALID_HOOK_EVENTS.has(eventName)) {
         logWarning(
-          `Unknown hook event "${eventName}". Known events: ${VALID_HOOK_EVENTS.join(', ')}`
+          `Unknown hook event "${eventName}". Known events: ${[...VALID_HOOK_EVENTS].join(', ')}`
         );
       }
 
@@ -474,50 +604,24 @@ function validatePlugin(pluginDir) {
 
           const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
           if (!scriptPath) {
-            // Check if it was a bash command that escaped the plugin dir
+            // resolveHookScriptPath returns null both for non-bash commands
+            // (echo "...", inline node -e, etc., which need no path check)
+            // and for bash commands that escape the plugin directory. The
+            // latter is a containment violation and must error.
             const resolved = hook.command.replaceAll(
               '${CLAUDE_PLUGIN_ROOT}',
               pluginDir
             );
             if (/^bash\s+/.test(resolved)) {
-              errors.push(
-                `Hook script path escapes plugin directory: ${hook.command}`
-              );
-              logError(
+              addError(
+                errors,
                 `Hook script path escapes plugin directory: ${hook.command}`
               );
             }
             continue;
           }
 
-          if (!fs.existsSync(scriptPath)) {
-            errors.push(
-              `Hook script not found: ${hook.command} (resolved: ${scriptPath})`
-            );
-            logError(
-              `Hook script not found for ${eventName}: ${hook.command}`
-            );
-          } else {
-            try {
-              fs.accessSync(scriptPath, fs.constants.R_OK);
-            } catch (accessErr) {
-              logWarning(
-                `Hook script not readable: ${scriptPath} (check file permissions)`
-              );
-            }
-            try {
-              const mode = fs.statSync(scriptPath).mode;
-              if ((mode & 0o111) === 0) {
-                logWarning(
-                  `Hook script not executable: ${scriptPath} (check file permissions)`
-                );
-              }
-            } catch (statErr) {
-              logWarning(
-                `Cannot inspect hook script mode: ${scriptPath} (${statErr.message})`
-              );
-            }
-          }
+          validateHookScriptPath(scriptPath, eventName, pluginDir, errors);
         }
       }
     }
@@ -652,71 +756,8 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 8: Hook script basics (shebang, decision output, no set -e)
-  if (hasInlineHooks) {
-    const DECISION_PROTOCOL_EVENTS = new Set([
-      'PreToolUse',
-      'PostToolUse',
-      'Stop',
-    ]);
-
-    for (const [eventName, hookEntries] of Object.entries(inlineHooks)) {
-      if (!Array.isArray(hookEntries)) continue;
-
-      for (const entry of hookEntries) {
-        if (!entry.hooks || !Array.isArray(entry.hooks)) continue;
-
-        for (const hook of entry.hooks) {
-          if (hook.type !== 'command' || !hook.command) continue;
-
-          const scriptPath = resolveHookScriptPath(hook.command, pluginDir);
-          if (!scriptPath || !fs.existsSync(scriptPath)) continue;
-
-          let content;
-          try {
-            content = fs.readFileSync(scriptPath, 'utf-8');
-          } catch (readErr) {
-            logWarning(
-              `Cannot read hook script: ${scriptPath} (${readErr.message})`
-            );
-            continue;
-          }
-
-          const relPath = path.relative(pluginDir, scriptPath);
-
-          // Check shebang
-          if (!content.startsWith('#!/')) {
-            logWarning(`${relPath}: missing shebang line (expected #!/bin/bash)`);
-          }
-
-          if (DECISION_PROTOCOL_EVENTS.has(eventName)) {
-            // Decision hooks should either emit a JSON decision or use exit 0/2.
-            const hasJsonOutput =
-              /"continue"\s*:/.test(content) || /"decision"\s*:/.test(content);
-            const hasExitCodeProtocol =
-              /exit\s+0/.test(content) && /exit\s+2/.test(content);
-            if (!hasJsonOutput && !hasExitCodeProtocol) {
-              logWarning(
-                `${relPath}: missing decision output for ${eventName} — expected {"continue": true}, {"decision": ...}, or exit 0/2 protocol`
-              );
-            }
-          }
-
-          // Check for set -e anti-pattern (matches -e flag or -o errexit)
-          if (
-            /^\s*set\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)(\s|$)/m.test(
-              content
-            )
-          ) {
-            logWarning(
-              `${relPath}: uses "set -e" which can prevent JSON output on error — ` +
-                'use "set -uo pipefail" instead'
-            );
-          }
-        }
-      }
-    }
-  }
+  // (RULE 8 — shebang / decision-output / set -e content checks — folded
+  // into RULES 6+8 single-pass loop above via validateHookScriptPath.)
 
   // Summary
   if (errors.length === 0) {
