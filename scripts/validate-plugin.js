@@ -326,71 +326,24 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 5b: output styles directory (if present)
-  // Per schema, outputStyles may be a single path string or an array of path strings.
-  if (manifest.outputStyles !== undefined) {
-    const stylePaths = Array.isArray(manifest.outputStyles)
-      ? manifest.outputStyles
-      : typeof manifest.outputStyles === 'string'
-        ? [manifest.outputStyles]
-        : null;
-    if (stylePaths === null) {
-      errors.push('outputStyles must be a string path or array of string paths');
-      logError('outputStyles must be a string path or array of string paths');
-    } else {
-      for (const stylePath of stylePaths) {
-        if (typeof stylePath !== 'string') {
-          errors.push('outputStyles entries must be string paths');
-          logError('outputStyles entries must be string paths');
-          continue;
-        }
-        const stylesDir = resolvePluginPath(stylePath, pluginDir);
-        if (!stylesDir) {
-          errors.push(`outputStyles path escapes plugin directory: ${stylePath}`);
-          logError(`outputStyles path escapes plugin directory: ${stylePath}`);
-        } else if (!fs.existsSync(stylesDir)) {
-          errors.push(`outputStyles directory not found: ${stylePath}`);
-          logError(`outputStyles directory not found: ${stylePath}`);
-        } else if (!fs.statSync(stylesDir).isDirectory()) {
-          errors.push(`outputStyles must point to a directory: ${stylePath}`);
-          logError(`outputStyles must point to a directory: ${stylePath}`);
-        } else {
-          const styleFiles = fs
-            .readdirSync(stylesDir, { withFileTypes: true })
-            .filter((entry) => entry.isFile() && entry.name.endsWith('.md'));
-          if (styleFiles.length === 0) {
-            errors.push(
-              `outputStyles directory must contain at least one .md file: ${stylePath}`
-            );
-            logError(
-              `outputStyles directory must contain at least one .md file: ${stylePath}`
-            );
-          } else {
-            logSuccess(
-              `Output styles: ${stylePath} (${styleFiles.length} file${styleFiles.length === 1 ? '' : 's'})`
-            );
-          }
-        }
-      }
-    }
-  }
-
-  // RULE 5c: Path existence for commands, agents, skills, mcpServers,
-  // lspServers, monitors, and hooks. The schema narrows these into two
-  // type-distinct shapes:
-  //   - dirOrDirs        (commands/agents/skills/outputStyles)   → directory paths
+  // RULE 5b/5c: Path existence for outputStyles, commands, agents, skills,
+  // mcpServers, lspServers, monitors, and hooks. The schema narrows these
+  // into two type-distinct shapes:
+  //   - dirOrDirs        (outputStyles/commands/agents/skills) → directory paths
   //   - fileFilesOrInline (mcpServers/hooks/lspServers/monitors) → file paths
   //                                                                or inline objects
   // The validator therefore only enforces filesystem existence: directory
-  // checks via validatePathOrPathsDir, file checks via validatePathFile.
-  // Inline objects are structurally accepted by JSON Schema and need no
+  // checks via validatePathOrPathsDir (recursive .md count, accepts the
+  // standard nested layouts), file checks via validatePathFile. Inline
+  // objects are structurally accepted by JSON Schema and need no
   // filesystem check here.
-  for (const field of ['commands', 'agents', 'skills']) {
-    if (manifest[field] !== undefined && typeof manifest[field] !== 'object') {
-      // non-object = string or array of strings → validate as directory paths
+  for (const field of ['outputStyles', 'commands', 'agents', 'skills']) {
+    if (manifest[field] !== undefined && typeof manifest[field] === 'string') {
+      // string form — single directory path
       validatePathOrPathsDir(field, manifest[field], pluginDir, errors);
     } else if (Array.isArray(manifest[field])) {
-      // array may mix path strings and inline objects — validate only strings
+      // array form — only string entries are filesystem-checked here;
+      // any non-string entries would be a schema violation caught by AJV.
       const stringPaths = manifest[field].filter((v) => typeof v === 'string');
       if (stringPaths.length > 0) {
         validatePathOrPathsDir(field, stringPaths, pluginDir, errors);
