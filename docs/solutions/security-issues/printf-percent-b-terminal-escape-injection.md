@@ -15,9 +15,15 @@ caller that passes external output (a CLI's stderr, a pip error string, a
 parsed version field) lets that source inject `\033[...m`, `\n`, `\t`, or
 arbitrary terminal escape sequences into the user's terminal.
 
-The risk increases when the helper is called as
-`error "$(some_external_command 2>&1)"` because the captured output contains
-literal `\033` bytes that `%b` will faithfully reinterpret.
+The risk materialises when the helper is called as
+`error "$(some_external_command 2>&1)"` and the captured output contains
+literal backslash-escape sequences as text (e.g. `\033[31m` written out as
+those six ASCII characters in a debug log, Python traceback, or version
+string). `%b` interprets those text sequences as terminal escapes. Note that
+content emitting real ESC bytes (0x1B) directly — rather than the two-character
+text `\033` — passes through both `%b` and `%s` unchanged, so `%s` does not
+neutralise every terminal-injection source; it only prevents printf-level
+backslash reinterpretation.
 
 ## Anti-Pattern
 
@@ -26,15 +32,15 @@ readonly RED='\033[0;31m'
 readonly NC='\033[0m'
 
 error() {
-  printf '%bError: %s%b\n' "$RED" "$1" "$NC" >&2
+  printf '%bError: %b%b\n' "$RED" "$1" "$NC" >&2
   exit 1
 }
 
 # Caller passes external output as $1:
 error "$(pip install pkg 2>&1)"
-# pip emits literal \033 bytes inside its diagnostic — terminal receives
-# arbitrary escape sequences from an attacker who controls the package
-# metadata or the PyPI mirror.
+# pip's diagnostic output may contain literal \033[...m text sequences.
+# %b reinterprets them as terminal escapes — an attacker who controls the
+# package metadata or the PyPI mirror can inject arbitrary escape sequences.
 ```
 
 ## Pattern
@@ -61,9 +67,14 @@ success() {
 Two consequences:
 
 - The format string is a static literal — no caller controls what `%b` sees.
-- `$1` flows through `%s`, which prints bytes verbatim without escape
-  interpretation. A malicious version string `\033[red]ERR\033[0m` is shown
-  as the literal text sequence, not a color change.
+- `$1` flows through `%s`, which prints bytes verbatim without printf-level
+  backslash interpretation. A version string containing literal text like
+  `\033[31m` is shown as those characters, not as a colour change.
+- Scope: `%s` prevents printf reinterpreting backslash-as-text sequences. It
+  does NOT strip real ESC bytes (0x1B) that a command emits directly — those
+  reach the terminal unchanged regardless of format specifier. For sources
+  that may emit real escape bytes, strip them before passing to the helper
+  (e.g. `strip_ansi "$(cmd)"` via `sed 's/\x1b\[[0-9;]*m//g'`).
 
 The named-constant variables (`RED`, `GREEN`, `YELLOW`, `NC`) become unused
 after this fix; remove them to silence shellcheck SC2034.

@@ -107,9 +107,12 @@ fi
 ## When Not to Use
 
 - Single call site: inline the detection.
-- Pure POSIX scripts where you cannot rely on `case` pattern matching with
-  spaces in patterns — fall back to `eval` carefully or split into separate
-  predicates per variant.
+- Pure POSIX scripts that need to avoid bash arrays and cannot use
+  `mapfile` (bash-only) — keep the inline `if/elif` chain at each call site
+  rather than introducing the helper pair. Note: POSIX `case` itself supports
+  quoted patterns with spaces (`"python3 -m pip")`), so the dispatcher
+  pattern is portable; the constraint is the caller-side array ergonomics,
+  not `case` syntax.
 - The chosen tokens vary in number across variants AND callers need
   programmatic access to the token list (rare; usually messages suffice).
 
