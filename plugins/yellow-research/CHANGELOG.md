@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.0.0
+
+### Major Changes
+
+- [#259](https://github.com/KingInYellows/yellow-plugins/pull/259)
+  [`160f021`](https://github.com/KingInYellows/yellow-plugins/commit/160f02182e5e37d66658fcd1d567893bf3026e0e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Roll out
+  userConfig-based credential storage across five plugins, replacing or
+  augmenting shell environment variable lookups with Claude Code userConfig.
+  - **yellow-semgrep** (BREAKING): `SEMGREP_APP_TOKEN` is now read from
+    `userConfig.semgrep_app_token` instead of the shell environment variable.
+    Users who supplied the token only via `SEMGREP_APP_TOKEN` in their shell
+    profile must re-enter it via the userConfig prompt (run `/semgrep:setup`);
+    the shell env path no longer feeds the MCP server at startup.
+  - **yellow-research** (BREAKING): All three API keys (`PERPLEXITY_API_KEY`,
+    `TAVILY_API_KEY`, `EXA_API_KEY`) are migrated to userConfig. Existing users
+    who relied solely on shell env vars must answer the userConfig prompt to
+    continue using the plugin; run `/research:setup` to re-enter credentials.
+  - **yellow-devin** (additive): HTTP-MCP userConfig declaration added for
+    `devin_service_user_token` and `devin_org_id`. The shell env fallback
+    (`DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID`) continues to work; no action
+    required for current users.
+  - **yellow-core** (additive): New `mcp-health-probe` skill defining a
+    canonical three-state MCP health classification (OFFLINE / DEGRADED /
+    HEALTHY) for `/<plugin>:status` commands. The existing
+    `mcp-integration-patterns` skill is split into three focused sub-skills for
+    narrower auto-invocation: `memory-recall-pattern`,
+    `memory-remember-pattern`, and `morph-discovery-pattern`. The umbrella
+    `mcp-integration-patterns` skill is retained until consumers migrate. The
+    `/setup:all` env-variable dashboard gains a `check_key()` helper that
+    reports shell env vs userConfig state per credential.
+
 All notable changes to this plugin are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -12,32 +44,30 @@ and this project adheres to
 
 ### Major Changes
 
-- **Breaking:** all three API keys (`PERPLEXITY_API_KEY`,
-  `TAVILY_API_KEY`, `EXA_API_KEY`) migrated to `userConfig`. The
-  perplexity, tavily, and exa MCP servers now read their API keys from
-  Claude Code's `userConfig` (sensitive, keychain-backed) instead of
-  shell env vars. The three keys are declared **optional** — the plugin
-  degrades gracefully when any are missing, so skipping the prompts is
-  valid for users who only want a subset of research sources.
+- **Breaking:** all three API keys (`PERPLEXITY_API_KEY`, `TAVILY_API_KEY`,
+  `EXA_API_KEY`) migrated to `userConfig`. The perplexity, tavily, and exa MCP
+  servers now read their API keys from Claude Code's `userConfig` (sensitive,
+  keychain-backed) instead of shell env vars. The three keys are declared
+  **optional** — the plugin degrades gracefully when any are missing, so
+  skipping the prompts is valid for users who only want a subset of research
+  sources.
 
   Empirically verified behavior (MCP stdio probe, 2026-04-17): perplexity
-  hard-fails at startup without `PERPLEXITY_API_KEY` (so its tools
-  disappear entirely); tavily and exa start without their keys but return
-  runtime errors on tool invocation. Either way, `/research:deep` and
-  `/research:code` continue to operate with whichever sources are
-  available.
+  hard-fails at startup without `PERPLEXITY_API_KEY` (so its tools disappear
+  entirely); tavily and exa start without their keys but return runtime errors
+  on tool invocation. Either way, `/research:deep` and `/research:code` continue
+  to operate with whichever sources are available.
 
 ### Migration (existing users)
 
-- Run `claude plugin update yellow-research@yellow-plugins`. Claude Code
-  prompts for each key at plugin-enable time; dismiss any you don't want
-  stored. Answering preserves the keychain-backed experience; skipping
-  leaves the old shell-env path broken for that MCP (since plugin.json
-  now references `${user_config.*}`, not `${*_API_KEY}` shell vars).
-- Power users who prefer shell env vars can add a thin wrapper script
-  per MCP (see yellow-morph's `bin/start-morph.sh` for a pattern), but
-  for most users answering the userConfig prompt is the recommended
-  path.
+- Run `claude plugin update yellow-research@yellow-plugins`. Claude Code prompts
+  for each key at plugin-enable time; dismiss any you don't want stored.
+  Answering preserves the keychain-backed experience; skipping leaves the old
+  shell-env path broken for that MCP (since plugin.json now references
+  `${user_config.*}`, not `${*_API_KEY}` shell vars).
+- Power users who prefer shell env vars can add a thin wrapper script per MCP
+  (see yellow-morph's `bin/start-morph.sh` for a pattern), but for most users
+  answering the userConfig prompt is the recommended path.
 
 ---
 
@@ -226,6 +256,7 @@ and this project adheres to
 
   Roll back by re-adding the `mcpServers.context7` block to
   `plugins/yellow-core/.claude-plugin/plugin.json` and reverting the tool-name
+
 ---
 
 ## [1.3.0] - 2026-03-10

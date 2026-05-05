@@ -1,6 +1,6 @@
 {
   "name": "yellow-review",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review"
 }
