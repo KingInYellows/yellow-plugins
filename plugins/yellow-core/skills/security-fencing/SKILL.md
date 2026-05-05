@@ -25,12 +25,15 @@ yellow-debt, yellow-ci, and yellow-browser-test. Machine-verifiable count:
 rg -l 'CRITICAL SECURITY RULES' plugins/ --type md \
   | grep -v 'security-fencing/SKILL.md' \
   | grep -v 'CLAUDE.md' \
+  | grep -v 'CHANGELOG.md' \
   | wc -l
 ```
 
-At time of writing this returns **34** agent consumers. The full
-enumeration in "Current consumers" below is hand-maintained — re-run
-the one-liner before relying on the list.
+At time of writing this returns **34** agent consumers (CHANGELOG.md
+mentions of the phrase are excluded — those are release-note references,
+not active fence consumers). The full enumeration in "Current consumers"
+below is hand-maintained — re-run the one-liner before relying on the
+list.
 
 ## When to Use
 
