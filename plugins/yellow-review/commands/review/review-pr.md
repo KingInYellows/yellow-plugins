@@ -395,6 +395,19 @@ pipeline (`review_pipeline: persona`, the default).
 
 ### Step 5: Pass 1 — Parallel Persona Dispatch
 
+> **Why this orchestrator collects via TaskOutput, not RUN_DIR.**
+> Step 5 collects findings via TaskOutput because each reviewer emits
+> compact-return JSON per the schema in this file (see "Compact-return
+> enforcement" below). The Subagent Failure Convention's file-based
+> RUN_DIR pattern (see `yellow-core:create-agent-skills` SKILL.md
+> §Subagent Failure Convention "When the convention applies") is
+> reserved for prose-emitting orchestrators like `/workflows:work`
+> Phase 3. Compact-return JSON already gives Step 6 a deterministic
+> failure signal — malformed/missing schema fields drop the entire
+> return as part of validation. Layering RUN_DIR on top would
+> duplicate the signal and add an empty-glob silent-regression risk
+> if any spawned agent isn't updated to write a result file.
+
 Launch all selected agents EXCEPT `code-simplifier` in parallel via Task
 tool. **Each Task invocation MUST set `run_in_background: true`** — the
 review agents declare `background: true` in their frontmatter, but true

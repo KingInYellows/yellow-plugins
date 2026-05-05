@@ -76,4 +76,11 @@ Optional markdown content for user reference.
 - Use `schema: 1` for future versioning support
 - Settings files are gitignored by `.local.md` convention
 
-**Reference:** See `yellow-browser-test` plugin for working example.
+**Reference:** This pattern is documented end-to-end in the
+`yellow-core:local-config` skill (the `yellow-plugins.local.md`
+schema, schema versioning rules, and the per-plugin equivalent). The
+example fields above (`devServer`, `auth.credentials`) are
+illustrative — concrete plugin schemas vary by domain. The
+generic `.claude/<plugin-name>.local.md` pattern itself has no
+single canonical consumer in this monorepo today; the
+yellow-plugins.local.md path covers the cross-plugin case.

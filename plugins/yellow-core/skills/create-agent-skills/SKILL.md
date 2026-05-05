@@ -252,6 +252,29 @@ but is not yet shipped.
 
 **Community-adopted workaround: the output-file convention.**
 
+### When the convention applies
+
+The output-file convention is for orchestrators that spawn agents
+emitting **unstructured prose** — security-sentinel, performance-oracle,
+code-simplicity-reviewer, polyglot-reviewer in `/workflows:work` Phase 3
+are the canonical examples. Prose stdout cannot be deterministically
+parsed for partial-failure signals; the file-based result + `status`
+field gives the orchestrator a structural failure signal independent of
+the Task return value.
+
+Orchestrators whose spawned agents return **structured JSON** per a
+documented compact-return schema (e.g., `/review:pr` Step 5, where each
+reviewer emits a 10-field JSON object validated against a schema in the
+command file itself) do NOT need this convention. Structured returns
+already give the orchestrator a deterministic failure signal — malformed
+or missing schema fields cause the entire return to be dropped at the
+aggregation step. Layering file-based collection on top would only
+duplicate the signal and adds an empty-glob silent-regression risk if
+any spawned agent isn't updated to write a result file.
+
+The convention's scope, in one line: **prose-emitting orchestrators
+need it; compact-return-JSON orchestrators don't.**
+
 ### For subagent authors
 
 Instruct the subagent (in its system prompt or spawning prompt) to write a
