@@ -1,0 +1,6 @@
+{
+  "name": "yellow-council",
+  "version": "0.1.0",
+  "private": true,
+  "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus"
+}
