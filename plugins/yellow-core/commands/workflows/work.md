@@ -535,11 +535,16 @@ it at a Phase 1b checkpoint.
    ```
 
    Substitute the same literal path captured in step 3a (do not
-   reference `$RUN_DIR` — it does not survive across Bash calls). On
-   any error path that exits before this step (mktemp failure, agent
-   spawn error), there is nothing to clean up because the directory
-   was either never created or contains only the agent stub files;
-   in that case skip the cleanup and continue.
+   reference `$RUN_DIR` — it does not survive across Bash calls).
+   **If the run directory was successfully created in step 3a, you
+   MUST clean it up even if the workflow exits early** (agent spawn
+   error, TaskOutput failure, conflict reconciliation rollback,
+   user-initiated cancel) — the directory may already contain agent
+   result files with diff excerpts, secrets, or credentials, and
+   leaving them in `/tmp` is the exact data-residue risk this step
+   exists to prevent. The ONLY skip case is when `mktemp -d` itself
+   failed and no directory was created (the empty-RUN_DIR error path
+   from step 3a).
 
 5. Address critical and important issues:
    - Fix P1 issues immediately

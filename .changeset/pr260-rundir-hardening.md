@@ -2,6 +2,8 @@
 'yellow-core': patch
 ---
 
+# RUN_DIR Hardening
+
 Harden the RUN_DIR / result-file convention introduced in PR #260
 against the bash-block subshell isolation anti-pattern (per
 `docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`)
@@ -16,7 +18,8 @@ and add atomic-write semantics + cleanup.
   fresh subprocess. Step 3a now instructs the orchestrator to capture
   the printed path and substitute the **literal value** into Task
   input prompts (not the variable name `$RUN_DIR`). Flagged by
-  adversarial (P1) and matches the documented anti-pattern in MEMORY.md.
+  adversarial (P1) and matches the documented anti-pattern in
+  `docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
 - **Empty-RUN_DIR error path.** If `mktemp -d` fails (disk full,
   permission denied) the captured path is empty. Step 3a now requires
   reporting the failure and skipping parallel review rather than

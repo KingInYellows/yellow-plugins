@@ -289,7 +289,9 @@ $RUN_DIR/agent-result-<agent-name>.json
 
 where `$RUN_DIR` is a unique directory the orchestrator creates at the
 start of the run (see orchestrator example below) and passes to each agent
-via the spawn prompt.
+via the spawn prompt. The spawned agent receives the literal directory path
+in its prompt; it cannot inherit a shell variable from the orchestrator's
+process.
 
 **Atomic write semantics.** Agents MUST write to a `.tmp` filename first,
 then `mv` to the final `.json` filename. POSIX rename is atomic with
@@ -298,6 +300,7 @@ sees either the complete result file or no file at all — never a partial
 write. The orchestrator MUST glob only `*.json`, never `*.tmp`. Sequence:
 
 ```bash
+RUN_DIR="/tmp/yellow-work-abc123"
 RESULT_TMP="$RUN_DIR/agent-result-${AGENT_NAME}.tmp"
 RESULT_FINAL="$RUN_DIR/agent-result-${AGENT_NAME}.json"
 printf '%s\n' "$JSON_PAYLOAD" > "$RESULT_TMP" && mv "$RESULT_TMP" "$RESULT_FINAL"
