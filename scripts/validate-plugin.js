@@ -167,6 +167,40 @@ function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
   }
 }
 
+/**
+ * Collect inline-form hook entries from either the top-level inline-object
+ * form or the array form (which may mix path strings and inline objects).
+ * Returns a merged event-keyed dict where each event maps to the
+ * concatenated entries arrays from all inline-object sources. Path-string
+ * entries are ignored (file existence is enforced separately by RULE 5c).
+ *
+ * The schema's fileFilesOrInline allows array items to be inline event-keyed
+ * configs (e.g. [{"PreToolUse": [...]}]), and those inline objects need to
+ * be subjected to RULES 6/7/8 just like the top-level inline-object form.
+ *
+ * @param {*} hooks - manifest.hooks raw value
+ * @returns {Object} event-keyed dict (possibly empty)
+ */
+function collectInlineHooks(hooks) {
+  const sources =
+    hooks && typeof hooks === 'object' && !Array.isArray(hooks)
+      ? [hooks]
+      : Array.isArray(hooks)
+        ? hooks.filter(
+            (v) => v && typeof v === 'object' && !Array.isArray(v)
+          )
+        : [];
+  const merged = {};
+  for (const source of sources) {
+    for (const [event, entries] of Object.entries(source)) {
+      if (!Array.isArray(entries)) continue;
+      if (!merged[event]) merged[event] = [];
+      merged[event].push(...entries);
+    }
+  }
+  return merged;
+}
+
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
@@ -403,15 +437,15 @@ function validatePlugin(pluginDir) {
     }
   }
 
+  // RULES 6/7/8 operate on inline event-keyed hook configs. The
+  // fileFilesOrInline schema permits these as either the top-level
+  // inline-object form OR as inline objects mixed inside an array form,
+  // so collectInlineHooks merges both into a single event-keyed dict.
+  const inlineHooks = collectInlineHooks(manifest.hooks);
+  const hasInlineHooks = Object.keys(inlineHooks).length > 0;
+
   // RULE 6: Hook script existence (if hooks declared as inline object).
-  // Skip when hooks is an array (the path-array form added by the extended
-  // schema) — array entries are paths/objects, not event-keyed, so the
-  // event-name validation below does not apply.
-  if (
-    manifest.hooks &&
-    typeof manifest.hooks === 'object' &&
-    !Array.isArray(manifest.hooks)
-  ) {
+  if (hasInlineHooks) {
     const VALID_HOOK_EVENTS = [
       'PreToolUse',
       'PostToolUse',
@@ -429,7 +463,7 @@ function validatePlugin(pluginDir) {
       'PreCompact',
     ];
 
-    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
+    for (const [eventName, hookEntries] of Object.entries(inlineHooks)) {
       // Validate event name
       if (!VALID_HOOK_EVENTS.includes(eventName)) {
         logWarning(
@@ -509,12 +543,9 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist).
-  // Only meaningful for inline-object hooks; array form has no event keys.
-  if (
-    manifest.hooks &&
-    typeof manifest.hooks === 'object' &&
-    !Array.isArray(manifest.hooks)
-  ) {
+  // Operates on the merged inline-hooks dict so array-form inline objects
+  // are also drift-checked against hooks.json.
+  if (hasInlineHooks) {
     const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
     if (fs.existsSync(hooksJsonPath)) {
       try {
@@ -522,7 +553,7 @@ function validatePlugin(pluginDir) {
           fs.readFileSync(hooksJsonPath, 'utf-8')
         );
         const hooksJsonHooks = hooksJson.hooks || {};
-        const manifestHooks = manifest.hooks;
+        const manifestHooks = inlineHooks;
         let driftFound = false;
 
         // Compare event names
@@ -629,18 +660,14 @@ function validatePlugin(pluginDir) {
   }
 
   // RULE 8: Hook script basics (shebang, decision output, no set -e)
-  if (
-    manifest.hooks &&
-    typeof manifest.hooks === 'object' &&
-    !Array.isArray(manifest.hooks)
-  ) {
+  if (hasInlineHooks) {
     const DECISION_PROTOCOL_EVENTS = new Set([
       'PreToolUse',
       'PostToolUse',
       'Stop',
     ]);
 
-    for (const [eventName, hookEntries] of Object.entries(manifest.hooks)) {
+    for (const [eventName, hookEntries] of Object.entries(inlineHooks)) {
       if (!Array.isArray(hookEntries)) continue;
 
       for (const entry of hookEntries) {
