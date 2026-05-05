@@ -55,9 +55,11 @@ on failure so install still succeeds for users who can fix it manually:
 # Smoke-test the MCP entrypoint that plugin.json will invoke. If this
 # subcommand is absent, the MCP server silently fails to start with no
 # diagnostics, leaving the user with 0 tools.
-if ! mempalace mcp --help >/dev/null 2>&1; then
-  warning "'mempalace mcp --help' failed — the MCP entrypoint may differ in this version."
-  warning "Verify plugin.json mcpServers.mempalace.command matches the installed CLI."
+MCP_CHECK=$(mempalace mcp --help 2>&1)
+if [ $? -ne 0 ]; then
+  printf '[install-mempalace] Warning: "mempalace mcp --help" failed — MCP entrypoint may differ in this version.\n' >&2
+  printf '[install-mempalace] Output: %s\n' "$MCP_CHECK" >&2
+  printf '[install-mempalace] Verify plugin.json mcpServers.mempalace.command matches the installed CLI.\n' >&2
 fi
 
 success "mempalace ${installed_version} installed successfully via ${INSTALL_METHOD}"

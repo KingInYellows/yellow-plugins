@@ -9,11 +9,15 @@ category: 'security-issues'
 ## Summary
 
 Shell helper functions like `error()`, `warning()`, and `success()` commonly
-use `printf` with `%b` to inject ANSI color codes around a message. The `%b`
-specifier interprets backslash escape sequences in the argument — so any
-caller that passes external output (a CLI's stderr, a pip error string, a
-parsed version field) lets that source inject `\033[...m`, `\n`, `\t`, or
-arbitrary terminal escape sequences into the user's terminal.
+use `printf` with multiple `%b` specifiers — one for an opening color constant,
+one for the closing reset, and (the risky part) **one for the message argument
+`$1` itself**. Because `%b` interprets backslash escape sequences in its
+argument, any caller that passes external output (a CLI's stderr, a pip error
+string, a parsed version field) directly to that `%b` slot lets that source
+inject `\033[...m`, `\n`, `\t`, or arbitrary terminal escape sequences into the
+user's terminal. The injection path requires `$1` to flow through a `%b`
+specifier; a helper that uses `%b` only for known-internal color constants and
+`%s` for `$1` is not vulnerable to this specific vector.
 
 The risk materialises when the helper is called as
 `error "$(some_external_command 2>&1)"` and the captured output contains
@@ -81,14 +85,43 @@ after this fix; remove them to silence shellcheck SC2034.
 
 ## Detection
 
+**Step 1 — find `printf` calls that have any `%b` in the format string:**
+
 ```bash
-# Find risky helpers in install/setup scripts:
-rg -nP "printf\s+'[^']*%b[^']*'" plugins/*/scripts/*.sh
+# Find printf calls whose format string contains %b:
+rg -nP "printf\s+['\"][^'\"]*%b[^'\"]*['\"]" plugins/*/scripts/*.sh
 ```
 
-A match where `%b` is followed by a `%s`-like content slot signals the
-pattern. False positives: `%b` used to print a known internal constant
-(e.g., a flag set by the script itself).
+**Step 2 — for each match, confirm whether `%b` consumes untrusted data.**
+
+The regex above intentionally casts a wide net. Triage each match:
+
+- **Safe (not risky):** `%b` arguments are exclusively known-static color
+  constants declared `readonly` in the same script (e.g.,
+  `printf '%b%s\n' "$RED" "$1"` where `readonly RED='\033[0;31m'`).
+  Here `%b` only interprets the controlled constant; `%s` handles all
+  variable/external content.
+
+- **Risky:** any of the following shapes:
+  - `printf '%b' "$var"` — a single `%b` consuming a variable directly.
+  - `printf '%b%b\n' "$RED" "$1"` — `$1` (caller-supplied) reaches `%b`.
+  - `printf "$FMT" ...` — format string itself is a variable; `%b` may
+    appear at runtime depending on `$FMT`.
+  - Multi-arg where it is not clear which variable maps to `%b` — count
+    `%` specifiers in order vs. argument positions to confirm.
+
+A quick confirmation for ambiguous cases — check whether all `%b`
+arguments are drawn from `readonly` constants declared in the same file:
+
+```bash
+# List readonly color constants in the same file to cross-check %b args:
+rg -n 'readonly\s+(RED|GREEN|YELLOW|BLUE|NC|RESET|BOLD)=' <file>.sh
+```
+
+If every argument bound to a `%b` slot is in that set, the call is safe.
+If any `%b` slot receives `$1`, `$2`, `"$(cmd)"`, or any other non-readonly
+external value, it is the risky pattern and should be fixed per the
+Pattern section above.
 
 ## Origin
 
