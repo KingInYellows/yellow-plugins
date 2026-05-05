@@ -795,6 +795,47 @@ jobs:
           fi
 
   # ============================================================================
+  # PLUGIN SHELL TESTS (bats) — blocking for yellow-core, advisory for others
+  # ============================================================================
+  plugin-shell-tests:
+    name: Plugin Shell Tests
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    timeout-minutes: 5
+    needs: [validate-schemas]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
+
+      - name: Install bats
+        # Pin via npm: ubuntu 22.04 apt ships bats 1.2.1 which lacks the
+        # bats_require_minimum_version helper (>=1.5.0) used in this repo.
+        run: sudo npm install -g bats@1.11.0
+
+      - name: Run yellow-core git-worktree bats suite (required)
+        run: bats plugins/yellow-core/skills/git-worktree/tests/
+
+      - name: Run other plugins' bats suites (advisory)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          STATUS=0
+          # Both top-level and nested test dirs (yellow-core's bats suite
+          # lives under skills/git-worktree/tests/, not at the plugin root).
+          for d in plugins/*/tests plugins/*/skills/*/tests; do
+            [ -d "$d" ] || continue
+            echo "::group::bats $d"
+            bats "$d" || STATUS=$?
+            echo "::endgroup::"
+          done
+          if [ $STATUS -ne 0 ]; then
+            echo "::warning::One or more advisory bats suites failed. Track as follow-up; not blocking this PR."
+          fi
+
+  # ============================================================================
   # AGGREGATE METRICS AND REPORT
   # ============================================================================
   report-metrics:
@@ -813,6 +854,7 @@ jobs:
         security-audit,
         build,
         changeset-check,
+        plugin-shell-tests,
       ]
 
     steps:
@@ -904,6 +946,7 @@ jobs:
         security-audit,
         build,
         changeset-check,
+        plugin-shell-tests,
       ]
 
     steps:
@@ -916,6 +959,7 @@ jobs:
              [ "${{ needs.integration-tests.result }}" == "success" ] && \
              [ "${{ needs.contract-drift.result }}" == "success" ] && \
              [ "${{ needs.security-audit.result }}" == "success" ] && \
+             [ "${{ needs.plugin-shell-tests.result }}" == "success" ] && \
              { [ "${{ needs.build.result }}" == "success" ] || [ "${{ needs.build.result }}" == "skipped" ]; } && \
              { [ "${{ needs.changeset-check.result }}" == "success" ] || [ "${{ needs.changeset-check.result }}" == "skipped" ]; }; then
             echo "::notice::✅ All CI validation checks passed"
@@ -929,6 +973,7 @@ jobs:
             echo "Integration Tests: ${{ needs.integration-tests.result }}"
             echo "Contract Drift: ${{ needs.contract-drift.result }}"
             echo "Security Audit: ${{ needs.security-audit.result }}"
+            echo "Plugin Shell Tests: ${{ needs.plugin-shell-tests.result }}"
             echo "Build (main only): ${{ needs.build.result }}"
             echo "Changeset Required: ${{ needs.changeset-check.result }}"
             exit 1

@@ -131,7 +131,13 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
   binary is unavailable, hooks exit silently without error
 - No offline MCP fallback — if ruvector MCP is down, search and memory
   operations fail gracefully
-- `.ruvector/` is shared across git worktrees — concurrent indexing may race
+- `.ruvector/` is shared across git worktrees via a symlink injected by
+  yellow-core's `worktree-manager.sh` at worktree creation time. Concurrent
+  worktree sessions writing to the same DB may race; the ruvector CLI's
+  internal session queue provides partial serialization within a single
+  process, but cross-process write safety is not documented. Avoid running
+  simultaneous Claude Code sessions with active `hooks_remember` or
+  `/ruvector:index` operations on the same project
 - MCP cold start adds 300-1500ms on first tool call after session start
 - Hook recall uses hash embeddings (not ONNX semantic) — paraphrased queries
   (e.g., "fix the bug" vs "correct the error") score near-zero similarity.

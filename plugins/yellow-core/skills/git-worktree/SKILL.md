@@ -56,6 +56,8 @@ worktree-manager.sh create <branch-name> [from-branch]
 - Branches from `main` by default (or specify `from-branch`)
 - Copies all `.env*` files from main repo
 - Adds `.worktrees/` to `.gitignore` if missing
+- Symlinks the main repo's `.ruvector/` into the worktree if it exists
+  (see [ruvector DB Sharing](#ruvector-db-sharing) below)
 - Fails safely if worktree already exists
 
 **Examples:**
@@ -114,7 +116,46 @@ worktree-manager.sh copy-env <name>
 ```
 
 Copies all `.env*` files from main repo to specified worktree. Useful if you've
-updated environment configuration and need to sync.
+updated environment configuration and need to sync. Also repairs a missing
+`.ruvector/` symlink for worktrees created before that feature existed (see
+below).
+
+### ruvector DB Sharing
+
+When a Claude Code session runs inside a worktree, the ruvector MCP server
+resolves `${PWD}/.ruvector/` against the worktree path. Because `.ruvector/`
+is gitignored (`**/.ruvector/`), it is not present in a fresh worktree, so
+the MCP server and hook scripts would silently no-op (no recall, no
+session-start context, no post-edit indexing).
+
+`worktree-manager.sh create` injects an absolute symlink
+`${worktree}/.ruvector -> ${main_repo}/.ruvector` after the `.env` copy step,
+so MCP and hooks reach the project's shared DB. `worktree-manager.sh copy-env`
+applies the same fix retroactively.
+
+**Behavior:**
+
+- Skipped silently (with `info`) if the symlink already exists — idempotent.
+- Skipped (with `warning`) if a real `.ruvector/` directory already exists in
+  the worktree — preserves the user's intentional isolated DB if they bypassed
+  the manager script.
+- Skipped (with `warning`) if the main repo has no `.ruvector/` yet — no
+  dangling symlinks.
+- Removed safely on `cleanup`: `[ -L ]` check, then `rm --` (no `-r`, no `-f`,
+  no trailing slash). Cannot follow into the main repo's DB.
+
+**MCP-spawn-time qualifier:** `RUVECTOR_STORAGE_PATH` is evaluated when
+Claude Code spawns the MCP server process for a session. The symlink only
+helps when Claude Code is launched (or re-launched) **from inside the
+worktree directory**. A pre-existing session started in main that later
+`cd`s into a worktree continues to write to the main repo's DB directly.
+
+**Concurrent-write caveat:** When two Claude Code sessions run simultaneously
+(one in main, one in a worktree, or two worktrees), both MCP server processes
+write to the same shared DB without cross-process locking. Avoid running
+simultaneous sessions with active `hooks_remember` / `/ruvector:index`
+operations on the same project. See `plugins/yellow-ruvector/CLAUDE.md`
+Known Limitations.
 
 ### cleanup / clean
 
