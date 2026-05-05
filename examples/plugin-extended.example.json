@@ -26,8 +26,8 @@
   "monitors": [
     {
       "name": "deploy-status",
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/poll-deploy.sh '${user_config.api_endpoint}'",
-      "description": "Deployment status changes"
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/poll-deploy.sh",
+      "description": "Deployment status changes. SAFE PATTERN: pass user_config values to the wrapper script via the ${CLAUDE_PLUGIN_OPTION_<KEY>} environment variables exported by Claude Code. The wrapper reads them as ${API_ENDPOINT:?} or similar and passes them as literal argv entries — never as shell-interpolated strings. UNSAFE PATTERN: writing 'poll-deploy.sh ${user_config.api_endpoint}' (or even single-quoted '${user_config.api_endpoint}') interpolates the value into the shell command string before execution; a value containing a single quote breaks out of the quoting and achieves command injection."
     },
     {
       "name": "error-log",

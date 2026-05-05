@@ -99,15 +99,29 @@ function validatePathFile(fieldName, filePath, pluginDir, errors) {
   if (!resolved) {
     errors.push(`${fieldName} path escapes plugin directory: ${filePath}`);
     logError(`${fieldName} path escapes plugin directory: ${filePath}`);
-  } else if (!fs.existsSync(resolved)) {
+    return;
+  }
+  if (!fs.existsSync(resolved)) {
     errors.push(`${fieldName} file not found: ${filePath}`);
     logError(`${fieldName} file not found: ${filePath}`);
-  } else if (fs.statSync(resolved).isDirectory()) {
+    return;
+  }
+  // Use lstatSync (not statSync) so symlinks are detected before they are
+  // followed; a symlink inside the plugin directory could otherwise point at
+  // an arbitrary filesystem location and bypass the resolvePluginPath
+  // boundary check. Reject symlinks outright.
+  const stat = fs.lstatSync(resolved);
+  if (stat.isSymbolicLink()) {
+    errors.push(`${fieldName} path is a symlink which is not permitted: ${filePath}`);
+    logError(`${fieldName} path is a symlink which is not permitted: ${filePath}`);
+    return;
+  }
+  if (stat.isDirectory()) {
     errors.push(`${fieldName} must point to a file, not a directory: ${filePath}`);
     logError(`${fieldName} must point to a file, not a directory: ${filePath}`);
-  } else {
-    logSuccess(`${fieldName}: ${filePath}`);
+    return;
   }
+  logSuccess(`${fieldName}: ${filePath}`);
 }
 
 /**
@@ -138,31 +152,47 @@ function validatePathOrPathsDir(fieldName, fieldValue, pluginDir, errors) {
     if (!resolved) {
       errors.push(`${fieldName} path escapes plugin directory: ${p}`);
       logError(`${fieldName} path escapes plugin directory: ${p}`);
-    } else if (!fs.existsSync(resolved)) {
+      continue;
+    }
+    if (!fs.existsSync(resolved)) {
       errors.push(`${fieldName} directory not found: ${p}`);
       logError(`${fieldName} directory not found: ${p}`);
-    } else if (!fs.statSync(resolved).isDirectory()) {
+      continue;
+    }
+    // lstatSync (not statSync): detect symlinks before following them. A
+    // symlink inside the plugin directory could otherwise point to a
+    // directory outside and let readdirSync enumerate arbitrary filesystem
+    // paths past the resolvePluginPath boundary. Reject symlinks outright.
+    const stat = fs.lstatSync(resolved);
+    if (stat.isSymbolicLink()) {
+      errors.push(`${fieldName} path is a symlink which is not permitted: ${p}`);
+      logError(`${fieldName} path is a symlink which is not permitted: ${p}`);
+      continue;
+    }
+    if (!stat.isDirectory()) {
       errors.push(`${fieldName} must point to a directory: ${p}`);
       logError(`${fieldName} must point to a directory: ${p}`);
+      continue;
+    }
+    // Walk the directory recursively to find any .md files. The 'skills'
+    // field uses SKILL.md files inside per-skill subdirectories; 'commands'
+    // and 'agents' commonly group .md files into category subdirectories
+    // (e.g. setup/all.md, research/best-practices-researcher.md). A
+    // single-level readdirSync misses both layouts and false-rejects them.
+    // countMarkdownRecursive skips symlinks at every depth, complementing
+    // the top-level lstatSync guard above.
+    const mdCount = countMarkdownRecursive(resolved);
+    if (mdCount === 0) {
+      errors.push(
+        `${fieldName} directory must contain at least one .md file (recursively): ${p}`
+      );
+      logError(
+        `${fieldName} directory must contain at least one .md file (recursively): ${p}`
+      );
     } else {
-      // Walk the directory recursively to find any .md files. The 'skills'
-      // field uses SKILL.md files inside per-skill subdirectories; 'commands'
-      // and 'agents' commonly group .md files into category subdirectories
-      // (e.g. setup/all.md, research/best-practices-researcher.md). A
-      // single-level readdirSync misses both layouts and false-rejects them.
-      const mdCount = countMarkdownRecursive(resolved);
-      if (mdCount === 0) {
-        errors.push(
-          `${fieldName} directory must contain at least one .md file (recursively): ${p}`
-        );
-        logError(
-          `${fieldName} directory must contain at least one .md file (recursively): ${p}`
-        );
-      } else {
-        logSuccess(
-          `${fieldName}: ${p} (${mdCount} file${mdCount === 1 ? '' : 's'})`
-        );
-      }
+      logSuccess(
+        `${fieldName}: ${p} (${mdCount} file${mdCount === 1 ? '' : 's'})`
+      );
     }
   }
 }
