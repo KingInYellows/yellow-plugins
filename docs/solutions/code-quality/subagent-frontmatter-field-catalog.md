@@ -99,12 +99,12 @@ Only `worktree` is officially documented as of May 2026. Values like `strict`, `
 
 **`memory:` is a tool expansion**, not just a storage flag. Setting any scope auto-grants `Read`, `Write`, and `Edit` to the subagent **regardless of its `tools:` allowlist**. For agents documented as read-only (e.g., review agents that "report findings, do NOT edit"), the read-only contract becomes prompt-level only — the runtime permission is full read/write. Validate at PR-review time: when an author adds `memory:`, re-check the agent's tool-allowlist semantics still match its documented contract.
 
-**Fix for read-only agents that need `memory:`:** add `disallowedTools: [Write, Edit, MultiEdit]` alongside `memory: project`. The denylist is applied after the `memory:` grant, so `Read` still works for memory file access but write operations are blocked at runtime.
+**Fix for read-only agents that need `memory:`:** add `disallowedTools: [Write, Edit, MultiEdit, NotebookEdit]` alongside `memory: project`. The denylist is applied after the `memory:` grant, so `Read` still works for memory file access but write operations are blocked at runtime.
 
 ```yaml
 # Review agent that must not edit files:
 memory: project
-disallowedTools: [Write, Edit, MultiEdit]
+disallowedTools: [Write, Edit, MultiEdit, NotebookEdit]
 ```
 
 PR #255 audit found ~10 agents in yellow-review and yellow-core carrying `memory: project` without this guard. All were documented as "report findings only / Do NOT edit any files" — the expanded write permission existed silently at runtime for every one. Cross-validated by 4 reviewers (adversarial, security, correctness, plugin-contract).
