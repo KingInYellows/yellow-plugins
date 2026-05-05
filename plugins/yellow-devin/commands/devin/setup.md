@@ -282,6 +282,25 @@ Probe the org-scoped API to check `ViewOrgSessions` (list) and
 `ManageOrgSessions` (message).
 
 ```bash
+# Bash-level enforcement of the userConfig-only skip guard described above.
+# Without this, the prose instruction is the only thing keeping the curl
+# call from running with an empty Bearer token (→ misleading 401) when
+# Steps 1+2 ran in the same invocation and TOKEN_SRC/ORG_SRC are
+# "userconfig" with no shell exports.
+if [ "${TOKEN_SRC:-}" = "userconfig" ] && [ "${ORG_SRC:-}" = "userconfig" ] \
+    && [ -z "${DEVIN_SERVICE_USER_TOKEN:-}" ] && [ -z "${DEVIN_ORG_ID:-}" ]; then
+  printf '\n=== Permission Checks ===\n'
+  printf 'Skipping live API probes — credentials are in userConfig only (no shell env vars).\n'
+  printf 'MCP tool visibility is the credential validation signal in this mode.\n'
+  printf 'To enable curl-based permission probes, also add to ~/.zshrc or ~/.bashrc:\n'
+  printf '  export DEVIN_SERVICE_USER_TOKEN="<your-cog-token>"\n'
+  printf '  export DEVIN_ORG_ID="<your-org-id>"\n'
+  PROBE_VIEW_ORG=UNKNOWN
+  PROBE_MANAGE_ORG=UNKNOWN
+  PROBE_VIEW_ACCOUNT=UNKNOWN
+  exit 0
+fi
+
 DEVIN_API_BASE="https://api.devin.ai/v3"
 ORG_URL="${DEVIN_API_BASE}/organizations/${DEVIN_ORG_ID}"
 

@@ -387,7 +387,7 @@ Setup complete. Run /semgrep:status to see findings.
 
 If `SKIP_CURL_PROBE=1` (userConfig-only mode), replace the Deployment line with:
 
-```
+```text
 Deployment:   not detected (userConfig-only mode — shell SEMGREP_APP_TOKEN unset)
               REST-API features (deployment slug, findings API) are unavailable.
               To enable: add `export SEMGREP_APP_TOKEN="<your-sgp-token>"` to

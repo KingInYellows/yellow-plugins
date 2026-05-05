@@ -24,11 +24,17 @@
   working unchanged. `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`
   shell exports are still read by all `/devin:*` commands.
 - Recommended for new installs: answer the userConfig prompt at plugin
-  enable so the token is keychain-backed and no shell export is
-  required. If you want the commands to work without also exporting
-  the shell env var, a thin wrapper / CLI bridge would be needed — see
-  yellow-morph's `bin/start-morph.sh` for a reference pattern. In this
-  release the two sources remain independent for backward compat.
+  enable so the token is keychain-backed and Claude Code's MCP env
+  substitution handles authentication for the MCP server without a
+  shell export. **`/devin:*` curl-based commands still need the same
+  values exported in the shell** — they do not read userConfig directly.
+  In this release the two sources remain independent for backward
+  compat: keychain backs the MCP, shell env backs the curl-based
+  commands. Power users who want the curl path to work without a shell
+  export can author a thin per-command CLI bridge that resolves the
+  credential from the keychain at invocation time — see
+  yellow-morph's `bin/start-morph.sh` for a reference pattern of that
+  shape.
 
 ## 2.1.1
 

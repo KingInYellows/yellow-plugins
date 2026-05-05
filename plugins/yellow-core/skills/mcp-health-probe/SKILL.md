@@ -1,6 +1,6 @@
 ---
 name: mcp-health-probe
-description: "Canonical three-state MCP server health classification (OFFLINE / DEGRADED / HEALTHY) for `/<plugin>:status` commands. Use when authoring a status command that needs to distinguish 'MCP never started' from 'MCP running but upstream API degraded'."
+description: "Canonical MCP server health classification (OFFLINE / DEGRADED / HEALTHY plus PRESENT (untested) refinement) for `/<plugin>:status` commands. Use when authoring a status command that needs to distinguish 'MCP never started' from 'MCP running but upstream API degraded'."
 user-invokable: false
 ---
 
@@ -8,11 +8,14 @@ user-invokable: false
 
 ## What It Does
 
-Defines the canonical three-state MCP health classification (OFFLINE /
-DEGRADED / HEALTHY) used by `/<plugin>:status` commands so the user can
-distinguish "the MCP server didn't start" from "the MCP started but the
-upstream API is failing." Extracted from yellow-morph's `/morph:status`
-and generalized for any plugin with an MCP + upstream HTTP API.
+Defines the canonical health classification used by `/<plugin>:status`
+commands so the user can distinguish "the MCP server didn't start" from
+"the MCP started but the upstream API is failing." Three core states
+(OFFLINE / DEGRADED / HEALTHY) cover the universal case; a fourth label,
+`PRESENT (untested)`, is a refinement of HEALTHY for MCPs that defer
+credential validation to first tool invocation. Extracted from
+yellow-morph's `/morph:status` and generalized for any plugin with an
+MCP + upstream HTTP API.
 
 ## When to Use
 
@@ -24,10 +27,11 @@ consistently.
 
 ## Usage
 
-Three-state classification pattern for `/<plugin>:status` commands that
-expose an MCP server. The subsections below cover the three states, the
-detection pattern, the classification table, the rationale, a reference
-implementation, and the anti-patterns to avoid.
+Health classification pattern for `/<plugin>:status` commands that expose
+an MCP server. Three core states, plus one refinement label for MCPs that
+do not validate credentials at startup. The subsections below cover the
+states, the detection pattern, the classification table, the rationale, a
+reference implementation, and the anti-patterns to avoid.
 
 ### States
 
@@ -39,8 +43,16 @@ implementation, and the anti-patterns to avoid.
   Tools are callable but will fail at invocation time until the upstream
   recovers or the credential is fixed.
 - **HEALTHY** — MCP tools are visible AND the API probe returned 200 (or
-  was skipped because the credential isn't readable from the shell — see
-  "Skipped probe" below).
+  was skipped because the credential isn't readable from the shell, AND
+  the MCP validates credentials at startup so visibility implies a working
+  credential — see "Skipped probe" below).
+- **PRESENT (untested)** — Refinement of the skipped-probe HEALTHY case
+  for MCPs that do NOT validate credentials at startup (exa, tavily): the
+  credential is stored and the MCP loaded, but neither the API probe nor
+  MCP startup has validated it. Use this label only in the
+  per-skipped-probe row of the table; aggregate state for the user-facing
+  banner remains HEALTHY (the MCP is usable; first invocation will surface
+  any auth problem).
 
 ### Pattern
 
@@ -139,6 +151,8 @@ consistent surface across plugins.
 - **Do not** omit the "What to do" block — a state without an action is
   a dead-end for the user. Every state should have at least one concrete
   next step.
-- **Do not** invent a fourth state ("INITIALIZING", "UNKNOWN"). The
-  three-state surface is deliberately simple; if a probe is ambiguous,
-  report DEGRADED with the ambiguity in the "What to do" block.
+- **Do not** invent ad-hoc states like "INITIALIZING" or "UNKNOWN". The
+  surface is deliberately small: three core states (OFFLINE / DEGRADED /
+  HEALTHY) plus the documented `PRESENT (untested)` refinement of HEALTHY
+  for non-startup-validating MCPs. If a probe is ambiguous beyond those
+  cases, report DEGRADED with the ambiguity in the "What to do" block.
