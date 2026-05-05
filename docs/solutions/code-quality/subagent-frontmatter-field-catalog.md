@@ -128,7 +128,7 @@ The `background: true` frontmatter flag declares the agent is concurrent-eligibl
 grep -LE 'background:[[:space:]]*true' plugins/<name>/agents/<agent-name>.md
 ```
 
-Absence of output is a false claim in the orchestrator prose, not a minor doc inconsistency — it means those agents silently serialize and the stated parallelism guarantee is broken.
+Any output from this command (printed filenames) is a false claim in the orchestrator prose, not a minor doc inconsistency — it means those agents silently serialize and the stated parallelism guarantee is broken. Absence of output means every named agent has the flag and the claim is verified.
 
 ### `mcpServers` inline config
 
