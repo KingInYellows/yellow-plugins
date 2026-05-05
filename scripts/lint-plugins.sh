@@ -15,11 +15,14 @@
 # loop before subsequent files are checked.
 set -uo pipefail
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
-if [ -z "$ROOT" ]; then
-  printf '[lint-plugins] Error: not in a git repository\n' >&2
+command -v git >/dev/null 2>&1 || {
+  printf '[lint-plugins] Error: git not found in PATH\n' >&2
   exit 1
-fi
+}
+ROOT="$(git rev-parse --show-toplevel 2>&1)" || {
+  printf '[lint-plugins] Error: %s\n' "$ROOT" >&2
+  exit 1
+}
 cd "$ROOT" || exit 1
 
 errors=0

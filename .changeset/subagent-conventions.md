@@ -15,9 +15,12 @@ new sections:
 
 2. **Subagent Failure Convention (Output-File Pattern)** — documents the
    community-adopted workaround for unreliable Task tool return values
-   (GitHub Issues #24181, #25818): spawned agents write a structured JSON
-   result file to `${CLAUDE_PLUGIN_DATA}/agent-result-<agent>.json`, and
-   orchestrators read the file rather than relying on stdout parsing.
+   (GitHub Issues #24181, #25818): orchestrators create a per-run directory
+   via `RUN_DIR=$(mktemp -d -t run-XXXXXXXX)` and pass it to each spawned
+   agent, which writes a structured JSON result to
+   `$RUN_DIR/agent-result-<agent>.json`. Orchestrators read the file rather
+   than relying on stdout parsing. (`CLAUDE_PLUGIN_DATA` is not a documented
+   Claude Code runtime variable and must not be used for this pattern.)
 
 Wires the convention into the review-pr.md (Step 5 Pass 1) and work.md
 (Phase 3 step 4) orchestrators so multi-agent sessions can distinguish
