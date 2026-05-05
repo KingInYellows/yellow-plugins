@@ -295,7 +295,8 @@
               },
               "version": {
                 "type": "string",
-                "description": "Semver constraint such as ^1.2.0, ~2.1.0, or >=3.0.0."
+                "semverRange": true,
+                "description": "Semver range constraint such as ^1.2.0, ~2.1.0, or >=3.0.0. Validated by the semverRange AJV custom keyword (semver.validRange)."
               }
             },
             "additionalProperties": false
