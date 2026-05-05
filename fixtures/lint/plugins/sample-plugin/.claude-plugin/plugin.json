@@ -1,0 +1,6 @@
+{
+  "name": "sample-plugin",
+  "version": "0.1.0",
+  "description": "Synthetic plugin used by tests/lint-plugins.bats — not a real plugin.",
+  "author": "lint-fixture"
+}
