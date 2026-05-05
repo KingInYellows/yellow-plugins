@@ -31,13 +31,19 @@ teardown() {
 run_lint_in_fixture() {
   local subdir="$1"
   local fixture_path="$2"
-  cp -r "$fixture_path" "$TEST_TMP/$subdir/plugins"
+  cp -r "$fixture_path" "$TEST_TMP/$subdir/plugins" || {
+    echo "fixture setup failed: cp -r '$fixture_path' '$TEST_TMP/$subdir/plugins'" >&2
+    return 1
+  }
   ( cd "$TEST_TMP/$subdir" \
       && git init -q \
       && git config user.email lint@example.invalid \
       && git config user.name lint \
       && git add . \
-      && git commit -q -m init >/dev/null )
+      && git commit -q -m init >/dev/null ) || {
+    echo "fixture setup failed: git init/commit in '$TEST_TMP/$subdir'" >&2
+    return 1
+  }
   cd "$TEST_TMP/$subdir"
   # bats-core >= 1.5.0 captures only stdout in $output; lint-plugins.sh writes
   # findings to stderr via err()/warn(). Merge streams so $output assertions
@@ -134,4 +140,5 @@ run_lint_in_fixture() {
   cd "$ROOT"
   [ "$status" -eq 0 ]
   [[ "$output" != *"ERROR"* ]]
+  [[ "$output" != *"WARN"* ]]
 }
