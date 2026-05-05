@@ -136,7 +136,7 @@ fi
 ### Step 5: Extract session ID for cleanup
 
 ```bash
-SESSION_ID=$(jq -r 'first(.sessionID // empty)' "$OUTPUT_FILE" 2>/dev/null)
+SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.sessionID' "$OUTPUT_FILE" 2>/dev/null | head -1)
 ```
 
 If `SESSION_ID` is empty, the JSONL stream may not have a `step_start` event

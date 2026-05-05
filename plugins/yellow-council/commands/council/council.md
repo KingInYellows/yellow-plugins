@@ -255,7 +255,11 @@ Construct the synthesis report as a single markdown string (`SYNTHESIS_MD`).
 
 ### Step 6: Slug + target path derivation
 
-Use the skill's `build_slug` and `build_target_path` helpers:
+Use the skill's `build_slug` and `build_target_path` helpers. Because each
+bash block runs as a fresh subprocess, these functions are not in scope unless
+you define them first. Before running this block, copy the `build_slug` and
+`build_target_path` function bodies verbatim from the `council-patterns` skill
+and paste them at the top of the block (before the first call site).
 
 ```bash
 # Re-derive state — each bash block runs in a fresh subprocess
