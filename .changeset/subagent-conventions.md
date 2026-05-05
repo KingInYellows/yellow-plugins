@@ -3,6 +3,8 @@
 "yellow-review": patch
 ---
 
+# Agent Archetypes And Subagent Failure Convention
+
 Document agent archetypes and subagent failure convention
 
 Extends `plugins/yellow-core/skills/create-agent-skills/SKILL.md` with two

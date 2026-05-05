@@ -130,7 +130,7 @@ context: fork
 
 **Keep SKILL.md under 500 lines.** Split detailed content into reference files.
 
-```
+```text
 skills/
   complex-workflow/
     SKILL.md              # Main skill (< 500 lines)
@@ -283,11 +283,11 @@ result files to a per-run directory so concurrent sessions cannot collide
 (e.g., two review sessions running on different PRs at the same time). The
 canonical path is:
 
-```
-${TMPDIR:-/tmp}/<run-dir>/agent-result-<agent-name>.json
+```text
+$RUN_DIR/agent-result-<agent-name>.json
 ```
 
-where `<run-dir>` is a unique directory the orchestrator creates at the
+where `$RUN_DIR` is a unique directory the orchestrator creates at the
 start of the run (see orchestrator example below) and passes to each agent
 via the spawn prompt.
 
@@ -310,6 +310,14 @@ via the spawn prompt.
    invalid JSON all indicate incomplete work that the orchestrator should
    surface.
 
+   **Note for command-file authors:** in Claude Code command `.md` files each
+   fenced bash block runs in a fresh subprocess (see
+   `docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`),
+   so `$RUN_DIR` from Step 1 is NOT in scope here. The block below is
+   illustrative shell logic — in a command file, either re-derive the path
+   in the same fence, or pass the **literal path captured from `mktemp -d`**
+   to the agent's Task input instead of the variable name.
+
 ```bash
 RESULT="$RUN_DIR/agent-result-${AGENT_NAME}.json"
 if [ ! -f "$RESULT" ]; then
@@ -319,7 +327,7 @@ elif ! jq -e . "$RESULT" >/dev/null 2>&1; then
 elif ! STATUS=$(jq -er .status "$RESULT" 2>/dev/null); then
   # jq -er exits non-zero for both absent .status AND .status: null —
   # both indicate a malformed agent output and are treated identically here
-  report_failed "$AGENT_NAME" "result file missing or null \"status\" field"
+  report_failed "$AGENT_NAME" "missing or null \"status\" field"
 elif [ "$STATUS" != "success" ]; then
   REASON=$(jq -r '.reason // "no reason given"' "$RESULT")
   report_failed "$AGENT_NAME" "$REASON"
@@ -333,7 +341,7 @@ The two-stage check (`jq -e .` for JSON validity, then `jq -er .status` for
 field presence) avoids the misleading "not valid JSON" diagnosis when the
 file parses correctly but `.status` is null or absent.
 
-4. Clean up `$RUN_DIR` at the end of the workflow, or leave it in place
+1. Clean up `$RUN_DIR` at the end of the workflow, or leave it in place
    when retaining result files aids post-run debugging.
 
 ### Why files and not stdout
