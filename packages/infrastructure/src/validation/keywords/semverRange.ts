@@ -9,37 +9,58 @@
  * Used in `schemas/plugin.schema.json` for `dependencies[].version`. The
  * schema applies a lightweight `pattern` first to reject obvious non-semver
  * input; this keyword runs second and rejects strings that pass the
- * structural gate but are not actually valid range expressions.
+ * structural gate but are not actually valid range expressions. The schema
+ * MUST also set `minLength: 1` on the field — `semver.validRange("")`
+ * returns `"*"` (truthy, the universal range), so the empty string would
+ * otherwise pass this keyword.
  *
  * @module infrastructure/validation/keywords/semverRange
  */
 
+import type { FuncKeywordDefinition, SchemaValidateFunction } from 'ajv';
 import semver from 'semver';
-
-import type { CodeKeywordDefinition, KeywordDefinition } from 'ajv';
 
 /**
  * Keyword definition object suitable for `ajv.addKeyword(...)`.
  *
- * The keyword fires only when its schema value is `true` and the data
- * being validated is a string. Non-string data falls through (caller
- * already declared `type: "string"` if a string is required).
+ * AJV's `type: 'string'` filter ensures the validate function is only
+ * invoked for string-typed data, so no in-function non-string guard is
+ * needed. `errors: true` enables structured error output with the
+ * offending value, replacing AJV's default generic "must pass keyword
+ * validation" message.
  */
-export const semverRangeKeyword: KeywordDefinition = {
+// AJV's SchemaValidateFunction is a callable that ALSO carries an `errors`
+// property the function itself populates with structured error objects on
+// failure. TypeScript expresses that as a callable + property, so we
+// construct the validate function and attach `errors` in two steps.
+const validateFn: SchemaValidateFunction = (
+  schemaValue: unknown,
+  data: unknown
+): boolean => {
+  if (schemaValue !== true) {
+    validateFn.errors = null;
+    return true;
+  }
+  // AJV's `type: 'string'` filter guarantees data is a string when this
+  // function is invoked; no defensive guard needed.
+  if (semver.validRange(data as string, { loose: false }) !== null) {
+    validateFn.errors = null;
+    return true;
+  }
+  validateFn.errors = [
+    {
+      keyword: 'semverRange',
+      message: `must be a valid npm semver range (got "${String(data)}")`,
+      params: { value: data },
+    },
+  ];
+  return false;
+};
+
+export const semverRangeKeyword: FuncKeywordDefinition = {
   keyword: 'semverRange',
   type: 'string',
   schemaType: 'boolean',
-  errors: false,
-  validate: (schemaValue: unknown, data: unknown): boolean => {
-    if (schemaValue !== true) return true;
-    if (typeof data !== 'string') return true;
-    // semver.validRange returns the canonicalized range on valid input,
-    // null on invalid input. Treat null as "not a valid range".
-    return semver.validRange(data, { loose: false }) !== null;
-  },
+  errors: true,
+  validate: validateFn,
 };
-
-// Re-export the type alias used by the AJV API surface so consumers can
-// strongly type `ajv.addKeyword(semverRangeKeyword)` calls without
-// importing AJV directly.
-export type SemverRangeKeyword = CodeKeywordDefinition | KeywordDefinition;

@@ -124,6 +124,7 @@ jobs:
                     -s schemas/plugin.schema.json \
                     -d "$manifest" \
                     -c ajv-formats \
+                    -c ./scripts/ajv-custom-keywords.js \
                     --strict=true \
                     --all-errors
                 done
@@ -172,6 +173,7 @@ jobs:
                     -s schemas/plugin.schema.json \
                     -d "$example" \
                     -c ajv-formats \
+                    -c ./scripts/ajv-custom-keywords.js \
                     --strict=true \
                     --all-errors
                 done

@@ -106,7 +106,7 @@ describe('semverRange custom keyword (PR-B)', () => {
         version: {
           type: 'string',
           minLength: 1,
-          pattern: '^[~^>=<*xX0-9]',
+          pattern: '^[~^>=<*xXvV0-9]',
           semverRange: true,
         },
       },
@@ -127,13 +127,25 @@ describe('semverRange custom keyword (PR-B)', () => {
   });
 
   it('accepts >=3.0.0', () => {
-    expect(
-      factory.validate('semver-test', { version: '>=3.0.0' }).valid
-    ).toBe(true);
+    expect(factory.validate('semver-test', { version: '>=3.0.0' }).valid).toBe(
+      true
+    );
   });
 
   it('accepts 1.2.3 (exact)', () => {
     expect(factory.validate('semver-test', { version: '1.2.3' }).valid).toBe(
+      true
+    );
+  });
+
+  it('accepts v1.2.3 (exact with v prefix)', () => {
+    expect(factory.validate('semver-test', { version: 'v1.2.3' }).valid).toBe(
+      true
+    );
+  });
+
+  it('accepts =1.2.3 (exact with equals prefix)', () => {
+    expect(factory.validate('semver-test', { version: '=1.2.3' }).valid).toBe(
       true
     );
   });
@@ -143,7 +155,7 @@ describe('semverRange custom keyword (PR-B)', () => {
   });
 
   it('rejects "banana" (non-semver)', () => {
-    // Pattern gate rejects this before semverRange runs (starts with letter).
+    // Pattern gate rejects this before semverRange runs.
     expect(factory.validate('semver-test', { version: 'banana' }).valid).toBe(
       false
     );

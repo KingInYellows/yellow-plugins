@@ -85,7 +85,9 @@ jobs:
                 ajv validate \
                   -s schemas/plugin.schema.json \
                   -d "$manifest" \
-                  -c ajv-formats --strict=true --all-errors
+                  -c ajv-formats \
+                  -c ./scripts/ajv-custom-keywords.js \
+                  --strict=true --all-errors
               done
               for manifest in $PLUGIN_MANIFESTS; do
                 node scripts/validate-plugin.js --plugin "$manifest"
@@ -112,7 +114,9 @@ jobs:
                 ajv validate \
                   -s schemas/plugin.schema.json \
                   -d "$example" \
-                  -c ajv-formats --strict=true --all-errors
+                  -c ajv-formats \
+                  -c ./scripts/ajv-custom-keywords.js \
+                  --strict=true --all-errors
               done
               ;;
             *)
