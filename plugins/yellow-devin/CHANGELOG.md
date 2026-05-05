@@ -1,40 +1,70 @@
 # Changelog
 
+## 2.3.0
+
+### Minor Changes
+
+- [#259](https://github.com/KingInYellows/yellow-plugins/pull/259)
+  [`160f021`](https://github.com/KingInYellows/yellow-plugins/commit/160f02182e5e37d66658fcd1d567893bf3026e0e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Roll out
+  userConfig-based credential storage across five plugins, replacing or
+  augmenting shell environment variable lookups with Claude Code userConfig.
+  - **yellow-semgrep** (BREAKING): `SEMGREP_APP_TOKEN` is now read from
+    `userConfig.semgrep_app_token` instead of the shell environment variable.
+    Users who supplied the token only via `SEMGREP_APP_TOKEN` in their shell
+    profile must re-enter it via the userConfig prompt (run `/semgrep:setup`);
+    the shell env path no longer feeds the MCP server at startup.
+  - **yellow-research** (BREAKING): All three API keys (`PERPLEXITY_API_KEY`,
+    `TAVILY_API_KEY`, `EXA_API_KEY`) are migrated to userConfig. Existing users
+    who relied solely on shell env vars must answer the userConfig prompt to
+    continue using the plugin; run `/research:setup` to re-enter credentials.
+  - **yellow-devin** (additive): HTTP-MCP userConfig declaration added for
+    `devin_service_user_token` and `devin_org_id`. The shell env fallback
+    (`DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID`) continues to work; no action
+    required for current users.
+  - **yellow-core** (additive): New `mcp-health-probe` skill defining a
+    canonical three-state MCP health classification (OFFLINE / DEGRADED /
+    HEALTHY) for `/<plugin>:status` commands. The existing
+    `mcp-integration-patterns` skill is split into three focused sub-skills for
+    narrower auto-invocation: `memory-recall-pattern`,
+    `memory-remember-pattern`, and `morph-discovery-pattern`. The umbrella
+    `mcp-integration-patterns` skill is retained until consumers migrate. The
+    `/setup:all` env-variable dashboard gains a `check_key()` helper that
+    reports shell env vs userConfig state per credential.
+
 ## [2.2.0] - 2026-04-17
 
 ### Minor Changes
 
 - **Adopt `userConfig` for credential entry.** `DEVIN_SERVICE_USER_TOKEN`
-  (sensitive) and `DEVIN_ORG_ID` (non-sensitive — IDs are not secrets)
-  are now declared as `userConfig` fields in `plugin.json`. Claude Code
-  prompts for them at plugin-enable time and stores the token in the
-  system keychain (or `~/.claude/.credentials.json` at 0600 perms on
-  Linux). Commands still read the shell env vars for curl invocations,
-  so existing shell-env setups continue to work unchanged — userConfig
-  is an additive UX improvement, not a breaking change. `/setup:all`
-  now classifies the plugin READY when either source is present.
-- `/devin:setup` now emits a dual-source drift WARNING when userConfig
-  is configured but the corresponding shell env var is empty, noting
-  that `/devin:*` curl-based commands will return 401 until the shell
-  export is also added.
+  (sensitive) and `DEVIN_ORG_ID` (non-sensitive — IDs are not secrets) are now
+  declared as `userConfig` fields in `plugin.json`. Claude Code prompts for them
+  at plugin-enable time and stores the token in the system keychain (or
+  `~/.claude/.credentials.json` at 0600 perms on Linux). Commands still read the
+  shell env vars for curl invocations, so existing shell-env setups continue to
+  work unchanged — userConfig is an additive UX improvement, not a breaking
+  change. `/setup:all` now classifies the plugin READY when either source is
+  present.
+- `/devin:setup` now emits a dual-source drift WARNING when userConfig is
+  configured but the corresponding shell env var is empty, noting that
+  `/devin:*` curl-based commands will return 401 until the shell export is also
+  added.
 
 ### Migration (existing users)
 
-- No action required for existing shell-env setups — they continue
-  working unchanged. `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID`
-  shell exports are still read by all `/devin:*` commands.
-- Recommended for new installs: answer the userConfig prompt at plugin
-  enable so the token is keychain-backed and Claude Code's MCP env
-  substitution handles authentication for the MCP server without a
-  shell export. **`/devin:*` curl-based commands still need the same
-  values exported in the shell** — they do not read userConfig directly.
-  In this release the two sources remain independent for backward
-  compat: keychain backs the MCP, shell env backs the curl-based
-  commands. Power users who want the curl path to work without a shell
-  export can author a thin per-command CLI bridge that resolves the
-  credential from the keychain at invocation time — see
-  yellow-morph's `bin/start-morph.sh` for a reference pattern of that
-  shape.
+- No action required for existing shell-env setups — they continue working
+  unchanged. `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` shell exports are
+  still read by all `/devin:*` commands.
+- Recommended for new installs: answer the userConfig prompt at plugin enable so
+  the token is keychain-backed and Claude Code's MCP env substitution handles
+  authentication for the MCP server without a shell export. **`/devin:*`
+  curl-based commands still need the same values exported in the shell** — they
+  do not read userConfig directly. In this release the two sources remain
+  independent for backward compat: keychain backs the MCP, shell env backs the
+  curl-based commands. Power users who want the curl path to work without a
+  shell export can author a thin per-command CLI bridge that resolves the
+  credential from the keychain at invocation time — see yellow-morph's
+  `bin/start-morph.sh` for a reference pattern of that shape.
 
 ## 2.1.2
 

@@ -24,7 +24,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.10.0",
+      "version": "1.11.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -44,7 +44,7 @@
     {
       "name": "yellow-devin",
       "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -64,7 +64,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "2.5.0",
+      "version": "2.5.1",
       "author": {
         "name": "KingInYellows"
       },
@@ -124,7 +124,7 @@
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
-      "version": "2.0.0",
+      "version": "3.0.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -144,7 +144,7 @@
     {
       "name": "yellow-semgrep",
       "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
-      "version": "3.0.0",
+      "version": "4.0.0",
       "author": {
         "name": "KingInYellows"
       },

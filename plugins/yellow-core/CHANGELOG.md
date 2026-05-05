@@ -1,5 +1,90 @@
 # Changelog
 
+## 1.11.0
+
+### Minor Changes
+
+- [#259](https://github.com/KingInYellows/yellow-plugins/pull/259)
+  [`160f021`](https://github.com/KingInYellows/yellow-plugins/commit/160f02182e5e37d66658fcd1d567893bf3026e0e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Roll out
+  userConfig-based credential storage across five plugins, replacing or
+  augmenting shell environment variable lookups with Claude Code userConfig.
+  - **yellow-semgrep** (BREAKING): `SEMGREP_APP_TOKEN` is now read from
+    `userConfig.semgrep_app_token` instead of the shell environment variable.
+    Users who supplied the token only via `SEMGREP_APP_TOKEN` in their shell
+    profile must re-enter it via the userConfig prompt (run `/semgrep:setup`);
+    the shell env path no longer feeds the MCP server at startup.
+  - **yellow-research** (BREAKING): All three API keys (`PERPLEXITY_API_KEY`,
+    `TAVILY_API_KEY`, `EXA_API_KEY`) are migrated to userConfig. Existing users
+    who relied solely on shell env vars must answer the userConfig prompt to
+    continue using the plugin; run `/research:setup` to re-enter credentials.
+  - **yellow-devin** (additive): HTTP-MCP userConfig declaration added for
+    `devin_service_user_token` and `devin_org_id`. The shell env fallback
+    (`DEVIN_SERVICE_USER_TOKEN`, `DEVIN_ORG_ID`) continues to work; no action
+    required for current users.
+  - **yellow-core** (additive): New `mcp-health-probe` skill defining a
+    canonical three-state MCP health classification (OFFLINE / DEGRADED /
+    HEALTHY) for `/<plugin>:status` commands. The existing
+    `mcp-integration-patterns` skill is split into three focused sub-skills for
+    narrower auto-invocation: `memory-recall-pattern`,
+    `memory-remember-pattern`, and `morph-discovery-pattern`. The umbrella
+    `mcp-integration-patterns` skill is retained until consumers migrate. The
+    `/setup:all` env-variable dashboard gains a `check_key()` helper that
+    reports shell env vs userConfig state per credential.
+
+- [`d79f9f7`](https://github.com/KingInYellows/yellow-plugins/commit/d79f9f7a9e2098759c8f054f9f98ee699cdb1bf5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add canonical
+  security-fencing skill as source of truth for agent prompt-injection hardening
+
+  Introduces `plugins/yellow-core/skills/security-fencing/SKILL.md` as the
+  authoritative copy of the CRITICAL SECURITY RULES + content-fencing block used
+  by 25 agents across yellow-core, yellow-review, yellow-debt, yellow-ci, and
+  yellow-browser-test.
+
+  The skill is marked `user-invokable: false` (following repo convention) and is
+  intended as documentation/template, not runtime-injected via agent `skills:`
+  frontmatter. Rationale: research (GitHub Issue #21891) confirms Claude Code
+  does not deduplicate skill content across parallel subagent spawns, so
+  migrating 25 consumers would not deliver token savings at runtime for this
+  ~180–220-token block.
+
+  Future migration is explicitly deferred pending (a) empirical verification of
+  skill-injection behavior at scale and (b) a drift-detection lint rule. Until
+  then, the skill serves as the single source of truth — update here first, then
+  propagate to inline copies.
+
+### Patch Changes
+
+- [`2872425`](https://github.com/KingInYellows/yellow-plugins/commit/287242561d9c3f1d68c76bb9a8609607043e4ff4)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Security
+  hardening follow-ups to PR #257:
+  - yellow-review/commands/review/review-pr.md: pr-context fence now requires
+    literal-delimiter substitution (`[ESCAPED] begin/end pr-context`) BEFORE XML
+    metacharacter escaping. Prevents fence-breakout when a PR diff contains the
+    closing delimiter on its own line (PR #254 pattern).
+  - yellow-review/commands/review/resolve-pr.md: cluster-comments fence requires
+    the same literal-delimiter substitution for `--- pr context begin/end`,
+    `--- cluster comments begin/end`, and `--- next thread ---`. Prevents
+    fence-breakout from raw GitHub thread text.
+  - yellow-core/skills/security-fencing/SKILL.md: new "Orchestrator-level fence
+    sanitization" section documents the canonical 2-step sanitization
+    (literal-delimiter substitution → XML escape) for any command that
+    interpolates untrusted external content into a fenced region.
+  - scripts/validate-plugin.js: validatePathFile and validatePathOrPathsDir now
+    use fs.lstatSync and reject symlinks outright at the top level. Recursive
+    .md counting goes through countMarkdownRecursive (a manual stack walk that
+    skips symlinks at every depth), avoiding fs.readdirSync({ recursive: true })
+    — which silently follows directory symlinks and would otherwise let .md
+    files inside a symlinked subdirectory slip past the plugin boundary.
+  - schemas/plugin.schema.json: userConfigEntry.default is now type-constrained
+    via allOf+if/then to match the entry's `type` field. monitor.command
+    description strengthened to require quoting `${user_config.KEY}`
+    substitutions.
+  - examples/plugin-extended.example.json: monitor command rewritten to drop
+    unsafe `'${user_config.KEY}'` shell interpolation; description teaches the
+    env-var pattern via `${CLAUDE_PLUGIN_OPTION_<KEY>}` and explicitly calls out
+    the unsafe form.
+
 ## 1.10.0
 
 ### Minor Changes
