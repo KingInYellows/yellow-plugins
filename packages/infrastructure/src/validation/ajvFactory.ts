@@ -17,6 +17,8 @@ import Ajv, {
 } from 'ajv';
 import addFormats from 'ajv-formats';
 
+import { semverRangeKeyword } from './keywords/semverRange.js';
+
 type AjvInstance = import('ajv').default;
 type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 type AddFormatsFn = (ajv: AjvInstance) => AjvInstance;
@@ -93,6 +95,10 @@ export class AjvValidatorFactory {
 
     // Add format validators (uri, email, date-time, etc.)
     applyFormats(this.ajv);
+
+    // Register custom keywords. semverRange validates dependencies[].version
+    // entries against npm semver range grammar (delegates to semver.validRange).
+    this.ajv.addKeyword(semverRangeKeyword);
 
     this.validatorCache = new Map();
   }

@@ -504,3 +504,11 @@ merges into `main` once PR #260 lands.
   .changeset/pr260-doc-sync.md
 - **Tasks:** 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9
 - **Depends on:** #3
+
+## Stack Progress
+
+<!-- Updated by workflows:work. Do not edit manually. -->
+- [x] 1. agent/fix/pr260-validator-hardening (PR #360, completed 2026-05-05)
+- [x] 2. agent/feat/pr260-schema-tightening (completed 2026-05-05)
+- [ ] 3. agent/fix/pr260-work-rundir-hardening
+- [ ] 4. agent/docs/pr260-doc-sync
