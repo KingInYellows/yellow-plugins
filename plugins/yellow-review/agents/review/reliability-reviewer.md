@@ -2,6 +2,7 @@
 name: reliability-reviewer
 description: "Conditional code-review persona, selected when the diff touches error handling, retries, circuit breakers, timeouts, health checks, background jobs, or async handlers. Use when reviewing any PR with I/O, async, or production-reliability-relevant code — review:pr selects this automatically based on diff content."
 model: inherit
+background: true
 tools:
   - Read
   - Grep

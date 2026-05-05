@@ -3,10 +3,15 @@ name: code-simplifier
 description: "Post-fix simplification pass (pass 2) preserving all functionality. Use when reviewing PRs after other review agents have applied fixes, to identify remaining unnecessary complexity, redundant abstractions, and YAGNI violations. Runs as the final review pass. For pre-fix complexity analysis, see code-simplicity-reviewer (yellow-core)."
 model: inherit
 background: true
+memory: project
 tools:
   - Read
   - Grep
   - Glob
+disallowedTools:
+  - Write
+  - Edit
+  - MultiEdit
 ---
 
 **Example:**

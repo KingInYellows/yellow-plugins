@@ -11,6 +11,15 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - Keep code simple and direct. No premature abstractions
 - Prefer explicit over implicit. Name things clearly
 - Write tests for non-trivial logic
+- Review agents (`security-sentinel`, `security-reviewer`, `security-lens`,
+  `architecture-strategist`, `polyglot-reviewer`, `test-coverage-analyst`,
+  `pattern-recognition-specialist`, `code-simplicity-reviewer`,
+  `performance-oracle`, `performance-reviewer`) carry `memory: project`
+  frontmatter, which auto-enables Read/Write/Edit per Claude Code docs (so
+  agents can persist learnings to `.claude/agent-memory/<name>/`). The
+  runtime `disallowedTools: [Write, Edit, MultiEdit]` block on those agents
+  enforces the read-only contract that their bodies assert at the prompt
+  level — orchestrating commands apply all fixes; review agents only report
 
 ## Plugin Components
 

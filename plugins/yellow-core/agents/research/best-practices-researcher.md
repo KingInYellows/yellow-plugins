@@ -3,6 +3,7 @@ name: best-practices-researcher
 description: "Technology researcher specializing in discovering and synthesizing best practices from authoritative sources. Use when implementing new features, evaluating libraries, or establishing architectural patterns."
 model: inherit
 background: true
+memory: project
 tools:
   - WebSearch
   - WebFetch
