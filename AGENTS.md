@@ -6,8 +6,8 @@ the validation and release tooling around it.
 
 - `plugins/`: Installable plugins. Current plugin directories are
   `gt-workflow`, `yellow-browser-test`, `yellow-chatprd`, `yellow-ci`,
-  `yellow-core`, `yellow-debt`, `yellow-devin`, `yellow-docs`,
-  `yellow-linear`,
+  `yellow-codex`, `yellow-composio`, `yellow-core`, `yellow-council`,
+  `yellow-debt`, `yellow-devin`, `yellow-docs`, `yellow-linear`,
   `yellow-morph`, `yellow-research`, `yellow-review`, `yellow-ruvector`, and
   `yellow-semgrep`.
 - `plugins/<plugin-name>/.claude-plugin/plugin.json`: Required plugin manifest.

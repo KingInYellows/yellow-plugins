@@ -120,10 +120,6 @@ Codex agent.)
   invocation via `opencode session delete <id>`, but if the cleanup itself
   fails (rare), sessions accumulate. Periodic manual `opencode session list`
   audit is recommended.
-- **Major OpenCode upgrades trigger SQLite migration.** First invocation after
-  a major version bump (e.g., 1.1.x → 1.14.x) can take 2–5 minutes. Run
-  `opencode run "test"` once interactively after upgrading before invoking
-  `/council`.
 - **Gemini workspace trust.** In untrusted directories, `--approval-mode plan`
   is overridden to `default` unless `--skip-trust` is also passed.
   yellow-council always passes `--skip-trust` for non-interactive use.
@@ -137,8 +133,21 @@ Codex agent.)
   enhancement issue rather than modifying `codex-reviewer.md`.
 - **No fresh-machine install CI.** No automated CI job verifies that Claude
   Code's runtime accepts the plugin manifest. A manual fresh-install test
-  is required before each release (procedure documented in the implementation
-  plan).
+  is required before each release (procedure documented in
+  `docs/testing/yellow-council-manual-tests.md`).
+- **Gemini CLI may hang on first non-interactive use in WSL2.** Observed
+  during spike testing on 2026-05-04: `gemini -p "..."` hung indefinitely
+  after the `.geminiignore` lookup with no further output, despite valid
+  OAuth credentials. Workaround: run `gemini -p "test"` interactively once
+  per session to refresh auth state before invoking `/council`. If the hang
+  persists, the gemini-reviewer agent's timeout (default 600s) will catch it
+  and report TIMEOUT — council still produces a partial-result report.
+- **OpenCode large minor-version jumps trigger a one-time SQLite migration**
+  (2–5 minutes). After running `opencode upgrade` from v1.1.x to v1.14+, the
+  next `opencode run` invocation performs a database migration that may
+  exceed the council's `COUNCIL_TIMEOUT` (default 600s). Run
+  `opencode run "test"` once interactively after each upgrade before relying
+  on the agent for time-bounded invocations.
 - **Single-shot V1.** No multi-round iterative review. V2 will add `--round 2`
   for follow-up consultations and `/council fleet *` subcommands for persistent
   session management.
