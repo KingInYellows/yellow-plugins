@@ -1,5 +1,235 @@
 # Changelog
 
+## 1.14.1
+
+### Patch Changes
+
+- [`e040554`](https://github.com/KingInYellows/yellow-plugins/commit/e0405546065b9980f2e6b419007540e0541d5df5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - # Documentation
+  Sync
+
+  Doc sync against PR #260 review findings — refresh stale references and add
+  Subagent Failure Convention scope clarification.
+
+  `plugins/yellow-core/skills/security-fencing/SKILL.md`:
+  - **Refresh consumer count** from "25 agents" (stale) to **34** (current
+    enumeration as of this commit). The 7 Wave-2 yellow-review personas
+    (correctness-reviewer, maintainability-reviewer,
+    project-compliance-reviewer, project-standards-reviewer,
+    reliability-reviewer, adversarial-reviewer, plugin-contract-reviewer) added
+    since the original count plus 3 yellow-core additions (security-lens,
+    security-reviewer, performance-reviewer) — 10 net additions — minus 1 for
+    the `code-reviewer.md` Wave-2 deprecation stub now excluded from the count,
+    account for the **9-file delta**.
+  - **Add machine-verifiable count one-liner**
+    (`rg -l 'CRITICAL SECURITY RULES' plugins/ --type md | grep -v 'security-fencing/SKILL.md' | grep -v 'CLAUDE.md' | wc -l`)
+    so future drift is self-correcting. The hand-maintained list now carries
+    per-directory counts that sum to the verifiable total. Flagged by
+    comment-analyzer (P2).
+  - **Note `code-reviewer.md` deprecation stub** in the yellow-review/
+    agents/review/ entry — the file is the Wave-2 rename stub and does not
+    contain the canonical block, so it is excluded from the count by design.
+    Pointer to `project-compliance-reviewer` migration.
+
+  `plugins/yellow-core/skills/create-agent-skills/SKILL.md`:
+  - **Add §Subagent Failure Convention "When the convention applies" scope
+    clarification** (NEW subsection at top of the section). The convention is
+    for prose-emitting orchestrators (`/workflows:work` Phase 3).
+    Compact-return-JSON orchestrators (`/review:pr` Step 5) do not need it —
+    structured returns already give the orchestrator a deterministic failure
+    signal independent of TaskOutput. This closes the cross-reviewer-flagged gap
+    on review-pr.md (4 reviewers on PR #260 flagged the missing convention; the
+    gap is intentional architectural divergence and now has a documented scope
+    rationale to prevent re-flagging in future reviews).
+
+  `plugins/yellow-review/commands/review/review-pr.md` Step 5:
+  - **Add architectural-choice comment block** at the top of Step 5 explaining
+    why this orchestrator uses TaskOutput-only collection. Forward-references
+    the SKILL.md scope clarification. Makes the intentional design decision
+    discoverable in the file that gets reviewed.
+
+  `plugins/yellow-core/skills/create-agent-skills/references/ quick-reference.md`:
+  - **Fix `yellow-browser-test` reference** at line 79. The original reference
+    cited fields (`devServer.command`, `auth.credentials`) and env vars
+    (`$BROWSER_TEST_EMAIL`, `$BROWSER_TEST_PASSWORD`) that don't exist in that
+    plugin (it uses `.claude/browser-test-auth.json`, not the `.local.md`
+    pattern). Replaced with a pointer to the `yellow-core:local-config` skill
+    which documents the cross-plugin schema generically. Flagged by
+    comment-analyzer (P2).
+
+  No code changes — all edits are markdown documentation.
+
+  `pnpm validate:plugins` and `pnpm test:integration` green. The pre-existing
+  `pnpm validate:agents` failure on session-historian.md is out of scope
+  (predates PR #260).
+
+- [`22b5e56`](https://github.com/KingInYellows/yellow-plugins/commit/22b5e5670bcfdf6f8ce3824e786281cf2d502c88)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - # RUN_DIR
+  Hardening
+
+  Harden the RUN_DIR / result-file convention introduced in PR #260 against the
+  bash-block subshell isolation anti-pattern (per
+  `docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`)
+  and add atomic-write semantics + cleanup.
+
+  `plugins/yellow-core/commands/workflows/work.md` Phase 3:
+  - **Shell-variable isolation fix.** The previous step 3a captured
+    `RUN_DIR=$(mktemp …)` in one Bash call and referenced `$RUN_DIR` in later
+    Task input prompts as if the variable persisted. Bash variables do not
+    survive across separate Bash tool calls — each call is a fresh subprocess.
+    Step 3a now instructs the orchestrator to capture the printed path and
+    substitute the **literal value** into Task input prompts (not the variable
+    name `$RUN_DIR`). Flagged by adversarial (P1) and matches the documented
+    anti-pattern in
+    `docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
+  - **Empty-RUN_DIR error path.** If `mktemp -d` fails (disk full, permission
+    denied) the captured path is empty. Step 3a now requires reporting the
+    failure and skipping parallel review rather than spawning agents with an
+    empty `run_dir`. Flagged by correctness + silent-failure-hunter (P3).
+  - **Cleanup step.** New step after collection:
+    `rm -rf "<literal mktemp path>"`. Result files may contain diff excerpts
+    including secrets; retention in `/tmp` is a data-residue risk on multi-user
+    or long-lived machines. Skip-cleanup is allowed only with explicit
+    user-visible documentation. Flagged by adversarial (P2).
+
+  `plugins/yellow-core/skills/create-agent-skills/SKILL.md` §Subagent Failure
+  Convention:
+  - **Atomic write `.tmp` → `mv` to `.json`.** Agents now MUST write to a `.tmp`
+    file first then `mv` to `.json` (POSIX rename atomicity). The orchestrator
+    globs only `*.json`, never `*.tmp` — partial writes are invisible. Lock
+    files remain unnecessary because each agent owns a unique filename. Pattern
+    validated against community conventions (barkain
+    claude-code-workflow-orchestration).
+  - **Orchestrator example refresh.** Re-frames the `mktemp` capture so the
+    variable-substitution requirement is explicit at the canonical source,
+    alongside the empty-path error advice and the data-residue cleanup
+    rationale.
+
+  No code changes — all updates are prose-instruction edits to two authoring
+  docs. The downstream effect is that `/workflows:work` Phase 3 becomes
+  correctness-readable (an LLM following the steps top-to-bottom no longer
+  carries a phantom `$RUN_DIR` shell variable across Bash calls) and
+  parallel-orchestrator authors get the atomic-write convention documented at
+  the canonical source.
+
+- [`be0fa07`](https://github.com/KingInYellows/yellow-plugins/commit/be0fa07a7323f5848875ba05b36c545797297c9e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - # Schema
+  Tightening
+
+  Tighten `schemas/plugin.schema.json` against PR #260 review findings; add
+  `semverRange` AJV custom keyword; rebuild
+  `examples/plugin-extended.example.json` to satisfy the tightened schema; add
+  fixture-based test (`tests/integration/example-files-schema.test.ts`) that
+  AJV-validates every plugin example against the schema after every schema edit
+  (closes the silent-orphan gap on the example file).
+
+  Schema changes:
+  - **`pathPathsOrInline`** — array-element bare `{type:object}` and the
+    bare-object branch both now require `minProperties: 1`. Adds `$comment`
+    documenting that the multi-purpose def serves mcpServers/hooks/lspServers —
+    deeper shape ownership lives in Claude Code's runtime validator. Flagged by
+    adversarial (P1).
+  - **`userConfig`** — extracts a new `userConfigEntry` `$def` with
+    `additionalProperties: false` (rejects typos like `sensitiv` that would
+    silently disable keychain protection) and nested `if/then/else` enforcing
+    type-conditional `default` (string type → string default, number type →
+    number default, boolean type → boolean default). Uses nested if/then/else
+    NOT `oneOf` per AJV docs (the documented "default breaks oneOf" hazard).
+    `channels[].userConfig` now references the same `$def` so per-channel
+    overrides receive the same validation. Flagged by adversarial +
+    silent-failure-hunter + polyglot (P2, multi-reviewer agreement).
+  - **`monitors`** — relax inline-array element `additionalProperties: false` →
+    `true`. Same anti-pattern that caused historic `repository` object-form
+    rejection grief; closes off forward-compat for fields Claude Code may add.
+    Required-field checks remain. Flagged by architecture (P2).
+  - **`dependencies[].version`** — adds `pattern: ^[~^>=<*xXvV0-9]` lightweight
+    structural gate + new `semverRange: true` AJV custom keyword that calls
+    `semver.validRange()` for full semantic check. Two-layer approach per
+    industry convention (npm CLI uses the same shape: pattern for type, library
+    for semantic). Flagged by architecture + polyglot (P2 cross-reviewer
+    agreement).
+  - **`outputStyles`** description — wording aligned with RULE 5b enforcement
+    ("directories containing .md files", not "files/ directories"). Flagged by
+    correctness (P3).
+  - **`channels[].server`** description clarifies cross-field constraint is not
+    enforced by schema — runtime owns referential integrity. Flagged by
+    architecture (P3).
+
+  Implementation:
+  - New file `packages/infrastructure/src/validation/keywords/semverRange.ts`
+    exports `semverRangeKeyword` for AJV registration. Type-string keyword with
+    boolean schema; delegates to `semver.validRange()`. Tested in
+    `example-files-schema.test.ts` with 10 cases covering accepted ranges
+    (`^1.0.0`, `~2.1.0`, `>=3.0.0`, `1.2.3`, `v1.2.3`, `=1.2.3`, `*`) and
+    rejected non-semver (`banana`, `1.banana.0`, empty).
+  - `AjvValidatorFactory` constructor now registers the keyword before any
+    schema compilation so all loaded schemas can use `semverRange: true`.
+  - GitHub schema-validation workflows now load `scripts/ajv-custom-keywords.js`
+    so `ajv-cli --strict=true` recognizes `semverRange` for plugin manifests and
+    plugin examples.
+  - `examples/plugin-extended.example.json` `hooks` field replaced from
+    `"./hooks/hooks.json"` (the validator's documented anti-pattern) with
+    inline-object form demonstrating the preferred PreToolUse pattern.
+
+  CI test coverage:
+
+  `tests/integration/example-files-schema.test.ts` AJV-validates every
+  `examples/plugin*.json` against the tightened plugin schema. The custom
+  keyword surface is exercised in isolation against an in-memory test schema.
+  `examples/marketplace.example.json` is intentionally skipped (pre-existing
+  drift between the upstream fixture and this repo's local marketplace schema,
+  out of scope for this PR).
+
+  **Behavior change for downstream consumers:** plugins that ship `userConfig`
+  entries with unknown fields (e.g., typo `sensitiv: true` instead of
+  `sensitive: true`) will now fail validation. This is intentional hardening —
+  the typo previously caused silent plaintext-credential exposure. No in-repo
+  plugin uses `userConfig` in its `plugin.json` manifest (verified by repo
+  research) so in-repo blast radius is zero.
+
+- [`3eeefe7`](https://github.com/KingInYellows/yellow-plugins/commit/3eeefe78a218e1b4c5f702d190b5c06be5c8af3e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - # Validator
+  Hardening
+
+  Harden `scripts/validate-plugin.js` and add the first integration test suite
+  for the validator (`tests/integration/validate-plugin.test.ts`):
+  - Fix array-form `hooks` path-validation bypass: array entries that are string
+    paths now receive the same path-existence + plugin-dir containment checks as
+    the string-form `hooks` field. Inline event-keyed objects mixed inside the
+    array form flow through `collectInlineHooks` and now get RULES 6/7/8 (script
+    existence, hooks.json drift, shebang / decision-output / `set -e` content
+    checks) — previously skipped because the inline-object loop short-circuited
+    on `!Array.isArray(manifest.hooks)`.
+  - Add path-existence + plugin-dir-containment check for the string-form
+    `hooks` (was previously only checked for the documented anti-pattern).
+  - Add `SessionStart` to the `DECISION_PROTOCOL_EVENTS` Set — `SessionStart`
+    hooks must emit a decision response per documented project memory (PR #72
+    incident: missing JSON output blocks session startup).
+  - Enforce `outputStyles` directory-only via a new `directoryOnly` parameter on
+    `validatePathOrPathsDir`: a `.md` file path is rejected for `outputStyles`
+    even though Anthropic's `relativePath` schema allows single-file paths for
+    `commands`/`agents`/`skills`. (Schema description alignment lands in PR-B.)
+  - Refactor: extract `addError(errors, msg)` helper to eliminate the pervasive
+    `errors.push + logError` drift (RULE 1 / RULE 3 messages had silently
+    drifted between the two paths) and
+    `validateHookScriptPath(scriptPath, eventName, pluginDir, errors)` helper
+    that centralizes per-script-path RULE 6 + RULE 8 checks (existence,
+    readability, executable mode, shebang, decision output, `set -e`). RULE 6
+    and RULE 8 now share a single iteration pass over the inline hooks instead
+    of two duplicate loops.
+  - Hoist `VALID_HOOK_EVENTS` and `DECISION_PROTOCOL_EVENTS` from in-function
+    declarations to module-scope `Set`s — `.has()` is O(1) vs `.includes()`
+    linear scan, and the membership tests are now reused across all rules
+    instead of re-allocated per `validatePlugin` call.
+
+  **Behavior change for downstream consumers:** plugins that ship array-form
+  `hooks` with raw script paths will previously have passed validation silently.
+  After this change those plugins receive the standard path-existence +
+  containment check. Plugins shipping inline event-keyed objects inside an array
+  form now also get RULES 6/7/8. Plugins shipping `outputStyles` as a `.md` file
+  path will newly fail validation (must be a directory). No in-repo plugin uses
+  any of these patterns, so in-repo blast radius is zero.
+
 ## 1.14.0
 
 ### Minor Changes
