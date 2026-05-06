@@ -4,20 +4,34 @@ Optional Composio accelerator for batch workflows with local usage tracking.
 
 ## How It Works
 
-This plugin does NOT bundle an MCP server. Composio tools are provided by
-the user's MCP connector (prefix varies by configuration -- e.g.,
-`mcp__claude_ai_composio__*` for native integrations or
-`mcp__composio-server__*` for manual `.mcp.json` setups). The plugin provides:
+This plugin bundles a `type: http` Composio MCP server, declared in
+`plugin.json` and configured via two `userConfig` prompts on first enable:
+the per-customer MCP URL and the Composio API key. Both are stored in
+the system keychain (URL non-sensitive, API key sensitive). Bundled
+tools appear under the `mcp__plugin_yellow-composio_composio-server__*`
+prefix.
 
-1. Setup validation to confirm Composio is configured and reachable
-2. Local usage tracking since Composio has no billing/usage API
-3. A patterns skill documenting Workbench, Multi-Execute, and degradation
+The plugin still works with externally-configured Composio MCPs — if the
+userConfig prompts are dismissed (URL left blank), the bundled server
+will fail to start and the plugin falls back to detecting any of the
+external Composio variants (`mcp__claude_ai_composio__*` for native
+integrations, `mcp__composio-server__*` for manual `.mcp.json` setups).
+This is the legacy migration path for users who configured the MCP
+manually before this plugin bundled it.
+
+The plugin provides:
+
+1. Bundled MCP server with `userConfig`-prompt-driven credentials
+2. Setup validation to confirm Composio is configured and reachable
+3. Local usage tracking since Composio has no billing/usage API
+4. A patterns skill documenting Workbench, Multi-Execute, and degradation
    conventions for consuming plugins
 
-## Composio MCP Tools (Not Bundled)
+## Composio MCP Tools
 
-The following tools are provided by the user's Composio MCP connector (not by
-this plugin). They are discoverable via ToolSearch:
+These tools are now bundled via this plugin (preferred) and may also be
+provided by external connectors (legacy / fallback). All variants are
+discoverable via ToolSearch:
 
 - `COMPOSIO_SEARCH_TOOLS` -- Discover tools, get schemas, check connection status
 - `COMPOSIO_GET_TOOL_SCHEMAS` -- Full parameter schemas for specific tools
@@ -64,7 +78,10 @@ Composio has no billing API. This is the only way to monitor execution budget.
 
 ## Security Notes
 
-- **No API keys stored** -- Native MCP connector handles credentials
+- **API key stored in system keychain** -- Composio API key is sensitive
+  `userConfig` (`composio_api_key`) and held in the OS keychain. The MCP
+  URL is non-sensitive and held in plain `userConfig` storage. Never
+  echo either value in command output or commits.
 - **Remote execution** -- Workbench runs on Composio's cloud. Do not send
   secrets, private keys, or proprietary algorithms
 - **Content fencing** -- Wrap all Composio responses in `--- begin/end ---`

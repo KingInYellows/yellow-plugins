@@ -15,5 +15,28 @@
     "workbench",
     "usage-tracking",
     "mcp"
-  ]
+  ],
+  "userConfig": {
+    "composio_mcp_url": {
+      "type": "string",
+      "title": "Composio MCP URL",
+      "description": "Per-customer Composio MCP endpoint. Generate via the Composio dashboard or `npx @composio/mcp@latest setup <customer_id> <app_id>`. Looks like https://mcp.composio.dev/<id>. If left blank, the MCP server is skipped and you can fall back to a manual `claude mcp add` setup (see /composio:setup).",
+      "sensitive": false
+    },
+    "composio_api_key": {
+      "type": "string",
+      "title": "Composio API key",
+      "description": "Composio API key from https://app.composio.dev/settings. Sent as the X-API-Key header on every MCP request. Stored in the system keychain.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "composio-server": {
+      "type": "http",
+      "url": "${user_config.composio_mcp_url}",
+      "headers": {
+        "X-API-Key": "${user_config.composio_api_key}"
+      }
+    }
+  }
 }
