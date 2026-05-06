@@ -727,7 +727,31 @@ function validatePlugin(pluginDir) {
           errors,
           'hooks/hooks.json: top-level "hooks" key is required and must be a non-null object — Claude Code 2.1.131+ rejects plugins with a different shape'
         );
-      } else if (hasInlineHooks) {
+      } else {
+        // Per-event shape check: each event's value must be an array of hook
+        // entries. Claude Code's runtime expects Record<EventName, Array<...>>;
+        // a non-array value (string, object, number) passes the top-level
+        // shape check but fails at install time. Runs unconditionally — hooks-
+        // only plugins (no inline hooks in plugin.json) must also be validated.
+        // Event-name recognition mirrors the inline-hooks check above so typos
+        // (e.g., "SesionStart") are caught even when plugin.json has no inline
+        // hooks to trigger that branch.
+        for (const [event, value] of Object.entries(hooksField)) {
+          if (!VALID_HOOK_EVENTS.has(event)) {
+            logWarning(
+              `hooks/hooks.json: unknown hook event "${event}". Known events: ${[...VALID_HOOK_EVENTS].join(', ')}`
+            );
+          }
+          if (!Array.isArray(value)) {
+            addError(
+              errors,
+              `hooks/hooks.json: event "${event}" must be an array of hook entries — got ${value === null ? 'null' : typeof value}; Claude Code 2.1.131+ rejects non-array event values`
+            );
+          }
+        }
+      }
+
+      if (hasValidShape && hasInlineHooks) {
         // Drift check between plugin.json inline hooks and hooks.json.
         const hooksJsonHooks = hooksField;
         const manifestHooks = inlineHooks;

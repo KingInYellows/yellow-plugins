@@ -572,4 +572,74 @@ printf 'plain text\\n'
     expect(status).toBe(0);
     expect(stderr).not.toMatch(/hooks\/hooks\.json/);
   });
+
+  it('errors when hooks/hooks.json has a non-array event value with inline hooks present (RULE 7: per-event shape check)', () => {
+    // Top-level shape can be valid ({ hooks: { ... } }) but each event must be
+    // an array of hook entries. Claude Code's runtime expects
+    // Record<EventName, Array<HookEntry>>; a string/object/number value under
+    // an event key passes the top-level check but fails at install time. This
+    // case exercises the hasInlineHooks=true branch — the next test exercises
+    // the hooks-only path.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify({ hooks: { SessionStart: 'not-an-array' } }, null, 2),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      hooks: {
+        SessionStart: [
+          {
+            matcher: '*',
+            hooks: [{ type: 'command', command: 'echo ok' }],
+          },
+        ],
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: event "SessionStart" must be an array of hook entries — got string/
+    );
+  });
+
+  it('runs per-event array check even when plugin.json has no inline hooks (RULE 7: hoisted out of drift branch)', () => {
+    // The per-event check must fire for hooks-only plugins (plugin.json with
+    // no inline hooks). Previously this validation lived inside the
+    // hasInlineHooks-gated drift branch and silently passed.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify({ hooks: { PostToolUse: { matcher: '*' } } }, null, 2),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: event "PostToolUse" must be an array of hook entries — got object/
+    );
+  });
+
+  it('warns on unknown hook event name in hooks/hooks.json even when plugin.json has no inline hooks (RULE 7: event-name recognition)', () => {
+    // Mirrors the inline-hooks unknown-event warning so typos in hooks-only
+    // plugins (e.g., "SesionStart") are caught — the inline branch is gated
+    // on hasInlineHooks and would otherwise skip them.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify(
+        { hooks: { SesionStart: [{ hooks: [{ type: 'command', command: 'echo ok' }] }] } },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
+    const { stderr } = runValidator(pluginDir);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: unknown hook event "SesionStart"/
+    );
+  });
 });
