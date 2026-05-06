@@ -446,4 +446,4 @@ Additional gates per PR:
 - [x] 2. agent/feat/agent-native-reviewers (PR #403, completed 2026-05-06)
 - [x] 3. agent/feat/yellow-debt-scanner-v2-emission (PR #406, completed 2026-05-06; audit-only — all scanners already v2.0-compliant)
 - [x] 4. agent/feat/yellow-docs-doc-review (PR #410, completed 2026-05-06)
-- [ ] 5. agent/chore/everyinc-merge-closure-smoke-test
+- [x] 5. agent/chore/everyinc-merge-closure-smoke-test (PR #412, completed 2026-05-06)
