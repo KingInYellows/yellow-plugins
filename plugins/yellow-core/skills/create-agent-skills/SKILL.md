@@ -252,6 +252,27 @@ but is not yet shipped.
 
 **Community-adopted workaround: the output-file convention.**
 
+### When the convention applies
+
+Use this convention for orchestrators spawning **prose-emitting**
+agents — `/workflows:work` Phase 3 reviewers are canonical. Prose
+stdout cannot be deterministically parsed for partial-failure
+signals; the file-based result + `status` field is the structural
+signal.
+
+Skip when every spawned agent returns strict structured JSON validated
+against a documented schema. `/review:pr` Step 5 is the canonical
+compact-return JSON case: reviewers emit schema-bound findings through
+TaskOutput, so adding `$RUN_DIR` there would duplicate the return
+contract.
+
+If an orchestrator mixes compact-return agents with prose emitters, use
+this convention only for the prose emitters or split those emitters into
+a workflow that can enforce file-backed results.
+
+The convention's scope, in one line: **prose-emitting orchestrators
+need it; compact-return-JSON orchestrators don't.**
+
 ### For subagent authors
 
 Instruct the subagent (in its system prompt or spawning prompt) to write a

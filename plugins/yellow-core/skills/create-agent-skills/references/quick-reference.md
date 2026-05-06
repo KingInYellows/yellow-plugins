@@ -76,4 +76,18 @@ Optional markdown content for user reference.
 - Use `schema: 1` for future versioning support
 - Settings files are gitignored by `.local.md` convention
 
-**Reference:** See `yellow-browser-test` plugin for working example.
+**Reference:** Two distinct file patterns exist and are documented
+separately:
+
+- **Cross-plugin config** — `yellow-plugins.local.md` at repo root.
+  Schema and rules in the `yellow-core:local-config` skill.
+- **Per-plugin config** — `.claude/<plugin-name>.local.md` (or
+  `.claude/yellow-<plugin>.local.md`). Live consumers include
+  `yellow-ci` (runner targets). Some plugins use different per-plugin
+  config files, such as `yellow-browser-test`'s
+  `.claude/browser-test-auth.json`; those are documented in the
+  plugin-specific conventions skill. There is no cross-plugin canonical
+  schema for the per-plugin file.
+
+The example fields above (`devServer`, `auth.credentials`) are
+illustrative — concrete schemas vary by domain.

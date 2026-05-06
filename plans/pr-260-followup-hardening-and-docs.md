@@ -510,5 +510,5 @@ merges into `main` once PR #260 lands.
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. agent/fix/pr260-validator-hardening (PR #360, completed 2026-05-05)
 - [x] 2. agent/feat/pr260-schema-tightening (PR #362, completed 2026-05-05)
-- [x] 3. agent/fix/pr260-work-rundir-hardening (completed 2026-05-05)
-- [ ] 4. agent/docs/pr260-doc-sync
+- [x] 3. agent/fix/pr260-work-rundir-hardening (PR #364, completed 2026-05-05)
+- [x] 4. agent/docs/pr260-doc-sync (completed 2026-05-05)
