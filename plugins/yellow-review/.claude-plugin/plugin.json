@@ -1,6 +1,6 @@
 {
   "name": "yellow-review",
-  "version": "2.5.3",
+  "version": "2.5.4",
   "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
   "author": {
     "name": "KingInYellows",
