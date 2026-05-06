@@ -70,8 +70,16 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (11)
+### Skills (13)
 
+- `agent-native-architecture` — reference for the five agent-native
+  architecture principles (action parity, context parity, shared workspace,
+  primitives over workflows, dynamic context injection); canonical source
+  applied by `yellow-review:review:agent-native-reviewer`
+- `agent-native-audit` — step-by-step audit checklist for evaluating an
+  existing codebase against agent-native principles (capability mapping,
+  noun test, anti-pattern catalog); used by `agent-native-reviewer` for PR
+  reviews and broader audits
 - `brainstorming` — reference guide for iterative brainstorm dialogues (internal)
 - `compound-lifecycle` — audit, refresh, and consolidate `docs/solutions/`
   with composite-scored staleness detection, BM25+cosine overlap clustering,

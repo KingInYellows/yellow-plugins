@@ -32,7 +32,7 @@ yellow-core integration before reviewing real PRs.
 
 ## Agents
 
-### Review (12)
+### Review (15)
 
 | Agent                          | Description                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -43,6 +43,9 @@ yellow-core integration before reviewing real PRs.
 | `project-standards-reviewer`   | Frontmatter, references, cross-platform portability (always selected; new in Wave 2)                         |
 | `adversarial-reviewer`         | Constructed failure scenarios across boundaries (conditional; new in Wave 2)                                 |
 | `plugin-contract-reviewer`     | Breaking changes to plugin public surface — subagent_type / command / skill / MCP-tool renames, manifest field changes, hook contract changes (conditional; new in Wave 3) |
+| `cli-readiness-reviewer`       | CLI agent-readiness for autonomous invocation — non-interactive bypass, structured output, actionable errors, safe retries, bounded output, pipeline composability (conditional; new in Wave 3) |
+| `agent-cli-readiness-reviewer` | 7-principle Blocker/Friction/Optimization rubric for CLI agent-optimization — deeper than `cli-readiness-reviewer`, suited for design-doc audits (conditional; new in Wave 3) |
+| `agent-native-reviewer`        | Action parity, context parity, shared workspace, primitives over workflows, dynamic context injection — references `agent-native-architecture` and `agent-native-audit` skills (conditional; new in Wave 3) |
 | `pr-test-analyzer`             | Test coverage and behavioral completeness                                                                    |
 | `comment-analyzer`             | Comment accuracy and rot detection                                                                           |
 | `code-simplifier`              | Simplification preserving functionality (final pass)                                                         |

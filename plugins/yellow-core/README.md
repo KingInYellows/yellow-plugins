@@ -66,6 +66,8 @@ TypeScript, Python, Rust, and Go.
 
 | Skill                 | Description                                                                                                                                                       |
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent-native-architecture` | Reference for five agent-native architecture principles: action parity, context parity, shared workspace, primitives over workflows, dynamic context injection (applied by `yellow-review:review:agent-native-reviewer`)                                            |
+| `agent-native-audit`        | Step-by-step audit checklist for evaluating an existing codebase against agent-native principles — capability mapping, noun test, anti-pattern catalog                                                                                                              |
 | `compound-lifecycle`  | Audit, refresh, and consolidate `docs/solutions/` with composite-scored staleness detection, BM25+cosine overlap clustering, and archive superseded entries       |
 | `create-agent-skills` | Guidance for creating skills and agents                                                                                                                           |
 | `debugging`           | Systematic root-cause debugging with causal-chain gate, prediction-for-uncertain-links hypotheses, three-failed-attempts smart escalation, and conditional defense-in-depth |
