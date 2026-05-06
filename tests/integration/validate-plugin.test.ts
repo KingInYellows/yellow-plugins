@@ -572,4 +572,41 @@ printf 'plain text\\n'
     expect(status).toBe(0);
     expect(stderr).not.toMatch(/hooks\/hooks\.json/);
   });
+
+  it('errors when hooks/hooks.json has a non-array event value (RULE 7: per-event shape check)', () => {
+    // Top-level shape can be valid ({ hooks: { ... } }) but each event must be
+    // an array of hook entries. Claude Code's runtime expects
+    // Record<EventName, Array<HookEntry>>; a string/object/number value under
+    // an event key passes the top-level check but fails at install time.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify({ hooks: { SessionStart: 'not-an-array' } }, null, 2),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: event "SessionStart" must be an array of hook entries — got string/
+    );
+  });
+
+  it('runs per-event array check even when plugin.json has no inline hooks (RULE 7: hoisted out of drift branch)', () => {
+    // The per-event check must fire for hooks-only plugins (plugin.json with
+    // no inline hooks). Previously this validation lived inside the
+    // hasInlineHooks-gated drift branch and silently passed.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify({ hooks: { PostToolUse: { matcher: '*' } } }, null, 2),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: event "PostToolUse" must be an array of hook entries — got object/
+    );
+  });
 });
