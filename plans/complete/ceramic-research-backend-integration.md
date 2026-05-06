@@ -4,6 +4,31 @@
 > context. Codebase line-number drift annotations below remain accurate
 > to the post-merge `main`.
 
+<!-- audit: 2026-05-06 -->
+> **Decision Changed During Implementation (audit 2026-05-06).** Item
+> **3.1** (add `mcpServers.ceramic` to `plugins/yellow-core/.claude-plugin/plugin.json`)
+> was deliberately *not* shipped as written. The implementation chose a
+> better path: yellow-core no longer declares any `mcpServers` at all
+> (parity with PR #486, 2026-04-03, which removed the bundled
+> `context7` entry to avoid dual-OAuth-popup issues for users who also
+> have it at user level). Instead, `best-practices-researcher.md` does
+> runtime ToolSearch detection for `ceramic_search` and uses the
+> yellow-research-namespaced tool (`mcp__plugin_yellow-research_ceramic__ceramic_search`)
+> when yellow-research is installed, falling back silently to built-in
+> `WebSearch` when it isn't. This means item 3.2's tool-name reference
+> also shifted from `mcp__plugin_yellow-core_ceramic__…` (as the plan
+> originally specified) to `mcp__plugin_yellow-research_ceramic__…`.
+> Net effect: a single OAuth session covers both plugins, no duplicate
+> registration, and graceful degradation when yellow-research is
+> absent. The original plan's "yellow-core independently capable" goal
+> is achieved via the fallback chain rather than via duplicated MCP
+> registration. Audit artifact:
+> `docs/brainstorms/2026-05-06-ceramic-setup-all-coverage-audit-brainstorm.md`.
+> All other plan items (including the integration test
+> `tests/integration/ceramic.test.ts`) are confirmed shipped.
+<!-- /audit -->
+
+
 ## Problem Statement
 
 Today, all external research in `yellow-plugins` flows through three paid
@@ -230,10 +255,13 @@ Key design decisions (operator-confirmed defaults from
 
 ### Phase 3: yellow-core (secondary migration)
 
-- [x] **3.1** Add `mcpServers.ceramic` block to
+- [x] **3.1** ~~Add `mcpServers.ceramic` block to
   `plugins/yellow-core/.claude-plugin/plugin.json` (after the existing
   `context7` block at lines 14-17). Note: this becomes yellow-core's
-  second MCP entry.
+  second MCP entry.~~ **Superseded — see audit annotation at top of
+  file.** yellow-core ships zero `mcpServers` entries; runtime ToolSearch
+  detection in `best-practices-researcher.md` reaches the
+  yellow-research-namespaced ceramic tool instead.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The `context7` block is actually at lines **21-25**,
@@ -241,6 +269,17 @@ Key design decisions (operator-confirmed defaults from
 > existing HTTP MCPs in the repo (parallel, context7) — no `env`
 > block (per the OAuth finding above).
 <!-- /deepen-plan -->
+
+<!-- audit: 2026-05-06 -->
+> **Audit (2026-05-06):** Both `context7` and the would-be `ceramic`
+> entries are now absent from yellow-core's `plugin.json` — the manifest
+> is intentionally minimal (name/version/description/author/keywords
+> only, 20 lines). The `context7` block was removed in PR #486
+> (2026-04-03) to fix dual-OAuth pop-ups when users had context7 at
+> user level. The same reasoning applied to ceramic during PR #265
+> implementation: skip the duplicate registration, detect at runtime,
+> fall back to `WebSearch`. Verified by `grep -n mcpServers plugins/yellow-core/.claude-plugin/plugin.json` returning no matches.
+<!-- /audit -->
 - [x] **3.2** Update `agents/research/best-practices-researcher.md`:
   - `tools:` add `mcp__plugin_yellow-core_ceramic__ceramic_search`
     (line 7-14 region).
