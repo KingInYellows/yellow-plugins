@@ -67,7 +67,8 @@ if command -v mempalace >/dev/null 2>&1; then
   mp_version_raw=$(mempalace --version 2>/dev/null | head -n1)
   mp_version=$(printf '%s' "$mp_version_raw" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1)
   printf 'mempalace:          OK (%s)\n' "${mp_version_raw:-unknown}"
-  if [ -n "$mp_version" ] && [ "$(printf '%s\n3.0.0\n' "$mp_version" | sort -V | head -n1)" = "3.0.0" ]; then
+  mp_major=${mp_version%%.*}
+  if [ -n "$mp_major" ] && [ "$mp_major" -ge 3 ] 2>/dev/null; then
     printf 'mempalace_mcp_check: ok\n'
   else
     printf 'mempalace_mcp_check: too_old\n'
