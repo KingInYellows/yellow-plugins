@@ -1062,11 +1062,12 @@
   Two small docs/maintenance fixes:
   1. **CHANGELOG migration text:** `plugins/yellow-core/CHANGELOG.md` and
      `plugins/yellow-review/CHANGELOG.md` had migration notes citing the legacy
-     2-segment `subagent_type: "yellow-review:code-reviewer"` form. The repo's
-     runtime expects 3-segment as of PRs #288/#290. The validator's INFO note
-     flagged these for future hard-fail. Updated both migration snippets to the
-     3-segment form (`yellow-review:review:code-reviewer`) so the migration text
-     stays accurate and the INFO warnings clear.
+     2-segment `subagent_type` field with value `"yellow-review:code-reviewer"`
+     form. The repo's runtime expects 3-segment as of PRs #288/#290. The
+     validator's INFO note flagged these for future hard-fail. Updated both
+     migration snippets to the 3-segment form
+     `yellow-review:review:code-reviewer` so the migration text stays accurate
+     and the INFO warnings clear.
   2. **CONTRIBUTING.md cache-refresh note:** added a "Manual cache refresh for
      non-interactive sessions" subsection covering the rsync workaround when
      `/plugin marketplace update` (TUI-only) isn't available — e.g., background
@@ -1292,8 +1293,8 @@
     patterns, and project-pattern adherence. General correctness is now handled
     by the new `correctness-reviewer`; frontmatter / portability /
     cross-platform tool selection by the new `project-standards-reviewer`.
-  - **Migration:** Callers passing
-    `subagent_type: "yellow-review:review:code-reviewer"` should update to
+  - **Migration:** Callers passing the previous `subagent_type` value
+    `"yellow-review:review:code-reviewer"` should update to
     `"yellow-review:review:project-compliance-reviewer"`. A deprecation stub is
     left at the old path for one minor version — third-party installs that
     reference the old name continue to function (with a deprecation log line)

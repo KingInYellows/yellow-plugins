@@ -359,14 +359,8 @@ for the Coverage section of the final report.
 When `yellow-plugins.local.md` sets `review_pipeline: legacy`, skip the
 persona dispatch table above and use the pre-Wave-2 adaptive selection:
 
-- Always include: `project-compliance-reviewer` (or its `code-reviewer`
-  deprecation stub for older installs), `correctness-reviewer`,
-  `maintainability-reviewer`. Without `correctness-reviewer` and
-  `maintainability-reviewer`, the legacy fallback would silently lose the
-  core territory the pre-Wave-2 `code-reviewer` covered (logic errors,
-  state bugs, dead code, premature abstraction) — `code-reviewer` is now a
-  no-op deprecation stub so projects activating the escape hatch must
-  retain that coverage from the persona reviewers directly.
+- Always include: `project-compliance-reviewer`, `correctness-reviewer`,
+  `maintainability-reviewer`.
 - Conditionally include: `pr-test-analyzer`, `comment-analyzer`,
   `type-design-analyzer`, `silent-failure-hunter`
 - Cross-plugin via Task: `security-sentinel` (yellow-core),
@@ -525,8 +519,7 @@ normalized, otherwise their findings are silently dropped on diffs that
 trigger them:
 
 - yellow-review own: `pr-test-analyzer`, `comment-analyzer`,
-  `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`, and
-  the `code-reviewer` deprecation stub.
+  `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`.
 - yellow-core cross-plugin: `architecture-strategist`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`,
   `polyglot-reviewer`, `security-reviewer`, `performance-reviewer`
@@ -562,8 +555,7 @@ Apply the aggregation steps from
    schema. The exhaustive list (must match Step 5 above):
 
    - yellow-review own: `pr-test-analyzer`, `comment-analyzer`,
-     `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`,
-     and the `code-reviewer` deprecation stub.
+     `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`.
    - yellow-core cross-plugin: `architecture-strategist`,
      `pattern-recognition-specialist`, `code-simplicity-reviewer`,
      `polyglot-reviewer`, `security-reviewer`, `performance-reviewer`,

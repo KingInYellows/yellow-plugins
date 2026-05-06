@@ -2,6 +2,8 @@
 title: "Cross-Plugin Frontmatter Sweeps and Canonical Skill Copy Drift"
 date: 2026-04-28
 category: code-quality
+track: knowledge
+problem: 'Cross-Plugin Frontmatter Sweeps and Canonical Skill Copy Drift'
 tags: [frontmatter, skill, canonical, cross-plugin, sweep, documentation-rot]
 components: [plugins/yellow-debt, plugins/yellow-ci, plugins/yellow-review, plugins/yellow-core]
 ---

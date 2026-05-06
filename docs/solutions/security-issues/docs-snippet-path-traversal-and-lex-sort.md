@@ -1,3 +1,16 @@
+---
+title: 'Documentation Snippet Path Traversal and Lex-Sort Bugs (PR #295)'
+category: 'security-issues'
+track: bug
+problem: 'Copy-paste shell snippet in CONTRIBUTING.md introduced path traversal via jq-controlled values and a lex-sort version-comparison bug'
+tags:
+  - path-traversal
+  - shell-security
+  - jq-injection
+  - documentation
+  - version-comparison
+---
+
 # Documentation Snippet Path Traversal and Lex-Sort Bugs (PR #295)
 
 **Category:** security-issues  
