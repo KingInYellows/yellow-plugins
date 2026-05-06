@@ -609,10 +609,12 @@ jobs:
             # declarations (lines ending in `: {` are object-typed field
             # openings, not secret values); ${user_config.*} template
             # references (substituted at runtime, not literal secrets);
-            # `"description":` lines (documentation prose mentioning "token"
-            # or "API key" describing what the field is, not its value).
+            # `"description":` and `"title":` lines (documentation /
+            # UI-label metadata mentioning "token" or "API key" describing
+            # what the field is, not its value — the Claude Code remote
+            # validator requires `"title":` on every userConfig entry).
             SENSITIVE=$(grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --include="*.json" \
-              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{user_config\.|"description":' \
+              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{user_config\.|"description":|"title":' \
               || true)
             if [ -n "$SENSITIVE" ]; then
               echo "$SENSITIVE"
