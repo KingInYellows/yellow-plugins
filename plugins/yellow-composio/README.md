@@ -25,7 +25,7 @@ Then install the plugin:
    Two prompts appear on enable:
    - **Composio MCP URL** -- per-customer endpoint, looks like
      `https://mcp.composio.dev/<id>`. Generate via the Composio
-     dashboard or `npx @composio/mcp@latest setup <customer_id> <app_id>`.
+     dashboard or `npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID`.
    - **Composio API key** -- from <https://app.composio.dev/settings>
      (stored in the OS keychain).
 
