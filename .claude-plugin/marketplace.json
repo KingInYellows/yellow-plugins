@@ -124,7 +124,7 @@
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
-      "version": "3.0.2",
+      "version": "3.0.3",
       "author": {
         "name": "KingInYellows"
       },
