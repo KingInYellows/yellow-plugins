@@ -461,4 +461,101 @@ printf 'plain text\\n'
     expect(status).toBeGreaterThan(0);
     expect(stderr).toMatch(/at least one \.md file/);
   });
+
+  it('errors when hooks/hooks.json has events at the top level (RULE 7: shape check, missing "hooks" wrapper)', () => {
+    // Claude Code 2.1.131+ auto-discovers hooks/hooks.json and validates the
+    // top-level shape against { hooks: { ... } }. A file with events at the
+    // root (no wrapper) causes "Hook load failed: expected record, received
+    // undefined at path ['hooks']" and the plugin fails to load. The
+    // validator must catch this before the file ships.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify(
+        {
+          PostToolUse: [
+            {
+              matcher: '*',
+              hooks: [{ type: 'command', command: 'echo broken' }],
+            },
+          ],
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      hooks: {
+        PostToolUse: [
+          {
+            matcher: '*',
+            hooks: [{ type: 'command', command: 'echo broken' }],
+          },
+        ],
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: top-level "hooks" key is required/
+    );
+  });
+
+  it('errors when hooks/hooks.json is unparseable JSON (RULE 7: parse failure is now hard error)', () => {
+    // Previously a logWarning at validate-plugin.js:790; promoted to addError
+    // since Claude Code's auto-discovery rejects unparseable files at install
+    // time the same way it rejects malformed shape.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      '{not valid json',
+      'utf8'
+    );
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      hooks: {
+        PostToolUse: [
+          {
+            matcher: '*',
+            hooks: [{ type: 'command', command: 'echo unparseable' }],
+          },
+        ],
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/hooks\/hooks\.json: cannot parse/);
+  });
+
+  it('runs hooks/hooks.json shape check even when plugin.json has no inline hooks', () => {
+    // The shape gate must fire whenever the file is present on disk —
+    // dropping the `hasInlineHooks` guard ensures Claude Code's auto-discovery
+    // contract is enforced even for plugins that only ship hooks/hooks.json.
+    // A well-formed file with no inline manifest block must pass.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify(
+        {
+          hooks: {
+            PostToolUse: [
+              {
+                matcher: '*',
+                hooks: [{ type: 'command', command: 'echo ok' }],
+              },
+            ],
+          },
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBe(0);
+    expect(stderr).not.toMatch(/hooks\/hooks\.json/);
+  });
 });
