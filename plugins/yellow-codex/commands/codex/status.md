@@ -83,15 +83,19 @@ fi
 ```bash
 if [ -n "${OPENAI_API_KEY:-}" ]; then
   printf '[yellow-codex] Auth: OPENAI_API_KEY set\n'
-elif [ -f "${HOME}/.codex/auth.json" ]; then
-  if command -v jq >/dev/null 2>&1; then
-    auth_mode=$(jq -r '.auth_mode // "unknown"' "${HOME}/.codex/auth.json" 2>/dev/null || echo "unknown")
-    printf '[yellow-codex] Auth: codex login (%s)\n' "$auth_mode"
+elif command -v codex >/dev/null 2>&1; then
+  # Note: codex CLI writes login status to stderr (eprintln!), not stdout — capture both via 2>&1
+  login_status=$(codex login status 2>&1 || true)
+  if printf '%s' "$login_status" | grep -qi '^logged in'; then
+    # Do NOT echo $login_status — codex CLI may include API key fragments (e.g. "Logged in using an API key - sk-proj-***...")
+    printf '[yellow-codex] Auth: codex login\n'
+  elif [ -f "${HOME}/.codex/auth.json" ]; then
+    printf '[yellow-codex] Auth: legacy auth.json found (pre-v0.118 format)\n'
   else
-    printf '[yellow-codex] Auth: codex login (auth file exists, jq not installed)\n'
+    printf '[yellow-codex] Auth: not configured\n'
   fi
 else
-  printf '[yellow-codex] Auth: not configured\n'
+  printf '[yellow-codex] Auth: not configured (codex CLI not installed)\n'
 fi
 ```
 
