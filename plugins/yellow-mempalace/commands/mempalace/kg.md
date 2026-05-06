@@ -39,9 +39,9 @@ Use ToolSearch with query `"+mempalace kg"` to find KG tools.
 For `add` and `invalidate`, present the parsed triple inside reference-only
 fencing before calling AskUserQuestion.
 
-Before inserting subject/predicate/object values into the fence below,
-replace any occurrence of `--- end KG triple ---` in those values with
-`[ESCAPED] end KG triple` to prevent the closing delimiter from
+Before inserting subject/predicate/object/valid_from values into the fence
+below, replace any occurrence of `--- end KG triple ---` in those values
+with `[ESCAPED] end KG triple` to prevent the closing delimiter from
 terminating the fence early. Apply the same substitution to
 `--- begin KG triple (reference only) ---` if it appears in the source.
 
@@ -50,7 +50,7 @@ terminating the fence early. Apply the same substitution to
 subject: <subject, with delimiter substitution applied>
 predicate: <predicate, with delimiter substitution applied>
 object: <object, with delimiter substitution applied>
-valid_from: <YYYY-MM-DD or omitted>   # add only
+valid_from: <YYYY-MM-DD or omitted, with delimiter substitution applied>   # add only
 --- end KG triple ---
 ```
 

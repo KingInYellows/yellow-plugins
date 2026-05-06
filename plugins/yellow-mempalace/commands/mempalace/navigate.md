@@ -45,7 +45,7 @@ the source.
 ```text
 --- begin navigation request (reference only) ---
 wing: <parsed-wing, with delimiter substitution applied>
-tunnels: <wingA> ↔ <wingB>
+tunnels: <wingA, with delimiter substitution applied> ↔ <wingB, with delimiter substitution applied>
 --- end navigation request ---
 ```
 
