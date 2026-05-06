@@ -503,6 +503,20 @@ printf 'plain text\\n'
     );
   });
 
+  it('errors when hooks/hooks.json contains literal null (RULE 7: shape check, root must be an object)', () => {
+    // JSON.parse('null') succeeds and returns null. The shape check must
+    // still fire — a null root has no "hooks" key, so Claude Code's
+    // auto-discovery would reject it.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(join(pluginDir, 'hooks', 'hooks.json'), 'null', 'utf8');
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST);
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: top-level "hooks" key is required/
+    );
+  });
+
   it('errors when hooks/hooks.json is unparseable JSON (RULE 7: parse failure is now hard error)', () => {
     // Previously a logWarning at validate-plugin.js:790; promoted to addError
     // since Claude Code's auto-discovery rejects unparseable files at install
