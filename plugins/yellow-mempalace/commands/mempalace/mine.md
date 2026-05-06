@@ -1,7 +1,7 @@
 ---
 name: mempalace:mine
-description: "Mine project files, conversations, or general content into the palace. Use when importing new content or indexing a project for the first time."
-argument-hint: '<path> [--mode projects|convos|general]'
+description: "Mine project files or conversation exports into the palace. Use when importing new content or indexing a project for the first time."
+argument-hint: '<path> [--mode projects|convos]'
 allowed-tools:
   - Bash
   - ToolSearch
@@ -20,18 +20,18 @@ and drawers.
 Extract from `$ARGUMENTS`:
 
 - **path** (required): Directory to mine
-- **--mode** (optional): Mining mode — `projects` (default), `convos`, or
-  `general`
+- **--mode** (optional): Mining mode — `projects` (default) or `convos`
 
 If path is empty: use AskUserQuestion to ask "What directory should I mine?"
 with options: "Current project (.)", "Other" (free-text path entry).
 
 If `--mode` is provided, validate it against the allowed set before proceeding.
-Allowed values: `projects`, `convos`, `general`. If the value is not one of
+Allowed values: `projects`, `convos` (matching the upstream
+`mempalace mine --mode` argparse choices). If the value is not one of
 these, stop and report:
 
 ```
-Invalid --mode: <value>. Allowed: projects, convos, general
+Invalid --mode: <value>. Allowed: projects, convos
 ```
 
 Do not proceed. If `--mode` is omitted, default to `projects`.
@@ -47,8 +47,13 @@ with `-` (flag injection), or that contain `..` traversal segments:
 PATH_ARG="<resolved-path>"
 case "$PATH_ARG" in
   -*) printf '[yellow-mempalace] Error: path may not start with -\n' >&2; exit 1 ;;
+  '~'*) printf '[yellow-mempalace] Error: path may not begin with ~ (tilde)\n' >&2; exit 1 ;;
   *..*) printf '[yellow-mempalace] Error: path may not contain ..\n' >&2; exit 1 ;;
 esac
+if [ -L "$PATH_ARG" ]; then
+  printf '[yellow-mempalace] Error: symlink paths are not allowed: %s\n' "$PATH_ARG" >&2
+  exit 1
+fi
 if [ ! -d "$PATH_ARG" ]; then
   printf '[yellow-mempalace] Error: directory not found: %s\n' "$PATH_ARG" >&2
   exit 1

@@ -6,12 +6,15 @@ with semantic search and a temporal knowledge graph for entity relationships.
 
 ## MCP Server
 
-- **mempalace** — Stdio transport via `mempalace mcp`
+- **mempalace** — Stdio transport via `mempalace-mcp` (the dedicated MCP
+  server binary; `mempalace mcp` is a separate CLI subcommand that prints
+  setup instructions and exits — do not use it as the server entry point)
 - Storage: ChromaDB (vector embeddings) + SQLite (temporal KG) in `~/.mempalace/`
 - Lifecycle: starts on first MCP tool call, shuts down on session end
 - Cold start: 2-5 seconds on subsequent sessions; first-ever run downloads
   the all-MiniLM-L6-v2 embedding model (~80MB) which can take longer
-- 22 MCP tools: search, navigation, knowledge graph, write, diary
+- ~29 MCP tools across read, search, knowledge graph, graph traversal,
+  write, and diary categories — see README.md for the full list
 - Palace directory is `~/.mempalace/` (no env var override documented)
 
 ## Conventions

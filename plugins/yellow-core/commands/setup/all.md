@@ -77,6 +77,7 @@ if command -v python3 >/dev/null 2>&1; then
 else
   printf 'python3:            NOT FOUND\n'
   printf 'python37_check:     missing\n'
+  printf 'python310_check:    missing\n'
   printf 'python313_check:    missing\n'
 fi
 

@@ -14,9 +14,6 @@ tools:
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_list_rooms
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_get_taxonomy
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_search
-  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_wing
-  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_room
-  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_hall
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_traverse
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_find_tunnels
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_graph_stats
@@ -72,8 +69,8 @@ Trigger when the user wants to:
    - **Cross-wing connections**: Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_find_tunnels` with two wing
      names
    - **Graph traversal**: Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_traverse` from a starting room
-   - **Search within location**: Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_search_wing` or
-     `mcp__plugin_yellow-mempalace_mempalace__mempalace_search_room` with query
+   - **Search within location**: Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_search` with query
+     plus the optional `wing` and/or `room` parameters to scope results
 
 4. Present results in a clear, navigable format with counts and relationships.
 

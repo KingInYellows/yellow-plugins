@@ -84,13 +84,18 @@ __EOF_VERSION_RIGHT__
 
 cleanup() {
   local exit_code=$?
+  # Only emit cleanup advisory on a fresh-install failure (pipx|pip).
+  # The *-upgrade paths reach exit 2 only when an upgrade SUCCEEDED but
+  # produced a version still below MIN_VERSION — the binary is correctly
+  # installed and should NOT be uninstalled.
   if [ $exit_code -ne 0 ] && [ -n "${INSTALL_METHOD:-}" ]; then
     case "${INSTALL_METHOD:-}" in
-      pipx|pipx-upgrade) warning "To clean up: pipx uninstall mempalace" ;;
-      pip|pip-upgrade) warning "To clean up: pip uninstall mempalace" ;;
+      pipx) warning "Installation failed. Partial install may remain."
+            warning "To clean up: pipx uninstall mempalace" ;;
+      pip)  warning "Installation failed. Partial install may remain."
+            warning "To clean up: pip uninstall mempalace" ;;
       *) return ;;
     esac
-    warning "Installation failed. Partial install may remain."
   fi
 }
 trap cleanup EXIT
@@ -261,11 +266,16 @@ if ! version_gte "$installed_version" "$MIN_VERSION"; then
   warning "Upgrade with: pipx upgrade mempalace"
 fi
 
-# Smoke-test the MCP entrypoint that plugin.json will invoke. If this
-# subcommand is absent, the MCP server silently fails to start with no
-# diagnostics, leaving the user with 0 tools.
-if ! mempalace mcp --help >/dev/null 2>&1; then
-  warning "'mempalace mcp --help' failed — the MCP entrypoint may differ in this version."
+# Smoke-test the MCP entrypoint that plugin.json will invoke. The
+# dedicated `mempalace-mcp` binary is the actual MCP server; the
+# `mempalace mcp` CLI subcommand only prints setup instructions and
+# exits 0, so using it as the server entry point silently registers
+# zero tools.
+if ! command -v mempalace-mcp >/dev/null 2>&1; then
+  warning "'mempalace-mcp' binary not found — MCP server will fail to start."
+  warning "Verify plugin.json mcpServers.mempalace.command matches the installed CLI."
+elif ! mempalace-mcp --help >/dev/null 2>&1; then
+  warning "'mempalace-mcp --help' failed — the MCP entry point may differ in this version."
   warning "Verify plugin.json mcpServers.mempalace.command matches the installed CLI."
 fi
 

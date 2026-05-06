@@ -54,7 +54,7 @@ On first interaction with the palace in a session:
 | **L3** | Deep semantic search | On-demand (cross-palace) | Variable |
 
 - L0+L1 are loaded via `mempalace_status` (~170 tokens total)
-- L2 is triggered by wing/room-scoped searches
+- L2 is triggered by `mempalace_search` with `wing`/`room` filters
 - L3 is triggered by unfiltered `mempalace_search`
 
 ### When to Use What (Tool Selection)
@@ -62,8 +62,8 @@ On first interaction with the palace in a session:
 | Need | Tool | Why |
 |------|------|-----|
 | "What do we know about X?" | `mempalace_search` | Broad semantic search |
-| "What's in the auth wing?" | `mempalace_search_wing` | Scoped, higher precision |
-| "What decisions did we make?" | `mempalace_search_hall` with `hall_facts` | Type-filtered |
+| "What's in the auth wing?" | `mempalace_search` with `wing` param | Scoped, higher precision |
+| "What decisions did we make?" | `mempalace_search` (filter results client-side by hall type) | No `hall` filter exists on the tool |
 | "Who works on what?" | `mempalace_kg_query` | Entity relationships |
 | "What changed since January?" | `mempalace_kg_timeline` | Temporal history |
 | "How are X and Y connected?" | `mempalace_find_tunnels` | Cross-wing discovery |

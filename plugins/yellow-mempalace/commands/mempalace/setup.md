@@ -98,8 +98,19 @@ If palace is NOT initialized, use AskUserQuestion:
 If the user chooses **Yes**:
 
 ```bash
-mempalace init
+if ! init_output=$(mempalace init 2>&1); then
+  printf '[yellow-mempalace] Error: mempalace init failed.\n' >&2
+  printf '%s\n' "$init_output" >&2
+  printf '[yellow-mempalace] Common causes: missing ChromaDB dependency,\n' >&2
+  printf '[yellow-mempalace] permission error on ~/.mempalace/, or python\n' >&2
+  printf '[yellow-mempalace] interpreter mismatch. Resolve, then re-run.\n' >&2
+  exit 1
+fi
+printf '%s\n' "$init_output"
 ```
+
+If `mempalace init` fails, stop. Do not proceed to Step 3 — the palace
+state is unknown and downstream MCP calls will fail confusingly.
 
 If the user chooses **No, skip for now**: continue to Step 3 without
 initializing.
@@ -130,8 +141,8 @@ If fewer than 4 tools found:
 - Check if mempalace version supports MCP: `mempalace --version`
 - If version < 3.0.0: "Upgrade with: pipx upgrade mempalace"
 - If version >= 3.0.0: "MCP server may have failed to start. Try restarting
-  Claude Code. Check that `mempalace mcp` runs without errors by running it
-  manually in a terminal."
+  Claude Code. Verify the `mempalace-mcp` binary is on PATH and runs without
+  errors by invoking `mempalace-mcp --help` manually in a terminal."
 
 ### Step 4: Report summary
 

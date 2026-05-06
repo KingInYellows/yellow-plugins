@@ -18,10 +18,8 @@
   ],
   "mcpServers": {
     "mempalace": {
-      "command": "mempalace",
-      "args": [
-        "mcp"
-      ],
+      "command": "mempalace-mcp",
+      "args": [],
       "env": {
         "PYTHONWARNINGS": "ignore",
         "TRANSFORMERS_VERBOSITY": "error",

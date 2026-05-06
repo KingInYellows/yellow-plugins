@@ -51,13 +51,21 @@ Example: `mcp__plugin_yellow-mempalace_mempalace__mempalace_search`
 
 ### Search Filter Patterns
 
-Narrow searches progressively for better results:
-1. **Unfiltered**: `mempalace_search` — broad search across entire palace
-2. **Wing-filtered**: `mempalace_search_wing` — +12% retrieval boost
-3. **Room-filtered**: `mempalace_search_room` — +34% retrieval boost
-4. **Hall-filtered**: `mempalace_search_hall` — filter by memory type
+Use `mempalace_search` for all semantic queries. It accepts optional
+`wing` and `room` filter parameters that narrow the embedding scan to the
+named location:
 
-Always prefer the most specific filter available.
+1. **Unfiltered**: `mempalace_search(query)` — broad search across the
+   entire palace
+2. **Wing-scoped**: `mempalace_search(query, wing=<name>)` — narrows to a
+   single wing for higher precision
+3. **Room-scoped**: `mempalace_search(query, wing=<name>, room=<name>)` —
+   narrowest scope; use when both location terms are known
+
+There is no `hall` filter parameter on `mempalace_search`. Hall types
+(`hall_facts`, `hall_events`, etc.) categorize content but are not
+selectable via the search API; surface this as a known limitation if a
+caller asks for hall-filtered results.
 
 ### Knowledge Graph Triple Format
 

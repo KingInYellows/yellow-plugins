@@ -39,16 +39,25 @@ Structured long-term memory with temporal knowledge graph via
 | `/mempalace:kg <action>` | Knowledge graph: query, add, invalidate, timeline |
 | `/mempalace:navigate [wing]` | Browse palace structure, find tunnels |
 
-## MCP Tools (22)
+## MCP Tools
 
-The plugin exposes 22 MCP tools via the mempalace server:
+The plugin exposes the following MCP tools from the mempalace server. The
+upstream `mempalace_search` tool accepts optional `wing` and `room` filter
+parameters; there are no separate `search_wing`/`search_room`/`search_hall`
+tools.
 
 - **Read**: status, list_wings, list_rooms, get_taxonomy, get_aaak_spec
-- **Search**: search, search_wing, search_hall, search_room, check_duplicate
+- **Search**: search, check_duplicate
 - **Knowledge Graph**: kg_query, kg_add, kg_invalidate, kg_timeline, kg_stats
-- **Graph**: traverse, find_tunnels, graph_stats
-- **Write**: add_drawer, delete_drawer
+- **Graph**: traverse, find_tunnels, graph_stats, create_tunnel,
+  list_tunnels, delete_tunnel, follow_tunnels
+- **Write**: add_drawer, delete_drawer, get_drawer, list_drawers,
+  update_drawer
 - **Diary**: diary_write, diary_read
+
+This plugin's commands and agents reference a curated subset of these
+tools. The full registry is defined upstream in
+[mempalace/mcp_server.py](https://pypi.org/project/mempalace/).
 
 ## How It Works
 

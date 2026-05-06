@@ -1,13 +1,10 @@
 ---
 name: mempalace:search
-description: "Search palace memories by semantic similarity with optional wing/room/hall filters. Use when recalling past decisions, facts, or context."
-argument-hint: '<query> [--wing <wing>] [--room <room>] [--hall <hall>]'
+description: "Search palace memories by semantic similarity with optional wing or room filter. Use when recalling past decisions, facts, or context."
+argument-hint: '<query> [--wing <wing>] [--room <room>]'
 allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-mempalace_mempalace__mempalace_search
-  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_wing
-  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_room
-  - mcp__plugin_yellow-mempalace_mempalace__mempalace_search_hall
 ---
 
 # Search Palace
@@ -24,24 +21,25 @@ Extract from `$ARGUMENTS`:
   string)
 - **--wing** (optional): Filter to a specific wing
 - **--room** (optional): Filter to a specific room
-- **--hall** (optional): Filter to a specific hall type (hall_facts,
-  hall_events, hall_discoveries, hall_preferences, hall_advice)
 
 If query is empty: report "Usage: `/mempalace:search <query>` — provide a
 search query." and stop.
 
+> Hall filtering is not exposed by the upstream `mempalace_search` MCP tool.
+> If callers ask for `--hall <type>`, ignore it with a one-line notice and
+> proceed with an unfiltered (or wing/room-filtered) search.
+
 ### Step 2: Discover MCP tools
 
-Use ToolSearch with query `"+mempalace search"` to find search tools.
+Use ToolSearch with query `"+mempalace search"` to confirm
+`mempalace_search` is available.
 
 ### Step 3: Execute search
 
-Choose the most specific search tool based on provided filters:
-
-- **room filter**: Call `mempalace_search_room` with query, room, and limit=5
-- **wing filter**: Call `mempalace_search_wing` with query, wing, and limit=5
-- **hall filter**: Call `mempalace_search_hall` with query, hall, and limit=5
-- **no filter**: Call `mempalace_search` with query and limit=5
+Call `mempalace_search` with `query`, `limit=5`, and (when supplied) the
+optional `wing` and/or `room` parameters. Use the room filter for the
+highest precision when a room is given; otherwise pass only `wing`; when
+neither is given, omit both filters.
 
 ### Step 4: Display results
 
