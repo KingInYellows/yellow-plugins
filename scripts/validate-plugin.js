@@ -780,6 +780,63 @@ function validatePlugin(pluginDir) {
   // (RULE 8 — shebang / decision-output / set -e content checks — folded
   // into RULES 6+8 single-pass loop above via validateHookScriptPath.)
 
+  // RULE 9: userConfig entries must declare `type` and `title`. The Claude
+  // Code remote validator (claude doctor) rejects any entry missing either,
+  // and only accepts type ∈ {string, number, boolean, directory, file}. Local
+  // CI mirrors that here because the JSON Schema in schemas/plugin.schema.json
+  // is not currently AJV-loaded by validate-plugin.js — without this check
+  // the drift only surfaces at install time. See
+  // docs/solutions/build-errors/userconfig-type-title-remote-validator-drift.md
+  if (manifest.userConfig !== undefined) {
+    if (
+      typeof manifest.userConfig !== 'object' ||
+      manifest.userConfig === null ||
+      Array.isArray(manifest.userConfig)
+    ) {
+      addError(errors, 'userConfig must be an object keyed by config name');
+    } else {
+      const VALID_USER_CONFIG_TYPES = new Set([
+        'string',
+        'number',
+        'boolean',
+        'directory',
+        'file',
+      ]);
+      for (const [key, entry] of Object.entries(manifest.userConfig)) {
+        if (
+          typeof entry !== 'object' ||
+          entry === null ||
+          Array.isArray(entry)
+        ) {
+          addError(errors, `userConfig.${key} must be an object`);
+          continue;
+        }
+        if (entry.type === undefined) {
+          addError(
+            errors,
+            `userConfig.${key} is missing required field "type" (one of: string, number, boolean, directory, file)`
+          );
+        } else if (!VALID_USER_CONFIG_TYPES.has(entry.type)) {
+          addError(
+            errors,
+            `userConfig.${key}.type "${entry.type}" is invalid — must be one of: string, number, boolean, directory, file`
+          );
+        }
+        if (entry.title === undefined) {
+          addError(
+            errors,
+            `userConfig.${key} is missing required field "title" (human-readable UI label)`
+          );
+        } else if (typeof entry.title !== 'string' || entry.title.length === 0) {
+          addError(
+            errors,
+            `userConfig.${key}.title must be a non-empty string`
+          );
+        }
+      }
+    }
+  }
+
   // Summary
   if (errors.length === 0) {
     logSuccess(`Plugin "${manifest.name}" is valid`);

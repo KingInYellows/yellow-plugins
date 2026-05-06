@@ -22,14 +22,20 @@
   "outputStyles": "./output-styles",
   "userConfig": {
     "perplexity_api_key": {
+      "type": "string",
+      "title": "Perplexity API key",
       "description": "Optional Perplexity API key. Get one at https://www.perplexity.ai/settings/api. Without a key, perplexity MCP will fail at startup and those tools are skipped — other sources (tavily, exa, parallel, ast-grep) continue to work. Stored in system keychain.",
       "sensitive": true
     },
     "tavily_api_key": {
+      "type": "string",
+      "title": "Tavily API key",
       "description": "Optional Tavily API key. Get one at https://app.tavily.com. Tavily MCP starts without a key but tool calls return runtime errors — key required for actual searches. Stored in system keychain.",
       "sensitive": true
     },
     "exa_api_key": {
+      "type": "string",
+      "title": "Exa API key",
       "description": "Optional Exa API key. Get one at https://dashboard.exa.ai. Exa MCP starts without a key but tool calls return runtime errors — key required for actual searches. Stored in system keychain.",
       "sensitive": true
     }

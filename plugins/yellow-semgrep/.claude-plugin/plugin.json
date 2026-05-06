@@ -18,6 +18,8 @@
   ],
   "userConfig": {
     "semgrep_app_token": {
+      "type": "string",
+      "title": "Semgrep app token",
       "description": "Semgrep API token (sgp_ prefix). Must have Web API scope. Create at Semgrep Organization Settings > API Tokens. Stored in system keychain.",
       "sensitive": true
     }

@@ -18,6 +18,8 @@
   ],
   "userConfig": {
     "morph_api_key": {
+      "type": "string",
+      "title": "Morph API key",
       "description": "Morph API key (get one at https://morphllm.com — free tier 250K credits/month). Stored in system keychain or ~/.claude/.credentials.json.",
       "sensitive": true
     }
