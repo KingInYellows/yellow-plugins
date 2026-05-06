@@ -295,7 +295,10 @@
               },
               "version": {
                 "type": "string",
-                "description": "Semver constraint such as ^1.2.0, ~2.1.0, or >=3.0.0."
+                "minLength": 1,
+                "pattern": "^[~^>=<*xXvV0-9]",
+                "semverRange": true,
+                "description": "Semver range constraint such as ^1.2.0, ~2.1.0, >=3.0.0, or v1.2.3. Two-layer validation: the `pattern` is a lightweight structural gate that rejects unsupported leading characters before the keyword runs; `semverRange` then calls semver.validRange() for full semantic correctness. minLength: 1 guards the empty-string case — semver.validRange(\"\") returns \"*\" (truthy) so the keyword alone would accept it."
               }
             },
             "additionalProperties": false

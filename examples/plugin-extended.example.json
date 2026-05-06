@@ -15,7 +15,20 @@
   "commands": "./commands/",
   "agents": ["./agents/", "./vendored-agents/"],
   "outputStyles": "./styles/",
-  "hooks": "./hooks/hooks.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-bash.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  },
   "mcpServers": {
     "telegram": {
       "command": "${CLAUDE_PLUGIN_ROOT}/servers/telegram",
