@@ -1,11 +1,12 @@
 # P3 Remediation: gt-setup AI Agent Wizard
 
 > **Status: Implemented (archived)** — P3-1 now ships across
-> `smart-submit.md`, `gt-amend.md`, and `gt-stack-plan.md`: yq parse failures
+> smart-submit.md, gt-amend.md, and gt-stack-plan.md: yq parse failures
 > emit explicit stderr warnings before falling back to defaults. P3-2 shipped
-> (`gt: BROKEN` text confirmed in `gt-setup.md`), P3-4 and P3-5 removals
+> (gt: BROKEN text confirmed in gt-setup.md), P3-4 and P3-5 removals
 > shipped, and the required changeset was added during the PR #228 cycle.
-> Retained for historical context.
+> Unchecked task boxes below are stale historical planning state, not remaining
+> work. Retained for historical context.
 
 ## Overview
 
