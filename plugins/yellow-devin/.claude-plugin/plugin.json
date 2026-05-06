@@ -18,10 +18,14 @@
   ],
   "userConfig": {
     "devin_service_user_token": {
+      "type": "string",
+      "title": "Devin service user token",
       "description": "Devin V3 service user token (cog_ prefix). Create at Devin Enterprise Settings > Service Users. Stored in system keychain.",
       "sensitive": true
     },
     "devin_org_id": {
+      "type": "string",
+      "title": "Devin organization ID",
       "description": "Devin organization ID. Find at Devin Enterprise Settings > Organizations.",
       "sensitive": false
     }

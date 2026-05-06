@@ -19,10 +19,11 @@
 // NOTE: JSON Schema validation (AJV) runs separately via validate-schemas.js /
 // `pnpm validate:schemas`. This script enforces additional rules not expressible
 // in JSON Schema: path existence, directory structure, .md file presence, hook
-// script sanity, and hooks.json drift. Always run both together via
+// script sanity, hooks.json drift, and (since the userConfig type/title fix
+// per docs/solutions/build-errors/userconfig-type-title-remote-validator-drift.md)
+// the userConfig shape constraints. Always run both together via
 // `pnpm validate:schemas` — running this script alone does not catch schema
-// shape violations in fields like monitors, channels, userConfig, and
-// dependencies.
+// shape violations in fields like monitors and dependencies.
 
 const fs = require('fs');
 const path = require('path');
@@ -59,6 +60,20 @@ const DECISION_PROTOCOL_EVENTS = new Set([
   'PostToolUse',
   'Stop',
   'SessionStart',
+]);
+
+// Valid `type` values for a userConfig entry, mirroring the Claude Code
+// remote validator's enum. Module-scope so RULE 9 can reuse the Set across
+// both the top-level userConfig walk and the per-channel walk without
+// reallocating it per validatePlugin call (matches the VALID_HOOK_EVENTS
+// pattern above). Keep in sync with `definitions.userConfigEntry.properties.type.enum`
+// in schemas/plugin.schema.json.
+const VALID_USER_CONFIG_TYPES = new Set([
+  'string',
+  'number',
+  'boolean',
+  'directory',
+  'file',
 ]);
 
 /**
@@ -779,6 +794,63 @@ function validatePlugin(pluginDir) {
 
   // (RULE 8 — shebang / decision-output / set -e content checks — folded
   // into RULES 6+8 single-pass loop above via validateHookScriptPath.)
+
+  // RULE 9: userConfig entries must declare `type` and `title`. The Claude
+  // Code remote validator (claude doctor) rejects any entry missing either,
+  // and only accepts type ∈ {string, number, boolean, directory, file}. Local
+  // CI mirrors that here because the JSON Schema in schemas/plugin.schema.json
+  // is not currently AJV-loaded by validate-plugin.js — without this check
+  // the drift only surfaces at install time. The check covers both the
+  // top-level `userConfig` object AND each `channels[].userConfig` object,
+  // because `channels[*].userConfig` reuses the same `userConfigEntry`
+  // schema definition and carries the same remote-validator constraints.
+  // See docs/solutions/build-errors/userconfig-type-title-remote-validator-drift.md
+  function validateUserConfigEntries(userConfig, pathPrefix) {
+    if (
+      typeof userConfig !== 'object' ||
+      userConfig === null ||
+      Array.isArray(userConfig)
+    ) {
+      addError(errors, `${pathPrefix} must be an object keyed by config name`);
+      return;
+    }
+    for (const [key, entry] of Object.entries(userConfig)) {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        addError(errors, `${pathPrefix}.${key} must be an object`);
+        continue;
+      }
+      if (entry.type == null) {
+        addError(
+          errors,
+          `${pathPrefix}.${key} is missing required field "type" (one of: string, number, boolean, directory, file)`
+        );
+      } else if (!VALID_USER_CONFIG_TYPES.has(entry.type)) {
+        addError(
+          errors,
+          `${pathPrefix}.${key}.type "${entry.type}" is invalid — must be one of: string, number, boolean, directory, file`
+        );
+      }
+      if (entry.title == null) {
+        addError(
+          errors,
+          `${pathPrefix}.${key} is missing required field "title" (human-readable UI label)`
+        );
+      } else if (typeof entry.title !== 'string' || entry.title.length === 0) {
+        addError(errors, `${pathPrefix}.${key}.title must be a non-empty string`);
+      }
+    }
+  }
+
+  if (manifest.userConfig !== undefined) {
+    validateUserConfigEntries(manifest.userConfig, 'userConfig');
+  }
+  if (Array.isArray(manifest.channels)) {
+    manifest.channels.forEach((ch, i) => {
+      if (ch && typeof ch === 'object' && ch.userConfig !== undefined) {
+        validateUserConfigEntries(ch.userConfig, `channels[${i}].userConfig`);
+      }
+    });
+  }
 
   // Summary
   if (errors.length === 0) {

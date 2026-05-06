@@ -11,13 +11,16 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["string", "number", "boolean"],
-          "default": "string"
+          "enum": ["string", "number", "boolean", "directory", "file"]
         },
-        "label": { "type": "string" },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Human-readable label shown in the Claude Code setup UI when prompting for this value. Required by the Claude Code remote validator (claude doctor); absence causes a manifest-rejection at install time."
+        },
         "description": { "type": "string" },
         "default": {
-          "description": "Default value. Must match the declared `type` (string|number|boolean). Constrained via allOf below to prevent a string default containing shell metacharacters from being interpolated unsafely into monitor.command via ${user_config.KEY}."
+          "description": "Default value. Must match the declared `type` (string|number|boolean for value types; string for directory/file path types). Constrained via allOf below to prevent a string default containing shell metacharacters from being interpolated unsafely into monitor.command via ${user_config.KEY}."
         },
         "required": { "type": "boolean" },
         "sensitive": {
@@ -26,6 +29,7 @@
           "description": "Store value in OS keychain when true."
         }
       },
+      "required": ["type", "title"],
       "additionalProperties": false,
       "allOf": [
         {
@@ -41,7 +45,11 @@
           "then": { "properties": { "default": { "type": "boolean" } } }
         },
         {
-          "if": { "not": { "required": ["type"] } },
+          "if": { "properties": { "type": { "const": "directory" } }, "required": ["type"] },
+          "then": { "properties": { "default": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "file" } }, "required": ["type"] },
           "then": { "properties": { "default": { "type": "string" } } }
         }
       ]
@@ -246,7 +254,7 @@
     },
     "userConfig": {
       "type": "object",
-      "description": "Config keys prompted at install time. Values substituted as ${user_config.KEY} and exported as CLAUDE_PLUGIN_OPTION_<KEY> env vars. Each entry may declare type, label, description, default, required, sensitive.",
+      "description": "Config keys prompted at install time. Values substituted as ${user_config.KEY} and exported as CLAUDE_PLUGIN_OPTION_<KEY> env vars. Each entry must declare type and title (required by the Claude Code remote validator), and may declare description, default, required, sensitive.",
       "propertyNames": {
         "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
       },
