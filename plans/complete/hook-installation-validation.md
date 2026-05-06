@@ -1,7 +1,9 @@
 # Feature: Ensure Plugin Hooks Install and Work Correctly
 
-Status: implemented in-repo. Phases 1-3 and automated validation are complete;
-the remaining follow-up is manual `/ruvector:setup` verification.
+Status: complete. All phases implemented and verified, including manual
+`/ruvector:setup` verification (happy path confirmed: ruvector v0.2.25
+installed, all 5 hooks active via plugin.json, global binary in PATH, smoke
+test passed).
 
 ## Problem Statement
 
@@ -204,7 +206,10 @@ Three complementary fixes, ordered by impact:
 - [x] 4.1: Run `pnpm validate:schemas` to verify current rules pass for all
   plugins and confirm there is no remaining hooks.json drift
 
-- [ ] 4.2: Manually test ruvector setup flow with the updated setup.md
+- [x] 4.2: Manually test ruvector setup flow with the updated setup.md
+  (verified 2026-05-06: `/ruvector:setup` happy path — installed v0.2.25, all
+  5 hooks reported active via plugin.json, global binary detected in PATH,
+  smoke test passed under 1s)
 
 ## Technical Details
 

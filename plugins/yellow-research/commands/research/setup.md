@@ -290,6 +290,35 @@ else
     -d '{"query":"test","numResults":1}')
   curl_exit=$?
   http_status=$(printf '%s' "$response" | tail -n1)
+
+  # Inline decision tree — must run in the same subprocess as the curl probe so
+  # $curl_exit and $http_status are still in scope (each ```bash``` block is a
+  # fresh subprocess; see comment at the top of this Step).
+  if [ "$curl_exit" -ne 0 ]; then
+    provider_status="UNREACHABLE"
+    provider_detail="API unreachable (curl exit $curl_exit — timeout or network error)"
+  elif [ "$http_status" = "200" ]; then
+    provider_status="ACTIVE"
+    provider_detail="Live test passed"
+  elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
+    provider_status="INVALID"
+    # v2.0.0 shell-env-only diagnostic: a 401 here means the key was in shell
+    # env (we ran the curl probe). The shell-env path no longer reaches the
+    # MCP — plugin.json reads ${user_config.exa_api_key} — so a valid key
+    # in shell env still fails to authenticate the MCP. Distinguish "key
+    # expired" from "key never reached MCP" so the user can act on the right
+    # cause.
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
+  elif [ "$http_status" = "429" ]; then
+    provider_status="RATE LIMITED"
+    provider_detail="Key may be valid; service is busy. Try again later."
+  elif printf '%s' "$http_status" | grep -qE '^5[0-9][0-9]$'; then
+    provider_status="UNREACHABLE"
+    provider_detail="API server error (HTTP $http_status)"
+  else
+    provider_status="UNREACHABLE"
+    provider_detail="Unexpected HTTP $http_status"
+  fi
 fi
 ```
 
@@ -344,6 +373,28 @@ else
     -d "$tavily_body")
   curl_exit=$?
   http_status=$(printf '%s' "$response" | tail -n1)
+
+  # Inline decision tree — must run in the same subprocess as the curl probe.
+  if [ "$curl_exit" -ne 0 ]; then
+    provider_status="UNREACHABLE"
+    provider_detail="API unreachable (curl exit $curl_exit — timeout or network error)"
+  elif [ "$http_status" = "200" ]; then
+    provider_status="ACTIVE"
+    provider_detail="Live test passed"
+  elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
+    provider_status="INVALID"
+    # v2.0.0 shell-env-only diagnostic: see EXA block above for rationale.
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
+  elif [ "$http_status" = "429" ]; then
+    provider_status="RATE LIMITED"
+    provider_detail="Key may be valid; service is busy. Try again later."
+  elif printf '%s' "$http_status" | grep -qE '^5[0-9][0-9]$'; then
+    provider_status="UNREACHABLE"
+    provider_detail="API server error (HTTP $http_status)"
+  else
+    provider_status="UNREACHABLE"
+    provider_detail="Unexpected HTTP $http_status"
+  fi
 fi
 ```
 
@@ -401,6 +452,28 @@ else
     -d '{"model":"sonar","messages":[{"role":"user","content":"hi"}],"max_tokens":1}')
   curl_exit=$?
   http_status=$(printf '%s' "$response" | tail -n1)
+
+  # Inline decision tree — must run in the same subprocess as the curl probe.
+  if [ "$curl_exit" -ne 0 ]; then
+    provider_status="UNREACHABLE"
+    provider_detail="API unreachable (curl exit $curl_exit — timeout or network error)"
+  elif [ "$http_status" = "200" ]; then
+    provider_status="ACTIVE"
+    provider_detail="Live test passed"
+  elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
+    provider_status="INVALID"
+    # v2.0.0 shell-env-only diagnostic: see EXA block above for rationale.
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
+  elif [ "$http_status" = "429" ]; then
+    provider_status="RATE LIMITED"
+    provider_detail="Key may be valid; service is busy. Try again later."
+  elif printf '%s' "$http_status" | grep -qE '^5[0-9][0-9]$'; then
+    provider_status="UNREACHABLE"
+    provider_detail="API server error (HTTP $http_status)"
+  else
+    provider_status="UNREACHABLE"
+    provider_detail="Unexpected HTTP $http_status"
+  fi
 fi
 ```
 
@@ -415,8 +488,6 @@ exists for this credential).
 if [ -z "${CERAMIC_API_KEY:-}" ]; then
   provider_status="ABSENT"
   provider_detail="CERAMIC_API_KEY not in shell env (REST probe skipped). MCP OAuth path unaffected."
-  curl_exit=0
-  http_status="000"
 else
   response=$(curl -s --connect-timeout 5 --max-time 5 \
     -w "\n%{http_code}" \
@@ -426,33 +497,38 @@ else
     -d '{"query":"test"}')
   curl_exit=$?
   http_status=$(printf '%s' "$response" | tail -n1)
+
+  # Inline decision tree — Ceramic has no userConfig path (MCP authenticates
+  # via OAuth), so the v2.0.0 shell-env-only diagnostic does not apply here:
+  # a 401 means the REST key is genuinely bad. Keep the simple message.
+  if [ "$curl_exit" -ne 0 ]; then
+    provider_status="UNREACHABLE"
+    provider_detail="API unreachable (curl exit $curl_exit — timeout or network error)"
+  elif [ "$http_status" = "200" ]; then
+    provider_status="ACTIVE"
+    provider_detail="Live test passed"
+  elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
+    provider_status="INVALID"
+    provider_detail="Key rejected by API (HTTP $http_status)"
+  elif [ "$http_status" = "429" ]; then
+    provider_status="RATE LIMITED"
+    provider_detail="Key may be valid; service is busy. Try again later."
+  elif printf '%s' "$http_status" | grep -qE '^5[0-9][0-9]$'; then
+    provider_status="UNREACHABLE"
+    provider_detail="API server error (HTTP $http_status)"
+  else
+    provider_status="UNREACHABLE"
+    provider_detail="Unexpected HTTP $http_status"
+  fi
 fi
 ```
 
-After each probe, evaluate `$curl_exit` first, then `$http_status`. Apply this
-explicit decision tree for each provider:
-
-```bash
-if [ "$curl_exit" -ne 0 ]; then
-  provider_status="UNREACHABLE"
-  provider_detail="API unreachable (curl exit $curl_exit — timeout or network error)"
-elif [ "$http_status" = "200" ]; then
-  provider_status="ACTIVE"
-  provider_detail="Live test passed"
-elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
-  provider_status="INVALID"
-  provider_detail="Key rejected by API (HTTP $http_status)"
-elif [ "$http_status" = "429" ]; then
-  provider_status="RATE LIMITED"
-  provider_detail="Key may be valid; service is busy. Try again later."
-elif printf '%s' "$http_status" | grep -qE '^5[0-9][0-9]$'; then
-  provider_status="UNREACHABLE"
-  provider_detail="API server error (HTTP $http_status)"
-else
-  provider_status="UNREACHABLE"
-  provider_detail="Unexpected HTTP $http_status"
-fi
-```
+Each provider block above runs its own inline decision tree (in the same
+subprocess as the curl probe) so `$curl_exit` and `$http_status` stay in
+scope. A standalone post-probe decision tree was tried earlier but failed —
+each ``` ```bash``` ``` block is a fresh subprocess, so variables set in one
+block are invisible to the next. See
+`docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
 
 Never display raw API response bodies for any provider — only `provider_status`
 and `provider_detail` are used in the results table. If body content must ever

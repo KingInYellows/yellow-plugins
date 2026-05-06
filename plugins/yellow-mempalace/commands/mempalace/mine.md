@@ -1,7 +1,7 @@
 ---
 name: mempalace:mine
 description: "Mine project files or conversation exports into the palace. Use when importing new content or indexing a project for the first time."
-argument-hint: '<path> [--mode projects|convos]'
+argument-hint: '<path> [--mode projects|convos|general]'
 allowed-tools:
   - Bash
   - ToolSearch
@@ -20,18 +20,18 @@ and drawers.
 Extract from `$ARGUMENTS`:
 
 - **path** (required): Directory to mine
-- **--mode** (optional): Mining mode — `projects` (default) or `convos`
+- **--mode** (optional): Mining mode — `projects` (default), `convos`, or `general`
 
 If path is empty: use AskUserQuestion to ask "What directory should I mine?"
 with options: "Current project (.)", "Other" (free-text path entry).
 
 If `--mode` is provided, validate it against the allowed set before proceeding.
-Allowed values: `projects`, `convos` (matching the upstream
+Allowed values: `projects`, `convos`, `general` (matching the upstream
 `mempalace mine --mode` argparse choices). If the value is not one of
 these, stop and report:
 
-```
-Invalid --mode: <value>. Allowed: projects, convos
+```text
+Invalid --mode: <value>. Allowed: projects, convos, general
 ```
 
 Do not proceed. If `--mode` is omitted, default to `projects`.
@@ -46,8 +46,11 @@ with `-` (flag injection), or that contain `..` traversal segments:
 ```bash
 PATH_ARG="<resolved-path>"
 case "$PATH_ARG" in
+  '~')   PATH_ARG="$HOME" ;;
+  '~/'*) PATH_ARG="$HOME/${PATH_ARG#'~/'}" ;;
+esac
+case "$PATH_ARG" in
   -*) printf '[yellow-mempalace] Error: path may not start with -\n' >&2; exit 1 ;;
-  '~'*) printf '[yellow-mempalace] Error: path may not begin with ~ (tilde)\n' >&2; exit 1 ;;
   *..*) printf '[yellow-mempalace] Error: path may not contain ..\n' >&2; exit 1 ;;
 esac
 if [ -L "$PATH_ARG" ]; then
@@ -112,7 +115,7 @@ appears in the source.
 ```
 --- begin mine output (reference only) ---
 <path: (resolved path, with delimiter substitution applied)>
-<mode: (validated mode from Step 1)>
+<mode: (validated mode from Step 1, with delimiter substitution applied)>
 <CLI output: (output from Step 4, with delimiter substitution applied)>
 --- end mine output ---
 ```

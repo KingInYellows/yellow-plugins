@@ -289,14 +289,19 @@ Truncation limits:
 
 ## Authentication Methods
 
-| Method | Env Var | Config File | Priority |
-|--------|---------|-------------|----------|
-| API Key | `OPENAI_API_KEY` | — | Checked first |
-| ChatGPT OAuth | — | `~/.codex/auth.json` | Checked second |
-| Manual login | — | Run `codex login` | Interactive only |
+| Method | Env Var | Storage | State Probe |
+|--------|---------|---------|-------------|
+| API Key | `OPENAI_API_KEY` | Shell env | `[ -n "$OPENAI_API_KEY" ]` |
+| ChatGPT OAuth | — | OS keyring (libsecret/Keychain/CredMgr) | `codex login status` |
+| Legacy OAuth | — | `~/.codex/auth.json` (pre-v0.118 only) | File existence |
 
-The plugin never stores credentials. Users manage keys in their shell profile
-or via `codex login`.
+The Rust CLI (v0.118+) writes its OAuth state to the OS keyring, not to
+`~/.codex/auth.json`. Use `codex login status` to probe OAuth/keyring
+login state — it reads from wherever the installed CLI version actually
+persists credentials. For API key auth, check `[ -n "$OPENAI_API_KEY" ]`
+directly; that env var is never written to disk and `codex login status`
+does not reflect its presence. The plugin never stores credentials. Users
+manage keys in their shell profile or via `codex login`.
 
 ## Cost Estimation
 

@@ -121,22 +121,32 @@ fi
 
 **Method 2: ChatGPT OAuth via `codex login`**
 
+The Rust-based Codex CLI (v0.118+) stores its authentication in the OS
+keyring (libsecret on Linux, Keychain on macOS, Credential Manager on
+Windows) — NOT in `~/.codex/auth.json` (that path was the pre-Rust storage
+format). The `codex login status` subcommand is the canonical, version-stable
+probe; it reads from wherever the current CLI persists credentials and
+returns a line like `Logged in using ChatGPT` or `Not logged in`.
+
 ```bash
-if [ -f "${HOME}/.codex/auth.json" ]; then
-  if command -v jq >/dev/null 2>&1; then
-    auth_mode=$(jq -r '.auth_mode // empty' "${HOME}/.codex/auth.json" 2>/dev/null || true)
-    if [ "$auth_mode" = "chatgpt" ]; then
-      printf '[yellow-codex] codex login: authenticated (ChatGPT OAuth)\n'
-    elif [ -n "$auth_mode" ]; then
-      printf '[yellow-codex] codex login: authenticated (%s)\n' "$auth_mode"
-    else
-      printf '[yellow-codex] codex login: auth file exists but mode unknown\n'
-    fi
+if command -v codex >/dev/null 2>&1; then
+  # Note: codex CLI writes login status to stderr (eprintln!), not stdout — capture both via 2>&1.
+  # Capture exit code separately so probe failures (keyring locked, config corruption) are
+  # distinguishable from the "Not logged in" unauthenticated case (both leave the grep unmatched).
+  if login_status=$(codex login status 2>&1); then login_exit=0; else login_exit=$?; fi
+  if [ "$login_exit" -eq 0 ] && printf '%s' "$login_status" | grep -qi '^logged in'; then
+    # Do NOT echo $login_status — codex CLI may include API key fragments (e.g. "Logged in using an API key - sk-proj-***...")
+    printf '[yellow-codex] codex login: authenticated\n'
+  elif [ -f "${HOME}/.codex/auth.json" ]; then
+    # Check legacy file before reporting probe error — pre-v0.118 CLIs may lack the `login status` subcommand entirely (non-zero exit) yet still be authenticated via auth.json.
+    printf '[yellow-codex] codex login: legacy auth.json found (pre-v0.118 format)\n'
+  elif [ "$login_exit" -ne 0 ]; then
+    printf '[yellow-codex] codex login: probe error (codex login status exited %d; run it manually to diagnose)\n' "$login_exit" >&2
   else
-    printf '[yellow-codex] codex login: auth file exists (jq not installed; mode unknown)\n'
+    printf '[yellow-codex] codex login: not configured (run `codex login` to authenticate via ChatGPT)\n'
   fi
 else
-  printf '[yellow-codex] codex login: not configured\n'
+  printf '[yellow-codex] codex login: skipped (codex CLI not installed)\n'
 fi
 ```
 
@@ -145,7 +155,7 @@ If neither method is configured:
 ```text
 [yellow-codex] Warning: No authentication configured.
   Option 1: export OPENAI_API_KEY="sk-..." in ~/.zshrc
-  Option 2: codex login (authenticates via ChatGPT)
+  Option 2: codex login (authenticates via ChatGPT, stored in OS keyring)
 ```
 
 Never echo the actual API key value. If detected, replace output with:
