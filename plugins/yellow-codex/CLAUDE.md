@@ -19,7 +19,10 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
   GitHub Releases.
 - **Authentication** — One of:
   - `OPENAI_API_KEY` environment variable (`sk-` or `sk-proj-` prefix)
-  - ChatGPT OAuth via `codex login` (stored in `~/.codex/auth.json`)
+  - ChatGPT OAuth via `codex login` (v0.118+ stores state in the OS
+    keyring — libsecret on Linux, Keychain on macOS, Credential Manager
+    on Windows; older versions wrote `~/.codex/auth.json`). Probe with
+    `codex login status`.
 
 ## Conventions
 
