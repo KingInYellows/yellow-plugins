@@ -1,7 +1,7 @@
 ---
 name: mempalace:mine
 description: "Mine project files or conversation exports into the palace. Use when importing new content or indexing a project for the first time."
-argument-hint: '<path> [--mode projects|convos]'
+argument-hint: '<path> [--mode projects|convos|general]'
 allowed-tools:
   - Bash
   - ToolSearch
@@ -20,18 +20,18 @@ and drawers.
 Extract from `$ARGUMENTS`:
 
 - **path** (required): Directory to mine
-- **--mode** (optional): Mining mode — `projects` (default) or `convos`
+- **--mode** (optional): Mining mode — `projects` (default), `convos`, or `general`
 
 If path is empty: use AskUserQuestion to ask "What directory should I mine?"
 with options: "Current project (.)", "Other" (free-text path entry).
 
 If `--mode` is provided, validate it against the allowed set before proceeding.
-Allowed values: `projects`, `convos` (matching the upstream
+Allowed values: `projects`, `convos`, `general` (matching the upstream
 `mempalace mine --mode` argparse choices). If the value is not one of
 these, stop and report:
 
 ```
-Invalid --mode: <value>. Allowed: projects, convos
+Invalid --mode: <value>. Allowed: projects, convos, general
 ```
 
 Do not proceed. If `--mode` is omitted, default to `projects`.
