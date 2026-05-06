@@ -308,7 +308,7 @@ else
     # in shell env still fails to authenticate the MCP. Distinguish "key
     # expired" from "key never reached MCP" so the user can act on the right
     # cause.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: /plugin disable yellow-research && /plugin enable yellow-research, then answer the userConfig prompt."
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
@@ -384,7 +384,7 @@ else
   elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
     provider_status="INVALID"
     # v2.0.0 shell-env-only diagnostic: see EXA block above for rationale.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: /plugin disable yellow-research && /plugin enable yellow-research, then answer the userConfig prompt."
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
@@ -463,7 +463,7 @@ else
   elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
     provider_status="INVALID"
     # v2.0.0 shell-env-only diagnostic: see EXA block above for rationale.
-    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: /plugin disable yellow-research && /plugin enable yellow-research, then answer the userConfig prompt."
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: run /plugin disable yellow-research, then /plugin enable yellow-research, and answer the userConfig prompt."
   elif [ "$http_status" = "429" ]; then
     provider_status="RATE LIMITED"
     provider_detail="Key may be valid; service is busy. Try again later."
