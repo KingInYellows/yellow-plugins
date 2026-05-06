@@ -130,11 +130,15 @@ returns a line like `Logged in using ChatGPT` or `Not logged in`.
 
 ```bash
 if command -v codex >/dev/null 2>&1; then
-  # Note: codex CLI writes login status to stderr (eprintln!), not stdout — capture both via 2>&1
-  login_status=$(codex login status 2>&1 || true)
-  if printf '%s' "$login_status" | grep -qi '^logged in'; then
+  # Note: codex CLI writes login status to stderr (eprintln!), not stdout — capture both via 2>&1.
+  # Capture exit code separately so probe failures (keyring locked, config corruption) are
+  # distinguishable from the "Not logged in" unauthenticated case (both leave the grep unmatched).
+  if login_status=$(codex login status 2>&1); then login_exit=0; else login_exit=$?; fi
+  if [ "$login_exit" -eq 0 ] && printf '%s' "$login_status" | grep -qi '^logged in'; then
     # Do NOT echo $login_status — codex CLI may include API key fragments (e.g. "Logged in using an API key - sk-proj-***...")
     printf '[yellow-codex] codex login: authenticated\n'
+  elif [ "$login_exit" -ne 0 ]; then
+    printf '[yellow-codex] codex login: probe error (codex login status exited %d; run it manually to diagnose)\n' "$login_exit" >&2
   elif [ -f "${HOME}/.codex/auth.json" ]; then
     printf '[yellow-codex] codex login: legacy auth.json found (pre-v0.118 format)\n'
   else
