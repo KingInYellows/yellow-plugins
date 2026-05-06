@@ -34,30 +34,64 @@ This is a soft prerequisite -- setup continues without jq.
 
 ### Step 2: Check Composio MCP tools
 
-Use ToolSearch to discover Composio tools:
+Use ToolSearch to discover Composio tools across all known prefixes:
 
 ```text
-ToolSearch("COMPOSIO_REMOTE_WORKBENCH")
+ToolSearch("COMPOSIO_SEARCH_TOOLS")
 ```
 
-If ToolSearch returns no Composio tools, report:
+Three possible prefixes exist; in priority order:
+
+1. `mcp__plugin_yellow-composio_composio-server__*` — bundled by this
+   plugin (preferred, requires both `userConfig` values to be set).
+2. `mcp__claude_ai_composio__*` — Claude.ai native Composio integration
+   (legacy, still supported).
+3. `mcp__composio-server__*` — manual `claude mcp add` setup
+   (legacy / migration path).
+
+If ToolSearch returns at least one Composio tool, record which prefix is
+active and proceed to Step 3.
+
+If ToolSearch returns no Composio tools, the bundled MCP did not start.
+The two most common causes are:
+
+- The `userConfig` prompt was dismissed (URL or API key blank).
+- `${user_config.*}` substitution in `mcpServers.url`/`headers` is not
+  supported by your Claude Code version (this is the first plugin in the
+  marketplace to use that pattern; see the Fallback below).
+
+Report:
 
 ```text
-[yellow-composio] Composio MCP server not found.
+[yellow-composio] No Composio MCP tools found in this session.
 
-To configure Composio for Claude Code:
+Recommended (bundled MCP server):
 
-  1. Sign up at https://composio.dev and get your API key
-  2. Generate an MCP URL via the Composio dashboard or SDK
-  3. Add to Claude Code:
+  1. Sign up at https://composio.dev and copy your API key from
+     https://app.composio.dev/settings.
+  2. Generate a per-customer MCP URL via the Composio dashboard or:
+       npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID --client claude
+  3. Re-prompt the plugin's userConfig:
+       /plugin disable yellow-composio
+       /plugin enable yellow-composio
+     Answer "Composio MCP URL" and "Composio API key" when prompted.
+     Tools appear under mcp__plugin_yellow-composio_composio-server__*.
+  4. Re-run /composio:setup to verify.
 
-     claude mcp add --transport http composio-server "YOUR_MCP_URL" \
-       --headers "X-API-Key:YOUR_COMPOSIO_API_KEY"
+Fallback (manual claude mcp add — for older Claude Code versions or if
+the bundled MCP fails to start, e.g., because user_config substitution
+in `mcpServers.<name>.url` is not resolved by your harness version):
 
-  4. Restart Claude Code and re-run /composio:setup
+  claude mcp add --transport http composio-server "YOUR_MCP_URL" \
+    --headers "X-API-Key:YOUR_COMPOSIO_API_KEY"
 
-Alternative (npx):
-  npx @composio/mcp@latest setup "<customer_id>" "<app_id>" --client claude
+  Then restart Claude Code and re-run /composio:setup. Tools appear
+  under mcp__composio-server__* in this configuration.
+
+  Note: this manual path stores YOUR_COMPOSIO_API_KEY as plaintext in
+  ~/.claude.json (not the OS keychain). If the bundled path later starts
+  working on your version, run `claude mcp remove composio-server` to
+  drop the plaintext entry and re-rely on the keychain-backed bundle.
 ```
 
 Stop here if no tools found.
@@ -68,10 +102,19 @@ Step 2 confirmed Composio tools are discoverable via ToolSearch. Now call
 `COMPOSIO_SEARCH_TOOLS` directly to validate authentication and network
 connectivity.
 
-**Note**: The fully-qualified MCP tool name varies by configuration
-(e.g., `mcp__claude_ai_composio__COMPOSIO_SEARCH_TOOLS` for native
-integrations, `mcp__composio-server__COMPOSIO_SEARCH_TOOLS` for manual
-`.mcp.json` setups). Use the exact tool name returned by ToolSearch in Step 2.
+**Note**: The fully-qualified MCP tool name varies by configuration:
+
+- `mcp__plugin_yellow-composio_composio-server__COMPOSIO_SEARCH_TOOLS` —
+  bundled MCP from this plugin (preferred).
+- `mcp__claude_ai_composio__COMPOSIO_SEARCH_TOOLS` — Claude.ai native
+  Composio integration.
+- `mcp__composio-server__COMPOSIO_SEARCH_TOOLS` — manual `claude mcp add`
+  setup.
+
+Use the exact tool name returned by ToolSearch in Step 2. Step 3 should
+exercise the active prefix and proceed even if multiple prefixes are
+visible (it is normal for users mid-migration to have both the bundled
+and the legacy MCP registered until they remove the manual entry).
 
 ```text
 COMPOSIO_SEARCH_TOOLS({
@@ -134,7 +177,7 @@ If the file does not exist, create it:
 mkdir -p .claude
 MONTH=$(date -u +%Y-%m)
 TODAY=$(date -u +%Y-%m-%d)
-cat > ".claude/composio-usage.json" << JSONEOF
+cat > ".claude/composio-usage.json" << __EOF_COMPOSIO_USAGE__
 {
   "version": 1,
   "created": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
@@ -153,7 +196,7 @@ cat > ".claude/composio-usage.json" << JSONEOF
     }
   }
 }
-JSONEOF
+__EOF_COMPOSIO_USAGE__
 printf '[yellow-composio] Usage counter initialized at .claude/composio-usage.json\n'
 ```
 
