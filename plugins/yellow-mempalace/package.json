@@ -1,0 +1,6 @@
+{
+  "name": "yellow-mempalace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Structured long-term memory with temporal knowledge graph via MemPalace"
+}

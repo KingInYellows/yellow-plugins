@@ -8,8 +8,8 @@ the validation and release tooling around it.
   `gt-workflow`, `yellow-browser-test`, `yellow-chatprd`, `yellow-ci`,
   `yellow-codex`, `yellow-composio`, `yellow-core`, `yellow-council`,
   `yellow-debt`, `yellow-devin`, `yellow-docs`, `yellow-linear`,
-  `yellow-morph`, `yellow-research`, `yellow-review`, `yellow-ruvector`, and
-  `yellow-semgrep`.
+  `yellow-mempalace`, `yellow-morph`, `yellow-research`, `yellow-review`,
+  `yellow-ruvector`, and `yellow-semgrep`.
 - `plugins/<plugin-name>/.claude-plugin/plugin.json`: Required plugin manifest.
   Many plugins also include `commands/`, `agents/`, `skills/`, optional
   `hooks/`, and optional `tests/`.
