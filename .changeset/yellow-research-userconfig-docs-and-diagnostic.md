@@ -25,14 +25,20 @@ The new message names both causes and tells the user how to act on
 each: regenerate at the provider dashboard for (a), `/plugin disable
 yellow-research && /plugin enable yellow-research` to answer the
 userConfig prompt for (b). Ceramic's branch is unaffected — it has no
-userConfig entry; its REST probe and MCP authentication are independent
-and the diagnostic is gated on `provider_has_userconfig_path=1`.
+userConfig entry; its REST probe and MCP authentication are independent.
 
-Implementation detail: each of the three userConfig-capable provider
-probe blocks now sets `provider_has_userconfig_path=1`; Ceramic sets
-it to `0`. The shared decision tree's 401/403 branch reads the flag
-together with `SKIP_CURL_PROBE` to distinguish "key from shell env" from
-"key from userConfig" runs.
+Implementation detail: the 401/403 diagnostic is inlined into each of
+the three userConfig-capable provider probe blocks (EXA, Tavily,
+Perplexity), inside the curl-ran branch right after `$http_status` is
+set, so the diagnostic evaluates in the same subprocess where the probe
+ran. Ceramic's block runs its own inline decision tree without the
+v2.0.0 diagnostic. The pre-existing standalone post-probe decision-tree
+block was removed: each ```` ```bash``` ```` block in a command file is
+a fresh subprocess, so variables set in the per-provider blocks
+(`$curl_exit`, `$http_status`, `$provider_status`, `$provider_detail`,
+`$SKIP_CURL_PROBE`) were never visible to a separate decision-tree
+block. See
+`docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
 
 ## Doc corrections
 
