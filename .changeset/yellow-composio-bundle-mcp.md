@@ -62,3 +62,11 @@ already covers the manual path.
   rewritten to detect all three tool-name prefixes and to recommend
   `/plugin disable && /plugin enable` for first-time setup, with the
   manual `claude mcp add` instructions retained as the fallback path.
+- `plugins/yellow-composio/README.md` — Quick Start and How It Works
+  sections updated to lead with the `userConfig`-prompt path and to
+  document the three-prefix detection plus migration guidance for the
+  manual `claude mcp add` flow.
+- `plugins/yellow-composio/skills/composio-patterns/SKILL.md` — prefix
+  list expanded from two to three (bundled first), and the security
+  note flipped from "no API keys stored" to "API key stored in system
+  keychain" to match the new bundled path.
