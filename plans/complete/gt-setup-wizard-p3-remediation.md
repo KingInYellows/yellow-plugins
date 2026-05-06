@@ -1,12 +1,11 @@
 # P3 Remediation: gt-setup AI Agent Wizard
 
-> **Status: Partially Implemented** — P3-2 shipped (`gt: BROKEN` text
-> confirmed in `gt-setup.md`). P3-4 and P3-5 removals shipped (no `Retry
-> failed settings` or 3-option `Show diff` flow remain). **Outstanding:**
-> P3-1 (yq exit-code stderr warning across
-> `smart-submit.md`/`gt-amend.md`/`gt-stack-plan.md`) — current code still
-> uses bare `2>/dev/null || true`. Required changeset for the wizard PR
-> was added separately during PR #228 cycle.
+> **Status: Implemented (archived)** — P3-1 now ships across
+> `smart-submit.md`, `gt-amend.md`, and `gt-stack-plan.md`: yq parse failures
+> emit explicit stderr warnings before falling back to defaults. P3-2 shipped
+> (`gt: BROKEN` text confirmed in `gt-setup.md`), P3-4 and P3-5 removals
+> shipped, and the required changeset was added during the PR #228 cycle.
+> Retained for historical context.
 
 ## Overview
 
@@ -17,7 +16,7 @@ changeset for CI. These are minor refinements — no new functionality.
 
 ### Accept (4 items)
 
-- [ ] **P3-1: yq parse failures indistinguishable from absent fields.** In the
+- [x] **P3-1: yq parse failures indistinguishable from absent fields.** In the
   yq parsing blocks across `gt-setup.md`, `smart-submit.md`, `gt-amend.md`, and
   `gt-stack-plan.md`, the `2>/dev/null || true` pattern silently swallows yq
   errors. Add a single-line stderr warning when yq returns non-zero (distinct
