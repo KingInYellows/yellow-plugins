@@ -26,22 +26,46 @@ manually: `npm install -g @ast-grep/cli`.
 
 ## API Key Setup
 
-Add to your shell config (`~/.zshrc` or `~/.bashrc`):
+As of v2.0.0, EXA / Tavily / Perplexity API keys are stored in `userConfig`
+(system keychain), NOT shell environment variables. The MCPs read from
+`${user_config.<key>}` — exporting `*_API_KEY` in `~/.zshrc` no longer feeds
+the MCP and the Perplexity MCP will hard-fail at startup without a valid
+userConfig value.
 
-```sh
-export EXA_API_KEY="..."          # https://exa.ai/
-export TAVILY_API_KEY="..."       # https://tavily.com/
-export PERPLEXITY_API_KEY="..."   # https://www.perplexity.ai/settings/api
-export CERAMIC_API_KEY="..."      # https://platform.ceramic.ai/keys
-                                  # (REST live-probe only; the MCP uses OAuth)
+Recommended path (one-time per workstation, no restart needed):
+
+```text
+/plugin disable yellow-research
+/plugin enable yellow-research
 ```
 
-Restart Claude Code after setting keys.
+Claude Code prompts for each key on enable. Answer the prompts for the
+sources you want; dismiss the others. Values persist in the system keychain
+(or `~/.claude/.credentials.json` at 0600 on minimal Linux).
 
-The **Parallel Task** and **Ceramic** servers use OAuth — Claude Code handles
-authentication automatically. You'll be prompted to authorize on first use
-(no API key needed). `CERAMIC_API_KEY` is optional and only powers the
-`/research:setup` REST live-probe.
+`CERAMIC_API_KEY` is the only shell-env key still in use — it powers the
+`/research:setup` REST live-probe only (the Ceramic MCP itself authenticates
+via OAuth):
+
+```sh
+export CERAMIC_API_KEY="..."   # https://platform.ceramic.ai/keys
+                               # REST probe only; MCP uses OAuth
+```
+
+Get keys at:
+
+- EXA — https://exa.ai/
+- Tavily — https://tavily.com/
+- Perplexity — https://www.perplexity.ai/settings/api
+
+The **Parallel Task** and **Ceramic** MCP servers use OAuth — Claude Code
+handles authentication automatically. You'll be prompted to authorize on
+first use (no API key needed).
+
+Power users who insist on shell-env-driven auth can bridge with a per-MCP
+wrapper script (see `plugins/yellow-morph/bin/start-morph.sh` for the
+canonical pattern). `plugin.json` no longer reads shell `*_API_KEY` vars
+directly.
 
 ## Usage
 

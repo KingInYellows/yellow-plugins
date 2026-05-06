@@ -100,28 +100,46 @@ If an MCP server is unavailable (key not set, connection error, rate limit):
 
 ## API Key Setup
 
-Add to `~/.zshrc` (or equivalent shell config):
+As of v2.0.0, EXA / Tavily / Perplexity API keys are stored in `userConfig`
+(system keychain). `plugin.json` reads `${user_config.<key>}`; shell env
+vars are no longer wired into the MCP processes. Perplexity hard-fails at
+startup without a valid userConfig value (tools disappear entirely); EXA
+and Tavily start but tool calls error at invocation.
 
-```sh
-export EXA_API_KEY="your-key-here"
-export TAVILY_API_KEY="your-key-here"
-export PERPLEXITY_API_KEY="your-key-here"
-export CERAMIC_API_KEY="your-key-here"   # optional — REST live-probe only;
-                                         # Ceramic MCP itself uses OAuth
+To configure (one-time, no restart needed):
+
+```text
+/plugin disable yellow-research
+/plugin enable yellow-research
 ```
+
+Claude Code prompts for each key. Answer the ones you want; dismiss the
+rest. Stored in OS keychain (or `~/.claude/.credentials.json` at 0600 on
+minimal Linux).
 
 Get keys from:
 
 - EXA: https://exa.ai/
 - Tavily: https://tavily.com/
 - Perplexity: https://www.perplexity.ai/settings/api
-- Ceramic (optional): https://platform.ceramic.ai/keys
 
-The **Parallel Task** and **Ceramic** servers use OAuth (no API key needed).
-Claude Code handles authentication automatically — you'll be prompted to
-authorize on first use of each.
+The **Parallel Task** and **Ceramic** servers use OAuth (no API key
+needed). Claude Code handles authentication automatically — you'll be
+prompted to authorize on first use of each.
 
-After adding keys: source `~/.zshrc` and restart Claude Code.
+`CERAMIC_API_KEY` is the one remaining shell-env var. It is optional and
+powers only the `/research:setup` REST live-probe (the Ceramic MCP uses
+OAuth). Get a REST key at https://platform.ceramic.ai/keys if you want
+that probe to run.
+
+```sh
+# Optional, REST live-probe only
+export CERAMIC_API_KEY="your-key-here"
+```
+
+Power users who want a fully shell-env-driven setup can wrap each MCP in a
+per-MCP launcher script (see `plugins/yellow-morph/bin/start-morph.sh`).
+The plugin no longer reads `*_API_KEY` from shell env directly.
 
 ## MCP Tool Name Verification
 
