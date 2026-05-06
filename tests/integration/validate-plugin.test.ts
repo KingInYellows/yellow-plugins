@@ -609,4 +609,25 @@ printf 'plain text\\n'
       /hooks\/hooks\.json: event "PostToolUse" must be an array of hook entries — got object/
     );
   });
+
+  it('warns on unknown hook event name in hooks/hooks.json even when plugin.json has no inline hooks (RULE 7: event-name recognition)', () => {
+    // Mirrors the inline-hooks unknown-event warning so typos in hooks-only
+    // plugins (e.g., "SesionStart") are caught — the inline branch is gated
+    // on hasInlineHooks and would otherwise skip them.
+    mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
+    writeFileSync(
+      join(pluginDir, 'hooks', 'hooks.json'),
+      JSON.stringify(
+        { hooks: { SesionStart: [{ hooks: [{ type: 'command', command: 'echo ok' }] }] } },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
+    const { stderr } = runValidator(pluginDir);
+    expect(stderr).toMatch(
+      /hooks\/hooks\.json: unknown hook event "SesionStart"/
+    );
+  });
 });

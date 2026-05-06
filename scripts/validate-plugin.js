@@ -733,7 +733,15 @@ function validatePlugin(pluginDir) {
         // a non-array value (string, object, number) passes the top-level
         // shape check but fails at install time. Runs unconditionally — hooks-
         // only plugins (no inline hooks in plugin.json) must also be validated.
+        // Event-name recognition mirrors the inline-hooks check above so typos
+        // (e.g., "SesionStart") are caught even when plugin.json has no inline
+        // hooks to trigger that branch.
         for (const [event, value] of Object.entries(hooksField)) {
+          if (!VALID_HOOK_EVENTS.has(event)) {
+            logWarning(
+              `hooks/hooks.json: unknown hook event "${event}". Known events: ${[...VALID_HOOK_EVENTS].join(', ')}`
+            );
+          }
           if (!Array.isArray(value)) {
             addError(
               errors,
