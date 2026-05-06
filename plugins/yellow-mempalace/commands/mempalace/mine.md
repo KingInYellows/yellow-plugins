@@ -46,8 +46,11 @@ with `-` (flag injection), or that contain `..` traversal segments:
 ```bash
 PATH_ARG="<resolved-path>"
 case "$PATH_ARG" in
+  '~')   PATH_ARG="$HOME" ;;
+  '~/'*) PATH_ARG="$HOME/${PATH_ARG#'~/'}" ;;
+esac
+case "$PATH_ARG" in
   -*) printf '[yellow-mempalace] Error: path may not start with -\n' >&2; exit 1 ;;
-  '~'*) printf '[yellow-mempalace] Error: path may not begin with ~ (tilde)\n' >&2; exit 1 ;;
   *..*) printf '[yellow-mempalace] Error: path may not contain ..\n' >&2; exit 1 ;;
 esac
 if [ -L "$PATH_ARG" ]; then

@@ -382,7 +382,7 @@ Compute bundled source availability out of 6:
 
 - READY: `python310_check` ok AND `mempalace` binary found in PATH AND
   `~/.mempalace/` directory exists
-- PARTIAL: `mempalace` binary found but `~/.mempalace/` not initialized
+- PARTIAL: `python310_check` ok AND `mempalace` binary found but `~/.mempalace/` not initialized
 - NEEDS SETUP: `mempalace` binary not found OR `python310_check` not ok
 
 **yellow-core:**
