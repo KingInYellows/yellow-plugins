@@ -696,9 +696,11 @@ function validatePlugin(pluginDir) {
   // the other.
   const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
   if (fs.existsSync(hooksJsonPath)) {
-    let hooksJson = null;
+    let hooksJson;
+    let parseSuccessful = false;
     try {
       hooksJson = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
+      parseSuccessful = true;
     } catch (parseErr) {
       addError(
         errors,
@@ -706,9 +708,15 @@ function validatePlugin(pluginDir) {
       );
     }
 
-    if (hooksJson !== null) {
-      // Shape check: top-level "hooks" must be a non-null object (not array).
-      const hooksField = hooksJson.hooks;
+    if (parseSuccessful) {
+      // Shape check: root must be an object, top-level "hooks" must be a
+      // non-null object (not array). A file containing literal `null` parses
+      // successfully but must still fail the shape check.
+      const rootIsObject =
+        typeof hooksJson === 'object' &&
+        hooksJson !== null &&
+        !Array.isArray(hooksJson);
+      const hooksField = rootIsObject ? hooksJson.hooks : undefined;
       const hasValidShape =
         typeof hooksField === 'object' &&
         hooksField !== null &&
