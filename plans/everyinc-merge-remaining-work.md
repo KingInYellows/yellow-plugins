@@ -192,7 +192,7 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 
 - 3 new reviewer agents in yellow-review, all read-only, all 3-segment subagent_type-compliant.
 - 2 new skills in yellow-core, three-heading-compliant.
-- Both `review-pr.md` and `review-all.md` dispatch tables list the new reviewers identically.
+- `review-pr.md` dispatch table lists the new reviewers; `review-all.md` requires no edit (delegates persona dispatch by reference per task 3.5).
 - Validation gates + Bats green.
 - One changeset spanning yellow-review (minor) AND yellow-core (minor).
 
@@ -319,7 +319,7 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
 | `docs/solutions/security-issues/docs-snippet-path-traversal-and-lex-sort.md` | 1 | Add YAML frontmatter (manual) |
 | `docs/solutions/<5 files>.md` | 1 | `track`/`problem` fields added by backfill script |
 | `plugins/yellow-review/commands/review/review-pr.md` | 1, 3 | PR1: remove code-reviewer row; PR3: add 3 new rows |
-| `plugins/yellow-review/commands/review/review-all.md` | 1, 3 | PR1: remove code-reviewer row; PR3: add 3 new rows (mirror) |
+| `plugins/yellow-review/commands/review/review-all.md` | 1 | PR1: excise stub prose reference (no dispatch table exists in this file); PR3: no edit per task 3.5 |
 | `plugins/yellow-debt/agents/scanners/<5 scanner files>.md` | 2 | Verify/update v2.0 schema emission |
 | `plugins/yellow-review/CLAUDE.md` and `README.md` | 3 | Bump agent count, add table rows |
 | `plugins/yellow-core/CLAUDE.md` and `README.md` | 3 | Bump skill count (16 → 18), add table rows |
@@ -376,7 +376,7 @@ Additional gates per PR:
 
 1. PR1 merged: backfill `--check` exits 0; `code-reviewer.md` deleted; zero live `subagent_type` references; yellow-review changeset is major.
 2. PR2 merged: 5 yellow-debt scanner agents emit v2.0 schema fields; audit-synthesizer dual-read intact.
-3. PR3 merged: 3 new yellow-review reviewers + 2 new yellow-core skills present; `review-pr.md` and `review-all.md` mirror each other; one changeset spans both plugins.
+3. PR3 merged: 3 new yellow-review reviewers + 2 new yellow-core skills present; `review-pr.md` dispatch table updated, `review-all.md` requires no edit per task 3.5; one changeset spans both plugins.
 4. PR4 merged: `plugins/yellow-docs/agents/review/` directory + 7 personas + `/docs:review` command live; CLAUDE.md/README updated.
 5. PR5 merged: functional smoke-test checklist authored; smoke test executed and signed off.
 
