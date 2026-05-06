@@ -153,15 +153,24 @@ optional.
 "composio_mcp_url": {
   "type": "string",
   "title": "Composio MCP URL",
-  "pattern": "^https://[^\\s/$.?#].[^\\s]*$"
+  "pattern": "^https://[a-zA-Z0-9][a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(?:/|$)"
 }
 ```
 
-Looser variant accepting any HTTPS URL:
+This pattern requires `https://`, an alphanumeric host start, a dot,
+and a TLD-like trailing segment, then either a `/` or end-of-string.
 
-```json
-"pattern": "^https://"
-```
+**Do NOT** use the simpler `^https://` prefix-only check for
+security-sensitive credentials. Prefix-only validation is bypassable
+via URL confusion: `https://evil.com#@victim.com`,
+`https://evil.com\@victim.com`, and similar payloads pass `^https://`
+while routing the request to an attacker-controlled host. The whole
+point of TLS enforcement is to prevent credential leakage; a bypassable
+TLS check is worse than none because it gives a false sense of safety.
+
+If full hostname enforcement is needed, use a runtime check (the schema
+`pattern` field cannot express "URL parses to allowed host") and pin
+the host explicitly: `^https://mcp\.composio\.dev/`.
 
 ### Vendor-prefixed API keys
 
@@ -171,23 +180,42 @@ Looser variant accepting any HTTPS URL:
 | Anthropic `sk-ant-...` | `^sk-ant-[A-Za-z0-9_-]{20,}$` |
 | Composio `cog_...` | `^cog_[A-Za-z0-9_-]{16,}$` |
 | GitHub PAT (classic) | `^ghp_[A-Za-z0-9]{36}$` |
-| GitHub PAT (fine-grained) | `^github_pat_[A-Za-z0-9_]{82}$` |
+| GitHub PAT (fine-grained) | `^github_pat_[A-Za-z0-9_]{40,}$` |
 | Generic alphanumeric token | `^[A-Za-z0-9_\\-]{20,}$` |
 
 ### Filesystem path inputs (anti-traversal)
+
+The naive character-class pattern `^[A-Za-z0-9_./\\-]+$` allows `..`
+(each character is individually in the set), so `../../../etc/passwd`
+matches and bypasses the intended traversal block. Use ONE of the two
+patterns below — never the naive form alone.
+
+**Option 1 — single pattern with negative lookahead** (works on AJV
+and modern JSON Schema engines that support `(?!...)`):
 
 ```json
 "workspace_dir": {
   "type": "directory",
   "title": "Workspace directory",
-  "pattern": "^[A-Za-z0-9_./\\-]+$"
+  "pattern": "^(?!.*\\.\\.)[A-Za-z0-9_./-]+$"
 }
 ```
 
-For deeper traversal protection, combine with a `not.pattern` rejection
-of `..` segments. Some JSON Schema implementations do not support
-lookaheads, so the explicit anti-pattern is more portable than negative
-lookahead inside the main pattern.
+**Option 2 — pair `pattern` with `not.pattern`** (portable to engines
+without lookahead support):
+
+```json
+"workspace_dir": {
+  "type": "directory",
+  "title": "Workspace directory",
+  "pattern": "^[A-Za-z0-9_./-]+$",
+  "not": { "pattern": "\\.\\." }
+}
+```
+
+(Note: the local schema's `userConfigEntry` does not currently allow
+`not` as a property — Option 2 requires a sibling schema extension.
+Until that ships, use Option 1.)
 
 ### File-path with extension constraint
 
@@ -274,7 +302,7 @@ jq '.userConfig // empty | to_entries[] | select(.value.pattern) | {key: .key, p
 - `docs/brainstorms/2026-05-05-plugin-manifest-userconfig-validator-drift-brainstorm.md`
   — Decision 4 implementation note documenting the script-vs-schema
   enforcement reality.
-- `scripts/validate-plugin.js:856–864` — source-of-truth comment on the
+- `scripts/validate-plugin.js:856–875` — source-of-truth comment on the
   AJV-vs-script split.
 - AJV docs: <https://ajv.js.org/json-schema.html#if-then-else>
 - AJV strict-mode `strictRequired` reference:

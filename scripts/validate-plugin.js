@@ -76,6 +76,13 @@ const VALID_USER_CONFIG_TYPES = new Set([
   'file',
 ]);
 
+// Subset of VALID_USER_CONFIG_TYPES for which `pattern` (RULE 10) is
+// meaningful. Number/boolean values cannot carry a regex constraint.
+// Module-scope to match the VALID_HOOK_EVENTS / VALID_USER_CONFIG_TYPES
+// pattern — reused across the top-level userConfig walk and the
+// per-channel walk without reallocating the Set per validatePlugin call.
+const PATTERN_VALID_TYPES = new Set(['string', 'directory', 'file']);
+
 /**
  * Resolve a hook command to a script path within the plugin directory.
  * Returns the resolved path, or null if the command is not a "bash <path>"
@@ -873,7 +880,6 @@ function validatePlugin(pluginDir) {
   //   set as a string, the default itself must match the pattern — otherwise
   //   the manifest ships an internally inconsistent constraint. See
   //   docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md
-  const PATTERN_VALID_TYPES = new Set(['string', 'directory', 'file']);
   function validateUserConfigEntries(userConfig, pathPrefix) {
     if (
       typeof userConfig !== 'object' ||
@@ -914,11 +920,13 @@ function validatePlugin(pluginDir) {
             errors,
             `${pathPrefix}.${key}.pattern must be a non-empty string`
           );
-        } else if (
-          entry.type != null &&
-          VALID_USER_CONFIG_TYPES.has(entry.type) &&
-          !PATTERN_VALID_TYPES.has(entry.type)
-        ) {
+        } else if (entry.type == null || !VALID_USER_CONFIG_TYPES.has(entry.type)) {
+          // Type missing or unknown — RULE 9 already reported the underlying
+          // problem. Skip pattern enforcement entirely rather than fall
+          // through to the regex-compile path, which would produce a
+          // confusing duplicate error and silently bypass the type-allowlist
+          // gate when type is absent.
+        } else if (!PATTERN_VALID_TYPES.has(entry.type)) {
           addError(
             errors,
             `${pathPrefix}.${key}.pattern is only valid when type is one of: string, directory, file (got "${entry.type}")`
@@ -938,9 +946,15 @@ function validatePlugin(pluginDir) {
             typeof entry.default === 'string' &&
             !compiled.test(entry.default)
           ) {
+            // Redact default in error output when the field is sensitive,
+            // so a partially-correct credential never lands in CI logs.
+            const defaultDisplay =
+              entry.sensitive === true
+                ? '<redacted — sensitive field>'
+                : `"${entry.default}"`;
             addError(
               errors,
-              `${pathPrefix}.${key}.default "${entry.default}" does not match pattern "${entry.pattern}"`
+              `${pathPrefix}.${key}.default ${defaultDisplay} does not match pattern "${entry.pattern}"`
             );
           }
         }

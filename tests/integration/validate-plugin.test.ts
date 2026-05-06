@@ -738,7 +738,7 @@ describe('validate-plugin PR-B userConfig pattern field (RULE 10)', () => {
     );
   });
 
-  it('rejects an invalid regex pattern', () => {
+  it('rejects an invalid regex pattern with the failing key path in stderr', () => {
     writePluginManifest(pluginDir, {
       ...VALID_BASE_MANIFEST,
       userConfig: {
@@ -751,10 +751,12 @@ describe('validate-plugin PR-B userConfig pattern field (RULE 10)', () => {
     });
     const { status, stderr } = runValidator(pluginDir);
     expect(status).toBeGreaterThan(0);
-    expect(stderr).toMatch(/pattern is not a valid regular expression/);
+    expect(stderr).toMatch(
+      /userConfig\.api_url\.pattern is not a valid regular expression/
+    );
   });
 
-  it('rejects a default that does not match its pattern', () => {
+  it('rejects a default that does not match its pattern with the key path in stderr', () => {
     writePluginManifest(pluginDir, {
       ...VALID_BASE_MANIFEST,
       userConfig: {
@@ -768,7 +770,114 @@ describe('validate-plugin PR-B userConfig pattern field (RULE 10)', () => {
     });
     const { status, stderr } = runValidator(pluginDir);
     expect(status).toBeGreaterThan(0);
-    expect(stderr).toMatch(/default ".*" does not match pattern "/);
+    expect(stderr).toMatch(
+      /userConfig\.api_url\.default "http:\/\/example\.com" does not match pattern "\^https:\/\/"/
+    );
+  });
+
+  it('redacts a sensitive field default value in pattern-mismatch error', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        secret_key: {
+          type: 'string',
+          title: 'Secret key',
+          sensitive: true,
+          pattern: '^sk-',
+          default: 'pk-leaked-value',
+        },
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /userConfig\.secret_key\.default <redacted — sensitive field> does not match pattern "\^sk-"/
+    );
+    // The actual value must not appear in stderr
+    expect(stderr).not.toMatch(/pk-leaked-value/);
+  });
+
+  it('does NOT report a RULE 10 pattern-allowlist error when type is absent (RULE 9 already errored)', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        // intentionally missing `type`
+        api_url: { title: 'API URL', pattern: '^abc' } as unknown as Record<
+          string,
+          unknown
+        >,
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    // RULE 9 missing-type error must fire
+    expect(stderr).toMatch(/userConfig\.api_url is missing required field "type"/);
+    // RULE 10 must NOT also report a pattern-allowlist or compile error
+    expect(stderr).not.toMatch(/pattern is only valid when type is one of/);
+    expect(stderr).not.toMatch(/pattern is not a valid regular expression/);
+  });
+
+  it('does NOT report a RULE 10 pattern-allowlist error when type is an unknown string (RULE 9 already errored)', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        api_url: {
+          type: 'secret' as unknown as string,
+          title: 'API URL',
+          pattern: '^abc',
+        },
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    // RULE 9 invalid-type error must fire
+    expect(stderr).toMatch(/type "secret" is invalid/);
+    // RULE 10 should not report a duplicate or compile error for an
+    // already-rejected type
+    expect(stderr).not.toMatch(/pattern is only valid when type is one of/);
+  });
+
+  it('does not crash when default is non-string and a pattern is set', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        api_url: {
+          type: 'string',
+          title: 'API URL',
+          pattern: '^https://',
+          default: 42 as unknown as string,
+        },
+      },
+    });
+    // Validator should run to completion without throwing; whether the
+    // status is 0 or non-zero depends on other rules — the contract
+    // here is "no crash, no spurious pattern error".
+    const { stderr } = runValidator(pluginDir);
+    expect(stderr).not.toMatch(/does not match pattern/);
+  });
+
+  it('validates pattern field on a channels[].userConfig entry', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      channels: [
+        {
+          server: 'test-channel',
+          userConfig: {
+            channel_url: {
+              type: 'string',
+              title: 'Channel URL',
+              pattern: '^https://',
+              default: 'http://bad.example.com',
+            },
+          },
+        },
+      ],
+    } as unknown as Record<string, unknown>);
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /channels\[0\]\.userConfig\.channel_url\.default "http:\/\/bad\.example\.com" does not match pattern/
+    );
   });
 
   it('accepts pattern on a directory-typed entry', () => {

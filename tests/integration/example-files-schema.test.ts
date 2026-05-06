@@ -263,4 +263,50 @@ describe('userConfigEntry.pattern field (PR-C)', () => {
     });
     expect(factory.validate('plugin', data).valid).toBe(true);
   });
+
+  it('rejects pattern on a channels[].userConfig entry with type number (allOf propagates through $ref)', () => {
+    const data = {
+      name: 'test-plugin',
+      version: '1.0.0',
+      description:
+        'Test plugin to confirm userConfigEntry.allOf rules propagate through channels[].userConfig $ref.',
+      author: 'KingInYellows',
+      channels: [
+        {
+          server: 'test-channel',
+          userConfig: {
+            port: { type: 'number', title: 'Port', pattern: '^[0-9]+$' },
+          },
+        },
+      ],
+    };
+    expect(factory.validate('plugin', data).valid).toBe(false);
+  });
+
+  it('AJV does NOT enforce regex compilability — that is RULE 10 in validate-plugin.js', () => {
+    // Documents the intentional two-layer split: AJV checks
+    // type+minLength only; the script-level RULE 10 compiles the regex
+    // and surfaces SyntaxError. A future schema change that adds a
+    // regex-format keyword would silently change this surface; this
+    // test pins the boundary.
+    const data = pluginWithUserConfig({
+      api_url: { type: 'string', title: 'API URL', pattern: '[unclosed' },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(true);
+  });
+
+  it('AJV does NOT enforce default-vs-pattern matching — that is RULE 10 in validate-plugin.js', () => {
+    // Same boundary: AJV's allOf only constrains the default's *type*
+    // by the userConfig type, not whether the default matches the
+    // declared pattern. Script-level RULE 10 owns that check.
+    const data = pluginWithUserConfig({
+      api_url: {
+        type: 'string',
+        title: 'API URL',
+        pattern: '^https://',
+        default: 'http://does-not-match.example',
+      },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(true);
+  });
 });

@@ -160,9 +160,18 @@ PR #396 merging first. Document this ordering.
       "properties": { "type": { "enum": ["number", "boolean"] } },
       "required": ["type"]
     },
-    "then": { "not": { "required": ["pattern"] } }
+    "then": { "properties": { "pattern": false } }
   }
   ```
+
+> **Implementation deviation note (2026-05-06):** the original plan
+> body proposed `"then": { "not": { "required": ["pattern"] } }`. AJV
+> strict mode rejects that formulation as `strictRequired` (the
+> property name appearing in `required` must also be declared in the
+> local schema's `properties`, even inside a `not` clause). The
+> `properties: { pattern: false }` idiom (a `false` schema means
+> "always invalid") is both stricter AND AJV-strict-mode-friendly.
+> The shipped code uses the latter.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The existing `allOf` at `schemas/plugin.schema.json` lines
