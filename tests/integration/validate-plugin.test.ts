@@ -573,18 +573,30 @@ printf 'plain text\\n'
     expect(stderr).not.toMatch(/hooks\/hooks\.json/);
   });
 
-  it('errors when hooks/hooks.json has a non-array event value (RULE 7: per-event shape check)', () => {
+  it('errors when hooks/hooks.json has a non-array event value with inline hooks present (RULE 7: per-event shape check)', () => {
     // Top-level shape can be valid ({ hooks: { ... } }) but each event must be
     // an array of hook entries. Claude Code's runtime expects
     // Record<EventName, Array<HookEntry>>; a string/object/number value under
-    // an event key passes the top-level check but fails at install time.
+    // an event key passes the top-level check but fails at install time. This
+    // case exercises the hasInlineHooks=true branch — the next test exercises
+    // the hooks-only path.
     mkdirSync(join(pluginDir, 'hooks'), { recursive: true });
     writeFileSync(
       join(pluginDir, 'hooks', 'hooks.json'),
       JSON.stringify({ hooks: { SessionStart: 'not-an-array' } }, null, 2),
       'utf8'
     );
-    writePluginManifest(pluginDir, VALID_BASE_MANIFEST); // no inline hooks
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      hooks: {
+        SessionStart: [
+          {
+            matcher: '*',
+            hooks: [{ type: 'command', command: 'echo ok' }],
+          },
+        ],
+      },
+    });
     const { status, stderr } = runValidator(pluginDir);
     expect(status).toBeGreaterThan(0);
     expect(stderr).toMatch(
