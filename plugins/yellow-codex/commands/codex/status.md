@@ -91,10 +91,11 @@ elif command -v codex >/dev/null 2>&1; then
   if [ "$login_exit" -eq 0 ] && printf '%s' "$login_status" | grep -qi '^logged in'; then
     # Do NOT echo $login_status — codex CLI may include API key fragments (e.g. "Logged in using an API key - sk-proj-***...")
     printf '[yellow-codex] Auth: codex login\n'
+  elif [ -f "${HOME}/.codex/auth.json" ]; then
+    # Check legacy file before reporting probe error — pre-v0.118 CLIs may lack the `login status` subcommand entirely (non-zero exit) yet still be authenticated via auth.json.
+    printf '[yellow-codex] Auth: legacy auth.json found (pre-v0.118 format)\n'
   elif [ "$login_exit" -ne 0 ]; then
     printf '[yellow-codex] Auth: probe error (codex login status exited %d)\n' "$login_exit" >&2
-  elif [ -f "${HOME}/.codex/auth.json" ]; then
-    printf '[yellow-codex] Auth: legacy auth.json found (pre-v0.118 format)\n'
   else
     printf '[yellow-codex] Auth: not configured\n'
   fi
