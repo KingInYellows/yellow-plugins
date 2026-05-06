@@ -685,15 +685,51 @@ function validatePlugin(pluginDir) {
     }
   }
 
-  // RULE 7: hooks.json sync check (if both plugin.json hooks and hooks.json exist).
-  // Operates on the merged inline-hooks dict so array-form inline objects
-  // are also drift-checked against hooks.json.
-  if (hasInlineHooks) {
-    const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
-    if (fs.existsSync(hooksJsonPath)) {
-      try {
-        const hooksJson = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
-        const hooksJsonHooks = hooksJson.hooks || {};
+  // RULE 7: hooks.json shape + sync check.
+  // Shape and parseability errors block CI: Claude Code 2.1.131+ auto-discovers
+  // hooks/hooks.json and validates against { hooks: Record<EventName, ...> },
+  // rejecting plugins with a malformed file at install time (e.g., events at
+  // the top level instead of nested under "hooks" produces "Hook load failed:
+  // expected record, received undefined at path [\"hooks\"]"). Drift between
+  // plugin.json inline hooks and hooks.json remains a warning — both files
+  // are individually valid, mismatch only signals one was updated without
+  // the other.
+  const hooksJsonPath = path.join(pluginDir, 'hooks', 'hooks.json');
+  if (fs.existsSync(hooksJsonPath)) {
+    let hooksJson;
+    let parseSuccessful = false;
+    try {
+      hooksJson = JSON.parse(fs.readFileSync(hooksJsonPath, 'utf-8'));
+      parseSuccessful = true;
+    } catch (parseErr) {
+      addError(
+        errors,
+        `hooks/hooks.json: cannot parse — must be valid JSON for Claude Code to load the hook config (${parseErr.message})`
+      );
+    }
+
+    if (parseSuccessful) {
+      // Shape check: root must be an object, top-level "hooks" must be a
+      // non-null object (not array). A file containing literal `null` parses
+      // successfully but must still fail the shape check.
+      const rootIsObject =
+        typeof hooksJson === 'object' &&
+        hooksJson !== null &&
+        !Array.isArray(hooksJson);
+      const hooksField = rootIsObject ? hooksJson.hooks : undefined;
+      const hasValidShape =
+        typeof hooksField === 'object' &&
+        hooksField !== null &&
+        !Array.isArray(hooksField);
+
+      if (!hasValidShape) {
+        addError(
+          errors,
+          'hooks/hooks.json: top-level "hooks" key is required and must be a non-null object — Claude Code 2.1.131+ rejects plugins with a different shape'
+        );
+      } else if (hasInlineHooks) {
+        // Drift check between plugin.json inline hooks and hooks.json.
+        const hooksJsonHooks = hooksField;
         const manifestHooks = inlineHooks;
         let driftFound = false;
 
@@ -786,8 +822,6 @@ function validatePlugin(pluginDir) {
         } else {
           logSuccess('hooks.json sync check passed — no drift');
         }
-      } catch (parseErr) {
-        logWarning(`Cannot parse hooks.json: ${parseErr.message}`);
       }
     }
   }
