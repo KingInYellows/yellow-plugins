@@ -153,12 +153,17 @@ optional.
 "composio_mcp_url": {
   "type": "string",
   "title": "Composio MCP URL",
-  "pattern": "^https://[a-zA-Z0-9][a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(?:/|$)"
+  "pattern": "^https://[a-zA-Z0-9][a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(?:/\\S*)?$"
 }
 ```
 
 This pattern requires `https://`, an alphanumeric host start, a dot,
-and a TLD-like trailing segment, then either a `/` or end-of-string.
+and a TLD-like trailing segment, optionally followed by a `/` and a
+non-whitespace path/query segment. Both anchors (`^` ... `$`) are
+required: JS `RegExp.test()` returns `true` on any substring match,
+so a host-only pattern without a trailing `$` accepts arbitrary
+appended garbage (e.g., `https://mcp.composio.dev/ bad` or embedded
+newlines), defeating the safety goal.
 
 **Do NOT** use the simpler `^https://` prefix-only check for
 security-sensitive credentials. Prefix-only validation is bypassable
