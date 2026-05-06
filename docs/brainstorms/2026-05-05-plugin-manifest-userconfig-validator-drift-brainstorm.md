@@ -142,8 +142,22 @@ without `title` as a belt-and-suspenders guard, in case a future schema update
 accidentally loosens the constraint again. Given the history of two-validator
 drift in this repo, this extra guard has value.
 
-**Decision: defer the hard-coded check to a follow-up — the schema tightening
-is sufficient for now (YAGNI). Document the gap in the solutions doc.**
+**Original decision: defer the hard-coded check to a follow-up — the schema
+tightening is sufficient for now (YAGNI). Document the gap in the solutions
+doc.**
+
+**Implementation note (added during /workflows:work):** The decision was
+reversed during implementation. The `pnpm validate:schemas` chain runs four
+Node scripts and only `validate-marketplace.js` AJV-loads its schema —
+`validate-plugin.js` is a 900-line hand-rolled validator that does not
+load `schemas/plugin.schema.json` at all. Tightening the schema therefore
+catches drift only via `pnpm test:integration` (which validates example
+fixtures against the schema), not via `pnpm validate:plugins`. To make the
+script-level enforcement actually fail when a manifest violates the
+constraints, RULE 9 was added to `scripts/validate-plugin.js` covering both
+top-level `userConfig` and `channels[].userConfig`. The "AJV catches it"
+premise of the original decision was incorrect for this script. This is
+Approach C for the validator script, not Approach B.
 
 ### Decision 5: Single changeset or one per plugin?
 

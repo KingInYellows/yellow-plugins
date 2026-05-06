@@ -44,7 +44,7 @@ Reviewed files:
 3. **`devin_org_id` `sensitive: false`** — keep explicit. Defaults can change; explicit-is-better matches the existing style elsewhere in the file.
 4. **`directory`/`file` enum entries** — add for parity with remote validator, even though no current plugin uses them. Purely additive, zero risk.
 5. **`sensitive` field survival** — explicitly preserved in the new schema. Verified in step 3.2 below.
-6. **`validate-plugin.js` hard-coded check (Approach C)** — defer per YAGNI. Schema enforcement via AJV is sufficient until a third drift incident.
+6. **`validate-plugin.js` hard-coded check (Approach C)** — implemented during /workflows:work, reversing the original "defer per YAGNI" plan. Reason: `validate-plugin.js` is a hand-rolled 900-line validator that does NOT AJV-load `schemas/plugin.schema.json`. Without a script-level rule, `pnpm validate:plugins` would still pass on a manifest missing `type` or `title`. The schema tightening catches the drift via `pnpm test:integration` only, not via the plugin validator. RULE 9 was added covering both top-level `userConfig` and `channels[].userConfig`.
 
 ## Implementation Plan
 
