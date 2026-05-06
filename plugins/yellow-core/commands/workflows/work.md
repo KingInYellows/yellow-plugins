@@ -446,27 +446,43 @@ it at a Phase 1b checkpoint.
    tweak, rename only), skip this step and proceed to Step 4.** For complex
    changes, run reviewer agents in parallel using Task tool.
 
-   **3a. Create the per-run directory FIRST (before any Task spawn)** so
-   each agent receives a path to write its result file to. The directory
-   prevents collisions between concurrent workflow sessions:
+   **3a. Create the per-run directory FIRST (before any Task spawn).**
+   Bash variables do NOT survive across separate Bash tool calls — each
+   call is a fresh subprocess. To make `$RUN_DIR` reach the Task input
+   prompts in step 3b, run mktemp and immediately capture the absolute
+   path the command printed; substitute that literal path value inline
+   into each Task prompt below. Do not reference the variable name
+   `$RUN_DIR` in the Task input — the spawned agent receives the value
+   you substitute, not a shell-variable expansion.
 
    ```bash
-   RUN_DIR=$(mktemp -d -t run-XXXXXXXX)
+   RUN_DIR=$(mktemp -d -t run-XXXXXXXX) && printf '%s\n' "$RUN_DIR"
    ```
 
-   **3b. Spawn agents in parallel.** **Issue all four Task invocations in a
-   single response** so they execute concurrently. **Each Task invocation
+   **Empty-RUN_DIR error path.** If `mktemp -d` fails (disk full,
+   permission denied) the command produces empty output. If the captured
+   path is empty, do NOT spawn reviewer agents — report the failure to
+   the user ("[/workflows:work] Could not create run directory; skipping
+   parallel review (run mktemp -d manually to diagnose)") and proceed to
+   step 5 with an empty findings set, marked as "no parallel review
+   coverage". Continuing with empty `$RUN_DIR` would cause every agent
+   to write to a non-existent path and silently appear "failed".
+
+   **3b. Spawn agents in parallel.** **Issue all four Task invocations in
+   a single response** so they execute concurrently. **Each Task invocation
    MUST set `run_in_background: true`** — the review agents declare
    `background: true` in their frontmatter, but true parallelism also
-   requires the spawning call to run in the background. Pass `$RUN_DIR` to
-   each agent so it can write `$RUN_DIR/agent-result-<agent-name>.json`
-   (see `create-agent-skills` skill §Subagent Failure Convention). Wait
+   requires the spawning call to run in the background. Pass the
+   **literal path** captured from step 3a to each agent so it can write
+   `<run_dir>/agent-result-<agent-name>.tmp` then atomically rename to
+   `<run_dir>/agent-result-<agent-name>.json` (POSIX rename atomicity;
+   see `create-agent-skills` skill §Subagent Failure Convention). Wait
    for all agents via TaskOutput before aggregating findings.
 
    ```text
    Task: code-simplicity-reviewer
    subagent_type: "yellow-core:review:code-simplicity-reviewer"
-   Input: {changed_files, diff, run_dir: $RUN_DIR}
+   Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Identify overly complex code, suggest simplifications
    run_in_background: true
    ```
@@ -474,7 +490,7 @@ it at a Phase 1b checkpoint.
    ```text
    Task: security-sentinel
    subagent_type: "yellow-core:review:security-sentinel"
-   Input: {changed_files, diff, run_dir: $RUN_DIR}
+   Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Find security vulnerabilities, unsafe patterns
    run_in_background: true
    ```
@@ -482,7 +498,7 @@ it at a Phase 1b checkpoint.
    ```text
    Task: performance-oracle
    subagent_type: "yellow-core:review:performance-oracle"
-   Input: {changed_files, diff, run_dir: $RUN_DIR}
+   Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Identify performance issues, optimization opportunities
    run_in_background: true
    ```
@@ -490,16 +506,18 @@ it at a Phase 1b checkpoint.
    ```text
    Task: polyglot-reviewer
    subagent_type: "yellow-core:review:polyglot-reviewer"
-   Input: {changed_files, diff, run_dir: $RUN_DIR}
+   Input: {changed_files, diff, run_dir: <literal mktemp path>}
    Goal: Check language-specific best practices, idioms
    run_in_background: true
    ```
 
-4. Collect agent findings from `$RUN_DIR/agent-result-<agent-name>.json`
-   files. Each agent writes its result with a `status` and `findings`
-   before exiting. After TaskOutput completes, read each file. Agents with
-   missing files, invalid JSON, or `status != "success"` are logged as
-   failed and surfaced in the summary — not silently dropped.
+4. Collect agent findings. The orchestrator globs only `*.json` files
+   (never `.tmp` — partial writes are invisible). Read each
+   `<run_dir>/agent-result-<agent-name>.json`. Each agent writes its
+   result with a `status` and `findings` before exiting. After
+   TaskOutput completes, read each file. Agents with missing `.json`
+   files, invalid JSON, or `status != "success"` are logged as failed
+   and surfaced in the summary — not silently dropped.
 
    Present the consolidated agent findings:
    - Critical issues (P1): Must fix before merge
@@ -507,6 +525,26 @@ it at a Phase 1b checkpoint.
    - Nice-to-have (P3): Optional improvements
    - Failed agents (if any): agent name + failure reason, so the user knows
      which concerns were NOT evaluated
+
+   **Cleanup the run directory** after findings have been read.
+   Reviewer result files may contain diff excerpts including secrets or
+   credentials; retention in `/tmp` is a data-residue risk. Run:
+
+   ```bash
+   rm -rf "<literal mktemp path>"
+   ```
+
+   Substitute the same literal path captured in step 3a (do not
+   reference `$RUN_DIR` — it does not survive across Bash calls).
+   **If the run directory was successfully created in step 3a, you
+   MUST clean it up even if the workflow exits early** (agent spawn
+   error, TaskOutput failure, conflict reconciliation rollback,
+   user-initiated cancel) — the directory may already contain agent
+   result files with diff excerpts, secrets, or credentials, and
+   leaving them in `/tmp` is the exact data-residue risk this step
+   exists to prevent. The ONLY skip case is when `mktemp -d` itself
+   failed and no directory was created (the empty-RUN_DIR error path
+   from step 3a).
 
 5. Address critical and important issues:
    - Fix P1 issues immediately
