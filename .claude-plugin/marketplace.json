@@ -184,7 +184,7 @@
     {
       "name": "yellow-mempalace",
       "description": "Structured long-term memory with temporal knowledge graph via MemPalace",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "author": {
         "name": "KingInYellows"
       },
