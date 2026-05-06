@@ -27,6 +27,11 @@
           "type": "boolean",
           "default": false,
           "description": "Store value in OS keychain when true."
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Regular expression (JavaScript syntax, anchored with ^ and $ recommended) the user-supplied value must match. Only valid when `type` is one of: string, directory, file (number/boolean values cannot meaningfully carry a regex constraint). Enforced locally by scripts/validate-plugin.js RULE 10; remote-validator support is empirically untested at the time of introduction."
         }
       },
       "required": ["type", "title"],
@@ -51,6 +56,10 @@
         {
           "if": { "properties": { "type": { "const": "file" } }, "required": ["type"] },
           "then": { "properties": { "default": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["number", "boolean"] } }, "required": ["type"] },
+          "then": { "properties": { "pattern": false } }
         }
       ]
     },

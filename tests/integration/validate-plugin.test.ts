@@ -643,3 +643,172 @@ printf 'plain text\\n'
     );
   });
 });
+
+describe('validate-plugin PR-B userConfig pattern field (RULE 10)', () => {
+  let tmpRoot: string;
+  let pluginDir: string;
+
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-validate-plugin-pattern-'));
+    pluginDir = join(tmpRoot, 'test-plugin');
+    mkdirSync(pluginDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('accepts a string-typed userConfig with a valid pattern and matching default', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        api_url: {
+          type: 'string',
+          title: 'API URL',
+          pattern: '^https://',
+          default: 'https://example.com',
+        },
+      },
+    });
+    const { status } = runValidator(pluginDir);
+    expect(status).toBe(0);
+  });
+
+  it('rejects a non-string pattern value', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        api_url: {
+          type: 'string',
+          title: 'API URL',
+          pattern: 123 as unknown as string,
+        },
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/pattern must be a non-empty string/);
+  });
+
+  it('rejects an empty string pattern', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        api_url: { type: 'string', title: 'API URL', pattern: '' },
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/pattern must be a non-empty string/);
+  });
+
+  it('rejects a pattern when type is number', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        port: {
+          type: 'number',
+          title: 'Port',
+          pattern: '^[0-9]+$',
+        },
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /pattern is only valid when type is one of: string, directory, file/
+    );
+  });
+
+  it('rejects a pattern when type is boolean', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        flag: {
+          type: 'boolean',
+          title: 'Flag',
+          pattern: '^(true|false)$',
+        },
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(
+      /pattern is only valid when type is one of: string, directory, file/
+    );
+  });
+
+  it('rejects an invalid regex pattern', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        api_url: {
+          type: 'string',
+          title: 'API URL',
+          pattern: '[unclosed',
+        },
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/pattern is not a valid regular expression/);
+  });
+
+  it('rejects a default that does not match its pattern', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        api_url: {
+          type: 'string',
+          title: 'API URL',
+          pattern: '^https://',
+          default: 'http://example.com',
+        },
+      },
+    });
+    const { status, stderr } = runValidator(pluginDir);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/default ".*" does not match pattern "/);
+  });
+
+  it('accepts pattern on a directory-typed entry', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        workspace: {
+          type: 'directory',
+          title: 'Workspace path',
+          pattern: '^[A-Za-z0-9_./-]+$',
+        },
+      },
+    });
+    const { status } = runValidator(pluginDir);
+    expect(status).toBe(0);
+  });
+
+  it('accepts pattern on a file-typed entry', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        config_file: {
+          type: 'file',
+          title: 'Config file path',
+          pattern: '\\.json$',
+        },
+      },
+    });
+    const { status } = runValidator(pluginDir);
+    expect(status).toBe(0);
+  });
+
+  it('accepts a userConfig entry without a pattern (back-compat)', () => {
+    writePluginManifest(pluginDir, {
+      ...VALID_BASE_MANIFEST,
+      userConfig: {
+        api_url: { type: 'string', title: 'API URL' },
+      },
+    });
+    const { status } = runValidator(pluginDir);
+    expect(status).toBe(0);
+  });
+});

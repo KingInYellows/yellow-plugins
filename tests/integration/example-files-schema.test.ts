@@ -172,3 +172,95 @@ describe('semverRange custom keyword (PR-B)', () => {
     expect(factory.validate('semver-test', { version: '' }).valid).toBe(false);
   });
 });
+
+describe('userConfigEntry.pattern field (PR-C)', () => {
+  let factory: AjvValidatorFactory;
+
+  beforeAll(async () => {
+    factory = new AjvValidatorFactory();
+    await factory.loadSchemaFromFile(
+      'plugin',
+      join(SCHEMAS_DIR, 'plugin.schema.json')
+    );
+  });
+
+  function pluginWithUserConfig(
+    userConfig: Record<string, unknown>
+  ): Record<string, unknown> {
+    return {
+      name: 'test-plugin',
+      version: '1.0.0',
+      description: 'Test plugin for userConfig pattern AJV-side validation.',
+      author: 'KingInYellows',
+      userConfig,
+    };
+  }
+
+  it('accepts a string-typed entry with a valid pattern', () => {
+    const data = pluginWithUserConfig({
+      api_url: { type: 'string', title: 'API URL', pattern: '^https://' },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(true);
+  });
+
+  it('accepts a directory-typed entry with a pattern', () => {
+    const data = pluginWithUserConfig({
+      workspace: {
+        type: 'directory',
+        title: 'Workspace',
+        pattern: '^[A-Za-z0-9_./-]+$',
+      },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(true);
+  });
+
+  it('accepts a file-typed entry with a pattern', () => {
+    const data = pluginWithUserConfig({
+      config_file: {
+        type: 'file',
+        title: 'Config file',
+        pattern: '\\.json$',
+      },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(true);
+  });
+
+  it('rejects a number-typed entry that also declares a pattern', () => {
+    const data = pluginWithUserConfig({
+      port: { type: 'number', title: 'Port', pattern: '^[0-9]+$' },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(false);
+  });
+
+  it('rejects a boolean-typed entry that also declares a pattern', () => {
+    const data = pluginWithUserConfig({
+      flag: {
+        type: 'boolean',
+        title: 'Flag',
+        pattern: '^(true|false)$',
+      },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(false);
+  });
+
+  it('rejects a non-string pattern value', () => {
+    const data = pluginWithUserConfig({
+      api_url: { type: 'string', title: 'API URL', pattern: 123 },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(false);
+  });
+
+  it('rejects an empty string pattern', () => {
+    const data = pluginWithUserConfig({
+      api_url: { type: 'string', title: 'API URL', pattern: '' },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(false);
+  });
+
+  it('accepts an entry without a pattern (back-compat)', () => {
+    const data = pluginWithUserConfig({
+      api_url: { type: 'string', title: 'API URL' },
+    });
+    expect(factory.validate('plugin', data).valid).toBe(true);
+  });
+});
