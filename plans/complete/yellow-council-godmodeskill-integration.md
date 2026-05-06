@@ -1,5 +1,12 @@
 # Feature: yellow-council Plugin (GodModeSkill Integration V1)
 
+> **Status: Implemented (PRs #328, #329, #330, merged)** — Plugin shipped at
+> `plugins/yellow-council/` with manifest/package metadata, `/council`,
+> `/council:setup`, Gemini and OpenCode reviewer agents, `council-patterns`,
+> README, CLAUDE.md, and changelog entries. Stack progress at the bottom marks
+> the three implementation PRs complete. Unchecked task boxes in the body are
+> stale historical planning state, not remaining work.
+
 **Source brainstorm:** `docs/brainstorms/2026-05-03-godmodeskill-integration-brainstorm.md`
 **Source investigation:** `research/GodModeSkill Integration Investigation.md`
 **GodModeSkill reference commit:** `b693d1da498cbcfc2e5cba1f85b3d341205bfeb0`

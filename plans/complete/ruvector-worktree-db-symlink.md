@@ -1,5 +1,13 @@
 # Feature: ruvector Worktree DB Symlink
 
+> **Status: Implemented (archived)** — Shipped in repo. The implementation now
+> includes `get_main_repo_root`, `link_ruvector_db`, and
+> `cleanup_ruvector_link` in `worktree-manager.sh`; create/copy-env/cleanup
+> wiring; `/worktree:cleanup` parity; Bats coverage under the git-worktree
+> skill; required `plugin-shell-tests` CI wiring; documentation updates; and
+> the integration-issues solution writeup. Unchecked task boxes below are stale
+> historical planning state, not remaining work.
+
 ## Problem Statement
 
 When a Claude Code session runs inside a git worktree (e.g.
