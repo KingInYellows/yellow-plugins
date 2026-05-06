@@ -21,6 +21,7 @@
       "type": "string",
       "title": "Composio MCP URL",
       "description": "Per-customer Composio MCP endpoint. Generate via the Composio dashboard or `npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID`. Looks like https://mcp.composio.dev/<id>. Only `https://mcp.composio.dev/*` URLs are expected — Claude Code will make HTTP MCP connections to whatever you provide here, so do not paste arbitrary URLs (file://, internal hosts, metadata endpoints). If left blank, the bundled MCP server will fail to start — fall back to a manual `claude mcp add` setup (see /composio:setup).",
+      "pattern": "^https://[a-zA-Z0-9][a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(?:/|$)",
       "sensitive": false,
       "required": false
     },
