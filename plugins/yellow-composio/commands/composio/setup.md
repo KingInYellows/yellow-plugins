@@ -37,7 +37,7 @@ This is a soft prerequisite -- setup continues without jq.
 Use ToolSearch to discover Composio tools across all known prefixes:
 
 ```text
-ToolSearch("COMPOSIO_REMOTE_WORKBENCH")
+ToolSearch("COMPOSIO_SEARCH_TOOLS")
 ```
 
 Three possible prefixes exist; in priority order:
@@ -70,7 +70,7 @@ Recommended (bundled MCP server):
   1. Sign up at https://composio.dev and copy your API key from
      https://app.composio.dev/settings.
   2. Generate a per-customer MCP URL via the Composio dashboard or:
-       npx @composio/mcp@latest setup <customer_id> <app_id> --client claude
+       npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID --client claude
   3. Re-prompt the plugin's userConfig:
        /plugin disable yellow-composio
        /plugin enable yellow-composio
