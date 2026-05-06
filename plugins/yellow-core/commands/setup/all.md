@@ -63,7 +63,19 @@ command -v ruvector >/dev/null 2>&1 && printf 'ruvector:           OK\n' || prin
 command -v codex >/dev/null 2>&1 && printf 'codex:              OK (%s)\n' "$(codex --version 2>/dev/null | head -n1)" || printf 'codex:              NOT FOUND\n'
 command -v gemini >/dev/null 2>&1 && printf 'gemini:             OK (%s)\n' "$(gemini --version 2>&1 | head -n1)" || printf 'gemini:             NOT FOUND\n'
 command -v opencode >/dev/null 2>&1 && printf 'opencode:           OK (%s)\n' "$(opencode --version 2>&1 | head -n1)" || printf 'opencode:           NOT FOUND\n'
-command -v mempalace >/dev/null 2>&1 && printf 'mempalace:          OK (%s)\n' "$(mempalace --version 2>/dev/null | head -n1)" || printf 'mempalace:          NOT FOUND\n'
+if command -v mempalace >/dev/null 2>&1; then
+  mp_version_raw=$(mempalace --version 2>/dev/null | head -n1)
+  mp_version=$(printf '%s' "$mp_version_raw" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1)
+  printf 'mempalace:          OK (%s)\n' "${mp_version_raw:-unknown}"
+  if [ -n "$mp_version" ] && [ "$(printf '%s\n3.0.0\n' "$mp_version" | sort -V | head -n1)" = "3.0.0" ]; then
+    printf 'mempalace_mcp_check: ok\n'
+  else
+    printf 'mempalace_mcp_check: too_old\n'
+  fi
+else
+  printf 'mempalace:          NOT FOUND\n'
+  printf 'mempalace_mcp_check: missing\n'
+fi
 
 if command -v python3 >/dev/null 2>&1; then
   py_ver=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
@@ -380,10 +392,10 @@ Compute bundled source availability out of 6:
 
 **yellow-mempalace:**
 
-- READY: `python310_check` ok AND `mempalace` binary found in PATH AND
+- READY: `python310_check` ok AND `mempalace_mcp_check` ok AND
   `~/.mempalace/` directory exists
-- PARTIAL: `python310_check` ok AND `mempalace` binary found but `~/.mempalace/` not initialized
-- NEEDS SETUP: `mempalace` binary not found OR `python310_check` not ok
+- PARTIAL: `python310_check` ok AND `mempalace_mcp_check` ok AND `~/.mempalace/` not initialized
+- NEEDS SETUP: `mempalace_mcp_check` not ok (binary missing or version `< 3.0.0`) OR `python310_check` not ok
 
 **yellow-core:**
 
