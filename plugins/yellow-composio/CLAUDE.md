@@ -5,11 +5,11 @@ Optional Composio accelerator for batch workflows with local usage tracking.
 ## How It Works
 
 This plugin bundles a `type: http` Composio MCP server, declared in
-`plugin.json` and configured via two `userConfig` prompts on first enable:
-the per-customer MCP URL and the Composio API key. Both are stored in
-the system keychain (URL non-sensitive, API key sensitive). Bundled
-tools appear under the `mcp__plugin_yellow-composio_composio-server__*`
-prefix.
+`plugin.json` and configured via two `userConfig` prompts on enable: the
+per-customer MCP URL and the Composio API key. The API key is stored in
+the system keychain (`sensitive: true`); the MCP URL is stored as plain
+(non-sensitive) `userConfig`. Bundled tools appear under the
+`mcp__plugin_yellow-composio_composio-server__*` prefix.
 
 The plugin still works with externally-configured Composio MCPs — if the
 userConfig prompts are dismissed (URL left blank), the bundled server

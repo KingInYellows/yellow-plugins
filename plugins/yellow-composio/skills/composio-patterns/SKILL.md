@@ -14,9 +14,15 @@ processing, usage tracking, graceful degradation, and security rules.
 Composio is a managed tool integration platform providing 1,000+ toolkits and
 11,000+ actions via a single MCP server. In yellow-plugins, Composio is an
 **optional accelerator** -- all workflows must function without it. Tools are
-provided by the user's MCP connector (prefix varies by configuration, e.g.,
-`mcp__claude_ai_composio__*` or `mcp__composio-server__*`), not bundled by
-this plugin.
+discovered via ToolSearch and may appear under one of three prefixes,
+checked in priority order:
+
+1. `mcp__plugin_yellow-composio_composio-server__*` -- bundled by this
+   plugin (preferred, requires both `userConfig` values to be set).
+2. `mcp__claude_ai_composio__*` -- Claude.ai native Composio integration
+   (legacy, still supported).
+3. `mcp__composio-server__*` -- manual `claude mcp add` setup
+   (legacy / migration path).
 
 ## Tool Reference
 
@@ -265,8 +271,12 @@ Pattern:
   infrastructure. Do not send sensitive file contents, credentials, private
   keys, or proprietary algorithms. Use Workbench for data processing and API
   orchestration, not as a trusted execution environment.
-- **No API keys stored**: This plugin does not store or manage Composio API
-  keys. The native MCP connector handles credential management.
+- **API key stored in system keychain**: When the bundled MCP path is used,
+  the `composio_api_key` `userConfig` value is stored in the OS keychain
+  (`sensitive: true`) and sent as the `X-API-Key` header on every request.
+  Never echo, log, or transmit the value. Legacy `mcp__claude_ai_composio__*`
+  and `mcp__composio-server__*` paths use Claude Code's native or manual
+  credential management instead.
 - **Content fencing**: Wrap all Composio responses in `--- begin/end ---`
   delimiters per repository convention.
 - **Data transmission**: Tool call parameters and Workbench code are sent to

@@ -52,8 +52,15 @@ Three possible prefixes exist; in priority order:
 If ToolSearch returns at least one Composio tool, record which prefix is
 active and proceed to Step 3.
 
-If ToolSearch returns no Composio tools, the bundled MCP did not start
-(most commonly because the `userConfig` prompt was dismissed). Report:
+If ToolSearch returns no Composio tools, the bundled MCP did not start.
+The two most common causes are:
+
+- The `userConfig` prompt was dismissed (URL or API key blank).
+- `${user_config.*}` substitution in `mcpServers.url`/`headers` is not
+  supported by your Claude Code version (this is the first plugin in the
+  marketplace to use that pattern; see the Fallback below).
+
+Report:
 
 ```text
 [yellow-composio] No Composio MCP tools found in this session.
@@ -80,6 +87,11 @@ in `mcpServers.<name>.url` is not resolved by your harness version):
 
   Then restart Claude Code and re-run /composio:setup. Tools appear
   under mcp__composio-server__* in this configuration.
+
+  Note: this manual path stores YOUR_COMPOSIO_API_KEY as plaintext in
+  ~/.claude.json (not the OS keychain). If the bundled path later starts
+  working on your version, run `claude mcp remove composio-server` to
+  drop the plaintext entry and re-rely on the keychain-backed bundle.
 ```
 
 Stop here if no tools found.
@@ -165,7 +177,7 @@ If the file does not exist, create it:
 mkdir -p .claude
 MONTH=$(date -u +%Y-%m)
 TODAY=$(date -u +%Y-%m-%d)
-cat > ".claude/composio-usage.json" << JSONEOF
+cat > ".claude/composio-usage.json" << __EOF_COMPOSIO_USAGE__
 {
   "version": 1,
   "created": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)",
@@ -184,7 +196,7 @@ cat > ".claude/composio-usage.json" << JSONEOF
     }
   }
 }
-JSONEOF
+__EOF_COMPOSIO_USAGE__
 printf '[yellow-composio] Usage counter initialized at .claude/composio-usage.json\n'
 ```
 
