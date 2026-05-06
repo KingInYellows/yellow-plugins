@@ -276,6 +276,7 @@ has_userconfig() {
 # Note: exa MCP @ 3.1.8 starts without a key and only fails at tool invocation,
 # so MCP startup does NOT validate this credential — we only know the key is
 # stored in the keychain.
+provider_has_userconfig_path=1   # consumed by the v2.0.0 shell-env-only diagnostic below
 SKIP_CURL_PROBE=0
 [ -z "${EXA_API_KEY:-}" ] && has_userconfig yellow-research exa_api_key && SKIP_CURL_PROBE=1
 if [ $SKIP_CURL_PROBE -eq 1 ]; then
@@ -325,6 +326,7 @@ has_userconfig() {
 # Skip curl probe when key is userConfig-only — MCP reads it from userConfig.
 # Note: tavily MCP @ 0.2.17 starts without a key and only fails at tool
 # invocation, so MCP startup does NOT validate this credential.
+provider_has_userconfig_path=1   # consumed by the v2.0.0 shell-env-only diagnostic below
 SKIP_CURL_PROBE=0
 [ -z "${TAVILY_API_KEY:-}" ] && has_userconfig yellow-research tavily_api_key && SKIP_CURL_PROBE=1
 if [ $SKIP_CURL_PROBE -eq 1 ]; then
@@ -379,6 +381,7 @@ has_userconfig() {
 # Skip curl probe when key is userConfig-only — MCP reads it from userConfig.
 # Note: perplexity MCP @ 0.8.2 hard-fails at startup without a valid key
 # (tools disappear entirely), so MCP startup IS a credential signal here.
+provider_has_userconfig_path=1   # consumed by the v2.0.0 shell-env-only diagnostic below
 SKIP_CURL_PROBE=0
 [ -z "${PERPLEXITY_API_KEY:-}" ] && has_userconfig yellow-research perplexity_api_key && SKIP_CURL_PROBE=1
 if [ $SKIP_CURL_PROBE -eq 1 ]; then
@@ -412,6 +415,7 @@ mark it absent and skip; do not call `has_userconfig` (no userConfig path
 exists for this credential).
 
 ```bash
+provider_has_userconfig_path=0   # Ceramic has no userConfig entry; MCP uses OAuth.
 if [ -z "${CERAMIC_API_KEY:-}" ]; then
   provider_status="ABSENT"
   provider_detail="CERAMIC_API_KEY not in shell env (REST probe skipped). MCP OAuth path unaffected."
@@ -441,7 +445,18 @@ elif [ "$http_status" = "200" ]; then
   provider_detail="Live test passed"
 elif [ "$http_status" = "401" ] || [ "$http_status" = "403" ]; then
   provider_status="INVALID"
-  provider_detail="Key rejected by API (HTTP $http_status)"
+  # v2.0.0 shell-env-only diagnostic: a 401 on a userConfig-capable provider
+  # (EXA / Tavily / Perplexity) when the curl probe ran (i.e., the key was
+  # in shell env, not userConfig) is structurally ambiguous — the key in
+  # shell env may genuinely be expired, OR the user may have a valid key
+  # in shell env that still fails to reach the MCP because plugin.json now
+  # injects ${user_config.<key>} into the MCP env. Distinguish so the user
+  # knows whether to regenerate or migrate.
+  if [ "${provider_has_userconfig_path:-0}" = "1" ] && [ "${SKIP_CURL_PROBE:-0}" = "0" ]; then
+    provider_detail="Key in shell env was rejected by the live API (HTTP $http_status). Two distinct causes — check both: (a) the key may be expired or revoked — regenerate at the provider dashboard. (b) as of yellow-research 2.0.0 the MCP reads the key from userConfig (system keychain), NOT shell env — even a valid shell-env key never reaches the MCP. To migrate: /plugin disable yellow-research && /plugin enable yellow-research, then answer the userConfig prompt."
+  else
+    provider_detail="Key rejected by API (HTTP $http_status)"
+  fi
 elif [ "$http_status" = "429" ]; then
   provider_status="RATE LIMITED"
   provider_detail="Key may be valid; service is busy. Try again later."
