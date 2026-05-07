@@ -1,5 +1,7 @@
 ---
+name: docs:review
 description: "Multi-persona review of a planning document (PRD, brainstorm, spec, ADR) using 6 always-applicable personas plus 1 conditional adversarial reviewer. Each persona returns structured findings; the orchestrator aggregates with a confidence-rubric gate."
+argument-hint: "<path-to-document>"
 allowed-tools:
   - Read
   - Grep
