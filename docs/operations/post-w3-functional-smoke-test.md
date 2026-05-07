@@ -116,12 +116,15 @@ reviewers work end-to-end on a real planning document.
   ```
   - Expected: 5 scanner agents dispatch in parallel
   - Expected: each writes to `.debt/scanner-output/<scanner>.json`
-  - Expected: every finding has the v2.0 fields: `finding`, `file`,
-    `failure_scenario`, `confidence`
+  - Expected: every finding carries the canonical v2.0 schema fields per
+    `plugins/yellow-debt/skills/debt-conventions/SKILL.md`:
+    `finding`, `file`, `failure_scenario`, `confidence`, `category`,
+    `severity`, `effort`, and `fix`.
 - [ ] Verify schema in any one output:
   ```bash
   jq '.findings[0] | keys' .debt/scanner-output/ai-pattern-scanner.json
-  # Expected: ["confidence", "failure_scenario", "file", "finding", ...]
+  # Expected: ["category", "confidence", "effort", "failure_scenario", "file",
+  #           "finding", "fix", "severity"] — all 8 v2.0 keys present
   ```
 
 ### C.4 W3 #5 auto-trigger on plugin-authoring diff
