@@ -132,8 +132,8 @@ shown below. Suppress findings with `confidence < 75` except P0 findings at
       "file": "path/to/file",
       "line": 42,
       "confidence": 75,
-      "autofix_class": "manual|advisory|gated_auto",
-      "owner": "review-fixer|downstream-resolver|human",
+      "autofix_class": "manual|advisory",
+      "owner": "human",
       "requires_verification": false,
       "pre_existing": false,
       "suggested_fix": "Concrete fix or null"
