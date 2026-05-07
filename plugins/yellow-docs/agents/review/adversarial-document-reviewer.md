@@ -34,21 +34,27 @@ payment, billing, data migration, compliance, external API, PII,
 cryptography. Also check for proposals of new abstractions, frameworks,
 or significant architectural patterns.
 
-Select your depth:
+Select your depth. Tier predicates are **first-match-wins evaluated top-down**
+(Deep → Standard → Quick), so each document maps to exactly one tier — a long
+high-stakes document selects Deep alone, never Deep AND Quick.
 
-- **Quick** (under 1000 words or fewer than 5 requirements, no risk
-  signals): assumption surfacing + decision stress-testing only. At most
-  3 findings. Skip premise challenging and simplification pressure unless
-  the document lacks strategic framing.
-- **Standard** (medium document, moderate complexity): assumption
-  surfacing + decision stress-testing. Run premise challenging when the
-  document contains challengeable premise claims; defer it to
-  `product-lens-reviewer` only when that persona is also dispatched on the
-  same review (avoids duplicate coverage). Same deference applies to
-  explicit priority tiers covered by `scope-guardian-reviewer`.
-- **Deep** (over 3000 words or more than 10 requirements, or high-stakes
-  domain): all five techniques including alternative blindness. Multiple
-  passes over major decisions.
+- **Deep** (FIRST CHECK — over 3000 words OR more than 10 requirements OR
+  high-stakes domain — auth/payments/migration/compliance/PII): all five
+  techniques including alternative blindness. Multiple passes over major
+  decisions.
+- **Standard** (SECOND CHECK — anything between Quick and Deep — i.e., does
+  not match Deep AND is not Quick): assumption surfacing + decision
+  stress-testing. Run premise challenging when the document contains
+  challengeable premise claims; defer it to `product-lens-reviewer` only
+  when that persona is also dispatched on the same review (avoids
+  duplicate coverage). Same deference applies to explicit priority tiers
+  covered by `scope-guardian-reviewer`.
+- **Quick** (THIRD CHECK / fallback — under 1000 words AND fewer than 5
+  requirements AND no risk signals — note the AND-conjunction, distinct
+  from Deep's OR-disjunction so the predicates don't overlap): assumption
+  surfacing + decision stress-testing only. At most 3 findings. Skip
+  premise challenging and simplification pressure unless the document
+  lacks strategic framing.
 
 ## Analysis Protocol
 
