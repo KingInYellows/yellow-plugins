@@ -55,7 +55,8 @@
       "title": "API endpoint",
       "description": "Your team's API endpoint",
       "required": true,
-      "sensitive": false
+      "sensitive": false,
+      "pattern": "^https://"
     },
     "api_token": {
       "type": "string",

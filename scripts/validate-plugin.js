@@ -76,6 +76,13 @@ const VALID_USER_CONFIG_TYPES = new Set([
   'file',
 ]);
 
+// Subset of VALID_USER_CONFIG_TYPES for which `pattern` (RULE 10) is
+// meaningful. Number/boolean values cannot carry a regex constraint.
+// Module-scope to match the VALID_HOOK_EVENTS / VALID_USER_CONFIG_TYPES
+// pattern — reused across the top-level userConfig walk and the
+// per-channel walk without reallocating the Set per validatePlugin call.
+const PATTERN_VALID_TYPES = new Set(['string', 'directory', 'file']);
+
 /**
  * Resolve a hook command to a script path within the plugin directory.
  * Returns the resolved path, or null if the command is not a "bash <path>"
@@ -853,16 +860,26 @@ function validatePlugin(pluginDir) {
   // (RULE 8 — shebang / decision-output / set -e content checks — folded
   // into RULES 6+8 single-pass loop above via validateHookScriptPath.)
 
-  // RULE 9: userConfig entries must declare `type` and `title`. The Claude
-  // Code remote validator (claude doctor) rejects any entry missing either,
-  // and only accepts type ∈ {string, number, boolean, directory, file}. Local
-  // CI mirrors that here because the JSON Schema in schemas/plugin.schema.json
-  // is not currently AJV-loaded by validate-plugin.js — without this check
-  // the drift only surfaces at install time. The check covers both the
-  // top-level `userConfig` object AND each `channels[].userConfig` object,
-  // because `channels[*].userConfig` reuses the same `userConfigEntry`
-  // schema definition and carries the same remote-validator constraints.
-  // See docs/solutions/build-errors/userconfig-type-title-remote-validator-drift.md
+  // RULE 9 + RULE 10: userConfig entry constraints. Local CI mirrors the
+  // Claude Code remote validator here because schemas/plugin.schema.json is
+  // not currently AJV-loaded by validate-plugin.js — without these checks
+  // the drift only surfaces at install time. Both rules cover the top-level
+  // `userConfig` object AND each `channels[].userConfig` object, because
+  // `channels[*].userConfig` reuses the same `userConfigEntry` schema
+  // definition and carries the same constraints.
+  //
+  // RULE 9: every entry must declare `type` (one of string|number|boolean|
+  //   directory|file) and a non-empty `title` string. The remote validator
+  //   rejects entries missing either field. See
+  //   docs/solutions/build-errors/userconfig-type-title-remote-validator-drift.md
+  //
+  // RULE 10: optional `pattern` regex constraint. When present, `pattern`
+  //   must be a non-empty string that compiles as a JavaScript RegExp, and
+  //   `type` must be one of {string, directory, file} (number/boolean values
+  //   cannot meaningfully carry a regex constraint). When `default` is also
+  //   set as a string, the default itself must match the pattern — otherwise
+  //   the manifest ships an internally inconsistent constraint. See
+  //   docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md
   function validateUserConfigEntries(userConfig, pathPrefix) {
     if (
       typeof userConfig !== 'object' ||
@@ -895,6 +912,52 @@ function validatePlugin(pluginDir) {
         );
       } else if (typeof entry.title !== 'string' || entry.title.length === 0) {
         addError(errors, `${pathPrefix}.${key}.title must be a non-empty string`);
+      }
+      // RULE 10: pattern field validation
+      if (entry.pattern !== undefined) {
+        if (typeof entry.pattern !== 'string' || entry.pattern.length === 0) {
+          addError(
+            errors,
+            `${pathPrefix}.${key}.pattern must be a non-empty string`
+          );
+        } else if (entry.type == null || !VALID_USER_CONFIG_TYPES.has(entry.type)) {
+          // Type missing or unknown — RULE 9 already reported the underlying
+          // problem. Skip pattern enforcement entirely rather than fall
+          // through to the regex-compile path, which would produce a
+          // confusing duplicate error and silently bypass the type-allowlist
+          // gate when type is absent.
+        } else if (!PATTERN_VALID_TYPES.has(entry.type)) {
+          addError(
+            errors,
+            `${pathPrefix}.${key}.pattern is only valid when type is one of: string, directory, file (got "${entry.type}")`
+          );
+        } else {
+          let compiled = null;
+          try {
+            compiled = new RegExp(entry.pattern);
+          } catch (e) {
+            addError(
+              errors,
+              `${pathPrefix}.${key}.pattern is not a valid regular expression: ${e.message}`
+            );
+          }
+          if (
+            compiled !== null &&
+            typeof entry.default === 'string' &&
+            !compiled.test(entry.default)
+          ) {
+            // Redact default in error output when the field is sensitive,
+            // so a partially-correct credential never lands in CI logs.
+            const defaultDisplay =
+              entry.sensitive === true
+                ? '<redacted — sensitive field>'
+                : `"${entry.default}"`;
+            addError(
+              errors,
+              `${pathPrefix}.${key}.default ${defaultDisplay} does not match pattern "${entry.pattern}"`
+            );
+          }
+        }
       }
     }
   }

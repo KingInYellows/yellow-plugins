@@ -27,6 +27,11 @@
           "type": "boolean",
           "default": false,
           "description": "Store value in OS keychain when true."
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Regular expression (JavaScript syntax) the user-supplied value must match. MUST be anchored with `^` and `$` when used to enforce security constraints (URL scheme, token format) — an unanchored pattern matches anywhere in the string and can be bypassed (`https://` matches `http://evil/https://`). Only valid when `type` is one of: string, directory, file. Entries with absent `type` skip RULE 10 enforcement (RULE 9 reports the missing-type error independently). See docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md for the empirical-test recipe; remote-validator support is empirically untested."
         }
       },
       "required": ["type", "title"],
@@ -51,6 +56,10 @@
         {
           "if": { "properties": { "type": { "const": "file" } }, "required": ["type"] },
           "then": { "properties": { "default": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["number", "boolean"] } }, "required": ["type"] },
+          "then": { "properties": { "pattern": false } }
         }
       ]
     },
