@@ -5,6 +5,20 @@
 # Note: -e omitted intentionally — hook must output {"continue": true} on all
 # paths, even when individual commands fail. start-morph.sh handles install
 # synchronously as a correctness gate; this hook is purely an optimization.
+#
+# Async background pattern (H-01, audit 2026-05-07):
+# The actual install work runs in a detached subshell so the parent process
+# can yield to Claude Code in <1s. The previous synchronous form held the
+# session-start critical path for up to 30s on cold caches — single largest
+# user-visible perf cost in the marketplace. The accepted trade-off: if the
+# user invokes a morph tool within ~30s of session start on a slow connection,
+# they may still hit a cold cache (start-morph.sh runs install synchronously
+# as the correctness fallback). The hook is purely an optimization; missing
+# the async window is no worse than not having the hook at all.
+#
+# The lock + install live INSIDE the subshell so the parent's exit does not
+# release the lock while install is still running. The subshell's EXIT trap
+# is the single owner of lock release.
 set -uo pipefail
 
 # Centralized JSON-output exit. Claude Code BLOCKS session startup if a
@@ -37,20 +51,28 @@ yellow_morph_needs_install || json_exit
 
 mkdir -p "$CLAUDE_PLUGIN_DATA" || json_exit "mkdir failed; skipping prewarm"
 
-# 5s budget. Prewarm is purely an optimization — if we can't acquire the
-# lock quickly, yield to whoever has it (probably the wrapper) and exit.
-if ! yellow_morph_acquire_install_lock 5; then
-  json_exit "install lock held by another process; yielding to start-morph.sh"
-fi
-trap 'yellow_morph_release_install_lock' EXIT INT TERM
+# Detached background install. The subshell owns the lock and all install
+# work; the parent does not acquire the lock and exits as soon as the
+# subshell is spawned. All child output goes to /dev/null — corrupting the
+# parent's `{"continue": true}` stdout would block session startup.
+#
+# Lock acquisition uses the same 5s budget as the previous synchronous form:
+# if another process (e.g., the start-morph.sh wrapper) holds the lock, the
+# subshell yields silently. The subshell's EXIT/INT/TERM trap is the single
+# owner of lock release.
+(
+  if ! yellow_morph_acquire_install_lock 5; then
+    exit 0
+  fi
+  trap 'yellow_morph_release_install_lock' EXIT INT TERM
 
-# Re-check under the lock — the wrapper or a previous prewarm may have
-# completed the install while we were waiting.
-yellow_morph_needs_install || json_exit
+  # Re-check under the lock — the wrapper or a previous prewarm may have
+  # completed the install while we were waiting.
+  yellow_morph_needs_install || exit 0
 
-if yellow_morph_do_install >&2; then
-  json_exit
-fi
+  if ! yellow_morph_do_install; then
+    yellow_morph_cleanup_failed_install
+  fi
+) >/dev/null 2>&1 & disown
 
-yellow_morph_cleanup_failed_install
-json_exit "npm ci failed; start-morph.sh will retry synchronously on first MCP call"
+json_exit
