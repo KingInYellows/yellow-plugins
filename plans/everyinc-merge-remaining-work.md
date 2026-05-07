@@ -439,3 +439,11 @@ Additional gates per PR:
 - **Depends on:** #4
 
 > **Note on linearization:** The body's PR labels (PR1–PR5) are the original mixed-topology numbering. Stack item numbers above (1–5) are the linear execution order. The `Tasks:` field is the source-of-truth mapping from a stack item to body tasks. Items 3 (yellow-debt) and 4 (yellow-docs) don't structurally depend on items 2 and 3 respectively — they're stacked here purely so `/workflows:work` can execute the linear chain. Practical impact: zero (Graphite stacks merge bottom-up; once item 1 lands, items 2–5 rebase cleanly).
+
+## Stack Progress
+<!-- Updated by workflows:work. Do not edit manually. -->
+- [x] 1. agent/chore/everyinc-merge-backbone-loose-threads (PR #402, completed 2026-05-06)
+- [x] 2. agent/feat/agent-native-reviewers (PR #403, completed 2026-05-06)
+- [x] 3. agent/feat/yellow-debt-scanner-v2-emission (PR #406, completed 2026-05-06; audit-only — all scanners already v2.0-compliant)
+- [x] 4. agent/feat/yellow-docs-doc-review (PR #410, completed 2026-05-06)
+- [x] 5. agent/chore/everyinc-merge-closure-smoke-test (PR #412, completed 2026-05-06)
