@@ -20,15 +20,19 @@ repository. Detects project structure and adapts analysis accordingly.
 
 ## Plugin Components
 
-### Commands (5)
+### Commands (6)
 
 - `/docs:setup` — Validate prerequisites and detect project structure
 - `/docs:audit` — Scan repo for documentation gaps, staleness, and coverage
 - `/docs:generate` — AI-assisted documentation generation with human review
 - `/docs:diagram` — Context-aware Mermaid diagram generation
 - `/docs:refresh` — Update stale docs based on code changes
+- `/docs:review` — Multi-persona review of a planning document (PRD,
+  brainstorm, spec, ADR) using 6 always-applicable personas plus 1
+  conditional adversarial reviewer; mirrors yellow-review's Wave 2
+  confidence-rubric aggregation pattern
 
-### Agents (3)
+### Agents (10)
 
 **Analysis:**
 
@@ -44,6 +48,31 @@ repository. Detects project structure and adapts analysis accordingly.
   structure, selects diagram type, enforces node limits. Used by
   `/docs:diagram`.
 
+**Review** — parallel document-review specialists (report findings, do NOT edit):
+
+- `coherence-reviewer` — Internal consistency, contradictions, terminology
+  drift, broken cross-references, ambiguity. Adapted from upstream CE v3.3.2.
+- `design-lens-reviewer` — Information architecture, interaction states, user
+  flows, accessibility, AI-slop check. Dimensional rating 0–10. Adapted from
+  upstream CE v3.3.2.
+- `feasibility-reviewer` — Architecture reality, shadow path tracing
+  (happy/nil/empty/error), dependencies, performance, migration safety.
+  Adapted from upstream CE v3.3.2.
+- `product-lens-reviewer` — Premise challenge, strategic consequences,
+  alternatives, goal-requirement alignment, prioritization coherence.
+  Internal/external product context. Adapted from upstream CE v3.3.2.
+- `scope-guardian-reviewer` — Right-sized for goals; complexity challenge;
+  priority dependency analysis; completeness principle. Adapted from upstream
+  CE v3.3.2.
+- `security-lens-reviewer` — Plan-level threat model: attack surface,
+  auth/authz gaps, data exposure, third-party trust boundaries, secrets.
+  Adapted from upstream CE v3.3.2.
+- `adversarial-document-reviewer` — Conditional persona for documents with
+  more than 5 requirements OR high-stakes domain signals (auth, payments,
+  migration, compliance, PII). Premise challenging, assumption surfacing,
+  decision stress-testing, simplification pressure, alternative blindness.
+  Adapted from upstream CE v3.3.2.
+
 ### Skills (1)
 
 - `docs-conventions` — Shared templates, diagram type selection decision tree,
@@ -58,6 +87,7 @@ repository. Detects project structure and adapts analysis accordingly.
 | Add visual diagrams | `/docs:diagram architecture`, `/docs:diagram ./src/` |
 | Update outdated docs | `/docs:refresh` |
 | Verify plugin works | `/docs:setup` |
+| Review a planning document (PRD, brainstorm, spec, ADR) | `/docs:review <path>` |
 
 ## Cross-Plugin Dependencies
 
