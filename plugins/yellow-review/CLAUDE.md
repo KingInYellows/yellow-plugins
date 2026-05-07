@@ -38,7 +38,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:sweep` — Wrapper that runs `/review:pr` then `/review:resolve` on
   the same PR with a user-confirmed boundary gate between them
 
-### Agents (13)
+### Agents (16)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
@@ -64,6 +64,23 @@ resolution, and sequential stack review. Graphite-native workflow.
   `plugins/*/hooks/`. Sister to `pattern-recognition-specialist`
   (yellow-core) — pattern-rec catches new convention drift,
   plugin-contract catches breaks to existing surface. New in Wave 3.
+- `cli-readiness-reviewer` — Conditional persona that reviews CLI command
+  surface for autonomous-agent invocability (interactive prompts without
+  bypass, missing structured output, vague errors, unsafe retries, ANSI
+  in pipes). Selected on the same plugin-authoring globs as
+  `plugin-contract-reviewer`; concerns are disjoint. New in Wave 3.
+- `agent-cli-readiness-reviewer` — Conditional persona using a 7-principle
+  Blocker/Friction/Optimization rubric for CLI agent-readiness (non-interactive
+  defaults, structured output, actionable errors, safe retries, bounded
+  output, composability, discoverability). Adapted from upstream CE
+  v3.3.2; deeper than `cli-readiness-reviewer` for design-doc audits and
+  full-CLI evaluations. New in Wave 3.
+- `agent-native-reviewer` — Conditional persona reviewing agent-native
+  parity: every UI action has an agent tool equivalent, agents see the
+  same data users see, shared workspace, primitives over workflows,
+  dynamic context injection. Adapted from upstream CE v3.3.2. References
+  `yellow-core:agent-native-architecture` and
+  `yellow-core:agent-native-audit` skills. New in Wave 3.
 - `pr-test-analyzer` — Test coverage and behavioral completeness
 - `comment-analyzer` — Comment accuracy and rot detection
 - `code-simplifier` — Simplification preserving functionality (runs as final
