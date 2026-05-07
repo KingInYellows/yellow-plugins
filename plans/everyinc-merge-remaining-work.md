@@ -32,7 +32,7 @@ The closure gate — the post-Wave-3 install smoke test — has no documented fu
 
 ### Sequencing rationale
 
-- **PR1 (loose threads) before PR3 (W3 #5):** PR1's BT-2 deletes the `code-reviewer` stub from yellow-review. The stub is named in BOTH `review-pr.md` and `review-all.md` dispatch tables. By having BT-2 remove all references during deletion, PR3's W3 #5 reviewer wiring becomes purely additive and avoids the merge conflict that would otherwise arise.
+- **PR1 (loose threads) before PR3 (W3 #5):** PR1's BT-2 deletes the `code-reviewer` stub from yellow-review. The stub is referenced in both `review-pr.md` (dispatch table prose + several legacy-fallback paragraphs) and `review-all.md` (one-phrase prose reference; no inline dispatch table — that file delegates persona dispatch to `review-pr.md` by reference). By having BT-2 remove all references during deletion, PR3's W3 #5 reviewer wiring becomes purely additive and avoids the merge conflict that would otherwise arise.
 - **PR2 (W3 #7) is independent:** touches only yellow-debt scanner agents. No conflict with PR1, PR3, or PR4.
 - **PR3 (W3 #5) before PR4 (W3 #2):** the 7 yellow-docs personas may reference `agent-native-architecture` / `agent-native-audit` skills that PR3 introduces in yellow-core. Conditional dependency confirmed during agent porting (grep step in PR4).
 - **PR5 (smoke test) after all four:** the functional checklist exercises every Wave 3 deliverable.
@@ -76,7 +76,7 @@ All five PRs merged to `main`; per-plugin tags published; smoke test sign-off re
   - **Line 566:** read the surrounding context first; the same deletion pattern applies if the list repeats here.
 - [ ] 1.7 BT-2c: excise stub reference from `plugins/yellow-review/commands/review/review-all.md`. NO dispatch table exists in this file — the only reference is a single phrase in a prose list. Apply 1 textual edit:
   - **Line 157:** delete the phrase `the \`code-reviewer\` deprecation stub, and ` from the parenthetical pre-Wave-2 list at Step 7 (compact-return pass 1). Result: `Pre-Wave-2 agents (\`pr-test-analyzer\`, \`comment-analyzer\`, \`type-design-analyzer\`, \`silent-failure-hunter\`, the cross-plugin reviewers \`architecture-strategist\`, ...) return legacy prose format`.
-- [ ] 1.8 BT-2d verify: `git grep 'code-reviewer' plugins/yellow-review/` returns zero hits in `commands/` and `agents/`; CHANGELOG references in CHANGELOG.md are acceptable historical prose. `git grep 'yellow-review:review:code-reviewer'` returns matches ONLY in CHANGELOG files.
+- [ ] 1.8 BT-2d verify: `git grep 'code-reviewer' -- plugins/yellow-review/commands/ plugins/yellow-review/agents/` returns zero hits (the pathspec scopes the grep to the live-dispatch surfaces only; CHANGELOG.md and prose "renamed from `code-reviewer`" mentions in CLAUDE.md/README.md/SKILL.md/project-standards-reviewer.md are acceptable historical references and out of scope for this scoped grep). Additionally, `git grep 'yellow-review:review:code-reviewer'` returns matches ONLY in CHANGELOG files (no live dispatch).
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Second-pass research confirmed the stub is referenced only in prose, not table rows. `review-pr.md` lines 362, 365–368, 527–529, 566 hold the references; `review-all.md` line 157 holds a single phrase reference. The earlier plan-version's "remove the stub's row" instruction was incorrect — there is no row. The 5 textual edits above are exhaustive.

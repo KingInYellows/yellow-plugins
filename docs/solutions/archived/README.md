@@ -3,7 +3,7 @@ title: 'Archived Solution Entries (Index)'
 category: 'archived'
 tags:
   - archived
-track: meta
+track: knowledge
 problem: 'Index page for archived docs/solutions/ entries; not a solution itself'
 ---
 
