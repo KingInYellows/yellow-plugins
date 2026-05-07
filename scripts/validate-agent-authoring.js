@@ -141,7 +141,15 @@ const agentFiles = walk(
     filePath.includes(`${path.sep}agents${path.sep}`) &&
     filePath.endsWith('.md')
 );
-const markdownFiles = walk(PLUGINS_DIR, (filePath) => filePath.endsWith('.md'));
+// Skip CHANGELOG.md files: they document history including agents that have
+// since been deleted/renamed, so subagent_type references in CHANGELOG prose
+// are not live dispatches and must not be validated against the current
+// agent registry. See `docs/solutions/build-errors/` for context.
+const markdownFiles = walk(
+  PLUGINS_DIR,
+  (filePath) =>
+    filePath.endsWith('.md') && path.basename(filePath) !== 'CHANGELOG.md'
+);
 const commandFiles = walk(
   PLUGINS_DIR,
   (filePath) =>
