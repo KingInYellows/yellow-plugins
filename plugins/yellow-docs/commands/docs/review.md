@@ -6,6 +6,7 @@ allowed-tools:
   - Glob
   - Bash
   - Task
+  - TaskOutput
   - AskUserQuestion
 ---
 
@@ -75,13 +76,13 @@ Count words and detect domain risk signals. **Note:** each fenced bash block run
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 case "$ARGUMENTS" in /*) FULL_PATH="$ARGUMENTS" ;; *) FULL_PATH="$PROJECT_ROOT/$ARGUMENTS" ;; esac
 WORD_COUNT=$(wc -w < "$FULL_PATH")
-RISK_HITS=$(grep -ciE -- '\b(auth|authz|payment|billing|migration|compliance|cryptography|pii|external api)\b' "$FULL_PATH" || true)
+RISK_HITS=$(grep -ciE -- '\b(auth|authn|authz|authentication|authorization|payment|billing|migration|compliance|cryptography|crypto|pii|external\s+api|secret|credential|token|oauth|jwt)\b' "$FULL_PATH" || true)
 REQ_COUNT=$(grep -cE -- '^- \[ \]|^[0-9]+\.|^R[0-9]+' "$FULL_PATH" || true)
 ```
 
 Use these to decide whether to invoke the conditional `adversarial-document-reviewer`:
 
-- Invoke if `WORD_COUNT > 1000` OR `REQ_COUNT >= 5` OR `RISK_HITS >= 1`.
+- Invoke if `WORD_COUNT > 1000` OR `REQ_COUNT > 5` OR `RISK_HITS >= 1` (matching the agent's "more than 5 requirements" trigger described in `adversarial-document-reviewer.md`).
 - Otherwise, skip adversarial; the 6 always-applicable personas are
   sufficient for short or low-stakes documents.
 
