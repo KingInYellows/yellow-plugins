@@ -1,6 +1,6 @@
 ---
 name: design-lens-reviewer
-description: "Reviews planning documents for missing design decisions — information architecture, interaction states, user flows, accessibility, and AI slop risk. Uses dimensional rating (0-10) to identify gaps that would block or derail implementation. Use when reviewing PRDs, specs, or feature plans that include UI/UX surface area via /yellow-docs:docs:review."
+description: "Reviews planning documents for missing design decisions — information architecture, interaction states, user flows, accessibility, and AI slop risk. Uses dimensional rating (0-10) to identify gaps that would block or derail implementation. Use when reviewing PRDs, specs, or feature plans that include UI/UX surface area via /docs:review."
 model: sonnet
 background: true
 tools:

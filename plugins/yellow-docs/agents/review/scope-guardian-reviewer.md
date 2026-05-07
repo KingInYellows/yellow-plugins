@@ -1,6 +1,6 @@
 ---
 name: scope-guardian-reviewer
-description: "Reviews planning documents for scope alignment and unjustified complexity — challenges unnecessary abstractions, premature frameworks, scope that exceeds stated goals, and priority dependency inversions. Asks 'Is this right-sized for its goals?' and 'Does every abstraction earn its keep?' Use when reviewing plans that introduce new abstractions, add scope to existing work, or use priority tiering via /yellow-docs:docs:review."
+description: "Reviews planning documents for scope alignment and unjustified complexity — challenges unnecessary abstractions, premature frameworks, scope that exceeds stated goals, and priority dependency inversions. Asks 'Is this right-sized for its goals?' and 'Does every abstraction earn its keep?' Use when reviewing plans that introduce new abstractions, add scope to existing work, or use priority tiering via /docs:review."
 model: sonnet
 background: true
 tools:

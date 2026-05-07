@@ -1,6 +1,6 @@
 ---
 name: adversarial-document-reviewer
-description: "Conditional document-review persona, selected when the document has more than 5 requirements, makes significant architectural decisions, covers high-stakes domains (auth, payments, migrations, compliance), or proposes new abstractions. Challenges premises, surfaces unstated assumptions, and stress-tests decisions rather than evaluating document quality. Use when reviewing high-stakes plans where premise validation matters via /yellow-docs:docs:review."
+description: "Conditional document-review persona, selected when the document has more than 5 requirements, makes significant architectural decisions, covers high-stakes domains (auth, payments, migrations, compliance), or proposes new abstractions. Challenges premises, surfaces unstated assumptions, and stress-tests decisions rather than evaluating document quality. Use when reviewing high-stakes plans where premise validation matters via /docs:review."
 model: inherit
 background: true
 tools:
