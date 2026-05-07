@@ -32,7 +32,7 @@ yellow-core integration before reviewing real PRs.
 
 ## Agents
 
-### Review (13)
+### Review (12)
 
 | Agent                          | Description                                                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
@@ -48,7 +48,6 @@ yellow-core integration before reviewing real PRs.
 | `code-simplifier`              | Simplification preserving functionality (final pass)                                                         |
 | `type-design-analyzer`         | Type design, encapsulation, invariants                                                                       |
 | `silent-failure-hunter`        | Silent failure and error handling analysis                                                                   |
-| `code-reviewer`                | DEPRECATED stub; will be removed next minor version                                                          |
 
 ### Workflow (1)
 

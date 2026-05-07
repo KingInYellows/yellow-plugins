@@ -2,6 +2,10 @@
 title: 'printf `%b` in Colored Output Helpers Enables Terminal Escape Injection'
 date: 2026-04-28
 category: 'security-issues'
+track: bug
+problem: 'printf `%b` in Colored Output Helpers Enables Terminal Escape Injection'
+tags:
+  - security-issues
 ---
 
 ## Summary

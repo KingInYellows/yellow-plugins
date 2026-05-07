@@ -2,6 +2,10 @@
 title: 'Plugin Install Scripts Must Smoke-Test the MCP Entrypoint Subcommand'
 date: 2026-04-28
 category: 'code-quality'
+track: knowledge
+problem: 'Plugin Install Scripts Must Smoke-Test the MCP Entrypoint Subcommand'
+tags:
+  - code-quality
 ---
 
 ## Summary

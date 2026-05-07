@@ -2,6 +2,8 @@
 title: "JSON Schema typeof-object Check Bypassed by Array Form"
 date: 2026-04-28
 category: logic-errors
+track: bug
+problem: 'JSON Schema typeof-object Check Bypassed by Array Form'
 tags: [json-schema, validation, discriminated-union, typeof, plugin-manifest]
 components: [scripts/validate-plugin.js, schemas/plugin.schema.json]
 ---

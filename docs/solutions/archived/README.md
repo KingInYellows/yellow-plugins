@@ -1,3 +1,12 @@
+---
+title: 'Archived Solution Entries (Index)'
+category: 'archived'
+tags:
+  - archived
+track: knowledge
+problem: 'Index page for archived docs/solutions/ entries; not a solution itself'
+---
+
 # Archived Solution Entries
 
 This directory holds `docs/solutions/` entries that have been superseded

@@ -38,7 +38,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `/review:sweep` — Wrapper that runs `/review:pr` then `/review:resolve` on
   the same PR with a user-confirmed boundary gate between them
 
-### Agents (14)
+### Agents (13)
 
 **Review** — parallel code analysis specialists (report findings, do NOT edit):
 
@@ -70,8 +70,6 @@ resolution, and sequential stack review. Graphite-native workflow.
   pass)
 - `type-design-analyzer` — Type design, encapsulation, invariants
 - `silent-failure-hunter` — Silent failure and error handling analysis
-- `code-reviewer` — DEPRECATED stub for the rename above; will be removed
-  in next minor version
 
 **Workflow** — orchestration helpers:
 

@@ -153,8 +153,7 @@ aggregation rules change there, propagate the same change here.
    selected agents in parallel except `code-simplifier`. Wave 2 persona
    agents return the structured JSON compact-return schema. Pre-Wave-2
    agents (`pr-test-analyzer`, `comment-analyzer`,
-   `type-design-analyzer`, `silent-failure-hunter`, the `code-reviewer`
-   deprecation stub, and the cross-plugin reviewers
+   `type-design-analyzer`, `silent-failure-hunter`, and the cross-plugin reviewers
    `architecture-strategist`, `pattern-recognition-specialist`,
    `code-simplicity-reviewer`, `polyglot-reviewer`, `security-reviewer`,
    `performance-reviewer`, `security-sentinel`, `performance-oracle`)

@@ -2,6 +2,10 @@
 title: '`have_X` + `run_X` Helper Pair for Multi-Variant Tool Detection'
 date: 2026-04-28
 category: 'code-quality'
+track: knowledge
+problem: '`have_X` + `run_X` Helper Pair for Multi-Variant Tool Detection'
+tags:
+  - code-quality
 ---
 
 ## Summary
