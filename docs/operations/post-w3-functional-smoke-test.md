@@ -27,14 +27,23 @@ yellow-plugins marketplace entries.
   - macOS: `brew upgrade claude-code` or download latest
   - Linux: per platform installer
   - WSL: per Windows install path
+- [ ] CLI prerequisites for the verification steps below: `gh` (used for
+  PR listing in C.1 / C.4), `gt` (Graphite, used for branch management),
+  and `jq` (used for the v2.0 schema verification in C.3). These are
+  invoked directly by the checklist; install before starting if any are
+  missing.
 - [ ] Verify clean state (run inside Claude Code, not a shell):
   ```text
   /plugin marketplace list
   # Expected: KingInYellows/yellow-plugins NOT present
   ```
   If present, remove first: `/plugin marketplace remove KingInYellows/yellow-plugins`
-- [ ] Open a test repo (any git repo will work; recommend a small TS or
-  Python project)
+- [ ] Open a test repo. **Recommended:** a clone of `yellow-plugins`
+  itself, because Sections C.2 and C.4 reference the repo's own paths
+  (e.g., `docs/operations/post-w3-functional-smoke-test.md`) and PR
+  history (`gh pr list --search 'plugins/'`). A generic TS or Python
+  repo will work for C.1 and C.3 but C.2 / C.4 will require you to
+  substitute equivalent local paths and PRs.
 
 ---
 
@@ -209,5 +218,7 @@ If any check fails:
 - Brainstorm: `docs/brainstorms/2026-05-06-everyinc-merge-remaining-work-brainstorm.md`
 - Existing Section 3 (CLI install/update/publish/rollback mechanics):
   `docs/operations/release-checklist.md` Section 3
-- Sign-off block format: reused from `release-checklist.md` Section 3
-  "Smoke Test Sign-Off" line 644
+- Sign-off block format: **adapted from** `release-checklist.md` Section 3
+  "Smoke Test Sign-Off" — the field set is extended (Claude Code version,
+  yellow-plugins catalog version, and the per-check results table are
+  Wave-3-specific additions), so this is not a verbatim copy.
