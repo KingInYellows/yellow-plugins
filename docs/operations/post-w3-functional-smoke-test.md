@@ -27,8 +27,8 @@ yellow-plugins marketplace entries.
   - macOS: `brew upgrade claude-code` or download latest
   - Linux: per platform installer
   - WSL: per Windows install path
-- [ ] Verify clean state:
-  ```bash
+- [ ] Verify clean state (run inside Claude Code, not a shell):
+  ```text
   /plugin marketplace list
   # Expected: KingInYellows/yellow-plugins NOT present
   ```
@@ -62,7 +62,7 @@ short-form command.
 
 ## Section C: Wave 3 Functional Acceptance
 
-### C.1 `/yellow-review:review:pr` end-to-end
+### C.1 `/review:pr` end-to-end
 
 **Objective**: Confirm the Wave 2 multi-persona review pipeline still works
 end-to-end after BT-2 stub removal and the W3 #5 reviewer additions.
@@ -85,7 +85,7 @@ end-to-end after BT-2 stub removal and the W3 #5 reviewer additions.
   - Expected: command exits cleanly (no stack traces, no orphan
     background processes)
 
-### C.2 `/yellow-docs:docs:review` end-to-end (NEW)
+### C.2 `/docs:review` end-to-end (NEW)
 
 **Objective**: Confirm the W3 #2 `/docs:review` orchestrator and 7 persona
 reviewers work end-to-end on a real planning document.
@@ -93,7 +93,7 @@ reviewers work end-to-end on a real planning document.
 - [ ] Pick any planning doc as input (a brainstorm or PRD in the test
   repo, or use this checklist itself):
   ```text
-  /yellow-docs:docs:review docs/operations/post-w3-functional-smoke-test.md
+  /docs:review docs/operations/post-w3-functional-smoke-test.md
   ```
   - Expected: command validates the path
   - Expected: 6 always-applicable persona reviewers dispatch in parallel
@@ -105,14 +105,14 @@ reviewers work end-to-end on a real planning document.
   - Expected: report rendered to stdout grouped by persona
   - Expected: no errors; graceful degradation if any persona fails
 
-### C.3 `/yellow-debt:debt:audit` v2.0 schema confirmation
+### C.3 `/debt:audit` v2.0 schema confirmation
 
 **Objective**: Confirm the W3 #7 audit-only PR (#406) result holds — all
 5 scanners emit v2.0 schema fields.
 
 - [ ] Run a small audit:
   ```text
-  /yellow-debt:debt:audit
+  /debt:audit
   ```
   - Expected: 5 scanner agents dispatch in parallel
   - Expected: each writes to `.debt/scanner-output/<scanner>.json`
@@ -190,7 +190,7 @@ authoring surface.
 
 If any check fails:
 
-1. Do NOT close PR #411 (or whichever PR carries this checklist) until
+1. Do NOT close PR #412 (or whichever PR carries this checklist) until
    resolved.
 2. File a follow-up bug. The merge effort remains open.
 3. Diagnose: was the failure due to local validator drift vs. remote
