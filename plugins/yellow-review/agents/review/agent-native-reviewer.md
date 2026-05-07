@@ -188,16 +188,17 @@ shown below. Suppress findings with `confidence < 75` except P0 findings at
   "reviewer": "agent-native-reviewer",
   "findings": [
     {
-      "id": "agent-native-001",
-      "category": "agent-native",
+      "title": "Anti-pattern name — concise one-line title",
       "severity": "P1|P2|P3",
-      "confidence": 75,
+      "category": "agent-native",
       "file": "path/to/file",
       "line": 42,
-      "finding": "Concise description with anti-pattern name",
-      "fix": "Suggested fix",
-      "autofix_class": "manual|advisory",
-      "owner": "human"
+      "confidence": 75,
+      "autofix_class": "manual|advisory|gated_auto",
+      "owner": "review-fixer|downstream-resolver|human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Concrete fix or null"
     }
   ],
   "residual_risks": [],

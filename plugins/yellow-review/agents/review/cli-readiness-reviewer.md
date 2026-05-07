@@ -126,16 +126,17 @@ shown below. Suppress findings with `confidence < 75` except P0 findings at
   "reviewer": "cli-readiness-reviewer",
   "findings": [
     {
-      "id": "cli-readiness-001",
-      "category": "cli-readiness",
+      "title": "Concise one-line title",
       "severity": "P1|P2|P3",
-      "confidence": 75,
+      "category": "cli-readiness",
       "file": "path/to/file",
       "line": 42,
-      "finding": "Concise description",
-      "fix": "Suggested fix",
-      "autofix_class": "manual|advisory",
-      "owner": "human"
+      "confidence": 75,
+      "autofix_class": "manual|advisory|gated_auto",
+      "owner": "review-fixer|downstream-resolver|human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Concrete fix or null"
     }
   ],
   "residual_risks": [],

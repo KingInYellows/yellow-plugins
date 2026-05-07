@@ -244,18 +244,19 @@ shown below. Cap findings at 5–7 per review. Suppress findings with
   "reviewer": "agent-cli-readiness-reviewer",
   "findings": [
     {
-      "id": "agent-cli-readiness-001",
-      "category": "agent-cli-readiness",
+      "title": "Blocker/Friction/Optimization tier — concise one-line title",
       "severity": "P1|P2|P3",
-      "confidence": 75,
+      "category": "agent-cli-readiness",
       "file": "path/to/file",
       "line": 42,
+      "confidence": 75,
+      "autofix_class": "manual|advisory|gated_auto",
+      "owner": "review-fixer|downstream-resolver|human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Framework-idiomatic fix or null",
       "principle": "1|2|3|4|5|6|7",
-      "command_type": "read|mutating|streaming|interactive|bulk",
-      "finding": "Concise description with severity tier (Blocker/Friction/Optimization)",
-      "fix": "Framework-idiomatic fix",
-      "autofix_class": "manual|advisory",
-      "owner": "human"
+      "command_type": "read|mutating|streaming|interactive|bulk"
     }
   ],
   "residual_risks": [],
