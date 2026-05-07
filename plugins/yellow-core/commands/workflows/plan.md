@@ -87,7 +87,7 @@ research, analysis, and structured documentation.
 
    ```text
    Task: repo-research-analyst
-   subagent_type: "yellow-core:repo-research-analyst"
+   subagent_type: "yellow-core:research:repo-research-analyst"
    Input: {feature_description}
    Goal: Find relevant files, existing patterns, similar implementations
    run_in_background: true
@@ -95,7 +95,7 @@ research, analysis, and structured documentation.
 
    ```text
    Task: best-practices-researcher
-   subagent_type: "yellow-core:best-practices-researcher"
+   subagent_type: "yellow-core:research:best-practices-researcher"
    Input: {feature_description}
    Goal: Identify project conventions, architectural patterns, testing approaches
    run_in_background: true
@@ -129,7 +129,7 @@ research, analysis, and structured documentation.
 
    ```text
    Task: spec-flow-analyzer
-   subagent_type: "yellow-core:spec-flow-analyzer"
+   subagent_type: "yellow-core:workflow:spec-flow-analyzer"
    Input: {feature_description, research_findings}
    Goal: Validate completeness, identify edge cases, find missing requirements
    run_in_background: true

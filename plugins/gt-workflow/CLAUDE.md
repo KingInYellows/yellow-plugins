@@ -12,6 +12,29 @@ Graphite-native workflow commands for stacked PR development.
   start and graphite MCP tools are simply unavailable — run `/gt-setup` to
   diagnose
 
+## Namespace exception
+
+The seven commands shipped by gt-workflow (`gt-amend`, `gt-sync`, `gt-nav`,
+`gt-stack-plan`, `gt-cleanup`, `gt-setup`, `smart-submit`) are
+**un-namespaced** — they do NOT carry the `plugin-name:command` prefix that
+later marketplace conventions adopted. This is intentional, not a bug:
+
+1. **Historical:** these commands predate the `plugin-name:command`
+   namespacing convention and shipped under their bare names.
+2. **Low collision risk:** six of the seven are `gt-`-prefixed and no other
+   marketplace plugin would plausibly register them. `smart-submit` is the
+   only generic name; no observed competing plugin ships it.
+3. **No re-flagging without a trigger:** future contributors and auditors
+   should not propose renaming these commands without a concrete trigger —
+   either an actual collision in the marketplace or an incoming plugin that
+   would clash. Theoretical collision concerns alone are not sufficient
+   justification for the rename churn across user habits, documentation,
+   and external references.
+
+If a real collision arises, the migration path is to dual-publish under
+both `gt-workflow:<name>` and the bare `<name>` for one minor release,
+then remove the bare form in the next major.
+
 ## Conventions
 
 - **ALWAYS** use `gt` (Graphite CLI) for branch management, commits, and PR
