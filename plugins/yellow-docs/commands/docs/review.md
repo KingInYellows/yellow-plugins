@@ -26,7 +26,10 @@ Run a multi-persona review of a planning document at `$ARGUMENTS`.
 ### Step 1: Validate path
 
 ```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  printf '[/docs:review] Error: not inside a git repository (matches the rest of /docs:* commands; required so the path-containment check has a meaningful root)\n' >&2
+  exit 1
+}
 DOC_PATH="$ARGUMENTS"
 
 if [ -z "$DOC_PATH" ]; then
