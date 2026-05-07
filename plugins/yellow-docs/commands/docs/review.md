@@ -88,9 +88,11 @@ Use these to decide whether to invoke the conditional `adversarial-document-revi
 
 ### Step 3: Learnings pre-pass (optional)
 
-If yellow-research is installed, invoke `learnings-researcher` via Task to
-surface prior `docs/solutions/` entries relevant to the document's domain.
-Inject the result as advisory context into each persona prompt:
+If `yellow-core` is installed (the `learnings-researcher` agent lives in
+yellow-core, not yellow-research), invoke it via Task to surface prior
+`docs/solutions/` entries relevant to the document's domain. The agent
+itself will degrade gracefully if yellow-research's MCP sources are not
+available. Inject the result as advisory context into each persona prompt:
 
 ```text
 Task: learnings-researcher
@@ -100,7 +102,7 @@ Goal: Find prior solutions docs relevant to this document's domain
 run_in_background: false
 ```
 
-If yellow-research isn't installed, skip silently (graceful degradation).
+If `yellow-core` isn't installed, skip silently (graceful degradation).
 
 ### Step 4: Dispatch personas in parallel
 

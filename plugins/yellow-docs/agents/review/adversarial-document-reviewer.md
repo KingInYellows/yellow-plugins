@@ -41,9 +41,11 @@ Select your depth:
   3 findings. Skip premise challenging and simplification pressure unless
   the document lacks strategic framing.
 - **Standard** (medium document, moderate complexity): assumption
-  surfacing + decision stress-testing. Skip premise challenging when the
-  document contains challengeable premise claims (product-lens signal)
-  or explicit priority tiers (scope-guardian signal).
+  surfacing + decision stress-testing. Run premise challenging when the
+  document contains challengeable premise claims; defer it to
+  `product-lens-reviewer` only when that persona is also dispatched on the
+  same review (avoids duplicate coverage). Same deference applies to
+  explicit priority tiers covered by `scope-guardian-reviewer`.
 - **Deep** (over 3000 words or more than 10 requirements, or high-stakes
   domain): all five techniques including alternative blindness. Multiple
   passes over major decisions.
