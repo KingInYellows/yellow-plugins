@@ -30,9 +30,9 @@ The deepen-plan annotations (`<!-- deepen-plan: source -->` blocks) embedded thr
 
 1. **Add Claude as the 4th reviewer slot** as in-process Task subagent (asymmetric architecture). Activates true 4-lineage diversity once OpenCode is wired to a non-Big-3 provider.
 2. **Mitigate self-enhancement bias** in the Claude→Claude synthesis path via two-pass order-swap and double-blind lineage labels. This is the new #1 quality risk under the asymmetric architecture.
-3. **Track subscription quotas per reviewer** so quota exhaustion fails gracefully (emit `verdict=QUOTA_EXHAUSTED` per Task 3.3, surface ETA in headline, do not retry).
+3. **Track subscription quotas per reviewer** so quota exhaustion fails gracefully (emit `verdict=QUOTA_EXHAUSTED`, surface ETA in headline, do not retry — see Task 3.3 for the reviewer-side handler).
 4. **Wire OpenCode to a non-Big-3 lineage** (DeepSeek/Grok/Mistral) for genuine 4-lineage orthogonality.
-5. **Add Tier 1-2 evidence verification** (exact match + diff-match-patch fuzzy) to the synthesis step. Tier 3 (ast-grep) is V3.
+5. **Add Tier 1-2 evidence verification** (exact match + `rapidfuzz` similarity ≥85) to the synthesis step. Tier 3 (ast-grep) is V3.
 
 ## Non-goals (deferred)
 
@@ -154,11 +154,12 @@ In Step 4 (Parallel reviewer fan-out via Task), add the 4th Task spawn alongside
 Task(subagent_type="yellow-council:review:claude-reviewer", prompt=<pack with REVIEWER_NAME=Claude>)
 ```
 
-Update the parse helpers and synthesis logic (Step 5) to handle 4 reviewers instead of 3:
+Update the parse helpers, synthesis logic (Step 5), AND report assembly to handle 4 reviewers instead of 3:
 - `REVIEWER_VERDICTS` etc. now indexed by `claude` / `codex` / `gemini` / `opencode`
 - Headline counts: "All 4 reviewers APPROVE" / "Council ran with N of 4 reviewers (...)"
 - Agreement bucket: "cited by 2+ reviewers" threshold unchanged
 - Disagreement bucket: same logic, just 4 inputs
+- **Report assembly (raw-output appendix and any per-reviewer iteration):** every loop that currently iterates over `codex gemini opencode` must be extended to include `claude` first. Grep `council.md` for the literal string `codex gemini opencode` (or any subset of those three reviewer slugs) and audit each match — missing the report-assembly loop ships PR-A with Claude's raw section silently absent from the saved report, breaking traceability for one quarter of the ensemble.
 
 ### Task 1.3: Update `council-patterns` SKILL.md (S, 1h)
 
@@ -171,11 +172,11 @@ Update the parse helpers and synthesis logic (Step 5) to handle 4 reviewers inst
 ### Task 1.4: Plugin manifest + docs update (S, 1h)
 
 **Files:**
-- `plugins/yellow-council/.claude-plugin/plugin.json` — bump version (minor)
 - `plugins/yellow-council/CLAUDE.md` — update Plugin Components section: "Agents (3)" with claude-reviewer added
 - `plugins/yellow-council/README.md` — update reviewer count and lineage map
 - `plugins/yellow-council/CHANGELOG.md` — add entry for V2 four-CLI architecture
-- Add changeset via `pnpm changeset` (minor bump — additive)
+
+**Version bump (do NOT hand-edit `plugin.json` or `marketplace.json`):** the repo's three-way sync model treats `plugins/yellow-council/package.json` as the Changesets source of truth. Run `pnpm changeset` (minor — additive), commit the resulting `.changeset/*.md`, and let `pnpm apply:changesets` (or the Version Packages PR) propagate the bump to `.claude-plugin/plugin.json` and `marketplace.json` via `scripts/sync-manifests.js`. Direct edits to `plugin.json`/`marketplace.json` produce three-way drift and fail `validate-versions.js` in CI.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Two Configuration tables exist with different column counts. `plugins/yellow-council/CLAUDE.md:109–114` is the canonical 4-column form (`Var | Type | Default | Purpose`). `plugins/yellow-council/commands/council/council.md:462–467` is a 3-column form (`Var | Default | Purpose`) used inline in the `/council` command help output. Any new env var (COUNCIL_OPENCODE_MODEL, COUNCIL_DOUBLE_PASS_SYNTHESIS, COUNCIL_CLAUDE_TIER, COUNCIL_CODEX_TIER, COUNCIL_GEMINI_TIER) must be added to BOTH tables to keep them in sync. Phase 7 PR-A through PR-E should each include a "Configuration table sync check" step in their PR description.
@@ -207,7 +208,7 @@ Modify synthesis to run twice:
 - Pass A: reviewers in order R1, R2, R3, R4
 - Pass B: reviewers in order R4, R3, R2, R1
 
-Compare the two passes. Mark a finding as `low-confidence-synthesis` if either: (a) its verdict flips between passes (e.g., `APPROVE` → `REVISE`, or `REVISE` → `APPROVE`), or (b) its confidence tier changes (`HIGH` → `LOW`, etc.) without a verdict flip. Verdict flip is the primary trigger; confidence-tier change is a secondary trigger (per Zheng et al. 2023 follow-up, binary verdict-flip is the most defensible heuristic, and reviewer contracts emit categorical `HIGH|MEDIUM|LOW|N/A` rather than numeric confidence so a percentage threshold is undefined). The headline includes the count and percentage of low-confidence findings.
+A finding is marked `low-confidence-synthesis` if its verdict flips between pass A and pass B (e.g., `APPROVE` → `REVISE`), or if its confidence tier changes without a verdict flip (e.g., `HIGH` → `LOW`). The headline includes the count and percentage of low-confidence findings. (Rationale for the binary heuristic — vs. an older `>15%` threshold — lives in the deepen-plan annotation below.)
 
 For V1's descriptive synthesis (no scoring), this manifests as: a finding that appears in pass A's "Agreement" section but pass B's "Disagreement" section is flagged as low-confidence.
 
@@ -304,7 +305,7 @@ summary=<reviewer> subscription quota exhausted; window resets at <ETA>
 Update `council.md` Step 4 parse logic AND add `QUOTA_EXHAUSTED` to the verdict case-statement allow-list in all four reviewer agent files (`plugins/yellow-codex/agents/review/codex-reviewer.md` after PR-0 normalization, `plugins/yellow-council/agents/review/gemini-reviewer.md`, `plugins/yellow-council/agents/review/opencode-reviewer.md`, and the new `plugins/yellow-council/agents/review/claude-reviewer.md`) to handle `QUOTA_EXHAUSTED` as a UNAVAILABLE-class verdict (excluded from synthesis count, surfaced in headline with ETA). Without all 5 file updates, the verdict will silently normalize to `UNKNOWN` per the `*) VERDICT="UNKNOWN"` fallback.
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** `QUOTA_EXHAUSTED` cannot piggyback on UNAVAILABLE without code changes. Both `gemini-reviewer.md:222–226` and `opencode-reviewer.md:272–276` have `case "$VERDICT" in APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;; *) VERDICT="UNKNOWN"` — any unrecognized verdict (including `QUOTA_EXHAUSTED`) is silently normalized to `UNKNOWN`. Two paths forward: (a) **Add `QUOTA_EXHAUSTED` to the case-in list** in BOTH existing reviewers + claude-reviewer + Headline exclusion logic in `council.md` Step 5 Rule 1; OR (b) **Reuse `verdict=ERROR` with summary keyword** like `"summary=Quota exhausted; window resets at <ETA>"` and let synthesis grep the summary. Path (b) is simpler (no new verdict propagation) but loses headline-level visibility — quota errors appear under "ERROR" in the Reviewer Status section, not as a distinct category. **Recommendation:** path (a) — the quota-vs-error distinction is too important to bury in a summary string, especially since the recovery path differs (wait vs. retry).
+> **Codebase:** `QUOTA_EXHAUSTED` cannot piggyback on UNAVAILABLE without code changes. Both `gemini-reviewer.md:222–226` and `opencode-reviewer.md:272–276` have `case "$VERDICT" in APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;; *) VERDICT="UNKNOWN"` — any unrecognized verdict (including `QUOTA_EXHAUSTED`) is silently normalized to `UNKNOWN`. Two paths were considered: (a) **Add `QUOTA_EXHAUSTED` to the case-in list** in BOTH existing reviewers + claude-reviewer + Headline exclusion logic in `council.md` Step 5 Rule 1; OR (b) **Reuse `verdict=ERROR` with summary keyword** like `"summary=Quota exhausted; window resets at <ETA>"` and let synthesis grep the summary. Path (b) is simpler (no new verdict propagation) but loses headline-level visibility — quota errors appear under "ERROR" in the Reviewer Status section, not as a distinct category. **Decision (locked):** path (a) — the quota-vs-error distinction is too important to bury in a summary string, especially since the recovery path differs (wait vs. retry).
 <!-- /deepen-plan -->
 
 <!-- deepen-plan: external -->
@@ -435,12 +436,14 @@ Don't fail — the user might be running a homogeneous benchmark intentionally.
 Add a `verify_finding()` bash function that:
 - Parses a finding's `<file>:<line>` reference
 - Tier 1: `git show "HEAD:$file" | sed -n "${line}p"` exact match
-- Tier 2: if exact fails, run `python3 -c "import diff_match_patch; ..."` for fuzzy match (≥85% similarity, implemented as `dmp.Match_Threshold = 0.15` — inverted scale: 0.0 = exact, 1.0 = any match; see annotation below)
+- Tier 2: if exact fails, run `python3 -c "from rapidfuzz import fuzz; ..."` for fuzzy match (≥85% similarity → `fuzz.ratio(a, b) >= 85`; intuitive 0–100 scale, no inverted threshold)
 - Returns `verified` / `fuzzy-verified` / `unverified`
 
-`diff-match-patch` Python availability:
-- Check `python3 -c "import diff_match_patch"` at preflight
-- Soft-skip Tier 2 if not installed (Tier 1 only); print a warning suggesting `pip install diff-match-patch`
+**Library decision (locked):** `rapidfuzz` — yellow-council needs only similarity scoring, not the patch/apply semantics that motivate `diff-match-patch`. `rapidfuzz` is actively maintained (frequent 2025 releases), C++-backed (orders of magnitude faster on large inputs), and uses an intuitive 0–100 scale that avoids the inverted-threshold trap that `diff-match-patch`'s `Match_Threshold` exposes.
+
+`rapidfuzz` Python availability:
+- Check `python3 -c "import rapidfuzz"` at preflight
+- Soft-skip Tier 2 if not installed (Tier 1 only); print a warning suggesting `pip install rapidfuzz`
 - Document in CLAUDE.md as an optional dependency
 
 <!-- deepen-plan: external -->
@@ -512,7 +515,7 @@ Add 4-CLI test scenarios:
 - OpenCode routed to `deepseek/deepseek-v4-pro` (verify the resolved slug appears in report header lineage map)
 - Synthesis order-swap verdict-flip detected (manual injection of a flip-flop finding)
 - 2-pass synthesis disabled via `--single-pass` flag
-- Evidence verification — Tier 1 hit, Tier 2 hit (rapidfuzz or diff-match-patch), Tier 1+2 miss → finding lands in "Unverified Claims" bucket
+- Evidence verification — Tier 1 hit, Tier 2 hit (`rapidfuzz` ≥85), Tier 1+2 miss → finding lands in "Unverified Claims" bucket
 
 ### Task 6.3: Updated CHANGELOG (XS, 30min)
 
@@ -584,8 +587,8 @@ Each PR includes:
 
 ### R3 — Evidence verification adds latency
 
-**Risk:** Tier 2 fuzzy matching across all findings on a large diff could add seconds to synthesis. Tier 1 (exact match) is fast (`git show` + grep). Tier 2 (diff-match-patch) is per-finding ~1ms but could compound.
-**Mitigation:** Run verification in parallel with synthesis prompt construction. Cap Tier 2 at top-N findings (e.g., 50) per reviewer. Skip Tier 2 entirely if `python3 -c "import diff_match_patch"` fails.
+**Risk:** Tier 2 fuzzy matching across all findings on a large diff could add seconds to synthesis. Tier 1 (exact match) is fast (`git show` + grep). Tier 2 (`rapidfuzz`) is per-finding sub-millisecond but could compound.
+**Mitigation:** Run verification in parallel with synthesis prompt construction. Cap Tier 2 at top-N findings (e.g., 50) per reviewer. Skip Tier 2 entirely if `python3 -c "import rapidfuzz"` fails (per the Task 5.1 locked library decision).
 
 ### R4 — OpenCode provider configuration drift
 
@@ -607,6 +610,7 @@ Each PR includes:
 - ✅ Provider routing: relies on user's `opencode.json` having `defaultProvider: "openrouter"` and `opencode auth login openrouter` completed
 - ✅ 2-pass synthesis: default ON; user toggle via `COUNCIL_DOUBLE_PASS_SYNTHESIS=0` or `--single-pass` flag
 - ✅ Claude reviewer prompt: contrarian / devil's-advocate framing baked into Task 1.1
+- ✅ Tier 2 fuzzy-match library: `rapidfuzz` (similarity-only need; faster + intuitive 0–100 scale vs. `diff-match-patch`'s inverted `Match_Threshold`). R3 preflight skip-condition references `rapidfuzz`.
 
 **Still open:**
 
