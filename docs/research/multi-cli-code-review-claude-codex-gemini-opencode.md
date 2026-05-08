@@ -204,7 +204,7 @@ opencode session delete "<id>"   # cleanup
 | **Session state** | Orchestrator's Claude session | SQLite log DB | `~/.gemini/` | SQLite + snapshots ⚠️ |
 | **Cleanup required** | No | No | No | YES (`session delete`) |
 | **Disk leak risk** | None | Low | Low | HIGH (318 GB documented) |
-| **Output schema stability** | High (Task tool contract) | Medium (Rust v0.93+ stable) | Lower (early-stage CLI) | Medium (SDK structured outputs new Feb 2026) |
+| **Output schema stability** | High (Task tool contract) | Medium (rust-v0.129.0 stable) | Lower (early-stage CLI) | Medium (SDK structured outputs new Feb 2026) |
 | **Default model** | claude-sonnet-4-6 | gpt-5.3-codex | gemini-2.5-pro | (deployment-configured) |
 | **Default lineage** | Anthropic | OpenAI | Google | Non-Big-3 (recommended) |
 | **Best for** | Orchestrator-aligned reasoning, fast iteration | Sandboxed read-only reviews, deep analysis | Long-context reviews (200K+), multimodal | Provider rotation, lineage extension |
@@ -406,10 +406,11 @@ Reproduced from prior doc with the asymmetric-architecture caveat:
 
 **Why this is the #1 risk under the asymmetric architecture:** the synthesizer is Claude (orchestrator), and one of the reviewers is also Claude (in-process subagent). Self-enhancement bias compounds with positional bias. Without active mitigation, the synthesis is effectively Claude voting for itself.
 
-**Required for V2 (mandatory):**
+**Required for V2 (mandatory — research labels all three as mandatory; plan defers item 4 to V2.5):**
 1. Strip "Reviewer 1" / "Reviewer 2" / "Reviewer 3" / "Reviewer 4" labels in synthesis prompt — never reveal which reviewer is Claude
 2. Run synthesis twice with reviewer order swapped, average scores
 3. Restore lineage labels only for the final report attribution
+4. **Length-controlled scoring** (research-mandatory, plan-deferred): normalize finding scores by reviewer output length so verbosity doesn't inflate ranking. Plan ships V2 with mitigations 1–3 only (order-swap + double-blind); length-controlled scoring is V2-7 in this research roadmap and corresponds to plan Risk R6 / Non-goals. Verbosity bias is a known quality gap until V2.5 lands.
 
 ---
 
@@ -423,7 +424,7 @@ Reproduced from prior doc with the asymmetric-architecture caveat:
 
 **QW-3: Add subscription quota tracking.** `~/.config/yellow-council/quota.json` with per-reviewer used/cap/window. Pre-flight warning when headroom <2x review cost. Heuristic increment + reset on window expiry; recalibrate on quota-exhausted errors. Estimated: 4 hours.
 
-**QW-4: Add quota-exhausted failure handler.** New `verdict=QUOTA_EXHAUSTED` (or extend existing UNAVAILABLE handler). Surface ETA in headline. No retry. Estimated: 2 hours.
+**QW-4: Add quota-exhausted failure handler.** New `verdict=QUOTA_EXHAUSTED` (plan-locked: distinct enum, NOT a reuse of `UNAVAILABLE` or `ERROR` — see plan Task 3.3). Surface ETA in headline. No retry. Estimated: 2 hours.
 
 **QW-5: Wrap pack in explicit prompt-injection fencing.** Already done in V1 — verify it covers all 4 reviewers including the new claude-reviewer. Estimated: 30 min audit.
 
