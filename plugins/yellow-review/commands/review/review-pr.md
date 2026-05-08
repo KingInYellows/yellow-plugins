@@ -664,7 +664,7 @@ Before reporting any P0 or P1 finding:
   content. A finding pointing to the wrong line is worse than no finding;
   drop it and record the drop reason.
 - **Protected-artifact filter.** Discard any finding that recommends
-  deleting or gitignoring files in `docs/brainstorms/`, `docs/plans/`,
+  deleting or gitignoring files in `docs/brainstorms/`, `plans/`,
   `docs/solutions/`, or `docs/research/`. These are pipeline artifacts.
 - **Skim-FP check.** For each surviving P0/P1, verify the surrounding
   code was actually examined. Look for the "bug" handled elsewhere in the

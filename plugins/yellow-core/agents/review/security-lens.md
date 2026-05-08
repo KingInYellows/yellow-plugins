@@ -110,7 +110,7 @@ and section as the location.
     {
       "severity": "P0|P1|P2|P3",
       "category": "security-lens",
-      "file": "docs/plans/some-plan.md",
+      "file": "plans/some-plan.md",
       "section": "Section heading or line range",
       "finding": "What's missing in one sentence; quote the plan text it grounds in.",
       "fix": "What the plan should specify to close the gap.",

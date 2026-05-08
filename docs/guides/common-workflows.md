@@ -75,13 +75,13 @@ The most common workflow chain. Use for any feature implementation.
    Skip if requirements are already clear.
 
 2. **`/workflows:plan`** — Transform the brainstorm into an actionable plan at
-   `docs/plans/YYYY-MM-DD-<topic>-plan.md`. Creates task breakdown, identifies
+   `plans/YYYY-MM-DD-<topic>-plan.md`. Creates task breakdown, identifies
    files to modify, and sets acceptance criteria.
 
 3. **`/gt-stack-plan`** — Plan how to split the implementation into stacked PRs.
    Skip for single-PR features.
 
-4. **`/workflows:work docs/plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
+4. **`/workflows:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
    plan. **Important:** pass the plan file path explicitly. Creates commits via
    Graphite.
 

@@ -95,7 +95,7 @@ Match rules to the files they govern.
   for clear directives.
 - **Protected-artifact violations** — findings, suggestions, or
   instructions that recommend deleting or gitignoring files in paths the
-  standards designate as protected (`docs/brainstorms/`, `docs/plans/`,
+  standards designate as protected (`docs/brainstorms/`, `plans/`,
   `docs/solutions/`, `docs/research/`).
 
 ## Confidence calibration
