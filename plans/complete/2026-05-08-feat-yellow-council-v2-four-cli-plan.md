@@ -113,11 +113,11 @@ gt stack submit
 Match the shape of `gemini-reviewer.md` and `opencode-reviewer.md`, but:
 - No CLI subprocess invocation — the agent answers the prompt directly using Claude's reasoning
 - No `Bash` in `tools:` (this agent does not invoke a binary; pure reasoning + Read for evidence verification)
-- Tools: `[Read, Grep, Glob]` — same as W1.5 read-only-reviewer baseline (no allowlist entry needed; see annotation below)
+- Tools: `[Read, Grep, Glob]` — same as W1.5 read-only-reviewer baseline
 - Frontmatter `name: claude-reviewer`, `model: inherit`
 - `skills: [council-patterns]`
 
-Output contract: identical to existing reviewers — emit `verdict=` / `confidence=` / `summary=` / `findings_block_begin` / `<findings>` / `findings_block_end` lines.
+Output contract: identical to existing reviewers — emit the 6-key block: `verdict=` / `confidence=` / `summary=` / `fenced_output_path=` / `findings_block_begin` / `<findings>` / `findings_block_end` lines.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Use `gemini-reviewer.md` as the structural template, NOT `codex-reviewer.md`. The three existing reviewers do NOT share a uniform contract: gemini-reviewer (lines 261–267) and opencode-reviewer (lines 323–331) emit the full 6-key block (`verdict=` / `confidence=` / `summary=` / `fenced_output_path=` / `findings_block_begin` / `findings_block_end`), while yellow-codex's `codex-reviewer.md` returns free-form prose with `[P1]` markers and a one-line summary. The new claude-reviewer must match gemini/opencode exactly. Verdict enum: `APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE` (gemini-reviewer.md:223–225, opencode-reviewer.md:273–276). Note: codex-reviewer's contract drift is a pre-existing inconsistency that may need separate addressing in a follow-up — surface this in the PR-A description.
@@ -301,7 +301,7 @@ confidence=N/A
 summary=<reviewer> subscription quota exhausted; window resets at <ETA>
 ```
 
-Update `council.md` Step 4 parse logic AND add `QUOTA_EXHAUSTED` to the verdict case-statement allow-list in all four reviewer agent files (`plugins/yellow-codex/agents/review/codex-reviewer.md` after PR-0 normalization, `plugins/yellow-council/agents/gemini-reviewer.md`, `plugins/yellow-council/agents/opencode-reviewer.md`, and the new `plugins/yellow-council/agents/claude-reviewer.md`) to handle `QUOTA_EXHAUSTED` as a UNAVAILABLE-class verdict (excluded from synthesis count, surfaced in headline with ETA). Without all 5 file updates, the verdict will silently normalize to `UNKNOWN` per the `*) VERDICT="UNKNOWN"` fallback.
+Update `council.md` Step 4 parse logic AND add `QUOTA_EXHAUSTED` to the verdict case-statement allow-list in all four reviewer agent files (`plugins/yellow-codex/agents/review/codex-reviewer.md` after PR-0 normalization, `plugins/yellow-council/agents/review/gemini-reviewer.md`, `plugins/yellow-council/agents/review/opencode-reviewer.md`, and the new `plugins/yellow-council/agents/review/claude-reviewer.md`) to handle `QUOTA_EXHAUSTED` as a UNAVAILABLE-class verdict (excluded from synthesis count, surfaced in headline with ETA). Without all 5 file updates, the verdict will silently normalize to `UNKNOWN` per the `*) VERDICT="UNKNOWN"` fallback.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** `QUOTA_EXHAUSTED` cannot piggyback on UNAVAILABLE without code changes. Both `gemini-reviewer.md:222–226` and `opencode-reviewer.md:272–276` have `case "$VERDICT" in APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;; *) VERDICT="UNKNOWN"` — any unrecognized verdict (including `QUOTA_EXHAUSTED`) is silently normalized to `UNKNOWN`. Two paths forward: (a) **Add `QUOTA_EXHAUSTED` to the case-in list** in BOTH existing reviewers + claude-reviewer + Headline exclusion logic in `council.md` Step 5 Rule 1; OR (b) **Reuse `verdict=ERROR` with summary keyword** like `"summary=Quota exhausted; window resets at <ETA>"` and let synthesis grep the summary. Path (b) is simpler (no new verdict propagation) but loses headline-level visibility — quota errors appear under "ERROR" in the Reviewer Status section, not as a distinct category. **Recommendation:** path (a) — the quota-vs-error distinction is too important to bury in a summary string, especially since the recovery path differs (wait vs. retry).
@@ -434,7 +434,7 @@ Don't fail — the user might be running a homogeneous benchmark intentionally.
 
 Add a `verify_finding()` bash function that:
 - Parses a finding's `<file>:<line>` reference
-- Tier 1: `git show HEAD:<file> | sed -n '<line>p'` exact match
+- Tier 1: `git show "HEAD:$file" | sed -n "${line}p"` exact match
 - Tier 2: if exact fails, run `python3 -c "import diff_match_patch; ..."` for fuzzy match (≥85% similarity, implemented as `dmp.Match_Threshold = 0.15` — inverted scale: 0.0 = exact, 1.0 = any match; see annotation below)
 - Returns `verified` / `fuzzy-verified` / `unverified`
 
@@ -503,7 +503,7 @@ Confirm W1.5 allowlist (`scripts/validate-agent-authoring.js`) — claude-review
 
 ### Task 6.2: Manual e2e test checklist (S, 2h)
 
-**File:** `plugins/yellow-council/docs/testing/yellow-council-manual-tests.md`
+**File:** `docs/testing/yellow-council-manual-tests.md`
 
 Add 4-CLI test scenarios:
 - All 4 reviewers APPROVE on a clean diff
@@ -549,7 +549,7 @@ Each PR includes:
 - **Configuration table sync check** — verify both `CLAUDE.md` (4-col) and `council.md` (3-col) tables are in lockstep
 - Changeset entry (patch for PR-0 refactor; minor for PR-A through PR-E additive changes)
 - Updated CLAUDE.md / README.md / CHANGELOG.md
-- Manual test checklist additions in `plugins/yellow-council/docs/testing/yellow-council-manual-tests.md`
+- Manual test checklist additions in `docs/testing/yellow-council-manual-tests.md`
 
 ---
 

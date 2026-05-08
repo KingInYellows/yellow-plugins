@@ -97,7 +97,7 @@ The asymmetric shape — in-process Task subagent for Claude, subprocess CLIs fo
 
 **Auth:** Inherited from orchestrator's Claude Code session (`~/.claude.json` OAuth or API key). No separate auth required.
 
-**Quota debit:** Every reviewer turn counts against the orchestrator's Claude subscription window (5h limit for Pro, weekly for Max). Two consecutive `/council` invocations within 5h could exhaust Pro quota.
+**Quota debit:** Every reviewer turn counts against the orchestrator's Claude subscription window (5h limit for Pro, weekly for Max). On Pro (45 msg / 5h) at 2 messages/review (1 reviewer + 1 synthesis), a user gets ~22 reviews per window; with 2-pass synthesis (3 msgs/review), ~15 reviews per window. See Dimension 4 quota-state schema for the per-reviewer accounting.
 
 **Isolation:** Separate conversation context (the subagent doesn't see orchestrator history), but same auth/billing/rate-limit bucket.
 
@@ -282,10 +282,10 @@ Pre-flight check: if any reviewer's headroom is `< 2 * messages_per_review`, war
 
 | Failure | Detection | Recovery |
 |---|---|---|
-| Claude quota exhausted (in-process reviewer or synthesizer) | Anthropic API error + structured response from Task | Mark reviewer/synthesizer as UNAVAILABLE; surface in headline; do NOT retry until window reset |
-| ChatGPT quota exhausted (Codex) | `codex exec` returns subscription error | Mark Codex UNAVAILABLE; council continues with remaining 3 reviewers |
-| Gemini quota exhausted | HTTP 429 or subscription error in `gemini -p` output | Mark Gemini UNAVAILABLE; council continues |
-| OpenCode provider quota | Provider-specific error in `opencode run` output | Mark OpenCode UNAVAILABLE; council continues |
+| Claude quota exhausted (in-process reviewer or synthesizer) | Anthropic API error + structured response from Task | Mark reviewer/synthesizer as `verdict=QUOTA_EXHAUSTED`; surface in headline with ETA; do NOT retry until window reset |
+| ChatGPT quota exhausted (Codex) | `codex exec` returns subscription error | Mark Codex `verdict=QUOTA_EXHAUSTED`; council continues with remaining 3 reviewers |
+| Gemini quota exhausted | HTTP 429 or subscription error in `gemini -p` output | Mark Gemini `verdict=QUOTA_EXHAUSTED`; council continues |
+| OpenCode provider quota | Provider-specific error in `opencode run` output | Mark OpenCode `verdict=QUOTA_EXHAUSTED`; council continues |
 
 The graceful-degradation pattern (council runs with N-of-4 reviewers when one fails) is already in V1 — this is just a new failure category to feed into the same handler.
 
@@ -358,7 +358,7 @@ Under subscription auth, caching does not save money — it saves time. Cache hi
 
 | Failure Mode | Detection | Claude (in-proc) | Codex CLI | Gemini CLI | OpenCode |
 |---|---|---|---|---|---|
-| Subscription quota exhausted | Provider-specific error | Mark UNAVAILABLE; do NOT retry | Mark UNAVAILABLE | Mark UNAVAILABLE | Mark UNAVAILABLE |
+| Subscription quota exhausted | Provider-specific error | Mark `QUOTA_EXHAUSTED`; do NOT retry | Mark `QUOTA_EXHAUSTED` | Mark `QUOTA_EXHAUSTED` | Mark `QUOTA_EXHAUSTED` |
 | Network 5xx / timeout | HTTP status / timer | Retry once via Task; fall through | Retry once; downgrade model | Retry once; fall back to Flash | Retry once; create new session |
 | Per-minute rate limit (free Gemini) | HTTP 429 | N/A | N/A | Backoff + retry once; cap 5 retries | N/A |
 | Auth token expired | Auth error | Re-login required (orchestrator) | `codex login` again | `gemini login` again | Provider-specific |
