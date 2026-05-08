@@ -139,18 +139,29 @@ an optional sensitive `userConfig` field in `plugin.json`.
 On first enable (or after `claude plugin update yellow-research`), Claude
 Code prompts for each key. Answer the prompts for the sources you want;
 dismiss the others. Values are stored in the system keychain (or
-`~/.claude/.credentials.json` at 0600 perms on minimal Linux) and
-substituted into each MCP's env block via
-`${user_config.<name>_api_key}` — no Claude Code restart needed when a
-key changes.
+`~/.claude/.credentials.json` at 0600 perms on minimal Linux).
 
-If you prefer shell env vars, that path no longer feeds the MCPs as of
-2.0.0 (the plugin.json references `${user_config.*}`, not `${*_API_KEY}`).
-Either answer the prompt or, for a fully shell-driven setup, add a thin
-wrapper per MCP (see `plugins/yellow-morph/bin/start-morph.sh` for a
-reference pattern). `CERAMIC_API_KEY` remains a shell-only env var because
-it gates the REST live-probe in `/research:setup`, not the MCP server (which
-uses OAuth).
+Each MCP server is launched via a thin wrapper in `bin/start-<server>.sh`
+that resolves the API key with the following precedence:
+
+1. `userConfig` value (preferred — keychain-encrypted)
+2. Shell env fallback: `PERPLEXITY_API_KEY`, `TAVILY_API_KEY`, `EXA_API_KEY`
+
+This means power users who already export the keys in their shell rc do
+not have to re-enter them via `userConfig`. If both are set, `userConfig`
+wins. If neither is set, the wrapper unsets the empty value so the MCP
+package sees "absent" not "explicitly empty"; tool calls then return
+runtime errors. `CERAMIC_API_KEY` remains a shell-only env var because
+it gates the REST live-probe in `/research:setup`, not the MCP server
+(which uses OAuth).
+
+**Scope note (security):** the resolved API key is exported into the MCP
+process environment and is therefore visible to any subprocess the MCP
+server spawns (e.g., a `node` child or a tool that shells out). This
+matches the morph and other-MCP precedent, but consumers handling
+high-sensitivity keys should prefer the `userConfig` keychain path over
+shell exports — the keychain isolates the value to Claude Code's
+substitution engine and keeps it out of generic shell-process leaks.
 
 The **parallel** server uses OAuth — Claude Code handles authentication
 automatically (no API key needed). You'll be prompted to authorize on first use.
