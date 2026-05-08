@@ -101,7 +101,7 @@ The asymmetric shape — in-process Task subagent for Claude, subprocess CLIs fo
 
 **Isolation:** Separate conversation context (the subagent doesn't see orchestrator history), but same auth/billing/rate-limit bucket.
 
-**Output contract:** Same structured `verdict=` / `confidence=` / `summary=` / `findings_block_*` format the existing reviewers use. Match the existing protocol exactly so synthesis logic is reused.
+**Output contract:** Same 6-key block — `verdict=` / `confidence=` / `summary=` / `fenced_output_path=` / `findings_block_begin` / `findings_block_end` — that the existing gemini/opencode reviewers emit. Match the protocol exactly so `council.md`'s parser (including the `fenced_output_path` lookup for the findings file) is reused without a special case.
 
 **Caching:** Anthropic prompt caching at `cache_control` ≥1,024 tokens. Even on subscription, caching reduces TTFT — claim the cache by sending the core-pack as a stable prefix.
 
