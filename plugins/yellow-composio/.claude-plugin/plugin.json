@@ -20,15 +20,14 @@
     "composio_mcp_url": {
       "type": "string",
       "title": "Composio MCP URL",
-      "description": "Per-customer Composio MCP endpoint. Generate via the Composio dashboard or `npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID`. Looks like https://mcp.composio.dev/<id>. Only `https://mcp.composio.dev/*` URLs are expected — Claude Code will make HTTP MCP connections to whatever you provide here, so do not paste arbitrary URLs (file://, internal hosts, metadata endpoints). If left blank, the bundled MCP server will fail to start — fall back to a manual `claude mcp add` setup (see /composio:setup).",
-      "pattern": "^https://[a-zA-Z0-9][a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(?:/\\S*)?$",
+      "description": "Per-customer Composio MCP endpoint. Generate via the Composio dashboard or `npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID`. Looks like https://mcp.composio.dev/<id>. MUST start with `https://` — Claude Code sends the API key as the `X-API-Key` header to whatever URL you provide, so a non-HTTPS URL leaks the credential in cleartext. Only `https://mcp.composio.dev/*` URLs are expected; do not paste arbitrary URLs (`http://`, `file://`, internal hosts, metadata endpoints). Format is not enforced at the schema level; a SessionStart hook surfaces a runtime warning if the URL is non-HTTPS. If left blank, the bundled MCP server will fail to start — fall back to a manual `claude mcp add` setup (see /composio:setup).",
       "sensitive": false,
       "required": false
     },
     "composio_api_key": {
       "type": "string",
       "title": "Composio API key",
-      "description": "Composio API key from https://app.composio.dev/settings. Sent as the X-API-Key header on every MCP request. Stored in the system keychain.",
+      "description": "Composio API key from https://app.composio.dev/settings. Sent as the X-API-Key header on every MCP request. Stored in the system keychain. Format is not validated at schema level — invalid keys produce a 401 at runtime from Composio.",
       "sensitive": true,
       "required": false
     }
@@ -41,5 +40,19 @@
         "X-API-Key": "${user_config.composio_api_key}"
       }
     }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-mcp-url.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
   }
 }
