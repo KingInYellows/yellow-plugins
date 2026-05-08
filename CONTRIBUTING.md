@@ -345,6 +345,38 @@ a version bump.
 - Constants: `UPPER_SNAKE_CASE`
 - Plugin names: `kebab-case`
 
+## Local vs Remote Validator Divergence
+
+Yellow-plugins runs two local validation passes: `pnpm validate:plugins`
+checks plugin-specific rules in `scripts/validate-plugin.js` (path existence,
+hook script sanity, userConfig allowlist, hooks.json drift), and
+`pnpm validate:schemas` runs AJV against `schemas/plugin.schema.json`. CI
+runs both. **Neither passing guarantees the plugin will install successfully
+via `claude doctor`.** Claude Code's remote validator can reject keys our
+local schemas permit — recent examples:
+
+| Field | Status | Symptom on `claude doctor` |
+|---|---|---|
+| `userConfig.<key>.pattern` | rejected | `Unrecognized key: "pattern"` (PR #409 → reverted 2026-05-08) |
+| `plugin.changelog` | rejected | unknown root key |
+| `repository: {type, url}` (npm-style) | rejected | invalid type, expects string |
+| `userConfig.<key>` missing `type` or `title` | rejected | required fields per official schema |
+
+**Always test schema-affecting changes on a fresh install before merging:**
+
+1. Run `claude plugin validate` (official local CLI) — catches more than AJV.
+2. Optional: bundle plugin to a zip + serve via HTTPS, then test load in a
+   disposable session via `claude --plugin-url <https-artifact-url>`. This
+   exercises the client-side load path (still not the marketplace remote
+   validator, but closest available).
+3. Most reliable: check out the PR branch on a clean machine, install the
+   marketplace, and run `claude doctor` to confirm zero plugin errors.
+
+The canonical official schema reference is
+`https://json.schemastore.org/claude-code-plugin-manifest.json`. All plugins
+in this marketplace declare it via `"$schema": "..."` in `plugin.json` for
+editor autocomplete and inline validation.
+
 ## Skill Description Budget
 
 Plugin skill descriptions are subject to Claude Code's session-level
