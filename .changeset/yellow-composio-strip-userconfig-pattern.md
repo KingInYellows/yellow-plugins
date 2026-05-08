@@ -13,7 +13,7 @@ fire, matching pre-PR409 baseline):
 
 - New `hooks/check-mcp-url.sh` SessionStart hook prints a warning if the
   configured `composio_mcp_url` does not start with `https://`.
-- Updated `composio_mcp_url.description` and `composio_patterns` SKILL
+- Updated `composio_mcp_url.description` and `composio-patterns` SKILL
   Security section to explicitly state HTTPS-only requirement and that
   format validation is not schema-enforced.
 - Updated `composio_api_key.description` to note that key format is not
