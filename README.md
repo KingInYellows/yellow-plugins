@@ -1,6 +1,6 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 17 plugins for Git workflows, code
+Personal Claude Code plugin marketplace — 18 plugins for Git workflows, code
 review, CI, research, testing, documentation, code editing, security
 remediation, and cross-lineage code council.
 
@@ -34,6 +34,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
 | `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 3 agents, 5 commands, 1 skill                  |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 9 commands, 1 skill, 1 MCP           |
+| `yellow-mempalace`    | Structured long-term memory with temporal knowledge graph via MemPalace                                     | 2 agents, 6 commands, 2 skills, 1 MCP          |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                       | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 1 skill, 6 MCPs          |
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 14 agents, 4 commands, 1 skill                 |
@@ -264,11 +265,15 @@ yellow-plugins/
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
 │   ├── yellow-chatprd/        # ChatPRD integration (4 agents, 6 commands, 1 skill, 1 MCP)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 8 commands, 2 skills, 1 hook)
+│   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
+│   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
 │   ├── yellow-core/           # Dev toolkit (17 agents, 8 commands, 7 skills)
+│   ├── yellow-council/        # Cross-lineage code council (2 agents, 1 command, 1 skill)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)
 │   ├── yellow-docs/           # Documentation (3 agents, 5 commands, 1 skill)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
+│   ├── yellow-mempalace/      # MemPalace memory (2 agents, 6 commands, 2 skills, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
 │   ├── yellow-research/       # Deep research (2 agents, 4 commands, 1 skill, 6 MCPs)
 │   ├── yellow-review/         # PR review (14 agents, 4 commands, 1 skill)
