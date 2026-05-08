@@ -202,8 +202,10 @@ Yes, this is the documented behavior. `model: inherit` in Claude Code subagent f
 Yes, with calibration:
 
 - `code-simplicity-reviewer`, `pattern-recognition-specialist`, `test-coverage-analyst` — pattern matching and coverage counting. `model: sonnet` is the quality ceiling. These agents do not benefit from Opus reasoning.
-- `security-reviewer` — security analysis warrants Sonnet at minimum; Opus would be defensible for security-critical codebases, but Sonnet catches exploitable vulnerabilities reliably. Recommendation: `model: sonnet`, user can override at the command level if they want Opus security review. (`security-sentinel` stays on Opus per Section 2a — adversarial reasoning over multi-step inference benefits from Opus.)
-- `performance-reviewer` — calibration persona adding anchored confidence on top of `performance-oracle`'s analysis. Recommendation: `model: sonnet`. (`performance-oracle` stays on Opus — primary discovery agent for algorithmic complexity, N+1, and memory management; novel complexity reasoning earns the cost.)
+- `security-sentinel` — primary discovery agent for active vulnerability audits (OWASP top 10, injection, XSS, auth/authz flaws). Adversarial reasoning over multi-step inference where false negatives are high-cost. Recommendation: `model: opus` (no change).
+- `security-reviewer` — calibration persona that adds anchored confidence on top of `security-sentinel` output, not an independent vulnerability scanner. Recommendation: `model: sonnet`.
+- `performance-oracle` — primary performance discovery agent (algorithmic complexity, N+1, memory management). Opus earns its cost for novel complexity reasoning. Recommendation: `model: opus` (no change).
+- `performance-reviewer` — calibration persona that adds anchored confidence on top of `performance-oracle` analysis. Recommendation: `model: sonnet`.
 - `architecture-strategist` — currently `model: opus`. This is correctly Opus: architectural judgment is the use case Opus is designed for. Do not downgrade.
 - `polyglot-reviewer` — language-idiomatic review. Sonnet knows idioms across TS/Py/Rust/Go reliably. `model: sonnet`.
 
@@ -278,8 +280,4 @@ Yes, with calibration:
 
 - **Ceramic Search** (10 results, 2026-05-08) — LLMOps database, AINews, xAGI Labs — General landscape context for multi-model multi-agent patterns.
 
-- **Direct codebase reads** (15 agent files, 2026-05-08) — `/home/kinginyellow/projects/yellow-plugins/plugins/` — Ground truth for current frontmatter assignments, agent task descriptions, and tool declarations.
-
-- [research-conductor] Source skipped: EXA (web_search_exa, web_search_advanced_exa, crawling_exa, deep_researcher_start) — all returning HTTP 400 errors.
-- [research-conductor] Source skipped: Tavily (tavily_research) — TAVILY_API_KEY not configured.
-- [research-conductor] Parallel Task trun_6ae53d1e637f41f8b3811323c0ae6c72 — still running at synthesis time; not retrieved. Result may contain additional pricing data.
+- **Direct codebase reads** (15 agent files, 2026-05-08) — `plugins/` — Ground truth for current frontmatter assignments, agent task descriptions, and tool declarations.

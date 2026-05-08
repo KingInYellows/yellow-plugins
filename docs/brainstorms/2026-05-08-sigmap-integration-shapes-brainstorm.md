@@ -282,7 +282,7 @@ No `mcpServers` block — RTK is not an MCP server. RTK's own PreToolUse hook (i
 - Solves a problem the stack has zero current coverage for
 - Automatic on every session once hook is installed — zero workflow changes required
 - Measurable ROI via `rtk gain` in 7-14 days
-- Zero interaction with ruvector (different hook type, different data)
+- Low interaction risk with ruvector — both register `PreToolUse` hooks, but on disjoint operations (RTK rewrites command output; ruvector's `PreToolUse` returns `{continue: true}` without modifying the command). Verified in `plugins/yellow-ruvector/.claude-plugin/plugin.json`. See `docs/research/rtk-vs-sigmap-context-management-comparison.md` §"Hook collision with ruvector".
 - Single Rust binary, Homebrew install, no API keys, no accounts
 - 3+ contributors, lower bus-factor than sigmap
 
