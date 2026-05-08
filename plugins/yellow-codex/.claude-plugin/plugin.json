@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-codex",
   "version": "0.2.2",
   "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
