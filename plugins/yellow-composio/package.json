@@ -1,6 +1,6 @@
 {
   "name": "yellow-composio",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "description": "Optional Composio accelerator for batch workflows with usage tracking"
 }
