@@ -5,8 +5,8 @@
  *
  * Reads .claude-plugin/marketplace.json as the canonical plugin count, then
  * scans root-level narrative docs (CLAUDE.md, README.md, etc.) for
- * "<N> plugins" / "<N> marketplace plugins" / "<N> consumers" claims and
- * fails if any claim's integer does not match the canonical count.
+ * "<N> plugins" / "<N> marketplace plugins" claims and fails if any claim's
+ * integer does not match the canonical count.
  *
  * M-01 (audit 2026-05-07): catches drift between marketplace.json and the
  * narrative documentation. CLAUDE.md said "14 plugins" while marketplace
@@ -38,12 +38,10 @@ const MARKETPLACE = path.join(ROOT, '.claude-plugin', 'marketplace.json');
 const SCAN_FILES = ['CLAUDE.md', 'README.md', 'CONTRIBUTING.md', 'AGENTS.md'];
 
 // Patterns to match. Each pattern captures a single integer (group 1) before
-// the keyword. Use \b around keywords to avoid matching "Nplugins" or
-// "consumers123".
+// the keyword. Use \b around keywords to avoid matching "Nplugins".
 const PATTERNS = [
   { regex: /\b(\d+)\s+plugins\b/gi, label: 'plugins' },
   { regex: /\b(\d+)\s+marketplace\s+plugins\b/gi, label: 'marketplace plugins' },
-  { regex: /\b(\d+)\s+consumers\b/gi, label: 'consumers' },
 ];
 
 const colors = {
@@ -69,9 +67,8 @@ function readMarketplaceCount() {
   return data.plugins.length;
 }
 
-// Same canonical count is used for plugins / marketplace plugins /
-// consumers — they all reference the same metric in the audit context.
-// If a project later wants distinct counts per label, extend this map.
+// Both labels resolve to the same canonical plugin count. If a project
+// later wants distinct counts per label, extend this map.
 function expectedFor(_label, canonical) {
   return canonical;
 }
