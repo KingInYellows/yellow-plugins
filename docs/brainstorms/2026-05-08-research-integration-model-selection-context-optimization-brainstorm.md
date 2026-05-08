@@ -190,12 +190,12 @@ frontmatter scalars via `parseScalar()`.
 
 #### Rule V1: `effort:` enum validation
 
-If `effort:` is present in agent frontmatter, its value must be one of `low | medium | high | max`.
+If `effort:` is present in agent frontmatter, its value must be one of `low | medium | high | xhigh | max`.
 Any other value is a hard error. This prevents typos (`hight`, `lo`) from silently falling
 back to default behavior.
 
 **Implementation:** Add `parseScalar(frontmatter, 'effort')` → if not null, check against
-`['low', 'medium', 'high', 'max']` → push error on mismatch.
+`['low', 'medium', 'high', 'xhigh', 'max']` → push error on mismatch.
 
 #### Rule V2: `model:` enum validation
 
@@ -221,9 +221,9 @@ nudge behavior until the pattern is established. Escalation to error is a follow
 
 #### Rule V4: `effort: high` advisory for synthesizer/orchestrator agents (warning, not error)
 
-Agents whose description contains keywords `synthesize`, `orchestrat`, `deduplicate`, or
-`merge` that lack `effort: high` or `effort: max` produce a non-blocking advisory. This
-surfaces the recommendation without blocking.
+Agents whose `name:` field matches keywords `synthesizer`, `orchestrator`, `conductor`,
+`aggregator`, or `compounder` that lack `effort: high`, `effort: xhigh`, or `effort: max`
+produce a non-blocking advisory. This surfaces the recommendation without blocking.
 
 **Note:** Rules V3 and V4 produce warnings via a new `warnings` array (alongside the existing
 `errors` array). The exit code remains 0 if only warnings are present. CI output prints
