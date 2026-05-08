@@ -16,9 +16,13 @@
 # as the correctness fallback). The hook is purely an optimization; missing
 # the async window is no worse than not having the hook at all.
 #
-# The lock + install live INSIDE the subshell so the parent's exit does not
-# release the lock while install is still running. The subshell's EXIT trap
-# is the single owner of lock release.
+# The parent acquires the lock; the subshell holds the install work and is
+# the SOLE owner of the release trap. The parent has no EXIT trap on the
+# lock, so its early exit does not orphan release. The parent then writes
+# the subshell's PID (via $!) to the lock's pid file — works on bash 3.2+
+# unlike $BASHPID, and collapses the race window between mkdir and pid
+# overwrite to zero so concurrent stale-lock recovery never sees a dead
+# owner.
 set -uo pipefail
 
 # Centralized JSON-output exit. Claude Code BLOCKS session startup if a
@@ -51,34 +55,36 @@ yellow_morph_needs_install || json_exit
 
 mkdir -p "$CLAUDE_PLUGIN_DATA" || json_exit "mkdir failed; skipping prewarm"
 
-# Detached background install. The subshell owns the lock and all install
-# work; the parent does not acquire the lock and exits as soon as the
-# subshell is spawned. All child output goes to /dev/null — corrupting the
-# parent's `{"continue": true}` stdout would block session startup.
-#
-# Lock acquisition uses the same 5s budget as the previous synchronous form:
-# if another process (e.g., the start-morph.sh wrapper) holds the lock, the
-# subshell yields silently. The subshell's EXIT/INT/TERM trap is the single
-# owner of lock release.
+# Acquire the lock in the parent — $$ is the parent's real, live PID at this
+# point. 5s budget; yield silently if another holder beats us.
+if ! yellow_morph_acquire_install_lock 5; then
+  json_exit "install lock held by another process; yielding to start-morph.sh"
+fi
+
+# Re-check under the lock — wrapper or a previous prewarm may have finished
+# while we were waiting.
+if ! yellow_morph_needs_install; then
+  yellow_morph_release_install_lock
+  json_exit
+fi
+
+# Detached background install. The subshell's trap is the SOLE release
+# point; parent has no EXIT trap, so its early exit does not orphan the
+# lock. All child output → /dev/null to keep the parent's `{"continue":
+# true}` stdout uncorrupted.
 (
-  if ! yellow_morph_acquire_install_lock 5; then
-    exit 0
-  fi
-  # Overwrite the lock's PID file with $BASHPID (the subshell's actual PID).
-  # acquire_install_lock writes $$, which in a bash subshell is the parent's
-  # PID — and the parent exits immediately after spawning us. Without this,
-  # a later caller's stale-lock recovery would see the parent as dead, break
-  # the lock, and race a concurrent npm ci against ours.
-  printf '%s' "$BASHPID" > "${CLAUDE_PLUGIN_DATA}/.install.lock/pid" 2>/dev/null || true
   trap 'yellow_morph_release_install_lock' EXIT INT TERM
-
-  # Re-check under the lock — the wrapper or a previous prewarm may have
-  # completed the install while we were waiting.
-  yellow_morph_needs_install || exit 0
-
   if ! yellow_morph_do_install; then
     yellow_morph_cleanup_failed_install
   fi
-) >/dev/null 2>&1 & disown
+) >/dev/null 2>&1 &
+sub_pid=$!
+disown
+
+# acquire_install_lock wrote $$ (parent's PID) to the lock's pid file; the
+# parent is about to exit. Overwrite with $! (the subshell's PID, captured
+# in the parent — works on bash 3.2 unlike $BASHPID) so any concurrent
+# stale-lock check sees a live owner.
+printf '%s' "$sub_pid" > "${CLAUDE_PLUGIN_DATA}/.install.lock/pid" 2>/dev/null || true
 
 json_exit
