@@ -90,7 +90,7 @@ elif schema_version == "1.0" or missing:
 if schema_version == "2.0":
     pass through
 else:
-    log error: "Found v1.0 (or unversioned) scanner output at <file>.
+    log warning: "Found v1.0 (or unversioned) scanner output at <file>.
     This schema is no longer supported. Re-run the scanner."
     skip file
 ```

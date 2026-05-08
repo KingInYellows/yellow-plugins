@@ -37,9 +37,11 @@ Read `.debt/scanner-output/*.json`. Inspect each file's `schema_version`:
 
 - **v2.0** (`schema_version: "2.0"`) — pass through into the in-memory shape
   used by the rest of the pipeline.
-- **Any other value** (`schema_version: "1.0"`, missing, or unrecognized) —
-  log
-  `[synthesizer] Warning: scanner-output/<file>.json is schema_version <value>; no longer supported. Re-run the scanner to regenerate v2.0 output.`
+- **Any other value** (`schema_version: "1.0"` or unrecognized) — log
+  `[synthesizer] Warning: scanner-output/<file>.json is schema_version "<value>"; no longer supported. Re-run the scanner to regenerate v2.0 output.`
+  to stderr and skip the file.
+- **Missing `schema_version` field** — log
+  `[synthesizer] Warning: scanner-output/<file>.json has no schema_version; no longer supported. Re-run the scanner to regenerate v2.0 output.`
   to stderr and skip the file.
 
 Skip malformed files entirely (log error, continue with remaining scanners).

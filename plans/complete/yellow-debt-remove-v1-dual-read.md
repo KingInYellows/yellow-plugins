@@ -73,7 +73,7 @@ Single PR, branched off `main`. Type: `refactor`. Changeset bump: `patch` for ye
 - [x] 2.3 Replace Step 1 body (lines 36-74). New body must:
   - Read `.debt/scanner-output/*.json` and inspect `schema_version`.
   - Pass through `schema_version: "2.0"` records unchanged.
-  - For records with `schema_version: "1.0"`, missing `schema_version`, or any other value: log `[synthesizer] Error: <file>.json is schema_version <value> which is no longer supported. Re-run the scanner to generate a v2.0 output.` to stderr and skip the file. Continue with remaining files.
+  - For records with `schema_version: "1.0"`, missing `schema_version`, or any other value: log `[synthesizer] Warning: <file>.json is schema_version <value> which is no longer supported. Re-run the scanner to generate a v2.0 output.` to stderr and skip the file. Continue with remaining files.
   - Preserve the existing "Skip malformed files entirely (log error, continue with remaining scanners)" sentence.
   - Remove all references to `_migrated_from`, `stats.migrated_from_v1`, multi-file fan-out, and the transition-window warning. Downstream code already reads only v2.0 fields per the existing line 73-74 statement; that statement can stay.
 <!-- deepen-plan: codebase -->

@@ -350,8 +350,11 @@ Scanner output must use `"schema_version": "2.0"`. Older artifacts
 (`schema_version: "1.0"` or unversioned) are no longer accepted; the
 synthesizer logs a warning and skips them.
 
-**Remediation**: Re-run the scanner to regenerate v2.0 output. The audit
-command (`/debt:audit`) does this automatically before synthesis.
+**Remediation**: Re-run the scanner to regenerate v2.0 output. A full
+`/debt:audit` overwrites each scanner's output before synthesis. If a prior
+partial audit or scanner failure left stale `.debt/scanner-output/*.json`
+files, delete them before re-running so the synthesizer does not skip
+them.
 
 ### Confidence Out of Range
 
