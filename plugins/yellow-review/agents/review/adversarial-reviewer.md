@@ -1,7 +1,7 @@
 ---
 name: adversarial-reviewer
 description: "Conditional code-review persona, selected when the diff is large (>200 changed lines) or touches high-risk domains like auth, payments, data mutations, external APIs, or trust boundaries. Use when reviewing PRs that pass the size/risk threshold — review:pr selects this automatically. Actively constructs failure scenarios to break the implementation rather than checking against known patterns."
-model: inherit
+model: opus
 background: true
 tools:
   - Read
