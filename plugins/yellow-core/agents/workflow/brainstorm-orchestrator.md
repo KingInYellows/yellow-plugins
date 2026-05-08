@@ -1,7 +1,8 @@
 ---
 name: brainstorm-orchestrator
 description: 'Iterative brainstorm dialogue — questions, research, approaches, doc write. Input: feature topic or empty string. Output: docs/brainstorms/<date>-<topic>-brainstorm.md. Use when running /workflows:brainstorm.'
-model: inherit
+model: sonnet
+effort: high
 memory: project
 skills:
   - brainstorming
