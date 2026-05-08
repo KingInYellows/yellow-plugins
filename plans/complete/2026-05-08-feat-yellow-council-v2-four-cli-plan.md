@@ -41,6 +41,7 @@ The deepen-plan annotations (`<!-- deepen-plan: source -->` blocks) embedded thr
 - Bradley-Terry calibration, AgentAuditor branch verification, GitHub PR webhook pre-warming — V3+.
 - Local quota query API — providers don't expose this; V2 uses heuristic tracking only.
 - Direct API path (sidesteps subscription auth) — explicitly off the table per user requirement.
+- **Length-controlled finding scoring** (Wang 2024 verbosity-bias mitigation) — deferred to V2.5 (V2-7 in research roadmap). The source research labels this "mandatory before any quality claim" (Dimension 10), but V2 ships only 2 of the 3 mitigations (order-swap + double-blind labels). Verbosity bias in synthesis remains a known quality gap until V2.5 — see Risk R6.
 
 ---
 
@@ -113,7 +114,7 @@ gt stack submit
 Match the shape of `gemini-reviewer.md` and `opencode-reviewer.md`, but:
 - No CLI subprocess invocation — the agent answers the prompt directly using Claude's reasoning
 - No `Bash` in `tools:` (this agent does not invoke a binary; pure reasoning + Read for evidence verification)
-- Tools: `[Read, Grep, Glob]` — same as W1.5 read-only-reviewer baseline
+- Tools: `[Read, Grep, Glob, Write]` — read-only baseline plus `Write` so the agent can materialize the `fenced_output_path` temp file the 6-key contract requires. Requires a corresponding entry in `REVIEW_AGENT_ALLOWLIST` (see annotation below).
 - Frontmatter `name: claude-reviewer`, `model: inherit`
 - `skills: [council-patterns]`
 
@@ -124,7 +125,7 @@ Output contract: identical to existing reviewers — emit the 6-key block: `verd
 <!-- /deepen-plan -->
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** No W1.5 allowlist update needed. `scripts/validate-agent-authoring.js:20` defines `REVIEW_AGENT_DENIED_TOOLS = ['Bash', 'Write', 'Edit']` (case-insensitive). The check at line 226 fires only when a non-allowlisted reviewer lists ANY denied tool. A claude-reviewer at `plugins/yellow-council/agents/review/claude-reviewer.md` with `tools: [Read, Grep, Glob]` has zero violations and passes automatically — no entry in `REVIEW_AGENT_ALLOWLIST` (lines 26–38) is required. Plan should remove the "W1.5 allowlist UPDATE NOT needed" caveat as it implies the question was open; it is not.
+> **Codebase (locked decision):** claude-reviewer needs `Write` in `tools:` to create `/tmp/council-claude-fenced-XXXXXX.txt` for the 6-key contract — without it `council.md` would need a special-case "in-process reviewer" parser branch the plan tries to avoid. `scripts/validate-agent-authoring.js:20` defines `REVIEW_AGENT_DENIED_TOOLS = ['Bash', 'Write', 'Edit']`, so claude-reviewer with `Write` would fail validation unless added to `REVIEW_AGENT_ALLOWLIST` (lines 26–38). **Required action in PR-A:** add an allowlist entry for `plugins/yellow-council/agents/review/claude-reviewer.md` and document the exception (Write is used only to materialize the fenced output file; the agent does NOT modify repo state).
 <!-- /deepen-plan -->
 
 <!-- deepen-plan: external -->
@@ -284,6 +285,7 @@ Add a pre-flight that checks each reviewer's headroom before fan-out:
   - Skip this reviewer (continue with N-1 reviewers)
   - Cancel (abort the council invocation)
 - If headroom is 0 (already exhausted), automatically emit `verdict=QUOTA_EXHAUSTED` (per Task 3.3) without spawning the reviewer — preflight and mid-review exhaustion converge on the same verdict so headline/ETA reporting is uniform regardless of detection point.
+- **Minimum-quorum gate:** if the count of active reviewers (headroom > 0, after any user-chosen "skip this reviewer" responses) falls below `COUNCIL_MIN_REVIEWERS` (default `2`), surface a final AskUserQuestion: "Continue with N active reviewer(s) — `Agreement (cited by 2+ reviewers)` bucket will be empty / synthesis signal degraded" or "Cancel." Document `COUNCIL_MIN_REVIEWERS` in BOTH Configuration tables (per the Task 1.4 codebase annotation). Rationale: the headline and synthesis sections were designed around quorum language; with <2 active reviewers the ensemble argument collapses and the user should consciously opt in.
 
 ### Task 3.3: Quota-exhausted handler (S, 2h)
 
@@ -326,6 +328,33 @@ Add new section "Subscription Quota Tracking" with:
 - Env var overrides
 - Recovery procedure when quota is exhausted (wait for window reset)
 - Note on heuristic accuracy (best-effort; recalibrates on actual quota-exhausted errors)
+- `COUNCIL_QUOTA_RESET` reset escape-hatch (see Task 3.5)
+- `COUNCIL_MIN_REVIEWERS` quorum gate (default `2`; see Task 3.2)
+
+### Task 3.5: COUNCIL_QUOTA_RESET reset handler (XS, 1h)
+
+**File:** `plugins/yellow-council/commands/council/council.md` Step 1 (Pre-flight, before the headroom check)
+
+Implements the manual reset escape-hatch promised in Risk R2's mitigation. Pre-flight inspects `COUNCIL_QUOTA_RESET` and clears the matching `quota.json` entry before any headroom check runs:
+
+```bash
+if [ -n "${COUNCIL_QUOTA_RESET:-}" ]; then
+  case "$COUNCIL_QUOTA_RESET" in
+    all)
+      # Clear all four reviewer entries (used=0, window_start=now)
+      ;;
+    claude|codex|gemini|opencode)
+      # Clear just that reviewer's used/window_start
+      ;;
+    *)
+      echo "[council] Unknown reviewer for COUNCIL_QUOTA_RESET: $COUNCIL_QUOTA_RESET (ignored)" >&2
+      ;;
+  esac
+  echo "[council] Quota reset: $COUNCIL_QUOTA_RESET"
+fi
+```
+
+Document the escape-hatch in CLAUDE.md (Task 3.4) so users encountering quota miscounts have a one-shot fix without manually editing `quota.json`. Without Task 3.5, the only recovery is `rm ~/.config/yellow-council/quota.json` — exactly the opaque workaround R2's mitigation aims to replace.
 
 ---
 
@@ -385,7 +414,7 @@ Override examples (documented in CLAUDE.md, not enforced):
 - `COUNCIL_OPENCODE_MODEL=` (empty) — defer to OpenCode's own config (V1 behavior)
 
 **Pre-flight check at PR-D time:**
-- Verify the user has OpenRouter configured in OpenCode (`opencode auth list` should include `openrouter`)
+- Verify the user has OpenRouter configured in OpenCode. Try `opencode auth list` first (provider list); if that subcommand exits non-zero (older OpenCode versions don't have it — see Task 4.0 spike, currently `[unverified]`), fall back to parsing `~/.opencode/opencode.json` with `jq -r '.defaultProvider // empty'`. If neither path returns `openrouter`, treat as "not configured."
 - If not configured, surface a clear error: `[opencode-reviewer] Error: OpenRouter not configured. Run 'opencode auth login openrouter' or set COUNCIL_OPENCODE_MODEL to a different provider.`
 - Mark UNAVAILABLE rather than failing the whole council
 
@@ -502,7 +531,7 @@ pnpm test:unit
 pnpm typecheck
 ```
 
-Confirm W1.5 allowlist (`scripts/validate-agent-authoring.js`) — claude-reviewer has no `Bash` so no allowlist entry needed; verify the file is NOT in the allowlist (would be wrong if it were).
+Confirm W1.5 allowlist (`scripts/validate-agent-authoring.js`) — claude-reviewer uses `Write` for the fenced-output file (per Task 1.1 locked decision), so its allowlist entry must be present.
 
 ### Task 6.2: Manual e2e test checklist (S, 2h)
 
@@ -563,11 +592,11 @@ Each PR includes:
 | Phase 0: codex-reviewer normalization | 4 tasks | ~half day |
 | Phase 1: Foundation | 5 tasks | ~1 day |
 | Phase 2: Bias mitigation | 3 tasks | ~1 day |
-| Phase 3: Quota tracking | 4 tasks | ~1 day |
+| Phase 3: Quota tracking | 5 tasks | ~1 day |
 | Phase 4: OpenCode routing | 4 tasks | ~half day |
 | Phase 5: Evidence verification | 3 tasks | ~2.5 days* |
 | Phase 6: Final validation + e2e | 3 tasks | ~half day |
-| **Total** | **26 tasks** | **~7 days** |
+| **Total** | **27 tasks** | **~7 days** |
 
 \*Phase 5 task sums = 1d (Task 5.1) + 1d (Task 5.2) + 2h (Task 5.3) ≈ 2.25 days. The ~2.5-day estimate adds a small buffer for the highest-risk phase (new Python dependency + new synthesis-output structure).
 
@@ -600,6 +629,11 @@ Each PR includes:
 **Risk:** 2-pass order-swap means 2 Claude synthesis messages per `/council` invocation. Total per review = 1 reviewer + 2 synthesis = 3 messages. On Claude Pro (45 msg / 5h), this reduces the user's available council count from ~22 (single-pass: 1+1=2 msgs/review) to ~15 (double-pass: 1+2=3 msgs/review) invocations per window — see Task 2.2 for the full math.
 **Mitigation (DECIDED):** 2-pass is default ON for quality. User can disable per-invocation (`/council review --single-pass`) or globally (`COUNCIL_DOUBLE_PASS_SYNTHESIS=0`). Pre-flight in `/council` Step 1 warns when 2-pass is on AND Claude headroom < 6 messages (≈ 2 reviews of headroom), recommending `--single-pass` for that run — see Task 2.2 for the authoritative threshold definition. Track empirically: if user invocation count regularly exceeds quota window, advise switching the global default off.
 
+### R6 — Verbosity bias remains unmitigated until V2.5
+
+**Risk:** Source research (Dimension 10) labels three synthesizer-bias mitigations as "mandatory before any quality claim": (1) two-pass order-swap (Task 2.2), (2) double-blind lineage labels (Task 2.1), and (3) length-controlled scoring (Wang 2024, +22.9 pp win-rate inflation). V2 ships items (1) and (2) only. Item (3) is deferred to V2.5 (V2-7 in the research roadmap). Until V2.5 lands, the synthesizer can systematically upweight more verbose findings — the same finding stated in 500 words ranks above the same finding stated in 100.
+**Mitigation:** Document the gap explicitly in CLAUDE.md "Known Limitations" so users interpret V2 synthesis output with this caveat in mind. PR-B's checklist includes a note that "V2 ships 2 of 3 mandatory bias mitigations." When V2.5 lands, length-controlled scoring becomes the headline change.
+
 ---
 
 ## Open decisions to surface in PRs
@@ -611,6 +645,9 @@ Each PR includes:
 - ✅ 2-pass synthesis: default ON; user toggle via `COUNCIL_DOUBLE_PASS_SYNTHESIS=0` or `--single-pass` flag
 - ✅ Claude reviewer prompt: contrarian / devil's-advocate framing baked into Task 1.1
 - ✅ Tier 2 fuzzy-match library: `rapidfuzz` (similarity-only need; faster + intuitive 0–100 scale vs. `diff-match-patch`'s inverted `Match_Threshold`). R3 preflight skip-condition references `rapidfuzz`.
+- ✅ claude-reviewer tools: `[Read, Grep, Glob, Write]` — `Write` is required to materialize the 6-key contract's `fenced_output_path`; PR-A adds the matching `REVIEW_AGENT_ALLOWLIST` entry.
+- ✅ Minimum quorum: `COUNCIL_MIN_REVIEWERS=2` default; preflight surfaces AskUserQuestion when active reviewers drop below this threshold.
+- ✅ Length-controlled scoring deferred to V2.5 (V2-7); V2 ships 2 of 3 mandatory synthesizer-bias mitigations (see Risk R6 + Non-goals).
 
 **Still open:**
 
