@@ -80,7 +80,7 @@ findings_block_end
 
 Preserve existing finding format (P1/P2/P3 markers) inside the `findings_block_*` delimiters — don't change Codex's review *content*, only its return-envelope shape.
 
-Add the case-statement validation (`case "$VERDICT" in APPROVE|REVISE|...|UNAVAILABLE) ;; *) VERDICT="UNKNOWN"`) to match gemini-reviewer.md:222–226.
+Add the case-statement validation (`case "$VERDICT" in APPROVE|REVISE|...|UNAVAILABLE) ;; *) VERDICT="UNKNOWN"`) to match gemini-reviewer.md:223–226 (search for `case "$VERDICT" in APPROVE` — line numbers may shift).
 
 ### Task 0.3: Update yellow-council `council.md` to remove codex special-case (S, 1h)
 
@@ -120,7 +120,7 @@ Match the shape of `gemini-reviewer.md` and `opencode-reviewer.md`, but:
 Output contract: identical to existing reviewers — emit `verdict=` / `confidence=` / `summary=` / `findings_block_begin` / `<findings>` / `findings_block_end` lines.
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** Use `gemini-reviewer.md` as the structural template, NOT `codex-reviewer.md`. The three existing reviewers do NOT share a uniform contract: gemini-reviewer (lines 261–266) and opencode-reviewer (lines 323–331) emit the full 6-key block (`verdict=` / `confidence=` / `summary=` / `fenced_output_path=` / `findings_block_begin` / `findings_block_end`), while yellow-codex's `codex-reviewer.md` returns free-form prose with `[P1]` markers and a one-line summary. The new claude-reviewer must match gemini/opencode exactly. Verdict enum: `APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE` (gemini-reviewer.md:223–225, opencode-reviewer.md:273–276). Note: codex-reviewer's contract drift is a pre-existing inconsistency that may need separate addressing in a follow-up — surface this in the PR-A description.
+> **Codebase:** Use `gemini-reviewer.md` as the structural template, NOT `codex-reviewer.md`. The three existing reviewers do NOT share a uniform contract: gemini-reviewer (lines 261–267) and opencode-reviewer (lines 323–331) emit the full 6-key block (`verdict=` / `confidence=` / `summary=` / `fenced_output_path=` / `findings_block_begin` / `findings_block_end`), while yellow-codex's `codex-reviewer.md` returns free-form prose with `[P1]` markers and a one-line summary. The new claude-reviewer must match gemini/opencode exactly. Verdict enum: `APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE` (gemini-reviewer.md:223–225, opencode-reviewer.md:273–276). Note: codex-reviewer's contract drift is a pre-existing inconsistency that may need separate addressing in a follow-up — surface this in the PR-A description.
 <!-- /deepen-plan -->
 
 <!-- deepen-plan: codebase -->
@@ -178,7 +178,7 @@ Update the parse helpers and synthesis logic (Step 5) to handle 4 reviewers inst
 - Add changeset via `pnpm changeset` (minor bump — additive)
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** Two Configuration tables exist with different column counts. `plugins/yellow-council/CLAUDE.md:110–115` is the canonical 4-column form (`Var | Type | Default | Purpose`). `plugins/yellow-council/commands/council/council.md:463–466` is a 3-column form (`Var | Default | Purpose`) used inline in the `/council` command help output. Any new env var (COUNCIL_OPENCODE_MODEL, COUNCIL_DOUBLE_PASS_SYNTHESIS, COUNCIL_CLAUDE_TIER, COUNCIL_CODEX_TIER, COUNCIL_GEMINI_TIER) must be added to BOTH tables to keep them in sync. Phase 7 PR-A through PR-E should each include a "Configuration table sync check" step in their PR description.
+> **Codebase:** Two Configuration tables exist with different column counts. `plugins/yellow-council/CLAUDE.md:109–114` is the canonical 4-column form (`Var | Type | Default | Purpose`). `plugins/yellow-council/commands/council/council.md:462–467` is a 3-column form (`Var | Default | Purpose`) used inline in the `/council` command help output. Any new env var (COUNCIL_OPENCODE_MODEL, COUNCIL_DOUBLE_PASS_SYNTHESIS, COUNCIL_CLAUDE_TIER, COUNCIL_CODEX_TIER, COUNCIL_GEMINI_TIER) must be added to BOTH tables to keep them in sync. Phase 7 PR-A through PR-E should each include a "Configuration table sync check" step in their PR description.
 <!-- /deepen-plan -->
 
 ### Task 1.5: Update root marketplace count if needed (XS, 15min)
@@ -216,7 +216,7 @@ For V1's descriptive synthesis (no scoring), this manifests as: a finding that a
 - Per-invocation flag: `/council review --single-pass` — bypass for the current run only
 - When disabled, the report still runs Pass A but skips Pass B and the variance comparison; headline omits the "low-confidence: X%" annotation
 
-**Quota cost note (surface in `/council` Step 1 pre-flight):** 2-pass synthesis costs 2 Claude messages instead of 1 per invocation. On Claude Pro (45 msg / 5h), this means ~22 reviews per window with 2-pass on, or ~45 reviews per window with single-pass. Pre-flight should warn if `COUNCIL_DOUBLE_PASS_SYNTHESIS=1` AND Claude headroom < 4 messages — recommend `--single-pass` for that invocation.
+**Quota cost note (surface in `/council` Step 1 pre-flight):** Each `/council` review debits 1 Claude message for the in-process reviewer plus N synthesis messages (1 for single-pass, 2 for double-pass). On Claude Pro (45 msg / 5h): ~15 reviews per window with 2-pass on (3 msgs/review), or ~22 reviews per window with single-pass (2 msgs/review). Pre-flight should warn if `COUNCIL_DOUBLE_PASS_SYNTHESIS=1` AND Claude headroom < 6 messages (≈ 2 reviews of headroom) — recommend `--single-pass` for that invocation.
 
 <!-- deepen-plan: external -->
 > **Research (Q4, threshold validity):** The 15% verdict-variance threshold for "low-confidence synthesis" is a **community convention**, not a formally validated metric. Zheng et al. 2023 reported positional bias rates of 10–30% depending on model + task, leading to the informal rule. Most defensible practice (post-Zheng): treat **any verdict flip** between A→B and B→A passes as low-confidence rather than relying on a percentage threshold. Consider documenting "verdict-flip" detection alongside the 15% threshold so the user knows the latter is a heuristic.
@@ -301,7 +301,7 @@ confidence=N/A
 summary=<reviewer> subscription quota exhausted; window resets at <ETA>
 ```
 
-Update `council.md` Step 4 parse logic to handle `QUOTA_EXHAUSTED` as a UNAVAILABLE-class verdict (excluded from synthesis count, surfaced in headline with ETA).
+Update `council.md` Step 4 parse logic AND add `QUOTA_EXHAUSTED` to the verdict case-statement allow-list in all four reviewer agent files (`plugins/yellow-codex/agents/review/codex-reviewer.md` after PR-0 normalization, `plugins/yellow-council/agents/gemini-reviewer.md`, `plugins/yellow-council/agents/opencode-reviewer.md`, and the new `plugins/yellow-council/agents/claude-reviewer.md`) to handle `QUOTA_EXHAUSTED` as a UNAVAILABLE-class verdict (excluded from synthesis count, surfaced in headline with ETA). Without all 5 file updates, the verdict will silently normalize to `UNKNOWN` per the `*) VERDICT="UNKNOWN"` fallback.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** `QUOTA_EXHAUSTED` cannot piggyback on UNAVAILABLE without code changes. Both `gemini-reviewer.md:222–226` and `opencode-reviewer.md:272–276` have `case "$VERDICT" in APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;; *) VERDICT="UNKNOWN"` — any unrecognized verdict (including `QUOTA_EXHAUSTED`) is silently normalized to `UNKNOWN`. Two paths forward: (a) **Add `QUOTA_EXHAUSTED` to the case-in list** in BOTH existing reviewers + claude-reviewer + Headline exclusion logic in `council.md` Step 5 Rule 1; OR (b) **Reuse `verdict=ERROR` with summary keyword** like `"summary=Quota exhausted; window resets at <ETA>"` and let synthesis grep the summary. Path (b) is simpler (no new verdict propagation) but loses headline-level visibility — quota errors appear under "ERROR" in the Reviewer Status section, not as a distinct category. **Recommendation:** path (a) — the quota-vs-error distinction is too important to bury in a summary string, especially since the recovery path differs (wait vs. retry).
@@ -388,7 +388,7 @@ Override examples (documented in CLAUDE.md, not enforced):
 - If not configured, surface a clear error: `[opencode-reviewer] Error: OpenRouter not configured. Run 'opencode auth login openrouter' or set COUNCIL_OPENCODE_MODEL to a different provider.`
 - Mark UNAVAILABLE rather than failing the whole council
 
-Implementation: pass `--model "$COUNCIL_OPENCODE_MODEL"` to `opencode run` when the env var is set. OpenCode's model syntax is `provider/model-name` (or `provider/vendor/model-name` for OpenRouter-routed models).
+Implementation: pass `--model "$COUNCIL_OPENCODE_MODEL"` to `opencode run` when the env var is set. OpenCode's model syntax is `provider/model-name` (bare 2-segment slug). Do NOT use a 3-segment `openrouter/provider/model-name` prefix — provider routing is handled by `opencode.json`, not by the model slug. See deepen-plan annotation above.
 
 ### Task 4.2: Document OpenRouter/DeepSeek v4 Pro as default (S, 1h)
 
@@ -412,8 +412,8 @@ Document `COUNCIL_OPENCODE_MODEL` in BOTH Configuration tables (per the codebase
 
 Add a best-effort lineage detection step:
 - Claude reviewer: assume `anthropic`
-- Codex CLI: parse `codex --model` setting (default `gpt-5.3-codex` → `openai`)
-- Gemini CLI: parse `gemini --model` setting (default `gemini-2.5-pro` → `google`)
+- Codex CLI: read `~/.codex/config.toml` `model` field (default `gpt-5.3-codex` → `openai`); `codex --model` is not an introspection command
+- Gemini CLI: read `~/.gemini/settings.json` `model` field (default `gemini-2.5-pro` → `google`); `gemini --model` is not an introspection command
 - OpenCode: read `COUNCIL_OPENCODE_MODEL` first; otherwise log "lineage unknown"
 
 If two reviewers resolve to the same lineage, emit a non-blocking warning:
@@ -435,7 +435,7 @@ Don't fail — the user might be running a homogeneous benchmark intentionally.
 Add a `verify_finding()` bash function that:
 - Parses a finding's `<file>:<line>` reference
 - Tier 1: `git show HEAD:<file> | sed -n '<line>p'` exact match
-- Tier 2: if exact fails, run `python3 -c "import diff_match_patch; ..."` for fuzzy match (≥85% threshold)
+- Tier 2: if exact fails, run `python3 -c "import diff_match_patch; ..."` for fuzzy match (≥85% similarity, implemented as `dmp.Match_Threshold = 0.15` — inverted scale: 0.0 = exact, 1.0 = any match; see annotation below)
 - Returns `verified` / `fuzzy-verified` / `unverified`
 
 `diff-match-patch` Python availability:
@@ -594,7 +594,7 @@ Each PR includes:
 
 ### R5 — Two-pass synthesis doubles synthesizer quota cost
 
-**Risk:** 2-pass order-swap means 2 Claude messages per `/council` invocation just for synthesis. On Claude Pro (45 msg / 5h), this halves the user's available council count from ~22 to ~11 invocations per window when both reviewer + synthesis count against Claude quota.
+**Risk:** 2-pass order-swap means 2 Claude synthesis messages per `/council` invocation. Total per review = 1 reviewer + 2 synthesis = 3 messages. On Claude Pro (45 msg / 5h), this reduces the user's available council count from ~22 (single-pass: 1+1=2 msgs/review) to ~15 (double-pass: 1+2=3 msgs/review) invocations per window — see Task 2.2 for the full math.
 **Mitigation (DECIDED):** 2-pass is default ON for quality. User can disable per-invocation (`/council review --single-pass`) or globally (`COUNCIL_DOUBLE_PASS_SYNTHESIS=0`). Pre-flight in `/council` Step 1 warns when 2-pass is on AND Claude headroom < 4 messages, recommending `--single-pass` for that run. Track empirically: if user invocation count regularly exceeds quota window, advise switching the global default off.
 
 ---

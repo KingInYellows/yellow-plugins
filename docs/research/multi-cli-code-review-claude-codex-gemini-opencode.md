@@ -118,10 +118,13 @@ The asymmetric shape — in-process Task subagent for Claude, subprocess CLIs fo
 **Headless invocation (yellow-council uses):**
 ```bash
 codex exec --json \
-  --approval-policy never \
-  --sandbox-mode read-only \
+  -a never \
+  -s read-only \
   --model gpt-5.3-codex \
   "<pack>"
+# Verified against codex CLI rust-v0.129.0 (`codex exec --help`).
+# `--approval-policy` / `--sandbox-mode` long forms documented in older
+# research are NOT valid flags on v0.129.0; use `-a` and `-s`.
 ```
 
 **Quota debit:** Each `codex exec` turn counts against ChatGPT subscription message cap. ChatGPT Plus message limits are tier-dependent and capped per 3-hour rolling window. Codex CLI sessions count separately from chatgpt.com web usage but share the same monthly cap on most tiers.
@@ -171,7 +174,7 @@ gemini -p "<pack>" --approval-mode plan --skip-trust -o text
 | GitLab AI Gateway | Enterprise GitLab subscription | Wraps multiple providers |
 | Local model via Ollama | $0 if user has local GPU | True air-gapped lineage |
 
-The "fourth lineage" choice is a deployment-time configuration. yellow-council should accept it as `COUNCIL_OPENCODE_PROVIDER` env var (default: whatever the user has wired in OpenCode's own config).
+The "fourth lineage" choice is a deployment-time configuration. yellow-council should accept it as `COUNCIL_OPENCODE_MODEL` env var (default: whatever the user has wired in OpenCode's own config). _(Note: this research draft originally proposed `COUNCIL_OPENCODE_PROVIDER`; the plan locked the name to `COUNCIL_OPENCODE_MODEL` because OpenCode handles provider routing via `opencode.json` rather than a CLI prefix.)_
 
 **Headless invocation (yellow-council currently uses):**
 ```bash
@@ -267,7 +270,7 @@ V2 should track per-reviewer quota headroom in `~/.config/yellow-council/quota.j
   "claude": { "used": 12, "cap": 45, "window_start": "2026-05-08T14:00:00Z", "window_hours": 5 },
   "codex": { "used": 8, "cap": 80, "window_start": "2026-05-08T15:30:00Z", "window_hours": 3 },
   "gemini": { "used": 230, "cap": 1500, "window_start": "2026-05-08T00:00:00Z", "window_hours": 24 },
-  "opencode": { "used": "n/a", "provider": "deepseek-v3.2" }
+  "opencode": { "used": "n/a", "model": "deepseek/deepseek-v4-pro" }
 }
 ```
 
@@ -322,7 +325,7 @@ This is the new top-of-list quality risk: **Claude is both Reviewer 1 and the sy
 
 **Tier 1 — Structural exact match (~0% FP, ~30% FN):** `git show <commit>:<file>` verbatim line match.
 
-**Tier 2 — Fuzzy alignment (~2% FP, ~12% FN):** `diff-match-patch` (Google, MIT): Myers' diff + Bitap, ≥85% threshold.
+**Tier 2 — Fuzzy alignment (~2% FP, ~12% FN):** `diff-match-patch` (Google, MIT): Myers' diff + Bitap, ≥85% similarity (implemented as `Match_Threshold = 0.15` — the diff-match-patch scale is **inverted**: 0.0 = exact match required, 1.0 = accept any match).
 
 **Tier 3 — AST match (~0.5% FP, ~20% FN):** `ast-grep` pattern-based structural matching. Semgrep Pro upgrade: 48% → 72% TP on WebGoat via cross-file analysis.
 
@@ -371,7 +374,7 @@ Under subscription auth, caching does not save money — it saves time. Cache hi
 
 1. Detect: provider returns subscription-specific error
 2. Log: `[council] <reviewer> quota exhausted — window resets at <ETA>`
-3. Mark: `verdict=UNAVAILABLE`, `confidence=N/A`, `summary=<reviewer> subscription quota exhausted; council ran with N-of-4 reviewers`
+3. Mark: `verdict=QUOTA_EXHAUSTED`, `confidence=N/A`, `summary=<reviewer> subscription quota exhausted; council ran with N-of-4 reviewers` _(plan-locked: distinct enum from generic `UNAVAILABLE`; case-statement allow-list must be extended in all 4 reviewer agent files — see plan Task 3.3)_
 4. Surface in synthesis Headline: `Council ran with N of 4 reviewers (<reviewer> quota exhausted, resets <ETA>)`
 5. Do NOT retry — quota-exhausted errors require window reset, not backoff
 
@@ -382,7 +385,7 @@ Each CLI maintains separate auth state. When auth fails:
 | CLI | Auth state location | Recovery command |
 |---|---|---|
 | Claude Code | `~/.claude.json` (orchestrator) | User runs `/login` in Claude Code |
-| Codex CLI | `~/.codex/auth.json` | User runs `codex login` |
+| Codex CLI | OS keyring (rust-v0.118+); probe with `codex login status`. _Legacy: `~/.codex/auth.json` on pre-v0.118._ | User runs `codex login` |
 | Gemini CLI | `~/.gemini/` | User runs `gemini login` (or `gcloud auth`) |
 | OpenCode | Provider-specific | Provider-specific |
 
@@ -416,7 +419,7 @@ Reproduced from prior doc with the asymmetric-architecture caveat:
 
 **QW-1: Add `claude-reviewer` agent (in-process Task subagent).** New agent definition matching gemini-reviewer/opencode-reviewer shape. Returns structured `verdict=` / `confidence=` / `summary=` / `findings_block_*`. Uses Claude's prompt directly (no subprocess). 4-CLI architecture activated. Estimated: 4 hours.
 
-**QW-2: Wire OpenCode to a non-Big-3 provider.** Document `COUNCIL_OPENCODE_PROVIDER` env var; default to `deepseek-v3.2` or user's configured OpenCode provider. Update CLAUDE.md "Lineage Map" section. Estimated: 1 hour.
+**QW-2: Wire OpenCode to a non-Big-3 provider.** Document `COUNCIL_OPENCODE_MODEL` env var; default to `deepseek/deepseek-v4-pro` or user's configured OpenCode provider. Update CLAUDE.md "Lineage Map" section. Estimated: 1 hour. _(Renamed from `COUNCIL_OPENCODE_PROVIDER` per plan locked decision.)_
 
 **QW-3: Add subscription quota tracking.** `~/.config/yellow-council/quota.json` with per-reviewer used/cap/window. Pre-flight warning when headroom <2x review cost. Heuristic increment + reset on window expiry; recalibrate on quota-exhausted errors. Estimated: 4 hours.
 
