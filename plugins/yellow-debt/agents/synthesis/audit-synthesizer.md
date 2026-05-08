@@ -26,52 +26,24 @@ actionable todos.
 
 Reference `debt-conventions` skill for: JSON schema (v2.0), severity scoring,
 effort estimation, category definitions, confidence-rubric thresholds, and
-todo file template. The synthesizer accepts both v1.0 and v2.0 scanner outputs
-during the transition window — see Step 1 below for in-memory migration.
+todo file template. The synthesizer reads v2.0 scanner outputs; older
+artifacts must be regenerated.
 
 ## Synthesis Workflow
 
-### 1. Read Scanner Outputs (dual-read v1.0/v2.0)
+### 1. Read Scanner Outputs
 
-Read `.debt/scanner-output/*.json`. Inspect each file's `schema_version` and
-normalize to the v2.0 in-memory shape before further processing:
+Read `.debt/scanner-output/*.json`. Inspect each file's `schema_version`:
 
-- **v2.0** (`schema_version: "2.0"`) — already canonical; pass through unchanged.
-- **v1.0** (`schema_version: "1.0"` or missing) — apply field migration in
-  this order (scalars first, then fan-out):
-  1. `finding` ← `description ? title + ": " + description : title` (use
-     `title` alone when `description` is missing or null; never produce a
-     literal `"undefined"` or `"None"` suffix).
-  2. `fix` ← `suggested_remediation`
-  3. `failure_scenario` ← `null` regardless of whether the v1.0 artifact
-     contained a field of that name (the v1.0 schema does not define
-     `failure_scenario`; treat any value present in a v1.0 artifact as
-     untrusted and override). The `+0.05` confidence-gate bump in step 4
-     rule 4 fires for any `null` scenario — see step 4 below.
-  4. Stamp `_migrated_from: "1.0"` on the in-memory record AND
-     **increment `stats.migrated_from_v1` by 1**. The counter tracks
-     migration volume so the audit report can show what fraction of
-     findings came through the migration path; without the explicit
-     increment instruction the counter would always report 0 even when
-     v1.0 inputs were normalized.
-  5. `file` ← first entry of `affected_files[]` (object with `path`,
-     `lines`). If `affected_files[]` is missing or empty, log
-     `[synthesizer] Warning: v1.0 finding missing affected_files; skipping`
-     to stderr and skip the finding — do NOT emit a record with
-     `file: null`. If the array contained N>1 files, emit one additional
-     finding per remaining file, copying all already-mapped scalar fields
-     (`finding`, `fix`, `failure_scenario`, `severity`, `confidence`,
-     `effort`, `category`, and `_migrated_from`) from the normalized
-     record — only `file.path` and `file.lines` differ across the
-     fanned-out records.
-
-Log a warning to stderr if any v1.0 inputs are encountered:
-`[synthesizer] Warning: scanner-output/<file>.json is schema_version 1.0;`
-`migrated in-memory. Re-run the scanner to upgrade the artifact.`
+- **v2.0** (`schema_version: "2.0"`) — pass through into the in-memory shape
+  used by the rest of the pipeline.
+- **Any other value** (`schema_version: "1.0"`, missing, or unrecognized) —
+  log
+  `[synthesizer] Warning: scanner-output/<file>.json is schema_version <value>; no longer supported. Re-run the scanner to regenerate v2.0 output.`
+  to stderr and skip the file.
 
 Skip malformed files entirely (log error, continue with remaining scanners).
-Both versions feed the same downstream pipeline; downstream code reads only
-v2.0 fields.
+Downstream code reads only v2.0 fields.
 
 ### 2. Deduplicate Findings
 
@@ -122,7 +94,7 @@ per finding; the first rule that fires decides the outcome:
    should be suppressed as malformed scanner output. Stop.
 3. **Severity exception (highest priority among numeric-confidence checks).**
    If `severity == "critical"` and `confidence ≥ 0.50`, the finding survives
-   the gate regardless of category or migration status. This is the Wave 2
+   the gate regardless of category. This is the Wave 2
    P0-at-anchor-50 exception
    (`RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/confidence-rubric.md`).
    **Increment `stats.survived_severity_exception` by 1** for each finding
@@ -132,15 +104,11 @@ per finding; the first rule that fires decides the outcome:
    rule 5 (the inner per-finding evaluation rules — Step 4 and Step 5 of
    the outer workflow are different scopes and remain part of the same
    pipeline).
-4. **Missing-failure-scenario bump.** If the finding is stamped
-   `_migrated_from: "1.0"` OR has `failure_scenario == null`, add `+0.05` to
-   the category threshold for this finding only. The bump compensates for
-   the missing concrete-failure signal — v1.0 records lack the field
-   entirely, and v2.0 records may legitimately emit `null` rather than
-   fabricate a scenario. The bump for v1.0-stamped records expires when the
-   transition window closes and v1.0 artifacts no longer appear in
-   `.debt/scanner-output/`; the bump for v2.0 `null` scenarios remains as a
-   permanent calibration mechanism.
+4. **Missing-failure-scenario bump.** If the finding has
+   `failure_scenario == null`, add `+0.05` to the category threshold for
+   this finding only. The bump compensates for the missing concrete-failure
+   signal — a v2.0 record may legitimately emit `null` rather than fabricate
+   a scenario. This is a permanent calibration mechanism.
 5. **Category gate.** Compare `confidence` against the (possibly bumped)
    category threshold from the table above. If `confidence ≥ threshold`, the
    finding survives. Otherwise, suppress with reason
@@ -161,8 +129,7 @@ Record gate stats:
 ```json
 "stats": {
   "suppressed_by_confidence_gate": 12,
-  "survived_severity_exception": 2,
-  "migrated_from_v1": 4
+  "survived_severity_exception": 2
 }
 ```
 
@@ -188,7 +155,7 @@ Create `docs/audits/YYYY-MM-DD-audit-report.md`:
 - Scanner status table (✓/✗, counts, duration)
 - Category breakdown (critical/high/medium/low)
 - Confidence-gate stats (suppressed counts per category, severity-exception
-  survivors, migrated-v1 count)
+  survivors)
 - Hotspot files
 - Next steps (`/debt:triage`)
 
@@ -211,9 +178,9 @@ Format: `todos/debt/NNN-pending-SEVERITY-slug-HASH.md`
 The v2.0 in-memory record uses `file: { path, lines }` (single object) and
 flat `finding`/`fix` strings. The on-disk todo frontmatter format
 (documented in the README "Todo File Format" section, read by
-`debt-fixer.md` Step 3) intentionally retains the v1.0-style
-`affected_files: - path:lines` array key for backward compatibility with
-the existing fixer scope-validator. Map the in-memory v2.0 fields to the
+`debt-fixer.md` Step 3) intentionally uses the stable on-disk
+`affected_files: - path:lines` array key — this is a live contract with
+the existing fixer scope-validator, not a migration holdover. Map the in-memory v2.0 fields to the
 on-disk frontmatter as follows:
 
 | v2.0 in-memory field | On-disk todo frontmatter key | Mapping rule                                |

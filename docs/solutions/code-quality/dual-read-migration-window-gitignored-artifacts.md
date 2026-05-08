@@ -97,13 +97,14 @@ config files, database rows, on-disk caches that persist across deployments).
 When all producers are migrated and the artifact is gitignored:
 
 1. Remove the dual-read branch entirely.
-2. Emit a clear error if a v1.0 artifact is encountered, rather than
-   silently migrating it:
+2. Emit a clear, skip-and-continue log line when a v1.0 artifact is
+   encountered, rather than silently migrating it. Use the same severity
+   prefix the agent already uses for other non-fatal skips
+   (commonly `Warning:` rather than `ERROR:`, since processing continues):
 
    ```text
-   ERROR: Found v1.0 scanner output at .debt/scanner-output/foo.json.
-   This schema is no longer supported. Re-run the scanner to generate
-   a v2.0 output.
+   [synthesizer] Warning: scanner-output/foo.json is schema_version 1.0;
+   no longer supported. Re-run the scanner to regenerate v2.0 output.
    ```
 
 3. Document the breaking schema change in the changeset:
@@ -160,3 +161,9 @@ presence on each run).
   during the same schema rename
 - `docs/solutions/build-errors/plugin-json-changelog-key-schema-drift-remote-validator.md` —
   Schema drift in CI/manifest context
+
+---
+
+## Decision (2026-05-07)
+
+**Decision: (a) remove now — Rationale:** The gitignored artifact directory and all-scanners-migrated condition mean the transition window was already closed on the day PR #316 landed. The defense-in-depth argument requires a v1.0 artifact to appear in a supported workflow, but the primary user flow (`/debt:audit`) regenerates artifacts before synthesis, making stale-artifact encounters structurally rare. The `_migrated_from` trigger in Step 4 rule 4 was already decoupled from the `failure_scenario == null` permanent calibration by the PR1 round-1 fix, so removal does not regress v2.0 scoring. The ongoing cost — three-file prose synchronization, dead `stats.migrated_from_v1` telemetry, and a non-falsifiable closure criterion in SKILL.md — is real and was the source of most P2/P3 findings in PR #316's review. Hard error + skip is a clean, already-precedented code path in the synthesizer, and the error message is immediately actionable. Remove now. See full analysis at `docs/brainstorms/2026-05-07-yellow-debt-dual-read-removal-brainstorm.md`.

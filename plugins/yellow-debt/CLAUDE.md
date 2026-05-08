@@ -101,6 +101,10 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 - Linear sync requires yellow-linear plugin to be installed
 - Fix agent modifies working directory — commit or stash changes first
 - Concurrent audits not supported (single-user CLI tool)
+- Scanner output schema v1.0 is no longer accepted; the synthesizer warns
+  and skips any `.debt/scanner-output/*.json` with `schema_version` other
+  than `"2.0"`. Run `/debt:audit` (which regenerates outputs automatically)
+  rather than invoking synthesis against stale artifacts
 
 ### MCP Tool Integration
 
