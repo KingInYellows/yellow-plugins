@@ -277,6 +277,15 @@ Pattern:
   Never echo, log, or transmit the value. Legacy `mcp__claude_ai_composio__*`
   and `mcp__composio-server__*` paths use Claude Code's native or manual
   credential management instead.
+- **HTTPS-only MCP URL (advisory)**: `composio_mcp_url` MUST start with
+  `https://` — Claude Code sends the API key as the `X-API-Key` header to
+  whatever URL is configured, so a non-HTTPS URL leaks the credential in
+  cleartext. Format is not enforced at the schema level (the Claude Code
+  remote validator does not support `userConfig.<key>.pattern`); the bundled
+  `hooks/check-mcp-url.sh` SessionStart hook prints a warning if the URL is
+  non-HTTPS, but it cannot block the MCP server from attaching first. Treat
+  the warning as a "reconfigure now" signal: open `/plugin`, set the URL to
+  an `https://mcp.composio.dev/*` value, and restart the session.
 - **Content fencing**: Wrap all Composio responses in `--- begin/end ---`
   delimiters per repository convention.
 - **Data transmission**: Tool call parameters and Workbench code are sent to
