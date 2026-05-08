@@ -284,6 +284,47 @@ yellow-plugins/
 └── docs/                      # Validation guides, operational docs, and solutions
 ```
 
+## Troubleshooting
+
+### `claude doctor` says "descriptions dropped"
+
+If `claude doctor` shows a warning like
+`157 descriptions dropped (4.9%/1% of context)`, your skill listing budget
+is too small for the total skill descriptions installed across all your
+plugins. This is a **per-user Claude Code setting**, not a plugin problem
+— yellow-plugins skill descriptions are well under the official 1,536-char
+per-skill cap (per [code.claude.com/docs/en/skills](https://code.claude.com/docs/en/skills)).
+
+The default budget is 1% of the context window, with an 8,000-character
+fallback. Two ways to give Claude Code more room:
+
+1. **Raise `skillListingBudgetFraction`** — edit `~/.claude/settings.json`:
+
+   ```jsonc
+   {
+     "skillListingBudgetFraction": 0.04
+   }
+   ```
+
+   `0.04` (4%) is enough to fit the full yellow-plugins marketplace plus
+   typical adjacent installs, at the cost of roughly 8K extra characters
+   reserved from the per-session context window. Note: this setting is
+   community-discovered (decompiled from Claude Code 2.1.129) and not yet
+   in the official docs — it may be renamed before public documentation.
+
+2. **Set `SLASH_COMMAND_TOOL_CHAR_BUDGET`** as an environment variable for
+   a one-off raise without editing settings. Default is 15,000 characters;
+   set higher (e.g. `SLASH_COMMAND_TOOL_CHAR_BUDGET=40000`) to fit larger
+   skill listings.
+
+(Disabling skills via `/skills` or `skillOverrides` is intentionally
+omitted: those knobs apply to user-scoped skills, not plugin-provided
+skills, and would not reduce yellow-plugins' contribution to the
+budget.)
+
+The warning is informational — Claude Code drops the lowest-priority
+descriptions first. Critical skills you use frequently stay listed.
+
 ## License
 
 MIT

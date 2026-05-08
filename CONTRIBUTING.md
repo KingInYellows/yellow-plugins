@@ -345,6 +345,21 @@ a version bump.
 - Constants: `UPPER_SNAKE_CASE`
 - Plugin names: `kebab-case`
 
+## Skill Description Budget
+
+Plugin skill descriptions are subject to Claude Code's session-level
+[skill listing budget](https://code.claude.com/docs/en/skills) (default 1%
+of context, 8,000-char fallback). Each individual skill's combined
+`description` + `when_to_use` is officially capped at **1,536 characters**;
+yellow-plugins skill descriptions are all well under that limit.
+
+Authors should not artificially trim descriptions to fit the budget — that
+hurts auto-invocation accuracy. Instead, document per-user knobs in the
+README for downstream installs that hit the budget. See [`claude doctor`
+says "descriptions dropped"](README.md#claude-doctor-says-descriptions-dropped)
+for the user-side workaround (`skillListingBudgetFraction`,
+`SLASH_COMMAND_TOOL_CHAR_BUDGET`).
+
 ## Questions?
 
 - Browse each plugin's README for usage
