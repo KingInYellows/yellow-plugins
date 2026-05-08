@@ -325,7 +325,7 @@
               "reason": {
                 "type": "string",
                 "minLength": 1,
-                "description": "Informational free-text explaining why this plugin is required — typically the specific MCP tool, command, or capability the consumer relies on. Not validated; intended as an audit trail readable by humans and AI reviewers. No equivalent field exists in npm/VS Code/JetBrains plugin schemas; this is a yellow-plugins extension."
+                "description": "Informational free-text explaining why this plugin is required — typically the specific MCP tool, command, or capability the consumer relies on. Content is not semantically validated (any non-empty string is accepted; minLength: 1 rejects only \"\"); intended as an audit trail readable by humans and AI reviewers. No equivalent field exists in npm/VS Code/JetBrains plugin schemas; this is a yellow-plugins extension."
               }
             },
             "additionalProperties": false

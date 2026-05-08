@@ -466,7 +466,7 @@ function getMarketplacePluginNames() {
   }
   try {
     const data = JSON.parse(fs.readFileSync(marketplacePath, 'utf8'));
-    if (Array.isArray(data.plugins)) {
+    if (data && Array.isArray(data.plugins)) {
       _marketplacePluginNames = new Set(
         data.plugins
           .filter((p) => p && typeof p.name === 'string')
@@ -1014,9 +1014,6 @@ function validatePlugin(pluginDir) {
   // surfacing install-time coupling that would otherwise fail opaquely at
   // runtime ("MCP tool not found"). Optional deps stay silent (matches
   // npm peerDependenciesMeta semantics: declared, not enforced).
-  //
-  // Loaded once per validate-plugin invocation; passed to validateManifest
-  // via the `marketplacePluginNames` parameter (see discoverPlugins).
   if (Array.isArray(manifest.dependencies) && marketplacePluginNames) {
     for (const dep of manifest.dependencies) {
       // String form: bare plugin name. Cannot be optional; cannot carry reason.
