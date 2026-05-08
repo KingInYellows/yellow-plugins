@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.3.2
+
+### Patch Changes
+
+- [`c3cdfdb`](https://github.com/KingInYellows/yellow-plugins/commit/c3cdfdb5a2c0d260e32096a524c4712fe277d019)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add `$schema`
+  pointer to all remaining plugin manifests:
+  `https://json.schemastore.org/claude-code-plugin-manifest.json`
+
+  Per https://code.claude.com/docs/en/plugins-reference, Claude Code's plugin
+  loader ignores this field at load time, but editors and IDEs use it for
+  autocomplete and inline validation against the official remote validator
+  schema. yellow-core received the pointer earlier in the stack as a
+  single-plugin probe; this PR extends it to the other 17.
+
+  Also documents local vs remote validator divergence in CONTRIBUTING.md with a
+  recipe for empirical install testing (`claude plugin validate`,
+  `claude --plugin-url`, fresh-install probe). The `claude plugin validate` CI
+  integration is deferred to a follow-up PR pending CI runtime evaluation.
+
 ## 2.3.1
 
 ### Patch Changes
