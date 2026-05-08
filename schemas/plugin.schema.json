@@ -316,6 +316,16 @@
                 "pattern": "^[~^>=<*xXvV0-9]",
                 "semverRange": true,
                 "description": "Semver range constraint such as ^1.2.0, ~2.1.0, >=3.0.0, or v1.2.3. Two-layer validation: the `pattern` is a lightweight structural gate that rejects unsupported leading characters before the keyword runs; `semverRange` then calls semver.validRange() for full semantic correctness. minLength: 1 guards the empty-string case — semver.validRange(\"\") returns \"*\" (truthy) so the keyword alone would accept it."
+              },
+              "optional": {
+                "type": "boolean",
+                "default": false,
+                "description": "When true, the validator does not warn if this dep is missing from .claude-plugin/marketplace.json. Mirrors npm peerDependenciesMeta `optional: true` semantics: declared as a soft dep for documentation/audit purposes, not hard-required at install time. Hard deps (default `false` or omitted) trigger a WARNING (not ERROR) when missing from the catalog."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Informational free-text explaining why this plugin is required — typically the specific MCP tool, command, or capability the consumer relies on. Content is not semantically validated (any non-empty string is accepted; minLength: 1 rejects only \"\"); intended as an audit trail readable by humans and AI reviewers. No equivalent field exists in npm/VS Code/JetBrains plugin schemas; this is a yellow-plugins extension."
               }
             },
             "additionalProperties": false
@@ -323,7 +333,7 @@
         ]
       },
       "minItems": 1,
-      "description": "Other plugins this plugin requires, optionally with semver version constraints."
+      "description": "Other plugins this plugin requires, optionally with semver version constraints. Each entry may also declare `optional: true` (soft dep — no warning if missing from marketplace catalog) and `reason: \"<text>\"` (audit trail explaining the specific MCP tool, command, or capability the consumer uses from this dep)."
     }
   },
   "additionalProperties": false

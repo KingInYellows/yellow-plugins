@@ -21,5 +21,13 @@
       "type": "http",
       "url": "https://app.chatprd.ai/mcp"
     }
-  }
+  },
+  "dependencies": [
+    {
+      "name": "yellow-linear",
+      "version": "*",
+      "optional": true,
+      "reason": "chatprd:link-linear uses mcp__plugin_yellow-linear_linear__create_issue"
+    }
+  ]
 }
