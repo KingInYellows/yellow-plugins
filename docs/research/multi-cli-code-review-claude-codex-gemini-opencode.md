@@ -3,7 +3,7 @@
 **Date:** 2026-05-08
 **Architecture:** Claude Code orchestrator + in-process Claude reviewer subagent + 3 subprocess CLI reviewers (Codex, Gemini, OpenCode)
 **Auth model:** Subscription auth across all four lineages (Claude Pro/Max, ChatGPT Plus/Pro, Gemini Advanced/AI Studio, OpenCode → non-Big-3 subscription provider)
-**Sources:** Ceramic search (10 result sets), Claude Code CHANGELOG v2.1.92, Codex CLI CHANGELOG rust-v0.93.x, OpenCode CHANGELOG Feb 2026, prior research doc (yellow-council-multi-agent-code-review-p.md, 2026-05-08), academic papers (Zheng 2023, Du 2023/ICML 2024, Shinn NeurIPS 2023, Wang 2024, Wynn 2025, MetaGPT, AgentAuditor)
+**Sources:** Ceramic search (10 result sets), Claude Code CHANGELOG v2.1.92, Codex CLI CHANGELOG rust-v0.129.0, OpenCode CHANGELOG Feb 2026, prior research doc (yellow-council-multi-agent-code-review-p.md, 2026-05-08), academic papers (Zheng 2023, Du 2023/ICML 2024, Shinn NeurIPS 2023, Wang 2024, Wynn 2025, MetaGPT, AgentAuditor)
 
 ---
 
@@ -111,7 +111,7 @@ The asymmetric shape — in-process Task subagent for Claude, subprocess CLIs fo
 
 ### Codex CLI (subprocess reviewer slot)
 
-**Version (May 2026):** rust-v0.93.x (openai/codex). Default model: `gpt-5.3-codex` (272K context).
+**Version (May 2026):** rust-v0.129.0 (openai/codex) — the version the headless invocation block below has been verified against. Default model: `gpt-5.3-codex` (272K context).
 
 **Subscription auth:** ChatGPT Plus/Pro account login via `codex login` → routes through ChatGPT subscription quota instead of API billing. As of recent Codex CLI, this is the supported path for paid users who don't want to set up API keys.
 
@@ -315,7 +315,7 @@ The literature is stable and the prior doc's recommendations carry forward uncha
 This is the new top-of-list quality risk: **Claude is both Reviewer 1 and the synthesizer.** Without mitigation, the synthesizer favors Claude-reviewer findings 10-15% above chance (Zheng 2023, "Judging LLM-as-a-Judge"). Combined with the 23.8% positional swap-consistency for Claude, the synthesis output is essentially Claude voting for Claude with some noise.
 
 **Required mitigations (V2 mandatory before any quality claim):**
-1. **Two-pass order-swap.** Synthesize findings A→B then B→A, average. Flag >15% variance as "low-confidence synthesis."
+1. **Two-pass order-swap.** Synthesize findings A→B then B→A, average. Flag any finding whose verdict flips between the two passes (or whose confidence tier changes without a flip) as "low-confidence synthesis." (Plan-locked: binary verdict-flip, not the older `>15% variance` heuristic — see plan Task 2.2.)
 2. **Double-blind lineage labels.** Strip CLI/model identity before synthesis. Present to synthesizer as "Reviewer 1/2/3/4." Restore identity in final output for attribution.
 3. **Length-controlled scoring.** Normalize finding score by length to prevent verbosity bias inflation.
 
@@ -325,7 +325,7 @@ This is the new top-of-list quality risk: **Claude is both Reviewer 1 and the sy
 
 **Tier 1 — Structural exact match (~0% FP, ~30% FN):** `git show <commit>:<file>` verbatim line match.
 
-**Tier 2 — Fuzzy alignment (~2% FP, ~12% FN):** `diff-match-patch` (Google, MIT): Myers' diff + Bitap, ≥85% similarity (implemented as `Match_Threshold = 0.15` — the diff-match-patch scale is **inverted**: 0.0 = exact match required, 1.0 = accept any match).
+**Tier 2 — Fuzzy alignment (~2% FP, ~12% FN):** `rapidfuzz` (MIT, C++-backed): Levenshtein-based similarity scoring, `fuzz.ratio(a, b) >= 85` on the intuitive 0–100 scale. (Plan-locked over `diff-match-patch`: yellow-council needs only similarity scoring, not patch/apply semantics, and the `rapidfuzz` 0–100 scale avoids the inverted-threshold trap of diff-match-patch's `Match_Threshold = 0.15` for "≥85% match." See plan Task 5.1 + Locked decisions.)
 
 **Tier 3 — AST match (~0.5% FP, ~20% FN):** `ast-grep` pattern-based structural matching. Semgrep Pro upgrade: 48% → 72% TP on WebGoat via cross-file analysis.
 
@@ -431,11 +431,11 @@ Reproduced from prior doc with the asymmetric-architecture caveat:
 
 ### V2 Roadmap (2-5 days, medium risk)
 
-**V2-1: Two-pass order-swap synthesizer.** Run synthesis on findings A→B then B→A, average scores. Flag >15% variance as "low-confidence synthesis." Mandatory before quality claims. Estimated: 4 hours.
+**V2-1: Two-pass order-swap synthesizer.** Run synthesis on findings A→B then B→A, average scores. Flag any finding whose verdict flips between passes (or whose confidence tier changes without a flip) as "low-confidence synthesis." Mandatory before quality claims. Estimated: 4 hours. (Plan-locked: binary verdict-flip, not the older `>15% variance` heuristic — see plan Task 2.2.)
 
 **V2-2: Double-blind lineage labels in synthesis.** Strip "Claude" / "Codex" / "Gemini" / "OpenCode" labels before synthesis prompt. Present as "Reviewer 1/2/3/4." Restore identity in final report attribution. Estimated: 3 hours.
 
-**V2-3: Tiered evidence verification cascade (Tier 1→2→3).** Exact match → diff-match-patch fuzzy (≥85%) → ast-grep AST match. Move unverified findings to "Unverified Claims" section in synthesis. Highest-leverage quality improvement. Estimated: 3 days.
+**V2-3: Tiered evidence verification cascade (Tier 1→2→3).** Exact match → `rapidfuzz` fuzzy (`fuzz.ratio >= 85`) → ast-grep AST match. Move unverified findings to "Unverified Claims" section in synthesis. Highest-leverage quality improvement. Estimated: 3 days. (Plan-locked library: `rapidfuzz`, not `diff-match-patch`.)
 
 **V2-4: Verify-first gate on `--round 2` (when round 2 is added).** Block round-2 trigger unless ≥1 finding passes Tier-1/2 verification AND is severity P1/P0. EIR drops to ~0%. Estimated: 4 hours after V2-3 lands.
 
@@ -515,7 +515,7 @@ Pin all three subprocess CLI versions in the plugin's CLAUDE.md. A background `n
 - Claude Code CLI definitive reference — https://blakecrosley.com/guides/claude-code — configuration hierarchy, flags, permissions
 - Claude Code best practices (Feb 2026) — https://notes.muthu.co/2026/02/claude-code-cli-best-practices-checklist/ — `-p`, `--output-format json`, `--dangerously-skip-permissions` confirmed
 - Codex CLI reference — https://blakecrosley.com/guides/codex — `config.toml` full reference, sandbox modes, approval policies, model selection
-- Codex CLI changelog rust-v0.93.x (Feb 2026) — https://www.gradually.ai/en/changelogs/codex-cli/ — MCP smart approvals, SQLite log DB, ChatGPT login subscription auth path
+- Codex CLI changelog rust-v0.129.0 (May 2026) — https://www.gradually.ai/en/changelogs/codex-cli/ — MCP smart approvals, SQLite log DB, ChatGPT login subscription auth path; flag rename from `--approval-policy`/`--sandbox-mode` to `-a`/`-s`
 - Codex CLI GitHub Actions integration — https://inventivehq.com/knowledge-base/openai/how-to-use-codex-for-code-review — `codex exec --json`, CI patterns, `/review` command
 - Gemini CLI documentation — https://geminicli.com/docs/ — headless mode, MCP, sandboxing, extensions
 - Gemini CLI 2025 guide — https://a2aprotocol.ai/insights/2025-gemini-cli-tips-tricks — MCP server registration, `~/.gemini/settings.json`, context management
