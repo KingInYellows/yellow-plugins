@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-28 (decomposition split 2026-04-29; reconciled 2026-04-30; second sweep 2026-05-01)
 **Source plan:** `plans/everyinc-merge.md` (backbone — must merge to `main` before this plan runs)
-**Status:** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 shipped via PR #287; item #6 shipped via PR #296; item #12 shipped via PR #293; phase-0 snapshots + plan reconciliation shipped via PR #300. **Sweep 2026-04-30 evening:** items #1, #3, #11 shipped via PRs #306 (`cc3d1f9`), #307 (`39e5d7a`), #308 (`9826330`). **Sweep 2026-05-01 small-skill batch:** items #8, #9, #10 shipped via PRs #310 (`d7f36fa`), #312 (`a2486f1`), #311 (`9cb0f32`). **3 parallel branches remain** (items #2, #5, and #7).
+**Status:** **COMPLETE (2026-05-06).** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 shipped via PR #287; item #6 shipped via PR #296; item #12 shipped via PR #293; phase-0 snapshots + plan reconciliation shipped via PR #300. **Sweep 2026-04-30 evening:** items #1, #3, #11 shipped via PRs #306 (`cc3d1f9`), #307 (`39e5d7a`), #308 (`9826330`). **Sweep 2026-05-01 small-skill batch:** items #8, #9, #10 shipped via PRs #310 (`d7f36fa`), #312 (`a2486f1`), #311 (`9cb0f32`). **Final 3 items (2026-05-06):** items #2, #5, #7 rolled into `plans/everyinc-merge-remaining-work.md` and shipped via PRs #410 (`ef442045`), #403 (`f2be88cc`), #406 (`26026ce6`).
 
 ## Reconciliation 2026-05-01
 
@@ -182,12 +182,12 @@ Per-component reverts: each Wave 3 PR is independent; reverting one does not aff
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. feat/ce-debug-skill (completed 2026-04-30 via PR #306)
-- [ ] 2. feat/yellow-docs-doc-review
+- [x] 2. feat/yellow-docs-doc-review (completed 2026-05-06 via PR #410, squash commit `ef442045` — rolled into `plans/everyinc-merge-remaining-work.md` PR4)
 - [x] 3. feat/resolve-pr-cluster-and-actionability (completed 2026-04-30 via PR #307)
 - [x] 4. fix/git-worktree-and-local-config-expansion (completed 2026-04-30 via PR #287)
-- [ ] 5. feat/agent-native-reviewers
+- [x] 5. feat/agent-native-reviewers (completed 2026-05-06 via PR #403, squash commit `f2be88cc` — rolled into `plans/everyinc-merge-remaining-work.md` PR3)
 - [x] 6. feat/compound-lifecycle-skill (completed 2026-04-30 via PR #296)
-- [ ] 7. feat/yellow-debt-confidence-calibration
+- [x] 7. feat/yellow-debt-confidence-calibration (completed 2026-05-06 via PR #406, squash commit `26026ce6` — rolled into `plans/everyinc-merge-remaining-work.md` PR2; audit-only, scanners already v2.0-compliant)
 - [x] 8. feat/ideation-skill (completed 2026-05-01 via PR #310)
 - [x] 9. feat/cross-vendor-session-history (completed 2026-05-01 via PR #312)
 - [x] 10. feat/optimize-skill (completed 2026-05-01 via PR #311)
