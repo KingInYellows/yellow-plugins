@@ -56,8 +56,12 @@ yellow_morph_needs_install || json_exit
 mkdir -p "$CLAUDE_PLUGIN_DATA" || json_exit "mkdir failed; skipping prewarm"
 
 # Acquire the lock in the parent — $$ is the parent's real, live PID at this
-# point. 5s budget; yield silently if another holder beats us.
-if ! yellow_morph_acquire_install_lock 5; then
+# point. Budget = 2 attempts (~2s worst case): the hook's overall timeout is
+# 5s, and under live contention we must yield with budget left to spare for
+# the json_exit print, or Claude Code SIGKILLs us mid-output and blocks
+# session startup. 2 attempts is also the minimum that lets stale-lock
+# recovery succeed (i=1 detects a dead owner and continues; i=2 acquires).
+if ! yellow_morph_acquire_install_lock 2; then
   json_exit "install lock held by another process; yielding to start-morph.sh"
 fi
 
