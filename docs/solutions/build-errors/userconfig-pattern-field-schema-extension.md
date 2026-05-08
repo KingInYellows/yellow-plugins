@@ -1,7 +1,8 @@
 ---
-title: "Schema extension: optional `pattern` regex field on userConfigEntry"
+title: "Schema extension: optional `pattern` regex field on userConfigEntry (REVERTED)"
 category: build-errors
 track: feature
+status: reverted
 problem: "Plugin authors had no schema-level mechanism to enforce regex constraints on user-supplied userConfig values (URLs, API keys, file paths). The local schema's userConfigEntry used additionalProperties: false and did not list `pattern` as a recognized property, so any plugin that wrote `\"pattern\": \"^https://\"` into plugin.json failed `pnpm validate:plugins` with an additional-property error."
 tags:
   - plugin-manifest
@@ -10,6 +11,7 @@ tags:
   - two-validator-drift
   - input-validation
   - regex
+  - reverted
 severity: P2
 components:
   - schemas/plugin.schema.json
@@ -19,9 +21,43 @@ components:
   - examples/plugin-extended.example.json
 error_pattern: 'must NOT have additional properties \(pattern\) at #/properties/userConfig/properties/<key>'
 date_resolved: 2026-05-06
+date_reverted: 2026-05-08
 ---
 
-# Schema extension: optional `pattern` regex field on `userConfigEntry`
+# Schema extension: optional `pattern` regex field on `userConfigEntry` (REVERTED)
+
+## Outcome (2026-05-08)
+
+**Reverted.** The Claude Code remote validator rejects `userConfig.<key>.pattern`
+as `Validation errors: userConfig.<key>: Unrecognized key: "pattern"` on a
+fresh install (`claude doctor`). The official `userConfig` entry schema at
+`code.claude.com/docs/en/plugins-reference` permits only
+`{type, title, description, sensitive, required, default, multiple, min, max}`
+— `pattern` is NOT in the canonical schema. Our local extension was a
+non-standard divergence; the remote rejection is correct behavior.
+
+The schema field, RULE 10 in `validate-plugin.js`, the PR-B describe block in
+`tests/integration/validate-plugin.test.ts`, the PR-C describe block in
+`tests/integration/example-files-schema.test.ts`, and the `pattern` line in
+`examples/plugin-extended.example.json` are all removed. The original
+TLS-enforcement use case (`yellow-composio` `composio_mcp_url`) now relies on:
+
+- A `SessionStart` hook (`plugins/yellow-composio/hooks/check-mcp-url.sh`)
+  that warns the user if the configured URL is not HTTPS (advisory, cannot
+  block MCP attach).
+- Updated `composio_mcp_url.description` and `composio-patterns` SKILL
+  Security section explicitly documenting the HTTPS-only requirement.
+
+This matches the pre-PR409 (PR #396) baseline. **Do not re-attempt schema-level
+`pattern` enforcement** unless the official Claude Code remote validator schema
+is updated to accept it.
+
+> **Note:** the sections below (`## Problem`, `## Solution`, `## Architectural
+> rationale`, `## Common pattern recipes`, etc.) describe the original PR #409
+> design in present tense for historical reference only. None of those rules
+> are active — see the `## Outcome` section above for the current state.
+
+## Historical Context (PR #409 design — REVERTED)
 
 ## Problem
 
