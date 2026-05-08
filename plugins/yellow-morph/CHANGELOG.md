@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.2.3
+
+### Patch Changes
+
+- [`40f6767`](https://github.com/KingInYellows/yellow-plugins/commit/40f67673bca785741114c05aba73b8445e20ce72)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Apply
+  mechanical audit followups (2026-05-07 audit):
+  - **C-02 (yellow-core):** update three legacy 2-segment `subagent_type:`
+    references in `commands/workflows/plan.md` lines 90/98/132 to the 3-segment
+    runtime form (`yellow-core:research:repo-research-analyst`,
+    `yellow-core:research:best-practices-researcher`,
+    `yellow-core:workflow:spec-flow-analyzer`). Clears three INFO warnings from
+    `pnpm validate:agents`.
+  - **M-02 (yellow-morph):** mark `hooks/scripts/prewarm-morph.sh` as
+    executable. The hook already worked because `bash script.sh` was the
+    invocation form, but the missing `+x` bit raised a WARNING in
+    `pnpm validate:schemas`.
+  - **C-01 (gt-workflow):** document the un-namespaced command convention
+    exception in `CLAUDE.md`. The seven gt-workflow commands ship without the
+    `namespace:verb` prefix intentionally — they predate the namespacing
+    convention. No behavior change; documentation only.
+
+  Companion to PR #436 (X-02 validator fix) and the broader audit followups plan
+  at `plans/audit-followups-2026-05-07.md`.
+
+- [`9977b28`](https://github.com/KingInYellows/yellow-plugins/commit/9977b280f2fab42d4c4627dc2ead0d4d09331d45)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - H-01 (audit
+  2026-05-07): run yellow-morph SessionStart prewarm in a detached background
+  subshell. The previous synchronous form held the session-start critical path
+  for up to 30s while `npm ci` installed `@morphllm/morphmcp` into
+  `${CLAUDE_PLUGIN_DATA}/node_modules/` — single largest user-visible perf cost
+  in the marketplace.
+
+  The refactored hook spawns the install work in a detached subshell
+  (`( ... ) >/dev/null 2>&1 & disown`) and yields to Claude Code in <10ms on the
+  parent. The subshell owns the install lock and trap-releases on EXIT, so the
+  parent's early exit does not orphan the lock. SessionStart timeout reduced
+  from 30s to 5s in `plugin.json` and `hooks/hooks.json` (both kept in sync per
+  drift check).
+
+  **Trade-off:** if the user invokes a morph tool within ~30s of session start
+  on a slow connection, they may still hit a cold cache — `bin/start-morph.sh`
+  runs install synchronously as the correctness fallback. The hook is purely an
+  optimization; missing the async window is no worse than not having the hook at
+  all.
+
+  Companion: also marks `prewarm-morph.sh` executable (M-02 backport — the chmod
+  also lands in PR #437; this PR carries it because PR 3 branched off main,
+  parallel topology).
+
 ## 1.2.2
 
 ### Patch Changes
