@@ -1,7 +1,8 @@
 ---
 name: opencode-reviewer
 description: "Cross-lineage code reviewer that invokes the OpenCode CLI for an independent verdict. Spawned by /council via Task. Returns structured findings with Verdict / Confidence / Findings / Summary."
-model: inherit
+model: haiku
+effort: low
 tools:
   - Bash
   - Read

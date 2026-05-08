@@ -1,7 +1,8 @@
 ---
 name: learnings-researcher
 description: "Searches docs/solutions/ for past learnings relevant to a PR diff or planning context, returning a fenced advisory block of distilled findings. Use when running review:pr, /workflows:plan, or /workflows:brainstorm — surfaces prior bugs, architecture patterns, design decisions, and conventions so institutional knowledge carries forward into the current work."
-model: inherit
+model: haiku
+effort: low
 tools:
   - Read
   - Grep
