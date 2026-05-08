@@ -52,9 +52,7 @@ All scanner agents MUST produce output matching this JSON schema:
 
 **Field Constraints**:
 
-- `schema_version`: "2.0" for new findings; v1.0 inputs accepted by
-  `audit-synthesizer` during the transition window (see "Schema Migration"
-  below)
+- `schema_version`: "2.0" — the current and only accepted version
 - `status`: "success" | "partial" | "error"
 - `category`: "ai-pattern" | "complexity" | "duplication" | "architecture" |
   "security-debt"
@@ -71,12 +69,11 @@ All scanner agents MUST produce output matching this JSON schema:
   the debt enables — the trigger, the execution path, and the user-visible or
   operational outcome. Not generic risk language ("could be hard to maintain"),
   not speculation ("might cause bugs"). If no concrete scenario can be
-  constructed, set to `null` and the synthesizer applies the same `+0.05`
-  confidence-gate bump used for migrated v1.0 records (see
-  `audit-synthesizer.md` Step 4, rule 4). The bump compensates for the
-  missing concrete-failure signal regardless of whether `null` came from a
-  v1.0 migration or a v2.0 scanner that chose not to fabricate. Borrowed
-  from the upstream `ce-adversarial-reviewer` failure-scenario framing.
+  constructed, set to `null` and the synthesizer applies a `+0.05`
+  confidence-gate bump (see `audit-synthesizer.md` Step 4, rule 4) to
+  compensate for the missing concrete-failure signal — `null` represents a
+  v2.0 scanner that chose not to fabricate rather than guess. Borrowed from
+  the upstream `ce-adversarial-reviewer` failure-scenario framing.
 
 ### Confidence Rubric — Category Thresholds (v2.0)
 
@@ -349,31 +346,15 @@ All shell scripts must use LF (Unix) line endings, not CRLF (Windows).
 
 ### Schema Version Mismatch
 
-Scanner output should use `"schema_version": "2.0"` (current). The
-`audit-synthesizer` accepts both 1.0 and 2.0 during the transition window
-(see "Schema Migration" below) so older `.debt/scanner-output/*.json` files
-do not break re-runs.
+Scanner output must use `"schema_version": "2.0"`. Older artifacts
+(`schema_version: "1.0"` or unversioned) are no longer accepted; the
+synthesizer logs a warning and skips them.
 
-**Remediation**: Update new or modified scanner agents to emit v2.0. Leave
-older artifact files untouched — the synthesizer normalizes them in-memory.
-
-### Schema Migration (v1.0 → v2.0)
-
-Breaking changes from v1.0:
-
-| v1.0 field              | v2.0 field          | Migration                                                          |
-| ----------------------- | ------------------- | ------------------------------------------------------------------ |
-| `title`                 | `finding`           | `description ? title + ": " + description : title` — use `title` alone when `description` is null or missing; never produce a literal `"undefined"` or `"None"` suffix |
-| `description`           | `finding`           | Merged into `finding`                                              |
-| `affected_files[]`      | `file`              | Take first array entry; if `null`/empty/missing, log warning and skip the finding; if N>1, emit one additional finding per remaining file copying all other fields including `_migrated_from: "1.0"` so each sibling receives the Step 4 +0.05 confidence bump |
-| `suggested_remediation` | `fix`               | Direct rename                                                      |
-| _(new)_                 | `failure_scenario`  | v1.0 inputs default to `null` (synthesizer flags as upgradeable)   |
-
-The `audit-synthesizer` performs this normalization in-memory when it reads a
-`schema_version: "1.0"` artifact; scanner authors do not need migration code.
-The transition window remains open until all scanners on `main` emit v2.0 and
-no `.debt/scanner-output/*.json` files older than 30 days remain in active
-project trees.
+**Remediation**: Re-run the scanner to regenerate v2.0 output. A full
+`/debt:audit` overwrites each scanner's output before synthesis. If a prior
+partial audit or scanner failure left stale `.debt/scanner-output/*.json`
+files, delete them before re-running so the synthesizer does not skip
+them.
 
 ### Confidence Out of Range
 
