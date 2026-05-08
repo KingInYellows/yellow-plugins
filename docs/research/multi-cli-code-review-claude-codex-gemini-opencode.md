@@ -129,7 +129,7 @@ codex exec --json \
 
 **Quota debit:** Each `codex exec` turn counts against ChatGPT subscription message cap. ChatGPT Plus message limits are tier-dependent and capped per 3-hour rolling window. Codex CLI sessions count separately from chatgpt.com web usage but share the same monthly cap on most tiers.
 
-**Isolation:** Full subprocess isolation. Separate auth state (`~/.codex/auth.json`), separate session log (`--log-db`), Seatbelt/Landlock OS-level sandbox.
+**Isolation:** Full subprocess isolation. Separate auth state — OS keyring on rust-v0.118+ (probe with `codex login status`); legacy `~/.codex/auth.json` only on pre-v0.118 installs. Separate session log (`--log-db`), Seatbelt/Landlock OS-level sandbox.
 
 **Output stability:** Medium. Rust rewrite is stable but JSON output schema is not formally versioned. Pin to a specific Rust release tag.
 
@@ -267,9 +267,9 @@ V2 should track per-reviewer quota headroom in `~/.config/yellow-council/quota.j
 
 ```json
 {
-  "claude": { "used": 12, "cap": 45, "window_start": "2026-05-08T14:00:00Z", "window_hours": 5 },
-  "codex": { "used": 8, "cap": 80, "window_start": "2026-05-08T15:30:00Z", "window_hours": 3 },
-  "gemini": { "used": 230, "cap": 1500, "window_start": "2026-05-08T00:00:00Z", "window_hours": 24 },
+  "claude": { "used": 12, "cap": 45, "window_start": "2026-05-08T14:00:00Z", "window_hours": 5, "tier": "pro" },
+  "codex": { "used": 8, "cap": 80, "window_start": "2026-05-08T15:30:00Z", "window_hours": 3, "tier": "plus" },
+  "gemini": { "used": 230, "cap": 1500, "window_start": "2026-05-08T00:00:00Z", "window_hours": 24, "tier": "advanced" },
   "opencode": { "used": "n/a", "model": "deepseek/deepseek-v4-pro" }
 }
 ```
