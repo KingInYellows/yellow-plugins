@@ -35,8 +35,10 @@ precedence:
 2. Shell env fallback: `EXA_API_KEY`, `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`
 
 If both are set, `userConfig` wins. If neither is set, the wrapper
-unsets the empty value and the MCP starts but tool calls return runtime
-errors (Perplexity hard-fails at startup; Tavily/EXA error on first call).
+unsets the empty value before exec; behavior then differs by server.
+Perplexity's MCP hard-fails at startup so its tools are unavailable,
+while Tavily and EXA start successfully and surface a runtime error
+on the first tool call.
 
 Recommended path (one-time per workstation, no restart needed):
 

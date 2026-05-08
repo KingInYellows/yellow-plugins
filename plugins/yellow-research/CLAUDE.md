@@ -150,10 +150,12 @@ that resolves the API key with the following precedence:
 This means power users who already export the keys in their shell rc do
 not have to re-enter them via `userConfig`. If both are set, `userConfig`
 wins. If neither is set, the wrapper unsets the empty value so the MCP
-package sees "absent" not "explicitly empty"; tool calls then return
-runtime errors. `CERAMIC_API_KEY` remains a shell-only env var because
-it gates the REST live-probe in `/research:setup`, not the MCP server
-(which uses OAuth).
+package sees "absent" not "explicitly empty"; behavior then differs by
+server. Perplexity's MCP hard-fails at startup so its tools are
+unavailable, while Tavily and EXA start successfully and surface a
+runtime error on the first tool call. `CERAMIC_API_KEY` remains a
+shell-only env var because it gates the REST live-probe in
+`/research:setup`, not the MCP server (which uses OAuth).
 
 **Scope note (security):** the resolved API key is exported into the MCP
 process environment and is therefore visible to any subprocess the MCP
