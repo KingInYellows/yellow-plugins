@@ -14,7 +14,7 @@
  *
  * Usage:
  *   node scripts/validate-doc-counts.js
- *   ROOT=/some/path node scripts/validate-doc-counts.js
+ *   VALIDATE_DOC_COUNTS_ROOT=/some/path node scripts/validate-doc-counts.js
  *
  * Exit codes:
  *   0 - All claims match canonical count

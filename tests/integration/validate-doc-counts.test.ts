@@ -141,6 +141,6 @@ describe('validate-doc-counts', () => {
     const { status, stderr } = runValidator(tmpRoot);
 
     expect(status).toBe(1);
-    expect(stderr).toMatch(/17/);
+    expect(stderr).toMatch(/17 marketplace plugins/);
   });
 });
