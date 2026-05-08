@@ -135,8 +135,8 @@ A new plugin in `plugins/yellow-sigmap/` with its own `plugin.json`, a skill exp
 **`/sigmap:orient` step-by-step:**
 1. Check `command -v sigmap` — fail clearly if not installed, with install instructions
 2. Check ruvector session context: if ruvector's recall returned relevant memories for this area, note this and proceed more conservatively (less pre-pass weight needed)
-3. Call `mcp__plugin_yellow-ruvector_sigmap__query_context` with the task description from `$ARGUMENTS`
-4. Call `mcp__plugin_yellow-ruvector_sigmap__search_signatures` on the top 5 ranked files
+3. Call `mcp__plugin_yellow-sigmap_sigmap__query_context` with the task description from `$ARGUMENTS`
+4. Call `mcp__plugin_yellow-sigmap_sigmap__search_signatures` on the top 5 ranked files
 5. Output: ranked file list, key signatures, "files you likely need" summary — no more than 30 lines
 6. Do NOT write to `CLAUDE.md` or any file — output inline only. The CLAUDE.md write path is explicitly disabled.
 

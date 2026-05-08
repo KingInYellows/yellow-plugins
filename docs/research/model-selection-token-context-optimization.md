@@ -1,11 +1,7 @@
 # Model Selection and Token Context Optimization in yellow-plugins
 
 **Date:** 2026-05-08
-**Sources:** Ceramic (10 results), GitHub code search (community agent patterns), direct codebase reads (15 agent files), Anthropic Claude Code CLI reference (blakecrosley.com), Parallel Task (running — partial; not retrieved)
-
-[research-conductor] Source skipped: EXA web search (advanced/basic/crawling) — all returning 400 errors.
-[research-conductor] Source skipped: Tavily — TAVILY_API_KEY not configured.
-[research-conductor] Parallel Task (trun_6ae53d1e637f41f8b3811323c0ae6c72) — still running at synthesis time; not retrieved.
+**Sources:** Ceramic (10 results), GitHub code search (community agent patterns), direct codebase reads (15 agent files), Anthropic Claude Code CLI reference (blakecrosley.com), Parallel Task (running — partial; not retrieved). EXA and Tavily skipped — see Sources section at end of document for full provenance.
 
 ---
 
@@ -99,7 +95,7 @@ Analyzes workflow jobs against a runner inventory (structured data) and outputs 
 **Agents that should be explicit `model: sonnet`:**
 
 **`product-lens-reviewer`** (`plugins/yellow-docs/agents/review/product-lens-reviewer.md`, line 4: `model: inherit`)
-This is the one inconsistency in yellow-docs's otherwise intentional tiering. The other five always-on reviewers are: coherence-reviewer (haiku), scope-guardian-reviewer (sonnet), design-lens-reviewer (sonnet), security-lens-reviewer (sonnet), feasibility-reviewer (unknown — not read, likely sonnet or inherit). `product-lens-reviewer` does premise challenging and strategic consequence analysis — this is genuine analytical work that warrants Sonnet, matching its sibling reviewers. `model: sonnet` is the correct assignment.
+This is one of three reviewers in yellow-docs that hold `model: inherit` (the others: feasibility-reviewer, adversarial-document-reviewer). The four explicitly-tiered always-on reviewers are: coherence-reviewer (haiku), scope-guardian-reviewer (sonnet), design-lens-reviewer (sonnet), security-lens-reviewer (sonnet). `product-lens-reviewer` does premise challenging and strategic consequence analysis — this is genuine analytical work that warrants Sonnet, matching its sibling reviewers. `model: sonnet` is the correct assignment.
 
 **All 5 yellow-debt scanners** (`plugins/yellow-debt/agents/scanners/*.md`, all `model: inherit`):
 - `ai-pattern-scanner` — pattern matching against AI anti-pattern taxonomy
@@ -207,7 +203,7 @@ Yes, with calibration:
 
 - `code-simplicity-reviewer`, `pattern-recognition-specialist`, `test-coverage-analyst` — pattern matching and coverage counting. `model: sonnet` is the quality ceiling. These agents do not benefit from Opus reasoning.
 - `security-reviewer` — security analysis warrants Sonnet at minimum; Opus would be defensible for security-critical codebases, but Sonnet catches exploitable vulnerabilities reliably. Recommendation: `model: sonnet`, user can override at the command level if they want Opus security review. (`security-sentinel` stays on Opus per Section 2a — adversarial reasoning over multi-step inference benefits from Opus.)
-- `performance-oracle`, `performance-reviewer` — algorithmic complexity analysis. Sonnet is sufficient for well-scoped code; Opus adds value for complex distributed systems analysis. Recommendation: `model: sonnet`, with a note that users working on high-performance systems may want to override.
+- `performance-reviewer` — calibration persona adding anchored confidence on top of `performance-oracle`'s analysis. Recommendation: `model: sonnet`. (`performance-oracle` stays on Opus — primary discovery agent for algorithmic complexity, N+1, and memory management; novel complexity reasoning earns the cost.)
 - `architecture-strategist` — currently `model: opus`. This is correctly Opus: architectural judgment is the use case Opus is designed for. Do not downgrade.
 - `polyglot-reviewer` — language-idiomatic review. Sonnet knows idioms across TS/Py/Rust/Go reliably. `model: sonnet`.
 

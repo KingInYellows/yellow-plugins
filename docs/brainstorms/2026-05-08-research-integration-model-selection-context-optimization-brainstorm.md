@@ -204,7 +204,7 @@ versioned form like `sonnet-4-5`, `opus-4-6`). Any other value is a hard error. 
 misspellings and invalid model IDs before they silently fall back to the session default.
 
 **Implementation:** Add `parseScalar(frontmatter, 'model')` → validate against known enum
-(allow prefix match for versioned IDs like `haiku-4-5`).
+(allow specific versioned IDs via regex such as `^(haiku|sonnet|opus)(-[0-9]+)*$` — accepts `haiku-4-5` and `sonnet-4-6` while rejecting `haiku-typo` or `sonnetly`).
 
 #### Rule V3: `model: inherit` warning for narrow-role agents (warning, not error)
 

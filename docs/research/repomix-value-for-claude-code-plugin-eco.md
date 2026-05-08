@@ -7,7 +7,7 @@
 
 ## Summary
 
-Repomix is a mature, actively-maintained CLI that serializes a repository into a single AI-consumable file (XML, Markdown, or plain text) with token counting, secret redaction, tree-sitter compression, and remote-repo support. For `yellow-plugins`, **the core problem repomix solves — giving an LLM filesystem access it doesn't have — is almost entirely pre-solved** by Claude Code's native Read/Grep/Glob and the Explore subagent. The one legitimate gap is **external CLI and Devin handoffs**, where repomix produces a clean, scoped briefing artifact without requiring the external agent to negotiate filesystem access. The verdict is **Adopt narrowly**, specifically as a pre-handoff packing step in yellow-codex, yellow-devin, and optionally yellow-review.
+Repomix is a mature, actively-maintained CLI that serializes a repository into a single AI-consumable file (XML, Markdown, or plain text) with token counting, secret redaction, tree-sitter compression, and remote-repo support. For `yellow-plugins`, **the core problem repomix solves — giving an LLM filesystem access it doesn't have — is almost entirely pre-solved** by Claude Code's native Read/Grep/Glob and the Explore subagent. The one legitimate gap is **external CLI and Devin handoffs**, where repomix produces a clean, scoped briefing artifact without requiring the external agent to negotiate filesystem access. The verdict is **Adopt narrowly**, specifically as a pre-handoff packing step in yellow-codex, yellow-devin, and yellow-council (the plugin responsible for external CLI handoffs).
 
 ---
 
