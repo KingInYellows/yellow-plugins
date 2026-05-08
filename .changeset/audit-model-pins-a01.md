@@ -34,7 +34,7 @@ scope — no edits needed:
 | `best-practices-researcher` | `[WebSearch, WebFetch, Read, Glob, Grep]` — keep |
 | `git-history-analyzer` | `[Bash, Read, Grep, Glob]` — Bash needed |
 | `spec-flow-analyzer` | `[Read, Grep, Glob, Bash]` — Bash needed |
-| `code-researcher` | full set with ToolSearch + MCP tools — far too narrow to restrict |
+| `code-researcher` | broad toolset by design (Read, Grep, Glob, Bash, ToolSearch + 11 MCP tools) — keep; restricting would break inline research |
 | `codex-analyst` | `[Bash, Read, Grep, Glob]` — Bash needed |
 | `linear-explorer` | `[Bash, ToolSearch, 5× MCP]` — verified |
 
