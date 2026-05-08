@@ -209,12 +209,15 @@ only one with an explicit external gate.
   `docs/solutions/build-errors/validate-agent-authoring-changelog-skip.md`.
 - [ ] 1.3: Run `pnpm release:check` — verify the false-positive ERROR on
   `plugins/yellow-review/CHANGELOG.md` no longer fires.
-- [ ] 1.4: Add a regression test:
-  - `tests/validate-agent-authoring/changelog-prose.fixture.md` containing
-    a `yellow-review:review:code-reviewer` reference inside a Markdown bullet
-  - Test asserts the validator does NOT flag this fixture
-  - Pair fixture: a real `agent.md` with a broken `subagent_type:` in
-    frontmatter → must still be flagged
+- [ ] 1.4: Add regression coverage at
+  `tests/integration/validate-agent-authoring-changelog-skip.test.ts`
+  (Vitest integration test, not a static fixture). Three cases:
+  1. CHANGELOG.md containing a deleted-agent `subagent_type:` reference →
+     validator does NOT flag it.
+  2. Non-CHANGELOG markdown (e.g., a command file) with the same reference →
+     validator STILL flags it.
+  3. Both files present → only the non-CHANGELOG file is flagged; CHANGELOG
+     remains silent.
 - [ ] 1.5: Run `pnpm test:unit && pnpm validate:schemas`.
 - [ ] 1.6: Commit with `fix(scripts): restrict subagent_type validator to frontmatter`.
 - [ ] 1.7: `gt submit` → PR 1.
@@ -767,7 +770,7 @@ were checked for least-privilege; current tools are correct."
 
 | Phase | File | Change |
 |---|---|---|
-| 1 | `scripts/validate-agent-authoring.js` | Frontmatter-only matching for `subagent_type:` rule |
+| 1 | `scripts/validate-agent-authoring.js` | Skip `CHANGELOG.md` files in the `markdownFiles` walk predicate (revised from the brainstormed frontmatter-only approach — see Phase 1 / step 1.2 for rationale) |
 | 2 | `plugins/yellow-core/commands/workflows/plan.md` | Lines 90, 98, 132: 2-segment → 3-segment |
 | 2 | `CLAUDE.md` | Line 8: `14` → `18` |
 | 2 | `README.md` | Line 3: `17` → `18` |
@@ -814,7 +817,7 @@ array. Existing manifests without the field validate unchanged.
   "name": "yellow-debt",
   "version": "1.x.x",
   "dependencies": [
-    { "plugin": "yellow-linear", "reason": "debt:sync uses ..." }
+    { "name": "yellow-linear", "version": "*", "optional": true, "reason": "debt:sync uses ..." }
   ]
 }
 ```

@@ -14,7 +14,7 @@
  * deprecated agents — blocking `pnpm release:check` indefinitely.
  */
 
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
@@ -30,21 +30,18 @@ interface ValidatorRun {
 }
 
 function runValidator(pluginsDir: string): ValidatorRun {
-  try {
-    const stdout = execFileSync('node', [VALIDATOR], {
-      env: { ...process.env, VALIDATE_PLUGINS_DIR: pluginsDir },
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { status: 0, stdout, stderr: '' };
-  } catch (err) {
-    const e = err as { status: number; stdout?: string; stderr?: string };
-    return {
-      status: e.status,
-      stdout: e.stdout ?? '',
-      stderr: e.stderr ?? '',
-    };
-  }
+  // spawnSync (not execFileSync) so stderr is captured on success too —
+  // the assertions below check stderr regardless of exit code.
+  const result = spawnSync('node', [VALIDATOR], {
+    env: { ...process.env, VALIDATE_PLUGINS_DIR: pluginsDir },
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return {
+    status: result.status ?? 1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
 }
 
 function writeFile(

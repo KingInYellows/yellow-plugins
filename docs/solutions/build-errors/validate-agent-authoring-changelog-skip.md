@@ -1,8 +1,17 @@
 ---
-problem: validate-agent-authoring.js hard-errors on CHANGELOG.md prose mentioning deleted agents
+title: 'validate-agent-authoring.js hard-errors on CHANGELOG.md prose mentioning deleted agents'
 category: build-errors
+track: bug
+problem: 'validate-agent-authoring.js hard-errors on CHANGELOG.md prose mentioning deleted agents'
 date: 2026-05-07
-related-files:
+tags:
+  - validate-agent-authoring
+  - subagent_type
+  - changelog
+  - false-positive
+  - release-check
+severity: P2
+components:
   - scripts/validate-agent-authoring.js
   - tests/integration/validate-agent-authoring-changelog-skip.test.ts
 related-prs:
@@ -15,7 +24,7 @@ related-prs:
 
 `pnpm release:check` fails with a hard ERROR like:
 
-```
+```text
 ✗ ERROR: plugins/yellow-review/CHANGELOG.md: subagent_type "yellow-review:review:code-reviewer" does not match any declared plugin agent
 ```
 
@@ -72,9 +81,15 @@ Single-line filter on the walk predicate:
 const markdownFiles = walk(
   PLUGINS_DIR,
   (filePath) =>
-    filePath.endsWith('.md') && path.basename(filePath) !== 'CHANGELOG.md'
+    filePath.endsWith('.md') &&
+    path.basename(filePath).toUpperCase() !== 'CHANGELOG.MD'
 );
 ```
+
+The case-insensitive `toUpperCase()` is intentional defense — every existing
+CHANGELOG in the repo uses canonical `CHANGELOG.md` casing, but a stray
+`Changelog.md` from a different tool's convention should not silently re-open
+the false-positive surface.
 
 Trade-off: if a CHANGELOG entry references an agent that DOES still
 exist, the validator no longer cross-checks it. Acceptable because:

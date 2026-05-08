@@ -18,7 +18,7 @@
 
 ## 1. Repository map
 
-```
+```text
 yellow-plugins/                          # pnpm monorepo (no published runtime)
 ├── .claude-plugin/marketplace.json      # 18-plugin catalog, schema-validated
 ├── plugins/                             # 18 plugins (auto-discovery)

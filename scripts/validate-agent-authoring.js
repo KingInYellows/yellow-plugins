@@ -148,7 +148,8 @@ const agentFiles = walk(
 const markdownFiles = walk(
   PLUGINS_DIR,
   (filePath) =>
-    filePath.endsWith('.md') && path.basename(filePath) !== 'CHANGELOG.md'
+    filePath.endsWith('.md') &&
+    path.basename(filePath).toUpperCase() !== 'CHANGELOG.MD'
 );
 const commandFiles = walk(
   PLUGINS_DIR,

@@ -60,13 +60,23 @@ resolves that for future contributors without incurring rename churn.
 
 #### X-02 — Fix validator CHANGELOG false positive
 - **File:** `scripts/validate-agent-authoring.js`
-- **Approach:** frontmatter-only matching — only flag `subagent_type:` values found inside
-  YAML frontmatter blocks (between `---` delimiters), not in prose, code fences, or CHANGELOG entries
-- **Rationale for approach:** skip-CHANGELOG-entirely would also miss a future README or
-  solution doc that documents a deleted agent; frontmatter-only matches the validator's
-  actual intent ("catch broken declarations")
+- **Approach (revised at implementation time):** skip `CHANGELOG.md` files entirely from
+  the `markdownFiles` walk predicate. Frontmatter-only matching was rejected on closer
+  inspection — `subagent_type:` references rarely appear in frontmatter; they appear in
+  command-file bodies (Task tool invocation pseudo-code in fenced code blocks) and inline
+  as `Task(subagent_type="...")` in prose. Restricting to frontmatter would have silently
+  dropped ~11 legitimate inline usages and effectively turned the validator into a no-op
+  for the surface it actually protects.
+- **Rationale for skip-CHANGELOG:** semantically correct — CHANGELOGs document the past,
+  not the current dispatch graph; their references are intentionally not current. The
+  filter is strictly more targeted than frontmatter-only and preserves all existing
+  validation surfaces. See
+  `docs/solutions/build-errors/validate-agent-authoring-changelog-skip.md` for the full
+  decision record.
 - **Verify:** `pnpm release:check` passes cleanly; `yellow-review/CHANGELOG.md` no longer
-  triggers the hard ERROR
+  triggers the hard ERROR. Three regression tests at
+  `tests/integration/validate-agent-authoring-changelog-skip.test.ts` cover the
+  CHANGELOG-silent / non-CHANGELOG-flagged / both-present cases.
 - **Changeset:** not required (scripts/ change, no plugin content change)
 
 #### H-01 — Morph prewarm async background
