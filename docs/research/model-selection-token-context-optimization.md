@@ -11,7 +11,7 @@
 
 ## Summary
 
-The yellow-plugins system has 71 of 79 agents (90%) using `model: inherit`, zero agents using `effort:` frontmatter, and one plugin (yellow-docs) that has already demonstrated intentional model tiering with measurable design rationale. The inheritance trap is real: `/review:pr` dispatching 16 reviewers from an Opus session multiplies token cost by 16x at the Opus rate with no quality ceiling benefit for pattern-matching or structured-output tasks. The clearest wins are: (1) explicit model assignment for the 10+ narrow-role agents where Haiku or Sonnet is clearly sufficient, (2) `effort: low` adoption for all background scanning and CLI-wrapper agents, and (3) making `product-lens-reviewer`'s `model: inherit` consistent with its yellow-docs peers. Prompt caching is not directly actionable at the plugin-author level — it is a platform-managed concern — but skill preloading choices indirectly affect what gets cached.
+The yellow-plugins system has 66 of 79 agents (83.5%) using `model: inherit`, zero agents using `effort:` frontmatter, and one plugin (yellow-docs) that has already demonstrated intentional model tiering with measurable design rationale. The inheritance trap is real: `/review:pr` dispatching 16 reviewers from an Opus session multiplies token cost by 16x at the Opus rate with no quality ceiling benefit for pattern-matching or structured-output tasks. The clearest wins are: (1) explicit model assignment for the 10+ narrow-role agents where Haiku or Sonnet is clearly sufficient, (2) `effort: low` adoption for all background scanning and CLI-wrapper agents, and (3) making `product-lens-reviewer`'s `model: inherit` consistent with its yellow-docs peers. Prompt caching is not directly actionable at the plugin-author level — it is a platform-managed concern — but skill preloading choices indirectly affect what gets cached.
 
 ---
 
@@ -34,7 +34,7 @@ Based on Anthropic's published capability documentation and the community refere
 From the Claude Code CLI reference (v2.1.33+, confirmed Ceramic rank-2 result):
 
 ```
-effort: low | medium | high | max
+effort: low | medium | high | xhigh | max
 ```
 
 `effort:` controls the model's reasoning depth — specifically how much extended thinking / chain-of-thought the model applies before answering. It does NOT change which model is selected. Key behavioral differences:
@@ -206,12 +206,12 @@ Yes, this is the documented behavior. `model: inherit` in Claude Code subagent f
 Yes, with calibration:
 
 - `code-simplicity-reviewer`, `pattern-recognition-specialist`, `test-coverage-analyst` — pattern matching and coverage counting. `model: sonnet` is the quality ceiling. These agents do not benefit from Opus reasoning.
-- `security-sentinel`, `security-reviewer` — security analysis warrants Sonnet at minimum; Opus would be defensible for security-critical codebases, but Sonnet catches exploitable vulnerabilities reliably. Recommendation: `model: sonnet`, user can override at the command level if they want Opus security review.
+- `security-reviewer` — security analysis warrants Sonnet at minimum; Opus would be defensible for security-critical codebases, but Sonnet catches exploitable vulnerabilities reliably. Recommendation: `model: sonnet`, user can override at the command level if they want Opus security review. (`security-sentinel` stays on Opus per Section 2a — adversarial reasoning over multi-step inference benefits from Opus.)
 - `performance-oracle`, `performance-reviewer` — algorithmic complexity analysis. Sonnet is sufficient for well-scoped code; Opus adds value for complex distributed systems analysis. Recommendation: `model: sonnet`, with a note that users working on high-performance systems may want to override.
 - `architecture-strategist` — currently `model: opus`. This is correctly Opus: architectural judgment is the use case Opus is designed for. Do not downgrade.
 - `polyglot-reviewer` — language-idiomatic review. Sonnet knows idioms across TS/Py/Rust/Go reliably. `model: sonnet`.
 
-**Note on yellow-docs vs. yellow-review:** yellow-docs has already set explicit model assignments for 6 of 7 reviewers (haiku/sonnet mix). This is the pattern that yellow-review and yellow-debt should adopt. The yellow-docs implementation is the reference implementation.
+**Note on yellow-docs vs. yellow-review:** yellow-docs has set explicit model assignments for 4 of 7 reviewers (coherence=haiku, design-lens/scope-guardian/security-lens=sonnet); the remaining three (product-lens, feasibility, adversarial-document) hold `model: inherit`. This partial-tiering is the closest existing pattern in the repo and a starting point that yellow-review and yellow-debt could extend.
 
 ---
 

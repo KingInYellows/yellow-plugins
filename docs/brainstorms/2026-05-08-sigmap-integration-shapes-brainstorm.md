@@ -16,7 +16,7 @@ The two tools are orthogonal, not competing:
 - **RTK** compresses the OUTPUT of shell commands (git status, cat, ls, test runners) before it enters the context window. It fires automatically via a PreToolUse hook. It reduces token cost per command by 60-99%.
 - **sigmap** ranks and summarizes which SOURCE FILES are relevant to a given query. It requires explicit MCP tool invocation or a workflow command pre-pass. It reduces the wrong-file-loading problem, not the command-output-bloat problem.
 
-Neither tool overlaps with ruvector. RTK and ruvector operate on different hook types (PreToolUse vs. PostToolUse) with different data. sigmap and ruvector partially overlap on "file relevance ranking" but answer different questions (TF-IDF structural ranking vs. semantic embedding recall).
+Neither tool overlaps with ruvector. **Both RTK and ruvector register PreToolUse hooks** (verified in `plugins/yellow-ruvector/.claude-plugin/plugin.json` — ruvector's matcher is `Edit|Write|MultiEdit|Bash`), but they perform different operations on different data: RTK rewrites command output to compress it; ruvector's PreToolUse outputs `{continue: true}` without modifying the command. The "no collision" conclusion holds operationally — different operations, different data — but it is **not** because of different hook types. sigmap and ruvector partially overlap on "file relevance ranking" but answer different questions (TF-IDF structural ranking vs. semantic embedding recall).
 
 ---
 
@@ -187,7 +187,7 @@ A new plugin in `plugins/yellow-sigmap/` with its own `plugin.json`, a skill exp
 A new plugin in `plugins/yellow-rtk/` that wraps the RTK CLI. No MCP server. No agents. Three commands plus a SessionStart hook that warns if `rtk` is not on PATH. This is the right first move because it solves a problem the stack has zero coverage for — command-output compression — and activates automatically on every session once the hook is installed.
 
 **Why RTK before sigmap:**
-- RTK has zero overlap with ruvector (different hook types, different data, zero collision surface)
+- RTK has zero overlap with ruvector (both register PreToolUse hooks but on disjoint operations; different data; zero collision surface)
 - RTK fires automatically on cold-start from session prompt one, regardless of ruvector history
 - For Pain B (targeted-fix over-reading): RTK reduces the token cost of every file read by 60-75%, even if Claude still over-reads
 - For Pain D (cold-start): RTK makes every exploratory `ls`, `cat`, `git log` 70-80% smaller, reducing cold-start token spend substantially

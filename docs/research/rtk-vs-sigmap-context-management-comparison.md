@@ -150,7 +150,7 @@ No MCP server entry needed — RTK integrates via the hook system, not MCP. A `y
 - An `/rtk:discover` command that analyzes past sessions for missed savings opportunities
 - A `SessionStart` hook to check RTK is installed and warn if not
 
-**Hook collision with ruvector:** None. RTK's hook is a PreToolUse that rewrites the `command` field. ruvector's hooks are PostToolUse (remember) and a separate recall injection. They operate on different hook types and different data — no collision possible.
+**Hook collision with ruvector:** None. **Both RTK and ruvector register PreToolUse hooks** (verified in `plugins/yellow-ruvector/.claude-plugin/plugin.json` — ruvector's PreToolUse matcher is `Edit|Write|MultiEdit|Bash`), but they perform different operations on different data: RTK rewrites the command field to compress output; ruvector's PreToolUse outputs `{continue: true}` without modifying the command. ruvector additionally runs PostToolUse (memory writeback) and UserPromptSubmit (recall injection); none surface conflict with RTK's command-rewrite path. The "no collision" conclusion holds operationally — different operations on different data — but it is **not** because hook types differ.
 
 **File-write conflicts:** RTK's `rtk init` patches `CLAUDE.md` with a 134-line RTK awareness block. This is the one friction point: yellow-core auto-memory and sigmap also write to `CLAUDE.md`. The RTK block is append-only (it does not replace), but any plugin that manages `CLAUDE.md` as curated content needs to account for this. Mitigation: use `rtk init --hook-only` in the plugin setup command, and expose the CLAUDE.md patch as a separate opt-in step.
 
@@ -201,7 +201,7 @@ No MCP server entry needed — RTK integrates via the hook system, not MCP. A `y
 
 2. **It activates automatically on both target pains.** For cold-start (Pain D), RTK fires on every exploratory command from the first session, regardless of ruvector history. For targeted-fix (Pain B), RTK reduces the token cost of every file read Claude makes, even if Claude still reads too many files.
 
-3. **Zero interaction with ruvector.** Different hook type (PreToolUse vs. PostToolUse), different data (command rewrite vs. memory injection), zero collision surface.
+3. **Zero interaction with ruvector.** Both register PreToolUse hooks (matcher `Edit|Write|MultiEdit|Bash`), but on different operations and different data — RTK rewrites command output; ruvector's PreToolUse outputs `{continue: true}` without command modification. The hooks operate orthogonally on disjoint payloads, so the no-collision conclusion holds operationally, not because of hook-type difference.
 
 4. **Lower bus-factor than sigmap.** Three named contributors, Homebrew formula, Discord, external website — materially more organizational surface than a solo-maintainer npm package at 181 stars.
 
@@ -238,7 +238,7 @@ The prior sigmap evaluation left the door open for a single `mcpServers` entry i
 - [rtk-ai/rtk — openclaw/README.md](https://github.com/rtk-ai/rtk/blob/master/openclaw/README.md) — OpenClaw plugin, measured savings per command
 - [rtk-ai/rtk — openclaw/package.json](https://github.com/rtk-ai/rtk/blob/master/openclaw/package.json) — `@rtk-ai/rtk-rewrite` package name, confirms plugin structure
 - [manojmallick/sigmap — full prior evaluation](https://github.com/manojmallick/sigmap) — mechanism, MCP tools, maturity signals, integration cost (via prior research stored at `docs/research/sigmap-evaluation-for-yellow-plugins.md`)
-- `/home/kinginyellow/projects/yellow-plugins/docs/research/sigmap-evaluation-for-yellow-plugins.md` — prior sigmap evaluation (read directly)
+- `docs/research/sigmap-evaluation-for-yellow-plugins.md` — prior sigmap evaluation (read directly)
 - Ceramic search (`rtk-ai RTK retrieval toolkit context management LLM MCP`) — 1 unrelated result, no prior team discussion found
 - Ceramic search (`sigmap TF-IDF graph context management Claude Code MCP token reduction`) — 0 results
 - [research-conductor] EXA — skipped (400 errors on all calls)
