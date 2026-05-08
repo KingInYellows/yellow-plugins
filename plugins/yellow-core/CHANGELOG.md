@@ -1,5 +1,70 @@
 # Changelog
 
+## 1.15.1
+
+### Patch Changes
+
+- [`40f6767`](https://github.com/KingInYellows/yellow-plugins/commit/40f67673bca785741114c05aba73b8445e20ce72)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Apply
+  mechanical audit followups (2026-05-07 audit):
+  - **C-02 (yellow-core):** update three legacy 2-segment `subagent_type:`
+    references in `commands/workflows/plan.md` lines 90/98/132 to the 3-segment
+    runtime form (`yellow-core:research:repo-research-analyst`,
+    `yellow-core:research:best-practices-researcher`,
+    `yellow-core:workflow:spec-flow-analyzer`). Clears three INFO warnings from
+    `pnpm validate:agents`.
+  - **M-02 (yellow-morph):** mark `hooks/scripts/prewarm-morph.sh` as
+    executable. The hook already worked because `bash script.sh` was the
+    invocation form, but the missing `+x` bit raised a WARNING in
+    `pnpm validate:schemas`.
+  - **C-01 (gt-workflow):** document the un-namespaced command convention
+    exception in `CLAUDE.md`. The seven gt-workflow commands ship without the
+    `namespace:verb` prefix intentionally — they predate the namespacing
+    convention. No behavior change; documentation only.
+
+  Companion to PR #436 (X-02 validator fix) and the broader audit followups plan
+  at `plans/audit-followups-2026-05-07.md`.
+
+- [`902a9ce`](https://github.com/KingInYellows/yellow-plugins/commit/902a9cee8bf9b61807e91e5bcb49c91ba0d7c4d0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - A-01 (audit
+  2026-05-07): pin `model: opus` on five deep-analysis review personas that
+  previously inherited the parent's model. Establishes deterministic quality on
+  the most analytically demanding agents in the review surface, completing the
+  existing pinning convention (`architecture-strategist`, `research-conductor`
+  are already pinned to opus).
+
+  **yellow-core:**
+  - `agents/review/security-sentinel.md`: `model: inherit` → `model: opus`
+  - `agents/review/performance-oracle.md`: `model: inherit` → `model: opus`
+
+  **yellow-review:**
+  - `agents/review/adversarial-reviewer.md`: `model: inherit` → `model: opus`
+  - `agents/review/agent-cli-readiness-reviewer.md`: `model: inherit` →
+    `model: opus`
+  - `agents/review/agent-native-reviewer.md`: `model: inherit` → `model: opus`
+
+  Identifier `opus` (bare string) matches existing precedent in
+  `plugins/yellow-core/agents/review/architecture-strategist.md`.
+
+  **A-02 Phase 1 (audit pass):** the brainstorm proposed restricting `tools:` on
+  eight read-only research agents but per-body verification (deepen-plan
+  codebase research) shows all 8 already have correct narrowed scope — no edits
+  needed:
+
+  | Agent                       | Status                                                                                                                      |
+  | --------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+  | `learnings-researcher`      | already `[Read, Grep, Glob]`                                                                                                |
+  | `repo-research-analyst`     | `[Read, Grep, Glob, Bash]` — Bash needed                                                                                    |
+  | `best-practices-researcher` | `[WebSearch, WebFetch, Read, Glob, Grep]` — keep                                                                            |
+  | `git-history-analyzer`      | `[Bash, Read, Grep, Glob]` — Bash needed                                                                                    |
+  | `spec-flow-analyzer`        | `[Read, Grep, Glob, Bash]` — Bash needed                                                                                    |
+  | `code-researcher`           | broad toolset by design (Read, Grep, Glob, Bash, ToolSearch + 11 MCP tools) — keep; restricting would break inline research |
+  | `codex-analyst`             | `[Bash, Read, Grep, Glob]` — Bash needed                                                                                    |
+  | `linear-explorer`           | `[Bash, ToolSearch, 5× MCP]` — verified                                                                                     |
+
+  Audit confirms least-privilege precedent is already in place for these eight
+  agents. No `Edit`/`Write` inheritance found.
+
 ## 1.15.0
 
 ### Minor Changes
