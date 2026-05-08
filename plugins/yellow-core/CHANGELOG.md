@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.15.2
+
+### Patch Changes
+
+- [`e18b65f`](https://github.com/KingInYellows/yellow-plugins/commit/e18b65ff1193429ffd7e263a9f09ac820f8599fe)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add `$schema`
+  pointer to `https://json.schemastore.org/claude-code-plugin-manifest.json` in
+  `plugin.json`. Single-plugin probe — IDE/editor JSON Schema autocomplete
+  should now work, and Claude Code's plugin loader should silently ignore the
+  field per official docs ("Claude Code ignores this field at load time"). If
+  the remote validator unexpectedly rejects this key on install (similar to the
+  recent `userConfig.pattern` rejection), this single bump can be reverted
+  without affecting any other plugin.
+
+  Gates the broader 17-plugin rollout in a follow-up PR.
+
 ## 1.15.1
 
 ### Patch Changes

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-devin",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
   "author": {
     "name": "KingInYellows",
