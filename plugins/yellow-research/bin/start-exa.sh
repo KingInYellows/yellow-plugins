@@ -12,6 +12,6 @@ unset EXA_API_KEY_USERCONFIG
 # string so the MCP package sees "absent" not "explicitly empty".
 [ -z "${EXA_API_KEY:-}" ] && unset EXA_API_KEY
 
-exec npx -y exa-mcp-server@3.1.8 \
+exec npx -y "exa-mcp-server@3.1.8" \
   "tools=web_search_exa,get_code_context_exa,company_research_exa,web_search_advanced_exa,crawling_exa,deep_researcher_start,deep_researcher_check" \
-  -- "$@"
+  ${1+-- "$@"}

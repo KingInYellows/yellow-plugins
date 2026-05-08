@@ -12,4 +12,4 @@ unset TAVILY_API_KEY_USERCONFIG
 # string so the MCP package sees "absent" not "explicitly empty".
 [ -z "${TAVILY_API_KEY:-}" ] && unset TAVILY_API_KEY
 
-exec npx -y tavily-mcp@0.2.17 -- "$@"
+exec npx -y "tavily-mcp@0.2.17" ${1+-- "$@"}

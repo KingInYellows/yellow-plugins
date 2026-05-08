@@ -13,4 +13,4 @@ unset PERPLEXITY_API_KEY_USERCONFIG
 # string so the MCP package sees "absent" not "explicitly empty".
 [ -z "${PERPLEXITY_API_KEY:-}" ] && unset PERPLEXITY_API_KEY
 
-exec npx -y "@perplexity-ai/mcp-server@0.8.2" -- "$@"
+exec npx -y "@perplexity-ai/mcp-server@0.8.2" ${1+-- "$@"}
