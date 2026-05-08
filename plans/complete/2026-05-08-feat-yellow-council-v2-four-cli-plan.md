@@ -30,7 +30,7 @@ The deepen-plan annotations (`<!-- deepen-plan: source -->` blocks) embedded thr
 
 1. **Add Claude as the 4th reviewer slot** as in-process Task subagent (asymmetric architecture). Activates true 4-lineage diversity once OpenCode is wired to a non-Big-3 provider.
 2. **Mitigate self-enhancement bias** in the Claude→Claude synthesis path via two-pass order-swap and double-blind lineage labels. This is the new #1 quality risk under the asymmetric architecture.
-3. **Track subscription quotas per reviewer** so quota exhaustion fails gracefully (mark UNAVAILABLE, surface ETA, do not retry).
+3. **Track subscription quotas per reviewer** so quota exhaustion fails gracefully (emit `verdict=QUOTA_EXHAUSTED` per Task 3.3, surface ETA in headline, do not retry).
 4. **Wire OpenCode to a non-Big-3 lineage** (DeepSeek/Grok/Mistral) for genuine 4-lineage orthogonality.
 5. **Add Tier 1-2 evidence verification** (exact match + diff-match-patch fuzzy) to the synthesis step. Tier 3 (ast-grep) is V3.
 
@@ -207,7 +207,7 @@ Modify synthesis to run twice:
 - Pass A: reviewers in order R1, R2, R3, R4
 - Pass B: reviewers in order R4, R3, R2, R1
 
-Compare the two passes. If any finding's verdict-confidence differs by >15% between passes, mark it as `low-confidence-synthesis` in the output. The headline includes the percentage of low-confidence findings.
+Compare the two passes. Mark a finding as `low-confidence-synthesis` if either: (a) its verdict flips between passes (e.g., `APPROVE` → `REVISE`, or `REVISE` → `APPROVE`), or (b) its confidence tier changes (`HIGH` → `LOW`, etc.) without a verdict flip. Verdict flip is the primary trigger; confidence-tier change is a secondary trigger (per Zheng et al. 2023 follow-up, binary verdict-flip is the most defensible heuristic, and reviewer contracts emit categorical `HIGH|MEDIUM|LOW|N/A` rather than numeric confidence so a percentage threshold is undefined). The headline includes the count and percentage of low-confidence findings.
 
 For V1's descriptive synthesis (no scoring), this manifests as: a finding that appears in pass A's "Agreement" section but pass B's "Disagreement" section is flagged as low-confidence.
 
@@ -282,7 +282,7 @@ Add a pre-flight that checks each reviewer's headroom before fan-out:
   - Continue (proceed; reviewer may exhaust mid-review)
   - Skip this reviewer (continue with N-1 reviewers)
   - Cancel (abort the council invocation)
-- If headroom is 0 (already exhausted), automatically mark UNAVAILABLE without spawning the reviewer.
+- If headroom is 0 (already exhausted), automatically emit `verdict=QUOTA_EXHAUSTED` (per Task 3.3) without spawning the reviewer — preflight and mid-review exhaustion converge on the same verdict so headline/ETA reporting is uniform regardless of detection point.
 
 ### Task 3.3: Quota-exhausted handler (S, 2h)
 
@@ -595,7 +595,7 @@ Each PR includes:
 ### R5 — Two-pass synthesis doubles synthesizer quota cost
 
 **Risk:** 2-pass order-swap means 2 Claude synthesis messages per `/council` invocation. Total per review = 1 reviewer + 2 synthesis = 3 messages. On Claude Pro (45 msg / 5h), this reduces the user's available council count from ~22 (single-pass: 1+1=2 msgs/review) to ~15 (double-pass: 1+2=3 msgs/review) invocations per window — see Task 2.2 for the full math.
-**Mitigation (DECIDED):** 2-pass is default ON for quality. User can disable per-invocation (`/council review --single-pass`) or globally (`COUNCIL_DOUBLE_PASS_SYNTHESIS=0`). Pre-flight in `/council` Step 1 warns when 2-pass is on AND Claude headroom < 4 messages, recommending `--single-pass` for that run. Track empirically: if user invocation count regularly exceeds quota window, advise switching the global default off.
+**Mitigation (DECIDED):** 2-pass is default ON for quality. User can disable per-invocation (`/council review --single-pass`) or globally (`COUNCIL_DOUBLE_PASS_SYNTHESIS=0`). Pre-flight in `/council` Step 1 warns when 2-pass is on AND Claude headroom < 6 messages (≈ 2 reviews of headroom), recommending `--single-pass` for that run — see Task 2.2 for the authoritative threshold definition. Track empirically: if user invocation count regularly exceeds quota window, advise switching the global default off.
 
 ---
 
@@ -625,7 +625,7 @@ The plan is successful when:
 1. **codex-reviewer emits the structured 6-key block** (Phase 0) — `verdict=` / `confidence=` / `summary=` / `fenced_output_path=` / `findings_block_begin` / `findings_block_end`, matching gemini-reviewer's contract
 2. `/council review` fans out to 4 reviewers (Claude in-process + Codex + Gemini + OpenCode subprocess)
 3. Synthesis output includes `Agreement (verified)` / `Agreement (unverified)` / `Disagreement` / `Unverified Claims` sections
-4. Quota exhaustion in any single reviewer produces a clean UNAVAILABLE-class verdict with ETA, no retry
+4. Quota exhaustion in any single reviewer produces a clean `verdict=QUOTA_EXHAUSTED` with ETA in headline, no retry
 5. Lineage map in report header shows 4 distinct lineages (Anthropic / OpenAI / Google / Other — typically `deepseek/deepseek-v4-pro` for Other)
 6. 2-pass synthesis verdict-flip count is reported in the headline (or `--single-pass` cleanly bypasses)
 7. Manual e2e tests pass on a fresh install with all 4 CLIs configured and OpenRouter wired into OpenCode
