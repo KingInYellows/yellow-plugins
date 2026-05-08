@@ -154,9 +154,9 @@ The specific gap sigmap fills — pre-task file ranking to enforce token budget 
 - [sigmap on npmjs.com](https://www.npmjs.com/package/sigmap) — version history and download stats
 - [ruvnet/ruvector README](https://raw.githubusercontent.com/ruvnet/ruvector/HEAD/README.md) — upstream ruvector project
 - [mempalace/mempalace](https://github.com/mempalace/mempalace) — upstream MemPalace project
-- `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-ruvector/.claude-plugin/plugin.json` and `CLAUDE.md` — authoritative yellow-ruvector plugin spec
-- `/home/kinginyellow/projects/yellow-plugins/plugins/yellow-mempalace/.claude-plugin/plugin.json` and `CLAUDE.md` — authoritative yellow-mempalace plugin spec
-- `/home/kinginyellow/projects/yellow-plugins/.claude-plugin/marketplace.json` — full plugin inventory
+- `plugins/yellow-ruvector/.claude-plugin/plugin.json` and `plugins/yellow-ruvector/CLAUDE.md` (repo-relative) — authoritative yellow-ruvector plugin spec
+- `plugins/yellow-mempalace/.claude-plugin/plugin.json` and `plugins/yellow-mempalace/CLAUDE.md` (repo-relative) — authoritative yellow-mempalace plugin spec
+- `.claude-plugin/marketplace.json` (repo-relative) — full plugin inventory
 - Parallel Task deep research (trun_6ae53d1e637f41f8a73ba6298aaca6db) — multi-source synthesis
 - [research-conductor] Ceramic — 0 results, no prior team discussion of sigmap found
 - [research-conductor] Tavily — skipped (TAVILY_API_KEY unavailable)

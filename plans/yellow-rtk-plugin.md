@@ -2,7 +2,7 @@
 
 ## Overview
 
-Build a thin wrapper plugin around the [RTK (Rust Token Killer)](https://github.com/rtk-ai/rtk) CLI binary. RTK compresses the output of shell commands (git, cat, ls, test runners, linters) by 60–99% via a PreToolUse hook installed in Claude Code's settings.json. This plugin owns three commands (`/rtk:setup`, `/rtk:gain`, `/rtk:discover`) and one SessionStart probe — RTK itself owns the PreToolUse hook.
+Build a thin wrapper plugin around the [RTK (Rust Token Killer)](https://github.com/rtk-ai/rtk) CLI binary. RTK compresses the output of shell commands (git, cat, ls, test runners, linters) by 60–99% via a PreToolUse hook installed in Claude Code's settings.json. This plugin owns three commands (`/rtk:setup`, `/rtk:gain`, `/rtk:discover`) and one SessionStart hook — RTK itself owns the PreToolUse hook.
 
 This is Phase 1 of a layered strategy. Phase 2 (sigmap evaluation) is gated on measured RTK savings. See `docs/brainstorms/2026-05-08-sigmap-integration-shapes-brainstorm.md`.
 
@@ -23,7 +23,7 @@ Sessions on repos with 50K+ LOC hit context limits. Prompts get truncated. Token
 Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison.md`) found:
 - RTK has **zero overlap** with the existing yellow-plugins context stack (yellow-ruvector, yellow-mempalace, yellow-research, yellow-core auto-memory).
 - RTK activates **automatically on every command** via PreToolUse hook — no MCP tool invocation needed; helps cold-start from session prompt one.
-- RTK has **3+ named contributors, Homebrew formula, Discord** — materially lower bus-factor than sigmap (single maintainer, 181 stars).
+- RTK has **3+ named contributors (per README, not independently verified against commit history), Homebrew formula, Discord** — lower bus-factor than sigmap (single maintainer, 181 stars).
 - RTK provides **measurable ROI** via `rtk gain` SQLite dashboard — falsifiable in 7 days.
 
 ## Proposed Solution
@@ -71,7 +71,7 @@ Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison
 
 - **Embed RTK setup into yellow-ruvector vs. separate plugin** — chose separate plugin for clean install/uninstall and to keep yellow-ruvector dense surface from growing further.
 - **SessionStart hook with version check vs. setup-only check** — chose hook because version drift is a real concern (RTK at v0.38.0 moves fast, hook format may change between minor versions). The hook is warn-only (always exits `{"continue": true}`).
-- **Validate `rtk_binary_path` userConfig at setup time vs. runtime** — chose runtime (in setup command + hook), because remote validator support for `userConfig.pattern` is empirically untested.
+- **Validate `rtk_binary_path` userConfig at setup time vs. runtime** — chose runtime (in setup command + hook), because Claude Code's remote validator rejects `userConfig.pattern` (reverted 2026-05-08; see Technical Specifications callout) and ships only `type: "string"` for the entry.
 
 ## Implementation Plan
 
@@ -88,13 +88,13 @@ Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison
 
 - [ ] 2.1: Author `plugins/yellow-rtk/hooks/scripts/session-start.sh`
   - Use `set -uo pipefail` (no `-e`)
-  - Define `json_exit()` helper at top (use yellow-ci variant: emit `systemMessage` via `jq -n` when jq available)
+  - Define `json_exit()` helper at top — use **yellow-ci variant** specifically: emit `systemMessage` via `jq -n` when jq is available (yellow-rtk needs systemMessage for "rtk-not-found" and "version-too-old" warnings; yellow-ruvector's variant only outputs `{"continue": true}` and is NOT a suitable template for this hook)
   - `command -v jq` guard
   - `command -v rtk` probe; if missing, `json_exit "rtk binary not found. Run /rtk:setup."`
   - `MIN_RTK_VERSION="0.38.0"` constant
   - Parse `rtk --version 2>/dev/null | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1`
   - `version_gte()` pure-bash helper (mirror yellow-codex pattern)
-  - Check PreToolUse hook presence via `jq` on `~/.claude/settings.json` (presence-only check, not content audit) — fail-closed on jq parse error
+  - Check PreToolUse hook presence via `jq 'select(.command == "rtk hook claude")'` over `hooks.PreToolUse[*].hooks[*]` on `~/.claude/settings.json` — match on `command` only (not full structural equality), since `/rtk:setup` Step 5 adds an `env` block to the entry. A structural-equality check would miss properly-configured hooks and produce a "hook not found" warning every session. Fail-closed on jq parse error.
   - Always `json_exit` on every path
 
 <!-- deepen-plan: external -->
@@ -102,8 +102,9 @@ Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison
 > The exact hook entry shape RTK writes (use this for the presence check): `{"matcher": "Bash", "hooks": [{"type": "command", "command": "rtk hook claude"}]}` — NO `timeout`, NO `env` block in the Claude variant. Match on `command == "rtk hook claude"` inside `hooks.PreToolUse[*]` where `matcher == "Bash"`.
 > Source: [`src/main.rs`](https://github.com/rtk-ai/rtk/blob/master/src/main.rs), [`src/hooks/init.rs:840`](https://github.com/rtk-ai/rtk/blob/master/src/hooks/init.rs), [`src/hooks/constants.rs`](https://github.com/rtk-ai/rtk/blob/master/src/hooks/constants.rs) (`CLAUDE_HOOK_COMMAND = "rtk hook claude"`)
 <!-- /deepen-plan -->
-- [ ] 2.2: Author `plugins/yellow-rtk/hooks/hooks.json` reference-only file with `"_comment"` key and timeout matching plugin.json
-- [ ] 2.3: Strip CRLF: `sed -i 's/\r$//' plugins/yellow-rtk/hooks/scripts/session-start.sh`
+- [ ] 2.2: Strip CRLF: `sed -i 's/\r$//' plugins/yellow-rtk/hooks/scripts/session-start.sh`
+
+> **Note (2026-05-08):** Earlier drafts of this plan included an extra step to author a `hooks/hooks.json` reference-only file. That step is intentionally **dropped**: the file would carry a maintenance burden (timeout-drift risk against `plugin.json`) for zero functional value — Claude Code reads inline `hooks` from `plugin.json`, not from a sibling `hooks.json`. The single source of truth is `plugin.json`.
 
 ### Phase 3: `/rtk:setup` Command
 
@@ -188,11 +189,11 @@ Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison
 ### Phase 7: Validation + Release
 
 - [ ] 7.1: Run `pnpm validate:schemas` — must pass
-- [ ] 7.2: Run `pnpm validate:setup-all` — must pass (all 5 check locations updated)
+- [ ] 7.2: Run `pnpm validate:setup-all` — must pass (4 marker-bounded sections in `all.md` + 1 `COMMAND_PLUGIN_MAP` edit in `validate-setup-all.js`, per Phase 6 steps 6.2 and 6.3)
 - [ ] 7.3: Run `pnpm validate:versions` — must pass (package.json / plugin.json / marketplace.json three-way sync at `0.1.0`)
 - [ ] 7.4: Run `pnpm test:unit` and `pnpm typecheck` and `pnpm lint` — no new failures
 - [ ] 7.5: Author `.changeset/yellow-rtk-initial-release.md` with `"yellow-rtk": minor` and feature description
-- [ ] 7.6: Run `pnpm changeset` to verify it picks up
+- [ ] 7.6: Verify the changeset is well-formed: `cat .changeset/yellow-rtk-initial-release.md` (do **not** run `pnpm changeset` here — that opens an interactive TUI to author a new changeset, not a passive verifier; the existing `pnpm validate:versions` step already gates the three-way version sync)
 - [ ] 7.7: Manual smoke test on a machine with RTK installed: run `/rtk:setup`, `/rtk:gain`, `/rtk:discover`; verify SessionStart hook completes within 3s and outputs `{"continue": true}`
 - [ ] 7.8: Manual install test on a clean Claude Code instance: `/plugin marketplace add` and verify yellow-rtk appears (per project memory: local CI ≠ remote validation)
 
@@ -213,9 +214,8 @@ plugins/yellow-rtk/
 │       ├── gain.md                  # /rtk:gain
 │       └── discover.md              # /rtk:discover
 ├── hooks/
-│   ├── hooks.json                   # reference-only with _comment
 │   └── scripts/
-│       └── session-start.sh         # binary + version probe
+│       └── session-start.sh         # binary + version probe (hooks live in plugin.json — no hooks.json file)
 └── package.json                     # version 0.1.0, private
 .changeset/
 └── yellow-rtk-initial-release.md    # changeset
@@ -241,23 +241,12 @@ plugins/yellow-rtk/
   "keywords": ["token-compression", "context-management", "rtk", "performance"],
   "userConfig": {
     "rtk_binary_path": {
-      "type": "file",
+      "type": "string",
       "title": "RTK binary path",
       "description": "Path to the rtk binary. Leave empty to use rtk from PATH.",
       "required": false
     }
   },
-  // <!-- deepen-plan: codebase -->
-  // > **Codebase:** Zero plugins use `type: "file"` for userConfig. Local schema
-  // > permits it (`schemas/plugin.schema.json:14`) but remote validator support
-  // > is **empirically untested** — same uncertainty as the `pattern` field.
-  // > **Safer fallback:** `type: "string"` with anchored absolute-path regex
-  // > (matches the yellow-composio precedent for URL validation in
-  // > `plugins/yellow-composio/.claude-plugin/plugin.json`). Recommend shipping
-  // > `type: "string"` with `"pattern": "^(/[^/\\0]+)+$"` for v0.1.0; revisit
-  // > `type: "file"` only after Claude Code remote validator behavior is
-  // > empirically confirmed.
-  // <!-- /deepen-plan -->
   "hooks": {
     "SessionStart": [
       {
@@ -274,6 +263,14 @@ plugins/yellow-rtk/
   }
 }
 ```
+
+<!-- deepen-plan: codebase -->
+> **Codebase — `userConfig.rtk_binary_path` typing:** Zero in-repo plugins use `type: "file"` for userConfig. The local schema (`schemas/plugin.schema.json`) permits it via the `type` enum, but Claude Code's **remote** validator support is empirically untested.
+>
+> **`pattern` field is NOT an option.** Per `MEMORY.md` (revert dated 2026-05-08): `userConfig.pattern` was added in PR #409, then **REVERTED** because the Claude Code remote validator emits `Unrecognized key: "pattern"` on install. The official manifest schema permits only `{type, title, description, sensitive, required, default, multiple, min, max}`. Any local validator support for `pattern` (e.g., `validate-plugin.js` RULE 10 if still present on this branch) is stale and will be removed.
+>
+> **v0.1.0 ships `type: "string"` with NO `pattern` field.** Validation lives at runtime: `/rtk:setup` and the SessionStart hook check `[ -f "$path" ] && [ -x "$path" ]` (resolving symlinks via `realpath`) before invoking the binary. Revisit `type: "file"` only after the remote validator behavior is empirically confirmed against another plugin.
+<!-- /deepen-plan -->
 
 ### Marketplace Entry
 
@@ -293,7 +290,7 @@ plugins/yellow-rtk/
 External (user installs):
 - `rtk` binary >= 0.38.0 (Homebrew: `brew install rtk` / cargo: `cargo install rtk`)
 - `jq` (already required by other plugins in the marketplace)
-- `bash` 4.0+
+- `bash` 4.0+. **macOS caveat:** macOS ships with bash 3.2 by default (last GPLv2 version). Either (a) `brew install bash` and document this as a prereq alongside `brew install rtk`, or (b) audit `session-start.sh` and `version_gte()` to use only POSIX sh features and switch the shebang to `/bin/sh`. Decide during Phase 2 implementation; the README must be explicit about which path was taken.
 
 Repo-internal (no new deps): standard `pnpm` workspace install covers all schema validation.
 
@@ -346,10 +343,10 @@ This plugin is primarily shell scripts and markdown commands; existing yellow-pl
 | RTK binary not on PATH | `/rtk:setup`: AskUserQuestion offers install. SessionStart hook: warn-only via `systemMessage`. |
 | Multiple RTK binaries on PATH (Homebrew + cargo) | Resolve via `command -v rtk` (first wins). Document in README that `rtk_binary_path` userConfig overrides this. |
 | RTK version below 0.38.0 | `/rtk:setup`: AskUserQuestion offers upgrade. SessionStart: warn-only. |
-| `rtk init --hook-only` not idempotent | Step 3 of `/rtk:setup` counts hook entries before writing telemetry env; if duplicates detected, prompt user via AskUserQuestion to dedupe via jq. |
+| `rtk init --hook-only` idempotency (resolved) | RTK is fully idempotent (`hook_already_present()` guard at `src/hooks/init.rs:727`). Step 3 of `/rtk:setup` is a sanity-check warning only — no automatic dedupe write needed under normal operation. The warning fires only if the user manually edited `settings.json` to create duplicate entries. |
 | `~/.claude/settings.json` does not exist | Create empty `{"hooks": {}}` skeleton before `rtk init` runs (or rely on `rtk init` to create it; verify during implementation). |
 | `~/.claude/settings.json` is malformed JSON | jq parse error → fail-closed, abort `/rtk:setup` with clear error message; do NOT overwrite. |
-| Concurrent `/rtk:setup` from two sessions | Use `flock` on `~/.claude/settings.json` if available; if not, atomic `tmp + mv` reduces (but does not eliminate) the race. |
+| Concurrent `/rtk:setup` from two sessions (resolved: not shipping flock) | `rename(2)` is atomic (readers see old or new, never partial); the real risk is read-modify-write TOCTOU. RTK's own `hook_already_present()` second-write guard catches this when the second reader runs after the first writer's rename. For a single-invocation user-initiated setup, `flock` is overkill — documented as defensive option but **not shipped in v0.1.0**. |
 
 <!-- deepen-plan: external -->
 > **Research — missing settings.json:** RTK itself handles this by creating `serde_json::json!({})` ([`src/hooks/init.rs:717-727`](https://github.com/rtk-ai/rtk/blob/master/src/hooks/init.rs)) — a fresh empty object, no error. The plugin's RTK_TELEMETRY injection step should mirror: `[ -f ~/.claude/settings.json ] || echo '{}' > ~/.claude/settings.json` before mutation.
@@ -360,8 +357,7 @@ This plugin is primarily shell scripts and markdown commands; existing yellow-pl
 <!-- deepen-plan: external -->
 > **Research — settings.json permissions:** `mv` (rename) does NOT preserve permissions. The `mktemp`-created temp file is typically `0600`; `~/.claude/settings.json` may be `0644`. Add `chmod --reference=settings.json "$tmp"` (Linux) or `chmod $(stat -f '%Mp%Lp' settings.json) "$tmp"` (macOS) before `mv`. RTK's own implementation does NOT preserve permissions either — capture the original mode immediately before mutating, since post-`rtk init` the file may already be 0600.
 <!-- /deepen-plan -->
-| User runs `/rtk:setup` then never runs Claude Code again | No session = no SessionStart fires = no problem. |
-| User uninstalls yellow-rtk without manual settings.json cleanup | RTK hook persists in `settings.json` and continues to fire. Document in README. Optional: future `/rtk:teardown` if user demand justifies. |
+| User uninstalls yellow-rtk without manual settings.json cleanup | RTK hook persists in `settings.json` and continues to fire. Document in README with the explicit jq removal command (see Migration & Rollback). Optional: future `/rtk:teardown` if user demand justifies. |
 | RTK upgrades and changes hook format | SessionStart probe checks version >= 0.38.0; if breaking change ships in a future version that's still >= 0.38.0, version-only check is insufficient. Out of scope for v0.1.0; revisit in version-bump changeset. |
 | Non-Homebrew platform (Linux, Windows) | `/rtk:setup` install branch detects `uname`; offers `cargo install rtk` on Linux, direct download on Windows. |
 | WSL2 cold-start exceeds 3s SessionStart timeout | Note this as a known risk in CLAUDE.md; if hit in practice, raise hook timeout to 5s. |
@@ -378,10 +374,10 @@ This plugin is primarily shell scripts and markdown commands; existing yellow-pl
 ## Security Considerations
 
 - **Telemetry is opt-out by default.** `RTK_TELEMETRY=0` is written into the hook entry's `env` block on Step 5 of `/rtk:setup`. User must explicitly choose "Enable telemetry" via AskUserQuestion to opt in.
-- **Atomic settings.json write.** Use `jq '...' ~/.claude/settings.json > ~/.claude/settings.json.tmp.$$ && mv ~/.claude/settings.json.tmp.$$ ~/.claude/settings.json`. Temp file uses PID suffix to avoid collisions; permissions inherit from parent dir (Claude Code sets these correctly).
+- **Atomic settings.json write.** Use `jq '...' ~/.claude/settings.json > ~/.claude/settings.json.tmp.$$ && mv ~/.claude/settings.json.tmp.$$ ~/.claude/settings.json`. Temp file uses PID suffix to avoid collisions. **Permissions are NOT preserved by `mv` / `rename(2)`** — the destination inherits the temp file's `umask`-based mode (typically 0600 from `mktemp`). Apply `chmod --reference=settings.json "$tmp"` (Linux) or `chmod $(stat -f '%Mp%Lp' settings.json) "$tmp"` (macOS) **before** the `mv`. Capture the original mode immediately before any mutation, since RTK's own `rtk init` may have already set the file to 0600.
 - **jq parse failure is fail-closed.** Per project memory: `EXIT_CODE="${exit_code:-0}"` defaults to success on parse error; this plugin uses `${exit_code:-1}` (fail-closed) and aborts with explicit error message rather than silently continuing.
 - **No string interpolation into jq.** All settings.json values that depend on user input or env state pass through `jq --arg` (e.g., the telemetry choice).
-- **userConfig path validation.** `rtk_binary_path` is a `type: "file"` userConfig. The `/rtk:setup` and SessionStart hook validate `[ -f "$path" ] && [ -x "$path" ]` before invoking it; symlinks resolved via `realpath`.
+- **userConfig path validation.** `rtk_binary_path` is a `type: "string"` userConfig (no `pattern` — see Technical Specifications callout for the remote-validator rationale). The `/rtk:setup` and SessionStart hook validate `[ -f "$path" ] && [ -x "$path" ]` before invoking it; symlinks resolved via `realpath`.
 - **No shell injection in version parsing.** `rtk --version | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n1` is safe; no eval, no command substitution into strings.
 - **Heredoc delimiter style.** If any free-text user input is collected (none in v0.1.0), use `<<'__EOF_<CONTEXT>__'` style (per project memory on heredoc delimiter collision).
 - **RTK output is treated as untrusted.** `/rtk:discover` wraps stdout in fences (`--- begin/end (reference only) ---`) before summarization, per security-fencing skill.
@@ -391,7 +387,15 @@ This plugin is primarily shell scripts and markdown commands; existing yellow-pl
 - **No migration concerns** — this is a brand-new plugin at v0.1.0; no users to migrate.
 - **Rollback procedure:**
   1. Revert the merge commit (single `feat(yellow-rtk): initial release`)
-  2. Users who installed yellow-rtk can `/plugin marketplace remove yellow-rtk` — but this leaves the RTK PreToolUse hook in their `settings.json`. README documents the manual cleanup.
+  2. Users who installed yellow-rtk can `/plugin marketplace remove yellow-rtk` — but this leaves the RTK PreToolUse hook in their `settings.json`.
+  3. **Manual hook removal (the README MUST surface this exact command):**
+     ```bash
+     jq 'del(.hooks.PreToolUse[]?.hooks[]? | select(.command == "rtk hook claude"))' \
+        ~/.claude/settings.json > ~/.claude/settings.json.tmp.$$ \
+        && mv ~/.claude/settings.json.tmp.$$ ~/.claude/settings.json
+     ```
+     (Apply `chmod --reference=settings.json "$tmp"` before `mv` per the Security Considerations.)
+  4. Alternative: `rtk init --uninstall` (RTK ships its own clean-removal command that performs the same surgery atomically).
 - **No breaking changes** — additive plugin only.
 
 ## References
@@ -406,8 +410,8 @@ This plugin is primarily shell scripts and markdown commands; existing yellow-pl
 - `plugins/yellow-ci/hooks/scripts/session-start.sh` — `json_exit()` pattern with systemMessage variant
 - `plugins/yellow-semgrep/commands/semgrep/setup.md` — gold-standard external CLI setup command
 - `plugins/yellow-codex/commands/codex/setup.md` — minimal binary-probe + version_gte template
-- `plugins/yellow-morph/.claude-plugin/plugin.json:19-27` — userConfig with type+title shape
-- `plugins/yellow-ruvector/hooks/scripts/session-start.sh` — minimal `set -uo pipefail` + `json_exit()` pattern
+- `plugins/yellow-composio/.claude-plugin/plugin.json` — userConfig with `type: "string"`, `title`, `required: false` (closest match to `rtk_binary_path`'s shape; sensitive=false, no pattern)
+- `plugins/yellow-morph/.claude-plugin/plugin.json:19-27` — secondary userConfig precedent (note: yellow-morph uses `sensitive: true`, which yellow-rtk does NOT)
 
 ### Validators
 - `scripts/validate-versions.js` — three-way version sync enforcement
@@ -444,18 +448,23 @@ This plugin is primarily shell scripts and markdown commands; existing yellow-pl
 <!-- deepen-plan: codebase -->
 > **Codebase — added by deepen-plan (in-repo precedents):**
 > - `plugins/yellow-core/commands/statusline/setup.md:446-481` — only existing precedent for atomic settings.json mutation (Python-based, `.tmp` + validate-via-re-read + `os.replace`). yellow-rtk's nested-key surgery extends this pattern.
-> - `plugins/yellow-composio/.claude-plugin/plugin.json` — `type: "string"` + anchored `pattern` regex for URL validation; precedent for falling back from `type: "file"` to validated string.
-> - `schemas/plugin.schema.json:14` — `type` enum includes `"file"` (local-schema valid); empirically untested against Claude Code's remote validator.
-> - `scripts/validate-plugin.js:948,975` — local validator accepts `type: "file"` and allows `pattern` on it; no behavioral enforcement beyond type/title required.
+> - `plugins/yellow-composio/.claude-plugin/plugin.json` — `type: "string"` precedent (note: any `pattern` field on this entry is being removed in the same review window — the remote validator rejects `userConfig.pattern`).
+> - `schemas/plugin.schema.json` — `type` enum includes `"file"` (local-schema valid); empirically untested against Claude Code's remote validator.
+> - `scripts/validate-plugin.js:940-950` — local validator's type-allowlist check; rejects unknown `type` values at line 948 with `must be one of: string, number, boolean, directory, file`. `'file'` is **accepted by membership** in `VALID_USER_CONFIG_TYPES`, not by an explicit accept-branch. Any `PATTERN_VALID_TYPES`-related code is stale and being removed alongside the userConfig.pattern revert.
 <!-- /deepen-plan -->
 
 ## Open Questions (resolve during implementation)
 
-1. ~~**Exact `rtk gain` flag for time windows.**~~ **RESOLVED via deepen-plan research:** No time-window flag exists. Use `-d/-w/-m/-a/-g`. See annotation in Phase 4.
-2. ~~**`rtk init --hook-only` idempotency.**~~ **RESOLVED via deepen-plan research:** Fully idempotent (`hook_already_present()` guard at `src/hooks/init.rs:727`). Step 3 simplifies to sanity check.
-3. ~~**RTK version flag.**~~ **RESOLVED via deepen-plan research:** `--version` only (`-V` not registered). Output: `rtk X.Y.Z`. See annotation in Phase 2.
-4. **Initial version pin: `0.1.0` vs another value.** Repo convention for new plugins: confirm by checking the most recently added plugin's first-tag version.
-5. **`hooks/hooks.json` necessity.** Per project memory, this file is reference-only. If it adds maintenance burden without value, consider omitting; verify whether validators flag its absence.
-6. **(NEW from deepen-plan)** **Should `/rtk:teardown` be added to the plan?** RTK ships `rtk init --uninstall` which cleanly removes the hook from settings.json with atomic write. The brainstorm explicitly said "no /rtk:teardown" — but a thin command wrapping `rtk init --uninstall` is now low-cost. Decide before Phase 1 cuts.
-7. **(NEW from deepen-plan)** **`type: "file"` vs `type: "string"` + regex for `rtk_binary_path`.** Zero in-repo precedent for `type: "file"`; remote validator untested. Recommend `type: "string"` with anchored path regex for v0.1.0. See annotation in Technical Specifications.
-8. **(NEW from deepen-plan)** **Malformed-settings.json policy:** mirror RTK's fail-closed propagation, or follow yellow-core/statusline's `.corrupt.backup` rescue pattern? Pick one and document. Recommend RTK alignment (fail-closed, no auto-repair) since the plugin operates against RTK's mental model.
+Closed before implementation (rationale recorded for traceability):
+
+- ~~**`rtk gain` time-window flag.**~~ Resolved: no `--since/--last/--days` exists; use `-d/-w/-m/-a/-g`. See Phase 4 annotation.
+- ~~**`rtk init --hook-only` idempotency.**~~ Resolved: fully idempotent (`hook_already_present()` guard at `src/hooks/init.rs:727`). Step 3 is a sanity-check warning only.
+- ~~**RTK version flag.**~~ Resolved: `--version` only (`-V` not registered). Output: `rtk X.Y.Z`. See Phase 2 annotation.
+- ~~**`/rtk:teardown` command.**~~ Resolved: **not built in v0.1.0**. The brainstorm and Key Design Decisions both close on "no teardown." Manual cleanup is documented in the Migration & Rollback section with the exact jq command, plus a pointer to RTK's own `rtk init --uninstall`. Revisit only if user demand emerges.
+- ~~**`type: "file"` vs `type: "string"` for `rtk_binary_path`.**~~ Resolved: ship `type: "string"` with **no `pattern` field** — runtime validation only. Rationale: `userConfig.pattern` was reverted 2026-05-08 (remote validator rejects it); `type: "file"` is empirically untested against the remote validator. Revisit `type: "file"` only after another plugin lands it successfully.
+- ~~**`hooks/hooks.json` reference file.**~~ Resolved: **not authored**. Reference-only files create timeout-drift risk against `plugin.json` for zero functional gain. Hooks live only in `plugin.json`. See Phase 2.
+
+Remaining open (resolve during implementation):
+
+1. **Initial version pin: `0.1.0` vs another value.** Repo convention for new plugins: confirm by checking the most recently added plugin's first-tag version.
+2. **Malformed-settings.json policy:** mirror RTK's fail-closed propagation, or follow yellow-core/statusline's `.corrupt.backup` rescue pattern? Recommend RTK alignment (fail-closed, no auto-repair) since the plugin operates against RTK's mental model — confirm before Phase 3 cuts.

@@ -16,7 +16,7 @@ The two tools are orthogonal, not competing:
 - **RTK** compresses the OUTPUT of shell commands (git status, cat, ls, test runners) before it enters the context window. It fires automatically via a PreToolUse hook. It reduces token cost per command by 60-99%.
 - **sigmap** ranks and summarizes which SOURCE FILES are relevant to a given query. It requires explicit MCP tool invocation or a workflow command pre-pass. It reduces the wrong-file-loading problem, not the command-output-bloat problem.
 
-Neither tool overlaps with ruvector. RTK and ruvector operate on different hook types (PreToolUse vs. PostToolUse) with different data. sigmap and ruvector partially overlap on "file relevance ranking" but answer different questions (TF-IDF structural ranking vs. semantic embedding recall).
+Neither tool overlaps with ruvector. **Both RTK and ruvector register PreToolUse hooks** (verified in `plugins/yellow-ruvector/.claude-plugin/plugin.json` — ruvector's matcher is `Edit|Write|MultiEdit|Bash`), but they perform different operations on different data: RTK rewrites the command's `stdout` after execution to compress output, ruvector injects context before execution. The "no collision" conclusion holds operationally — different operations, different data — but it is **not** because of different hook types. sigmap and ruvector partially overlap on "file relevance ranking" but answer different questions (TF-IDF structural ranking vs. semantic embedding recall).
 
 ---
 
@@ -135,8 +135,8 @@ A new plugin in `plugins/yellow-sigmap/` with its own `plugin.json`, a skill exp
 **`/sigmap:orient` step-by-step:**
 1. Check `command -v sigmap` — fail clearly if not installed, with install instructions
 2. Check ruvector session context: if ruvector's recall returned relevant memories for this area, note this and proceed more conservatively (less pre-pass weight needed)
-3. Call `mcp__plugin_yellow-ruvector_sigmap__query_context` with the task description from `$ARGUMENTS`
-4. Call `mcp__plugin_yellow-ruvector_sigmap__search_signatures` on the top 5 ranked files
+3. Call `mcp__plugin_yellow-sigmap_sigmap__query_context` with the task description from `$ARGUMENTS`
+4. Call `mcp__plugin_yellow-sigmap_sigmap__search_signatures` on the top 5 ranked files
 5. Output: ranked file list, key signatures, "files you likely need" summary — no more than 30 lines
 6. Do NOT write to `CLAUDE.md` or any file — output inline only. The CLAUDE.md write path is explicitly disabled.
 
@@ -184,115 +184,19 @@ A new plugin in `plugins/yellow-sigmap/` with its own `plugin.json`, a skill exp
 
 ### Approach D (NEW): yellow-rtk plugin — build this first
 
-A new plugin in `plugins/yellow-rtk/` that wraps the RTK CLI. No MCP server. No agents. Three commands plus a SessionStart hook that warns if `rtk` is not on PATH. This is the right first move because it solves a problem the stack has zero coverage for — command-output compression — and activates automatically on every session once the hook is installed.
+A new plugin in `plugins/yellow-rtk/` that wraps the RTK CLI. No MCP server. No agents. Three commands plus a SessionStart hook that warns if `rtk` is not on PATH.
 
-**Why RTK before sigmap:**
-- RTK has zero overlap with ruvector (different hook types, different data, zero collision surface)
-- RTK fires automatically on cold-start from session prompt one, regardless of ruvector history
-- For Pain B (targeted-fix over-reading): RTK reduces the token cost of every file read by 60-75%, even if Claude still over-reads
-- For Pain D (cold-start): RTK makes every exploratory `ls`, `cat`, `git log` 70-80% smaller, reducing cold-start token spend substantially
-- `rtk gain` gives measurable per-session savings from a local SQLite DB — falsifiable in 7 days, not a benchmark claim
-- 3+ named contributors, Homebrew formula, Discord, website — materially lower bus-factor than sigmap
+**This brainstorm intentionally does NOT duplicate the Approach D design.** The full plugin design — `plugin.json` shape, command behavior, SessionStart hook script, CLAUDE.md collision mitigation, telemetry policy, version pinning, marketplace integration, edge cases, security considerations — lives in the implementation plan and is the authoritative source:
 
-**plugin.json shape:**
+- → **`plans/yellow-rtk-plugin.md`**
 
-```json
-{
-  "name": "yellow-rtk",
-  "version": "1.0.0",
-  "description": "Token-efficient Claude Code sessions via RTK command-output compression",
-  "author": {
-    "name": "KingInYellows",
-    "url": "https://github.com/KingInYellows"
-  },
-  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-rtk",
-  "repository": "https://github.com/KingInYellows/yellow-plugins",
-  "license": "MIT",
-  "keywords": [
-    "token-compression",
-    "context-management",
-    "rtk",
-    "performance"
-  ],
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
-            "timeout": 3
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+**Why this Approach D, in one paragraph:** RTK is a CLI binary that compresses Claude Code's shell-tool output via a PreToolUse hook installed in `~/.claude/settings.json`. It has zero overlap with ruvector (different hook surface, different data), activates automatically from session prompt one, gives a falsifiable ROI signal via `rtk gain`'s SQLite dashboard within 7 days, and has materially lower bus-factor than sigmap (3+ contributors per README, Homebrew formula). The plugin owns three commands (`/rtk:setup`, `/rtk:gain`, `/rtk:discover`) plus a thin SessionStart probe — RTK itself owns the PreToolUse hook in user space.
 
-No `mcpServers` block — RTK is not an MCP server. RTK's own PreToolUse hook (installed by `rtk init`) is registered directly in Claude Code's `settings.json`, not in `plugin.json`. The plugin's SessionStart hook only checks that RTK is installed and warns if not.
+**Pros:** Solves a problem the stack has zero current coverage for; automatic; measurable ROI in 7–14 days; zero collision with ruvector; single Rust binary, Homebrew install.
 
-**Commands:**
+**Cons:** Adds a Rust binary prerequisite (Homebrew makes trivial); RTK's compression is opaque to Claude — filter bugs cause silent data loss; orphan PreToolUse hook persists in `settings.json` after `/plugin marketplace remove` (manual cleanup documented in the plan).
 
-`/rtk:setup $ARGUMENTS` — Prerequisite setup. Checks `command -v rtk` and verifies version >= 0.38.0. Runs `rtk init --hook-only` (skip the 134-line CLAUDE.md patch to avoid collision with yellow-core auto-memory). Verifies the PreToolUse hook entry appears in `~/.claude/settings.json`. Sets `RTK_TELEMETRY=0` in the hook environment to opt out of telemetry by default. If the user wants to opt in to telemetry, they can remove this env override manually — the command surfaces the choice explicitly rather than silently opting in.
-
-`/rtk:gain` — Savings dashboard. Runs `rtk gain` to display per-session and cumulative token savings from the local SQLite DB. Use after 7-14 days of deployment to validate whether RTK is delivering measurable value on the specific repos where context pressure was observed.
-
-`/rtk:discover` — Missed savings analysis. Runs `rtk discover` to analyze past sessions and identify commands that could have been compressed but were not (e.g., commands run before RTK was installed, or compound commands that weren't split correctly). Use this to identify gaps in RTK's coverage for this specific workflow.
-
-**SessionStart hook behavior:**
-- Check `command -v rtk` — if missing, print warning to stderr: `[yellow-rtk] Warning: rtk binary not found. Run /rtk:setup to install.`
-- Check RTK version meets minimum: `rtk --version | grep -E '[0-9]+\.[0-9]+' || warn`
-- Check that the PreToolUse hook is registered in `settings.json` — if not found, warn that `rtk init --hook-only` needs to be re-run
-- Output `{"continue": true}` on all paths including all error/warning paths (set -e must NOT be used in this hook — see project memory)
-- `json_exit()` helper pattern required: all early exits call `json_exit` not bare `exit 0`
-
-**CLAUDE.md collision mitigation:**
-- `rtk init --hook-only` flag skips the 134-line CLAUDE.md patch entirely. This is the default in `/rtk:setup`.
-- If a user wants the RTK awareness block in their CLAUDE.md, they can run `rtk init` manually — but this is explicitly NOT done by the plugin command, because yellow-core auto-memory manages CLAUDE.md.
-- Document this clearly in the plugin's CLAUDE.md and README.
-
-**Telemetry policy:**
-- Default: `RTK_TELEMETRY=0` set in the hook environment. RTK sends no data to `rtk-ai.app`.
-- The `/rtk:setup` command surfaces this choice with an AskUserQuestion: "RTK collects opt-out usage telemetry to rtk-ai.app. Keep telemetry disabled (recommended) or enable it?" Options: `[Keep disabled]` / `[Enable telemetry]`.
-- If the user enables telemetry, the command removes the `RTK_TELEMETRY=0` env override from the hook entry.
-
-**Version pinning strategy:**
-- The SessionStart hook checks that installed RTK version is >= 0.38.0 (current at time of writing).
-- Pin the minimum version in the hook script as a constant, not hardcoded at install time.
-- When RTK releases breaking changes (hook format changes between minor versions are possible), update the minimum version constant and issue a `pnpm changeset`.
-- The `/rtk:setup` command installs whatever version is available via `brew install rtk` — users should run `brew upgrade rtk` periodically. The SessionStart warning fires if they drift below the minimum.
-
-**Marketplace entry:**
-```json
-{
-  "name": "yellow-rtk",
-  "description": "Token-efficient Claude Code sessions via RTK command-output compression",
-  "category": "development"
-}
-```
-
-**What requires updating when yellow-rtk is added:**
-- `.claude-plugin/marketplace.json` — add plugin entry
-- `plugins/yellow-core/commands/setup/all.md` — add to setup dashboard
-- `pnpm changeset` — required
-
-**Pros:**
-- Solves a problem the stack has zero current coverage for
-- Automatic on every session once hook is installed — zero workflow changes required
-- Measurable ROI via `rtk gain` in 7-14 days
-- Zero interaction with ruvector (different hook type, different data)
-- Single Rust binary, Homebrew install, no API keys, no accounts
-- 3+ contributors, lower bus-factor than sigmap
-
-**Cons:**
-- Adds a Rust binary prerequisite (though Homebrew makes this trivial)
-- RTK's compression is opaque to Claude — filter bugs cause silent data loss
-- `rtk init --hook-only` means the plugin user must manage the PreToolUse hook separately from the plugin lifecycle — if the plugin is uninstalled, the RTK hook entry in `settings.json` is not cleaned up automatically
-- Version pinning requires maintenance as RTK evolves
-
-**Best when:** You are experiencing observable context-length pain on large-codebase sessions and want an immediate, automatic, measurable improvement. Build this before any sigmap integration shape.
+**Best when:** Observable context-length pain on large-codebase sessions and you want an immediate, automatic, measurable improvement. Build this before any sigmap integration shape.
 
 ---
 
