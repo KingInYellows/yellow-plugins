@@ -17,49 +17,13 @@
  * process.
  */
 
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve, dirname } from 'node:path';
+import { join } from 'node:path';
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-const VALIDATOR = resolve(__dirname, '..', '..', 'scripts', 'validate-agent-authoring.js');
-
-interface ValidatorRun {
-  status: number;
-  stdout: string;
-  stderr: string;
-}
-
-function runValidator(pluginsDir: string): ValidatorRun {
-  try {
-    const stdout = execFileSync('node', [VALIDATOR], {
-      env: { ...process.env, VALIDATE_PLUGINS_DIR: pluginsDir },
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { status: 0, stdout, stderr: '' };
-  } catch (err) {
-    const e = err as { status: number; stdout?: string; stderr?: string };
-    return {
-      status: e.status,
-      stdout: e.stdout ?? '',
-      stderr: e.stderr ?? '',
-    };
-  }
-}
-
-function writeAgent(
-  pluginsDir: string,
-  pluginRelative: string,
-  body: string
-): void {
-  const fullPath = join(pluginsDir, pluginRelative);
-  const dir = dirname(fullPath);
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(fullPath, body, 'utf8');
-}
+import { runValidator, writeAgent } from './helpers/validator-harness';
 
 const REVIEW_AGENT_BASH_VIOLATOR = `---
 name: synth-violator
