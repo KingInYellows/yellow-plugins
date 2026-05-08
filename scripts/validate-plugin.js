@@ -450,8 +450,10 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
 // Lazy-loaded set of plugin names declared in the marketplace catalog.
 // Populated on first call to `getMarketplacePluginNames()` and reused for
 // every subsequent plugin's RULE 11 cross-dep check. Returns null when
-// marketplace.json is absent or unparseable — RULE 11 skips silently in
-// that case rather than producing spurious warnings.
+// marketplace.json is absent (silent — single-plugin validation outside
+// the monorepo is a legitimate flow), unparseable, or has an unexpected
+// shape; the latter two cases also emit a WARNING so a broken catalog
+// doesn't quietly reduce validation coverage.
 let _marketplacePluginNames = undefined;
 function getMarketplacePluginNames() {
   if (_marketplacePluginNames !== undefined) return _marketplacePluginNames;
@@ -473,9 +475,15 @@ function getMarketplacePluginNames() {
           .map((p) => p.name)
       );
     } else {
+      logWarning(
+        'cannot parse .claude-plugin/marketplace.json (unexpected shape); skipping dependency cross-checks'
+      );
       _marketplacePluginNames = null;
     }
   } catch (_err) {
+    logWarning(
+      'cannot parse .claude-plugin/marketplace.json (invalid JSON); skipping dependency cross-checks'
+    );
     _marketplacePluginNames = null;
   }
   return _marketplacePluginNames;
