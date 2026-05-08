@@ -29,5 +29,13 @@
         ]
       }
     ]
-  }
+  },
+  "dependencies": [
+    {
+      "name": "yellow-linear",
+      "version": "*",
+      "optional": true,
+      "reason": "ci:report-linear uses mcp__plugin_yellow-linear_linear__create_issue"
+    }
+  ]
 }

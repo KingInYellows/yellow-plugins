@@ -447,10 +447,45 @@ function validateHookScriptPath(scriptPath, eventName, pluginDir, errors) {
 /**
  * Validate a single plugin directory
  */
+// Lazy-loaded set of plugin names declared in the marketplace catalog.
+// Populated on first call to `getMarketplacePluginNames()` and reused for
+// every subsequent plugin's RULE 11 cross-dep check. Returns null when
+// marketplace.json is absent or unparseable — RULE 11 skips silently in
+// that case rather than producing spurious warnings.
+let _marketplacePluginNames = undefined;
+function getMarketplacePluginNames() {
+  if (_marketplacePluginNames !== undefined) return _marketplacePluginNames;
+  const marketplacePath = path.join(
+    PROJECT_ROOT,
+    '.claude-plugin',
+    'marketplace.json'
+  );
+  if (!fs.existsSync(marketplacePath)) {
+    _marketplacePluginNames = null;
+    return _marketplacePluginNames;
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(marketplacePath, 'utf8'));
+    if (Array.isArray(data.plugins)) {
+      _marketplacePluginNames = new Set(
+        data.plugins
+          .filter((p) => p && typeof p.name === 'string')
+          .map((p) => p.name)
+      );
+    } else {
+      _marketplacePluginNames = null;
+    }
+  } catch (_err) {
+    _marketplacePluginNames = null;
+  }
+  return _marketplacePluginNames;
+}
+
 function validatePlugin(pluginDir) {
   const manifestPath = path.join(pluginDir, '.claude-plugin', 'plugin.json');
   const dirName = path.basename(pluginDir);
   const errors = [];
+  const marketplacePluginNames = getMarketplacePluginNames();
 
   // Check manifest exists
   if (!fs.existsSync(manifestPath)) {
@@ -971,6 +1006,31 @@ function validatePlugin(pluginDir) {
         validateUserConfigEntries(ch.userConfig, `channels[${i}].userConfig`);
       }
     });
+  }
+
+  // RULE 11: cross-plugin dependency declarations.
+  // For each entry in `dependencies`, look up the dep's `name` in the
+  // marketplace catalog. Hard deps (`optional` not true) WARN if missing —
+  // surfacing install-time coupling that would otherwise fail opaquely at
+  // runtime ("MCP tool not found"). Optional deps stay silent (matches
+  // npm peerDependenciesMeta semantics: declared, not enforced).
+  //
+  // Loaded once per validate-plugin invocation; passed to validateManifest
+  // via the `marketplacePluginNames` parameter (see discoverPlugins).
+  if (Array.isArray(manifest.dependencies) && marketplacePluginNames) {
+    for (const dep of manifest.dependencies) {
+      // String form: bare plugin name. Cannot be optional; cannot carry reason.
+      const depName = typeof dep === 'string' ? dep : dep && dep.name;
+      const depOptional = typeof dep === 'object' && dep && dep.optional === true;
+      const depReason = typeof dep === 'object' && dep && dep.reason;
+      if (!depName || depOptional) continue;
+      if (!marketplacePluginNames.has(depName)) {
+        const reasonSuffix = depReason ? ` — reason: ${depReason}` : '';
+        logWarning(
+          `${manifest.name}: declared dependency "${depName}" is not present in marketplace.json catalog${reasonSuffix}`
+        );
+      }
+    }
   }
 
   // Summary
