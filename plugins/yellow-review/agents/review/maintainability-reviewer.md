@@ -1,7 +1,7 @@
 ---
 name: maintainability-reviewer
 description: "Always-on code-review persona. Reviews code for premature abstraction, unnecessary indirection, dead code, coupling between unrelated modules, and naming that obscures intent. Use when reviewing any PR — selected automatically by review:pr alongside the other always-on personas."
-model: inherit
+model: sonnet
 background: true
 tools:
   - Read

@@ -1,7 +1,7 @@
 ---
 name: pr-comment-resolver
 description: "Implements a single coherent fix for a cluster of related PR review comments (same file region). Use when spawned in parallel by /review:resolve to reconcile a cluster of unresolved review threads by reading the file region, understanding each comment, and applying one consolidated edit."
-model: inherit
+model: sonnet
 background: true
 tools:
   - Read

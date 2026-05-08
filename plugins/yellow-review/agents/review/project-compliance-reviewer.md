@@ -1,7 +1,7 @@
 ---
 name: project-compliance-reviewer
 description: "Reviews PRs against project-specific conventions defined in CLAUDE.md and AGENTS.md — naming patterns, repo-defined commit conventions, plugin-authoring rules, and project-pattern adherence. Use when reviewing any PR — selected automatically by review:pr alongside the other always-on personas. Distinct from project-standards-reviewer (frontmatter, references, portability) and from correctness-reviewer (general logic bugs)."
-model: inherit
+model: sonnet
 background: true
 memory: project
 tools:
