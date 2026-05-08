@@ -54,6 +54,31 @@ Sources: [docs.anthropic.com/en/docs/claude-code/sub-agents](https://docs.anthro
 | `initialPrompt` | string | none | SDK-level |
 | `color` | `red`/`blue`/`green`/`yellow`/`purple`/`orange`/`pink`/`cyan` | none | undocumented until GH #19292 |
 
+### `effort` tier-selection rule (high vs xhigh vs max)
+
+The official Anthropic docs list the `effort` enum but do not document
+operational distinctions between `high`, `xhigh`, and `max`. Community
+precedent and yellow-plugins convention (established M-A-05, 2026-05-08):
+
+| Tier | Use when | Avoid when |
+|---|---|---|
+| `low` | CLI relay agents, narrow taxonomy scanners, deterministic agents that follow a fixed procedural script | The agent does any synthesis or scoring across candidates |
+| `medium` | Default for caller-flexible agents — let the calling session's context decide depth | The agent has compound reasoning that should override caller defaults |
+| `high` | Agent applies a **bounded structured rubric** (n principles, n axes, n criteria) where each axis is itself bounded; multi-axis but bounded analysis | The agent is open-ended and additional CoT mostly redoes the same axes |
+| `xhigh` | Open-ended reasoning with **no rubric ceiling** — adversarial scenario construction, novel-pattern detection, agents that *generate* failure modes rather than check against them. Effective ceiling on Opus 4.7+ | Agent is sonnet/haiku-tier (xhigh on lower models is pointless — model ceiling already constrains output before effort would) |
+| `max` | Deepest single-pass synthesis on the largest documents, when wall-clock cost is acceptable | The deployed model is not pinned to a specific Opus version that supports `max` — community sources indicate `max` may be Opus 4.6-exclusive and returns API errors on other models. Avoid in plugin agents that ship across Opus versions |
+
+**Pairing with `model:`:** `xhigh`/`max` are most impactful with `model: opus`.
+On `sonnet` or `haiku`, the model's ceiling constrains output quality before
+the effort budget would; pair lower-tier models with `low`/`medium`/`high`
+or omit `effort:` entirely to inherit caller context.
+
+**No published cost/latency multipliers.** Anthropic does not document the
+token-budget ratio between tiers. Order-of-magnitude proxies based on the
+underlying API extended-thinking parameter: `high` ≈ 2-4× a non-thinking
+call; `xhigh` adds further latency on complex prompts; `max` reportedly
+approaches 5-10× a non-thinking call. Treat as best-guess only.
+
 ### `permissionMode` enum and inheritance
 
 | Value | Behavior |
