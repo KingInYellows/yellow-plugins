@@ -30,7 +30,7 @@ Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison
 
 ### High-Level Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────┐
 │  yellow-rtk plugin (this repo)              │
 │  ─────────────────────────────────────────  │
@@ -131,9 +131,23 @@ Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison
     - Question: "RTK collects opt-out usage telemetry to rtk-ai.app. How do you want to proceed?"
     - Options: "Keep disabled (recommended)" / "Enable telemetry"
   - Step 5 — Write `RTK_TELEMETRY=0` (or omit on enable) to hook entry's `env`:
-    - Atomic write: `jq '...' ~/.claude/settings.json > ~/.claude/settings.json.tmp.$$ && mv ~/.claude/settings.json.tmp.$$ ~/.claude/settings.json`
-    - Use `jq --arg` for the value (never string interpolation)
-    - On jq parse failure of settings.json: fail-closed, do NOT silently continue
+    - Atomic write using `mktemp` (consistent with the deepen-plan annotation below) and a precise jq selector that targets only the RTK Bash-matcher hook:
+      ```bash
+      tmp=$(mktemp ~/.claude/settings.json.tmp.XXXXXX) \
+        && jq --arg val "0" '
+            (.hooks.PreToolUse[]
+              | select(.matcher == "Bash").hooks[]
+              | select(.command == "rtk hook claude")
+              | .env.RTK_TELEMETRY) = $val
+          ' ~/.claude/settings.json > "$tmp" \
+        && chmod --reference=~/.claude/settings.json "$tmp" \
+        && mv "$tmp" ~/.claude/settings.json
+      ```
+    - The jq selector matches `.hooks.PreToolUse[].hooks[]` filtered by `.matcher == "Bash"` AND `.command == "rtk hook claude"` — so unrelated PreToolUse entries (yellow-ruvector's `Edit|Write|MultiEdit|Bash` hook, user-installed hooks) are untouched.
+    - `mktemp ~/.claude/settings.json.tmp.XXXXXX` is preferred over the bare `$$` PID suffix: avoids collision races, picks a fresh `XXXXXX`-randomised name on each run, and (`mktemp -p ~/.claude/` may also be used on Linux for explicit dir control).
+    - Use `jq --arg` for the value (never string interpolation).
+    - `chmod --reference=...` (Linux) or `chmod $(stat -f '%Mp%Lp' ~/.claude/settings.json) "$tmp"` (macOS) **before** `mv` — see Security Considerations for the platform-specific syntax.
+    - On jq parse failure of settings.json: fail-closed, do NOT silently continue.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** The only existing precedent for atomic settings.json mutation is `plugins/yellow-core/commands/statusline/setup.md:446-481` (Python: `tmp = path + '.tmp'`, `json.dump`, re-read to validate, `os.replace`). It only mutates a top-level key; yellow-rtk does **nested-key surgery** (`hooks[N].env.RTK_TELEMETRY`), which has no in-repo precedent. Extend the statusline pattern, don't invent a new one. No `flock` usage exists anywhere in the codebase for `~/.claude/`.
@@ -201,7 +215,7 @@ Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison
 
 ### Files to Create
 
-```
+```text
 plugins/yellow-rtk/
 ├── .claude-plugin/
 │   └── plugin.json                  # manifest (hooks, userConfig, no MCP)
