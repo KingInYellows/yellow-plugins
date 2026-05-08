@@ -3,7 +3,7 @@
 "yellow-docs": patch
 ---
 
-Tier yellow-core review/research/workflow personas + 2 yellow-docs reviewers
+Tier yellow-core review/workflow personas + 2 yellow-docs reviewers
 to explicit `model:` frontmatter (Phase 3b of M-A-01).
 
 **yellow-core (8 files)** — single-axis review and structured analysis;
