@@ -64,6 +64,12 @@ mkdir -p "$CLAUDE_PLUGIN_DATA" || json_exit "mkdir failed; skipping prewarm"
   if ! yellow_morph_acquire_install_lock 5; then
     exit 0
   fi
+  # Overwrite the lock's PID file with $BASHPID (the subshell's actual PID).
+  # acquire_install_lock writes $$, which in a bash subshell is the parent's
+  # PID — and the parent exits immediately after spawning us. Without this,
+  # a later caller's stale-lock recovery would see the parent as dead, break
+  # the lock, and race a concurrent npm ci against ours.
+  printf '%s' "$BASHPID" > "${CLAUDE_PLUGIN_DATA}/.install.lock/pid" 2>/dev/null || true
   trap 'yellow_morph_release_install_lock' EXIT INT TERM
 
   # Re-check under the lock — the wrapper or a previous prewarm may have
