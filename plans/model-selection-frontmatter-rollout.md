@@ -34,7 +34,7 @@ Five Graphite-stackable PRs, ordered by risk and coordination cost:
 3. **PR 3 (Phase 3a):** yellow-review reviewer-tier downgrades (13 agents).
 4. **PR 4 (Phase 3b):** yellow-core review/research/workflow personas + 2
    yellow-docs reviewers (10 files).
-5. **PR 5 (Phase 4):** Validator V1–V4 rules + tests (tooling-only, no plugin
+5. **PR 5 (Phase 5):** Validator V1–V4 rules + tests (tooling-only, no plugin
    files, no changeset).
 
 Code quality is preserved because:
@@ -70,7 +70,7 @@ Branch: `agent/feat/model-explicit-phase-1`
 - [ ] 1.9: Edit
   `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md` — add
   `model: sonnet` and `effort: high`
-- [ ] 1.10: Run `pnpm validate:agents && pnpm validate:plugins`
+- [ ] 1.10: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
 - [ ] 1.11: WSL2 normalize: `for f in <edited files>; do sed -i 's/\r$//' "$f"; done`
 - [ ] 1.12: `pnpm changeset` — single file, `patch` bumps for `yellow-docs`,
   `yellow-council`, `yellow-core`, `yellow-ci`, `yellow-debt`, `yellow-research`
@@ -100,7 +100,7 @@ Branch: `agent/feat/model-explicit-phase-2` (stacked on PR 1)
   add `model: sonnet`
 - [ ] 2.5: Edit `plugins/yellow-core/agents/workflow/session-historian.md` —
   add `model: sonnet`
-- [ ] 2.6: Run `pnpm validate:agents && pnpm validate:plugins`
+- [ ] 2.6: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
 - [ ] 2.7: WSL2 normalize edited files
 - [ ] 2.8: `pnpm changeset` — **one file**, `patch` bumps for **both**
   `yellow-debt` AND `yellow-core` (mirrors PR A-01 precedent from 2026-05-07)
@@ -134,7 +134,7 @@ Branch: `agent/feat/model-explicit-phase-3a` (stacked on PR 2)
   - `plugin-contract-reviewer.md`
   - `cli-readiness-reviewer.md`
   - `agents/workflow/pr-comment-resolver.md`
-- [ ] 3.3: Run `pnpm validate:agents && pnpm validate:plugins`
+- [ ] 3.3: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
 - [ ] 3.4: WSL2 normalize edited files
 - [ ] 3.5: `pnpm changeset` — single `patch` bump for `yellow-review`
 - [ ] 3.6: `gt commit create -m "feat(yellow-review): tier 13 reviewer agents to sonnet"`
@@ -171,7 +171,7 @@ confirmations, not edits.
 - [ ] 4.4: Edit
   `plugins/yellow-docs/agents/review/adversarial-document-reviewer.md` — add
   `model: sonnet` and `effort: high`
-- [ ] 4.5: Run `pnpm validate:agents && pnpm validate:plugins`
+- [ ] 4.5: Run `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins`
 - [ ] 4.6: WSL2 normalize edited files
 - [ ] 4.7: `pnpm changeset` — one file, `patch` bumps for `yellow-core` AND
   `yellow-docs`
@@ -382,8 +382,9 @@ PR 5 (validator-only) requires NO changeset.
 
 1. Each PR's per-phase acceptance criteria (above) met.
 2. After PR 5 lands, `pnpm validate:agents` against the live plugin tree
-   exits 0 with optional V3/V4 warnings only on allowlisted files (none
-   expected since allowlist excludes those).
+   exits 0 and emits zero V3/V4 warnings, because every file that would
+   otherwise trigger them is either explicitly tiered (Phases 1–4) or
+   listed in `MODEL_RULE_ALLOWLIST` (the 3 intentional-inherit exemptions).
 3. After all 5 PRs land, `grep -rn '^model:' plugins/*/agents/ | wc -l`
    shows the expected count of explicit assignments (~30 + the 8 already
    on opus/sonnet pre-rollout = ~38).
