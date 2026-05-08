@@ -18,7 +18,7 @@ Apply mechanical audit followups (2026-05-07 audit):
   `pnpm validate:schemas`.
 - **C-01 (gt-workflow):** document the un-namespaced command convention
   exception in `CLAUDE.md`. The seven gt-workflow commands ship without
-  the `plugin-name:command` prefix intentionally — they predate the
+  the `namespace:verb` prefix intentionally — they predate the
   namespacing convention. No behavior change; documentation only.
 
 Companion to PR #436 (X-02 validator fix) and the broader audit followups

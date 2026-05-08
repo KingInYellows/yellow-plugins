@@ -16,10 +16,12 @@ Graphite-native workflow commands for stacked PR development.
 
 The seven commands shipped by gt-workflow (`gt-amend`, `gt-sync`, `gt-nav`,
 `gt-stack-plan`, `gt-cleanup`, `gt-setup`, `smart-submit`) are
-**un-namespaced** — they do NOT carry the `plugin-name:command` prefix that
-later marketplace conventions adopted. This is intentional, not a bug:
+**un-namespaced** — they do NOT carry the `namespace:verb` prefix that
+later marketplace conventions adopted (where `namespace` is the
+`commands/<namespace>/` directory the file ships under, producing forms
+like `/ci:diagnose` or `/review:plan`). This is intentional, not a bug:
 
-1. **Historical:** these commands predate the `plugin-name:command`
+1. **Historical:** these commands predate the `namespace:verb`
    namespacing convention and shipped under their bare names.
 2. **Low collision risk:** six of the seven are `gt-`-prefixed and no other
    marketplace plugin would plausibly register them. `smart-submit` is the
@@ -31,9 +33,10 @@ later marketplace conventions adopted. This is intentional, not a bug:
    justification for the rename churn across user habits, documentation,
    and external references.
 
-If a real collision arises, the migration path is to dual-publish under
-both `gt-workflow:<name>` and the bare `<name>` for one minor release,
-then remove the bare form in the next major.
+If a real collision arises, the migration path is to relocate the files
+under `commands/gt/` (yielding `/gt:amend`, `/gt:nav`, etc.) and
+dual-publish under both the new `gt:<verb>` and the bare `<name>` for
+one minor release, then remove the bare form in the next major.
 
 ## Conventions
 
