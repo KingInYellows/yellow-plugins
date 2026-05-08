@@ -1,7 +1,7 @@
 ---
 name: spec-flow-analyzer
 description: "User experience flow analyst and requirements engineer. Examines specifications through the lens of the end user. Use when reviewing requirements, identifying gaps in specifications, or validating user journey completeness."
-model: inherit
+model: sonnet
 background: true
 memory: project
 tools:

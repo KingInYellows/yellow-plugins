@@ -1,7 +1,7 @@
 ---
 name: feasibility-reviewer
 description: "Evaluates whether proposed technical approaches in planning documents will survive contact with reality — architecture conflicts, dependency gaps, migration risks, performance feasibility, and implementability. Uses shadow path tracing (happy/nil/empty/error) for new data flows. Use when reviewing technical plans, ADRs, or specs that propose new architecture or significant migrations via /docs:review."
-model: inherit
+model: sonnet
 background: true
 tools:
   - Read
