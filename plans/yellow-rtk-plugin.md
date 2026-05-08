@@ -164,10 +164,10 @@ Comparative research (`docs/research/rtk-vs-sigmap-context-management-comparison
 ### Phase 4: `/rtk:gain` Command
 
 - [ ] 4.1: Author `plugins/yellow-rtk/commands/rtk/gain.md`
-  - Frontmatter: `name: rtk:gain`, single-line description, `argument-hint: '[7d|14d|all]'`, `allowed-tools: [Bash]`
+  - Frontmatter: `name: rtk:gain`, single-line description, `argument-hint: '[daily|weekly|monthly|all|graph|json]'`, `allowed-tools: [Bash]` (positional time-window args like `7d`/`14d` are NOT supported by RTK — see deepen-plan annotation below for the actual flag set)
   - Step 0: `command -v rtk` guard (re-defined; can't share state with hook)
-  - Step 1: Verify `rtk gain --help` supports the argument shape; document the actual flag once verified during implementation
-  - Step 2: Run `rtk gain [window]` with output capped via `head -n 40` to budget the context
+  - Step 1: Map `$ARGUMENTS` → RTK flag: `daily`→`-d`, `weekly`→`-w`, `monthly`→`-m`, `all`→`-a`, `graph`→`-g`, `json`→`-f json` (default: no flag = whatever `rtk gain` shows by default)
+  - Step 2: Run `rtk gain <flag>` with output capped via `head -n 40` to budget the context (or use `-f json` and pipe to a structured renderer when `json` requested — JSON output is verbatim and does not need head-capping)
   - Step 3: Empty-state detection — if `rtk gain` returns "no data" / empty, print `[yellow-rtk] No savings data yet. RTK collects data as you use Claude Code. Run a few sessions and check back.` and exit cleanly
 
 <!-- deepen-plan: external -->
