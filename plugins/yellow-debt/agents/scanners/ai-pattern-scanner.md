@@ -1,7 +1,8 @@
 ---
 name: ai-pattern-scanner
 description: "AI-specific anti-pattern detection. Use when auditing code for excessive comments, boilerplate, over-specification, or other AI-generated debt patterns."
-model: inherit
+model: sonnet
+effort: low
 background: true
 skills:
   - debt-conventions
