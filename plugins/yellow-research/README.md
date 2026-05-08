@@ -26,11 +26,19 @@ manually: `npm install -g @ast-grep/cli`.
 
 ## API Key Setup
 
-As of v2.0.0, EXA / Tavily / Perplexity API keys are stored in `userConfig`
-(system keychain), NOT shell environment variables. The MCPs read from
-`${user_config.<key>}` — exporting `*_API_KEY` in `~/.zshrc` no longer feeds
-the MCP and the Perplexity MCP will hard-fail at startup without a valid
-userConfig value.
+EXA / Tavily / Perplexity API keys are read from `userConfig` (system
+keychain) by default. As of v3.1.0, each MCP server is launched via a
+small wrapper in `bin/start-<server>.sh` that resolves the key with this
+precedence:
+
+1. `userConfig` value (preferred — keychain-encrypted)
+2. Shell env fallback: `EXA_API_KEY`, `TAVILY_API_KEY`, `PERPLEXITY_API_KEY`
+
+If both are set, `userConfig` wins. If neither is set, the wrapper
+unsets the empty value before exec; behavior then differs by server.
+Perplexity's MCP hard-fails at startup so its tools are unavailable,
+while Tavily and EXA start successfully and surface a runtime error
+on the first tool call.
 
 Recommended path (one-time per workstation, no restart needed):
 
@@ -62,10 +70,10 @@ The **Parallel Task** and **Ceramic** MCP servers use OAuth — Claude Code
 handles authentication automatically. You'll be prompted to authorize on
 first use (no API key needed).
 
-Power users who insist on shell-env-driven auth can bridge with a per-MCP
-wrapper script (see `plugins/yellow-morph/bin/start-morph.sh` for the
-canonical pattern). `plugin.json` no longer reads shell `*_API_KEY` vars
-directly.
+Power users who already export `EXA_API_KEY`, `TAVILY_API_KEY`, and/or
+`PERPLEXITY_API_KEY` in their shell rc do not need to re-enter them via
+`userConfig` — the bundled `bin/start-<server>.sh` wrappers pick up shell
+env values automatically when no `userConfig` value is set.
 
 ## Usage
 
