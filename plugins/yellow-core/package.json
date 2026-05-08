@@ -1,6 +1,6 @@
 {
   "name": "yellow-core",
-  "version": "1.15.2",
+  "version": "1.15.3",
   "private": true,
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "scripts": {
