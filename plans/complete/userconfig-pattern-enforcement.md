@@ -1,5 +1,13 @@
 # Feature: `userConfigEntry.pattern` schema field for input regex constraints
 
+**Status:** **REVERTED (2026-05-08).** Implemented via PR #409 (`d49ce331 feat(schema): add pattern regex field to userConfigEntry + RULE 10`), then rolled back via PR #458 (`d6053407 chore: remove userConfig.pattern schema/RULE 10/tests (remote validator rejects)`) on 2026-05-08. Claude Code's remote validator emits `Unrecognized key: "pattern"` on install (`claude doctor`); the official schema permits only `{type, title, description, sensitive, required, default, multiple, min, max}`. Decision **D3** ("local enforcement only — remote may silently ignore") was empirically falsified: the remote actively rejects the key, breaking install. Composio cleartext-credential mitigation (the motivating P1 from PR #396) shipped via PR #457 stripping `pattern` from `composio_mcp_url` and falling back to a SessionStart hook + prose advisory. **Do not re-attempt** unless the official Anthropic plugin schema adds `pattern` to `userConfigEntry`.
+
+**Outcome doc:** [`docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md`](../docs/solutions/build-errors/userconfig-pattern-field-schema-extension.md) (`## Outcome` section).
+
+**Related rollback plan:** `plans/2026-05-08-doctor-fix-rollback-userconfig-pattern.md`.
+
+---
+
 ## Problem Statement
 
 PR #396 (`yellow-composio` bundles HTTP MCP via userConfig) introduced the first
