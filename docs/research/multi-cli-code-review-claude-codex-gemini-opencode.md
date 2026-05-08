@@ -38,7 +38,7 @@ The asymmetric shape — in-process Task subagent for Claude, subprocess CLIs fo
 
 ### Architecture diagram
 
-```
+```text
                     User invokes /council <mode>
                               │
                               ▼
@@ -374,7 +374,7 @@ Under subscription auth, caching does not save money — it saves time. Cache hi
 
 1. Detect: provider returns subscription-specific error
 2. Log: `[council] <reviewer> quota exhausted — window resets at <ETA>`
-3. Mark: `verdict=QUOTA_EXHAUSTED`, `confidence=N/A`, `summary=<reviewer> subscription quota exhausted; council ran with N-of-4 reviewers` _(plan-locked: distinct enum from generic `UNAVAILABLE`; case-statement allow-list must be extended in all 4 reviewer agent files — see plan Task 3.3)_
+3. Mark: `verdict=QUOTA_EXHAUSTED`, `confidence=N/A`, `summary=<reviewer> subscription quota exhausted; council ran with N-of-4 reviewers`. Plan-locked: `QUOTA_EXHAUSTED` is a new, distinct verdict (separate from `UNAVAILABLE` and `ERROR`) and requires updating the case-statement allow-list in all four reviewer agent files (claude-reviewer, codex-reviewer, gemini-reviewer, opencode-reviewer) — see plan Task 3.3.
 4. Surface in synthesis Headline: `Council ran with N of 4 reviewers (<reviewer> quota exhausted, resets <ETA>)`
 5. Do NOT retry — quota-exhausted errors require window reset, not backoff
 
