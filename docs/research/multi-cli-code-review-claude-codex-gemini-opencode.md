@@ -317,10 +317,10 @@ The literature is stable and the prior doc's recommendations carry forward uncha
 
 This is the new top-of-list quality risk: **Claude is both Reviewer 1 and the synthesizer.** Without mitigation, the synthesizer favors Claude-reviewer findings 10-15% above chance (Zheng 2023, "Judging LLM-as-a-Judge"). Combined with the 23.8% positional swap-consistency for Claude, the synthesis output is essentially Claude voting for Claude with some noise.
 
-**Required mitigations (V2 mandatory before any quality claim):**
-1. **Two-pass order-swap.** Synthesize findings A→B then B→A, average. Flag any finding whose verdict flips between the two passes (or whose confidence tier changes without a flip) as "low-confidence synthesis." (Plan-locked: binary verdict-flip, not the older `>15% variance` heuristic — see plan Task 2.2.)
-2. **Double-blind lineage labels.** Strip CLI/model identity before synthesis. Present to synthesizer as "Reviewer 1/2/3/4." Restore identity in final output for attribution.
-3. **Length-controlled scoring.** Normalize finding score by length to prevent verbosity bias inflation.
+**Required mitigations (research-mandatory before any quality claim; see Dimension 10 + plan Risk R6 for plan-level deferrals):**
+1. **Two-pass order-swap.** Synthesize findings A→B then B→A, average. Flag any finding whose verdict flips between the two passes (or whose confidence tier changes without a flip) as "low-confidence synthesis." (Plan-locked: binary verdict-flip, not the older `>15% variance` heuristic — see plan Task 2.2.) **Plan status: V2 (Task 2.2).**
+2. **Double-blind lineage labels.** Strip CLI/model identity before synthesis. Present to synthesizer as "Reviewer 1/2/3/4." Restore identity in final output for attribution. **Plan status: V2 (Task 2.1).**
+3. **Length-controlled scoring.** Normalize finding score by length to prevent verbosity bias inflation. **Plan status: deferred to V2.5 (V2-7) — V2 ships items 1 and 2 only. Verbosity bias is a known quality gap until V2.5 lands. See Dimension 10 item 4 + plan Risk R6 + plan Non-goals for the locked deferral and rationale.**
 
 ---
 
