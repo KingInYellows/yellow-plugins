@@ -357,13 +357,16 @@ Implements the manual reset escape-hatch promised in Risk R2's mitigation. Pre-f
 if [ -n "${COUNCIL_QUOTA_RESET:-}" ]; then
   case "$COUNCIL_QUOTA_RESET" in
     all)
-      # Reset claude/codex/gemini entries (used=0, window_start=now); preserve opencode.used=null per Task 3.1 invariant — opencode is sentinel, not numeric
+      # Reset claude/codex/gemini entries (used=0, window_start=now); for claude ALSO reset weekly_used=0 + weekly_window_start=now per the Task 3.1 dual-window invariant; preserve opencode.used=null per Task 3.1 invariant — opencode is sentinel, not numeric
       ;;
-    claude|codex|gemini)
+    claude)
+      # Clear BOTH 5h-window fields (used=0, window_start=now) AND weekly-window fields (weekly_used=0, weekly_window_start=now); per Task 3.1 dual-window invariant, leaving weekly state stale would keep pre-flight in a false-exhausted state after the reset
+      ;;
+    codex|gemini)
       # Clear just that reviewer's used/window_start
       ;;
     opencode)
-      # No-op on `used` (opencode.used is null sentinel per Task 3.1 invariant); only window_start may be touched, `used` stays null
+      # No-op — the opencode entry has no numeric `used` and no `window_start` field per the Task 3.1 schema (`{ "used": null, "model": "..." }`). Reset is meaningless here; do nothing.
       ;;
     *)
       echo "[council] Unknown reviewer for COUNCIL_QUOTA_RESET: $COUNCIL_QUOTA_RESET (ignored)" >&2
@@ -500,7 +503,7 @@ Add a `verify_finding()` bash function that:
 <!-- /deepen-plan -->
 
 <!-- deepen-plan: external -->
-> **Research (Q3, alternative library):** `rapidfuzz` (pip install rapidfuzz) is the strongly recommended modern alternative for line-level fuzzy matching as of May 2026. Actively maintained (frequent 2025 releases), C++ backend (orders of magnitude faster than diff-match-patch on large inputs), and provides `fuzz.ratio(a, b) >= 85` with intuitive 0–100 percentage scale (no inverted threshold). `python-Levenshtein` now delegates to rapidfuzz internally. **Recommendation:** consider `rapidfuzz` for the verify_finding helper instead of diff-match-patch. Use diff-match-patch only if you need patch/apply semantics (yellow-council does not — it only needs similarity scoring). If switching to rapidfuzz, the helper becomes: `python3 -c "from rapidfuzz import fuzz; import sys; print(fuzz.ratio(open('/dev/stdin').read(), '<expected>'))"` returning 0–100.
+> **Research (Q3, alternative library):** `rapidfuzz` (pip install rapidfuzz) is the strongly recommended modern alternative for line-level fuzzy matching as of May 2026. Actively maintained (frequent 2025 releases), C++ backend (orders of magnitude faster than diff-match-patch on large inputs), and provides `fuzz.ratio(a, b) >= 85` with intuitive 0–100 percentage scale (no inverted threshold). `python-Levenshtein` now delegates to rapidfuzz internally. **Confirmed (locked decision — see Task 5.1 + "Locked decisions"):** `rapidfuzz` is the V2 fuzzy-match library; `diff-match-patch` is NOT used (yellow-council needs only similarity scoring, not patch/apply semantics). Helper invocation: `python3 -c "from rapidfuzz import fuzz; import sys; print(fuzz.ratio(open('/dev/stdin').read(), '<expected>'))"` returning 0–100.
 <!-- /deepen-plan -->
 
 <!-- deepen-plan: external -->
