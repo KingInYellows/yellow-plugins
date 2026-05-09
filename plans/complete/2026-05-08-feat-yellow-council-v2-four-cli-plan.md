@@ -345,10 +345,13 @@ Implements the manual reset escape-hatch promised in Risk R2's mitigation. Pre-f
 if [ -n "${COUNCIL_QUOTA_RESET:-}" ]; then
   case "$COUNCIL_QUOTA_RESET" in
     all)
-      # Clear all four reviewer entries (used=0, window_start=now)
+      # Reset claude/codex/gemini entries (used=0, window_start=now); preserve opencode.used=null per Task 3.1 invariant — opencode is sentinel, not numeric
       ;;
-    claude|codex|gemini|opencode)
+    claude|codex|gemini)
       # Clear just that reviewer's used/window_start
+      ;;
+    opencode)
+      # No-op on `used` (opencode.used is null sentinel per Task 3.1 invariant); only window_start may be touched, `used` stays null
       ;;
     *)
       echo "[council] Unknown reviewer for COUNCIL_QUOTA_RESET: $COUNCIL_QUOTA_RESET (ignored)" >&2
