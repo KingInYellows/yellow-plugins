@@ -332,9 +332,9 @@ This is the new top-of-list quality risk: **Claude is both Reviewer 1 and the sy
 
 **Tier 3 — AST match (~0.5% FP, ~20% FN):** `ast-grep` pattern-based structural matching. Semgrep Pro upgrade: 48% → 72% TP on WebGoat via cross-file analysis.
 
-**Discard policy:** Any finding failing all three tiers is discarded or downgraded to "unverified suggestion." Never surface at the same confidence level as verified findings.
+**Discard policy:** Any finding failing all three tiers is **downgraded** (NOT silently dropped) and surfaced under a separate "Unverified Claims" section. Never surface unverified findings at the same confidence level as verified ones — but never silently lose them either, because traceability matters for the user's audit of why reviewers disagreed. (Plan-locked, see Task 5.2: "Do not silently discard unverified findings — surface them in a separate section so the user can manually verify.")
 
-For yellow-council V2, the verification cascade should run inside the synthesis step, before the "Agreement" section is constructed. Findings cited by 2+ reviewers but failing all tiers should be moved to a separate "Unverified Claims" section, not "Agreement."
+For yellow-council V2, the verification cascade should run inside the synthesis step, before the "Agreement" section is constructed. Findings cited by 2+ reviewers but failing all tiers should be moved to the "Unverified Claims" section, not "Agreement."
 
 ---
 
