@@ -7,7 +7,7 @@
 
 ## Summary
 
-The yellow-plugins system has 66 of 79 agents (83.5%) using `model: inherit`, zero agents using `effort:` frontmatter, and one plugin (yellow-docs) that has already demonstrated intentional model tiering with measurable design rationale. The inheritance trap is real: `/review:pr` dispatching 16 reviewers from an Opus session multiplies token cost by 16x at the Opus rate with no quality ceiling benefit for pattern-matching or structured-output tasks. The clearest wins are: (1) explicit model assignment for the 10+ narrow-role agents where Haiku or Sonnet is clearly sufficient, (2) `effort: low` adoption for all background scanning and CLI-wrapper agents, and (3) making `product-lens-reviewer`'s `model: inherit` consistent with its yellow-docs peers. Prompt caching is not directly actionable at the plugin-author level — it is a platform-managed concern — but skill preloading choices indirectly affect what gets cached.
+The yellow-plugins system has 66 of 79 agents (83.5%) using `model: inherit`, zero agents using `effort:` frontmatter, and one plugin (yellow-docs) that has already demonstrated intentional model tiering with measurable design rationale. The inheritance trap is real: `/review:pr` dispatches 4 always-on personas plus up to 15 conditional personas plus an optional codex reviewer (worst-case fan-out ~20), and from an Opus session every one of them runs on Opus — multiplying token cost by the dispatched-reviewer count with no quality ceiling benefit for pattern-matching or structured-output tasks. The clearest wins are: (1) explicit model assignment for the 10+ narrow-role agents where Haiku or Sonnet is clearly sufficient, (2) `effort: low` adoption for all background scanning and CLI-wrapper agents, and (3) making `product-lens-reviewer`'s `model: inherit` consistent with its yellow-docs peers. Prompt caching is not directly actionable at the plugin-author level — it is a platform-managed concern — but skill preloading choices indirectly affect what gets cached.
 
 ---
 
@@ -23,7 +23,7 @@ Based on Anthropic's published capability documentation and the community refere
 
 **Claude Opus 4.6 / 4.7** — highest capability, significantly higher per-token cost. Suited for: tasks requiring extended reasoning, cross-domain synthesis, novel judgment calls, orchestration decisions that decompose ambiguous problems. The Ceramic result confirms Opus 4.6 introduced 1M-token context, adaptive thinking (auto reasoning depth), and effort controls. Appropriate for: final synthesizers that merge N scanner outputs into a single scored report, orchestrators that decide how to decompose a complex research topic, architectural strategy agents where a wrong decision has high downstream cost.
 
-**Cost differential (approximate from Anthropic pricing as of knowledge cutoff):** Haiku is roughly 20-25x cheaper per token than Opus; Sonnet is roughly 5-8x cheaper than Opus. In a 16-reviewer fan-out where each reviewer sends ~10K tokens of system prompt plus ~5K of context, the difference between running all 16 on inherited Opus vs. explicit Sonnet is approximately 5-8x the token cost — a concrete, measurable savings for every `/review:pr` invocation.
+**Cost differential (approximate from Anthropic pricing as of knowledge cutoff):** Haiku is roughly 20-25x cheaper per token than Opus; Sonnet is roughly 5-8x cheaper than Opus. In a representative 16-reviewer fan-out (a large diff that triggers most conditional personas — actual count ranges from 4 always-on up to ~20 with the optional codex reviewer), where each reviewer sends ~10K tokens of system prompt plus ~5K of context, the difference between running all on inherited Opus vs. explicit Sonnet is approximately 5-8x the token cost — a concrete, measurable savings for every `/review:pr` invocation. The savings ratio holds at any reviewer count; absolute cost scales linearly with the dispatched set.
 
 ### Effort Tier Frontmatter
 
@@ -43,7 +43,7 @@ The community pattern observed in GitHub search is: `model: haiku` + `effort: lo
 
 ### `model: inherit` Semantics
 
-From the Claude Code sub-agents documentation (confirmed by Ceramic rank-8 sub-agent-patterns result and community agent examples): `model: inherit` causes the spawned subagent to use whatever model the parent session is running. If a user runs Claude Code on Opus and spawns 16 subagents with `model: inherit`, all 16 run on Opus. There is no cap, no fallback, and no platform-level cost optimization.
+From the Claude Code sub-agents documentation (confirmed by Ceramic rank-8 sub-agent-patterns result and community agent examples): `model: inherit` causes the spawned subagent to use whatever model the parent session is running. If a user runs Claude Code on Opus and spawns N subagents with `model: inherit` (e.g., the 4 always-on + N triggered conditional personas in `/review:pr`), all N run on Opus. There is no cap, no fallback, and no platform-level cost optimization.
 
 This is appropriate when:
 - The agent needs the same model quality as the parent (e.g., a final synthesis step)
@@ -168,7 +168,7 @@ As established in Section 1: yellow-plugins cannot directly control `cache_contr
 
 2. **Skill content stability.** If the skills preloaded into an agent's system prompt change on every version bump, cache hits are invalidated. Stabilizing skill content (minimizing churn in large skills like `debt-conventions` at 409 lines) preserves whatever automatic caching the platform applies.
 
-3. **The high-fan-out insight.** In `/review:pr` dispatching 16 reviewers in parallel within a single session, each reviewer's system prompt is sent as a fresh context. If Claude Code applies any session-level caching for repeated tool invocations, the stable portion of each reviewer's system prompt (the fixed skill content, the security fencing block from `security-fencing` skill) would be candidates for cache hits. The implication: agents that share large common skill blocks (e.g., all yellow-review reviewers loading a shared conventions skill) may benefit more from caching than agents with unique content. This is a platform behavior to observe, not to engineer around.
+3. **The high-fan-out insight.** In `/review:pr` dispatching its full reviewer set (up to ~20 personas in a worst-case fan-out) in parallel within a single session, each reviewer's system prompt is sent as a fresh context. If Claude Code applies any session-level caching for repeated tool invocations, the stable portion of each reviewer's system prompt (the fixed skill content, the security fencing block from `security-fencing` skill) would be candidates for cache hits. The implication: agents that share large common skill blocks (e.g., all yellow-review reviewers loading a shared conventions skill) may benefit more from caching than agents with unique content. This is a platform behavior to observe, not to engineer around.
 
 4. **Finding: no actionable prompt caching gap exists at the plugin authoring level.** The correct conclusion is to not add fake `cache_control` annotations or attempt to work around the plugin boundary — doing so would either be silently ignored or break the validation pipeline.
 
@@ -193,9 +193,9 @@ A retrieval agent at 303 lines warrants a body review. If it contains scoring ru
 
 ### 2f. The Inheritance Trap
 
-**Is `/review:pr` dispatching 16 reviewers all inheriting the parent model?**
+**Is `/review:pr` dispatching its full reviewer fan-out all inheriting the parent model?**
 
-Yes, this is the documented behavior. `model: inherit` in Claude Code subagent frontmatter causes the spawned agent to use the parent session's model. When a user invokes `/review:pr` from an Opus session, all 16 dispatched agents run on Opus. The cost multiplier is: 16 reviewers × ~15K tokens each × Opus rate = ~240K tokens at Opus pricing per invocation. At Sonnet rates, the same 16 reviewers cost ~240K × (1/5) = ~48K tokens equivalent — an 80% reduction.
+Yes, this is the documented behavior. `model: inherit` in Claude Code subagent frontmatter causes the spawned agent to use the parent session's model. When a user invokes `/review:pr` from an Opus session, every dispatched agent runs on Opus. The dispatched set is variable: 4 always-on personas (`project-compliance-reviewer`, `correctness-reviewer`, `maintainability-reviewer`, `project-standards-reviewer`) plus up to 15 conditional personas (triggered by diff size, file types, content patterns) plus an optional `codex-reviewer` — a worst-case fan-out of ~20. At a representative 16-reviewer dispatch (large diff triggering most conditionals): 16 × ~15K tokens × Opus rate = ~240K tokens at Opus pricing per invocation. At Sonnet rates, the same set costs ~240K × (1/5) = ~48K tokens equivalent — an 80% reduction. The ratio holds at any reviewer count; absolute cost scales linearly with the dispatched set.
 
 **Should explicit model defaults be set on dispatched reviewers?**
 
