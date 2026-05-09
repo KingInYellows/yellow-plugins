@@ -128,7 +128,7 @@ codex exec --json \
 # research are NOT valid flags on v0.129.0; use `-a` and `-s`.
 ```
 
-**Quota debit:** Each `codex exec` turn counts against ChatGPT subscription message cap. ChatGPT Plus message limits are tier-dependent and capped per 3-hour rolling window. Codex CLI sessions count separately from chatgpt.com web usage but share the same monthly cap on most tiers.
+**Quota debit:** Each `codex exec` turn counts against ChatGPT subscription message cap. ChatGPT Plus message limits are tier-dependent and capped per 3-hour rolling window. Codex CLI sessions count separately from chatgpt.com web usage. (ChatGPT Plus also enforces a monthly cap on most tiers, but V2 quota tracking is scoped to the 3h rolling window only — monthly tracking is deferred to V3 because it requires persistent month-spanning state and a separate error-message variant for monthly exhaustion that has not been observed in this codebase. The 3h window is sufficient to surface the most common production failure mode: rapid review bursts.)
 
 **Isolation:** Full subprocess isolation. Separate auth state — OS keyring on rust-v0.118+ (probe with `codex login status`); legacy `~/.codex/auth.json` only on pre-v0.118 installs. Separate session log (`--log-db`), Seatbelt/Landlock OS-level sandbox.
 
@@ -199,7 +199,7 @@ opencode session delete "<id>"   # cleanup
 |---|---|---|---|---|
 | **Spawn shape** | Task subagent (in-process) | `codex exec --json` subprocess | `gemini -p ... -o text` subprocess | `opencode run --format json` subprocess |
 | **Auth model** | Inherited from orchestrator | `codex login` (ChatGPT account) | Google OAuth | Provider-specific |
-| **Quota window** | Shared with orchestrator (5h Pro / weekly Max) | ChatGPT 3h rolling + monthly | Gemini Advanced daily | Provider-dependent |
+| **Quota window** | Shared with orchestrator (5h Pro + weekly cap) | ChatGPT 3h rolling (monthly cap exists but tracking deferred to V3 — see Dim 2) | Gemini Advanced daily | Provider-dependent |
 | **Quota-exhaust signal** | Same as orchestrator (rare in practice) | Structured error from `codex exec` | HTTP 429 or subscription error | Provider-specific |
 | **Subprocess startup** | 0s (in-process) | ~2s | ~1.5s | ~3s |
 | **OS-level sandbox** | None (Task tool surface) | Seatbelt (macOS) / Landlock (Linux) | None | None |
@@ -281,7 +281,9 @@ V2 should track per-reviewer quota headroom in `~/.config/yellow-council/quota.j
 }
 ```
 
-**Claude entry carries dual-window fields (REQUIRED — see plan Task 3.1 dual-window invariant):** Anthropic enforces both a 5-hour rolling window AND a weekly cap, so the `claude` entry MUST include `weekly_used` / `weekly_cap` / `weekly_window_start` / `weekly_window_hours` alongside the 5h-window pair. `check_quota_headroom()` MUST return `min(cap - used, weekly_cap - weekly_used)` so the reported reset horizon ("retry in ~5h" vs "retry in ~days") matches whichever window is closer to exhausted. Without this, the helper silently falls back to the 5h horizon and misreports weekly exhaustion. The other reviewers (codex/gemini/opencode) have a single window and do NOT carry weekly fields.
+**Claude entry carries dual-window fields (REQUIRED — see plan Task 3.1 dual-window invariant):** Anthropic enforces both a 5-hour rolling window AND a weekly cap, so the `claude` entry MUST include `weekly_used` / `weekly_cap` / `weekly_window_start` / `weekly_window_hours` alongside the 5h-window pair. `check_quota_headroom()` MUST return `min(cap - used, weekly_cap - weekly_used)` so the reported reset horizon ("retry in ~5h" vs "retry in ~days") matches whichever window is closer to exhausted. Without this, the helper silently falls back to the 5h horizon and misreports weekly exhaustion.
+
+**V2 scope for the other reviewers (single-window tracking only):** codex/gemini/opencode each carry a single window pair in the schema. ChatGPT Plus's monthly cap on Codex is acknowledged in Dimension 2 but its tracking is deferred to V3 (requires persistent month-spanning state and a distinct monthly-vs-3h error-message variant that has not been observed). Gemini and OpenCode have only one published quota window each (Gemini daily; OpenCode provider-dependent). If a future provider adds a second window, follow the Claude dual-window pattern and add `<window>_used` / `<window>_cap` / `<window>_window_start` / `<window>_window_hours` fields rather than introducing a new schema shape.
 
 Pre-flight check: if any reviewer's headroom is `< 2 * messages_per_review`, warn the user and offer `/council` skip-this-reviewer mode.
 
