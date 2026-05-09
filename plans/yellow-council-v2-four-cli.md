@@ -526,7 +526,7 @@ Before constructing the Agreement / Disagreement sections, run `verify_finding()
 <findings where ≥2 reviewers cited but no tier verifies>
 
 ### Disagreement
-<reviewers split on verdict for the same finding (e.g., 2 APPROVE / 2 REVISE), regardless of verification tier>
+<≥2 reviewers cited but their verdicts are NOT unanimous (e.g., 2 APPROVE / 2 REVISE, or 3 REVISE / 1 APPROVE), regardless of verification tier>
 
 ### Single-Reviewer Findings (evidence verified)
 <findings cited by exactly 1 reviewer AND tier-1 or tier-2 verified — kept because evidence holds even if quorum doesn't>
@@ -535,7 +535,7 @@ Before constructing the Agreement / Disagreement sections, run `verify_finding()
 <findings cited by exactly 1 reviewer with NO tier-1/2 verification — surfaced for manual review, not discarded>
 ```
 
-Bucket-assignment rule (helpers MUST honor): every finding lands in exactly one bucket; the four single-reviewer/disagreement buckets are exhaustive over `(citation_count ≥ 2 vs = 1) × (verification pass/fail)` plus the verdict-split case. Do not silently discard unverified findings — surface them in the "Unverified Claims" section so the user can manually verify.
+Bucket-assignment rule (helpers MUST honor): every finding lands in exactly one bucket. Precedence: (1) `citation_count = 1` → Single-Reviewer Findings (evidence verified) OR Unverified Claims (split by verification pass/fail); (2) `citation_count ≥ 2` AND verdicts NOT unanimous across citing reviewers → Disagreement (verdict-split takes precedence over Agreement, so a 3:1 verdict split with majority verdict = REVISE routes to Disagreement, NOT Agreement); (3) `citation_count ≥ 2` AND verdicts unanimous across citing reviewers → Agreement (split by verification pass/fail). Do not silently discard unverified findings — surface them in the "Unverified Claims" section so the user can manually verify.
 
 ### Task 5.3: Update SKILL synthesis rubric documentation (S, 2h)
 
