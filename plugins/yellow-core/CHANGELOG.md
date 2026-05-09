@@ -1,5 +1,65 @@
 # Changelog
 
+## 1.15.4
+
+### Patch Changes
+
+- [`5547dbf`](https://github.com/KingInYellows/yellow-plugins/commit/5547dbf602946a8d8d29dc8f22bbef6abe5ca24c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Tier
+  yellow-debt scanners and yellow-core workflow agents to explicit sonnet/effort
+  frontmatter (Phase 2 of M-A-01).
+
+  **yellow-debt scanners + remediation** — taxonomy-driven single-pass analysis;
+  Sonnet is the quality ceiling. `effort: low` for the parallel scanner tier.
+  - `ai-pattern-scanner`, `complexity-scanner`, `duplication-scanner`,
+    `architecture-scanner`, `security-debt-scanner`: `model: sonnet` +
+    `effort: low`
+  - `debt-fixer`: `model: sonnet` (no `effort:` change). Spot-check passed —
+    `isolation: worktree` is model-agnostic and tools list contains no
+    Opus-tier-only entries.
+
+  **yellow-core workflow** — sophisticated retrieval/orchestration without
+  Opus-level synthesis (sub-agents handle the actual writing):
+  - `knowledge-compounder`: `model: sonnet` — orchestrates dispatch and novelty
+    detection; sub-agents do the synthesis.
+  - `session-historian`: `model: sonnet` — BM25 + cosine + RRF retrieval with
+    secret redaction. Ranking-and-returning is a Sonnet-ceiling task.
+
+  Distinguished from `security-sentinel` (Opus, active vulnerability audit)
+  which stays unchanged.
+
+- [`6367eae`](https://github.com/KingInYellows/yellow-plugins/commit/6367eae6811d1f5c3a0615f3a46730fd358299ab)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Tier
+  yellow-core review/workflow personas + 2 yellow-docs reviewers to explicit
+  `model:` frontmatter (Phase 3b of M-A-01).
+
+  **yellow-core (8 files)** — single-axis review and structured analysis; Sonnet
+  is the quality ceiling:
+  - Review personas: code-simplicity-reviewer, pattern-recognition-specialist,
+    test-coverage-analyst, polyglot-reviewer, security-lens, security-reviewer,
+    performance-reviewer
+  - Workflow: spec-flow-analyzer (UX flow analysis with defined axes)
+
+  `security-sentinel`, `performance-oracle`, and `architecture-strategist` stay
+  on `opus` (no change) — primary discovery agents and architectural judgment.
+
+  **yellow-docs (2 files)**:
+  - `feasibility-reviewer`: `model: sonnet` — structured feasibility assessment
+    matching the sibling pattern (design-lens, scope-guardian,
+    security-lens-reviewer, coherence-reviewer are all already explicitly
+    tiered)
+  - `adversarial-document-reviewer`: `model: sonnet` + `effort: high` — applies
+    a structured challenge protocol; the adversarial angle benefits from
+    extended chain-of-thought, but the protocol is structured enough that Sonnet
+    is the appropriate ceiling
+
+  **Already-correct (no edit) yellow-docs siblings** confirmed via grep:
+  `design-lens-reviewer`, `scope-guardian-reviewer`, `security-lens-reviewer`
+  all carry `model: sonnet` already — closes the documentation gap surfaced
+  during planning.
+
+  Per docs/research/model-selection-token-context-optimization.md.
+
 ## 1.15.3
 
 ### Patch Changes
