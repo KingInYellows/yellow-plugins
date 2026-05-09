@@ -383,7 +383,10 @@ Plugin skill descriptions are subject to Claude Code's session-level
 [skill listing budget](https://code.claude.com/docs/en/skills) (default 1%
 of context, 8,000-char fallback). Each individual skill's combined
 `description` + `when_to_use` is officially capped at **1,536 characters**;
-yellow-plugins skill descriptions are all well under that limit.
+yellow-plugins skill descriptions are all well under that limit. None of
+the yellow-plugins SKILL.md files currently use `when_to_use:`; the
+guidance below covers `description:` only. If `when_to_use:` is adopted
+in a future PR, revisit the budget arithmetic.
 
 **Trim for selection clarity, not for budget.** Two principles, both
 load-bearing:
@@ -402,15 +405,36 @@ load-bearing:
 
 The two are compatible: you can have short descriptions AND accurate
 selection by keeping the differentiating clause and cutting the noise.
-There is no character cap, but descriptions over ~250 chars increasingly
-risk having trailing content truncated at auto-invocation time
-([anthropics/claude-code#44780](https://github.com/anthropics/claude-code/issues/44780)),
-which is where most reported routing failures actually originate.
+The only hard limit is the official per-skill cap of **1,536 characters**,
+and all yellow-plugins descriptions sit well under it. The community
+threshold cited in
+[anthropics/claude-code#44780](https://github.com/anthropics/claude-code/issues/44780)
+(observed 2026-05-09; behavior reported by users, not documented in the
+official schema) is that
+trailing content past ~250 chars may be deprioritized at auto-invocation
+time. The implication is positional, not a budget to cut toward: keep
+the differentiating clause and "Use when..." trigger inside the first
+~200 chars regardless of total description length.
+
+This guidance does NOT apply to `user-invokable: false` skills — those
+descriptions are loaded only by agents that preload them via `skills:`
+frontmatter, never rendered in the listing budget. The positional
+~250-char threshold above does not apply. Trim them only when the
+description has obvious documentation-style bloat (capability
+enumerations, methodology names, body-content repetition that the
+reader can recover from the skill body) — as the audit did for
+`agent-native-audit` and `council-patterns` in PR #507. Do not trim
+for budget pressure alone.
 
 For downstream installs hitting the budget, see [`claude doctor` says
 "descriptions dropped"](README.md#claude-doctor-says-descriptions-dropped)
 for the user-side workarounds (`skillListingBudgetFraction`,
-`SLASH_COMMAND_TOOL_CHAR_BUDGET`).
+`CLAUDE_SLASH_COMMAND_TOOL_CHAR_BUDGET`).
+
+When trims need to be rolled back, note that yellow-plugins uses a single
+combined changeset per audit PR. Reverting one skill's description
+requires a cherry-pick of just that file's diff plus a fresh patch
+changeset — not a simple `git revert` of the whole PR.
 
 ## Questions?
 

@@ -1,11 +1,11 @@
 # Claude Code Skill Listing Bloat — Brainstorm
 
 **Date:** 2026-05-09
-**Status:** Ready for planning
+**Status:** Implemented in PR #507 (2026-05-11). Plan: `plans/complete/skill-description-audit.md`.
 
 ## What We're Building
 
-A two-part resolution to the `claude-doctor` warning about skill listing
+A two-part resolution to the `claude doctor` warning about skill listing
 truncation (179 descriptions dropped at 5.6% of context, 11k tokens for the
 full listing):
 
@@ -31,7 +31,7 @@ marketplace consumers, not just the author's local setup.
 **Where:** Add as a top-level key alongside the existing keys in the global
 `~/.claude/settings.json` (not the project-level settings).
 
-**Why 6%:** The `claude-doctor` warning reports the full skill listing costs
+**Why 6%:** The `claude doctor` warning reports the full skill listing costs
 5.6% of context at current installed plugin count. Setting 6% clears the
 warning with a small margin for plugin additions. The 11k tokens/session is
 not a new cost — Claude Code was already allocating that budget and showing
@@ -67,7 +67,8 @@ listing-time field needs.
 
 ### Concentration: yellow-core is 61% of the problem
 
-Across 37 SKILL.md files in this repo:
+Across 37 SKILL.md files in this repo (initial measurement; remeasured
+in plan/changeset, see note below):
 
 | Plugin | Skills | Total description chars | Avg per skill |
 |---|---|---|---|
@@ -83,6 +84,15 @@ yellow-core's top three descriptions alone:
 - `compound-lifecycle`: 692 chars
 - `ideation`: 666 chars
 - `optimize`: 619 chars
+
+> **Note (added during PR review):** These initial counts were re-measured
+> by the deepen-plan codebase research and the changeset uses the
+> remeasured values: `compound-lifecycle: 686`, `ideation: 664`,
+> `optimize: 613`, `debugging: 518`, `session-history: 516`,
+> `agent-native-audit: 377`, yellow-core total `5,921` (avg 348).
+> The 4-6 char diffs are measurement-method drift (whether trailing
+> quote/newline is counted). The plan and changeset values are
+> authoritative.
 
 These are not outliers of a general problem — yellow-core's average of 351
 chars/description is where the bloat lives. Most other plugins are already in
@@ -240,7 +250,7 @@ Quick read-through of the other 10 plugins' descriptions. Most are likely fine.
 Trim only if a clear bloat pattern is visible. Time-box this phase.
 
 **Success criteria for the PR:**
-- `claude-doctor` shows no truncation warning at `skillListingBudgetFraction:
+- `claude doctor` shows no truncation warning at `skillListingBudgetFraction:
   0.06` (or lower)
 - All skill descriptions retain their differentiating clause
 - No skill that was previously selectable becomes unselectable after trim

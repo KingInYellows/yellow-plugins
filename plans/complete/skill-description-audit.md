@@ -1,5 +1,10 @@
 # Feature: Skill Description Audit (yellow-core focus)
 
+**Status:** Implemented in PR #507 (2026-05-11). All 6 phases shipped; task
+checkboxes below preserve the original plan structure as a retrospective.
+See `plans/complete/skill-description-audit-followups.md` for review
+follow-up work that landed on the same PR.
+
 ## Problem Statement
 
 Claude Code v2.1.137 reports the skill listing is truncated: 179 of ~200
@@ -22,21 +27,6 @@ genuinely non-load-bearing content (trigger phrase enumerations, body-content
 repetition, methodology bleed) while preserving the WHAT + WHEN structure
 that drives skill auto-invocation accuracy.
 
-<!-- deepen-plan: external -->
-> **Research:** Community-documented evidence reverses the assumed risk
-> direction. GitHub issue `anthropics/claude-code#44780` and the skill-creator
-> tool's own warning logic both name **~250 chars** as the practical
-> auto-invocation threshold — content past that point is functionally invisible
-> to Claude's selection logic. Our 5 verbose descriptions (500-690 chars) are
-> already in a degradation zone where the trailing trigger-phrase lists never
-> get read. Trimming to 200-250 chars moves them INTO the reliable
-> auto-invocation window, not out of it. See:
-> https://github.com/anthropics/claude-code/issues/44780 and
-> https://github.com/backnotprop/plannotator/issues/412 (455-char description
-> truncated, losing trigger phrases) and
-> https://github.com/anthropics/claude-code/issues/9716 (skills unselectable
-> after description growth past threshold).
-<!-- /deepen-plan -->
 
 ## Linear Issues
 
@@ -59,17 +49,6 @@ None — this is internal repo cleanup, not tracked in Linear.
   This was added by PR #459 and predates this work; the trim PR's premise
   must be reconciled with that policy.
 
-<!-- deepen-plan: codebase -->
-> **Codebase:** Exact location confirmed. `## Skill Description Budget`
-> section opens at `CONTRIBUTING.md:380` (not 388). The policy sentence to
-> rewrite spans lines 388-393. The next section `## Questions?` begins at
-> line 395 — clean boundary, nothing between the policy block and the next
-> heading to preserve. Env var name on line 393 is
-> `CLAUDE_SLASH_COMMAND_TOOL_CHAR_BUDGET` (with the `CLAUDE_` prefix), not
-> `SLASH_COMMAND_TOOL_CHAR_BUDGET` as some external research sources state.
-> The plan's Phase 1.3 should reference the prefixed name when the rewrite
-> mentions the user-side workaround.
-<!-- /deepen-plan -->
 
 ## Proposed Solution
 
@@ -91,24 +70,6 @@ Bump type: `patch` per all touched plugins. Per CONTRIBUTING.md's own
 classification, frontmatter-only edits are documentation-only changes.
 The skill bodies and runtime behavior are unchanged.
 
-<!-- deepen-plan: external -->
-> **Research:** Anthropic's own reference skills (github.com/anthropics/skills)
-> set the implicit target for "good description length." Sample of 5
-> Anthropic-authored skills:
-> - `claude-api`: ~140 chars
-> - `webapp-testing`: ~210 chars
-> - `docx`: ~210 chars (with explicit trigger phrases)
-> - `skill-creator`: ~225 chars
-> - `pptx`: ~370 chars (outlier — exhaustive enumeration of file ops)
->
-> Three of five are under 225 chars; even the deliberate-overflow case stays
-> under 400. Every one leads with a concrete action verb cluster
-> ("Build, debug, and optimize"; "Toolkit for"; "Use this skill whenever").
-> None use folded YAML scalars or multi-line forms. These set a credible
-> trim target band for the 5 verbose yellow-core descriptions: aim for
-> 150-300 chars depending on differentiation needs. Source:
-> https://github.com/anthropics/skills
-<!-- /deepen-plan -->
 
 ## Implementation Plan
 
@@ -147,17 +108,6 @@ adjacent-skill collision check.
       Keep: `docs/solutions/` rotting prevention (WHAT), the
       `knowledge-compounder` cross-reference (non-obvious applicability)
 
-<!-- deepen-plan: codebase -->
-> **Codebase:** Body-content repetition CONFIRMED at high density. The three
-> operations ("staleness detection (composite-scored, not pure age)",
-> "overlap detection (BM25 + ruvector cosine)", "consolidation hand-off
-> (AskUserQuestion-gated...archives to docs/solutions/archived/)") all appear
-> verbatim or near-verbatim in body Steps 1-3 and §5a/5b. The trigger phrase
-> list ("refresh learnings", "audit solutions", "clean up stale docs",
-> "consolidate overlapping entries") duplicates the `## When to Use` bullets
-> verbatim. All four cuttable elements have direct body counterparts —
-> aggressive trim is safe.
-<!-- /deepen-plan -->
 - [ ] 2.2: `ideation` (664 chars)
       Cut: Toulmin/MIDAS methodology names (belong in body), enumerated
       trigger phrase list
@@ -166,63 +116,23 @@ adjacent-skill collision check.
       `user-invokable: false`, so collision is asymmetric — `ideation` is
       the user-facing one and bears the WHAT-clause weight)
 
-<!-- deepen-plan: codebase -->
-> **Codebase:** Body-content repetition CONFIRMED. The Toulmin/MIDAS sentence
-> compresses `## What It Does` lines 36-40 ("Drives a six-phase flow built
-> around the MIDAS three-phase core...The Toulmin warrant contract is the
-> quality mechanism"). The vague-problem examples ("better error handling",
-> "reduce flaky tests", "improve onboarding") are near-verbatim restatements
-> of `## When to Use` lines 55-58 examples. The brainstorm hand-off duplicates
-> Phase 5 heading. The trigger-phrase list duplicates `## When to Use` line 63.
-> All cuttable elements have body counterparts — high cut depth is safe.
-<!-- /deepen-plan -->
 - [ ] 2.3: `optimize` (613 chars)
       Cut: judge-implementation details ("two judge runs with order-swap",
       "per-criterion scoring (1-5)"), enumerated trigger phrases
       Keep: "metric-driven optimization pass", measurable-goal framing
 
-<!-- deepen-plan: codebase -->
-> **Codebase:** Body-content repetition CONFIRMED. All three methodology
-> claims appear in the Notes section at lines 434-450: "Two-run order-swap
-> is the cost-effective minimum to recover most of the variance",
-> "Per-criterion rubrics produce more reliable inter-rater agreement than
-> holistic scoring", "The self-check is a low-cost flag...". The use-case
-> list ("prompt variants, agent system prompt revisions, command flow
-> changes, config tunings") restates `## When to Use` lines 50-54. The
-> trigger-phrase list duplicates line 55. All cuttable content is mirrored
-> in the body — high cut depth is safe.
-<!-- /deepen-plan -->
 - [ ] 2.4: `debugging` (518 chars)
       Cut: enumerated trigger phrase list ("debug this", "why is this
       failing", etc.), capability listing of issue tracker types
       Keep: root-cause-before-fix differentiator vs `session-history`,
       hypothesis-with-predictions detail (non-obvious applicability)
 
-<!-- deepen-plan: codebase -->
-> **Codebase:** Body-content repetition is moderate-high but NOT total. The
-> opening clause and use-case list (issue tracker types, stack traces,
-> failed-fix-attempts) all restate body intro lines 10-11 and `## When to
-> Use` lines 35-42. HOWEVER: the closing trigger-phrase list ("debug this",
-> "why is this failing", "trace this error", "fix this bug") has NO
-> verbatim body counterpart — it's genuine description-only content. This
-> means cut depth here is slightly less aggressive than the other 4 — keep
-> ONE phrasing of the trigger-phrase pattern in the trimmed description as
-> the "WHEN" clause anchor.
-<!-- /deepen-plan -->
 - [ ] 2.5: `session-history` (516 chars)
       Cut: detailed trigger phrase examples in parens, "with secret-redacted
       excerpts" implementation detail
       Keep: cross-vendor framing (Claude Code, Devin, Codex), "after
       compaction or session boundary" non-obvious applicability
 
-<!-- deepen-plan: codebase -->
-> **Codebase:** Body-content repetition CONFIRMED at total density. Every
-> clause in the description has a direct body counterpart: three-vendor
-> framing (body intro lines 10-12), result format (Phase 3 lines 122-130 +
-> §Secret Redaction), all three trigger scenarios (`## When to Use` lines
-> 46-53), multi-session decision-trail framing (line 50), compaction/session
-> boundary clause (line 52). High cut depth is safe.
-<!-- /deepen-plan -->
 
 ### Phase 3: yellow-core borderline tier (5 skills, light pass)
 
@@ -288,19 +198,6 @@ yellow-semgrep.
       - `compound-lifecycle` (skill) vs `knowledge-compounder` (agent — name
         cross-reference must survive in description)
 
-<!-- deepen-plan: codebase -->
-> **Codebase:** All five adjacent-pair "neighbor" skills are
-> `user-invokable: false` (`brainstorming`, `agent-native-architecture`,
-> `agent-native-audit`, `memory-recall-pattern`, `memory-remember-pattern`).
-> This means user-facing collision risk is zero — these skills are not
-> presented to the user at selection time, only loaded by other agents that
-> declare them in `skills:` frontmatter. The "distinguishability" check
-> therefore matters for INTERNAL routing within agents that preload multiple
-> related skills (e.g., an agent that declares both `memory-recall-pattern`
-> and `memory-remember-pattern`). The check is still required, but the
-> failure mode is "agent picks the wrong preloaded skill" not "user sees
-> two indistinguishable skills" — the latter never happens for this set.
-<!-- /deepen-plan -->
 - [ ] 5.6: Run `pnpm changeset` and produce a single multi-plugin changeset
       file. Format example (adjust to plugins actually touched):
       ```
@@ -425,21 +322,6 @@ For each modified SKILL.md, verify:
   within 14 days of merge gets prompt revert; later reports get a normal
   patch fix.
 
-<!-- deepen-plan: external -->
-> **Research:** The empirical risk asymmetry strongly favors trimming. All
-> documented routing failures in the Claude Code community concern
-> descriptions that are TOO LONG (truncated past the ~250-char auto-invocation
-> threshold), not too short. There are no community-documented cases of a
-> conservative trim causing a skill to become unselectable. Concrete cases:
-> `anthropics/claude-code#9716` (skills unrecognized after description
-> growth), `anthropics/claude-code#56710` (122 descriptions dropped due to
-> bulk over-budget), `backnotprop/plannotator#412` (trigger phrases lost in
-> 455-char description). Practitioner account: "All 200 characters of it —
-> used up on a detailed explanation of *what* the skill does, with zero
-> space left for the 'Use when…' clause" (medium.com/system-design-mastery).
-> The plan's risk framing is accurate but the rollback urgency may be
-> over-specified — empirical risk is low.
-<!-- /deepen-plan -->
 - **`when_to_use` field adoption is out of scope.** Some skills could be
   cleanly split (capability in `description:`, triggers in `when_to_use:`),
   but adopting that field is a separate refactor — the per-file edit shape
@@ -485,32 +367,4 @@ For each modified SKILL.md, verify:
 - PR #459 (commit `6d86b1d6`) — added the current "don't trim for budget"
   policy line
 
-<!-- deepen-plan: external -->
-> **Research — Anthropic-published reference SKILL.md descriptions** (target
-> shape for trim outcomes):
-> - https://github.com/anthropics/skills — official reference repo
-> - https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md (~225 chars)
-> - https://github.com/anthropics/skills/blob/main/skills/claude-api/SKILL.md (~140 chars)
-> - https://github.com/anthropics/skills/blob/main/skills/webapp-testing/SKILL.md (~210 chars)
-> - https://github.com/anthropics/skills/blob/main/skills/docx/SKILL.md (~210 chars, with explicit triggers)
-> - https://github.com/anthropics/skills/blob/main/skills/pptx/SKILL.md (~370 chars, deliberate enumeration outlier)
-<!-- /deepen-plan -->
 
-<!-- deepen-plan: external -->
-> **Research — Auto-invocation threshold and routing-failure evidence:**
-> - https://github.com/anthropics/claude-code/issues/44780 — 250-char
->   practical threshold (skill-creator's own warning logic)
-> - https://github.com/anthropics/claude-code/issues/56710 — bulk
->   description-dropped warning in production
-> - https://github.com/anthropics/claude-code/issues/9716 — skills
->   unselectable after description grew past threshold
-> - https://github.com/backnotprop/plannotator/issues/412 — 455-char
->   description truncated, losing trigger phrases
-> - https://claudefa.st/blog/guide/mechanics/skill-listing-budget — budget
->   math, token-cost-per-skill estimation
-> - https://leehanchung.github.io/blogs/2025/10/26/claude-skills-deep-dive/
->   — `when_to_use` undocumented status (justifies deferral)
-> - https://resources.anthropic.com/hubfs/The-Complete-Guide-to-Building-Skill-for-Claude.pdf
->   — Anthropic guide stating description "MUST include BOTH WHAT and WHEN,
->   under 1024 characters"
-<!-- /deepen-plan -->
