@@ -7,21 +7,31 @@ Optional Composio accelerator for batch workflows with local usage tracking.
 This plugin bundles a `type: http` Composio MCP server, declared in
 `plugin.json` and configured via two `userConfig` prompts on enable: the
 per-customer MCP URL and the Composio API key. Both are `required: true`
-— if either is left blank, Claude Code refuses to enable the plugin
-because the bundled MCP would otherwise register with an empty URL and
-break `claude doctor` for every other MCP server (`'/' cannot be parsed
-as a URL`). The API key is stored in the system keychain
-(`sensitive: true`); the MCP URL is stored as plain (non-sensitive)
-`userConfig`. Bundled tools appear under the
-`mcp__plugin_yellow-composio_composio-server__*` prefix.
+— on a fresh enable, Claude Code refuses to enable the plugin if either
+is left blank, because the bundled MCP would otherwise register with an
+empty URL and break `claude doctor` for every other MCP server
+(`SDK auth failed: "/" cannot be parsed as a URL`). The API key is
+stored in the system keychain (`sensitive: true`); the MCP URL is
+stored as plain (non-sensitive) `userConfig`. Bundled tools appear
+under the `mcp__plugin_yellow-composio_composio-server__*` prefix.
+
+`required: true` gates *new* enables only — it does not retroactively
+remediate plugins that were already enabled before v1.2.4 with empty
+or absent values, so a legacy install can still hold a blank
+`composio_mcp_url` until the user disables and re-enables. The
+SessionStart hook (`hooks/check-mcp-url.sh`) accepts the empty-URL
+case and exits silently because, in that legacy state, the bundled
+MCP simply fails to start and there is no API key on the wire to
+warn about.
 
 The plugin still detects externally-configured Composio MCPs as a
 migration aid (`mcp__claude_ai_composio__*` for the Claude.ai native
 integration, `mcp__composio-server__*` for manual `.mcp.json` setups
 predating this plugin). Detection runs in `/composio:setup` and is
-independent of the bundled MCP — it does NOT activate when the bundled
-userConfig is left blank, because `required: true` prevents that state
-from existing.
+independent of the bundled MCP — for new enables it cannot activate
+against an empty bundled `userConfig` because `required: true` blocks
+that state, but legacy pre-v1.2.4 installs may still be in it until
+re-enabled.
 
 The plugin provides:
 
