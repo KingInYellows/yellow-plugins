@@ -313,13 +313,18 @@ In each reviewer's CLI invocation step, detect quota-exhausted error patterns sp
 - Gemini CLI: match `RESOURCE_EXHAUSTED` status; distinguish subscription cap (`"Quota exceeded for quota metric 'generate_requests_per_day'"`) from free-tier RPM/RPD
 - OpenCode: parse the `error` event in `opencode run --format json` SSE stream; match the underlying provider's quota text
 
-On detection, return:
+On detection, return the **full 6-key block** (stub the 3 keys that don't apply to a quota-exhausted reviewer so `council.md`'s Step 4 parser stays uniform across all 4 reviewers — no special-case branch, per the locked decision in the codebase annotation below):
 
 ```text
 verdict=QUOTA_EXHAUSTED
 confidence=N/A
 summary=<reviewer> subscription quota exhausted; window resets at <ETA>
+fenced_output_path=/dev/null
+findings_block_begin
+findings_block_end
 ```
+
+`fenced_output_path=/dev/null` keeps the parser's path-lookup happy without producing a real findings file (reading `/dev/null` returns empty, which the synthesis loop already handles for reviewers with zero findings). The empty `findings_block_begin`/`findings_block_end` pair satisfies the contract while carrying no findings. Together these mean the QUOTA_EXHAUSTED path uses the SAME parse helpers as APPROVE/REVISE/etc — the only difference is the verdict-case-statement entry routing it to the headline ETA section instead of the synthesis input.
 
 Update `council.md` Step 4 parse logic AND add `QUOTA_EXHAUSTED` to the verdict case-statement allow-list in all four reviewer agent files (`plugins/yellow-codex/agents/review/codex-reviewer.md` after PR-0 normalization, `plugins/yellow-council/agents/review/gemini-reviewer.md`, `plugins/yellow-council/agents/review/opencode-reviewer.md`, and the new `plugins/yellow-council/agents/review/claude-reviewer.md`) to handle `QUOTA_EXHAUSTED` as a UNAVAILABLE-class verdict (excluded from synthesis count, surfaced in headline with ETA). Without all 5 file updates, the verdict will silently normalize to `UNKNOWN` per the `*) VERDICT="UNKNOWN"` fallback.
 
