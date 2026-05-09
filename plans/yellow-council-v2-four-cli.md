@@ -526,13 +526,16 @@ Before constructing the Agreement / Disagreement sections, run `verify_finding()
 <findings where ≥2 reviewers cited but no tier verifies>
 
 ### Disagreement
-<unchanged>
+<reviewers split on verdict for the same finding (e.g., 2 APPROVE / 2 REVISE), regardless of verification tier>
+
+### Single-Reviewer Findings (evidence verified)
+<findings cited by exactly 1 reviewer AND tier-1 or tier-2 verified — kept because evidence holds even if quorum doesn't>
 
 ### Unverified Claims
-<single-reviewer findings with no evidence verification>
+<findings cited by exactly 1 reviewer with NO tier-1/2 verification — surfaced for manual review, not discarded>
 ```
 
-Do not silently discard unverified findings — surface them in a separate section so the user can manually verify.
+Bucket-assignment rule (helpers MUST honor): every finding lands in exactly one bucket; the four single-reviewer/disagreement buckets are exhaustive over `(citation_count ≥ 2 vs = 1) × (verification pass/fail)` plus the verdict-split case. Do not silently discard unverified findings — surface them in the "Unverified Claims" section so the user can manually verify.
 
 ### Task 5.3: Update SKILL synthesis rubric documentation (S, 2h)
 
@@ -637,7 +640,7 @@ Each PR includes:
 ### R2 — Subscription quota tracking accuracy
 
 **Risk:** Heuristic increment is approximate. Caps drift across provider releases. Recalibration on quota-exhausted errors only happens after the user already hit the wall.
-**Mitigation:** Make the tracker *advisory*, not *gating*. The pre-flight warns but doesn't block. Document explicitly in CLAUDE.md that the tracker is best-effort. Provide `COUNCIL_QUOTA_RESET <reviewer>` command to manually clear state.
+**Mitigation:** Make the tracker *advisory*, not *gating*. The pre-flight warns but doesn't block. Document explicitly in CLAUDE.md that the tracker is best-effort. Provide `COUNCIL_QUOTA_RESET=<reviewer> /council review` env-var escape-hatch (NOT a positional `COUNCIL_QUOTA_RESET <reviewer>` argument — Task 3.5 reads from the environment) to manually clear state.
 
 ### R3 — Evidence verification adds latency
 
