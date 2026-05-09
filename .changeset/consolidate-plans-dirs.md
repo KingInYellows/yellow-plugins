@@ -9,11 +9,8 @@ tooling (`/workflows:plan`, `/workflows:work`, `/workflows:review`) all
 expect plans at `plans/<name>.md` and archive completed plans to
 `plans/complete/`; `docs/plans/` was a frozen pre-convention archive.
 
-Also updates active plugin references:
+Also updates active plugin references that pointed at the old path:
 
 - `yellow-core` `agents/review/security-lens.md` example path
 - `yellow-review` `agents/review/project-standards-reviewer.md` and
   `commands/review/review-pr.md` protected-artifact path lists
-
-Documentation-only (`docs/guides/common-workflows.md` and
-`docs/guides/advanced-workflows.md`) updated outside the changeset scope.

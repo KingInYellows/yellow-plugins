@@ -94,9 +94,9 @@ Match rules to the files they govern.
   `consider`) that leave agent behavior undefined when the standards call
   for clear directives.
 - **Protected-artifact violations** — findings, suggestions, or
-  instructions that recommend deleting or gitignoring files in paths the
-  standards designate as protected (`docs/brainstorms/`, `plans/`,
-  `docs/solutions/`, `docs/research/`).
+  instructions that recommend deleting or adding to `.gitignore` files
+  in paths the standards designate as protected (`docs/brainstorms/`,
+  `plans/`, `docs/solutions/`, `docs/research/`).
 
 ## Confidence calibration
 
