@@ -3,7 +3,7 @@
 **Date:** 2026-05-08
 **Sources:** Parallel Deep Research (ultra), 12-task group (Perplexity synthesis per sub-topic), academic papers (Zheng 2023, Shinn 2023, Du 2023, Wang 2024, Wynn 2025), GodModeSkill source analysis, Semgrep/SRLabs practitioner reports
 
-> **Status: prior research, partially superseded.** This is the original 10-CLI exploration. For implementation, the **4-CLI subscription-auth research** (`multi-cli-code-review-claude-codex-gemini-opencode.md`) and the **V2 plan** (`docs/plans/2026-05-08-feat-yellow-council-v2-four-cli-plan.md`, "Locked decisions" section) are authoritative, specifically:
+> **Status: prior research, partially superseded.** This is the original 10-CLI exploration. For implementation, the **4-CLI subscription-auth research** (`multi-cli-code-review-claude-codex-gemini-opencode.md`) and the **V2 plan** (`plans/yellow-council-v2-four-cli.md`, "Locked decisions" section) are authoritative, specifically:
 > - **Tier 2 fuzzy-match library: `rapidfuzz`** (not `diff-match-patch`). Threshold expressed as `fuzz.ratio(a, b) >= 85` on the intuitive 0–100 scale, NOT `diff-match-patch`'s inverted `Match_Threshold = 0.15`. Any "≥85% threshold" wording in this document referring to `diff-match-patch` is historical — the locked library is `rapidfuzz`.
 > - **Low-confidence synthesis heuristic: any verdict flip between A→B and B→A passes** (with confidence-tier change as a secondary trigger), NOT a `>15% variance` threshold.
 > - **Quota-exhaustion verdict: `QUOTA_EXHAUSTED`** (distinct enum, not generic `UNAVAILABLE` or `ERROR`).
