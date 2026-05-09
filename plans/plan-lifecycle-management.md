@@ -12,7 +12,7 @@ We need: a status surface, an explicit archival command with completion validati
 
 ## Current State
 
-- 2 open plans in `plans/`, 44 archived in `plans/complete/`
+- 3 open plans in `plans/`, 44 archived in `plans/complete/` (counts as of this PR landing; the validator checks `plans/complete/` so the open count is informational only)
 - No frontmatter convention — plans are plain markdown starting with `# Feature: …`
 - 36% of archived plans (16/44) contain stray `- [ ]` lines from prose checklists, future-work sections, or quoted code — meaning a naive checkbox validator would block CI immediately
 - `/workflows:plan` writes plans but no stable per-plan identifier survives renames
@@ -58,16 +58,18 @@ ci-skip-checkbox-check: false   # optional; defaults to false
 ### Phase 1: Foundation — frontmatter parsing utility
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** `scripts/validate-agent-authoring.js` lines 62-105 already implements
-> `extractFrontmatter(text)`, `parseScalar(frontmatter, key)`, and `parseList(frontmatter, key)`
-> as module-private helpers. `scripts/lint-plugins.sh:74` has a bash-side `frontmatter()`
+> **Codebase:** `scripts/validate-agent-authoring.js` already implements
+> `extractFrontmatter(text)` (≈line 62), `parseScalar(frontmatter, key)` (≈line 67), and
+> `parseList(frontmatter, key)` (≈line 73, ends just before `relative()` at line 115)
+> as module-private helpers. Refer to the function names rather than fixed line ranges
+> when implementing — the file is edited frequently and exact ranges drift. `scripts/lint-plugins.sh:74` has a bash-side `frontmatter()`
 > function. `scripts/backfill-solution-frontmatter.js` contains another independent parser.
 > Do **not** invent a fourth implementation — extract those three functions into the new
 > shared `scripts/lib/plan-frontmatter.js` and have `validate-agent-authoring.js` import from
 > it (or accept the duplication and copy verbatim if cross-script imports add complexity).
 <!-- /deepen-plan -->
 
-- [ ] 1.1: Add `parsePlanFrontmatter(filePath)` helper to `scripts/lib/plan-frontmatter.js` — reads first `---` block, returns `{slug, created, ciSkipCheckboxCheck}` plus a `_raw` field for the body. Pure regex (no js-yaml dep) — frontmatter is simple key:value only. Mirror the parser pattern in `scripts/validate-agent-authoring.js` lines 62-90.
+- [ ] 1.1: Add `parsePlanFrontmatter(filePath)` helper to `scripts/lib/plan-frontmatter.js` — reads first `---` block, returns `{slug, created, ciSkipCheckboxCheck}` plus a `_raw` field for the body. Pure regex (no js-yaml dep) — frontmatter is simple key:value only. Mirror the `extractFrontmatter` / `parseScalar` / `parseList` helpers in `scripts/validate-agent-authoring.js` (referenced by name, not line range, to avoid drift).
 - [ ] 1.2: Unit-test the helper in `tests/integration/plan-frontmatter.test.ts` against fixtures: missing frontmatter, malformed YAML, present-but-empty, all-fields-present.
 - [ ] 1.3: Document the schema in `docs/CLAUDE.md` (versioning section already exists) and `plugins/yellow-core/CLAUDE.md`.
 
@@ -205,7 +207,24 @@ Three checks:
 2. `git log main --oneline --grep="$SLUG"` — at least one commit.
 3. Read plan body; for each `path/to/file.ts`-style reference under "Files to create" or "Files to modify" sections, check file exists. Report fraction.
 
-UNCERTAIN if PR check has zero results but commit check has results (unusual — usually means slug mismatch). PASS if all three have evidence. FAIL if all three are empty.
+**Verdict precedence rule (covers all 8 PR/commit/file combinations deterministically):**
+
+1. **FAIL** if both PR evidence AND commit evidence are absent — regardless of file evidence. (Files alone never justify PASS; a plan can name files that exist for unrelated reasons.)
+2. **PASS** if all three checks have evidence.
+3. **UNCERTAIN** otherwise — i.e. any case where exactly one or two of the three checks has evidence and rule 1 doesn't fire. The verdict triggers an `AskUserQuestion` confirmation in `/plan:complete` Step 5.
+
+Explicit truth table (P=PR, C=commits, F=files; ✓=evidence found, ✗=empty):
+
+| P | C | F | Verdict   | Notes                                            |
+|---|---|---|-----------|--------------------------------------------------|
+| ✓ | ✓ | ✓ | PASS      | All three checks satisfied                       |
+| ✓ | ✓ | ✗ | UNCERTAIN | Files renamed/moved? Confirm                     |
+| ✓ | ✗ | ✓ | UNCERTAIN | Squash-merge with non-matching commit msg?       |
+| ✓ | ✗ | ✗ | UNCERTAIN | PR exists but no traces — confirm intentionality |
+| ✗ | ✓ | ✓ | UNCERTAIN | Direct-to-main commits, no PR — confirm          |
+| ✗ | ✓ | ✗ | UNCERTAIN | Commits but no files/PR — slug mismatch likely   |
+| ✗ | ✗ | ✓ | FAIL      | Files alone are insufficient evidence            |
+| ✗ | ✗ | ✗ | FAIL      | No evidence anywhere                             |
 
 ## Acceptance Criteria
 
