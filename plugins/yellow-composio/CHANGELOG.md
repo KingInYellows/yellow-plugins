@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.4
+
+### Patch Changes
+
+- [`c60438d`](https://github.com/KingInYellows/yellow-plugins/commit/c60438dc3930c8fe8e1f6e94be80738f5e20780a)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Mark
+  `composio_mcp_url` and `composio_api_key` as `required: true` so the plugin
+  can no longer be enabled with empty userConfig values. Previously, dismissing
+  either prompt left the bundled HTTP MCP server registered with an empty URL,
+  which Claude Code's transport normalizes to `/` and which `claude doctor`
+  reports as `SDK auth failed: "/" cannot be parsed as a URL` — the failure was
+  loud, misleading (auth message for a URL parse error), and prevented other MCP
+  servers from passing their auth checks. With both fields required, the
+  "dismissed prompt" state is unreachable: users either provide the values at
+  enable time or do not enable the plugin. CLAUDE.md and `/composio:setup` prose
+  updated to drop the dismissed-prompt fallback path.
+
 ## 1.2.3
 
 ### Patch Changes
