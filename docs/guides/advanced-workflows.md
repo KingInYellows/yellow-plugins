@@ -114,7 +114,7 @@ Use `/debt:status` at any time for a dashboard of current debt levels.
 3. **`/workflows:plan`** — Transform brainstorm into actionable plan. The plan
    command auto-detects the most recent brainstorm doc.
 
-4. **`/workflows:work docs/plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
+4. **`/workflows:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
    plan. Pass the file path explicitly.
 
 ### Quick Research (No Files)
@@ -139,7 +139,7 @@ Example: Feature with research, implementation, review, and tracking.
 /workflows:brainstorm
 /workflows:plan
 /gt-stack-plan
-/workflows:work docs/plans/...
+/workflows:work plans/...
 /smart-submit
 /review:pr
 /review:resolve
