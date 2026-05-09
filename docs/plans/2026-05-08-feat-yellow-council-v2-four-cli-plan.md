@@ -254,6 +254,7 @@ Document the new synthesis contract (double-blind + 2-pass) so future agent upda
 State file: `~/.config/yellow-council/quota.json`
 
 Schema:
+
 ```json
 {
   "claude": {
@@ -269,7 +270,7 @@ Schema:
 
 The `opencode.model` field mirrors `COUNCIL_OPENCODE_MODEL` for diagnostic display — OpenCode itself routes via OpenRouter so the underlying provider may impose its own quota; tracking that quota is a V3 enhancement (would require OpenRouter API introspection).
 
-**Dual-window invariant for Claude (helpers MUST honor):** Anthropic enforces both a 5-hour rolling window AND a weekly cap (introduced Aug 2026; Max-tier feels the weekly window most often, but Pro can hit it too). The schema therefore tracks BOTH windows independently:
+**Dual-window invariant for Claude (helpers MUST honor):** Anthropic enforces both a 5-hour rolling window AND a weekly cap (the weekly cap is announced for August 2026 [unverified — re-verify the exact rollout date and cap values before PR-C ships]; Max-tier is expected to feel the weekly window most often, but Pro can hit it too). The schema therefore tracks BOTH windows independently:
 - `used` / `cap` / `window_start` / `window_hours` → 5h rolling window
 - `weekly_used` / `weekly_cap` / `weekly_window_start` / `weekly_window_hours` → weekly window
 
@@ -470,7 +471,8 @@ Add a best-effort lineage detection step:
 - OpenCode: read `COUNCIL_OPENCODE_MODEL` first; otherwise log "lineage unknown"
 
 If two reviewers resolve to the same lineage, emit a non-blocking warning:
-```
+
+```text
 [council] Warning: reviewers <X> and <Y> resolve to the same lineage (<lineage>).
 Diversity argument is weakened. Consider configuring different models per slot.
 ```
@@ -499,7 +501,7 @@ Add a `verify_finding()` bash function that:
 - Document in CLAUDE.md as an optional dependency
 
 <!-- deepen-plan: external -->
-> **Research (Q3, threshold scale — CRITICAL CORRECTION):** `Match_Threshold` is a **tolerance/looseness scale**, NOT a similarity score. Range: `0.0 = exact match required`, `1.0 = accept any match`. To express "≥85% match," set `Match_Threshold = 0.15` (NOT `0.85`). Default is `0.5` (accept up to 50% error). The plan's "≥85% threshold" wording in Tier 2 is correct in spirit but the implementation must invert: `dmp.Match_Threshold = 0.15`. Add a comment in the helper explaining the inverted scale to prevent future contributors from "fixing" it backwards.
+> **Research (Q3, threshold scale — HISTORICAL / SUPERSEDED by the rapidfuzz lock):** This annotation documents `diff-match-patch`'s `Match_Threshold` semantics (a tolerance/looseness scale where `0.0 = exact match required`, `1.0 = accept any match`, so "≥85% match" inverts to `dmp.Match_Threshold = 0.15`, NOT `0.85`). It is retained only as background for why `rapidfuzz`'s intuitive 0–100 scale was preferred. **Plan-locked: Tier 2 uses `rapidfuzz` (`fuzz.ratio(a, b) >= 85`, no inverted threshold).** Do NOT use `diff-match-patch`'s `Match_Threshold` API in implementation — see the locked decision in Task 5.1 body and the "Locked decisions" section.
 <!-- /deepen-plan -->
 
 <!-- deepen-plan: external -->
