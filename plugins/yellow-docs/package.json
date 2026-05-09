@@ -1,6 +1,6 @@
 {
   "name": "yellow-docs",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "private": true,
   "description": "Documentation audit, generation, and Mermaid diagram creation for any repository"
 }
