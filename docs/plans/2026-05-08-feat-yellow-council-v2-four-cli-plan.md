@@ -256,7 +256,11 @@ State file: `~/.config/yellow-council/quota.json`
 Schema:
 ```json
 {
-  "claude": { "used": 0, "cap": 45, "window_start": "2026-05-08T14:00:00Z", "window_hours": 5, "tier": "pro" },
+  "claude": {
+    "used": 0, "cap": 45, "window_start": "2026-05-08T14:00:00Z", "window_hours": 5,
+    "weekly_used": 0, "weekly_cap": 250, "weekly_window_start": "2026-05-05T00:00:00Z", "weekly_window_hours": 168,
+    "tier": "pro"
+  },
   "codex": { "used": 0, "cap": 80, "window_start": "...", "window_hours": 3, "tier": "plus" },
   "gemini": { "used": 0, "cap": 1500, "window_start": "...", "window_hours": 24, "tier": "advanced" },
   "opencode": { "used": null, "model": "deepseek/deepseek-v4-pro" }
@@ -265,9 +269,15 @@ Schema:
 
 The `opencode.model` field mirrors `COUNCIL_OPENCODE_MODEL` for diagnostic display — OpenCode itself routes via OpenRouter so the underlying provider may impose its own quota; tracking that quota is a V3 enhancement (would require OpenRouter API introspection).
 
+**Dual-window invariant for Claude (helpers MUST honor):** Anthropic enforces both a 5-hour rolling window AND a weekly cap (introduced Aug 2026; Max-tier feels the weekly window most often, but Pro can hit it too). The schema therefore tracks BOTH windows independently:
+- `used` / `cap` / `window_start` / `window_hours` → 5h rolling window
+- `weekly_used` / `weekly_cap` / `weekly_window_start` / `weekly_window_hours` → weekly window
+
+`track_quota_usage()` MUST increment BOTH `used` and `weekly_used` on every Claude debit. `check_quota_headroom()` MUST surface whichever window is closer to exhausted (`min(cap-used, weekly_cap-weekly_used)`). The recalibration step on quota-exhausted detection (Task 3.3) MUST key on the error-message variant — set `used = cap` + `window_start = now` for the 5h variant (`"usage limit reached"` without weekly-window language), or set `weekly_used = weekly_cap` + `weekly_window_start = now` for the weekly variant — so the headline ETA reflects the correct reset horizon (~5h vs. potentially several days). Without this distinction, the tracker reports a 5-hour ETA when the user is actually blocked for days.
+
 **Schema invariant (helpers MUST honor):** `opencode.used` is `null` (not numeric) because per-provider quota is not tracked locally. `track_quota_usage()` and `check_quota_headroom()` MUST skip any reviewer entry whose `used` is `null` during increment and headroom-check operations — do not coerce to `0`, do not increment, do not warn on `< headroom × N` math.
 
-Heuristic increment: each reviewer invocation with numeric `used` increments by 1 (or 2 for synthesizer turns). Window expiry triggers reset. Recalibration on quota-exhausted error: set `used = cap`, `window_start = now`.
+Heuristic increment: each reviewer invocation with numeric `used` increments by 1 (or 2 for synthesizer turns). Window expiry triggers reset. Recalibration on quota-exhausted error: set `used = cap`, `window_start = now` for the 5h-window variant; set `weekly_used = weekly_cap`, `weekly_window_start = now` for the weekly-window variant. (See "Dual-window invariant for Claude" above and Task 3.3 error-pattern table for which message variants map to which window.)
 
 User-configurable caps via env vars:
 - `COUNCIL_CLAUDE_TIER` = `pro` | `max-5x` | `max-20x` (default `pro`)
