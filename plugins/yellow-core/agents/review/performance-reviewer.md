@@ -1,7 +1,7 @@
 ---
 name: performance-reviewer
 description: "Conditional review persona for runtime performance and scalability. Use when reviewing PRs that touch database queries, loop-heavy data transforms, caching layers, or I/O-intensive paths — adds anchored confidence calibration on top of performance-oracle's deeper analysis."
-model: inherit
+model: sonnet
 memory: project
 tools:
   - Read
