@@ -416,9 +416,9 @@ Reproduced from prior doc with the asymmetric-architecture caveat:
 **Why this is the #1 risk under the asymmetric architecture:** the synthesizer is Claude (orchestrator), and one of the reviewers is also Claude (in-process subagent). Self-enhancement bias compounds with positional bias. Without active mitigation, the synthesis is effectively Claude voting for itself.
 
 **Required for V2 (mandatory — research labels all three as mandatory; plan defers item 4 to V2.5):**
-1. Strip "Reviewer 1" / "Reviewer 2" / "Reviewer 3" / "Reviewer 4" labels in synthesis prompt — never reveal which reviewer is Claude
+1. Strip CLI/lineage labels (`claude` / `codex` / `gemini` / `opencode`) before synthesis and replace them with anonymous IDs `Reviewer 1` / `Reviewer 2` / `Reviewer 3` / `Reviewer 4` — keep the anonymous IDs in the synthesis input so per-reviewer provenance and pass A↔B attribution are preserved while lineage stays hidden; never reveal which reviewer is Claude
 2. Run synthesis twice with reviewer order swapped, average scores
-3. Restore lineage labels only for the final report attribution
+3. Restore CLI/lineage labels only for the final report attribution (the anonymous Reviewer N → real reviewer slug mapping is restored after synthesis completes)
 4. **Length-controlled scoring** (research-mandatory, plan-deferred): normalize finding scores by reviewer output length so verbosity doesn't inflate ranking. Plan ships V2 with mitigations 1–3 only (order-swap + double-blind); length-controlled scoring is V2-7 in this research roadmap and corresponds to plan Risk R6 / Non-goals. Verbosity bias is a known quality gap until V2.5 lands.
 
 ---
@@ -427,7 +427,7 @@ Reproduced from prior doc with the asymmetric-architecture caveat:
 
 ### Quick Wins (≤1 day, low risk, high signal)
 
-**QW-1: Add `claude-reviewer` agent (in-process Task subagent).** New agent definition matching gemini-reviewer/opencode-reviewer shape. Returns structured `verdict=` / `confidence=` / `summary=` / `findings_block_*`. Uses Claude's prompt directly (no subprocess). 4-CLI architecture activated. Estimated: 4 hours.
+**QW-1: Add `claude-reviewer` agent (in-process Task subagent).** New agent definition matching gemini-reviewer/opencode-reviewer shape. Returns the structured 6-key block: `verdict=` / `confidence=` / `summary=` / `fenced_output_path=` / `findings_block_begin` / `findings_block_end`. The `fenced_output_path` is required for parser/file-lookup symmetry with the other reviewers — see plan Task 1.1 locked decision (claude-reviewer needs `Write` in `tools:` to materialize this temp file). Uses Claude's prompt directly (no subprocess). 4-CLI architecture activated. Estimated: 4 hours.
 
 **QW-2: Wire OpenCode to a non-Big-3 provider.** Document `COUNCIL_OPENCODE_MODEL` env var; default to `deepseek/deepseek-v4-pro` or user's configured OpenCode provider. Update CLAUDE.md "Lineage Map" section. Estimated: 1 hour. _(Renamed from `COUNCIL_OPENCODE_PROVIDER` per plan locked decision.)_
 
