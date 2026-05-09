@@ -1,6 +1,6 @@
 ---
 name: debugging
-description: "Find root causes systematically before fixing — investigate, trace the full causal chain, form hypotheses with predictions for uncertain links, then optionally implement a test-first fix. Use when debugging errors, investigating test failures, reproducing bugs from issue trackers (GitHub, Linear, Jira), tracing stack traces, or when stuck after failed fix attempts. Triggers on phrases like \"debug this\", \"why is this failing\", \"trace this error\", \"fix this bug\", or pasted stack traces and issue references."
+description: "Find root causes systematically before fixing — trace the causal chain, form hypotheses with predictions for uncertain links, then optionally implement a test-first fix. Use when debugging errors, test failures, stack traces, or when stuck after failed fix attempts."
 argument-hint: '[issue reference, error message, test path, or description of broken behavior]'
 user-invokable: true
 ---

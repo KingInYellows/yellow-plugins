@@ -1,6 +1,6 @@
 ---
 name: session-history
-description: "Search prior sessions across Claude Code, Devin, and Codex for the same problem or topic. Returns timestamped per-vendor results merged by relevance, with secret-redacted excerpts. Use when investigating context the current session cannot see (\"what did we decide last week\", \"did we already try this\", \"what was the conclusion of the auth work\"), reconstructing a multi-session decision trail, or carrying institutional knowledge forward when an agent compaction or session boundary cleared the prior context."
+description: "Search prior sessions across Claude Code, Devin, and Codex for the same problem or topic. Use when the current session cannot see prior context — after agent compaction, session boundary, or when reconstructing a multi-session decision trail."
 argument-hint: '[query — topic, decision phrase, error string, or "last N days" time range]'
 user-invokable: true
 ---

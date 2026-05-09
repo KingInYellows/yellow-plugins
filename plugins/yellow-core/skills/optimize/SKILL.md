@@ -1,6 +1,6 @@
 ---
 name: optimize
-description: "Run a metric-driven optimization pass with parallel candidate variants and an LLM-as-judge analytic rubric. Two judge runs with order-swap recover most of the variance from positional bias; per-criterion scoring (1-5) outperforms holistic scoring; style-bias self-check flags rationale drift. Use when comparing approaches against a measurable goal — prompt variants, agent system prompt revisions, command flow changes, config tunings — anywhere \"better\" can be expressed as a per-criterion rubric. Triggers on phrases like \"optimize this prompt\", \"compare variants of X\", \"which version of Y is better\"."
+description: "Run a metric-driven optimization pass: parallel candidate variants scored against an LLM-as-judge analytic rubric. Use when comparing approaches against a measurable goal — anywhere 'better' can be expressed as a per-criterion rubric."
 argument-hint: '[path to optimization spec YAML, or describe the optimization goal to scaffold one interactively]'
 user-invokable: true
 ---

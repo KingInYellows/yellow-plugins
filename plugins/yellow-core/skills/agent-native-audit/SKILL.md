@@ -1,6 +1,6 @@
 ---
 name: agent-native-audit
-description: "Audit checklist for evaluating an existing codebase against agent-native architecture principles. Inventories UI actions, agent tools, system prompts, and shared workspace patterns to identify parity gaps. Use when auditing a codebase for agent-native readiness, before adding new agent integration, or when deciding whether to extract orchestration logic from a workflow tool."
+description: "Audit checklist for evaluating an existing codebase against agent-native architecture principles to identify parity gaps. Use when auditing for agent-native readiness or deciding whether to extract orchestration logic from a workflow tool."
 user-invokable: false
 ---
 

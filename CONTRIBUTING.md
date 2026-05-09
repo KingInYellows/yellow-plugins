@@ -385,11 +385,31 @@ of context, 8,000-char fallback). Each individual skill's combined
 `description` + `when_to_use` is officially capped at **1,536 characters**;
 yellow-plugins skill descriptions are all well under that limit.
 
-Authors should not artificially trim descriptions to fit the budget — that
-hurts auto-invocation accuracy. Instead, document per-user knobs in the
-README for downstream installs that hit the budget. See [`claude doctor`
-says "descriptions dropped"](README.md#claude-doctor-says-descriptions-dropped)
-for the user-side workaround (`skillListingBudgetFraction`,
+**Trim for selection clarity, not for budget.** Two principles, both
+load-bearing:
+
+- **Do not cut content that aids selection accuracy.** The WHAT clause, the
+  "Use when…" trigger, the clause that distinguishes a skill from its
+  closest neighbor, and any scope boundary that prevents misfire all earn
+  their characters. Removing them to fit a budget target will hurt
+  auto-invocation.
+- **Do cut content that does not contribute to selection.** Enumerated
+  trigger phrase lists ("phrases like 'X', 'Y', 'Z'"), body-content
+  repetition (methodology names, algorithm steps, scoring rubrics that
+  belong in the skill body), and capability listings the model can
+  extrapolate from a precise WHAT clause are all dead weight at listing
+  time. They consume budget without contributing to selection.
+
+The two are compatible: you can have short descriptions AND accurate
+selection by keeping the differentiating clause and cutting the noise.
+There is no character cap, but descriptions over ~250 chars increasingly
+risk having trailing content truncated at auto-invocation time
+([anthropics/claude-code#44780](https://github.com/anthropics/claude-code/issues/44780)),
+which is where most reported routing failures actually originate.
+
+For downstream installs hitting the budget, see [`claude doctor` says
+"descriptions dropped"](README.md#claude-doctor-says-descriptions-dropped)
+for the user-side workarounds (`skillListingBudgetFraction`,
 `SLASH_COMMAND_TOOL_CHAR_BUDGET`).
 
 ## Questions?

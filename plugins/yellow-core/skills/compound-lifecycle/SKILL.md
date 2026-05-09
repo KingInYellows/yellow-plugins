@@ -1,6 +1,6 @@
 ---
 name: compound-lifecycle
-description: "Audit, refresh, and consolidate `docs/solutions/` to keep the institutional knowledge catalog from rotting. Runs three operations — staleness detection (composite-scored, not pure age), overlap detection (BM25 + optional ruvector cosine clustering on `problem:`), and consolidation hand-off (AskUserQuestion-gated, dispatches `knowledge-compounder` to write the merged entry, archives superseded entries to `docs/solutions/archived/`). Use when a `docs/solutions/` sweep is needed — phrases like \"refresh learnings\", \"audit solutions\", \"clean up stale docs\", \"consolidate overlapping entries\", or after `knowledge-compounder` flags an older entry as superseded by a newer write."
+description: "Audit, refresh, and consolidate `docs/solutions/` to keep the institutional knowledge catalog from rotting. Use when a `docs/solutions/` sweep is needed or after `knowledge-compounder` flags an older entry as superseded."
 user-invokable: true
 ---
 
