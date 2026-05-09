@@ -258,13 +258,15 @@ Schema:
   "claude": { "used": 0, "cap": 45, "window_start": "2026-05-08T14:00:00Z", "window_hours": 5, "tier": "pro" },
   "codex": { "used": 0, "cap": 80, "window_start": "...", "window_hours": 3, "tier": "plus" },
   "gemini": { "used": 0, "cap": 1500, "window_start": "...", "window_hours": 24, "tier": "advanced" },
-  "opencode": { "used": "n/a", "model": "deepseek/deepseek-v4-pro" }
+  "opencode": { "used": null, "model": "deepseek/deepseek-v4-pro" }
 }
 ```
 
 The `opencode.model` field mirrors `COUNCIL_OPENCODE_MODEL` for diagnostic display — OpenCode itself routes via OpenRouter so the underlying provider may impose its own quota; tracking that quota is a V3 enhancement (would require OpenRouter API introspection).
 
-Heuristic increment: each reviewer invocation increments `used` by 1 (or 2 for synthesizer turns). Window expiry triggers reset. Recalibration on quota-exhausted error: set `used = cap`, `window_start = now`.
+**Schema invariant (helpers MUST honor):** `opencode.used` is `null` (not numeric) because per-provider quota is not tracked locally. `track_quota_usage()` and `check_quota_headroom()` MUST skip any reviewer entry whose `used` is `null` during increment and headroom-check operations — do not coerce to `0`, do not increment, do not warn on `< headroom × N` math.
+
+Heuristic increment: each reviewer invocation with numeric `used` increments by 1 (or 2 for synthesizer turns). Window expiry triggers reset. Recalibration on quota-exhausted error: set `used = cap`, `window_start = now`.
 
 User-configurable caps via env vars:
 - `COUNCIL_CLAUDE_TIER` = `pro` | `max-5x` | `max-20x` (default `pro`)
@@ -416,8 +418,9 @@ Override examples (documented in CLAUDE.md, not enforced):
 - `COUNCIL_OPENCODE_MODEL=` (empty) — defer to OpenCode's own config (V1 behavior)
 
 **Pre-flight check at PR-D time:**
-- Verify the user has OpenRouter configured in OpenCode. Try `opencode auth list` first (provider list); if that subcommand exits non-zero (older OpenCode versions don't have it — see Task 4.0 spike, currently `[unverified]`), fall back to parsing `~/.opencode/opencode.json` with `jq -r '.defaultProvider // empty'`. If neither path returns `openrouter`, treat as "not configured."
-- If not configured, surface a clear error: `[opencode-reviewer] Error: OpenRouter not configured. Run 'opencode auth login openrouter' or set COUNCIL_OPENCODE_MODEL to a different provider.`
+- Resolve the expected provider from `COUNCIL_OPENCODE_MODEL`: bare slugs like `deepseek/*`, `mistralai/*`, `x-ai/*` resolve to `openrouter`; `ollama/*` resolves to `ollama`; explicit `provider/model` slugs resolve to the prefix. The check verifies the **resolved** provider is configured, NOT a hard-coded `openrouter`.
+- Try `opencode auth list` first (provider list); if that subcommand exits non-zero (older OpenCode versions don't have it — see Task 4.0 spike, currently `[unverified]`), fall back to parsing the OpenCode config file. The on-disk path varies across installs and OS — probe `~/.opencode/config.json`, `~/.opencode/opencode.json`, and `./opencode.json` (project-local) in that order; resolve which one OpenCode actually reads in the Task 4.0 spike before PR-D ships and pin the path then. Read `defaultProvider` (or the equivalent key in whatever config OpenCode uses).
+- If neither path returns the expected provider, surface a clear error: `[opencode-reviewer] Error: <provider> not configured. Run 'opencode auth login <provider>' or set COUNCIL_OPENCODE_MODEL to a different provider.`
 - Mark UNAVAILABLE rather than failing the whole council
 
 Implementation: pass `--model "$COUNCIL_OPENCODE_MODEL"` to `opencode run` when the env var is set. OpenCode's model syntax is `provider/model-name` (bare 2-segment slug). Do NOT use a 3-segment `openrouter/provider/model-name` prefix — provider routing is handled by `opencode.json`, not by the model slug. See deepen-plan annotation above.
@@ -466,7 +469,7 @@ Don't fail — the user might be running a homogeneous benchmark intentionally.
 
 Add a `verify_finding()` bash function that:
 - Parses a finding's `<file>:<line>` reference
-- Tier 1: `git show "HEAD:$file" | sed -n "${line}p"` exact match
+- Tier 1: source-aware exact match. The lookup target depends on `/council` mode: for `review` mode (the default, where the diff is against committed code) use `git show "HEAD:$file" | sed -n "${line}p"`; for `plan` / `debug` / `question` modes (where the input is the working tree) use `sed -n "${line}p" "$file"` if the file exists in the working tree, otherwise fall back to HEAD. When mode is unknown or `$file` is from a non-checkout context (URL, paste), skip Tier 1 and proceed directly to Tier 2.
 - Tier 2: if exact fails, run `python3 -c "from rapidfuzz import fuzz; ..."` for fuzzy match (≥85% similarity → `fuzz.ratio(a, b) >= 85`; intuitive 0–100 scale, no inverted threshold)
 - Returns `verified` / `fuzzy-verified` / `unverified`
 
