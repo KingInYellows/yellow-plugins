@@ -94,7 +94,7 @@ AutoGen provides `GroupChat` with role-play orchestration; LangGraph provides `S
 Verify that the quoted line appears verbatim in `git show <commit>:<file>` or the PR diff hunk. Near-zero false positives. High false negatives when LLM reformats whitespace or reflows comments.
 
 **Tier 2 — Fuzzy alignment (cost: CPU, ~1ms)**
-`diff-match-patch` (Google, MIT license): Myers' diff + Bitap string matching with accuracy/location weighting. Recovers findings where the LLM slightly altered whitespace, trimmed trailing spaces, or collapsed multi-line expressions. Recommended threshold: ≥85% match score for promotion to "verified."
+**[HISTORICAL / SUPERSEDED — see locked-decision banner at top of doc]** `diff-match-patch` (Google, MIT license): Myers' diff + Bitap string matching with accuracy/location weighting. Recovers findings where the LLM slightly altered whitespace, trimmed trailing spaces, or collapsed multi-line expressions. Recommended threshold: ≥85% match score for promotion to "verified." **V2 implementation uses `rapidfuzz` (`fuzz.ratio(a, b) >= 85`) instead — this paragraph is retained for historical context only.**
 
 **Tier 3 — AST match (cost: low, requires ast-grep or Semgrep)**
 `ast-grep`: pattern-based structural matching against the AST. Distinguishes `null` dereferences in different AST contexts. False positive rate near zero for well-formed patterns; false negatives when LLM describes the wrong AST node type.
@@ -255,7 +255,7 @@ Claude-v1's 23.8% swap-consistency means it assigns the same verdict to the same
 
 ### Required mitigations
 
-**Two-pass order-swap:** Run the synthesizer on the findings in order A→B, then B→A. Average the scores. If the scores diverge by more than 15%, flag as "low-confidence synthesis" and surface raw findings to the developer.
+**Two-pass order-swap:** Run the synthesizer on the findings in order A→B, then B→A. Average the scores. **[HISTORICAL — superseded by locked-decision banner]** Older heuristic: if the scores diverge by more than 15%, flag as "low-confidence synthesis" and surface raw findings to the developer. **V2 implementation uses any verdict flip between A→B and B→A passes (with confidence-tier change as a secondary trigger), NOT a `>15%` variance threshold — see locked-decision block at the top of this doc.**
 
 **Double-blind lineage labels:** Remove model identity from findings before presenting to synthesizer. The synthesizer should see "Reviewer 1", "Reviewer 2", "Reviewer 3" — not "GPT-4.1", "Claude", "Gemini." Prevents self-enhancement bias.
 
@@ -345,7 +345,7 @@ Best option for CI automation: final-response-only mode means no interactive pro
 
 ### Quick Wins (≤1 day, low risk, high signal)
 
-**QW-1: Implement two-pass order-swap in synthesizer.** Before synthesizing findings, run the synthesizer with findings in order A then B, then B then A. Average scores. Discard findings with >15% score variance as "low-confidence." Eliminates the primary positional bias vector. Estimated implementation: 2–3 hours.
+**QW-1: Implement two-pass order-swap in synthesizer.** Before synthesizing findings, run the synthesizer with findings in order A then B, then B then A. Average scores. **[HISTORICAL — superseded]** Older heuristic: discard findings with >15% score variance as "low-confidence." **V2 implementation triggers on any verdict flip between passes (per locked-decision block at top of doc).** Eliminates the primary positional bias vector. Estimated implementation: 2–3 hours.
 
 **QW-2: Add verify-first gate to round-2 trigger.** Block round-2 invocation unless at least one finding passes Tier-1 or Tier-2 evidence verification AND is severity P1 or P0. Current V1 behavior (unconstrained round triggering) is the primary source of hallucination amplification. Estimated: 1–2 hours.
 
@@ -359,7 +359,7 @@ Best option for CI automation: final-response-only mode means no interactive pro
 
 **V2-1: Core-pack prompt cache pre-warming.** Pre-submit the core-pack to each provider immediately after `git fetch`, before diff extraction. Use streaming to detect cache confirmation. Expected: 80–90% TTFT reduction on warm cache. Requires per-provider cache implementation (OpenAI auto, Anthropic `cache_control`, Gemini implicit). Estimated: 2 days.
 
-**V2-2: Tiered evidence verification pipeline (Tier 1 → 2 → 3).** Implement the cascade: exact match → `diff-match-patch` fuzzy (≥85% threshold) → ast-grep AST match. Discard unverified findings. This is the highest-leverage quality improvement available: eliminates the primary complaint class (hallucinated line references) that erodes developer trust. Estimated: 3 days.
+**V2-2: Tiered evidence verification pipeline (Tier 1 → 2 → 3).** Implement the cascade: exact match → fuzzy match (≥85% threshold) → ast-grep AST match. **[HISTORICAL — superseded]** Older library recommendation: `diff-match-patch`. **V2 implementation uses `rapidfuzz` (`fuzz.ratio(a, b) >= 85`) per locked-decision block at top of doc.** Discard policy is replaced by an explicit "Unverified Claims" bucket — see plan Task 5.2. This is the highest-leverage quality improvement available: eliminates the primary complaint class (hallucinated line references) that erodes developer trust. Estimated: 3 days.
 
 **V2-3: OpenCode session lifecycle management.** Create sessions at review start, capture session ID, delete on completion or 10-minute timeout. Implement a session registry with periodic cleanup. Prevents the 318 GB disk leak. Estimated: 1 day.
 
@@ -460,7 +460,11 @@ JSON output from CLI reviewers (Aider, OpenCode, Cline) breaks on minor version 
 - Bradley-Terry personalization gap — ρ=0.04 global ranking vs individual preferences
 - Agent of Empires (njbrake) — tmux + git worktrees fleet management
 - claude-flow v2 — SQLite memory, 64 agents, MCP integration, ZDR gap documentation
-- [research-conductor] Source skipped: Tavily — unavailable (missing TAVILY_API_KEY)
-- [research-conductor] Source skipped: Perplexity — tool not found in deferred tool registry
-- [research-conductor] EXA deep_researcher_start failed (HTTP 400) — skipped
-- [research-conductor] Ceramic returned 0 results for keyword query — fell back to parallel task group
+Skipped sources (raw `[research-conductor]` tool output, fenced as untrusted content per repo `**/*.md` guideline):
+
+```text
+[research-conductor] Source skipped: Tavily — unavailable (missing TAVILY_API_KEY)
+[research-conductor] Source skipped: Perplexity — tool not found in deferred tool registry
+[research-conductor] EXA deep_researcher_start failed (HTTP 400) — skipped
+[research-conductor] Ceramic returned 0 results for keyword query — fell back to parallel task group
+```
