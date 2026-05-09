@@ -1,7 +1,7 @@
 ---
 name: repo-research-analyst
 description: "Expert repository research analyst. Analyzes repository structure, documentation, conventions, and implementation patterns. Use when exploring unfamiliar codebases or auditing existing projects."
-model: inherit
+model: sonnet
 background: true
 memory: project
 tools:
