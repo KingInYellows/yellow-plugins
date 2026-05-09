@@ -1,7 +1,8 @@
 ---
 name: security-debt-scanner
 description: "Security tech debt detection (deprecated crypto, missing validation, hardcoded config — NOT active vulnerabilities). Use when auditing code for debt patterns that could become vulnerabilities. For active/exploitable vulnerability audits, use security-sentinel (yellow-core)."
-model: inherit
+model: sonnet
+effort: low
 background: true
 skills:
   - debt-conventions

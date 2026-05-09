@@ -1,7 +1,8 @@
 ---
 name: duplication-scanner
 description: "Code duplication and near-duplicate detection. Use when auditing code for repeated patterns, copy-paste code, or duplicate logic."
-model: inherit
+model: sonnet
+effort: low
 background: true
 skills:
   - debt-conventions

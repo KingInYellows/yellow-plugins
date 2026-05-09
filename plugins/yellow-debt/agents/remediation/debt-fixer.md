@@ -1,7 +1,7 @@
 ---
 name: debt-fixer
 description: "Implement fixes for specific technical debt findings with human approval. Use when remediating accepted debt items."
-model: inherit
+model: sonnet
 isolation: worktree
 skills:
   - debt-conventions
