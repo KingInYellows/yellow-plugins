@@ -270,7 +270,7 @@ V2 should track per-reviewer quota headroom in `~/.config/yellow-council/quota.j
   "claude": { "used": 12, "cap": 45, "window_start": "2026-05-08T14:00:00Z", "window_hours": 5, "tier": "pro" },
   "codex": { "used": 8, "cap": 80, "window_start": "2026-05-08T15:30:00Z", "window_hours": 3, "tier": "plus" },
   "gemini": { "used": 230, "cap": 1500, "window_start": "2026-05-08T00:00:00Z", "window_hours": 24, "tier": "advanced" },
-  "opencode": { "used": "n/a", "model": "deepseek/deepseek-v4-pro" }
+  "opencode": { "used": null, "model": "deepseek/deepseek-v4-pro" }
 }
 ```
 
