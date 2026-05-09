@@ -91,9 +91,11 @@ the most thorough deliberation possible (none of the M-A-05 agents qualify).
 > documents the `effort:` enum (`low|medium|high|xhigh|max`) but provides
 > **no semantic distinction between `high`, `xhigh`, and `max`**. The plan's
 > "no rubric ceiling" framing is authorial — not a confirmation of an
-> existing convention. The validator (`scripts/validate-agent-authoring.js:52`)
-> treats all three as equivalent for V4 satisfiability via
-> `HIGH_EFFORT = new Set(['high', 'xhigh', 'max'])`. **Action:** as part of
+> existing convention. Once PR #477 (M-A-01..M-A-04 upstream, not yet merged
+> on this branch) lands, the validator (`scripts/validate-agent-authoring.js`)
+> will treat all three as equivalent for V4 satisfiability via a
+> `HIGH_EFFORT = new Set(['high', 'xhigh', 'max'])` constant — but that
+> check does not exist on this branch today. **Action:** as part of
 > Phase 4.1, add this decision rule to the catalog so future tiers have a
 > documented reference rather than re-deriving it. This PR is the first to
 > use either `xhigh` or `max` in the repo (verified: `rg 'effort: xhigh'`
@@ -187,9 +189,12 @@ M-A-01..M-A-04 rollout plan that originated it has been archived.
 ### Phase 3: Validation
 
 - [ ] 3.1: Run `pnpm validate:agents` — must exit 0 with no warnings.
-  Expected: V3 inapplicable (none in scanners/ or ci/), V4 inapplicable
-  (none match the synthesizer regex). If any warning fires, the assumption
-  in the Current State section is wrong; re-evaluate.
+  On the current branch (PR #477 not merged), the validator checks tool
+  allowlists and `subagent_type` references only — no V3/V4 model/effort
+  warnings are emitted. After PR #477 lands: V3 will fire as inapplicable
+  (none in scanners/ or ci/), V4 will fire as inapplicable (none match the
+  synthesizer regex). If any warning fires post-merge, the assumption in the
+  Current State section is wrong; re-evaluate.
 - [ ] 3.2: Run `pnpm validate:schemas` — must pass.
 - [ ] 3.3: Run `pnpm test:unit` — must pass.
 - [ ] 3.4: Run `pnpm typecheck && pnpm lint` — must pass.

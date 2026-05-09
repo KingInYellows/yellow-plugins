@@ -37,7 +37,8 @@ avoid in agents that ship across Opus versions). The decision rule is now
 documented in `docs/solutions/code-quality/subagent-frontmatter-field-catalog.md`
 as part of this PR.
 
-V3/V4 validator inapplicable to all 9 agents: none are in `agents/scanners/`
-or `agents/ci/` (V3 inert), and none of their `name:` fields match the
+Once PR #477 (V3/V4 model/effort validation rules) lands, all 9 agents will
+be inapplicable to those rules: none are in `agents/scanners/` or `agents/ci/`
+(V3 inert), and none of their `name:` fields match the
 synthesizer/orchestrator/conductor/aggregator/compounder pattern (V4 inert).
-No allowlist updates required.
+No allowlist updates will be required when PR #477 merges.
