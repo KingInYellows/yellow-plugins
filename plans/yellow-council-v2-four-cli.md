@@ -694,7 +694,7 @@ The plan is successful when:
 
 1. **codex-reviewer emits the structured 6-key block** (Phase 0) — `verdict=` / `confidence=` / `summary=` / `fenced_output_path=` / `findings_block_begin` / `findings_block_end`, matching gemini-reviewer's contract
 2. `/council review` fans out to 4 reviewers (Claude in-process + Codex + Gemini + OpenCode subprocess)
-3. Synthesis output includes `Agreement (verified)` / `Agreement (unverified)` / `Disagreement` / `Unverified Claims` sections
+3. Synthesis output includes all five Task 5.2 buckets: `Agreement (cited by 2+ reviewers, evidence verified)` / `Agreement (cited by 2+ reviewers, evidence unverified)` / `Disagreement` / `Single-Reviewer Findings (evidence verified)` / `Unverified Claims`
 4. Quota exhaustion in any single reviewer produces a clean `verdict=QUOTA_EXHAUSTED` with ETA in headline, no retry
 5. Lineage map in report header shows 4 distinct lineages (Anthropic / OpenAI / Google / Other — typically `deepseek/deepseek-v4-pro` for Other)
 6. 2-pass synthesis verdict-flip count is reported in the headline (or `--single-pass` cleanly bypasses)
