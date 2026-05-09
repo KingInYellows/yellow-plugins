@@ -377,7 +377,7 @@ Under subscription auth, caching does not save money — it saves time. Cache hi
 
 1. Detect: provider returns subscription-specific error
 2. Log: `[council] <reviewer> quota exhausted — window resets at <ETA>`
-3. Mark: `verdict=QUOTA_EXHAUSTED`, `confidence=N/A`, `summary=<reviewer> subscription quota exhausted; council ran with N-of-4 reviewers`. Plan-locked: `QUOTA_EXHAUSTED` is a new, distinct verdict (separate from `UNAVAILABLE` and `ERROR`) and requires updating the case-statement allow-list in all four reviewer agent files (claude-reviewer, codex-reviewer, gemini-reviewer, opencode-reviewer) — see plan Task 3.3.
+3. Mark (reviewer-level output, what the failing reviewer emits): `verdict=QUOTA_EXHAUSTED`, `confidence=N/A`, `summary=<reviewer> subscription quota exhausted; window resets at <ETA>`. The reviewer cannot know how many of the 4 reviewers will complete — that is orchestrator-only knowledge — so the "N-of-4" language MUST live in the synthesis Headline (step 4 below), not in the reviewer's `summary=`. Plan-locked: `QUOTA_EXHAUSTED` is a new, distinct verdict (separate from `UNAVAILABLE` and `ERROR`) and requires updating the case-statement allow-list in all four reviewer agent files (claude-reviewer, codex-reviewer, gemini-reviewer, opencode-reviewer) — see plan Task 3.3.
 4. Surface in synthesis Headline: `Council ran with N of 4 reviewers (<reviewer> quota exhausted, resets <ETA>)`
 5. Do NOT retry — quota-exhausted errors require window reset, not backoff
 
