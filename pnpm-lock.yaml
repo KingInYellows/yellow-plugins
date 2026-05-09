@@ -124,6 +124,8 @@ importers:
 
   plugins/yellow-core: {}
 
+  plugins/yellow-council: {}
+
   plugins/yellow-debt: {}
 
   plugins/yellow-devin: {}
@@ -131,6 +133,8 @@ importers:
   plugins/yellow-docs: {}
 
   plugins/yellow-linear: {}
+
+  plugins/yellow-mempalace: {}
 
   plugins/yellow-morph:
     dependencies:

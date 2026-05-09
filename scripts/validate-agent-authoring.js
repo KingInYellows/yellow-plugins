@@ -37,11 +37,51 @@ const REVIEW_AGENT_ALLOWLIST = new Set([
   'yellow-council/agents/review/opencode-reviewer.md',
 ]);
 
+// V1/V2/V3/V4 — model/effort frontmatter lint rules (see M-A-01 plan).
+// V1: effort: enum (low|medium|high|xhigh|max) — hard error
+// V2: model: enum (haiku|sonnet|opus|inherit, optionally versioned) — hard error
+// V3: model: inherit on a scanner/CI agent — non-blocking warning
+// V4: synthesizer/orchestrator name without effort: high — non-blocking warning
+// `inherit` is a bare keyword (no version suffix). Real model IDs (haiku,
+// sonnet, opus) accept an optional one- or two-segment numeric suffix
+// (e.g., `sonnet-4-6`).
+const MODEL_VALUE_PATTERN = /^(haiku|sonnet|opus)(-\d+(-\d+)?)?$|^inherit$/;
+const EFFORT_VALUES = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
+// Effort tiers that satisfy V4's "extended chain-of-thought" requirement.
+// Subset of EFFORT_VALUES — keep in sync if EFFORT_VALUES grows.
+const HIGH_EFFORT = new Set(['high', 'xhigh', 'max']);
+const SYNTHESIZER_NAME_PATTERN =
+  /(synthesizer|orchestrator|conductor|aggregator|compounder)/i;
+
+// Files exempt from V3/V4 advisory warnings — intentional inheritance
+// or intentional default-effort. Each entry must be a plugins-relative
+// POSIX path. Adding a file here is a documented decision that the
+// agent's role does NOT match the rule's intent (e.g., failure-analyst
+// in agents/ci/ is a workflow integration agent, not a scanner).
+const MODEL_RULE_ALLOWLIST = new Set([
+  // failure-analyst is a CI failure diagnosis orchestrator that delegates
+  // to runner-diagnostics for deep work — its model: inherit is intentional.
+  'yellow-ci/agents/ci/failure-analyst.md',
+  // workflow-optimizer is a CI workflow analysis agent whose output quality
+  // scales with the parent session's model — intentional inherit.
+  'yellow-ci/agents/ci/workflow-optimizer.md',
+  // devin-orchestrator coordinates Devin V3 sessions; its name matches V4's
+  // synthesizer/orchestrator pattern but the effort default is intentional —
+  // sub-sessions run independently in Devin.
+  'yellow-devin/agents/workflow/devin-orchestrator.md',
+  // knowledge-compounder dispatches sub-agents that handle synthesis;
+  // its own role is orchestration without Opus-level reasoning. The name
+  // matches V4's pattern but the brainstorm explicitly decided no
+  // effort: high because the heavy work happens in sub-agents.
+  'yellow-core/agents/workflow/knowledge-compounder.md',
+]);
+
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
   green: '\x1b[32m',
   blue: '\x1b[34m',
+  yellow: '\x1b[33m',
 };
 
 function walk(dir, predicate = () => true) {
@@ -124,6 +164,10 @@ function logError(message) {
   console.error(`${colors.red}✗ ERROR:${colors.reset} ${message}`);
 }
 
+function logWarning(message) {
+  console.log(`${colors.yellow}⚠ WARN:${colors.reset} ${message}`);
+}
+
 function logSuccess(message) {
   console.log(`${colors.green}✓ PASS:${colors.reset} ${message}`);
 }
@@ -161,6 +205,7 @@ const commandFiles = walk(
 logInfo(`Validating ${agentFiles.length} agents and ${markdownFiles.length} markdown files...`);
 
 const errors = [];
+const warnings = [];
 const pluginAgents = new Set();
 const skillReferencePattern = /`([a-z0-9][a-z0-9-]*)`\s+skill\b/gi;
 const pluginSubagentPattern =
@@ -181,8 +226,71 @@ for (const filePath of agentFiles) {
   const relPath = path.relative(PLUGINS_DIR, filePath);
   const relSegments = relPath.split(path.sep);
   const pluginName = relSegments[0];
+  // Hoist segment computations used by V3/V4 + W1.5 + 3-segment registration.
+  // POSIX-form path keeps allowlist matching consistent across platforms.
+  const agentsIdx = relSegments.indexOf('agents');
+  const subdir = agentsIdx >= 0 ? relSegments[agentsIdx + 1] : null;
+  const pluginsRelPath = relSegments.join('/');
+  const allowlisted = MODEL_RULE_ALLOWLIST.has(pluginsRelPath);
 
+  // V1: effort: enum (low | medium | high | xhigh | max). Hard error.
+  // Catches typos (e.g., effort: hight) that would otherwise silently fall
+  // back to the default and make the assignment a no-op.
+  const effortVal = parseScalar(frontmatter, 'effort');
+  const effortValid = effortVal === null || EFFORT_VALUES.has(effortVal);
+  if (effortVal !== null && !EFFORT_VALUES.has(effortVal)) {
+    errors.push(
+      `${relative(filePath)}: invalid effort: '${effortVal}' ` +
+        `(must be one of low|medium|high|xhigh|max)`
+    );
+  }
+
+  // V2: model: enum (haiku | sonnet | opus | inherit, optionally with a
+  // version suffix like sonnet-4-5). Hard error. Catches typos and invalid
+  // model IDs that would otherwise fall back to the session default.
+  const modelVal = parseScalar(frontmatter, 'model');
+  if (modelVal !== null && !MODEL_VALUE_PATTERN.test(modelVal)) {
+    errors.push(
+      `${relative(filePath)}: invalid model: '${modelVal}' ` +
+        `(must match ^(haiku|sonnet|opus)(-\\d+(-\\d+)?)?$|^inherit$)`
+    );
+  }
+
+  // V3: model: inherit on a scanner/CI agent — non-blocking warning.
+  // Nudge authors to make an explicit model choice for narrow-role agents
+  // where inheritance is usually wasteful (Opus session → scanner doing
+  // taxonomy matching).
+  if (
+    modelVal === 'inherit' &&
+    !allowlisted &&
+    (subdir === 'scanners' || subdir === 'ci')
+  ) {
+    warnings.push(
+      `[V3 advisory] ${relative(filePath)}: model: inherit on a ` +
+        `${subdir}/ agent — consider explicit model: sonnet or model: ` +
+        `haiku based on task complexity.`
+    );
+  }
+
+  // V4: synthesizer/orchestrator agents without effort: high — non-blocking
+  // warning. Matches against the name field (not description) to reduce
+  // false positives on integration agents that mention "synthesize" or
+  // "merge" in passing. Skipped when V1 already errors on effortVal so
+  // authors get one clear message instead of two.
   const name = parseScalar(frontmatter, 'name');
+  if (
+    name &&
+    SYNTHESIZER_NAME_PATTERN.test(name) &&
+    effortValid &&
+    !HIGH_EFFORT.has(effortVal) &&
+    !allowlisted
+  ) {
+    warnings.push(
+      `[V4 advisory] ${relative(filePath)}: synthesizer/orchestrator ` +
+        `agent without effort: high — consider extended chain-of-thought.`
+    );
+  }
+
   if (!name) {
     errors.push(`${relative(filePath)}: missing agent name`);
   } else {
@@ -195,10 +303,8 @@ for (const filePath of agentFiles) {
     // markdown-scan loop below emits a warning when a 2-segment hit has
     // an available 3-segment equivalent — turning silent runtime
     // failures into loud CI signal for new code.
-    const agentsIdx = relSegments.indexOf('agents');
     if (agentsIdx >= 0 && relSegments.length > agentsIdx + 2) {
-      const dir = relSegments[agentsIdx + 1];
-      pluginAgents.add(`${pluginName}:${dir}:${name}`);
+      pluginAgents.add(`${pluginName}:${subdir}:${name}`);
     }
   }
 
@@ -214,16 +320,12 @@ for (const filePath of agentFiles) {
     }
 
     // W1.5 — Rule X: review/ agents must be read-only (no Bash, Write, Edit)
-    // unless explicitly allowlisted with a documented exception. Reuse the
-    // PLUGINS_DIR-relative path computed above. Tool comparison is
-    // case-insensitive so lowercase variants (e.g., `bash`) cannot bypass
-    // the security check.
-    const agentsIdx = relSegments.indexOf('agents');
-    const isReviewAgent =
-      agentsIdx >= 0 && relSegments[agentsIdx + 1] === 'review';
-    if (isReviewAgent) {
-      const pluginsRel = relSegments.join('/');
-      if (!REVIEW_AGENT_ALLOWLIST.has(pluginsRel)) {
+    // unless explicitly allowlisted with a documented exception. Tool
+    // comparison is case-insensitive so lowercase variants (e.g., `bash`)
+    // cannot bypass the security check. Reuses subdir/pluginsRelPath
+    // computed once at the top of the loop body.
+    if (subdir === 'review') {
+      if (!REVIEW_AGENT_ALLOWLIST.has(pluginsRelPath)) {
         const deniedLower = REVIEW_AGENT_DENIED_TOOLS.map((t) =>
           t.toLowerCase()
         );
@@ -316,6 +418,12 @@ for (const filePath of commandFiles) {
       `${relative(filePath)}: markdown command sources plugin files via BASH_SOURCE; use \${CLAUDE_PLUGIN_ROOT} or a real script path`
     );
   }
+}
+
+// Print warnings first so they remain visible above the trailing
+// success/error block. Warnings do NOT affect exit code; only errors do.
+for (const warning of warnings) {
+  logWarning(warning);
 }
 
 if (errors.length > 0) {

@@ -304,7 +304,8 @@ Branch: `agent/feat/model-effort-validator-rules` (stacked on PR 4)
 - All 5 test groups pass (V1, V2, V3, V4, exit-code semantics).
 - `pnpm validate:agents` against the live `plugins/` tree exits 0 with
   warnings printed but no errors (Phases 1–4 already landed correct values).
-- Allowlist documents the 3 intentional exemptions.
+- Allowlist documents the 4 intentional exemptions (failure-analyst,
+  workflow-optimizer, devin-orchestrator, knowledge-compounder).
 
 ## Technical Specifications
 
