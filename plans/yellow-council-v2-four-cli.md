@@ -506,7 +506,7 @@ Add a `verify_finding()` bash function that:
 - Document in CLAUDE.md as an optional dependency
 
 <!-- deepen-plan: external -->
-> **Research (Q3, threshold scale — HISTORICAL / SUPERSEDED by the rapidfuzz lock):** This annotation documents `diff-match-patch`'s `Match_Threshold` semantics (a tolerance/looseness scale where `0.0 = exact match required`, `1.0 = accept any match`, so "≥85% match" inverts to `dmp.Match_Threshold = 0.15`, NOT `0.85`). It is retained only as background for why `rapidfuzz`'s intuitive 0–100 scale was preferred. **Plan-locked: Tier 2 uses `rapidfuzz` (`fuzz.ratio(a, b) >= 85`, no inverted threshold).** Do NOT use `diff-match-patch`'s `Match_Threshold` API in implementation — see the locked decision in Task 5.1 body and the "Locked decisions" section.
+> **Research (Q3, threshold scale):** `rapidfuzz` uses an intuitive 0–100 percentage scale where `fuzz.ratio(a, b) >= 85` means "≥85% similar" — no inversion required. This is the plan-locked Tier 2 threshold. **Plan-locked: Tier 2 uses `rapidfuzz` (`fuzz.ratio(a, b) >= 85`, intuitive 0–100 scale).** See the locked decision in Task 5.1 body and the "Locked decisions" section.
 <!-- /deepen-plan -->
 
 <!-- deepen-plan: external -->
