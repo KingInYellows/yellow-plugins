@@ -6,18 +6,22 @@ Optional Composio accelerator for batch workflows with local usage tracking.
 
 This plugin bundles a `type: http` Composio MCP server, declared in
 `plugin.json` and configured via two `userConfig` prompts on enable: the
-per-customer MCP URL and the Composio API key. The API key is stored in
-the system keychain (`sensitive: true`); the MCP URL is stored as plain
-(non-sensitive) `userConfig`. Bundled tools appear under the
+per-customer MCP URL and the Composio API key. Both are `required: true`
+— if either is left blank, Claude Code refuses to enable the plugin
+because the bundled MCP would otherwise register with an empty URL and
+break `claude doctor` for every other MCP server (`'/' cannot be parsed
+as a URL`). The API key is stored in the system keychain
+(`sensitive: true`); the MCP URL is stored as plain (non-sensitive)
+`userConfig`. Bundled tools appear under the
 `mcp__plugin_yellow-composio_composio-server__*` prefix.
 
-The plugin still works with externally-configured Composio MCPs — if the
-userConfig prompts are dismissed (URL left blank), the bundled server
-will fail to start and the plugin falls back to detecting any of the
-external Composio variants (`mcp__claude_ai_composio__*` for native
-integrations, `mcp__composio-server__*` for manual `.mcp.json` setups).
-This is the legacy migration path for users who configured the MCP
-manually before this plugin bundled it.
+The plugin still detects externally-configured Composio MCPs as a
+migration aid (`mcp__claude_ai_composio__*` for the Claude.ai native
+integration, `mcp__composio-server__*` for manual `.mcp.json` setups
+predating this plugin). Detection runs in `/composio:setup` and is
+independent of the bundled MCP — it does NOT activate when the bundled
+userConfig is left blank, because `required: true` prevents that state
+from existing.
 
 The plugin provides:
 

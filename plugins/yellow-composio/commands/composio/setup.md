@@ -53,12 +53,18 @@ If ToolSearch returns at least one Composio tool, record which prefix is
 active and proceed to Step 3.
 
 If ToolSearch returns no Composio tools, the bundled MCP did not start.
-The two most common causes are:
+Because both `userConfig` fields are `required: true` (v1.2.4+), the
+"dismissed prompt" case cannot reach this state — Claude Code refuses
+to enable the plugin without both values. Remaining causes:
 
-- The `userConfig` prompt was dismissed (URL or API key blank).
+- The plugin was installed before v1.2.4 and the userConfig values were
+  never re-prompted. Fix: `/plugin disable yellow-composio` then
+  `/plugin enable yellow-composio` to re-fire the prompts.
 - `${user_config.*}` substitution in `mcpServers.url`/`headers` is not
-  supported by your Claude Code version (this is the first plugin in the
-  marketplace to use that pattern; see the Fallback below).
+  supported by your Claude Code version (this plugin is among the first
+  in the marketplace to use that pattern; see the Fallback below).
+- The MCP URL is reachable but the API key is invalid (401) — see
+  Step 3 connectivity probe.
 
 Report:
 
