@@ -97,7 +97,7 @@ The asymmetric shape — in-process Task subagent for Claude, subprocess CLIs fo
 
 **Auth:** Inherited from orchestrator's Claude Code session (`~/.claude.json` OAuth or API key). No separate auth required.
 
-**Quota debit:** Every reviewer turn counts against the orchestrator's Claude subscription window (5h limit for Pro, weekly for Max). On Pro (45 msg / 5h) at 2 messages/review (1 reviewer + 1 synthesis), a user gets ~22 reviews per window; with 2-pass synthesis (3 msgs/review), ~15 reviews per window. See Dimension 4 quota-state schema for the per-reviewer accounting.
+**Quota debit:** Every reviewer turn counts against the orchestrator's Claude subscription window (5h limit for Pro, weekly for Max). Each `/council review` debits **5–6 Claude messages**: 4 Task-subagent fan-out spawns (the in-process claude-reviewer plus the codex/gemini/opencode wrappers — every Bash-issuing wrapper still costs ≥1 orchestrator message) + 1–2 synthesis messages (1 for V1 single-pass, 2 for V2 two-pass order-swap). On Pro (45 msg / 5h) that gives ~7–9 reviews per window. See Dimension 4 quota-state schema for the per-reviewer accounting; see plan Task 2.2 for the corrected accounting derivation.
 
 **Isolation:** Separate conversation context (the subagent doesn't see orchestrator history), but same auth/billing/rate-limit bucket.
 
@@ -116,6 +116,7 @@ The asymmetric shape — in-process Task subagent for Claude, subprocess CLIs fo
 **Subscription auth:** ChatGPT Plus/Pro account login via `codex login` → routes through ChatGPT subscription quota instead of API billing. As of recent Codex CLI, this is the supported path for paid users who don't want to set up API keys.
 
 **Headless invocation (yellow-council uses):**
+
 ```bash
 codex exec --json \
   -a never \
@@ -144,6 +145,7 @@ codex exec --json \
 **Subscription auth:** Google OAuth login (free tier: 60 req/min, 1,000 req/day). Gemini Advanced subscription gives higher caps. Vertex AI is the enterprise path. yellow-council assumes the user has either free-tier OAuth or Gemini Advanced.
 
 **Headless invocation (yellow-council uses):**
+
 ```bash
 gemini -p "<pack>" --approval-mode plan --skip-trust -o text
 ```
@@ -177,6 +179,7 @@ gemini -p "<pack>" --approval-mode plan --skip-trust -o text
 The "fourth lineage" choice is a deployment-time configuration. yellow-council should accept it as `COUNCIL_OPENCODE_MODEL` env var (default: whatever the user has wired in OpenCode's own config). _(Note: this research draft originally proposed `COUNCIL_OPENCODE_PROVIDER`; the plan locked the name to `COUNCIL_OPENCODE_MODEL` because OpenCode handles provider routing via `opencode.json` rather than a CLI prefix.)_
 
 **Headless invocation (yellow-council currently uses):**
+
 ```bash
 opencode run --format json --variant high "<pack>"
 opencode session delete "<id>"   # cleanup
@@ -252,12 +255,12 @@ This dimension replaces the prior doc's "CLI-vs-API decision matrix." Direct API
 ### Quota-exhaustion failure model
 
 A `/council review` invocation costs roughly:
-- 1 Claude message (in-process reviewer) + 1 Claude message (synthesis) = 2 Claude debit per review
+- 5–6 Claude messages: 4 Task-subagent fan-out (in-process claude-reviewer + the codex/gemini/opencode wrappers, since every Bash-issuing wrapper still debits ≥1 orchestrator message) + 1 synthesis (V1 single-pass) or 2 synthesis (V2 two-pass order-swap)
 - 1 ChatGPT message (Codex reviewer)
 - 1 Gemini message (Gemini reviewer)
 - 1 provider message (OpenCode reviewer)
 
-For a Claude Pro user (45 msg / 5h), running `/council` costs 2 messages — the user can run ~22 reviews per 5-hour window before exhausting Claude quota. Adding multiple turns (e.g., V2 round-2) doubles this cost.
+For a Claude Pro user (45 msg / 5h), running `/council` costs 5–6 messages — the user gets ~7–9 reviews per 5-hour window before exhausting Claude quota. The pre-flight quota tracker (Task 3.1) MUST use `cap ÷ 5–6` for headroom math, not `cap ÷ 2`; using the wrong divisor inverts the warning threshold (fires when only ~2 reviews remain instead of ~7).
 
 **Critical implication:** quota exhaustion under subscription auth fails *fast* (single review hits cap → cap stays hit until window resets). This is materially different from API rate limits, which are recoverable with backoff.
 
