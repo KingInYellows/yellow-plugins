@@ -2,11 +2,11 @@
 
 **Date:** 2026-04-28 (decomposition split 2026-04-29; reconciled 2026-04-30; second sweep 2026-05-01)
 **Source plan:** `plans/everyinc-merge.md` (backbone — must merge to `main` before this plan runs)
-**Status:** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 shipped via PR #287; item #6 shipped via PR #296; item #12 shipped via PR #293; phase-0 snapshots + plan reconciliation shipped via PR #300. **Sweep 2026-04-30 evening:** items #1, #3, #11 shipped via PRs #306 (`cc3d1f9`), #307 (`39e5d7a`), #308 (`9826330`). **Sweep 2026-05-01 small-skill batch:** items #8, #9, #10 shipped via PRs #310 (`d7f36fa`), #312 (`a2486f1`), #311 (`9cb0f32`). **3 parallel branches remain** (items #2, #5, and #7).
+**Status:** **COMPLETE (2026-05-06).** Backbone merged (PRs #273–#275, #280–#283 + follow-ups #287/#288/#290/#294/#295). Item #4 shipped via PR #287; item #6 shipped via PR #296; item #12 shipped via PR #293; phase-0 snapshots + plan reconciliation shipped via PR #300. **Sweep 2026-04-30 evening:** items #1, #3, #11 shipped via PRs #306 (`cc3d1f9`), #307 (`39e5d7a`), #308 (`9826330`). **Sweep 2026-05-01 small-skill batch:** items #8, #9, #10 shipped via PRs #310 (`d7f36fa`), #312 (`a2486f1`), #311 (`9cb0f32`). **Final 3 items (2026-05-06):** items #2, #5, #7 rolled into `plans/everyinc-merge-remaining-work.md` and shipped via PRs #410 (`ef442045`), #403 (`f2be88cc`), #406 (`26026ce6`).
 
 ## Reconciliation 2026-05-01
 
-Nine of 12 stack items have shipped:
+All 12 stack items have shipped:
 
 - **Item #1 (`feat/ce-debug-skill`, W3.1) — DONE.** Shipped via PR #306 (squash-merged 2026-04-30 as `cc3d1f9` on `main`). Adds `plugins/yellow-core/skills/debugging/SKILL.md` (5-phase root-cause workflow with causal-chain gate).
 - **Item #3 (`feat/resolve-pr-cluster-and-actionability`, W3.3) — DONE.** Shipped via PR #307 (squash-merged 2026-04-30 as `39e5d7a` on `main`). Adds Step 3c (actionability filter) + Step 3d (file+region clustering with transitive merge) to `/yellow-review:resolve`; updates `pr-comment-resolver` agent input contract; adds `resolve_pr.cluster_line_distance` to local-config schema.
@@ -18,7 +18,7 @@ Nine of 12 stack items have shipped:
 - **Item #11 (`docs/yellow-codex-and-composio-research`, W3.7 + W3.8) — DONE.** Shipped via PR #308 (squash-merged 2026-04-30 as `9826330` on `main`). Adds `docs/research/yellow-codex-expansion.md` (YES on codex-reviewer learnings integration; YES Option-B on adversarial codex command) and `docs/research/yellow-composio-expansion.md` (NO-GO direct expansion; YES-GO opt-in W3.14 adapter). Research-only — implementation deferred.
 - **Item #12 (`feat/plugin-contract-reviewer`, W3.15) — DONE.** Shipped via PR #293 (squash-merged 2026-04-30 as `f3985d8` on `main`). Adds `plugins/yellow-review/agents/review/plugin-contract-reviewer.md` (~241 lines), wires the dispatch table in `review-pr.md` and `review-all.md`. Item #5 (`feat/agent-native-reviewers`) — when authored — should add its three new personas alongside the now-merged plugin-contract-reviewer in the dispatch table.
 
-**Effective parallel branch count for this wave:** **3 branches remain** — items #2 (`feat/yellow-docs-doc-review`), #5 (`feat/agent-native-reviewers`), and #7 (`feat/yellow-debt-confidence-calibration`).
+**Effective parallel branch count for this wave:** **0 branches remain** — all 12 items shipped (items #2, #5, #7 completed 2026-05-06 via PRs #410, #403, #406).
 
 **CE upstream SHA:** unchanged (`e5b397c9d1883354f03e338dd00f98be3da39f9f` / `compound-engineering-v3.3.2`). No new releases to incorporate.
 
@@ -44,10 +44,10 @@ Before starting the parallel stack:
 - [x] 0.2 Fetch upstream snapshots for Wave 3 tasks not already snapshotted in the backbone. **2026-04-30:** Done — 62 files fetched into `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/`. See `MANIFEST.md` for the full snapshot→task map. Shipped via PR #300 (merged 2026-04-30 as `7782dbf`).
 - [x] 0.3 Validate snapshot bodies are reasonable; flag any > 500 lines for extract-only treatment. **2026-04-30:** 6 newly-fetched files exceed 500 lines (`ce-compound-refresh/SKILL.md` 703, `ce-optimize/SKILL.md` 659, and 4 `ce-agent-native-architecture/references/` files at 506–871). All flagged in MANIFEST.md cap-policy table with extract-only treatment.
 - [x] 0.4 Run `pnpm validate:schemas && pnpm test:unit` baseline on `main` after backbone merges. **2026-04-30:** Green on fresh `origin/main` checkout — `All plugins passed validation` (64 agents, 240 markdown files); `Test Files 1 passed (1) / Tests 3 passed (3)`.
-- [ ] 0.5 Read the source plan's "Wave 3" section in full so the implementation context is loaded.
+- [x] 0.5 Read the source plan's "Wave 3" section in full so the implementation context is loaded.
 - [x] 0.6 ~~Watch PR #293 (item #12)~~ — **2026-04-30:** PR #293 merged as `f3985d8`. Item #5 (`feat/agent-native-reviewers`), when authored, must add its three new personas to the dispatch table that now also contains `plugin-contract-reviewer`.
 
-For full task content, see `plans/everyinc-merge.md` "Wave 3: P1 Adoptions (reviewed by Wave 2 pipeline)" section.
+For full task content, see `plans/complete/everyinc-merge.md` "Wave 3: P1 Adoptions (reviewed by Wave 2 pipeline)" section.
 
 ## Acceptance Criteria
 
@@ -58,7 +58,7 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 <!-- stack-topology: parallel -->
 <!-- stack-trunk: main -->
 
-**Original count:** 12 parallel branches from `main`. **As of 2026-05-01:** items #1, #3, #4, #6, #8, #9, #10, #11, #12 are DONE (PRs #306, #307, #287, #296, #310, #312, #311, #308, #293). Active runway is **3 branches** — items #2, #5, #7. Each remaining branch is independent (no cross-branch file overlap) and can be developed, reviewed, and merged in any order. Branch creation is just-in-time per `/workflows:work` Phase 1b parallel topology.
+**Original count:** 12 parallel branches from `main`. **As of 2026-05-01:** items #1, #3, #4, #6, #8, #9, #10, #11, #12 are DONE (PRs #306, #307, #287, #296, #310, #312, #311, #308, #293). Active runway is **0 branches** — all 12 items complete. Each branch was independent (no cross-branch file overlap). Branch creation was just-in-time per `/workflows:work` Phase 1b parallel topology.
 
 **Known merge-conflict pattern:** every Wave 3 PR that adds a new skill or agent under `plugins/yellow-core/` updates the agent or skill count in `plugins/yellow-core/CLAUDE.md` and the skill table in `plugins/yellow-core/README.md`. Parallel branches off main therefore conflict on those two files at merge time. The pattern is well-understood and quick to resolve: bump the count to the new total, alphabetize the row in the README skill table, drop both conflict markers. The 2026-05-01 small-skill sweep confirmed this is the only structural conflict — branches do not collide on actual skill or agent file content.
 
@@ -163,7 +163,7 @@ Per-component acceptance is enumerated inside each task in the source plan. The 
 
 ## Next Session Pickup
 
-When resuming with `/workflows:work plans/everyinc-merge-wave3.md`, the parser will detect `## Stack Decomposition` with `<!-- stack-topology: parallel -->` and the existing `## Stack Progress` block (3 unchecked items: #2, #5, #7). For each remaining item, Phase 1b creates a fresh branch from `main` (parallel topology — no stacking).
+When resuming with `/workflows:work plans/everyinc-merge-wave3.md`, the parser will detect `## Stack Decomposition` with `<!-- stack-topology: parallel -->` and the existing `## Stack Progress` block (0 unchecked items — all 12 complete). No remaining items; this plan is fully shipped.
 
 **Suggested order** by complexity:
 
@@ -182,12 +182,12 @@ Per-component reverts: each Wave 3 PR is independent; reverting one does not aff
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. feat/ce-debug-skill (completed 2026-04-30 via PR #306)
-- [ ] 2. feat/yellow-docs-doc-review
+- [x] 2. feat/yellow-docs-doc-review (completed 2026-05-06 via PR #410, squash commit `ef442045` — rolled into `plans/everyinc-merge-remaining-work.md` PR4)
 - [x] 3. feat/resolve-pr-cluster-and-actionability (completed 2026-04-30 via PR #307)
 - [x] 4. fix/git-worktree-and-local-config-expansion (completed 2026-04-30 via PR #287)
-- [ ] 5. feat/agent-native-reviewers
+- [x] 5. feat/agent-native-reviewers (completed 2026-05-06 via PR #403, squash commit `f2be88cc` — rolled into `plans/everyinc-merge-remaining-work.md` PR3)
 - [x] 6. feat/compound-lifecycle-skill (completed 2026-04-30 via PR #296)
-- [ ] 7. feat/yellow-debt-confidence-calibration
+- [x] 7. feat/yellow-debt-confidence-calibration (completed 2026-05-06 via PR #406, squash commit `26026ce6` — rolled into `plans/everyinc-merge-remaining-work.md` PR2; audit-only, scanners already v2.0-compliant)
 - [x] 8. feat/ideation-skill (completed 2026-05-01 via PR #310)
 - [x] 9. feat/cross-vendor-session-history (completed 2026-05-01 via PR #312)
 - [x] 10. feat/optimize-skill (completed 2026-05-01 via PR #311)

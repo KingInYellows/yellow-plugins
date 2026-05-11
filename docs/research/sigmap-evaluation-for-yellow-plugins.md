@@ -40,11 +40,11 @@ Skip sigmap as a yellow-plugins plugin integration for now. It solves a real pro
 
 ## What yellow-plugins already has for context management
 
-**yellow-ruvector (v1.1.2):** Persistent vector memory via ruvector. Hooks fire on every prompt submission, every edit, session start, and session end. `hooks_recall` injects relevant memories before Claude processes each prompt. `hooks_remember` records learnings after edits. Semantic code search via `hooks_recall` with `--semantic`. ~80+ MCP tools. Embedding model: all-MiniLM-L6-v2 via ONNX WASM. Storage: `.ruvector/intelligence/memory.rvdb` per-project.
+**yellow-ruvector (v1.1.3):** Persistent vector memory via ruvector. Hooks fire on every prompt submission, every edit, session start, and session end. `hooks_recall` injects relevant memories before Claude processes each prompt. `hooks_remember` records learnings after edits. Semantic code search via `hooks_recall` with `--semantic`. ~80+ MCP tools. Embedding model: all-MiniLM-L6-v2 via ONNX WASM. Storage: `.ruvector/intelligence/memory.rvdb` per-project.
 
-**yellow-mempalace (v1.1.1):** ChromaDB + SQLite temporal knowledge graph. ~29 MCP tools. Global palace at `~/.mempalace/`. Long-term verbatim recall, entity relationships, timelines.
+**yellow-mempalace (v1.1.2):** ChromaDB + SQLite temporal knowledge graph. ~29 MCP tools. Global palace at `~/.mempalace/`. Long-term verbatim recall, entity relationships, timelines.
 
-**yellow-research (v3.0.3):** Research fan-out to Ceramic, Perplexity, Tavily, EXA, Parallel Task. Complexity-routed. Saves to `docs/research/<slug>.md`.
+**yellow-research (v3.1.2):** Research fan-out to Ceramic, Perplexity, Tavily, EXA, Parallel Task. Complexity-routed. Saves to `docs/research/<slug>.md`.
 
 **yellow-core auto-memory:** File-based MEMORY.md index at `~/.claude/projects/<dir>/memory/`. Categories: user, feedback, project, reference. Currently at 305 lines, 44.8KB.
 

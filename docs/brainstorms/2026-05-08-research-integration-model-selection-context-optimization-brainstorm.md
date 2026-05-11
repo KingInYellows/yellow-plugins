@@ -22,11 +22,11 @@ which is roughly equal across phases.
 
 ## Why This Approach
 
-**The inheritance trap is real and measurable.** 71 of 79 agents (90%) use `model: inherit`.
+**The inheritance trap is real and measurable.** 66 of 79 agents (83.5%) use `model: inherit`.
 When a user runs `/review:pr` from an Opus session, all dispatched reviewers inherit Opus
 at ~5-8x the cost of an equivalent Sonnet invocation — for pattern-matching tasks that have
 no quality ceiling above Sonnet. The yellow-docs plugin already demonstrates the correct
-pattern (explicit haiku/sonnet tiering across 6 of 7 reviewers); the rest of the system
+pattern (explicit haiku/sonnet tiering across 4 of 7 reviewers); the rest of the system
 should converge to that pattern.
 
 **Code quality is preserved by:**
@@ -204,7 +204,7 @@ versioned form like `sonnet-4-5`, `opus-4-6`). Any other value is a hard error. 
 misspellings and invalid model IDs before they silently fall back to the session default.
 
 **Implementation:** Add `parseScalar(frontmatter, 'model')` → validate against known enum
-(allow prefix match for versioned IDs like `haiku-4-5`).
+(allow specific versioned IDs via regex such as `^(haiku|sonnet|opus)(-[0-9]+)*$` — accepts `haiku-4-5` and `sonnet-4-6` while rejecting `haiku-typo` or `sonnetly`).
 
 #### Rule V3: `model: inherit` warning for narrow-role agents (warning, not error)
 
