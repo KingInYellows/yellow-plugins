@@ -201,7 +201,7 @@ No MCP server entry needed — RTK integrates via the hook system, not MCP. A `y
 
 2. **It activates automatically on both target pains.** For cold-start (Pain D), RTK fires on every exploratory command from the first session, regardless of ruvector history. For targeted-fix (Pain B), RTK reduces the token cost of every file read Claude makes, even if Claude still reads too many files.
 
-3. **Zero interaction with ruvector.** Both register PreToolUse hooks (matcher `Edit|Write|MultiEdit|Bash`), but on different operations and different data — RTK rewrites command output; ruvector's PreToolUse outputs `{continue: true}` without command modification. The hooks operate orthogonally on disjoint payloads, so the no-collision conclusion holds operationally, not because of hook-type difference.
+3. **Zero interaction with ruvector.** Both register PreToolUse hooks (matcher `Edit|Write|MultiEdit|Bash`), but on different operations and different data — RTK rewrites the command field; ruvector's PreToolUse outputs `{continue: true}` without command modification. The hooks operate orthogonally on disjoint payloads, so the no-collision conclusion holds operationally, not because of hook-type difference.
 
 4. **Lower bus-factor than sigmap.** Three named contributors, Homebrew formula, Discord, external website — materially more organizational surface than a solo-maintainer npm package at 181 stars.
 

@@ -102,6 +102,6 @@ The tree-sitter compression mode and the instruction-file embedding feature are 
 - [linuxcommandlibrary.com/man/repomix](https://linuxcommandlibrary.com/man/repomix) — CLI flags reference (`--style`, `--compress`, `--top-files-len`)
 - [cyberchitta.cc — 36 Alternatives to LLM Context](https://www.cyberchitta.cc/articles/lc-alternatives.html) — competitive landscape (gitingest, code2prompt, files-to-prompt, yek, ai-digest)
 - [MCP Store listing for repomix](https://mcpstore.co/server/67f39fc1b66f446c3d8efaef) — MCP server tool names and integration notes
-- [scour.ing — Archbot AI code reviewer](https://scour.ing/@matmat/p/https:/alexandrecastro.tech/blog/building-archbot-ai-code-reviewer) — real-world use of repomix in 2-phase LLM review pipeline (selective file packing pattern)
+- [scour.ing — Archbot AI code reviewer](https://scour.ing/@matmat/p/https://alexandrecastro.tech/blog/building-archbot-ai-code-reviewer) — real-world use of repomix in 2-phase LLM review pipeline (selective file packing pattern)
 - Tavily — skipped (unavailable, API key not configured)
 - Perplexity — skipped (unavailable)

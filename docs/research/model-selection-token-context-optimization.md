@@ -7,7 +7,7 @@
 
 ## Summary
 
-The yellow-plugins system has 66 of 79 agents (83.5%) using `model: inherit`, zero agents using `effort:` frontmatter, and one plugin (yellow-docs) that has already demonstrated intentional model tiering with measurable design rationale. The inheritance trap is real: `/review:pr` dispatches 4 always-on personas plus up to 16 conditional personas plus an optional codex reviewer (worst-case fan-out ~21), and from an Opus session every one of them runs on Opus — multiplying token cost by the dispatched-reviewer count with no quality ceiling benefit for pattern-matching or structured-output tasks. The clearest wins are: (1) explicit model assignment for the 10+ narrow-role agents where Haiku or Sonnet is clearly sufficient, (2) `effort: low` adoption for all background scanning and CLI-wrapper agents, and (3) making `product-lens-reviewer`'s `model: inherit` consistent with its yellow-docs peers. Prompt caching is not directly actionable at the plugin-author level — it is a platform-managed concern — but skill preloading choices indirectly affect what gets cached.
+The yellow-plugins system has 66 of 79 agents (83.5%) using `model: inherit`, zero agents using `effort:` frontmatter (pre-rollout snapshot as of 2026-05-08, before Phase 1/2 migrations shipped), and one plugin (yellow-docs) that has already demonstrated intentional model tiering with measurable design rationale. The inheritance trap is real: `/review:pr` dispatches 4 always-on personas plus up to 16 conditional personas plus an optional codex reviewer (worst-case fan-out ~21), and from an Opus session every one of them runs on Opus — multiplying token cost by the dispatched-reviewer count with no quality ceiling benefit for pattern-matching or structured-output tasks. The clearest wins are: (1) explicit model assignment for the 10+ narrow-role agents where Haiku or Sonnet is clearly sufficient, (2) `effort: low` adoption for all background scanning and CLI-wrapper agents, and (3) making `product-lens-reviewer`'s `model: inherit` consistent with its yellow-docs peers. Prompt caching is not directly actionable at the plugin-author level — it is a platform-managed concern — but skill preloading choices indirectly affect what gets cached.
 
 ---
 
@@ -29,7 +29,7 @@ Based on Anthropic's published capability documentation and the community refere
 
 From the Claude Code CLI reference (v2.1.33+, confirmed Ceramic rank-2 result):
 
-```
+```yaml
 effort: low | medium | high | xhigh | max
 ```
 
@@ -252,21 +252,21 @@ Yes, with calibration:
 
 ### Phase 2 — Tested wins (implement after A/B validation)
 
-7. **All 5 yellow-debt scanners: add `model: sonnet` + `effort: low`**. Run A/B on labeled fixture first. If precision within 20% of inherit-from-Opus, merge. Estimated savings: 5-8x cost reduction on scanner tier per audit.
+1. **All 5 yellow-debt scanners: add `model: sonnet` + `effort: low`**. Run A/B on labeled fixture first. If precision within 20% of inherit-from-Opus, merge. Estimated savings: 5-8x cost reduction on scanner tier per audit.
 
-8. **`session-historian`: add `model: sonnet`** (`plugins/yellow-core/agents/workflow/session-historian.md`). Run comparison on 5 known session queries; accept if RRF ranking quality is maintained.
+2. **`session-historian`: add `model: sonnet`** (`plugins/yellow-core/agents/workflow/session-historian.md`). Run comparison on 5 known session queries; accept if RRF ranking quality is maintained.
 
-9. **`knowledge-compounder`: add `model: sonnet`** (`plugins/yellow-core/agents/workflow/knowledge-compounder.md`). Run comparison on 3 compounding sessions; accept if sub-agent dispatch and doc quality is maintained.
+3. **`knowledge-compounder`: add `model: sonnet`** (`plugins/yellow-core/agents/workflow/knowledge-compounder.md`). Run comparison on 3 compounding sessions; accept if sub-agent dispatch and doc quality is maintained.
 
-10. **`runner-assignment` body audit**: review whether 373-line body has compressible examples. If yes, compress before or alongside the model change in Phase 1.
+4. **`runner-assignment` body audit**: review whether 373-line body has compressible examples. If yes, compress before or alongside the model change in Phase 1.
 
 ### Phase 3 — Deeper changes (schema or multi-file coordination required)
 
-11. **yellow-review reviewer tier assignment**: systematically assign `model: sonnet` to all 12 pattern-matching reviewers, keeping `model: opus` only for `architecture-strategist`. This affects the most files (12+ agents) and has the highest quality risk surface (security recall). Requires the golden-set security test to pass first. **This is a Phase-3 change** — the /review:pr pipeline is the highest-value workflow in the system; a regression here has high user impact.
+1. **yellow-review reviewer tier assignment**: systematically assign `model: sonnet` to all 12 pattern-matching reviewers, keeping `model: opus` only for `architecture-strategist`. This affects the most files (12+ agents) and has the highest quality risk surface (security recall). Requires the golden-set security test to pass first. **This is a Phase-3 change** — the /review:pr pipeline is the highest-value workflow in the system; a regression here has high user impact.
 
-12. **Skill lazy-loading audit**: read the full body of the five largest agents (knowledge-compounder, session-historian, runner-assignment, opencode-reviewer, learnings-researcher) and catalog which skill sections are used only in specific branches vs. throughout. Convert branch-specific skill references to inline prose for those branches. This is a multi-file reading exercise before any changes.
+2. **Skill lazy-loading audit**: read the full body of the five largest agents (knowledge-compounder, session-historian, runner-assignment, opencode-reviewer, learnings-researcher) and catalog which skill sections are used only in specific branches vs. throughout. Convert branch-specific skill references to inline prose for those branches. This is a multi-file reading exercise before any changes.
 
-13. **`opencode-reviewer` body compression**: if the JSON event stream parsing instructions (OpenCode `--format json` output) exceed 30% of the 361-line body, extract to a `council-patterns` skill section shared with `gemini-reviewer`. This reduces both agents' system prompt size and benefits from skill preloading consolidation.
+3. **`opencode-reviewer` body compression**: if the JSON event stream parsing instructions (OpenCode `--format json` output) exceed 30% of the 361-line body, extract to a `council-patterns` skill section shared with `gemini-reviewer`. This reduces both agents' system prompt size and benefits from skill preloading consolidation.
 
 ---
 

@@ -244,7 +244,20 @@ No `mcpServers` block — RTK is not an MCP server. RTK's own PreToolUse hook (i
 
 **SessionStart hook behavior:**
 - Check `command -v rtk` — if missing, print warning to stderr: `[yellow-rtk] Warning: rtk binary not found. Run /rtk:setup to install.`
-- Check RTK version meets minimum: `rtk --version | grep -E '[0-9]+\.[0-9]+' || warn`
+- Check RTK version meets minimum `>= 0.38.0` using a real semver comparison — `grep -E '[0-9]+\.[0-9]+'` only confirms a version-shaped string exists and will silently pass `0.10.0`. Use `sort -V` (portable on macOS/Linux):
+  ```bash
+  RTK_VERSION=$(rtk --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  if [ -z "$RTK_VERSION" ]; then
+    printf '[yellow-rtk] Warning: rtk not found or version unreadable\n' >&2
+    json_exit
+  fi
+  MIN_VERSION="0.38.0"
+  LOWEST=$(printf '%s\n%s\n' "$MIN_VERSION" "$RTK_VERSION" | sort -V | head -1)
+  if [ "$LOWEST" != "$MIN_VERSION" ]; then
+    printf '[yellow-rtk] Warning: rtk %s is older than required %s\n' "$RTK_VERSION" "$MIN_VERSION" >&2
+    json_exit
+  fi
+  ```
 - Check that the PreToolUse hook is registered in `settings.json` — if not found, warn that `rtk init --hook-only` needs to be re-run
 - Output `{"continue": true}` on all paths including all error/warning paths (set -e must NOT be used in this hook — see project memory)
 - `json_exit()` helper pattern required: all early exits call `json_exit` not bare `exit 0`
