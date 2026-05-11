@@ -44,10 +44,10 @@ Before starting the parallel stack:
 - [x] 0.2 Fetch upstream snapshots for Wave 3 tasks not already snapshotted in the backbone. **2026-04-30:** Done — 62 files fetched into `RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/plugins/compound-engineering/`. See `MANIFEST.md` for the full snapshot→task map. Shipped via PR #300 (merged 2026-04-30 as `7782dbf`).
 - [x] 0.3 Validate snapshot bodies are reasonable; flag any > 500 lines for extract-only treatment. **2026-04-30:** 6 newly-fetched files exceed 500 lines (`ce-compound-refresh/SKILL.md` 703, `ce-optimize/SKILL.md` 659, and 4 `ce-agent-native-architecture/references/` files at 506–871). All flagged in MANIFEST.md cap-policy table with extract-only treatment.
 - [x] 0.4 Run `pnpm validate:schemas && pnpm test:unit` baseline on `main` after backbone merges. **2026-04-30:** Green on fresh `origin/main` checkout — `All plugins passed validation` (64 agents, 240 markdown files); `Test Files 1 passed (1) / Tests 3 passed (3)`.
-- [ ] 0.5 Read the source plan's "Wave 3" section in full so the implementation context is loaded.
+- [x] 0.5 Read the source plan's "Wave 3" section in full so the implementation context is loaded.
 - [x] 0.6 ~~Watch PR #293 (item #12)~~ — **2026-04-30:** PR #293 merged as `f3985d8`. Item #5 (`feat/agent-native-reviewers`), when authored, must add its three new personas to the dispatch table that now also contains `plugin-contract-reviewer`.
 
-For full task content, see `plans/everyinc-merge.md` "Wave 3: P1 Adoptions (reviewed by Wave 2 pipeline)" section.
+For full task content, see `plans/complete/everyinc-merge.md` "Wave 3: P1 Adoptions (reviewed by Wave 2 pipeline)" section.
 
 ## Acceptance Criteria
 

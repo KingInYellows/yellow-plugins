@@ -13,7 +13,7 @@ Repomix is a mature, actively-maintained CLI that serializes a repository into a
 
 ## What Repomix Is
 
-Repomix (`npx repomix` / `brew install repomix`, MIT license, ~20k GitHub stars, 2100+ commits, actively maintained as of early 2025) does one thing: it concatenates a repository's files into a single structured document optimized for LLM context windows. Key features:
+Repomix (`npx repomix` / `brew install repomix`, MIT license, ~20k GitHub stars, 2100+ commits, actively maintained as of May 2026) does one thing: it concatenates a repository's files into a single structured document optimized for LLM context windows. Key features:
 
 - **Output formats:** XML (recommended — Claude reportedly handles it best), Markdown, plain text. Each includes a directory tree header, per-file content blocks with clear delimiters, optional token counts.
 - **Token counting:** Reports token count per file and total, letting you judge whether output fits a model's context limit before sending.

@@ -37,7 +37,9 @@ effort: low | medium | high | xhigh | max
 
 - `effort: low` — minimal chain-of-thought, fastest response, appropriate for: single-pass scans, structured-output extraction, CLI wrappers, background monitors
 - `effort: medium` — default when not specified
-- `effort: high` / `max` — extended reasoning, appropriate for: final synthesizers, orchestrators making irreversible decisions, security review requiring adversarial thinking
+- `effort: high` — extended reasoning, appropriate for: final synthesizers, orchestrators making irreversible decisions, security review requiring adversarial thinking
+- `effort: xhigh` — extended-plus reasoning depth at the upper ceiling, appropriate for: open-ended adversarial scenario construction and high-stakes review where the rubric ceiling is not yet calibrated
+- `effort: max` — open-ended reasoning with no rubric ceiling, appropriate for: cross-system synthesis where the trade-offs are not fully enumerable up front
 
 The community pattern observed in GitHub search is: `model: haiku` + `effort: low` for narrow scanning agents; `model: sonnet` + `effort: low` for quality-gate pattern checkers; `model: opus` (or inherit) + `effort: high` reserved for synthesizers and orchestrators.
 
@@ -270,7 +272,7 @@ Yes, with calibration:
 
 ## Section 5: Sources
 
-- **Claude Code CLI Technical Reference** — blakecrosley.com/en/guides/claude-code — Confirmed effort controls (low/medium/high/max) introduced in v2.1.33; Claude Opus 4.6 model ID, 1M context, adaptive thinking, agent teams research preview; `model: inherit` behavior documented.
+- **Claude Code CLI Technical Reference** — blakecrosley.com/en/guides/claude-code — Confirmed effort controls (low/medium/high/xhigh/max) introduced in v2.1.33; Claude Opus 4.6 model ID, 1M context, adaptive thinking, agent teams research preview; `model: inherit` behavior documented.
 
 - **Anthropic AI Engineer Conference Recap** — zenml.io/llmops-tags/documentation — Memory tools + context editing delivering 39% benchmark improvement; Spotify's context engineering principles for agent reliability at scale.
 

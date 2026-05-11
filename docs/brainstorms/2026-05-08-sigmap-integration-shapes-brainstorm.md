@@ -1,6 +1,7 @@
 # Sigmap Integration Shapes — Brainstorm
 
 **Date:** 2026-05-08
+**Status:** Decisions resolved — Approach D (yellow-rtk plugin) is the recommended first step, ready for `/workflows:plan`. Approaches A/B/C (sigmap integration shapes) deferred pending 14-day RTK measurement.
 **Pain:** Context-length problems on large-codebase tasks — Claude opens too many files or prompt gets truncated. Observed in two specific scenarios: (B) targeted-fix tasks where Claude reads too many adjacent files, and (D) cold-start on unfamiliar codebases before ruvector has session history.
 **Stack context:** yellow-ruvector active with hooks running; ruvector handles "what did we learn before?" but not "make command output smaller right now."
 **Research inputs:** `docs/research/sigmap-evaluation-for-yellow-plugins.md`, `docs/research/rtk-vs-sigmap-context-management-comparison.md`
@@ -16,7 +17,7 @@ The two tools are orthogonal, not competing:
 - **RTK** compresses the OUTPUT of shell commands (git status, cat, ls, test runners) before it enters the context window. It fires automatically via a PreToolUse hook. It reduces token cost per command by 60-99%.
 - **sigmap** ranks and summarizes which SOURCE FILES are relevant to a given query. It requires explicit MCP tool invocation or a workflow command pre-pass. It reduces the wrong-file-loading problem, not the command-output-bloat problem.
 
-Neither tool overlaps with ruvector. **Both RTK and ruvector register PreToolUse hooks** (verified in `plugins/yellow-ruvector/.claude-plugin/plugin.json` — ruvector's matcher is `Edit|Write|MultiEdit|Bash`), but they perform different operations on different data: RTK rewrites command output to compress it; ruvector's PreToolUse outputs `{continue: true}` without modifying the command. The "no collision" conclusion holds operationally — different operations, different data — but it is **not** because of different hook types. sigmap and ruvector partially overlap on "file relevance ranking" but answer different questions (TF-IDF structural ranking vs. semantic embedding recall).
+Neither tool overlaps with ruvector. **Both RTK and ruvector register PreToolUse hooks** (verified in `plugins/yellow-ruvector/.claude-plugin/plugin.json` — ruvector's matcher is `Edit|Write|MultiEdit|Bash`), but they perform different operations on different data: RTK rewrites the command field to compress output; ruvector's PreToolUse outputs `{continue: true}` without modifying the command. The "no collision" conclusion holds operationally — different operations, different data — but it is **not** because of different hook types. sigmap and ruvector partially overlap on "file relevance ranking" but answer different questions (TF-IDF structural ranking vs. semantic embedding recall).
 
 ---
 
@@ -282,7 +283,7 @@ No `mcpServers` block — RTK is not an MCP server. RTK's own PreToolUse hook (i
 - Solves a problem the stack has zero current coverage for
 - Automatic on every session once hook is installed — zero workflow changes required
 - Measurable ROI via `rtk gain` in 7-14 days
-- Low interaction risk with ruvector — both register `PreToolUse` hooks, but on disjoint operations (RTK rewrites command output; ruvector's `PreToolUse` returns `{continue: true}` without modifying the command). Verified in `plugins/yellow-ruvector/.claude-plugin/plugin.json`. See `docs/research/rtk-vs-sigmap-context-management-comparison.md` §"Hook collision with ruvector".
+- Low interaction risk with ruvector — both register `PreToolUse` hooks, but on disjoint operations (RTK rewrites the command field; ruvector's `PreToolUse` returns `{continue: true}` without modifying the command). Verified in `plugins/yellow-ruvector/.claude-plugin/plugin.json`. See `docs/research/rtk-vs-sigmap-context-management-comparison.md` §"Integration Cost into yellow-plugins".
 - Single Rust binary, Homebrew install, no API keys, no accounts
 - 3+ contributors, lower bus-factor than sigmap
 

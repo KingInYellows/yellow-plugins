@@ -44,7 +44,7 @@ Skip sigmap as a yellow-plugins plugin integration for now. It solves a real pro
 
 **yellow-mempalace (v1.1.2):** ChromaDB + SQLite temporal knowledge graph. ~29 MCP tools. Global palace at `~/.mempalace/`. Long-term verbatim recall, entity relationships, timelines.
 
-**yellow-research (v3.1.1):** Research fan-out to Ceramic, Perplexity, Tavily, EXA, Parallel Task. Complexity-routed. Saves to `docs/research/<slug>.md`.
+**yellow-research (v3.1.2):** Research fan-out to Ceramic, Perplexity, Tavily, EXA, Parallel Task. Complexity-routed. Saves to `docs/research/<slug>.md`.
 
 **yellow-core auto-memory:** File-based MEMORY.md index at `~/.claude/projects/<dir>/memory/`. Categories: user, feedback, project, reference. Currently at 305 lines, 44.8KB.
 
