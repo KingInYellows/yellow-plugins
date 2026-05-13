@@ -7,18 +7,24 @@ hybrid MCP + REST API architecture.
 
 ## Required Credentials
 
-- **`semgrep_app_token`** (userConfig — **primary**, used by the MCP
-  server) and **`SEMGREP_APP_TOKEN`** (shell env — used by the curl-based
-  REST calls in `/semgrep:*` commands). Both hold the same token
-  (`sgp_` prefix, **Web API** scope, create at Semgrep Organization
+- **`semgrep_app_token`** (userConfig — **preferred**) **OR**
+  **`SEMGREP_APP_TOKEN`** (shell env — fallback). Both hold the same
+  token (`sgp_` prefix, **Web API** scope, create at Semgrep Organization
   Settings > API Tokens).
+
+  Resolution precedence (mirrors yellow-research/yellow-morph):
+  1. `userConfig.semgrep_app_token` — keychain-encrypted, preferred for
+     single-host installs.
+  2. Shell `SEMGREP_APP_TOKEN` — power-user / multi-host fleet fallback.
+
+  Resolution happens in `bin/start-semgrep.sh` (the MCP wrapper). Empty
+  userConfig values do NOT overwrite a working shell env value — this
+  was a regression in earlier versions that this wrapper closes.
 
   Claude Code prompts for `semgrep_app_token` at plugin-enable time and
   stores it in the system keychain (or `~/.claude/.credentials.json` at
-  0600 perms on minimal Linux). The userConfig value is substituted into
-  the MCP server's environment via `${user_config.semgrep_app_token}` in
-  `plugin.json` — so the MCP starts correctly in the same session,
-  without a Claude Code restart.
+  0600 perms on minimal Linux). The shell env fallback enables dotfile
+  / direnv / secrets-manager workflows (see `multi-host-fleet` skill).
 
   Commands that run curl directly (`/semgrep:status`, `/semgrep:fix`,
   etc.) still read the shell `SEMGREP_APP_TOKEN`. Keep both sources in
@@ -39,12 +45,14 @@ hybrid MCP + REST API architecture.
   - Provides: `semgrep_scan`, `semgrep_findings`, `get_abstract_syntax_tree`,
     `semgrep_scan_with_custom_rule`, `semgrep_rule_schema`,
     `get_supported_languages`, `semgrep_scan_supply_chain`
-  - Auth: `userConfig.semgrep_app_token` is the source of truth — Claude
-    Code injects it into the MCP process environment via
-    `${user_config.semgrep_app_token}` in `plugin.json`. The shell
-    `SEMGREP_APP_TOKEN` env var is **not** read by the MCP server (only
-    by the curl-based `/semgrep:*` REST commands). Run `/semgrep:setup`
-    to keep both sources in sync if you also use those commands.
+  - Auth: `userConfig.semgrep_app_token` is the preferred source —
+    Claude Code substitutes it into `SEMGREP_APP_TOKEN_USERCONFIG` and
+    the `bin/start-semgrep.sh` wrapper exports it as `SEMGREP_APP_TOKEN`
+    for the MCP process. If userConfig is empty, the wrapper falls back
+    to the shell `SEMGREP_APP_TOKEN` (passed through via the env block
+    in `plugin.json`). See "Required Credentials" above for the full
+    precedence rules. Run `/semgrep:setup` to keep both sources in sync
+    if you also use the curl-based `/semgrep:*` REST commands.
   - Note: MCP tools are read-only for triage state. Triage mutations use the
     REST API directly.
   - Migration: The standalone `semgrep-mcp` PyPI package was archived Oct 2025.
