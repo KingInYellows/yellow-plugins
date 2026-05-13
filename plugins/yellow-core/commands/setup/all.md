@@ -110,6 +110,8 @@ fi
 [ -n "${TAVILY_API_KEY:-}" ] && printf 'TAVILY_API_KEY:            set\n' || printf 'TAVILY_API_KEY:            NOT SET\n'
 [ -n "${PERPLEXITY_API_KEY:-}" ] && printf 'PERPLEXITY_API_KEY:        set\n' || printf 'PERPLEXITY_API_KEY:        NOT SET\n'
 [ -n "${CERAMIC_API_KEY:-}" ] && printf 'CERAMIC_API_KEY:           set\n' || printf 'CERAMIC_API_KEY:           NOT SET\n'
+[ -n "${COMPOSIO_MCP_URL:-}" ] && printf 'COMPOSIO_MCP_URL:          set\n' || printf 'COMPOSIO_MCP_URL:          NOT SET\n'
+[ -n "${COMPOSIO_API_KEY:-}" ] && printf 'COMPOSIO_API_KEY:          set\n' || printf 'COMPOSIO_API_KEY:          NOT SET\n'
 
 printf '\n=== Repository State ===\n'
 repo_top=$(git rev-parse --show-toplevel 2>/dev/null || true)
@@ -242,27 +244,34 @@ restarted.
 
 ### Step 1.6: Credential Status Files
 
-Credential-bearing plugins (yellow-research, yellow-composio, yellow-semgrep,
-yellow-morph) emit a `credential-status.json` from a SessionStart hook so
-the dashboard can classify them accurately without probing the system
-keychain. See `docs/plugin-credential-status-protocol.md`.
+Credential-bearing plugins (yellow-research, yellow-composio, yellow-semgrep)
+emit a `credential-status.json` from a SessionStart hook so the dashboard
+can classify them accurately without probing the system keychain. See
+`docs/plugin-credential-status-protocol.md`. yellow-morph will join the
+protocol in a follow-up; until then its classification block reads
+Step 1's env+userConfig probe directly.
 
 Run one Bash block to read each plugin's status file:
 
 ```bash
 printf '\n=== Credential Status Files ===\n'
 PLUGIN_DATA_DIR="$HOME/.claude/plugins/data"
-for plugin in yellow-research yellow-composio yellow-semgrep yellow-morph; do
+for plugin in yellow-research yellow-composio yellow-semgrep; do
   status_file="$PLUGIN_DATA_DIR/$plugin/credential-status.json"
   if [ -f "$status_file" ] && command -v jq >/dev/null 2>&1; then
-    present_count=$(jq '[.credentials[] | select(.present == true)] | length' "$status_file" 2>/dev/null)
-    total_count=$(jq '.credentials | length' "$status_file" 2>/dev/null)
-    user_config_count=$(jq '[.credentials[] | select(.source == "userConfig")] | length' "$status_file" 2>/dev/null)
-    shell_env_count=$(jq '[.credentials[] | select(.source == "shell_env")] | length' "$status_file" 2>/dev/null)
-    version=$(jq -r '.version // "unknown"' "$status_file" 2>/dev/null)
+    # Single jq invocation per plugin — extract all fields as TSV.
+    read -r present_count total_count user_config_count shell_env_count version <<EOF
+$(jq -r '[
+  ([.credentials[] | select(.present == true)] | length),
+  (.credentials | length),
+  ([.credentials[] | select(.source == "userConfig")] | length),
+  ([.credentials[] | select(.source == "shell_env")] | length),
+  (.version // "unknown")
+] | @tsv' "$status_file" 2>/dev/null)
+EOF
     printf '%-22s %s/%s present (uc:%s env:%s, v%s)\n' \
-      "$plugin:" "$present_count" "$total_count" \
-      "$user_config_count" "$shell_env_count" "$version"
+      "$plugin:" "${present_count:-0}" "${total_count:-0}" \
+      "${user_config_count:-0}" "${shell_env_count:-0}" "${version:-unknown}"
   elif [ -f "$status_file" ]; then
     printf '%-22s status file present but jq missing\n' "$plugin:"
   else
@@ -521,18 +530,26 @@ If NO web-app signals AND no config file: omit from dashboard.
 **yellow-composio:**
 
 The bundled MCP is now `command`-type stdio with a wrapper resolving
-userConfig OR shell env (v1.3.0+). Use the credential-status file for
-authoritative classification.
+userConfig OR shell env (v1.3.0+). Prefer the credential-status file for
+classification; when it is absent, fall back to the `COMPOSIO_MCP_URL` /
+`COMPOSIO_API_KEY` shell env vars (per Step 1.6's documented fallback rule)
+so a fresh install that has not yet written the status file is not
+mis-classified.
+
+Define `composio_creds_present` as: status file shows BOTH `composio_mcp_url`
+and `composio_api_key` `present == true`, OR (status file absent AND both
+`COMPOSIO_MCP_URL` and `COMPOSIO_API_KEY` are set in shell env).
 
 - READY: `jq` OK AND `node` OK AND Composio MCP tools visible via ToolSearch
-  AND status file shows BOTH `composio_mcp_url` and `composio_api_key`
-  present AND `.claude/composio-usage.json` exists
-- PARTIAL: status file shows credentials present but MCP tools not visible
-  yet (Claude Code restart needed) OR usage counter missing OR `node` missing
-- NEEDS SETUP: status file shows either credential as `source: absent`
-  (wrapper will exit non-zero and the bundled MCP won't start — no cascade
-  failure to other MCPs) OR status file is missing entirely (run
-  `/plugin disable yellow-composio && /plugin enable yellow-composio`)
+  AND `composio_creds_present` AND `.claude/composio-usage.json` exists
+- PARTIAL: `composio_creds_present` but MCP tools not visible yet (Claude
+  Code restart needed) OR usage counter missing OR `node` missing
+- NEEDS SETUP: status file shows either credential as `source: absent`, OR
+  status file missing AND at least one of `COMPOSIO_MCP_URL` /
+  `COMPOSIO_API_KEY` is unset. In either case the wrapper will exit
+  non-zero and the bundled MCP won't start — no cascade failure to other
+  MCPs. Remediation: run `/plugin disable yellow-composio && /plugin
+  enable yellow-composio` (or export both env vars for fleet installs).
 
 **yellow-codex:**
 
