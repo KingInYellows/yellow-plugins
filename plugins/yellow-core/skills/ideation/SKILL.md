@@ -1,6 +1,6 @@
 ---
 name: ideation
-description: "Generate 3 grounded approaches to a soft problem using the Toulmin warrant contract (evidence + linking principle + idea), filtered through MIDAS three-phase generation, then route the chosen approach into the brainstorm-orchestrator. Use when starting from a vague problem (\"better error handling\", \"reduce flaky tests\", \"improve onboarding\"), exploring solution space before committing to one direction, or when /workflows:brainstorm is too narrow because the problem statement is still soft. Triggers on phrases like \"give me ideas for X\", \"ideate on X\", \"what should I do about X\", or any request for solution-space exploration before requirements."
+description: "Generate 3 grounded approaches to a soft problem, then hand the chosen one off to `brainstorm-orchestrator`. Use when the problem statement is still vague or `/workflows:brainstorm` narrows too quickly."
 argument-hint: '[problem statement; append --strict-warrant or --no-strict-warrant to override domain default]'
 user-invokable: true
 ---

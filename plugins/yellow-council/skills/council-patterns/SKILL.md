@@ -1,6 +1,6 @@
 ---
 name: council-patterns
-description: "Canonical reference for yellow-council CLI invocation patterns, per-mode pack templates, redaction rules, slug derivation, atomic file write, timeout handling, and structured-output parsing. Use when authoring or modifying gemini-reviewer, opencode-reviewer, or the /council command."
+description: "Canonical reference for yellow-council CLI invocation, redaction, and output-parsing conventions. Use when authoring or modifying gemini-reviewer, opencode-reviewer, or the /council command."
 user-invokable: false
 ---
 
