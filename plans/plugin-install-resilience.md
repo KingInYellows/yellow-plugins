@@ -835,8 +835,8 @@ behind 1 in a Graphite stack; PRs 4–8 sequential.
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. agent/feat/credential-status-protocol (completed 2026-05-13, PR #510)
-- [ ] 2. agent/fix/yellow-semgrep-env-fallback
-- [ ] 3. agent/feat/yellow-composio-stdio-fallback
+- [x] 2. agent/fix/yellow-semgrep-env-fallback (completed 2026-05-13, PR #511)
+- [x] 3. agent/feat/yellow-composio-stdio-fallback (completed 2026-05-13)
 - [ ] 4. agent/feat/yellow-research-status-hook
 - [ ] 5. agent/feat/setup-all-status-classification
 - [ ] 6. agent/feat/validate-plugin-credential-warnings
