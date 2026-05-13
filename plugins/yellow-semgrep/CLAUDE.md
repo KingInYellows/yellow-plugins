@@ -7,18 +7,24 @@ hybrid MCP + REST API architecture.
 
 ## Required Credentials
 
-- **`semgrep_app_token`** (userConfig — **primary**, used by the MCP
-  server) and **`SEMGREP_APP_TOKEN`** (shell env — used by the curl-based
-  REST calls in `/semgrep:*` commands). Both hold the same token
-  (`sgp_` prefix, **Web API** scope, create at Semgrep Organization
+- **`semgrep_app_token`** (userConfig — **preferred**) **OR**
+  **`SEMGREP_APP_TOKEN`** (shell env — fallback). Both hold the same
+  token (`sgp_` prefix, **Web API** scope, create at Semgrep Organization
   Settings > API Tokens).
+
+  Resolution precedence (mirrors yellow-research/yellow-morph):
+  1. `userConfig.semgrep_app_token` — keychain-encrypted, preferred for
+     single-host installs.
+  2. Shell `SEMGREP_APP_TOKEN` — power-user / multi-host fleet fallback.
+
+  Resolution happens in `bin/start-semgrep.sh` (the MCP wrapper). Empty
+  userConfig values do NOT overwrite a working shell env value — this
+  was a regression in earlier versions that this wrapper closes.
 
   Claude Code prompts for `semgrep_app_token` at plugin-enable time and
   stores it in the system keychain (or `~/.claude/.credentials.json` at
-  0600 perms on minimal Linux). The userConfig value is substituted into
-  the MCP server's environment via `${user_config.semgrep_app_token}` in
-  `plugin.json` — so the MCP starts correctly in the same session,
-  without a Claude Code restart.
+  0600 perms on minimal Linux). The shell env fallback enables dotfile
+  / direnv / secrets-manager workflows (see `multi-host-fleet` skill).
 
   Commands that run curl directly (`/semgrep:status`, `/semgrep:fix`,
   etc.) still read the shell `SEMGREP_APP_TOKEN`. Keep both sources in
