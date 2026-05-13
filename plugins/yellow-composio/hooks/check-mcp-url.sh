@@ -29,13 +29,54 @@ json_exit() {
 }
 
 URL="${CLAUDE_PLUGIN_OPTION_COMPOSIO_MCP_URL:-}"
+API_KEY_OPT="${CLAUDE_PLUGIN_OPTION_COMPOSIO_API_KEY:-}"
 
-# Empty URL = user dismissed the prompt; bundled MCP will fail to start, no leak risk.
-if [ -z "$URL" ]; then
+# Emit credential-status.json (best-effort; never blocks SessionStart).
+emit_status() {
+  local helper="${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/credential-status.sh"
+  [ -f "$helper" ] || return 0
+  # shellcheck source=/dev/null
+  . "$helper" 2>/dev/null || return 0
+
+  local version="unknown"
+  if command -v jq >/dev/null 2>&1 && [ -f "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" ]; then
+    version=$(jq -r '.version // "unknown"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null || printf 'unknown')
+  fi
+
+  # URL: userConfig wins, shell env fallback.
+  local url_source="absent" url_present="false"
+  if [ -n "$URL" ]; then
+    url_source="userConfig"; url_present="true"
+  elif [ -n "${COMPOSIO_MCP_URL:-}" ]; then
+    url_source="shell_env"; url_present="true"
+  fi
+
+  # API key: userConfig wins, shell env fallback.
+  local key_source="absent" key_present="false"
+  if [ -n "$API_KEY_OPT" ]; then
+    key_source="userConfig"; key_present="true"
+  elif [ -n "${COMPOSIO_API_KEY:-}" ]; then
+    key_source="shell_env"; key_present="true"
+  fi
+
+  local url_field key_field
+  url_field=$(credential_status_field "composio_mcp_url" "$url_source" "$url_present" "null")
+  key_field=$(credential_status_field "composio_api_key" "$key_source" "$key_present" "null")
+  write_credential_status "yellow-composio" "$version" "[$url_field,$key_field]" 2>/dev/null || true
+}
+
+emit_status
+
+# Empty URL = no source provided; wrapper will exit non-zero and the bundled MCP
+# will not start. Nothing to warn about — no API key is on the wire.
+if [ -z "$URL" ] && [ -z "${COMPOSIO_MCP_URL:-}" ]; then
   json_exit ""
 fi
 
-case "$URL" in
+# Use the resolved value (userConfig preferred, then shell env) for HTTPS check.
+EFFECTIVE_URL="${URL:-${COMPOSIO_MCP_URL:-}}"
+
+case "$EFFECTIVE_URL" in
   https://*)
     json_exit ""
     ;;

@@ -2,6 +2,34 @@
 
 Optional Composio accelerator for batch workflows with local usage tracking.
 
+## Upgrading from v1.2.x to v1.3.0
+
+v1.3.0 converts the bundled Composio MCP from `type: http` to a `command`-type
+stdio wrapper. This is a transport-level change; tool names and behavior are
+identical. Existing keychain-stored credentials are preserved.
+
+**After Claude Code picks up the new plugin manifest, run:**
+
+```text
+/plugin disable yellow-composio
+/plugin enable yellow-composio
+```
+
+The disable/enable cycle re-registers the MCP server with its new
+`command`-type configuration. If you skip this step, the previous `type: http`
+registration may linger until your next session restart.
+
+**New: shell env fallback for multi-host fleets.** v1.3.0 honors
+`COMPOSIO_MCP_URL` and `COMPOSIO_API_KEY` shell env vars when the userConfig
+fields are empty. Set them in your shell rc / direnv / secrets manager and
+the wrapper picks them up automatically — no per-host userConfig prompts
+needed. See `/multi-host-fleet` (in yellow-core) for the full fleet pattern.
+
+**Empty URL no longer cascades.** Previously, a blank `composio_mcp_url`
+broke `claude doctor` for all other MCPs (`SDK auth failed: "/" cannot be
+parsed as a URL`). The v1.3.0 wrapper now exits non-zero on empty values,
+so only Composio fails to start — other MCPs are unaffected.
+
 ## Installation
 
 ```bash
