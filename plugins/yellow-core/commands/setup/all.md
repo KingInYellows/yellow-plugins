@@ -178,6 +178,75 @@ printf '\n=== Optional Working Paths ===\n'
 [ -n "$repo_top" ] && [ -d "$repo_top/docs/audits" ] && printf 'docs/audits/:                       exists\n' || printf 'docs/audits/:                       missing\n'
 [ -n "$repo_top" ] && [ -d "$repo_top/todos/debt" ] && printf 'todos/debt/:                        exists\n' || printf 'todos/debt/:                        missing\n'
 
+printf '\n=== Web App Signals (yellow-browser-test) ===\n'
+# Probe for web-app signals so the classifier can decide whether to OMIT
+# yellow-browser-test on non-web repos. Any single match flips
+# web_signal_count > 0; the classifier uses the count, not individual flags.
+web_signal_count=0
+if [ -n "$repo_top" ] && [ -f "$repo_top/package.json" ] && \
+   grep -qE '"(next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs)"' "$repo_top/package.json" 2>/dev/null; then
+  printf 'web_signal_node:               present\n'
+  web_signal_count=$((web_signal_count + 1))
+else
+  printf 'web_signal_node:               absent\n'
+fi
+if [ -n "$repo_top" ] && [ -f "$repo_top/Gemfile" ] && \
+   grep -qE "^[[:space:]]*gem[[:space:]]+['\"]rails['\"]" "$repo_top/Gemfile" 2>/dev/null; then
+  printf 'web_signal_rails:              present\n'
+  web_signal_count=$((web_signal_count + 1))
+else
+  printf 'web_signal_rails:              absent\n'
+fi
+python_web_present=0
+for f in "$repo_top/requirements.txt" "$repo_top/pyproject.toml"; do
+  if [ -n "$repo_top" ] && [ -f "$f" ] && \
+     grep -qiE "(django|flask|fastapi|starlette|sanic)" "$f" 2>/dev/null; then
+    python_web_present=1
+    break
+  fi
+done
+if [ "$python_web_present" -eq 1 ]; then
+  printf 'web_signal_python:             present\n'
+  web_signal_count=$((web_signal_count + 1))
+else
+  printf 'web_signal_python:             absent\n'
+fi
+if [ -n "$repo_top" ] && [ -f "$repo_top/go.mod" ] && \
+   grep -qE "(gin-gonic|labstack/echo|gofiber/fiber|go-chi/chi|gorilla/mux)" "$repo_top/go.mod" 2>/dev/null; then
+  printf 'web_signal_go:                 present\n'
+  web_signal_count=$((web_signal_count + 1))
+else
+  printf 'web_signal_go:                 absent\n'
+fi
+if [ -n "$repo_top" ] && [ -f "$repo_top/Cargo.toml" ] && \
+   grep -qE "^(axum|actix-web|rocket|warp)[[:space:]]*=" "$repo_top/Cargo.toml" 2>/dev/null; then
+  printf 'web_signal_rust:               present\n'
+  web_signal_count=$((web_signal_count + 1))
+else
+  printf 'web_signal_rust:               absent\n'
+fi
+paas_match=""
+for f in fly.toml render.yaml vercel.json netlify.toml; do
+  if [ -n "$repo_top" ] && [ -f "$repo_top/$f" ]; then
+    paas_match="$f"
+    break
+  fi
+done
+if [ -n "$paas_match" ]; then
+  printf 'web_signal_paas:               present (%s)\n' "$paas_match"
+  web_signal_count=$((web_signal_count + 1))
+else
+  printf 'web_signal_paas:               absent\n'
+fi
+if [ -n "$repo_top" ] && [ -f "$repo_top/docker-compose.yml" ] && \
+   grep -qE '^[[:space:]]*-[[:space:]]*"?[0-9]+:(80|443|3000|3001|4000|5000|5173|8000|8080|8888)"?' "$repo_top/docker-compose.yml" 2>/dev/null; then
+  printf 'web_signal_docker_http:        present\n'
+  web_signal_count=$((web_signal_count + 1))
+else
+  printf 'web_signal_docker_http:        absent\n'
+fi
+printf 'web_signal_count:              %s\n' "$web_signal_count"
+
 printf '\n=== Installed Plugins ===\n'
 plugin_cache="$HOME/.claude/plugins/cache"
 if [ -d "$plugin_cache" ]; then
@@ -324,24 +393,41 @@ else
   fi
 
   if [ -f "$DRIFT_CACHE" ] && command -v jq >/dev/null 2>&1; then
-    # Diff installed vs available — surface OUTDATED only. Schema observed:
+    # Emit (id, installed, available) triples for every plugin present in both
+    # arrays. Schema observed:
     # {"installed":[{"id":"<plugin>@<marketplace>","version":"X.Y.Z","scope":"user|project|local"}],
     #  "available":[...]}. The `available` array shape is not fully documented;
     # parse defensively and skip plugins that lack an available record.
-    outdated_count=$(jq -r '
-      [.installed[] as $i
-        | (.available // [])[]
-        | select(.id == $i.id and .version != $i.version)
-        | "\($i.id): installed=\($i.version) available=\(.version)"]
-      | length' "$DRIFT_CACHE" 2>/dev/null || printf 0)
-    if [ "${outdated_count:-0}" -gt 0 ]; then
+    drift_pairs=$(jq -r '
+      .installed[] as $i
+      | (.available // [])[]
+      | select(.id == $i.id)
+      | "\($i.id)\t\($i.version)\t\(.version)"
+    ' "$DRIFT_CACHE" 2>/dev/null)
+
+    # Use sort -V (semver-aware version sort) to flag OUTDATED only when the
+    # installed version sorts strictly before the available one. Plain
+    # inequality would also flag installed-newer-than-available (local
+    # prereleases, ahead-of-marketplace builds) as outdated, which produces
+    # confusing downgrade guidance.
+    outdated_count=0
+    outdated_report=""
+    while IFS=$(printf '\t') read -r pkg_id installed_ver available_ver; do
+      [ -z "$pkg_id" ] && continue
+      [ "$installed_ver" = "$available_ver" ] && continue
+      sorted_first=$(printf '%s\n%s\n' "$installed_ver" "$available_ver" \
+        | LC_ALL=C sort -V 2>/dev/null | head -n1)
+      if [ "$sorted_first" = "$installed_ver" ]; then
+        outdated_count=$((outdated_count + 1))
+        outdated_report="${outdated_report}  OUTDATED: ${pkg_id} installed=${installed_ver} → available=${available_ver}
+"
+      fi
+    done <<EOF
+$drift_pairs
+EOF
+    if [ "$outdated_count" -gt 0 ]; then
       printf 'version_drift: %s outdated\n' "$outdated_count"
-      jq -r '
-        .installed[] as $i
-        | (.available // [])[]
-        | select(.id == $i.id and .version != $i.version)
-        | "  OUTDATED: \($i.id) installed=\($i.version) → available=\(.version)"' \
-        "$DRIFT_CACHE" 2>/dev/null
+      printf '%s' "$outdated_report"
     else
       printf 'version_drift: all current\n'
     fi
@@ -493,34 +579,29 @@ yellow-research` to re-trigger the userConfig prompts."
 
 **yellow-browser-test:**
 
-Run a project-type heuristic before classifying. If the current repository
-shows NO web-app signals AND `.claude/yellow-browser-test.local.md` is
+Run a project-type heuristic before classifying. Read `web_signal_count`
+from Step 1's "Web App Signals" section (the bash dashboard probes
+`package.json` for framework deps, `Gemfile` for Rails, `requirements.txt`/
+`pyproject.toml` for Django/Flask/FastAPI, `go.mod` for Gin/Echo/Fiber/Chi/
+Gorilla, `Cargo.toml` for Axum/Actix/Rocket/Warp, PaaS configs
+`fly.toml`/`render.yaml`/`vercel.json`/`netlify.toml`, and
+`docker-compose.yml` for HTTP port mappings).
+
+If `web_signal_count` is `0` AND `.claude/yellow-browser-test.local.md` is
 absent, OMIT this plugin from the dashboard entirely — a non-web-app repo
 (dotfiles, CLI tool, library) has nothing for browser-test to target.
 
-Positive web-app signals (any one is sufficient):
-
-- `package.json` containing any of:
-  `next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs`
-- `vercel.json`, `netlify.toml`, `fly.toml`, `render.yaml` present at repo root
-- `Gemfile` contains `rails`
-- `requirements.txt` or `pyproject.toml` contains
-  `django|flask|fastapi|starlette|sanic`
-- `go.mod` contains `gin-gonic|echo|fiber|chi|gorilla/mux`
-- `Cargo.toml` contains `axum|actix-web|rocket|warp`
-- `docker-compose.yml` has any service with HTTP port mapping
-
-Classification when web-app signals ARE present:
+Classification when `web_signal_count >= 1` OR config file present:
 
 - READY: `.claude/yellow-browser-test.local.md` exists AND `node18_check` ok
   AND `npm` OK AND `agent-browser` OK
-- RECOMMENDED: web app detected but `.claude/yellow-browser-test.local.md`
+- RECOMMENDED: `web_signal_count >= 1` but `.claude/yellow-browser-test.local.md`
   is missing — emit "Web app detected; run `/browser-test:setup` to enable
   testing." This is informational, not a NEEDS SETUP error.
 - NEEDS SETUP: config file exists but tooling missing (`node18_check`/`npm`/
   `agent-browser`)
 
-If NO web-app signals AND no config file: omit from dashboard.
+If `web_signal_count` is `0` AND no config file: omit from dashboard.
 
 **yellow-docs:**
 
