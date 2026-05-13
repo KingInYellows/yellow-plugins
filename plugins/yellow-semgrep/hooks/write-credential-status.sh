@@ -11,11 +11,11 @@ json_exit() {
   exit 0
 }
 
-# Source the shared helper from yellow-core. yellow-core/lib/ is the
-# canonical location for this helper; we resolve it relative to
-# CLAUDE_PLUGIN_ROOT (which points at the yellow-semgrep dir) by going
-# up one level and into yellow-core/lib.
-HELPER="${CLAUDE_PLUGIN_ROOT:-${HOME}/.claude/plugins/cache/yellow-plugins/yellow-semgrep}/../yellow-core/lib/credential-status.sh"
+# Resolve the plugin root with a fallback so the rest of the script can
+# reference it safely under `set -u`. CLAUDE_PLUGIN_ROOT points at the
+# yellow-semgrep dir; the shared helper lives one level up in yellow-core/lib.
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${HOME}/.claude/plugins/cache/yellow-plugins/yellow-semgrep}"
+HELPER="${PLUGIN_ROOT}/../yellow-core/lib/credential-status.sh"
 
 if [ ! -f "$HELPER" ]; then
   # yellow-core not installed alongside yellow-semgrep — skip silently.
@@ -27,8 +27,8 @@ fi
 
 # Read plugin version from plugin.json (manifest is the source of truth).
 VERSION="unknown"
-if command -v jq >/dev/null 2>&1 && [ -f "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" ]; then
-  VERSION=$(jq -r '.version // "unknown"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null || printf 'unknown')
+if command -v jq >/dev/null 2>&1 && [ -f "${PLUGIN_ROOT}/.claude-plugin/plugin.json" ]; then
+  VERSION=$(jq -r '.version // "unknown"' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null || printf 'unknown')
 fi
 
 # Classify SEMGREP_APP_TOKEN: userConfig wins, shell env is fallback.

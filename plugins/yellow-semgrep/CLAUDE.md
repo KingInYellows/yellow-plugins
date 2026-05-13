@@ -45,12 +45,14 @@ hybrid MCP + REST API architecture.
   - Provides: `semgrep_scan`, `semgrep_findings`, `get_abstract_syntax_tree`,
     `semgrep_scan_with_custom_rule`, `semgrep_rule_schema`,
     `get_supported_languages`, `semgrep_scan_supply_chain`
-  - Auth: `userConfig.semgrep_app_token` is the source of truth — Claude
-    Code injects it into the MCP process environment via
-    `${user_config.semgrep_app_token}` in `plugin.json`. The shell
-    `SEMGREP_APP_TOKEN` env var is **not** read by the MCP server (only
-    by the curl-based `/semgrep:*` REST commands). Run `/semgrep:setup`
-    to keep both sources in sync if you also use those commands.
+  - Auth: `userConfig.semgrep_app_token` is the preferred source —
+    Claude Code substitutes it into `SEMGREP_APP_TOKEN_USERCONFIG` and
+    the `bin/start-semgrep.sh` wrapper exports it as `SEMGREP_APP_TOKEN`
+    for the MCP process. If userConfig is empty, the wrapper falls back
+    to the shell `SEMGREP_APP_TOKEN` (passed through via the env block
+    in `plugin.json`). See "Required Credentials" above for the full
+    precedence rules. Run `/semgrep:setup` to keep both sources in sync
+    if you also use the curl-based `/semgrep:*` REST commands.
   - Note: MCP tools are read-only for triage state. Triage mutations use the
     REST API directly.
   - Migration: The standalone `semgrep-mcp` PyPI package was archived Oct 2025.
