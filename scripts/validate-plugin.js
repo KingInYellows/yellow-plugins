@@ -1017,9 +1017,14 @@ function validatePlugin(pluginDir) {
 
       for (const [envKey, envValue] of Object.entries(env)) {
         if (typeof envValue !== 'string') continue;
-        // Match `${user_config.<field>}` interpolations.
+        // Match `${user_config.<field>` interpolations. The lookahead allows
+        // either a plain close (`${user_config.X}`) or a default clause
+        // (`${user_config.X:-...}`) — both shapes still write the user_config
+        // value to the env var when set, and both can clobber shell env when
+        // unset (the bare and empty-default forms write empty; only an
+        // inline self-passthrough default rescues shell env).
         const userConfigMatch = envValue.match(
-          /\$\{user_config\.([a-zA-Z_][a-zA-Z0-9_]*)\}/
+          /\$\{user_config\.([a-zA-Z_][a-zA-Z0-9_]*)(?=[}:])/
         );
         if (!userConfigMatch) continue;
 
@@ -1042,7 +1047,7 @@ function validatePlugin(pluginDir) {
 
         if (!hasFallbackPattern) {
           logWarning(
-            `${manifest.name}: mcpServers.${serverName}.env.${envKey} interpolates ${userConfigMatch[0]} directly. Consider the 3-element wrapper pattern (${envKey}_USERCONFIG + ${envKey} with \${${envKey}:-} fallback) so power users on multi-host fleets can use shell env. See plugins/yellow-research/bin/start-*.sh for the canonical pattern.`
+            `${manifest.name}: mcpServers.${serverName}.env.${envKey} interpolates \${user_config.${userConfigMatch[1]}} directly without a \${${envKey}:-} self-passthrough. Consider the 3-element wrapper pattern (${envKey}_USERCONFIG + ${envKey} with \${${envKey}:-} fallback) so power users on multi-host fleets can use shell env. See plugins/yellow-research/bin/start-*.sh for the canonical pattern.`
           );
         }
       }
