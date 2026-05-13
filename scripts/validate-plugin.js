@@ -1003,6 +1003,57 @@ function validatePlugin(pluginDir) {
     }
   }
 
+  // RULE 12: credential-bearing MCP servers should use the 3-element fallback
+  // pattern. If a mcpServers entry's env block contains `${user_config.X}`
+  // directly (without a `${X:-}` shell-env-passthrough companion), the plugin
+  // overwrites any pre-existing shell env value with an empty string when the
+  // user dismisses the userConfig prompt. Warn so plugin authors adopt the
+  // wrapper pattern (yellow-research/yellow-morph precedent).
+  if (manifest.mcpServers && typeof manifest.mcpServers === 'object') {
+    for (const [serverName, server] of Object.entries(manifest.mcpServers)) {
+      if (!server || typeof server !== 'object') continue;
+      const env = server.env;
+      if (!env || typeof env !== 'object') continue;
+
+      for (const [envKey, envValue] of Object.entries(env)) {
+        if (typeof envValue !== 'string') continue;
+        // Match `${user_config.<field>` interpolations. The lookahead allows
+        // either a plain close (`${user_config.X}`) or a default clause
+        // (`${user_config.X:-...}`) — both shapes still write the user_config
+        // value to the env var when set, and both can clobber shell env when
+        // unset (the bare and empty-default forms write empty; only an
+        // inline self-passthrough default rescues shell env).
+        const userConfigMatch = envValue.match(
+          /\$\{user_config\.([a-zA-Z_][a-zA-Z0-9_]*)(?=[}:])/
+        );
+        if (!userConfigMatch) continue;
+
+        // Skip if the env key has the conventional `_USERCONFIG` suffix —
+        // this indicates the plugin IS using the wrapper pattern (the bare
+        // env var name will hold the resolved value).
+        if (envKey.endsWith('_USERCONFIG')) continue;
+
+        // The canonical wrapper pattern moves `${user_config.X}` to a
+        // `<KEY>_USERCONFIG` sibling and sets the bare `<KEY>` to
+        // `${<KEY>:-}`. The bare key matching `${user_config.X}` here means
+        // that move did not happen. The only valid non-broken shape is an
+        // inline fallback that self-references this env var, e.g.
+        // `${user_config.X:-${<envKey>:-}}`. Anything else (including a
+        // `<KEY>_USERCONFIG` sibling that exists but coexists with a broken
+        // bare KEY, or an unrelated `:-` default elsewhere) is the broken
+        // case the rule is meant to catch.
+        const selfFallback = '${' + envKey + ':-';
+        const hasFallbackPattern = envValue.includes(selfFallback);
+
+        if (!hasFallbackPattern) {
+          logWarning(
+            `${manifest.name}: mcpServers.${serverName}.env.${envKey} interpolates \${user_config.${userConfigMatch[1]}} directly without a \${${envKey}:-} self-passthrough. Consider the 3-element wrapper pattern (${envKey}_USERCONFIG + ${envKey} with \${${envKey}:-} fallback) so power users on multi-host fleets can use shell env. See plugins/yellow-research/bin/start-*.sh for the canonical pattern.`
+          );
+        }
+      }
+    }
+  }
+
   // Summary
   if (errors.length === 0) {
     logSuccess(`Plugin "${manifest.name}" is valid`);
