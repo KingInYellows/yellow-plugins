@@ -60,14 +60,35 @@ server or any project commands — you only read files.
 Read `package.json` scripts field. Look for keys: `dev`, `start`, `serve`,
 `preview`.
 
-If no `package.json`, check:
+Always also check the following non-Node signals — not only when
+`package.json` is absent. Polyglot projects commonly carry a `package.json`
+for asset tooling (Tailwind, esbuild, Vite) on top of a Rails/Django/Go/Rust
+backend; running these checks unconditionally lets the agent surface the
+backend dev command alongside any frontend script:
 
 - `Makefile` — targets like `dev`, `serve`, `run`
 - `docker-compose.yml` — service definitions
 - `Procfile` — web process
+- `Gemfile` — `rails` gem implies `rails server` (default :3000)
+- `requirements.txt` / `pyproject.toml` — `django`/`flask`/`fastapi`/`starlette`/`sanic`
+  imply the framework's standard dev command (`python manage.py runserver`,
+  `flask run`, `uvicorn app:app --reload`)
+- `go.mod` — `gin-gonic`/`echo`/`fiber`/`chi`/`gorilla/mux` imply `go run`
+  with the main package
+- `Cargo.toml` — `axum`/`actix-web`/`rocket`/`warp` imply `cargo run`
+- `fly.toml`, `render.yaml`, `vercel.json`, `netlify.toml` — strong web-app
+  signals; report as "deployable web app" even when local dev command is
+  not detectable
 
 If multiple commands found, return all of them — the calling command will use
-AskUserQuestion to let the user choose.
+AskUserQuestion to let the user choose. When `package.json` is present but
+yields no usable dev script (no `dev`/`start`/`serve`/`preview`) and one of
+the non-Node signals matches, surface the non-Node command rather than
+falling through to "no web app detected".
+
+If NONE of the above signals are present, return "no web app detected" — the
+project may be a CLI tool, library, or dotfiles repo where browser-test
+does not apply.
 
 ### Step 2: Determine Base URL and Port
 
