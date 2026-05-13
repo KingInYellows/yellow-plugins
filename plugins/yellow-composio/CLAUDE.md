@@ -4,25 +4,33 @@ Optional Composio accelerator for batch workflows with local usage tracking.
 
 ## How It Works
 
-This plugin bundles a `type: http` Composio MCP server, declared in
-`plugin.json` and configured via two `userConfig` prompts on enable: the
-per-customer MCP URL and the Composio API key. Both are `required: true`
-— on a fresh enable, Claude Code refuses to enable the plugin if either
-is left blank, because the bundled MCP would otherwise register with an
-empty URL and break `claude doctor` for every other MCP server
-(`SDK auth failed: "/" cannot be parsed as a URL`). The API key is
-stored in the system keychain (`sensitive: true`); the MCP URL is
-stored as plain (non-sensitive) `userConfig`. Bundled tools appear
-under the `mcp__plugin_yellow-composio_composio-server__*` prefix.
+This plugin bundles a Composio MCP server via a small `command`-type stdio
+wrapper (`bin/start-composio.sh` + `bin/composio-proxy.mjs`) that resolves
+credentials and proxies stdio MCP JSON-RPC to Composio's HTTPS endpoint.
 
-`required: true` gates *new* enables only — it does not retroactively
-remediate plugins that were already enabled before v1.2.4 with empty
-or absent values, so a legacy install can still hold a blank
-`composio_mcp_url` until the user disables and re-enables. The
-SessionStart hook (`hooks/check-mcp-url.sh`) accepts the empty-URL
-case and exits silently because, in that legacy state, the bundled
-MCP simply fails to start and there is no API key on the wire to
-warn about.
+**Why stdio + proxy instead of `type: http`?** Claude Code's `${VAR}`
+substitution in HTTP MCP `headers` fields is a confirmed bug
+([anthropics/claude-code#51581](https://github.com/anthropics/claude-code/issues/51581)).
+The wrapper sidesteps this — it runs in a normal shell subprocess where
+both `userConfig` and shell env are visible. Composio's official
+recommendation is `claude mcp add --transport http`, but that path
+cannot honor `COMPOSIO_MCP_URL` / `COMPOSIO_API_KEY` shell env vars,
+which blocks dotfile-managed multi-host fleets.
+
+**Credential resolution precedence** (in `bin/start-composio.sh`):
+1. `userConfig.composio_mcp_url` / `composio_api_key` (keychain — preferred)
+2. Shell env `COMPOSIO_MCP_URL` / `COMPOSIO_API_KEY` (fleet fallback)
+3. Unset → wrapper exits **non-zero**, preventing the bundled MCP from
+   registering with an empty URL (which would cascade-fail `claude doctor`
+   for all other MCPs in the session).
+
+`required: true` was removed from the userConfig fields. Per
+[#39827](https://github.com/anthropics/claude-code/issues/39827) it does
+NOT block install — it merely produces a confusing MCP-startup error. The
+wrapper's hard exit on empty values is the actual safeguard. The
+SessionStart hook (`hooks/check-mcp-url.sh`) also writes a
+`credential-status.json` consumed by `/setup:all` for dashboard
+classification.
 
 The plugin still detects externally-configured Composio MCPs as a
 migration aid (`mcp__claude_ai_composio__*` for the Claude.ai native
