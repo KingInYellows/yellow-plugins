@@ -204,6 +204,42 @@ mv plugins/hookify-old plugins/hookify
 > plugin-local hook script paths (existence and basic structure). These checks
 > run automatically but are not documented as separate numbered rules above.
 
+### Rule 12: Credential-userConfig Env-Var Fallback (warning)
+
+For each `mcpServers.<server>.env.<KEY>: "${user_config.X}"` interpolation,
+the validator checks whether a companion `${KEY:-}` shell-env-passthrough
+entry exists in the same env block (or whether the env-key name itself ends
+with `_USERCONFIG`, indicating the wrapper pattern is already in use).
+
+When the companion entry is missing, the validator emits a warning
+recommending the 3-element fallback wrapper pattern (yellow-research /
+yellow-morph precedent). This pattern lets power users on multi-host fleets
+resolve credentials from shell env vars (`PERPLEXITY_API_KEY`,
+`SEMGREP_APP_TOKEN`, etc.) instead of running the userConfig prompt cycle
+on every host.
+
+**Why a warning, not an error**: Plugins that interpolate `${user_config.X}`
+directly aren't broken — they just don't accept a shell env fallback. The
+warning gives plugin authors a clear remediation path without breaking
+existing manifests.
+
+**Example warning**:
+
+```text
+[warn] yellow-foo: mcpServers.foo-server.env.FOO_API_KEY interpolates
+${user_config.foo_api_key} directly. Consider the 3-element wrapper pattern
+(FOO_API_KEY_USERCONFIG + FOO_API_KEY with ${FOO_API_KEY:-} fallback) so
+power users on multi-host fleets can use shell env. See
+plugins/yellow-research/bin/start-*.sh for the canonical pattern.
+```
+
+**Remediation**: Add a wrapper script under `bin/` that resolves precedence
+(userConfig wins → shell env fallback → unset empty), and rewrite the env
+block to declare both `_USERCONFIG` and shell-passthrough variants. See
+`plugins/yellow-core/skills/multi-host-fleet/SKILL.md` for the canonical
+contract and `plugins/yellow-research/bin/start-perplexity.sh` for the
+~12-line wrapper template.
+
 ---
 
 ## CI Integration

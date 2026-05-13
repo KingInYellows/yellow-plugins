@@ -1003,6 +1003,48 @@ function validatePlugin(pluginDir) {
     }
   }
 
+  // RULE 12: credential-bearing MCP servers should use the 3-element fallback
+  // pattern. If a mcpServers entry's env block contains `${user_config.X}`
+  // directly (without a `${X:-}` shell-env-passthrough companion), the plugin
+  // overwrites any pre-existing shell env value with an empty string when the
+  // user dismisses the userConfig prompt. Warn so plugin authors adopt the
+  // wrapper pattern (yellow-research/yellow-morph precedent).
+  if (manifest.mcpServers && typeof manifest.mcpServers === 'object') {
+    for (const [serverName, server] of Object.entries(manifest.mcpServers)) {
+      if (!server || typeof server !== 'object') continue;
+      const env = server.env;
+      if (!env || typeof env !== 'object') continue;
+
+      for (const [envKey, envValue] of Object.entries(env)) {
+        if (typeof envValue !== 'string') continue;
+        // Match `${user_config.<field>}` interpolations.
+        const userConfigMatch = envValue.match(
+          /\$\{user_config\.([a-zA-Z_][a-zA-Z0-9_]*)\}/
+        );
+        if (!userConfigMatch) continue;
+
+        // Skip if the env key has the conventional `_USERCONFIG` suffix —
+        // this indicates the plugin IS using the wrapper pattern (the bare
+        // env var name will hold the resolved value).
+        if (envKey.endsWith('_USERCONFIG')) continue;
+
+        // Look for a companion `${ENV_VAR:-}` passthrough entry to confirm the
+        // wrapper pattern is in place.
+        const companionShellEnv = env[envKey];
+        const hasFallbackPattern =
+          envKey + '_USERCONFIG' in env ||
+          (typeof companionShellEnv === 'string' &&
+            companionShellEnv.includes(':-'));
+
+        if (!hasFallbackPattern) {
+          logWarning(
+            `${manifest.name}: mcpServers.${serverName}.env.${envKey} interpolates ${userConfigMatch[0]} directly. Consider the 3-element wrapper pattern (${envKey}_USERCONFIG + ${envKey} with \${${envKey}:-} fallback) so power users on multi-host fleets can use shell env. See plugins/yellow-research/bin/start-*.sh for the canonical pattern.`
+          );
+        }
+      }
+    }
+  }
+
   // Summary
   if (errors.length === 0) {
     logSuccess(`Plugin "${manifest.name}" is valid`);
