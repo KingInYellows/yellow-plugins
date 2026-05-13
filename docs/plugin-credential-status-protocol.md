@@ -171,7 +171,9 @@ Plugins planned to emit this file (per the
 `plans/plugin-install-resilience.md` stack — adopters land in follow-up
 PRs after this foundation merges):
 
-- yellow-research (perplexity/tavily/exa keys + ceramic OAuth state)
+- yellow-research (perplexity/tavily/exa userConfig keys; ceramic/parallel
+  are OAuth-managed and have no userConfig field, so they are intentionally
+  omitted from the credentials array)
 - yellow-morph (morph key)
 - yellow-semgrep (semgrep token)
 - yellow-composio (URL + API key)

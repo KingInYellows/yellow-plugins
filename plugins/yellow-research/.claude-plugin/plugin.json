@@ -85,5 +85,19 @@
         "ast-grep-server"
       ]
     }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
   }
 }
