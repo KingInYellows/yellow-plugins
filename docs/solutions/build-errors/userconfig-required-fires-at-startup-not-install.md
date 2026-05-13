@@ -1,7 +1,14 @@
 ---
-title: userConfig `required: true` fires at MCP startup, not install
-captured-at: 2026-05-13
-tags: [userConfig, MCP, plugin-install, claude-code-bugs]
+title: 'userConfig `required: true` fires at MCP startup, not install'
+category: build-errors
+track: bug
+problem: 'userConfig `required: true` does not block plugin install — error surfaces at MCP startup via variable substitution, leaving users with no actionable feedback'
+date: 2026-05-13
+tags:
+  - userConfig
+  - MCP
+  - plugin-install
+  - claude-code-bugs
 ---
 
 # `required: true` on userConfig fields does NOT block plugin install

@@ -14,8 +14,9 @@ credentials across multiple hosts (workstations, CI runners, ephemeral
 sandboxes, devcontainers) without re-running `/plugin disable && /plugin
 enable` per host.
 
-The yellow-plugins marketplace adopts a uniform 3-element credential
-resolution pattern for every credential-bearing plugin:
+The yellow-plugins marketplace adopts a 3-element credential resolution
+pattern for credential-bearing plugins that bundle a stdio MCP server
+(yellow-research, yellow-morph, yellow-semgrep, yellow-composio):
 
 1. `userConfig` value (stored in OS keychain) — **preferred** for single-host
    installs
@@ -24,8 +25,15 @@ resolution pattern for every credential-bearing plugin:
 3. Unset → MCP server either fails to start (composio) or starts in
    degraded mode (research, semgrep)
 
-Setting the canonical shell env var on a new host bypasses the userConfig
-prompt entirely. Wrapper scripts in each plugin honor the precedence.
+Plugins with HTTP-only MCPs (yellow-devin) accept the same userConfig OR
+shell env var sources, but commands read shell env directly rather than
+flowing through a wrapper.
+
+Setting the canonical shell env var on a new host lets the plugin operate
+without ever populating the userConfig keychain entry. The enable-time
+userConfig prompt still fires on platforms where prompting works
+(see [#39455](https://github.com/anthropics/claude-code/issues/39455));
+dismissing or skipping it is safe when the shell env var is set.
 
 ## When to Use
 
@@ -52,8 +60,8 @@ prompt entirely. Wrapper scripts in each plugin honor the precedence.
 | yellow-semgrep | `SEMGREP_APP_TOKEN` | `semgrep_app_token` | yes | `sgp_` prefix |
 | yellow-composio | `COMPOSIO_MCP_URL` | `composio_mcp_url` | no | Must start with `https://` |
 | yellow-composio | `COMPOSIO_API_KEY` | `composio_api_key` | yes | |
-| yellow-devin | `DEVIN_SERVICE_USER_TOKEN` | (none) | yes | env-only; no userConfig |
-| yellow-devin | `DEVIN_ORG_ID` | (none) | no | env-only; no userConfig |
+| yellow-devin | `DEVIN_SERVICE_USER_TOKEN` | `devin_service_user_token` | yes | HTTP MCP; commands read shell env directly |
+| yellow-devin | `DEVIN_ORG_ID` | `devin_org_id` | no | HTTP MCP; commands read shell env directly |
 
 The userConfig path uses the system keychain when available (macOS,
 Windows) or `~/.claude/.credentials.json` (0600 perms) on minimal Linux.
@@ -66,14 +74,14 @@ direnv:
 
 ```bash
 # In ~/.zshrc or ~/.bashrc (NOT version-controlled in plaintext)
-export PERPLEXITY_API_KEY="$(cat ~/.secrets/perplexity)"
-export TAVILY_API_KEY="$(cat ~/.secrets/tavily)"
-export EXA_API_KEY="$(cat ~/.secrets/exa)"
-export MORPH_API_KEY="$(cat ~/.secrets/morph)"
-export SEMGREP_APP_TOKEN="$(cat ~/.secrets/semgrep)"
+export PERPLEXITY_API_KEY="$(cat ~/.secrets/perplexity 2>/dev/null)"
+export TAVILY_API_KEY="$(cat ~/.secrets/tavily 2>/dev/null)"
+export EXA_API_KEY="$(cat ~/.secrets/exa 2>/dev/null)"
+export MORPH_API_KEY="$(cat ~/.secrets/morph 2>/dev/null)"
+export SEMGREP_APP_TOKEN="$(cat ~/.secrets/semgrep 2>/dev/null)"
 export COMPOSIO_MCP_URL="https://mcp.composio.dev/your-customer-id"
-export COMPOSIO_API_KEY="$(cat ~/.secrets/composio)"
-export DEVIN_SERVICE_USER_TOKEN="$(cat ~/.secrets/devin-token)"
+export COMPOSIO_API_KEY="$(cat ~/.secrets/composio 2>/dev/null)"
+export DEVIN_SERVICE_USER_TOKEN="$(cat ~/.secrets/devin-token 2>/dev/null)"
 export DEVIN_ORG_ID="your-org-id"
 ```
 
@@ -81,7 +89,7 @@ Or with [direnv](https://direnv.net) (per-project `.envrc`, not committed):
 
 ```bash
 # .envrc (gitignored)
-export PERPLEXITY_API_KEY="$(cat ~/.secrets/perplexity)"
+export PERPLEXITY_API_KEY="$(cat ~/.secrets/perplexity 2>/dev/null)"
 # ... etc
 ```
 
@@ -101,7 +109,7 @@ secrets-manager patterns below.
     SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
     COMPOSIO_MCP_URL: ${{ vars.COMPOSIO_MCP_URL }}
     COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
-  run: claude code --headless ...
+  run: claude -p "/workflows:work ..." 
 ```
 
 Add each canonical env var name to **Repository Settings → Secrets and
@@ -153,24 +161,24 @@ export PERPLEXITY_API_KEY="op://Personal/Perplexity API/credential"
 export EXA_API_KEY="op://Personal/EXA API/credential"
 
 # Then launch Claude Code via:
-op run --env-file=.envrc.template -- claude code
+op run --env-file=.envrc.template -- claude
 ```
 
 **HashiCorp Vault (envconsul):**
 
 ```bash
-envconsul -consul-addr=vault.internal -prefix=secret/yellow-plugins claude code
+envconsul -vault-addr=https://vault.internal -secret=secret/yellow-plugins claude
 ```
 
 **Doppler:**
 
 ```bash
-doppler run --project yellow-plugins -- claude code
+doppler run --project yellow-plugins -- claude
 ```
 
 **Generic env-file pattern (any tool):**
 
-The contract is: by the time `claude code` starts, the canonical env vars
+The contract is: by the time `claude` starts, the canonical env vars
 must be in the process environment. Any tool that achieves this works.
 The wrapper scripts inside each plugin will pick them up.
 
@@ -219,7 +227,9 @@ userConfig prompt (or unset the keychain entry).
 ## Security
 
 - Never commit `.env`, `.envrc`, or `~/.secrets/*` files. Use
-  `.gitignore` patterns: `.envrc`, `.env*`, `*.secret`.
+  `.gitignore` patterns: `.env`, `.envrc`, `*.secret`, `!.envrc.template`.
+  Do not use a bare `.env*` glob — it also matches `.envrc.template`, which
+  this guide recommends committing.
 - Keep `~/.secrets/` at 0700 directory perms and 0600 file perms.
 - For sensitive plugins (semgrep, perplexity, exa, tavily, morph,
   composio_api_key), prefer keychain (userConfig) over shell env when
