@@ -111,5 +111,5 @@ rl.on('close', () => {
   process.exit(0);
 });
 
-process.on('SIGTERM', () => process.exit(0));
-process.on('SIGINT', () => process.exit(0));
+process.on('SIGTERM', () => rl.close());
+process.on('SIGINT', () => rl.close());

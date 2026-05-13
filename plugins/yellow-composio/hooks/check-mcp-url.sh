@@ -33,14 +33,18 @@ API_KEY_OPT="${CLAUDE_PLUGIN_OPTION_COMPOSIO_API_KEY:-}"
 
 # Emit credential-status.json (best-effort; never blocks SessionStart).
 emit_status() {
-  local helper="${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/credential-status.sh"
+  # Guard CLAUDE_PLUGIN_ROOT against `set -u` unbound exit when the hook runs
+  # outside a Claude Code session (e.g. manual invocation or stale environment).
+  # Fallback mirrors the cached plugin location used by yellow-semgrep.
+  local plugin_root="${CLAUDE_PLUGIN_ROOT:-${HOME}/.claude/plugins/cache/yellow-plugins/yellow-composio}"
+  local helper="${plugin_root}/../yellow-core/lib/credential-status.sh"
   [ -f "$helper" ] || return 0
   # shellcheck source=/dev/null
   . "$helper" 2>/dev/null || return 0
 
   local version="unknown"
-  if command -v jq >/dev/null 2>&1 && [ -f "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" ]; then
-    version=$(jq -r '.version // "unknown"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null || printf 'unknown')
+  if command -v jq >/dev/null 2>&1 && [ -f "${plugin_root}/.claude-plugin/plugin.json" ]; then
+    version=$(jq -r '.version // "unknown"' "${plugin_root}/.claude-plugin/plugin.json" 2>/dev/null || printf 'unknown')
   fi
 
   # URL: userConfig wins, shell env fallback.

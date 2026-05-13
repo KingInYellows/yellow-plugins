@@ -1,5 +1,5 @@
 ---
-'yellow-composio': minor
+'yellow-composio': major
 ---
 
 feat(yellow-composio): stdio MCP transport with shell env fallback
