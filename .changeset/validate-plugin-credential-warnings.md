@@ -1,5 +1,5 @@
 ---
-'yellow-plugins-validator': patch
+'yellow-plugins-root': patch
 ---
 
 feat(validate-plugin): warn on credential userConfig interpolation without shell-env fallback

@@ -1028,13 +1028,17 @@ function validatePlugin(pluginDir) {
         // env var name will hold the resolved value).
         if (envKey.endsWith('_USERCONFIG')) continue;
 
-        // Look for a companion `${ENV_VAR:-}` passthrough entry to confirm the
-        // wrapper pattern is in place.
-        const companionShellEnv = env[envKey];
-        const hasFallbackPattern =
-          envKey + '_USERCONFIG' in env ||
-          (typeof companionShellEnv === 'string' &&
-            companionShellEnv.includes(':-'));
+        // The canonical wrapper pattern moves `${user_config.X}` to a
+        // `<KEY>_USERCONFIG` sibling and sets the bare `<KEY>` to
+        // `${<KEY>:-}`. The bare key matching `${user_config.X}` here means
+        // that move did not happen. The only valid non-broken shape is an
+        // inline fallback that self-references this env var, e.g.
+        // `${user_config.X:-${<envKey>:-}}`. Anything else (including a
+        // `<KEY>_USERCONFIG` sibling that exists but coexists with a broken
+        // bare KEY, or an unrelated `:-` default elsewhere) is the broken
+        // case the rule is meant to catch.
+        const selfFallback = '${' + envKey + ':-';
+        const hasFallbackPattern = envValue.includes(selfFallback);
 
         if (!hasFallbackPattern) {
           logWarning(
