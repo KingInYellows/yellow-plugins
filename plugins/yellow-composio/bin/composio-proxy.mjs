@@ -30,6 +30,14 @@ if (!URL.startsWith('https://')) {
   process.exit(1);
 }
 
+// Streamable HTTP MCP session state. Both are server-opt-in: if the upstream
+// never issues a session id or never echoes a protocolVersion, these stay null
+// and the headers are simply omitted (matches Composio's documented behavior).
+// Captured here so spec-compliant upstreams that DO enforce these don't fail
+// after initialize.
+let sessionId = null;
+let protocolVersion = null;
+
 const rl = createInterface({
   input: process.stdin,
   crlfDelay: Infinity,
@@ -44,16 +52,23 @@ async function forward(jsonRpcMessage) {
     return;
   }
 
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    'X-API-Key': API_KEY,
+  };
+  if (sessionId) headers['Mcp-Session-Id'] = sessionId;
+  if (protocolVersion) headers['MCP-Protocol-Version'] = protocolVersion;
+
   try {
     const response = await fetch(URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-API-Key': API_KEY,
-      },
+      headers,
       body: JSON.stringify(parsed),
     });
+
+    const respSessionId = response.headers.get('mcp-session-id');
+    if (respSessionId) sessionId = respSessionId;
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
@@ -77,6 +92,20 @@ async function forward(jsonRpcMessage) {
     if (responseBody.trim().length === 0) {
       // Notification (no response expected) — drop silently.
       return;
+    }
+
+    // Capture negotiated protocolVersion from the initialize result so we can
+    // echo it on every subsequent request per Streamable HTTP MCP. Parse for
+    // inspection only — the original body is still forwarded verbatim.
+    if (parsed.method === 'initialize') {
+      try {
+        const r = JSON.parse(responseBody);
+        if (r && r.result && typeof r.result.protocolVersion === 'string') {
+          protocolVersion = r.result.protocolVersion;
+        }
+      } catch {
+        // Non-JSON or unexpected shape — leave protocolVersion null.
+      }
     }
 
     // Composio returns one JSON object per request — emit as one stdio line.
