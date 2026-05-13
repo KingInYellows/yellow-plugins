@@ -174,6 +174,20 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 - For `userConfig`, mark secrets with `sensitive: true`. Do not interpolate
   untrusted user config directly into shell commands; pass it through
   environment variables or validated wrapper scripts.
+- Credential-bearing MCP servers should follow the 3-element fallback pattern
+  (yellow-research/yellow-morph precedent): `plugin.json` env block declares
+  both `${user_config.KEY}` and `${KEY:-}` shell passthrough, and a wrapper
+  script in `bin/` resolves userConfig-wins precedence before exec'ing the
+  MCP binary. `required: true` on credential fields does NOT block install —
+  per anthropics/claude-code#39827 it surfaces at MCP startup as a confusing
+  error. Prefer optional fields + wrapper-side empty-string detection.
+- Plugins with credential-bearing fields should emit a credential-status JSON
+  from a SessionStart hook so `/setup:all` can render an accurate dashboard
+  without probing the system keychain. See
+  `docs/plugin-credential-status-protocol.md` for the schema and
+  `plugins/yellow-core/lib/credential-status.sh` for the reusable helper.
+  Never write credential values to the status file — only the resolution
+  source (`userConfig` / `shell_env` / `absent`) and a presence boolean.
 
 ## Command, Agent, And Skill Authoring
 
