@@ -147,8 +147,10 @@ Four coordinated workstreams, each independently shippable:
 ### Trade-offs Considered
 
 - **Composio proxy shim adds a dependency.** Verified: `@composio/mcp` or a
-  ~30-line hand-rolled proxy in `bin/composio-proxy.mjs` can pipe stdio MCP to
-  Composio's HTTPS endpoint. Per-session startup cost is one Node process
+  60–120 LoC hand-rolled proxy in `bin/composio-proxy.mjs` can pipe stdio MCP
+  to Composio's HTTPS endpoint (revised upward from the original ~30 LoC
+  estimate after reference-implementation review — see Phase 3.1
+  deepen-plan note). Per-session startup cost is one Node process
   (negligible).
 - **Status files vs. live keychain probing.** Status files require SessionStart
   hook to have fired at least once. First-install state is ambiguous. Mitigation:
@@ -243,8 +245,9 @@ Four coordinated workstreams, each independently shippable:
 
 - [ ] 3.1 Spike: verify `@composio/mcp` (or equivalent) exposes a stdio MCP
        relay accepting `--url` and `--header` flags. If not, write
-       `plugins/yellow-composio/bin/composio-proxy.mjs` (~30 LoC stdio↔HTTPS
-       proxy using Node's built-in `https` and `process.stdin`/`stdout`).
+       `plugins/yellow-composio/bin/composio-proxy.mjs` (60–120 LoC stdio↔HTTPS
+       proxy using Node's built-in `https` and `process.stdin`/`stdout`; see
+       the deepen-plan research note below for the revised LoC budget).
 
 <!-- deepen-plan: external -->
 > **Research:** Spike inputs identified:
@@ -557,7 +560,8 @@ Four coordinated workstreams, each independently shippable:
 ### Dependencies
 
 - No new external runtime deps if `composio-proxy.mjs` is hand-rolled
-  (~30 LoC, Node 18+ builtin `https`, `process.stdin/stdout`).
+  (60–120 LoC per the Phase 3.1 deepen-plan research above, using Node
+  18+ builtin `https` and `process.stdin/stdout`).
 - If external relay package is chosen (Phase 3.1 spike outcome), pin via
   `npx -y @composio/mcp@<version>` and document supported range.
 
@@ -735,51 +739,96 @@ behind 1 in a Graphite stack; PRs 4–8 sequential.
 <!-- stack-trunk: main -->
 
 ### 1. agent/feat/credential-status-protocol
+
 - **Type:** feat
 - **Description:** add credential-status protocol + yellow-core lib helper
-- **Scope:** plugins/yellow-core/lib/credential-status.sh, docs/plugin-credential-status-protocol.md, AGENTS.md, plugins/yellow-core/tests/credential-status.bats, .changeset/
+- **Scope:**
+  - `plugins/yellow-core/lib/credential-status.sh`
+  - `docs/plugin-credential-status-protocol.md`
+  - `AGENTS.md`
+  - `plugins/yellow-core/tests/credential-status.bats`
+  - `.changeset/`
 - **Tasks:** 1.1, 1.2, 1.3, 1.4
 - **Depends on:** (none)
 
 ### 2. agent/fix/yellow-semgrep-env-fallback
+
 - **Type:** fix
 - **Description:** honor shell env as fallback for SEMGREP_APP_TOKEN
-- **Scope:** plugins/yellow-semgrep/.claude-plugin/plugin.json, plugins/yellow-semgrep/bin/start-semgrep.sh, plugins/yellow-semgrep/hooks/write-credential-status.sh, plugins/yellow-semgrep/CLAUDE.md, plugins/yellow-semgrep/tests/, .changeset/
+- **Scope:**
+  - `plugins/yellow-semgrep/.claude-plugin/plugin.json`
+  - `plugins/yellow-semgrep/bin/start-semgrep.sh`
+  - `plugins/yellow-semgrep/hooks/write-credential-status.sh`
+  - `plugins/yellow-semgrep/CLAUDE.md`
+  - `plugins/yellow-semgrep/tests/`
+  - `.changeset/`
 - **Tasks:** 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
 - **Depends on:** #1
 
 ### 3. agent/feat/yellow-composio-stdio-fallback
+
 - **Type:** feat
 - **Description:** convert yellow-composio to type:stdio with proxy + env fallback
-- **Scope:** plugins/yellow-composio/.claude-plugin/plugin.json (transport change), plugins/yellow-composio/bin/start-composio.sh, plugins/yellow-composio/bin/composio-proxy.mjs, plugins/yellow-composio/hooks/check-mcp-url.sh (status emit), plugins/yellow-composio/CLAUDE.md, plugins/yellow-composio/README.md, plugins/yellow-composio/tests/, .changeset/
+- **Scope:**
+  - `plugins/yellow-composio/.claude-plugin/plugin.json` (transport change)
+  - `plugins/yellow-composio/bin/start-composio.sh`
+  - `plugins/yellow-composio/bin/composio-proxy.mjs`
+  - `plugins/yellow-composio/hooks/check-mcp-url.sh` (status emit)
+  - `plugins/yellow-composio/CLAUDE.md`
+  - `plugins/yellow-composio/README.md`
+  - `plugins/yellow-composio/tests/`
+  - `.changeset/`
 - **Tasks:** 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
 - **Depends on:** #2
 
 ### 4. agent/feat/yellow-research-status-hook
+
 - **Type:** feat
 - **Description:** emit credential-status.json from SessionStart for yellow-research
-- **Scope:** plugins/yellow-research/hooks/write-credential-status.sh, plugins/yellow-research/.claude-plugin/plugin.json (hooks block), plugins/yellow-research/CLAUDE.md, .changeset/
+- **Scope:**
+  - `plugins/yellow-research/hooks/write-credential-status.sh`
+  - `plugins/yellow-research/.claude-plugin/plugin.json` (hooks block)
+  - `plugins/yellow-research/CLAUDE.md`
+  - `.changeset/`
 - **Tasks:** 4.1, 4.2, 4.3
 - **Depends on:** #3
 
 ### 5. agent/feat/setup-all-status-classification
+
 - **Type:** feat
 - **Description:** classify plugins via status files + version drift in /setup:all
-- **Scope:** plugins/yellow-core/commands/setup/all.md, plugins/yellow-browser-test/agents/testing/app-discoverer.md, .changeset/
+- **Scope:**
+  - `plugins/yellow-core/commands/setup/all.md`
+  - `plugins/yellow-browser-test/agents/testing/app-discoverer.md`
+  - `.changeset/`
 - **Tasks:** 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7
 - **Depends on:** #4
 
 ### 6. agent/feat/validate-plugin-credential-warnings
+
 - **Type:** feat
 - **Description:** warn on required+sensitive userConfig fields without wrapper indirection
-- **Scope:** scripts/validate-plugin.js (RULE 12+13), packages/infrastructure tests, fixtures, docs/plugin-validation-guide.md
+- **Scope:**
+  - `scripts/validate-plugin.js` (RULE 12+13)
+  - `packages/infrastructure` tests
+  - fixtures
+  - `docs/plugin-validation-guide.md`
 - **Tasks:** 7.1, 7.2, 7.3, 7.4
 - **Depends on:** #5
 
 ### 7. agent/docs/multi-host-fleet-skill
+
 - **Type:** docs
 - **Description:** multi-host fleet SKILL.md + migration solution doc + release notes
-- **Scope:** plugins/yellow-core/skills/multi-host-fleet/SKILL.md, docs/solutions/build-errors/userconfig-required-fires-at-startup-not-install.md, AGENTS.md, plugins/yellow-research/README.md, plugins/yellow-morph/README.md, plugins/yellow-semgrep/README.md, plugins/yellow-composio/README.md, .changeset/
+- **Scope:**
+  - `plugins/yellow-core/skills/multi-host-fleet/SKILL.md`
+  - `docs/solutions/build-errors/userconfig-required-fires-at-startup-not-install.md`
+  - `AGENTS.md`
+  - `plugins/yellow-research/README.md`
+  - `plugins/yellow-morph/README.md`
+  - `plugins/yellow-semgrep/README.md`
+  - `plugins/yellow-composio/README.md`
+  - `.changeset/`
 - **Tasks:** 6.1, 6.2, 6.3, 6.4, 8.1, 8.2, 8.3, 8.4, 8.5
 - **Depends on:** #6
 

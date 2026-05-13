@@ -51,7 +51,7 @@ directories — no cross-plugin write contention.
 | `credentials[].field` | string | Field name (must match a `userConfig` key) |
 | `credentials[].source` | enum | `"userConfig"` \| `"shell_env"` \| `"absent"` |
 | `credentials[].present` | boolean | True if the resolved value is non-empty |
-| `credentials[].valid` | bool\|null | Optional: `true` after a live probe, `false` if probe failed, `null` if unverified |
+| `credentials[].valid` | boolean\|null | Optional: `true` after a live probe, `false` if probe failed, `null` if unverified |
 
 ### Forbidden
 
@@ -68,7 +68,7 @@ checking written status files for recognizable credential patterns
 |-------|----------|
 | First SessionStart after install | File created with all `userConfig` fields enumerated |
 | Subsequent SessionStarts | Full overwrite (no append; no merge) |
-| `/plugin disable <name>` | File becomes orphaned; Claude Code does not currently expose a plugin-disable hook event, so the file persists until the next SessionStart of an installed-and-enabled instance overwrites it. Readers treat a stale file as "status unknown" once the plugin no longer appears in `claude plugin list`. |
+| `/plugin disable <name>` | File becomes orphaned. Claude Code does not<br/>expose a plugin-disable hook event, so the file persists<br/>until the next SessionStart of an installed-and-enabled<br/>instance overwrites it. Readers treat a stale file as<br/>"status unknown" once the plugin no longer appears in<br/>`claude plugin list`. |
 | `/plugin update <name>` | Stale until next SessionStart populates a new file |
 | Hook crash / write failure | Silently skipped — readers treat missing file as "unknown" |
 
