@@ -65,9 +65,23 @@ If no `package.json`, check:
 - `Makefile` — targets like `dev`, `serve`, `run`
 - `docker-compose.yml` — service definitions
 - `Procfile` — web process
+- `Gemfile` — `rails` gem implies `rails server` (default :3000)
+- `requirements.txt` / `pyproject.toml` — `django`/`flask`/`fastapi`/`starlette`/`sanic`
+  imply the framework's standard dev command (`python manage.py runserver`,
+  `flask run`, `uvicorn app:app --reload`)
+- `go.mod` — `gin-gonic`/`echo`/`fiber`/`chi`/`gorilla/mux` imply `go run`
+  with the main package
+- `Cargo.toml` — `axum`/`actix-web`/`rocket`/`warp` imply `cargo run`
+- `fly.toml`, `render.yaml`, `vercel.json`, `netlify.toml` — strong web-app
+  signals; report as "deployable web app" even when local dev command is
+  not detectable
 
 If multiple commands found, return all of them — the calling command will use
 AskUserQuestion to let the user choose.
+
+If NONE of the above signals are present, return "no web app detected" — the
+project may be a CLI tool, library, or dotfiles repo where browser-test
+does not apply.
 
 ### Step 2: Determine Base URL and Port
 

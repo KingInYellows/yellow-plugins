@@ -240,6 +240,114 @@ ToolSearch reflects current-session visibility only. If a plugin was installed
 after the session started, the tool may remain invisible until Claude Code is
 restarted.
 
+### Step 1.6: Credential Status Files
+
+Credential-bearing plugins (yellow-research, yellow-composio, yellow-semgrep,
+yellow-morph) emit a `credential-status.json` from a SessionStart hook so
+the dashboard can classify them accurately without probing the system
+keychain. See `docs/plugin-credential-status-protocol.md`.
+
+Run one Bash block to read each plugin's status file:
+
+```bash
+printf '\n=== Credential Status Files ===\n'
+PLUGIN_DATA_DIR="$HOME/.claude/plugins/data"
+for plugin in yellow-research yellow-composio yellow-semgrep yellow-morph; do
+  status_file="$PLUGIN_DATA_DIR/$plugin/credential-status.json"
+  if [ -f "$status_file" ] && command -v jq >/dev/null 2>&1; then
+    present_count=$(jq '[.credentials[] | select(.present == true)] | length' "$status_file" 2>/dev/null)
+    total_count=$(jq '.credentials | length' "$status_file" 2>/dev/null)
+    user_config_count=$(jq '[.credentials[] | select(.source == "userConfig")] | length' "$status_file" 2>/dev/null)
+    shell_env_count=$(jq '[.credentials[] | select(.source == "shell_env")] | length' "$status_file" 2>/dev/null)
+    version=$(jq -r '.version // "unknown"' "$status_file" 2>/dev/null)
+    printf '%-22s %s/%s present (uc:%s env:%s, v%s)\n' \
+      "$plugin:" "$present_count" "$total_count" \
+      "$user_config_count" "$shell_env_count" "$version"
+  elif [ -f "$status_file" ]; then
+    printf '%-22s status file present but jq missing\n' "$plugin:"
+  else
+    printf '%-22s no status file (restart Claude Code or /plugin disable && enable)\n' "$plugin:"
+  fi
+done
+```
+
+The status file is the AUTHORITATIVE source for classification. When it
+exists, prefer its `present_count` over shell-env-only probes. When it is
+absent, fall back to the legacy shell-env-only check (and emit a hint that
+the user should restart Claude Code to populate the file).
+
+### Step 1.7: Plugin Version Drift Check
+
+Detect plugins where the installed version is older than the marketplace
+catalog version (e.g., user installed a plugin months ago and the catalog
+has shipped multiple minor releases since). Uses `claude plugin list --json
+--available` with a 24h cache to avoid a network call on every dashboard
+invocation.
+
+```bash
+printf '\n=== Plugin Version Drift ===\n'
+DRIFT_CACHE="$HOME/.claude/plugins/data/yellow-core/version-check-cache.json"
+DRIFT_CACHE_DIR=$(dirname "$DRIFT_CACHE")
+
+# Feature-detect: `claude plugin list --json --available` may not be available
+# on older Claude Code releases. Soft-skip if `claude` is missing or the flag
+# is not supported.
+if ! command -v claude >/dev/null 2>&1; then
+  printf 'version_drift: SKIPPED (claude CLI not found)\n'
+elif ! claude plugin list --help 2>&1 | grep -q -- '--available'; then
+  printf 'version_drift: SKIPPED (claude plugin list --available not supported in this release)\n'
+else
+  # 24h TTL: re-fetch only if cache is missing or older than 86400 seconds.
+  refresh_cache=1
+  if [ -f "$DRIFT_CACHE" ]; then
+    cache_age=$(( $(date +%s) - $(stat -c %Y "$DRIFT_CACHE" 2>/dev/null || stat -f %m "$DRIFT_CACHE" 2>/dev/null || printf 0) ))
+    [ "$cache_age" -lt 86400 ] && refresh_cache=0
+  fi
+
+  if [ "$refresh_cache" -eq 1 ]; then
+    mkdir -p "$DRIFT_CACHE_DIR" 2>/dev/null
+    if claude plugin list --json --available 2>/dev/null > "$DRIFT_CACHE.tmp"; then
+      mv -f "$DRIFT_CACHE.tmp" "$DRIFT_CACHE" 2>/dev/null
+    else
+      rm -f "$DRIFT_CACHE.tmp" 2>/dev/null
+      printf 'version_drift: SKIPPED (claude plugin list --json --available failed)\n'
+    fi
+  fi
+
+  if [ -f "$DRIFT_CACHE" ] && command -v jq >/dev/null 2>&1; then
+    # Diff installed vs available — surface OUTDATED only. Schema observed:
+    # {"installed":[{"id":"<plugin>@<marketplace>","version":"X.Y.Z","scope":"user|project|local"}],
+    #  "available":[...]}. The `available` array shape is not fully documented;
+    # parse defensively and skip plugins that lack an available record.
+    outdated_count=$(jq -r '
+      [.installed[] as $i
+        | (.available // [])[]
+        | select(.id == $i.id and .version != $i.version)
+        | "\($i.id): installed=\($i.version) available=\(.version)"]
+      | length' "$DRIFT_CACHE" 2>/dev/null || printf 0)
+    if [ "${outdated_count:-0}" -gt 0 ]; then
+      printf 'version_drift: %s outdated\n' "$outdated_count"
+      jq -r '
+        .installed[] as $i
+        | (.available // [])[]
+        | select(.id == $i.id and .version != $i.version)
+        | "  OUTDATED: \($i.id) installed=\($i.version) → available=\(.version)"' \
+        "$DRIFT_CACHE" 2>/dev/null
+    else
+      printf 'version_drift: all current\n'
+    fi
+    cache_age_hours=$(( cache_age / 3600 ))
+    printf 'version_drift_cache_age_h: %s\n' "${cache_age_hours:-0}"
+  fi
+fi
+```
+
+When OUTDATED plugins are reported, suggest: `/plugin update <name>` to
+upgrade. After update, run `/setup:all` again — outdated plugins may need
+`/plugin disable && /plugin enable` to re-trigger userConfig prompts for
+any new fields the upgrade introduced (per
+[anthropics/claude-code#39827](https://github.com/anthropics/claude-code/issues/39827)).
+
 ### Step 2: Classify Plugin Status
 
 Classify each installed plugin as **READY**, **PARTIAL**, or **NEEDS SETUP**.
@@ -295,17 +403,30 @@ path" and rely on `/morph:status` for authoritative OFFLINE detection.
 
 **yellow-semgrep:**
 
-- READY: `curl` OK AND `jq` OK AND `SEMGREP_APP_TOKEN` set AND `semgrep` OK
-- PARTIAL: `SEMGREP_APP_TOKEN` set but `semgrep` CLI is missing
-- NEEDS SETUP: token missing OR `curl` missing OR `jq` missing
+Prefer the credential-status file from Step 1.6 over shell-env-only probes.
+The wrapper script honors both userConfig and shell env as of v4.1.0.
+
+- READY: `curl` OK AND `jq` OK AND `semgrep` OK AND (status file shows
+  `semgrep_app_token` present, OR status file absent AND `SEMGREP_APP_TOKEN`
+  set in shell env)
+- PARTIAL: token resolved (per status file or shell env) but `semgrep` CLI
+  is missing
+- NEEDS SETUP: token absent (status file shows `source: absent` OR file
+  absent AND shell env unset) OR `curl` missing OR `jq` missing
 
 **yellow-research:**
 
+Prefer the credential-status file from Step 1.6 over shell-env-only probes.
+The 3-element fallback wrapper means keys may be resolved from the keychain
+(invisible to the dashboard's Bash subprocess) — the status file is the
+only accurate signal.
+
 Compute bundled source availability out of 6:
 
-1. `EXA_API_KEY` set
-2. `TAVILY_API_KEY` set
-3. `PERPLEXITY_API_KEY` set
+1. `exa_api_key` present per status file, OR `EXA_API_KEY` set in shell env
+   (legacy path when status file absent)
+2. `tavily_api_key` present per status file, OR `TAVILY_API_KEY` set
+3. `perplexity_api_key` present per status file, OR `PERPLEXITY_API_KEY` set
 4. Parallel Task tool visible via ToolSearch
 5. ast-grep counts only when the exact ToolSearch match is present **and**
    `ast-grep` OK **and** `uv` OK (uv manages Python 3.13 transparently via
@@ -319,6 +440,11 @@ Compute bundled source availability out of 6:
 - READY: all 6 bundled sources available
 - PARTIAL: 1-5 bundled sources available
 - NEEDS SETUP: 0 bundled sources available
+
+If the status file is absent AND no shell env vars are set, surface a hint:
+"yellow-research credentials not detected — restart Claude Code to populate
+the status file, or run `/plugin disable yellow-research && /plugin enable
+yellow-research` to re-trigger the userConfig prompts."
 
 **yellow-linear:**
 
@@ -358,9 +484,34 @@ Compute bundled source availability out of 6:
 
 **yellow-browser-test:**
 
+Run a project-type heuristic before classifying. If the current repository
+shows NO web-app signals AND `.claude/yellow-browser-test.local.md` is
+absent, OMIT this plugin from the dashboard entirely — a non-web-app repo
+(dotfiles, CLI tool, library) has nothing for browser-test to target.
+
+Positive web-app signals (any one is sufficient):
+
+- `package.json` containing any of:
+  `next|react|vue|svelte|astro|nuxt|remix|express|fastify|koa|hono|gatsby|vite|webpack-dev-server|@angular/core|lit|solid-js|preact|alpinejs`
+- `vercel.json`, `netlify.toml`, `fly.toml`, `render.yaml` present at repo root
+- `Gemfile` contains `rails`
+- `requirements.txt` or `pyproject.toml` contains
+  `django|flask|fastapi|starlette|sanic`
+- `go.mod` contains `gin-gonic|echo|fiber|chi|gorilla/mux`
+- `Cargo.toml` contains `axum|actix-web|rocket|warp`
+- `docker-compose.yml` has any service with HTTP port mapping
+
+Classification when web-app signals ARE present:
+
 - READY: `.claude/yellow-browser-test.local.md` exists AND `node18_check` ok
   AND `npm` OK AND `agent-browser` OK
-- NEEDS SETUP: any READY condition not met
+- RECOMMENDED: web app detected but `.claude/yellow-browser-test.local.md`
+  is missing — emit "Web app detected; run `/browser-test:setup` to enable
+  testing." This is informational, not a NEEDS SETUP error.
+- NEEDS SETUP: config file exists but tooling missing (`node18_check`/`npm`/
+  `agent-browser`)
+
+If NO web-app signals AND no config file: omit from dashboard.
 
 **yellow-docs:**
 
@@ -369,10 +520,19 @@ Compute bundled source availability out of 6:
 
 **yellow-composio:**
 
-- READY: `jq` OK AND Composio MCP tools visible via ToolSearch AND
-  `.claude/composio-usage.json` exists with valid `version` field
-- PARTIAL: Composio MCP tools visible but `jq` missing or usage counter missing
-- NEEDS SETUP: Composio MCP tools not visible in the current session
+The bundled MCP is now `command`-type stdio with a wrapper resolving
+userConfig OR shell env (v1.3.0+). Use the credential-status file for
+authoritative classification.
+
+- READY: `jq` OK AND `node` OK AND Composio MCP tools visible via ToolSearch
+  AND status file shows BOTH `composio_mcp_url` and `composio_api_key`
+  present AND `.claude/composio-usage.json` exists
+- PARTIAL: status file shows credentials present but MCP tools not visible
+  yet (Claude Code restart needed) OR usage counter missing OR `node` missing
+- NEEDS SETUP: status file shows either credential as `source: absent`
+  (wrapper will exit non-zero and the bundled MCP won't start — no cascade
+  failure to other MCPs) OR status file is missing entirely (run
+  `/plugin disable yellow-composio && /plugin enable yellow-composio`)
 
 **yellow-codex:**
 
