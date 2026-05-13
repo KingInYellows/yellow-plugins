@@ -822,15 +822,25 @@ jobs:
       - name: Run yellow-core git-worktree bats suite (required)
         run: bats plugins/yellow-core/skills/git-worktree/tests/
 
+      - name: Run yellow-core top-level bats suite (required)
+        # Covers credential-status.sh and any future yellow-core lib helpers.
+        # Required (not advisory) because yellow-core libraries are sourced
+        # by every credential-bearing plugin in the marketplace.
+        run: bats plugins/yellow-core/tests/
+
       - name: Run other plugins' bats suites (advisory)
         continue-on-error: true
         run: |
           set -uo pipefail
           STATUS=0
-          # Both top-level and nested test dirs (yellow-core's bats suite
-          # lives under skills/git-worktree/tests/, not at the plugin root).
+          # Both top-level and nested test dirs. yellow-core's suites are
+          # run as required steps above; skip them here to avoid double
+          # execution and to keep the advisory status accurate.
           for d in plugins/*/tests plugins/*/skills/*/tests; do
             [ -d "$d" ] || continue
+            case "$d" in
+              plugins/yellow-core/tests|plugins/yellow-core/skills/git-worktree/tests) continue ;;
+            esac
             echo "::group::bats $d"
             bats "$d" || STATUS=$?
             echo "::endgroup::"

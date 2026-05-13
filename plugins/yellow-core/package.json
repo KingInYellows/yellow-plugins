@@ -4,6 +4,6 @@
   "private": true,
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "scripts": {
-    "test": "bats skills/git-worktree/tests/"
+    "test": "bats skills/git-worktree/tests/ tests/"
   }
 }

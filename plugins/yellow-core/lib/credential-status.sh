@@ -14,9 +14,24 @@
 #   - Never aborts on failure — readers handle "file absent" gracefully.
 #   - Never echoes credential values; only resolution sources.
 #
-# Note: -e omitted intentionally — hook must output {"continue": true} on
-# all paths. The caller is responsible for the final JSON emission.
-set -uo pipefail
+# Note: this file is intended to be sourced. It MUST NOT alter the caller's
+# shell options (no top-level `set -e`, `set -u`, `set -o pipefail`) — doing
+# so can break a SessionStart hook's required `{"continue": true}` emission
+# if the caller relied on default behavior. Functions below use ${var:-}
+# defaulting and explicit failure branches instead of relying on `set`.
+
+# Escape a value for safe embedding inside a JSON string literal. Handles
+# backslash, double-quote, and the two control characters most likely to
+# appear in plugin/version strings (newline, tab). Sufficient for the
+# printf fallback path; jq does its own escaping when available.
+_credstatus_json_escape() {
+  local s="${1:-}"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
 
 # Resolve the data directory for the given plugin.
 # Honors $CLAUDE_PLUGIN_DATA (canonical, per Claude Code docs) and falls
@@ -34,11 +49,13 @@ _credstatus_resolve_dir() {
   fi
 }
 
-# Compose the JSON document. Prefers jq when available so we get correct
-# escaping for free; falls back to printf for environments without jq.
-# The shell env passthrough cannot produce arbitrary user input here — the
-# only string inputs are the plugin name (from manifest) and version
-# (semver) — so printf-only fallback is safe.
+# Compose the JSON document. Prefers jq when available — both for correct
+# escaping AND for fields_json validation. When jq is installed, a parse
+# failure (e.g., malformed fields_json) returns non-zero and the caller
+# skips the write rather than emitting invalid JSON via the printf path.
+# The printf fallback is reserved for environments where jq is not
+# installed; it escapes plugin/version but trusts that fields_json is
+# already valid JSON (caller responsibility, documented in the protocol).
 _credstatus_compose() {
   local plugin="$1"
   local version="$2"
@@ -47,19 +64,26 @@ _credstatus_compose() {
   session_ts=$(date -u +'%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf '1970-01-01T00:00:00Z')
 
   if command -v jq >/dev/null 2>&1; then
+    # When jq is available, treat parse/build failure as a hard error so
+    # we never overwrite a previously valid status file with garbage.
     jq -nc \
       --arg plugin "$plugin" \
       --arg version "$version" \
       --arg session_ts "$session_ts" \
       --argjson credentials "$fields_json" \
       '{plugin: $plugin, version: $version, session_ts: $session_ts, credentials: $credentials}' \
-      2>/dev/null && return 0
+      2>/dev/null
+    return $?
   fi
 
-  # Fallback: assume fields_json is already valid JSON (caller responsibility).
-  # Plugin and version are constrained by validate-plugin.js to safe chars.
+  # jq not installed → printf fallback. Escape plugin/version so unusual
+  # input (quotes, backslashes) cannot break the JSON shape. fields_json
+  # is assumed valid (caller responsibility per the protocol contract).
+  local plugin_esc version_esc
+  plugin_esc=$(_credstatus_json_escape "$plugin")
+  version_esc=$(_credstatus_json_escape "$version")
   printf '{"plugin":"%s","version":"%s","session_ts":"%s","credentials":%s}' \
-    "$plugin" "$version" "$session_ts" "$fields_json"
+    "$plugin_esc" "$version_esc" "$session_ts" "$fields_json"
 }
 
 # Public API: write credential status for a plugin.
@@ -98,7 +122,12 @@ write_credential_status() {
   }
 
   local target="$data_dir/credential-status.json"
-  local tmp="${target}.tmp"
+  # Per-invocation unique temp filename so concurrent SessionStart writers
+  # for the same plugin (e.g., two Claude Code sessions racing) cannot
+  # clobber each other's tmp file mid-write. Falls back to a PID-suffixed
+  # path if mktemp is unavailable (extremely rare).
+  local tmp
+  tmp=$(mktemp "${target}.tmp.XXXXXX" 2>/dev/null) || tmp="${target}.tmp.$$"
 
   printf '%s\n' "$doc" >"$tmp" 2>/dev/null || {
     printf '[credential-status] Warning: could not write %s\n' "$tmp" >&2
@@ -130,15 +159,22 @@ credential_status_field() {
   local valid="${4:-null}"
 
   if command -v jq >/dev/null 2>&1; then
+    # Mirrors _credstatus_compose: jq parse failure (e.g., non-boolean
+    # present/valid) returns non-zero so callers don't accidentally embed
+    # invalid JSON into the composed document.
     jq -nc \
       --arg field "$field" \
       --arg source "$source" \
       --argjson present "$present" \
       --argjson valid "$valid" \
       '{field: $field, source: $source, present: $present, valid: $valid}' \
-      2>/dev/null && return 0
+      2>/dev/null
+    return $?
   fi
 
+  local field_esc source_esc
+  field_esc=$(_credstatus_json_escape "$field")
+  source_esc=$(_credstatus_json_escape "$source")
   printf '{"field":"%s","source":"%s","present":%s,"valid":%s}' \
-    "$field" "$source" "$present" "$valid"
+    "$field_esc" "$source_esc" "$present" "$valid"
 }

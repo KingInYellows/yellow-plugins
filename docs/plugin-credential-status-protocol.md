@@ -56,9 +56,11 @@ directories — no cross-plugin write contention.
 ### Forbidden
 
 The file MUST NOT contain credential values. Only the resolution source
-(`userConfig` / `shell_env` / `absent`) and presence boolean. Validators
-will fail any file containing a recognizable credential pattern (40+ char
-strings, `sk_*`, `sgp_*`, etc.).
+(`userConfig` / `shell_env` / `absent`) and presence boolean. This rule
+is currently enforced via code review on the SessionStart hook contents;
+a `validate-credential-status.js` companion to `validate-plugin.js`
+checking written status files for recognizable credential patterns
+(40+ char strings, `sk_*`, `sgp_*`, etc.) is planned but not yet shipped.
 
 ## Lifecycle
 
@@ -66,7 +68,7 @@ strings, `sk_*`, `sgp_*`, etc.).
 |-------|----------|
 | First SessionStart after install | File created with all `userConfig` fields enumerated |
 | Subsequent SessionStarts | Full overwrite (no append; no merge) |
-| `/plugin disable <name>` | File deleted by hook teardown (best-effort) |
+| `/plugin disable <name>` | File becomes orphaned; Claude Code does not currently expose a plugin-disable hook event, so the file persists until the next SessionStart of an installed-and-enabled instance overwrites it. Readers treat a stale file as "status unknown" once the plugin no longer appears in `claude plugin list`. |
 | `/plugin update <name>` | Stale until next SessionStart populates a new file |
 | Hook crash / write failure | Silently skipped — readers treat missing file as "unknown" |
 
@@ -99,11 +101,22 @@ The helper:
 
 1. Resolves `${CLAUDE_PLUGIN_DATA}` (falls back to
    `~/.claude/plugins/data/<plugin>/`).
-2. Writes to `<dir>/credential-status.json.tmp` first.
+2. Writes to a per-invocation unique temp file
+   (`credential-status.json.tmp.XXXXXX` via `mktemp`) so concurrent
+   SessionStart writers cannot clobber each other's tmp path.
 3. Atomically renames to `credential-status.json` (POSIX rename atomicity).
 4. Silently exits on any failure — never blocks SessionStart.
-5. Always finishes with `printf '{"continue": true}\n'` if invoked as a
-   standalone hook (caller is responsible if sourced into a larger hook).
+
+The helper does NOT emit `{"continue": true}`. That JSON is the
+SessionStart hook's contract with Claude Code, not the writer's. Every
+hook that sources this helper is responsible for emitting the response
+itself, e.g.:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/credential-status.sh"
+write_credential_status "yellow-foo" "1.2.3" "$fields_json"
+printf '{"continue": true}\n'
+```
 
 ## Reader Contract (`/setup:all`)
 
@@ -154,7 +167,9 @@ subprocess context and dashboard context — every credential-bearing
 plugin emits one identical-shape file so `/setup:all` can render an
 accurate dashboard without per-plugin special-casing.
 
-Plugins that emit this file:
+Plugins planned to emit this file (per the
+`plans/plugin-install-resilience.md` stack — adopters land in follow-up
+PRs after this foundation merges):
 
 - yellow-research (perplexity/tavily/exa keys + ceramic OAuth state)
 - yellow-morph (morph key)

@@ -77,7 +77,43 @@ teardown() {
 @test "atomic write: no leftover .tmp file on success" {
   fields='[]'
   write_credential_status "yellow-foo" "1.0.0" "$fields"
-  [ ! -f "$CLAUDE_PLUGIN_DATA/credential-status.json.tmp" ]
+  # Unique per-invocation tmp filenames (mktemp template
+  # credential-status.json.tmp.XXXXXX) — assert none survived the rename.
+  shopt -s nullglob
+  leftovers=( "$CLAUDE_PLUGIN_DATA"/credential-status.json.tmp* )
+  shopt -u nullglob
+  [ "${#leftovers[@]}" -eq 0 ]
+}
+
+@test "malformed fields_json does not overwrite a previously valid file (when jq is present)" {
+  if ! command -v jq >/dev/null 2>&1; then
+    skip "jq not installed; printf fallback path skipped"
+  fi
+  write_credential_status "yellow-foo" "1.0.0" '[{"field":"k","source":"userConfig","present":true,"valid":null}]'
+  [ -f "$CLAUDE_PLUGIN_DATA/credential-status.json" ]
+  prev_version=$(jq -r '.version' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+  [ "$prev_version" = "1.0.0" ]
+
+  # Second call with invalid JSON in fields_json — jq rejects, helper
+  # returns 0 (non-blocking) but does NOT overwrite the file.
+  run write_credential_status "yellow-foo" "9.9.9" 'not-json-at-all'
+  [ "$status" -eq 0 ]
+  after_version=$(jq -r '.version' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+  [ "$after_version" = "1.0.0" ]
+}
+
+@test "does not pollute the caller's shell options" {
+  # The lib MUST NOT enable nounset / pipefail at file scope, otherwise
+  # SessionStart hooks that omit `set -u` would abort on unset vars and
+  # fail to emit their required {"continue": true} response. Run in a
+  # fresh subshell so bats's own option state doesn't mask drift.
+  result=$(bash -c '
+    before=$(set +o | tr -d "\n")
+    . "$1"
+    after=$(set +o | tr -d "\n")
+    [ "$before" = "$after" ] && echo OK || echo "DRIFT: $before -> $after"
+  ' _ "$BATS_TEST_DIRNAME/../lib/credential-status.sh")
+  [ "$result" = "OK" ]
 }
 
 # --- credential_status_field helper ---

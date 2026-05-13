@@ -204,8 +204,13 @@ Four coordinated workstreams, each independently shippable:
 <!-- deepen-plan: codebase -->
 > **Codebase:** `plugins/yellow-core/lib/` directory does NOT exist today.
 > Only `plugins/yellow-morph/lib/` exists (`install-morphmcp.sh`). Phase 1.2
-> creates the `yellow-core/lib/` directory from scratch. Follow yellow-morph's
-> sourcing precedent: `source "${CLAUDE_PLUGIN_ROOT}/lib/credential-status.sh"`.
+> creates the `yellow-core/lib/` directory from scratch. Because the helper
+> lives in `yellow-core/lib/` (not the consuming plugin's own
+> `${CLAUDE_PLUGIN_ROOT}/lib/`), adopter plugins source it via the
+> cross-plugin path documented in `docs/plugin-credential-status-protocol.md`:
+> `source "${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/credential-status.sh"`.
+> Adopters that need yellow-core-independent install must copy the helper
+> inline (also called out in the protocol doc's writer contract).
 <!-- /deepen-plan -->
 - [ ] 1.3 Unit test the helper with bats: file absent → write succeeds;
        file present + new schema → overwrite preserves valid JSON; jq
