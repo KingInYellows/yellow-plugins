@@ -27,13 +27,26 @@
   },
   "mcpServers": {
     "semgrep": {
-      "command": "semgrep",
-      "args": [
-        "mcp"
-      ],
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-semgrep.sh",
+      "args": [],
       "env": {
-        "SEMGREP_APP_TOKEN": "${user_config.semgrep_app_token}"
+        "SEMGREP_APP_TOKEN_USERCONFIG": "${user_config.semgrep_app_token}",
+        "SEMGREP_APP_TOKEN": "${SEMGREP_APP_TOKEN:-}"
       }
     }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
   }
 }
