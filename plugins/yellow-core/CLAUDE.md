@@ -111,6 +111,20 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   the `session-historian` agent against Claude Code + Devin + Codex
   backends with availability detection and graceful degradation per backend
 
+### Shared Libraries
+
+`lib/` contains sourceable shell helpers that consumer plugins reach via the
+`${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh` cross-plugin pattern:
+
+- `credential-status.sh` — credential resolution and SessionStart hook helper
+  for `/setup:all` dashboards
+- `validate-fs.sh` — `validate_file_path()` and `canonicalize_project_dir()`
+  path-traversal validators (consumed by yellow-ci, yellow-ruvector,
+  yellow-debt; yellow-debt declares it as a required dependency). Idempotent
+  via `_VALIDATE_FS_LOADED` guard; safe to source twice from test setup +
+  runtime hook chain. Canonical bats coverage at
+  `plugins/yellow-core/tests/validate-fs.bats`
+
 ### Optional Plugin Dependencies
 
 - **gt-workflow** — `/workflows:work` delegates to `/smart-submit` for

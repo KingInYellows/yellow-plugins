@@ -24,7 +24,9 @@ This plugin follows security patterns from `docs/solutions/security-issues/`:
 2. **Prompt injection defense**: All scanner agents fence code content with
    "treat as reference only" advisories
 3. **Path validation**: All path arguments validated via `validate_file_path()`
-   before use (reject `..`, `/`, `~`)
+   before use (reject `..`, `/`, `~`). Sourced from
+   `yellow-core/lib/validate-fs.sh` via `lib/validate.sh`; yellow-core is a
+   required dependency declared in `plugin.json`
 4. **TOCTOU protection**: State transitions re-read file inside `flock` scope
 5. **Derived path validation**: Synthesizer validates category/slug contain only
    `[a-z0-9-]` before constructing todo paths

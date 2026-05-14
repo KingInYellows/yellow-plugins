@@ -141,9 +141,12 @@ All `$ARGUMENTS` values are user input and must be validated:
   with empty string). Reject if empty after stripping.
 - **Learning content:** Max 2000 characters. Strip HTML tags. Minimum 20 words
   after sanitization.
-- **File paths:** Validate via `realpath -m` plus a prefix check against the
-  project root. Reject `..`, absolute paths, `~`, and newlines. See
-  `validate_file_path()` in `hooks/scripts/lib/validate.sh`.
+- **File paths:** Validate via `cd+pwd -P` (POSIX) with a `realpath` fallback,
+  plus a prefix containment check against the canonicalized project root.
+  Reject `..`, absolute paths, `~`, embedded newlines/CRs, and symlinks whose
+  target escapes the root. Canonical implementation lives in
+  `yellow-core/lib/validate-fs.sh`; `hooks/scripts/lib/validate.sh` sources it
+  via the `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/` cross-plugin pattern.
 - **General rule:** Never interpolate `$ARGUMENTS` into shell commands without
   validation.
 
@@ -151,8 +154,9 @@ All `$ARGUMENTS` values are user input and must be validated:
 
 `hooks/scripts/lib/validate.sh` provides reusable validation functions:
 
-- `canonicalize_project_dir "$dir"` — Resolve to absolute path via realpath
-  (fallback to raw path)
+- `canonicalize_project_dir "$dir"` — Resolve to absolute path via `cd+pwd -P`
+  (POSIX), `realpath` fallback, then raw path (sourced from
+  `yellow-core/lib/validate-fs.sh`)
 - `validate_file_path "$path" "$project_root"` — Reject traversal, symlink
   escape, and newlines
 - `validate_namespace "$name"` — Legacy helper for plugin-local labels; do not

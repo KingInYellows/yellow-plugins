@@ -3,6 +3,11 @@
 
 setup() {
   SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../hooks/scripts" && pwd)"
+  # validate_file_path now lives in yellow-core's shared lib. At runtime
+  # validate.sh sources it via CLAUDE_PLUGIN_ROOT; in tests source it
+  # directly first (validate.sh's guarded source then no-ops).
+  # shellcheck source=../../yellow-core/lib/validate-fs.sh
+  . "$(dirname "$BATS_TEST_FILENAME")/../../yellow-core/lib/validate-fs.sh"
   # shellcheck source=../hooks/scripts/lib/validate.sh
   . "${SCRIPT_DIR}/lib/validate.sh"
 }

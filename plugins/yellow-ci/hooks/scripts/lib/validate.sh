@@ -12,72 +12,22 @@ has_newline() {
   esac
 }
 
+# Shared filesystem-path validators (validate_file_path,
+# canonicalize_project_dir) live in yellow-core's shared lib so a security
+# fix lands in one place. At runtime CLAUDE_PLUGIN_ROOT is set by Claude
+# Code; in Bats tests the suite sources validate-fs.sh directly.
+_VALIDATE_FS_HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
+if [ -f "$_VALIDATE_FS_HELPER" ]; then
+  # shellcheck source=/dev/null
+  . "$_VALIDATE_FS_HELPER"
+fi
+unset _VALIDATE_FS_HELPER
+
 # ============================================================================
 # Shared validation library functions
 # The following functions are not all used by every plugin but are available
 # as a shared validation library for hooks, commands, and agents.
 # ============================================================================
-
-# Validate file_path is within project root (path traversal mitigation)
-# Usage: validate_file_path "$path" "$project_root"
-validate_file_path() {
-  local raw_path="$1"
-  local project_root="$2"
-
-  # Quick reject: obvious traversal patterns
-  case "$raw_path" in
-    *..* | /* | *~*) return 1 ;;
-  esac
-
-  # Empty path is invalid
-  if [ -z "$raw_path" ]; then
-    return 1
-  fi
-
-  # Reject newlines and carriage returns
-  if has_newline "$raw_path"; then
-    return 1
-  fi
-
-  # Resolve to absolute and check containment
-  local full_path="${project_root}/${raw_path}"
-
-  # Reject symlinks outside project root
-  if [ -L "$full_path" ]; then
-    local target
-    if command -v realpath >/dev/null 2>&1; then
-      target="$(realpath -- "$full_path" 2>/dev/null)" || return 1
-    elif command -v readlink >/dev/null 2>&1; then
-      local link_content
-      link_content=$(readlink -- "$full_path" 2>/dev/null) || return 1
-      case "$link_content" in
-        /*) target="$link_content" ;;
-        *)  target="$(cd -- "$(dirname "$full_path")" 2>/dev/null && cd -- "$(dirname "$link_content")" 2>/dev/null && pwd -P)/$(basename "$link_content")" || return 1 ;;
-      esac
-    else
-      return 1
-    fi
-    case "$target" in
-      "${project_root}/"*) ;;
-      *) return 1 ;;
-    esac
-  fi
-
-  # Resolve path
-  local resolved
-  if [ -e "$full_path" ] && [ -d "$(dirname "$full_path")" ]; then
-    resolved="$(cd -- "$(dirname "$full_path")" 2>/dev/null && pwd -P)/$(basename "$full_path")"
-  elif command -v realpath >/dev/null 2>&1; then
-    resolved="$(realpath -- "$full_path" 2>/dev/null)" || resolved="$full_path"
-  else
-    resolved="$full_path"
-  fi
-
-  case "$resolved" in
-    "${project_root}/"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 # Validate runner name: DNS-safe, 2-64 chars, lowercase alphanumeric + hyphens
 # Usage: validate_runner_name "$name"
