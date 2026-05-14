@@ -18,6 +18,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { readMarketplaceManifest } = require('./lib/marketplace-reader');
+
 const DEFAULT_MARKETPLACE_PATH = '.claude-plugin/marketplace.json';
 const PROJECT_ROOT = process.cwd();
 
@@ -87,21 +89,20 @@ function logSuccess(message) {
  */
 function validateFileExists() {
   const fullPath = path.join(PROJECT_ROOT, marketplacePath);
+  const result = readMarketplaceManifest(fullPath);
 
-  if (!fs.existsSync(fullPath)) {
+  if (result.status === 'missing') {
     logError(`Marketplace file not found: ${marketplacePath}`);
     return false;
   }
-
-  try {
-    const content = fs.readFileSync(fullPath, 'utf8');
-    marketplace = JSON.parse(content);
-    logSuccess(`Marketplace file loaded: ${marketplacePath}`);
-    return true;
-  } catch (err) {
-    logError(`Failed to parse marketplace.json: ${err.message}`);
+  if (result.status === 'invalid') {
+    logError(`Failed to parse marketplace.json: ${result.error}`);
     return false;
   }
+
+  marketplace = result.data;
+  logSuccess(`Marketplace file loaded: ${marketplacePath}`);
+  return true;
 }
 
 /**

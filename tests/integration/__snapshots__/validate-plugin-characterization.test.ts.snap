@@ -1,0 +1,58 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 1: missing required fields 1`] = `
+[
+  "Missing required field: "author"",
+  "Missing required field: "description"",
+  "Missing required field: "name"",
+]
+`;
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 2: name does not match directory 1`] = `
+[
+  "Plugin name "wrong-name" does not match directory name "name-mismatch"",
+]
+`;
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 3: invalid version format 1`] = `
+[
+  "Invalid version format: v1 (must be MAJOR.MINOR.PATCH)",
+]
+`;
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 5: keywords must be an array of strings 1`] = `
+[
+  "keywords must be an array",
+]
+`;
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 5b: commands directory not found 1`] = `
+[
+  "commands directory not found: ./nope",
+]
+`;
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 5b: path escapes plugin directory 1`] = `
+[
+  "agents path escapes plugin directory: ../escape",
+]
+`;
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 7: hooks/hooks.json with events at the top level 1`] = `
+[
+  "hooks/hooks.json: top-level "hooks" key is required and must be a non-null object — Claude Code 2.1.131+ rejects plugins with a different shape",
+]
+`;
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 9: userConfig entry missing type and title 1`] = `
+[
+  "userConfig.api_key is missing required field "title" (human-readable UI label)",
+  "userConfig.api_key is missing required field "type" (one of: string, number, boolean, directory, file)",
+]
+`;
+
+exports[`validate-plugin characterization: invalid-fixture error arrays > RULE 9: userConfig entry with an unsupported field 1`] = `
+[
+  "userConfig.api_key has unsupported field "pattern" — Claude Code's remote validator rejects keys outside {type, title, description, default, required, sensitive, multiple, min, max}",
+]
+`;

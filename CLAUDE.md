@@ -30,12 +30,13 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes
 pnpm validate:marketplace     # .claude-plugin/marketplace.json only
 pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace
 pnpm validate:agents          # agent-authoring rules only
 pnpm validate:versions        # cross-manifest version drift check
+pnpm validate:error-codes     # scripts/ must use ERROR-* codes from errorCatalog.ts
 
 pnpm release:check            # validate:schemas + validate:versions + typecheck
 pnpm changeset                # create a changeset for plugin file changes

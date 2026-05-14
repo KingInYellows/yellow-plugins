@@ -36,6 +36,9 @@ validators in `scripts/`, the schemas in `schemas/`, and this file.
   utilities. Important entry points include `validate-agent-authoring.js`,
   `validate-marketplace.js`, `validate-plugin.js`, `validate-setup-all.js`,
   `validate-versions.js`, `sync-manifests.js`, and `catalog-version.js`.
+  Shared helpers live in `scripts/lib/` (`plugin-rules.js`, `plugin-paths.js`,
+  `logging.js`, `marketplace-reader.js`) — `validate-plugin.js` and
+  `validate-marketplace.js` are thin orchestrators that import from there.
 - `schemas/`: JSON schemas for plugin manifests and marketplace files.
 - `api/cli-contracts/` and `examples/`: Contract fixtures and schema examples.
 - `tests/integration/`: Vitest integration coverage for validators and fixtures.
@@ -58,8 +61,10 @@ Use pnpm only. `preinstall` enforces Node and pnpm through
 - `pnpm typecheck`: Run strict TypeScript checks without emit.
 - `pnpm test:unit`: Run Vitest for `packages/`.
 - `pnpm test:integration`: Run Vitest for `tests/integration/`.
-- `pnpm validate:schemas`: Run marketplace, plugin, setup-all, and
-  agent-authoring validation in one pass.
+- `pnpm validate:schemas`: Run marketplace, plugin, setup-all,
+  agent-authoring, and error-code re-implementation validation in one pass.
+- `pnpm validate:error-codes`: Scan `scripts/*.js` for hard-coded `ERROR-*`
+  codes that re-implement entries from `packages/domain/src/errorCatalog.ts`.
 - `pnpm validate:agents`: Run the agent and markdown authoring validator only.
 - `pnpm validate:marketplace`: Validate `.claude-plugin/marketplace.json`.
 - `pnpm validate:plugins`: Validate plugin manifests plus plugin-specific
