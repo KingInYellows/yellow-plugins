@@ -48,5 +48,13 @@
         ]
       }
     ]
-  }
+  },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": "*",
+      "optional": false,
+      "reason": "hooks/write-credential-status.sh sources yellow-core/lib/credential-status.sh for the credential_hook_scaffold function"
+    }
+  ]
 }
