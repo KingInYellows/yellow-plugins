@@ -9,7 +9,6 @@
 // Validation toolkit
 export {
   AjvValidatorFactory,
-  sharedValidatorFactory,
   type ValidationError,
   type ValidationResult,
 } from './validation/ajvFactory.js';

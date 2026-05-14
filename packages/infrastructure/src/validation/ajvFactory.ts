@@ -1,8 +1,6 @@
 /**
- * AJV Factory for JSON Schema Validation
- *
- * Provides centralized AJV configuration with schema compilation and caching.
- * Supports JSON Schema Draft-07 with strict validation and format checking.
+ * AJV factory for JSON Schema (Draft-07) validation: centralized AJV
+ * configuration with per-schema compilation and caching.
  *
  * @module infrastructure/validation/ajvFactory
  */
@@ -23,6 +21,8 @@ type AjvInstance = import('ajv').default;
 type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 type AddFormatsFn = (ajv: AjvInstance) => AjvInstance;
 
+// Ajv / ajv-formats ship as CJS-with-default under ESM — normalize to the
+// callable in both interop shapes.
 const AjvCtor: AjvConstructor =
   (Ajv as unknown as { default?: AjvConstructor }).default ??
   (Ajv as unknown as AjvConstructor);
@@ -31,17 +31,11 @@ const applyFormats: AddFormatsFn =
   (addFormats as unknown as { default?: AddFormatsFn }).default ??
   (addFormats as unknown as AddFormatsFn);
 
-/**
- * Validation result containing success status and typed errors
- */
 export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
 }
 
-/**
- * Structured validation error with enhanced context
- */
 export interface ValidationError {
   path: string;
   message: string;
@@ -50,9 +44,6 @@ export interface ValidationError {
   schemaPath: string;
 }
 
-/**
- * Schema compilation cache entry
- */
 interface CachedValidator {
   validator: ValidateFunction;
   schemaId: string;
@@ -60,60 +51,36 @@ interface CachedValidator {
 }
 
 /**
- * AJV Factory for creating and caching schema validators
- *
- * Features:
- * - Strict mode validation (no coercion)
- * - Format validation (uri, email, date-time, hostname)
- * - Schema caching for performance
- * - Detailed error reporting
- *
- * @example
- * ```typescript
- * const factory = new AjvValidatorFactory();
- * await factory.loadSchemaFromFile('marketplace', './schemas/marketplace.schema.json');
- * const result = factory.validate('marketplace', data);
- * if (!result.valid) {
- *   console.error('Validation errors:', result.errors);
- * }
- * ```
+ * Creates and caches AJV schema validators. Strict mode (no coercion),
+ * `allErrors` (collect every error, not just the first), format validation,
+ * and the custom `semverRange` keyword.
  */
 export class AjvValidatorFactory {
-  private ajv: AjvInstance; // AJV instance
+  private ajv: AjvInstance;
   private validatorCache: Map<string, CachedValidator>;
 
   constructor() {
-    // Initialize AJV with strict configuration
     this.ajv = new AjvCtor({
-      strict: true, // Strict schema validation
-      allErrors: true, // Collect all errors (not just first)
-      verbose: true, // Include schema and data in errors
-      discriminator: true, // Support discriminator keyword
-      allowUnionTypes: true, // Allow union types in schemas
-      $data: true, // Support $data references
+      strict: true,
+      allErrors: true, // collect all errors, not just the first
+      verbose: true, // include schema + data in error objects
+      discriminator: true,
+      allowUnionTypes: true,
+      $data: true,
     });
 
-    // Add format validators (uri, email, date-time, etc.)
     applyFormats(this.ajv);
 
-    // Register custom keywords. semverRange validates dependencies[].version
-    // entries against npm semver range grammar (delegates to semver.validRange).
+    // semverRange validates dependencies[].version entries against npm
+    // semver range grammar (delegates to semver.validRange).
     this.ajv.addKeyword(semverRangeKeyword);
 
     this.validatorCache = new Map();
   }
 
   /**
-   * Load and compile a JSON schema from file
-   *
-   * @param schemaName - Unique identifier for this schema
-   * @param filePath - Path to JSON schema file (absolute or relative to CWD)
-   * @throws Error if schema file cannot be read or is invalid
-   *
-   * @example
-   * ```typescript
-   * await factory.loadSchemaFromFile('marketplace', './schemas/marketplace.schema.json');
-   * ```
+   * Load and compile a JSON schema from a file (path absolute or relative
+   * to CWD). Throws if the file cannot be read or the schema is invalid.
    */
   async loadSchemaFromFile(
     schemaName: string,
@@ -135,26 +102,15 @@ export class AjvValidatorFactory {
   }
 
   /**
-   * Load and compile a JSON schema from object
-   *
-   * @param schemaName - Unique identifier for this schema
-   * @param schema - JSON schema object
-   * @throws Error if schema compilation fails
-   *
-   * @example
-   * ```typescript
-   * factory.loadSchema('plugin', pluginSchemaObject);
-   * ```
+   * Compile and cache a JSON schema object under `schemaName`. Throws if
+   * compilation fails.
    */
   loadSchema(schemaName: string, schema: object): void {
     try {
-      // Compile the schema
       const validator = this.ajv.compile(schema);
-
-      // Extract schema $id if present, otherwise use schemaName
+      // Prefer the schema's own $id; fall back to the caller's name.
       const schemaId = (schema as { $id?: string }).$id || schemaName;
 
-      // Cache the compiled validator
       this.validatorCache.set(schemaName, {
         validator,
         schemaId,
@@ -170,22 +126,8 @@ export class AjvValidatorFactory {
   }
 
   /**
-   * Validate data against a loaded schema
-   *
-   * @param schemaName - Name of the schema to validate against
-   * @param data - Data to validate
-   * @returns ValidationResult with success status and detailed errors
-   * @throws Error if schema not found
-   *
-   * @example
-   * ```typescript
-   * const result = factory.validate('marketplace', marketplaceData);
-   * if (!result.valid) {
-   *   result.errors.forEach(err => {
-   *     console.error(`${err.path}: ${err.message}`);
-   *   });
-   * }
-   * ```
+   * Validate `data` against a previously loaded schema. Throws if the named
+   * schema was never loaded.
    */
   validate(schemaName: string, data: unknown): ValidationResult {
     const cached = this.validatorCache.get(schemaName);
@@ -202,19 +144,11 @@ export class AjvValidatorFactory {
       return { valid: true, errors: [] };
     }
 
-    // Transform AJV errors to our structured format
     const errors = this.transformErrors(cached.validator.errors || []);
 
     return { valid: false, errors };
   }
 
-  /**
-   * Transform AJV errors into structured ValidationError format
-   *
-   * @private
-   * @param ajvErrors - Raw AJV error objects
-   * @returns Structured validation errors with enhanced context
-   */
   private transformErrors(ajvErrors: ErrorObject[]): ValidationError[] {
     return ajvErrors.map((error) => ({
       path: error.instancePath || '/',
@@ -225,71 +159,7 @@ export class AjvValidatorFactory {
     }));
   }
 
-  /**
-   * Check if a schema is loaded
-   *
-   * @param schemaName - Name of the schema to check
-   * @returns True if schema is loaded and compiled
-   */
   hasSchema(schemaName: string): boolean {
     return this.validatorCache.has(schemaName);
   }
-
-  /**
-   * Get list of all loaded schema names
-   *
-   * @returns Array of schema names
-   */
-  getLoadedSchemas(): string[] {
-    return Array.from(this.validatorCache.keys());
-  }
-
-  /**
-   * Clear all cached validators
-   *
-   * Useful for testing or reloading schemas
-   */
-  clearCache(): void {
-    this.validatorCache.clear();
-  }
-
-  /**
-   * Get cache statistics
-   *
-   * @returns Object with cache size and schema details
-   */
-  getCacheStats(): {
-    size: number;
-    schemas: Array<{ name: string; id: string; compiledAt: Date }>;
-  } {
-    return {
-      size: this.validatorCache.size,
-      schemas: Array.from(this.validatorCache.entries()).map(
-        ([name, cached]) => ({
-          name,
-          id: cached.schemaId,
-          compiledAt: cached.compiledAt,
-        })
-      ),
-    };
-  }
 }
-
-/**
- * Singleton instance of AjvValidatorFactory
- *
- * Provides a shared validator factory across the application for performance.
- * Use this for most validation needs.
- *
- * @example
- * ```typescript
- * import { sharedValidatorFactory } from './ajvFactory.js';
- *
- * // In application initialization
- * await sharedValidatorFactory.loadSchemaFromFile('marketplace', './schemas/marketplace.schema.json');
- *
- * // Later in the code
- * const result = sharedValidatorFactory.validate('marketplace', data);
- * ```
- */
-export const sharedValidatorFactory = new AjvValidatorFactory();

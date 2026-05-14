@@ -77,7 +77,6 @@ Domain-level validator implementing `IValidator` interface.
 
 - Maps AJV errors to domain error codes (ERROR-SCHEMA-001, etc.)
 - Provides specification traceability (CRIT-_, FR-_ references)
-- Includes resolution guidance for each error
 - Validates compatibility constraints (Claude Code version, Node.js, OS, arch)
 
 **API**:
@@ -140,7 +139,6 @@ if (result.status === ValidationStatus.SUCCESS) {
   console.error('❌ Validation errors:');
   result.errors.forEach(err => {
     console.error(`  [${err.code}] ${err.path}: ${err.message}`);
-    console.error(`  Resolution: ${err.resolution}`);
   });
 }
 ```
@@ -254,7 +252,7 @@ console.log('Plugin:', result2.status); // Should be SUCCESS
    - IValidator interface in domain layer
    - SchemaValidator implementation in infrastructure
    - AjvValidatorFactory for schema compilation
-   - Domain-level error types with resolution guidance
+   - Domain-level error types with specification traceability
 
 4. ✅ **Diagrams render without syntax errors**
    - `docs/diagrams/component-overview.mmd` - Mermaid syntax verified
