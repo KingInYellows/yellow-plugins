@@ -21,18 +21,27 @@ resolution, and sequential stack review. Graphite-native workflow.
 - Commit messages: `fix: address review findings from <agents>` or
   `fix: resolve PR #<num> review comments`
 - Always confirm with user via `AskUserQuestion` before pushing changes — never
-  auto-push without human approval
+  auto-push without human approval. **Exception:** `/review:resolve-stack` runs
+  fully autonomously by design and intentionally suppresses every
+  `AskUserQuestion` gate (including the push gate, via
+  `/review:resolve --non-interactive`); this is its documented, expected
+  behavior — see its `## What It Does` section. The default `/review:resolve`
+  path keeps every gate.
 
 ## Plugin Components
 
-### Commands (5)
+### Commands (6)
 
 - `/review:setup` — Validate GitHub, jq, Graphite, and optional yellow-core
   integration before reviewing PRs
 - `/review:pr` — Adaptive multi-agent review of a single PR with automatic fix
   application
 - `/review:resolve` — Parallel resolution of unresolved PR review comments via
-  GraphQL
+  GraphQL. Accepts `--non-interactive` to suppress its spawn-cap, CONFLICT, and
+  push-confirmation gates (used by `/review:resolve-stack`)
+- `/review:resolve-stack` — Walk the current Graphite stack bottom-up and run
+  `/review:resolve --non-interactive` on every open PR fully autonomously (no
+  prompts), pushing and restacking as it goes
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
 - `/review:sweep` — Wrapper that runs `/review:pr` then `/review:resolve` on
@@ -93,10 +102,13 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `pr-comment-resolver` — Implements fix for a single review comment (spawned in
   parallel)
 
-### Skills (1)
+### Skills (2)
 
 - `pr-review-workflow` — Internal reference for adaptive selection, output
   format, error handling, and Graphite integration (not user-invokable)
+- `stack-traversal` — Internal reference for the bottom-up Graphite
+  stack-traversal procedure shared by `/review:all` and
+  `/review:resolve-stack` (not user-invokable)
 
 ### Scripts (2)
 
@@ -111,8 +123,15 @@ resolution, and sequential stack review. Graphite-native workflow.
   commands fail before agent analysis begins.
 - **`/review:pr`** — Review a single PR with adaptive agent selection. Best for
   focused reviews of individual changes.
-- **`/review:resolve`** — Address pending review comments. Run after receiving
-  feedback to fix and mark threads resolved.
+- **`/review:resolve`** — Address pending review comments on a single PR. Run
+  after receiving feedback to fix and mark threads resolved. Keeps its
+  spawn-cap and push-confirmation gates for interactive use.
+- **`/review:resolve-stack`** — Resolve comments across an entire Graphite
+  stack in one unattended pass. Walks base → tip, runs `/review:resolve` per PR
+  with gates suppressed, pushes and restacks autonomously. Best when you have
+  review feedback spread across a multi-PR stack and want it all cleared
+  without per-PR prompts. Distinct from `/review:all scope=stack` (which runs
+  the full review + resolve pipeline per PR) — `resolve-stack` is resolve-only.
 - **`/review:all scope=stack`** — Review entire Graphite stack in dependency
   order (base → tip). Best before submitting a stack for review.
 - **`/review:all scope=all`** — Batch-review all your open non-draft PRs. Best
