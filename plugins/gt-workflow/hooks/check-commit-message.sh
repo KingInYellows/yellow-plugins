@@ -29,7 +29,12 @@ case "$COMMAND" in
   *) exit_ok ;;
 esac
 
-# Skip validation if command failed
+# Skip validation if command failed. Note: defaults to 0 when exit_code is
+# absent — this hook is a validation gate, so "fail-closed" here means "run
+# the validation when uncertain" (better to warn on a maybe-bad message than
+# silently let a non-conventional message through because tool_result was
+# missing). On a real jq parse error we fall through to EXIT_CODE=1 below
+# (skipping validation), which matches the prior behavior.
 EXIT_CODE=$(printf '%s' "$INPUT" | jq -r '.tool_result.exit_code // 0') || {
   printf '[gt-workflow] Warning: could not parse exit_code from hook input\n' >&2
   EXIT_CODE=1
@@ -38,12 +43,13 @@ if [ "$EXIT_CODE" != "0" ]; then
   exit_ok
 fi
 
-# Extract first non-empty -m flag value (double-quoted form only).
-# Known gaps (permissive by design — warn-only hook):
-#   - Single-quoted: -m 'message' → not matched, skips validation
-#   - Multi -m flags: -m "subject" -m "body" → only first is checked
-# These gaps cause false-negatives (no warning), never false-positives or blocks.
-MSG=$(printf '%s' "$COMMAND" | grep -oE '\-m "[^"]*"' | head -1 | sed 's/^-m "//;s/"$//') || MSG=""
+# Extract the first -m flag value. Matches both double- and single-quoted
+# forms (debt finding 032 — the single-quote gap let `-m 'feat: x'` bypass
+# conventional-commit enforcement entirely).
+# Remaining gap (permissive by design — warn-only hook):
+#   - Multi -m flags: -m "subject" -m "body" → only the first is checked
+# This causes false-negatives (no warning), never false-positives or blocks.
+MSG=$(printf '%s' "$COMMAND" | grep -oE "\-m ['\"][^'\"]*['\"]" | head -1 | sed -E "s/^-m ['\"]//;s/['\"]\$//") || MSG=""
 
 # If we couldn't extract the message, skip validation (permissive)
 [ -z "$MSG" ] && exit_ok

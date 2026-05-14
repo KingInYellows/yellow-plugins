@@ -60,9 +60,20 @@ if ! mkdir -p "$cache_dir" 2>/dev/null; then
   json_exit "$routing_summary"
 fi
 
-# Create cache key from current directory
-cache_key=$(printf '%s' "$PWD" | tr '/' '_')
-cache_file="${cache_dir}/last-check${cache_key}"
+# Create a bounded, collision-resistant cache key from the current
+# directory. $PWD on a deeply nested tree can exceed the filesystem's
+# 255-byte filename limit, which would break the cache file path entirely
+# (debt finding 023). Hash it to a fixed 32-char key.
+if command -v md5sum >/dev/null 2>&1; then
+  cache_key=$(printf '%s' "$PWD" | md5sum | cut -c1-32)
+elif command -v md5 >/dev/null 2>&1; then
+  cache_key=$(printf '%s' "$PWD" | md5 -q | cut -c1-32)
+else
+  # No md5 tool — sanitize and truncate to the last 64 chars. Not
+  # collision-proof, but bounded so the path stays valid.
+  cache_key=$(printf '%s' "$PWD" | tr '/' '_' | tail -c 64)
+fi
+cache_file="${cache_dir}/last-check-${cache_key}"
 
 # Check cache freshness (60s TTL)
 if [ -f "$cache_file" ]; then
