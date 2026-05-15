@@ -24,6 +24,17 @@ fixes, comment resolution, and learning compounding.
 
 ## Workflow
 
+<!-- Steps 1–3 and Step 4 sub-steps 1 & 13 implement the bottom-up Graphite
+     stack traversal documented canonically in the `stack-traversal` skill
+     (skills/stack-traversal/SKILL.md): Step 1 ↔ skill Steps 1–2 (enumerate +
+     open-PR filter + base-to-tip order), Step 2 ↔ skill Step 3 (validate +
+     clean-tree check), Step 3 ↔ skill Step 4 (gt track adoption), Step 4.1 ↔
+     skill Step 5 (gt checkout), Step 4.13 ↔ skill Step 6 (gt upstack restack +
+     conflict handling). The `scope=all` and `scope=PR#` branches in Step 1 are
+     review-all-specific and intentionally NOT in the shared skill. When the
+     traversal logic changes, update the skill and every command that mirrors
+     it (this file and resolve-stack.md). -->
+
 ### Step 1: Resolve PR List
 
 Parse `$ARGUMENTS` to determine scope:

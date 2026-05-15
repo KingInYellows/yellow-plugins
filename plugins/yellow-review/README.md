@@ -22,13 +22,14 @@ yellow-core integration before reviewing real PRs.
 
 ## Commands
 
-| Command           | Description                                                               |
-| ----------------- | ------------------------------------------------------------------------- |
-| `/review:setup`   | Validate review prerequisites and optional yellow-core integration        |
-| `/review:pr`      | Adaptive multi-agent review of a single PR with automatic fix application |
-| `/review:resolve` | Parallel resolution of unresolved PR review comments                      |
-| `/review:all`     | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
-| `/review:sweep`   | Run `/review:pr` then `/review:resolve` on the same PR in one invocation  |
+| Command                 | Description                                                               |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `/review:setup`         | Validate review prerequisites and optional yellow-core integration        |
+| `/review:pr`            | Adaptive multi-agent review of a single PR with automatic fix application |
+| `/review:resolve`       | Parallel resolution of unresolved PR review comments                      |
+| `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously |
+| `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
+| `/review:sweep`         | Run `/review:pr` then `/review:resolve` on the same PR in one invocation  |
 
 ## Agents
 
@@ -60,9 +61,10 @@ yellow-core integration before reviewing real PRs.
 
 ## Skills
 
-| Skill                | Description                                                 |
-| -------------------- | ----------------------------------------------------------- |
-| `pr-review-workflow` | Internal reference for adaptive selection and output format |
+| Skill                | Description                                                          |
+| -------------------- | -------------------------------------------------------------------- |
+| `pr-review-workflow` | Internal reference for adaptive selection and output format          |
+| `stack-traversal`    | Internal reference for the bottom-up Graphite stack walk shared by `/review:all` and `/review:resolve-stack` |
 
 ## Limitations
 
