@@ -28,14 +28,32 @@
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.resolve(__dirname, '..');
+// Allow tests to point ROOT at a fixture tree, mirroring the
+// validate-doc-counts.js / validate-agent-authoring.js test-injection
+// pattern (VALIDATE_DOC_COUNTS_ROOT, etc.).
+const ROOT = process.env.SYNC_SHELL_SNIPPETS_ROOT
+  ? path.resolve(process.env.SYNC_SHELL_SNIPPETS_ROOT)
+  : path.resolve(__dirname, '..');
 const SNIPPETS_DIR = path.join(ROOT, 'scripts', 'snippets');
 const CHECK_MODE = process.argv.slice(2).includes('--check');
 
 // Manifest: each install script → the ordered list of snippet names it
-// embeds. install-helpers (colors + error/warning/success) is shared by all
-// three; install-version-gte is shared only by codex + semgrep (ruvector
-// keeps its own version_lt).
+// embeds. install-helpers (colors + error/warning/success) is shared by
+// codex + semgrep + ruvector + yellow-research's install-ast-grep.sh;
+// install-version-gte is shared by codex + semgrep (ruvector keeps its own
+// version_lt).
+//
+// Known additional consumers not yet onboarded to this generator (codex P2
+// review #534, threadId PRRT_kwDOQ3SUys6CmtOZ):
+//   - plugins/yellow-research/scripts/install-ast-grep.sh — embeds the
+//     install-helpers block byte-for-byte; onboarded as a TARGETS entry.
+//   - plugins/yellow-mempalace/scripts/install-mempalace.sh — defines a
+//     version_gte that differs ONLY in heredoc-delimiter style
+//     (__EOF_VERSION_LEFT__ / __EOF_VERSION_RIGHT__) to avoid
+//     heredoc-delimiter collision with user input. That safety property
+//     is documented in MEMORY.md "Heredoc delimiter collision". Do NOT
+//     migrate mempalace to install-version-gte without first porting the
+//     unique-delimiter pattern into the canonical snippet.
 const TARGETS = {
   'plugins/yellow-codex/scripts/install-codex.sh': [
     'install-helpers',
@@ -46,17 +64,29 @@ const TARGETS = {
     'install-version-gte',
   ],
   'plugins/yellow-ruvector/scripts/install.sh': ['install-helpers'],
+  'plugins/yellow-research/scripts/install-ast-grep.sh': ['install-helpers'],
 };
 
+// Cache loaded snippets so a multi-target manifest does not re-read the
+// same file once per (target, snippet) pair (copilot review #534).
+const snippetCache = new Map();
+
 function loadSnippet(name) {
+  if (snippetCache.has(name)) {
+    return snippetCache.get(name);
+  }
   const p = path.join(SNIPPETS_DIR, `${name}.sh`);
   if (!fs.existsSync(p)) {
-    console.error(`[sync-shell-snippets] Error: snippet not found: ${p}`);
-    process.exit(1);
+    // Throw rather than process.exit so main()'s outer loop can keep
+    // surfacing the rest of the targets' errors in a single CI run
+    // (gemini review #534).
+    throw new Error(`snippet not found: ${p}`);
   }
   // Trim a trailing newline so the generated block joins cleanly; the
   // begin/end markers supply their own line breaks.
-  return fs.readFileSync(p, 'utf8').replace(/\n$/, '');
+  const content = fs.readFileSync(p, 'utf8').replace(/\n$/, '');
+  snippetCache.set(name, content);
+  return content;
 }
 
 /**
@@ -101,6 +131,9 @@ function main() {
     let updated = original;
     try {
       for (const name of snippetNames) {
+        // regenerateBlock now also surfaces "snippet not found" by way of
+        // loadSnippet throwing, so a missing snippet is per-target rather
+        // than terminating the whole run.
         updated = regenerateBlock(updated, name);
       }
     } catch (err) {
