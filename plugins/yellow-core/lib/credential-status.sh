@@ -178,3 +178,73 @@ credential_status_field() {
   printf '{"field":"%s","source":"%s","present":%s,"valid":%s}' \
     "$field_esc" "$source_esc" "$present" "$valid"
 }
+
+# Public API: complete SessionStart-hook scaffold for credential-bearing
+# plugins. Reads the plugin version from the manifest, classifies each
+# credential field (userConfig env wins, shell env is the fallback),
+# writes credential-status.json, then emits {"continue": true} and exits 0.
+#
+# This collapses the previously copy-pasted write-credential-status.sh
+# bodies (debt findings 024/025) — a calling hook only needs to source this
+# file and invoke the scaffold with its field list.
+#
+# Args:
+#   $1:    plugin name (e.g. "yellow-research")
+#   $2:    plugin root directory (typically CLAUDE_PLUGIN_ROOT)
+#   $3..:  one or more field specs, each "field_name:userconfig_env:shell_env"
+#
+# Never blocks SessionStart: every path still emits {"continue": true} and
+# exits 0, including jq-absent, manifest-absent, and write-failure cases.
+credential_hook_scaffold() {
+  # Precondition: plugin name + plugin root are required. Without them the
+  # for-loop below would treat `$1` (or `$1 $2`) as a field spec, producing
+  # garbage credential-status.json. Fail-closed by emitting the required
+  # SessionStart JSON and exiting cleanly — never let the caller's hook
+  # exit without `{"continue": true}` (which would block SessionStart).
+  if [ "$#" -lt 2 ]; then
+    printf '[credential-status] Warning: credential_hook_scaffold requires plugin name + plugin root (got %d args); skipping\n' "$#" >&2
+    printf '{"continue": true}\n'
+    exit 0
+  fi
+  local plugin="${1:-}"
+  local plugin_root="${2:-}"
+  shift 2
+
+  local version="unknown"
+  if command -v jq >/dev/null 2>&1 && [ -n "$plugin_root" ] \
+    && [ -f "${plugin_root}/.claude-plugin/plugin.json" ]; then
+    version=$(jq -r '.version // "unknown"' \
+      "${plugin_root}/.claude-plugin/plugin.json" 2>/dev/null || printf 'unknown')
+  fi
+
+  local fields_json="[" first=1
+  local spec field uc_env sh_env source present entry
+  for spec in "$@"; do
+    field="${spec%%:*}"
+    uc_env="${spec#*:}"
+    uc_env="${uc_env%%:*}"
+    sh_env="${spec##*:}"
+    source="absent"
+    present="false"
+    if [ -n "$(printenv "$uc_env" 2>/dev/null || printf '')" ]; then
+      source="userConfig"
+      present="true"
+    elif [ -n "$(printenv "$sh_env" 2>/dev/null || printf '')" ]; then
+      source="shell_env"
+      present="true"
+    fi
+    entry=$(credential_status_field "$field" "$source" "$present" "null")
+    if [ "$first" -eq 1 ]; then
+      first=0
+    else
+      fields_json="${fields_json},"
+    fi
+    fields_json="${fields_json}${entry}"
+  done
+  fields_json="${fields_json}]"
+
+  write_credential_status "$plugin" "$version" "$fields_json" 2>/dev/null || true
+
+  printf '{"continue": true}\n'
+  exit 0
+}

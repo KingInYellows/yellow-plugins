@@ -6,43 +6,18 @@
 # {"continue": true} on all paths, including jq/write failures.
 set -uo pipefail
 
-json_exit() {
-  printf '{"continue": true}\n'
-  exit 0
-}
-
-# Resolve the plugin root with a fallback so the rest of the script can
-# reference it safely under `set -u`. CLAUDE_PLUGIN_ROOT points at the
-# yellow-semgrep dir; the shared helper lives one level up in yellow-core/lib.
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${HOME}/.claude/plugins/cache/yellow-plugins/yellow-semgrep}"
-HELPER="${PLUGIN_ROOT}/../yellow-core/lib/credential-status.sh"
-
-if [ ! -f "$HELPER" ]; then
-  # yellow-core not installed alongside yellow-semgrep — skip silently.
-  json_exit
-fi
-
+HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/credential-status.sh"
+# yellow-core not installed alongside yellow-semgrep — skip silently.
+[ -f "$HELPER" ] || { printf '{"continue": true}\n'; exit 0; }
 # shellcheck source=/dev/null
-. "$HELPER" 2>/dev/null || json_exit
+. "$HELPER" 2>/dev/null || { printf '{"continue": true}\n'; exit 0; }
+# Defend against version skew: if yellow-core was updated to a release that
+# has credential-status.sh but predates credential_hook_scaffold, the
+# source succeeds but the function is undefined. Skip cleanly.
+command -v credential_hook_scaffold >/dev/null 2>&1 || { printf '{"continue": true}\n'; exit 0; }
 
-# Read plugin version from plugin.json (manifest is the source of truth).
-VERSION="unknown"
-if command -v jq >/dev/null 2>&1 && [ -f "${PLUGIN_ROOT}/.claude-plugin/plugin.json" ]; then
-  VERSION=$(jq -r '.version // "unknown"' "${PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null || printf 'unknown')
-fi
-
-# Classify SEMGREP_APP_TOKEN: userConfig wins, shell env is fallback.
-SOURCE="absent"
-PRESENT="false"
-if [ -n "${CLAUDE_PLUGIN_OPTION_SEMGREP_APP_TOKEN:-}" ]; then
-  SOURCE="userConfig"
-  PRESENT="true"
-elif [ -n "${SEMGREP_APP_TOKEN:-}" ]; then
-  SOURCE="shell_env"
-  PRESENT="true"
-fi
-
-FIELDS=$(credential_status_field "semgrep_app_token" "$SOURCE" "$PRESENT" "null")
-write_credential_status "yellow-semgrep" "$VERSION" "[$FIELDS]"
-
-json_exit
+# credential_hook_scaffold reads the version, classifies the token field
+# (userConfig wins, shell env fallback), writes credential-status.json,
+# then emits {"continue": true} and exits 0.
+credential_hook_scaffold "yellow-semgrep" "${CLAUDE_PLUGIN_ROOT:-}" \
+  "semgrep_app_token:CLAUDE_PLUGIN_OPTION_SEMGREP_APP_TOKEN:SEMGREP_APP_TOKEN"

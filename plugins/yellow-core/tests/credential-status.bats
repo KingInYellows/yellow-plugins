@@ -149,3 +149,80 @@ teardown() {
   [ -f "$fake_home/.claude/plugins/data/yellow-bar/credential-status.json" ]
   rm -rf "$fake_home"
 }
+
+# --- credential_hook_scaffold (SessionStart-hook scaffold) ---
+
+@test "credential_hook_scaffold writes status, classifies userConfig, emits continue" {
+  CLAUDE_PLUGIN_OPTION_SEMGREP_APP_TOKEN="sgp_test" \
+    run credential_hook_scaffold "yellow-semgrep" "" \
+      "semgrep_app_token:CLAUDE_PLUGIN_OPTION_SEMGREP_APP_TOKEN:SEMGREP_APP_TOKEN"
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"continue": true}' ]
+  [ -f "$CLAUDE_PLUGIN_DATA/credential-status.json" ]
+  if command -v jq >/dev/null 2>&1; then
+    field=$(jq -r '.credentials[0].field' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+    [ "$field" = "semgrep_app_token" ]
+    src=$(jq -r '.credentials[0].source' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+    [ "$src" = "userConfig" ]
+  fi
+}
+
+@test "credential_hook_scaffold classifies an absent field" {
+  run credential_hook_scaffold "yellow-foo" "" \
+    "foo_key:CLAUDE_PLUGIN_OPTION_FOO_KEY_UNSET:FOO_KEY_UNSET"
+  [ "$status" -eq 0 ]
+  [ "$output" = '{"continue": true}' ]
+  if command -v jq >/dev/null 2>&1; then
+    src=$(jq -r '.credentials[0].source' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+    [ "$src" = "absent" ]
+  fi
+}
+
+@test "credential_hook_scaffold falls back to shell env when no userConfig" {
+  FOO_KEY="shell-value" run credential_hook_scaffold "yellow-foo" "" \
+    "foo_key:CLAUDE_PLUGIN_OPTION_FOO_KEY:FOO_KEY"
+  [ "$status" -eq 0 ]
+  if command -v jq >/dev/null 2>&1; then
+    src=$(jq -r '.credentials[0].source' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+    [ "$src" = "shell_env" ]
+  fi
+}
+
+@test "credential_hook_scaffold handles multiple field specs" {
+  CLAUDE_PLUGIN_OPTION_A_KEY="x" \
+    run credential_hook_scaffold "yellow-multi" "" \
+      "a_key:CLAUDE_PLUGIN_OPTION_A_KEY:A_KEY" \
+      "b_key:CLAUDE_PLUGIN_OPTION_B_KEY:B_KEY"
+  [ "$status" -eq 0 ]
+  if command -v jq >/dev/null 2>&1; then
+    count=$(jq '.credentials | length' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+    [ "$count" = "2" ]
+  fi
+}
+
+@test "credential_hook_scaffold: userConfig wins when both env vars are set (precedence)" {
+  # Documented precedence (yellow-research CLAUDE.md): userConfig value
+  # wins over shell env when both are exported. Without an explicit test
+  # for the conflict case, a future swap of the if/elif branches would
+  # silently regress /setup:all status reporting.
+  CLAUDE_PLUGIN_OPTION_DUAL_KEY="from-userconfig" DUAL_KEY="from-shell-env" \
+    run credential_hook_scaffold "yellow-dual" "" \
+      "dual_key:CLAUDE_PLUGIN_OPTION_DUAL_KEY:DUAL_KEY"
+  [ "$status" -eq 0 ]
+  if command -v jq >/dev/null 2>&1; then
+    src=$(jq -r '.credentials[0].source' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+    [ "$src" = "userConfig" ]
+  fi
+}
+
+@test "credential_hook_scaffold: fail-closed when called with too few args (still emits continue)" {
+  # Precondition guard added 2026-05-16 — calling with <2 args must not
+  # exit without {"continue": true} (would block SessionStart) and must
+  # not enter the for-loop treating the plugin name as a field spec.
+  # bats `run` captures stdout + stderr — the warning goes to stderr,
+  # the JSON continue line goes to stdout. Assert on the last line so
+  # the test passes regardless of the warning's exact wording.
+  run credential_hook_scaffold "only-plugin-name"
+  [ "$status" -eq 0 ]
+  [ "${lines[-1]}" = '{"continue": true}' ]
+}
