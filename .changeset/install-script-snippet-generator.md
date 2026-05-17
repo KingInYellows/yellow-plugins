@@ -2,6 +2,7 @@
 'yellow-codex': patch
 'yellow-semgrep': patch
 'yellow-ruvector': patch
+'yellow-research': patch
 ---
 
 refactor: de-duplicate install-script helpers via a build-time generator
@@ -19,8 +20,10 @@ findings 014/015/036/037).
   markers. `pnpm generate:snippets` regenerates; `pnpm validate:snippets`
   (and now `pnpm validate:schemas`, run in CI) fails on drift.
 - `install-codex.sh` and `install-semgrep.sh` embed both snippets;
-  `install.sh` (yellow-ruvector) embeds `install-helpers` only — it keeps
-  its own `version_lt` (a distinct comparator).
+  `install.sh` (yellow-ruvector) and `install-ast-grep.sh`
+  (yellow-research) embed `install-helpers` only. yellow-ruvector
+  keeps its own `version_lt` (a distinct comparator); yellow-research
+  does not need version comparison.
 
 No behavior change — the embedded blocks are byte-identical to the prior
 inline copies. Gates: `generate:snippets` + `validate:snippets` (drift
