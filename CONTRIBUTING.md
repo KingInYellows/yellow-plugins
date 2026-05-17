@@ -345,6 +345,40 @@ a version bump.
 - Constants: `UPPER_SNAKE_CASE`
 - Plugin names: `kebab-case`
 
+## Split Validation Architecture
+
+The repo deliberately runs **two parallel validation stacks** that do not
+share code:
+
+1. **`scripts/*.js`** — hand-rolled Node validators (`validate-plugin.js`,
+   `validate-marketplace.js`, `validate-agent-authoring.js`,
+   `validate-setup-all.js`). These enforce rules that JSON Schema cannot
+   express: filesystem path existence, directory layout, `.md` presence,
+   hook-script sanity, `hooks.json` drift, the userConfig shape allowlist.
+   `validate-plugin.js` does **not** AJV-load `schemas/plugin.schema.json`.
+   Since PR-A it is a thin orchestrator: per-rule checks live in
+   `scripts/lib/plugin-rules.js`, path/hook helpers in
+   `scripts/lib/plugin-paths.js`, console output in `scripts/lib/logging.js`,
+   and the shared `marketplace.json` reader in
+   `scripts/lib/marketplace-reader.js`.
+2. **`packages/`** — the AJV-based TypeScript validator library
+   (`packages/domain`, `packages/infrastructure`, `packages/cli`). It owns
+   the JSON Schema validation path and the canonical error-code registry,
+   `packages/domain/src/validation/errorCatalog.ts`.
+
+The two stacks are intentionally separate — `scripts/` exists because the
+filesystem/authoring rules predate (and outgrew) the schema. But the
+**error-code registry must not be re-implemented.** If a `scripts/*.js`
+file ever needs a structured `ERROR-<CATEGORY>-<NNN>` code, it must
+`require` it from the catalog rather than hard-coding the string — the
+packages build emits CJS that `scripts/` can consume. `pnpm
+validate:error-codes` (also run inside `pnpm validate:schemas`) fails CI if
+any `scripts/` file hard-codes a code already defined in the catalog.
+
+There is intentionally **no migration of `scripts/` into `packages/`** —
+the two have different jobs, no shared consumer, and no concrete trigger
+for unification (YAGNI).
+
 ## Local vs Remote Validator Divergence
 
 Yellow-plugins runs two local validation passes: `pnpm validate:plugins`
