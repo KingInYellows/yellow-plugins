@@ -124,44 +124,44 @@ function ruleKeywords(manifest, errors) {
 // existence check. Inline objects are accepted structurally by JSON Schema.
 // outputStyles is directory-only.
 function rulePathFields(manifest, pluginDir, errors) {
+  // dirOrDirs fields: validatePathOrPathsDir normalizes (string → [string])
+  // and validateSinglePath type-checks each entry. Pass the raw value so
+  // schema violations like a number in the array surface as typed errors
+  // instead of being silently filtered out.
   for (const field of ['outputStyles', 'commands', 'agents', 'skills']) {
-    const directoryOnly = field === 'outputStyles';
-    if (manifest[field] !== undefined && typeof manifest[field] === 'string') {
+    if (manifest[field] !== undefined) {
       validatePathOrPathsDir(
         field,
         manifest[field],
         pluginDir,
         errors,
-        directoryOnly
+        field === 'outputStyles'
       );
-    } else if (Array.isArray(manifest[field])) {
-      // array form — only string entries are filesystem-checked here;
-      // non-string entries would be a schema violation caught by AJV.
-      const stringPaths = manifest[field].filter((v) => typeof v === 'string');
-      if (stringPaths.length > 0) {
-        validatePathOrPathsDir(
-          field,
-          stringPaths,
-          pluginDir,
-          errors,
-          directoryOnly
-        );
-      }
     }
   }
 
-  // mcpServers / lspServers / monitors / hooks use pathPathsOrInline — string
-  // and array entries point to JSON config files (not directories). The
-  // inline-object forms are validated elsewhere (JSON Schema, or RULES 6/7/8
-  // for hooks).
+  // mcpServers / lspServers / monitors / hooks use pathPathsOrInline:
+  // string and array-of-strings entries point to JSON config files; the
+  // inline-object forms (event-keyed dict for hooks, server config object
+  // for mcpServers, etc.) are handled by other rules / JSON Schema. Pass
+  // string entries straight to validatePathFile, which type-checks and
+  // emits a clear error for non-strings — the previous .filter() silently
+  // dropped invalid entries like `[123]`.
   for (const field of ['mcpServers', 'lspServers', 'monitors', 'hooks']) {
-    if (manifest[field] !== undefined && typeof manifest[field] === 'string') {
-      validatePathFile(field, manifest[field], pluginDir, errors);
-    } else if (Array.isArray(manifest[field])) {
-      for (const p of manifest[field].filter((v) => typeof v === 'string')) {
+    const value = manifest[field];
+    if (value === undefined) continue;
+    if (typeof value === 'string') {
+      validatePathFile(field, value, pluginDir, errors);
+    } else if (Array.isArray(value)) {
+      for (const p of value) {
+        // Skip inline-object entries (valid for hook arrays); pass all
+        // other types so validatePathFile reports them.
+        if (typeof p === 'object' && p !== null) continue;
         validatePathFile(field, p, pluginDir, errors);
       }
     }
+    // Top-level inline-object form passes through unhandled — validated
+    // elsewhere.
   }
 }
 

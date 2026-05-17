@@ -51,9 +51,11 @@ const DECISION_PROTOCOL_EVENTS = new Set([
  */
 function resolveHookScriptPath(command, pluginDir) {
   const resolved = command.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginDir);
-  const match = resolved.match(/^bash\s+(\S+)/);
+  // Accept double-quoted, single-quoted, and unquoted script paths so a
+  // command like `bash "scripts/my hook.sh"` resolves correctly.
+  const match = resolved.match(/^bash\s+(?:"([^"]+)"|'([^']+)'|(\S+))/);
   if (!match) return null;
-  const scriptPath = match[1];
+  const scriptPath = match[1] || match[2] || match[3];
   const normalized = path.resolve(pluginDir, scriptPath);
   if (!normalized.startsWith(path.resolve(pluginDir) + path.sep)) return null;
   return normalized;
@@ -117,6 +119,10 @@ function countMarkdownRecursive(dir) {
  * @param {string[]} errors   - Error array to push into
  */
 function validatePathFile(fieldName, filePath, pluginDir, errors) {
+  if (typeof filePath !== 'string') {
+    addError(errors, `${fieldName} entries must be string paths`);
+    return;
+  }
   const resolved = resolvePluginPath(filePath, pluginDir);
   if (!resolved) {
     addError(errors, `${fieldName} path escapes plugin directory: ${filePath}`);
