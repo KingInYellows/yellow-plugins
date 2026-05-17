@@ -31,6 +31,12 @@
   },
   "dependencies": [
     {
+      "name": "yellow-core",
+      "version": "*",
+      "optional": false,
+      "reason": "validate_file_path() is sourced from yellow-core/lib/validate-fs.sh; debt commands fail without it"
+    },
+    {
       "name": "yellow-linear",
       "version": "*",
       "optional": true,

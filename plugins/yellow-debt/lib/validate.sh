@@ -2,6 +2,24 @@
 # shellcheck disable=SC2154
 # Shared validation functions for yellow-debt plugin
 
+# Shared filesystem-path validators (validate_file_path,
+# canonicalize_project_dir) live in yellow-core's shared lib so a security
+# fix lands in one place. At runtime CLAUDE_PLUGIN_ROOT is set by Claude
+# Code; in Bats tests the suite sources validate-fs.sh directly.
+_VALIDATE_FS_HELPER="${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh"
+if [ -f "$_VALIDATE_FS_HELPER" ]; then
+  # shellcheck source=/dev/null
+  . "$_VALIDATE_FS_HELPER"
+fi
+unset _VALIDATE_FS_HELPER
+
+# Surface the missing-dependency case explicitly: yellow-debt commands have
+# live callers of validate_file_path (commands/debt/fix.md, sync.md, audit.md).
+# Without the function defined, those callers exit 127 — fail-closed but the
+# error gives no hint that yellow-core needs to be installed.
+command -v validate_file_path >/dev/null 2>&1 || \
+  printf '[yellow-debt] Warning: validate_file_path unavailable — install yellow-core (provides lib/validate-fs.sh)\n' >&2
+
 # Extract YAML frontmatter from markdown file for yq processing
 # Usage: extract_frontmatter FILE | yq '.field'
 # NOTE: kislyuk/yq (Python wrapper) cannot parse markdown with YAML frontmatter.
@@ -54,50 +72,6 @@ update_frontmatter() {
   # Atomic replace
   mv "$temp_file" "$file" || return 1
   return 0
-}
-
-validate_file_path() {
-  local raw_path="$1"
-  local project_root="${2:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-
-  # Reject empty paths
-  [ -z "$raw_path" ] && return 1
-
-  # Newline detection (command substitution strips trailing newlines)
-  local path_len=${#raw_path}
-  local oneline
-  oneline=$(printf '%s' "$raw_path" | tr -d '\n\r')
-  [ ${#oneline} -ne "$path_len" ] && return 1
-
-  # Reject path traversal patterns
-  case "$raw_path" in
-    *..*|/*|~*) return 1 ;;
-  esac
-
-  # Canonicalize and verify containment
-  local canonical_root candidate resolved parent_dir
-  canonical_root=$(cd -- "$project_root" 2>/dev/null && pwd -P) || return 1
-  candidate="${canonical_root}/${raw_path}"
-
-  # Prefer GNU realpath -m when available (handles non-existent targets safely).
-  if command -v realpath >/dev/null 2>&1 && realpath -m / >/dev/null 2>&1; then
-    resolved=$(realpath -m -- "$candidate") || return 1
-  else
-    # Portable fallback: resolve the nearest existing ancestor, then append remaining path.
-    # This preserves the ability to validate paths for files not yet created.
-    local dir="$candidate" remainder=""
-    while [ -n "$dir" ] && [ "$dir" != "/" ] && ! [ -e "$dir" ]; do
-      remainder="$(basename -- "$dir")${remainder:+/$remainder}"
-      dir="$(dirname -- "$dir")"
-    done
-    parent_dir=$(cd -- "$dir" 2>/dev/null && pwd -P) || return 1
-    resolved="${parent_dir}${remainder:+/$remainder}"
-  fi
-
-  case "$resolved" in
-    "${canonical_root}/"*|"${canonical_root}") return 0 ;;
-    *) return 1 ;;
-  esac
 }
 
 validate_category() {

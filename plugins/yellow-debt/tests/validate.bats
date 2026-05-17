@@ -2,6 +2,10 @@
 # Tests for lib/validate.sh
 
 setup() {
+  # validate_file_path now lives in yellow-core's shared lib. At runtime
+  # validate.sh sources it via CLAUDE_PLUGIN_ROOT; in tests source it
+  # directly first (validate.sh's guarded source then no-ops).
+  . "$BATS_TEST_DIRNAME/../../yellow-core/lib/validate-fs.sh"
   # Source the validation library
   . "$BATS_TEST_DIRNAME/../lib/validate.sh"
 

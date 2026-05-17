@@ -188,6 +188,15 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   `plugins/yellow-core/lib/credential-status.sh` for the reusable helper.
   Never write credential values to the status file — only the resolution
   source (`userConfig` / `shell_env` / `absent`) and a presence boolean.
+- Plugins that need path-traversal validation should source
+  `plugins/yellow-core/lib/validate-fs.sh` from their local `lib/validate.sh`
+  via the `${CLAUDE_PLUGIN_ROOT:-}/../yellow-core/lib/validate-fs.sh`
+  cross-plugin pattern (mirrors the credential-status.sh precedent). The
+  shared lib provides `validate_file_path()` and `canonicalize_project_dir()`
+  with newline-defense, symlink-escape rejection, and an optional `$2` root
+  that defaults to the git toplevel. Declare yellow-core as a required
+  dependency in the consumer's `plugin.json` if any command actually calls
+  these functions; declare it optional if only sourced for future use.
 
 ## Command, Agent, And Skill Authoring
 
