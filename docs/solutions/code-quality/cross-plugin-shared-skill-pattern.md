@@ -136,7 +136,9 @@ The canonical block to inline for context7 + EXA + WebSearch fallback:
 - If found: use `mcp__context7__resolve-library-id` to get the library ID,
   then `mcp__context7__query-docs` with that ID and your topic.
 - If not found: skip to Step 2. Annotate:
-  `[<agent-name>] context7 unavailable — falling back to EXA.`
+  `[<agent-name>] context7 unavailable — falling back to EXA`
+  (cross-plugin consumers that lack EXA emit `falling back to WebSearch`
+  instead — the canonical sentinel suffix is the next source name).
 
 **Step 2 (EXA fallback):** Call `ToolSearch("get_code_context_exa")`.
 - If found (yellow-research installed): use `mcp__plugin_yellow-research_exa__get_code_context_exa`.
@@ -195,10 +197,16 @@ Never trust LLM-generated MCP tool names.
 or via Claude Code MCP settings). Do not bundle it in any plugin — CE PR #486 confirmed
 this recreates dual-registration OAuth pop-ups.
 
-**Two-step call sequence:** `resolve-library-id` (~2.5s) must precede `get-library-docs`
-(~1.2s). Resolved IDs cannot persist across Bash subprocesses without re-derivation.
+**Two-step call sequence:** `resolve-library-id` (~2.5s) must precede `query-docs`
+(aka `get-library-docs` on older context7 installs — verify via ToolSearch;
+~1.2s). Resolved IDs cannot persist across Bash subprocesses without
+re-derivation.
 
-**Drift detection sentinel** for the library-context inline block:
+**Drift detection sentinel** for the library-context inline block — use the
+partial-string form so both full-chain (`falling back to EXA`) and safe-chain
+(`falling back to WebSearch`) consumers match:
 ```bash
-rg -l 'context7 unavailable — falling back to EXA' plugins/ --type md
+rg -l 'context7 unavailable — falling back to' plugins/ --type md \
+  | grep -v 'library-context/SKILL.md' \
+  | grep -v 'library-context/reference.md'
 ```

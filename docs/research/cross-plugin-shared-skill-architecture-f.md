@@ -227,7 +227,10 @@ The block to be inlined is:
 - If found: use `mcp__context7__resolve-library-id` to get the library ID,
   then `mcp__context7__query-docs` with that ID and your topic.
 - If not found: skip to Step 2. Annotate:
-  `[<agent-name>] context7 unavailable — falling back to EXA.`
+  `[<agent-name>] context7 unavailable — falling back to EXA`
+  (cross-plugin consumers without EXA terminate at WebSearch and use
+  `falling back to WebSearch` as the suffix; the canonical sentinel
+  prefix is `context7 unavailable — falling back to`).
 
 **Step 2 (EXA fallback):** Call `ToolSearch("get_code_context_exa")`.
 - If found (yellow-research installed): use `mcp__plugin_yellow-research_exa__get_code_context_exa`.
@@ -260,7 +263,7 @@ Each step uses ToolSearch to detect availability before attempting the call. Eac
 
 ### What trade-offs are accepted
 
-1. **Duplication persists, but is controlled.** 16 plugins will each inline the block. Like security-fencing, a machine-verifiable grep one-liner (`rg -l 'context7 unavailable — falling back to EXA' plugins/ --type md`) detects drift. This is the same trade-off security-fencing accepted and it is well-understood in this repo.
+1. **Duplication persists, but is controlled.** 16 plugins will each inline the block. Like security-fencing, a machine-verifiable grep one-liner (`rg -l 'context7 unavailable — falling back to' plugins/ --type md`) detects drift — the partial-string form matches both full-chain consumers (`falling back to EXA`) and cross-plugin safe-chain consumers (`falling back to WebSearch`). This is the same trade-off security-fencing accepted and it is well-understood in this repo.
 
 2. **yellow-research install is required for EXA fallback.** Agents in plugins that do not have yellow-research will fall through to WebSearch as their secondary source. This is acceptable — WebSearch is the same fallback that best-practices-researcher uses today when yellow-research is absent.
 

@@ -73,17 +73,18 @@ generic external sources.
 1. **Library documentation lookup (safe chain):**
    1. Detect via `ToolSearch("context7")`. If
       `mcp__context7__resolve-library-id` is not present, annotate
-      `[best-practices-researcher] context7 unavailable — falling back to
-      WebSearch` and proceed to step 1.3.
+      `[best-practices-researcher] context7 unavailable — falling back to WebSearch`
+      (single line — the drift-detection grep is line-based) and proceed to step 1.3.
    2. If context7 is present, call `mcp__context7__resolve-library-id` with
       the library name (multiple candidates → prefer exact name match; else
-      pick first result and annotate the matched slug in the citation),
+      pick first result and annotate the matched slug in the citation;
+      zero candidates → skip `query-docs` and proceed directly to step 1.3),
       then call `mcp__context7__query-docs` with the resolved ID and a
       topic string. Never call `query-docs` with a plain library name. On
       HTTP 429 or any error message containing "rate limit" or "quota",
-      annotate `[best-practices-researcher] context7 rate-limited (60 req/hr
-      anonymous global pool) — falling back to WebSearch` and proceed to
-      step 1.3. Do NOT retry context7 within the same session.
+      annotate `[best-practices-researcher] context7 rate-limited (60 req/hr anonymous global pool) — falling back to WebSearch`
+      (single line) and proceed to step 1.3. Do NOT retry context7 within
+      the same session.
    3. Fall back to built-in `WebSearch` / `WebFetch` on authoritative
       domains with the library name + topic as query. If WebSearch also
       errors, stop and report: "No documentation source available for
