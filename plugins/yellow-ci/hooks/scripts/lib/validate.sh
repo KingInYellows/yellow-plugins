@@ -219,9 +219,13 @@ validate_ssh_host() {
   esac
 
   # Try IPv4 first: N.N.N.N format. Exit 2 means "not IPv4-shaped" — fall
-  # through to FQDN validation below.
-  _validate_private_ipv4 "$host"
-  case "$?" in
+  # through to FQDN validation below. The exit code is captured via `||`
+  # so a non-zero return is errexit-safe when this library is sourced
+  # under `set -e` (a bare call followed by `case "$?"` would exit the
+  # shell on exit code 1 OR 2 before reaching the case).
+  local _ipv4_rc=0
+  _validate_private_ipv4 "$host" || _ipv4_rc=$?
+  case "$_ipv4_rc" in
     0) return 0 ;;
     1) return 1 ;;
   esac

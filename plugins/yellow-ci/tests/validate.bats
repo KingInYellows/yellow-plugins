@@ -222,6 +222,17 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "ssh_host: FQDN validation is safe under errexit (set -e)" {
+  # Regression for codex P2: a bare `_validate_private_ipv4 "$host"` call
+  # followed by `case "$?"` exits the shell under set -e for non-IPv4
+  # inputs (helper returns 2). The fix captures the exit code via `||`.
+  # Run in a subshell with set -e to assert the function returns 0
+  # without aborting on the path through the FQDN fall-through.
+  local rc=0
+  ( set -e; validate_ssh_host "runner-01.local" ) || rc=$?
+  [ "$rc" -eq 0 ]
+}
+
 @test "ssh_host: reject public IP" {
   run validate_ssh_host "8.8.8.8"
   [ "$status" -eq 1 ]

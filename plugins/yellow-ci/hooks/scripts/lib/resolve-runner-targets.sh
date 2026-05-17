@@ -63,6 +63,8 @@ rt_atomic_write() {
     }
   else
     printf '[yellow-ci] Warning: Cannot write tmp file %s\n' "$tmp" >&2
+    # Disk full / permission failure may leave a zero-byte tmp; clean up.
+    rm -f "$tmp" 2>/dev/null
   fi
 }
 
@@ -82,15 +84,13 @@ emit_runner_json() {
 
   local json='{"schema":1,"runner_targets":['
   local first=1
-  local rname rdata rtype rmode selectors bf af nt sel_json bf_json af_json nt_json
+  local rname rdata _rname_unused rtype rmode selectors bf af nt sel_json bf_json af_json nt_json
   for rname in "${_order[@]}"; do
     rdata="${_runners[$rname]}"
-    rtype=$(printf '%s' "$rdata" | cut -d'|' -f2)
-    rmode=$(printf '%s' "$rdata" | cut -d'|' -f3)
-    selectors=$(printf '%s' "$rdata" | cut -d'|' -f4)
-    bf=$(printf '%s' "$rdata" | cut -d'|' -f5)
-    af=$(printf '%s' "$rdata" | cut -d'|' -f6)
-    nt=$(printf '%s' "$rdata" | cut -d'|' -f7)
+    # Parse all 7 pipe-delimited fields in one read — replaces 6
+    # printf|cut subshells per runner. _rname_unused absorbs field 1
+    # (the runner name), which we already know from the loop variable.
+    IFS='|' read -r _rname_unused rtype rmode selectors bf af nt <<< "$rdata"
 
     # Validate type/mode before JSON interpolation (prevents injection)
     if [ -n "$rtype" ] && ! validate_runner_type "$rtype"; then
@@ -124,18 +124,23 @@ emit_runner_json() {
     local rfirst=1 rule
     while IFS= read -r rule; do
       [ "$rfirst" -eq 1 ] && rfirst=0 || json="${json},"
-      # Escape backslashes then double quotes for valid JSON
-      rule=$(printf '%s' "$rule" | sed 's/\\/\\\\/g; s/"/\\"/g')
+      # Escape backslashes then double quotes for valid JSON. Bash
+      # parameter expansion is in-process — replaces a sed subshell per
+      # routing rule.
+      rule="${rule//\\/\\\\}"
+      rule="${rule//\"/\\\"}"
       json="${json}\"${rule}\""
     done < <(rt_extract_rules "$rules_source")
     json="${json}]"
   fi
 
   json="${json},"
-  # Escape paths for safe JSON interpolation (may contain backslashes on WSL)
-  local esc_global esc_local
-  esc_global=$(printf '%s' "$global_path" | sed 's/\\/\\\\/g; s/"/\\"/g')
-  esc_local=$(printf '%s' "$local_path" | sed 's/\\/\\\\/g; s/"/\\"/g')
+  # Escape paths for safe JSON interpolation (may contain backslashes on WSL).
+  # Bash parameter expansion — no subshell per emit.
+  local esc_global="${global_path//\\/\\\\}"
+  esc_global="${esc_global//\"/\\\"}"
+  local esc_local="${local_path//\\/\\\\}"
+  esc_local="${esc_local//\"/\\\"}"
   json="${json}\"_meta\":{\"global_path\":\"${esc_global}\",\"local_path\":\"${esc_local}\""
   json="${json},\"has_global\":${has_global},\"has_local\":${has_local}}}"
 
@@ -252,9 +257,13 @@ rt_extract_rules() {
 #   - Writes ~/.cache/yellow-ci/runner-targets-merged.json
 # Returns 0 on success, 1 if no config found (graceful degradation)
 resolve_runner_targets() {
-  # Associative arrays require Bash 4+
-  if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ]; then
-    printf '[yellow-ci] Error: resolve_runner_targets requires Bash 4+. macOS users: install bash via Homebrew.\n' >&2
+  # emit_runner_json() uses `local -n` namerefs, which require Bash 4.3+
+  # (Feb 2014). The previous check accepted 4.0-4.2 and produced a
+  # runtime error from the nameref declaration. Enforce 4.3 strictly.
+  local _bv_major="${BASH_VERSINFO[0]:-0}"
+  local _bv_minor="${BASH_VERSINFO[1]:-0}"
+  if [ "$_bv_major" -lt 4 ] || { [ "$_bv_major" -eq 4 ] && [ "$_bv_minor" -lt 3 ]; }; then
+    printf '[yellow-ci] Error: resolve_runner_targets requires Bash 4.3+. macOS users: install bash via Homebrew.\n' >&2
     return 1
   fi
 
