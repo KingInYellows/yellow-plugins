@@ -4,6 +4,12 @@ set -Eeuo pipefail
 # install-ast-grep.sh — Install ast-grep CLI for yellow-research plugin
 # Usage: bash install-ast-grep.sh
 
+# >>> generated: install-helpers (source: scripts/snippets/install-helpers.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# Color constants + error/warning/success helpers — shared, byte-identically,
+# across the plugin install scripts (debt findings 036/037).
+# Canonical source: scripts/snippets/install-helpers.sh — edit there, then run
+# `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
@@ -21,6 +27,7 @@ warning() {
 success() {
   printf '%b%s%b\n' "$GREEN" "$1" "$NC"
 }
+# <<< generated: install-helpers <<<
 
 cleanup() {
   local exit_code=$?

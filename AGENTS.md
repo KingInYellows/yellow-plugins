@@ -35,10 +35,14 @@ validators in `scripts/`, the schemas in `schemas/`, and this file.
 - `scripts/`: Node and shell validation, sync, release, metrics, and versioning
   utilities. Important entry points include `validate-agent-authoring.js`,
   `validate-marketplace.js`, `validate-plugin.js`, `validate-setup-all.js`,
-  `validate-versions.js`, `sync-manifests.js`, and `catalog-version.js`.
-  Shared helpers live in `scripts/lib/` (`plugin-rules.js`, `plugin-paths.js`,
-  `logging.js`, `marketplace-reader.js`) — `validate-plugin.js` and
-  `validate-marketplace.js` are thin orchestrators that import from there.
+  `validate-versions.js`, `sync-manifests.js`, `sync-shell-snippets.js`, and
+  `catalog-version.js`. Shared helpers live in `scripts/lib/` (`plugin-rules.js`,
+  `plugin-paths.js`, `logging.js`, `marketplace-reader.js`) — `validate-plugin.js`
+  and `validate-marketplace.js` are thin orchestrators that import from there.
+  Canonical sources for cross-plugin shell snippets (color helpers,
+  `version_gte`) live in `scripts/snippets/` — install scripts embed
+  generated blocks via `pnpm generate:snippets`; drift gated in CI by
+  `pnpm validate:snippets`.
 - `schemas/`: JSON schemas for plugin manifests and marketplace files.
 - `api/cli-contracts/` and `examples/`: Contract fixtures and schema examples.
 - `tests/integration/`: Vitest integration coverage for validators and fixtures.
@@ -62,9 +66,16 @@ Use pnpm only. `preinstall` enforces Node and pnpm through
 - `pnpm test:unit`: Run Vitest for `packages/`.
 - `pnpm test:integration`: Run Vitest for `tests/integration/`.
 - `pnpm validate:schemas`: Run marketplace, plugin, setup-all,
-  agent-authoring, and error-code re-implementation validation in one pass.
+  agent-authoring, error-code re-implementation, and install-script snippet
+  drift validation in one pass.
 - `pnpm validate:error-codes`: Scan `scripts/*.js` for hard-coded `ERROR-*`
   codes that re-implement entries from `packages/domain/src/errorCatalog.ts`.
+- `pnpm validate:snippets`: Check `--check` mode of `sync-shell-snippets.js`
+  — generated blocks in install scripts must match the canonical sources in
+  `scripts/snippets/`. Drift fails CI.
+- `pnpm generate:snippets`: Apply mode of `sync-shell-snippets.js` —
+  rewrite generated blocks in install scripts from `scripts/snippets/`
+  canonical sources. Run after editing any `scripts/snippets/*.sh`.
 - `pnpm validate:agents`: Run the agent and markdown authoring validator only.
 - `pnpm validate:marketplace`: Validate `.claude-plugin/marketplace.json`.
 - `pnpm validate:plugins`: Validate plugin manifests plus plugin-specific

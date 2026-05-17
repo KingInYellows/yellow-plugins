@@ -4,13 +4,16 @@ set -Eeuo pipefail
 # install-codex.sh — Install OpenAI Codex CLI for yellow-codex plugin
 # Usage: bash install-codex.sh
 
+# >>> generated: install-helpers (source: scripts/snippets/install-helpers.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# Color constants + error/warning/success helpers — shared, byte-identically,
+# across the plugin install scripts (debt findings 036/037).
+# Canonical source: scripts/snippets/install-helpers.sh — edit there, then run
+# `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[0;33m'
 readonly NC='\033[0m'
-
-readonly MIN_CODEX_VERSION="0.118.0"
-readonly MIN_NODE_MAJOR=22
 
 error() {
   printf '%bError: %s%b\n' "$RED" "$1" "$NC" >&2
@@ -24,6 +27,10 @@ warning() {
 success() {
   printf '%b%s%b\n' "$GREEN" "$1" "$NC"
 }
+# <<< generated: install-helpers <<<
+
+readonly MIN_CODEX_VERSION="0.118.0"
+readonly MIN_NODE_MAJOR=22
 
 cleanup() {
   local exit_code=$?
@@ -40,6 +47,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# >>> generated: install-version-gte (source: scripts/snippets/install-version-gte.sh) >>>
+# DO NOT EDIT — regenerate with: pnpm generate:snippets
+# POSIX-compatible semver comparison — shared, byte-identically, by
+# install-codex.sh and install-semgrep.sh (debt findings 014/015).
+# Canonical source: scripts/snippets/install-version-gte.sh — edit there, then
+# run `pnpm generate:snippets`. CI (`pnpm validate:snippets`) fails on drift.
 # Compare two semver strings. Returns 0 if $1 >= $2, 1 otherwise.
 # POSIX-compatible: no bash arrays, herestrings, or (( )) arithmetic.
 version_gte() {
@@ -70,6 +83,7 @@ EOF
   if [ "$left_patch" -lt "$right_patch" ]; then return 1; fi
   return 0  # equal
 }
+# <<< generated: install-version-gte <<<
 
 # --- Check if already installed ---
 if command -v codex >/dev/null 2>&1; then
