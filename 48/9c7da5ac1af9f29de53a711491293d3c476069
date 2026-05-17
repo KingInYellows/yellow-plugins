@@ -1,0 +1,19 @@
+plans/library-context-followups.md
+  s_6cdb4ed3aab017::t_a84c94395d5b1c 1-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "489c7da5ac1af9f29de53a711491293d3c476069",
+  "prompts": {},
+  "sessions": {
+    "s_6cdb4ed3aab017": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b91ed7a6-9689-4084-89ad-60b90b5f456c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
