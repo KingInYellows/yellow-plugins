@@ -196,9 +196,19 @@ credential_status_field() {
 # Never blocks SessionStart: every path still emits {"continue": true} and
 # exits 0, including jq-absent, manifest-absent, and write-failure cases.
 credential_hook_scaffold() {
+  # Precondition: plugin name + plugin root are required. Without them the
+  # for-loop below would treat `$1` (or `$1 $2`) as a field spec, producing
+  # garbage credential-status.json. Fail-closed by emitting the required
+  # SessionStart JSON and exiting cleanly — never let the caller's hook
+  # exit without `{"continue": true}` (which would block SessionStart).
+  if [ "$#" -lt 2 ]; then
+    printf '[credential-status] Warning: credential_hook_scaffold requires plugin name + plugin root (got %d args); skipping\n' "$#" >&2
+    printf '{"continue": true}\n'
+    exit 0
+  fi
   local plugin="${1:-}"
   local plugin_root="${2:-}"
-  shift 2 2>/dev/null || true
+  shift 2
 
   local version="unknown"
   if command -v jq >/dev/null 2>&1 && [ -n "$plugin_root" ] \

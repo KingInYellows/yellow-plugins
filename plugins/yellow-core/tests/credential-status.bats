@@ -199,3 +199,30 @@ teardown() {
     [ "$count" = "2" ]
   fi
 }
+
+@test "credential_hook_scaffold: userConfig wins when both env vars are set (precedence)" {
+  # Documented precedence (yellow-research CLAUDE.md): userConfig value
+  # wins over shell env when both are exported. Without an explicit test
+  # for the conflict case, a future swap of the if/elif branches would
+  # silently regress /setup:all status reporting.
+  CLAUDE_PLUGIN_OPTION_DUAL_KEY="from-userconfig" DUAL_KEY="from-shell-env" \
+    run credential_hook_scaffold "yellow-dual" "" \
+      "dual_key:CLAUDE_PLUGIN_OPTION_DUAL_KEY:DUAL_KEY"
+  [ "$status" -eq 0 ]
+  if command -v jq >/dev/null 2>&1; then
+    src=$(jq -r '.credentials[0].source' "$CLAUDE_PLUGIN_DATA/credential-status.json")
+    [ "$src" = "userConfig" ]
+  fi
+}
+
+@test "credential_hook_scaffold: fail-closed when called with too few args (still emits continue)" {
+  # Precondition guard added 2026-05-16 — calling with <2 args must not
+  # exit without {"continue": true} (would block SessionStart) and must
+  # not enter the for-loop treating the plugin name as a field spec.
+  # bats `run` captures stdout + stderr — the warning goes to stderr,
+  # the JSON continue line goes to stdout. Assert on the last line so
+  # the test passes regardless of the warning's exact wording.
+  run credential_hook_scaffold "only-plugin-name"
+  [ "$status" -eq 0 ]
+  [ "${lines[-1]}" = '{"continue": true}' ]
+}
