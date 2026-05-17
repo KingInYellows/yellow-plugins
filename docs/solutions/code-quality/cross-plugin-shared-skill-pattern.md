@@ -104,7 +104,7 @@ Getting this wrong produces one of three failure modes:
    yellow-core for exactly this reason. Any plugin that bundles context7 will recreate it.
 
 3. **Fallback chain pointing at an optional plugin's tool** — creates an implicit install
-   dependency for consumers in unrelated plugins. `mcp__plugin_yellow-research_exa__...'
+   dependency for consumers in unrelated plugins. `mcp__plugin_yellow-research_exa__...`
    as a fallback terminator means yellow-debt agents silently lose their fallback when
    yellow-research is absent. Always terminate with a built-in tool (WebSearch).
 

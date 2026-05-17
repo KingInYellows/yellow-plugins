@@ -67,6 +67,11 @@ context7 is installed at all) but cannot rename a statically-declared tool.
 
 **Within-yellow-research (full chain):**
 
+First, detect context7 availability via ToolSearch("context7"). If
+`mcp__context7__resolve-library-id` is not present, annotate
+`[library-context] context7 unavailable — falling back to EXA`
+and skip directly to step 2.
+
 1. context7 (`resolve-library-id` → `query-docs`)
 2. `mcp__plugin_yellow-research_exa__get_code_context_exa` — code-focused
 3. `mcp__plugin_yellow-research_exa__web_search_exa` — broader web search
@@ -78,7 +83,7 @@ context7 is installed at all) but cannot rename a statically-declared tool.
 1. Detect via ToolSearch("context7"). If `mcp__context7__resolve-library-id`
    is not present, annotate
    `[library-context] context7 unavailable — falling back to WebSearch`
-   and proceed to step 2.
+   and proceed to step 3.
 2. If context7 is present, call `mcp__context7__resolve-library-id` then
    `mcp__context7__query-docs`. On HTTP 429 or any error message
    containing "rate limit" or "quota", annotate

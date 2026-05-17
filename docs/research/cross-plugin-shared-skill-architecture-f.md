@@ -178,7 +178,7 @@ The `mcp-integration-patterns` skill in yellow-core provides the analogous prece
 | Domain ownership | Owns context7 domain knowledge; both existing consumers are here or in yellow-core but reference yellow-research's EXA fallback | Hosts other cross-plugin shared utilities: `security-fencing`, `mcp-integration-patterns`, `session-history` |
 | Consumer plugins | yellow-research agents use context7 now; non-research plugins (yellow-debt, yellow-docs) have no yellow-research dependency | All plugins effectively depend on yellow-core — it is the "toolkit" plugin |
 | Install prevalence | yellow-research is optional (requires API keys, separate install) | yellow-core is the base plugin recommended for all users |
-| Precedent for shared skills | No non-research-specific shared skills today | Three non-plugin-specific shared skills confirmed: `security-fencing`, `mcp-integration-patterns`, `mcp-integration-patterns` |
+| Precedent for shared skills | No non-research-specific shared skills today | Three non-plugin-specific shared skills confirmed: `security-fencing`, `mcp-integration-patterns`, `session-history` |
 | Conflict with existing patterns | yellow-research already has the EXA fallback tools and the ToolSearch pattern | yellow-core previously bundled context7 and removed it explicitly (PR #486) — re-adding any context7 dependency to yellow-core risks confusion |
 
 **The strongest arguments:**
