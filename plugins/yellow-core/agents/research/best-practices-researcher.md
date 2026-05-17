@@ -57,12 +57,18 @@ generic external sources.
 
 ### Phase 1: Curated Knowledge Check
 
-<!-- Inlined from yellow-research:library-context — keep in sync; verified 2026-05-17.
-     Cross-plugin `skills:` resolution is unavailable (anthropics/claude-code#15944,
-     closed not planned), so the safe-chain block below is copied verbatim from
-     plugins/yellow-research/skills/library-context/SKILL.md's "Cross-plugin
-     (safe chain — copy verbatim)" section. Drift sentinel:
-     `context7 unavailable — falling back to` (em dash U+2014). -->
+<!-- Inlined from yellow-research:library-context — adapted from the
+     "Cross-plugin (safe chain — copy verbatim)" section in
+     plugins/yellow-research/skills/library-context/SKILL.md. Cross-plugin
+     `skills:` resolution is unavailable (anthropics/claude-code#15944,
+     closed not planned), so the block must live inline. Intentional deltas
+     vs the canonical safe chain: (1) numbered as sub-steps 1.1/1.2/1.3
+     (parent step is "Library documentation lookup"); (2) Step 1.2 pulls in
+     the disambiguation rule from SKILL.md's separate "Disambiguation"
+     section (kept together here for cross-plugin consumers that don't see
+     the rest of the skill); (3) Step 1.3 names `WebFetch` alongside
+     `WebSearch` since this agent already lists both as built-ins.
+     Drift sentinel: `context7 unavailable — falling back to` (em dash U+2014). -->
 
 1. **Library documentation lookup (safe chain):**
    1. Detect via `ToolSearch("context7")`. If

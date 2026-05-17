@@ -114,6 +114,12 @@ unavailable or returns `result.totalResults < 3`. See
 
 - `research-patterns` — Reference: slug naming, source selection, API key setup,
   graceful degradation, when to compound findings.
+- `library-context` — Canonical fallback chain for library documentation lookup
+  (context7 → EXA → WebSearch); preloaded by within-plugin `code-researcher`
+  via `skills:` frontmatter, inlined verbatim by cross-plugin consumers (initial:
+  yellow-core `best-practices-researcher`). Sibling `reference.md` holds
+  implementer notes (distribution rationale, future RULE 13 grep, deferred
+  cache-hook contract); read on demand, not auto-injected by `skills:` preload.
 
 ## Prerequisites
 

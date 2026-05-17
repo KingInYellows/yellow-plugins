@@ -39,6 +39,11 @@ Tools that auto-correct ASCII to typographic punctuation can produce mismatches
 that silently fail detection. Copy the phrase from SKILL.md's source, not
 from rendered Markdown output.
 
+The phrase MUST appear on a single line in the inlined consumer. The grep
+below is line-based and silently misses wrapped occurrences. SKILL.md's
+canonical safe-chain code fence has the phrase on a single long line —
+preserve that wrapping when copying.
+
 ### Machine-verifiable grep (today, manual)
 
 ```bash
@@ -54,11 +59,39 @@ faster than this file is edited.
 ### Future RULE 13 lint (deferred follow-up)
 
 `scripts/validate-agent-authoring.js` should grow a RULE 13 that fails CI
-when any agent file references `mcp__context7__` in its `tools:` list but the
-agent body does NOT contain the sentinel phrase. Template after W1.5
-(`scripts/validate-agent-authoring.js` ~line 250 region); approximately 15-20
-lines of additional logic. The grep above is the runtime check the rule
-should perform per-file.
+when an agent file references `mcp__context7__` in its `tools:` list AND
+does NOT preload via `skills: [library-context]` AND does NOT contain the
+sentinel phrase in the body. The two-condition exemption is mandatory —
+without it, the rule false-positives on within-yellow-research consumers
+like `code-researcher` where the sentinel is injected at spawn via the
+preloaded skill, not present in the static agent body.
+
+Pseudocode:
+
+```
+for each agent.md in plugins/*/agents/**/*.md:
+  if 'mcp__context7__' in tools list:
+    has_preload   = 'library-context' in skills frontmatter list
+    has_sentinel  = 'context7 unavailable — falling back to' in body
+    if not has_preload and not has_sentinel:
+      fail(agent.md, "context7 reference without library-context preload or sentinel block")
+```
+
+Fixture coverage the follow-up PR MUST add:
+
+- Positive: `code-researcher` (preload-exempt — has context7 in tools AND
+  `library-context` in skills; body has no sentinel — rule passes)
+- Positive: `best-practices-researcher` (inline path — has context7 in tools,
+  no preload, sentinel present in body — rule passes)
+- Negative: synthetic agent fixture with context7 in tools, no preload, no
+  sentinel — rule fails
+
+Template after W1.5 in `scripts/validate-agent-authoring.js` — locate via
+`grep -n 'W1.5' scripts/validate-agent-authoring.js` (line offsets shift
+as the validator grows; the current W1.5 implementation is ~line 290);
+approximately 15-20 lines of additional logic plus the fixture tests.
+The grep above is the runtime check the rule's negative branch performs
+per-file.
 
 Block opt-in adoption to additional plugins until RULE 13 lands — otherwise
 each new consumer is a fresh drift surface with no CI coverage.

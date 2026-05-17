@@ -11,6 +11,7 @@ tools:
   - Glob
   - Bash
   - ToolSearch
+  - WebSearch
   - mcp__plugin_yellow-research_ceramic__ceramic_search
   - mcp__plugin_yellow-research_exa__get_code_context_exa
   - mcp__plugin_yellow-research_exa__web_search_exa

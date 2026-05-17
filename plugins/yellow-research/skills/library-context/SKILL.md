@@ -34,7 +34,8 @@ research agents. Skip when:
 - The query is about repo-internal code (use Grep / Read directly)
 - The agent already has the answer cached in context from earlier turns
 - The user is asking about a private/internal library context7 doesn't index
-  (skip directly to WebSearch — see "Edge: private libraries" below)
+  (skip directly to WebSearch — see "Edge cases" below, "context7 returns
+  zero candidates" bullet)
 
 ## Usage
 
@@ -73,19 +74,25 @@ that name; otherwise prefer `query-docs`.
 **Cross-plugin (safe chain — copy verbatim):**
 
 ```
-1. Detect via ToolSearch("context7"). If `mcp__context7__resolve-library-id` is
-   not present, annotate `[library-context] context7 unavailable — falling
-   back to WebSearch` and proceed to step 2.
+1. Detect via ToolSearch("context7"). If `mcp__context7__resolve-library-id`
+   is not present, annotate
+   `[library-context] context7 unavailable — falling back to WebSearch`
+   and proceed to step 2.
 2. If context7 is present, call `mcp__context7__resolve-library-id` then
-   `mcp__context7__query-docs`. On HTTP 429 or any error message containing
-   "rate limit" or "quota", annotate `[library-context] context7 rate-limited
-   (60 req/hr anonymous global pool) — falling back to WebSearch` and proceed
-   to step 3. Do NOT retry context7 within the same session.
-3. Fall back to built-in `WebSearch` with the library name + topic as query.
-   If WebSearch also errors, stop and report: "No documentation source
-   available for <library>. Check network connectivity or install context7
-   at user level."
+   `mcp__context7__query-docs`. On HTTP 429 or any error message
+   containing "rate limit" or "quota", annotate
+   `[library-context] context7 rate-limited (60 req/hr anonymous global pool) — falling back to WebSearch`
+   and proceed to step 3. Do NOT retry context7 within the same session.
+3. Fall back to built-in `WebSearch` with the library name + topic as
+   query. If WebSearch also errors, stop and report: "No documentation
+   source available for <library>. Check network connectivity or install
+   context7 at user level."
 ```
+
+The sentinel phrase `context7 unavailable — falling back to` MUST appear on
+a single line when copied — do not let your editor wrap it. The drift-
+detection grep (see `reference.md`) is line-based and will silently miss
+wrapped occurrences.
 
 The cross-plugin safe chain MUST NOT reference any `mcp__plugin_yellow-research_*`
 tool — yellow-research is not a declared dependency of other plugins, and
