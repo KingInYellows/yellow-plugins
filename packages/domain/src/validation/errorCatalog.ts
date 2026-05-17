@@ -113,7 +113,6 @@ export class ValidationErrorFactory {
       category: ErrorCategory.SCHEMA_VALIDATION,
       context: { keyword, ...context },
       specReference: 'FR-001, FR-002',
-      resolution: this.getSchemaErrorResolution(keyword),
     };
   }
 
@@ -174,7 +173,6 @@ export class ValidationErrorFactory {
       category: ErrorCategory.COMPATIBILITY,
       context: { requirement, actual, expected },
       specReference: errorInfo.crit,
-      resolution: `Please ensure your system meets the requirement: ${requirement} ${expected}`,
     };
   }
 
@@ -201,7 +199,6 @@ export class ValidationErrorFactory {
       category: ErrorCategory.INSTALLATION,
       context: { pluginId, ...context },
       specReference: 'CRIT-007, CRIT-010',
-      resolution: this.getInstallationErrorResolution(code),
     };
   }
 
@@ -226,59 +223,7 @@ export class ValidationErrorFactory {
       category: ErrorCategory.DISCOVERY,
       context,
       specReference: 'CRIT-008',
-      resolution:
-        'Verify marketplace configuration and plugin references are valid',
     };
-  }
-
-  /**
-   * Get resolution guidance for schema errors
-   */
-  private static getSchemaErrorResolution(keyword: string): string {
-    const resolutionMap: Record<string, string> = {
-      required: 'Add the required field to your manifest file',
-      pattern:
-        'Ensure the field value matches the expected pattern (e.g., kebab-case, semver)',
-      format: 'Verify the field format (e.g., valid URI, email, or date-time)',
-      type: 'Correct the field type (e.g., string, number, array, object)',
-      enum: 'Use one of the allowed values from the enumeration',
-      minLength:
-        'Increase the field value length to meet the minimum requirement',
-      maxLength: 'Reduce the field value length to meet the maximum limit',
-      additionalProperties:
-        'Remove unexpected fields not defined in the schema',
-    };
-
-    return (
-      resolutionMap[keyword] ||
-      'Review the schema documentation and correct the field value'
-    );
-  }
-
-  /**
-   * Get resolution guidance for installation errors
-   */
-  private static getInstallationErrorResolution(code: string): string {
-    const resolutionMap: Record<string, string> = {
-      [ERROR_CODES.INST_PLUGIN_NOT_FOUND]:
-        'Verify the plugin ID exists in the marketplace',
-      [ERROR_CODES.INST_VERSION_NOT_FOUND]:
-        'Check available versions with "/plugin info <id>"',
-      [ERROR_CODES.INST_ALREADY_INSTALLED]:
-        'Use "/plugin update <id>" to update or "/plugin uninstall <id>" to reinstall',
-      [ERROR_CODES.INST_DOWNLOAD_FAILED]:
-        'Check network connectivity and marketplace URL',
-      [ERROR_CODES.INST_CHECKSUM_MISMATCH]:
-        'Re-download the plugin or report a security issue to the maintainer',
-      [ERROR_CODES.INST_LIFECYCLE_FAILED]:
-        'Review lifecycle script logs and fix any errors',
-      [ERROR_CODES.INST_MANIFEST_INVALID]:
-        'Contact plugin maintainer to fix the manifest file',
-    };
-
-    return (
-      resolutionMap[code] || 'Review installation logs and retry the operation'
-    );
   }
 }
 
@@ -331,6 +276,5 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.NET_TIMEOUT,
       ERROR_CODES.NET_PARSE_FAILED,
     ],
-    [ErrorCategory.LIFECYCLE]: [], // Lifecycle errors are mapped to INSTALLATION category
   };
 }

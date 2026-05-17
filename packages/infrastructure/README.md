@@ -4,7 +4,7 @@ Infrastructure layer — AJV schema validation for plugin marketplace manifests.
 
 ## Exports
 
-- `AjvValidatorFactory`, `sharedValidatorFactory` — AJV validator factory and singleton
+- `AjvValidatorFactory` — AJV validator factory
 - `SchemaValidator`, `createValidator` — High-level validator for marketplace and plugin schemas
 - `ValidationError`, `ValidationResult` — Result types
 - `version` — Package version string

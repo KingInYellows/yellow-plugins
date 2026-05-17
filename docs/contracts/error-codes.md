@@ -808,8 +808,8 @@ data).
 
 ### For CLI Users
 
-1. **Read Error Messages**: Error messages include resolution guidance
-2. **Check Error Codes**: Use this reference for detailed explanations
+1. **Read Error Messages**: Error messages are human-readable and name the failing field/value
+2. **Check Error Codes**: Use this reference for detailed explanations and suggested remediation
 3. **Review Logs**: Enable verbose logging for debugging
 4. **Report Issues**: Contact plugin maintainer or file bug report
 
@@ -871,9 +871,15 @@ interface DomainValidationError {
   category: string; // e.g., "SCHEMA_VALIDATION"
   context?: object; // Additional debugging context
   specReference?: string; // e.g., "CRIT-007, FR-004"
-  resolution?: string; // Suggested fix
 }
 ```
+
+> The `resolution?: string` field was removed from `DomainValidationError`
+> in v1.2.x. Remediation guidance lives in this document under each error
+> code rather than on the validator response — the prior in-band field
+> was only ever populated for a subset of codes and was not part of any
+> tested contract. CLI/API consumers should look up `code` here for the
+> human-facing fix.
 
 **Example**:
 
@@ -888,8 +894,7 @@ interface DomainValidationError {
     "keyword": "required",
     "missingProperty": "version"
   },
-  "specReference": "FR-001, FR-002",
-  "resolution": "Add the required field to your manifest file"
+  "specReference": "FR-001, FR-002"
 }
 ```
 

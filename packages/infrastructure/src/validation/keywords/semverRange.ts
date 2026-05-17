@@ -1,18 +1,12 @@
 /**
- * AJV custom keyword: `semverRange`
- *
- * Validates that a string value is a syntactically valid npm semver range
- * (e.g., `^1.0.0`, `~2.0.0`, `>=3 <4`, `1.x`, `*`, `1.2.3 - 2.0.0`,
- * `>=1.0.0 || ^2.0.0`). Delegates to `semver.validRange()` from the
- * canonical npm `semver` package.
+ * AJV custom keyword `semverRange`: validates that a string is a valid npm
+ * semver range (delegates to `semver.validRange()`).
  *
  * Used in `schemas/plugin.schema.json` for `dependencies[].version`. The
- * schema applies a lightweight `pattern` first to reject obvious non-semver
- * input; this keyword runs second and rejects strings that pass the
- * structural gate but are not actually valid range expressions. The schema
- * MUST also set `minLength: 1` on the field — `semver.validRange("")`
- * returns `"*"` (truthy, the universal range), so the empty string would
- * otherwise pass this keyword.
+ * schema applies a lightweight `pattern` first; this keyword rejects strings
+ * that pass the structural gate but are not valid ranges. The schema MUST
+ * also set `minLength: 1` — `semver.validRange("")` returns `"*"` (truthy),
+ * so the empty string would otherwise pass here.
  *
  * @module infrastructure/validation/keywords/semverRange
  */
@@ -20,19 +14,10 @@
 import type { FuncKeywordDefinition, SchemaValidateFunction } from 'ajv';
 import semver from 'semver';
 
-/**
- * Keyword definition object suitable for `ajv.addKeyword(...)`.
- *
- * AJV's `type: 'string'` filter ensures the validate function is only
- * invoked for string-typed data, so no in-function non-string guard is
- * needed. `errors: true` enables structured error output with the
- * offending value, replacing AJV's default generic "must pass keyword
- * validation" message.
- */
 // AJV's SchemaValidateFunction is a callable that ALSO carries an `errors`
-// property the function itself populates with structured error objects on
-// failure. TypeScript expresses that as a callable + property, so we
-// construct the validate function and attach `errors` in two steps.
+// property the function populates on failure — built and attached in two
+// steps. `type: 'string'` (on the keyword below) guarantees `data` is a
+// string when this runs, so no in-function type guard is needed.
 const validateFn: SchemaValidateFunction = (
   schemaValue: unknown,
   data: unknown
@@ -41,8 +26,6 @@ const validateFn: SchemaValidateFunction = (
     validateFn.errors = null;
     return true;
   }
-  // AJV's `type: 'string'` filter guarantees data is a string when this
-  // function is invoked; no defensive guard needed.
   if (semver.validRange(data as string, { loose: false }) !== null) {
     validateFn.errors = null;
     return true;
@@ -57,6 +40,8 @@ const validateFn: SchemaValidateFunction = (
   return false;
 };
 
+// `errors: true` enables structured error output with the offending value,
+// replacing AJV's generic "must pass keyword validation" message.
 export const semverRangeKeyword: FuncKeywordDefinition = {
   keyword: 'semverRange',
   type: 'string',
