@@ -7,7 +7,7 @@
 'yellow-morph': patch
 ---
 
-fix: remediate 7 security-debt patterns across 6 plugins and scripts/
+fix: remediate 7 security-debt patterns across 6 plugins and root scripts
 
 Targeted fixes for the security-debt findings (006, 009, 017, 022, 023,
 032, 033) from the 2026-05-13 audit.

@@ -43,13 +43,20 @@ if [ "$EXIT_CODE" != "0" ]; then
   exit_ok
 fi
 
-# Extract the first -m flag value. Matches both double- and single-quoted
-# forms (debt finding 032 — the single-quote gap let `-m 'feat: x'` bypass
-# conventional-commit enforcement entirely).
+# Extract the first -m flag value. Try double-quoted first, then
+# single-quoted. The previous single-pattern form mixed both quote types in
+# one character class (`[^'"]*`), which false-rejected legitimate messages
+# containing the OTHER quote type — `-m "don't crash"` and `-m 'fix "bug"'`
+# both truncated mid-message and missed the conventional prefix entirely.
+# Separate patterns let each quote type contain the other.
 # Remaining gap (permissive by design — warn-only hook):
 #   - Multi -m flags: -m "subject" -m "body" → only the first is checked
 # This causes false-negatives (no warning), never false-positives or blocks.
-MSG=$(printf '%s' "$COMMAND" | grep -oE "\-m ['\"][^'\"]*['\"]" | head -1 | sed -E "s/^-m ['\"]//;s/['\"]\$//") || MSG=""
+MSG=$(printf '%s' "$COMMAND" | grep -oE '\-m "[^"]*"' | head -1 | sed 's/^-m "//;s/"$//')
+if [ -z "$MSG" ]; then
+  MSG=$(printf '%s' "$COMMAND" | grep -oE "\-m '[^']*'" | head -1 | sed "s/^-m '//;s/'\$//")
+fi
+MSG="${MSG:-}"
 
 # If we couldn't extract the message, skip validation (permissive)
 [ -z "$MSG" ] && exit_ok

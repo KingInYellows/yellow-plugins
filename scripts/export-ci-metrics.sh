@@ -8,7 +8,10 @@
 #   ./scripts/export-ci-metrics.sh <stage> <status> [additional-labels]
 #
 # Arguments:
-#   stage: CI stage name (lint, unit_test, integration_test, schema_validation, build)
+#   stage: CI stage name. Built-ins: lint, unit_test, integration_test,
+#          schema_validation, contract_drift, security_audit, build.
+#          Custom stages accepted as long as they match ^[a-zA-Z][a-zA-Z0-9_]*$
+#          (e.g., custom_stage, new_stage — see docs/operations/ci-pipeline.md).
 #   status: Job status (success, failure, cancelled)
 #   additional-labels: Optional K=V pairs (e.g., target="marketplace")
 #
@@ -45,11 +48,17 @@ done
 # STAGE / STATUS are embedded directly into Prometheus label values below.
 # An unrecognized value (typo, or a crafted argument containing a quote)
 # could break out of the label quoting and inject arbitrary metric lines.
-# Allowlist-validate before use (debt finding 009).
-# Keep VALID_STAGES in sync with `.github/workflows/validate-schemas.yml` —
-# every `./scripts/export-ci-metrics.sh <stage>` callsite must appear here.
-VALID_STAGES="lint unit_test integration_test schema_validation contract_drift security_audit build"
+# Validate against the injection-safe shape that Prometheus also requires
+# for label values it round-trips cleanly (debt finding 009).
+#
+# STAGE accepts any label that matches `^[a-zA-Z][a-zA-Z0-9_]*$` so the
+# documented extension flow in `docs/operations/ci.md` and
+# `docs/operations/ci-pipeline.md` (which shows `custom_stage` /
+# `new_stage` as user-supplied stage names) keeps working without
+# requiring code changes per new callsite. STATUS stays a closed list —
+# the Prometheus convention is a small fixed enum of job outcomes.
 VALID_STATUSES="success failure cancelled"
+SAFE_LABEL_PATTERN='^[a-zA-Z][a-zA-Z0-9_]*$'
 
 validate_in_allowlist() {
   # $1=value  $2=space-separated allowlist  $3=field name
@@ -62,14 +71,25 @@ validate_in_allowlist() {
   exit 1
 }
 
+validate_safe_label() {
+  # $1=value  $2=field name
+  local v="$1" field="$2"
+  if printf '%s' "$v" | grep -qE "$SAFE_LABEL_PATTERN"; then
+    return 0
+  fi
+  printf '[ci-metrics] Error: invalid %s "%s" — must match %s\n' \
+    "$field" "$v" "$SAFE_LABEL_PATTERN" >&2
+  exit 1
+}
+
 # Validate each provided argument independently. The "unknown" sentinel means
 # the argument was omitted entirely — keep the existing warn-and-continue
-# behavior for that field only; a provided value outside the allowlist is
+# behavior for that field only; a provided value that fails validation is
 # still a hard error even when the other field is omitted.
 if [ "$STAGE" = "unknown" ] || [ "$STATUS" = "unknown" ]; then
   printf '[ci-metrics] Warning: Missing required arguments (stage=%s, status=%s). Metrics may be incomplete.\n' "$STAGE" "$STATUS" >&2
 fi
-[ "$STAGE" != "unknown" ] && validate_in_allowlist "$STAGE" "$VALID_STAGES" stage
+[ "$STAGE" != "unknown" ] && validate_safe_label "$STAGE" stage
 [ "$STATUS" != "unknown" ] && validate_in_allowlist "$STATUS" "$VALID_STATUSES" status
 
 # Build label string
