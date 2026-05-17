@@ -62,12 +62,15 @@ generic external sources.
      plugins/yellow-research/skills/library-context/SKILL.md. Cross-plugin
      `skills:` resolution is unavailable (anthropics/claude-code#15944,
      closed not planned), so the block must live inline. Intentional deltas
-     vs the canonical safe chain: (1) numbered as sub-steps 1.1/1.2/1.3
-     (parent step is "Library documentation lookup"); (2) Step 1.2 pulls in
-     the disambiguation rule from SKILL.md's separate "Disambiguation"
-     section (kept together here for cross-plugin consumers that don't see
-     the rest of the skill); (3) Step 1.3 names `WebFetch` alongside
-     `WebSearch` since this agent already lists both as built-ins.
+     vs the canonical safe chain (which uses flat numbering 1/2/3):
+     (1) numbered as sub-steps 1.1/1.2/1.3 because the parent step in this
+     agent is the broader "Library documentation lookup" step — sub-numbering
+     keeps the safe chain nested under that parent without renumbering the
+     agent's outer Phase 1 steps; (2) Step 1.2 pulls in the disambiguation
+     rule from SKILL.md's separate "Disambiguation" section (kept together
+     here for cross-plugin consumers that don't see the rest of the skill);
+     (3) Step 1.3 names `WebFetch` alongside `WebSearch` since this agent
+     already lists both as built-ins.
      Drift sentinel: `context7 unavailable — falling back to` (em dash U+2014). -->
 
 1. **Library documentation lookup (safe chain):**
@@ -85,11 +88,13 @@ generic external sources.
       annotate `[best-practices-researcher] context7 rate-limited (60 req/hr anonymous global pool) — falling back to WebSearch`
       (single line) and proceed to step 1.3. Do NOT retry context7 within
       the same session.
-   3. Fall back to built-in `WebSearch` / `WebFetch` on authoritative
-      domains with the library name + topic as query. If WebSearch also
-      errors, stop and report: "No documentation source available for
-      <library>. Check network connectivity or install context7 at user
-      level."
+   3. Fall back to built-in `WebSearch` first to locate authoritative URLs
+      (library name + topic as query), then use `WebFetch` to dereference
+      specific URLs returned by that search. `WebFetch` is not used
+      independently here — it dereferences URLs that `WebSearch` surfaced.
+      If `WebSearch` errors, stop and report: "No documentation source
+      available for <library>. Check network connectivity or install
+      context7 at user level."
 
    Context7 is a user-level optional MCP since 2026-04 — yellow-core no
    longer bundles it to avoid the dual-install OAuth pop-up problem.

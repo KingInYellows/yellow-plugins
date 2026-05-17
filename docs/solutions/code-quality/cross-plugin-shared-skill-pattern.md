@@ -50,6 +50,7 @@ verbatim. Drift is detected by a machine-verifiable grep one-liner.
 **Source of truth:** `plugins/<owner>/skills/<skill-name>/SKILL.md`
 
 **Drift detection one-liner** (run in CI or manually):
+
 ```bash
 rg -l '<unique sentinel phrase from the block>' plugins/ --type md
 ```

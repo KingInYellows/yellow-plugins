@@ -133,7 +133,10 @@ but should be noted as a tracking item.
 ### Decision 2: Fallback chain has two published forms
 
 **Within yellow-research (full chain):**
-context7 → `mcp__plugin_yellow-research_exa__get_code_context_exa` → `mcp__plugin_yellow-research_exa__web_search_exa` → built-in WebSearch
+context7 →
+`mcp__plugin_yellow-research_exa__get_code_context_exa` →
+`mcp__plugin_yellow-research_exa__web_search_exa` →
+built-in WebSearch
 
 **Cross-plugin inlined excerpt (safe chain):**
 context7 → built-in WebSearch
