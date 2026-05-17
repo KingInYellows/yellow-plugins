@@ -200,8 +200,10 @@ required range.
     path: '/compatibility/claudeCodeMin',
     severity: 'ERROR',
     category: 'COMPATIBILITY',
-    specReference: 'CRIT-002b',
-    resolution: 'Please ensure your system meets the requirement: claudeCodeMin >=1.5.0'
+    specReference: 'CRIT-002b'
+    // Remediation guidance is in docs/contracts/error-codes.md under
+    // ERROR-COMPAT-001 — the prior in-band `resolution` field was
+    // removed when DomainValidationError was simplified.
   }
 }
 ```
@@ -385,8 +387,11 @@ All errors include:
 
 - **Error code** from specification Section 4
 - **Specification reference** (CRIT/FR anchor)
-- **Suggested resolution** text
 - **Contextual data** (required, actual values)
+
+Suggested remediation for each error code is documented in
+`docs/contracts/error-codes.md` (no longer returned in-band on the
+validator response).
 
 ---
 
