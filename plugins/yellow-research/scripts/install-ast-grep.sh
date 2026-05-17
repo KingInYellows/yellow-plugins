@@ -60,7 +60,28 @@ if ! command -v uv >/dev/null 2>&1; then
     printf '[yellow-research] uv not found — installing (needed for ast-grep MCP server)...\n'
     # Note: uv installer is from Astral (uv maintainers). User confirmation
     # happens in research:setup via AskUserQuestion before this script runs.
-    if curl -LsSf https://astral.sh/uv/install.sh | sh; then
+    #
+    # Security (debt finding 006): never pipe a remote URL straight to a
+    # shell. Download the installer to a temp file over HTTPS, sanity-check
+    # it (non-empty, has a shebang), then execute the local copy — a
+    # truncated or tampered stream cannot partially execute, and the file is
+    # auditable on disk. The URL is version-pinned (not the floating
+    # /uv/install.sh) so the fetched script is reproducible.
+    # `mktemp` with no template fails on macOS (BSD mktemp requires the
+    # template argument). Pass a template that works on both GNU and BSD.
+    uv_installer=$(mktemp "${TMPDIR:-/tmp}/uv-install.XXXXXX" 2>/dev/null) || \
+      error "Cannot create temp file for uv installer"
+    uv_install_ok=false
+    if curl -fLsS --proto '=https' --proto-redir '=https' --tlsv1.2 \
+         "https://astral.sh/uv/0.5.11/install.sh" -o "$uv_installer" \
+       && [ -s "$uv_installer" ] \
+       && head -n1 "$uv_installer" | grep -q '^#!'; then
+      if sh "$uv_installer"; then
+        uv_install_ok=true
+      fi
+    fi
+    rm -f "$uv_installer"
+    if [ "$uv_install_ok" = true ]; then
       # Source uv into current session
       export PATH="${HOME}/.local/bin:${PATH}"
       if command -v uv >/dev/null 2>&1; then
@@ -71,7 +92,7 @@ if ! command -v uv >/dev/null 2>&1; then
       fi
     else
       warning "uv installation failed. ast-grep MCP server will not work without uv."
-      warning "Install manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
+      warning "Install manually — see https://docs.astral.sh/uv/getting-started/installation/"
       printf '[yellow-research] uv: NOT FOUND (installation failed)\n'
     fi
   fi

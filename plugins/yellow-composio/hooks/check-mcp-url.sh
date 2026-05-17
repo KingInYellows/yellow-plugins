@@ -33,10 +33,18 @@ API_KEY_OPT="${CLAUDE_PLUGIN_OPTION_COMPOSIO_API_KEY:-}"
 
 # Emit credential-status.json (best-effort; never blocks SessionStart).
 emit_status() {
-  # Guard CLAUDE_PLUGIN_ROOT against `set -u` unbound exit when the hook runs
-  # outside a Claude Code session (e.g. manual invocation or stale environment).
-  # Fallback mirrors the cached plugin location used by yellow-semgrep.
-  local plugin_root="${CLAUDE_PLUGIN_ROOT:-${HOME}/.claude/plugins/cache/yellow-plugins/yellow-composio}"
+  # When CLAUDE_PLUGIN_ROOT is unset (hook run outside a Claude Code session
+  # — manual invocation or a stale environment), skip the credential-status
+  # write rather than guessing a path. The previous hardcoded cache-path
+  # fallback (debt finding 022) was brittle: the cache layout is not a
+  # stable contract, and a wrong guess only ever resolved to "helper not
+  # found" anyway. The credential-status file is a best-effort artifact
+  # consumed by /setup:all — skipping it is harmless.
+  local plugin_root="${CLAUDE_PLUGIN_ROOT:-}"
+  [ -n "$plugin_root" ] || return 0
+  # credential-status.sh lives in yellow-core, which must be co-installed
+  # alongside yellow-composio. The guard below makes the absent-plugin case
+  # a graceful no-op.
   local helper="${plugin_root}/../yellow-core/lib/credential-status.sh"
   [ -f "$helper" ] || return 0
   # shellcheck source=/dev/null

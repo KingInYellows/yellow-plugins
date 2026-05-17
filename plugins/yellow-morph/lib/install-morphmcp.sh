@@ -81,7 +81,25 @@ yellow_morph_acquire_install_lock() {
     if [ "$stale_recovered" -eq 0 ] && [ -f "${lock_dir}/pid" ]; then
       local owner_pid
       owner_pid=$(cat "${lock_dir}/pid" 2>/dev/null)
-      if [ -n "$owner_pid" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
+      # An empty or non-numeric pid file means a partial write or
+      # corruption — treat it as a stale lock rather than passing garbage
+      # to `kill -0` (which would print a spurious error and skip the
+      # recovery path entirely).
+      case "$owner_pid" in
+        '' | *[!0-9]* | 0)
+          # Reject empty / non-numeric values and 0 (kernel swapper, never
+          # a valid lock owner). Do NOT reject PID 1: in containerized
+          # installer runs (Docker, K8s init), the installer process itself
+          # may legitimately be PID 1, and clearing its lock would create
+          # a concurrency hazard (codex P2 #532).
+          printf 'yellow-morph: lock pid file missing or invalid (got %q); clearing stale lock\n' "$owner_pid" >&2
+          rm -f "${lock_dir}/pid" 2>/dev/null
+          rmdir "$lock_dir" 2>/dev/null
+          stale_recovered=1
+          continue
+          ;;
+      esac
+      if ! kill -0 "$owner_pid" 2>/dev/null; then
         printf 'yellow-morph: stale lock owner PID %s no longer running; clearing\n' \
           "$owner_pid" >&2
         rm -f "${lock_dir}/pid" 2>/dev/null
