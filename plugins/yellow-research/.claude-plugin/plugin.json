@@ -103,9 +103,9 @@
   "dependencies": [
     {
       "name": "yellow-core",
-      "version": "*",
+      "version": ">=1.17.1",
       "optional": false,
-      "reason": "hooks/write-credential-status.sh sources yellow-core/lib/credential-status.sh for the credential_hook_scaffold function"
+      "reason": "hooks/write-credential-status.sh sources yellow-core/lib/credential-status.sh for credential_hook_scaffold — first available in yellow-core 1.17.1"
     }
   ]
 }
