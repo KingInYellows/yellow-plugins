@@ -3,6 +3,8 @@ name: code-researcher
 description: "Inline code research for active development. Use when user asks how to use a library, needs code examples, API patterns, or framework documentation. Routes to best source by query type; returns concise in-context synthesis without saving a file."
 model: inherit
 memory: project
+skills:
+  - library-context
 tools:
   - Read
   - Grep
@@ -31,7 +33,7 @@ Choose the best source based on query type:
 
 | Query Type                      | Primary Tool                                                                                                             |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Library/framework docs          | `mcp__context7__resolve-library-id` → `mcp__context7__query-docs` (Context7 — user-level MCP, install separately)       |
+| Library/framework docs          | See `library-context` skill (preloaded — context7 → EXA → WebSearch chain with availability detection and disambiguation)|
 | Code examples, patterns, GitHub | `mcp__plugin_yellow-research_exa__get_code_context_exa`                                                                  |
 | AST/structural code patterns    | `mcp__plugin_yellow-research_ast-grep__find_code` / `mcp__plugin_yellow-research_ast-grep__find_code_by_rule` (ast-grep) |
 | GitHub code search              | `mcp__grep__searchGitHub`                                                                                                |
@@ -39,16 +41,11 @@ Choose the best source based on query type:
 | General web (keyword-tight)     | `mcp__plugin_yellow-research_ceramic__ceramic_search` (lexical; rewrite query first — see below)                         |
 | General web (neural fallback)   | `mcp__plugin_yellow-research_exa__web_search_exa`                                                                        |
 
-**Start with Context7** for any named library when the tool is available — it
-has official, up-to-date docs. **Context7 is a user-level optional MCP** since
-2026-04 (yellow-core no longer bundles it; install once at user level via
-`/plugin install context7@upstash` to enable). If ToolSearch cannot find
-`mcp__context7__resolve-library-id`, skip directly to
-`mcp__plugin_yellow-research_exa__get_code_context_exa`. If Context7 is
-available but returns no match, use
-`mcp__plugin_yellow-research_exa__get_code_context_exa` as the content fallback.
-If EXA returns nothing useful, use
-`mcp__plugin_yellow-research_exa__web_search_exa` as last resort.
+**For library/framework docs**, the preloaded `library-context` skill defines
+the context7 → EXA → WebSearch fallback chain, two-step invocation
+(`resolve-library-id` → `query-docs`), disambiguation rules for multiple
+candidates, rate-limit handling, and the citation format. Follow that chain
+for any library query; do not re-document it here.
 
 **For general web queries** (when no library is named and no code-context
 match exists), prefer `mcp__plugin_yellow-research_ceramic__ceramic_search`
