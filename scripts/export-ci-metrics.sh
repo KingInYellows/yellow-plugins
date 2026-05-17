@@ -74,6 +74,18 @@ validate_in_allowlist() {
 validate_safe_label() {
   # $1=value  $2=field name
   local v="$1" field="$2"
+  # Reject embedded newlines / carriage returns up front. `grep -qE` is
+  # line-oriented, so a multiline value like $'lint\nattack_total{p="q"'
+  # passes the first-line match while the rest of the string still flows
+  # into the Prometheus label and forges metric lines (codex P2 review).
+  if [ "$v" != "$(printf '%s' "$v" | tr -d '\n\r')" ]; then
+    printf '[ci-metrics] Error: %s contains a newline or carriage return\n' \
+      "$field" >&2
+    exit 1
+  fi
+  # Whole-string match. The newline rejection above means `grep -qE` here
+  # cannot succeed on a partial first-line match — but keep the anchors
+  # for defense in depth in case a future edit drops the tr guard.
   if printf '%s' "$v" | grep -qE "$SAFE_LABEL_PATTERN"; then
     return 0
   fi
