@@ -82,6 +82,23 @@ teardown() {
   [ "$status" -eq 1 ]
 }
 
+@test "validate_file_path rejects a bare tilde" {
+  run validate_file_path "~" "$PROJECT_ROOT"
+  [ "$status" -eq 1 ]
+}
+
+@test "validate_file_path accepts a filename containing a tilde (not leading)" {
+  touch "$PROJECT_ROOT/src/backup~.txt"
+  run validate_file_path "src/backup~.txt" "$PROJECT_ROOT"
+  [ "$status" -eq 0 ]
+}
+
+@test "validate_file_path accepts a filename with embedded tilde" {
+  touch "$PROJECT_ROOT/src/file~1.sh"
+  run validate_file_path "src/file~1.sh" "$PROJECT_ROOT"
+  [ "$status" -eq 0 ]
+}
+
 @test "validate_file_path rejects a path with a newline" {
   bad_path=$'src/file\n.txt'
   run validate_file_path "$bad_path" "$PROJECT_ROOT"
@@ -98,6 +115,26 @@ teardown() {
   ln -s /etc/passwd "$PROJECT_ROOT/src/evil-link"
   run validate_file_path "src/evil-link" "$PROJECT_ROOT"
   [ "$status" -eq 1 ]
+}
+
+@test "validate_file_path rejects a broken intermediate symlink (target could escape on creation)" {
+  # safe/link is a symlink whose target does not currently exist; the
+  # pre-fix walk-up logic skipped it (-e false) and produced a resolved
+  # path inside the project root, even though once the target is created
+  # the path could land anywhere. Conservative fix: reject.
+  mkdir -p "$PROJECT_ROOT/safe"
+  ln -s /tmp/yellow-validate-fs-nonexistent-target "$PROJECT_ROOT/safe/link"
+  run validate_file_path "safe/link/new.md" "$PROJECT_ROOT"
+  [ "$status" -eq 1 ]
+}
+
+# --- validate_file_path: project-root edge cases ---
+
+@test "validate_file_path accepts \".\" (project root itself)" {
+  # The pre-fix containment check matched only "${canonical_root}/*", so
+  # paths resolving to canonical_root exactly (e.g. ".") were rejected.
+  run validate_file_path "." "$PROJECT_ROOT"
+  [ "$status" -eq 0 ]
 }
 
 # --- validate_file_path: optional project root ($2 defaults to git toplevel) ---

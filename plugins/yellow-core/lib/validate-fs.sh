@@ -14,8 +14,9 @@
 # Contract:
 #   - validate_file_path returns 0 if the path is a project-relative path
 #     that resolves inside the project root, 1 otherwise. Rejects empty
-#     paths, "..", leading "/", "~" anywhere in the path, embedded newlines/CRs, and symlinks
-#     whose target escapes the root.
+#     paths, "..", leading "/", leading "~" (home-directory expansion),
+#     embedded newlines/CRs, symlinks whose target escapes the root, and
+#     broken intermediate symlinks (whose future target could escape).
 #   - The project root ($2) is optional; it defaults to the git toplevel
 #     (or $PWD). yellow-debt callers rely on the optional form.
 #
@@ -56,9 +57,11 @@ validate_file_path() {
   local raw_path="$1"
   local project_root="${2:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
-  # Quick reject: obvious traversal patterns.
+  # Quick reject: obvious traversal patterns. Tilde rejection is anchored
+  # to a leading "~" only — embedded tildes in filenames (backup~.txt,
+  # file~1.sh) are legal and must not be rejected.
   case "$raw_path" in
-    *..* | /* | *~*) return 1 ;;
+    *..* | /* | '~' | '~/'*) return 1 ;;
   esac
 
   # Empty path is invalid.
@@ -119,10 +122,23 @@ validate_file_path() {
   #      escape the project root. Walking up and resolving the nearest
   #      existing ancestor via pwd -P catches this.
   local resolved candidate="$full_path" remainder=""
-  while [ -n "$candidate" ] && [ "$candidate" != "/" ] && [ ! -e "$candidate" ]; do
+  # Stop the walk on either an existing entry (-e) OR a symlink (-L).
+  # Without -L the loop happily skipped a broken intermediate symlink
+  # (target absent → -e false) and produced a resolved path that would
+  # escape the project root once the symlink target was created — see
+  # the codex P2 regression on yellow-debt's pre-creation validate path.
+  while [ -n "$candidate" ] && [ "$candidate" != "/" ] && [ ! -e "$candidate" ] && [ ! -L "$candidate" ]; do
     remainder="$(basename -- "$candidate")${remainder:+/$remainder}"
     candidate="$(dirname -- "$candidate")"
   done
+
+  # If the walk stopped at a broken symlink (-L but not -e), reject
+  # conservatively: cd cannot follow it, and once its target is created
+  # the resolved path could land anywhere on the filesystem.
+  if [ -L "$candidate" ] && [ ! -e "$candidate" ]; then
+    return 1
+  fi
+
   # If candidate is a regular file (not a directory), cd to its parent and
   # append its basename — cd fails on non-directories.
   local resolved_parent
@@ -134,9 +150,13 @@ validate_file_path() {
   fi
   resolved="${resolved_parent}${remainder:+/$remainder}"
 
-  # Verify resolved path is under the project root.
+  # Verify resolved path is under the project root. Match both
+  # "${canonical_root}/..." (a path within the root) and "${canonical_root}"
+  # exactly (the root itself, e.g. validate_file_path "."). The old
+  # yellow-debt implementation handled both; dropping the equality branch
+  # was a regression.
   case "$resolved" in
-    "${canonical_root}/"*) return 0 ;;
+    "${canonical_root}/"*|"${canonical_root}") return 0 ;;
     *) return 1 ;;
   esac
 }
