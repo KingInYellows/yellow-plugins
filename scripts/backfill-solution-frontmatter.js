@@ -126,26 +126,19 @@ function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function fmGetScalar(fmRaw, key) {
-  // Handles three YAML forms:
-  //   1. Inline scalar:           `title: foo` or `title: 'foo'`
-  //   2. Folded/literal block:    `title: >` / `title: |` followed by indented lines
-  //   3. Plain multi-line:        `title:` (or value-on-same-line + continuation
-  //      lines that are merely indented; common in prettier-formatted YAML where
-  //      a long string wraps under the key).
-  // The third form is what produced the truncated `problem` values found in the
-  // initial backfill (e.g., `wsl2-crlf-pr-merge-unblocking.md`,
-  // `yellow-linear-plugin-pr-review-fixes.md`,
-  // `skill-frontmatter-attribute-and-format-requirements.md`). The fix joins
-  // continuation lines for case (3) the same way it does for case (2).
-  const escKey = escapeRe(key);
-  // [ \t]* (not \s*) between `:` and capture group — \s* would greedy-match
-  // across newlines and capture the first indented line as the "head value",
-  // which produced the truncated `problem` regression in the initial backfill.
-  const inline = fmRaw.match(new RegExp(`^${escKey}\\s*:[ \\t]*(.*)$`, 'm'));
-  if (!inline) return null;
-  const headValue = inline[1];
-
+// Resolve a frontmatter scalar value from its already-matched head value,
+// handling the three YAML forms:
+//   1. Inline scalar:           `title: foo` or `title: 'foo'`
+//   2. Folded/literal block:    `title: >` / `title: |` followed by indented lines
+//   3. Plain multi-line:        value-on-same-line + continuation lines that are
+//      merely indented; common in prettier-formatted YAML where a long string
+//      wraps under the key.
+// The third form is what produced the truncated `problem` values found in the
+// initial backfill (e.g., `wsl2-crlf-pr-merge-unblocking.md`,
+// `yellow-linear-plugin-pr-review-fixes.md`,
+// `skill-frontmatter-attribute-and-format-requirements.md`). The fix joins
+// continuation lines for case (3) the same way it does for case (2).
+function resolveScalarValue(headValue, fmRaw, key) {
   // Case 2: folded/literal block scalar.
   if (headValue.trim() === '>' || headValue.trim() === '|') {
     const collected = collectIndentedContinuation(fmRaw, key);
@@ -162,6 +155,16 @@ function fmGetScalar(fmRaw, key) {
 
   // Case 1: simple inline scalar.
   return stripWrappingQuotes(headValue.trim());
+}
+
+function fmGetScalar(fmRaw, key) {
+  const escKey = escapeRe(key);
+  // [ \t]* (not \s*) between `:` and capture group — \s* would greedy-match
+  // across newlines and capture the first indented line as the "head value",
+  // which produced the truncated `problem` regression in the initial backfill.
+  const inline = fmRaw.match(new RegExp(`^${escKey}\\s*:[ \\t]*(.*)$`, 'm'));
+  if (!inline) return null;
+  return resolveScalarValue(inline[1], fmRaw, key);
 }
 
 // Collect lines that follow `<key>:` AND are indented (i.e., they are
@@ -337,31 +340,16 @@ function injectFrontmatter(fmRaw, additions) {
   return lines.join(lineEnding);
 }
 
-function processEntry(filePath) {
-  let parsed;
-  try {
-    parsed = readEntry(filePath);
-  } catch (err) {
-    RESULTS.errors.push({ file: filePath, error: err.message });
-    return;
-  }
-
-  const category = deriveCategory(filePath);
-  // Use fmHasNonEmptyField for the already-complete short-circuit so a
-  // bare `problem:` (no value) or empty `tags:` list does not silently
-  // bypass derivation. Use fmHasField below when deciding whether to add
-  // a field — if the key is present (even empty) we still skip injection
-  // to avoid duplicate keys.
+// Derive the frontmatter additions for an entry. Returns either
+// `{ additions }` (an object of fields to inject) or `{ flagged: reason }`
+// when the entry needs manual review and must not be auto-modified.
+function computeAdditions(parsed, category) {
+  // Use fmHasNonEmptyField for the present-but-empty checks so a bare
+  // `problem:` (no value) does not masquerade as complete. Use fmHasField
+  // when deciding whether to ADD a field — if the key is present (even
+  // empty) we still skip injection to avoid duplicate YAML keys.
   const hasTrack = fmHasNonEmptyField(parsed.fmRaw, 'track');
   const hasProblem = fmHasNonEmptyField(parsed.fmRaw, 'problem');
-  const hasTags = fmHasNonEmptyField(parsed.fmRaw, 'tags');
-
-  if (hasTrack && hasProblem && hasTags) {
-    RESULTS.alreadyComplete.push(path.relative(ROOT, filePath));
-    return;
-  }
-
-  // Don't double-inject — these gate field addition.
   const hasTrackKey = fmHasField(parsed.fmRaw, 'track');
   const hasProblemKey = fmHasField(parsed.fmRaw, 'problem');
 
@@ -369,27 +357,13 @@ function processEntry(filePath) {
 
   if (!hasTrackKey) {
     const { track, reason } = deriveTrack(category, parsed.fmRaw, parsed.body);
-    if (!track) {
-      RESULTS.flaggedForReview.push({
-        file: path.relative(ROOT, filePath),
-        category,
-        reason,
-      });
-      return;
-    }
+    if (!track) return { flagged: reason };
     additions.track = track;
   }
 
   if (!hasProblemKey) {
     const { problem, source } = deriveProblem(parsed.fmRaw, parsed.body);
-    if (!problem) {
-      RESULTS.flaggedForReview.push({
-        file: path.relative(ROOT, filePath),
-        category,
-        reason: `no-derivable-problem:${source}`,
-      });
-      return;
-    }
+    if (!problem) return { flagged: `no-derivable-problem:${source}` };
     additions.problem = problem;
   }
 
@@ -406,27 +380,28 @@ function processEntry(filePath) {
   if (hasTrackKey && !hasTrack) presentButEmpty.push('track');
   if (hasProblemKey && !hasProblem) presentButEmpty.push('problem');
   if (presentButEmpty.length > 0) {
-    RESULTS.flaggedForReview.push({
-      file: path.relative(ROOT, filePath),
-      category,
-      reason:
+    return {
+      flagged:
         `present-but-empty-fields:${presentButEmpty.join(',')}: ` +
         'required keys exist but have no value, and the gate prevents ' +
         'double-injection. Set values manually.',
-    });
-    return;
+    };
   }
 
   // If derivation produced no additions, there is nothing to do.
   if (Object.keys(additions).length === 0) {
-    RESULTS.flaggedForReview.push({
-      file: path.relative(ROOT, filePath),
-      category,
-      reason: 'no-additions-derivable: all required keys present and tags unchanged.',
-    });
-    return;
+    return {
+      flagged:
+        'no-additions-derivable: all required keys present and tags unchanged.',
+    };
   }
 
+  return { additions };
+}
+
+// Apply the derived additions to an entry and write it back atomically.
+// Records the outcome in RESULTS.modified, or RESULTS.errors on write failure.
+function writeEntry(filePath, parsed, additions) {
   const newFm = injectFrontmatter(parsed.fmRaw, additions);
   // Preserve the original line ending around the `---` delimiters so a CRLF
   // file does not produce mixed line endings. injectFrontmatter already
@@ -464,6 +439,42 @@ function processEntry(filePath) {
     file: path.relative(ROOT, filePath),
     added: Object.keys(additions),
   });
+}
+
+function processEntry(filePath) {
+  let parsed;
+  try {
+    parsed = readEntry(filePath);
+  } catch (err) {
+    RESULTS.errors.push({ file: filePath, error: err.message });
+    return;
+  }
+
+  const category = deriveCategory(filePath);
+
+  // Already-complete short-circuit: all three required fields present AND
+  // non-empty. fmHasNonEmptyField (not fmHasField) so a bare `problem:` or
+  // empty `tags:` list does not silently bypass derivation.
+  if (
+    fmHasNonEmptyField(parsed.fmRaw, 'track') &&
+    fmHasNonEmptyField(parsed.fmRaw, 'problem') &&
+    fmHasNonEmptyField(parsed.fmRaw, 'tags')
+  ) {
+    RESULTS.alreadyComplete.push(path.relative(ROOT, filePath));
+    return;
+  }
+
+  const result = computeAdditions(parsed, category);
+  if (result.flagged) {
+    RESULTS.flaggedForReview.push({
+      file: path.relative(ROOT, filePath),
+      category,
+      reason: result.flagged,
+    });
+    return;
+  }
+
+  writeEntry(filePath, parsed, result.additions);
 }
 
 function walkSolutions() {

@@ -158,6 +158,47 @@ validate_repo_slug() {
   return 0
 }
 
+# Classify a host string as a private/loopback IPv4 address.
+# Returns: 0 = valid private or loopback IPv4; 1 = IPv4-shaped but invalid
+# (bad octet, leading zero) or public; 2 = not IPv4-shaped (caller should
+# fall through to FQDN validation).
+# Usage: _validate_private_ipv4 "$host"
+_validate_private_ipv4() {
+  local host="$1"
+
+  [[ "$host" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] || return 2
+
+  local octet1=${BASH_REMATCH[1]}
+  local octet2=${BASH_REMATCH[2]}
+  local octet3=${BASH_REMATCH[3]}
+  local octet4=${BASH_REMATCH[4]}
+
+  # Check octet bounds and reject leading zeros
+  local octet
+  for octet in "$octet1" "$octet2" "$octet3" "$octet4"; do
+    # Reject leading zeros (except "0" itself)
+    if [ ${#octet} -gt 1 ] && [ "${octet:0:1}" = "0" ]; then
+      return 1
+    fi
+    # Validate 0-255 range
+    if [ ${#octet} -gt 3 ] || [ "$octet" -gt 255 ] 2>/dev/null; then
+      return 1
+    fi
+  done
+
+  # Validate private range: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x
+  if [ "$octet1" -eq 10 ] 2>/dev/null; then
+    return 0
+  elif [ "$octet1" -eq 172 ] 2>/dev/null && [ "$octet2" -ge 16 ] 2>/dev/null && [ "$octet2" -le 31 ] 2>/dev/null; then
+    return 0
+  elif [ "$octet1" -eq 192 ] 2>/dev/null && [ "$octet2" -eq 168 ] 2>/dev/null; then
+    return 0
+  elif [ "$octet1" -eq 127 ] 2>/dev/null; then
+    return 0  # localhost
+  fi
+  return 1  # Public IP rejected
+}
+
 # Validate SSH host: private IPv4 or FQDN
 # Usage: validate_ssh_host "$host"
 validate_ssh_host() {
@@ -177,38 +218,17 @@ validate_ssh_host() {
     *\;*|*\&*|*\|*|*\$*|*\`*|*\'*|*\"*|*\\*) return 1 ;;
   esac
 
-  # Try IPv4 first: N.N.N.N format
-  if [[ "$host" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-    # Validate each octet is 0-255
-    local octet1=${BASH_REMATCH[1]}
-    local octet2=${BASH_REMATCH[2]}
-    local octet3=${BASH_REMATCH[3]}
-    local octet4=${BASH_REMATCH[4]}
-
-    # Check octet bounds and reject leading zeros
-    for octet in "$octet1" "$octet2" "$octet3" "$octet4"; do
-      # Reject leading zeros (except "0" itself)
-      if [ ${#octet} -gt 1 ] && [ "${octet:0:1}" = "0" ]; then
-        return 1
-      fi
-      # Validate 0-255 range
-      if [ ${#octet} -gt 3 ] || [ "$octet" -gt 255 ] 2>/dev/null; then
-        return 1
-      fi
-    done
-
-    # Validate private range: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
-    if [ "$octet1" -eq 10 ] 2>/dev/null; then
-      return 0
-    elif [ "$octet1" -eq 172 ] 2>/dev/null && [ "$octet2" -ge 16 ] 2>/dev/null && [ "$octet2" -le 31 ] 2>/dev/null; then
-      return 0
-    elif [ "$octet1" -eq 192 ] 2>/dev/null && [ "$octet2" -eq 168 ] 2>/dev/null; then
-      return 0
-    elif [ "$octet1" -eq 127 ] 2>/dev/null; then
-      return 0  # localhost
-    fi
-    return 1  # Public IP rejected
-  fi
+  # Try IPv4 first: N.N.N.N format. Exit 2 means "not IPv4-shaped" — fall
+  # through to FQDN validation below. The exit code is captured via `||`
+  # so a non-zero return is errexit-safe when this library is sourced
+  # under `set -e` (a bare call followed by `case "$?"` would exit the
+  # shell on exit code 1 OR 2 before reaching the case).
+  local _ipv4_rc=0
+  _validate_private_ipv4 "$host" || _ipv4_rc=$?
+  case "$_ipv4_rc" in
+    0) return 0 ;;
+    1) return 1 ;;
+  esac
 
   # FQDN: lowercase alphanumeric, hyphens, dots
   case "$host" in
@@ -438,6 +458,70 @@ validate_selector_label() {
   return 0
 }
 
+# Check a runner targets file for the schema version and reject
+# parser-unsupported YAML syntax (tabs, flow sequences, block scalars).
+# Returns 0 if the syntax is acceptable, 1 otherwise (error on stderr).
+_rt_check_yaml_syntax() {
+  local filepath="$1"
+
+  if ! grep -qE '^schema:[[:space:]]*1[[:space:]]*$' "$filepath"; then
+    printf '[yellow-ci] Error: Missing or unsupported schema version (expected: schema: 1)\n' >&2
+    return 1
+  fi
+  if grep -qP '\t' "$filepath"; then
+    printf '[yellow-ci] Error: Tabs found — use spaces only (canonical YAML)\n' >&2
+    return 1
+  fi
+  if grep -qE '^\s+\w+:\s*\[' "$filepath"; then
+    printf '[yellow-ci] Error: Flow syntax [a, b] not supported — use block sequences\n' >&2
+    return 1
+  fi
+  if grep -qE '^\s+\w+:\s*[|>][-+]?\s*$' "$filepath"; then
+    printf '[yellow-ci] Error: Multi-line scalars (| or >) not supported\n' >&2
+    return 1
+  fi
+  return 0
+}
+
+# Validate every runner target name in the file against validate_runner_name.
+# Returns 0 if all names are valid, 1 on the first invalid name (error on stderr).
+_rt_check_runner_names() {
+  local filepath="$1"
+  local name
+  while IFS= read -r name; do
+    # Trim the "- name:" prefix and trailing whitespace.
+    name=$(printf '%s' "$name" | sed 's/^[[:space:]]*-[[:space:]]*name:[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    if [ -n "$name" ] && ! validate_runner_name "$name"; then
+      printf '[yellow-ci] Error: Invalid runner target name: %s\n' "$name" >&2
+      return 1
+    fi
+  done < <(grep -E '^[[:space:]]*-[[:space:]]+name:' "$filepath")
+  return 0
+}
+
+# Enforce the max-20 limits on runner targets and routing rules.
+# Returns 0 if within limits, 1 otherwise (error on stderr).
+_rt_check_target_counts() {
+  local filepath="$1"
+
+  local target_count
+  target_count=$(grep -cE '^[[:space:]]*-[[:space:]]+name:' "$filepath") || target_count=0
+  if [ "$target_count" -gt 20 ]; then
+    printf '[yellow-ci] Error: Too many runner targets (%s, max 20)\n' "$target_count" >&2
+    return 1
+  fi
+
+  if grep -qE '^routing_rules:' "$filepath"; then
+    local rule_count
+    rule_count=$(sed -n '/^routing_rules:/,/^[a-z]/{ /^[[:space:]]*-/p; }' "$filepath" | wc -l) || rule_count=0
+    if [ "$rule_count" -gt 20 ]; then
+      printf '[yellow-ci] Error: Too many routing rules (%s, max 20)\n' "$rule_count" >&2
+      return 1
+    fi
+  fi
+  return 0
+}
+
 # Validate a runner targets YAML file for structural correctness
 # Checks: file exists, size < 32KB, has schema: 1, has runner_targets section
 # Usage: validate_runner_targets_file "$filepath"
@@ -458,71 +542,27 @@ validate_runner_targets_file() {
     return 1
   fi
 
-  # Schema version check
-  if ! grep -qE '^schema:[[:space:]]*1[[:space:]]*$' "$filepath"; then
-    printf '[yellow-ci] Error: Missing or unsupported schema version (expected: schema: 1)\n' >&2
-    return 1
-  fi
+  _rt_check_yaml_syntax "$filepath" || return 1
 
-  # Reject parser-unsupported YAML syntax (flow sequences, block scalars, tabs)
-  if grep -qP '\t' "$filepath"; then
-    printf '[yellow-ci] Error: Tabs found — use spaces only (canonical YAML)\n' >&2
-    return 1
-  fi
-  if grep -qE '^\s+\w+:\s*\[' "$filepath"; then
-    printf '[yellow-ci] Error: Flow syntax [a, b] not supported — use block sequences\n' >&2
-    return 1
-  fi
-  if grep -qE '^\s+\w+:\s*[|>][-+]?\s*$' "$filepath"; then
-    printf '[yellow-ci] Error: Multi-line scalars (| or >) not supported\n' >&2
-    return 1
-  fi
-
-  # runner_targets section is optional (local override may only have routing_rules)
-  # But if present, it must have at least one valid entry
+  # runner_targets section is optional (local override may only have
+  # routing_rules). If present, it must have at least one valid entry.
   if grep -qE '^runner_targets:' "$filepath"; then
     if ! grep -qE '^[[:space:]]*-[[:space:]]+name:' "$filepath"; then
       printf '[yellow-ci] Error: runner_targets section exists but has no entries\n' >&2
       return 1
     fi
   else
-    # No runner_targets — valid only if routing_rules exists (local override)
+    # No runner_targets — valid only if routing_rules exists (local override).
     if ! grep -qE '^routing_rules:' "$filepath"; then
       printf '[yellow-ci] Error: File must have runner_targets and/or routing_rules\n' >&2
       return 1
     fi
-    # routing_rules-only file — skip runner validation, return success
+    # routing_rules-only file — skip runner validation, return success.
     return 0
   fi
 
-  # Validate each runner name found
-  local name
-  while IFS= read -r name; do
-    # Trim whitespace
-    name=$(printf '%s' "$name" | sed 's/^[[:space:]]*-[[:space:]]*name:[[:space:]]*//' | sed 's/[[:space:]]*$//')
-    if [ -n "$name" ] && ! validate_runner_name "$name"; then
-      printf '[yellow-ci] Error: Invalid runner target name: %s\n' "$name" >&2
-      return 1
-    fi
-  done < <(grep -E '^[[:space:]]*-[[:space:]]+name:' "$filepath")
-
-  # Count runner targets (max 20)
-  local target_count
-  target_count=$(grep -cE '^[[:space:]]*-[[:space:]]+name:' "$filepath") || target_count=0
-  if [ "$target_count" -gt 20 ]; then
-    printf '[yellow-ci] Error: Too many runner targets (%s, max 20)\n' "$target_count" >&2
-    return 1
-  fi
-
-  # Count routing rules if present (max 20)
-  if grep -qE '^routing_rules:' "$filepath"; then
-    local rule_count
-    rule_count=$(sed -n '/^routing_rules:/,/^[a-z]/{ /^[[:space:]]*-/p; }' "$filepath" | wc -l) || rule_count=0
-    if [ "$rule_count" -gt 20 ]; then
-      printf '[yellow-ci] Error: Too many routing rules (%s, max 20)\n' "$rule_count" >&2
-      return 1
-    fi
-  fi
+  _rt_check_runner_names "$filepath" || return 1
+  _rt_check_target_counts "$filepath" || return 1
 
   return 0
 }

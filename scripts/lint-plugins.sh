@@ -117,7 +117,13 @@ if [ -z "$known_skills" ]; then
   warn "no SKILL.md files discovered — skipping skill-reference check"
 fi
 
-if [ -n "$known_skills" ]; then
+# Check that every skill referenced in an agent's frontmatter `skills:` list
+# resolves to a known SKILL.md name. Reports misses via err() (increments the
+# global error counter). $1 = newline-separated known skill names.
+check_skill_references() {
+  local known_skills="$1"
+  local f fm in_skills name bare line inline_body _item _bare
+  local -a _items
   while IFS= read -r f; do
     fm=$(frontmatter "$f")
     # Extract lines like "  - skill-name" under a "skills:" key.
@@ -165,6 +171,10 @@ if [ -n "$known_skills" ]; then
       esac
     done < <(printf '%s\n' "$fm")
   done < <(find plugins -type f -path '*/agents/*.md')
+}
+
+if [ -n "$known_skills" ]; then
+  check_skill_references "$known_skills"
 fi
 
 # --- Summary ---

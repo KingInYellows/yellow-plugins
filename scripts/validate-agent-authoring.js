@@ -172,52 +172,21 @@ function logSuccess(message) {
   console.log(`${colors.green}✓ PASS:${colors.reset} ${message}`);
 }
 
-const pluginNames = new Set(
-  fs
-    .readdirSync(PLUGINS_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-);
-
-const agentFiles = walk(
-  PLUGINS_DIR,
-  (filePath) =>
-    filePath.includes(`${path.sep}agents${path.sep}`) &&
-    filePath.endsWith('.md')
-);
-// Skip CHANGELOG.md files: they document history including agents that have
-// since been deleted/renamed, so subagent_type references in CHANGELOG prose
-// are not live dispatches and must not be validated against the current
-// agent registry. See `docs/solutions/build-errors/` for context.
-const markdownFiles = walk(
-  PLUGINS_DIR,
-  (filePath) =>
-    filePath.endsWith('.md') &&
-    path.basename(filePath).toUpperCase() !== 'CHANGELOG.MD'
-);
-const commandFiles = walk(
-  PLUGINS_DIR,
-  (filePath) =>
-    filePath.includes(`${path.sep}commands${path.sep}`) &&
-    filePath.endsWith('.md')
-);
-
-logInfo(`Validating ${agentFiles.length} agents and ${markdownFiles.length} markdown files...`);
-
-const errors = [];
-const warnings = [];
-const pluginAgents = new Set();
+// Patterns used by the agent and markdown scans. Module-scoped constants.
 const skillReferencePattern = /`([a-z0-9][a-z0-9-]*)`\s+skill\b/gi;
 const pluginSubagentPattern =
   /subagent_type\s*(?:=|:)\s*["']?([a-z0-9-]+:[a-z0-9-]+(?::[a-z0-9-]+)?)["']?/g;
 
-for (const filePath of agentFiles) {
+// Validate a single agent .md file. Pushes findings into ctx.errors /
+// ctx.warnings and registers discovered agent names in ctx.pluginAgents.
+function validateAgentFile(filePath, ctx) {
+  const { errors, warnings, pluginAgents } = ctx;
   const content = fs.readFileSync(filePath, 'utf8');
   const frontmatter = extractFrontmatter(content);
 
   if (!frontmatter) {
     errors.push(`${relative(filePath)}: missing frontmatter`);
-    continue;
+    return;
   }
 
   // Derive plugin name from the path relative to PLUGINS_DIR so the validator
@@ -367,72 +336,139 @@ for (const filePath of agentFiles) {
 
 // Map plugin:name → plugin:dir:name (when unambiguous). Used to suggest
 // the 3-segment form to authors who wrote a 2-segment dispatch.
-const twoToThreeSegment = new Map();
-for (const ref of pluginAgents) {
-  const parts = ref.split(':');
-  if (parts.length !== 3) continue;
-  const twoSeg = `${parts[0]}:${parts[2]}`;
-  if (twoToThreeSegment.has(twoSeg)) {
-    twoToThreeSegment.set(twoSeg, null); // ambiguous
-  } else {
-    twoToThreeSegment.set(twoSeg, ref);
+function buildTwoToThreeSegmentMap(pluginAgents) {
+  const twoToThreeSegment = new Map();
+  for (const ref of pluginAgents) {
+    const parts = ref.split(':');
+    if (parts.length !== 3) continue;
+    const twoSeg = `${parts[0]}:${parts[2]}`;
+    if (twoToThreeSegment.has(twoSeg)) {
+      twoToThreeSegment.set(twoSeg, null); // ambiguous
+    } else {
+      twoToThreeSegment.set(twoSeg, ref);
+    }
   }
+  return twoToThreeSegment;
 }
 
-for (const filePath of markdownFiles) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  for (const match of content.matchAll(pluginSubagentPattern)) {
-    const subagentType = match[1];
-    const pluginName = subagentType.split(':', 1)[0];
-    if (!pluginNames.has(pluginName)) {
-      continue;
-    }
-    if (!pluginAgents.has(subagentType)) {
-      errors.push(
-        `${relative(filePath)}: subagent_type "${subagentType}" does not match any declared plugin agent`
-      );
-      continue;
-    }
-    // The 2-segment form remains valid (transitional) but the runtime
-    // requires 3-segment. Warn when a 2-segment hit has an unambiguous
-    // 3-segment equivalent so authors update before the runtime fails.
-    const segments = subagentType.split(':');
-    if (segments.length === 2) {
-      const suggestion = twoToThreeSegment.get(subagentType);
-      if (suggestion) {
-        logInfo(
-          `${relative(filePath)}: subagent_type "${subagentType}" uses the legacy 2-segment form — runtime expects "${suggestion}" (3-segment). Update before this CI gate becomes hard-fail.`
+// Validate subagent_type references across all markdown files against the
+// discovered agent registry. Pushes hard errors into ctx.errors; emits
+// advisory info logs for legacy 2-segment dispatch forms.
+function validateSubagentReferences(markdownFiles, ctx) {
+  const { pluginNames, pluginAgents, twoToThreeSegment, errors } = ctx;
+  for (const filePath of markdownFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    for (const match of content.matchAll(pluginSubagentPattern)) {
+      const subagentType = match[1];
+      const pluginName = subagentType.split(':', 1)[0];
+      if (!pluginNames.has(pluginName)) {
+        continue;
+      }
+      if (!pluginAgents.has(subagentType)) {
+        errors.push(
+          `${relative(filePath)}: subagent_type "${subagentType}" does not match any declared plugin agent`
         );
+        continue;
+      }
+      // The 2-segment form remains valid (transitional) but the runtime
+      // requires 3-segment. Warn when a 2-segment hit has an unambiguous
+      // 3-segment equivalent so authors update before the runtime fails.
+      const segments = subagentType.split(':');
+      if (segments.length === 2) {
+        const suggestion = twoToThreeSegment.get(subagentType);
+        if (suggestion) {
+          logInfo(
+            `${relative(filePath)}: subagent_type "${subagentType}" uses the legacy 2-segment form — runtime expects "${suggestion}" (3-segment). Update before this CI gate becomes hard-fail.`
+          );
+        }
       }
     }
   }
 }
 
-for (const filePath of commandFiles) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const frontmatter = extractFrontmatter(content);
-  const codeBlocks = content.match(/```[^\n]*\n[\s\S]*?```/g) || [];
-  const codeContent = (frontmatter || '') + '\n' + codeBlocks.join('\n');
-  if (codeContent.includes('BASH_SOURCE')) {
-    errors.push(
-      `${relative(filePath)}: markdown command sources plugin files via BASH_SOURCE; use \${CLAUDE_PLUGIN_ROOT} or a real script path`
-    );
+// Validate that command files do not source plugin files via BASH_SOURCE.
+function validateCommandFiles(commandFiles, errors) {
+  for (const filePath of commandFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const frontmatter = extractFrontmatter(content);
+    const codeBlocks = content.match(/```[^\n]*\n[\s\S]*?```/g) || [];
+    const codeContent = (frontmatter || '') + '\n' + codeBlocks.join('\n');
+    if (codeContent.includes('BASH_SOURCE')) {
+      errors.push(
+        `${relative(filePath)}: markdown command sources plugin files via BASH_SOURCE; use \${CLAUDE_PLUGIN_ROOT} or a real script path`
+      );
+    }
   }
 }
 
-// Print warnings first so they remain visible above the trailing
-// success/error block. Warnings do NOT affect exit code; only errors do.
-for (const warning of warnings) {
-  logWarning(warning);
-}
+function main() {
+  const pluginNames = new Set(
+    fs
+      .readdirSync(PLUGINS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+  );
 
-if (errors.length > 0) {
-  for (const error of errors) {
-    logError(error);
+  const agentFiles = walk(
+    PLUGINS_DIR,
+    (filePath) =>
+      filePath.includes(`${path.sep}agents${path.sep}`) &&
+      filePath.endsWith('.md')
+  );
+  // Skip CHANGELOG.md files: they document history including agents that have
+  // since been deleted/renamed, so subagent_type references in CHANGELOG prose
+  // are not live dispatches and must not be validated against the current
+  // agent registry. See `docs/solutions/build-errors/` for context.
+  const markdownFiles = walk(
+    PLUGINS_DIR,
+    (filePath) =>
+      filePath.endsWith('.md') &&
+      path.basename(filePath).toUpperCase() !== 'CHANGELOG.MD'
+  );
+  const commandFiles = walk(
+    PLUGINS_DIR,
+    (filePath) =>
+      filePath.includes(`${path.sep}commands${path.sep}`) &&
+      filePath.endsWith('.md')
+  );
+
+  logInfo(
+    `Validating ${agentFiles.length} agents and ${markdownFiles.length} markdown files...`
+  );
+
+  const errors = [];
+  const warnings = [];
+  const pluginAgents = new Set();
+
+  for (const filePath of agentFiles) {
+    validateAgentFile(filePath, { errors, warnings, pluginAgents });
   }
-  process.exit(1);
+
+  const twoToThreeSegment = buildTwoToThreeSegmentMap(pluginAgents);
+  validateSubagentReferences(markdownFiles, {
+    pluginNames,
+    pluginAgents,
+    twoToThreeSegment,
+    errors,
+  });
+  validateCommandFiles(commandFiles, errors);
+
+  // Print warnings first so they remain visible above the trailing
+  // success/error block. Warnings do NOT affect exit code; only errors do.
+  for (const warning of warnings) {
+    logWarning(warning);
+  }
+
+  if (errors.length > 0) {
+    for (const error of errors) {
+      logError(error);
+    }
+    process.exit(1);
+  }
+
+  logSuccess(
+    `Validated ${agentFiles.length} agents and ${markdownFiles.length} markdown files`
+  );
 }
 
-logSuccess(
-  `Validated ${agentFiles.length} agents and ${markdownFiles.length} markdown files`
-);
+main();
