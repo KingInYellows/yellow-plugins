@@ -1,0 +1,25 @@
+.changeset/library-context-cache-hook.md
+  s_6cdb4ed3aab017::t_89a56d72cd4ab4 1-43
+plugins/yellow-research/hooks/lib/context7-cache.sh
+  s_6cdb4ed3aab017::t_0754f6338eadb5 1-181
+plugins/yellow-research/tests/context7-cache.bats
+  s_6cdb4ed3aab017::t_88b1c609d38b9c 1-241
+plugins/yellow-research/hooks/write-credential-status.sh
+  s_6cdb4ed3aab017::t_57f2accfe74349 2-5,20-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "b91bf8909d15c8b976af5343e996094c743fa527",
+  "prompts": {},
+  "sessions": {
+    "s_6cdb4ed3aab017": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b91ed7a6-9689-4084-89ad-60b90b5f456c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
