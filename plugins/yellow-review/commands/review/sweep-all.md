@@ -98,7 +98,7 @@ Use the `AskUserQuestion` tool with:
     #<numN> — <titleN>
   ```
 - **Options**:
-  - **Proceed — sweep all N PRs** — continue to Step 4
+  - **Proceed — sweep all <N> PRs** — continue to Step 4
   - **Cancel** — stop without running any sweep
 
 If the user selects **Cancel** — OR the prompt is dismissed, times out,
