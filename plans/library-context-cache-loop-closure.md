@@ -151,7 +151,7 @@ Cross-plugin (BPR) inline gets the same updates with the
 > "simplified" later. No existing read-modify-write JSON pattern elsewhere in
 > the repo — this introduces a new (sound) shape.
 <!-- /deepen-plan -->
-- [ ] 1.4 Add `_lc_write_tier2(id, topic, docs)` function — atomic merge with LRU eviction when at cap. Use `jq` to sort by `fetched_at` desc, take top `$_LC_TIER2_MAX_ENTRIES - 1`, then add the new entry.
+- [ ] 1.4 Add `_lc_write_tier2(id, topic, docs)` function — atomic merge with LRU eviction. Use `jq` to insert/replace the new entry (`id|topic`) into tier2 with current `fetched_at`, then sort by `fetched_at` desc and take top `$_LC_TIER2_MAX_ENTRIES`. Updates to an existing key do not evict unrelated entries.
 - [ ] 1.5 Create `plugins/yellow-research/bin/lc-cache-lookup-docs` wrapper. Same shape as `lc-cache-lookup` — source the lib + call `_lc_lookup_docs`. Two args: `<library-id> <topic>`.
 - [ ] 1.6 Create `plugins/yellow-research/bin/lc-cache-write` wrapper with subcommand dispatch (`tier1` / `tier2`). For tier2, read the docs body from the file path argument before calling `_lc_write_tier2`.
 - [ ] 1.7 Make both new wrappers executable (`chmod +x`).

@@ -51,9 +51,13 @@ cached_id=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup" "<library-name>" 2>
 ```
 
 If `cached_id` is non-empty, use it as the library-id and proceed
-directly to Step 2 — skip `mcp__context7__resolve-library-id`. The
-wrapper exits 0 on every path (cache miss, expired, helper absent, jq
-missing) — empty output is the safe fallback signal, never an error.
+directly to Step 2 — skip `mcp__context7__resolve-library-id`. Before
+invoking Step 2, still verify `mcp__context7__query-docs` is available
+via ToolSearch — in restricted-tool spawns or installs without context7
+the cached library-id is unusable; fall through to the
+Within-yellow-research fallback chain (EXA → WebSearch) in that case.
+The wrapper exits 0 on every path (cache miss, expired, helper absent,
+jq missing) — empty output is the safe fallback signal, never an error.
 
 If `cached_id` is empty, fall through to the live resolve:
 `mcp__context7__resolve-library-id <library-name>`. Returns an array of

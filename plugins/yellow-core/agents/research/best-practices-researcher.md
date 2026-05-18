@@ -85,8 +85,10 @@ generic external sources.
 1. **Library documentation lookup (safe chain):**
    1. **(Optional, when yellow-research is installed)** Try the pre-warmed
       cache via `bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup" "<library-name>" 2>/dev/null || true`.
-      If output is non-empty, use it as the library-id and skip directly to
-      step 1.3 (`query-docs`). Empty output = cache miss / helper absent /
+      If output is non-empty, use it as the library-id, skip the
+      `mcp__context7__resolve-library-id` call in step 1.2, and call
+      `mcp__context7__query-docs` directly with the cached library-id. Empty
+      output = cache miss / helper absent /
       yellow-research not installed — proceed to step 1.2 below. The trailing
       `|| true` ensures bash exit 127 (binary absent when yellow-research is
       not installed) is treated identically to a cache miss; never treat a
