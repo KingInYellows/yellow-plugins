@@ -29,7 +29,8 @@ yellow-core integration before reviewing real PRs.
 | `/review:resolve`       | Parallel resolution of unresolved PR review comments                      |
 | `/review:resolve-stack` | Walk a Graphite stack bottom-up and run `/review:resolve` on every open PR autonomously |
 | `/review:all`           | Sequential review of multiple PRs (Graphite stack, all open, or single)   |
-| `/review:sweep`         | Run `/review:pr` then `/review:resolve` on the same PR in one invocation  |
+| `/review:sweep`         | Run `/review:pr --non-interactive` then `/review:resolve --non-interactive` on the same PR in one unattended pass |
+| `/review:sweep-all`     | Run `/review:sweep` on every open non-draft PR you authored, sequentially, with one upfront confirmation |
 
 ## Agents
 

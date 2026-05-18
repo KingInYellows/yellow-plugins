@@ -1,7 +1,7 @@
 ---
 name: review:pr
 description: 'Adaptive multi-agent review of a single PR with a tiered persona pipeline, learnings pre-pass, and confidence-rubric aggregation. Use when you want comprehensive code review with automatic agent selection based on PR size and content.'
-argument-hint: '[PR# | URL | branch]'
+argument-hint: '[PR# | URL | branch] [--non-interactive]'
 allowed-tools:
   - Bash
   - Read
@@ -29,16 +29,27 @@ finding is surfaced.
 
 ## Workflow
 
-### Step 1: Resolve PR
+### Step 1: Resolve PR and Parse Flags
 
-Determine the target PR from `$ARGUMENTS`:
+Split `$ARGUMENTS` on whitespace into tokens.
 
-1. **If numeric**: Use directly as PR number
-2. **If URL** (contains `github.com` and `/pull/`): Extract PR number from URL
-   path
-3. **If branch name**: `gh pr view "$ARGUMENTS" --json number -q .number`
-4. **If empty**: Detect from current branch:
-   `gh pr view --json number -q .number`
+1. **Flag token**: if any token is exactly `--non-interactive`, set
+   non-interactive mode ON and remove it from the token list. Any token
+   beginning with `--` that is not `--non-interactive` is an error — report
+   `[review:pr] Error: unknown flag <token>.` and stop. Non-interactive mode
+   is OFF by default.
+2. **PR target token**: from the remaining tokens:
+   - **If more than one token remains**: report
+     `[review:pr] Error: too many arguments — expected at most one PR target.`
+     and stop.
+   - **If exactly one token remains**:
+     - **If numeric**: Use directly as PR number
+     - **If URL** (contains `github.com` and `/pull/`): Extract PR number from
+       URL path
+     - **If branch name**: `gh pr view "<token>" --json number -q .number`
+   - **If no token remains** (empty `$ARGUMENTS`, or only the flag was
+     passed): Detect from current branch:
+     `gh pr view --json number -q .number`
 
 Validate the PR exists and is open:
 
@@ -47,6 +58,12 @@ gh pr view <PR#> --json state -q .state
 ```
 
 If the command fails or the state is not "OPEN", report the error and stop.
+
+**Non-interactive mode** suppresses the Step 9 push-confirmation gate and
+the Step 9b P2-only "save learnings" prompt — so the command runs unattended.
+It is set automatically when `/review:sweep` invokes this command; an
+interactive user can also pass `--non-interactive` explicitly. When the flag
+is absent, every gate behaves exactly as before.
 
 ### Step 2: Check Working Directory
 
@@ -711,16 +728,20 @@ helper); the default routing is human review.
 
 If any changes were made:
 
-1. Show `git diff --stat` summary to the user
-2. Use `AskUserQuestion` to confirm: "Push these review fixes for PR #X?"
-3. On approval:
+1. Show `git diff --stat` summary to the user.
+2. **If non-interactive mode is OFF** (default): Use `AskUserQuestion` to
+   confirm: "Push these review fixes for PR #X?" On approval, run the push
+   commands below. If rejected, report that changes remain uncommitted for
+   manual review and stop.
+3. **If non-interactive mode is ON**: Skip the AskUserQuestion entirely and
+   proceed directly to the push commands below — the caller has accepted
+   responsibility for the push.
+4. Push commands:
 
 ```bash
 gt modify -m "fix: address review findings from <comma-separated-reviewer-categories>"
 gt submit --no-interactive
 ```
-
-4. If rejected: report changes remain uncommitted for manual review
 
 ### Step 9a: Knowledge Compounding
 
@@ -759,8 +780,10 @@ If `.ruvector/` exists:
 2. If any P0 or P1 findings were identified (security, correctness, data
    loss, contract breakage): Auto-record a learning summarizing the
    findings with context/insight/action structure. No user prompt.
-3. If P2 findings exist but no P0/P1: use AskUserQuestion — "Save review
-   learnings to memory?" Record if confirmed.
+3. If P2 findings exist but no P0/P1: **in non-interactive mode**, skip
+   (do not record — the caller did not opt in to memory writes). **In
+   interactive mode**, use AskUserQuestion — "Save review learnings to
+   memory?" Record if confirmed.
 4. If P3 only: skip.
 5. Dedup check before storing:
    `mcp__plugin_yellow-ruvector_ruvector__hooks_recall`(query=content,
