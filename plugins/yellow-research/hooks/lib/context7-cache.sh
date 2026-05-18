@@ -26,6 +26,7 @@ _LC_TIER1_TTL=86400        # 24h
 _LC_PREWARM_MAX=5           # max libraries resolved per session warm
 _LC_CURL_TIMEOUT=3          # seconds per resolve call
 _LC_LOCKFILES=(
+  package.json
   package-lock.json pnpm-lock.yaml yarn.lock
   Cargo.lock go.sum requirements.txt
 )
@@ -213,6 +214,7 @@ _lc_prewarm() {
 
   local tier1='{}'
   local now id
+  local count=0
   now=$(_lc_now)
   while IFS= read -r name; do
     [ -z "$name" ] && continue
@@ -221,7 +223,13 @@ _lc_prewarm() {
     tier1=$(printf '%s' "$tier1" | jq \
       --arg n "$name" --arg i "$id" --argjson t "$now" \
       '. + {($n): {library_id: $i, fetched_at: $t}}')
+    count=$((count + 1))
   done <<< "$names"
+
+  if [ "$count" -eq 0 ]; then
+    _lc_log "Warning: all context7 resolves failed; skipping cache write to allow retry next session"
+    return 0
+  fi
 
   local fp
   fp=$(_lc_lockfile_fingerprint)
@@ -231,8 +239,6 @@ _lc_prewarm() {
     '{schema: "1", warmed_at: $w, lockfile_fingerprint: $fp, tier1: $t1, tier2: {}}')
 
   if _lc_atomic_write "$cache_path" "$cache"; then
-    local count
-    count=$(printf '%s' "$tier1" | jq 'length')
     _lc_log "Warmed context7 cache: $count libraries → $cache_path"
   fi
 }
