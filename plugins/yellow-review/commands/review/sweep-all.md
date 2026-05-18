@@ -57,23 +57,25 @@ pre-flight and will surface a `gt` failure inline.
 
 ### Step 2: Enumerate open non-draft PRs
 
-Query GitHub for the current user's open non-draft PRs, sorted by PR
-number ascending:
+Query GitHub for the current user's open PRs, then filter to non-draft
+and sort by PR number ascending. Check for truncation before filtering:
 
 ```bash
 set -u
-gh pr list --author @me --state open --limit 1000 \
-  --json number,headRefName,isDraft,title \
-  --jq '[.[] | select(.isDraft == false)] | sort_by(.number)'
+RAW_JSON=$(gh pr list --author @me --state open --limit 1000 \
+  --json number,headRefName,isDraft,title)
+RAW_COUNT=$(printf '%s' "$RAW_JSON" | jq 'length')
+if [ "$RAW_COUNT" -eq 1000 ]; then
+  printf '[review:sweep-all] Warning: gh pr list returned exactly 1000 PRs — results may be truncated. Re-run with a higher --limit if you have more open PRs.\n' >&2
+fi
+printf '%s' "$RAW_JSON" | jq '[.[] | select(.isDraft == false)] | sort_by(.number)'
 ```
 
-Capture the JSON array result. Each element has `number`, `headRefName`,
-`isDraft` (always `false` after filtering), and `title`. Substitute the
-actual PR numbers and titles as literals in every later block (variables
-do not survive across Bash tool calls).
-
-**Truncation warning.** If the returned array length is exactly 1000, warn:
-`[review:sweep-all] Warning: gh pr list returned exactly 1000 PRs — results may be truncated. Re-run with a higher --limit if you have more open PRs.`
+Capture the filtered JSON array result (the final line of output). Each
+element has `number`, `headRefName`, `isDraft` (always `false` after
+filtering), and `title`. Substitute the actual PR numbers and titles as
+literals in every later block (variables do not survive across Bash tool
+calls).
 
 **Empty-list early exit.** If the resulting array is empty (`[]` or
 length 0), print:
