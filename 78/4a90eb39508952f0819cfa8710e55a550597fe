@@ -1,0 +1,39 @@
+plugins/yellow-review/commands/review/review-pr.md
+  s_f07e49d3cfb38c::t_f50a29aba25930 779-782
+  s_f07e49d3cfb38c::t_718b8f326b45ce 4
+  s_f07e49d3cfb38c::t_47b0beac2b933b 32,34,36-48,58-62
+  s_f07e49d3cfb38c::t_7e21b49d8e15be 727-735
+plugins/yellow-review/README.md
+  s_f07e49d3cfb38c::t_317b56096d8f12 32-33
+plugins/yellow-review/CLAUDE.md
+  s_f07e49d3cfb38c::t_c18ff072a714c1 39,44-46,49,55-60
+  s_f07e49d3cfb38c::t_0aba539987e30e 151-162
+  s_f07e49d3cfb38c::t_e00e633eda4f94 24-35
+.changeset/sweep-unattended-and-sweep-all.md
+  s_f07e49d3cfb38c::t_53c7c4dcb58173 1-19
+plugins/yellow-review/commands/review/sweep-all.md
+  s_f07e49d3cfb38c::t_6cefeb6f952bfc 1-222
+plugins/yellow-review/commands/review/sweep.md
+  s_f07e49d3cfb38c::t_d1983362976ca3 3
+  s_f07e49d3cfb38c::t_84e42f203cb229 131
+  s_f07e49d3cfb38c::t_175582cb5d3743 151-155
+  s_f07e49d3cfb38c::t_956ed929835305 10,12-17,20-24
+  s_f07e49d3cfb38c::t_9e453cd2efffa8 88,90-91,93-98,100,102-106,108-116,124,126-127
+  s_f07e49d3cfb38c::t_848b114364f39a 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "784a90eb39508952f0819cfa8710e55a550597fe",
+  "prompts": {},
+  "sessions": {
+    "s_f07e49d3cfb38c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fb9ef018-515b-48ee-9591-8c160cca484e",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
