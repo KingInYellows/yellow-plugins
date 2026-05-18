@@ -143,13 +143,15 @@ changeset entry. Should NOT land before RULE 13.
   globally: `/plugin install context7@upstash` or via Claude Code MCP
   settings.
 
-## Cache (consumer wiring landed in this PR; hook in PR #537)
+## Cache (consumer wiring in this PR; hook shipped in PR #537)
 
 SKILL.md Step 1 now reads the pre-warmed cache via the
 `${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup` helper before calling
 `mcp__context7__resolve-library-id`. The helper is provided by
-yellow-research; cross-plugin consumers probe for it and skip cleanly
-when yellow-research is not installed.
+yellow-research; cross-plugin consumers reach it via the established
+`${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup` path
+pattern and absorb bash exit 127 (yellow-research not installed) into
+the empty-output branch with `2>/dev/null || true`.
 
 **Cache shape** (defined by the SessionStart hook in PR #537,
 `hooks/lib/context7-cache.sh`):

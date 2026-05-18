@@ -10,6 +10,7 @@ tools:
   - Read
   - Glob
   - Grep
+  - Bash
   - ToolSearch
   - mcp__context7__resolve-library-id
   - mcp__context7__query-docs
@@ -67,21 +68,29 @@ generic external sources.
      in this agent is the broader "Library documentation lookup" step —
      sub-numbering keeps the safe chain nested under that parent without
      renumbering the agent's outer Phase 1 steps; (2) Step 1.1 adds an
-     optional pre-warmed-cache lookup via lc-cache-lookup (yellow-research
-     install) — skipped when yellow-research absent; (3) Step 1.3 pulls in
-     the disambiguation rule from SKILL.md's separate "Disambiguation"
-     section (kept together here for cross-plugin consumers that don't see
-     the rest of the skill); (4) Step 1.4 names `WebFetch` alongside
-     `WebSearch` since this agent already lists both as built-ins.
+     optional pre-warmed-cache lookup via lc-cache-lookup at
+     ${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup (the
+     established cross-plugin path pattern; bash exit 127 when
+     yellow-research is absent is absorbed into the empty-output branch
+     by 2>/dev/null || true); (3) Step 1.3 pulls in the disambiguation
+     rule from SKILL.md's separate "Disambiguation" section (kept
+     together here for cross-plugin consumers that don't see the rest of
+     the skill); (4) Step 1.4 names `WebFetch` alongside `WebSearch`
+     since this agent already lists both as built-ins; (5) annotation
+     prefix is `[best-practices-researcher]` not `[library-context]` in
+     the unavailable-fallback and rate-limited log strings, since this
+     agent owns the inlined safe chain.
      Drift sentinel: `context7 unavailable — falling back to` (em dash U+2014). -->
 
 1. **Library documentation lookup (safe chain):**
    1. **(Optional, when yellow-research is installed)** Try the pre-warmed
-      cache via `bash "${YELLOW_RESEARCH_ROOT:-/nonexistent}/bin/lc-cache-lookup" "<library-name>"`.
+      cache via `bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup" "<library-name>" 2>/dev/null || true`.
       If output is non-empty, use it as the library-id and skip directly to
       step 1.3 (`query-docs`). Empty output = cache miss / helper absent /
-      yellow-research not installed — proceed to step 1.2 below. The wrapper
-      always exits 0; never treat a missing helper as an error.
+      yellow-research not installed — proceed to step 1.2 below. The trailing
+      `|| true` ensures bash exit 127 (binary absent when yellow-research is
+      not installed) is treated identically to a cache miss; never treat a
+      missing helper as an error.
    2. Detect context7 via `ToolSearch("context7")`. If
       `mcp__context7__resolve-library-id` is not present, annotate
       `[best-practices-researcher] context7 unavailable — falling back to WebSearch`

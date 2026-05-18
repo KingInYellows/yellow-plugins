@@ -61,10 +61,14 @@ candidate libraries — see "Disambiguation" below for picking among them.
 
 **Cross-plugin consumers** (yellow-core agents, etc.) that inline the
 safe-chain block: the cache lookup is optional. The helper lives in
-yellow-research, so probe before calling — `[ -x "${YELLOW_RESEARCH_ROOT:-/nonexistent}/bin/lc-cache-lookup" ]`
-or simply attempt the bash call and accept the empty result. Direct
-context7 resolve is the correct fallback when yellow-research is not
-installed.
+yellow-research; reach it via the established cross-plugin path pattern
+`${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup` (same form
+documented in `AGENTS.md` and `plugins/yellow-core/CLAUDE.md` for
+`${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh`). Attempt the bash
+call with `2>/dev/null || true` and accept an empty result as the
+fallback signal — this absorbs both binary-absent (yellow-research not
+installed, bash exit 127) and runtime cache miss into the same branch.
+Direct context7 resolve is the correct continuation when output is empty.
 
 ### Step 2 — Document lookup
 

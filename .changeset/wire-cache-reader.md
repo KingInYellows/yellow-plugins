@@ -22,12 +22,16 @@ This commit closes the loop:
   on every path (cache miss, expired, helper absent, jq missing), so
   empty output is the safe fallback signal — never an error.
 - `plugins/yellow-core/agents/research/best-practices-researcher.md`:
-  inlined block adds an optional 1.1 pre-step that probes for the
-  helper in `${YELLOW_RESEARCH_ROOT:-/nonexistent}/bin/lc-cache-lookup`.
-  Cross-plugin consumers without yellow-research installed get empty
-  output and fall through to direct context7 resolve. Other safe-chain
-  steps renumber to 1.2-1.4; HTML annotation enumerates the four
-  intentional deltas vs the canonical SKILL.md block.
+  inlined block adds an optional 1.1 pre-step that calls the helper at
+  `${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup` (the
+  established cross-plugin path pattern documented in `AGENTS.md` and
+  `plugins/yellow-core/CLAUDE.md`). The call is suffixed with
+  `2>/dev/null || true` so bash exit 127 (yellow-research not
+  installed) is absorbed into the same empty-output branch as a real
+  cache miss. `Bash` is added to the agent's `tools:` list since the
+  body now invokes the Bash tool. Other safe-chain steps renumber to
+  1.2-1.4; HTML annotation enumerates the five intentional deltas vs
+  the canonical SKILL.md block.
 - `reference.md`: "Cache-compatibility (deferred)" → "Cache (consumer
   wiring landed in this PR; hook in PR #537)" with the full cache
   schema documented.
