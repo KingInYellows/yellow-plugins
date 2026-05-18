@@ -115,7 +115,7 @@ runtime guidance to the agent; the block must be present in the agent's context.
 **Drift detection requirement:** Every consumer agent's inlined block must
 contain the exact phrase:
 
-```
+```text
 context7 unavailable — falling back to
 ```
 

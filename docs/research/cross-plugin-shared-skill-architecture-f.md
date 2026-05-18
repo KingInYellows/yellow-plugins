@@ -53,7 +53,7 @@ Claude Code's `skills:` frontmatter is strictly plugin-scoped — no native cros
 
 The two existing context7 consumers in this repo implement an identical three-step pattern:
 
-```
+```text
 1. ToolSearch("resolve-library-id")
    → If found: use mcp__context7__resolve-library-id + mcp__context7__query-docs
    → If not found: skip directly to fallback (EXA get_code_context_exa)
@@ -249,7 +249,7 @@ Consuming agents must list all tools they may use in their `tools:` frontmatter 
 
 ### What the fallback chain inside the skill looks like
 
-```
+```text
 context7 resolve-library-id
     ↓ (miss or absent)
 mcp__plugin_yellow-research_exa__get_code_context_exa

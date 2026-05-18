@@ -25,7 +25,7 @@ This doc captures the decision tree that has emerged from the security-fencing p
 
 ### Decision tree: which pattern to use
 
-```
+```text
 Is the logic pure shell (validation, path canonicalization, no LLM reasoning)?
   YES → sourced bash library (lib/validate.sh pattern)
   NO ↓
