@@ -52,8 +52,8 @@ cached_id=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup" "$lib_name" 2>/dev/
 ```
 
 If `cached_id` is non-empty, use it as the library-id and proceed
-directly to Step 2 — skip `mcp__context7__resolve-library-id`. Before
-invoking Step 2, still verify `mcp__context7__query-docs` is available
+invoking Step 2, still verify a context7 docs tool is available
+via ToolSearch (`mcp__context7__query-docs` or `mcp__context7__get-library-docs`) — in restricted-tool spawns or installs without context7
 via ToolSearch — in restricted-tool spawns or installs without context7
 the cached library-id is unusable; fall through to the
 Within-yellow-research fallback chain (EXA → WebSearch) in that case.
