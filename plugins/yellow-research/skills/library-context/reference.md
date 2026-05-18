@@ -143,19 +143,32 @@ changeset entry. Should NOT land before RULE 13.
   globally: `/plugin install context7@upstash` or via Claude Code MCP
   settings.
 
-## Cache-compatibility (deferred — Approach B from brainstorm)
+## Cache (consumer wiring in this PR; hook shipped in PR #537)
 
-The "Step 1 — Library ID resolution (cache-compatible)" wording in SKILL.md
-reserves a named step boundary so a future SessionStart hook can insert a
-cache-check before `resolve-library-id`. The cache contract — path, keying,
-TTL, invalidation — is NOT defined here. When the hook PR lands, it owns
-that design and updates SKILL.md's Step 1 with the specifics (single-line
-edit; no chain restructure required).
+SKILL.md Step 1 now reads the pre-warmed cache via the
+`${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup` helper before calling
+`mcp__context7__resolve-library-id`. The helper is provided by
+yellow-research; cross-plugin consumers reach it via the established
+`${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup` path
+pattern and absorb bash exit 127 (yellow-research not installed) into
+the empty-output branch with `2>/dev/null || true`.
 
-The brainstorm proposed `.claude/context7-cache.json` keyed by library name.
-The hook PR may find a different shape works better
-(e.g., `(library-name, topic)` keying) — the contract is the hook PR's call,
-not pre-specified here.
+**Cache shape** (defined by the SessionStart hook in PR #537,
+`hooks/lib/context7-cache.sh`):
+
+- Location: `${CLAUDE_PLUGIN_DATA}/context7-cache-<md5_of_project_dir>.json`
+- `tier1`: `library-name → {library_id, fetched_at}` (24h TTL, capped at 5
+  libs pre-warmed per session)
+- `tier2`: `library-id|topic → {docs, fetched_at}` (4h TTL, max 50;
+  reserved for future lazy population on cache miss — not pre-warmed)
+- `lockfile_fingerprint`: mtimes of detected lockfiles for invalidation
+- `schema: "1"` for forward-compatibility
+
+The `lc-cache-lookup` reader only consults `tier1`; doc-content caching
+(tier2) is reserved for a future round where the skill's Step 2
+(`query-docs`) similarly checks the cache before the MCP call. That round
+also needs to design a cache-write contract for runtime hits (today the
+cache only fills via the SessionStart pre-warm).
 
 ## Why a documentation skill, not just frontmatter preload (longer note)
 

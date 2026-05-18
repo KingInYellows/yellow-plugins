@@ -10,6 +10,7 @@ tools:
   - Read
   - Glob
   - Grep
+  - Bash
   - ToolSearch
   - mcp__context7__resolve-library-id
   - mcp__context7__query-docs
@@ -63,32 +64,51 @@ generic external sources.
      `skills:` resolution is unavailable (anthropics/claude-code#15944,
      closed not planned), so the block must live inline. Intentional deltas
      vs the canonical safe chain (which uses flat numbering 1/2/3):
-     (1) numbered as sub-steps 1.1/1.2/1.3 because the parent step in this
-     agent is the broader "Library documentation lookup" step — sub-numbering
-     keeps the safe chain nested under that parent without renumbering the
-     agent's outer Phase 1 steps; (2) Step 1.2 pulls in the disambiguation
-     rule from SKILL.md's separate "Disambiguation" section (kept together
-     here for cross-plugin consumers that don't see the rest of the skill);
-     (3) Step 1.3 names `WebFetch` alongside `WebSearch` since this agent
-     already lists both as built-ins.
+     (1) numbered as sub-steps 1.1/1.2/1.3/1.4 because the parent step
+     in this agent is the broader "Library documentation lookup" step —
+     sub-numbering keeps the safe chain nested under that parent without
+     renumbering the agent's outer Phase 1 steps; (2) Step 1.1 adds an
+     optional pre-warmed-cache lookup via lc-cache-lookup at
+     ${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup (the
+     established cross-plugin path pattern; bash exit 127 when
+     yellow-research is absent is absorbed into the empty-output branch
+     by 2>/dev/null || true); (3) Step 1.3 pulls in the disambiguation
+     rule from SKILL.md's separate "Disambiguation" section (kept
+     together here for cross-plugin consumers that don't see the rest of
+     the skill); (4) Step 1.4 names `WebFetch` alongside `WebSearch`
+     since this agent already lists both as built-ins; (5) annotation
+     prefix is `[best-practices-researcher]` not `[library-context]` in
+     the unavailable-fallback and rate-limited log strings, since this
+     agent owns the inlined safe chain.
      Drift sentinel: `context7 unavailable — falling back to` (em dash U+2014). -->
 
 1. **Library documentation lookup (safe chain):**
-   1. Detect via `ToolSearch("context7")`. If
+   1. **(Optional, when yellow-research is installed)** Assign the library name
+      to a variable first to prevent shell expansion, then try the pre-warmed
+      cache via `lib_name='<library-name>'; bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup" "$lib_name" 2>/dev/null || true`.
+      If output is non-empty, use it as the library-id, skip the
+      `mcp__context7__resolve-library-id` call in step 1.2, and call
+      `mcp__context7__query-docs` directly with the cached library-id. Empty
+      output = cache miss / helper absent /
+      yellow-research not installed — proceed to step 1.2 below. The trailing
+      `|| true` ensures bash exit 127 (binary absent when yellow-research is
+      not installed) is treated identically to a cache miss; never treat a
+      missing helper as an error.
+   2. Detect context7 via `ToolSearch("context7")`. If
       `mcp__context7__resolve-library-id` is not present, annotate
       `[best-practices-researcher] context7 unavailable — falling back to WebSearch`
-      (single line — the drift-detection grep is line-based) and proceed to step 1.3.
-   2. If context7 is present, call `mcp__context7__resolve-library-id` with
+      (single line — the drift-detection grep is line-based) and proceed to step 1.4.
+   3. If context7 is present, call `mcp__context7__resolve-library-id` with
       the library name (multiple candidates → prefer exact name match; else
       pick first result and annotate the matched slug in the citation;
-      zero candidates → skip `query-docs` and proceed directly to step 1.3),
+      zero candidates → skip `query-docs` and proceed directly to step 1.4),
       then call `mcp__context7__query-docs` with the resolved ID and a
       topic string. Never call `query-docs` with a plain library name. On
       HTTP 429 or any error message containing "rate limit" or "quota",
       annotate `[best-practices-researcher] context7 rate-limited (60 req/hr anonymous global pool) — falling back to WebSearch`
-      (single line) and proceed to step 1.3. Do NOT retry context7 within
+      (single line) and proceed to step 1.4. Do NOT retry context7 within
       the same session.
-   3. Fall back to built-in `WebSearch` first to locate authoritative URLs
+   4. Fall back to built-in `WebSearch` first to locate authoritative URLs
       (library name + topic as query), then use `WebFetch` to dereference
       specific URLs returned by that search. `WebFetch` is not used
       independently here — it dereferences URLs that `WebSearch` surfaced.

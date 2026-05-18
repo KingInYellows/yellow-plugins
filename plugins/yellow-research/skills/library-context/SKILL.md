@@ -39,14 +39,41 @@ research agents. Skip when:
 
 ## Usage
 
-### Step 1 — Library ID resolution (cache-compatible)
+### Step 1 — Library ID resolution (cache-first)
 
-Resolve the library identifier from cache (if available) or via
-`mcp__context7__resolve-library-id` with the library name as the only
-argument. Returns an array of candidate libraries — see "Disambiguation"
-below for picking among them. The step is written as a named boundary so a
-future cache hook (deferred — see `reference.md`) can drop in without
-restructuring the chain.
+**First, check the pre-warmed cache.** yellow-research ships a SessionStart
+hook that pre-resolves the project's top library IDs into a per-project
+cache; the reader lives at `${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup`.
+Run it via Bash before any MCP call:
+
+```bash
+lib_name='<library-name>'
+cached_id=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup" "$lib_name" 2>/dev/null || true)
+```
+
+If `cached_id` is non-empty, use it as the library-id and proceed
+invoking Step 2, still verify a context7 docs tool is available
+via ToolSearch (`mcp__context7__query-docs` or `mcp__context7__get-library-docs`) — in restricted-tool spawns or installs without context7
+via ToolSearch — in restricted-tool spawns or installs without context7
+the cached library-id is unusable; fall through to the
+Within-yellow-research fallback chain (EXA → WebSearch) in that case.
+The wrapper exits 0 on every path (cache miss, expired, helper absent,
+jq missing) — empty output is the safe fallback signal, never an error.
+
+If `cached_id` is empty, fall through to the live resolve:
+`mcp__context7__resolve-library-id <library-name>`. Returns an array of
+candidate libraries — see "Disambiguation" below for picking among them.
+
+**Cross-plugin consumers** (yellow-core agents, etc.) that inline the
+safe-chain block: the cache lookup is optional. The helper lives in
+yellow-research; reach it via the established cross-plugin path pattern
+`${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup` (same form
+documented in `AGENTS.md` and `plugins/yellow-core/CLAUDE.md` for
+`${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/<name>.sh`). Attempt the bash
+call with `2>/dev/null || true` and accept an empty result as the
+fallback signal — this absorbs both binary-absent (yellow-research not
+installed, bash exit 127) and runtime cache miss into the same branch.
+Direct context7 resolve is the correct continuation when output is empty.
 
 ### Step 2 — Document lookup
 
