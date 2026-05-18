@@ -1,0 +1,25 @@
+plugins/yellow-core/agents/research/best-practices-researcher.md
+  s_6cdb4ed3aab017::t_60479813a5603c 97,99
+  s_6cdb4ed3aab017::t_88fd4cabad6dbc 79-85,88-89,92
+  s_6cdb4ed3aab017::t_9e28bec207039a 66-75
+plugins/yellow-research/skills/library-context/reference.md
+  s_6cdb4ed3aab017::t_2ff24283e7c7cb 146-169
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_6cdb4ed3aab017::t_94f281bca3e1ee 42-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "e6b53694aff5084d9fcfa6578059930621e6e054",
+  "prompts": {},
+  "sessions": {
+    "s_6cdb4ed3aab017": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b91ed7a6-9689-4084-89ad-60b90b5f456c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
