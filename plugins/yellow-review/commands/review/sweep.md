@@ -1,30 +1,27 @@
 ---
 name: review:sweep
-description: 'Run /review:pr then /review:resolve on the same PR in one invocation. Use when you want both an AI review pass and cleanup of any open bot or human reviewer comment threads without manually re-invoking on the same PR number.'
+description: 'Run /review:pr then /review:resolve on the same PR in one unattended pass — no gates, no per-step prompts. Use when you want both an AI review pass and cleanup of any open bot or human reviewer comment threads without manually re-invoking on the same PR number.'
 argument-hint: '[PR# | URL | branch]'
 allowed-tools:
   - Bash
   - Skill
-  - AskUserQuestion
 ---
 
-# Sweep: Review + Resolve in One Pass
+# Sweep: Review + Resolve in One Unattended Pass
 
-Run a full review-and-cleanup pass on a single PR: invoke `/review:pr`
-for adaptive multi-agent code review with autonomous fix application,
-then `/review:resolve` for parallel resolution of all open reviewer
-comment threads. Both skills run against the same PR, with a
-user-confirmed boundary gate between them (the `Skill` tool surfaces no
-machine-readable exit status, so user confirmation is the failure
-signal).
+Run a full review-and-cleanup pass on a single PR: invoke `/review:pr
+--non-interactive` for adaptive multi-agent code review with autonomous fix
+application AND autonomous push, then `/review:resolve --non-interactive`
+for parallel resolution of all open reviewer comment threads with no
+spawn-cap, CONFLICT-surfacing, or push gates. Both skills run against the
+same PR with no human gates anywhere — sweep is fire-and-forget by design.
 
 Use when you want both an AI review pass and cleanup of any open bot or
-human comment threads in a single invocation. Use `/review:pr` directly
-to skip the resolve step, or `/review:resolve` directly to skip the
-review. For multi-PR or stack-wide sweeps, use `/review:all` —
-`/review:all scope=<PR#>` covers similar ground on a single PR but also
-invokes a post-review compounding step, while `/review:sweep` is the
-lighter alternative for review-then-resolve without compounding.
+human comment threads in a single unattended invocation. Use `/review:pr`
+directly (without the flag) to keep its push-confirmation gate, or
+`/review:resolve` directly to keep its spawn-cap and push gates. For
+batch sweeping every open PR you authored, use `/review:sweep-all`. For
+multi-PR or stack-wide pipelines with compounding, use `/review:all`.
 
 ## Workflow
 
@@ -67,7 +64,7 @@ Then stop.
 Confirm the working directory is clean (both `/review:pr` and
 `/review:resolve` will refuse to run on a dirty tree, and `/review:pr`
 running via the `Skill` tool surfaces no exit status — so a wrapper-level
-check eliminates the ambiguity at the Step 3 gate before it appears):
+pre-flight check fails fast before any unattended Skill invocation):
 
 ```bash
 set -eu
@@ -88,51 +85,35 @@ If the command fails or the state is not `OPEN`, report
 `[review:sweep] Error: PR #<PR#> is not open or could not be fetched.` and
 stop.
 
-### Step 2: Run /review:pr
+### Step 2: Run /review:pr --non-interactive
 
-Invoke the `Skill` tool with `skill: "review:pr"` and `args: "<PR#>"`.
-Wait for it to complete.
+Invoke the `Skill` tool with `skill: "review:pr"` and `args: "<PR#>
+--non-interactive"`. Wait for it to complete.
 
-`/review:pr` runs its full pipeline: adaptive agent selection, parallel
-multi-agent review, autonomous P0/P1 fix application, the
-push-confirmation gate, and the final report.
+The `--non-interactive` flag suppresses `/review:pr`'s Step 9
+push-confirmation prompt and its Step 9b "save learnings to memory"
+prompt — so the review runs unattended end-to-end. `/review:pr` still
+runs its full pipeline (adaptive agent selection, parallel multi-agent
+review, autonomous P0/P1 fix application, auto-push via `gt submit`,
+final report); only the human prompts are suppressed.
 
-### Step 3: Confirm clean completion (failure-boundary gate)
+### Step 3: Run /review:resolve --non-interactive
 
-The `Skill` tool returns no machine-readable exit status, so the wrapper
-cannot programmatically detect whether `/review:pr` errored, the user
-declined the push at its push-confirmation gate, or the review completed
-cleanly. The user is the authoritative signal at this boundary.
+Invoke the `Skill` tool with `skill: "review:resolve"` and `args:
+"<PR#> --non-interactive"`. The skill name is `review:resolve` (the
+value of the `name:` frontmatter field in `resolve-pr.md`) — do NOT
+use `review:resolve-pr`, which is the filename, not the slash-command
+name, and would silently fail to invoke the skill.
 
-Use the `AskUserQuestion` tool with:
-
-- Question: ``/review:pr` finished. Did it complete cleanly (review
-  succeeded; fixes were pushed or none were needed)? Proceed to resolve
-  open comment threads on PR #<PR#>?``
-- Options:
-  - **Proceed** — continue to Step 4
-  - **Stop** — skip the resolve step
-
-If the user selects **Stop** — OR the prompt is dismissed, times out, or
-cannot be shown (non-interactive environment, Escape, no response) — do
-NOT invoke `/review:resolve`. Treat any non-`Proceed` outcome as Stop.
-Print:
-
-```text
-[review:sweep] Resolve step skipped. Re-run /review:resolve <PR#>
-manually when ready.
-```
-
-Then stop. Do not proceed to Step 4 or Step 5.
-
-### Step 4: Run /review:resolve
-
-If the user selected **Proceed** in Step 3, invoke the `Skill` tool with
-`skill: "review:resolve"` and `args: "<PR#>"`. The skill name is
-`review:resolve` (the value of the `name:` frontmatter field in
-`resolve-pr.md`) — do NOT use `review:resolve-pr`, which is the
-filename, not the slash-command name, and would silently fail to invoke
-the skill.
+The `--non-interactive` flag suppresses `/review:resolve`'s Step 4
+spawn-cap gate, Step 5 CONFLICT-surfacing gate, and Step 6
+push-confirmation gate. The Skill tool returns no machine-readable exit
+status, so the wrapper cannot programmatically detect whether
+`/review:pr` errored or its fixes weren't pushed — sweep proceeds
+unconditionally; if `/review:pr` left no fixes to resolve against,
+`/review:resolve` will simply find fewer threads to address. Post-hoc
+cleanup is the user's responsibility (this risk is documented in the
+plan that authored the gate removal).
 
 `/review:resolve` fetches all unresolved review threads on the PR via
 GraphQL (no author-type filter — both bot and human threads are
@@ -140,14 +121,14 @@ addressed) and routes each thread through a `pr-comment-resolver` agent
 that either submits a fix or posts a false-positive response and marks
 the thread resolved.
 
-### Step 5: Final summary
+### Step 4: Final summary
 
-Reached only when the user selected **Proceed** at Step 3 and Step 4 ran.
-Print a summary line for the run:
+Reached after Step 2 (`/review:pr`) and Step 3 (`/review:resolve`) have
+run. Print a summary line for the run:
 
 ```text
 [review:sweep] PR #<PR#>
-  Review:  completed (per user confirmation)
+  Review:  completed (unattended; see /review:pr output above)
   Resolve: <one-line summary from /review:resolve, e.g., "5 threads
             resolved, 2 fixes applied" or "no open threads found">
 ```
@@ -167,11 +148,11 @@ than synthesizing a plausible-looking summary.
 - **Dirty working directory** at Step 1: `[review:sweep] Error:
   uncommitted changes detected. Commit or stash first.` and stop.
   Both downstream skills enforce this independently; the wrapper-level
-  check eliminates the ambiguity at the Step 3 gate before it appears
-  (see Step 1 rationale).
-- **`/review:pr` failed or push declined**: surfaced via the
-  user-confirmed Step 3 gate. On any non-`Proceed` outcome the resolve
-  step is skipped; re-run `/review:resolve <PR#>` manually when ready.
+  pre-flight check fails fast before any unattended Skill invocation.
+- **`/review:pr` failed silently**: with the human gate removed, sweep
+  proceeds to `/review:resolve` unconditionally. If `/review:pr`'s push
+  failed or fixes weren't applied, `/review:resolve` may find unexpected
+  state — inspect its output and re-run components manually if needed.
 - **`/review:resolve` returns no extractable summary**: report
   `Resolve: completed (output unavailable — see above)` rather than
   synthesizing one.

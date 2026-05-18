@@ -21,31 +21,43 @@ resolution, and sequential stack review. Graphite-native workflow.
 - Commit messages: `fix: address review findings from <agents>` or
   `fix: resolve PR #<num> review comments`
 - Always confirm with user via `AskUserQuestion` before pushing changes — never
-  auto-push without human approval. **Exception:** `/review:resolve-stack` runs
-  fully autonomously by design and intentionally suppresses every
-  `AskUserQuestion` gate (including the push gate, via
-  `/review:resolve --non-interactive`); this is its documented, expected
-  behavior — see its `## What It Does` section. The default `/review:resolve`
-  path keeps every gate.
+  auto-push without human approval. **Exceptions** (commands that intentionally
+  run unattended and suppress every push gate by design):
+  - `/review:resolve-stack` — walks a Graphite stack invoking
+    `/review:resolve --non-interactive` per PR
+  - `/review:sweep` — invokes `/review:pr --non-interactive` then
+    `/review:resolve --non-interactive` on a single PR with no gates
+  - `/review:sweep-all` — loops `/review:sweep` over every open non-draft PR
+    you authored; only the one upfront M3 confirmation is interactive
+  
+  The default `/review:pr` and `/review:resolve` paths (no flag) keep every
+  gate. The `--non-interactive` flag opts a single invocation in to the
+  unattended behavior.
 
 ## Plugin Components
 
-### Commands (6)
+### Commands (7)
 
 - `/review:setup` — Validate GitHub, jq, Graphite, and optional yellow-core
   integration before reviewing PRs
 - `/review:pr` — Adaptive multi-agent review of a single PR with automatic fix
-  application
+  application. Accepts `--non-interactive` to suppress its Step 9
+  push-confirmation prompt and its Step 9b "save learnings" prompt (used by
+  `/review:sweep`)
 - `/review:resolve` — Parallel resolution of unresolved PR review comments via
   GraphQL. Accepts `--non-interactive` to suppress its spawn-cap, CONFLICT, and
-  push-confirmation gates (used by `/review:resolve-stack`)
+  push-confirmation gates (used by `/review:resolve-stack` and `/review:sweep`)
 - `/review:resolve-stack` — Walk the current Graphite stack bottom-up and run
   `/review:resolve --non-interactive` on every open PR fully autonomously (no
   prompts), pushing and restacking as it goes
 - `/review:all` — Sequential review of multiple PRs (Graphite stack, all open,
   or single PR)
-- `/review:sweep` — Wrapper that runs `/review:pr` then `/review:resolve` on
-  the same PR with a user-confirmed boundary gate between them
+- `/review:sweep` — Wrapper that runs `/review:pr --non-interactive` then
+  `/review:resolve --non-interactive` on the same PR with no gates in
+  between — fully unattended
+- `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
+  authored sequentially, with one upfront confirmation, skip-and-continue per
+  PR, end-of-loop summary, and a single `/workflows:compound` pass at the end
 
 ### Agents (16)
 
@@ -136,9 +148,18 @@ resolution, and sequential stack review. Graphite-native workflow.
   order (base → tip). Best before submitting a stack for review.
 - **`/review:all scope=all`** — Batch-review all your open non-draft PRs. Best
   for catching up on review backlog.
-- **`/review:sweep`** — Run `/review:pr` then `/review:resolve` sequentially
-  on a single PR. Best when you want both an AI review pass and cleanup of
-  any open bot/human comment threads in one invocation.
+- **`/review:sweep`** — Run `/review:pr --non-interactive` then
+  `/review:resolve --non-interactive` sequentially on a single PR with no
+  gates anywhere. Best when you want both an AI review pass and cleanup of
+  any open bot/human comment threads in one fire-and-forget invocation.
+- **`/review:sweep-all`** — Loop `/review:sweep` over every open non-draft
+  PR you authored, sequentially. One upfront M3 confirmation shows the PR
+  list; after Proceed, runs unattended end-to-end. Skip-and-continue on
+  per-PR failure, summary table, and an end-of-loop `/workflows:compound`
+  pass to capture learnings. Best for clearing review + resolve backlog
+  across multiple open PRs at once. Distinct from `/review:all scope=all`
+  (which runs the deeper review pipeline per PR with per-PR push gates) —
+  `sweep-all` is the lighter, fully-unattended batch alternative.
 - **`/workflows:review`** (yellow-core) — Session-level review against a plan
   file. Evaluates plan adherence, cross-PR coherence, and scope drift.
   Complementary to `/review:pr` (per-PR code quality) — use both for full
