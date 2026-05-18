@@ -1,0 +1,27 @@
+docs/research/cross-plugin-shared-skill-architecture-f.md
+  s_3a0683ba92e204::t_32a6e8c34b2e0b 56
+  s_3a0683ba92e204::t_81334f41565792 252
+docs/brainstorms/2026-05-17-library-context-skill-brainstorm.md
+  s_3a0683ba92e204::t_ced89d3db1ed6d 118
+docs/solutions/code-quality/cross-plugin-shared-skill-pattern.md
+  s_3a0683ba92e204::t_26f48aa07c4052 28
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_3a0683ba92e204::t_a5998bd7bde4c1 148
+  s_3a0683ba92e204::t_fbd81b6ad21fd8 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "3c952ee9af17d1d4dd9ff7cf5b636f90825d43eb",
+  "prompts": {},
+  "sessions": {
+    "s_3a0683ba92e204": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "058aaa37-cd00-4e37-92f8-fc57ca8caf02",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
