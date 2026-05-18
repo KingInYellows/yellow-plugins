@@ -39,14 +39,32 @@ research agents. Skip when:
 
 ## Usage
 
-### Step 1 — Library ID resolution (cache-compatible)
+### Step 1 — Library ID resolution (cache-first)
 
-Resolve the library identifier from cache (if available) or via
-`mcp__context7__resolve-library-id` with the library name as the only
-argument. Returns an array of candidate libraries — see "Disambiguation"
-below for picking among them. The step is written as a named boundary so a
-future cache hook (deferred — see `reference.md`) can drop in without
-restructuring the chain.
+**First, check the pre-warmed cache.** yellow-research ships a SessionStart
+hook that pre-resolves the project's top library IDs into a per-project
+cache; the reader lives at `${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup`.
+Run it via Bash before any MCP call:
+
+```bash
+cached_id=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup" "<library-name>" 2>/dev/null || true)
+```
+
+If `cached_id` is non-empty, use it as the library-id and proceed
+directly to Step 2 — skip `mcp__context7__resolve-library-id`. The
+wrapper exits 0 on every path (cache miss, expired, helper absent, jq
+missing) — empty output is the safe fallback signal, never an error.
+
+If `cached_id` is empty, fall through to the live resolve:
+`mcp__context7__resolve-library-id <library-name>`. Returns an array of
+candidate libraries — see "Disambiguation" below for picking among them.
+
+**Cross-plugin consumers** (yellow-core agents, etc.) that inline the
+safe-chain block: the cache lookup is optional. The helper lives in
+yellow-research, so probe before calling — `[ -x "${YELLOW_RESEARCH_ROOT:-/nonexistent}/bin/lc-cache-lookup" ]`
+or simply attempt the bash call and accept the empty result. Direct
+context7 resolve is the correct fallback when yellow-research is not
+installed.
 
 ### Step 2 — Document lookup
 
