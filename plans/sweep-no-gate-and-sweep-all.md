@@ -168,7 +168,7 @@ None — this is a self-directed feature.
     not duplicate it).
   - **`### Step 2: Enumerate open non-draft PRs`** — one Bash block:
     ```bash
-    gh pr list --author @me --state open \
+    gh pr list --author @me --state open --limit 1000 \
       --json number,headRefName,isDraft,title \
       --jq '[.[] | select(.isDraft == false)] | sort_by(.number)'
     ```

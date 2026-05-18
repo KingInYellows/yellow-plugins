@@ -87,8 +87,9 @@ stop.
 
 ### Step 2: Run /review:pr --non-interactive
 
-Invoke the `Skill` tool with `skill: "review:pr"` and `args: "<PR#>
---non-interactive"`. Wait for it to complete.
+Invoke the `Skill` tool with `skill: "review:pr"`. Pass the args string
+`<PR#> --non-interactive` (literal — substitute the actual PR number;
+the `--non-interactive` flag is fixed text). Wait for it to complete.
 
 The `--non-interactive` flag suppresses `/review:pr`'s Step 9
 push-confirmation prompt and its Step 9b "save learnings to memory"
@@ -97,13 +98,34 @@ runs its full pipeline (adaptive agent selection, parallel multi-agent
 review, autonomous P0/P1 fix application, auto-push via `gt submit`,
 final report); only the human prompts are suppressed.
 
+### Step 2a: Verify branch alignment
+
+After `/review:pr` completes, verify the current checked-out branch still
+matches the PR's head branch. If `/review:pr` errored mid-way or a tool
+checked out a different branch, `/review:resolve` would commit fixes
+against the wrong PR.
+
+```bash
+set -eu
+EXPECTED=$(gh pr view <PR#> --json headRefName -q .headRefName)
+ACTUAL=$(git rev-parse --abbrev-ref HEAD)
+[ "$EXPECTED" = "$ACTUAL" ] || {
+  printf '[review:sweep] Error: branch mismatch (expected %s, on %s). Aborting resolve.\n' "$EXPECTED" "$ACTUAL" >&2
+  exit 1
+}
+```
+
+If the branch does not match, stop — do not proceed to Step 3.
+
 ### Step 3: Run /review:resolve --non-interactive
 
-Invoke the `Skill` tool with `skill: "review:resolve"` and `args:
-"<PR#> --non-interactive"`. The skill name is `review:resolve` (the
-value of the `name:` frontmatter field in `resolve-pr.md`) — do NOT
-use `review:resolve-pr`, which is the filename, not the slash-command
-name, and would silently fail to invoke the skill.
+Invoke the `Skill` tool with `skill: "review:resolve"`. Pass the args
+string `<PR#> --non-interactive` (literal — substitute the actual PR
+number; the `--non-interactive` flag is fixed text). The skill name is
+`review:resolve` (the value of the `name:` frontmatter field in
+`resolve-pr.md`) — do NOT use `review:resolve-pr`, which is the
+filename, not the slash-command name, and would silently fail to invoke
+the skill.
 
 The `--non-interactive` flag suppresses `/review:resolve`'s Step 4
 spawn-cap gate, Step 5 CONFLICT-surfacing gate, and Step 6
@@ -149,6 +171,11 @@ than synthesizing a plausible-looking summary.
   uncommitted changes detected. Commit or stash first.` and stop.
   Both downstream skills enforce this independently; the wrapper-level
   pre-flight check fails fast before any unattended Skill invocation.
+- **Branch mismatch after `/review:pr`** (Step 2a): `[review:sweep]
+  Error: branch mismatch (expected <head>, on <actual>). Aborting
+  resolve.` and stop. Indicates `/review:pr` errored mid-checkout or
+  another tool changed branches during the run — re-run after manually
+  checking out the PR head branch.
 - **`/review:pr` failed silently**: with the human gate removed, sweep
   proceeds to `/review:resolve` unconditionally. If `/review:pr`'s push
   failed or fixes weren't applied, `/review:resolve` may find unexpected

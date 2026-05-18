@@ -166,7 +166,7 @@ either command.
 | `plugins/yellow-review/commands/review/sweep-all.md` | New file |
 | `plugins/yellow-review/CLAUDE.md` | Update Component Catalog table to add `sweep-all` row |
 | `plugins/yellow-review/README.md` | Add `sweep-all` to command list |
-| `plugins/yellow-review/plugin.json` | Add `sweep-all` to commands list; minor version bump |
+| `plugins/yellow-review/.claude-plugin/plugin.json` | No change — yellow-review uses auto-discovery; no `commands` array exists. Version bump applied via Changesets flow only. |
 | `plugins/yellow-review/package.json` | Minor version bump (coordinated with plugin.json) |
 | `.claude-plugin/marketplace.json` | Version bump for yellow-review |
 | `plugins/yellow-core/commands/setup/all.md` | Likely no change — `sweep-all` is yellow-review internal, not a new plugin |
@@ -229,7 +229,7 @@ author:
    - Exits cleanly with a "No open PRs found." message when the filtered list is
      empty, without showing the M3 confirmation
 
-3. `pnpm validate:plugins` passes (plugin.json commands list updated).
+3. `pnpm validate:plugins` passes.
 
 4. `pnpm validate:agents` passes (frontmatter fields, description single-line,
    tools list includes every tool referenced in the body).

@@ -38,11 +38,15 @@ Split `$ARGUMENTS` on whitespace into tokens.
    beginning with `--` that is not `--non-interactive` is an error — report
    `[review:pr] Error: unknown flag <token>.` and stop. Non-interactive mode
    is OFF by default.
-2. **PR target token**: from the remaining tokens (at most one expected):
-   - **If numeric**: Use directly as PR number
-   - **If URL** (contains `github.com` and `/pull/`): Extract PR number from
-     URL path
-   - **If branch name**: `gh pr view "<token>" --json number -q .number`
+2. **PR target token**: from the remaining tokens:
+   - **If more than one token remains**: report
+     `[review:pr] Error: too many arguments — expected at most one PR target.`
+     and stop.
+   - **If exactly one token remains**:
+     - **If numeric**: Use directly as PR number
+     - **If URL** (contains `github.com` and `/pull/`): Extract PR number from
+       URL path
+     - **If branch name**: `gh pr view "<token>" --json number -q .number`
    - **If no token remains** (empty `$ARGUMENTS`, or only the flag was
      passed): Detect from current branch:
      `gh pr view --json number -q .number`
