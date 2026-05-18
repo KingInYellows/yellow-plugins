@@ -7,7 +7,21 @@
 
 ## Executive summary
 
-Claude Code's `skills:` frontmatter is strictly plugin-scoped — no native cross-plugin skill resolution exists and the upstream feature request (anthropics/claude-code#15944) was closed as "not planned." The only runtime mechanism that reliably crosses plugin boundaries is the `Task` tool (subagent spawn) or the `Skill` tool with a fully-qualified invocation, both of which require the consuming agent to spell out the exact `subagent_type` or skill path. This repo already has a working precedent for the problem in yellow-core's `security-fencing` skill, which documents itself as "a documentation skill, not an agent-injection skill" precisely because inlining wins over `skills:` injection until scale justifies the migration cost. The same rationale applies to `library-context`: the canonical skill body should live in yellow-research (domain owner), be documented via SKILL.md as the single source of truth, and be propagated to each consumer plugin as an inlined block — with a ToolSearch-gated fallback chain already established by the two existing consumers serving as the template.
+Claude Code's `skills:` frontmatter is strictly plugin-scoped — no native
+cross-plugin skill resolution exists and the upstream feature request
+(anthropics/claude-code#15944) was closed as "not planned." The only runtime
+mechanism that reliably crosses plugin boundaries is the `Task` tool (subagent
+spawn) or the `Skill` tool with a fully-qualified invocation, both of which
+require the consuming agent to spell out the exact `subagent_type` or skill
+path. This repo already has a working precedent for the problem in
+yellow-core's `security-fencing` skill, which documents itself as "a
+documentation skill, not an agent-injection skill" precisely because inlining
+wins over `skills:` injection until scale justifies the migration cost. The
+same rationale applies to `library-context`: the canonical skill body should
+live in yellow-research (domain owner), be documented via SKILL.md as the
+single source of truth, and be propagated to each consumer plugin as an
+inlined block — with a ToolSearch-gated fallback chain already established by
+the two existing consumers serving as the template.
 
 ---
 

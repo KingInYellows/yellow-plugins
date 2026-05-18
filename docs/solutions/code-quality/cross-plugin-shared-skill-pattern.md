@@ -206,6 +206,7 @@ re-derivation.
 **Drift detection sentinel** for the library-context inline block — use the
 partial-string form so both full-chain (`falling back to EXA`) and safe-chain
 (`falling back to WebSearch`) consumers match:
+
 ```bash
 rg -l 'context7 unavailable — falling back to' plugins/ --type md \
   | grep -v 'library-context/SKILL.md' \
