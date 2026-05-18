@@ -1,0 +1,25 @@
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_9930f24284600a::t_0623ce6641ec19 64-71
+.changeset/wire-cache-reader.md
+  s_9930f24284600a::t_0623ce6641ec19 25-34
+plugins/yellow-core/agents/research/best-practices-researcher.md
+  s_9930f24284600a::t_0623ce6641ec19 13,71-82,87,90-93
+plugins/yellow-research/skills/library-context/reference.md
+  s_9930f24284600a::t_0623ce6641ec19 146,151-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "19b061e778644630091d94adfc52883149e8a519",
+  "prompts": {},
+  "sessions": {
+    "s_9930f24284600a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "33d8f4d4-9187-4ef9-9d0b-9f301d39bed4",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
