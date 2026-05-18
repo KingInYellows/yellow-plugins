@@ -83,8 +83,9 @@ generic external sources.
      Drift sentinel: `context7 unavailable — falling back to` (em dash U+2014). -->
 
 1. **Library documentation lookup (safe chain):**
-   1. **(Optional, when yellow-research is installed)** Try the pre-warmed
-      cache via `bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup" "<library-name>" 2>/dev/null || true`.
+   1. **(Optional, when yellow-research is installed)** Assign the library name
+      to a variable first to prevent shell expansion, then try the pre-warmed
+      cache via `lib_name='<library-name>'; bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup" "$lib_name" 2>/dev/null || true`.
       If output is non-empty, use it as the library-id, skip the
       `mcp__context7__resolve-library-id` call in step 1.2, and call
       `mcp__context7__query-docs` directly with the cached library-id. Empty

@@ -47,7 +47,8 @@ cache; the reader lives at `${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup`.
 Run it via Bash before any MCP call:
 
 ```bash
-cached_id=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup" "<library-name>" 2>/dev/null || true)
+lib_name='<library-name>'
+cached_id=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup" "$lib_name" 2>/dev/null || true)
 ```
 
 If `cached_id` is non-empty, use it as the library-id and proceed
