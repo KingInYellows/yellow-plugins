@@ -1,0 +1,37 @@
+plugins/yellow-review/commands/review/sweep.md
+  s_0fddd6f60100d2::t_5f102fe397dd0f 101-119
+  s_0fddd6f60100d2::t_e7dd74ce1f2dbd 90-92
+  s_0fddd6f60100d2::t_0bfaeeb916eefc 174-178
+  s_0fddd6f60100d2::t_88e588e7cb5641 122-128
+plans/sweep-no-gate-and-sweep-all.md
+  s_0fddd6f60100d2::t_1b3e90cc072ee9 171
+docs/brainstorms/2026-05-18-sweep-command-human-gate-removal-brainstorm.md
+  s_0fddd6f60100d2::t_076017bc47e317 232
+  s_0fddd6f60100d2::t_0c1b111428b759 169
+plugins/yellow-review/commands/review/sweep-all.md
+  s_0fddd6f60100d2::t_5efbc58ec8e135 65,75-76
+  s_0fddd6f60100d2::t_6df0f049e650ea 145-152
+  s_0fddd6f60100d2::t_1f999bf678a012 171-176,178
+  s_0fddd6f60100d2::t_0d1d6a170aeaea 95-98,100,102-103,105-107
+  s_0fddd6f60100d2::t_c73c2087d97e63 186,192,197,200-201
+  s_0fddd6f60100d2::t_8ab002f86262be 204-206
+  s_0fddd6f60100d2::t_b3d169733e1fa8 230-236
+plugins/yellow-review/commands/review/review-pr.md
+  s_0fddd6f60100d2::t_75beaa25eb6cb1 41-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.8",
+  "base_commit_sha": "ea5bbd0a60eef68f85aa721abd29d4ee25989610",
+  "prompts": {},
+  "sessions": {
+    "s_0fddd6f60100d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "39cf8a7f-5a65-4f04-a3d5-0b48a951c0c1",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
