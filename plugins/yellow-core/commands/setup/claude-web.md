@@ -416,6 +416,8 @@ default_allow = [
 if not isinstance(cfg.get("permissions"), dict):
     cfg["permissions"] = {}
 existing_allow = cfg["permissions"].get("allow", [])
+if not isinstance(existing_allow, list):
+    existing_allow = []
 for entry in default_allow:
     if entry not in existing_allow:
         existing_allow.append(entry)
@@ -429,6 +431,8 @@ default_deny = [
     "Read(**/.env.*)",
 ]
 existing_deny = cfg["permissions"].get("deny", [])
+if not isinstance(existing_deny, list):
+    existing_deny = []
 for entry in default_deny:
     if entry not in existing_deny:
         existing_deny.append(entry)
@@ -439,8 +443,13 @@ if "env" not in cfg:
     cfg["env"] = {"NODE_ENV": "test"}
 
 # hooks.SessionStart (append-only; do not duplicate install_pkgs.sh wire-up)
-cfg.setdefault("hooks", {})
+# Guard against pre-existing `"hooks": null` or other non-dict — setdefault
+# would leave the value in place, then `.get(...)` raises AttributeError.
+if not isinstance(cfg.get("hooks"), dict):
+    cfg["hooks"] = {}
 session_start = cfg["hooks"].get("SessionStart", [])
+if not isinstance(session_start, list):
+    session_start = []
 already_wired = False
 for entry in session_start:
     for hook in entry.get("hooks", []):
