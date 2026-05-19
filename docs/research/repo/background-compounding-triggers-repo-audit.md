@@ -401,7 +401,7 @@ STAGING_BASE="${HOME}/.claude/projects/${PROJECT_SLUG}/compound-staging"
 
 ### Worktree consideration
 
-The brainstorm doc's compound-staging path is `~/.claude/projects/<hash>/compound-staging/`. For worktrees, `git rev-parse --show-toplevel` returns the worktree root, not the main working tree root. Two worktrees of the same repo will produce different slugs and different staging directories. The brainstorm does not address this — the plan phase must decide: use `git worktree list --main | head -1` to anchor to the main tree, or accept per-worktree isolation.
+The brainstorm doc's compound-staging path is `~/.claude/projects/<hash>/compound-staging/`. For worktrees, `git rev-parse --show-toplevel` returns the worktree root, not the main working tree root. Two worktrees of the same repo will produce different slugs and different staging directories. The brainstorm does not address this — the plan phase must decide: use `git worktree list --porcelain | awk '/^worktree/{print $2; exit}'` to anchor to the main tree, or accept per-worktree isolation. (Resolved by plan D5: per-worktree isolation is the chosen approach.)
 
 ---
 
@@ -569,7 +569,7 @@ Step 4: Report Results
 
 ### Conventions to mirror in `compound/review-staged.md`
 
-1. **Name field:** `workflows:review-staged` (sibling to `workflows:compound`)
+1. **Name field:** `workflows:review-staged` (sibling to `workflows:compound`) — **SUPERSEDED:** plan and brainstorm both place this command at `commands/compound/review-staged.md` invoked as `/compound:review-staged`. Use the `compound:` prefix.
 2. **allowed-tools:** `Bash`, `Read`, `Task`, `ToolSearch`, plus ruvector MCP tools (same list)
 3. **Step 1 guard:** Check `docs/solutions/` exists AND check that staging dir has entries; if staging is empty, output a message and stop
 4. **Step 2:** `Task(subagent_type: "yellow-core:workflow:staging-reviewer")` — not `knowledge-compounder` directly
@@ -598,7 +598,7 @@ Step 4: Report Results
 | `plugins/yellow-core/hooks/scripts/stop.sh` | Mirrors ruvector stop.sh structure; adds background subshell (prewarm-morph pattern lines 79–86); writes JSONL to staging |
 | `plugins/yellow-core/hooks/scripts/session-start.sh` | Mirrors yellow-ci structure; filesystem-only checks; spawns reviewer via disown if threshold met |
 | `plugins/yellow-core/agents/workflow/staging-reviewer.md` | New non-interactive agent; ruvector dedup + promote via knowledge-compounder with `mode: background` |
-| `plugins/yellow-core/commands/workflows/review-staged.md` | Sibling to compound.md; manual drain trigger |
+| `plugins/yellow-core/commands/compound/review-staged.md` | Sibling to compound.md; manual drain trigger (note: plan places this under `commands/compound/`, not `commands/workflows/`) |
 | `plugins/yellow-core/tests/stop.bats` | 5 tests per Item 9 spec |
 | `plugins/yellow-core/tests/session-start.bats` | 5 tests per Item 9 spec |
 
@@ -607,7 +607,7 @@ Step 4: Report Results
 | File | Change |
 |---|---|
 | `plugins/yellow-core/.claude-plugin/plugin.json` | Add `"hooks"` block with Stop (10s) + SessionStart (3s) entries |
-| `plugins/yellow-core/agents/workflow/knowledge-compounder.md` | Add `mode: background` branch at M3 Confirmation section (lines 199–212) to suppress AskUserQuestion |
+| `plugins/yellow-core/agents/workflow/knowledge-compounder.md` | **SUPERSEDED BY plan D8** — knowledge-compounder is NOT modified. The plan introduces a separate `staging-promoter` agent (frontmatter `disallowedTools: [AskUserQuestion]`) instead of adding a `mode: background` branch. Listed under "Files NOT Modified" in plans/background-compounding-triggers.md. |
 
 ### Open question resolutions for the plan
 
@@ -615,7 +615,7 @@ Step 4: Report Results
 Recommendation: use `git rev-parse --show-toplevel` on the main worktree (derivable via `git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel`, or by parsing `git worktree list --porcelain` for the first `worktree ` line). Rationale: staging entries represent project-level learnings, not worktree-specific state. Alternative: accept per-worktree isolation (simpler, matches current behavior for auto-memory). Defer to plan phase. Plan opted for per-worktree isolation per D5 in plans/background-compounding-triggers.md — this recommendation is research-only and was not adopted.
 
 **Q: knowledge-compounder non-interactive mode**
-Mechanism: add `mode: background` sentinel to the Task prompt. The agent body checks for this string and skips AskUserQuestion gates. This is safe — interactive callers never include `mode: background` in their prompts. The plan must add a short paragraph to the M3 Confirmation section of `knowledge-compounder.md`.
+Mechanism: add `mode: background` sentinel to the Task prompt. The agent body checks for this string and skips AskUserQuestion gates. This is safe — interactive callers never include `mode: background` in their prompts. The plan must add a short paragraph to the M3 Confirmation section of `knowledge-compounder.md`. **SUPERSEDED BY plan D8:** the plan introduces a separate `staging-promoter` agent with `disallowedTools: [AskUserQuestion]` in frontmatter, leaving `knowledge-compounder.md` untouched. This research-stage recommendation was not adopted.
 
 **Q: 0.82 threshold for staging-reviewer**
 Confirmed directly from compound-lifecycle SKILL.md line 212 and compound.md line 81. Use `hooks_recall` with `top_k=1`, skip if score ≥ 0.82. No new calibration needed.

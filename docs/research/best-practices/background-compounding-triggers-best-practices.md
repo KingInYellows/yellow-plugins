@@ -494,8 +494,8 @@ In plugin.json hooks block:
 }
 ```
 
-The stop.sh script still uses the morph-prewarm pattern (`( haiku-agent-call ) &>/dev/null &; disown`)
-as defense-in-depth. The `async: true` prevents any blocking even if the script hangs before disown.
+The stop.sh script still uses the morph-prewarm pattern (`( haiku-agent-call ) >/dev/null 2>&1 & disown`)
+as defense-in-depth. (Note: an earlier draft of this section recommended `async: true` on the hook registration; that recommendation has been superseded — see plan D4 and deepen-validation Q2: `async: true` is NOT a supported Claude Code hook-schema field. Non-blocking behavior is provided entirely by the disowned subshell.)
 
 ### JSONL schema versioning policy (Q6)
 

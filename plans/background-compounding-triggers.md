@@ -126,7 +126,7 @@ checked at the top of both hooks. If set: immediate exit. Prevents:
 drain infinite recursion.
 
 **D4 — Disowned-subshell async (not `async: true`).**
-Considered `async: true` for hook registrations, but deepen-validation Q1 and
+Considered `async: true` for hook registrations, but deepen-validation Q2 and
 reviewer feedback confirmed it is not a supported Claude Code schema field —
 the remote validator rejects it. Non-blocking behavior is provided entirely by
 the disowned subshell pattern: the hook parent forks, disowns, and exits within
@@ -324,7 +324,7 @@ interactive session.
     ]}]
   }
   ```
-  Note: `async: true` removed — not a supported Claude Code schema field (confirmed by deepen-validation Q1 + gemini reviewer). Non-blocking behavior comes from the disowned subshell (steps 1.2/1.4), not from a schema key. Short timeouts (5s/3s) cover the synchronous parent fork; the disowned subshell continues running after the parent exits regardless of hook timeout.
+  Note: `async: true` removed — not a supported Claude Code schema field (confirmed by deepen-validation Q2 + gemini reviewer). Non-blocking behavior comes from the disowned subshell (steps 1.2/1.4), not from a schema key. Short timeouts (5s/3s) cover the synchronous parent fork; the disowned subshell continues running after the parent exits regardless of hook timeout.
 - [ ] **1.6** CRLF normalize: `sed -i 's/\r$//' plugins/yellow-core/hooks/scripts/*.sh plugins/yellow-core/lib/compound-staging.sh`
 
 ### Phase 2: staging-reviewer agent (drain orchestrator)
@@ -659,7 +659,7 @@ None new. Reuses:
 ## Risks
 
 - ~~**`async: true` rejected by Claude Code remote validator**~~ — resolved: `async: true`
-  confirmed unsupported (deepen-validation Q1 + gemini reviewer). Omitted from
+  confirmed unsupported (deepen-validation Q2 + gemini reviewer). Omitted from
   `plugin.json`. Disowned-subshell pattern is the sole non-blocking mechanism. AC #7 removed.
 - **`claude -p` headless command surface drift** between Claude Code
   versions. Mitigation: pin minimum Claude Code version in plugin.json
@@ -716,7 +716,7 @@ None new. Reuses:
 - **Repo audit:** `docs/research/repo/background-compounding-triggers-repo-audit.md`
 - **Best-practices research:** `docs/research/best-practices/background-compounding-triggers-best-practices.md`
 - **Deepen-plan validation:** `docs/research/repo/background-compounding-triggers-deepen-validation.md`
-- **Hook input schema verification:** `code.claude.com/docs/en/hooks` (Stop hook stdin includes `transcript_path`, `session_id`, `cwd`, `last_assistant_message`, `stop_hook_active`); `async: true` confirmed via Perplexity Sonar Pro citing official docs
+- **Hook input schema verification:** `code.claude.com/docs/en/hooks` (Stop hook stdin includes `transcript_path`, `session_id`, `cwd`, `last_assistant_message`, `stop_hook_active`); `async: true` is NOT a supported hook schema field — see D4 (lines 126–135). Non-blocking behavior is provided by the disowned-subshell pattern; `async: true` is omitted from `plugin.json` hooks.
 - **Architecture revision history:**
   - V1 plan (526 lines): assumed `Agent` tool callable from bash hooks
   - Deepen-plan revealed: bash hooks CANNOT invoke Agent/Task (main-loop primitives); zero precedent in marketplace
