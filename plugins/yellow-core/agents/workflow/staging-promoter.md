@@ -2,6 +2,7 @@
 name: staging-promoter
 description: Promote a vetted compound-staging entry to docs/solutions/<category>/<slug>.md and append a one-line index entry to MEMORY.md's Session Notes section. Use when invoked by staging-reviewer with a fully-vetted entry; never asks for confirmation (frontmatter-enforced).
 model: sonnet
+memory: project
 tools:
   - Read
   - Write
@@ -71,7 +72,7 @@ The dispatch prompt provides these fields (one per line, `key: value`):
 - `suggested_solution_category` (required, one of the 6 allowed)
 - `tags` (optional, comma-separated, kebab-case)
 - The `--- begin candidate_text --- ... --- end candidate_text ---`
-  fenced block (required, max 800 chars after fence-stripping)
+  fenced block (required, max 400 chars after fence-stripping — must match the staging-scorer candidate_text cap)
 
 Refuse the promotion (print to stderr, exit 0) if:
 

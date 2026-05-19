@@ -2,6 +2,7 @@
 name: staging-reviewer
 description: Drain the compound-staging ledger by scoring, dedup-checking, and promoting eligible session-transcript entries to docs/solutions/ and MEMORY.md. Use when invoked from a `claude -p` drain session spawned by yellow-core's SessionStart hook, or when manually dispatched via `/compound:review-staged`.
 model: sonnet
+memory: project
 tools:
   - Task
   - Bash
