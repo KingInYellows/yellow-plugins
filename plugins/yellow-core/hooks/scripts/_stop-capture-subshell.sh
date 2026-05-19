@@ -28,6 +28,14 @@ if [ -z "$TRANSCRIPT" ] || [ -z "$SESSION_ID" ] || [ -z "$STAGING_DIR" ]; then
   exit 0
 fi
 
+# Sanitize SESSION_ID to a safe filename component. Replace anything that
+# isn't [A-Za-z0-9._-] with `_`. Defends against path traversal (`..`, `/`)
+# and shell-meta in the destination filename. Empty result is rejected.
+SESSION_ID=$(printf '%s' "$SESSION_ID" | tr -c 'A-Za-z0-9._-' '_')
+if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "." ] || [ "$SESSION_ID" = ".." ]; then
+  exit 0
+fi
+
 # Require jq for JSON build.
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
@@ -78,4 +86,8 @@ ENTRY=$(jq -nc \
 # atomic. cs_atomic_jsonl_write handles the tmp + mv internally; we just
 # point it at the final destination.
 PENDING_PATH="${STAGING_DIR}/pending/${SESSION_ID}.jsonl"
-cs_atomic_jsonl_write "$PENDING_PATH" "$ENTRY" || exit 0
+# JSONL requires each entry terminated by a newline. cs_atomic_jsonl_write
+# does not append \n on its own (the helper is content-agnostic), so the
+# caller is responsible for line termination.
+cs_atomic_jsonl_write "$PENDING_PATH" "${ENTRY}
+" || exit 0

@@ -188,12 +188,24 @@ _plant_pending() {
 # --- Orphan tmp reaper ---
 
 @test "session-start reaps orphan tmp files > 60min old" {
-  mkdir -p "$STAGING/pending" "$STAGING/tmp"
-  touch "$STAGING/tmp/orphan.jsonl.tmp.123"
-  touch -t "$(date -d '90 minutes ago' +%Y%m%d%H%M 2>/dev/null \
-    || date -v-90M +%Y%m%d%H%M)" "$STAGING/tmp/orphan.jsonl.tmp.123"
+  # cs_atomic_jsonl_write creates sibling .tmp.PID files in the destination
+  # directory (pending/, processing/, or STAGING root for drain-budget.json).
+  # The reaper scans those locations, NOT a separate tmp/ subdir.
+  mkdir -p "$STAGING/pending" "$STAGING/processing"
+  touch "$STAGING/pending/orphan.jsonl.tmp.123"
+  touch "$STAGING/processing/orphan.jsonl.tmp.456"
+  touch "$STAGING/drain-budget.json.tmp.789"
+  for f in \
+    "$STAGING/pending/orphan.jsonl.tmp.123" \
+    "$STAGING/processing/orphan.jsonl.tmp.456" \
+    "$STAGING/drain-budget.json.tmp.789"; do
+    touch -t "$(date -d '90 minutes ago' +%Y%m%d%H%M 2>/dev/null \
+      || date -v-90M +%Y%m%d%H%M)" "$f"
+  done
   bash "$SS_HOOK" <<< "$(_stdin_json)" >/dev/null
-  [ ! -f "$STAGING/tmp/orphan.jsonl.tmp.123" ]
+  [ ! -f "$STAGING/pending/orphan.jsonl.tmp.123" ]
+  [ ! -f "$STAGING/processing/orphan.jsonl.tmp.456" ]
+  [ ! -f "$STAGING/drain-budget.json.tmp.789" ]
 }
 
 # --- Output contract ---

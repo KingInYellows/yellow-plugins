@@ -67,9 +67,14 @@ fi
 # Each find runs independently so one failure doesn't suppress the others.
 # Errors are non-fatal — log to stderr only.
 
-# Orphan tmp/*.jsonl > 1h: leftover from crashed atomic writes.
-find "${STAGING_DIR}/tmp" -name '*.jsonl.tmp.*' -mmin +60 -delete 2>/dev/null \
-  || true
+# Orphan *.jsonl.tmp.* > 1h: leftover from crashed atomic writes.
+# cs_atomic_jsonl_write writes sibling tmp files in the DESTINATION dir
+# (not under tmp/), so reap from pending/, processing/, drain-budget.json's dir.
+for reap_dir in "${STAGING_DIR}/pending" "${STAGING_DIR}/processing" "${STAGING_DIR}"; do
+  [ -d "$reap_dir" ] || continue
+  find "$reap_dir" -maxdepth 1 -name '*.tmp.*' -type f -mmin +60 -delete 2>/dev/null \
+    || true
+done
 
 # Stale .drain-lock: dir-style lock. If mtime > 30 min, previous drain
 # crashed without releasing — reap so a fresh drain can fire.
@@ -141,8 +146,10 @@ if [ "$PENDING_COUNT" -ge 5 ] 2>/dev/null; then
 else
   # Check oldest mtime. Linux stat first, BSD/macOS stat second.
   oldest_epoch=""
+  # Use cut -d' ' -f2- to preserve paths containing spaces (awk '{print $2}'
+  # truncates after the first space).
   oldest_file=$(find "${STAGING_DIR}/pending" -maxdepth 1 -name '*.jsonl' -type f \
-    -printf '%T@ %p\n' 2>/dev/null | sort -n | head -1 | awk '{print $2}')
+    -printf '%T@ %p\n' 2>/dev/null | sort -n | head -1 | cut -d' ' -f2-)
   if [ -z "$oldest_file" ]; then
     # BSD find doesn't support -printf. Fall back to stat per-file.
     oldest_epoch=$(find "${STAGING_DIR}/pending" -maxdepth 1 -name '*.jsonl' -type f \
