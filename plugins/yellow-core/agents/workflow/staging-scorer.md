@@ -100,7 +100,9 @@ Field rules:
   the most accurate even if it will be rejected downstream (do not lie
   to bypass the guardian).
 - `facts[]` and `preferences[]` are short atomic statements. Either may
-  be empty; at least one must be non-empty for non-skip output.
+  be empty; at least one must be non-empty for non-skip output — except
+  when `category` is `behavioral_instruction`, where both may be empty
+  (the request itself is the content; fabricating facts would be dishonest).
 - `candidate_text` is the prose that staging-promoter will write to the
   solution doc and MEMORY.md Session Notes index. Maximum 400 chars,
   starts with a verb or noun phrase, ends with a period.
