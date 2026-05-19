@@ -1,0 +1,22 @@
+plugins/yellow-core/.claude-plugin/plugin.json
+  s_63f7909075d5bd::t_059a963a822cdf 28
+  s_63f7909075d5bd::t_904df8f7dea0ce 40
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_63f7909075d5bd::t_27028f71808dbf 221-236,240-254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "5d4f038edadef776ff1a41b8c94b5e89c7ce6bdc",
+  "prompts": {},
+  "sessions": {
+    "s_63f7909075d5bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6fd3039-cb5f-4e1b-b6ff-1f164acf019c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
