@@ -64,8 +64,13 @@ proceed.
 ### Step 2: Comprehensive Audit
 
 Run a single Bash block that reads every signal Steps 3–8 need. Output
-follows a `key: value` vocabulary using only these values:
-`ok | missing | present | corrupt | error | yes | no | n/a | too_large`.
+follows a `key: value` vocabulary. Core values: `ok | missing | present |
+corrupt | error | yes | no | n/a | too_large`. Some keys carry extended
+values: file-existence keys (`settings_json`, `mcp_json`, `gitattributes`,
+`gitignore`) use `exists` or `missing`; the remote-gate detection key
+(`install_pkgs_has_remote_gate`) also uses `present_unclear`; STDIO server
+lists (`mcp_stdio_servers`) are space-separated server names or `none`;
+size/count keys (`claude_md_lines`, `claude_md_bytes`) are integers.
 
 ```bash
 REPO_TOP=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -83,15 +88,24 @@ fi
 
 if [ -f .claude/settings.json ]; then
   printf 'settings_json: exists\n'
-  if [ "$JQ_OK" = yes ] && jq empty .claude/settings.json >/dev/null 2>&1; then
-    printf 'settings_json_valid: yes\n'
-    printf 'settings_has_session_start: %s\n' "$(jq -r 'if (.hooks.SessionStart // [] | length) > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
-    printf 'settings_has_allow: %s\n' "$(jq -r 'if (.permissions.allow // [] | length) > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
-    printf 'settings_has_deny: %s\n' "$(jq -r 'if (.permissions.deny // [] | length) > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
-    printf 'settings_has_env: %s\n' "$(jq -r 'if (.env // {} | length) > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
-    printf 'settings_session_start_has_install_pkgs: %s\n' "$(jq -r '[.hooks.SessionStart // [] | .[].hooks // [] | .[].command] | map(select(. != null and contains("install_pkgs.sh"))) | if length > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
+  if [ "$JQ_OK" = yes ]; then
+    if jq empty .claude/settings.json >/dev/null 2>&1; then
+      printf 'settings_json_valid: yes\n'
+      printf 'settings_has_session_start: %s\n' "$(jq -r 'if (.hooks.SessionStart // [] | length) > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
+      printf 'settings_has_allow: %s\n' "$(jq -r 'if (.permissions.allow // [] | length) > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
+      printf 'settings_has_deny: %s\n' "$(jq -r 'if (.permissions.deny // [] | length) > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
+      printf 'settings_has_env: %s\n' "$(jq -r 'if (.env // {} | length) > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
+      printf 'settings_session_start_has_install_pkgs: %s\n' "$(jq -r '[.hooks.SessionStart // [] | .[].hooks // [] | .[].command] | map(select(. != null and contains("install_pkgs.sh"))) | if length > 0 then "yes" else "no" end' .claude/settings.json 2>/dev/null || printf 'error')"
+    else
+      printf 'settings_json_valid: no\n'
+      printf 'settings_has_session_start: n/a\n'
+      printf 'settings_has_allow: n/a\n'
+      printf 'settings_has_deny: n/a\n'
+      printf 'settings_has_env: n/a\n'
+      printf 'settings_session_start_has_install_pkgs: n/a\n'
+    fi
   else
-    printf 'settings_json_valid: no\n'
+    printf 'settings_json_valid: n/a\n'
     printf 'settings_has_session_start: n/a\n'
     printf 'settings_has_allow: n/a\n'
     printf 'settings_has_deny: n/a\n'
@@ -116,7 +130,8 @@ else
 fi
 if [ -f scripts/install_pkgs.sh ]; then
   printf 'install_pkgs_exists: yes\n'
-  if grep -qE 'CLAUDE_CODE_REMOTE.*!=.*"true".*exit 0|exit 0.*CLAUDE_CODE_REMOTE.*!=.*"true"' scripts/install_pkgs.sh 2>/dev/null; then
+  if grep -qE 'CLAUDE_CODE_REMOTE.*!=' scripts/install_pkgs.sh 2>/dev/null && \
+     grep -q 'exit 0' scripts/install_pkgs.sh 2>/dev/null; then
     printf 'install_pkgs_has_remote_gate: yes\n'
   elif grep -q 'CLAUDE_CODE_REMOTE' scripts/install_pkgs.sh 2>/dev/null; then
     printf 'install_pkgs_has_remote_gate: present_unclear\n'
@@ -185,16 +200,21 @@ fi
 printf '\n=== MCP ===\n'
 if [ -f .mcp.json ]; then
   printf 'mcp_json: exists\n'
-  if [ "$JQ_OK" = yes ] && jq empty .mcp.json >/dev/null 2>&1; then
-    printf 'mcp_json_valid: yes\n'
-    STDIO=$(jq -r '[.mcpServers // {} | to_entries[] | select(.value.type == "stdio") | .key] | join(" ")' .mcp.json 2>/dev/null)
-    if [ -n "$STDIO" ]; then
-      printf 'mcp_stdio_servers: %s\n' "$STDIO"
+  if [ "$JQ_OK" = yes ]; then
+    if jq empty .mcp.json >/dev/null 2>&1; then
+      printf 'mcp_json_valid: yes\n'
+      STDIO=$(jq -r '[.mcpServers // {} | to_entries[] | select(.value.type == "stdio") | .key] | join(" ")' .mcp.json 2>/dev/null)
+      if [ -n "$STDIO" ]; then
+        printf 'mcp_stdio_servers: %s\n' "$STDIO"
+      else
+        printf 'mcp_stdio_servers: none\n'
+      fi
     else
-      printf 'mcp_stdio_servers: none\n'
+      printf 'mcp_json_valid: no\n'
+      printf 'mcp_stdio_servers: n/a\n'
     fi
   else
-    printf 'mcp_json_valid: no\n'
+    printf 'mcp_json_valid: n/a\n'
     printf 'mcp_stdio_servers: n/a\n'
   fi
 else
@@ -298,8 +318,13 @@ for PAT in '.env' '.env.*' '.env.local' '*.pem' '*.key' '.aws/' '.ssh/' 'secrets
 done
 if [ "$NEEDS_HEADER" = yes ]; then
   _ensure_trailing_newline .gitignore
-  grep -qF '# Claude Code Web — sensitive file protection' .gitignore 2>/dev/null || \
-    printf '\n# Claude Code Web — sensitive file protection\n' >> .gitignore
+  if ! grep -qF '# Claude Code Web — sensitive file protection' .gitignore 2>/dev/null; then
+    if [ -s .gitignore ]; then
+      printf '\n# Claude Code Web — sensitive file protection\n' >> .gitignore
+    else
+      printf '# Claude Code Web — sensitive file protection\n' >> .gitignore
+    fi
+  fi
 fi
 for PAT in '.env' '.env.*' '.env.local' '*.pem' '*.key' '.aws/' '.ssh/' 'secrets/' 'credentials/'; do
   _append_if_missing .gitignore "$PAT"
@@ -333,7 +358,7 @@ Show the scaffold template to the user as a code block. Then ask:
 
 ```
 AskUserQuestion:
-  question: "Write `.claude/settings.json` with a SessionStart hook for scripts/install_pkgs.sh, default permissions.allow / .deny entries, and env.NODE_ENV?"
+  question: "Write `.claude/settings.json` with a SessionStart hook for scripts/install_pkgs.sh (guarded by a `-x` test so a missing script does not block session startup), default permissions.allow / .deny entries, and env.NODE_ENV?"
   options: ["Write it", "Skip"]
 ```
 
@@ -348,7 +373,7 @@ Show a diff-style summary of what would be added. Then ask:
 
 ```
 AskUserQuestion:
-  question: "Merge missing keys into existing `.claude/settings.json` (preserve all existing entries; only append)?"
+  question: "Merge missing keys into existing `.claude/settings.json` (preserve all existing entries; only append)? The SessionStart hook is guarded by a `-x` test so a missing scripts/install_pkgs.sh does not block session startup."
   options: ["Merge", "Skip"]
 ```
 
@@ -430,7 +455,7 @@ if not already_wired:
         "matcher": "*",
         "hooks": [{
             "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR:-$PWD}\"/scripts/install_pkgs.sh"
+            "command": "[ -x \"${CLAUDE_PROJECT_DIR:-$PWD}/scripts/install_pkgs.sh\" ] && \"${CLAUDE_PROJECT_DIR:-$PWD}/scripts/install_pkgs.sh\" || true"
         }]
     })
 cfg["hooks"]["SessionStart"] = session_start
@@ -563,6 +588,11 @@ cd "\$PROJECT_DIR" || exit 1
 
 # Detected package manager: ${PKG_NAME}
 ${INSTALL_CMD}
+INSTALL_RC=\$?
+if [ "\$INSTALL_RC" -ne 0 ]; then
+  printf '[install_pkgs] Warning: ${PKG_NAME} install exited %d — cloud session may be missing dependencies\n' \
+    "\$INSTALL_RC" >&2
+fi
 
 exit 0
 __EOF_INSTALL_PKGS__
@@ -692,12 +722,14 @@ HOOK_SCRIPTS=$(jq -r '
 
 printf '%s\n' "$HOOK_SCRIPTS" | while IFS= read -r raw_path; do
   [ -z "$raw_path" ] && continue
-  # Extract a .sh path from the command string. Hook commands typically look
-  # like "${CLAUDE_PROJECT_DIR:-$PWD}"/scripts/foo.sh — grep captures the
-  # path tail after the variable expansion, then sed strips leading `/` or
-  # `./` to produce a repo-relative path.
+  # Extract a .sh path from the command string. Hook commands may take several
+  # forms: "${CLAUDE_PROJECT_DIR:-$PWD}"/scripts/foo.sh (quoted expansion),
+  # ${CLAUDE_PROJECT_DIR:-$PWD}/scripts/foo.sh (unquoted), or $VAR/scripts/foo.sh.
+  # Strip any leading variable-expansion prefix first so the grep only sees
+  # the bare path tail.
   rel=$(printf '%s' "$raw_path" \
-    | grep -oE '[^"$ ]+\.sh' \
+    | sed -E 's|^"?\$\{[^}]+\}"?/||; s|^"?\$[A-Z_][A-Z_0-9]*"?/||' \
+    | grep -oE '\.?/?[^" ]+\.sh' \
     | head -1 \
     | sed -E 's|^/||; s|^\./||')
   [ -z "$rel" ] && continue
