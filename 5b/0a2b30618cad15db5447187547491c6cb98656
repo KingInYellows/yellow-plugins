@@ -1,0 +1,19 @@
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_7a8660e50e836e::t_e2a8c02b324000 229,233-241
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "5b0a2b30618cad15db5447187547491c6cb98656",
+  "prompts": {},
+  "sessions": {
+    "s_7a8660e50e836e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0f430e9c-32ae-4f1b-8391-9cfb191f29b0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
