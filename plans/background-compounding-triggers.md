@@ -753,7 +753,7 @@ None new. Reuses:
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. agent/feat/compound-staging-hooks (PR #542, completed 2026-05-18)
-- [ ] 2. agent/feat/compound-staging-agents
+- [x] 2. agent/feat/compound-staging-agents (PR #543, completed 2026-05-18)
 - [ ] 3. agent/feat/compound-staging-surface
 
 ## References
