@@ -416,7 +416,10 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
   //   disallowedTools: [AskUserQuestion]
   // or flow-style with other entries:
   //   disallowedTools: [Foo, AskUserQuestion, Bar]
-  const listForm = /^disallowedTools:\s*\n(?:\s+-\s+\w+\s*\n)*\s+-\s+AskUserQuestion\b/m;
+  // Tool names may contain hyphens, colons, and double-underscores (e.g.
+  // `mcp__plugin_x__tool`, `Bash-Read`). Allow [\w:-] inside list entries
+  // so preceding tools don't anchor the AskUserQuestion match incorrectly.
+  const listForm = /^disallowedTools:\s*\n(?:\s+-\s+[\w:-]+\s*\n)*\s+-\s+AskUserQuestion\b/m;
   const flowForm = /^disallowedTools:\s*\[[^\]]*\bAskUserQuestion\b[^\]]*\]/m;
 
   if (!listForm.test(frontmatter) && !flowForm.test(frontmatter)) {
@@ -452,14 +455,20 @@ function validateMemoryWriteSectionGate(agentFiles, errors) {
   //  - or be inside a `## References` block.
   // The signal we care about is whether the body documents the gate.
   const hasSessionNotesGate = /Session Notes/.test(body);
+  // All three protected sections must be named in a "Never modify/write/touch"
+  // context. Listing just one is insufficient — the partition invariant
+  // is that the promoter never touches ANY of CORE_RULES, USER_PREFERENCES,
+  // or KNOWN_PROJECTS, so all three must be enumerated.
+  const neverPattern = /[Nn]ever (?:modif|write|touch)/.test(body);
+  const namesCoreRules = /CORE_RULES/.test(body) && neverPattern;
+  const namesUserPrefs = /USER_PREFERENCES/.test(body) && neverPattern;
+  const namesKnownProjects = /KNOWN_PROJECTS/.test(body) && neverPattern;
   const hasNeverModifyInvariant =
-    /[Nn]ever (?:modif|write|touch).*?(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)/.test(
-      body
-    );
+    namesCoreRules && namesUserPrefs && namesKnownProjects;
 
   if (!hasSessionNotesGate || !hasNeverModifyInvariant) {
     errors.push(
-      `${relative(promoter)}: RULE 14b — staging-promoter body must reference \`## Session Notes\` write gate AND state a "Never modify CORE_RULES/USER_PREFERENCES/KNOWN_PROJECTS" invariant (D9-L1 memory-partition enforcement)`
+      `${relative(promoter)}: RULE 14b — staging-promoter body must reference \`## Session Notes\` write gate AND state a "Never modify" invariant that enumerates ALL THREE protected sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS) (D9-L1 memory-partition enforcement)`
     );
   }
 }

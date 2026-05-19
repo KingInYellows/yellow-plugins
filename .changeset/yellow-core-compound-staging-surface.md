@@ -57,8 +57,8 @@ memory entries (`pattern_staging_promoter_disallowed_tools.md`,
 `pattern_compound_drain_in_progress_env_recursion_guard.md`) capture
 the load-bearing patterns for future sessions.
 
-**Validation:** `pnpm validate:schemas && validate:agents && test:unit
-&& lint && typecheck && bats plugins/yellow-core/tests/` all green
+**Validation:** `pnpm validate:schemas && pnpm validate:agents && pnpm test:unit
+&& pnpm lint && pnpm typecheck && bats plugins/yellow-core/tests/` all green
 (83/83 bats including the 44 from stack #1).
 
 **Pipeline now end-to-end functional:**
