@@ -267,7 +267,7 @@ yellow-plugins/
 │   ├── yellow-ci/             # CI toolkit (4 agents, 8 commands, 2 skills, 1 hook)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
-│   ├── yellow-core/           # Dev toolkit (17 agents, 8 commands, 7 skills)
+│   ├── yellow-core/           # Dev toolkit (17 agents, 9 commands, 7 skills)
 │   ├── yellow-council/        # Cross-lineage code council (2 agents, 1 command, 1 skill)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)

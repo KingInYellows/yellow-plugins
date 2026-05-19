@@ -386,7 +386,10 @@ default_allow = [
     "Bash(git diff:*)",
     "Bash(git log:*)",
 ]
-cfg.setdefault("permissions", {})
+# Guard against pre-existing `"permissions": null` — setdefault would
+# leave None in place, then `.get("allow", [])` raises AttributeError.
+if not isinstance(cfg.get("permissions"), dict):
+    cfg["permissions"] = {}
 existing_allow = cfg["permissions"].get("allow", [])
 for entry in default_allow:
     if entry not in existing_allow:
@@ -487,7 +490,7 @@ the CLAUDE_CODE_REMOTE gate. Without it, the script runs on every local
 session too.
 
 Add this at line 2 of your script:
-    if [ "$CLAUDE_CODE_REMOTE" != "true" ]; then exit 0; fi
+    if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then exit 0; fi
 ```
 Do NOT overwrite the existing script. Proceed to Step 7.
 
@@ -547,8 +550,10 @@ cat > "scripts/install_pkgs.sh" <<__EOF_INSTALL_PKGS__
 # Note: -e omitted intentionally — hook must exit 0 on the gate path.
 set -uo pipefail
 
-# Gate: only run full installs in cloud sessions
-if [ "\$CLAUDE_CODE_REMOTE" != "true" ]; then
+# Gate: only run full installs in cloud sessions.
+# Use \${VAR:-} default expansion so set -u does not abort when
+# CLAUDE_CODE_REMOTE is unset (the common local-session case).
+if [ "\${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
