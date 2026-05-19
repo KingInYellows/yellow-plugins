@@ -112,10 +112,11 @@ script itself via a disowned subshell — **the parent script returns
 disown`) does the background work.** This is runtime-level async, not a
 schema-level `async: true` key.
 
-The plan's reference to `async: true` in plugin.json hook registration does
-not correspond to any existing schema field. If the Claude Code hook schema
-does support `async: true`, it has no precedent in this marketplace. The
-established pattern is the disowned-subshell technique.
+No existing plugin in this marketplace uses `async: true`. Per the official
+Claude Code hooks reference, `async: true` IS a supported optional command-hook
+field ("if true, runs in the background without blocking") — it simply has no
+precedent in this marketplace. The established pattern here is the
+disowned-subshell technique, which the plan adopts as its primary mechanism.
 
 ---
 
@@ -358,7 +359,7 @@ frontmatter. No separate body-extraction helper exists — derive it inline.
 | # | Risk | Severity | Finding |
 |---|------|----------|---------|
 | Q1 | Hook scripts cannot invoke LLM agents directly | **BLOCKER** | Zero precedent in codebase. Plan Phase 1.3 ("Haiku agent via Agent tool") is architecturally incoherent. Must specify: `claude -p` CLI subprocess OR curl-to-API OR defer LLM to next SessionStart |
-| Q2 | `async: true` in plugin.json has no precedent | **Gap** | Not a supported schema field in any current plugin. Background async is implemented as disowned-subshell within the hook script. Plan must use the disowned-subshell pattern, not a schema key. |
+| Q2 | `async: true` in plugin.json has no precedent | **Gap** | `async: true` is a supported optional hook field (official docs) but is used by no current plugin — no marketplace precedent. Background async is implemented as disowned-subshell within the hook script. Plan uses the disowned-subshell pattern as its primary mechanism. |
 | Q5 | Task tool cannot be called from a disowned bash subshell | **BLOCKER** | Confirmed by auditing both existing subshell patterns (morph, research). Both do pure shell/HTTP work. Agent dispatch requires main-loop context. Plan Phase 1.4 design is infeasible as described. |
 | Q3 | `disallowedTools` pattern is viable | Confirmed | Well-established in 9 agents across 2 plugins. Must be in frontmatter, not Task invocation parameters. AskUserQuestion is a valid tool name to deny. |
 | Q4 | ruvector MCP unavailability handling | Confirmed | Graceful-degradation pattern (conditional guards, degraded-mode note in output). Staging-reviewer should mirror the same "when ruvector is available" guard structure. |

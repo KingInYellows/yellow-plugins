@@ -1,4 +1,5 @@
 # Repo Audit: Background Compounding Triggers
+
 **Date:** 2026-05-18
 **Branch:** agent/docs/compound-staging-plan
 **Purpose:** Feed the `/workflows:plan` phase for the two-tier background compounding pipeline
@@ -122,7 +123,7 @@ _lc_atomic_write() {
 
 ### Signature
 
-```
+```text
 _lc_atomic_write <destination_path> <content_string>
 ```
 
@@ -261,7 +262,7 @@ This is a **severity-filter bypass** only — it does NOT suppress M3 confirmati
 
 The Task prompt can include a sentinel:
 
-```
+```text
 mode: background
 ```
 
@@ -379,7 +380,8 @@ PROJECT_DIR="$HOME/.claude/projects/$ENCODED"
 ### Confirmed: the user's memory path matches this derivation exactly
 
 The system-reminder shows the user's memory path as:
-```
+
+```text
 /home/kinginyellow/.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/MEMORY.md
 ```
 
@@ -472,7 +474,7 @@ The Stop hook entry must follow this exact shape (from `yellow-ruvector/plugin.j
 
 ### Available bats test files in yellow-ruvector
 
-```
+```text
 plugins/yellow-ruvector/tests/
   stop.bats              — Stop hook tests
   pre-tool-use.bats      — PreToolUse hook tests
@@ -560,7 +562,7 @@ allowed-tools:
 
 ### Step structure
 
-```
+```text
 Step 1: Validate Context     — bash guard, docs/solutions/ existence check
 Step 2: Delegate to Agent    — Task tool → knowledge-compounder, injection fencing on $ARGUMENTS
 Step 3: Persist to Ruvector  — optional ruvector hooks_remember with 0.82 dedup pre-check + retry logic
@@ -612,7 +614,7 @@ Step 4: Report Results
 ### Open question resolutions for the plan
 
 **Q: Worktree anchor for staging dir path**
-Recommendation: use `git rev-parse --show-toplevel` on the main worktree (derivable via `git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel`, or by parsing `git worktree list --porcelain` for the first `worktree ` line). Rationale: staging entries represent project-level learnings, not worktree-specific state. Alternative: accept per-worktree isolation (simpler, matches current behavior for auto-memory). Defer to plan phase. Plan opted for per-worktree isolation per D5 in plans/background-compounding-triggers.md — this recommendation is research-only and was not adopted.
+Recommendation: use `git rev-parse --show-toplevel` on the main worktree (derivable via `git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel`, or by parsing `git worktree list --porcelain` for the first `worktree` line). Rationale: staging entries represent project-level learnings, not worktree-specific state. Alternative: accept per-worktree isolation (simpler, matches current behavior for auto-memory). Defer to plan phase. Plan opted for per-worktree isolation per D5 in plans/background-compounding-triggers.md — this recommendation is research-only and was not adopted.
 
 **Q: knowledge-compounder non-interactive mode**
 Mechanism: add `mode: background` sentinel to the Task prompt. The agent body checks for this string and skips AskUserQuestion gates. This is safe — interactive callers never include `mode: background` in their prompts. The plan must add a short paragraph to the M3 Confirmation section of `knowledge-compounder.md`. **SUPERSEDED BY plan D8:** the plan introduces a separate `staging-promoter` agent with `disallowedTools: [AskUserQuestion]` in frontmatter, leaving `knowledge-compounder.md` untouched. This research-stage recommendation was not adopted.

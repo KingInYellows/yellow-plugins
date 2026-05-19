@@ -125,18 +125,25 @@ checked at the top of both hooks. If set: immediate exit. Prevents:
 (a) drain sessions being captured as new pending entries, (b) drain-fires-
 drain infinite recursion.
 
-**D4 — Disowned-subshell async (not `async: true`).**
-Considered `async: true` for hook registrations, but deepen-validation Q2 and
-reviewer feedback confirmed it is not a supported Claude Code schema field —
-the remote validator rejects it. Non-blocking behavior is provided entirely by
-the disowned subshell pattern: the hook parent forks, disowns, and exits within
-the timeout window; the subshell continues running independently. `async: true`
-is omitted from `plugin.json` hooks. Acceptance Criterion #7
-(`test-plugin-install.sh` accepts `async: true`) is obsolete and removed.
+**D4 — Disowned-subshell async (primary mechanism).**
+`async: true` IS a supported optional Claude Code hook-schema field (official
+hooks reference); an earlier draft of this plan wrongly recorded it as
+unsupported. Non-blocking behavior is still provided by the disowned subshell
+pattern — the proven, marketplace-precedented mechanism (yellow-morph,
+yellow-research): the hook parent forks, disowns, and exits within the timeout
+window while the subshell continues running independently. deepen-validation Q2
+found zero plugins using `async: true`, so the plan keeps the disowned-subshell
+pattern as the sole required mechanism; `async: true` MAY be layered on as
+defense-in-depth (best-practices Q5) but is not required. Acceptance Criterion
+#7 (`test-plugin-install.sh` accepts `async: true`) is dropped — the plan does
+not introduce that flag.
 
 **D5 — Per-worktree staging directory.**
-Confirmed with Brad. `git rev-parse --show-toplevel || pwd` (matches
-`knowledge-compounder` line 44 exactly). Each worktree has its own
+Confirmed with Brad. The slug is derived from the hook's `cwd` field (parsed
+from stdin): `git -C "$cwd" rev-parse --show-toplevel || printf '%s' "$cwd"`.
+`knowledge-compounder` uses the bare `git rev-parse` form, but hooks must pass
+`cwd` explicitly so the slug keys off the project being stopped/started rather
+than the hook runner's own directory. Each worktree has its own
 `compound-staging/` and promotes to its own `docs/solutions/`. Document as
 known limitation in `plugins/yellow-core/CLAUDE.md`.
 
@@ -229,7 +236,7 @@ interactive session.
 ### Trade-offs Considered
 
 - **A vs C:** Option A (`type: agent` hook) is architecturally cleaner but
-  bets on `type: agent` (unproven-in-marketplace) and `async: true` (confirmed unsupported).
+  bets on `type: agent` (unproven-in-marketplace) and `async: true` (supported but unproven-in-marketplace).
   Option C uses only production patterns. Picked C per Brad explicit choice.
 - **PII risk of C:** Raw transcript-tail in `pending/` until drain. Mitigated
   by tail cap, secret redaction, TTL reap.
@@ -250,8 +257,11 @@ interactive session.
 ### Phase 1: Yellow-core hook infrastructure (pure shell, no LLM)
 
 - [ ] **1.1** Add `plugins/yellow-core/lib/compound-staging.sh` with helpers:
-  - `derive_project_slug()` — `git rev-parse --show-toplevel || pwd`,
-    `tr '/' '-'`
+  - `derive_project_slug(cwd)` — resolve the project root from the hook's
+    `cwd` (parsed from stdin): `git -C "$cwd" rev-parse --show-toplevel
+    2>/dev/null || printf '%s' "$cwd"`, then `tr '/' '-'`. Keying off `cwd`
+    (not the hook process's own directory) ensures per-worktree staging
+    targets the project being stopped/started.
   - `staging_dir_for_slug()` — `${HOME}/.claude/projects/${slug}/compound-staging`
   - `atomic_jsonl_write()` — `_lc_atomic_write` pattern: tmp file written to
     `${STAGING_DIR}/tmp/<basename>.tmp` (sibling dir to `pending/`, same
@@ -272,8 +282,12 @@ interactive session.
 - [ ] **1.2** Add `plugins/yellow-core/hooks/scripts/stop.sh`:
   - `set -uo pipefail`; `json_exit()` helper
   - **Top:** `[ "${COMPOUND_DRAIN_IN_PROGRESS:-}" = "1" ] && json_exit`
-  - Parse stdin via `jq -r '@sh "TRANSCRIPT=\(.transcript_path) SESSION_ID=\(.session_id) CWD=\(.cwd)"'`
-  - Source `lib/compound-staging.sh`; derive `PROJECT_SLUG`, `STAGING_DIR`
+  - Parse stdin via `jq -r '@sh "TRANSCRIPT=\(.transcript_path) SESSION_ID=\(.session_id) CWD=\(.cwd) STOP_HOOK_ACTIVE=\(.stop_hook_active)"'`
+  - **Guard:** `[ "$STOP_HOOK_ACTIVE" = "true" ] && json_exit` — don't re-fire
+    within the same stop event (matches the architecture block's
+    `stop_hook_active` fast-exit)
+  - Source `lib/compound-staging.sh`; derive `PROJECT_SLUG` via
+    `derive_project_slug "$CWD"`, then `STAGING_DIR`
   - (no cost gate under subscription; drains are essentially free at Max 20x)
   - Spawn `(_stop_capture_subshell "$TRANSCRIPT" "$SESSION_ID" "$STAGING_DIR") >/dev/null 2>&1 & disown`
   - `printf '{"continue": true}\n'; exit 0`
@@ -324,7 +338,7 @@ interactive session.
     ]}]
   }
   ```
-  Note: `async: true` removed — not a supported Claude Code schema field (confirmed by deepen-validation Q2 + gemini reviewer). Non-blocking behavior comes from the disowned subshell (steps 1.2/1.4), not from a schema key. Short timeouts (5s/3s) cover the synchronous parent fork; the disowned subshell continues running after the parent exits regardless of hook timeout.
+  Note: `async: true` is a supported optional hook field (official Claude Code hooks reference) but is intentionally omitted here — non-blocking behavior comes from the disowned subshell (steps 1.2/1.4), which has marketplace precedent and works regardless of the schema key. It MAY be added as defense-in-depth (see D4). Short timeouts (5s/3s) cover the synchronous parent fork; the disowned subshell continues running after the parent exits regardless of hook timeout.
 - [ ] **1.6** CRLF normalize: `sed -i 's/\r$//' plugins/yellow-core/hooks/scripts/*.sh plugins/yellow-core/lib/compound-staging.sh`
 
 ### Phase 2: staging-reviewer agent (drain orchestrator)
@@ -467,7 +481,7 @@ interactive session.
   - Add `## Known Limitations`:
     - Per-worktree staging
     - PII: raw transcript-tails in `pending/` until drain (7d TTL reap)
-    - Async via disowned-subshell only; `async: true` schema key not used
+    - Async via disowned-subshell (primary); `async: true` schema key supported but not used (see D4)
     - Uninstall does not reap staging dirs
 - [ ] **6.4** Update `plugins/yellow-core/README.md`:
   - Add `staging-reviewer`, `staging-scorer`, `staging-promoter` agents
@@ -586,9 +600,9 @@ None new. Reuses:
    `password|token|secret|api_key|Bearer` patterns shows REDACTED in JSONL
 5. **All bats tests pass** in CI under `plugin-shell-tests`
 6. **`pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck`
-   green** with new plugin.json hooks block (no `async: true` — disowned-subshell only)
-7. ~~**`scripts/test-plugin-install.sh` accepts the new `async: true` flag`**~~ — obsolete;
-   `async: true` removed from schema (see D4). No AC needed.
+   green** with new plugin.json hooks block (disowned-subshell pattern; `async: true` not added — see D4)
+7. ~~**`scripts/test-plugin-install.sh` accepts the new `async: true` flag`**~~ — dropped;
+   the plan does not introduce the `async: true` flag (see D4). No AC needed.
 8. **Concurrent SessionStart from two terminals does NOT double-drain**
    (manual smoke test 8.6)
 9. **`/compound:review-staged` requires AskUserQuestion confirmation**
@@ -658,9 +672,10 @@ None new. Reuses:
 
 ## Risks
 
-- ~~**`async: true` rejected by Claude Code remote validator**~~ — resolved: `async: true`
-  confirmed unsupported (deepen-validation Q2 + gemini reviewer). Omitted from
-  `plugin.json`. Disowned-subshell pattern is the sole non-blocking mechanism. AC #7 removed.
+- ~~**`async: true` rejected by Claude Code remote validator**~~ — not a risk:
+  `async: true` is a supported optional hook field (official hooks reference).
+  The plan still omits it from `plugin.json` — the disowned-subshell pattern is
+  the proven non-blocking mechanism (see D4) — so this risk does not apply. AC #7 dropped.
 - **`claude -p` headless command surface drift** between Claude Code
   versions. Mitigation: pin minimum Claude Code version in plugin.json
   (if schema supports); document in CLAUDE.md.
@@ -716,7 +731,7 @@ None new. Reuses:
 - **Repo audit:** `docs/research/repo/background-compounding-triggers-repo-audit.md`
 - **Best-practices research:** `docs/research/best-practices/background-compounding-triggers-best-practices.md`
 - **Deepen-plan validation:** `docs/research/repo/background-compounding-triggers-deepen-validation.md`
-- **Hook input schema verification:** `code.claude.com/docs/en/hooks` (Stop hook stdin includes `transcript_path`, `session_id`, `cwd`, `last_assistant_message`, `stop_hook_active`); `async: true` is NOT a supported hook schema field — see D4 (lines 126–135). Non-blocking behavior is provided by the disowned-subshell pattern; `async: true` is omitted from `plugin.json` hooks.
+- **Hook input schema verification:** `code.claude.com/docs/en/hooks` (Stop hook stdin includes `transcript_path`, `session_id`, `cwd`, `last_assistant_message`, `stop_hook_active`); `async: true` IS a supported optional command-hook field — see D4. The plan provides non-blocking behavior via the disowned-subshell pattern and omits `async: true` from `plugin.json` hooks (it MAY be added as defense-in-depth).
 - **Architecture revision history:**
   - V1 plan (526 lines): assumed `Agent` tool callable from bash hooks
   - Deepen-plan revealed: bash hooks CANNOT invoke Agent/Task (main-loop primitives); zero precedent in marketplace
