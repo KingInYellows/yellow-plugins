@@ -1,0 +1,30 @@
+plugins/yellow-core/commands/setup/claude-web.md
+  s_4695705a4078de::t_a1fecf49d97bfe 458
+  s_4695705a4078de::t_f664610dece559 203-211,213-214,217
+  s_4695705a4078de::t_a7ae0242beafa1 67-73
+  s_4695705a4078de::t_a310959ef7ffd8 321-327
+  s_4695705a4078de::t_d9d8aa6f29a49b 361
+  s_4695705a4078de::t_aba69a9600ddef 591-595
+  s_4695705a4078de::t_8cd32e13b8fac2 725-729,731-732
+  s_4695705a4078de::t_732a92c1df1484 91-106,108
+  s_4695705a4078de::t_3c9e6a90701e98 133-134
+  s_4695705a4078de::t_a4185b0644be67 376
+README.md
+  s_4695705a4078de::t_153654a8b7f1ea 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "630aae2ba814152b586b0eb4f17466fc9a75f929",
+  "prompts": {},
+  "sessions": {
+    "s_4695705a4078de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ab8e68b-ea5b-4bd0-b5b0-b10f2ba133c5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
