@@ -94,6 +94,12 @@ cs_redact_secrets() {
     -e 's/ghs_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/[REDACTED:github-pat]/g' \
     -e 's/AKIA[0-9A-Z]\{16\}/[REDACTED:aws-access-key]/g' \
+    -e 's/sk-ant-api[A-Za-z0-9_-]\{20,\}/[REDACTED:anthropic-key]/g' \
+    -e 's/sk-[A-Za-z0-9]\{48\}/[REDACTED:openai-key]/g' \
+    -e 's/xox[baprsu]-[A-Za-z0-9-]\{10,\}/[REDACTED:slack-token]/g' \
+    -e 's/sk_live_[A-Za-z0-9]\{24,\}/[REDACTED:stripe-key]/g' \
+    -e 's/rk_live_[A-Za-z0-9]\{24,\}/[REDACTED:stripe-key]/g' \
+    -e 's/hf_[A-Za-z0-9]\{20,\}/[REDACTED:huggingface-token]/g' \
     -e 's/Bearer[[:space:]]\+[A-Za-z0-9._-]\{20,\}/Bearer [REDACTED]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/[REDACTED:jwt]/g' \
     -e 's/dckr_pat_[A-Za-z0-9_-]\{32,\}/[REDACTED:docker-token]/g' \
@@ -101,6 +107,8 @@ cs_redact_secrets() {
     -e 's/\(https\?\):\/\/[^:[:space:]]\+:[^@[:space:]]\+@/\1:\/\/[REDACTED:basic-auth]@/g' \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
+    -e 's/\("\(password\|secret\|token\|api_key\|credential\)"[[:space:]]*:[[:space:]]*"\)[^"]*"/\1[REDACTED]"/gI' \
+    -e "s/\\('\\(password\\|secret\\|token\\|api_key\\|credential\\)'[[:space:]]*:[[:space:]]*'\\)[^']*'/\\1[REDACTED]'/gI" \
     -e 's/\(password\|secret\|token\|api_key\|credential\)[[:space:]]*[=:][[:space:]]*[^[:space:]"'"'"']\{4,\}/\1=[REDACTED]/gI' \
   ) || {
     printf '[yellow-core] compound-staging: redaction pipeline failed; suppressing output\n' >&2

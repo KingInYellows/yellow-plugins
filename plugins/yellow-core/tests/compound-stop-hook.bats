@@ -41,10 +41,14 @@ _hook_stdin() {
     '{transcript_path: $t, session_id: $s, cwd: $c, stop_hook_active: false}'
 }
 
-# Helper: wait up to N seconds for a file to appear.
+# Helper: wait up to N seconds for a file to appear. `timeout` is in seconds.
+# Polls every 100ms; converts seconds to deciseconds for the loop bound so
+# the wait actually lasts the documented N seconds (the prior version
+# counted iterations, waiting 10x less than intended).
 _wait_for_file() {
   local path="$1" timeout="${2:-3}" elapsed=0
-  while [ ! -f "$path" ] && [ "$elapsed" -lt "$timeout" ]; do
+  local max_iters=$((timeout * 10))
+  while [ ! -f "$path" ] && [ "$elapsed" -lt "$max_iters" ]; do
     sleep 0.1
     elapsed=$((elapsed + 1))
   done

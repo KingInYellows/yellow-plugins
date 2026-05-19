@@ -46,10 +46,13 @@ _stdin_json() {
   jq -nc --arg c "$PROJECT_DIR" '{cwd: $c}'
 }
 
-# Wait briefly for the drain subshell to start the stub.
+# Wait briefly for the drain subshell to start the stub. `timeout` is in
+# seconds (matches _wait_for_file). Polls every 100ms; converts to
+# deciseconds for the loop bound so the wait actually lasts N seconds.
 _wait_for_stub() {
   local timeout="${1:-3}" elapsed=0
-  while [ ! -f "$STUB_MARKER" ] && [ "$elapsed" -lt "$timeout" ]; do
+  local max_iters=$((timeout * 10))
+  while [ ! -f "$STUB_MARKER" ] && [ "$elapsed" -lt "$max_iters" ]; do
     sleep 0.1
     elapsed=$((elapsed + 1))
   done

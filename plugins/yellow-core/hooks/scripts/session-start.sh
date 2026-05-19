@@ -45,6 +45,9 @@ if [ -n "$INPUT" ]; then
     || CWD=""
 fi
 if [ -z "$CWD" ]; then
+  if [ -z "${CLAUDE_PROJECT_DIR:-}" ]; then
+    printf '[yellow-core] compound-staging: Warning: CLAUDE_PROJECT_DIR unset; falling back to PWD (%s)\n' "$PWD" >&2
+  fi
   CWD="${CLAUDE_PROJECT_DIR:-$PWD}"
 fi
 
@@ -70,12 +73,28 @@ find "${STAGING_DIR}/tmp" -name '*.jsonl.tmp.*' -mmin +60 -delete 2>/dev/null \
 
 # Stale .drain-lock: dir-style lock. If mtime > 30 min, previous drain
 # crashed without releasing — reap so a fresh drain can fire.
+#
+# Edge case: .drain-lock as a regular file (created by accident or by
+# a non-yellow-core process). mkdir would always fail (EEXIST) and
+# rmdir cannot remove non-directories — without explicit handling we
+# would deadlock drain dispatch permanently. Remove the file first.
+if [ -f "${STAGING_DIR}/.drain-lock" ]; then
+  printf '[yellow-core] compound-staging: removing non-directory .drain-lock (deadlock recovery)\n' >&2
+  rm -f -- "${STAGING_DIR}/.drain-lock" 2>/dev/null \
+    || printf '[yellow-core] compound-staging: non-dir lock rm failed\n' >&2
+fi
 if [ -d "${STAGING_DIR}/.drain-lock" ]; then
-  lock_age_min=999
+  # Default lock_age_min to -1 (skip reap) when stat fails for any reason
+  # other than missing file. Defaulting to 999 (treat as stale) would
+  # blow away a live lock owned by another concurrent drain whenever
+  # stat returned non-zero for a reason other than absence.
+  lock_age_min=-1
   if lock_mtime=$(stat -c '%Y' "${STAGING_DIR}/.drain-lock" 2>/dev/null \
     || stat -f '%m' "${STAGING_DIR}/.drain-lock" 2>/dev/null); then
     now_epoch=$(date +%s)
     lock_age_min=$(( (now_epoch - lock_mtime) / 60 ))
+  else
+    printf '[yellow-core] compound-staging: Warning: stat failed on .drain-lock; skipping stale-lock reap this cycle\n' >&2
   fi
   if [ "$lock_age_min" -gt 30 ] 2>/dev/null; then
     rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null \
@@ -131,7 +150,10 @@ else
   else
     oldest_epoch=$(stat -c '%Y' "$oldest_file" 2>/dev/null) || oldest_epoch=""
   fi
-  if [ -n "$oldest_epoch" ]; then
+  # Guard against epoch-0 (stat failure) or non-numeric output that
+  # would compute a huge fake age and trigger drain on every session
+  # forever. Only dispatch when we have a positive epoch.
+  if [ -n "$oldest_epoch" ] && [ "$oldest_epoch" -gt 0 ] 2>/dev/null; then
     now_epoch=$(date +%s)
     age_hours=$(( (now_epoch - oldest_epoch) / 3600 ))
     if [ "$age_hours" -gt 48 ] 2>/dev/null; then
@@ -151,8 +173,16 @@ if ! mkdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; then
 fi
 
 # --- Resolve claude binary ---
-# Allow tests to override via COMPOUND_DRAIN_CMD env var.
-CLAUDE_BIN="${COMPOUND_DRAIN_CMD:-}"
+# Allow tests to override via COMPOUND_DRAIN_CMD env var, but ONLY
+# inside a bats test process (bats exports BATS_VERSION to every test
+# subprocess). Without this gate, the override would be a
+# production-available drain-hijack vector — anyone who can set the
+# env var before Claude Code starts could redirect the drain to an
+# arbitrary binary running with bypassPermissions.
+CLAUDE_BIN=""
+if [ -n "${COMPOUND_DRAIN_CMD:-}" ] && [ -n "${BATS_VERSION:-}" ]; then
+  CLAUDE_BIN="$COMPOUND_DRAIN_CMD"
+fi
 if [ -z "$CLAUDE_BIN" ]; then
   CLAUDE_BIN=$(command -v claude 2>/dev/null || true)
 fi

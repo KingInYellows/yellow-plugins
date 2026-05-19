@@ -109,6 +109,41 @@ teardown() {
   echo "$result" | grep -q 'REDACTED:github-token'
 }
 
+@test "redact_secrets strips Anthropic API keys (vendor-tagged when bare)" {
+  result=$(printf 'log line containing sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123 inline\n' | cs_redact_secrets)
+  echo "$result" | grep -q 'REDACTED:anthropic-key'
+  ! echo "$result" | grep -q 'sk-ant-api03-abcdefghijkl'
+}
+
+@test "redact_secrets redacts Anthropic API keys via key= form too" {
+  result=$(printf 'API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123\n' | cs_redact_secrets)
+  # Either the vendor-tagged form OR the generic [REDACTED] form is acceptable;
+  # what matters is the secret value is gone.
+  ! echo "$result" | grep -q 'sk-ant-api03-abcdefghijkl'
+  echo "$result" | grep -q '\[REDACTED'
+}
+
+@test "redact_secrets strips Slack tokens (vendor-tagged when bare)" {
+  # Build the prefix at runtime so GitHub secret scanning does not flag
+  # the literal token in the bats source. The runtime concatenation
+  # produces a valid prefix that exercises the redaction regex.
+  prefix=$(printf 'xox%s-' 'b')
+  result=$(printf 'webhook url contains %sTESTTOKENPLACEHOLDER-NOTREALCREDS somewhere\n' "$prefix" | cs_redact_secrets)
+  echo "$result" | grep -q 'REDACTED:slack-token'
+}
+
+@test "redact_secrets strips Stripe live keys" {
+  prefix=$(printf 'sk_%s_' 'live')
+  result=$(printf 'STRIPE=%sTESTPLACEHOLDERvalue1234NOTREAL\n' "$prefix" | cs_redact_secrets)
+  echo "$result" | grep -q 'REDACTED:stripe-key'
+}
+
+@test "redact_secrets strips JSON-formatted secrets (double-quoted)" {
+  result=$(printf '{"api_key": "sk-test-1234567890abcdef"}\n' | cs_redact_secrets)
+  echo "$result" | grep -q '\[REDACTED\]'
+  ! echo "$result" | grep -q 'sk-test-1234567890abcdef'
+}
+
 @test "redact_secrets handles basic-auth URLs" {
   result=$(printf 'https://user:pass@host/x\n' | cs_redact_secrets)
   echo "$result" | grep -q '\[REDACTED:basic-auth\]'
