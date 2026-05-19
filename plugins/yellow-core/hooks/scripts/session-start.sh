@@ -118,15 +118,24 @@ if [ "${expired_count:-0}" -gt 0 ] 2>/dev/null; then
     || true
 fi
 
-# Processing/ entries older than 1h are crashed mid-drain; move them back
-# to pending/ so they get retried. Younger files are in-flight from a
-# concurrent drain — leave them alone.
+# Processing/ entries older than 1h are crashed mid-drain; requeue them for
+# retry unless they also exceed the 7-day PII TTL, in which case purge them
+# to prevent stale PII from re-entering the pipeline. Younger files are
+# in-flight from a concurrent drain — leave them alone.
 if [ -d "${STAGING_DIR}/processing" ]; then
   while IFS= read -r f; do
     [ -z "$f" ] && continue
     base=$(basename -- "$f")
-    mv -- "$f" "${STAGING_DIR}/pending/${base}" 2>/dev/null \
-      || printf '[yellow-core] compound-staging: failed to requeue crashed entry %s\n' "$base" >&2
+    # Age-check: if the crashed entry is also older than 7 days, purge it
+    # instead of requeueing (PII TTL — same policy as pending/).
+    if find "$f" -name '*.jsonl' -mtime +7 -print 2>/dev/null | grep -q .; then
+      printf '[yellow-core] compound-staging: purging expired crashed entry %s (>7d PII TTL)\n' "$base" >&2
+      rm -f -- "$f" 2>/dev/null \
+        || printf '[yellow-core] compound-staging: failed to purge expired crashed entry %s\n' "$base" >&2
+    else
+      mv -- "$f" "${STAGING_DIR}/pending/${base}" 2>/dev/null \
+        || printf '[yellow-core] compound-staging: failed to requeue crashed entry %s\n' "$base" >&2
+    fi
   done < <(find "${STAGING_DIR}/processing" -name '*.jsonl' -mmin +60 -print 2>/dev/null)
 fi
 
@@ -198,17 +207,35 @@ if [ -z "$CLAUDE_BIN" ] || [ ! -x "$CLAUDE_BIN" ]; then
   json_exit "claude binary not found; skipping drain"
 fi
 
+# --- P1 guard: staging-reviewer agent must exist before dispatch ---
+# The agent lands in stack item #2. If it is absent, leave entries in
+# pending/ so they are drained once the agent is deployed; never silently
+# discard them.
+STAGING_REVIEWER_PATH="${SCRIPT_DIR}/../../agents/workflow/staging-reviewer.md"
+# Test-only override, gated on BATS_VERSION like COMPOUND_DRAIN_CMD above,
+# so the bats suite can point the guard at a stub agent file.
+if [ -n "${COMPOUND_STAGING_REVIEWER_AGENT:-}" ] && [ -n "${BATS_VERSION:-}" ]; then
+  STAGING_REVIEWER_PATH="$COMPOUND_STAGING_REVIEWER_AGENT"
+fi
+if [ ! -f "$STAGING_REVIEWER_PATH" ]; then
+  rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
+  json_exit "staging-reviewer agent not yet deployed (stack item #2); deferring drain"
+fi
+
 # --- Build drain prompt ---
-# Heredoc with single-quoted delimiter so $STAGING_DIR etc. are NOT
-# interpreted here — values are substituted via the inline expansion in
-# the printf format.
+# P2: STAGING_DIR and CWD are untrusted filesystem paths (a malicious
+# repo name could contain newlines or prompt-like text). Fence them with
+# begin/end delimiters so the model treats them as reference data only,
+# not as additional instructions.
 DRAIN_PROMPT=$(printf '%s\n' \
   'Invoke the staging-reviewer agent (yellow-core:workflow:staging-reviewer) via Task.' \
   '' \
   'Goal: drain the compound-staging ledger and promote eligible entries.' \
   '' \
+  '--- begin paths (reference only) ---' \
   "Staging dir: ${STAGING_DIR}" \
   "Project: ${CWD}" \
+  '--- end paths ---' \
   '' \
   'Do NOT ask the user any questions. This drain is non-interactive.' \
   'On completion, write a one-line summary to stdout and exit.')
@@ -235,7 +262,8 @@ DRAIN_TIMEOUT_BIN=$(command -v timeout 2>/dev/null || true)
 DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
 
 (
-  trap 'rmdir "'"${STAGING_DIR}"'/.drain-lock" 2>/dev/null || true' EXIT INT TERM
+  DRAIN_LOCK_PATH="${STAGING_DIR}/.drain-lock"
+  trap 'rmdir "$DRAIN_LOCK_PATH" 2>/dev/null || true' EXIT INT TERM
   export COMPOUND_DRAIN_IN_PROGRESS=1
   printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s)\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" >> "$DRAIN_LOG" 2>/dev/null

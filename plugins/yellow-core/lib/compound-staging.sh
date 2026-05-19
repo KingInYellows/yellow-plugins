@@ -60,7 +60,10 @@ cs_staging_dir_for_slug() {
 # Atomic write: write to a sibling tmp file in the same dir, then rename.
 # rename(2) is atomic when source and target are on the same filesystem,
 # which is guaranteed because the tmp file lives in the same directory as
-# the target. Pattern matches _lc_atomic_write
+# the target (not under tmp/). The SessionStart reaper covers these sibling
+# directories (pending/, processing/, and the staging root) with a
+# -name '*.tmp.*' glob so orphan temp files are reaped on next session start.
+# Pattern matches _lc_atomic_write
 # (plugins/yellow-research/hooks/lib/context7-cache.sh:166-172).
 #
 # Args:
@@ -83,17 +86,16 @@ cs_atomic_jsonl_write() {
 # Self-contained subset of yellow-ci's lib/redact.sh — the patterns Brad
 # called out in the plan (D12): password=, token=, api_key=, secret=,
 # Bearer, basic auth, plus the high-value vendor token prefixes and
-# PEM key blocks. Streaming via sed (constant memory).
+# PEM key blocks. Streams sed directly to stdout (constant memory).
 #
 # Future consolidation: when yellow-ci's redact.sh is relocated to a
 # shared yellow-core/lib/redact.sh, this wrapper can `. ` that file.
 cs_redact_secrets() {
-  local output
   # Use sed -E (ERE) for portable alternation `(a|b|c)` across GNU + BSD sed.
   # POSIX BRE `\|` is a GNU extension; BSD/macOS sed silently misses it.
   # Case-insensitive matching is achieved by enumerating both cases
   # explicitly in the keyword groups — the GNU `I` flag is non-portable.
-  output=$(sed -E \
+  sed -E \
     -e 's/ghp_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]{36,255}/[REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]{22,255}/[REDACTED:github-pat]/g' \
@@ -117,12 +119,11 @@ cs_redact_secrets() {
     -e 's/("(password|secret|token|api_key|credential|Password|Secret|Token|API_KEY|Credential|PASSWORD|SECRET|TOKEN|CREDENTIAL)"[[:space:]]*:[[:space:]]*")[^"]*"/\1[REDACTED]"/g' \
     -e "s/('(password|secret|token|api_key|credential|Password|Secret|Token|API_KEY|Credential|PASSWORD|SECRET|TOKEN|CREDENTIAL)'[[:space:]]*:[[:space:]]*')[^']*'/\\1[REDACTED]'/g" \
     -e 's/(password|secret|token|api_key|credential|Password|Secret|Token|API_KEY|Credential|PASSWORD|SECRET|TOKEN|CREDENTIAL)[[:space:]]*[=:][[:space:]]*[^[:space:]"'"'"']{4,}/\1=[REDACTED]/g' \
-  ) || {
+  || {
     printf '[yellow-core] compound-staging: redaction pipeline failed; suppressing output\n' >&2
     printf '[REDACTED: sanitization failed]\n'
     return 1
   }
-  printf '%s\n' "$output"
 }
 
 # Read the drain-budget JSON file. Emits a single-line JSON object on stdout.
@@ -214,6 +215,19 @@ cs_drain_budget_warn() {
   auth_route=$(printf '%s' "$current" | jq -r '.auth_route // "unknown"' 2>/dev/null)
   if [ "$auth_route" != "api" ]; then
     return 1
+  fi
+  local window_start
+  window_start=$(printf '%s' "$current" | jq -r '.window_start_iso // ""' 2>/dev/null)
+  if [ -n "$window_start" ]; then
+    local now_epoch window_epoch
+    now_epoch=$(date -u +%s 2>/dev/null) || now_epoch=0
+    window_epoch=$(date -u -d "$window_start" +%s 2>/dev/null \
+      || date -ujf '%Y-%m-%dT%H:%M:%SZ' "$window_start" +%s 2>/dev/null \
+      || echo 0)
+    # Window has rolled — persisted counter belongs to a past window; treat as fresh.
+    if [ "$window_epoch" -gt 0 ] && [ $((now_epoch - window_epoch)) -ge 18000 ]; then
+      return 1
+    fi
   fi
   local drains
   drains=$(printf '%s' "$current" | jq -r '.drains_in_window // 0' 2>/dev/null)

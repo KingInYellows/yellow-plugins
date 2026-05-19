@@ -59,8 +59,9 @@ staging-scorer + staging-promoter agents the drain dispatches; item #3
 adds the `/compound:review-staged` manual override, MEMORY.md partition,
 RULE 14 lint, and docs.
 
-**Behavior on install:** without items #2-3, drains will dispatch on
-schedule but the drain `claude -p` session has no `staging-reviewer`
-agent to invoke. The drain will log a failure to `drain-logs/` and exit;
-pending entries accumulate (capped by 7-day TTL reap) until item #2 lands.
-This is the intentional shape of an additive stack.
+**Behavior on install:** without item #2, the SessionStart drain dispatcher
+checks for the staging-reviewer agent before spawning `claude -p` and
+short-circuits when it is absent. No drain session is started; no cost is
+incurred. Pending entries accumulate in `compound-staging/pending/` and are
+reaped under the 7-day PII TTL. The pipeline is operationally inert until
+item #2 lands — this is the intentional shape of an additive stack.

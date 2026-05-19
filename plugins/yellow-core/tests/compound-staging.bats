@@ -196,10 +196,23 @@ teardown() {
 }
 
 @test "drain_budget_warn returns true under api route when over threshold" {
-  printf '{"window_start_iso":"2026-05-18T00:00:00Z","drains_in_window":20,"last_drain_iso":"2026-05-18T00:00:00Z","auth_route":"api"}\n' \
-    > "$STAGING_TEST_ROOT/drain-budget.json"
+  # Window must be current — an expired window resets the budget (next test).
+  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  printf '{"window_start_iso":"%s","drains_in_window":20,"last_drain_iso":"%s","auth_route":"api"}\n' \
+    "$now" "$now" > "$STAGING_TEST_ROOT/drain-budget.json"
   run cs_drain_budget_warn "$STAGING_TEST_ROOT"
   [ "$status" -eq 0 ]
+}
+
+@test "drain_budget_warn returns false under api route when window has expired" {
+  # Over threshold, but the 5h rolling window already rolled — the persisted
+  # counter belongs to a past window, so no warning should fire.
+  old=$(date -u -d '6 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -v-6H +%Y-%m-%dT%H:%M:%SZ)
+  printf '{"window_start_iso":"%s","drains_in_window":20,"last_drain_iso":"%s","auth_route":"api"}\n' \
+    "$old" "$old" > "$STAGING_TEST_ROOT/drain-budget.json"
+  run cs_drain_budget_warn "$STAGING_TEST_ROOT"
+  [ "$status" -ne 0 ]
 }
 
 # --- cs_detect_auth_route ---

@@ -41,9 +41,13 @@ if [ -z "$INPUT" ]; then
   json_exit
 fi
 
+TRANSCRIPT=""
+SESSION_ID=""
+CWD=""
+STOP_HOOK_ACTIVE="false"
 # shellcheck disable=SC2154
 eval "$(printf '%s' "$INPUT" | jq -r '@sh "TRANSCRIPT=\(.transcript_path // "") SESSION_ID=\(.session_id // "") CWD=\(.cwd // "") STOP_HOOK_ACTIVE=\(.stop_hook_active // false)"' 2>/dev/null)" \
-  || json_exit "failed to parse hook input"
+  || { TRANSCRIPT=""; SESSION_ID=""; CWD=""; STOP_HOOK_ACTIVE="false"; }
 
 # Per Anthropic hook docs: stop_hook_active=true means the hook is firing
 # in re-entrant context (Claude was woken up by another Stop hook). Don't

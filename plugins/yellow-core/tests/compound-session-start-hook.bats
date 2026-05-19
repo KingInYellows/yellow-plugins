@@ -27,6 +27,13 @@ STUB
 
   export COMPOUND_DRAIN_CMD="$STUB_BIN"
 
+  # Stub staging-reviewer agent so the dispatch guard passes — the real
+  # agent lands in stack item #2. The guard honors this override only
+  # under bats (BATS_VERSION set).
+  STAGING_REVIEWER_STUB="$STUB_DIR/staging-reviewer.md"
+  printf '%s\n' '---' 'name: staging-reviewer' '---' 'stub' > "$STAGING_REVIEWER_STUB"
+  export COMPOUND_STAGING_REVIEWER_AGENT="$STAGING_REVIEWER_STUB"
+
   # Resolve the staging dir the hook will use.
   . "$BATS_TEST_DIRNAME/../lib/compound-staging.sh"
   PROJECT_SLUG=$(cs_derive_project_slug "$PROJECT_DIR")
@@ -40,6 +47,7 @@ teardown() {
     fi
   done
   unset COMPOUND_DRAIN_CMD
+  unset COMPOUND_STAGING_REVIEWER_AGENT
 }
 
 _stdin_json() {
@@ -118,6 +126,21 @@ _plant_pending() {
   sleep 0.5
   # No dispatch because count<5 and entries are fresh (mtime ~now).
   [ ! -f "$STUB_MARKER" ]
+}
+
+# --- P1 guard: staging-reviewer agent absent ---
+
+@test "session-start defers drain when staging-reviewer agent is absent" {
+  _plant_pending 5
+  export COMPOUND_STAGING_REVIEWER_AGENT="$STUB_DIR/no-such-agent.md"
+  run bash "$SS_HOOK" <<< "$(_stdin_json)"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q '"continue": true'
+  sleep 0.5
+  # Guard short-circuits before dispatch; the stub claude is never invoked.
+  [ ! -f "$STUB_MARKER" ]
+  # Entries remain in pending/ for a future drain once the agent ships.
+  [ -f "$STAGING/pending/s1.jsonl" ]
 }
 
 # --- Threshold: age ---

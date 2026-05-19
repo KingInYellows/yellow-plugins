@@ -125,12 +125,23 @@ _wait_for_file() {
 
 @test "stop hook returns within 500ms (parent only)" {
   STAGING=$(_expected_staging_dir)
-  start=$(date +%s%N)
-  bash "$STOP_HOOK" <<< "$(_hook_stdin)" >/dev/null
-  end=$(date +%s%N)
-  elapsed_ms=$(( (end - start) / 1000000 ))
-  # Parent should be very fast; subshell does the I/O asynchronously.
-  [ "$elapsed_ms" -lt 500 ]
+  # date +%s%N is GNU-only; %N outputs a literal 'N' on BSD/macOS.
+  # Use Python 3 for millisecond precision when available; fall back to whole
+  # seconds with a coarser 5-second bound so the test stays meaningful on
+  # both platforms.
+  if command -v python3 >/dev/null 2>&1; then
+    start=$(python3 -c 'import time; print(int(time.monotonic() * 1000))')
+    bash "$STOP_HOOK" <<< "$(_hook_stdin)" >/dev/null
+    end=$(python3 -c 'import time; print(int(time.monotonic() * 1000))')
+    elapsed_ms=$(( end - start ))
+    [ "$elapsed_ms" -lt 500 ]
+  else
+    start=$(date +%s)
+    bash "$STOP_HOOK" <<< "$(_hook_stdin)" >/dev/null
+    end=$(date +%s)
+    elapsed_s=$(( end - start ))
+    [ "$elapsed_s" -lt 5 ]
+  fi
 }
 
 # --- Capture subshell standalone ---
