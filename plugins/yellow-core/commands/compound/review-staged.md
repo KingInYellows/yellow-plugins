@@ -69,7 +69,10 @@ Use this when:
      title=$(jq -r '.transcript_tail | .[0:80] | gsub("\\n"; " ")' "$f" 2>/dev/null \
        || printf '(parse error)')
      SAMPLES="${SAMPLES}- $(basename -- "$f"): ${title}"$'\n'
-   done < <(ls -t "$STAGING_DIR/pending"/*.jsonl 2>/dev/null | head -5)
+   # `ls -tr` = time-sorted, reversed → oldest first. Matches the step
+   # description ("five oldest pending entries") and surfaces the entries
+   # the user has been carrying the longest in the confirmation preview.
+   done < <(ls -tr "$STAGING_DIR/pending"/*.jsonl 2>/dev/null | head -5)
    printf '%s\n' "$SAMPLES"
    ```
 
