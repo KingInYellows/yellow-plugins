@@ -26,6 +26,7 @@ TypeScript, Python, Rust, and Go.
 | `/workflows:compound`   | Document a recently solved problem to compound knowledge           |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
 | `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |
+| `/setup:claude-web`     | Audit a repository and scaffold files Claude Code Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`, `.gitattributes`, `.gitignore`, `.github/workflows/claude.yml`) |
 
 ## Agents
 
