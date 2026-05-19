@@ -750,6 +750,12 @@ None new. Reuses:
 
 > **Phase 8 (Manual smoke tests)** runs post-merge on real Claude Code install; not a separate PR. Tasks 8.1-8.7 are the closure verification checklist.
 
+## Stack Progress
+<!-- Updated by workflows:work. Do not edit manually. -->
+- [x] 1. agent/feat/compound-staging-hooks (PR #542, completed 2026-05-18)
+- [ ] 2. agent/feat/compound-staging-agents
+- [ ] 3. agent/feat/compound-staging-surface
+
 ## References
 
 - `plugins/yellow-morph/hooks/scripts/prewarm-morph.sh` (lines 79-93) — disown subshell pattern
