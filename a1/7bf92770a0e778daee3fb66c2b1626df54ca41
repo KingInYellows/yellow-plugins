@@ -1,0 +1,23 @@
+README.md
+  s_4695705a4078de::t_89f3bf34076f1f 270
+plugins/yellow-core/commands/setup/claude-web.md
+  s_4695705a4078de::t_f98f9bd9d86007 553-556
+  s_4695705a4078de::t_243a838934547b 493
+  s_4695705a4078de::t_19ec83fcdbde79 389-392
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "a17bf92770a0e778daee3fb66c2b1626df54ca41",
+  "prompts": {},
+  "sessions": {
+    "s_4695705a4078de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7ab8e68b-ea5b-4bd0-b5b0-b10f2ba133c5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
