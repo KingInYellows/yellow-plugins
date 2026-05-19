@@ -54,7 +54,7 @@ This means:
 |---|---|
 | Run codex reviewer interactively | Works reliably; not automatable |
 | Pre-authenticate in same TTY before sweep | Not helpful — keyring still not accessible in subprocess |
-| Use an API key instead of OAuth | Would fix the issue if codex CLI supports `OPENAI_API_KEY` env var; not yet confirmed |
+| Use an API key instead of OAuth | Sidesteps the keyring entirely — codex CLI accepts `OPENAI_API_KEY` as a first-class auth method (see `plugins/yellow-codex/README.md:18`, `plugins/yellow-codex/CLAUDE.md:21`, `plugins/yellow-codex/skills/codex-patterns/SKILL.md:294`). **Not the desired fix for subscription OAuth workflows** — it bypasses the OAuth credential the user wants to use. Treat as a fallback only when OAuth subscription auth is not in play. |
 
 ## Prevention
 
