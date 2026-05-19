@@ -218,16 +218,40 @@ mkdir -p -- "${STAGING_DIR}/drain-logs" 2>/dev/null || true
 DRAIN_LOG="${STAGING_DIR}/drain-logs/$(date +%Y%m%d-%H%M%S).log"
 AUTH_ROUTE=$(cs_detect_auth_route)
 
+# Budget gate: skip dispatch when drain-budget.json indicates over-threshold on
+# API billing. Returns 0 (success) when over the COMPOUND_DRAIN_API_THRESHOLD
+# (default 8 drains in rolling window); returns 1 when under or on subscription
+# auth (no cost gate). Release the lock + json_exit on the over-threshold path.
+if cs_drain_budget_warn "$STAGING_DIR"; then
+  rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
+  json_exit "drain budget over threshold; skipping dispatch"
+fi
+
+# Wall-clock cap on the drain subshell. Without this, a hung `claude -p`
+# (model loop, network stall) holds .drain-lock until the 30-min stale-lock
+# reaper fires on a future SessionStart, suppressing all drains in between.
+# `timeout` is GNU coreutils; gracefully fall through if unavailable.
+DRAIN_TIMEOUT_BIN=$(command -v timeout 2>/dev/null || true)
+DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
+
 (
   trap 'rmdir "'"${STAGING_DIR}"'/.drain-lock" 2>/dev/null || true' EXIT INT TERM
   export COMPOUND_DRAIN_IN_PROGRESS=1
-  printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s)\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" >> "$DRAIN_LOG" 2>/dev/null
-  "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
-    --max-turns 50 \
-    --permission-mode bypassPermissions \
-    --output-format json \
-    >> "$DRAIN_LOG" 2>&1
+  printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s)\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" >> "$DRAIN_LOG" 2>/dev/null
+  if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
+    "$DRAIN_TIMEOUT_BIN" "$DRAIN_TIMEOUT_S" "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+      --max-turns 50 \
+      --permission-mode bypassPermissions \
+      --output-format json \
+      >> "$DRAIN_LOG" 2>&1
+  else
+    "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+      --max-turns 50 \
+      --permission-mode bypassPermissions \
+      --output-format json \
+      >> "$DRAIN_LOG" 2>&1
+  fi
   cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
 ) >/dev/null 2>&1 &
 disown
