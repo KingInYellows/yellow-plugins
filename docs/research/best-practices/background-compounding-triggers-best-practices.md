@@ -226,15 +226,19 @@ across all six questions.
 
 ### RECOMMENDED
 
-**3. Scope staging files to git-root hash, not worktree path.**
+**3. Scope staging files to a per-worktree project slug (plan D5).**
 
 - Source: brainstorm open question #2 deferred to plan phase. Research finding from yellow-
   ruvector CLAUDE.md: `.ruvector/` is shared across git worktrees via symlink because the
-  DB must survive worktree cleanup. Same logic applies to the staging ledger.
-- Recommendation: Derive `<hash>` from `md5(git rev-parse --show-toplevel)` — the git root,
-  not the current worktree path. This matches the auto-memory system convention and ensures
-  stager and reviewer always resolve to the same directory regardless of which worktree is
-  active.
+  DB must survive worktree cleanup.
+- Command nuance: `git rev-parse --show-toplevel` resolves to the *current worktree* root,
+  so it yields a distinct slug per worktree — correct for per-worktree staging, but it does
+  NOT produce a value stable across worktrees. A worktree-stable (shared) hash would require
+  `git rev-parse --git-common-dir` (the shared `.git` directory) instead.
+- Decision: the plan adopts per-worktree staging, keying the slug off `--show-toplevel` (see
+  plan D5, confirmed with Brad) — it matches the `knowledge-compounder` convention and keeps
+  each worktree's staged learnings isolated. Cross-worktree sharing is deferred; switch the
+  derivation to `--git-common-dir` only if it is later desired.
 
 ---
 
