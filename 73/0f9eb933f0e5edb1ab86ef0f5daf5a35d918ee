@@ -1,0 +1,19 @@
+docs/solutions/integration-issues/codex-cli-401-non-tty-task-spawn-degradation.md
+  s_63f7909075d5bd::t_0f42e207ac035c 57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "730f9eb933f0e5edb1ab86ef0f5daf5a35d918ee",
+  "prompts": {},
+  "sessions": {
+    "s_63f7909075d5bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6fd3039-cb5f-4e1b-b6ff-1f164acf019c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
