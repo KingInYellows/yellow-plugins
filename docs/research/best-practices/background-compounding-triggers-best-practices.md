@@ -304,11 +304,11 @@ across all six questions.
 
 ### MUST HAVE
 
-**1. Use `async: true` on the Stop hook registration — not a background subshell within a synchronous hook.**
+**1. Register the Stop hook with `async: true`, AND have the hook script spawn a disowned background subshell for the long-running work — use both, not one instead of the other.**
 
 - Source: Claude Code hooks reference (official docs, WebFetch confirmed). Key finding:
   async hooks are an official feature: `"async": true` in the hook JSON entry makes the hook
-  non-blocking without any subshell gymnastics. The default timeout for Stop hooks is 600
+  non-blocking at the framework level. The default timeout for Stop hooks is 600
   seconds; async hooks still respect this timeout but do not block Claude's session transition.
 - Critical nuance: `async: true` still kills the hook after the configured timeout. A hook
   that spawns a long-running background process and exits immediately is safe because the
