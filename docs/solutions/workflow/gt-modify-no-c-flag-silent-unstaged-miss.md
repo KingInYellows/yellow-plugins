@@ -13,7 +13,7 @@ components: [workflow, graphite]
 Running `gt modify -m "fix: ..."` after applying a file edit (e.g., via the Edit
 tool) produces output like:
 
-```
+```text
 1 file changed, 3 insertions(+), 2 deletions(-)
 ```
 
@@ -40,28 +40,34 @@ success when the edit was missed entirely.
 
 ## Solution
 
-Two correct patterns:
+Three correct patterns:
 
 **Option A — stage first, then amend:**
+
 ```bash
 git add <file>
 gt modify -m "fix: descriptive message"
 ```
+
 Use when you want to fold the change into the previous commit.
 
 **Option B — create a new commit:**
+
 ```bash
 git add <file>
 gt modify -c -m "fix: descriptive message"
 ```
+
 The `-c` flag creates a new commit rather than amending. Preferred when the
 prior commit is already meaningful on its own.
 
 **Option C — use git commit directly:**
+
 ```bash
 git add <file>
 git commit -m "fix: descriptive message"
 ```
+
 Valid fallback; Graphite tracks the commit either way.
 
 ## Why This Works
@@ -78,7 +84,7 @@ Before any `gt modify` or `gt commit` call, verify staged state:
 git status --short
 ```
 
-If the file you edited appears as `M ` (unstaged) rather than `M ` (staged),
+If the file you edited appears as ` M` (unstaged) rather than `M ` (staged),
 run `git add <file>` first.
 
 In automated agent workflows: always `git add <specific-file>` immediately after

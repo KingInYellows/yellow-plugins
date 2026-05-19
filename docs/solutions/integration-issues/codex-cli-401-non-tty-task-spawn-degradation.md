@@ -20,7 +20,7 @@ is not accessible from that context, and `codex` exits with HTTP 401.
 
 ## Observed failure
 
-```
+```text
 Error: Request failed with status code 401
     at ... codex/src/utils/openai-client.ts
 ```

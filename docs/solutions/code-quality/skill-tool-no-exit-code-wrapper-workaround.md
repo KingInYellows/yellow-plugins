@@ -3,7 +3,7 @@ title: 'Skill tool returns no exit code — wrapper command workaround'
 date: 2026-05-18
 category: code-quality
 track: knowledge
-problem: Claude Code Skill tool provides no machine-readable success/failure signal; wrapper commands cannot detect inner-skill failures
+problem: Skill tool provides no machine-readable success/failure signal; wrappers cannot detect failures
 tags: [skill-tool, exit-code, wrapper-command, sweep, platform-constraint]
 components: [yellow-review]
 ---
@@ -37,14 +37,16 @@ add a `Notes` column populated with any stderr-style error lines surfaced in the
 skill's output. This makes the limitation explicit in the UX rather than hiding it.
 
 Before:
-```
+
+```markdown
 | PR    | Status  |
 |-------|---------|
 | #539  | swept   |
 ```
 
 After:
-```
+
+```markdown
 | PR    | Status    | Notes                          |
 |-------|-----------|--------------------------------|
 | #539  | attempted | codex reviewer degraded (401)  |
@@ -61,6 +63,7 @@ Skill responses.
 ## When to Apply
 
 Whenever writing a command that:
+
 - Calls `Skill(...)` in a loop over N items
 - Needs to report aggregate success/failure to the user
 - Uses labels that imply completion (e.g., "reviewed", "swept", "processed")
