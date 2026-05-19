@@ -24,6 +24,7 @@ TypeScript, Python, Rust, and Go.
 | `/workflows:work`       | Execute work plans systematically                                  |
 | `/workflows:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |
 | `/workflows:compound`   | Document a recently solved problem to compound knowledge           |
+| `/compound:review-staged` | Manually drain the background-compounding staging ledger (M3-gated) |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
 | `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |
 | `/setup:claude-web`     | Audit a repository and scaffold files Claude Code Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`, `.gitattributes`, `.gitignore`, `.github/workflows/claude.yml`) |
@@ -54,7 +55,7 @@ TypeScript, Python, Rust, and Go.
 | `git-history-analyzer`      | Git archaeology, change history                                                              |
 | `learnings-researcher`      | Searches `docs/solutions/` for past learnings relevant to a PR diff or planning context      |
 
-### Workflow (4)
+### Workflow (7)
 
 | Agent                    | Description                                                    |
 | ------------------------ | -------------------------------------------------------------- |
@@ -62,6 +63,9 @@ TypeScript, Python, Rust, and Go.
 | `brainstorm-orchestrator` | Iterative brainstorm dialogue with research integration       |
 | `knowledge-compounder`   | Extract and document solved problems to compound knowledge     |
 | `session-historian`      | Cross-vendor session search across Claude Code (local JSONL), Devin (REST API via MCP), and Codex (local directory-per-session); BM25 + optional ruvector cosine + recency fused via Reciprocal Rank Fusion; secret redaction (AWS keys, GitHub tokens, API keys, JWTs, PEM blocks) before excerpts are returned |
+| `staging-reviewer`       | Drain orchestrator for the background-compounding pipeline; spawned by the SessionStart hook's `claude -p` drain subshell |
+| `staging-scorer`         | Haiku-backed rubric scorer for one transcript excerpt; structured JSON output with hardened prompt covering injection-attempt detection |
+| `staging-promoter`       | Non-interactive writer that creates `docs/solutions/<category>/<slug>.md` and appends to MEMORY.md `## Session Notes` only (frontmatter `disallowedTools: [AskUserQuestion]` is load-bearing, enforced by RULE 14 in `scripts/validate-agent-authoring.js`) |
 
 ## Skills
 

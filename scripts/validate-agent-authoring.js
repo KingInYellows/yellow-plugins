@@ -386,6 +386,84 @@ function validateSubagentReferences(markdownFiles, ctx) {
   }
 }
 
+// RULE 14 — staging-promoter frontmatter MUST contain
+// `disallowedTools: [AskUserQuestion]` (in YAML list form, with or without
+// flow-style brackets). This is the load-bearing structural enforcement
+// of D8 in plans/background-compounding-triggers.md: the
+// staging-promoter is dispatched from a background `claude -p` drain
+// session where AskUserQuestion would block indefinitely (no human
+// in the loop). If a future edit removes the deny, the drain breaks
+// silently. RULE 14 turns that into a CI failure.
+function validateStagingPromoterFrontmatter(agentFiles, errors) {
+  const promoter = agentFiles.find(
+    (f) =>
+      f.endsWith(
+        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
+      )
+  );
+  if (!promoter) {
+    // staging-promoter is not yet present (e.g., stack item #2 not merged).
+    // Don't fail; the agent itself is what's checked, not its absence.
+    return;
+  }
+  const content = fs.readFileSync(promoter, 'utf8');
+  const frontmatter = extractFrontmatter(content) || '';
+
+  // Match either YAML list form:
+  //   disallowedTools:
+  //     - AskUserQuestion
+  // or flow-style:
+  //   disallowedTools: [AskUserQuestion]
+  // or flow-style with other entries:
+  //   disallowedTools: [Foo, AskUserQuestion, Bar]
+  const listForm = /^disallowedTools:\s*\n(?:\s+-\s+\w+\s*\n)*\s+-\s+AskUserQuestion\b/m;
+  const flowForm = /^disallowedTools:\s*\[[^\]]*\bAskUserQuestion\b[^\]]*\]/m;
+
+  if (!listForm.test(frontmatter) && !flowForm.test(frontmatter)) {
+    errors.push(
+      `${relative(promoter)}: RULE 14 — staging-promoter frontmatter MUST contain \`disallowedTools: [AskUserQuestion]\` (this is the load-bearing D8 enforcement for the background-compounding drain pipeline)`
+    );
+  }
+}
+
+// RULE 14b — V1 prose-only: scan staging-promoter body for any Write/Edit
+// invocation that targets MEMORY.md but is not gated to the `## Session
+// Notes` section. Full AST lint deferred to V2. V1 catches the most
+// common drift: someone editing the agent to also append to other
+// MEMORY.md sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS).
+function validateMemoryWriteSectionGate(agentFiles, errors) {
+  const promoter = agentFiles.find(
+    (f) =>
+      f.endsWith(
+        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
+      )
+  );
+  if (!promoter) {
+    return;
+  }
+  const content = fs.readFileSync(promoter, 'utf8');
+  // Strip frontmatter so we don't false-positive on metadata.
+  const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '');
+
+  // Heuristic: every line mentioning MEMORY.md must either:
+  //  - reference `## Session Notes`,
+  //  - explicitly forbid writing to other sections (the `Never modify`
+  //    invariant statement),
+  //  - or be inside a `## References` block.
+  // The signal we care about is whether the body documents the gate.
+  const hasSessionNotesGate = /Session Notes/.test(body);
+  const hasNeverModifyInvariant =
+    /[Nn]ever (?:modif|write|touch).*?(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)/.test(
+      body
+    );
+
+  if (!hasSessionNotesGate || !hasNeverModifyInvariant) {
+    errors.push(
+      `${relative(promoter)}: RULE 14b — staging-promoter body must reference \`## Session Notes\` write gate AND state a "Never modify CORE_RULES/USER_PREFERENCES/KNOWN_PROJECTS" invariant (D9-L1 memory-partition enforcement)`
+    );
+  }
+}
+
 // Validate that command files do not source plugin files via BASH_SOURCE.
 function validateCommandFiles(commandFiles, errors) {
   for (const filePath of commandFiles) {
@@ -452,6 +530,8 @@ function main() {
     errors,
   });
   validateCommandFiles(commandFiles, errors);
+  validateStagingPromoterFrontmatter(agentFiles, errors);
+  validateMemoryWriteSectionGate(agentFiles, errors);
 
   // Print warnings first so they remain visible above the trailing
   // success/error block. Warnings do NOT affect exit code; only errors do.
