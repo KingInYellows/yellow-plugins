@@ -57,7 +57,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   via Reciprocal Rank Fusion. Secret redaction (AWS keys, GitHub tokens,
   API keys, JWTs, PEM blocks) before excerpts are returned
 
-### Commands (8)
+### Commands (9)
 
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
@@ -68,6 +68,12 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:compound` — document a recently solved problem to compound knowledge
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
+- `/setup:claude-web` — audit a repository and scaffold the files Claude Code
+  Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`,
+  `.gitattributes`, `.gitignore`, `.github/workflows/claude.yml`). Tiered
+  interaction: auto-write safe additive edits, AskUserQuestion gate before
+  new files / config merges, warn-only for STDIO MCP and oversized
+  CLAUDE.md
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
 ### Skills (13)
