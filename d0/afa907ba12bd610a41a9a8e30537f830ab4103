@@ -1,0 +1,25 @@
+docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md
+  s_6d2ef1322cfec1::t_e6112a48231af2 113-172
+docs/solutions/logic-errors/two-phase-commit-idempotency-patterns.md
+  s_6d2ef1322cfec1::t_3b7bd4663bd5d1 1-224
+docs/solutions/workflow/graphite-api-outage-fallback.md
+  s_6d2ef1322cfec1::t_6e65831763ebb5 1-114
+docs/solutions/logic-errors/bash-subshell-pid-rmdir-jq-null-primitives.md
+  s_6d2ef1322cfec1::t_fcc78d55ae67ca 1-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "d0afa907ba12bd610a41a9a8e30537f830ab4103",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
