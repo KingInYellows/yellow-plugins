@@ -1,0 +1,36 @@
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_e72e14f6bafd18::t_7bb84ce0c0b7e1 1-82,85-107,109-115,118-120,122-126,128-147,150-223,225-302,304-343
+plugins/yellow-core/agents/workflow/staging-scorer.md
+  s_e72e14f6bafd18::t_3154302df98673 1-4,7-18,22-102,104-210
+  s_e72e14f6bafd18::t_f68c621a0d0379 5-6
+  s_e72e14f6bafd18::t_54220849c210bb 19-21
+plugins/yellow-core/agents/workflow/staging-promoter.md
+  s_e72e14f6bafd18::t_45479ce0617cf0 1-50,53-73,75-95,100-152,156-160,166-172,177-214,218-264
+  s_e7078f78719364::t_88f4ca14742f2f 153,162
+.changeset/yellow-core-compound-staging-agents.md
+  s_e72e14f6bafd18::t_cda52b9ee2ee50 1-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "fe7edbf914f0022c7532ec43bfb3c46e49178e18",
+  "prompts": {},
+  "sessions": {
+    "s_e7078f78719364": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a4284f8-c99a-4dff-98b8-1db0f132a811",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e72e14f6bafd18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20321feb-5fb3-4265-8ac2-ac9b74d9122b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}
