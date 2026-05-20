@@ -296,9 +296,15 @@ interactive session.
     Stop. Same guard required in 1.4 (session-start).
   - Parse stdin and **assign** parsed fields via `eval` (jq `@sh` only emits
     shell-escaped text — without `eval` the variables remain unset and `set -u`
-    aborts the next guard before printing `{"continue": true}`):
-    `eval "$(jq -r '@sh "TRANSCRIPT=\(.transcript_path) SESSION_ID=\(.session_id) CWD=\(.cwd) STOP_HOOK_ACTIVE=\(.stop_hook_active)"')"`
-    Add `# shellcheck disable=SC2154` at file level.
+    aborts the next guard before printing `{"continue": true}`). Initialize
+    defaults BEFORE the eval so a malformed/empty stdin (jq returns nothing)
+    leaves variables with sentinel values, not unset:
+    ```bash
+    TRANSCRIPT="" SESSION_ID="" CWD="" STOP_HOOK_ACTIVE=""
+    eval "$(jq -r '@sh "TRANSCRIPT=\(.transcript_path) SESSION_ID=\(.session_id) CWD=\(.cwd) STOP_HOOK_ACTIVE=\(.stop_hook_active)"' 2>/dev/null)" || true
+    ```
+    Add `# shellcheck disable=SC2154` at file level. Same default-init +
+    `|| true` pattern is required in 1.4 (session-start).
   - **Guard:** `[ "$STOP_HOOK_ACTIVE" = "true" ] && json_exit` — don't re-fire
     within the same stop event (matches the architecture block's
     `stop_hook_active` fast-exit)
@@ -319,8 +325,14 @@ interactive session.
   - `set -uo pipefail`; `json_exit()` helper
   - **Top:** `[ "${COMPOUND_DRAIN_IN_PROGRESS:-}" = "1" ] && json_exit`
   - **jq guard:** `command -v jq >/dev/null 2>&1 || json_exit 'jq missing'`
-  - Parse stdin and **assign** via `eval` (see 1.2 rationale):
-    `eval "$(jq -r '@sh "CWD=\(.cwd)"')"`
+  - Parse stdin and **assign** via `eval` (see 1.2 rationale — default-init
+    first, then `|| true` on the eval so jq parse failure doesn't crash
+    `set -u`):
+    ```bash
+    CWD=""
+    eval "$(jq -r '@sh "CWD=\(.cwd)"' 2>/dev/null)" || true
+    [ -z "$CWD" ] && json_exit 'malformed stdin: missing .cwd'
+    ```
   - Source `lib/compound-staging.sh`; derive `STAGING_DIR`
   - `[ ! -d "$STAGING_DIR/pending" ] && json_exit` (first-run fast-exit)
   - Reap (logged to stderr):
@@ -338,10 +350,23 @@ interactive session.
   - If `COUNT >= 5` OR `OLDEST_AGE_HRS > 48`:  (Max 20x defaults — responsive)
     - `mkdir "$STAGING_DIR/.drain-lock" 2>/dev/null || json_exit` (another
       drain in flight)
+    - **Create drain-logs dir BEFORE the redirect.** Bash opens redirections
+      before the command starts, so a missing `drain-logs/` on a fresh
+      staging directory would prevent `claude -p` from launching at all.
+      `mkdir -p "$STAGING_DIR/drain-logs"` belongs immediately after lock
+      acquisition.
     - Build drain prompt (heredoc, escapes `$STAGING_DIR`)
-    - Spawn disowned subshell:
+    - Spawn disowned subshell. Write the subshell PID into `.drain-lock/pid`
+      as the FIRST action so the stale-lock reaper's `kill -0 $(cat pid)`
+      liveness probe (see reap step above) can actually distinguish a live
+      drain from a crashed one. Without this pidfile write, reaping always
+      falls back to the weaker mtime-only path and a long drain
+      (>30 min under `--max-turns 50`) can have its lock reaped while
+      still active, producing duplicate promotions:
       ```
+      mkdir -p "$STAGING_DIR/drain-logs"
       (
+        printf '%d\n' "$$" > "$STAGING_DIR/.drain-lock/pid"
         trap 'rmdir "$STAGING_DIR/.drain-lock" 2>/dev/null' EXIT
         # bypassPermissions is refused under root/sudo per Claude Code docs;
         # fall back to acceptEdits in that environment so drain still runs.
