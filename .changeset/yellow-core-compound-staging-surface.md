@@ -41,7 +41,8 @@ load-bearing lint rules that prevent the load-bearing
   note) and a `## Known Limitations` section (per-worktree staging,
   PII residue window with 7d TTL reaper, async via disowned-subshell
   only, manual MEMORY.md migration, uninstall does not reap staging
-  dirs). Agent catalog count bumped 18 → 21; commands 8 → 9; new
+  dirs). Agent catalog count bumped 18 → 21; commands 9 → 10
+  (`/worktree:cleanup` was already present); new
   `compound-staging.sh` listed in Shared Libraries.
 - `plugins/yellow-core/README.md` — extends Commands + Workflow Agents
   tables (Workflow 4 → 7) with staging-reviewer, staging-scorer,

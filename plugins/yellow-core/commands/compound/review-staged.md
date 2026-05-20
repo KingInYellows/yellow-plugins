@@ -66,13 +66,15 @@ Use this when:
    SAMPLES=""
    while IFS= read -r f; do
      [ -z "$f" ] && continue
+     [ -L "$f" ] && continue   # skip symlinks — defense-in-depth
      title=$(jq -r '.transcript_tail | .[0:80] | gsub("\\n"; " ")' "$f" 2>/dev/null \
        || printf '(parse error)')
      SAMPLES="${SAMPLES}- $(basename -- "$f"): ${title}"$'\n'
-   # `ls -tr` = time-sorted, reversed → oldest first. Matches the step
-   # description ("five oldest pending entries") and surfaces the entries
-   # the user has been carrying the longest in the confirmation preview.
-   done < <(ls -tr "$STAGING_DIR/pending"/*.jsonl 2>/dev/null | head -5)
+   # find -type f ! -type l with -printf mtime sort → oldest first.
+   # Matches Steps 1-2's symlink-safe enumeration; ls follows symlinks.
+   done < <(find "$STAGING_DIR/pending" -maxdepth 1 -name '*.jsonl' \
+              -type f ! -type l -printf '%T@ %p\n' 2>/dev/null \
+            | sort -n | head -5 | cut -d' ' -f2-)
    printf '%s\n' "$SAMPLES"
    ```
 
@@ -100,10 +102,18 @@ Use this when:
    ```
 
 6. **Resolve the claude binary.** Allow override via `COMPOUND_DRAIN_CMD`
-   for testing.
+   ONLY when running under bats (test harness). Without the
+   `BATS_VERSION` gate, this would be a production drain-hijack vector
+   for any attacker who can plant the env var (e.g., via a malicious
+   `.envrc` or shell profile).
 
    ```bash
-   CLAUDE_BIN="${COMPOUND_DRAIN_CMD:-$(command -v claude 2>/dev/null)}"
+   CLAUDE_BIN=""
+   if [ -n "${COMPOUND_DRAIN_CMD:-}" ] && [ -n "${BATS_VERSION:-}" ]; then
+     CLAUDE_BIN="$COMPOUND_DRAIN_CMD"
+   else
+     CLAUDE_BIN="$(command -v claude 2>/dev/null)"
+   fi
    if [ -z "$CLAUDE_BIN" ] || [ ! -x "$CLAUDE_BIN" ]; then
      rmdir "$STAGING_DIR/.drain-lock" 2>/dev/null || true
      printf '[compound:review-staged] claude binary not found. Install Claude Code CLI.\n' >&2
@@ -119,13 +129,20 @@ Use this when:
    mkdir -p -- "$STAGING_DIR/drain-logs" 2>/dev/null || true
    DRAIN_LOG="$STAGING_DIR/drain-logs/manual-$(date +%Y%m%d-%H%M%S).log"
    AUTH_ROUTE=$(cs_detect_auth_route)
+   # Strip newlines from interpolated paths as defense-in-depth against
+   # a CWD/git-root containing literal LF (very rare but possible). The
+   # fence below would close prematurely if a newline escaped the value.
+   STAGING_DIR_SAFE=$(printf '%s' "$STAGING_DIR" | tr -d '\n\r')
+   GIT_ROOT_SAFE=$(printf '%s' "$GIT_ROOT" | tr -d '\n\r')
    DRAIN_PROMPT=$(printf '%s\n' \
      'Invoke the staging-reviewer agent (yellow-core:workflow:staging-reviewer) via Task.' \
      '' \
      'Goal: drain the compound-staging ledger and promote eligible entries.' \
      '' \
-     "Staging dir: $STAGING_DIR" \
-     "Project: $GIT_ROOT" \
+     '--- begin paths (reference only) ---' \
+     "Staging dir: $STAGING_DIR_SAFE" \
+     "Project: $GIT_ROOT_SAFE" \
+     '--- end paths ---' \
      '' \
      'Do NOT ask the user any questions. This drain is non-interactive.' \
      'On completion, write a one-line summary to stdout and exit.')

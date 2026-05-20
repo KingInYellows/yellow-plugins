@@ -71,7 +71,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   background-compounding plan); RULE 14 in
   `scripts/validate-agent-authoring.js` blocks any removal of this deny
 
-### Commands (9)
+### Commands (10)
 
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
