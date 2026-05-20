@@ -29,14 +29,26 @@ new edit. The unstaged file change was never included.
 
 ## Root Cause
 
-`gt modify` without `-c` **amends the previous commit**. Git's amend only
-includes already-staged changes. If the edit was applied but not staged
-(`git add`), gt silently amends the message (and any staged hunks) and ignores
-the unstaged file.
+The real failure mode is **calling `gt modify` from a non-interactive
+agent context with unstaged changes** — not the absence of `-c`.
 
-The output "X files changed" refers to the amended commit's cumulative diff
-relative to its parent — not to what was just added. This makes it look like
-success when the edit was missed entirely.
+Per Graphite's own command reference, `gt modify` (in both amend and
+`--commit`/`-c` modes) prompts the user to stage unstaged changes when
+it detects them. The `-c` flag only switches between amending the
+previous commit vs. creating a new one. When the surrounding agent
+flow swallows that interactive prompt (or runs gt with stdin closed),
+the prompt resolves to "no stage" and the unstaged hunk is silently
+dropped from the resulting commit/amend.
+
+Git's amend itself only includes already-staged changes — which is
+correct behavior — but the staging gap was supposed to be caught by
+gt's prompt. The "X files changed" output then refers to the amended
+commit's cumulative diff relative to its parent, not to the just-edited
+file, so the failure looks like success.
+
+**Adding `-c` does NOT fix this.** `gt modify -c` exhibits the same
+silent-miss behavior in non-interactive agent contexts because the
+underlying staging prompt is what's being swallowed.
 
 ## Solution
 
@@ -59,7 +71,10 @@ gt modify -c -m "fix: descriptive message"
 ```
 
 The `-c` flag creates a new commit rather than amending. Preferred when the
-prior commit is already meaningful on its own.
+prior commit is already meaningful on its own. **The `-c` flag itself does
+not prevent the silent unstaged miss** — the explicit `git add` above is
+what makes the change visible to gt. Use `-c` based on whether you want a
+new commit vs. an amend, not as a fix for staging.
 
 **Option C — use git commit directly:**
 
@@ -73,8 +88,11 @@ Valid fallback; Graphite tracks the commit either way.
 ## Why This Works
 
 `git add` moves the file change from the working tree into the index. Only
-indexed (staged) changes are included in an amend or new commit. The `-c` flag
-is what distinguishes "new commit" from "amend" in gt modify.
+indexed (staged) changes are included in an amend or new commit, regardless
+of which subcommand path gt takes. The `-c` flag is what distinguishes
+"new commit" from "amend" in `gt modify`; it does NOT change staging
+behavior. Explicit `git add` before any `gt modify` invocation makes the
+fix robust whether gt prompts or not, and whether `-c` is present or not.
 
 ## Prevention
 
