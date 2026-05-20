@@ -1,0 +1,19 @@
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_0a45cd09595ada::t_c9e29f51be51a6 375-380
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "a406493313900744f6f871cc1006dbbcc9ad27e1",
+  "prompts": {},
+  "sessions": {
+    "s_0a45cd09595ada": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "110284f0-5fd4-4c62-a74c-063e6882d851",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
