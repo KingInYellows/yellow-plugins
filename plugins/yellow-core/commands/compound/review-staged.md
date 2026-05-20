@@ -63,13 +63,6 @@ Use this when:
    `transcript_tail` for context.
 
    ```bash
-   SAMPLES=""
-   while IFS= read -r f; do
-     [ -z "$f" ] && continue
-     [ -L "$f" ] && continue   # skip symlinks — defense-in-depth
-     title=$(jq -r '.transcript_tail | .[0:80] | gsub("\\n"; " ")' "$f" 2>/dev/null \
-       || printf '(parse error)')
-     SAMPLES="${SAMPLES}- $(basename -- "$f"): ${title}"$'\n'
    # find -type f ! -type l with -printf mtime sort → oldest first.
    # Matches Steps 1-2's symlink-safe enumeration; ls follows symlinks.
    # BSD find (macOS) does not support -printf — fall back to per-file
@@ -85,6 +78,14 @@ Use this when:
                       -exec stat -f '%m	%N' {} \; 2>/dev/null \
                     | sort -n | head -5 | cut -f2-)
    fi
+
+   SAMPLES=""
+   while IFS= read -r f; do
+     [ -z "$f" ] && continue
+     [ -L "$f" ] && continue   # skip symlinks — defense-in-depth
+     title=$(jq -r '.transcript_tail | .[0:80] | gsub("\\n"; " ")' "$f" 2>/dev/null \
+       || printf '(parse error)')
+     SAMPLES="${SAMPLES}- $(basename -- "$f"): ${title}"$'\n'
    done < <(printf '%s\n' "$PREVIEW_LIST")
    printf '%s\n' "$SAMPLES"
    ```
