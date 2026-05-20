@@ -57,6 +57,7 @@ This means:
   (not via Task spawn).
 
 **Quick auth-route check before deciding:**
+
 ```bash
 [ -n "${OPENAI_API_KEY:-}" ] && echo "api-key (401 is a real error)" \
                               || echo "oauth (401 may be benign)"

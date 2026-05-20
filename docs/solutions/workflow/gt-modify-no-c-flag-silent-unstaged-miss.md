@@ -1,10 +1,10 @@
 ---
-title: '`gt modify` without `-c` silently misses unstaged edits'
+title: '`gt modify` silently misses unstaged edits in non-interactive agent contexts'
 date: 2026-05-18
 category: workflow
 track: bug
-problem: gt modify without -c amends prior commit and ignores unstaged file edits; output looks successful
-tags: [graphite, gt-modify, unstaged, commit, silent-failure]
+problem: gt modify (with or without -c) silently drops unstaged file edits when its stage-prompt is swallowed by a non-interactive agent flow; output looks successful and the -c flag does not fix it
+tags: [graphite, gt-modify, unstaged, commit, silent-failure, non-interactive]
 components: [workflow, graphite]
 ---
 
