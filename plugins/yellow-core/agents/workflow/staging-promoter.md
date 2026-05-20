@@ -187,23 +187,35 @@ SOLUTION_DIR="$GIT_ROOT/docs/solutions/$SOLUTION_CATEGORY"
 SOLUTION_PATH="$SOLUTION_DIR/$SLUG.md"
 MEMORY_PATH="$HOME/.claude/projects/$(printf '%s' "$GIT_ROOT" | tr '/' '-')/memory/MEMORY.md"
 
-# Crash-retry idempotency check — MUST run BEFORE slug-collision suffixing.
+# Crash-retry idempotency check — MUST run BEFORE slug-collision suffixing
+# AND MUST be scoped to THIS session_id, not just slug matching.
 #
-# Why this order matters: if Phase 2 (write solution doc) succeeded on a
-# prior attempt but Phase 3 (MEMORY.md append) failed, the next drain
-# re-runs the promoter with the same session_id. If slug-collision logic
-# runs first, it sees the original SOLUTION_PATH already exists, rewrites
-# to `<slug>-2.md`, and then the idempotency guard checks `-2` and misses
-# the original `.promote-done` sentinel — writing a duplicate solution doc
-# and breaking the documented crash-retry contract.
+# Why slug-only matching is wrong: a successful prior promotion of a
+# DIFFERENT staged entry can produce the same first-60-char sanitized
+# slug. Treating "slug.md + .promote-done exists" as a crash retry would
+# then skip slug-collision logic and re-write a Phase-2 doc owned by a
+# previous session, corrupting it.
 #
-# Detection rule: if `<SOLUTION_PATH>.promote-done` exists AND
-# `<SOLUTION_PATH>` exists, this is a resume — skip slug-collision and
-# proceed directly to Phase 3 with the original SOLUTION_PATH/SLUG.
+# The .promote-done sentinel is now an enriched JSON body (written in
+# Phase 2) containing the session_id; the resume guard requires it to
+# match THIS session's session_id. If the sentinel is missing the field
+# or contains a different session_id, this is NOT a crash retry — fall
+# through to normal slug-collision suffixing.
+#
+# Why order still matters (over and above session scoping): if Phase 2
+# succeeded on a prior attempt but Phase 3 (MEMORY.md append) failed,
+# the next drain re-runs the promoter with the same session_id. If
+# slug-collision logic runs first, it sees the original SOLUTION_PATH
+# already exists, rewrites to `<slug>-2.md`, and then the idempotency
+# guard checks `-2` and misses the original sentinel — writing a
+# duplicate solution doc and breaking the documented crash-retry contract.
 PROMOTE_DONE_PATH="${SOLUTION_PATH}.promote-done"
 RESUMING_AFTER_CRASH=0
 if [ -f "$PROMOTE_DONE_PATH" ] && [ -f "$SOLUTION_PATH" ]; then
-  RESUMING_AFTER_CRASH=1
+  SENTINEL_SESSION=$(jq -r '.session_id // empty' "$PROMOTE_DONE_PATH" 2>/dev/null)
+  if [ "$SENTINEL_SESSION" = "$SESSION_ID" ]; then
+    RESUMING_AFTER_CRASH=1
+  fi
 fi
 
 # Slug collision: append -2, -3, ... up to -9 if file exists.
@@ -227,20 +239,24 @@ fi
 ## Phase 2: Write the solution doc (atomic + idempotent)
 
 Two-phase commit pattern: a `.promote-done` sentinel signals that Phase 2
-has completed successfully. If a previous attempt crashed between Phase 2
-and Phase 3 (solution doc written, MEMORY.md append failed), the next
-drain re-runs the promoter with the same session_id. Without the
-sentinel check, the slug-collision path would assign a `-2` suffix and
-create a duplicate solution doc.
+has completed successfully **for a specific session_id**. If a previous
+attempt crashed between Phase 2 and Phase 3 (solution doc written,
+MEMORY.md append failed), the next drain re-runs the promoter with the
+same session_id and the sentinel resumes correctly.
 
-**Idempotency guard (run BEFORE Phase 2):**
+The sentinel is enriched JSON (not an empty file) so the resume guard
+can match `session_id` — a different staged entry sanitizing to the
+same 60-char slug would otherwise be wrongly treated as a crash retry,
+corrupting the prior session's doc.
+
+**Idempotency guard reuses `RESUMING_AFTER_CRASH` from Phase 1** (computed
+there because it must run BEFORE slug-collision suffixing).
 
 ```bash
 PROMOTE_DONE_PATH="${SOLUTION_PATH}.promote-done"
 PHASE_2_SKIP=0
-if [ -f "$PROMOTE_DONE_PATH" ] && [ -f "$SOLUTION_PATH" ]; then
-  # Phase 2 succeeded on prior attempt; only re-attempt Phase 3 (MEMORY.md).
-  printf '[staging-promoter] resuming after prior crash: solution doc exists, retrying memory append\n' >&2
+if [ "$RESUMING_AFTER_CRASH" = "1" ]; then
+  printf '[staging-promoter] resuming after prior crash (session %s): solution doc exists, retrying memory append\n' "$SESSION_ID" >&2
   PHASE_2_SKIP=1
 fi
 ```
@@ -249,7 +265,12 @@ fi
 
 1. Write the full file content to a sibling temp path `${SOLUTION_PATH}.tmp`.
 2. Run `mv "${SOLUTION_PATH}.tmp" "${SOLUTION_PATH}"`.
-3. Create the sentinel: `: > "$PROMOTE_DONE_PATH"`.
+3. Create the sentinel as session-scoped JSON:
+   ```bash
+   printf '{"session_id":"%s","written_at":"%s"}\n' \
+     "$SESSION_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+     > "$PROMOTE_DONE_PATH"
+   ```
 
 This matches Critical Security Rule #4: partial writes are never observable at
 the final destination, AND the sentinel makes the operation idempotent
