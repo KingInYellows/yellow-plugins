@@ -281,14 +281,21 @@ DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
   export COMPOUND_DRAIN_IN_PROGRESS=1
   printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s)\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" >> "$DRAIN_LOG" 2>/dev/null
+  # --bare is the primary hook-recursion guard: it skips auto-discovery
+  # of hooks, skills, plugins, MCP servers, and CLAUDE.md in the child
+  # session. Without it, the child fires its own SessionStart hook and
+  # cascades. COMPOUND_DRAIN_IN_PROGRESS env var is defense-in-depth.
+  # See docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md.
   if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
     "$DRAIN_TIMEOUT_BIN" "$DRAIN_TIMEOUT_S" "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+      --bare \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
       >> "$DRAIN_LOG" 2>&1
   else
     "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+      --bare \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
