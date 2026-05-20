@@ -290,21 +290,25 @@ DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
   export COMPOUND_DRAIN_IN_PROGRESS=1
   printf '[yellow-core] compound-staging: drain dispatch %s (auth=%s, pending=%s, timeout=%s)\n' \
     "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$DRAIN_TIMEOUT_S" >> "$DRAIN_LOG" 2>/dev/null
-  # --bare is the primary hook-recursion guard: it skips auto-discovery
-  # of hooks, skills, plugins, MCP servers, and CLAUDE.md in the child
-  # session. Without it, the child fires its own SessionStart hook and
-  # cascades. COMPOUND_DRAIN_IN_PROGRESS env var is defense-in-depth.
-  # See docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md.
+  # NOTE: --bare CANNOT be used here. The drain prompt invokes the
+  # yellow-core:workflow:staging-reviewer agent via Task, and --bare
+  # skips plugin auto-discovery — the child session would not have the
+  # staging-reviewer agent registered and the drain would fail at the
+  # very first turn. COMPOUND_DRAIN_IN_PROGRESS env-var sentinel
+  # (exported above, checked at the top of stop.sh and session-start.sh)
+  # IS the recursion guard for this specific pattern. The env-var
+  # approach is the documented fallback when plugin agents must remain
+  # reachable in the child session.
+  # See docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md
+  # — "Defense-in-depth alternative when --bare is incompatible".
   if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
     "$DRAIN_TIMEOUT_BIN" "$DRAIN_TIMEOUT_S" "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
-      --bare \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
       >> "$DRAIN_LOG" 2>&1
   else
     "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
-      --bare \
       --max-turns 50 \
       --permission-mode bypassPermissions \
       --output-format json \
