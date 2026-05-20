@@ -1,0 +1,41 @@
+docs/research/repo/background-compounding-triggers-deepen-validation.md
+  s_7a8660e50e836e::t_4c824d57624f2b 362
+  s_7a8660e50e836e::t_6334cf54da0ad1 115-119
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_7a8660e50e836e::t_b75c4d2e4cab2f 498
+plans/background-compounding-triggers.md
+  s_7a8660e50e836e::t_073d1131e86f45 128-139
+  s_7a8660e50e836e::t_0a294da3ebe728 239
+  s_7a8660e50e836e::t_e80ba011ff2855 341
+  s_7a8660e50e836e::t_1ed7c8fda61933 484
+  s_7a8660e50e836e::t_4731252aee4ff8 260-264
+  s_7a8660e50e836e::t_206aba2978422e 142-146
+  s_7a8660e50e836e::t_f9c95b59e360a3 603-605
+  s_7a8660e50e836e::t_e053914ff068b5 285-290
+  s_7a8660e50e836e::t_03eedba59c5a33 734
+  s_7a8660e50e836e::t_fbf406fb2b6cbd 675-678
+docs/research/repo/background-compounding-triggers-repo-audit.md
+  s_7a8660e50e836e::t_569439e4369265 477
+  s_7a8660e50e836e::t_83195433fe2990 2
+  s_7a8660e50e836e::t_037a71047f5922 383-384
+  s_7a8660e50e836e::t_9dc924adf635a3 126
+  s_7a8660e50e836e::t_7fa2f87c27f86e 565
+  s_7a8660e50e836e::t_eac9407ad033a5 617
+  s_7a8660e50e836e::t_b574ecf000e1a6 265
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "cda8ba2f07ebdcd605469610bf813990b154d4e9",
+  "prompts": {},
+  "sessions": {
+    "s_7a8660e50e836e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0f430e9c-32ae-4f1b-8391-9cfb191f29b0",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
