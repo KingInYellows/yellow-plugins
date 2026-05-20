@@ -27,7 +27,7 @@ This is the right answer because it solves the stated problem (mixed topology fa
 
 **Layer 2 (opt-in per tier):** Within-tier parallel execution via background `Task` subagents + git worktrees. When a tier has more than one item, offer the user a choice: "Execute these N items sequentially or in parallel?" Parallel execution uses the existing `run_in_background: true` + atomic result file pattern already proven in Phase 3 (review agents). Each branch gets its own `git worktree` via the existing `git-worktree` skill, providing index isolation so concurrent `gt create`/`gt modify` calls do not race.
 
-**Why not Approach A (unconditional true parallelism)?** Parallel worktree agents race on the `## Stack Progress` section of the plan file — two agents completing at the same time both try to update the same markdown file. The file-ownership grouping doctrine from `parallel-todo-resolution-file-based-grouping.md` makes this explicit: one agent per file, never two. The plan file is not a per-branch file; it is shared. Solving this requires a lock or a merge step, adding complexity that is not needed for the default path.
+**Why not Approach A (unconditional true parallelism)?** Parallel worktree agents race on the `## Stack Progress` section of the plan file — two agents completing at the same time both try to update the same markdown file. The file-ownership grouping doctrine from [`parallel-todo-resolution-file-based-grouping.md`](../solutions/code-quality/parallel-todo-resolution-file-based-grouping.md) makes this explicit: one agent per file, never two. The plan file is not a per-branch file; it is shared. Solving this requires a lock or a merge step, adding complexity that is not needed for the default path.
 
 **Why not Approach B (pure tier scheduling, always sequential within tiers)?** This correctly handles `mixed` topology and removes the hard stop, but it misses the user's stated goal: "parallelize when possible and efficient." A tier with 4 independent branches executes 4x slower than needed. Since the parallel infrastructure already exists in this codebase, not offering it as an opt-in is leaving performance on the table.
 
@@ -39,14 +39,25 @@ This is the right answer because it solves the stated problem (mixed topology fa
 
 ### 1. DAG representation and parsing
 
-The `Depends on` field currently supports single-parent refs (`(none)` or `#N`). The format spec in `stack-decomposition.md` must be extended to allow comma-separated multi-parent refs (`#1, #3`) to support true DAG fan-in. The parser in `work.md` Phase 1b must:
+The `Depends on` field currently supports single-parent refs (`(none)` or `#N`). The format spec in [`plugins/gt-workflow/output-styles/stack-decomposition.md`](../../plugins/gt-workflow/output-styles/stack-decomposition.md) must be extended to allow comma-separated multi-parent refs (`#1, #3`) to support true DAG fan-in. The parser in [`plugins/yellow-core/commands/workflows/work.md`](../../plugins/yellow-core/commands/workflows/work.md) Phase 1b must:
 
 - Read all `Depends on` values across all items
 - Build an adjacency list: `item_number → [dependency_numbers]`
 - Topological sort (Kahn's algorithm or DFS) to produce ordered tiers
 - Validate: detect cycles (invalid plan) and report to user
 
-This parsing is purely in the LLM's working memory — no new files or scripts needed.
+This parsing should be offloaded to a helper script (e.g.,
+`plugins/yellow-core/lib/stack-toposort.sh` or a small Node/Python utility)
+to ensure Kahn's algorithm executes deterministically. LLM in-context
+topological sort is unreliable for non-trivial graphs (>~5 nodes, fan-in
+patterns) and would hallucinate orderings under context pressure. The
+helper would parse `## Stack Decomposition` items, emit the ordered tier
+list to stdout, and exit non-zero on cycle detection. `work.md` Phase 1b
+reads the helper output and dispatches tier loops accordingly.
+
+(Open question: V1 may inline a simple in-context sort for ≤4-item plans
+to defer the helper as YAGNI; the helper becomes mandatory once we ship
+plans with non-trivial fan-in. See Approach Comparison below.)
 
 ### 2. Tier execution loop
 
@@ -70,7 +81,14 @@ The `## Stack Progress` racing problem is solved by deferring all progress write
 ### 4. Worktree lifecycle
 
 Each parallel branch in a tier:
-1. Creates a worktree via `worktree-manager.sh create <branch-name>` from trunk (for parallel-from-trunk items) or from the parent branch (for items in a DAG with a shared ancestor)
+1. Creates a worktree via `worktree-manager.sh create <branch-name>` from
+   the primary parent (or trunk). **Fan-in case (multi-parent in the DAG):**
+   if the item declares `Depends on: #1, #3`, the orchestrator must merge
+   the secondary parents (#3) into the worktree branch after creation
+   (`git merge` from within the worktree). If merges conflict, surface the
+   conflicting paths to the user and abort the tier — auto-resolve is not
+   safe for code merges. The single-parent case (`Depends on: #N`) skips
+   the merge step and creates the worktree directly off `#N`'s branch.
 2. Runs implementation entirely within that worktree directory
 3. Commits and submits (`gt modify` + `gt submit`) from within the worktree
 4. The orchestrator tears down the worktree after `TaskOutput` returns, whether the agent succeeded or failed
@@ -91,7 +109,7 @@ Plans with `linear` topology: tier sort produces one item per tier — zero beha
 Plans with `parallel` topology (all `Depends on: (none)`): single tier with N items — offers sequential or parallel choice. Previously this was sequential anyway; the opt-in gives users parallelism for the first time.
 Plans with `mixed` topology: removes the hard stop; computes tiers correctly.
 
-### 7. The `stack-decomposition.md` format contract update
+### 7. The [`stack-decomposition.md`](../../plugins/gt-workflow/output-styles/stack-decomposition.md) format contract update
 
 Both `gt-stack-plan` (producer) and `workflows:work` (consumer) share this contract. Any change to `Depends on` syntax requires updating both sides. The `topology` comment (`<!-- stack-topology: ... -->`) becomes advisory-only once the DAG scheduler is in place — the scheduler derives topology from the graph, not the comment. The comment remains for human readability.
 
@@ -101,7 +119,7 @@ Both `gt-stack-plan` (producer) and `workflows:work` (consumer) share this contr
 
 **GitHub Actions `needs:` model (canonical reference):** The `needs:` field in GitHub Actions workflows is the direct analog of `Depends on`. Mixed topologies (some jobs parallel, some sequential) are the default case in Actions, not the exception. Jobs with no `needs:` start simultaneously; jobs with `needs:` wait for their dependencies. This is exactly what the tier scheduler produces. The model is battle-tested at massive scale and widely understood by developers.
 
-**This codebase's parallel-agent doctrine:** `parallel-multi-agent-review-orchestration.md` and `parallel-todo-resolution-file-based-grouping.md` establish the file-ownership-grouping pattern as the proven safe approach. The key insight: agents can run in parallel if and only if they do not share output files. Git worktrees provide index isolation (each worktree has its own `.git` index lock) but the plan file is shared. Deferring plan file writes to the orchestrator resolves this.
+**This codebase's parallel-agent doctrine:** [`parallel-multi-agent-review-orchestration.md`](../solutions/code-quality/parallel-multi-agent-review-orchestration.md) and [`parallel-todo-resolution-file-based-grouping.md`](../solutions/code-quality/parallel-todo-resolution-file-based-grouping.md) establish the file-ownership-grouping pattern as the proven safe approach. The key insight: agents can run in parallel if and only if they do not share output files. Git worktrees provide index isolation (each worktree has its own `.git` index lock) but the plan file is shared. Deferring plan file writes to the orchestrator resolves this.
 
 **Phase 3 reviewer parallelism as the pattern template:** The existing `run_in_background: true` + `mktemp -d` run dir + atomic `.tmp`→`.json` rename + `TaskOutput` pattern in Phase 3 is already working parallel-agent coordination in this codebase. The stack branch executor pattern is the same shape: N background agents, each writing to disjoint paths (their own worktrees), orchestrator waits for all before proceeding.
 
@@ -117,11 +135,36 @@ Both `gt-stack-plan` (producer) and `workflows:work` (consumer) share this contr
 
 1. **Should `gt-stack-plan` auto-detect parallelizable items and suggest a mixed topology?** Currently it mostly produces linear stacks. The DAG model is only useful if the producer emits non-trivial dependency graphs. This may be a producer-side change that should happen first.
 
-2. **What is the max safe parallelism for a tier?** Four parallel review agents is proven. Six parallel agents (from `parallel-todo-resolution-file-based-grouping.md`) is also proven. For stack branch execution, each agent runs a full implementation loop (potentially minutes of context). Context window pressure across N simultaneous sessions may become a constraint at N > 4–6. The opt-in question should surface this: "Execute in parallel (up to N branches simultaneously)?"
+2. **What is the max safe parallelism for a tier?** Four parallel review agents is proven. Six parallel agents (from [`parallel-todo-resolution-file-based-grouping.md`](../solutions/code-quality/parallel-todo-resolution-file-based-grouping.md)) is also proven. For stack branch execution, each agent runs a full implementation loop (potentially minutes of context). Context window pressure across N simultaneous sessions may become a constraint at N > 4–6. The opt-in question should surface this: "Execute in parallel (up to N branches simultaneously)?"
 
-3. **Should the new `stack-branch-executor` be a named subagent in yellow-core?** The parallel path requires a subagent that runs a single-branch implementation loop. Currently no such agent exists — the logic lives inline in `work.md`. Extracting it as `yellow-core:workflow:stack-branch-executor` would make the command cleaner but adds a new agent file to maintain. YAGNI says no for v1; inline first, extract later if the command file grows unwieldy.
+3. **Should the new `stack-branch-executor` be a named subagent in yellow-core?**
+   The parallel path requires a subagent that runs a single-branch
+   implementation loop. Reviewer feedback (PR #546) argues for extracting
+   from v1: inlining N-branch worktree + background-task logic into
+   `work.md` will produce an unwieldy command file and increase context
+   window pressure on every `/workflows:work` invocation, including the
+   common linear case where parallelism is not used. Extracting it as
+   `yellow-core:workflow:stack-branch-executor` (with a narrow tool
+   surface — Read, Bash for `gt`, plus Edit/Write only on the agent's
+   own worktree paths) keeps the orchestrator command focused on
+   dispatch + checkpoints. Decision: extract from v1. The agent's tool
+   definition must list ONLY the tools needed to run an implementation
+   loop inside a worktree — no Task, no AskUserQuestion (dispatch and
+   checkpoints stay in the orchestrator).
 
-4. **Worktree cleanup on user cancel at a tier checkpoint:** If the user selects "Stop here" at a tier checkpoint while parallel agents are still running (or just completed), the orchestrator must tear down all worktrees for that tier. The current checkpoint question fires after all agents complete — but if an agent hangs, the orchestrator is blocked. Should there be a timeout on `TaskOutput`?
+4. **Worktree cleanup on user cancel at a tier checkpoint:** If the user
+   selects "Stop here" at a tier checkpoint while parallel agents are
+   still running (or just completed), the orchestrator must tear down
+   all worktrees for that tier. The current checkpoint question fires
+   after all agents complete — but if an agent hangs, the orchestrator
+   is blocked. **A `TaskOutput` timeout is essential** to prevent a
+   hung subagent from blocking the orchestrator indefinitely and
+   skipping the cleanup phase. Default: 30 minutes per agent (matches
+   typical implementation loop), configurable via env var
+   (`STACK_EXECUTOR_TIMEOUT_S`). On timeout, the orchestrator marks
+   the agent's branch as failed, runs the worktree teardown, and
+   proceeds to the next tier with the partial result surfaced to the
+   user via the checkpoint question.
 
 5. **`Depends on` multi-parent format change: is this a breaking change?** Plans already written with single-parent `Depends on` fields remain valid. The parser can support both formats. But `gt-stack-plan` would need to start emitting multi-parent refs for real DAGs — this is a producer-side change that requires a version bump per the Changesets flow.
 
