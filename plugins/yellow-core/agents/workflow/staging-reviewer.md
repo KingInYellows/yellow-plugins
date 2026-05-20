@@ -87,6 +87,27 @@ printf '[staging-reviewer] drain start %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 If pre-flight fails, log the reason and exit. Do not proceed.
 
+## Subprocess variable scope (READ BEFORE EVERY PHASE)
+
+Every Bash tool call you make is a **fresh subprocess** with no
+environment inherited from the previous call. This means:
+
+- `$STAGING` and `$PROJECT` set in Phase 0 do NOT carry to Phase 1, 2,
+  4, or 10. They are undefined in each subsequent Bash call.
+- `$MOVED_THIS_DRAIN_FILE` set in Phase 1 does NOT carry to Phase 2 or 4.
+- Any other variable set in one Bash call is gone in the next.
+
+**At the top of every phase that uses `$STAGING`** (Phases 1, 2, 4, 10),
+you MUST re-paste the literal staging directory path from the dispatch
+prompt before running the block. Either substitute it inline (`STAGING=\"<paste path here>\"`)
+or use the actual string everywhere `$STAGING` appears. Without this,
+path operations like `\"$STAGING\"/processing/*.jsonl` expand to
+`/processing/*.jsonl` and operate on the wrong filesystem location.
+
+The LOCK_MTIME re-derivation pattern (used in Phases 1/2/4/10 for
+`MOVED_THIS_DRAIN_FILE`) follows the same rule — it must be recomputed
+in each Bash call, not assumed to carry from Phase 1.
+
 ## Phase 1: Move pending → processing (atomic per-file)
 
 For each `*.jsonl` in `pending/`, attempt an atomic `mv` to `processing/`.
@@ -100,20 +121,29 @@ in `processing/` when this drain started — those belong to a concurrent
 in-flight drain).
 
 ```bash
+# Re-paste $STAGING from Phase 0's dispatch prompt — fresh subprocess.
+#
 # MOVED_THIS_DRAIN_FILE uses the .drain-lock directory's mtime as a
 # drain-unique suffix. Each drain acquires a fresh lock (mkdir) with its
 # own mtime, so concurrent drains (in the rare lock-reaper-then-mkdir
 # race window) get different filenames and cannot clobber each other's
 # state. Phases 2 and 4 RE-DERIVE the same path in their own Bash tool
-# calls using the same lock mtime — each Bash tool call is a fresh
-# subprocess with a different PID and no env carry-over, so the
-# variable must be recomputed every phase. Phase 10 cleans it up
-# explicitly — do NOT add a Phase-1 EXIT trap, which would delete the
-# file when this Bash subprocess exits and break Phase 2/4's reads.
+# calls using the same lock mtime — Bash tool calls are fresh subprocesses
+# with no env carry-over (see "Subprocess variable scope" above). Phase 10
+# cleans it up explicitly — do NOT add a Phase-1 EXIT trap, which would
+# delete the file when this Bash subprocess exits and break Phase 2/4's reads.
+#
+# stat MUST succeed — fail-closed on missing lock. A `|| date +%s`
+# fallback would generate DIFFERENT timestamps in each phase, breaking
+# the drain-unique filename invariant; this-drain ownership checks would
+# silently fail across phases. If .drain-lock has disappeared, the drain
+# was interrupted (or someone removed it) and we cannot safely continue.
 moved=0
 LOCK_MTIME=$(stat -c '%Y' "$STAGING/.drain-lock" 2>/dev/null \
-  || stat -f '%m' "$STAGING/.drain-lock" 2>/dev/null \
-  || date +%s)
+  || stat -f '%m' "$STAGING/.drain-lock" 2>/dev/null) || {
+  printf '[staging-reviewer] fatal: cannot stat .drain-lock (lock missing or unreadable); aborting drain\n' >&2
+  exit 1
+}
 MOVED_THIS_DRAIN_FILE="$STAGING/.drain-moved-${LOCK_MTIME}.txt"
 : > "$MOVED_THIS_DRAIN_FILE"
 for f in "$STAGING"/pending/*.jsonl; do
@@ -162,46 +192,96 @@ the seen-hash set so that any duplicate moved by this drain is correctly
 suppressed.
 
 ```bash
-# Re-derive MOVED_THIS_DRAIN_FILE in this Bash call — each Bash tool
-# invocation is a fresh subprocess; variables from Phase 1 are not
-# inherited. The path must derive from the same .drain-lock mtime so
-# all phases of this drain reference the same file.
+# Re-paste $STAGING from Phase 0's dispatch prompt — fresh subprocess.
+# Re-derive MOVED_THIS_DRAIN_FILE from .drain-lock mtime — see Phase 1
+# rationale. stat MUST succeed (fail-closed) for the same reason.
 LOCK_MTIME=$(stat -c '%Y' "$STAGING/.drain-lock" 2>/dev/null \
-  || stat -f '%m' "$STAGING/.drain-lock" 2>/dev/null \
-  || date +%s)
+  || stat -f '%m' "$STAGING/.drain-lock" 2>/dev/null) || {
+  printf '[staging-reviewer] fatal: cannot stat .drain-lock in Phase 2; aborting drain\n' >&2
+  exit 1
+}
 MOVED_THIS_DRAIN_FILE="$STAGING/.drain-moved-${LOCK_MTIME}.txt"
 
-declare -A seen
+# Two-pass dedup: classify all files by hash FIRST, then per-hash
+# decide what to keep based on the full class composition of the
+# group. A single-pass first-seen-wins approach is order-dependent —
+# a stale file encountered before its in-flight twin would be kept
+# (and Phase 4 would promote it), while a concurrent drain promotes
+# the in-flight twin → duplicate solution entries.
+classify_file() {
+  local base
+  base=$(basename -- "$1")
+  if grep -qxF "$base" "$MOVED_THIS_DRAIN_FILE" 2>/dev/null; then
+    printf 'this-drain'
+  else
+    local now mtime age
+    now=$(date +%s)
+    mtime=$(stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1" 2>/dev/null || printf '0')
+    age=$(( now - mtime ))
+    if [ "$age" -lt 300 ]; then printf 'in-flight'; else printf 'stale'; fi
+  fi
+}
+
+# Pass 1: build hash → "path1:class1|path2:class2|..." map
+declare -A by_hash
 for f in "$STAGING"/processing/*.jsonl; do
   [ -f "$f" ] || continue
-  base=$(basename -- "$f")
   h=$(jq -r '.content_hash // empty' "$f" 2>/dev/null)
   [ -z "$h" ] && continue
-  if [ -n "${seen[$h]:-}" ]; then
-    if grep -qxF "$base" "$MOVED_THIS_DRAIN_FILE" 2>/dev/null; then
-      # Case 1: this-drain file — delete
-      printf '[staging-reviewer] hash-dedup: deleted duplicate %s (hash %s, this-drain)\n' \
-        "$base" "$h"
-      rm -- "$f"
-    else
-      # Case 2 vs 3: pre-existing — check mtime
-      now=$(date +%s)
-      mtime=$(stat -c '%Y' "$f" 2>/dev/null || stat -f '%m' "$f" 2>/dev/null || date +%s)
-      age=$(( now - mtime ))
-      if [ "$age" -lt 300 ]; then
-        # Case 2: in-flight (< 5 min) — skip, concurrent drain holds it
-        printf '[staging-reviewer] hash-dedup: skipped in-flight duplicate %s (hash %s, mtime %ss, belongs to concurrent drain)\n' \
-          "$base" "$h" "$age"
-      else
-        # Case 3: stale (>= 5 min) — delete, crashed prior drain left orphan
-        printf '[staging-reviewer] hash-dedup: deleted stale pre-existing duplicate %s (hash %s, mtime %ss, crashed prior drain)\n' \
-          "$base" "$h" "$age"
-        rm -- "$f"
-      fi
-    fi
-  else
-    seen[$h]=1
-  fi
+  cls=$(classify_file "$f")
+  by_hash[$h]+="${f}:${cls}|"
+done
+
+# Pass 2: decide keep/delete per hash group
+# Priority: this-drain > in-flight > stale.
+# Special rule: when both this-drain AND in-flight twins exist, delete
+# the this-drain copies — the concurrent drain owns the in-flight one
+# and WILL promote it; promoting ours too would duplicate.
+for h in "${!by_hash[@]}"; do
+  entries="${by_hash[$h]%|}"
+  IFS='|' read -ra arr <<< "$entries"
+  [ "${#arr[@]}" -lt 2 ] && continue   # no duplicates for this hash
+
+  has_inflight=0; has_thisdrain=0
+  for e in "${arr[@]}"; do
+    case "${e##*:}" in
+      in-flight)  has_inflight=1 ;;
+      this-drain) has_thisdrain=1 ;;
+    esac
+  done
+
+  kept_thisdrain=0; kept_stale=0
+  for e in "${arr[@]}"; do
+    f="${e%:*}"; cls="${e##*:}"
+    case "$cls" in
+      in-flight)
+        printf '[staging-reviewer] hash-dedup: skipped in-flight duplicate %s (hash %s, concurrent drain owns)\n' \
+          "$(basename -- "$f")" "$h"
+        ;;
+      this-drain)
+        if [ "$has_inflight" = 1 ]; then
+          printf '[staging-reviewer] hash-dedup: deleted this-drain %s (hash %s, in-flight twin → defer to concurrent drain)\n' \
+            "$(basename -- "$f")" "$h"
+          rm -- "$f"
+        elif [ "$kept_thisdrain" = 0 ]; then
+          kept_thisdrain=1
+        else
+          printf '[staging-reviewer] hash-dedup: deleted excess this-drain duplicate %s (hash %s)\n' \
+            "$(basename -- "$f")" "$h"
+          rm -- "$f"
+        fi
+        ;;
+      stale)
+        if [ "$has_inflight" = 1 ] || [ "$has_thisdrain" = 1 ] || [ "$kept_stale" = 1 ]; then
+          printf '[staging-reviewer] hash-dedup: deleted stale duplicate %s (hash %s, crashed prior drain)\n' \
+            "$(basename -- "$f")" "$h"
+          rm -- "$f"
+        else
+          kept_stale=1
+        fi
+        ;;
+    esac
+  done
 done
 ```
 
@@ -228,13 +308,15 @@ For each unique entry in `processing/` (skip duplicates from Phase 2):
 
 Concretely:
 ```bash
-# Re-derive MOVED_THIS_DRAIN_FILE in this Bash call — each Bash tool
-# invocation is a fresh subprocess; variables from Phases 1/2 are not
-# inherited. The path must derive from the same .drain-lock mtime so
-# all phases reference the same drain-unique ledger.
+# Re-paste $STAGING from Phase 0's dispatch prompt — fresh subprocess.
+# Re-derive MOVED_THIS_DRAIN_FILE from .drain-lock mtime; fail closed
+# if stat fails (see Phase 1 rationale — a date +%s fallback would
+# desynchronize phases).
 LOCK_MTIME=$(stat -c '%Y' "$STAGING/.drain-lock" 2>/dev/null \
-  || stat -f '%m' "$STAGING/.drain-lock" 2>/dev/null \
-  || date +%s)
+  || stat -f '%m' "$STAGING/.drain-lock" 2>/dev/null) || {
+  printf '[staging-reviewer] fatal: cannot stat .drain-lock in Phase 4; aborting drain\n' >&2
+  exit 1
+}
 MOVED_THIS_DRAIN_FILE="$STAGING/.drain-moved-${LOCK_MTIME}.txt"
 
 base=$(basename -- "$f")
@@ -430,13 +512,26 @@ hook's reaper).
 
 Clean up the per-drain scratch file (re-derive its drain-unique path
 the same way Phases 1/2/4 did — from the .drain-lock mtime), then
-write a one-line summary to stdout:
+write a one-line summary to stdout. Re-paste `$STAGING` from Phase 0's
+dispatch prompt — fresh subprocess.
+
+If stat fails here (the lock might have been reaped while we ran), do
+NOT fall back to `date +%s` — that would generate a different filename
+and we'd leak the actual scratch file on disk. Instead use a wildcard
+glob bounded to this staging dir as a defensive cleanup of any stale
+`.drain-moved-*.txt` (older than 1h) the PII reaper would otherwise
+miss. This is best-effort cleanup; the disowned subshell's EXIT trap
+in session-start.sh still removes the lock.
 
 ```bash
 LOCK_MTIME=$(stat -c '%Y' "$STAGING/.drain-lock" 2>/dev/null \
-  || stat -f '%m' "$STAGING/.drain-lock" 2>/dev/null \
-  || date +%s)
-rm -f -- "$STAGING/.drain-moved-${LOCK_MTIME}.txt" 2>/dev/null || true
+  || stat -f '%m' "$STAGING/.drain-lock" 2>/dev/null)
+if [ -n "$LOCK_MTIME" ]; then
+  rm -f -- "$STAGING/.drain-moved-${LOCK_MTIME}.txt" 2>/dev/null || true
+else
+  printf '[staging-reviewer] warning: .drain-lock missing in Phase 10; sweeping stale scratch files\n' >&2
+  find "$STAGING" -maxdepth 1 -name '.drain-moved-*.txt' -mmin +60 -delete 2>/dev/null || true
+fi
 ```
 
 ```
