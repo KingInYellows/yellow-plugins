@@ -100,10 +100,16 @@ in `processing/` when this drain started — those belong to a concurrent
 in-flight drain).
 
 ```bash
+# MOVED_THIS_DRAIN_FILE uses a stable path (no $$) so Phases 2 and 4 can
+# re-derive it in their own Bash tool calls. Concurrent drains are already
+# serialized by .drain-lock, so a fixed name is safe. Phase 10 cleans it
+# up explicitly — do NOT add a Phase-1 EXIT trap, which would delete the
+# file when this Bash subprocess exits and break Phase 2/4's reads (each
+# Bash tool call is a fresh subprocess with a different PID and no env
+# carry-over).
 moved=0
-MOVED_THIS_DRAIN_FILE="$STAGING/.drain-moved-$$.txt"
+MOVED_THIS_DRAIN_FILE="$STAGING/.drain-moved.txt"
 : > "$MOVED_THIS_DRAIN_FILE"
-trap 'rm -f -- "$MOVED_THIS_DRAIN_FILE" 2>/dev/null || true' EXIT
 for f in "$STAGING"/pending/*.jsonl; do
   [ -f "$f" ] || continue
   base=$(basename -- "$f")
@@ -398,7 +404,12 @@ hook's reaper).
 
 ## Phase 10: Final report
 
-Write a one-line summary to stdout:
+Clean up the per-drain scratch file, then write a one-line summary to
+stdout:
+
+```bash
+rm -f -- "$STAGING/.drain-moved.txt" 2>/dev/null || true
+```
 
 ```
 [staging-reviewer] drain complete: moved=N scored=N skipped=N rejected_guardian=N rejected_injection=N flagged=N promoted=N deduped=N errors=N
