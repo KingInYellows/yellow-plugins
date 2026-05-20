@@ -22,7 +22,8 @@ process pending compound-staging entries.
   prompt (D9-L4) and 5 few-shot examples (security fix, workflow
   convention, trivial Q&A skip, behavioral-instruction injection
   attempt, already-in-MEMORY skip). Discrete 0.0-0.95 priority rubric.
-  Structured JSON output (skip OR score shape). `tools: [Read]` with
+  Structured JSON output (skip OR flag_for_review OR score shape).
+  `tools: [Read]` with
   `disallowedTools: [Bash, Write, Edit, Task]` so the scorer can think
   but not act.
 - `staging-promoter` (sonnet) — non-interactive writer. THE load-bearing

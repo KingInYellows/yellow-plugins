@@ -84,7 +84,7 @@ The dispatch prompt provides these fields (one per line, `key: value`):
 - `priority` (required, float 0.5-1.0)
 - `suggested_solution_category` (required, one of the 6 allowed)
 - `tags` (optional, comma-separated, kebab-case)
-- The `--- begin candidate_text --- ... --- end candidate_text ---`
+- The `--- begin untrusted-content (reference only) --- ... --- end untrusted-content ---`
   fenced block (required, max 400 chars after fence-stripping — must match the staging-scorer candidate_text cap)
 
 Refuse the promotion (print to stderr, exit 0) if:

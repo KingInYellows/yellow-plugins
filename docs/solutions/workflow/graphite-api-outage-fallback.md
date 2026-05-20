@@ -3,7 +3,9 @@ title: 'Graphite API outage fallback: git push --force-with-lease per branch'
 date: 2026-05-20
 category: workflow
 track: knowledge
-problem: 'Graphite API returns persistent 503s independent of GitHub availability; gt submit fails but PRs can still be pushed and merged through GitHub directly'
+problem: >-
+  Graphite API returns persistent 503s independent of GitHub availability; gt
+  submit fails but PRs can still be pushed and merged through GitHub directly
 tags:
   - graphite
   - git
