@@ -1,0 +1,19 @@
+plugins/yellow-core/agents/workflow/staging-promoter.md
+  s_6d2ef1322cfec1::t_9c37aff32b4252 320-331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "56d9dc86e0ebdeabacf9997997e784507b9220b0",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
