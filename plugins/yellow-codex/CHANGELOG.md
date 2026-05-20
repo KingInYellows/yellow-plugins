@@ -1,5 +1,35 @@
 # yellow-codex
 
+## 0.2.4
+
+### Patch Changes
+
+- [#534](https://github.com/KingInYellows/yellow-plugins/pull/534)
+  [`70a5148`](https://github.com/KingInYellows/yellow-plugins/commit/70a5148a24e5213ed4a69fb21e3ba2ac8af36782)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor:
+  de-duplicate install-script helpers via a build-time generator
+
+  The `version_gte()` semver comparator and the color-output helpers
+  (`error`/`warning`/`success` + the `RED/GREEN/YELLOW/NC` constants) were
+  copy-pasted byte-identically across the plugin install scripts (debt findings
+  014/015/036/037).
+  - `scripts/snippets/install-helpers.sh` +
+    `scripts/snippets/install-version-gte.sh` — canonical sources, single point
+    of truth.
+  - `scripts/sync-shell-snippets.js` — generator that injects each canonical
+    snippet into the consuming install scripts between
+    `# >>> generated: <name> >>>` / `# <<< generated: <name> <<<` sentinel
+    markers. `pnpm generate:snippets` regenerates; `pnpm validate:snippets` (and
+    now `pnpm validate:schemas`, run in CI) fails on drift.
+  - `install-codex.sh` and `install-semgrep.sh` embed both snippets;
+    `install.sh` (yellow-ruvector) and `install-ast-grep.sh` (yellow-research)
+    embed `install-helpers` only. yellow-ruvector keeps its own `version_lt` (a
+    distinct comparator); yellow-research does not need version comparison.
+
+  No behavior change — the embedded blocks are byte-identical to the prior
+  inline copies. Gates: `generate:snippets` + `validate:snippets` (drift caught
+  on tamper, clean on sync), `validate:plugins`, shellcheck, bash -n.
+
 ## 0.2.3
 
 ### Patch Changes

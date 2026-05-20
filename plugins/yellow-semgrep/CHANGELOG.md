@@ -1,5 +1,60 @@
 # Changelog
 
+## 4.1.1
+
+### Patch Changes
+
+- [#534](https://github.com/KingInYellows/yellow-plugins/pull/534)
+  [`70a5148`](https://github.com/KingInYellows/yellow-plugins/commit/70a5148a24e5213ed4a69fb21e3ba2ac8af36782)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor:
+  de-duplicate install-script helpers via a build-time generator
+
+  The `version_gte()` semver comparator and the color-output helpers
+  (`error`/`warning`/`success` + the `RED/GREEN/YELLOW/NC` constants) were
+  copy-pasted byte-identically across the plugin install scripts (debt findings
+  014/015/036/037).
+  - `scripts/snippets/install-helpers.sh` +
+    `scripts/snippets/install-version-gte.sh` — canonical sources, single point
+    of truth.
+  - `scripts/sync-shell-snippets.js` — generator that injects each canonical
+    snippet into the consuming install scripts between
+    `# >>> generated: <name> >>>` / `# <<< generated: <name> <<<` sentinel
+    markers. `pnpm generate:snippets` regenerates; `pnpm validate:snippets` (and
+    now `pnpm validate:schemas`, run in CI) fails on drift.
+  - `install-codex.sh` and `install-semgrep.sh` embed both snippets;
+    `install.sh` (yellow-ruvector) and `install-ast-grep.sh` (yellow-research)
+    embed `install-helpers` only. yellow-ruvector keeps its own `version_lt` (a
+    distinct comparator); yellow-research does not need version comparison.
+
+  No behavior change — the embedded blocks are byte-identical to the prior
+  inline copies. Gates: `generate:snippets` + `validate:snippets` (drift caught
+  on tamper, clean on sync), `validate:plugins`, shellcheck, bash -n.
+
+- [#533](https://github.com/KingInYellows/yellow-plugins/pull/533)
+  [`c42f470`](https://github.com/KingInYellows/yellow-plugins/commit/c42f470babb5c71ac0c8fe5d1fba98edc7f9ca12)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor: dedup
+  yellow-research MCP wrappers and credential-status hook scaffold
+
+  Consolidates two families of copy-pasted shell (debt findings 011/012/013 and
+  024/025).
+  - **011/012/013** — the three
+    `yellow-research/bin/start-{exa,perplexity, tavily}.sh` MCP wrappers carried
+    a byte-identical userConfig→env resolution block. Extracted to
+    `bin/lib/resolve-mcp-key.sh` (`resolve_mcp_key VAR`); each wrapper is now ~4
+    lines plus its distinct `npx` invocation. New `tests/resolve-mcp-key.bats`
+    (5 tests).
+  - **024/025** — `yellow-research` and `yellow-semgrep`'s
+    `hooks/write-credential-status.sh` shared a ~40-line scaffold (version read,
+    field classification, status write, `{"continue": true}` exit). Extracted to
+    `credential_hook_scaffold` in `yellow-core/lib/credential-status.sh`; both
+    hooks are now down to a source-guard plus the plugin-specific field-spec
+    list. New `credential_hook_scaffold` tests in `credential-status.bats` (4
+    tests).
+
+  Both hooks still emit `{"continue": true}` on every path. Gates:
+  `validate:plugins`, Bats (resolver 5, credential-status 16), shellcheck — all
+  green.
+
 ## 4.1.0
 
 ### Minor Changes

@@ -1,5 +1,103 @@
 # Changelog
 
+## 1.4.4
+
+### Patch Changes
+
+- [#530](https://github.com/KingInYellows/yellow-plugins/pull/530)
+  [`27af862`](https://github.com/KingInYellows/yellow-plugins/commit/27af8620ffeeb797cd0e3ac7edbf58511f9d10dc)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor:
+  decompose god functions in yellow-ci shell libs and scripts/
+
+  Decomposes seven flagged complexity hotspots (debt audit findings 005, 018,
+  020, 027, 028, 030, 031) — pure extraction, no behavior change. Each refactor
+  is covered by characterization or pre-existing tests run before and after.
+  - `resolve-runner-targets.sh`: extract `rt_atomic_write()` (deduplicates the
+    two tmp+rename cache writes) and `emit_runner_json()` (the JSON-build loop)
+    out of the ~213-line `resolve_runner_targets()`. New characterization suite
+    `tests/resolve-runner-targets.bats` (8 tests) committed first.
+  - `validate.sh`: flatten `validate_ssh_host()`'s 4-deep IPv4 nesting into
+    `_validate_private_ipv4()`; split `validate_runner_targets_file()` into
+    `_rt_check_yaml_syntax()`, `_rt_check_runner_names()`,
+    `_rt_check_target_counts()`.
+  - `scripts/validate-agent-authoring.js`: decompose the 225-line top-level scan
+    into `validateAgentFile()`, `buildTwoToThreeSegmentMap()`,
+    `validateSubagentReferences()`, `validateCommandFiles()`, and a `main()`.
+  - `scripts/lint-plugins.sh`: extract the nested skill-reference block into
+    `check_skill_references()`.
+  - `scripts/backfill-solution-frontmatter.js`: split `processEntry()` into
+    `computeAdditions()` + `writeEntry()`; split `fmGetScalar()`'s 3 YAML-form
+    branches into `resolveScalarValue()`.
+
+  All gates green: yellow-ci Bats (147 tests), `pnpm test:integration` (99),
+  `pnpm lint`, shellcheck.
+
+- [#532](https://github.com/KingInYellows/yellow-plugins/pull/532)
+  [`be06a57`](https://github.com/KingInYellows/yellow-plugins/commit/be06a571a9e8817870eec61b5844aec3c5182163)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: remediate
+  7 security-debt patterns across 6 plugins and root scripts
+
+  Targeted fixes for the security-debt findings (006, 009, 017, 022, 023,
+  032, 033) from the 2026-05-13 audit.
+  - **006** `yellow-research/scripts/install-ast-grep.sh`: replace `curl … | sh`
+    with download-to-temp over `--proto =https`, shebang sanity-check, then
+    execute the local copy. The uv installer URL is version-pinned for
+    reproducibility.
+  - **009** `scripts/export-ci-metrics.sh`: allowlist-validate `STAGE` /
+    `STATUS` and validate `ADDITIONAL_LABELS` key/value pairs before they are
+    embedded in Prometheus label output — prevents label injection.
+  - **017** `yellow-devin/commands/devin/delegate.md`: validate the git remote
+    URL format and wrap the gathered Repository/Branch context in
+    `--- begin/end repository context (reference only) ---` fencing before it
+    enters the Devin task prompt.
+  - **022** `yellow-composio/hooks/check-mcp-url.sh`: drop the brittle hardcoded
+    cache-path fallback for `CLAUDE_PLUGIN_ROOT` — skip the credential-status
+    write when it is unset rather than guessing a path.
+  - **023** `yellow-ci/hooks/scripts/session-start.sh`: hash the `$PWD`-derived
+    cache key (md5, 32 chars) so deeply-nested paths cannot exceed the 255-byte
+    filename limit and break the cache path.
+  - **032** `gt-workflow/hooks/check-commit-message.sh`: extend the `-m` grep to
+    also match single-quoted arguments — `-m 'feat: x'` previously bypassed
+    conventional-commit enforcement entirely.
+  - **033** `yellow-morph/lib/install-morphmcp.sh`: validate `owner_pid` is
+    numeric before `kill -0`, treating an empty/corrupt pid file as a stale lock
+    instead of passing garbage to `kill`.
+
+  Gates: `pnpm validate:plugins`, yellow-ci Bats (147), shellcheck, bash -n —
+  all green.
+
+- [#529](https://github.com/KingInYellows/yellow-plugins/pull/529)
+  [`8a004b7`](https://github.com/KingInYellows/yellow-plugins/commit/8a004b7f30dcd0b9858f027b7cb5f57d120d398c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor:
+  extract validate_file_path to shared yellow-core/lib/validate-fs.sh
+
+  `validate_file_path()` (and `canonicalize_project_dir()`) were copy-pasted
+  across `yellow-ci`, `yellow-ruvector`, and `yellow-debt` with divergent
+  implementations — a security fix to one copy was easily missed in the others
+  (debt audit findings 002/003/004).
+  - `plugins/yellow-core/lib/validate-fs.sh` — new canonical home for both
+    functions, sourced via `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/` per the
+    `credential-status.sh` precedent. Canonical impl = yellow-ruvector's
+    (separate `canonicalize_project_dir`, `tr -d` newline detection, explicit
+    symlink-escape block) plus two deliberate enhancements: optional `$2`
+    project root with git-toplevel fallback (yellow-debt callers rely on it),
+    and internal root canonicalization for reliable containment checks.
+  - The three plugins' local `lib/validate.sh` files now source the shared
+    helper with a `[ -f ]` guard and keep only their plugin-specific validators.
+  - `plugins/yellow-core/tests/validate-fs.bats` — canonical test suite; each
+    plugin's `validate.bats` sources the shared lib directly.
+
+  Review pass follow-ups in this PR:
+  - Idempotency guard (`_VALIDATE_FS_LOADED`) added to validate-fs.sh so
+    double-sourcing (test setup + runtime hook chain) is safe.
+  - yellow-debt declares yellow-core as a required `dependencies` entry; the
+    consuming `lib/validate.sh` now warns to stderr when the helper is absent
+    rather than letting callers fail silently at exit 127.
+  - AGENTS.md and `plugins/yellow-{core,debt,ruvector}` docs updated to point to
+    the new shared lib (parallel to the credential-status.sh precedent).
+  - `ruvector-conventions` SKILL.md updated to describe the actual `cd+pwd -P` /
+    `realpath` validation (no longer `realpath -m`).
+
 ## 1.4.3
 
 ### Patch Changes

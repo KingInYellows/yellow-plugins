@@ -1,5 +1,52 @@
 # Changelog
 
+## 3.2.0
+
+### Minor Changes
+
+- [#528](https://github.com/KingInYellows/yellow-plugins/pull/528)
+  [`3cfafa8`](https://github.com/KingInYellows/yellow-plugins/commit/3cfafa8a1bdedf74462b6b5a32e9d974c5c4067b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-review): resolve-stack command + stack-traversal skill
+
+  Adds `/review:resolve-stack` — walks the current Graphite stack bottom-up and
+  runs `/review:resolve` on every open PR fully autonomously (no prompts),
+  pushing and restacking as it goes. Built for clearing reviewer comments spread
+  across a multi-PR stack in one unattended pass.
+  - `plugins/yellow-review/commands/review/resolve-stack.md` — new gateless
+    command: pre-flight checks, base-to-tip stack walk, per-PR delegation to
+    `/review:resolve --non-interactive`, independent self-verification via
+    `get-pr-comments`, log-and-continue error handling, final aggregate summary
+    with a "needs manual attention" section.
+  - `plugins/yellow-review/skills/stack-traversal/SKILL.md` — new internal
+    reference skill (`user-invokable: false`) documenting the canonical
+    bottom-up Graphite walk shared by `/review:all` and `/review:resolve-stack`.
+  - `plugins/yellow-review/commands/review/resolve-pr.md` — adds a
+    `--non-interactive` mode that suppresses the spawn-cap, CONFLICT, and
+    push-confirmation `AskUserQuestion` gates (spawn-cap is replaced by a hard
+    20-cluster cap). Default behavior is unchanged.
+  - `plugins/yellow-review/commands/review/review-all.md` — mirror-comment
+    citing the new `stack-traversal` skill as the traversal source of truth (no
+    logic change).
+
+- [#539](https://github.com/KingInYellows/yellow-plugins/pull/539)
+  [`1d79b35`](https://github.com/KingInYellows/yellow-plugins/commit/1d79b35fc13b1c493ffa829c3e89b4ed47683e39)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Remove the
+  human gate from /review:sweep and add /review:sweep-all for unattended batch
+  sweeping of all open PRs. /review:pr gains a `--non-interactive` flag (used
+  internally by /review:sweep) that suppresses its Step 9 push-confirmation
+  prompt and Step 9b "save learnings" prompt.
+  - `/review:sweep` now runs `/review:pr --non-interactive` then
+    `/review:resolve --non-interactive` with no AskUserQuestion gates anywhere —
+    fully fire-and-forget on a single PR.
+  - `/review:sweep-all` (new) enumerates your open non-draft PRs, shows one
+    upfront M3 confirmation listing PR count + titles, then loops sweep over
+    each PR sequentially with skip-and-continue on per-PR failure, an
+    end-of-loop summary table, and a single `/workflows:compound` pass to
+    capture learnings (skipped if zero PRs were swept).
+  - `/review:pr --non-interactive` is opt-in for standalone use too — calling
+    `/review:pr` without the flag retains the current interactive behavior.
+
 ## 3.1.4
 
 ### Patch Changes
