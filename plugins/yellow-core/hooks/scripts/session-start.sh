@@ -372,9 +372,13 @@ DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
   fi
   cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
 ) >/dev/null 2>&1 &
-disown
-# Hand lock ownership to the subshell: disarm the parent-side safety-net
-# trap so its EXIT does not rmdir a lock the subshell still holds.
+# Hand lock ownership to the subshell immediately after `&` parses — the
+# child now owns the lock via its own EXIT/INT/TERM trap (set as its
+# first statement inside the subshell). Clearing the parent flag BEFORE
+# `disown` (rather than after) closes the INT/TERM window where the
+# parent trap would still match `LOCK_OWNED_BY_PARENT=1` and rmdir a
+# lock the running child still holds (concurrent-drain race).
 LOCK_OWNED_BY_PARENT=0
+disown
 
 json_exit
