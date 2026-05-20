@@ -409,32 +409,21 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
   const content = fs.readFileSync(promoter, 'utf8');
   const frontmatter = extractFrontmatter(content) || '';
 
-  // Match either YAML list form:
-  //   disallowedTools:
-  //     - AskUserQuestion
-  //     - 'AskUserQuestion'        ← quoted scalar (also valid YAML)
-  //     - "AskUserQuestion"        ← quoted scalar
-  // or flow-style:
-  //   disallowedTools: [AskUserQuestion]
-  //   disallowedTools: ['AskUserQuestion', "Other"]
-  // Tool names may contain hyphens, colons, and double-underscores (e.g.
-  // `mcp__plugin_x__tool`, `Bash-Read`). Allow [\w:-] inside list entries
-  // so preceding tools don't anchor the AskUserQuestion match incorrectly.
-  // Quoted scalars are valid YAML — `- 'Foo'` and `- "Foo"` are
-  // semantically equivalent to `- Foo`. Without accepting them, a stylistic
-  // formatting change would falsely trip RULE 14 even with AskUserQuestion
-  // still present.
-  // The `(?<![\w-])` lookbehind and `(?![\w-])` lookahead enforce that
-  // AskUserQuestion is the EXACT token. `\bAskUserQuestion\b` alone
-  // would still match `AskUserQuestion-foo` (because the hyphen creates
-  // a word boundary), letting a future edit silently re-enable
-  // AskUserQuestion under a renamed token while RULE 14 passed. The
-  // lookaround rejects any adjacent word character or hyphen; quotes,
-  // commas, brackets, and whitespace remain valid neighbors.
-  const listForm = /^disallowedTools:\s*\n(?:\s+-\s+["']?[\w:-]+["']?\s*\n)*\s+-\s+["']?(?<![\w-])AskUserQuestion(?![\w-])["']?(?:\s|$)/m;
-  const flowForm = /^disallowedTools:\s*\[[^\]]*["']?(?<![\w-])AskUserQuestion(?![\w-])["']?[^\]]*\]/m;
-
-  if (!listForm.test(frontmatter) && !flowForm.test(frontmatter)) {
+  // Use the parseList() helper to extract disallowedTools as a real
+  // string array, then check whether 'AskUserQuestion' is a complete
+  // entry. parseList handles both flow form (`[A, B]`) and block form
+  // (`- A\n- B`) and strips surrounding quotes. A `.includes()` test on
+  // the parsed array is impossible to fool with substring tricks —
+  // values like `'foo AskUserQuestion'`, `'AskUserQuestion(bar)'`, or
+  // `'AskUserQuestion-disabled'` parse to entries that are NOT equal to
+  // the bare string `'AskUserQuestion'`, so they fail the check.
+  // Earlier regex-only approaches (\b boundaries, then lookarounds) were
+  // repeatedly bypassed — see PR #544 round-1/round-2/round-3 review
+  // comments — because regex cannot cleanly distinguish "the entry IS
+  // AskUserQuestion" from "the entry CONTAINS AskUserQuestion". Parsing
+  // first sidesteps the entire problem.
+  const disallowed = parseList(frontmatter, 'disallowedTools');
+  if (!disallowed.includes('AskUserQuestion')) {
     errors.push(
       `${relative(promoter)}: RULE 14 — staging-promoter frontmatter MUST contain \`disallowedTools: [AskUserQuestion]\` (this is the load-bearing D8 enforcement for the background-compounding drain pipeline)`
     );
