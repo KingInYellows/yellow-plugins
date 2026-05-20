@@ -118,33 +118,11 @@ if [ "${expired_count:-0}" -gt 0 ] 2>/dev/null; then
     || true
 fi
 
-# Processing/ entries older than 1h are crashed mid-drain; requeue them for
-# retry unless they also exceed the 7-day PII TTL, in which case purge them
-# to prevent stale PII from re-entering the pipeline. Younger files are
-# in-flight from a concurrent drain — leave them alone.
-#
-# Concurrency: only requeue when no drain is currently active. Without this
-# guard, a concurrent SessionStart could mv a processing/X.jsonl back to
-# pending/ while the active drain is still working on it, producing
-# duplicate work. The .drain-lock check is racy but defensive — the
-# active drain holds the lock through its EXIT trap, so a non-existent
-# lock means no concurrent drain is mid-flight.
-if [ -d "${STAGING_DIR}/processing" ] && [ ! -d "${STAGING_DIR}/.drain-lock" ]; then
-  while IFS= read -r f; do
-    [ -z "$f" ] && continue
-    base=$(basename -- "$f")
-    # Age-check: if the crashed entry is also older than 7 days, purge it
-    # instead of requeueing (PII TTL — same policy as pending/).
-    if find "$f" -name '*.jsonl' -mtime +7 -print 2>/dev/null | grep -q .; then
-      printf '[yellow-core] compound-staging: purging expired crashed entry %s (>7d PII TTL)\n' "$base" >&2
-      rm -f -- "$f" 2>/dev/null \
-        || printf '[yellow-core] compound-staging: failed to purge expired crashed entry %s\n' "$base" >&2
-    else
-      mv -- "$f" "${STAGING_DIR}/pending/${base}" 2>/dev/null \
-        || printf '[yellow-core] compound-staging: failed to requeue crashed entry %s\n' "$base" >&2
-    fi
-  done < <(find "${STAGING_DIR}/processing" -name '*.jsonl' -mmin +60 -print 2>/dev/null)
-fi
+# Processing/ entries older than 1h are crashed mid-drain — requeue them
+# below, AFTER acquiring the drain lock (Phase 1.2 of the plan). Doing it
+# pre-lock leaves a window where two concurrent SessionStart processes
+# both enter the requeue loop, producing duplicate `mv` operations. The
+# lock-protected version executes after line 196 (atomic mkdir) below.
 
 # --- Threshold check ---
 # count >= 5 OR oldest_age > 48h (Max 20x responsive defaults per plan §Budget Model).
@@ -201,8 +179,33 @@ fi
 # this trap — preventing it from rmdir'ing the lock while the subshell
 # still holds it.
 LOCK_OWNED_BY_PARENT=1
-# shellcheck disable=SC2064  # expand STAGING_DIR at trap-registration
-trap "[ \"\$LOCK_OWNED_BY_PARENT\" = 1 ] && rmdir '${STAGING_DIR}/.drain-lock' 2>/dev/null || true" EXIT INT TERM
+# Export STAGING_DIR so the trap can read it by name at execution time.
+# Single-quote interpolation at definition time would break for any
+# project path containing `'` (legal in Unix paths) — the trap payload
+# would become syntactically invalid and the lock would leak. Reading
+# the value at run-time via ${STAGING_DIR} avoids the quoting issue.
+export STAGING_DIR
+# shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true' EXIT INT TERM
+
+# --- Requeue crashed processing entries (lock-protected) ---
+# Now that we own the drain lock, no concurrent SessionStart can race us
+# on the requeue mv. Entries older than 1h are crashed mid-drain; older
+# than 7 days hit the PII TTL and are purged instead.
+if [ -d "${STAGING_DIR}/processing" ]; then
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    base=$(basename -- "$f")
+    if find "$f" -name '*.jsonl' -mtime +7 -print 2>/dev/null | grep -q .; then
+      printf '[yellow-core] compound-staging: purging expired crashed entry %s (>7d PII TTL)\n' "$base" >&2
+      rm -f -- "$f" 2>/dev/null \
+        || printf '[yellow-core] compound-staging: failed to purge expired crashed entry %s\n' "$base" >&2
+    else
+      mv -- "$f" "${STAGING_DIR}/pending/${base}" 2>/dev/null \
+        || printf '[yellow-core] compound-staging: failed to requeue crashed entry %s\n' "$base" >&2
+    fi
+  done < <(find "${STAGING_DIR}/processing" -name '*.jsonl' -mmin +60 -print 2>/dev/null)
+fi
 
 # --- Resolve claude binary ---
 # Allow tests to override via COMPOUND_DRAIN_CMD env var, but ONLY

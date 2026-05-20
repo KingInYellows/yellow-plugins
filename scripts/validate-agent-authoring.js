@@ -486,7 +486,7 @@ function validateMemoryWriteSectionGate(agentFiles, errors) {
 
   if (!hasSessionNotesGate || !hasNeverModifyInvariant) {
     errors.push(
-      `${relative(promoter)}: RULE 14b — staging-promoter body must reference \`## Session Notes\` write gate AND state a "Never modify" invariant that enumerates ALL THREE protected sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS) within 80 chars of the Never-verb (D9-L1 memory-partition enforcement)`
+      `${relative(promoter)}: RULE 14b — staging-promoter body must reference \`## Session Notes\` write gate AND state a "Never modify" invariant that enumerates ALL THREE protected sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS) within the same paragraph as the Never-verb (D9-L1 memory-partition enforcement)`
     );
   }
 }

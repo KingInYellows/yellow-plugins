@@ -100,6 +100,13 @@ Use this when:
      mtime=$(stat -c '%y' "$f" 2>/dev/null | cut -d. -f1 \
        || stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S' "$f" 2>/dev/null \
        || printf '?')
+     # Strip CR/LF + truncate cwd — `cwd` comes from raw hook input and
+     # isn't sanitized on write, so unusual directory names can contain
+     # newlines/control chars that would otherwise bleed into the
+     # AskUserQuestion prompt context.
+     sid=$(printf '%s' "$sid" | tr -d '\r\n' | cut -c1-64)
+     cwd=$(printf '%s' "$cwd" | tr -d '\r\n' | cut -c1-80)
+     title=$(printf '%s' "$title" | tr -d '\r\n' | cut -c1-80)
      SAMPLES="${SAMPLES}- $(basename -- "$f")  [session=${sid} cwd=${cwd} mtime=${mtime}]"$'\n'
      SAMPLES="${SAMPLES}    preview: ${title}"$'\n'
    done < <(printf '%s\n' "$PREVIEW_LIST")
