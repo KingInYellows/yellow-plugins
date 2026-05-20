@@ -1,0 +1,45 @@
+docs/brainstorms/2026-05-18-background-compounding-triggers-brainstorm.md
+  s_f188cf7e3ae96a::t_b7fe0e8e190aca 248-253
+  s_f188cf7e3ae96a::t_68166abb801996 108-113
+  s_f188cf7e3ae96a::t_fa5dc26583d448 264-268
+  s_f188cf7e3ae96a::t_1856f4d48b8b77 176-182
+plugins/yellow-core/commands/compound/review-staged.md
+  s_f188cf7e3ae96a::t_9e6a9d441e0e2a 61-69,78-88
+tests/integration/validate-agent-authoring-rule14.test.ts
+  s_f188cf7e3ae96a::t_7da4543b9483ac 1-218
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_f188cf7e3ae96a::t_32456e41307cb3 125-132
+  s_f188cf7e3ae96a::t_8607e00fb6bd3d 284
+  s_f188cf7e3ae96a::t_837283b3948fdd 324-326
+  s_f188cf7e3ae96a::t_a725bf322964d4 238
+  s_f188cf7e3ae96a::t_e61aca3d2836f1 222-223
+  s_f188cf7e3ae96a::t_e5ecadb1baab0d 197-205
+plugins/yellow-core/tests/compound-session-start-hook.bats
+  s_f188cf7e3ae96a::t_8f2e69d8234683 240-280
+plans/background-compounding-triggers.md
+  s_f188cf7e3ae96a::t_54e64a9d1a1db6 466-477
+.changeset/yellow-core-compound-staging-followups.md
+  s_f188cf7e3ae96a::t_1e1f0cc89cca66 1-48
+scripts/validate-agent-authoring.js
+  s_f188cf7e3ae96a::t_2f6368211f64f4 460-469,471,489
+  s_f188cf7e3ae96a::t_22481bbc34bcb4 470,472-476,478-485
+  s_f188cf7e3ae96a::t_4854e51fb489c3 398-412,414-440
+plans/compound-staging-review-followups.md
+  s_f188cf7e3ae96a::t_8d0eef6372b0b3 1-251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "c842352b815d941cf90f7cd1f5c0e7138467062c",
+  "prompts": {},
+  "sessions": {
+    "s_f188cf7e3ae96a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "40ca09a9-77f3-4e24-971e-6e365b2795cf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
