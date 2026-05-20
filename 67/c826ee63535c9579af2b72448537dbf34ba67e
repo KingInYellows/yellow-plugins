@@ -1,0 +1,21 @@
+docs/solutions/integration-issues/codex-cli-401-non-tty-task-spawn-degradation.md
+  s_6d2ef1322cfec1::t_f6a70c4c12685f 60
+docs/solutions/workflow/gt-modify-no-c-flag-silent-unstaged-miss.md
+  s_6d2ef1322cfec1::t_09277df5f4953a 2,6-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "67c826ee63535c9579af2b72448537dbf34ba67e",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
