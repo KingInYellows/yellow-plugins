@@ -151,7 +151,16 @@ for f in "$STAGING"/pending/*.jsonl; do
   base=$(basename -- "$f")
   target="$STAGING/processing/$base"
   if [ -f "$target" ]; then
-    age_s=$(( $(date +%s) - $(stat -c '%Y' "$target" 2>/dev/null || stat -f '%m' "$target" 2>/dev/null || date +%s) ))
+    target_mtime=$(stat -c '%Y' "$target" 2>/dev/null || stat -f '%m' "$target" 2>/dev/null || printf '')
+    if [ -z "$target_mtime" ]; then
+      # stat failed entirely (file exists but unstatable via either
+      # GNU or BSD form — usually permission/FS bug). Log + skip; the
+      # earlier `|| date +%s` fallback silently classified these as
+      # in-flight (age=0), masking the real problem.
+      printf '[staging-reviewer] warning: cannot stat existing target %s; skipping mv\n' "$target" >&2
+      continue
+    fi
+    age_s=$(( $(date +%s) - target_mtime ))
     [ "$age_s" -lt 300 ] && continue
   fi
   if mv -- "$f" "$target" 2>/dev/null; then
