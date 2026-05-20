@@ -412,15 +412,20 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
   // Match either YAML list form:
   //   disallowedTools:
   //     - AskUserQuestion
+  //     - 'AskUserQuestion'        ← quoted scalar (also valid YAML)
+  //     - "AskUserQuestion"        ← quoted scalar
   // or flow-style:
   //   disallowedTools: [AskUserQuestion]
-  // or flow-style with other entries:
-  //   disallowedTools: [Foo, AskUserQuestion, Bar]
+  //   disallowedTools: ['AskUserQuestion', "Other"]
   // Tool names may contain hyphens, colons, and double-underscores (e.g.
   // `mcp__plugin_x__tool`, `Bash-Read`). Allow [\w:-] inside list entries
   // so preceding tools don't anchor the AskUserQuestion match incorrectly.
-  const listForm = /^disallowedTools:\s*\n(?:\s+-\s+[\w:-]+\s*\n)*\s+-\s+AskUserQuestion\b/m;
-  const flowForm = /^disallowedTools:\s*\[[^\]]*\bAskUserQuestion\b[^\]]*\]/m;
+  // Quoted scalars are valid YAML — `- 'Foo'` and `- "Foo"` are
+  // semantically equivalent to `- Foo`. Without accepting them, a stylistic
+  // formatting change would falsely trip RULE 14 even with AskUserQuestion
+  // still present.
+  const listForm = /^disallowedTools:\s*\n(?:\s+-\s+["']?[\w:-]+["']?\s*\n)*\s+-\s+["']?AskUserQuestion["']?(?:\s|$)/m;
+  const flowForm = /^disallowedTools:\s*\[[^\]]*["']?\bAskUserQuestion\b["']?[^\]]*\]/m;
 
   if (!listForm.test(frontmatter) && !flowForm.test(frontmatter)) {
     errors.push(
@@ -448,23 +453,44 @@ function validateMemoryWriteSectionGate(agentFiles, errors) {
   // Strip frontmatter so we don't false-positive on metadata.
   const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '');
 
-  // Heuristic: every line mentioning MEMORY.md must either:
-  //  - reference `## Session Notes`,
-  //  - explicitly forbid writing to other sections (the `Never modify`
-  //    invariant statement),
-  //  - or be inside a `## References` block.
-  // The signal we care about is whether the body documents the gate.
-  const hasSessionNotesGate = /Session Notes/.test(body);
-  // All three protected sections must be named in a "Never modify/write/touch"
-  // context. Listing just one is insufficient — the partition invariant
-  // is that the promoter never touches ANY of CORE_RULES, USER_PREFERENCES,
-  // or KNOWN_PROJECTS, so all three must be enumerated.
-  const neverPattern = /[Nn]ever (?:modif|write|touch)/.test(body);
-  const namesCoreRules = /CORE_RULES/.test(body) && neverPattern;
-  const namesUserPrefs = /USER_PREFERENCES/.test(body) && neverPattern;
-  const namesKnownProjects = /KNOWN_PROJECTS/.test(body) && neverPattern;
-  const hasNeverModifyInvariant =
-    namesCoreRules && namesUserPrefs && namesKnownProjects;
+  // Bind both checks to a local context window so generic prose mentioning
+  // `Session Notes` or the section names somewhere unrelated cannot satisfy
+  // the rule. Window = ±200 chars around the anchor phrase.
+  //
+  // Session Notes gate: must appear within 200 chars of a write-restriction
+  // phrase (`only.*Session Notes`, `Session Notes.*only`, `Never.*other.*section`,
+  // `write only to .* Session Notes`). A naked `Session Notes` mention is
+  // insufficient.
+  const sessionNotesGateRe = new RegExp(
+    // Form A: "ONLY ... Session Notes" within 200 chars
+    '(?:only|ONLY)[\\s\\S]{0,200}Session Notes' +
+      // Form B: "Session Notes ... only/ONLY/section ONLY" within 200 chars
+      '|Session Notes[\\s\\S]{0,200}(?:section\\s+only|ONLY|never\\s+(?:any|other))' +
+      // Form C: "append to ... Session Notes" + "NEVER" within 200 chars
+      '|append[\\s\\S]{0,200}Session Notes[\\s\\S]{0,200}[Nn]ever',
+    ''
+  );
+  const hasSessionNotesGate = sessionNotesGateRe.test(body);
+
+  // Never-modify invariant: all three protected section names must appear
+  // in the same 400-char sliding window as a "Never modify/write/touch"
+  // phrase. Splitting them across the document (e.g., one in prose + one
+  // in code + one in references) would otherwise satisfy three independent
+  // global tests and let the actual invariant statement be silently removed.
+  const sectionContextRe =
+    /[Nn]ever[^.\n]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)[\s\S]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)[\s\S]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)/;
+  const hasNeverModifyInvariant = (() => {
+    const m = body.match(sectionContextRe);
+    if (!m) return false;
+    const span = m[0];
+    // All three names must appear within this single matched window.
+    return (
+      /CORE_RULES/.test(span) &&
+      /USER_PREFERENCES/.test(span) &&
+      /KNOWN_PROJECTS/.test(span) &&
+      /[Nn]ever (?:modif|write|touch)/.test(span)
+    );
+  })();
 
   if (!hasSessionNotesGate || !hasNeverModifyInvariant) {
     errors.push(

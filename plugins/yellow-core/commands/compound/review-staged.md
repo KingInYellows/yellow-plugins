@@ -72,9 +72,20 @@ Use this when:
      SAMPLES="${SAMPLES}- $(basename -- "$f"): ${title}"$'\n'
    # find -type f ! -type l with -printf mtime sort → oldest first.
    # Matches Steps 1-2's symlink-safe enumeration; ls follows symlinks.
-   done < <(find "$STAGING_DIR/pending" -maxdepth 1 -name '*.jsonl' \
-              -type f ! -type l -printf '%T@ %p\n' 2>/dev/null \
-            | sort -n | head -5 | cut -d' ' -f2-)
+   # BSD find (macOS) does not support -printf — fall back to per-file
+   # stat if -printf produces no output. session-start.sh uses the same
+   # two-tier pattern; keeping parity here avoids regressing macOS users.
+   PREVIEW_LIST=$(find "$STAGING_DIR/pending" -maxdepth 1 -name '*.jsonl' \
+                    -type f ! -type l -printf '%T@ %p\n' 2>/dev/null \
+                  | sort -n | head -5 | cut -d' ' -f2-)
+   if [ -z "$PREVIEW_LIST" ]; then
+     # BSD fallback: ${EPOCH}<TAB>${PATH} via stat -f
+     PREVIEW_LIST=$(find "$STAGING_DIR/pending" -maxdepth 1 -name '*.jsonl' \
+                      -type f ! -type l \
+                      -exec stat -f '%m	%N' {} \; 2>/dev/null \
+                    | sort -n | head -5 | cut -f2-)
+   fi
+   done < <(printf '%s\n' "$PREVIEW_LIST")
    printf '%s\n' "$SAMPLES"
    ```
 
@@ -126,8 +137,22 @@ Use this when:
    the lock; this command does NOT wait for drain completion.
 
    ```bash
+   # Re-source compound-staging.sh: each Bash tool call is a fresh
+   # subprocess, so the helpers sourced in Step 1 are not visible here.
+   # Without this, cs_detect_auth_route + cs_update_drain_budget would
+   # be undefined and manual drains would log empty auth and never
+   # update drain-budget.json — silently diverging from session-start.sh.
+   . "${CLAUDE_PLUGIN_ROOT}/lib/compound-staging.sh"
+
+   # Restrictive perms on drain-logs/: drain logs can include transcript
+   # fragments past redaction. Match session-start.sh (chmod 700 + umask 077
+   # so log files default to 0600). Without this, world-readable logs would
+   # leak session content on shared CI runners / multi-user machines.
    mkdir -p -- "$STAGING_DIR/drain-logs" 2>/dev/null || true
+   chmod 700 -- "$STAGING_DIR/drain-logs" 2>/dev/null || true
    DRAIN_LOG="$STAGING_DIR/drain-logs/manual-$(date +%Y%m%d-%H%M%S).log"
+   ( umask 077; : > "$DRAIN_LOG" ) 2>/dev/null || true
+
    AUTH_ROUTE=$(cs_detect_auth_route)
    # Strip newlines from interpolated paths as defense-in-depth against
    # a CWD/git-root containing literal LF (very rare but possible). The
@@ -147,16 +172,31 @@ Use this when:
      'Do NOT ask the user any questions. This drain is non-interactive.' \
      'On completion, write a one-line summary to stdout and exit.')
 
+   # Wall-clock cap for the drain subshell (matches session-start.sh).
+   # Without this, a hung `claude -p` would hold .drain-lock until the
+   # stale-lock reaper fires on a future SessionStart.
+   case "${COMPOUND_DRAIN_TIMEOUT_S:-600}" in
+     ''|*[!0-9]*|0) COMPOUND_DRAIN_TIMEOUT_S=600 ;;
+   esac
+
+   # Export STAGING_DIR before the subshell so the EXIT trap can read it
+   # by name (not by definition-time interpolation). The previous form
+   # baked the path into a single-quoted string, so any `"` in the path
+   # would break the trap payload and leak the lock — a project with
+   # `"` in its name would silently disable concurrent-drain protection.
+   export STAGING_DIR
    (
-     trap 'rmdir "'"$STAGING_DIR"'/.drain-lock" 2>/dev/null || true' EXIT INT TERM
+     trap 'rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true' EXIT INT TERM
      export COMPOUND_DRAIN_IN_PROGRESS=1
-     printf '[compound:review-staged] manual drain dispatch %s (auth=%s, pending=%s)\n' \
-       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" >> "$DRAIN_LOG" 2>/dev/null
+     printf '[compound:review-staged] manual drain dispatch %s (auth=%s, pending=%s, timeout=%ss)\n' \
+       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$COMPOUND_DRAIN_TIMEOUT_S" \
+       >> "$DRAIN_LOG" 2>/dev/null
      # --bare is the primary recursion guard: skips auto-discovery of
      # hooks, skills, plugins, MCP servers, CLAUDE.md in the child session.
      # Without it, the child fires its own SessionStart hook and cascades.
      # See docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md.
-     "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+     timeout --preserve-status "${COMPOUND_DRAIN_TIMEOUT_S}s" \
+       "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
        --bare \
        --max-turns 50 \
        --permission-mode bypassPermissions \
