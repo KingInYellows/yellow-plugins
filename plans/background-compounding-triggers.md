@@ -85,13 +85,20 @@ DRAIN SESSION (independent claude -p process)
   │         * If priority < promotion_threshold (0.5 / 0.7 no-ruvector): skip
   │         * Injection-marker scan on candidate_text → reject if found
   │         * Sanity check: if priority >= 0.8 but no concrete markers → flag for manual
-  │         * ruvector dedup (asymmetric: 0.82 corpus / 0.85 batch / 0.90 priority>=0.8)
+  │         * ruvector dedup (asymmetric):
+  │             - skip if cosine >= 0.82 AND priority < 0.8 (corpus dup)
+  │             - skip if cosine >= 0.85 AND priority < 0.8 (batch dup)
+  │             - skip if cosine >= 0.90 unconditionally (regardless of priority)
+  │           High-priority entries (>= 0.8) are protected at 0.82/0.85 but
+  │           still skipped at >= 0.90. See best-practices doc Q2 for derivation.
   │         * Task dispatch: staging-promoter (NEW agent, frontmatter
   │                          disallowedTools: [AskUserQuestion])
   │           - staging-promoter writes to docs/solutions/<category>/<slug>.md
   │             AND appends to MEMORY.md Session Notes section only
   │         * Delete processing/<session_id>.jsonl on success
-  │     - Update cost-counter.json
+  │     - Update drain-budget.json (5h rolling-window counter for
+  │       observability — under subscription auth, no hard ceiling; under
+  │       API auth, exceeding COMPOUND_DRAIN_API_THRESHOLD warns the user)
   │     - Final report to drain-logs/
   └── claude -p exits; SessionStart subshell's EXIT trap removes drain-lock
 
@@ -374,7 +381,10 @@ interactive session.
     `Task(subagent_type: "yellow-core:workflow:staging-promoter",
           prompt: <category + candidate_text fenced + suggested category>)`
   - **Phase 9: Cleanup.** Delete drained `processing/<session>.jsonl`.
-    Update cost-counter (`cold_path_calls += 1`, `estimated_usd += <cost>`).
+    Update `drain-budget.json` via `cs_update_drain_budget` — increments
+    `drains_in_window` on the 5h rolling counter, used by
+    `cs_drain_budget_warn` to surface over-threshold dispatches under API
+    auth.
   - Final report: written to `drain-logs/<timestamp>.log` (count drained,
     survived, rejected by guardian/injection/sanity, promoted).
 - [ ] **2.3** Add `plugins/yellow-core/agents/workflow/staging-scorer.md`
