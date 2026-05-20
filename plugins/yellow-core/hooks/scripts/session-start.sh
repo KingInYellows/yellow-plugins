@@ -130,9 +130,10 @@ PENDING_COUNT=$(find "${STAGING_DIR}/pending" -maxdepth 1 -name '*.jsonl' -type 
   | wc -l | tr -d '[:space:]')
 PENDING_COUNT="${PENDING_COUNT:-0}"
 
-if [ "$PENDING_COUNT" -eq 0 ] 2>/dev/null; then
-  json_exit
-fi
+# NOTE: do NOT early-exit on PENDING_COUNT==0 here. The REQUEUE_ONLY path
+# below needs to run even when pending/ is empty, otherwise crashed
+# processing/ entries stay stranded indefinitely under low-traffic
+# conditions (the original bug this PR's review-followups closed).
 
 DISPATCH=0
 if [ "$PENDING_COUNT" -ge 5 ] 2>/dev/null; then
