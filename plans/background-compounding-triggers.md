@@ -366,8 +366,17 @@ interactive session.
       ```
       mkdir -p "$STAGING_DIR/drain-logs"
       (
-        printf '%d\n' "$$" > "$STAGING_DIR/.drain-lock/pid"
-        trap 'rmdir "$STAGING_DIR/.drain-lock" 2>/dev/null' EXIT
+        # BASHPID is the SUBSHELL PID; $$ resolves to the parent's PID
+        # (subshells inherit $$ unchanged in bash). Writing $$ would have
+        # the stale-lock reaper's `kill -0 $(cat pid)` probe the wrong
+        # process and treat live drains as dead. Requires bash 4+ (BASHPID
+        # is bash-specific) — the hook shebang must be #!/usr/bin/env bash.
+        printf '%d\n' "$BASHPID" > "$STAGING_DIR/.drain-lock/pid"
+        # rmdir refuses non-empty directories — remove the pidfile FIRST,
+        # then rmdir succeeds and the lock is fully released. Otherwise
+        # every normal drain exit leaves a stale lock behind and the
+        # next SessionStart treats the drain as still in flight.
+        trap 'rm -f "$STAGING_DIR/.drain-lock/pid" 2>/dev/null; rmdir "$STAGING_DIR/.drain-lock" 2>/dev/null' EXIT
         # bypassPermissions is refused under root/sudo per Claude Code docs;
         # fall back to acceptEdits in that environment so drain still runs.
         PERM_MODE=bypassPermissions
