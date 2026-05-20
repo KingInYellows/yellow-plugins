@@ -131,16 +131,31 @@ at capture time). For each duplicate found, **delete the duplicate file from
 Do not defer deletion to Phase 9 — a later stale-processing requeue could
 otherwise resurrect and re-promote the duplicate.
 
+**Deletion is restricted to files moved by THIS drain** (i.e., basenames
+present in `MOVED_THIS_DRAIN_FILE`). Files that were already in
+`processing/` when this drain started belong to a concurrent or prior drain
+and must not be deleted here — deleting them would cause lost work or
+conflicting cleanup. Those pre-existing files are still included in the
+seen-hash set so that any duplicate moved this drain is correctly suppressed,
+but only this-drain files are eligible for deletion.
+
 ```bash
 declare -A seen
 for f in "$STAGING"/processing/*.jsonl; do
   [ -f "$f" ] || continue
+  base=$(basename -- "$f")
   h=$(jq -r '.content_hash // empty' "$f" 2>/dev/null)
   [ -z "$h" ] && continue
   if [ -n "${seen[$h]:-}" ]; then
-    printf '[staging-reviewer] hash-dedup: deleted duplicate %s (hash %s)\n' \
-      "$(basename -- "$f")" "$h"
-    rm -- "$f"
+    # Only delete if this drain moved the file — never delete a concurrent drain's file
+    if grep -qxF "$base" "$MOVED_THIS_DRAIN_FILE" 2>/dev/null; then
+      printf '[staging-reviewer] hash-dedup: deleted duplicate %s (hash %s)\n' \
+        "$base" "$h"
+      rm -- "$f"
+    else
+      printf '[staging-reviewer] hash-dedup: skipped pre-existing duplicate %s (hash %s, belongs to concurrent drain)\n' \
+        "$base" "$h"
+    fi
   else
     seen[$h]=1
   fi

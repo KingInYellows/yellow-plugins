@@ -264,13 +264,22 @@ fi
 **If `PHASE_2_SKIP=0`** — perform the atomic write:
 
 1. Write the full file content to a sibling temp path `${SOLUTION_PATH}.tmp`.
-2. Run `mv "${SOLUTION_PATH}.tmp" "${SOLUTION_PATH}"`.
-3. Create the sentinel as session-scoped JSON:
+2. Write the sentinel FIRST (marks intent before the file becomes visible at
+   its final path):
    ```bash
    printf '{"session_id":"%s","written_at":"%s"}\n' \
      "$SESSION_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
      > "$PROMOTE_DONE_PATH"
    ```
+3. Run `mv "${SOLUTION_PATH}.tmp" "${SOLUTION_PATH}"`.
+
+This ordering ensures the sentinel always exists before the final path becomes
+visible. A crash between steps 2 and 3 leaves the sentinel present but only
+`${SOLUTION_PATH}.tmp` on disk — the next drain retry detects the sentinel,
+matches the session_id, and retries the `mv` to complete the commit. Without
+this ordering, a crash after `mv` but before the sentinel write would cause
+the next retry to treat the existing final path as a slug collision and write
+a duplicate solution doc.
 
 This matches Critical Security Rule #4: partial writes are never observable at
 the final destination, AND the sentinel makes the operation idempotent
@@ -278,7 +287,12 @@ across drain retries.
 
 **If `PHASE_2_SKIP=1`** — skip the write and proceed to Phase 3.
 
-The file content must use this frontmatter + body shape:
+The file content must use this frontmatter + body shape. **Before substituting
+`candidate_text` into any single-quoted YAML field (`title:` or `problem:`),
+replace every `'` character with `''` (two single quotes) — the canonical
+YAML escape for an apostrophe inside a single-quoted scalar. For example, if
+`candidate_text` begins with `don't panic`, the `title:` field must be written
+as `title: 'Don''t Panic'`.**
 
 ```markdown
 ---
@@ -326,6 +340,23 @@ guarantees Phase 2 is skipped; Phase 3 must self-check. Scan the
 link inside the markdown bullet). If found, log
 `[staging-promoter] memory entry already present for <SOLUTION_PATH>; skipping append`
 and proceed to Phase 4 with `memory_appended=false` (treat as success).
+
+Before the grep, derive `REL_SOLUTION_PATH` from the absolute
+`SOLUTION_PATH` and the repo root established in Phase 1:
+
+```bash
+REL_SOLUTION_PATH="${SOLUTION_PATH#$GIT_ROOT/}"
+# Guard: if stripping failed (path not under GIT_ROOT), REL_SOLUTION_PATH
+# equals the full absolute path, which still contains a '/'. The only unsafe
+# case is an empty result — fail loudly rather than grep with an empty pattern
+# (which would match every line and produce a false-positive idempotency hit).
+if [ -z "$REL_SOLUTION_PATH" ]; then
+  printf '[staging-promoter] BUG: REL_SOLUTION_PATH is empty (SOLUTION_PATH=%s GIT_ROOT=%s); aborting\n' \
+    "$SOLUTION_PATH" "$GIT_ROOT" >&2
+  exit 1
+fi
+```
+
 Use `grep -F "$REL_SOLUTION_PATH" "$MEMORY_PATH"` rather than parsing
 markdown — the exact path string is a stable unique key.
 
