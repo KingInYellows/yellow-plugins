@@ -241,9 +241,23 @@ DRAIN_PROMPT=$(printf '%s\n' \
   'On completion, write a one-line summary to stdout and exit.')
 
 # --- Spawn disowned drain subshell ---
+# Drain log captures full model JSON output, which may re-contain
+# transcript fragments past redaction. Constrain to owner-only (0600/0700)
+# to prevent disclosure to other users on shared/CI systems.
 mkdir -p -- "${STAGING_DIR}/drain-logs" 2>/dev/null || true
+chmod 700 -- "${STAGING_DIR}/drain-logs" 2>/dev/null || true
 DRAIN_LOG="${STAGING_DIR}/drain-logs/$(date +%Y%m%d-%H%M%S).log"
+# Pre-create with restrictive perms so subsequent appends preserve 0600.
+( umask 077; : > "$DRAIN_LOG" ) 2>/dev/null || true
 AUTH_ROUTE=$(cs_detect_auth_route)
+
+# Validate COMPOUND_DRAIN_TIMEOUT_S is a positive integer (>0) to prevent
+# DoS via env-injected non-numeric value (timeout(1) exits 125 on bad
+# input, short-circuiting every drain) or "0" (which disables the timeout
+# entirely and lets a hung claude -p hold the lock until stale-reap).
+case "${COMPOUND_DRAIN_TIMEOUT_S:-600}" in
+  ''|*[!0-9]*|0) COMPOUND_DRAIN_TIMEOUT_S=600 ;;
+esac
 
 # Budget gate: skip dispatch when drain-budget.json indicates over-threshold on
 # API billing. Returns 0 (success) when over the COMPOUND_DRAIN_API_THRESHOLD

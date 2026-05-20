@@ -57,6 +57,20 @@ cs_staging_dir_for_slug() {
   printf '%s/.claude/projects/%s/compound-staging' "$HOME" "$slug"
 }
 
+# Convert an ISO-8601 timestamp (e.g., 2026-05-19T12:34:56Z) to a Unix
+# epoch on stdout. GNU `date -d` works on Linux; macOS/BSD needs the
+# explicit `-jf` format spec. Returns "0" if both attempts fail so
+# callers can numerically compare without a parse-error branch.
+#
+# Args:
+#   $1 — ISO-8601 timestamp string
+cs_iso_to_epoch() {
+  local ts="$1"
+  date -u -d "$ts" +%s 2>/dev/null \
+    || date -ujf '%Y-%m-%dT%H:%M:%SZ' "$ts" +%s 2>/dev/null \
+    || printf '0'
+}
+
 # Atomic write: write to a sibling tmp file in the same dir, then rename.
 # rename(2) is atomic when source and target are on the same filesystem,
 # which is guaranteed because the tmp file lives in the same directory as
@@ -65,6 +79,12 @@ cs_staging_dir_for_slug() {
 # -name '*.tmp.*' glob so orphan temp files are reaped on next session start.
 # Pattern matches _lc_atomic_write
 # (plugins/yellow-research/hooks/lib/context7-cache.sh:166-172).
+#
+# Permissions: writes are wrapped in `umask 077` so pending JSONL files
+# (which contain post-redaction transcript fragments — potentially
+# sensitive) and drain-budget state default to owner-only (0600) on
+# multi-user systems (CI, shared dev boxes, WSL2 with non-default umask).
+# The directory is also chmod'd to 0700 to keep listings private.
 #
 # Args:
 #   $1 — destination path
@@ -77,8 +97,11 @@ cs_atomic_jsonl_write() {
   local dir
   dir=$(dirname -- "$path")
   mkdir -p -- "$dir" 2>/dev/null || return 1
+  chmod 700 -- "$dir" 2>/dev/null || true
   local tmp="${path}.tmp.$$"
-  printf '%s' "$content" > "$tmp" 2>/dev/null || { rm -f -- "$tmp" 2>/dev/null; return 1; }
+  # Subshell scopes umask to the write only; sibling shell state untouched.
+  ( umask 077; printf '%s' "$content" > "$tmp" ) 2>/dev/null \
+    || { rm -f -- "$tmp" 2>/dev/null; return 1; }
   mv -- "$tmp" "$path" 2>/dev/null || { rm -f -- "$tmp" 2>/dev/null; return 1; }
 }
 
@@ -181,10 +204,7 @@ cs_update_drain_budget() {
   local reset=1
   if [ -n "$window_start" ]; then
     local window_epoch
-    # Try GNU date first (Linux); fall back to BSD date (macOS).
-    window_epoch=$(date -u -d "$window_start" +%s 2>/dev/null \
-      || date -ujf '%Y-%m-%dT%H:%M:%SZ' "$window_start" +%s 2>/dev/null \
-      || echo 0)
+    window_epoch=$(cs_iso_to_epoch "$window_start")
     if [ "$window_epoch" -gt 0 ] && [ $((now_epoch - window_epoch)) -lt 18000 ]; then
       reset=0
     fi
@@ -221,9 +241,7 @@ cs_drain_budget_warn() {
   if [ -n "$window_start" ]; then
     local now_epoch window_epoch
     now_epoch=$(date -u +%s 2>/dev/null) || now_epoch=0
-    window_epoch=$(date -u -d "$window_start" +%s 2>/dev/null \
-      || date -ujf '%Y-%m-%dT%H:%M:%SZ' "$window_start" +%s 2>/dev/null \
-      || echo 0)
+    window_epoch=$(cs_iso_to_epoch "$window_start")
     # Window has rolled — persisted counter belongs to a past window; treat as fresh.
     if [ "$window_epoch" -gt 0 ] && [ $((now_epoch - window_epoch)) -ge 18000 ]; then
       return 1
