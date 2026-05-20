@@ -317,6 +317,18 @@ a warning and append a freshly-created Session Notes section at the
 END of the file (do NOT insert anywhere else — preserve user-managed
 section ordering).
 
+**Idempotency check — required so a crash after Phase 3 (but before
+deleting `processing/<session_id>.jsonl`) does not append a duplicate
+index entry on retry.** Phase 1's `RESUMING_AFTER_CRASH=1` path only
+guarantees Phase 2 is skipped; Phase 3 must self-check. Scan the
+`## Session Notes` section for an existing line referencing
+`SOLUTION_PATH` (the relative `docs/solutions/<category>/<slug>.md`
+link inside the markdown bullet). If found, log
+`[staging-promoter] memory entry already present for <SOLUTION_PATH>; skipping append`
+and proceed to Phase 4 with `memory_appended=false` (treat as success).
+Use `grep -F "$REL_SOLUTION_PATH" "$MEMORY_PATH"` rather than parsing
+markdown — the exact path string is a stable unique key.
+
 The index entry shape:
 
 ```markdown
