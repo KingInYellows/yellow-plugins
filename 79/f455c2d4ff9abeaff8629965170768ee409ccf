@@ -1,0 +1,28 @@
+docs/research/best-practices/background-compounding-triggers-best-practices.md
+  s_6d2ef1322cfec1::t_e9552b431b4bb4 316-318
+  s_6d2ef1322cfec1::t_710f4ff5009490 508-515
+  s_6d2ef1322cfec1::t_f127c1437d4295 99-107
+  s_6d2ef1322cfec1::t_77e4ca0bd86896 553-556
+plans/background-compounding-triggers.md
+  s_6d2ef1322cfec1::t_a4366874b8d2ac 424-431
+  s_6d2ef1322cfec1::t_e6bdf0412502aa 321-323
+  s_6d2ef1322cfec1::t_fe6474dc552326 294-301
+  s_6d2ef1322cfec1::t_eb74f9cfbd2e2d 328-335
+  s_6d2ef1322cfec1::t_44c3f2e9ab0485 346-351,354
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "79f455c2d4ff9abeaff8629965170768ee409ccf",
+  "prompts": {},
+  "sessions": {
+    "s_6d2ef1322cfec1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "29c7b59c-0e2d-4e7c-97b6-3fb19422d5bf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
