@@ -1,5 +1,474 @@
 # Changelog
 
+## 1.18.0
+
+### Minor Changes
+
+- [#536](https://github.com/KingInYellows/yellow-plugins/pull/536)
+  [`ac8db1f`](https://github.com/KingInYellows/yellow-plugins/commit/ac8db1fc146b63f12634968ecd574a333cfa82b0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  refactor(yellow-core): `best-practices-researcher` inlines `library-context`
+  safe chain
+
+  Replaces the Phase 1 "Check Context7 Availability" item in
+  `plugins/yellow-core/agents/research/best-practices-researcher.md` with the
+  safe-chain block inlined from
+  `yellow-research/skills/library-context/SKILL.md` (cross-plugin `skills:`
+  preload is unavailable per `anthropics/claude-code#15944`, closed not
+  planned). The inlined block adapts the canonical safe chain with three
+  intentional deltas — sub-numbered as 1.x, disambiguation rule pulled in from
+  the skill's separate section, and `WebFetch` added alongside `WebSearch` since
+  this agent already lists both. The HTML annotation above the block enumerates
+  these deltas for future sync audits.
+
+  The inlined block uses only `WebSearch` (built-in) and context7 (optional
+  user-level MCP, used only when available) — no yellow-research MCP references
+  — so the agent works for yellow-core consumers that don't have yellow-research
+  installed. Adds the drift-detection sentinel
+  `context7 unavailable — falling back to` (Unicode em dash U+2014) plus
+  two-step invocation, disambiguation, rate-limit handling, and citation format.
+  The pre-existing Phase 1 items "Query Format" and "Priority Sources" are
+  preserved.
+
+- [#516](https://github.com/KingInYellows/yellow-plugins/pull/516)
+  [`db4547d`](https://github.com/KingInYellows/yellow-plugins/commit/db4547d54d1030f91aa8f2fcb1e897473d1dba23)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  docs(yellow-core): multi-host-fleet skill + userConfig required-vs-startup
+  solution doc
+
+  Adds the user-facing reference for replicating yellow-plugins credentials
+  across a fleet (workstations, CI, devcontainers, ephemeral sandboxes) without
+  per-host userConfig prompt cycles.
+  - `plugins/yellow-core/skills/multi-host-fleet/SKILL.md` — canonical env-var
+    contract table for every credential-bearing plugin (yellow-research,
+    yellow-morph, yellow-semgrep, yellow-composio, yellow-devin), with patterns
+    for dotfiles/direnv, GitHub Actions / GitLab CI / devcontainers, and
+    tool-agnostic secrets managers (1Password CLI, Vault envconsul, Doppler).
+    User-invokable skill: `/multi-host-fleet`.
+  - `docs/solutions/build-errors/userconfig-required-fires-at-startup-not-install.md`
+    — solution doc explaining why `required: true` on userConfig fields does NOT
+    block install (it surfaces at MCP startup, per Claude Code bug #39827) and
+    the wrapper-script pattern that should be used instead.
+
+  This closes the "no multi-host story" gap reported by users running plugins on
+  multiple hosts. The 3-element fallback wrapper pattern introduced in the
+  foundation PR is now discoverable end-to-end.
+
+- [#545](https://github.com/KingInYellows/yellow-plugins/pull/545)
+  [`c791a90`](https://github.com/KingInYellows/yellow-plugins/commit/c791a90d975b99a6b120d8b6cb6bafb988af8322)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-core): add `/setup:claude-web` command
+
+  Adds a new command at `plugins/yellow-core/commands/setup/claude-web.md` that
+  prepares a repository for Claude Code Web (`claude.ai/code`). The web sandbox
+  has no access to user-scope settings, `claude mcp add` entries, or locally
+  installed plugins — everything an agent uses must live in the repository. This
+  command audits and scaffolds the project-scope files that make a repo
+  cloud-ready.
+
+  The command runs in three tiers:
+  - **Tier 1 (auto-write):** appends missing patterns to `.gitattributes`
+    (`* text=auto`, `*.sh eol=lf`) and `.gitignore` (`.env`, `.env.*`, `*.pem`,
+    `*.key`, `.aws/`, `.ssh/`, `secrets/`, `credentials/`); fixes executable
+    bits via `chmod +x` + `git update-index --chmod=+x` on bootstrap scripts
+    referenced by hooks.
+  - **Tier 2 (AskUserQuestion gate):** scaffolds or merges into
+    `.claude/settings.json` (Python-based atomic write mirroring
+    `statusline/setup.md`); writes `scripts/install_pkgs.sh` from a detected
+    lockfile (pnpm > yarn > npm > uv > pip > cargo > bundler > composer > go)
+    with `CLAUDE_CODE_REMOTE=true` gate; writes `.github/workflows/claude.yml`
+    using the canonical `anthropics/claude-code-action@v1` shape with
+    `@claude`-mention triggers across `issue_comment`,
+    `pull_request_review_comment`, and `issues` events.
+  - **Tier 3 (warn-only):** flags STDIO MCP servers, oversized `CLAUDE.md`,
+    missing lockfiles, and the `permissions.deny`-as-defense-in-depth pattern
+    for sensitive paths.
+
+  Re-running on a fully configured repository produces zero writes — idempotency
+  is enforced via `grep -qF`-before-append for line additions and append-only
+  Python merge for JSON keys. Includes README + CLAUDE.md updates (commands
+  count `8 → 9`).
+
+- [#543](https://github.com/KingInYellows/yellow-plugins/pull/543)
+  [`2e57e78`](https://github.com/KingInYellows/yellow-plugins/commit/2e57e789d9368c0c40a3fa315a5e17b7ebb1c288)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-core): staging-reviewer + staging-scorer + staging-promoter agents
+
+  Stack item #2 of plans/background-compounding-triggers.md. Adds the three
+  agents that the SessionStart hook's `claude -p` drain dispatches to process
+  pending compound-staging entries.
+
+  **Agents (all under plugins/yellow-core/agents/workflow/):**
+  - `staging-reviewer` (sonnet) — drain orchestrator. 10 phases: move pending →
+    processing, fast content_hash dedup, ruvector availability gate, Haiku
+    scoring per entry, guardian classification gate (rejects
+    `category="behavioral_instruction"` — D9-L3), injection-marker validation,
+    high-priority sanity check, asymmetric semantic dedup (0.82/0.85/0.90 per
+    D10), staging-promoter dispatch, cleanup + drain-logs report.
+    `disallowedTools: [AskUserQuestion]` because the drain has no human in the
+    loop.
+  - `staging-scorer` (haiku) — rubric-based salience scorer with hardened prompt
+    (D9-L4) and 5 few-shot examples (security fix, workflow convention, trivial
+    Q&A skip, behavioral-instruction injection attempt, already-in-MEMORY skip).
+    Discrete 0.0-0.95 priority rubric. Structured JSON output (skip OR
+    flag_for_review OR score shape). `tools: [Read]` with
+    `disallowedTools: [Bash, Write, Edit, Task]` so the scorer can think but not
+    act.
+  - `staging-promoter` (sonnet) — non-interactive writer. THE load-bearing
+    enforcement of D8: `disallowedTools: [AskUserQuestion]` in frontmatter is
+    the hard-deny that prevents drain-context confirmation prompts. Writes
+    `docs/solutions/<category>/<slug>.md` (full frontmatter with
+    `source: compound-staging`) and appends one line to MEMORY.md's
+    `## Session Notes` section ONLY (never CORE_RULES, USER_PREFERENCES, or
+    KNOWN_PROJECTS — D9-L1). Slug-collision handling (1-9 suffix), category enum
+    gate, behavioral_instruction defense-in-depth refusal.
+
+  **Behavior on install (with stack #1 already merged):** SessionStart hook
+  dispatches the drain; the drain invokes `staging-reviewer`; the reviewer
+  scores → filters → promotes. Pipeline is end-to-end functional without stack
+  #3, but lacks:
+  - `/compound:review-staged` manual override (item #3 task 5.1)
+  - MEMORY.md partition (item #3 tasks 4.1-4.3) — pre-partition MEMORY.md has no
+    `## Session Notes` section, so `staging-promoter` creates one at end of file
+  - RULE 14 frontmatter lint (item #3 task 6.1) — if someone removes
+    `disallowedTools: [AskUserQuestion]` from staging-promoter frontmatter, no
+    CI signal until #3 lands; until then, the deny is enforced by Claude Code's
+    scheduler at runtime but not at PR-review time
+
+  These gaps are intentional and resolved in stack item #3.
+
+  **No bats tests this PR** — the agents are LLM-driven and tested via manual
+  smoke tests (item #3 Phase 8, post-merge). The deterministic bash plumbing is
+  fully covered by stack #1's 44 tests.
+
+- [#542](https://github.com/KingInYellows/yellow-plugins/pull/542)
+  [`59914bd`](https://github.com/KingInYellows/yellow-plugins/commit/59914bde6e2137b7f910b0faa9ad518ee661d14d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-core): Stop + SessionStart hooks for background compounding
+
+  Adds the hook infrastructure for an always-on background compounding pipeline
+  (plans/background-compounding-triggers.md, stack item #1).
+
+  **New files:**
+  - `lib/compound-staging.sh` — sourceable helper library:
+    - `cs_derive_project_slug` / `cs_staging_dir_for_slug` — per-project staging
+      directory under `~/.claude/projects/<slug>/compound-staging/`
+    - `cs_atomic_jsonl_write` — sibling-tmp + rename atomicity
+      (`_lc_atomic_write` pattern, yellow-research precedent)
+    - `cs_redact_secrets` — self-contained subset of yellow-ci/lib/redact.sh
+      covering password=, token=, api_key=, Bearer, basic-auth URLs, GitHub
+      - Docker + npm + JWT tokens, PEM blocks
+    - `cs_read_drain_budget` / `cs_update_drain_budget` / `cs_drain_budget_warn`
+      — 5h rolling-window observability counter (no hard ceiling under
+      subscription auth)
+    - `cs_detect_auth_route` — ANTHROPIC_API_KEY → "api" else "subscription"
+  - `hooks/scripts/stop.sh` — Stop hook (5s timeout, returns
+    `{"continue": true}` in < 500ms). Disowns a capture subshell that tails the
+    transcript, redacts secrets, and writes a JSONL entry to
+    `compound-staging/pending/<session_id>.jsonl`. Guards: recursion guard via
+    `COMPOUND_DRAIN_IN_PROGRESS=1`, `stop_hook_active` re-entrancy guard.
+  - `hooks/scripts/_stop-capture-subshell.sh` — runs disowned after the Stop
+    hook parent exits. tail -100 + redact + sha256 + atomic JSONL write.
+  - `hooks/scripts/session-start.sh` — SessionStart hook (3s timeout) with
+    reaper (orphan tmp >1h, stale `.drain-lock` >30min, PII TTL pending >7d,
+    crashed processing/ >1h requeued) and drain dispatcher. Thresholds: count >=
+    5 OR oldest pending > 48h. Acquires `.drain-lock` via atomic mkdir, spawns
+    disowned `claude -p` subshell with `COMPOUND_DRAIN_IN_PROGRESS=1` env var
+    inherited.
+
+  **Wired in plugin.json:** inline `hooks` block registering Stop (timeout 5)
+  and SessionStart (timeout 3). No `async: true` — disowned-subshell pattern is
+  the non-blocking mechanism (D4 in the plan).
+
+  **Test coverage (44 new bats, all 83 in yellow-core suite green):**
+  - `tests/compound-staging.bats` (24 tests) — lib helpers: slug derivation,
+    atomic write, redaction patterns, 5h budget rollover, auth-route detection,
+    idempotent source guard
+  - `tests/compound-stop-hook.bats` (8 tests) — recursion guard,
+    stop_hook_active guard, capture happy path, secret redaction (password +
+    Bearer), content_hash dedup field, <500ms parent latency, capture-subshell
+    standalone with missing transcript
+  - `tests/compound-session-start-hook.bats` (12 tests) — recursion guard,
+    first-run fast-exit, threshold gates (count=5, count=4, age>48h), drain-lock
+    honored + stale-lock reaped, PII TTL reap, crashed-processing requeue,
+    orphan tmp reap, JSON output contract
+
+  **Stack context:** stack item #1 of 3 (agent/feat/compound-staging-hooks).
+  Item #2 adds the staging-reviewer + staging-scorer + staging-promoter agents
+  the drain dispatches; item #3 adds the `/compound:review-staged` manual
+  override, MEMORY.md partition, RULE 14 lint, and docs.
+
+  **Behavior on install:** without item #2, the SessionStart drain dispatcher
+  checks for the staging-reviewer agent before spawning `claude -p` and
+  short-circuits when it is absent. No drain session is started; no cost is
+  incurred. Pending entries accumulate in `compound-staging/pending/` and are
+  reaped under the 7-day PII TTL. The pipeline is operationally inert until item
+  #2 lands — this is the intentional shape of an additive stack.
+
+- [#544](https://github.com/KingInYellows/yellow-plugins/pull/544)
+  [`eb70ad6`](https://github.com/KingInYellows/yellow-plugins/commit/eb70ad65a06ee9549e5470bd2709013a55dbf8d7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-core): /compound:review-staged + RULE 14/14b lint + docs
+
+  Stack item #3 of plans/background-compounding-triggers.md. Completes the
+  background-compounding pipeline with the manual-override command, the
+  load-bearing lint rules that prevent the load-bearing
+  `disallowedTools: [AskUserQuestion]` from being silently removed from
+  `staging-promoter`, and the docs that describe the full architecture.
+
+  **New files:**
+  - `plugins/yellow-core/commands/compound/review-staged.md` — manual drain
+    command. Skips count + age thresholds, includes M3 AskUserQuestion
+    confirmation gate showing pending count + sample titles before any bulk
+    write, acquires the same `.drain-lock` as the SessionStart hook (refuses if
+    a drain is in flight), spawns the same disowned `claude -p` subshell with
+    `COMPOUND_DRAIN_IN_PROGRESS=1`.
+
+  **Modified files:**
+  - `scripts/validate-agent-authoring.js` — adds RULE 14 and RULE 14b:
+    - RULE 14: staging-promoter frontmatter MUST contain
+      `disallowedTools: [AskUserQuestion]` (in YAML list or flow style). This is
+      the load-bearing scheduler-level hard-deny that prevents drain-context
+      confirmation prompts (D8 in the plan). Silent removal would block the
+      entire drain pipeline indefinitely; lint turns that into a CI failure.
+    - RULE 14b (V1 prose-only): staging-promoter body must reference the
+      `## Session Notes` write gate AND state a "Never modify CORE_RULES /
+      USER_PREFERENCES / KNOWN_PROJECTS" invariant. This is the V1 enforcement
+      of D9-L1 memory partitioning; V2 will add full AST lint of Write/Edit
+      invocations.
+    - Both rules verified with negative tests: removing the deny from
+      frontmatter or the invariant from the body fails the lint with a clear
+      error citing the rule.
+  - `plugins/yellow-core/CLAUDE.md` — adds a `## Compound Staging` section
+    (architecture summary, manual-override pointer, auth-route note) and a
+    `## Known Limitations` section (per-worktree staging, PII residue window
+    with 7d TTL reaper, async via disowned-subshell only, manual MEMORY.md
+    migration, uninstall does not reap staging dirs). Agent catalog count bumped
+    18 → 21; commands 9 → 10 (`/worktree:cleanup` was already present); new
+    `compound-staging.sh` listed in Shared Libraries.
+  - `plugins/yellow-core/README.md` — extends Commands + Workflow Agents tables
+    (Workflow 4 → 7) with staging-reviewer, staging-scorer, staging-promoter
+    rows.
+
+  **MEMORY.md partition (per-user, not committed):** the auto-memory MEMORY.md
+  (at `~/.claude/projects/<slug>/memory/MEMORY.md`, not in the repo) gets a
+  canonical 4-section structure (`## CORE_RULES`, `## USER_PREFERENCES`,
+  `## KNOWN_PROJECTS`, `## Session Notes`) with a contract preamble. Migration
+  is per-user manual work; `staging-promoter` creates `## Session Notes` at
+  end-of-file if absent. Two new local memory entries
+  (`pattern_staging_promoter_disallowed_tools.md`,
+  `pattern_compound_drain_in_progress_env_recursion_guard.md`) capture the
+  load-bearing patterns for future sessions.
+
+  **Validation:**
+  `pnpm validate:schemas && pnpm validate:agents && pnpm test:unit && pnpm lint && pnpm typecheck && bats plugins/yellow-core/tests/`
+  all green (83/83 bats including the 44 from stack #1).
+
+  **Pipeline now end-to-end functional:**
+
+  Stop hook (item #1) captures pending entries. SessionStart hook (item #1)
+  dispatches drain claude -p session. Drain invokes staging-reviewer (item #2).
+  Reviewer scores via staging-scorer (item #2). Reviewer promotes via
+  staging-promoter (item #2). Promoter writes docs/solutions/ + MEMORY.md ##
+  Session Notes. RULE 14 lint protects the promoter's disallowedTools
+  enforcement. /compound:review-staged offers manual flush ahead of thresholds.
+
+  Phase 8 (manual smoke tests) is the post-merge closure checklist; not part of
+  any PR.
+
+### Patch Changes
+
+- [#542](https://github.com/KingInYellows/yellow-plugins/pull/542)
+  [`59914bd`](https://github.com/KingInYellows/yellow-plugins/commit/59914bde6e2137b7f910b0faa9ad518ee661d14d)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Review fixes
+  for PR #542:
+  - session-start.sh: handle symlinked .drain-lock in deadlock recovery
+  - session-start.sh: sanitize STAGING_DIR/CWD before fence interpolation in
+    drain prompt (strip CR/LF + escape literal close-delimiter)
+  - compound-staging.sh: cs_drain_budget_warn takes optional live auth route so
+    route switches take effect immediately instead of waiting for the 5h rolling
+    window to roll
+
+- [#507](https://github.com/KingInYellows/yellow-plugins/pull/507)
+  [`0cae892`](https://github.com/KingInYellows/yellow-plugins/commit/0cae8920e98592d467c86e19372ca8998c05db04)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  docs(skill-descriptions): trim non-load-bearing content from 8 skill
+  descriptions while preserving WHAT + WHEN + differentiating clauses.
+
+  Targets 7 yellow-core skills (compound-lifecycle 686→220, ideation 664→202,
+  optimize 613→234, debugging 518→225, session-history 516→242,
+  agent-native-audit 377→250, agent-native-architecture 314→224) and 1
+  yellow-council skill (council-patterns 285→190). Total reduction: 2,186 chars
+  (55% across modified skills).
+
+  Rationale: descriptions over ~250 chars are in a documented degradation zone
+  where trailing content is invisible to Claude's auto-invocation logic
+  (anthropics/claude-code#44780, observed 2026-05-09; community-reported
+  behavior, not documented in the official schema). The trim removes enumerated
+  trigger phrase lists, body-content repetition, and methodology bleed — content
+  that adds no signal at skill-selection time and was actively suppressing
+  routing accuracy on the verbose skills. The five-principle enumeration in
+  agent-native-architecture, the OFFLINE/DEGRADED/HEALTHY classification in
+  mcp-health-probe, and the temporal differentiator in
+  memory-recall/remember-pattern were all preserved as load-bearing selection
+  signal.
+
+  Updates CONTRIBUTING.md "Skill Description Budget" section to reconcile the
+  existing "don't trim for budget" guidance with the new "trim non-load-bearing
+  content for selection accuracy" principle. The two are compatible. The
+  `user-invokable: false` carve-out clarifies that documentation-bloat trims
+  (capability enumerations, body-content repetition) are valid for internal
+  skills; budget pressure alone is not.
+
+  See plans/complete/skill-description-audit.md and
+  docs/brainstorms/2026-05-09-claude-code-skill-bloat-brainstorm.md for the full
+  audit methodology and per-skill before/after analysis.
+
+- [#529](https://github.com/KingInYellows/yellow-plugins/pull/529)
+  [`8a004b7`](https://github.com/KingInYellows/yellow-plugins/commit/8a004b7f30dcd0b9858f027b7cb5f57d120d398c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor:
+  extract validate_file_path to shared yellow-core/lib/validate-fs.sh
+
+  `validate_file_path()` (and `canonicalize_project_dir()`) were copy-pasted
+  across `yellow-ci`, `yellow-ruvector`, and `yellow-debt` with divergent
+  implementations — a security fix to one copy was easily missed in the others
+  (debt audit findings 002/003/004).
+  - `plugins/yellow-core/lib/validate-fs.sh` — new canonical home for both
+    functions, sourced via `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/` per the
+    `credential-status.sh` precedent. Canonical impl = yellow-ruvector's
+    (separate `canonicalize_project_dir`, `tr -d` newline detection, explicit
+    symlink-escape block) plus two deliberate enhancements: optional `$2`
+    project root with git-toplevel fallback (yellow-debt callers rely on it),
+    and internal root canonicalization for reliable containment checks.
+  - The three plugins' local `lib/validate.sh` files now source the shared
+    helper with a `[ -f ]` guard and keep only their plugin-specific validators.
+  - `plugins/yellow-core/tests/validate-fs.bats` — canonical test suite; each
+    plugin's `validate.bats` sources the shared lib directly.
+
+  Review pass follow-ups in this PR:
+  - Idempotency guard (`_VALIDATE_FS_LOADED`) added to validate-fs.sh so
+    double-sourcing (test setup + runtime hook chain) is safe.
+  - yellow-debt declares yellow-core as a required `dependencies` entry; the
+    consuming `lib/validate.sh` now warns to stderr when the helper is absent
+    rather than letting callers fail silently at exit 127.
+  - AGENTS.md and `plugins/yellow-{core,debt,ruvector}` docs updated to point to
+    the new shared lib (parallel to the credential-status.sh precedent).
+  - `ruvector-conventions` SKILL.md updated to describe the actual `cd+pwd -P` /
+    `realpath` validation (no longer `realpath -m`).
+
+- [#538](https://github.com/KingInYellows/yellow-plugins/pull/538)
+  [`253e453`](https://github.com/KingInYellows/yellow-plugins/commit/253e453e4329754d21d2f647dc4180645bd070fb)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(library-context): wire cache reader into Step 1 (closes PR #537's
+  chatgpt-codex consumer gap)
+
+  PR #537 (`yellow-research` SessionStart context7 cache pre-warm hook) shipped
+  the cache-write side + the `bin/lc-cache-lookup` reader infrastructure, but
+  the SKILL.md and best-practices-researcher inlined block — both shipped on PR
+  #536 — still instructed agents to call `mcp__context7__resolve-library-id`
+  directly. So the pre-warm consumed context7 quota and wrote a cache nothing
+  read; net effect was making the anonymous-pool pressure worse, not better.
+
+  This commit closes the loop:
+  - `plugins/yellow-research/skills/library-context/SKILL.md` Step 1 rewritten
+    as "cache-first" — instructs agents to call
+    `bash ${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup <name>` first and skip the
+    MCP resolve when output is non-empty. The wrapper exits 0 on every path
+    (cache miss, expired, helper absent, jq missing), so empty output is the
+    safe fallback signal — never an error.
+  - `plugins/yellow-core/agents/research/best-practices-researcher.md`: inlined
+    block adds an optional 1.1 pre-step that calls the helper at
+    `${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup` (the
+    established cross-plugin path pattern documented in `AGENTS.md` and
+    `plugins/yellow-core/CLAUDE.md`). The call is suffixed with
+    `2>/dev/null || true` so bash exit 127 (yellow-research not installed) is
+    absorbed into the same empty-output branch as a real cache miss. `Bash` is
+    added to the agent's `tools:` list since the body now invokes the Bash tool.
+    Other safe-chain steps renumber to 1.2-1.4; HTML annotation enumerates the
+    five intentional deltas vs the canonical SKILL.md block.
+  - `reference.md`: "Cache-compatibility (deferred)" → "Cache (consumer wiring
+    landed in this PR; hook in PR #537)" with the full cache schema documented.
+
+  Sentinel preserved (2 occurrences in BPR). With this PR + #537 merged, the
+  cache loop is closed: SessionStart pre-warms via HTTP → SKILL.md Step 1 reads
+  via `lc-cache-lookup` → runtime context7 quota drops on cache hits.
+
+- [#547](https://github.com/KingInYellows/yellow-plugins/pull/547)
+  [`88e70b5`](https://github.com/KingInYellows/yellow-plugins/commit/88e70b543a98cd083a3fe49623e222a9b00bd1c7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  Compound-staging review follow-ups: concurrency hardening + lint hardening +
+  doc clarity.
+
+  **Phase 1 — Concurrency hardening (PR #542 follow-on):**
+  - `session-start.sh`: processing/ requeue loop now gated on the absence of an
+    active `.drain-lock`. Closes the race where two concurrent SessionStarts
+    could both requeue the same crashed entry.
+  - `session-start.sh`: parent-side EXIT trap with `LOCK_OWNED_BY_PARENT` flag
+    releases `.drain-lock` if the parent exits between `mkdir` and successful
+    subshell dispatch. Closes the lock-orphan window (was previously recoverable
+    only via the 30-min stale-lock reaper).
+  - Two new bats tests:
+    `does not requeue processing/ entries when drain lock is held`,
+    `parent-side trap releases drain-lock on early-exit before dispatch`.
+
+  **Phase 2 — Brainstorm supersession callouts (PR #540 follow-on):**
+  - Per-section SUPERSEDED markers added to `docs/brainstorms/2026-05-18-*.md`
+    Architecture block, JSONL Schema section, Decision 3, and Decision 4 so
+    readers who scan to a specific section can't act on stale designs.
+
+  **Phase 3 — RULE 14/14b hardening + tests (PR #544 follow-on):**
+  - `scripts/validate-agent-authoring.js`: RULE 14 now also enforces
+    `disallowedTools: [AskUserQuestion]` on `staging-reviewer.md` (was only
+    checking `staging-promoter.md`). Both run non-interactively.
+  - RULE 14b: replaced the global-boolean co-location check with paragraph-based
+    co-location. Catches the decoy where "Never modify staging entries" appears
+    in one paragraph and the protected section names appear in unrelated
+    paragraphs elsewhere.
+  - RULE 14b: CRLF-tolerant frontmatter strip (matches `extractFrontmatter()`),
+    so WSL2-authored files aren't false-negative.
+  - RULE 14 character class widened from `[\w:-]+` to `[\w.:-]+` to admit tool
+    names with dots.
+  - New `tests/integration/validate-agent-authoring-rule14.test.ts` (8 cases):
+    pass/fail fixtures for both rules including the decoy false-negative.
+
+  **Phase 4 — Phase 5.1 preview UX clarification (PR #540 + PR #544
+  follow-on):**
+  - Plan Phase 5.1 description rewritten to explicitly state that the preview
+    shows raw `transcript_tail` bytes (not `candidate_text`, which doesn't exist
+    until drain time).
+  - `/compound:review-staged` Step 3 preview now renders metadata (`session_id`,
+    `cwd`, file mtime) alongside the transcript snippet so users can identify
+    which session each entry came from even when the transcript preview is
+    unintelligible.
+
+  No public-surface changes; all updates are internal hardening, doc clarity,
+  and test coverage. Patch bump.
+
+- [#533](https://github.com/KingInYellows/yellow-plugins/pull/533)
+  [`c42f470`](https://github.com/KingInYellows/yellow-plugins/commit/c42f470babb5c71ac0c8fe5d1fba98edc7f9ca12)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor: dedup
+  yellow-research MCP wrappers and credential-status hook scaffold
+
+  Consolidates two families of copy-pasted shell (debt findings 011/012/013 and
+  024/025).
+  - **011/012/013** — the three
+    `yellow-research/bin/start-{exa,perplexity, tavily}.sh` MCP wrappers carried
+    a byte-identical userConfig→env resolution block. Extracted to
+    `bin/lib/resolve-mcp-key.sh` (`resolve_mcp_key VAR`); each wrapper is now ~4
+    lines plus its distinct `npx` invocation. New `tests/resolve-mcp-key.bats`
+    (5 tests).
+  - **024/025** — `yellow-research` and `yellow-semgrep`'s
+    `hooks/write-credential-status.sh` shared a ~40-line scaffold (version read,
+    field classification, status write, `{"continue": true}` exit). Extracted to
+    `credential_hook_scaffold` in `yellow-core/lib/credential-status.sh`; both
+    hooks are now down to a source-guard plus the plugin-specific field-spec
+    list. New `credential_hook_scaffold` tests in `credential-status.bats` (4
+    tests).
+
+  Both hooks still emit `{"continue": true}` on every path. Gates:
+  `validate:plugins`, Bats (resolver 5, credential-status 16), shellcheck — all
+  green.
+
 ## 1.17.0
 
 ### Minor Changes

@@ -1,5 +1,67 @@
 # Changelog
 
+## 1.1.4
+
+### Patch Changes
+
+- [#534](https://github.com/KingInYellows/yellow-plugins/pull/534)
+  [`70a5148`](https://github.com/KingInYellows/yellow-plugins/commit/70a5148a24e5213ed4a69fb21e3ba2ac8af36782)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor:
+  de-duplicate install-script helpers via a build-time generator
+
+  The `version_gte()` semver comparator and the color-output helpers
+  (`error`/`warning`/`success` + the `RED/GREEN/YELLOW/NC` constants) were
+  copy-pasted byte-identically across the plugin install scripts (debt findings
+  014/015/036/037).
+  - `scripts/snippets/install-helpers.sh` +
+    `scripts/snippets/install-version-gte.sh` — canonical sources, single point
+    of truth.
+  - `scripts/sync-shell-snippets.js` — generator that injects each canonical
+    snippet into the consuming install scripts between
+    `# >>> generated: <name> >>>` / `# <<< generated: <name> <<<` sentinel
+    markers. `pnpm generate:snippets` regenerates; `pnpm validate:snippets` (and
+    now `pnpm validate:schemas`, run in CI) fails on drift.
+  - `install-codex.sh` and `install-semgrep.sh` embed both snippets;
+    `install.sh` (yellow-ruvector) and `install-ast-grep.sh` (yellow-research)
+    embed `install-helpers` only. yellow-ruvector keeps its own `version_lt` (a
+    distinct comparator); yellow-research does not need version comparison.
+
+  No behavior change — the embedded blocks are byte-identical to the prior
+  inline copies. Gates: `generate:snippets` + `validate:snippets` (drift caught
+  on tamper, clean on sync), `validate:plugins`, shellcheck, bash -n.
+
+- [#529](https://github.com/KingInYellows/yellow-plugins/pull/529)
+  [`8a004b7`](https://github.com/KingInYellows/yellow-plugins/commit/8a004b7f30dcd0b9858f027b7cb5f57d120d398c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor:
+  extract validate_file_path to shared yellow-core/lib/validate-fs.sh
+
+  `validate_file_path()` (and `canonicalize_project_dir()`) were copy-pasted
+  across `yellow-ci`, `yellow-ruvector`, and `yellow-debt` with divergent
+  implementations — a security fix to one copy was easily missed in the others
+  (debt audit findings 002/003/004).
+  - `plugins/yellow-core/lib/validate-fs.sh` — new canonical home for both
+    functions, sourced via `${CLAUDE_PLUGIN_ROOT}/../yellow-core/lib/` per the
+    `credential-status.sh` precedent. Canonical impl = yellow-ruvector's
+    (separate `canonicalize_project_dir`, `tr -d` newline detection, explicit
+    symlink-escape block) plus two deliberate enhancements: optional `$2`
+    project root with git-toplevel fallback (yellow-debt callers rely on it),
+    and internal root canonicalization for reliable containment checks.
+  - The three plugins' local `lib/validate.sh` files now source the shared
+    helper with a `[ -f ]` guard and keep only their plugin-specific validators.
+  - `plugins/yellow-core/tests/validate-fs.bats` — canonical test suite; each
+    plugin's `validate.bats` sources the shared lib directly.
+
+  Review pass follow-ups in this PR:
+  - Idempotency guard (`_VALIDATE_FS_LOADED`) added to validate-fs.sh so
+    double-sourcing (test setup + runtime hook chain) is safe.
+  - yellow-debt declares yellow-core as a required `dependencies` entry; the
+    consuming `lib/validate.sh` now warns to stderr when the helper is absent
+    rather than letting callers fail silently at exit 127.
+  - AGENTS.md and `plugins/yellow-{core,debt,ruvector}` docs updated to point to
+    the new shared lib (parallel to the credential-status.sh precedent).
+  - `ruvector-conventions` SKILL.md updated to describe the actual `cd+pwd -P` /
+    `realpath` validation (no longer `realpath -m`).
+
 ## 1.1.3
 
 ### Patch Changes

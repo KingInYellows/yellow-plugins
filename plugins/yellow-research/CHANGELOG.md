@@ -1,5 +1,203 @@
 # Changelog
 
+## 3.2.0
+
+### Minor Changes
+
+- [#537](https://github.com/KingInYellows/yellow-plugins/pull/537)
+  [`dbe1d70`](https://github.com/KingInYellows/yellow-plugins/commit/dbe1d70a4839049b44d9a57344eb69ba3c0d9bbc)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-research): SessionStart context7 cache pre-warm hook
+
+  Adds an asynchronous SessionStart pre-warm of the context7 library docs cache
+  so common library queries don't burn the anonymous global pool. Merged into
+  the existing `hooks/write-credential-status.sh` (background subshell,
+  fire-and-forget) so SessionStart cost stays under the ~3s UX budget —
+  yellow-morph `prewarm-morph.sh` precedent.
+
+  **Cache shape** at
+  `${CLAUDE_PLUGIN_DATA}/context7-cache-<md5_of_project_dir>.json`:
+  - `tier1` — `library-name → {library_id, fetched_at}` (24h TTL, capped at top
+    5 libs from project lockfiles)
+  - `tier2` — `library-id|topic → {docs, fetched_at}` (4h TTL, max 50; reserved
+    for future lazy population on cache miss)
+  - `lockfile_fingerprint` — mtimes of all detected lockfiles for invalidation
+    tracking
+  - `schema: "1"` for forward-compatibility
+
+  **Lockfile support:** package-lock.json, pnpm-lock.yaml, yarn.lock,
+  Cargo.lock, go.sum, requirements.txt (+ package.json fallback).
+
+  **Auth:** uses `CONTEXT7_API_KEY` as `Authorization: Bearer` when set;
+  anonymous otherwise. Anonymous quota is 200 req/hr global pool (per live
+  `ratelimit-limit` header on context7's HTTP API, 2026-05-17).
+
+  **HTTP API** verified live:
+  `GET https://context7.com/api/v1/search?query=<name>` returns
+  `{results: [{id: "/owner/repo", ...}]}`. The MCP server (used by agents at
+  runtime) is unaffected — the hook hits the HTTP API directly since shell hooks
+  can't invoke MCP tools.
+
+  **Safety:** atomic-rename writes (yellow-ci precedent), idempotent re-source
+  guard, no `set -e`, fire-and-forget background subshell so hook errors never
+  block session start. Skips cleanly when curl/jq missing, CLAUDE_PLUGIN_DATA
+  unset, no lockfile, or cache fresh (< 24h).
+
+  14 bats tests cover: no-lockfile skip, CLAUDE_PLUGIN_DATA-unset skip,
+  anonymous warm, authenticated warm, fresh-cache skip, corrupted-cache rewrite,
+  lockfile scanning for package.json + Cargo.lock, pre-warm cap, atomic write,
+  idempotent re-source.
+
+- [#536](https://github.com/KingInYellows/yellow-plugins/pull/536)
+  [`ac8db1f`](https://github.com/KingInYellows/yellow-plugins/commit/ac8db1fc146b63f12634968ecd574a333cfa82b0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-research): add `library-context` skill + refactor
+  `code-researcher` to preload it
+
+  New canonical SKILL.md at `plugins/yellow-research/skills/library-context/`
+  defines the context7 → EXA → WebSearch fallback chain for library
+  documentation lookup: ToolSearch availability detection, two-step invocation
+  (`resolve-library-id` → `query-docs`), disambiguation rules, rate-limit
+  handling (anonymous 60 req/hr global pool), citation format, and the
+  drift-detection sentinel phrase `context7 unavailable — falling back to`
+  (Unicode em dash U+2014).
+
+  Sibling `reference.md` holds distribution rationale, the deferred RULE 13
+  drift lint grep, the consumer enumeration, and the deferred cache-hook
+  contract. Loaded on demand, not auto-injected by `skills:` preload.
+
+  `code-researcher.md` now preloads via `skills: [library-context]` and
+  delegates library-doc routing to the skill (inline context7/fallback prose
+  removed from the "Source Routing" section; table row points to the skill).
+
+  Cross-plugin consumers (initial: yellow-core `best-practices-researcher`)
+  inline the safe-chain block verbatim since `anthropics/claude-code#15944`
+  (cross-plugin `skills:` resolution) is closed not planned.
+
+### Patch Changes
+
+- [#534](https://github.com/KingInYellows/yellow-plugins/pull/534)
+  [`70a5148`](https://github.com/KingInYellows/yellow-plugins/commit/70a5148a24e5213ed4a69fb21e3ba2ac8af36782)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor:
+  de-duplicate install-script helpers via a build-time generator
+
+  The `version_gte()` semver comparator and the color-output helpers
+  (`error`/`warning`/`success` + the `RED/GREEN/YELLOW/NC` constants) were
+  copy-pasted byte-identically across the plugin install scripts (debt findings
+  014/015/036/037).
+  - `scripts/snippets/install-helpers.sh` +
+    `scripts/snippets/install-version-gte.sh` — canonical sources, single point
+    of truth.
+  - `scripts/sync-shell-snippets.js` — generator that injects each canonical
+    snippet into the consuming install scripts between
+    `# >>> generated: <name> >>>` / `# <<< generated: <name> <<<` sentinel
+    markers. `pnpm generate:snippets` regenerates; `pnpm validate:snippets` (and
+    now `pnpm validate:schemas`, run in CI) fails on drift.
+  - `install-codex.sh` and `install-semgrep.sh` embed both snippets;
+    `install.sh` (yellow-ruvector) and `install-ast-grep.sh` (yellow-research)
+    embed `install-helpers` only. yellow-ruvector keeps its own `version_lt` (a
+    distinct comparator); yellow-research does not need version comparison.
+
+  No behavior change — the embedded blocks are byte-identical to the prior
+  inline copies. Gates: `generate:snippets` + `validate:snippets` (drift caught
+  on tamper, clean on sync), `validate:plugins`, shellcheck, bash -n.
+
+- [#532](https://github.com/KingInYellows/yellow-plugins/pull/532)
+  [`be06a57`](https://github.com/KingInYellows/yellow-plugins/commit/be06a571a9e8817870eec61b5844aec3c5182163)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: remediate
+  7 security-debt patterns across 6 plugins and root scripts
+
+  Targeted fixes for the security-debt findings (006, 009, 017, 022, 023,
+  032, 033) from the 2026-05-13 audit.
+  - **006** `yellow-research/scripts/install-ast-grep.sh`: replace `curl … | sh`
+    with download-to-temp over `--proto =https`, shebang sanity-check, then
+    execute the local copy. The uv installer URL is version-pinned for
+    reproducibility.
+  - **009** `scripts/export-ci-metrics.sh`: allowlist-validate `STAGE` /
+    `STATUS` and validate `ADDITIONAL_LABELS` key/value pairs before they are
+    embedded in Prometheus label output — prevents label injection.
+  - **017** `yellow-devin/commands/devin/delegate.md`: validate the git remote
+    URL format and wrap the gathered Repository/Branch context in
+    `--- begin/end repository context (reference only) ---` fencing before it
+    enters the Devin task prompt.
+  - **022** `yellow-composio/hooks/check-mcp-url.sh`: drop the brittle hardcoded
+    cache-path fallback for `CLAUDE_PLUGIN_ROOT` — skip the credential-status
+    write when it is unset rather than guessing a path.
+  - **023** `yellow-ci/hooks/scripts/session-start.sh`: hash the `$PWD`-derived
+    cache key (md5, 32 chars) so deeply-nested paths cannot exceed the 255-byte
+    filename limit and break the cache path.
+  - **032** `gt-workflow/hooks/check-commit-message.sh`: extend the `-m` grep to
+    also match single-quoted arguments — `-m 'feat: x'` previously bypassed
+    conventional-commit enforcement entirely.
+  - **033** `yellow-morph/lib/install-morphmcp.sh`: validate `owner_pid` is
+    numeric before `kill -0`, treating an empty/corrupt pid file as a stale lock
+    instead of passing garbage to `kill`.
+
+  Gates: `pnpm validate:plugins`, yellow-ci Bats (147), shellcheck, bash -n —
+  all green.
+
+- [#538](https://github.com/KingInYellows/yellow-plugins/pull/538)
+  [`253e453`](https://github.com/KingInYellows/yellow-plugins/commit/253e453e4329754d21d2f647dc4180645bd070fb)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(library-context): wire cache reader into Step 1 (closes PR #537's
+  chatgpt-codex consumer gap)
+
+  PR #537 (`yellow-research` SessionStart context7 cache pre-warm hook) shipped
+  the cache-write side + the `bin/lc-cache-lookup` reader infrastructure, but
+  the SKILL.md and best-practices-researcher inlined block — both shipped on PR
+  #536 — still instructed agents to call `mcp__context7__resolve-library-id`
+  directly. So the pre-warm consumed context7 quota and wrote a cache nothing
+  read; net effect was making the anonymous-pool pressure worse, not better.
+
+  This commit closes the loop:
+  - `plugins/yellow-research/skills/library-context/SKILL.md` Step 1 rewritten
+    as "cache-first" — instructs agents to call
+    `bash ${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup <name>` first and skip the
+    MCP resolve when output is non-empty. The wrapper exits 0 on every path
+    (cache miss, expired, helper absent, jq missing), so empty output is the
+    safe fallback signal — never an error.
+  - `plugins/yellow-core/agents/research/best-practices-researcher.md`: inlined
+    block adds an optional 1.1 pre-step that calls the helper at
+    `${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup` (the
+    established cross-plugin path pattern documented in `AGENTS.md` and
+    `plugins/yellow-core/CLAUDE.md`). The call is suffixed with
+    `2>/dev/null || true` so bash exit 127 (yellow-research not installed) is
+    absorbed into the same empty-output branch as a real cache miss. `Bash` is
+    added to the agent's `tools:` list since the body now invokes the Bash tool.
+    Other safe-chain steps renumber to 1.2-1.4; HTML annotation enumerates the
+    five intentional deltas vs the canonical SKILL.md block.
+  - `reference.md`: "Cache-compatibility (deferred)" → "Cache (consumer wiring
+    landed in this PR; hook in PR #537)" with the full cache schema documented.
+
+  Sentinel preserved (2 occurrences in BPR). With this PR + #537 merged, the
+  cache loop is closed: SessionStart pre-warms via HTTP → SKILL.md Step 1 reads
+  via `lc-cache-lookup` → runtime context7 quota drops on cache hits.
+
+- [#533](https://github.com/KingInYellows/yellow-plugins/pull/533)
+  [`c42f470`](https://github.com/KingInYellows/yellow-plugins/commit/c42f470babb5c71ac0c8fe5d1fba98edc7f9ca12)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - refactor: dedup
+  yellow-research MCP wrappers and credential-status hook scaffold
+
+  Consolidates two families of copy-pasted shell (debt findings 011/012/013 and
+  024/025).
+  - **011/012/013** — the three
+    `yellow-research/bin/start-{exa,perplexity, tavily}.sh` MCP wrappers carried
+    a byte-identical userConfig→env resolution block. Extracted to
+    `bin/lib/resolve-mcp-key.sh` (`resolve_mcp_key VAR`); each wrapper is now ~4
+    lines plus its distinct `npx` invocation. New `tests/resolve-mcp-key.bats`
+    (5 tests).
+  - **024/025** — `yellow-research` and `yellow-semgrep`'s
+    `hooks/write-credential-status.sh` shared a ~40-line scaffold (version read,
+    field classification, status write, `{"continue": true}` exit). Extracted to
+    `credential_hook_scaffold` in `yellow-core/lib/credential-status.sh`; both
+    hooks are now down to a source-guard plus the plugin-specific field-spec
+    list. New `credential_hook_scaffold` tests in `credential-status.bats` (4
+    tests).
+
+  Both hooks still emit `{"continue": true}` on every path. Gates:
+  `validate:plugins`, Bats (resolver 5, credential-status 16), shellcheck — all
+  green.
+
 ## 3.1.3
 
 ### Patch Changes
