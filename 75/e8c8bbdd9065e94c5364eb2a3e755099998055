@@ -1,0 +1,9 @@
+plugins/yellow-core/commands/compound/review-staged.md
+  ai_agent 1-71,76-102,104-105,107-126,129-189
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "75e8c8bbdd9065e94c5364eb2a3e755099998055",
+  "prompts": {}
+}
