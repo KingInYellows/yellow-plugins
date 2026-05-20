@@ -237,3 +237,44 @@ _plant_pending() {
   run bash "$SS_HOOK" <<< "$(_stdin_json)"
   echo "$output" | jq -e '.continue == true' >/dev/null
 }
+
+# --- Concurrency safety ---
+
+@test "session-start does not requeue processing/ entries when drain lock is held" {
+  # Simulates a concurrent SessionStart firing while another drain holds the
+  # lock: the requeue loop must be skipped (otherwise it could race the
+  # active drain's mv operations and produce duplicate pending entries).
+  mkdir -p "$STAGING/pending" "$STAGING/processing"
+  touch "$STAGING/processing/crashed.jsonl"
+  touch -t "$(date -d '90 minutes ago' +%Y%m%d%H%M 2>/dev/null \
+    || date -v-90M +%Y%m%d%H%M)" "$STAGING/processing/crashed.jsonl"
+  # Lock held by a "concurrent drain" (fresh mtime so it's NOT reaped as
+  # stale by the >30min reaper, and is treated as active).
+  mkdir "$STAGING/.drain-lock"
+
+  bash "$SS_HOOK" <<< "$(_stdin_json)" >/dev/null
+
+  # Lock survives (only the concurrent owner should release it).
+  [ -d "$STAGING/.drain-lock" ]
+  # Crashed entry stays in processing/ — was NOT requeued.
+  [ -f "$STAGING/processing/crashed.jsonl" ]
+  [ ! -f "$STAGING/pending/crashed.jsonl" ]
+}
+
+@test "session-start parent-side trap releases drain-lock on early-exit before dispatch" {
+  # If the parent exits between acquiring the lock and handing it to the
+  # subshell (e.g., staging-reviewer agent missing), the parent's EXIT
+  # trap must release the lock so the next SessionStart isn't blocked for
+  # 30 minutes by the stale-lock reaper.
+  mkdir -p "$STAGING/pending"
+  for i in 1 2 3 4 5; do
+    touch "$STAGING/pending/entry-$i.jsonl"
+  done
+  # Point at a non-existent staging-reviewer agent file so the parent
+  # exits via the "agent not yet deployed" path AFTER acquiring the lock.
+  COMPOUND_STAGING_REVIEWER_AGENT="/nonexistent/staging-reviewer.md" \
+    bash "$SS_HOOK" <<< "$(_stdin_json)" >/dev/null
+
+  # Lock should have been released by the parent's EXIT trap, not orphaned.
+  [ ! -d "$STAGING/.drain-lock" ]
+}

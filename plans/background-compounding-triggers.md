@@ -543,8 +543,18 @@ interactive session.
   - Body steps:
     1. Source `lib/compound-staging.sh`, derive `STAGING_DIR`
     2. Count `pending/*.jsonl`; exit if 0
-    3. Read up to 5 entry titles via `jq -r '.transcript_tail | .[0:80]'`
-       on first lines
+    3. Preview up to 5 entries: read the first 80 chars of
+       `transcript_tail` via `jq -r '.transcript_tail | .[0:80] |
+       gsub("\\n"; " ")'`. **This is raw, post-redaction transcript
+       bytes — NOT a human-readable title.** The pending JSONL schema
+       (Phase 1.3) only carries `transcript_tail`, `session_id`, `cwd`,
+       `timestamp`, and `content_hash`. The scored, human-readable
+       `candidate_text` is generated at drain time by
+       `staging-scorer`, so it cannot be previewed before dispatch
+       without paying the Haiku cost first. Show metadata
+       (`session_id`, `cwd`, file mtime) alongside the transcript
+       snippet so users with unintelligible preview content can still
+       identify *which* session each entry came from.
     4. **AskUserQuestion** ("N pending; sample titles: ...; Promote?")
        — Options: "Promote All" / "Cancel"
     5. On Cancel: exit

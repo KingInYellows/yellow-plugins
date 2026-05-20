@@ -395,38 +395,49 @@ function validateSubagentReferences(markdownFiles, ctx) {
 // in the loop). If a future edit removes the deny, the drain breaks
 // silently. RULE 14 turns that into a CI failure.
 function validateStagingPromoterFrontmatter(agentFiles, errors) {
-  const promoter = agentFiles.find(
-    (f) =>
-      f.endsWith(
-        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
-      )
-  );
-  if (!promoter) {
-    // staging-promoter is not yet present (e.g., stack item #2 not merged).
-    // Don't fail; the agent itself is what's checked, not its absence.
-    return;
-  }
-  const content = fs.readFileSync(promoter, 'utf8');
-  const frontmatter = extractFrontmatter(content) || '';
+  // RULE 14 applies to BOTH staging-promoter AND staging-reviewer — both
+  // run non-interactively under bypassPermissions; both must hard-deny
+  // AskUserQuestion at the frontmatter level (prose-only enforcement is
+  // insufficient — see docs/solutions/code-quality/subagent-frontmatter-field-catalog.md).
+  const checkedAgents = [
+    'staging-promoter.md',
+    'staging-reviewer.md',
+  ];
 
-  // Use the parseList() helper to extract disallowedTools as a real
-  // string array, then check whether 'AskUserQuestion' is a complete
-  // entry. parseList handles both flow form (`[A, B]`) and block form
-  // (`- A\n- B`) and strips surrounding quotes. A `.includes()` test on
-  // the parsed array is impossible to fool with substring tricks —
-  // values like `'foo AskUserQuestion'`, `'AskUserQuestion(bar)'`, or
-  // `'AskUserQuestion-disabled'` parse to entries that are NOT equal to
-  // the bare string `'AskUserQuestion'`, so they fail the check.
-  // Earlier regex-only approaches (\b boundaries, then lookarounds) were
-  // repeatedly bypassed — see PR #544 round-1/round-2/round-3 review
-  // comments — because regex cannot cleanly distinguish "the entry IS
-  // AskUserQuestion" from "the entry CONTAINS AskUserQuestion". Parsing
-  // first sidesteps the entire problem.
-  const disallowed = parseList(frontmatter, 'disallowedTools');
-  if (!disallowed.includes('AskUserQuestion')) {
-    errors.push(
-      `${relative(promoter)}: RULE 14 — staging-promoter frontmatter MUST contain \`disallowedTools: [AskUserQuestion]\` (this is the load-bearing D8 enforcement for the background-compounding drain pipeline)`
+  for (const basename of checkedAgents) {
+    const agentPath = agentFiles.find(
+      (f) =>
+        f.endsWith(
+          `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}${basename}`
+        )
     );
+    if (!agentPath) {
+      // Agent not yet present (e.g., stack item #2 not merged).
+      // Don't fail; the agent itself is what's checked, not its absence.
+      continue;
+    }
+    const content = fs.readFileSync(agentPath, 'utf8');
+    const frontmatter = extractFrontmatter(content) || '';
+
+    // Use the parseList() helper to extract disallowedTools as a real
+    // string array, then check whether 'AskUserQuestion' is a complete
+    // entry. parseList handles both flow form (`[A, B]`) and block form
+    // (`- A\n- B`) and strips surrounding quotes. A `.includes()` test
+    // on the parsed array is impossible to fool with substring tricks —
+    // values like `'foo AskUserQuestion'`, `'AskUserQuestion(bar)'`, or
+    // `'AskUserQuestion-disabled'` parse to entries that are NOT equal
+    // to the bare string `'AskUserQuestion'`, so they fail the check.
+    // Earlier regex-only approaches (`\b` boundaries, then lookarounds)
+    // were repeatedly bypassed — see PR #544 round-1/round-2/round-3
+    // review comments — because regex cannot cleanly distinguish "the
+    // entry IS AskUserQuestion" from "the entry CONTAINS AskUserQuestion".
+    // Parsing first sidesteps the entire problem.
+    const disallowed = parseList(frontmatter, 'disallowedTools');
+    if (!disallowed.includes('AskUserQuestion')) {
+      errors.push(
+        `${relative(agentPath)}: RULE 14 — frontmatter MUST contain \`disallowedTools: [AskUserQuestion]\` (load-bearing D8 enforcement for background-compounding drain pipeline; staging-promoter and staging-reviewer both run non-interactively)`
+      );
+    }
   }
 }
 
@@ -446,51 +457,57 @@ function validateMemoryWriteSectionGate(agentFiles, errors) {
     return;
   }
   const content = fs.readFileSync(promoter, 'utf8');
-  // Strip frontmatter so we don't false-positive on metadata.
-  const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '');
+  // Strip frontmatter so we don't false-positive on metadata. CRLF-tolerant:
+  // WSL2-authored files arrive with \r\n line endings before `.gitattributes`
+  // normalization, and this regex must match either form (mirrors the pattern
+  // used by extractFrontmatter()).
+  const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
 
-  // Bind both checks to a local context window so generic prose mentioning
-  // `Session Notes` or the section names somewhere unrelated cannot satisfy
-  // the rule. Window = ±200 chars around the anchor phrase.
+  // RULE 14b heuristic: the body must document that
+  //  (a) writes target `## Session Notes` ONLY (with explicit write-
+  //      restriction phrasing, not a bare "Session Notes" mention),
+  //  (b) the three protected sections (CORE_RULES, USER_PREFERENCES,
+  //      KNOWN_PROJECTS) are explicitly forbidden in a paragraph that
+  //      also contains a "Never modify|write|touch" verb.
   //
-  // Session Notes gate: must appear within 200 chars of a write-restriction
-  // phrase (`only.*Session Notes`, `Session Notes.*only`, `Never.*other.*section`,
-  // `write only to .* Session Notes`). A naked `Session Notes` mention is
-  // insufficient.
+  // Session Notes gate (a): bare `/Session Notes/` would let any
+  // unrelated mention (e.g., "Session Notes section exists") satisfy
+  // the rule, so a body that talks about Session Notes without claiming
+  // write-restriction could pass. Bind the check to a write-restriction
+  // anchor within ±200 chars: `only|ONLY .* Session Notes`,
+  // `Session Notes .* section ONLY|never any other`, or
+  // `append .* Session Notes .* [Nn]ever`.
   const sessionNotesGateRe = new RegExp(
     // Form A: "ONLY ... Session Notes" within 200 chars
     '(?:only|ONLY)[\\s\\S]{0,200}Session Notes' +
-      // Form B: "Session Notes ... only/ONLY/section ONLY" within 200 chars
+      // Form B: "Session Notes ... section only / ONLY / never any|other"
       '|Session Notes[\\s\\S]{0,200}(?:section\\s+only|ONLY|never\\s+(?:any|other))' +
-      // Form C: "append to ... Session Notes" + "NEVER" within 200 chars
+      // Form C: "append ... Session Notes ... Never" within 200 chars
       '|append[\\s\\S]{0,200}Session Notes[\\s\\S]{0,200}[Nn]ever',
     ''
   );
   const hasSessionNotesGate = sessionNotesGateRe.test(body);
 
-  // Never-modify invariant: all three protected section names must appear
-  // in the same 400-char sliding window as a "Never modify/write/touch"
-  // phrase. Splitting them across the document (e.g., one in prose + one
-  // in code + one in references) would otherwise satisfy three independent
-  // global tests and let the actual invariant statement be silently removed.
-  const sectionContextRe =
-    /[Nn]ever[^.\n]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)[\s\S]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)[\s\S]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)/;
-  const hasNeverModifyInvariant = (() => {
-    const m = body.match(sectionContextRe);
-    if (!m) return false;
-    const span = m[0];
-    // All three names must appear within this single matched window.
-    return (
-      /CORE_RULES/.test(span) &&
-      /USER_PREFERENCES/.test(span) &&
-      /KNOWN_PROJECTS/.test(span) &&
-      /[Nn]ever (?:modif|write|touch)/.test(span)
-    );
-  })();
+  // Never-modify invariant (b): paragraph co-location prevents the
+  // global-boolean false negative where a "Never modify staging entries"
+  // sentence elsewhere in the body satisfies the rule without actually
+  // protecting any section. A SINGLE paragraph (text between blank lines)
+  // must contain a "Never modify|write|touch" verb AND name all three
+  // protected sections. This admits multi-line invariants ("Never touch
+  // `## CORE_RULES`,\n `## USER_PREFERENCES`, or `## KNOWN_PROJECTS`")
+  // while rejecting decoys.
+  const paragraphs = body.split(/\n\s*\n/);
+  const hasNeverModifyInvariant = paragraphs.some(
+    (p) =>
+      /[Nn]ever (?:modif|write|touch)/.test(p) &&
+      /CORE_RULES/.test(p) &&
+      /USER_PREFERENCES/.test(p) &&
+      /KNOWN_PROJECTS/.test(p)
+  );
 
   if (!hasSessionNotesGate || !hasNeverModifyInvariant) {
     errors.push(
-      `${relative(promoter)}: RULE 14b — staging-promoter body must reference \`## Session Notes\` write gate AND state a "Never modify" invariant that enumerates ALL THREE protected sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS) (D9-L1 memory-partition enforcement)`
+      `${relative(promoter)}: RULE 14b — staging-promoter body must reference \`## Session Notes\` write gate AND state a "Never modify" invariant that enumerates ALL THREE protected sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS) within the same paragraph as the Never-verb (D9-L1 memory-partition enforcement)`
     );
   }
 }

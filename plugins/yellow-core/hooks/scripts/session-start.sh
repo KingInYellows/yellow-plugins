@@ -118,26 +118,11 @@ if [ "${expired_count:-0}" -gt 0 ] 2>/dev/null; then
     || true
 fi
 
-# Processing/ entries older than 1h are crashed mid-drain; requeue them for
-# retry unless they also exceed the 7-day PII TTL, in which case purge them
-# to prevent stale PII from re-entering the pipeline. Younger files are
-# in-flight from a concurrent drain — leave them alone.
-if [ -d "${STAGING_DIR}/processing" ]; then
-  while IFS= read -r f; do
-    [ -z "$f" ] && continue
-    base=$(basename -- "$f")
-    # Age-check: if the crashed entry is also older than 7 days, purge it
-    # instead of requeueing (PII TTL — same policy as pending/).
-    if find "$f" -name '*.jsonl' -mtime +7 -print 2>/dev/null | grep -q .; then
-      printf '[yellow-core] compound-staging: purging expired crashed entry %s (>7d PII TTL)\n' "$base" >&2
-      rm -f -- "$f" 2>/dev/null \
-        || printf '[yellow-core] compound-staging: failed to purge expired crashed entry %s\n' "$base" >&2
-    else
-      mv -- "$f" "${STAGING_DIR}/pending/${base}" 2>/dev/null \
-        || printf '[yellow-core] compound-staging: failed to requeue crashed entry %s\n' "$base" >&2
-    fi
-  done < <(find "${STAGING_DIR}/processing" -name '*.jsonl' -mmin +60 -print 2>/dev/null)
-fi
+# Processing/ entries older than 1h are crashed mid-drain — requeue them
+# below, AFTER acquiring the drain lock (Phase 1.2 of the plan). Doing it
+# pre-lock leaves a window where two concurrent SessionStart processes
+# both enter the requeue loop, producing duplicate `mv` operations. The
+# lock-protected version executes after line 196 (atomic mkdir) below.
 
 # --- Threshold check ---
 # count >= 5 OR oldest_age > 48h (Max 20x responsive defaults per plan §Budget Model).
@@ -145,9 +130,10 @@ PENDING_COUNT=$(find "${STAGING_DIR}/pending" -maxdepth 1 -name '*.jsonl' -type 
   | wc -l | tr -d '[:space:]')
 PENDING_COUNT="${PENDING_COUNT:-0}"
 
-if [ "$PENDING_COUNT" -eq 0 ] 2>/dev/null; then
-  json_exit
-fi
+# NOTE: do NOT early-exit on PENDING_COUNT==0 here. The REQUEUE_ONLY path
+# below needs to run even when pending/ is empty, otherwise crashed
+# processing/ entries stay stranded indefinitely under low-traffic
+# conditions (the original bug this PR's review-followups closed).
 
 DISPATCH=0
 if [ "$PENDING_COUNT" -ge 5 ] 2>/dev/null; then
@@ -178,6 +164,20 @@ else
   fi
 fi
 
+# Even when DISPATCH=0 (pending threshold not met), still proceed to lock +
+# requeue if processing/ has crashed entries older than 60 min. Otherwise
+# the common crash case (entries moved to processing/, then pending=0 on
+# next start) would leave the stale files unrecovered indefinitely.
+# REQUEUE_ONLY=1 signals: do the requeue then exit without firing drain.
+REQUEUE_ONLY=0
+if [ "$DISPATCH" -eq 0 ] && [ -d "${STAGING_DIR}/processing" ]; then
+  if find "${STAGING_DIR}/processing" -maxdepth 1 -name '*.jsonl' -mmin +60 \
+       -type f 2>/dev/null | head -1 | grep -q .; then
+    DISPATCH=1
+    REQUEUE_ONLY=1
+  fi
+fi
+
 if [ "$DISPATCH" -eq 0 ]; then
   json_exit
 fi
@@ -186,6 +186,61 @@ fi
 if ! mkdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; then
   # Concurrent drain already in flight (or stale lock not yet reaped).
   json_exit
+fi
+# Parent-side EXIT trap: if this process dies between acquiring the lock
+# and successfully handing ownership to the subshell, release the lock so
+# the next SessionStart isn't blocked. Once the subshell registers its
+# own trap and starts running, we set LOCK_OWNED_BY_PARENT=0 to disarm
+# this trap — preventing it from rmdir'ing the lock while the subshell
+# still holds it.
+LOCK_OWNED_BY_PARENT=1
+# Export STAGING_DIR so the trap can read it by name at execution time.
+# Single-quote interpolation at definition time would break for any
+# project path containing `'` (legal in Unix paths) — the trap payload
+# would become syntactically invalid and the lock would leak. Reading
+# the value at run-time via ${STAGING_DIR} avoids the quoting issue.
+export STAGING_DIR
+# EXIT trap: idempotent cleanup; runs on every exit path including
+# normal completion, hook timeouts, and after the INT/TERM handlers
+# below propagate.
+# shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true' EXIT
+# INT/TERM: clean up AND exit. Without an explicit exit, bash continues
+# past the trap into subsequent commands (cleanup runs but the script
+# proceeds into dispatch logic and spawns a drain even though termination
+# was requested). Use the conventional 128+signal exit codes so the
+# parent shell sees the proper status. The EXIT trap above still fires
+# on the way out — clean up here is duplicate-but-safe (rmdir is
+# idempotent under the LOCK_OWNED_BY_PARENT guard).
+# shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; exit 130' INT
+# shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; exit 143' TERM
+
+# --- Requeue crashed processing entries (lock-protected) ---
+# Now that we own the drain lock, no concurrent SessionStart can race us
+# on the requeue mv. Entries older than 1h are crashed mid-drain; older
+# than 7 days hit the PII TTL and are purged instead.
+if [ -d "${STAGING_DIR}/processing" ]; then
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    base=$(basename -- "$f")
+    if find "$f" -name '*.jsonl' -mtime +7 -print 2>/dev/null | grep -q .; then
+      printf '[yellow-core] compound-staging: purging expired crashed entry %s (>7d PII TTL)\n' "$base" >&2
+      rm -f -- "$f" 2>/dev/null \
+        || printf '[yellow-core] compound-staging: failed to purge expired crashed entry %s\n' "$base" >&2
+    else
+      mv -- "$f" "${STAGING_DIR}/pending/${base}" 2>/dev/null \
+        || printf '[yellow-core] compound-staging: failed to requeue crashed entry %s\n' "$base" >&2
+    fi
+  done < <(find "${STAGING_DIR}/processing" -name '*.jsonl' -mmin +60 -print 2>/dev/null)
+fi
+
+# If we entered the lock solely to requeue (pending threshold not met), release
+# the lock and exit without firing the drain. The requeued entries will be
+# picked up on the next SessionStart that meets the dispatch threshold.
+if [ "$REQUEUE_ONLY" = "1" ]; then
+  json_exit "requeue-only: stale processing entries restored to pending/"
 fi
 
 # --- Resolve claude binary ---
@@ -203,7 +258,8 @@ if [ -z "$CLAUDE_BIN" ]; then
   CLAUDE_BIN=$(command -v claude 2>/dev/null || true)
 fi
 if [ -z "$CLAUDE_BIN" ] || [ ! -x "$CLAUDE_BIN" ]; then
-  rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
+  # LOCK_OWNED_BY_PARENT is still 1 here — the EXIT trap will release the
+  # lock automatically when json_exit calls exit. No need to rmdir manually.
   json_exit "claude binary not found; skipping drain"
 fi
 
@@ -218,7 +274,7 @@ if [ -n "${COMPOUND_STAGING_REVIEWER_AGENT:-}" ] && [ -n "${BATS_VERSION:-}" ]; 
   STAGING_REVIEWER_PATH="$COMPOUND_STAGING_REVIEWER_AGENT"
 fi
 if [ ! -f "$STAGING_REVIEWER_PATH" ]; then
-  rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
+  # EXIT trap will rmdir the lock since LOCK_OWNED_BY_PARENT is still 1.
   json_exit "staging-reviewer agent not yet deployed (stack item #2); deferring drain"
 fi
 
@@ -273,7 +329,7 @@ esac
 # (default 8 drains in rolling window); returns 1 when under or on subscription
 # auth (no cost gate). Release the lock + json_exit on the over-threshold path.
 if cs_drain_budget_warn "$STAGING_DIR" "$AUTH_ROUTE"; then
-  rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
+  # EXIT trap will rmdir the lock since LOCK_OWNED_BY_PARENT is still 1.
   json_exit "drain budget over threshold; skipping dispatch"
 fi
 
@@ -316,6 +372,13 @@ DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
   fi
   cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
 ) >/dev/null 2>&1 &
+# Hand lock ownership to the subshell immediately after `&` parses — the
+# child now owns the lock via its own EXIT/INT/TERM trap (set as its
+# first statement inside the subshell). Clearing the parent flag BEFORE
+# `disown` (rather than after) closes the INT/TERM window where the
+# parent trap would still match `LOCK_OWNED_BY_PARENT=1` and rmdir a
+# lock the running child still holds (concurrent-drain race).
+LOCK_OWNED_BY_PARENT=0
 disown
 
 json_exit

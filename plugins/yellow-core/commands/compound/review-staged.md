@@ -58,9 +58,15 @@ Use this when:
 
    If `PENDING_COUNT == 0`, exit. Do not proceed to the confirmation.
 
-3. **Preview up to 5 entry titles.** Read the first line of each of the
-   five oldest pending files; extract the first 80 chars of
-   `transcript_tail` for context.
+3. **Preview up to 5 entry titles + metadata.** Read the first line of
+   each of the five oldest pending files. The preview is **raw,
+   post-redaction transcript bytes (first 80 chars of `transcript_tail`)
+   — NOT a human-readable title.** The human-readable `candidate_text`
+   is generated at drain time by `staging-scorer`, so it cannot be
+   previewed without paying the Haiku cost first. Show metadata
+   (`session_id`, `cwd`, file mtime) alongside the snippet so users with
+   unintelligible preview content can still identify *which* session
+   each entry came from.
 
    ```bash
    # find -type f ! -type l with -printf mtime sort → oldest first.
@@ -85,7 +91,30 @@ Use this when:
      [ -L "$f" ] && continue   # skip symlinks — defense-in-depth
      title=$(jq -r '.transcript_tail | .[0:80] | gsub("\\n"; " ")' "$f" 2>/dev/null \
        || printf '(parse error)')
-     SAMPLES="${SAMPLES}- $(basename -- "$f"): ${title}"$'\n'
+     [ -z "$title" ] && title='(empty)'
+     # Metadata sidecar — helps user identify which session even if the
+     # transcript snippet is unintelligible (binary, garbled, or empty
+     # after redaction).
+     sid=$(jq -r '.session_id // "?"' "$f" 2>/dev/null || printf '?')
+     cwd=$(jq -r '.cwd // "?"' "$f" 2>/dev/null || printf '?')
+     # GNU/BSD stat split: pipe to cut would swallow stat's exit (cut
+     # succeeds on empty input), so `|| stat -f` never fired on macOS
+     # and mtime came back empty. Capture stat output FIRST in a
+     # variable, then post-process — the fallback chain on the
+     # assignment line now actually triggers on macOS.
+     mtime_raw=$(stat -c '%y' "$f" 2>/dev/null \
+       || stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S' "$f" 2>/dev/null \
+       || printf '?')
+     mtime=$(printf '%s' "$mtime_raw" | cut -d. -f1)
+     # Strip CR/LF + truncate cwd — `cwd` comes from raw hook input and
+     # isn't sanitized on write, so unusual directory names can contain
+     # newlines/control chars that would otherwise bleed into the
+     # AskUserQuestion prompt context.
+     sid=$(printf '%s' "$sid" | tr -d '\r\n' | cut -c1-64)
+     cwd=$(printf '%s' "$cwd" | tr -d '\r\n' | cut -c1-80)
+     title=$(printf '%s' "$title" | tr -d '\r\n' | cut -c1-80)
+     SAMPLES="${SAMPLES}- $(basename -- "$f")  [session=${sid} cwd=${cwd} mtime=${mtime}]"$'\n'
+     SAMPLES="${SAMPLES}    preview: ${title}"$'\n'
    done < <(printf '%s\n' "$PREVIEW_LIST")
    printf '%s\n' "$SAMPLES"
    ```
