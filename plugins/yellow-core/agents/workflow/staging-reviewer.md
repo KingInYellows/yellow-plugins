@@ -94,8 +94,16 @@ A file in `processing/` younger than 5 minutes is in-flight from a
 concurrent drain (lock-race possible if the lock-reaper fired) — skip
 that file and continue.
 
+Record each just-moved file in `MOVED_THIS_DRAIN` so Phase 4 can always
+score them (the 5-min skip below applies only to files that were already
+in `processing/` when this drain started — those belong to a concurrent
+in-flight drain).
+
 ```bash
 moved=0
+MOVED_THIS_DRAIN_FILE="$STAGING/.drain-moved-$$.txt"
+: > "$MOVED_THIS_DRAIN_FILE"
+trap 'rm -f -- "$MOVED_THIS_DRAIN_FILE" 2>/dev/null || true' EXIT
 for f in "$STAGING"/pending/*.jsonl; do
   [ -f "$f" ] || continue
   base=$(basename -- "$f")
@@ -104,7 +112,10 @@ for f in "$STAGING"/pending/*.jsonl; do
     age_s=$(( $(date +%s) - $(stat -c '%Y' "$target" 2>/dev/null || stat -f '%m' "$target" 2>/dev/null || date +%s) ))
     [ "$age_s" -lt 300 ] && continue
   fi
-  mv -- "$f" "$target" 2>/dev/null && moved=$((moved + 1))
+  if mv -- "$f" "$target" 2>/dev/null; then
+    printf '%s\n' "$base" >> "$MOVED_THIS_DRAIN_FILE"
+    moved=$((moved + 1))
+  fi
 done
 printf '[staging-reviewer] moved %s entries to processing/\n' "$moved"
 ```
@@ -145,10 +156,28 @@ when semantic dedup is unavailable).
 
 ## Phase 4: Score each entry via Haiku Task dispatch
 
-For each unique entry in `processing/` whose mtime is **older than 5 minutes**
-(skip duplicates from Phase 2; also skip files moved into `processing/` within
-the last 5 minutes — they belong to a concurrent in-flight drain and a second
-drain processing them would produce duplicate promotions or conflicting cleanup):
+For each unique entry in `processing/` (skip duplicates from Phase 2):
+
+- **Always score files this drain just moved** (their basename is in
+  `MOVED_THIS_DRAIN_FILE` from Phase 1). These hold the lock, so no
+  concurrent drain can race them.
+- **For files already in `processing/` when the drain started:** skip
+  any whose mtime is younger than 5 minutes — they belong to a
+  concurrent in-flight drain and processing them would produce
+  duplicate promotions or conflicting cleanup. Pre-existing files
+  older than 5 minutes are crashed-mid-drain entries that need
+  scoring.
+
+Concretely:
+```bash
+base=$(basename -- "$f")
+if ! grep -qxF "$base" "$MOVED_THIS_DRAIN_FILE"; then
+  # Pre-existing file — apply 5-min in-flight skip
+  age_s=$(( $(date +%s) - $(stat -c '%Y' "$f" 2>/dev/null || stat -f '%m' "$f" 2>/dev/null || date +%s) ))
+  [ "$age_s" -lt 300 ] && continue
+fi
+# Score the entry...
+```
 
 1. Read the entry's `transcript_tail`, `session_id`, `cwd`, `timestamp`.
 2. Build a scorer prompt that includes:
@@ -173,10 +202,16 @@ drain processing them would produce duplicate promotions or conflicting cleanup)
    )
    ```
 
-4. Parse the agent's structured JSON output. The scorer returns one of:
+4. Parse the agent's structured JSON output. The scorer returns one of three shapes:
 
    ```json
    {"skip": true, "reason": "trivial Q&A"}
+   ```
+
+   or (NEW — preserves attack evidence):
+
+   ```json
+   {"flag_for_review": true, "reason": "injection-attempt-detected"}
    ```
 
    or
@@ -195,6 +230,11 @@ drain processing them would produce duplicate promotions or conflicting cleanup)
 If the response is not valid JSON or is missing required fields, log
 `[staging-reviewer] scorer returned malformed output for <session_id>` and
 move the entry to `flagged-review/`. Do not promote.
+
+If `flag_for_review == true`, **move to `flagged-review/` (do not delete)**
+so the suspected attack transcript is preserved for forensics and
+threshold tuning. Log
+`[staging-reviewer] flagged for review: <reason> <session_id>`.
 
 If `skip == true`, delete the processing file and continue. Log the reason.
 
