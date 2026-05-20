@@ -1,10 +1,10 @@
 plugins/yellow-core/commands/compound/review-staged.md
-  s_bb05a4e31d3513::t_af85f2feb19467 208-216
+  s_bb05a4e31d3513::t_af85f2feb19467 203-211
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.4.10",
-  "base_commit_sha": "eabf1b38916da8ec33ea91e7c134c2679aa995c6",
+  "base_commit_sha": "1fa41f63f161f531c93f20879aa8d09089b8a92d",
   "prompts": {},
   "sessions": {
     "s_bb05a4e31d3513": {
