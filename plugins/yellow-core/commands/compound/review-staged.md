@@ -152,7 +152,12 @@ Use this when:
      export COMPOUND_DRAIN_IN_PROGRESS=1
      printf '[compound:review-staged] manual drain dispatch %s (auth=%s, pending=%s)\n' \
        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" >> "$DRAIN_LOG" 2>/dev/null
+     # --bare is the primary recursion guard: skips auto-discovery of
+     # hooks, skills, plugins, MCP servers, CLAUDE.md in the child session.
+     # Without it, the child fires its own SessionStart hook and cascades.
+     # See docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md.
      "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+       --bare \
        --max-turns 50 \
        --permission-mode bypassPermissions \
        --output-format json \
