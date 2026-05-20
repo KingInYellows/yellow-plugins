@@ -97,9 +97,15 @@ Use this when:
      # after redaction).
      sid=$(jq -r '.session_id // "?"' "$f" 2>/dev/null || printf '?')
      cwd=$(jq -r '.cwd // "?"' "$f" 2>/dev/null || printf '?')
-     mtime=$(stat -c '%y' "$f" 2>/dev/null | cut -d. -f1 \
+     # GNU/BSD stat split: pipe to cut would swallow stat's exit (cut
+     # succeeds on empty input), so `|| stat -f` never fired on macOS
+     # and mtime came back empty. Capture stat output FIRST in a
+     # variable, then post-process — the fallback chain on the
+     # assignment line now actually triggers on macOS.
+     mtime_raw=$(stat -c '%y' "$f" 2>/dev/null \
        || stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S' "$f" 2>/dev/null \
        || printf '?')
+     mtime=$(printf '%s' "$mtime_raw" | cut -d. -f1)
      # Strip CR/LF + truncate cwd — `cwd` comes from raw hook input and
      # isn't sanitized on write, so unusual directory names can contain
      # newlines/control chars that would otherwise bleed into the

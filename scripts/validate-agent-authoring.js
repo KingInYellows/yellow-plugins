@@ -464,17 +464,38 @@ function validateMemoryWriteSectionGate(agentFiles, errors) {
   const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
 
   // RULE 14b heuristic: the body must document that
-  //  (a) writes target `## Session Notes` ONLY,
+  //  (a) writes target `## Session Notes` ONLY (with explicit write-
+  //      restriction phrasing, not a bare "Session Notes" mention),
   //  (b) the three protected sections (CORE_RULES, USER_PREFERENCES,
-  //      KNOWN_PROJECTS) are explicitly forbidden.
-  // Paragraph co-location prevents the global-boolean false negative where
-  // a "Never modify staging entries" sentence elsewhere in the body
-  // satisfies the rule without actually protecting any section. We require
-  // a SINGLE paragraph (text between blank lines) to contain a "Never
-  // modify|write|touch" verb AND name all three protected sections.
-  // This admits multi-line invariants ("Never touch `## CORE_RULES`,\n
-  // `## USER_PREFERENCES`, or `## KNOWN_PROJECTS`") while rejecting decoys.
-  const hasSessionNotesGate = /Session Notes/.test(body);
+  //      KNOWN_PROJECTS) are explicitly forbidden in a paragraph that
+  //      also contains a "Never modify|write|touch" verb.
+  //
+  // Session Notes gate (a): bare `/Session Notes/` would let any
+  // unrelated mention (e.g., "Session Notes section exists") satisfy
+  // the rule, so a body that talks about Session Notes without claiming
+  // write-restriction could pass. Bind the check to a write-restriction
+  // anchor within ±200 chars: `only|ONLY .* Session Notes`,
+  // `Session Notes .* section ONLY|never any other`, or
+  // `append .* Session Notes .* [Nn]ever`.
+  const sessionNotesGateRe = new RegExp(
+    // Form A: "ONLY ... Session Notes" within 200 chars
+    '(?:only|ONLY)[\\s\\S]{0,200}Session Notes' +
+      // Form B: "Session Notes ... section only / ONLY / never any|other"
+      '|Session Notes[\\s\\S]{0,200}(?:section\\s+only|ONLY|never\\s+(?:any|other))' +
+      // Form C: "append ... Session Notes ... Never" within 200 chars
+      '|append[\\s\\S]{0,200}Session Notes[\\s\\S]{0,200}[Nn]ever',
+    ''
+  );
+  const hasSessionNotesGate = sessionNotesGateRe.test(body);
+
+  // Never-modify invariant (b): paragraph co-location prevents the
+  // global-boolean false negative where a "Never modify staging entries"
+  // sentence elsewhere in the body satisfies the rule without actually
+  // protecting any section. A SINGLE paragraph (text between blank lines)
+  // must contain a "Never modify|write|touch" verb AND name all three
+  // protected sections. This admits multi-line invariants ("Never touch
+  // `## CORE_RULES`,\n `## USER_PREFERENCES`, or `## KNOWN_PROJECTS`")
+  // while rejecting decoys.
   const paragraphs = body.split(/\n\s*\n/);
   const hasNeverModifyInvariant = paragraphs.some(
     (p) =>

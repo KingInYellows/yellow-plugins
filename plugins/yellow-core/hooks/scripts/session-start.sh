@@ -200,8 +200,22 @@ LOCK_OWNED_BY_PARENT=1
 # would become syntactically invalid and the lock would leak. Reading
 # the value at run-time via ${STAGING_DIR} avoids the quoting issue.
 export STAGING_DIR
+# EXIT trap: idempotent cleanup; runs on every exit path including
+# normal completion, hook timeouts, and after the INT/TERM handlers
+# below propagate.
 # shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
-trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true' EXIT INT TERM
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true' EXIT
+# INT/TERM: clean up AND exit. Without an explicit exit, bash continues
+# past the trap into subsequent commands (cleanup runs but the script
+# proceeds into dispatch logic and spawns a drain even though termination
+# was requested). Use the conventional 128+signal exit codes so the
+# parent shell sees the proper status. The EXIT trap above still fires
+# on the way out — clean up here is duplicate-but-safe (rmdir is
+# idempotent under the LOCK_OWNED_BY_PARENT guard).
+# shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; exit 130' INT
+# shellcheck disable=SC2016  # ${STAGING_DIR} expanded at trap-fire, not register
+trap '[ "$LOCK_OWNED_BY_PARENT" = 1 ] && rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; exit 143' TERM
 
 # --- Requeue crashed processing entries (lock-protected) ---
 # Now that we own the drain lock, no concurrent SessionStart can race us
