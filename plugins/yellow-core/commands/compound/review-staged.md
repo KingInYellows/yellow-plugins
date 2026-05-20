@@ -58,9 +58,15 @@ Use this when:
 
    If `PENDING_COUNT == 0`, exit. Do not proceed to the confirmation.
 
-3. **Preview up to 5 entry titles.** Read the first line of each of the
-   five oldest pending files; extract the first 80 chars of
-   `transcript_tail` for context.
+3. **Preview up to 5 entry titles + metadata.** Read the first line of
+   each of the five oldest pending files. The preview is **raw,
+   post-redaction transcript bytes (first 80 chars of `transcript_tail`)
+   — NOT a human-readable title.** The human-readable `candidate_text`
+   is generated at drain time by `staging-scorer`, so it cannot be
+   previewed without paying the Haiku cost first. Show metadata
+   (`session_id`, `cwd`, file mtime) alongside the snippet so users with
+   unintelligible preview content can still identify *which* session
+   each entry came from.
 
    ```bash
    # find -type f ! -type l with -printf mtime sort → oldest first.
@@ -85,7 +91,17 @@ Use this when:
      [ -L "$f" ] && continue   # skip symlinks — defense-in-depth
      title=$(jq -r '.transcript_tail | .[0:80] | gsub("\\n"; " ")' "$f" 2>/dev/null \
        || printf '(parse error)')
-     SAMPLES="${SAMPLES}- $(basename -- "$f"): ${title}"$'\n'
+     [ -z "$title" ] && title='(empty)'
+     # Metadata sidecar — helps user identify which session even if the
+     # transcript snippet is unintelligible (binary, garbled, or empty
+     # after redaction).
+     sid=$(jq -r '.session_id // "?"' "$f" 2>/dev/null || printf '?')
+     cwd=$(jq -r '.cwd // "?"' "$f" 2>/dev/null || printf '?')
+     mtime=$(stat -c '%y' "$f" 2>/dev/null | cut -d. -f1 \
+       || stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S' "$f" 2>/dev/null \
+       || printf '?')
+     SAMPLES="${SAMPLES}- $(basename -- "$f")  [session=${sid} cwd=${cwd} mtime=${mtime}]"$'\n'
+     SAMPLES="${SAMPLES}    preview: ${title}"$'\n'
    done < <(printf '%s\n' "$PREVIEW_LIST")
    printf '%s\n' "$SAMPLES"
    ```

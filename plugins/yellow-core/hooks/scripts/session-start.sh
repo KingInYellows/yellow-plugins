@@ -122,7 +122,14 @@ fi
 # retry unless they also exceed the 7-day PII TTL, in which case purge them
 # to prevent stale PII from re-entering the pipeline. Younger files are
 # in-flight from a concurrent drain — leave them alone.
-if [ -d "${STAGING_DIR}/processing" ]; then
+#
+# Concurrency: only requeue when no drain is currently active. Without this
+# guard, a concurrent SessionStart could mv a processing/X.jsonl back to
+# pending/ while the active drain is still working on it, producing
+# duplicate work. The .drain-lock check is racy but defensive — the
+# active drain holds the lock through its EXIT trap, so a non-existent
+# lock means no concurrent drain is mid-flight.
+if [ -d "${STAGING_DIR}/processing" ] && [ ! -d "${STAGING_DIR}/.drain-lock" ]; then
   while IFS= read -r f; do
     [ -z "$f" ] && continue
     base=$(basename -- "$f")
@@ -187,6 +194,15 @@ if ! mkdir "${STAGING_DIR}/.drain-lock" 2>/dev/null; then
   # Concurrent drain already in flight (or stale lock not yet reaped).
   json_exit
 fi
+# Parent-side EXIT trap: if this process dies between acquiring the lock
+# and successfully handing ownership to the subshell, release the lock so
+# the next SessionStart isn't blocked. Once the subshell registers its
+# own trap and starts running, we set LOCK_OWNED_BY_PARENT=0 to disarm
+# this trap — preventing it from rmdir'ing the lock while the subshell
+# still holds it.
+LOCK_OWNED_BY_PARENT=1
+# shellcheck disable=SC2064  # expand STAGING_DIR at trap-registration
+trap "[ \"\$LOCK_OWNED_BY_PARENT\" = 1 ] && rmdir '${STAGING_DIR}/.drain-lock' 2>/dev/null || true" EXIT INT TERM
 
 # --- Resolve claude binary ---
 # Allow tests to override via COMPOUND_DRAIN_CMD env var, but ONLY
@@ -203,7 +219,8 @@ if [ -z "$CLAUDE_BIN" ]; then
   CLAUDE_BIN=$(command -v claude 2>/dev/null || true)
 fi
 if [ -z "$CLAUDE_BIN" ] || [ ! -x "$CLAUDE_BIN" ]; then
-  rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
+  # LOCK_OWNED_BY_PARENT is still 1 here — the EXIT trap will release the
+  # lock automatically when json_exit calls exit. No need to rmdir manually.
   json_exit "claude binary not found; skipping drain"
 fi
 
@@ -218,7 +235,7 @@ if [ -n "${COMPOUND_STAGING_REVIEWER_AGENT:-}" ] && [ -n "${BATS_VERSION:-}" ]; 
   STAGING_REVIEWER_PATH="$COMPOUND_STAGING_REVIEWER_AGENT"
 fi
 if [ ! -f "$STAGING_REVIEWER_PATH" ]; then
-  rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
+  # EXIT trap will rmdir the lock since LOCK_OWNED_BY_PARENT is still 1.
   json_exit "staging-reviewer agent not yet deployed (stack item #2); deferring drain"
 fi
 
@@ -273,7 +290,7 @@ esac
 # (default 8 drains in rolling window); returns 1 when under or on subscription
 # auth (no cost gate). Release the lock + json_exit on the over-threshold path.
 if cs_drain_budget_warn "$STAGING_DIR" "$AUTH_ROUTE"; then
-  rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
+  # EXIT trap will rmdir the lock since LOCK_OWNED_BY_PARENT is still 1.
   json_exit "drain budget over threshold; skipping dispatch"
 fi
 
@@ -317,5 +334,8 @@ DRAIN_TIMEOUT_S="${COMPOUND_DRAIN_TIMEOUT_S:-600}"
   cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
 ) >/dev/null 2>&1 &
 disown
+# Hand lock ownership to the subshell: disarm the parent-side safety-net
+# trap so its EXIT does not rmdir a lock the subshell still holds.
+LOCK_OWNED_BY_PARENT=0
 
 json_exit

@@ -105,6 +105,12 @@ primitives without inheriting the interactive gates.
 
 ## Architecture
 
+> **SUPERSEDED by plan §Architecture (Option C, pure-shell capture)** —
+> bash subshells cannot invoke `Agent`/`Task`. The Stop hook is now
+> pure-shell (no LLM); the drain runs in a disowned `claude -p` subshell
+> dispatched by the SessionStart hook. See
+> `plans/background-compounding-triggers.md` D1.
+
 ```
  ┌─────────────────────────────────────────────────────────────────┐
  │  SESSION END (Stop hook fires)                                  │
@@ -166,6 +172,13 @@ primitives without inheriting the interactive gates.
 ---
 
 ## JSONL Schema
+
+> **SUPERSEDED by plan §JSONL Schema (Phase 1.3)** — the Stop hook now
+> writes only `transcript_tail` (raw bytes), `session_id`, `cwd`, and
+> `content_hash`. The scored fields (`candidate_text`, `priority`, `tags`,
+> `category`) are generated at drain time by `staging-scorer` and live in
+> the in-flight `processing/` JSONL, not the `pending/` JSONL.
+
 
 Each entry written by the Haiku stager. Schema version `"1"` per yellow-plugins
 queue convention (matches ruvector JSONL pattern from MEMORY.md):
@@ -232,6 +245,12 @@ is the only active Stop hook in the entire marketplace besides yellow-ruvector's
 
 ### Decision 3: Staging-reviewer invokes knowledge-compounder for writes
 
+> **SUPERSEDED by plan D8** — `knowledge-compounder` is NOT modified; a
+> new `staging-promoter` agent is used instead. Promoter frontmatter has
+> `disallowedTools: [AskUserQuestion]` (D8 hard-deny enforced by RULE 14
+> in `scripts/validate-agent-authoring.js`).
+
+
 The `staging-reviewer` agent does NOT reimplement `docs/solutions/` write
 logic or MEMORY.md write logic. It delegates to
 `knowledge-compounder` (`subagent_type: "yellow-core:workflow:knowledge-compounder"`)
@@ -241,6 +260,11 @@ plan phase must address how to add a `--no-confirm` or `mode: background` path
 without breaking the interactive flow.
 
 ### Decision 4: Cold-path thresholds are configurable but hardcoded for MVP
+
+> **SUPERSEDED by plan §Budget Model** — base age threshold revised from
+> 24h to 48h for Max 20x responsive defaults. Count threshold remains 5.
+> See `plans/background-compounding-triggers.md` D context.
+
 
 Default thresholds: age > 24h OR count >= 5. These are hardcoded constants in
 the SessionStart hook for MVP. Per the `local-config` skill pattern, they can
