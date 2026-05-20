@@ -227,12 +227,18 @@ cs_update_drain_budget() {
 #
 # Args:
 #   $1 — staging dir
+#   $2 — live auth route ("api"|"subscription"|"unknown"); preferred over the
+#        persisted value so route switches take effect immediately. Falls back
+#        to the persisted drain-budget.json auth_route when omitted.
 cs_drain_budget_warn() {
   local staging="$1"
+  local live_route="${2:-}"
   local current
   current=$(cs_read_drain_budget "$staging")
-  local auth_route
-  auth_route=$(printf '%s' "$current" | jq -r '.auth_route // "unknown"' 2>/dev/null)
+  local auth_route="$live_route"
+  if [ -z "$auth_route" ]; then
+    auth_route=$(printf '%s' "$current" | jq -r '.auth_route // "unknown"' 2>/dev/null)
+  fi
   if [ "$auth_route" != "api" ]; then
     return 1
   fi

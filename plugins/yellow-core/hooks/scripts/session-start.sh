@@ -83,7 +83,7 @@ done
 # a non-yellow-core process). mkdir would always fail (EEXIST) and
 # rmdir cannot remove non-directories — without explicit handling we
 # would deadlock drain dispatch permanently. Remove the file first.
-if [ -f "${STAGING_DIR}/.drain-lock" ]; then
+if [ -f "${STAGING_DIR}/.drain-lock" ] || [ -L "${STAGING_DIR}/.drain-lock" ]; then
   printf '[yellow-core] compound-staging: removing non-directory .drain-lock (deadlock recovery)\n' >&2
   rm -f -- "${STAGING_DIR}/.drain-lock" 2>/dev/null \
     || printf '[yellow-core] compound-staging: non-dir lock rm failed\n' >&2
@@ -223,18 +223,27 @@ if [ ! -f "$STAGING_REVIEWER_PATH" ]; then
 fi
 
 # --- Build drain prompt ---
-# P2: STAGING_DIR and CWD are untrusted filesystem paths (a malicious
-# repo name could contain newlines or prompt-like text). Fence them with
-# begin/end delimiters so the model treats them as reference data only,
-# not as additional instructions.
+# P1: STAGING_DIR and CWD are untrusted filesystem paths (a malicious
+# repo name could contain newlines or prompt-like text). Two-layer defense:
+#   1. Strip CR/LF and substitute the literal close-delimiter so a path
+#      containing `--- end paths ---` cannot terminate the fence.
+#   2. Encode each value on a single fenced line so any residual prompt-like
+#      text is treated as reference data, not instructions.
+# Pattern source: yellow-core/skills/security-fencing — orchestrator-level
+# fence sanitization for untrusted text interpolated into prompts.
+sanitize_fence_value() {
+  printf '%s' "$1" | tr -d '\r\n' | sed 's/--- end paths ---/[ESCAPED] end paths/g'
+}
+STAGING_DIR_SAFE=$(sanitize_fence_value "$STAGING_DIR")
+CWD_SAFE=$(sanitize_fence_value "$CWD")
 DRAIN_PROMPT=$(printf '%s\n' \
   'Invoke the staging-reviewer agent (yellow-core:workflow:staging-reviewer) via Task.' \
   '' \
   'Goal: drain the compound-staging ledger and promote eligible entries.' \
   '' \
   '--- begin paths (reference only) ---' \
-  "Staging dir: ${STAGING_DIR}" \
-  "Project: ${CWD}" \
+  "Staging dir: ${STAGING_DIR_SAFE}" \
+  "Project: ${CWD_SAFE}" \
   '--- end paths ---' \
   '' \
   'Do NOT ask the user any questions. This drain is non-interactive.' \
@@ -263,7 +272,7 @@ esac
 # API billing. Returns 0 (success) when over the COMPOUND_DRAIN_API_THRESHOLD
 # (default 8 drains in rolling window); returns 1 when under or on subscription
 # auth (no cost gate). Release the lock + json_exit on the over-threshold path.
-if cs_drain_budget_warn "$STAGING_DIR"; then
+if cs_drain_budget_warn "$STAGING_DIR" "$AUTH_ROUTE"; then
   rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true
   json_exit "drain budget over threshold; skipping dispatch"
 fi
