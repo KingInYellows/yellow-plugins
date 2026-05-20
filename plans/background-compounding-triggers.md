@@ -299,12 +299,26 @@ interactive session.
     aborts the next guard before printing `{"continue": true}`). Initialize
     defaults BEFORE the eval so a malformed/empty stdin (jq returns nothing)
     leaves variables with sentinel values, not unset:
+    Use `// ""` coalescing in jq so missing fields emit empty strings
+    rather than the literal `null` (which would otherwise pass the `-z`
+    empty-check below and route staging to `~/.claude/projects/null/...`):
     ```bash
     TRANSCRIPT="" SESSION_ID="" CWD="" STOP_HOOK_ACTIVE=""
-    eval "$(jq -r '@sh "TRANSCRIPT=\(.transcript_path) SESSION_ID=\(.session_id) CWD=\(.cwd) STOP_HOOK_ACTIVE=\(.stop_hook_active)"' 2>/dev/null)" || true
+    eval "$(jq -r '@sh "TRANSCRIPT=\(.transcript_path // \"\") SESSION_ID=\(.session_id // \"\") CWD=\(.cwd // \"\") STOP_HOOK_ACTIVE=\(.stop_hook_active // \"\")"' 2>/dev/null)" || true
     ```
     Add `# shellcheck disable=SC2154` at file level. Same default-init +
-    `|| true` pattern is required in 1.4 (session-start).
+    `// ""` coalescing + `|| true` pattern is required in 1.4 (session-start).
+  - **Required-field guard:** validate `SESSION_ID`, `TRANSCRIPT`, and
+    `CWD` are non-empty BEFORE spawning the capture subshell. Without
+    this, malformed/partial hook input would write to `pending/.jsonl`
+    (empty session_id collides across stop events) or under a bogus
+    PROJECT_SLUG. Fail fast to `{"continue": true}` instead:
+    ```bash
+    [ -z "$SESSION_ID" ] && json_exit 'malformed stdin: empty session_id'
+    [ -z "$CWD" ]        && json_exit 'malformed stdin: empty cwd'
+    [ -z "$TRANSCRIPT" ] && json_exit 'malformed stdin: empty transcript_path'
+    [ -f "$TRANSCRIPT" ] || json_exit 'transcript_path does not point to a file'
+    ```
   - **Guard:** `[ "$STOP_HOOK_ACTIVE" = "true" ] && json_exit` — don't re-fire
     within the same stop event (matches the architecture block's
     `stop_hook_active` fast-exit)
@@ -330,9 +344,12 @@ interactive session.
     `set -u`):
     ```bash
     CWD=""
-    eval "$(jq -r '@sh "CWD=\(.cwd)"' 2>/dev/null)" || true
+    eval "$(jq -r '@sh "CWD=\(.cwd // \"\")"' 2>/dev/null)" || true
     [ -z "$CWD" ] && json_exit 'malformed stdin: missing .cwd'
     ```
+    The `// ""` coalescing is required — without it jq emits the literal
+    string `null` for a missing field, which is non-empty so the `-z`
+    guard would let an invalid CWD through.
   - Source `lib/compound-staging.sh`; derive `STAGING_DIR`
   - `[ ! -d "$STAGING_DIR/pending" ] && json_exit` (first-run fast-exit)
   - Reap (logged to stderr):
