@@ -424,8 +424,15 @@ function validateStagingPromoterFrontmatter(agentFiles, errors) {
   // semantically equivalent to `- Foo`. Without accepting them, a stylistic
   // formatting change would falsely trip RULE 14 even with AskUserQuestion
   // still present.
-  const listForm = /^disallowedTools:\s*\n(?:\s+-\s+["']?[\w:-]+["']?\s*\n)*\s+-\s+["']?AskUserQuestion["']?(?:\s|$)/m;
-  const flowForm = /^disallowedTools:\s*\[[^\]]*["']?\bAskUserQuestion\b["']?[^\]]*\]/m;
+  // The `(?<![\w-])` lookbehind and `(?![\w-])` lookahead enforce that
+  // AskUserQuestion is the EXACT token. `\bAskUserQuestion\b` alone
+  // would still match `AskUserQuestion-foo` (because the hyphen creates
+  // a word boundary), letting a future edit silently re-enable
+  // AskUserQuestion under a renamed token while RULE 14 passed. The
+  // lookaround rejects any adjacent word character or hyphen; quotes,
+  // commas, brackets, and whitespace remain valid neighbors.
+  const listForm = /^disallowedTools:\s*\n(?:\s+-\s+["']?[\w:-]+["']?\s*\n)*\s+-\s+["']?(?<![\w-])AskUserQuestion(?![\w-])["']?(?:\s|$)/m;
+  const flowForm = /^disallowedTools:\s*\[[^\]]*["']?(?<![\w-])AskUserQuestion(?![\w-])["']?[^\]]*\]/m;
 
   if (!listForm.test(frontmatter) && !flowForm.test(frontmatter)) {
     errors.push(

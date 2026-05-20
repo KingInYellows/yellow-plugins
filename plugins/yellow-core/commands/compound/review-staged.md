@@ -200,21 +200,24 @@ Use this when:
        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" \
        "${DRAIN_TIMEOUT_BIN:+${COMPOUND_DRAIN_TIMEOUT_S}s}${DRAIN_TIMEOUT_BIN:-none}" \
        >> "$DRAIN_LOG" 2>/dev/null
-     # --bare is the primary recursion guard: skips auto-discovery of
-     # hooks, skills, plugins, MCP servers, CLAUDE.md in the child session.
-     # Without it, the child fires its own SessionStart hook and cascades.
-     # See docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md.
+     # NOTE: --bare is intentionally NOT used here, mirroring
+     # session-start.sh (commit 64541309 fix(yellow-core): PR #542
+     # round-2 — remove --bare from drain (agent unreachable)).
+     # --bare disables plugin auto-discovery in the child session, so
+     # `Task(subagent_type: "yellow-core:workflow:staging-reviewer")`
+     # cannot resolve the agent and the drain becomes a silent no-op
+     # (user sees "dispatched" but no promotions happen). Hook recursion
+     # is instead guarded by the COMPOUND_DRAIN_IN_PROGRESS env var
+     # short-circuit at the top of stop.sh + session-start.sh.
      if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
        "$DRAIN_TIMEOUT_BIN" --preserve-status "${COMPOUND_DRAIN_TIMEOUT_S}s" \
          "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
-         --bare \
          --max-turns 50 \
          --permission-mode bypassPermissions \
          --output-format json \
          >> "$DRAIN_LOG" 2>&1
      else
        "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
-         --bare \
          --max-turns 50 \
          --permission-mode bypassPermissions \
          --output-format json \
