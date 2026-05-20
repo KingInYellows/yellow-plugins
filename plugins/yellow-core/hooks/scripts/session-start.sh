@@ -163,6 +163,20 @@ else
   fi
 fi
 
+# Even when DISPATCH=0 (pending threshold not met), still proceed to lock +
+# requeue if processing/ has crashed entries older than 60 min. Otherwise
+# the common crash case (entries moved to processing/, then pending=0 on
+# next start) would leave the stale files unrecovered indefinitely.
+# REQUEUE_ONLY=1 signals: do the requeue then exit without firing drain.
+REQUEUE_ONLY=0
+if [ "$DISPATCH" -eq 0 ] && [ -d "${STAGING_DIR}/processing" ]; then
+  if find "${STAGING_DIR}/processing" -maxdepth 1 -name '*.jsonl' -mmin +60 \
+       -type f 2>/dev/null | head -1 | grep -q .; then
+    DISPATCH=1
+    REQUEUE_ONLY=1
+  fi
+fi
+
 if [ "$DISPATCH" -eq 0 ]; then
   json_exit
 fi
@@ -205,6 +219,13 @@ if [ -d "${STAGING_DIR}/processing" ]; then
         || printf '[yellow-core] compound-staging: failed to requeue crashed entry %s\n' "$base" >&2
     fi
   done < <(find "${STAGING_DIR}/processing" -name '*.jsonl' -mmin +60 -print 2>/dev/null)
+fi
+
+# If we entered the lock solely to requeue (pending threshold not met), release
+# the lock and exit without firing the drain. The requeued entries will be
+# picked up on the next SessionStart that meets the dispatch threshold.
+if [ "$REQUEUE_ONLY" = "1" ]; then
+  json_exit "requeue-only: stale processing entries restored to pending/"
 fi
 
 # --- Resolve claude binary ---
