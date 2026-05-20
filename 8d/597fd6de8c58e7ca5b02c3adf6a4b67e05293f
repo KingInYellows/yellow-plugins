@@ -1,0 +1,105 @@
+plans/background-compounding-triggers.md
+  s_f188cf7e3ae96a::t_54e64a9d1a1db6 495-506
+plugins/yellow-core/commands/compound/review-staged.md
+  ai_agent 1-60,70-74,76-77,94-120,125-126,132-147,153-157,162-170,175,177-222
+  s_f188cf7e3ae96a::t_9e6a9d441e0e2a 61-69,78-88
+  s_f188cf7e3ae96a::t_25557ba57ee0e0 75,89-93
+  s_f188cf7e3ae96a::t_ada81220d92bf5 121-124,127-131
+  s_f188cf7e3ae96a::t_ad6953e5bf28ee 148-152,158-161
+  s_f188cf7e3ae96a::t_5ffcfd90b3f5a6 171-174,176
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_e72e14f6bafd18::t_d31f826b997e75 1-47,51-69,86,92-95,98-120,133-135,146-155,158,164-182,193-196,206-214
+  s_e72e14f6bafd18::t_91a237db880162 48-50
+  s_c1ce70ba5b1295::t_1d480739689db2 70-77
+  s_e72e14f6bafd18::t_a022d48510d7f4 78-85,87-91,96-97
+  s_20a7be2c72b16c::t_862dd95e0dbcfe 121-124,136-145
+  s_f188cf7e3ae96a::t_32456e41307cb3 125-132
+  s_c1ce70ba5b1295::t_95604f2af1d98c 156-157,159
+  s_e72e14f6bafd18::t_d6a7db0ee841e8 160-163
+  s_e72e14f6bafd18::t_296b03b4824fda 183,189,191-192
+  s_e72e14f6bafd18::t_b52e043170b14f 184-188,190
+  s_f188cf7e3ae96a::t_e5ecadb1baab0d 197-205
+  s_f188cf7e3ae96a::t_e61aca3d2836f1 222-223
+  s_20a7be2c72b16c::t_a6fe6d922911d7 227-231,237,239-241,243-246,252,255
+  s_20a7be2c72b16c::t_f0c7e46d9665e7 232-236
+  s_f188cf7e3ae96a::t_a725bf322964d4 238
+  s_63f7909075d5bd::t_27028f71808dbf 242,247-251,253,257-260,264,266,269-270
+  s_f188cf7e3ae96a::t_2ecf921d196023 261-263,265,267-268,275,277
+  s_f188cf7e3ae96a::t_80f86dabecea51 271-274,276
+  s_20a7be2c72b16c::t_0c620bcb5e3408 282-283
+  s_f188cf7e3ae96a::t_8607e00fb6bd3d 284
+  s_f188cf7e3ae96a::t_aa16c0f3fee3fc 301-305,308,315
+  s_f188cf7e3ae96a::t_837283b3948fdd 324-326
+docs/brainstorms/2026-05-18-background-compounding-triggers-brainstorm.md
+  s_f188cf7e3ae96a::t_68166abb801996 108-113
+  s_f188cf7e3ae96a::t_1856f4d48b8b77 176-182
+  s_f188cf7e3ae96a::t_b7fe0e8e190aca 248-253
+  s_f188cf7e3ae96a::t_fa5dc26583d448 264-268
+scripts/validate-agent-authoring.js
+  ai_agent 389-397,413,441-459,477,486-488,490-493,551-552,560-561
+  s_f188cf7e3ae96a::t_4854e51fb489c3 398-412,414-440
+  s_f188cf7e3ae96a::t_2f6368211f64f4 460-469,471,489
+  s_f188cf7e3ae96a::t_22481bbc34bcb4 470,472-476,478-485
+tests/integration/validate-agent-authoring-rule14.test.ts
+  s_f188cf7e3ae96a::t_7da4543b9483ac 1-218
+plans/compound-staging-review-followups.md
+  s_f188cf7e3ae96a::t_8d0eef6372b0b3 1-251
+.changeset/yellow-core-compound-staging-followups.md
+  s_f188cf7e3ae96a::t_1e1f0cc89cca66 1-48
+plugins/yellow-core/tests/compound-session-start-hook.bats
+  s_e72e14f6bafd18::t_aeacf8003f70bc 1-29,37-48,52-53,56-130,146-190
+  s_20a7be2c72b16c::t_113ada3ecc7750 30-36
+  s_e72e14f6bafd18::t_91a9d3b6d1de16 49,51,54-55
+  s_20a7be2c72b16c::t_b57a0b71324bd0 50
+  s_20a7be2c72b16c::t_447340c4bd4248 131-145
+  s_c1ce70ba5b1295::t_717abe6976c853 191-204,206-208
+  s_f188cf7e3ae96a::t_8f2e69d8234683 240-280
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "8d597fd6de8c58e7ca5b02c3adf6a4b67e05293f",
+  "prompts": {},
+  "sessions": {
+    "s_20a7be2c72b16c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "541a3199-2f01-485d-96ea-ef238fbef991",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    },
+    "s_63f7909075d5bd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6fd3039-cb5f-4e1b-b6ff-1f164acf019c",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1ce70ba5b1295": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd739ed8-a320-431c-b610-03f3fbb5c3b5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e72e14f6bafd18": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20321feb-5fb3-4265-8ac2-ac9b74d9122b",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    },
+    "s_f188cf7e3ae96a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "40ca09a9-77f3-4e24-971e-6e365b2795cf",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
