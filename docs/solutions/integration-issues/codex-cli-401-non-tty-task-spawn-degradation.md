@@ -43,10 +43,24 @@ This means:
 
 ## When to Apply
 
-- If `/review:sweep` or `/review:sweep-all` reports a codex reviewer failure with
-  a 401, dismiss it. The manual analysis the agent produced is still valid.
-- If you want a real codex pass, run `/yellow-codex:review:codex-reviewer`
-  directly in an interactive session (not via Task spawn).
+- If `/review:sweep` or `/review:sweep-all` reports a codex reviewer 401
+  failure **AND the auth route is OAuth subscription** (no `OPENAI_API_KEY`
+  in env): dismiss the 401. The manual analysis the agent produced is still
+  valid — this is the documented non-TTY OAuth degradation path.
+- If `OPENAI_API_KEY` is set: a 401 is NOT expected. Treat as a real
+  auth/config error (revoked key, bad scope, expired) and investigate
+  before assuming review coverage is intact. Do NOT dismiss API-key 401s
+  as benign — that would hide actionable failures and produce false
+  confidence in the sweep's coverage.
+- If you want a real codex OAuth pass under TTY constraints, run
+  `/yellow-codex:review:codex-reviewer` directly in an interactive session
+  (not via Task spawn).
+
+**Quick auth-route check before deciding:**
+```bash
+[ -n "${OPENAI_API_KEY:-}" ] && echo "api-key (401 is a real error)" \
+                              || echo "oauth (401 may be benign)"
+```
 
 ## Workarounds
 
