@@ -113,13 +113,31 @@ Use this when:
    fi
    ```
 
-6. **Resolve the claude binary.** Allow override via `COMPOUND_DRAIN_CMD`
-   ONLY when running under bats (test harness). Without the
-   `BATS_VERSION` gate, this would be a production drain-hijack vector
-   for any attacker who can plant the env var (e.g., via a malicious
-   `.envrc` or shell profile).
+6. **Resolve the claude binary + spawn the disowned drain subshell.**
+   Single Bash block: each Bash tool call is a fresh subprocess, so
+   `CLAUDE_BIN`, `PENDING_COUNT`, and `DRAIN_LOG` must all be derived
+   in the same block that uses them. Identical dispatch to
+   `hooks/scripts/session-start.sh` — the `EXIT` trap removes the lock;
+   this command does NOT wait for drain completion. The
+   `COMPOUND_DRAIN_CMD` override is gated on `BATS_VERSION` because
+   without it any attacker who can plant the env var (malicious
+   `.envrc`, shell profile) would have a production drain-hijack vector.
 
    ```bash
+   # Re-source compound-staging.sh: helpers from Step 1's block are out
+   # of scope here. Without this, cs_detect_auth_route +
+   # cs_update_drain_budget would be undefined and manual drains would
+   # log empty auth and never update drain-budget.json — silently
+   # diverging from session-start.sh.
+   . "${CLAUDE_PLUGIN_ROOT}/lib/compound-staging.sh"
+
+   # Re-derive PENDING_COUNT from Step 2 — its variable is gone with the
+   # previous subprocess. Substitute inline if the runner inlined Step 2.
+   PENDING_COUNT=$(find "$STAGING_DIR/pending" -maxdepth 1 -name '*.jsonl' -type f 2>/dev/null \
+     | wc -l | tr -d '[:space:]')
+
+   # Resolve the claude binary (was Step 6 in earlier drafts; merged here
+   # so the lock-cleanup-on-error path can run without a stranded subshell).
    CLAUDE_BIN=""
    if [ -n "${COMPOUND_DRAIN_CMD:-}" ] && [ -n "${BATS_VERSION:-}" ]; then
      CLAUDE_BIN="$COMPOUND_DRAIN_CMD"
@@ -131,19 +149,6 @@ Use this when:
      printf '[compound:review-staged] claude binary not found. Install Claude Code CLI.\n' >&2
      exit 1
    fi
-   ```
-
-7. **Spawn the disowned drain subshell.** Identical to
-   `hooks/scripts/session-start.sh`'s dispatch — the `EXIT` trap removes
-   the lock; this command does NOT wait for drain completion.
-
-   ```bash
-   # Re-source compound-staging.sh: each Bash tool call is a fresh
-   # subprocess, so the helpers sourced in Step 1 are not visible here.
-   # Without this, cs_detect_auth_route + cs_update_drain_budget would
-   # be undefined and manual drains would log empty auth and never
-   # update drain-budget.json — silently diverging from session-start.sh.
-   . "${CLAUDE_PLUGIN_ROOT}/lib/compound-staging.sh"
 
    # Restrictive perms on drain-logs/: drain logs can include transcript
    # fragments past redaction. Match session-start.sh (chmod 700 + umask 077
@@ -226,15 +231,17 @@ Use this when:
      cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
    ) >/dev/null 2>&1 &
    disown
-   ```
 
-8. **Report and exit.** The drain runs asynchronously; this command
-   reports the dispatch and returns immediately. Tail the drain log to
-   see progress.
-
-   ```bash
+   # Report dispatch from the same block that defined DRAIN_LOG — the
+   # variable would not survive a separate Bash tool call. The drain
+   # runs asynchronously; the user gets the prompt back immediately.
    printf '[compound:review-staged] dispatched. Tail with: tail -f %s\n' "$DRAIN_LOG"
    ```
+
+7. **Drain is asynchronous.** The disowned subshell continues writing
+   to the drain log past return of this command. The `tail -f` line
+   printed at the end of Step 6 is the canonical place to follow
+   progress.
 
 ## Behavior notes
 
