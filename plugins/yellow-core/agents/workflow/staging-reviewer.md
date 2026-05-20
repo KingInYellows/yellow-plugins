@@ -131,13 +131,23 @@ at capture time). For each duplicate found, **delete the duplicate file from
 Do not defer deletion to Phase 9 — a later stale-processing requeue could
 otherwise resurrect and re-promote the duplicate.
 
-**Deletion is restricted to files moved by THIS drain** (i.e., basenames
-present in `MOVED_THIS_DRAIN_FILE`). Files that were already in
-`processing/` when this drain started belong to a concurrent or prior drain
-and must not be deleted here — deleting them would cause lost work or
-conflicting cleanup. Those pre-existing files are still included in the
-seen-hash set so that any duplicate moved this drain is correctly suppressed,
-but only this-drain files are eligible for deletion.
+**Three-way classification governs which duplicates are deleted:**
+
+1. **This-drain files** (basename in `MOVED_THIS_DRAIN_FILE`): delete
+   unconditionally — this drain holds the lock on them.
+2. **In-flight pre-existing files** (NOT in `MOVED_THIS_DRAIN_FILE`, mtime
+   younger than 5 minutes): skip — a concurrent drain is actively working
+   on these, and deleting them would cause lost work or conflicting cleanup.
+3. **Stale pre-existing files** (NOT in `MOVED_THIS_DRAIN_FILE`, mtime
+   older than 5 minutes): delete — these were left by a crashed prior drain.
+   Phase 4 WILL score pre-existing files older than 5 minutes, so stale
+   duplicates must be removed here to prevent Phase 4 from scoring them
+   and Phase 9 from promoting duplicate solution entries.
+
+The 5-minute boundary is intentionally aligned with Phase 4's in-flight age
+guard. All pre-existing files (both in-flight and stale) are included in
+the seen-hash set so that any duplicate moved by this drain is correctly
+suppressed.
 
 ```bash
 declare -A seen
@@ -147,14 +157,26 @@ for f in "$STAGING"/processing/*.jsonl; do
   h=$(jq -r '.content_hash // empty' "$f" 2>/dev/null)
   [ -z "$h" ] && continue
   if [ -n "${seen[$h]:-}" ]; then
-    # Only delete if this drain moved the file — never delete a concurrent drain's file
     if grep -qxF "$base" "$MOVED_THIS_DRAIN_FILE" 2>/dev/null; then
-      printf '[staging-reviewer] hash-dedup: deleted duplicate %s (hash %s)\n' \
+      # Case 1: this-drain file — delete
+      printf '[staging-reviewer] hash-dedup: deleted duplicate %s (hash %s, this-drain)\n' \
         "$base" "$h"
       rm -- "$f"
     else
-      printf '[staging-reviewer] hash-dedup: skipped pre-existing duplicate %s (hash %s, belongs to concurrent drain)\n' \
-        "$base" "$h"
+      # Case 2 vs 3: pre-existing — check mtime
+      now=$(date +%s)
+      mtime=$(stat -c '%Y' "$f" 2>/dev/null || stat -f '%m' "$f" 2>/dev/null || date +%s)
+      age=$(( now - mtime ))
+      if [ "$age" -lt 300 ]; then
+        # Case 2: in-flight (< 5 min) — skip, concurrent drain holds it
+        printf '[staging-reviewer] hash-dedup: skipped in-flight duplicate %s (hash %s, mtime %ss, belongs to concurrent drain)\n' \
+          "$base" "$h" "$age"
+      else
+        # Case 3: stale (>= 5 min) — delete, crashed prior drain left orphan
+        printf '[staging-reviewer] hash-dedup: deleted stale pre-existing duplicate %s (hash %s, mtime %ss, crashed prior drain)\n' \
+          "$base" "$h" "$age"
+        rm -- "$f"
+      fi
     fi
   else
     seen[$h]=1
