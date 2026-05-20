@@ -386,6 +386,115 @@ function validateSubagentReferences(markdownFiles, ctx) {
   }
 }
 
+// RULE 14 — staging-promoter frontmatter MUST contain
+// `disallowedTools: [AskUserQuestion]` (in YAML list form, with or without
+// flow-style brackets). This is the load-bearing structural enforcement
+// of D8 in plans/background-compounding-triggers.md: the
+// staging-promoter is dispatched from a background `claude -p` drain
+// session where AskUserQuestion would block indefinitely (no human
+// in the loop). If a future edit removes the deny, the drain breaks
+// silently. RULE 14 turns that into a CI failure.
+function validateStagingPromoterFrontmatter(agentFiles, errors) {
+  const promoter = agentFiles.find(
+    (f) =>
+      f.endsWith(
+        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
+      )
+  );
+  if (!promoter) {
+    // staging-promoter is not yet present (e.g., stack item #2 not merged).
+    // Don't fail; the agent itself is what's checked, not its absence.
+    return;
+  }
+  const content = fs.readFileSync(promoter, 'utf8');
+  const frontmatter = extractFrontmatter(content) || '';
+
+  // Use the parseList() helper to extract disallowedTools as a real
+  // string array, then check whether 'AskUserQuestion' is a complete
+  // entry. parseList handles both flow form (`[A, B]`) and block form
+  // (`- A\n- B`) and strips surrounding quotes. A `.includes()` test on
+  // the parsed array is impossible to fool with substring tricks —
+  // values like `'foo AskUserQuestion'`, `'AskUserQuestion(bar)'`, or
+  // `'AskUserQuestion-disabled'` parse to entries that are NOT equal to
+  // the bare string `'AskUserQuestion'`, so they fail the check.
+  // Earlier regex-only approaches (\b boundaries, then lookarounds) were
+  // repeatedly bypassed — see PR #544 round-1/round-2/round-3 review
+  // comments — because regex cannot cleanly distinguish "the entry IS
+  // AskUserQuestion" from "the entry CONTAINS AskUserQuestion". Parsing
+  // first sidesteps the entire problem.
+  const disallowed = parseList(frontmatter, 'disallowedTools');
+  if (!disallowed.includes('AskUserQuestion')) {
+    errors.push(
+      `${relative(promoter)}: RULE 14 — staging-promoter frontmatter MUST contain \`disallowedTools: [AskUserQuestion]\` (this is the load-bearing D8 enforcement for the background-compounding drain pipeline)`
+    );
+  }
+}
+
+// RULE 14b — V1 prose-only: scan staging-promoter body for any Write/Edit
+// invocation that targets MEMORY.md but is not gated to the `## Session
+// Notes` section. Full AST lint deferred to V2. V1 catches the most
+// common drift: someone editing the agent to also append to other
+// MEMORY.md sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS).
+function validateMemoryWriteSectionGate(agentFiles, errors) {
+  const promoter = agentFiles.find(
+    (f) =>
+      f.endsWith(
+        `${path.sep}yellow-core${path.sep}agents${path.sep}workflow${path.sep}staging-promoter.md`
+      )
+  );
+  if (!promoter) {
+    return;
+  }
+  const content = fs.readFileSync(promoter, 'utf8');
+  // Strip frontmatter so we don't false-positive on metadata.
+  const body = content.replace(/^---\n[\s\S]*?\n---\n?/, '');
+
+  // Bind both checks to a local context window so generic prose mentioning
+  // `Session Notes` or the section names somewhere unrelated cannot satisfy
+  // the rule. Window = ±200 chars around the anchor phrase.
+  //
+  // Session Notes gate: must appear within 200 chars of a write-restriction
+  // phrase (`only.*Session Notes`, `Session Notes.*only`, `Never.*other.*section`,
+  // `write only to .* Session Notes`). A naked `Session Notes` mention is
+  // insufficient.
+  const sessionNotesGateRe = new RegExp(
+    // Form A: "ONLY ... Session Notes" within 200 chars
+    '(?:only|ONLY)[\\s\\S]{0,200}Session Notes' +
+      // Form B: "Session Notes ... only/ONLY/section ONLY" within 200 chars
+      '|Session Notes[\\s\\S]{0,200}(?:section\\s+only|ONLY|never\\s+(?:any|other))' +
+      // Form C: "append to ... Session Notes" + "NEVER" within 200 chars
+      '|append[\\s\\S]{0,200}Session Notes[\\s\\S]{0,200}[Nn]ever',
+    ''
+  );
+  const hasSessionNotesGate = sessionNotesGateRe.test(body);
+
+  // Never-modify invariant: all three protected section names must appear
+  // in the same 400-char sliding window as a "Never modify/write/touch"
+  // phrase. Splitting them across the document (e.g., one in prose + one
+  // in code + one in references) would otherwise satisfy three independent
+  // global tests and let the actual invariant statement be silently removed.
+  const sectionContextRe =
+    /[Nn]ever[^.\n]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)[\s\S]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)[\s\S]{0,400}(?:CORE_RULES|USER_PREFERENCES|KNOWN_PROJECTS)/;
+  const hasNeverModifyInvariant = (() => {
+    const m = body.match(sectionContextRe);
+    if (!m) return false;
+    const span = m[0];
+    // All three names must appear within this single matched window.
+    return (
+      /CORE_RULES/.test(span) &&
+      /USER_PREFERENCES/.test(span) &&
+      /KNOWN_PROJECTS/.test(span) &&
+      /[Nn]ever (?:modif|write|touch)/.test(span)
+    );
+  })();
+
+  if (!hasSessionNotesGate || !hasNeverModifyInvariant) {
+    errors.push(
+      `${relative(promoter)}: RULE 14b — staging-promoter body must reference \`## Session Notes\` write gate AND state a "Never modify" invariant that enumerates ALL THREE protected sections (CORE_RULES, USER_PREFERENCES, KNOWN_PROJECTS) (D9-L1 memory-partition enforcement)`
+    );
+  }
+}
+
 // Validate that command files do not source plugin files via BASH_SOURCE.
 function validateCommandFiles(commandFiles, errors) {
   for (const filePath of commandFiles) {
@@ -452,6 +561,8 @@ function main() {
     errors,
   });
   validateCommandFiles(commandFiles, errors);
+  validateStagingPromoterFrontmatter(agentFiles, errors);
+  validateMemoryWriteSectionGate(agentFiles, errors);
 
   // Print warnings first so they remain visible above the trailing
   // success/error block. Warnings do NOT affect exit code; only errors do.

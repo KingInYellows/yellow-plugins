@@ -23,7 +23,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ## Plugin Components
 
-### Agents (18)
+### Agents (21)
 
 **Review** — parallel code review specialists:
 
@@ -56,8 +56,22 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   directory-per-session). BM25 + optional ruvector cosine + recency fused
   via Reciprocal Rank Fusion. Secret redaction (AWS keys, GitHub tokens,
   API keys, JWTs, PEM blocks) before excerpts are returned
+- `staging-reviewer` — drain orchestrator for the background-compounding
+  pipeline; dispatched by the SessionStart hook's `claude -p` drain
+  subshell. 10-phase pipeline: move pending → processing, dedup,
+  Haiku scoring via `staging-scorer`, guardian + injection + sanity
+  filters, asymmetric semantic dedup, promotion via `staging-promoter`
+- `staging-scorer` — Haiku-backed rubric scorer for one transcript
+  excerpt; structured JSON output (skip OR score shape); hardened
+  prompt with few-shot examples covering injection attempts
+- `staging-promoter` — non-interactive writer that creates
+  `docs/solutions/<category>/<slug>.md` and appends a one-line index
+  entry to MEMORY.md `## Session Notes` ONLY. Frontmatter
+  `disallowedTools: [AskUserQuestion]` is load-bearing (D8 in the
+  background-compounding plan); RULE 14 in
+  `scripts/validate-agent-authoring.js` blocks any removal of this deny
 
-### Commands (9)
+### Commands (10)
 
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
@@ -66,6 +80,9 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   coherence, and scope drift with autonomous P1 fix loop. Falls back to
   `/review:pr` redirect for PR number/URL/branch arguments.
 - `/workflows:compound` — document a recently solved problem to compound knowledge
+- `/compound:review-staged` — manually drain the background-compounding
+  staging ledger ahead of the SessionStart auto-drain threshold;
+  AskUserQuestion M3 gate before any bulk write
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/setup:claude-web` — audit a repository and scaffold the files Claude Code
@@ -124,6 +141,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 - `credential-status.sh` — credential resolution and SessionStart hook helper
   for `/setup:all` dashboards
+- `compound-staging.sh` — helpers for the background-compounding pipeline
+  (project-slug derivation, atomic JSONL writes, secret redaction, drain-budget
+  observability counter, ANTHROPIC_API_KEY auth-route detection). Sourced by
+  yellow-core's `hooks/scripts/stop.sh`, `session-start.sh`,
+  `_stop-capture-subshell.sh`, and the `/compound:review-staged` command
 - `validate-fs.sh` — `validate_file_path()` and `canonicalize_project_dir()`
   path-traversal validators (consumed by yellow-ci, yellow-ruvector,
   yellow-debt; yellow-debt declares it as a required dependency). Idempotent
@@ -180,3 +202,74 @@ ToolSearch and gracefully fall through to WebSearch / EXA when absent.
 - **morph** — Preferred for file edits (>200 lines or 3+ non-contiguous
   regions) and intent-based code search. Discovered via ToolSearch at runtime;
   falls back to built-in tools silently.
+
+## Compound Staging
+
+Background-compounding pipeline that captures session-transcript excerpts
+at session end and asynchronously promotes high-signal entries to
+`docs/solutions/` + the project's auto-memory MEMORY.md. Designed so the
+main session never pays a turn-budget cost for compounding.
+
+**Architecture (see `plans/background-compounding-triggers.md` for full
+detail):**
+
+- Stop hook (pure shell, < 500ms) writes a JSONL pending entry to
+  `~/.claude/projects/<slug>/compound-staging/pending/<session_id>.jsonl`.
+  Secrets are redacted before write; transcript_tail capped at 100 lines.
+- SessionStart hook checks thresholds (`count >= 5` OR `oldest > 48h`),
+  acquires an atomic `.drain-lock` (mkdir-based), and disowns a
+  `claude -p` drain subshell with `COMPOUND_DRAIN_IN_PROGRESS=1` env var
+  set (recursion guard for the drain's own Stop + SessionStart hooks).
+- The drain `claude -p` session invokes `staging-reviewer`, which scores
+  each pending entry via `staging-scorer` (Haiku), filters through a
+  multi-layer guardian (`category != behavioral_instruction`, no
+  injection markers, sanity check for high-priority entries), runs
+  asymmetric semantic dedup against the ruvector corpus, and dispatches
+  surviving entries to `staging-promoter`.
+- `staging-promoter` writes `docs/solutions/<category>/<slug>.md` and
+  appends a one-line index entry to MEMORY.md's `## Session Notes`
+  section ONLY. Its frontmatter has
+  `disallowedTools: [AskUserQuestion]` as a load-bearing scheduler-level
+  hard-deny (D8 in the plan). RULE 14 in
+  `scripts/validate-agent-authoring.js` blocks any removal of this deny.
+
+**Manual override:** `/compound:review-staged` triggers a drain
+immediately (skips threshold check) with an `AskUserQuestion` M3
+confirmation gate showing pending count + sample titles.
+
+**Auth route:** drains use the existing Claude Code subscription OAuth
+token by default. If `ANTHROPIC_API_KEY` is set in the environment,
+`claude -p` routes to API billing instead. The compound-staging.sh helper
+detects this via `cs_detect_auth_route` and logs the chosen route to
+`drain-logs/`. Per-drain cost is observability-only under subscription
+auth (~5-20 short-message rate-limit equivalents per drain against the
+Max 20x 5h window); the API-route fork is ~$0.13-0.17/drain.
+
+## Known Limitations
+
+- **Per-worktree staging.** Each git worktree has its own
+  `~/.claude/projects/<slug>/compound-staging/` directory (derived from
+  `git rev-parse --show-toplevel`) and promotes to its own
+  `docs/solutions/`. Concurrent worktree sessions on the same project do
+  not share pending entries.
+- **PII residue window.** Raw transcript tails (post-secret-redaction)
+  sit in `pending/` until drained. The SessionStart hook's reaper
+  deletes pending entries older than 7 days as a PII safety net. Treat
+  `~/.claude/projects/<slug>/compound-staging/` as sensitive — do not
+  relocate to a tracked directory; the recommended `.gitignore` entry is
+  `compound-staging/`.
+- **Async via disowned subshells only.** The plugin manifest does NOT
+  use an `async: true` hook schema field (Claude Code's remote validator
+  rejects it — confirmed via deepen-plan validation). Non-blocking
+  behavior comes entirely from the disowned-subshell pattern in
+  `hooks/scripts/stop.sh` and `hooks/scripts/session-start.sh`.
+- **MEMORY.md migration is manual.** Plugin install does not partition
+  an existing MEMORY.md into `## CORE_RULES`/`## USER_PREFERENCES`/
+  `## KNOWN_PROJECTS`/`## Session Notes` automatically. `staging-promoter`
+  creates the `## Session Notes` section at end-of-file if absent;
+  partition migration is recommended manual work (see the contract block
+  at the top of MEMORY.md for the canonical structure).
+- **Uninstall does not reap staging dirs.** Removing yellow-core does
+  NOT delete `~/.claude/projects/<slug>/compound-staging/` or any
+  pending/processing entries. Manually `rm -rf` the staging dir to
+  reclaim disk; the directory is inert without the hooks installed.
