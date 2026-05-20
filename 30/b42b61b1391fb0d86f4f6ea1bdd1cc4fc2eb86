@@ -1,0 +1,27 @@
+plugins/yellow-core/hooks/scripts/_stop-capture-subshell.sh
+  s_c1ce70ba5b1295::t_0ae51ef4bb1daf 89-93
+  s_c1ce70ba5b1295::t_04bd4fb401be4b 31-38
+plugins/yellow-core/lib/compound-staging.sh
+  s_c1ce70ba5b1295::t_1e79f646279d5c 92-119
+plugins/yellow-core/tests/compound-session-start-hook.bats
+  s_c1ce70ba5b1295::t_717abe6976c853 191-204,206-208
+plugins/yellow-core/hooks/scripts/session-start.sh
+  s_c1ce70ba5b1295::t_1d480739689db2 70-77
+  s_c1ce70ba5b1295::t_95604f2af1d98c 149-150,152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "30b42b61b1391fb0d86f4f6ea1bdd1cc4fc2eb86",
+  "prompts": {},
+  "sessions": {
+    "s_c1ce70ba5b1295": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd739ed8-a320-431c-b610-03f3fbb5c3b5",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
