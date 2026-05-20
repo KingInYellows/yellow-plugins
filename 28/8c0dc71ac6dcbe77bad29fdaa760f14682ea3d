@@ -1,0 +1,32 @@
+docs/solutions/workflow/graphite-api-outage-fallback.md
+  s_bb05a4e31d3513::t_6ae1ea7d763354 6-8
+plugins/yellow-core/agents/workflow/staging-reviewer.md
+  s_bb05a4e31d3513::t_2d57e9d9b1c899 431-433,436-439
+  s_bb05a4e31d3513::t_1136f4b791c1aa 103-112,114-117
+  s_bb05a4e31d3513::t_442b644b20ee68 57,59
+  s_bb05a4e31d3513::t_8bafdaac6c10b7 231-239,241
+  s_bb05a4e31d3513::t_096489c580d9d9 399,401
+  s_bb05a4e31d3513::t_d4501e9836ef87 165-173
+plugins/yellow-core/agents/workflow/staging-promoter.md
+  s_bb05a4e31d3513::t_d40a0920ba7cad 87
+plugins/yellow-core/agents/workflow/staging-scorer.md
+  s_bb05a4e31d3513::t_3cee51e967af35 31-34
+.changeset/yellow-core-compound-staging-agents.md
+  s_bb05a4e31d3513::t_eb57f64a8558d5 25-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "288c0dc71ac6dcbe77bad29fdaa760f14682ea3d",
+  "prompts": {},
+  "sessions": {
+    "s_bb05a4e31d3513": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7359f15c-f7a1-453b-a3e4-191910d60901",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
