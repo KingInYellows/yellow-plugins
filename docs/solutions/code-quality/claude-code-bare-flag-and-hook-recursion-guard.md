@@ -110,3 +110,63 @@ COMPOUND_DRAIN_IN_PROGRESS=1 claude -p \
 - Authoring a Claude Code plugin that spawns `claude -p` from a hook.
 - Reviewing hooks that do not already include `--bare`.
 - Debugging unbounded recursion symptoms in hook-based pipelines.
+
+---
+
+## Update — 2026-05-20
+
+### Exception: `--bare` is incompatible with drain prompts that invoke plugin agents via Task
+
+**Context:** The compound-staging drain (PR #542) spawns `claude -p` from the
+Stop hook to process queued compound entries. The drain prompt instructs the
+child session to invoke `yellow-core:workflow:staging-reviewer` via Task — a
+plugin agent registered in `plugin.json`.
+
+**The conflict:** `--bare` skips plugin auto-discovery entirely. A child session
+launched with `--bare` has no plugins registered, so
+`yellow-core:workflow:staging-reviewer` does not exist in its Task registry.
+The subagent invocation fails — the Task tool reports the agent is not found.
+
+**Consequence for the existing guidance:** When a hook-spawned `claude -p` must
+itself invoke plugin agents via Task, `--bare` cannot be the recursion guard.
+The env-var sentinel (`COMPOUND_DRAIN_IN_PROGRESS=1`) becomes the **only**
+load-bearing guard. Both mechanisms work together only when the child session's
+prompt is self-contained and does not need plugin auto-discovery.
+
+**Decision tree:**
+
+```
+Does the drain prompt invoke any plugin agent (via Task subagent_type)?
+├── No  → use --bare (primary) + COMPOUND_DRAIN_IN_PROGRESS (defense-in-depth)
+└── Yes → MUST drop --bare
+           Use COMPOUND_DRAIN_IN_PROGRESS=1 as the sole recursion guard
+           Verify EVERY hook in the plugin checks this sentinel at the TOP
+           of the script (before any other work) and calls json_exit early
+```
+
+**Pattern for plugin-invoking drains (no `--bare`):**
+
+```bash
+# Stop hook — drain that calls plugin agents
+COMPOUND_DRAIN_IN_PROGRESS=1 claude -p \
+  --permission-mode bypassPermissions \
+  --max-turns 50 \
+  --output-format json \
+  "$DRAIN_PROMPT" >> "$DRAIN_LOG" 2>&1 &
+disown
+```
+
+```bash
+# session-start.sh / stop.sh — sentinel guard (must be the FIRST check)
+if [ "${COMPOUND_DRAIN_IN_PROGRESS:-}" = "1" ]; then
+  json_exit  # child drain session — skip all hook logic
+fi
+```
+
+Every hook in the plugin must carry this guard. Env-var inheritance through
+`claude -p` subprocess environments is reliable — Claude Code passes the
+spawning shell's environment to hook subprocesses. If any hook in the plugin
+fires in the child session without the sentinel check, it re-enters the drain
+dispatch logic and can recurse.
+
+**Source:** PR #542 review round 2, compound-staging stack.
