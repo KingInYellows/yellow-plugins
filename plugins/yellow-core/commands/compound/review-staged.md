@@ -180,6 +180,13 @@ Use this when:
      ''|*[!0-9]*|0) COMPOUND_DRAIN_TIMEOUT_S=600 ;;
    esac
 
+   # `timeout` is GNU coreutils; gracefully fall through if unavailable
+   # (common default on macOS / BSD). Without this check the dispatch
+   # would invoke a non-existent `timeout` binary, the subshell would
+   # exit immediately, and the user would see a "dispatched" message
+   # while no drain work actually ran. Mirrors session-start.sh.
+   DRAIN_TIMEOUT_BIN=$(command -v timeout 2>/dev/null || true)
+
    # Export STAGING_DIR before the subshell so the EXIT trap can read it
    # by name (not by definition-time interpolation). The previous form
    # baked the path into a single-quoted string, so any `"` in the path
@@ -189,20 +196,30 @@ Use this when:
    (
      trap 'rmdir "${STAGING_DIR}/.drain-lock" 2>/dev/null || true' EXIT INT TERM
      export COMPOUND_DRAIN_IN_PROGRESS=1
-     printf '[compound:review-staged] manual drain dispatch %s (auth=%s, pending=%s, timeout=%ss)\n' \
-       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" "$COMPOUND_DRAIN_TIMEOUT_S" \
+     printf '[compound:review-staged] manual drain dispatch %s (auth=%s, pending=%s, timeout=%s)\n' \
+       "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$AUTH_ROUTE" "$PENDING_COUNT" \
+       "${DRAIN_TIMEOUT_BIN:+${COMPOUND_DRAIN_TIMEOUT_S}s}${DRAIN_TIMEOUT_BIN:-none}" \
        >> "$DRAIN_LOG" 2>/dev/null
      # --bare is the primary recursion guard: skips auto-discovery of
      # hooks, skills, plugins, MCP servers, CLAUDE.md in the child session.
      # Without it, the child fires its own SessionStart hook and cascades.
      # See docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md.
-     timeout --preserve-status "${COMPOUND_DRAIN_TIMEOUT_S}s" \
+     if [ -n "$DRAIN_TIMEOUT_BIN" ]; then
+       "$DRAIN_TIMEOUT_BIN" --preserve-status "${COMPOUND_DRAIN_TIMEOUT_S}s" \
+         "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
+         --bare \
+         --max-turns 50 \
+         --permission-mode bypassPermissions \
+         --output-format json \
+         >> "$DRAIN_LOG" 2>&1
+     else
        "$CLAUDE_BIN" -p "$DRAIN_PROMPT" \
-       --bare \
-       --max-turns 50 \
-       --permission-mode bypassPermissions \
-       --output-format json \
-       >> "$DRAIN_LOG" 2>&1
+         --bare \
+         --max-turns 50 \
+         --permission-mode bypassPermissions \
+         --output-format json \
+         >> "$DRAIN_LOG" 2>&1
+     fi
      cs_update_drain_budget "$STAGING_DIR" "$AUTH_ROUTE" || true
    ) >/dev/null 2>&1 &
    disown
