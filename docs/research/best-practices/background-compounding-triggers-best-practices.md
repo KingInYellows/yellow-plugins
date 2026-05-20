@@ -96,10 +96,15 @@ across all six questions.
 - Why it matters: The brainstorm estimates $0.001-0.003/session. Keeping the input window to
   ~3000 tokens holds the lower end of that range and is consistent with the brainstorm's
   $1.20/month projection at 10 sessions/day.
-- How to implement: The Stop hook shell script truncates the tool-call list from the hook
-  input to the last 15 entries before passing to the Haiku agent. Use `jq '.[(-15):]'` on the
-  array of recent tool calls. Prioritize: tool calls with non-zero exit codes, Edit/Write tool
-  outputs (file changes), and Bash outputs containing "error" or "fix" patterns.
+- How to implement: Stop-hook stdin does NOT include a tool-call array — it
+  provides `session_id`, `transcript_path`, `cwd`, and `stop_hook_active`
+  per the Claude Code hooks reference. The Stop shell script must read the
+  transcript file referenced by `transcript_path` and extract the tail —
+  e.g., `tail -100 "$TRANSCRIPT_PATH" | redact_secrets` — then pass to the
+  Haiku agent. Prioritize within the tail: tool calls with non-zero exit
+  codes, Edit/Write tool outputs (file changes), and Bash outputs containing
+  "error" or "fix" patterns. Do NOT use `jq '.[(-15):]'` on hook input — that
+  would slice empty/invalid data and produce no signal.
 
 **5. Instruct Haiku to produce candidate_text as a self-contained fact, not a session summary.**
 
@@ -308,7 +313,9 @@ across all six questions.
 
 ### MUST HAVE
 
-**1. Register the Stop hook with `async: true`, AND have the hook script spawn a disowned background subshell for the long-running work — use both, not one instead of the other.**
+**1. Register the Stop hook with `async: true`, AND have the hook script
+spawn a disowned background subshell for the long-running work — use both,
+not one instead of the other.**
 
 - Source: Claude Code hooks reference (official docs, WebFetch confirmed). Key finding:
   async hooks are an official feature: `"async": true` in the hook JSON entry makes the hook
@@ -498,8 +505,14 @@ In plugin.json hooks block:
 }
 ```
 
-The stop.sh script still uses the morph-prewarm pattern (`( haiku-agent-call ) >/dev/null 2>&1 & disown`)
-as defense-in-depth: `async: true` is a supported optional hook-schema field (official Claude Code hooks reference) that keeps the hook from blocking the session transition, while the disowned subshell guarantees the parent script returns immediately even if it hangs before the `disown` line. No existing marketplace plugin uses `async: true` yet (deepen-validation Q2), so the disowned-subshell pattern remains the proven primary mechanism.
+The stop.sh script still uses the morph-prewarm pattern
+(`( haiku-agent-call ) >/dev/null 2>&1 & disown`) as defense-in-depth:
+`async: true` is a supported optional hook-schema field (official Claude Code
+hooks reference) that keeps the hook from blocking the session transition,
+while the disowned subshell guarantees the parent script returns immediately
+even if it hangs before the `disown` line. No existing marketplace plugin uses
+`async: true` yet (deepen-validation Q2), so the disowned-subshell pattern
+remains the proven primary mechanism.
 
 ### JSONL schema versioning policy (Q6)
 
@@ -537,8 +550,10 @@ as defense-in-depth: `async: true` is a supported optional hook-schema field (of
 - [RelayPlane: Agent Runaway Costs 2026](https://relayplane.com/blog/agent-runaway-costs-2026) (community)
 
 ### Prompt engineering
-- [AWS/Anthropic Prompt Engineering with Claude v3 (Few-Shot)]
-  (https://github.com/aws-samples/prompt-engineering-with-anthropic-claude-v-3/blob/main/07_Using_Examples_Few-Shot_Prompting.ipynb) (official sample)
+- [AWS/Anthropic Prompt Engineering with Claude v3 (Few-Shot)][aws-few-shot]
+  (official sample)
+
+[aws-few-shot]: https://github.com/aws-samples/prompt-engineering-with-anthropic-claude-v-3/blob/main/07_Using_Examples_Few-Shot_Prompting.ipynb
 - [Adaline: LLM-as-a-Judge Reliability and Bias](https://www.adaline.ai/blog/llm-as-a-judge-reliability-bias) (community/research)
 - [Prompt Engineering Guide: Few-Shot](https://www.promptingguide.ai/techniques/fewshot) (community)
 
