@@ -187,8 +187,28 @@ SOLUTION_DIR="$GIT_ROOT/docs/solutions/$SOLUTION_CATEGORY"
 SOLUTION_PATH="$SOLUTION_DIR/$SLUG.md"
 MEMORY_PATH="$HOME/.claude/projects/$(printf '%s' "$GIT_ROOT" | tr '/' '-')/memory/MEMORY.md"
 
+# Crash-retry idempotency check — MUST run BEFORE slug-collision suffixing.
+#
+# Why this order matters: if Phase 2 (write solution doc) succeeded on a
+# prior attempt but Phase 3 (MEMORY.md append) failed, the next drain
+# re-runs the promoter with the same session_id. If slug-collision logic
+# runs first, it sees the original SOLUTION_PATH already exists, rewrites
+# to `<slug>-2.md`, and then the idempotency guard checks `-2` and misses
+# the original `.promote-done` sentinel — writing a duplicate solution doc
+# and breaking the documented crash-retry contract.
+#
+# Detection rule: if `<SOLUTION_PATH>.promote-done` exists AND
+# `<SOLUTION_PATH>` exists, this is a resume — skip slug-collision and
+# proceed directly to Phase 3 with the original SOLUTION_PATH/SLUG.
+PROMOTE_DONE_PATH="${SOLUTION_PATH}.promote-done"
+RESUMING_AFTER_CRASH=0
+if [ -f "$PROMOTE_DONE_PATH" ] && [ -f "$SOLUTION_PATH" ]; then
+  RESUMING_AFTER_CRASH=1
+fi
+
 # Slug collision: append -2, -3, ... up to -9 if file exists.
-if [ -f "$SOLUTION_PATH" ]; then
+# Skipped on crash-retry — the existing file IS our prior write, not a collision.
+if [ "$RESUMING_AFTER_CRASH" = "0" ] && [ -f "$SOLUTION_PATH" ]; then
   for n in 2 3 4 5 6 7 8 9; do
     candidate="$SOLUTION_DIR/${SLUG}-${n}.md"
     if [ ! -f "$candidate" ]; then
