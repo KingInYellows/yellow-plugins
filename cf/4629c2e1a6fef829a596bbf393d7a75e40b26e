@@ -1,0 +1,22 @@
+docs/solutions/logic-errors/sentinel-mv-ordering-and-drain-classification.md
+  s_9edda907bb366b::t_27e2657a09d8d9 156-163
+  s_9edda907bb366b::t_7019e26986fae8 36
+docs/solutions/logic-errors/machine-generated-text-shell-gotchas.md
+  s_9edda907bb366b::t_cdb508f176f83a 141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "cf4629c2e1a6fef829a596bbf393d7a75e40b26e",
+  "prompts": {},
+  "sessions": {
+    "s_9edda907bb366b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "301fb299-9d55-4c26-a7da-a0b63fc7ead6",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
