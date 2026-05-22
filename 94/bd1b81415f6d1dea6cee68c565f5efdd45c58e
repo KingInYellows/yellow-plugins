@@ -1,0 +1,34 @@
+packages/domain/src/validation/errorCatalog.ts
+  s_0083c2dbdafe0e::t_60dd97e5563d21 269
+CLAUDE.md
+  s_0083c2dbdafe0e::t_dd7e05c8930ede 33,41
+AGENTS.md
+  s_0083c2dbdafe0e::t_8cb03627407887 85-86
+  s_0083c2dbdafe0e::t_9215d67fa2a62b 69-70
+docs/solutions/integration-issues/gh-api-graphql-plugin-command-template.md
+  s_0083c2dbdafe0e::t_c4f1e7a3869f32 225-230
+scripts/validate-solutions.js
+  s_0083c2dbdafe0e::t_f3fb3ad4f7a1ad 115-117
+  s_0083c2dbdafe0e::t_b1bd22c5946244 207-210,214-218,222
+  s_0083c2dbdafe0e::t_0f98000f7682fd 320-326
+  s_0083c2dbdafe0e::t_e588d60b179b21 387-397
+  s_0083c2dbdafe0e::t_dba87212a3e0ec 76-77
+  s_0083c2dbdafe0e::t_fe45231c633c92 16
+  s_0083c2dbdafe0e::t_6ca5df743097cd 28-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "94bd1b81415f6d1dea6cee68c565f5efdd45c58e",
+  "prompts": {},
+  "sessions": {
+    "s_0083c2dbdafe0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d37ed401-fd4a-4d85-b1d8-48bb4ce94b8d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
