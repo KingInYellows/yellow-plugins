@@ -1,0 +1,62 @@
+.github/workflows/validate-schemas.yml
+  s_3d732359543504::t_d890e45e320a94 14
+  s_3d732359543504::t_04d5fbeaeebc5b 55
+  s_3d732359543504::t_354453b0e771c2 184-193
+  s_3d732359543504::t_1f89d831e0a228 814-938
+AGENTS.md
+  s_3d732359543504::t_32c3552a911b94 328-336
+scripts/validate-solutions.js
+  s_3d732359543504::t_1688878a15d127 1-42,44-118,121-122,124-150,152,154-161,163-251,255-270,272,274-280,289,291-293,295-316,323-356
+  s_3d732359543504::t_223baa2cce3f1c 252-254,271,273,281-288,290,294
+  s_3d732359543504::t_a0ef6d53eb796a 317-322
+packages/domain/src/validation/types.ts
+  s_3d732359543504::t_680c446345bf39 26
+plugins/yellow-core/commands/workflows/compound.md
+  s_3d732359543504::t_25de8dd33f2ca8 4,25-29,32-37
+  s_3d732359543504::t_da5b0ec5d1a698 54-141
+docs/CLAUDE.md
+  s_3d732359543504::t_8983d2b819102a 84-95
+package.json
+  s_3d732359543504::t_23e7378f010676 20,24
+packages/domain/src/validation/errorCatalog.ts
+  s_3d732359543504::t_aef89f256a7410 71-77
+  s_3d732359543504::t_8443ac1286dcbf 286-289
+docs/solutions/integration-issues/gh-api-graphql-plugin-command-template.md
+  s_3d732359543504::t_b1536c8abc4058 1-241
+tests/integration/validate-solutions.test.ts
+  s_3d732359543504::t_20d47ebd9c9a79 1-387
+docs/plugin-validation-guide.md
+  s_3d732359543504::t_768f6d03df82db 53-57,60-70
+.changeset/solution-doc-git-workflow.md
+  s_3d732359543504::t_38e9015eca6eae 1-57
+plugins/yellow-core/README.md
+  s_3d732359543504::t_e5f199d04081ee 26
+plugins/yellow-core/CLAUDE.md
+  s_3d732359543504::t_65b5750d5c9905 82-90
+.github/pull_request_template.md
+  s_3d732359543504::t_0d8b93c6181100 13-26
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_3d732359543504::t_6836a8d32981bc 65-120
+  s_3d732359543504::t_6beb7af086d786 255-273
+  s_3d732359543504::t_dbabdefad9c6fc 345-355,361-366
+CONTRIBUTING.md
+  s_3d732359543504::t_54536cc1d37bf3 14
+  s_3d732359543504::t_e835763f7eff25 136-137
+  s_3d732359543504::t_c03765d7b0bb74 326-423
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "61995edb5c636ee80f95ac9df13e0ebb7b2da0a9",
+  "prompts": {},
+  "sessions": {
+    "s_3d732359543504": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1cdbf3a-f938-4393-b0f3-29245d9b53b0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
