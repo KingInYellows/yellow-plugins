@@ -347,7 +347,7 @@ widely-adopted OSS pattern for this exact flow, but adjacent patterns exist.
    Source: [Claude PR Reviewer — GitHub Marketplace](https://github.com/marketplace/actions/claude-pr-reviewer)
 
 2. **PR template enforces postmortem link.** A simpler pattern: add a checkbox
-   to `.github/PULL_REQUEST_TEMPLATE.md`:
+   to `.github/pull_request_template.md`:
 
    ```markdown
    - [ ] If this PR closes a P0/P1 issue, I have added or updated a solution
