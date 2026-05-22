@@ -226,10 +226,11 @@ practice.
    ' -f owner="$OWNER" -f repo="$REPO" -F pr="$PR_NUMBER"
    ```
 
-   This is well-established in the repo already (see
-   `docs/solutions/integration-issues/gh-api-graphql-plugin-command-template.md`
-   for the 6-element required pattern). The check would parse label names from
-   the response and trigger if any match `bug`, `P0`, or `P1`.
+   This is a standard GitHub Actions pattern. The implementation should follow
+   the 6-element `gh api graphql` safety pattern (symmetric exit-code capture,
+   `-f` flags for variables, `--jq` for server-side filtering, SC2016 disable,
+   jq null-repository guard, no string interpolation). The check would parse
+   label names from the response and trigger if any match `bug`, `P0`, or `P1`.
 
 2. **File pattern signal** — Detect whether the PR adds any file matching
    `docs/solutions/**/*.md` using `git diff --name-only origin/main...HEAD`.
@@ -459,7 +460,7 @@ without a doc change.
 2. Trigger on `P0`/`P1` only (not bare `bug`) to limit false positives
 3. Opt-out via `<!-- no-solution-doc -->` in PR body or `skip-doc-check` label
 4. Git diff detects new `docs/solutions/**/*.md` files as the "doc present" signal
-5. Applies the 6-element `gh api graphql` pattern from the existing solution doc
+5. Applies the 6-element `gh api graphql` safety pattern (symmetric exit-code capture, `-f` flags, `--jq` filtering, SC2016 disable, jq null-check, no string interpolation)
 
 **Area 4 (Solution doc format):**
 1. Keep existing hybrid format (Problems → Root Cause → Fix → Prevention)
