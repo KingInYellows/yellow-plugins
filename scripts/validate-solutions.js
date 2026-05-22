@@ -40,7 +40,7 @@
 
 'use strict';
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -116,11 +116,31 @@ function getChangedFiles() {
     raw = injected;
   } else {
     try {
-      raw = execSync(
-        `git diff --name-status ${BASE_REF}...HEAD -- docs/solutions/`,
+      // Use execFileSync (no shell) and pass the ref as an argument so a
+      // hostile VALIDATE_SOLUTIONS_BASE_REF cannot inject shell commands.
+      // execSync with a template literal would interpret metacharacters via
+      // /bin/sh -c, which was the original P1 security finding.
+      raw = execFileSync(
+        'git',
+        ['diff', '--name-status', `${BASE_REF}...HEAD`, '--', 'docs/solutions/'],
         { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
       );
-    } catch (_err) {
+    } catch (err) {
+      // Soft-skip for unreachable refs (fork PR, shallow clone). For other
+      // errors (git binary missing, EACCES on .git/, corrupt index), surface
+      // a stderr warning so the soft-skip is distinguishable from a runner
+      // misconfiguration — otherwise CI silently reports green on a
+      // misconfigured runner where validation never ran.
+      const stderr = err.stderr ? err.stderr.toString() : '';
+      const looksUnreachable =
+        /unknown revision|bad revision|does not have a commit|fatal: ambiguous argument/i.test(
+          stderr
+        );
+      if (!looksUnreachable) {
+        process.stderr.write(
+          `[validate-solutions] warn: git diff failed (${err.code || 'unknown'}): ${stderr.trim()}\n`
+        );
+      }
       return null;
     }
   }
@@ -147,10 +167,25 @@ function getChangedFiles() {
     if (!relPath || !relPath.endsWith('.md')) continue;
     if (!relPath.startsWith('docs/solutions/')) continue;
     if (relPath.startsWith('docs/solutions/archived/')) continue;
+    // Path-traversal guard: startsWith('docs/solutions/') alone passes
+    // payloads like 'docs/solutions/../../../etc/passwd', which path.join
+    // would then resolve outside the corpus root. Reject any entry whose
+    // normalized form escapes the corpus directory.
+    const normalized = path.posix.normalize(relPath);
+    if (
+      normalized !== relPath ||
+      normalized.includes('..') ||
+      path.isAbsolute(normalized)
+    ) {
+      process.stderr.write(
+        `[validate-solutions] warn: rejecting suspicious diff path: ${relPath}\n`
+      );
+      continue;
+    }
     // Require category-subdirectory shape: docs/solutions/<category>/<slug>.md
-    const segments = relPath.split('/');
+    const segments = normalized.split('/');
     if (segments.length < 4) continue;
-    entries.push({ status: normalizedStatus, path: relPath });
+    entries.push({ status: normalizedStatus, path: normalized });
   }
   return entries;
 }
@@ -159,7 +194,11 @@ function getChangedFiles() {
 // scripts/backfill-solution-frontmatter.js. Returns null if no frontmatter
 // delimiter pair is present.
 function parseFrontmatter(text) {
-  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  // The closing `---` may be followed by a newline + body, or by end-of-file
+  // (some editors strip the trailing newline). Require the opening delimiter
+  // newline but allow either form to terminate so we do not false-positive
+  // SOL-002 on a perfectly valid frontmatter-only file.
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?$/);
   if (!match) return null;
   const fmRaw = match[1];
   const fields = {};
@@ -255,7 +294,8 @@ function validateSlug(file) {
 // archived/ for the same reason it is excluded from the diff scan.
 function buildCorpusIndex() {
   const index = new Map();
-  if (!fs.existsSync(SOLUTIONS_DIR)) return index;
+  const stats = fs.statSync(SOLUTIONS_DIR, { throwIfNoEntry: false });
+  if (!stats || !stats.isDirectory()) return index;
   for (const cat of fs.readdirSync(SOLUTIONS_DIR, { withFileTypes: true })) {
     if (!cat.isDirectory() || cat.name === 'archived') continue;
     const subDir = path.join(SOLUTIONS_DIR, cat.name);

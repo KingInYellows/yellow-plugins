@@ -351,6 +351,59 @@ describe('validate-solutions — origin/main unreachable soft-skip', () => {
   });
 });
 
+describe('validate-solutions — parseFrontmatter no-trailing-newline', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-vs-eof-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('parses a doc whose closing --- has no trailing newline (P1 regression test)', () => {
+    // Some editors (vim default, certain CRLF normalizers) strip the
+    // trailing newline. Before the fix, the regex required `\r?\n---\r?\n`
+    // and would emit a false SOL-002 'missing YAML frontmatter block'.
+    const dir = join(tmpRoot, 'workflow');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'no-trailing-newline.md'),
+      `---\n${validFrontmatter()}\n---`, // no \n after closing ---
+      'utf8'
+    );
+
+    const { status, stdout, stderr } = runScript(tmpRoot, {
+      diff: 'A\tdocs/solutions/workflow/no-trailing-newline.md',
+    });
+
+    expect(status).toBe(0);
+    expect(stdout + stderr).not.toMatch(/missing YAML frontmatter block/);
+  });
+});
+
+describe('validate-solutions — path-traversal rejection (P1 regression test)', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-vs-traversal-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('rejects a diff entry attempting docs/solutions/../../etc/passwd-style traversal', () => {
+    // Use a .md suffix so the entry passes the early file-type filter and
+    // reaches the path-traversal guard. Before the fix,
+    // startsWith('docs/solutions/') passed and path.join resolved the
+    // traversal segments outside the corpus root.
+    const { status, stderr } = runScript(tmpRoot, {
+      diff: 'A\tdocs/solutions/../../../etc/sneaky.md',
+    });
+
+    expect(status).toBe(0);
+    expect(stderr).toMatch(/rejecting suspicious diff path/);
+  });
+});
+
 describe('validate-solutions — GitHub Actions annotation format', () => {
   let tmpRoot: string;
   beforeEach(() => {

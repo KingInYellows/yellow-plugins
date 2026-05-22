@@ -73,6 +73,18 @@ export const ERROR_CODES = {
   // docs/solutions/ entries on slug uniqueness and required frontmatter.
   // See CONTRIBUTING.md "Solution Docs" and the policy plan at
   // plans/solution-doc-git-workflow.md.
+  //
+  // Note on the consumer wiring gap: scripts/validate-solutions.js does NOT
+  // import these constants directly. The catalog package is ESM
+  // (packages/domain/package.json: "type": "module") and scripts/*.js are
+  // CJS — a direct `require()` of the built ESM output fails. Until the
+  // scripts/ layer migrates to ESM (a tooling-level concern out of scope
+  // for the solution-doc validator), the validator assembles the same
+  // strings via concatenation per MEMORY.md's documented fallback. These
+  // entries serve as the single source of truth that the validator's
+  // assembled strings MUST match; any change here requires a paired edit
+  // in scripts/validate-solutions.js (the constants SOL/SOL_SLUG_COLLISION/
+  // SOL_FRONTMATTER).
   SOL_SLUG_COLLISION: 'ERROR-SOL-001',
   SOL_FRONTMATTER_INVALID: 'ERROR-SOL-002',
 } as const;

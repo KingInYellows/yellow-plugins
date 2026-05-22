@@ -87,7 +87,7 @@ would derive from raw conversation transcript. Use them directly:
    or `workflow`; security-related → `security-issues`). Apply the existing
    category-to-track default mapping. Derive `SLUG` from the PR title
    (kebab-case, max 50 chars, regex-conformant).
-5. **Related Docs Finder substitute (MANDATORY — runs FIRST):** Grep
+5. **Related Docs Finder substitute (MANDATORY — runs before Phase 2):** Grep
    `docs/solutions/` for the derived `SLUG` stem and the top 3 keywords from
    `PROBLEM_TYPE`. If a doc with overlapping subject matter exists, output
    `AMEND_EXISTING: docs/solutions/<category>/<slug>.md` and proceed to the
