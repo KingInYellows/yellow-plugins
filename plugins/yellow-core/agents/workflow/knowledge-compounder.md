@@ -62,6 +62,62 @@ finding/fix pairs, CATEGORY from the findings table's Category column (see mappi
 below), and derive SLUG from the most critical finding's description (kebab-case,
 max 50 chars). Proceed directly to Compounding Rules with these values.
 
+**Fast path — in-PR context:** If spawned with `--- begin pr-context ---`
+delimiters in the input (e.g., from `/workflows:compound --in-pr`), skip the
+5-subagent Phase 1 pipeline. The PR body + commit subjects already contain the
+distilled problem statement and solution narrative the parallel extractors
+would derive from raw conversation transcript. Use them directly:
+
+1. Parse the JSON inside the fenced PR context block (fields: `number`,
+   `title`, `body`, `headRefName`, `baseRefName`, `commits[]`,
+   `closingIssuesReferences[]`).
+2. **Context Analyzer substitute** — derive:
+   - `PROBLEM_TYPE`: a short kebab-case label from the PR title (drop
+     conventional-commit prefix like `feat:` / `fix:` first).
+   - `SYMPTOMS`: extracted from the PR body's "Problem" / "Why" / "Summary"
+     section (whichever exists); fall back to the first paragraph.
+   - `ROUTING_HINT`: **default to `BOTH`** (write doc + MEMORY.md line). The
+     in-PR pattern's whole point is co-shipping both.
+3. **Solution Extractor substitute** — assemble the solution narrative from
+   (in priority order): PR body "Solution" / "Changes" / "Approach" section,
+   commit subjects + bodies for the branch, file paths touched in the PR.
+4. **Category Classifier substitute** — pick category from the
+   conventional-commit type if present (`fix:` → likely `logic-errors` or
+   `build-errors` depending on file paths; `feat:` → usually `code-quality`
+   or `workflow`; security-related → `security-issues`). Apply the existing
+   category-to-track default mapping. Derive `SLUG` from the PR title
+   (kebab-case, max 50 chars, regex-conformant).
+5. **Related Docs Finder substitute (MANDATORY — runs FIRST):** Grep
+   `docs/solutions/` for the derived `SLUG` stem and the top 3 keywords from
+   `PROBLEM_TYPE`. If a doc with overlapping subject matter exists, output
+   `AMEND_EXISTING: docs/solutions/<category>/<slug>.md` and proceed to the
+   AMEND_EXISTING route in Phase 2 — the suffix-collision loop in the new-file
+   Write path MUST be skipped (the loop is reserved for structural collisions,
+   not for legitimate updates to an existing topic).
+6. **Prevention Strategist substitute** — extract from PR body
+   "Prevention" / "Testing" sections; if absent, leave the section as a
+   placeholder for the M3 reviewer to fill in.
+
+Skip-eligibility check (run BEFORE jumping to Compounding Rules): if all of
+the following are true, emit a `SKIP` signal and exit cleanly without
+reaching M3:
+
+- PR title matches `(typo|whitespace|formatting|version bump|dep bump|chore: bump)`
+- PR body contains no failure-mode narrative (no "Problem", "Symptom",
+  "Why", "Root cause" sections)
+- No `closingIssuesReferences[]` entries (no linked issue → no recurring
+  pain point to document)
+- Files-touched scope is single-file OR documentation-only
+
+When the skip criteria match, print exactly:
+
+```
+[knowledge-compounder] No solution doc required for this PR: <one-line reason>
+```
+
+Then exit cleanly. Do not proceed to M3, do not write any file. This is the
+SKIP exit path; it is distinct from user-initiated Cancel at M3.
+
 **Fast path category mapping** (review finding → solution doc):
 
 | Finding Category | Solution Doc Category |
@@ -196,10 +252,25 @@ substitute a fallback.
 
 ## M3 Confirmation
 
-Use AskUserQuestion before any writes. Show:
-- Routing decision with rationale
-- Resolved file paths
-- MEMORY.md section title (if applicable)
+Use AskUserQuestion before any writes. The question body MUST include all of
+the following so the user can review the actual content (not just file
+paths) before approving:
+
+- Routing decision with one-line rationale (DOC_ONLY / MEMORY_ONLY / BOTH /
+  AMEND_EXISTING)
+- Resolved file paths (solution doc path + MEMORY.md path if applicable)
+- **Solution doc draft preview** — first 40 lines of the assembled body
+  (frontmatter + the first 1-2 sections), in a fenced block
+- **MEMORY.md entry draft** (if routing is MEMORY_ONLY or BOTH) — the exact
+  line that will be inserted, including the topic heading and bullet text,
+  in a fenced block
+
+This dual preview is required so the user can spot routing mismatches,
+mis-derived slugs, and content quality issues in a single gate — without
+having to re-run after a bad write. When routing is AMEND_EXISTING, show
+the section that will be appended to the existing doc (not the full new
+doc), preceded by the `## Update — YYYY-MM-DD` heading and the `---`
+horizontal rule.
 
 Options: "Write [route]" / "Adjust routing" / "Cancel"
 
@@ -271,13 +342,29 @@ If the above exits non-zero, stop. Do not proceed.
 
 ### Solution Doc (DOC_ONLY or BOTH)
 
+**Prerequisite:** This section runs ONLY when routing is `DOC_ONLY` or
+`BOTH`. If the Related Docs Finder returned `AMEND_EXISTING` (whether from
+the normal Phase 1 pipeline OR from the in-PR fast path), routing already
+resolved to AMEND_EXISTING in the Routing Decision table above and the
+AMEND_EXISTING Route ran instead — the suffix-collision loop below MUST be
+skipped. Never fall back to a `-2`/`-3` suffixed file when the topic
+already has an existing doc; the suffix loop exists only for structural
+collisions where the slug stem happens to overlap an existing file but
+the subject matter is demonstrably different (which Related Docs Finder
+confirms by returning `NO_MATCH`).
+
 Re-establish GIT_ROOT (bash state does not persist across Bash tool calls):
 ```bash
 GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 ```
 
-Create the category directory if needed, then resolve the final slug (handles
-collisions by appending a numeric suffix):
+Create the category directory if needed, then resolve the final slug. The
+suffix-collision loop runs ONLY when RDF returned `NO_MATCH` — confirming
+the existing file with the same slug stem covers a genuinely different
+problem statement. If RDF returned `AMEND_EXISTING`, the AMEND_EXISTING
+Route above short-circuited this section and the loop below is not
+entered:
+
 ```bash
 mkdir -p "$GIT_ROOT/docs/solutions/$CATEGORY"
 FINAL_SLUG="$SLUG"

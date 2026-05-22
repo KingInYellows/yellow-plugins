@@ -81,3 +81,15 @@ GitHub Release. Manual recovery: trigger `workflow_dispatch` with
 **Known issue:** Claude Code's background auto-update has a bug (GH #26744) where
 it doesn't prompt users when a new version is available. Users can run
 `/plugin marketplace update` manually.
+
+## Solution Docs
+
+`docs/solutions/` captures recurring engineering learnings. The default
+authoring pattern is **in-PR co-shipped** — while on a feature branch with
+an open draft PR, run `/workflows:compound --in-pr` and the
+`knowledge-compounder` agent will draft both the solution doc and the
+MEMORY.md index line from the PR body and commits. CI gates new docs on
+exact-slug uniqueness (`ERROR-SOL-001`) and required frontmatter
+(`ERROR-SOL-002`) via `scripts/validate-solutions.js`, wired into
+`pnpm validate:schemas`. Full policy, skip criteria, and CI behavior in
+[CONTRIBUTING.md "Solution Docs"](../CONTRIBUTING.md#solution-docs).

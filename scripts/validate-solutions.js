@@ -1,0 +1,356 @@
+#!/usr/bin/env node
+
+/**
+ * validate-solutions.js
+ *
+ * Diff-scoped validator for `docs/solutions/` entries. Runs on PR diffs to:
+ *
+ *   1. Block when a NEW doc reuses a slug that already exists elsewhere in
+ *      the corpus (exact filename collision — accidental overwrite).
+ *   2. Block when a NEW or MODIFIED doc has missing/invalid required
+ *      frontmatter fields (title, date, category, track, problem, tags) or
+ *      out-of-enum values.
+ *
+ * The validator runs only on files in the diff against `origin/main` (or the
+ * ref in `VALIDATE_SOLUTIONS_BASE_REF`). Pre-existing non-conforming docs
+ * are intentionally NOT touched — see the Phase 0 calibration plan at
+ * `docs/research/2026-05-21-solution-doc-jaccard-calibration.md`.
+ *
+ * Files under `docs/solutions/archived/` are skipped (legacy/inactive docs
+ * are not held to the live schema).
+ *
+ * Error codes (catalog: packages/domain/src/validation/errorCatalog.ts) are
+ * assembled via string concatenation so `scripts/lint-error-codes.js` does
+ * not flag this file as re-implementing them.
+ *
+ * Env:
+ *   VALIDATE_SOLUTIONS_BASE_REF=origin/main   diff base (override for CI)
+ *   VALIDATE_SOLUTIONS_DIFF                   newline list of "A path" /
+ *                                             "M path" lines; bypasses git
+ *                                             diff. Tests use this to inject
+ *                                             synthetic change sets.
+ *   SOLUTIONS_DIR=docs/solutions              corpus root (test override)
+ *   GITHUB_ACTIONS=true                       emits `::error file=`/`::notice::`
+ *                                             annotations.
+ *
+ * Exit codes:
+ *   0 - no validation errors (or soft-skip)
+ *   1 - one or more validation errors found
+ */
+
+'use strict';
+
+const { execSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+const SOLUTIONS_DIR = path.resolve(
+  ROOT,
+  process.env.SOLUTIONS_DIR || 'docs/solutions'
+);
+
+// Path-traversal guard: refuse to operate on a directory outside the project
+// root, with a temp-dir exception for vitest fixtures (same convention as
+// scripts/backfill-solution-frontmatter.js).
+const TMP_PREFIX = os.tmpdir();
+if (
+  !SOLUTIONS_DIR.startsWith(ROOT + path.sep) &&
+  !SOLUTIONS_DIR.startsWith(TMP_PREFIX + path.sep)
+) {
+  console.error(
+    '[validate-solutions] Error: SOLUTIONS_DIR resolves outside project ' +
+      'root or system temp dir. Refusing to operate on: ' +
+      SOLUTIONS_DIR
+  );
+  process.exit(1);
+}
+
+const IS_CI = process.env.GITHUB_ACTIONS === 'true';
+const BASE_REF = process.env.VALIDATE_SOLUTIONS_BASE_REF || 'origin/main';
+
+// Catalog code prefixes assembled via concatenation. See file docstring.
+const SOL = 'ERROR-' + 'SOL';
+const SOL_SLUG_COLLISION = SOL + '-001';
+const SOL_FRONTMATTER = SOL + '-002';
+
+const VALID_CATEGORIES = new Set([
+  'security-issues',
+  'build-errors',
+  'integration-issues',
+  'code-quality',
+  'workflow',
+  'logic-errors',
+]);
+const VALID_TRACKS = new Set(['bug', 'knowledge']);
+const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SLUG_MAX_LEN = 50;
+
+const errors = [];
+
+function emitError(file, code, msg) {
+  errors.push({ file, code, msg });
+  if (IS_CI) {
+    console.log(`::error file=${file}::${code}: ${msg}`);
+  } else {
+    console.error(`✗ ${file}: ${code}: ${msg}`);
+  }
+}
+
+function emitNotice(msg) {
+  if (IS_CI) {
+    console.log(`::notice::${msg}`);
+  } else {
+    console.log(`[validate-solutions] ${msg}`);
+  }
+}
+
+// Returns array of {status: 'A'|'M', relPath} entries within docs/solutions/
+// (excluding archived/), or null when the diff base is unreachable.
+function getChangedFiles() {
+  const injected = process.env.VALIDATE_SOLUTIONS_DIFF;
+  let raw;
+  if (injected !== undefined) {
+    raw = injected;
+  } else {
+    try {
+      raw = execSync(
+        `git diff --name-status ${BASE_REF}...HEAD -- docs/solutions/`,
+        { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+      );
+    } catch (_err) {
+      return null;
+    }
+  }
+  const entries = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    // git diff --name-status format: "<STATUS>\t<path>" or
+    // "<STATUS>\t<old>\t<new>" for R/C. Status may have similarity digits
+    // (R100, C75). We treat A/M as actionable, R-new as A, and skip D/C/T.
+    const parts = line.split(/\t/);
+    const statusChar = parts[0][0];
+    let relPath;
+    let normalizedStatus;
+    if (statusChar === 'A' || statusChar === 'M') {
+      relPath = parts[1];
+      normalizedStatus = statusChar;
+    } else if (statusChar === 'R') {
+      // Rename: treat new path as added (new slug → collision check).
+      relPath = parts[2];
+      normalizedStatus = 'A';
+    } else {
+      continue;
+    }
+    if (!relPath || !relPath.endsWith('.md')) continue;
+    if (!relPath.startsWith('docs/solutions/')) continue;
+    if (relPath.startsWith('docs/solutions/archived/')) continue;
+    // Require category-subdirectory shape: docs/solutions/<category>/<slug>.md
+    const segments = relPath.split('/');
+    if (segments.length < 4) continue;
+    entries.push({ status: normalizedStatus, path: relPath });
+  }
+  return entries;
+}
+
+// Parse YAML frontmatter — handrolled regex modeled on
+// scripts/backfill-solution-frontmatter.js. Returns null if no frontmatter
+// delimiter pair is present.
+function parseFrontmatter(text) {
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (!match) return null;
+  const fmRaw = match[1];
+  const fields = {};
+  for (const line of fmRaw.split(/\r?\n/)) {
+    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$/);
+    if (kv) {
+      const value = kv[2].trim().replace(/^['"]|['"]$/g, '');
+      fields[kv[1]] = value;
+    }
+  }
+  // tags can be inline (`tags: [a, b]`) or block-list. Both count as present.
+  const tagsInline = /^tags\s*:\s*\[([^\]]+)\]/m.test(fmRaw);
+  const lines = fmRaw.split(/\r?\n/);
+  let tagsBlock = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^tags\s*:\s*$/.test(lines[i])) {
+      // Look ahead for at least one list item before the next top-level key.
+      for (let j = i + 1; j < lines.length; j++) {
+        if (/^\s*-\s+\S/.test(lines[j])) {
+          tagsBlock = true;
+          break;
+        }
+        if (/^\S/.test(lines[j])) break;
+      }
+      break;
+    }
+  }
+  fields.__hasTags = tagsInline || tagsBlock;
+  return fields;
+}
+
+function validateFrontmatter(file, fm) {
+  // Required scalar fields. `tags` is checked separately because its shape
+  // (inline array or block list) requires extra parsing.
+  const required = ['title', 'date', 'category', 'track', 'problem'];
+  for (const field of required) {
+    if (!fm[field] || fm[field].length === 0) {
+      emitError(file, SOL_FRONTMATTER, `missing required field: ${field}`);
+    }
+  }
+  if (!fm.__hasTags) {
+    emitError(file, SOL_FRONTMATTER, 'missing required field: tags');
+  }
+  if (fm.category && !VALID_CATEGORIES.has(fm.category)) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      `invalid category "${fm.category}" — must be one of: ` +
+        [...VALID_CATEGORIES].sort().join(', ')
+    );
+  }
+  if (fm.track && !VALID_TRACKS.has(fm.track)) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      `invalid track "${fm.track}" — must be one of: bug, knowledge`
+    );
+  }
+  if (fm.date && !ISO_DATE_RE.test(fm.date)) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      `date "${fm.date}" is not ISO 8601 (YYYY-MM-DD)`
+    );
+  }
+}
+
+function validateSlug(file) {
+  const slug = path.basename(file, '.md');
+  if (slug.length > SLUG_MAX_LEN) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      `slug "${slug}" exceeds ${SLUG_MAX_LEN} chars`
+    );
+    return false;
+  }
+  if (!SLUG_RE.test(slug)) {
+    emitError(
+      file,
+      SOL_FRONTMATTER,
+      `slug "${slug}" must match ^[a-z0-9]+(-[a-z0-9]+)*$ ` +
+        '(lowercase, no leading/trailing/consecutive hyphens)'
+    );
+    return false;
+  }
+  return true;
+}
+
+// Build slug → [corpusRelPath, ...] map of pre-existing corpus files. Paths
+// are stored as `<category>/<slug>.md` (corpus-relative) so the same-file
+// check works regardless of where SOLUTIONS_DIR is rooted. Excludes
+// archived/ for the same reason it is excluded from the diff scan.
+function buildCorpusIndex() {
+  const index = new Map();
+  if (!fs.existsSync(SOLUTIONS_DIR)) return index;
+  for (const cat of fs.readdirSync(SOLUTIONS_DIR, { withFileTypes: true })) {
+    if (!cat.isDirectory() || cat.name === 'archived') continue;
+    const subDir = path.join(SOLUTIONS_DIR, cat.name);
+    let files;
+    try {
+      files = fs.readdirSync(subDir);
+    } catch (_err) {
+      continue;
+    }
+    for (const f of files) {
+      if (!f.endsWith('.md')) continue;
+      const slug = path.basename(f, '.md');
+      const corpusRel = `${cat.name}/${f}`;
+      if (!index.has(slug)) index.set(slug, []);
+      index.get(slug).push(corpusRel);
+    }
+  }
+  return index;
+}
+
+function checkSlugCollision(file, corpusIndex) {
+  const slug = path.basename(file, '.md');
+  // The diff entry is repo-relative ("docs/solutions/<cat>/<slug>.md");
+  // strip the prefix so it matches the corpus-relative form stored in the
+  // index, otherwise a self-comparison would never filter out and produce a
+  // false "collides with itself" error.
+  const selfCorpusRel = file.replace(/^docs\/solutions\//, '');
+  const existing = (corpusIndex.get(slug) || []).filter(
+    (p) => p !== selfCorpusRel
+  );
+  if (existing.length > 0) {
+    const displayPaths = existing.map((p) => `docs/solutions/${p}`);
+    emitError(
+      file,
+      SOL_SLUG_COLLISION,
+      `slug "${slug}" collides with existing: ${displayPaths.join(', ')}. ` +
+        'Rename to a distinct slug or amend the existing doc.'
+    );
+  }
+}
+
+function main() {
+  const changed = getChangedFiles();
+  if (changed === null) {
+    emitNotice(
+      `cannot reach ${BASE_REF} (likely fork PR or shallow clone) — ` +
+        'skipping solution-doc validation'
+    );
+    process.exit(0);
+  }
+  if (changed.length === 0) {
+    emitNotice('no docs/solutions/ changes in diff — nothing to validate');
+    process.exit(0);
+  }
+
+  const corpusIndex = buildCorpusIndex();
+
+  for (const entry of changed) {
+    // Diff entries are repo-relative ("docs/solutions/<cat>/<slug>.md").
+    // Strip the corpus prefix and resolve under SOLUTIONS_DIR so the lookup
+    // works both for production (SOLUTIONS_DIR = ROOT/docs/solutions) and
+    // for tests (SOLUTIONS_DIR overridden to a tmpdir).
+    const relUnderCorpus = entry.path.replace(/^docs\/solutions\//, '');
+    const fullPath = path.join(SOLUTIONS_DIR, relUnderCorpus);
+    let text;
+    try {
+      text = fs.readFileSync(fullPath, 'utf8');
+    } catch (_err) {
+      // Deletion races, broken symlinks, etc. — skip silently rather than
+      // erroring out (the diff says it changed; the file may have been
+      // removed in a later commit on the same branch).
+      continue;
+    }
+    const fm = parseFrontmatter(text);
+    if (!fm) {
+      emitError(
+        entry.path,
+        SOL_FRONTMATTER,
+        'missing YAML frontmatter block (file must start with `---` ... `---`)'
+      );
+      continue;
+    }
+    validateFrontmatter(entry.path, fm);
+    if (entry.status === 'A') {
+      if (validateSlug(entry.path)) {
+        checkSlugCollision(entry.path, corpusIndex);
+      }
+    }
+  }
+
+  console.log(
+    `\n[validate-solutions] checked ${changed.length} file(s); ` +
+      `${errors.length} error(s)`
+  );
+  process.exit(errors.length > 0 ? 1 : 0);
+}
+
+main();

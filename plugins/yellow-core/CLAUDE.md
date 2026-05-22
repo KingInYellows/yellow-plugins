@@ -79,7 +79,15 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:review` — session-level review of plan adherence, cross-PR
   coherence, and scope drift with autonomous P1 fix loop. Falls back to
   `/review:pr` redirect for PR number/URL/branch arguments.
-- `/workflows:compound` — document a recently solved problem to compound knowledge
+- `/workflows:compound` — document a recently solved problem to compound
+  knowledge. Pass `--in-pr` while on a feature branch with an open PR to
+  draft both the solution doc and the MEMORY.md index line from the PR
+  body + commit subjects instead of the live conversation transcript. This
+  is the default pattern documented in `CONTRIBUTING.md` "Solution Docs";
+  use it during a draft PR so the doc co-ships with the code change. The
+  `knowledge-compounder` agent runs Related Docs Finder before any slug
+  derivation so legitimate updates to an existing topic AMEND_EXISTING
+  rather than creating a `-2`/`-3` suffixed file
 - `/compound:review-staged` — manually drain the background-compounding
   staging ledger ahead of the SessionStart auto-drain threshold;
   AskUserQuestion M3 gate before any bulk write

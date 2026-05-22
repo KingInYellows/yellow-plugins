@@ -68,6 +68,13 @@ export const ERROR_CODES = {
   NET_FETCH_FAILED: 'ERROR-NET-001',
   NET_TIMEOUT: 'ERROR-NET-002',
   NET_PARSE_FAILED: 'ERROR-NET-003',
+
+  // Solution-doc Errors (SOL) — scripts/validate-solutions.js gates new
+  // docs/solutions/ entries on slug uniqueness and required frontmatter.
+  // See CONTRIBUTING.md "Solution Docs" and the policy plan at
+  // plans/solution-doc-git-workflow.md.
+  SOL_SLUG_COLLISION: 'ERROR-SOL-001',
+  SOL_FRONTMATTER_INVALID: 'ERROR-SOL-002',
 } as const;
 
 /**
@@ -275,6 +282,10 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.NET_FETCH_FAILED,
       ERROR_CODES.NET_TIMEOUT,
       ERROR_CODES.NET_PARSE_FAILED,
+    ],
+    [ErrorCategory.SOLUTION_DOCS]: [
+      ERROR_CODES.SOL_SLUG_COLLISION,
+      ERROR_CODES.SOL_FRONTMATTER_INVALID,
     ],
   };
 }

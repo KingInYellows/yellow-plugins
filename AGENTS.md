@@ -325,7 +325,15 @@ state by `scripts/validate-setup-all.js`.
 - Update `docs/security.md` when MCP servers, hooks, credential requirements, or
   trust boundaries change.
 - Add a `docs/solutions/<category>/...` writeup for non-obvious bugs, validator
-  failures, or security patterns that future agents are likely to repeat.
+  failures, or security patterns that future agents are likely to repeat. The
+  preferred workflow is in-PR co-shipped: while on the feature branch with
+  an open draft PR, run `/workflows:compound --in-pr` so the doc and the
+  MEMORY.md index line land in the same PR as the fix. See
+  [CONTRIBUTING.md "Solution Docs"](CONTRIBUTING.md#solution-docs) for the
+  full policy, skip criteria, and CI behavior. New/modified docs are gated
+  by `scripts/validate-solutions.js` (wired into `pnpm validate:schemas`),
+  which blocks on exact-slug collisions (`ERROR-SOL-001`) and required-
+  frontmatter violations (`ERROR-SOL-002`).
 - Keep active implementation plans in `plans/`; move conclusions or durable
   learnings into `docs/solutions/` or user-facing docs when the plan is done.
 
