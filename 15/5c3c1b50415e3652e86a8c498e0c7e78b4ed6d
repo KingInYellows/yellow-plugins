@@ -1,0 +1,31 @@
+.github/workflows/validate-schemas-fork.yml
+  s_3d732359543504::t_0d249da313a5b4 16
+  s_3d732359543504::t_38bdf32ccfd805 44,49-50
+  s_3d732359543504::t_2c45adfdc8eb76 126-133
+packages/domain/src/validation/errorCatalog.ts
+  s_3d732359543504::t_619aaa81623707 76-87
+scripts/validate-solutions.js
+  s_3d732359543504::t_6e628a11446619 119-125,128-143
+  s_3d732359543504::t_a8d286b9ea3d11 170-184,186,188
+  s_3d732359543504::t_19a5b3a8aa9ce8 43
+  s_3d732359543504::t_099a8499dca8ea 197-201
+tests/integration/validate-solutions.test.ts
+  s_3d732359543504::t_9e8213c1d94666 354-392,398,400-406
+  s_3d732359543504::t_4068e0dfe3d54e 393-397,399
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "155c3c1b50415e3652e86a8c498e0c7e78b4ed6d",
+  "prompts": {},
+  "sessions": {
+    "s_3d732359543504": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1cdbf3a-f938-4393-b0f3-29245d9b53b0",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
