@@ -222,12 +222,12 @@ addressed here.
 This pattern is in production use in:
 
 - `.github/workflows/validate-schemas.yml` —
-  `validate-solutions-advisory` job (advisory; closing-issue label check)
-- `plans/solution-doc-git-workflow.md` Phase 4 — reference for the
-  `closingIssuesReferences` query shape
-- `plugins/yellow-core/agents/workflow/knowledge-compounder.md` in-PR
-  fast path — `gh pr view` (REST-style, doesn't need the full template
-  but borrows elements 1, 5)
+  `validate-solutions-advisory` job (advisory; full 6-element
+  implementation for the closing-issues label check; canonical live
+  reference for the `closingIssuesReferences` query shape)
+- `plugins/yellow-core/commands/workflows/compound.md` — `gh pr view`
+  call in `--in-pr` mode (REST-style, doesn't need the full template but
+  borrows elements 1, 5)
 
 ## References
 

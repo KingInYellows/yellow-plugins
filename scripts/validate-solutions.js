@@ -13,7 +13,7 @@
  *
  * The validator runs only on files in the diff against `origin/main` (or the
  * ref in `VALIDATE_SOLUTIONS_BASE_REF`). Pre-existing non-conforming docs
- * are intentionally NOT touched — see the Phase 0 calibration plan at
+ * are intentionally NOT touched — see the Phase 0 calibration research at
  * `docs/research/2026-05-21-solution-doc-jaccard-calibration.md`.
  *
  * Files under `docs/solutions/archived/` are skipped (legacy/inactive docs
@@ -25,10 +25,13 @@
  *
  * Env:
  *   VALIDATE_SOLUTIONS_BASE_REF=origin/main   diff base (override for CI)
- *   VALIDATE_SOLUTIONS_DIFF                   newline list of "A path" /
- *                                             "M path" lines; bypasses git
- *                                             diff. Tests use this to inject
- *                                             synthetic change sets.
+ *   VALIDATE_SOLUTIONS_DIFF                   newline list of `A\t<path>` /
+ *                                             `M\t<path>` / `R<score>\t<old>\t<new>`
+ *                                             lines (tab-separated, matching
+ *                                             `git diff --name-status`).
+ *                                             Bypasses git diff. Tests use
+ *                                             this to inject synthetic change
+ *                                             sets.
  *   SOLUTIONS_DIR=docs/solutions              corpus root (test override)
  *   GITHUB_ACTIONS=true                       emits `::error file=`/`::notice::`
  *                                             annotations.
@@ -70,7 +73,8 @@ if (
 const IS_CI = process.env.GITHUB_ACTIONS === 'true';
 const BASE_REF = process.env.VALIDATE_SOLUTIONS_BASE_REF || 'origin/main';
 
-// Catalog code prefixes assembled via concatenation. See file docstring.
+// Catalog code prefixes assembled via concatenation. See the module header
+// for why these codes are assembled instead of imported from the catalog.
 const SOL = 'ERROR-' + 'SOL';
 const SOL_SLUG_COLLISION = SOL + '-001';
 const SOL_FRONTMATTER = SOL + '-002';
@@ -108,7 +112,9 @@ function emitNotice(msg) {
 }
 
 // Returns array of {status: 'A'|'M', relPath} entries within docs/solutions/
-// (excluding archived/), or null when the diff base is unreachable.
+// (excluding archived/), or null when the diff base is unreachable. Rename
+// entries (`R<score>\t<old>\t<new>`) are normalized to 'A' on the new path so
+// they receive slug-collision checking the same as fresh additions.
 function getChangedFiles() {
   const injected = process.env.VALIDATE_SOLUTIONS_DIFF;
   let raw;
@@ -198,13 +204,22 @@ function parseFrontmatter(text) {
   // (some editors strip the trailing newline). Require the opening delimiter
   // newline but allow either form to terminate so we do not false-positive
   // SOL-002 on a perfectly valid frontmatter-only file.
+  // Fast exit: if there is no second `---` delimiter, the regex's lazy
+  // `[\s\S]*?` would still try every backtrack permutation before failing.
+  // Cheap pre-check eliminates ReDoS exposure on unclosed frontmatter blocks.
+  if (!text.startsWith('---') || text.indexOf('\n---', 3) === -1) return null;
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?$/);
   if (!match) return null;
   const fmRaw = match[1];
-  const fields = {};
+  // Prototype-pollution guard: a frontmatter key named `__proto__` or
+  // `constructor` would otherwise mutate Object.prototype for the lifetime
+  // of this process. Use a null-prototype object as the accumulator and
+  // reject the forbidden keys explicitly.
+  const fields = Object.create(null);
   for (const line of fmRaw.split(/\r?\n/)) {
     const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$/);
     if (kv) {
+      if (kv[1] === '__proto__' || kv[1] === 'constructor' || kv[1] === 'prototype') continue;
       const value = kv[2].trim().replace(/^['"]|['"]$/g, '');
       fields[kv[1]] = value;
     }
@@ -302,7 +317,13 @@ function buildCorpusIndex() {
     let files;
     try {
       files = fs.readdirSync(subDir);
-    } catch (_err) {
+    } catch (err) {
+      // Log the skipped directory so runner misconfiguration (chmod, broken
+      // mount) is visible. A silently-incomplete corpus index would produce
+      // false-negative slug-collision results.
+      process.stderr.write(
+        `[validate-solutions] warn: could not read ${subDir}: ${err.code || err.message}\n`
+      );
       continue;
     }
     for (const f of files) {
@@ -363,10 +384,17 @@ function main() {
     let text;
     try {
       text = fs.readFileSync(fullPath, 'utf8');
-    } catch (_err) {
-      // Deletion races, broken symlinks, etc. — skip silently rather than
-      // erroring out (the diff says it changed; the file may have been
-      // removed in a later commit on the same branch).
+    } catch (err) {
+      // ENOENT is an expected deletion race (the diff says it changed; a
+      // later commit on the branch may have removed it). Other error codes
+      // (EACCES, EMFILE) signal runner misconfiguration and deserve a warning
+      // even though we still continue (the validator is not the right place
+      // to block on infrastructure faults).
+      if (err.code !== 'ENOENT') {
+        process.stderr.write(
+          `[validate-solutions] warn: could not read ${fullPath}: ${err.code || err.message}\n`
+        );
+      }
       continue;
     }
     const fm = parseFrontmatter(text);
