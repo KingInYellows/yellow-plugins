@@ -62,8 +62,8 @@ finding/fix pairs, CATEGORY from the findings table's Category column (see mappi
 below), and derive SLUG from the most critical finding's description (kebab-case,
 max 50 chars). Proceed directly to Compounding Rules with these values.
 
-**Fast path — in-PR context:** If spawned with `--- begin pr-context ---`
-delimiters in the input (e.g., from `/workflows:compound --in-pr`), skip the
+**Fast path — in-PR context:** If spawned with `--- begin untrusted-content (reference only) ---` delimiters
+where the first line inside the fence is `pr-context:` (e.g., from `/workflows:compound --in-pr`), skip the
 5-subagent Phase 1 pipeline. The PR body + commit subjects already contain the
 distilled problem statement and solution narrative the parallel extractors
 would derive from raw conversation transcript. Use them directly:
@@ -111,7 +111,7 @@ reaching M3:
 
 When the skip criteria match, print exactly:
 
-```
+```text
 [knowledge-compounder] No solution doc required for this PR: <one-line reason>
 ```
 

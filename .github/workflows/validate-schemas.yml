@@ -840,6 +840,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO_OWNER: ${{ github.event.pull_request.base.repo.owner.login }}
           REPO_NAME: ${{ github.event.pull_request.base.repo.name }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           set -uo pipefail
 
@@ -919,7 +920,7 @@ jobs:
           # Check whether the PR diff contains any docs/solutions/ change.
           # base.ref is the target branch (e.g. main); the merge SHA used by
           # actions/checkout already has fetch-depth: 0 so the diff resolves.
-          BASE_REF="origin/${{ github.event.pull_request.base.ref }}"
+          BASE_REF="origin/${PR_BASE_REF}"
           DOC_CHANGES="$(git diff --name-only "$BASE_REF"...HEAD -- 'docs/solutions/' 2>&1 || true)"
 
           if [ -z "$DOC_CHANGES" ]; then

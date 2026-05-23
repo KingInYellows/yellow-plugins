@@ -202,7 +202,7 @@ silently degrade rather than fail-loud:
 The "repository visibility" gap (element 6) is particularly load-bearing
 for advisory CI jobs that run on fork PRs — the
 `validate-solutions-advisory` job and the merge-queue detection in PR
-#305 both hit this when a fork token returns a null repository field.
+PR `#305` also hit this when a fork token returns a null repository field.
 
 ## When to Apply
 

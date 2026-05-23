@@ -381,6 +381,38 @@ describe('validate-solutions — parseFrontmatter no-trailing-newline', () => {
   });
 });
 
+describe('validate-solutions — nested path depth rejection (P2 regression test)', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-vs-depth-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('rejects a diff entry with more than 4 path segments (nested subdirectory)', () => {
+    // docs/solutions/workflow/nested/doc.md has 5 segments — deeper than the
+    // required docs/solutions/<category>/<slug>.md layout. Before the fix,
+    // segments.length < 4 silently skipped these; now they emit ERROR-SOL-002
+    // so the gap is visible instead of a quiet bypass.
+    const nestedDir = join(tmpRoot, 'workflow', 'nested');
+    mkdirSync(nestedDir, { recursive: true });
+    writeFileSync(
+      join(nestedDir, 'doc.md'),
+      `---\n${validFrontmatter('doc')}\n---\nBody.\n`,
+      'utf8'
+    );
+
+    const { status, stdout, stderr } = runScript(tmpRoot, {
+      diff: 'A\tdocs/solutions/workflow/nested/doc.md',
+    });
+
+    expect(status).toBe(1);
+    expect(stdout + stderr).toMatch(/ERROR-SOL-002/);
+    expect(stdout + stderr).toMatch(/expected docs\/solutions\/<category>\/<slug>\.md \(depth 4\)/);
+  });
+});
+
 describe('validate-solutions — path-traversal rejection (P1 regression test)', () => {
   let tmpRoot: string;
   beforeEach(() => {

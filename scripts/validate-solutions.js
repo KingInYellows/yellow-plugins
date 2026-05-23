@@ -90,6 +90,13 @@ const VALID_CATEGORIES = new Set([
 const VALID_TRACKS = new Set(['bug', 'knowledge']);
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidIsoDate(value) {
+  if (!ISO_DATE_RE.test(value)) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
 const SLUG_MAX_LEN = 50;
 
 const errors = [];
@@ -188,9 +195,20 @@ function getChangedFiles() {
       );
       continue;
     }
-    // Require category-subdirectory shape: docs/solutions/<category>/<slug>.md
+    // Require exact category-subdirectory shape: docs/solutions/<category>/<slug>.md
+    // Paths with more than 4 segments (e.g. docs/solutions/workflow/nested/doc.md)
+    // bypass slug-collision detection because buildCorpusIndex() only walks one
+    // level under each category. Reject them explicitly instead of silently
+    // continuing.
     const segments = normalized.split('/');
-    if (segments.length < 4) continue;
+    if (segments.length !== 4) {
+      emitError(
+        normalized,
+        SOL_FRONTMATTER,
+        `expected docs/solutions/<category>/<slug>.md (depth 4), got: ${normalized}`
+      );
+      continue;
+    }
     entries.push({ status: normalizedStatus, path: normalized });
   }
   return entries;
@@ -272,7 +290,7 @@ function validateFrontmatter(file, fm) {
       `invalid track "${fm.track}" — must be one of: bug, knowledge`
     );
   }
-  if (fm.date && !ISO_DATE_RE.test(fm.date)) {
+  if (fm.date && !isValidIsoDate(fm.date)) {
     emitError(
       file,
       SOL_FRONTMATTER,
@@ -368,6 +386,12 @@ function main() {
     process.exit(0);
   }
   if (changed.length === 0) {
+    // getChangedFiles() may have emitted errors (e.g., depth-4 violations)
+    // even though the actionable entries list is empty. Surface those and fail
+    // instead of silently exiting 0.
+    if (errors.length > 0) {
+      process.exit(1);
+    }
     emitNotice('no docs/solutions/ changes in diff — nothing to validate');
     process.exit(0);
   }
