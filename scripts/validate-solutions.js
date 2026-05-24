@@ -177,9 +177,20 @@ function getChangedFiles() {
     } else {
       continue;
     }
-    if (!relPath || !relPath.endsWith('.md')) continue;
+    if (!relPath) continue;
     if (!relPath.startsWith('docs/solutions/')) continue;
     if (relPath.startsWith('docs/solutions/archived/')) continue;
+    // Non-.md files under docs/solutions/ violate the corpus convention.
+    // Block rather than silently skip so an accidental .MD / .markdown /
+    // .txt landing in the solutions tree is caught at PR time.
+    if (!relPath.endsWith('.md')) {
+      emitError(
+        relPath,
+        SOL_FRONTMATTER,
+        `non-.md file under docs/solutions/ — expected lowercase .md extension`
+      );
+      continue;
+    }
     // Path-traversal guard: startsWith('docs/solutions/') alone passes
     // payloads like 'docs/solutions/../../../etc/passwd', which path.join
     // would then resolve outside the corpus root. Reject any entry whose
