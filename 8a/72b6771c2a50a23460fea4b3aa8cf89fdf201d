@@ -1,0 +1,23 @@
+scripts/validate-solutions.js
+  s_0083c2dbdafe0e::t_2d94772ec8f0b1 180,183-193
+plugins/yellow-core/commands/workflows/compound.md
+  s_0083c2dbdafe0e::t_c0ae415ec04317 129
+.github/workflows/validate-schemas.yml
+  s_0083c2dbdafe0e::t_720b9a84736214 827
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "8a72b6771c2a50a23460fea4b3aa8cf89fdf201d",
+  "prompts": {},
+  "sessions": {
+    "s_0083c2dbdafe0e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d37ed401-fd4a-4d85-b1d8-48bb4ce94b8d",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
