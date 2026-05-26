@@ -469,6 +469,37 @@ describe('validate-solutions — path-traversal rejection (P1 regression test)',
   });
 });
 
+describe('validate-solutions — malformed YAML frontmatter (SOL-002)', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-vs-malformed-yaml-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('blocks a doc with an unclosed flow sequence in frontmatter (e.g. title: [broken)', () => {
+    // The regex parser accepts `title: [broken` by capturing `[broken` as the
+    // value; real YAML parsers reject it. This test pins that parseFrontmatter
+    // now catches the unclosed bracket and emits ERROR-SOL-002.
+    const dir = join(tmpRoot, 'workflow');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'bad-yaml.md'),
+      '---\ntitle: [broken\ndate: 2026-05-21\ncategory: workflow\ntrack: knowledge\nproblem: p\ntags: [t]\n---\nBody.\n',
+      'utf8'
+    );
+
+    const { status, stdout, stderr } = runScript(tmpRoot, {
+      diff: 'A\tdocs/solutions/workflow/bad-yaml.md',
+    });
+
+    expect(status).toBe(1);
+    expect(stdout + stderr).toMatch(/ERROR-SOL-002/);
+    expect(stdout + stderr).toMatch(/malformed YAML/);
+  });
+});
+
 describe('validate-solutions — GitHub Actions annotation format', () => {
   let tmpRoot: string;
   beforeEach(() => {

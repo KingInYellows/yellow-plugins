@@ -82,16 +82,27 @@ BRANCH="$(git branch --show-current 2>/dev/null)"
   printf '[compound] Error: not on a branch (detached HEAD?). Cannot resolve PR.\n' >&2
   exit 1
 }
-PR_JSON="$(gh pr view --json number,title,body,headRefName,baseRefName,commits,files,closingIssuesReferences 2>&1)"
+# Validate branch name against a strict allowlist to prevent delimiter-collision
+# attacks. A branch name containing "--- end untrusted-content ---" would break
+# the trust fence when interpolated as plaintext into the agent prompt.
+printf '%s' "$BRANCH" | grep -qE '^[a-zA-Z0-9/_.-]+$' || {
+  printf '[compound] Error: branch name "%s" contains characters outside [a-zA-Z0-9/_.-].\n' "$BRANCH" >&2
+  printf '[compound] Rename the branch to use only safe characters before using --in-pr.\n' >&2
+  exit 1
+}
+_PR_STDERR_FILE="$(mktemp)"
+PR_JSON="$(gh pr view --json number,title,body,headRefName,baseRefName,commits,files,closingIssuesReferences 2>"$_PR_STDERR_FILE")"
 GH_RC=$?
+PR_ERR="$(cat "$_PR_STDERR_FILE")"
+rm -f "$_PR_STDERR_FILE"
 if [ $GH_RC -ne 0 ]; then
-  case "$PR_JSON" in
+  case "$PR_ERR" in
     *"no pull requests found"*|*"no open pull requests"*|*"no pull requests associated"*)
       printf '[compound] Error: no PR found for branch %s.\n' "$BRANCH" >&2
       printf '[compound] Create a draft PR first: gt stack submit --draft\n' >&2
       ;;
     *)
-      printf '[compound] Error: gh pr view failed: %s\n' "$PR_JSON" >&2
+      printf '[compound] Error: gh pr view failed: %s\n' "$PR_ERR" >&2
       ;;
   esac
   exit 1

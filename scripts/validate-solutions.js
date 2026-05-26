@@ -307,6 +307,21 @@ function parseFrontmatter(text) {
   // `constructor` would otherwise mutate Object.prototype for the lifetime
   // of this process. Use a null-prototype object as the accumulator and
   // reject the forbidden keys explicitly.
+  // Basic YAML syntax check: detect unclosed flow sequences/mappings on scalar
+  // value lines (e.g. `title: [broken`). The regex parser accepts these
+  // silently; downstream readers (YAML-based) will fail on them.
+  for (const line of fmRaw.split(/\r?\n/)) {
+    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$/);
+    if (!kv) continue;
+    const val = kv[2].trim();
+    const openBrackets = (val.match(/\[/g) || []).length;
+    const closeBrackets = (val.match(/\]/g) || []).length;
+    const openBraces = (val.match(/\{/g) || []).length;
+    const closeBraces = (val.match(/\}/g) || []).length;
+    if (openBrackets !== closeBrackets || openBraces !== closeBraces) {
+      return { __yamlError: `malformed YAML: unclosed flow collection on line: ${line.trim()}` };
+    }
+  }
   const fields = Object.create(null);
   for (const line of fmRaw.split(/\r?\n/)) {
     const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$/);
@@ -502,6 +517,10 @@ function main() {
         SOL_FRONTMATTER,
         'missing YAML frontmatter block (file must start with `---` ... `---`)'
       );
+      continue;
+    }
+    if (fm.__yamlError) {
+      emitError(entry.path, SOL_FRONTMATTER, fm.__yamlError);
       continue;
     }
     validateFrontmatter(entry.path, fm);
