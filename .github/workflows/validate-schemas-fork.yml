@@ -69,6 +69,8 @@ jobs:
           echo "$RUNNER_TEMP/ajv-tools/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Run schema validations
+        env:
+          VALIDATE_SOLUTIONS_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/main' }}
         run: |
           set -euo pipefail
           case "${{ matrix.target }}" in

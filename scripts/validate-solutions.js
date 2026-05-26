@@ -261,7 +261,7 @@ function getChangedFiles() {
     const normalized = path.posix.normalize(relPath);
     if (
       normalized !== relPath ||
-      normalized.includes('..') ||
+      normalized.split('/').some(s => s === '..') ||
       path.isAbsolute(normalized)
     ) {
       process.stderr.write(

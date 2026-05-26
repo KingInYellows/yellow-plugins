@@ -82,7 +82,7 @@ BRANCH="$(git branch --show-current 2>/dev/null)"
   printf '[compound] Error: not on a branch (detached HEAD?). Cannot resolve PR.\n' >&2
   exit 1
 }
-PR_JSON="$(gh pr view --json number,title,body,headRefName,baseRefName,commits,closingIssuesReferences 2>&1)"
+PR_JSON="$(gh pr view --json number,title,body,headRefName,baseRefName,commits,files,closingIssuesReferences 2>&1)"
 GH_RC=$?
 if [ $GH_RC -ne 0 ]; then
   case "$PR_JSON" in
