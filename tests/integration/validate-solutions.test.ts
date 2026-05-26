@@ -413,6 +413,39 @@ describe('validate-solutions — nested path depth rejection (P2 regression test
   });
 });
 
+describe('validate-solutions — unicode path passes through (P1 regression test for -z parsing)', () => {
+  let tmpRoot: string;
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'yellow-vs-unicode-'));
+  });
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('passes a non-ASCII path through to slug validation (not silently dropped)', () => {
+    // Without `-z` parsing, git would emit a quoted/escaped path for `café`
+    // (`"docs/solutions/workflow/caf\\303\\251.md"`) and the later
+    // startsWith('docs/solutions/') check would fail, silently bypassing the
+    // validator. With `-z`, the path arrives verbatim and reaches the slug
+    // regex check — which rejects `café` as a non-ASCII slug. The test pins
+    // that the path was *seen* (SOL-002 emitted) rather than silently dropped
+    // (exit 0). The VALIDATE_SOLUTIONS_DIFF injection bypasses git, so this
+    // fixture exercises the post-parse contract; real-git -z parsing is
+    // exercised in CI by any PR touching a non-ASCII filename.
+    writeDoc(tmpRoot, 'workflow', 'café', validFrontmatter('café'));
+
+    const { status, stdout, stderr } = runScript(tmpRoot, {
+      diff: 'A\tdocs/solutions/workflow/café.md',
+    });
+
+    // Slug regex `^[a-z0-9]+(-[a-z0-9]+)*$` rejects `é`, so validation runs
+    // and emits SOL-002 — proving the path was not silently skipped.
+    expect(status).toBe(1);
+    expect(stdout + stderr).toMatch(/ERROR-SOL-002/);
+    expect(stdout + stderr).toMatch(/slug "café"/);
+  });
+});
+
 describe('validate-solutions — path-traversal rejection (P1 regression test)', () => {
   let tmpRoot: string;
   beforeEach(() => {

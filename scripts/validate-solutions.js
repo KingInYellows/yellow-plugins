@@ -118,24 +118,91 @@ function emitNotice(msg) {
   }
 }
 
+// Parse `git diff --name-status -z` output. Records are NUL-separated.
+// For A/M: status\0path\0   For R/C: status\0old\0new\0
+// Returns array of {status, path, newPath?} records. Status may carry
+// similarity digits (R100, C75); callers use the first char.
+function parseNulSeparatedDiff(raw) {
+  const records = [];
+  const parts = raw.split('\0');
+  // git's -z output ends with a trailing NUL → an extra empty element.
+  // Walk by status to know how many fields each record consumes.
+  let i = 0;
+  while (i < parts.length) {
+    const status = parts[i];
+    if (!status) {
+      i++;
+      continue;
+    }
+    const ch = status[0];
+    if (ch === 'R' || ch === 'C') {
+      // Rename/copy: status, old, new
+      const oldPath = parts[i + 1];
+      const newPath = parts[i + 2];
+      if (oldPath === undefined || newPath === undefined) break;
+      records.push({ status, path: oldPath, newPath });
+      i += 3;
+    } else {
+      // A/M/D/T: status, path
+      const path = parts[i + 1];
+      if (path === undefined) break;
+      records.push({ status, path });
+      i += 2;
+    }
+  }
+  return records;
+}
+
+// Parse synthetic VALIDATE_SOLUTIONS_DIFF env var content (tab+newline format
+// matching `git diff --name-status` without `-z`). Test ergonomics only —
+// the real git path uses `-z` (NUL-separated) for unicode/space safety.
+function parseTabSeparatedDiff(raw) {
+  const records = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const parts = line.split(/\t/);
+    const status = parts[0];
+    const ch = status[0];
+    if (ch === 'R' || ch === 'C') {
+      if (parts.length < 3) continue;
+      records.push({ status, path: parts[1], newPath: parts[2] });
+    } else {
+      if (parts.length < 2) continue;
+      records.push({ status, path: parts[1] });
+    }
+  }
+  return records;
+}
+
 // Returns array of {status: 'A'|'M', relPath} entries within docs/solutions/
 // (excluding archived/), or null when the diff base is unreachable. Rename
-// entries (`R<score>\t<old>\t<new>`) are normalized to 'A' on the new path so
-// they receive slug-collision checking the same as fresh additions.
+// entries are normalized to 'A' on the new path so they receive
+// slug-collision checking the same as fresh additions.
 function getChangedFiles() {
   const injected = process.env.VALIDATE_SOLUTIONS_DIFF;
-  let raw;
+  let records;
   if (injected !== undefined) {
-    raw = injected;
+    // Synthetic test injection: tab+newline format. Tests don't carry
+    // unusual filenames so the tab format is safe and ergonomic for
+    // fixture writers (NUL bytes are awkward in JS string literals).
+    records = parseTabSeparatedDiff(injected);
   } else {
+    let raw;
     try {
       // Use execFileSync (no shell) and pass the ref as an argument so a
       // hostile VALIDATE_SOLUTIONS_BASE_REF cannot inject shell commands.
       // execSync with a template literal would interpret metacharacters via
       // /bin/sh -c, which was the original P1 security finding.
+      //
+      // `-z` is load-bearing: without it, git quotes paths containing
+      // unusual characters (non-ASCII like `café`, spaces, tabs, etc.)
+      // using C-style escaping, which would fail the later
+      // `startsWith('docs/solutions/')` check and silently bypass
+      // validation. With `-z`, records are NUL-separated and paths are
+      // emitted verbatim (no quoting).
       raw = execFileSync(
         'git',
-        ['diff', '--name-status', `${BASE_REF}...HEAD`, '--', 'docs/solutions/'],
+        ['diff', '--name-status', '-z', `${BASE_REF}...HEAD`, '--', 'docs/solutions/'],
         { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
       );
     } catch (err) {
@@ -156,23 +223,19 @@ function getChangedFiles() {
       }
       return null;
     }
+    records = parseNulSeparatedDiff(raw);
   }
   const entries = [];
-  for (const line of raw.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    // git diff --name-status format: "<STATUS>\t<path>" or
-    // "<STATUS>\t<old>\t<new>" for R/C. Status may have similarity digits
-    // (R100, C75). We treat A/M as actionable, R-new as A, and skip D/C/T.
-    const parts = line.split(/\t/);
-    const statusChar = parts[0][0];
+  for (const rec of records) {
+    const statusChar = rec.status[0];
     let relPath;
     let normalizedStatus;
     if (statusChar === 'A' || statusChar === 'M') {
-      relPath = parts[1];
+      relPath = rec.path;
       normalizedStatus = statusChar;
     } else if (statusChar === 'R') {
       // Rename: treat new path as added (new slug → collision check).
-      relPath = parts[2];
+      relPath = rec.newPath;
       normalizedStatus = 'A';
     } else {
       continue;
