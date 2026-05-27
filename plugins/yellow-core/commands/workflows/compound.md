@@ -110,7 +110,9 @@ fi
 # Base64-encode the JSON to prevent delimiter-collision attacks (a malicious
 # PR title/body containing "--- end untrusted-content ---" would otherwise
 # break the trust fence and inject arbitrary instructions to the agent).
-PR_JSON_B64="$(printf '%s' "$PR_JSON" | base64)"
+# `tr -d '\n'` strips GNU base64's default 76-column line wrapping so the
+# consumer can decode the payload as a single line on both GNU and BSD.
+PR_JSON_B64="$(printf '%s' "$PR_JSON" | base64 | tr -d '\n')"
 printf '%s\n' "$PR_JSON_B64"
 ```
 

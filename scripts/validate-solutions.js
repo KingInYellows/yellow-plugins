@@ -48,6 +48,13 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const yaml = require('yaml');
+
+// Private Symbol sentinel for YAML parse errors. Symbol keys cannot appear in
+// a YAML-parsed object (YAML produces only string-keyed objects), so there is
+// no collision risk with user frontmatter keys.
+const Y_ERR = Symbol('yamlError');
+
 const ROOT = path.resolve(__dirname, '..');
 const SOLUTIONS_DIR = path.resolve(
   ROOT,
@@ -303,52 +310,26 @@ function parseFrontmatter(text) {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?$/);
   if (!match) return null;
   const fmRaw = match[1];
-  // Prototype-pollution guard: a frontmatter key named `__proto__` or
-  // `constructor` would otherwise mutate Object.prototype for the lifetime
-  // of this process. Use a null-prototype object as the accumulator and
-  // reject the forbidden keys explicitly.
-  // Basic YAML syntax check: detect unclosed flow sequences/mappings on scalar
-  // value lines (e.g. `title: [broken`). The regex parser accepts these
-  // silently; downstream readers (YAML-based) will fail on them.
-  for (const line of fmRaw.split(/\r?\n/)) {
-    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$/);
-    if (!kv) continue;
-    const val = kv[2].trim();
-    const openBrackets = (val.match(/\[/g) || []).length;
-    const closeBrackets = (val.match(/\]/g) || []).length;
-    const openBraces = (val.match(/\{/g) || []).length;
-    const closeBraces = (val.match(/\}/g) || []).length;
-    if (openBrackets !== closeBrackets || openBraces !== closeBraces) {
-      return { __yamlError: `malformed YAML: unclosed flow collection on line: ${line.trim()}` };
-    }
+  let parsed;
+  try {
+    parsed = yaml.parse(fmRaw) || {};
+  } catch (err) {
+    return { [Y_ERR]: `malformed YAML: ${err.message}` };
   }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return { [Y_ERR]: 'malformed YAML: frontmatter must be a YAML mapping' };
+  }
+  // Prototype-pollution guard: copy whitelisted (string-keyed, non-dangerous)
+  // keys into a null-prototype object. yaml.parse() returns a plain object but
+  // we explicitly exclude __proto__ / constructor / prototype defensively.
   const fields = Object.create(null);
-  for (const line of fmRaw.split(/\r?\n/)) {
-    const kv = line.match(/^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:\s*(.*)$/);
-    if (kv) {
-      if (kv[1] === '__proto__' || kv[1] === 'constructor' || kv[1] === 'prototype') continue;
-      const value = kv[2].trim().replace(/^['"]|['"]$/g, '');
-      fields[kv[1]] = value;
-    }
+  for (const [k, v] of Object.entries(parsed)) {
+    if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+    fields[k] = v;
   }
-  // tags can be inline (`tags: [a, b]`) or block-list. Both count as present.
-  const tagsInline = /^tags\s*:\s*\[([^\]]+)\]/m.test(fmRaw);
-  const lines = fmRaw.split(/\r?\n/);
-  let tagsBlock = false;
-  for (let i = 0; i < lines.length; i++) {
-    if (/^tags\s*:\s*$/.test(lines[i])) {
-      // Look ahead for at least one list item before the next top-level key.
-      for (let j = i + 1; j < lines.length; j++) {
-        if (/^\s*-\s+\S/.test(lines[j])) {
-          tagsBlock = true;
-          break;
-        }
-        if (/^\S/.test(lines[j])) break;
-      }
-      break;
-    }
-  }
-  fields.__hasTags = tagsInline || tagsBlock;
+  // tags can be inline (`tags: [a, b]`) or block-list. yaml.parse normalises
+  // both forms to a JS array, so a simple Array.isArray check suffices.
+  fields.__hasTags = Array.isArray(parsed.tags) && parsed.tags.length > 0;
   return fields;
 }
 
@@ -519,8 +500,8 @@ function main() {
       );
       continue;
     }
-    if (fm.__yamlError) {
-      emitError(entry.path, SOL_FRONTMATTER, fm.__yamlError);
+    if (fm[Y_ERR]) {
+      emitError(entry.path, SOL_FRONTMATTER, fm[Y_ERR]);
       continue;
     }
     validateFrontmatter(entry.path, fm);

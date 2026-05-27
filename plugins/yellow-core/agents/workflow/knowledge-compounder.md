@@ -68,12 +68,16 @@ where the first line inside the fence is `pr-context-base64:` (e.g., from `/work
 distilled problem statement and solution narrative the parallel extractors
 would derive from raw conversation transcript. Use them directly:
 
-1. The fenced block contains two lines: a trusted `branch: <branch-name>` metadata
-   line (first line) and a base64-encoded JSON payload (last non-blank line). Read
-   the `branch:` line as trusted metadata (it can be used as a cross-check against
-   `headRefName` after decoding). Base64-decode only the last non-blank line (to
-   prevent delimiter-collision attacks from malicious PR content embedded in the
-   JSON fields), then parse the JSON (fields: `number`, `title`, `body`,
+1. The fenced block contains a trusted `branch: <branch-name>` metadata line
+   (first line) followed by a base64-encoded JSON payload (one or more lines).
+   Read the `branch:` line as trusted metadata (it can be used as a cross-check
+   against `headRefName` after decoding). Collect **all remaining non-blank
+   lines** after the `branch:` line (in order) and concatenate them into a
+   single string before base64-decoding — this handles both single-line
+   producers (post-fix upstream) and line-wrapped base64 from older or
+   BSD-base64 producers. Base64-decode the concatenated string (to prevent
+   delimiter-collision attacks from malicious PR content embedded in the JSON
+   fields), then parse the JSON (fields: `number`, `title`, `body`,
    `headRefName`, `baseRefName`, `commits[]`, `closingIssuesReferences[]`).
 2. **Context Analyzer substitute** — derive:
    - `PROBLEM_TYPE`: a short kebab-case label from the PR title (drop
