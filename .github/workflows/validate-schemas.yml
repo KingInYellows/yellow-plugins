@@ -11,6 +11,7 @@ on:
       - 'scripts/validate-*.js'
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
+      - 'docs/solutions/**'
       - '.github/workflows/validate-schemas.yml'
   push:
     branches:
@@ -51,6 +52,7 @@ jobs:
           - plugins
           - contracts
           - examples
+          - solutions
 
     steps:
       - name: Checkout repository
@@ -82,6 +84,8 @@ jobs:
         run: echo "CI_JOB_START=$(date +%s)" >> $GITHUB_ENV
 
       - name: Run schema validations
+        env:
+          VALIDATE_SOLUTIONS_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/main' }}
         run: |
           set -euo pipefail
           mkdir -p .ci-logs
@@ -177,6 +181,16 @@ jobs:
                     --strict=true \
                     --all-errors
                 done
+                echo "::endgroup::"
+                ;;
+              solutions)
+                # Diff-scoped slug-collision + frontmatter validator for
+                # docs/solutions/ entries. Blocks new docs that reuse an
+                # existing slug or have missing/invalid required frontmatter.
+                # See CONTRIBUTING.md "Solution Docs" and
+                # plans/solution-doc-git-workflow.md.
+                echo "::group::Solution-doc validation"
+                node scripts/validate-solutions.js
                 echo "::endgroup::"
                 ;;
               *)
@@ -797,6 +811,134 @@ jobs:
             echo "Changed plugins: $(echo "$CHANGED_PLUGINS" | tr '\n' ' ')"
             echo "Changesets: $(echo "$NEW_CHANGESETS" | tr '\n' ' ')"
           fi
+
+  # ============================================================================
+  # SOLUTION DOC ADVISORY — non-blocking nudge for P0/P1 issues without docs
+  # ============================================================================
+  # Emits ::warning:: annotations when a PR closes a P0/P1-labeled issue
+  # but contains no `docs/solutions/` change. Author judgment may override.
+  # Deliberately NOT in `ci-status` `needs:` — must never block merge. See
+  # CONTRIBUTING.md "Solution Docs" for the policy and known blind spots
+  # (cross-repo closures, commit-message-only closing keywords).
+  validate-solutions-advisory:
+    name: Solution Doc Advisory
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:atlas"]') }}
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
+          fetch-depth: 0
+
+      - name: Check P0/P1 labeled issue + missing solution doc
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO_OWNER: ${{ github.event.pull_request.base.repo.owner.login }}
+          REPO_NAME: ${{ github.event.pull_request.base.repo.name }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -uo pipefail
+
+          # Soft-skip when gh CLI or auth is unavailable. Advisory only —
+          # never block on tooling gaps.
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "::notice::gh CLI not available; skipping solution-doc advisory"
+            exit 0
+          fi
+          if ! gh auth status >/dev/null 2>&1; then
+            echo "::notice::gh CLI not authenticated; skipping solution-doc advisory"
+            exit 0
+          fi
+
+          # Resolve the priority label set the advisory cares about. Defaults
+          # to P0,P1,bug-critical; the workflow can be edited to add labels
+          # without touching this script.
+          PRIORITY_LABELS='["P0","P1","bug-critical"]'
+
+          # Query closingIssuesReferences for this PR. Use `-f` flags for
+          # safe variable interpolation (never raw string concat into the
+          # query body). The `closingIssuesReferences` field surfaces only
+          # issues linked via PR-body keywords (closes/fixes/resolves) in
+          # the same repo — cross-repo or commit-message-only closures are
+          # silently missed; this is documented in CONTRIBUTING.md as a
+          # known blind spot.
+          # shellcheck disable=SC2016
+          # SC2016: the `$owner`/`$repo`/`$pr` tokens are GraphQL variable
+          # references resolved server-side from `-f` flags, NOT shell
+          # variables we want expanded locally.
+          GQL_QUERY='query($owner:String!,$repo:String!,$pr:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$pr){closingIssuesReferences(first:25){nodes{number title labels(first:10){nodes{name}}}}}}}'
+
+          API_OUTPUT="$(gh api graphql \
+            -f query="$GQL_QUERY" \
+            -f owner="$REPO_OWNER" \
+            -f repo="$REPO_NAME" \
+            -F pr="$PR_NUMBER" 2>&1)"
+          API_RC=$?
+          if [ $API_RC -ne 0 ]; then
+            echo "::notice::gh api graphql failed (rc=$API_RC); skipping advisory: $API_OUTPUT"
+            exit 0
+          fi
+
+          # jq guards: null repository (token without access), null PR
+          # (deleted between trigger and check). Both treated as soft-skip.
+          PRIORITY_HITS="$(printf '%s' "$API_OUTPUT" | jq -r --argjson labels "$PRIORITY_LABELS" '
+            if .data.repository == null then
+              "REPO_NULL"
+            elif .data.repository.pullRequest == null then
+              "PR_NULL"
+            else
+              [.data.repository.pullRequest.closingIssuesReferences.nodes[]
+               | select(any(.labels.nodes[]; .name as $n | $labels | index($n)))
+               | "#\(.number) \(.title)"]
+              | join("\n")
+            end
+          ' 2>&1)" || {
+            echo "::notice::jq parse failed; skipping advisory"
+            exit 0
+          }
+
+          case "$PRIORITY_HITS" in
+            REPO_NULL)
+              echo "::notice::GraphQL returned null repository (token scope); skipping advisory"
+              exit 0
+              ;;
+            PR_NULL)
+              echo "::notice::PR not visible via GraphQL; skipping advisory"
+              exit 0
+              ;;
+            "")
+              echo "::notice::No P0/P1-labeled issues closed by this PR; advisory not applicable"
+              exit 0
+              ;;
+          esac
+
+          # Check whether the PR diff contains any docs/solutions/ change.
+          # base.ref is the target branch (e.g. main); the merge SHA used by
+          # actions/checkout already has fetch-depth: 0 so the diff resolves.
+          BASE_REF="origin/${PR_BASE_REF}"
+          DOC_CHANGES="$(git diff --name-only "$BASE_REF"...HEAD -- 'docs/solutions/' 2>&1 || true)"
+
+          if [ -z "$DOC_CHANGES" ]; then
+            echo "::warning::This PR closes a P0/P1-labeled issue but contains no docs/solutions/ change. Consider running /workflows:compound --in-pr to capture the learning. Closing issues:"
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              echo "::warning::  $line"
+            done <<< "$PRIORITY_HITS"
+            echo "Advisory: see CONTRIBUTING.md#solution-docs for the policy."
+          else
+            echo "::notice::PR closes P0/P1 issue(s) AND includes docs/solutions/ change(s). OK."
+          fi
+
+          # Always exit 0 — this job must never block merge.
+          exit 0
 
   # ============================================================================
   # PLUGIN SHELL TESTS (bats) — blocking for yellow-core, advisory for others

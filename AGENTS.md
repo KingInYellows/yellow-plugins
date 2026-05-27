@@ -66,8 +66,8 @@ Use pnpm only. `preinstall` enforces Node and pnpm through
 - `pnpm test:unit`: Run Vitest for `packages/`.
 - `pnpm test:integration`: Run Vitest for `tests/integration/`.
 - `pnpm validate:schemas`: Run marketplace, plugin, setup-all,
-  agent-authoring, error-code re-implementation, and install-script snippet
-  drift validation in one pass.
+  agent-authoring, error-code re-implementation, install-script snippet
+  drift, and solution-doc slug-collision/frontmatter validation in one pass.
 - `pnpm validate:error-codes`: Scan `scripts/*.js` for hard-coded `ERROR-*`
   codes that re-implement entries from `packages/domain/src/errorCatalog.ts`.
 - `pnpm validate:snippets`: Check `--check` mode of `sync-shell-snippets.js`
@@ -82,6 +82,8 @@ Use pnpm only. `preinstall` enforces Node and pnpm through
   filesystem and hook rules.
 - `pnpm validate:setup-all`: Validate `yellow-core`'s `setup:all` coverage and
   ordering against the marketplace.
+- `pnpm validate:solutions`: Run diff-scoped slug-collision and frontmatter
+  validator for `docs/solutions/` entries (ERROR-SOL-001 / ERROR-SOL-002).
 - `pnpm validate:versions` / `pnpm validate:versions:dry`: Check three-way
   version consistency across `package.json`, `plugin.json`, and
   `marketplace.json`.
@@ -325,7 +327,15 @@ state by `scripts/validate-setup-all.js`.
 - Update `docs/security.md` when MCP servers, hooks, credential requirements, or
   trust boundaries change.
 - Add a `docs/solutions/<category>/...` writeup for non-obvious bugs, validator
-  failures, or security patterns that future agents are likely to repeat.
+  failures, or security patterns that future agents are likely to repeat. The
+  preferred workflow is in-PR co-shipped: while on the feature branch with
+  an open draft PR, run `/workflows:compound --in-pr` so the doc and the
+  MEMORY.md index line land in the same PR as the fix. See
+  [CONTRIBUTING.md "Solution Docs"](CONTRIBUTING.md#solution-docs) for the
+  full policy, skip criteria, and CI behavior. New/modified docs are gated
+  by `scripts/validate-solutions.js` (wired into `pnpm validate:schemas`),
+  which blocks on exact-slug collisions (`ERROR-SOL-001`) and required-
+  frontmatter violations (`ERROR-SOL-002`).
 - Keep active implementation plans in `plans/`; move conclusions or durable
   learnings into `docs/solutions/` or user-facing docs when the plan is done.
 

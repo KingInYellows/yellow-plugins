@@ -23,6 +23,7 @@ export enum ErrorCategory {
   DISCOVERY = 'DISCOVERY',
   PERMISSION = 'PERMISSION',
   NETWORK = 'NETWORK',
+  SOLUTION_DOCS = 'SOLUTION_DOCS',
 }
 
 /** Structured validation error with specification traceability. */

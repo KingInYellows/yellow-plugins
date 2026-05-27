@@ -11,6 +11,7 @@ This document provides guidelines and processes for contributing to the project.
 - [Plugin Structure](#plugin-structure)
 - [Testing Requirements](#testing-requirements)
 - [Pull Request Process](#pull-request-process)
+- [Solution Docs](#solution-docs)
 - [Coding Standards](#coding-standards)
 
 ## Code of Conduct
@@ -132,6 +133,8 @@ pnpm release:check
 - [ ] Commit messages use conventional format (`feat:`, `fix:`, `docs:`, etc.)
 - [ ] Changeset file created if plugin files changed: `pnpm changeset` (see
       [Versioning](#versioning))
+- [ ] Solution doc written, updated, or skip criteria documented in PR
+      description (see [Solution Docs](#solution-docs))
 
 ### PR Review Process
 
@@ -319,6 +322,104 @@ still required to initialize the versioned directory. The shortcut
 covers the common case where a prior version directory already exists
 (from a previous install or seed copy) but its contents are stale after
 a version bump.
+
+## Solution Docs
+
+`docs/solutions/` captures recurring engineering learnings — bugs that took
+investigation, integration gotchas, workflow patterns — so the next time the
+same problem appears, the fix is already documented. `MEMORY.md` indexes
+those docs from a project-local auto-memory at
+`~/.claude/projects/<slug>/memory/MEMORY.md`.
+
+### Default pattern: in-PR co-shipped
+
+When a PR resolves a learning worth keeping, write the solution doc **in the
+same PR as the fix**. Both land atomically, the doc preserves a causal link
+to the code change, and MEMORY.md never points at a doc that does not exist
+on `main`. Run while on the feature branch with an open draft PR:
+
+```bash
+/workflows:compound --in-pr
+```
+
+The `knowledge-compounder` agent reads your PR body and commit subjects
+(via `gh pr view`), drafts both the solution doc and the one-line MEMORY.md
+index entry, runs Related Docs Finder against the existing corpus to detect
+updates to existing topics, and gates on AskUserQuestion before writing.
+Amend the resulting files into the same PR with `gt amend`.
+
+### When a doc is required
+
+Write a solution doc when the PR resolves something that would waste future
+time if forgotten:
+
+- A non-obvious bug fix where the root cause was hard to find or the
+  diagnosis path was indirect.
+- A workflow gotcha that bit you and is likely to bite the next person
+  (CRLF + WSL2, merge-queue + force-push, etc.).
+- An integration failure mode for a third-party tool or MCP server where
+  the surface error did not match the actual cause.
+- A reusable pattern extracted from a one-off fix that should become
+  policy.
+
+### Skip criteria
+
+Skip the doc when none of the above apply:
+
+- Trivial fixes (typos, whitespace, formatting).
+- Behavior already covered by an existing doc in `docs/solutions/`.
+- Subjective preference changes (rename, style adjustment) with no
+  underlying failure mode.
+- Version bumps, dependency updates, dependency lock-file refreshes.
+
+When you skip, note the reason in the PR description under a `## Notes`
+section so reviewers can sanity-check the call (e.g.,
+`No solution doc — typo fix in error message`).
+
+### Exception path: post-PR dedicated doc PR
+
+When a learning is too large to amend into the feature PR (e.g., a multi-
+file post-mortem that would dwarf the original fix), file a follow-up
+`docs(solutions): <topic>` PR within the same week. Link it back to the
+original PR in the description so the causal chain is preserved. Mark the
+feature PR's `## Notes` section: `Solution doc tracked separately in
+<follow-up PR URL>`.
+
+### CI behavior
+
+Two checks run on every PR that touches `docs/solutions/`:
+
+- **`validate-solutions` (blocking).** Runs inside `validate:schemas`.
+  Fails on exact-slug collisions (`ERROR-SOL-001`) when a NEW doc reuses an
+  existing slug from any category, and on missing or invalid required
+  frontmatter (`ERROR-SOL-002`). Diff-scoped — only new/modified files in
+  the current PR's diff are checked. Pre-existing non-conforming docs are
+  not retroactively gated; they only trip the validator when modified.
+- **`validate-solutions-advisory` (non-blocking).** Emits a
+  `::warning::` annotation when a PR closes a P0/P1-labeled issue but
+  contains no `docs/solutions/` change. This is a nudge, never a block —
+  reviewers can override at their judgment.
+
+The advisory job has known blind spots: it uses GitHub's
+`closingIssuesReferences` GraphQL field, which only surfaces issues linked
+via PR-body keywords (`closes`, `fixes`, `resolves`) in the same repo.
+Cross-repo closures (`closes other-repo#123`) and commit-message-only
+closing keywords do not trigger the warning. Author judgment fills the gap.
+
+### How `--in-pr` mode differs from the standard flow
+
+Without `--in-pr`, `/workflows:compound` extracts the solution from the
+**live conversation context** (the in-session transcript). That mode runs
+the full 5-subagent extraction pipeline and is best when the learning was
+just figured out and the PR body has not yet been written.
+
+With `--in-pr`, the agent skips the 5-subagent pipeline and uses the PR
+body + commit subjects directly as the canonical source. Use `--in-pr`
+once the PR description is in good shape; use the bare command earlier,
+while the analysis is still in your head.
+
+Both modes route to the same M3 AskUserQuestion gate, which shows the
+solution doc draft and the MEMORY.md entry side-by-side before any write.
 
 ## Coding Standards
 

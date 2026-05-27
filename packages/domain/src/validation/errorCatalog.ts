@@ -68,6 +68,25 @@ export const ERROR_CODES = {
   NET_FETCH_FAILED: 'ERROR-NET-001',
   NET_TIMEOUT: 'ERROR-NET-002',
   NET_PARSE_FAILED: 'ERROR-NET-003',
+
+  // Solution-doc Errors (SOL) — scripts/validate-solutions.js gates new
+  // docs/solutions/ entries on slug uniqueness and required frontmatter.
+  // See CONTRIBUTING.md "Solution Docs" and the policy plan at
+  // plans/solution-doc-git-workflow.md.
+  //
+  // Note on the consumer wiring gap: scripts/validate-solutions.js does NOT
+  // import these constants directly. The catalog package is ESM
+  // (packages/domain/package.json: "type": "module") and scripts/*.js are
+  // CJS — a direct `require()` of the built ESM output fails. Until the
+  // scripts/ layer migrates to ESM (a tooling-level concern out of scope
+  // for the solution-doc validator), the validator assembles the same
+  // strings via concatenation per MEMORY.md's documented fallback. These
+  // entries serve as the single source of truth that the validator's
+  // assembled strings MUST match; any change here requires a paired edit
+  // in scripts/validate-solutions.js (the constants SOL/SOL_SLUG_COLLISION/
+  // SOL_FRONTMATTER).
+  SOL_SLUG_COLLISION: 'ERROR-SOL-001',
+  SOL_FRONTMATTER_INVALID: 'ERROR-SOL-002',
 } as const;
 
 /**
@@ -247,6 +266,7 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.COMPAT_CLAUDE_VERSION_LOW,
       ERROR_CODES.COMPAT_CLAUDE_VERSION_HIGH,
       ERROR_CODES.COMPAT_NODE_VERSION_LOW,
+      ERROR_CODES.COMPAT_NODE_VERSION_HIGH,
       ERROR_CODES.COMPAT_PLATFORM_UNSUPPORTED,
       ERROR_CODES.COMPAT_ARCH_UNSUPPORTED,
       ERROR_CODES.COMPAT_PLUGIN_DEPENDENCY_MISSING,
@@ -275,6 +295,10 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.NET_FETCH_FAILED,
       ERROR_CODES.NET_TIMEOUT,
       ERROR_CODES.NET_PARSE_FAILED,
+    ],
+    [ErrorCategory.SOLUTION_DOCS]: [
+      ERROR_CODES.SOL_SLUG_COLLISION,
+      ERROR_CODES.SOL_FRONTMATTER_INVALID,
     ],
   };
 }

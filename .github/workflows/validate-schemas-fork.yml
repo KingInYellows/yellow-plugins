@@ -13,6 +13,7 @@ on:
       - 'scripts/validate-*.js'
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
+      - 'docs/solutions/**'
       - '.github/workflows/validate-schemas-fork.yml'
 
 concurrency:
@@ -40,10 +41,13 @@ jobs:
           - plugins
           - contracts
           - examples
+          - solutions
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
@@ -65,6 +69,8 @@ jobs:
           echo "$RUNNER_TEMP/ajv-tools/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Run schema validations
+        env:
+          VALIDATE_SOLUTIONS_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/main' }}
         run: |
           set -euo pipefail
           case "${{ matrix.target }}" in
@@ -118,6 +124,14 @@ jobs:
                   -c ./scripts/ajv-custom-keywords.js \
                   --strict=true --all-errors
               done
+              ;;
+            solutions)
+              # Diff-scoped slug-collision + frontmatter validator for
+              # docs/solutions/ — mirrors the main workflow's solutions
+              # matrix target. Fork PRs need parity here so a fork
+              # contributor adding a doc with a slug collision sees the
+              # same blocking signal as a same-repo contributor.
+              node scripts/validate-solutions.js
               ;;
             *)
               echo "::error::Unknown validation target: ${{ matrix.target }}"

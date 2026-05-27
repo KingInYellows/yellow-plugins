@@ -23,7 +23,7 @@ TypeScript, Python, Rust, and Go.
 | `/workflows:plan`       | Transform feature descriptions into structured plans               |
 | `/workflows:work`       | Execute work plans systematically                                  |
 | `/workflows:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |
-| `/workflows:compound`   | Document a recently solved problem to compound knowledge           |
+| `/workflows:compound`   | Document a recently solved problem to compound knowledge. Pass `--in-pr` while on a feature branch with an open PR to draft the doc + MEMORY.md line from the PR body and commits (the default pattern in CONTRIBUTING.md "Solution Docs") |
 | `/compound:review-staged` | Manually drain the background-compounding staging ledger (M3-gated) |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
 | `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |

@@ -50,7 +50,24 @@ node scripts/validate-plugin.js plugins/yellow-core
 
 # Validate using the CI-style manifest path
 node scripts/validate-plugin.js --plugin plugins/yellow-core/.claude-plugin/plugin.json
+
+# Validate solution docs added/modified in the current PR's diff
+# (blocks on slug collisions and required-frontmatter violations; see
+# CONTRIBUTING.md "Solution Docs")
+node scripts/validate-solutions.js
 ```
+
+This guide focuses on plugin-manifest validation. The full validator
+inventory wired into `pnpm validate:schemas`:
+
+- `scripts/validate-marketplace.js` — marketplace catalog
+- `scripts/validate-plugin.js` — plugin manifests
+- `scripts/validate-setup-all.js` — `/yellow-core:setup:all` coverage
+- `scripts/validate-agent-authoring.js` — agent/skill/command markdown rules
+- `scripts/lint-error-codes.js` — error catalog import discipline
+- `scripts/sync-shell-snippets.js --check` — install-script snippet sync
+- `scripts/validate-solutions.js` — solution-doc frontmatter and slug
+  uniqueness, diff-scoped
 
 ### Expected Output
 

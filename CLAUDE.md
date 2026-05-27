@@ -30,7 +30,7 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions
 pnpm validate:marketplace     # .claude-plugin/marketplace.json only
 pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace
@@ -38,6 +38,7 @@ pnpm validate:agents          # agent-authoring rules only
 pnpm validate:versions        # cross-manifest version drift check
 pnpm validate:error-codes     # scripts/ must use ERROR-* codes from errorCatalog.ts
 pnpm validate:snippets        # install-script generated blocks match scripts/snippets/ sources
+pnpm validate:solutions       # diff-scoped slug-collision + frontmatter gate for docs/solutions/
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
 
 pnpm release:check            # validate:schemas + validate:versions + typecheck
