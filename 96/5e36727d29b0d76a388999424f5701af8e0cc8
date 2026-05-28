@@ -1,0 +1,38 @@
+docs/solutions/workflow/plan-lifecycle-management.md
+  s_aadac9b32eee21::t_06ac57767fb6e7 1-168
+.changeset/plan-lifecycle-commands.md
+  s_aadac9b32eee21::t_830e1beb16dd99 1-51
+plans/plan-lifecycle-management.md
+  s_aadac9b32eee21::t_b149cf18bd911a 608
+plugins/yellow-core/tests/plan-commands.bats
+  s_aadac9b32eee21::t_cd6c8c67ee1d8b 1-12,15,17-131
+  s_aadac9b32eee21::t_2a6d1c3ed3a1d0 13-14,16
+plugins/yellow-core/commands/plan/status.md
+  s_aadac9b32eee21::t_11e021b5b8d33f 33-36,69-72
+  s_aadac9b32eee21::t_dda4d798729623 1-32,37-68,73-88
+plugins/yellow-core/commands/plan/complete.md
+  s_aadac9b32eee21::t_48e2190d2466cb 1-111,114-284
+  s_aadac9b32eee21::t_70565c39bdd8e0 112-113
+plugins/yellow-core/CLAUDE.md
+  s_aadac9b32eee21::t_23ad94b0f5cb01 74
+  s_aadac9b32eee21::t_4439f5c46c1e49 272-295
+  s_aadac9b32eee21::t_b5bc30cc88f5d8 94-109
+plugins/yellow-core/README.md
+  s_aadac9b32eee21::t_7ee6cb5f00c890 28-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "965e36727d29b0d76a388999424f5701af8e0cc8",
+  "prompts": {},
+  "sessions": {
+    "s_aadac9b32eee21": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "99d5df0e-018c-4dcc-bcf5-f772b26a22d9",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": null
+    }
+  }
+}
