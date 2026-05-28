@@ -86,8 +86,12 @@ visible progress indicator and surfaces install errors immediately rather
 than hanging the first tool call.
 
 ```bash
-export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
-export CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/yellow-morph}"
+# Both vars MUST be set — start-morph.sh (the MCP wrapper) requires both at
+# runtime and refuses to launch without them. Matching strict behaviour here
+# surfaces the unset-var failure during /morph:setup instead of letting the
+# install land in a path the MCP wrapper will refuse to read.
+export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set (run /morph:setup from within Claude Code)}"
+export CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA:?CLAUDE_PLUGIN_DATA must be set (Claude Code normally sets this; run /morph:setup from within Claude Code)}"
 
 # Source the shared install primitives used by bin/start-morph.sh and the
 # SessionStart prewarm hook. Single source of truth for path validation,
@@ -112,7 +116,10 @@ if yellow_morph_needs_install; then
   trap 'yellow_morph_release_install_lock' EXIT INT TERM
 
   if yellow_morph_needs_install; then
-    if ! yellow_morph_do_install 2>&1; then
+    # Send npm chatter to stderr only — matches bin/start-morph.sh's
+    # `yellow_morph_do_install >&2` pattern. Keeps registry URLs, package
+    # metadata, and version output out of the conversation log on success.
+    if ! yellow_morph_do_install >&2; then
       yellow_morph_cleanup_failed_install
       yellow_morph_release_install_lock
       trap - EXIT INT TERM

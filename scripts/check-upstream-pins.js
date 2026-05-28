@@ -10,7 +10,13 @@
  * Usage:
  *   node scripts/check-upstream-pins.js                   # advisory (all drift reported, exit 0 unless --strict)
  *   node scripts/check-upstream-pins.js --strict          # exit 1 on any drift
- *   node scripts/check-upstream-pins.js --threshold 10    # exit 1 only when major+minor drift >= 10 versions
+ *   node scripts/check-upstream-pins.js --threshold 1000  # exit 1 only when weighted drift score >= 1000
+ *   node scripts/check-upstream-pins.js --verbose         # print npm error messages on lookup failure
+ *
+ * --threshold N is compared against the WEIGHTED drift score from
+ * driftScore() below: major * 1000000 + minor * 1000 + patch. So a single
+ * minor-version bump scores 1000, a single major-version bump scores
+ * 1000000, and a 5-patch bump scores 5. Pick the threshold accordingly.
  *
  * The git-SHA-pinned entries (uvx --from git+...@<sha>) are listed but not
  * drift-checked, since resolving latest for a git repo requires extra API
@@ -24,18 +30,42 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 // Allowlist for npm package names: scope + name chars per npm-name-validator,
-// length capped at the registry's documented 214-char limit.
-const NPM_NAME_OK = /^(?:@[a-z0-9][a-z0-9._~-]{0,213}\/)?[a-z0-9][a-z0-9._~-]{0,213}$/i;
+// length capped at the registry's documented 214-char limit. The /i flag was
+// dropped intentionally — npm registry rejects uppercase package names, so
+// the regex must match registry reality. With /i, an uppercase pin would
+// silently fall through to getNpmLatest and surface as "npm lookup failed"
+// instead of being correctly identified as invalid input.
+const NPM_NAME_OK = /^(?:@[a-z0-9][a-z0-9._~-]{0,213}\/)?[a-z0-9][a-z0-9._~-]{0,213}$/;
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = process.env.CHECK_UPSTREAM_PINS_ROOT
+  ? path.resolve(process.env.CHECK_UPSTREAM_PINS_ROOT)
+  : path.resolve(__dirname, '..');
 const PLUGINS_DIR = path.join(ROOT, 'plugins');
 
 function parseArgs(argv) {
-  const args = { strict: false, threshold: null };
+  const args = { strict: false, threshold: null, verbose: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--strict') args.strict = true;
-    else if (a === '--threshold') args.threshold = parseInt(argv[++i], 10);
+    else if (a === '--verbose') args.verbose = true;
+    else if (a === '--threshold') {
+      // Validate the next arg exists, is not a flag, and parses to a finite
+      // number. Without this guard, `--threshold` as the final argv entry
+      // silently set `threshold = NaN`, and `maxDrift >= NaN` is always
+      // false — the threshold flag became a no-op instead of an error.
+      const next = argv[i + 1];
+      if (next === undefined || next.startsWith('--')) {
+        console.error('check-upstream-pins: --threshold requires a numeric argument');
+        process.exit(1);
+      }
+      const v = parseInt(next, 10);
+      if (Number.isNaN(v)) {
+        console.error(`check-upstream-pins: --threshold must be numeric (got "${next}")`);
+        process.exit(1);
+      }
+      args.threshold = v;
+      i++;
+    }
   }
   return args;
 }
@@ -80,7 +110,7 @@ function walkMcpServers(pluginJson, fn) {
   }
 }
 
-function getNpmLatest(pkg) {
+function getNpmLatest(pkg, verbose = false) {
   // Reject names that do not match the npm allowlist — prevents the name
   // becoming a shell-injection vector if a plugin.json or package.json is
   // ever crafted maliciously. execFileSync below avoids shell parsing, but
@@ -93,7 +123,15 @@ function getNpmLatest(pkg) {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     return out || null;
-  } catch {
+  } catch (e) {
+    // Under --verbose, surface the underlying failure (network error,
+    // npm-not-installed, registry 404) so CI logs explain why "npm lookup
+    // failed" appeared. Without --verbose, stay quiet to match the
+    // historical caller expectation that null means "no drift info".
+    if (verbose) {
+      const msg = e && e.message ? e.message : String(e);
+      console.error(`check-upstream-pins: npm view "${pkg}" failed: ${msg}`);
+    }
     return null;
   }
 }
@@ -168,7 +206,7 @@ function main() {
   let maxDrift = 0;
   console.log('-- npm pins --');
   for (const pin of report.npm) {
-    const latest = getNpmLatest(pin.name);
+    const latest = getNpmLatest(pin.name, args.verbose);
     if (!latest) {
       console.log(`  ${pin.plugin} / ${pin.serverName} :: ${pin.name}@${pin.version} -> (npm lookup failed)`);
       continue;

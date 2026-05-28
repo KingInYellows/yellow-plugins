@@ -28,7 +28,7 @@
       "type": "string",
       "title": "Devin organization ID",
       "description": "Devin organization ID. Find at Devin Enterprise Settings > Organizations.",
-      "sensitive": false
+      "sensitive": true
     }
   },
   "mcpServers": {

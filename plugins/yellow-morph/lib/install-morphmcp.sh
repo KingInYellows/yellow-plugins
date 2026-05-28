@@ -24,6 +24,26 @@ yellow_morph_validate_paths() {
     printf 'yellow-morph: CLAUDE_PLUGIN_DATA unset\n' >&2
     return 1
   fi
+
+  # Canonicalize before the prefix-guard so a traversal-laced value like
+  # "$HOME/../../etc" resolves to "/etc" and trips the case-guard instead
+  # of passing the naive string-prefix match on "$HOME/*". Capability test
+  # (not `command -v realpath`) because BSD realpath on stock macOS lacks
+  # the `-m` flag — `command -v` would falsely advertise a feature whose
+  # call then errors and silently leaves the raw value in place. With the
+  # capability test, fail-open posture preserves current behaviour on
+  # macOS without GNU coreutils; on Linux/WSL2/Homebrew-coreutils macOS
+  # the canonicalization runs and the export propagates the resolved
+  # paths to callers (start-morph.sh, prewarm hook, setup.md).
+  local canonical
+  if canonical=$(realpath -m -- "$CLAUDE_PLUGIN_ROOT" 2>/dev/null); then
+    CLAUDE_PLUGIN_ROOT="$canonical"
+  fi
+  if canonical=$(realpath -m -- "$CLAUDE_PLUGIN_DATA" 2>/dev/null); then
+    CLAUDE_PLUGIN_DATA="$canonical"
+  fi
+  export CLAUDE_PLUGIN_ROOT CLAUDE_PLUGIN_DATA
+
   case "$CLAUDE_PLUGIN_DATA" in
     "${HOME:-/__unset__}"/*|/tmp/*) ;;
     *)
