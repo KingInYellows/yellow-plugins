@@ -605,7 +605,7 @@ No new packages. `gh`, `git`, and `gt` are already required by the repo.
 
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. agent/feat/validate-plans-pr-scoped (submitted 2026-05-28 — PR #556 https://github.com/KingInYellows/yellow-plugins/pull/556)
-- [ ] 2. agent/feat/plan-commands
+- [x] 2. agent/feat/plan-commands (submitted 2026-05-28 — PR #557 https://github.com/KingInYellows/yellow-plugins/pull/557)
 
 ## References
 
