@@ -30,7 +30,7 @@ printf '%-60s %s\n' 'File' 'Progress'
 printf '%-60s %s\n' '----' '--------'
 for f in plans/*.md; do
   [ -f "$f" ] || continue
-  checked=$(grep -cE '^[[:space:]]*- \[x\]' "$f" 2>/dev/null || true)
+  checked=$(grep -ciE '^[[:space:]]*- \[x\]' "$f" 2>/dev/null || true)
   unchecked=$(grep -cE '^[[:space:]]*- \[ \]' "$f" 2>/dev/null || true)
   : "${checked:=0}"
   : "${unchecked:=0}"
@@ -66,7 +66,7 @@ printf '%-60s %s\n' 'File' 'Progress'
 printf '%-60s %s\n' '----' '--------'
 for f in plans/complete/*.md; do
   [ -f "$f" ] || continue
-  checked=$(grep -cE '^[[:space:]]*- \[x\]' "$f" 2>/dev/null || true)
+  checked=$(grep -ciE '^[[:space:]]*- \[x\]' "$f" 2>/dev/null || true)
   unchecked=$(grep -cE '^[[:space:]]*- \[ \]' "$f" 2>/dev/null || true)
   : "${checked:=0}"
   : "${unchecked:=0}"

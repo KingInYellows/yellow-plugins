@@ -47,6 +47,12 @@ command -v gh >/dev/null 2>&1 || { printf '[plan:complete] error: gh not install
 command -v gt >/dev/null 2>&1 || { printf '[plan:complete] error: gt not installed\n' >&2; exit 1; }
 command -v jq >/dev/null 2>&1 || { printf '[plan:complete] error: jq not installed\n' >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { printf '[plan:complete] error: gh not authenticated (run: gh auth login)\n' >&2; exit 1; }
+# Clear any stale state from a prior aborted run. Without this, a previous
+# run that wrote .git/tmp/plan-complete.override then cancelled at Phase 5
+# would leave the file behind, and the NEXT run for a different plan would
+# stamp that stale PR number into its commit trailer (review finding,
+# correctness + adversarial).
+rm -f .git/tmp/plan-complete.count .git/tmp/plan-complete.merged.json .git/tmp/plan-complete.override
 ```
 
 ## Phase 1: Filename validation + slug derivation
@@ -58,7 +64,7 @@ in bash code blocks". The block below derives both `CLEAN_ARG` and
 
 ```bash
 set -euo pipefail
-ARG='#$ARGUMENTS'
+ARG="$ARGUMENTS"
 if [ -z "$ARG" ]; then
   printf '[plan:complete] error: missing plan filename argument\n' >&2
   exit 1
@@ -87,7 +93,7 @@ printf '[plan:complete] arg=%s slug=%s\n' "$CLEAN_ARG" "$SLUG"
 
 ```bash
 set -euo pipefail
-ARG='#$ARGUMENTS'
+ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 if [ -f "plans/complete/$CLEAN_ARG" ]; then
   printf '[plan:complete] already archived: plans/complete/%s exists. Nothing to do.\n' "$CLEAN_ARG" >&2
@@ -99,6 +105,10 @@ if [ ! -f "plans/$CLEAN_ARG" ]; then
 fi
 ```
 
+**If the bash block above exited 0 with an "already archived" message,
+stop the workflow — do not proceed to Phase 3.** (The early `exit 0` ends
+the subprocess but not your turn; this instruction ends the turn.)
+
 ## Phase 3: Gate A — unchecked-box scan
 
 The same mechanical check applied by `scripts/validate-plans.js` on
@@ -107,7 +117,7 @@ before any branch is created.
 
 ```bash
 set -euo pipefail
-ARG='#$ARGUMENTS'
+ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 UNCHECKED=$(grep -cE '^[[:space:]]*- \[ \]' "plans/$CLEAN_ARG" 2>/dev/null || true)
 : "${UNCHECKED:=0}"
@@ -132,16 +142,26 @@ which enforces a word boundary (`^|$|/|_|-`) around `$SLUG`.
 
 ```bash
 set -euo pipefail
-ARG='#$ARGUMENTS'
+ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
+# Capture stderr (not /dev/null) so an auth/network failure is surfaced
+# rather than silently collapsing to "no PR found" → spurious override
+# prompt (review finding, pattern-recognition P1). A genuine empty result
+# is `[]` with exit 0; a real failure prints to GH_ERR and we warn.
+GH_ERR=$(mktemp)
 # shellcheck disable=SC2016
 MERGED=$(gh pr list \
   --search "in:title \"$SLUG\"" \
   --state merged \
   --limit 100 \
   --json number,title,headRefName,url \
-  --jq '[.[] | select(.headRefName | test("(^|[/_-])'"$SLUG"'($|[/_-])"))]' 2>/dev/null) || MERGED='[]'
+  --jq '[.[] | select(.headRefName | test("(^|[/_-])'"$SLUG"'($|[/_-])"))]' 2>"$GH_ERR") || {
+  printf '[plan:complete] WARNING: gh pr list failed (auth/network?): %s\n' "$(cat "$GH_ERR")" >&2
+  printf '[plan:complete] Treating as no-evidence; you will be prompted to confirm or cancel.\n' >&2
+  MERGED='[]'
+}
+rm -f "$GH_ERR"
 COUNT=$(printf '%s' "$MERGED" | jq 'length' 2>/dev/null || printf '0')
 printf '[plan:complete] Gate C: %d merged PR(s) match slug %s with word boundary\n' "$COUNT" "$SLUG"
 if [ "$COUNT" -ge 1 ]; then
@@ -153,6 +173,9 @@ mkdir -p .git/tmp
 printf '%s\n' "$COUNT" > .git/tmp/plan-complete.count
 printf '%s\n' "$MERGED" > .git/tmp/plan-complete.merged.json
 ```
+
+**If `COUNT >= 1` (Gate C PASS): skip the AskUserQuestion below entirely
+and proceed directly to Phase 5.** Only when `COUNT == 0` do you prompt.
 
 If `COUNT == 0`, prompt the user via `AskUserQuestion` with the
 following options. **The label of the free-text option MUST be the
@@ -177,12 +200,18 @@ If the user picks `Cancel`, **stop the workflow** — do not proceed to
 the next phase.
 
 If the user enters a PR number via `Other`, persist it for the commit
-trailer in Phase 7:
+trailer in Phase 7. **Substitute `<USER_RESPONSE_FROM_OTHER>` in the
+block below with the exact text the user typed in the AskUserQuestion
+"Other" input field** — do not run the block with the literal
+placeholder.
 
 ```bash
 set -euo pipefail
 # Validate the user-provided PR number is a bare positive integer.
-PR_NUM='<USER_RESPONSE_FROM_OTHER>'
+# Strip CR/LF first so a multi-line paste cannot smuggle extra content
+# past the per-line grep into the commit trailer (review finding,
+# security P2 — trailer injection).
+PR_NUM=$(printf '%s' '<USER_RESPONSE_FROM_OTHER>' | tr -d '\r\n')
 if ! printf '%s' "$PR_NUM" | grep -qE '^[1-9][0-9]{0,9}$'; then
   printf '[plan:complete] error: invalid PR number override %s\n' "$PR_NUM" >&2
   exit 1
@@ -198,35 +227,48 @@ unrelated WIP to preserve. AskUserQuestion confirms before proceeding.
 
 ```bash
 set -euo pipefail
-if [ -n "$(git status --porcelain)" ]; then
-  printf '[plan:complete] working tree is not clean. Uncommitted changes will be carried into the archival branch.\n' >&2
-  git status --short
-  printf '\n'
+PORCELAIN=$(git status --porcelain)
+if [ -n "$PORCELAIN" ]; then
+  printf '[plan:complete] DIRTY_TREE=1\n'
+  printf '%s\n' "$PORCELAIN"
+  # Tracked, modified files (index or worktree M/A/D/R in the first two
+  # columns, excluding untracked '??') will make the `git checkout main`
+  # in Phase 6 fail under `set -e`. Warn specifically so the user can
+  # stash rather than picking Proceed and stranding the run mid-checkout.
+  if printf '%s\n' "$PORCELAIN" | grep -qE '^[ MADRC]'; then
+    printf '[plan:complete] NOTE: tracked changes present — git checkout main in Phase 6 may refuse. Consider stashing before Proceed.\n' >&2
+  fi
+else
+  printf '[plan:complete] DIRTY_TREE=0\n'
 fi
 ```
 
-If the working tree was non-empty, **ask via AskUserQuestion**:
+**If the block printed `DIRTY_TREE=0`, skip the AskUserQuestion below and
+proceed directly to Phase 6.** Only when it printed `DIRTY_TREE=1` do you
+prompt via `AskUserQuestion`:
 
 - Question: `Working tree has uncommitted changes. Proceed with
   archival anyway?`
 - Header: `Dirty tree`
 - Options:
   - Label: `Proceed` — Description: `Carry the WIP into the archival
-    branch. You can resolve conflicts later.`
+    branch. If a NOTE about tracked changes appeared, stash first — the
+    checkout in Phase 6 will refuse otherwise.`
   - Label: `Cancel` — Description: `Stop. Commit or stash the WIP
     first.`
 
-If `Cancel`, stop.
+If `Cancel`, **stop the workflow** — do not proceed to Phase 6.
 
 ## Phase 6: Sync trunk + create archival branch
 
 ```bash
 set -euo pipefail
-ARG='#$ARGUMENTS'
+ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
 git checkout main
-gt repo sync 2>/dev/null || gt sync 2>/dev/null || true
+gt repo sync 2>/dev/null || gt sync 2>/dev/null || \
+  printf '[plan:complete] WARNING: gt sync failed; proceeding on possibly-stale trunk\n' >&2
 gt create "plan/archive-$SLUG"
 mkdir -p plans/complete
 # git mv (not bare mv): records the rename in the index immediately
@@ -246,7 +288,7 @@ commit on the current branch via `gt submit` in Phase 8.
 
 ```bash
 set -euo pipefail
-ARG='#$ARGUMENTS'
+ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
 COUNT=$(cat .git/tmp/plan-complete.count 2>/dev/null || printf '0')
