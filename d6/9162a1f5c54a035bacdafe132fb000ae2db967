@@ -1,0 +1,42 @@
+tests/integration/install-morphmcp.test.ts
+  s_24fefc22b8f330::t_ba408e61cdf9bd 21
+  s_24fefc22b8f330::t_00549964565f67 1-20,23-154,165-167,169-173,175-177
+  s_24fefc22b8f330::t_0351b6a42479a1 22
+  s_24fefc22b8f330::t_d9a28017392764 155-164,168,174
+plugins/yellow-devin/.claude-plugin/plugin.json
+  s_24fefc22b8f330::t_6ec83e7899ecce 31
+scripts/check-upstream-pins.js
+  s_24fefc22b8f330::t_7c46ef7d2893b8 113,126-134
+  s_24fefc22b8f330::t_c10dfd83da78ae 13-19
+  s_24fefc22b8f330::t_a436d0590fb8bc 33-42,46,50-68
+  s_24fefc22b8f330::t_8b42f9c228efba 209
+plugins/yellow-morph/lib/install-morphmcp.sh
+  s_24fefc22b8f330::t_8ad7020bcf0a2b 27-46
+plugins/yellow-morph/commands/morph/setup.md
+  s_24fefc22b8f330::t_6ef808b85449ee 89-94
+  s_24fefc22b8f330::t_3f3bdadd624d35 119-122
+tests/integration/check-upstream-pins.test.ts
+  s_24fefc22b8f330::t_dc89ebb6bb4c19 1-22,24-49,66-170
+  s_24fefc22b8f330::t_6cee490eec27a3 23
+  s_24fefc22b8f330::t_3efa9b59726df4 50-65
+.changeset/yellow-devin-org-id-sensitive.md
+  s_24fefc22b8f330::t_694f790ce61603 1-21
+.changeset/yellow-morph-setup-parity-canonicalize.md
+  s_24fefc22b8f330::t_5a52fc8d81d44e 1-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "d69162a1f5c54a035bacdafe132fb000ae2db967",
+  "prompts": {},
+  "sessions": {
+    "s_24fefc22b8f330": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4d7f3a3f-d51b-484a-b15c-444c1914e3dd",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
