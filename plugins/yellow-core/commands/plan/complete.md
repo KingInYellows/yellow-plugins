@@ -25,8 +25,8 @@ Archives a single open plan from `plans/<arg>.md` to
 
 This command does NOT delete the source file or push directly to main —
 it creates an archival branch (`plan/archive-<slug>`), records the
-rename via `git mv`, commits, and submits via `gt stack submit`. Review
-and merge land via the normal PR flow.
+rename via `git mv`, commits, and submits via `gt submit --no-interactive`.
+Review and merge land via the normal PR flow.
 
 Sibling commands: `/plan:status` (read-only dashboard),
 `/workflows:plan` (creates plans). See `plugins/yellow-core/CLAUDE.md`
@@ -48,11 +48,11 @@ command -v gt >/dev/null 2>&1 || { printf '[plan:complete] error: gt not install
 command -v jq >/dev/null 2>&1 || { printf '[plan:complete] error: jq not installed\n' >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { printf '[plan:complete] error: gh not authenticated (run: gh auth login)\n' >&2; exit 1; }
 # Clear any stale state from a prior aborted run. Without this, a previous
-# run that wrote .git/tmp/plan-complete.override then cancelled at Phase 5
-# would leave the file behind, and the NEXT run for a different plan would
-# stamp that stale PR number into its commit trailer (review finding,
-# correctness + adversarial).
-rm -f .git/tmp/plan-complete.count .git/tmp/plan-complete.merged.json .git/tmp/plan-complete.override
+# run that wrote .git/tmp/plan-complete.override in Phase 4 then cancelled at
+# the Phase 5 dirty-tree prompt would leave the file behind, and the NEXT run
+# for a different plan would stamp that stale PR number into its commit
+# trailer (review finding, correctness + adversarial).
+rm -f .git/tmp/plan-complete.count .git/tmp/plan-complete.override
 ```
 
 ## Phase 1: Filename validation + slug derivation
@@ -168,10 +168,10 @@ if [ "$COUNT" -ge 1 ]; then
   printf '%s\n' "$MERGED" | jq -r '.[] | "  #\(.number) — \(.title)\n    \(.url)"'
 fi
 # Store COUNT for the next step. Persist via temp file because the next
-# Bash block is a fresh subprocess.
+# Bash block is a fresh subprocess. (The matched-PR list is already shown
+# inline above; only COUNT is consumed downstream in Phase 7.)
 mkdir -p .git/tmp
 printf '%s\n' "$COUNT" > .git/tmp/plan-complete.count
-printf '%s\n' "$MERGED" > .git/tmp/plan-complete.merged.json
 ```
 
 **If `COUNT >= 1` (Gate C PASS): skip the AskUserQuestion below entirely
@@ -208,10 +208,17 @@ placeholder.
 ```bash
 set -euo pipefail
 # Validate the user-provided PR number is a bare positive integer.
-# Strip CR/LF first so a multi-line paste cannot smuggle extra content
-# past the per-line grep into the commit trailer (review finding,
-# security P2 — trailer injection).
-PR_NUM=$(printf '%s' '<USER_RESPONSE_FROM_OTHER>' | tr -d '\r\n')
+# Read the user's typed value through a QUOTED heredoc so no shell
+# metacharacter in the input (e.g. a stray quote or `$`) can break out
+# of the substitution before validation runs — this is the canonical
+# "free text into shell" pattern (MEMORY.md "Heredoc for user-supplied
+# free text"). The collision-resistant delimiter avoids premature close.
+# tr -d strips CR/LF so a multi-line paste cannot smuggle extra content
+# past the grep into the commit trailer (trailer injection).
+PR_NUM=$(tr -d '\r\n' <<'__EOF_PR_OVERRIDE__'
+<USER_RESPONSE_FROM_OTHER>
+__EOF_PR_OVERRIDE__
+)
 if ! printf '%s' "$PR_NUM" | grep -qE '^[1-9][0-9]{0,9}$'; then
   printf '[plan:complete] error: invalid PR number override %s\n' "$PR_NUM" >&2
   exit 1
@@ -303,7 +310,7 @@ else
 fi
 git commit -m "$SUBJECT" -m "$BODY"
 # Clean up temp files.
-rm -f .git/tmp/plan-complete.count .git/tmp/plan-complete.merged.json .git/tmp/plan-complete.override
+rm -f .git/tmp/plan-complete.count .git/tmp/plan-complete.override
 ```
 
 The `Plan-Verifier-Override:` trailer is grep-discoverable via

@@ -104,7 +104,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   `AskUserQuestion` "Other" label for a PR-number override; the
   decision is captured in a `Plan-Verifier-Override:` commit trailer.
   Archival branch is `plan/archive-<slug>`; submitted via
-  `gt stack submit --no-interactive`. The companion PR-diff-scoped
+  `gt submit --no-interactive`. The companion PR-diff-scoped
   validator `scripts/validate-plans.js` enforces the same
   no-stray-checkbox rule on archived files in CI
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health

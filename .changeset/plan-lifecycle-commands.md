@@ -27,7 +27,7 @@ in `plugins/yellow-core/CLAUDE.md`).
     `Other` (free-text) option for a PR-number override; the decision
     is recorded as a `Plan-Verifier-Override:` commit trailer.
   - Archival branch is `plan/archive-<slug>`; the rename is staged via
-    `git mv` and submitted with `gt stack submit --no-interactive`.
+    `git mv` and submitted with `gt submit --no-interactive`.
 
 Companion (already shipped in the bottom of the stack — PR #556):
 
