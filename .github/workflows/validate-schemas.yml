@@ -13,6 +13,7 @@ on:
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
       - 'docs/solutions/**'
+      - 'plans/**'
       - '.github/workflows/validate-schemas.yml'
   push:
     branches:
@@ -63,6 +64,7 @@ jobs:
           - examples
           - solutions
           - authoring
+          - plans
 
     steps:
       - name: Checkout repository
@@ -96,6 +98,7 @@ jobs:
       - name: Run schema validations
         env:
           VALIDATE_SOLUTIONS_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/main' }}
+          PLAN_VALIDATOR_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || 'origin/main' }}
         run: |
           set -euo pipefail
           mkdir -p .ci-logs
@@ -224,6 +227,15 @@ jobs:
 
                 echo "::group::Install-snippet drift"
                 node scripts/sync-shell-snippets.js --check
+                echo "::endgroup::"
+                ;;
+              plans)
+                # Diff-scoped stray-checkbox validator for plans/complete/
+                # entries. Blocks PRs that archive a plan with an unchecked
+                # task box (`- [ ]`), catching premature archival. See
+                # plans/plan-lifecycle-management.md.
+                echo "::group::Plan-archival validation"
+                node scripts/validate-plans.js
                 echo "::endgroup::"
                 ;;
               *)
