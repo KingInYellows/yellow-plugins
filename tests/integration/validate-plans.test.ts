@@ -199,6 +199,20 @@ describe('validate-plans — rename routing (R-record)', () => {
     expect(stdout + stderr).toMatch(/ERROR-PLAN-001/);
     expect(stdout + stderr).toMatch(/archived-dirty\.md/);
   });
+
+  it('FAIL: copy (C-record) into plans/complete/ with stray boxes is scanned like a rename', () => {
+    // `git config diff.renames=copies` emits C<score> records. The
+    // destination is a real archival path and must be gated the same as R.
+    writePlan(tmpRoot, 'complete', 'archived-copy', dirtyBody);
+
+    const { status, stdout, stderr } = runScript(tmpRoot, {
+      diff: 'C100\tplans/source.md\tplans/complete/archived-copy.md',
+    });
+
+    expect(status).toBe(1);
+    expect(stdout + stderr).toMatch(/ERROR-PLAN-001/);
+    expect(stdout + stderr).toMatch(/archived-copy\.md/);
+  });
 });
 
 describe('validate-plans — soft-skip and edge cases', () => {
@@ -247,6 +261,35 @@ describe('validate-plans — soft-skip and edge cases', () => {
 
     expect(status).toBe(0);
     expect(stdout).toMatch(/no plans\/complete\/ changes in diff/);
+  });
+
+  it('PASS (ENOENT deletion race): diff lists a file absent from disk → exit 0, no error', () => {
+    // The diff says the file changed, but it is gone from the working tree
+    // (a later commit on the branch removed it). This is an expected race,
+    // not a failure.
+    const { status, stdout, stderr } = runScript(tmpRoot, {
+      diff: 'A\tplans/complete/never-existed.md',
+    });
+
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/checked 1 file\(s\); 0 error\(s\)/);
+    expect(stderr).not.toMatch(/could not read/);
+  });
+
+  it('FAIL (non-ENOENT read error): unreadable plan file exits 1 with a read error, not a silent pass', () => {
+    // Create a DIRECTORY where a .md file is expected. readFileSync on a
+    // directory throws EISDIR — a non-ENOENT error that signals the file
+    // should have been scanned but could not be. The validator must fail
+    // loudly (exit 1) rather than report a misleading clean run.
+    mkdirSync(join(tmpRoot, 'complete', 'is-a-dir.md'), { recursive: true });
+
+    const { status, stderr } = runScript(tmpRoot, {
+      diff: 'A\tplans/complete/is-a-dir.md',
+    });
+
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/could not read/);
+    expect(stderr).toMatch(/is-a-dir\.md/);
   });
 
   it('emits GHA annotation when GITHUB_ACTIONS=true', () => {

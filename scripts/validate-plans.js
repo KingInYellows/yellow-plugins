@@ -38,7 +38,11 @@
  *
  * Exit codes:
  *   0 - no validation errors (or soft-skip on unreachable BASE_REF)
- *   1 - one or more validation errors found
+ *   1 - one or more stray-checkbox findings, OR a hard infrastructure error
+ *       (git binary missing / corrupt index, or a plan file that could not
+ *       be read for a non-ENOENT reason). Infrastructure errors fail loudly
+ *       rather than soft-skipping so CI never reports green on a runner where
+ *       validation could not actually run.
  *
  * CI recipe: requires `actions/checkout@v4` with `fetch-depth: 0` (or an
  * explicit `git fetch origin <base-ref>`) so the diff base is reachable.
@@ -82,6 +86,13 @@ const PLAN_STRAY_CHECKBOX = PLAN + '-001';
 const CHECKBOX_RE = /^[ \t]*- \[ \]/;
 
 const errors = [];
+
+// Set when the validator could not read a file it was asked to inspect for a
+// reason other than an expected deletion race (ENOENT). Tracked separately
+// from `errors` (which holds the stray-checkbox findings) so the
+// summary can distinguish "validated and found problems" from "could not
+// validate". Either condition fails the run.
+let infraError = false;
 
 function emitError(file, line, code, msg) {
   errors.push({ file, line, code, msg });
@@ -153,10 +164,13 @@ function parseTabSeparatedDiff(raw) {
   return records;
 }
 
-// Returns array of {status: 'A'|'M', relPath} entries within plans/complete/,
-// or null when the diff base is unreachable. Rename entries are normalized
-// to 'A' on the new path so an archival rename (plans/foo.md →
-// plans/complete/foo.md) receives the same checkbox scan as a direct add.
+// Returns array of {status: 'A'|'M', path} entries within plans/complete/,
+// or null when the diff base is unreachable (soft-skip). On a hard git error
+// (binary missing, EACCES on .git/, corrupt index) the function exits 1
+// directly rather than returning — see the catch block. Rename/copy entries
+// are normalized to 'A' on the new path so an archival move
+// (plans/foo.md → plans/complete/foo.md) receives the same checkbox scan as
+// a direct add.
 function getChangedFiles() {
   const injected = process.env.PLAN_VALIDATOR_DIFF;
   let records;
@@ -180,18 +194,26 @@ function getChangedFiles() {
         { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
       );
     } catch (err) {
-      // Soft-skip for unreachable refs (fork PR, shallow clone). For other
-      // errors, surface a stderr warning so the soft-skip is distinguishable
-      // from a runner misconfiguration.
+      // Distinguish two failure modes:
+      //   - Unreachable ref (fork PR, shallow clone): a no-op condition.
+      //     Return null → main() emits a notice and exits 0 (soft-skip).
+      //   - Hard error (git binary missing, EACCES on .git/, corrupt index):
+      //     the validator should have run but couldn't. Fail loudly with
+      //     exit 1 so CI does not report green on a misconfigured runner.
       const stderr = err.stderr ? err.stderr.toString() : '';
       const looksUnreachable =
         /unknown revision|bad revision|does not have a commit|fatal: ambiguous argument/i.test(
           stderr
         );
       if (!looksUnreachable) {
-        process.stderr.write(
-          `[validate-plans] warn: git diff failed (${err.code || 'unknown'}): ${stderr.trim()}\n`
-        );
+        const msg =
+          `git diff failed (${err.code || 'unknown'}): ${stderr.trim()}`;
+        if (IS_CI) {
+          console.log(`::error::[validate-plans] ${msg}`);
+        } else {
+          process.stderr.write(`[validate-plans] error: ${msg}\n`);
+        }
+        process.exit(1);
       }
       return null;
     }
@@ -205,8 +227,11 @@ function getChangedFiles() {
     if (statusChar === 'A' || statusChar === 'M') {
       relPath = rec.path;
       normalizedStatus = statusChar;
-    } else if (statusChar === 'R') {
-      // Rename: treat new path as added (we check the destination contents).
+    } else if (statusChar === 'R' || statusChar === 'C') {
+      // Rename/copy: scan the destination contents. A copy into
+      // plans/complete/ is a real archival path under
+      // `git config diff.renames=copies`, so it must be gated the same as
+      // a rename. Both carry newPath from the parsers above.
       relPath = rec.newPath;
       normalizedStatus = 'A';
     } else {
@@ -241,12 +266,18 @@ function scanFileForStrayCheckboxes(absPath, relPath) {
     text = fs.readFileSync(absPath, 'utf8');
   } catch (err) {
     // ENOENT is an expected deletion race (the diff says it changed; a later
-    // commit on the branch may have removed it). Other error codes
-    // (EACCES, EMFILE) signal runner misconfiguration.
+    // commit on the branch may have removed it) — silently skip. Other error
+    // codes (EACCES, EMFILE, EISDIR) signal runner misconfiguration: the file
+    // SHOULD have been scanned but couldn't be. Flag it so main() exits 1
+    // rather than reporting a misleading green run.
     if (err.code !== 'ENOENT') {
-      process.stderr.write(
-        `[validate-plans] warn: could not read ${absPath}: ${err.code || err.message}\n`
-      );
+      infraError = true;
+      const msg = `could not read ${relPath}: ${err.code || err.message}`;
+      if (IS_CI) {
+        console.log(`::error file=${relPath}::[validate-plans] ${msg}`);
+      } else {
+        process.stderr.write(`[validate-plans] error: ${msg}\n`);
+      }
     }
     return;
   }
@@ -287,11 +318,12 @@ function main() {
     scanFileForStrayCheckboxes(fullPath, entry.path);
   }
 
-  console.log(
+  const summary =
     `\n[validate-plans] checked ${changed.length} file(s); ` +
-      `${errors.length} error(s)`
-  );
-  process.exit(errors.length > 0 ? 1 : 0);
+    `${errors.length} error(s)` +
+    (infraError ? '; 1+ file(s) could not be read (see errors above)' : '');
+  console.log(summary);
+  process.exit(errors.length > 0 || infraError ? 1 : 0);
 }
 
 main();
