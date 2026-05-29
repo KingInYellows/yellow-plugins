@@ -172,3 +172,89 @@ describe('semverRange custom keyword (PR-B)', () => {
     expect(factory.validate('semver-test', { version: '' }).valid).toBe(false);
   });
 });
+
+describe('plugin.schema.json tightening (PR #559) — negative cases', () => {
+  let factory: AjvValidatorFactory;
+  // Minimal known-valid plugin manifest, read from the committed example so
+  // a future required-field change does not silently invalidate this base.
+  let base: Record<string, unknown>;
+
+  beforeAll(async () => {
+    factory = new AjvValidatorFactory();
+    await factory.loadSchemaFromFile(
+      'plugin',
+      join(SCHEMAS_DIR, 'plugin.schema.json')
+    );
+    base = JSON.parse(
+      readFileSync(join(EXAMPLES_DIR, 'plugin-minimal.example.json'), 'utf8')
+    );
+  });
+
+  it('accepts string repository (the only form the remote validator allows)', () => {
+    const d = { ...base, repository: 'https://github.com/x/y.git' };
+    expect(factory.validate('plugin', d).valid).toBe(true);
+  });
+
+  it('rejects object (npm-style) repository — remote validator rejects it', () => {
+    const d = {
+      ...base,
+      repository: { type: 'git', url: 'https://github.com/x/y.git' },
+    };
+    expect(factory.validate('plugin', d).valid).toBe(false);
+  });
+
+  it('accepts inline-object hooks keyed by event name', () => {
+    const d = {
+      ...base,
+      hooks: {
+        PostToolUse: [{ matcher: '*', hooks: [{ type: 'command', command: 'x' }] }],
+      },
+    };
+    expect(factory.validate('plugin', d).valid).toBe(true);
+  });
+
+  it('accepts an array of inline hook objects', () => {
+    const d = { ...base, hooks: [{ PostToolUse: [] }] };
+    expect(factory.validate('plugin', d).valid).toBe(true);
+  });
+
+  it('rejects string (file-path) hooks — remote validator rejects indirection', () => {
+    const d = { ...base, hooks: './hooks/hooks.json' };
+    expect(factory.validate('plugin', d).valid).toBe(false);
+  });
+});
+
+describe('official-marketplace.schema.json additionalProperties:false (PR #559)', () => {
+  let factory: AjvValidatorFactory;
+  let liveMarketplace: Record<string, unknown>;
+
+  beforeAll(async () => {
+    factory = new AjvValidatorFactory();
+    await factory.loadSchemaFromFile(
+      'marketplace-official',
+      join(SCHEMAS_DIR, 'official-marketplace.schema.json')
+    );
+    liveMarketplace = JSON.parse(
+      readFileSync(
+        join(REPO_ROOT, '.claude-plugin', 'marketplace.json'),
+        'utf8'
+      )
+    );
+  });
+
+  it('accepts the live .claude-plugin/marketplace.json', () => {
+    const result = factory.validate('marketplace-official', liveMarketplace);
+    if (!result.valid) {
+      const detail = result.errors
+        .map((e) => `  ${e.path || '/'}: ${e.message} (${e.keyword})`)
+        .join('\n');
+      throw new Error(`live marketplace.json failed schema:\n${detail}`);
+    }
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects an unknown top-level key (e.g. changelog) the remote validator also rejects', () => {
+    const d = { ...liveMarketplace, changelog: 'https://example.com/CHANGELOG' };
+    expect(factory.validate('marketplace-official', d).valid).toBe(false);
+  });
+});

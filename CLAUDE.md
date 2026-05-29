@@ -104,8 +104,12 @@ validators in `scripts/`:
 local schemas. The Claude Code remote validator can diverge — local CI
 passing does NOT guarantee install acceptance. Always test on a clean
 Claude Code install before publishing breaking schema changes.
-`schemas/official-marketplace.schema.json` is mirrored from upstream for
-reference only.
+`schemas/official-marketplace.schema.json` is mirrored from upstream but is
+also an active CI gate — `validate-schemas.yml` validates
+`.claude-plugin/marketplace.json` and `examples/marketplace.example.json`
+against it. It intentionally diverges from upstream by adding
+`additionalProperties: false` at the root to reject unknown top-level keys
+the remote validator also rejects; preserve that constraint when re-syncing.
 
 ### Release flow (Changesets-driven)
 

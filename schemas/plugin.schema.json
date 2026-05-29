@@ -91,6 +91,17 @@
         },
         { "type": "object", "minProperties": 1 }
       ]
+    },
+    "inlineHooks": {
+      "description": "Inline hooks only. Claude Code's remote validator rejects file-path indirection (e.g. \"hooks\": \"./hooks/hooks.json\") with 'hooks: Invalid input'; hooks must be an inline object keyed by event name (PreToolUse, PostToolUse, Stop, ...) or an array of such inline objects. See docs/solutions/build-errors/claude-code-plugin-manifest-validation-errors.md and ci-schema-drift-hooks-inline-vs-string.md.",
+      "oneOf": [
+        { "type": "object", "minProperties": 1 },
+        {
+          "type": "array",
+          "items": { "type": "object", "minProperties": 1 },
+          "minItems": 1
+        }
+      ]
     }
   },
   "properties": {
@@ -157,28 +168,9 @@
       "description": "Plugin homepage URL."
     },
     "repository": {
-      "oneOf": [
-        {
-          "type": "string",
-          "format": "uri"
-        },
-        {
-          "type": "object",
-          "required": ["type", "url"],
-          "properties": {
-            "type": {
-              "type": "string",
-              "enum": ["git"]
-            },
-            "url": {
-              "type": "string",
-              "format": "uri"
-            }
-          },
-          "additionalProperties": false
-        }
-      ],
-      "description": "Source repository (string URL or object with type and url)."
+      "type": "string",
+      "format": "uri",
+      "description": "Source repository URL (string only). Claude Code's remote validator rejects the npm-style object form ({\"type\":\"git\",\"url\":\"...\"}) with 'repository: Invalid input: expected string, received object'. See docs/solutions/build-errors/claude-code-plugin-manifest-validation-errors.md."
     },
     "keywords": {
       "type": "array",
@@ -197,8 +189,8 @@
       "allOf": [{ "$ref": "#/definitions/fileFilesOrInline" }]
     },
     "hooks": {
-      "description": "Hooks configuration: relative file path, array of paths/inline objects, or inline object keyed by event name (PreToolUse, PostToolUse, Stop, etc.).",
-      "allOf": [{ "$ref": "#/definitions/fileFilesOrInline" }]
+      "description": "Inline hooks configuration keyed by event name (PreToolUse, PostToolUse, Stop, etc.), or an array of inline hook objects. File-path indirection is NOT permitted — the remote validator rejects it.",
+      "allOf": [{ "$ref": "#/definitions/inlineHooks" }]
     },
     "outputStyles": {
       "description": "Directory or array of directories containing markdown output style files (replaces default ./output-styles/).",

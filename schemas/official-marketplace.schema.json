@@ -5,6 +5,8 @@
   "description": "Schema for .claude-plugin/marketplace.json as expected by Claude Code. This mirrors the official Anthropic format discovered from anthropics/claude-plugins-official, EveryInc/every-marketplace, and obra/superpowers-marketplace.",
   "type": "object",
   "required": ["name", "plugins"],
+  "$comment": "Mirrored from the upstream Claude Code marketplace schema, but intentionally diverges: this file is an active CI gate (validate-schemas.yml validates .claude-plugin/marketplace.json and examples against it), so 'additionalProperties: false' is added locally to reject unknown top-level keys (e.g. changelog, id) that the remote validator also rejects. Preserve this constraint when re-syncing from upstream. (CLAUDE.md's 'reference only' description of this file is stale — it gates CI.)",
+  "additionalProperties": false,
   "properties": {
     "$schema": {
       "type": "string",
