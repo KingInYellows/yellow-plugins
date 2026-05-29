@@ -1,0 +1,27 @@
+plugins/yellow-core/commands/plan/complete.md
+  s_1d7ebad06623ea::t_7e54bcf279c988 290-296
+  s_1d7ebad06623ea::t_0608c10f30f2f5 321-322,324-325,332-337,339
+  s_1d7ebad06623ea::t_7828a740f52b1f 78-86
+  s_1d7ebad06623ea::t_7391eb687b6e36 182-187
+  s_1d7ebad06623ea::t_f3a3199b229d3a 239-241
+  s_1d7ebad06623ea::t_46149fd6953d66 51-59
+plugins/yellow-core/tests/plan-commands.bats
+  s_1d7ebad06623ea::t_4cd4009e17e6a1 171-176
+  s_1d7ebad06623ea::t_f1d6bc77832749 25-27,29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "83210c0879f5c24b8b1c3c0e4da28c856bf5c565",
+  "prompts": {},
+  "sessions": {
+    "s_1d7ebad06623ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc70cc1c-2283-4107-9064-4fbf78bb603f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
