@@ -12,3 +12,8 @@ exclude_paths:
     - "plans/**"
     - "docs/brainstorms/**"
     - "RESEARCH/**"
+    # Changeset files are an ephemeral, fixed format: YAML frontmatter
+    # followed by a prose summary, never a top-level heading. markdownlint
+    # MD041 ("first line should be a top-level heading") is a structural
+    # false positive on every changeset. Consumed + deleted on release.
+    - ".changeset/**"
