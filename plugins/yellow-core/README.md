@@ -25,9 +25,12 @@ TypeScript, Python, Rust, and Go.
 | `/workflows:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |
 | `/workflows:compound`   | Document a recently solved problem to compound knowledge. Pass `--in-pr` while on a feature branch with an open PR to draft the doc + MEMORY.md line from the PR body and commits (the default pattern in CONTRIBUTING.md "Solution Docs") |
 | `/compound:review-staged` | Manually drain the background-compounding staging ledger (M3-gated) |
+| `/plan:status`          | Read-only dashboard of `plans/` (open) and `plans/complete/` (archived) with per-file checkbox progress |
+| `/plan:complete`        | Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies a same-named merged PR exists |
 | `/statusline:setup`     | Generate and install an adaptive statusline for plugins            |
 | `/setup:all`            | Run setup for all installed marketplace plugins with unified dashboard |
 | `/setup:claude-web`     | Audit a repository and scaffold files Claude Code Web needs (`.claude/settings.json`, `scripts/install_pkgs.sh`, `.gitattributes`, `.gitignore`, `.github/workflows/claude.yml`) |
+| `/worktree:cleanup`     | Scan git worktrees, classify by state, and remove stale worktrees with safeguards |
 
 ## Agents
 

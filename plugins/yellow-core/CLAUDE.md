@@ -71,7 +71,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   background-compounding plan); RULE 14 in
   `scripts/validate-agent-authoring.js` blocks any removal of this deny
 
-### Commands (10)
+### Commands (12)
 
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:plan` — transform feature descriptions into structured plans
@@ -91,6 +91,22 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/compound:review-staged` — manually drain the background-compounding
   staging ledger ahead of the SessionStart auto-drain threshold;
   AskUserQuestion M3 gate before any bulk write
+- `/plan:status` — read-only dashboard of `plans/` (open) and
+  `plans/complete/` (archived) with per-file checkbox progress; 100%
+  open plans annotated `-- ready to complete`. Sibling of
+  `/plan:complete` and `/workflows:plan` (see "Plan namespace split"
+  below)
+- `/plan:complete` — archive a single open plan with two safety gates:
+  Gate A scans for unchecked `- [ ]` boxes; Gate C queries GitHub for
+  a merged PR whose title and branch contain the slug derived from the
+  filename (server-side `--state merged` + `--jq` word-boundary
+  post-filter on `headRefName`). NO-EVIDENCE prompts the user via
+  `AskUserQuestion` "Other" label for a PR-number override; the
+  decision is captured in a `Plan-Verifier-Override:` commit trailer.
+  Archival branch is `plan/archive-<slug>`; submitted via
+  `gt submit --no-interactive`. The companion PR-diff-scoped
+  validator `scripts/validate-plans.js` enforces the same
+  no-stray-checkbox rule on archived files in CI
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/setup:claude-web` — audit a repository and scaffold the files Claude Code
@@ -252,6 +268,30 @@ detects this via `cs_detect_auth_route` and logs the chosen route to
 `drain-logs/`. Per-drain cost is observability-only under subscription
 auth (~5-20 short-message rate-limit equivalents per drain against the
 Max 20x 5h window); the API-route fork is ~$0.13-0.17/drain.
+
+## Plan Namespace Split
+
+The plugin uses two distinct namespaces for plan-related commands:
+
+- **`/workflows:*`** — end-to-end workflows that produce new artifacts.
+  `/workflows:plan` writes a new plan file from a feature description;
+  `/workflows:work` executes one. Plan creation lives here because it is
+  one of several artifact-producing workflows (alongside `brainstorm`,
+  `review`, `compound`).
+- **`/plan:*`** — lifecycle operations on existing plan artifacts.
+  `/plan:status` (read-only dashboard) and `/plan:complete` (archival
+  with Gate A + Gate C) are not general workflows; they operate
+  specifically on the corpus of `plans/*.md` files. Future authors
+  adding plan-related lifecycle commands should put them under
+  `/plan:*`.
+
+The PR-diff-scoped validator `scripts/validate-plans.js` (root-level)
+enforces no-stray-checkbox on archived files in PR diffs. It is wired
+as a 6th matrix target in `.github/workflows/validate-schemas.yml` (sibling
+to the marketplace/plugins/contracts/examples/solutions targets), not
+inside `validate:schemas` itself. The error code is `ERROR-PLAN-001`
+(catalog: `packages/domain/src/validation/errorCatalog.ts`, category
+`ErrorCategory.PLAN_LIFECYCLE`).
 
 ## Known Limitations
 
