@@ -20,11 +20,22 @@ on:
   push:
     branches:
       - main
+    # Mirror the validator-input globs from pull_request.paths so direct
+    # pushes/merges to main cannot bypass these checks. (.changeset/** is
+    # intentionally omitted — the changeset-check job is pull_request-only.)
     paths:
       - '.claude-plugin/marketplace.json'
       - 'plugins/**'
       - 'schemas/*.schema.json'
+      - 'scripts/validate-*.js'
+      - 'scripts/lint-error-codes.js'
+      - 'scripts/sync-shell-snippets.js'
+      - 'scripts/snippets/**'
+      - 'scripts/lib/**'
       - 'api/cli-contracts/*.json'
+      - 'packages/**/*.ts'
+      - 'docs/solutions/**'
+      - '.github/workflows/validate-schemas.yml'
   workflow_dispatch:
 
 # Cancel stale workflow runs
