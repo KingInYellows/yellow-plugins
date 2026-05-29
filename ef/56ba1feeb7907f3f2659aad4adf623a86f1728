@@ -1,0 +1,25 @@
+.github/workflows/validate-schemas.yml
+  s_11679bcd4aae34::t_d771b0ff0c9a63 12-15
+  s_11679bcd4aae34::t_2c26b36e8b9b1a 60
+  s_11679bcd4aae34::t_5cd8b8a594c267 201-223
+.github/workflows/validate-schemas-fork.yml
+  s_11679bcd4aae34::t_f87f9fd916315b 141-150
+  s_11679bcd4aae34::t_01622042e80369 14-17
+  s_11679bcd4aae34::t_8a2008409f4110 49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ef56ba1feeb7907f3f2659aad4adf623a86f1728",
+  "prompts": {},
+  "sessions": {
+    "s_11679bcd4aae34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3271bdc0-a9b0-4216-997d-929f94e40ef5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
