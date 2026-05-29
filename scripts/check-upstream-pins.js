@@ -117,19 +117,33 @@ function getNpmLatest(pkg, verbose = false) {
   // belt-and-suspenders is cheap here.
   if (typeof pkg !== 'string' || !NPM_NAME_OK.test(pkg)) return null;
   try {
-    const out = execFileSync('npm', ['view', pkg, 'version', '--silent'], {
+    // Capture stderr (third slot 'pipe', not 'ignore') so a failing lookup's
+    // error text reaches the catch below. `--silent` is deliberately omitted:
+    // it suppresses npm's E404/network error output entirely (verified
+    // against npm 11 — silent yields empty stderr), which would defeat the
+    // --verbose failure-surfacing. `npm view <pkg> version` prints only the
+    // version to stdout regardless of loglevel, so the success path stays
+    // clean.
+    const out = execFileSync('npm', ['view', pkg, 'version'], {
       encoding: 'utf8',
       timeout: 10000,
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
     return out || null;
   } catch (e) {
     // Under --verbose, surface the underlying failure (network error,
     // npm-not-installed, registry 404) so CI logs explain why "npm lookup
-    // failed" appeared. Without --verbose, stay quiet to match the
-    // historical caller expectation that null means "no drift info".
+    // failed" appeared. Prefer e.stderr (the real npm error, e.g. "code
+    // E404") over the generic "Command failed" carried in e.message. Without
+    // --verbose, stay quiet to match the historical caller expectation that
+    // null means "no drift info".
     if (verbose) {
-      const msg = e && e.message ? e.message : String(e);
+      const msg =
+        e && e.stderr
+          ? String(e.stderr).trim()
+          : e && e.message
+            ? e.message
+            : String(e);
       console.error(`check-upstream-pins: npm view "${pkg}" failed: ${msg}`);
     }
     return null;

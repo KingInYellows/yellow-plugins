@@ -137,6 +137,11 @@ describe('check-upstream-pins.js — CLI hardening (#267)', () => {
     // and stderr should — under --verbose — include the npm error reason.
     expect(result.stdout).toContain('npm lookup failed');
     expect(result.stderr).toContain('npm view');
+    // Assert the ACTUAL npm registry error detail surfaces, not just the
+    // script's own prefix. This guards the regression where stderr was
+    // discarded (stdio 'ignore') / suppressed (--silent) and only a generic
+    // "Command failed" reached --verbose output.
+    expect(result.stderr).toMatch(/404|E404|not found/i);
   });
 
   it('uppercase package names are rejected by NPM_NAME_OK before getNpmLatest runs', () => {
