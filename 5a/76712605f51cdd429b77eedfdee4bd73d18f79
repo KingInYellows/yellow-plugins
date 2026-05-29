@@ -1,0 +1,33 @@
+docs/upstream-pins.md
+  s_f767bca7d385eb::t_80081233a35952 27
+pnpm-lock.yaml
+  ai_agent 145-146,974-975,980,1003-1004
+plugins/yellow-research/commands/research/setup.md
+  s_f767bca7d385eb::t_6d847ea4378708 599
+.changeset/research-morphmcp-tool-note.md
+  s_f767bca7d385eb::t_57dd995b3f3870 1-5
+plugins/yellow-morph/CLAUDE.md
+  s_f767bca7d385eb::t_2d16dbc99e015a 8
+plugins/yellow-morph/package-lock.json
+  ai_agent 3,9,11,15-17,20-21,32-34,44-46,49,51,139-141,146,165-167,211-213,264-266,268-437,477-479,482-485,1088-1090,1647-1649,2673-2675,2679
+.changeset/bump-morphmcp-0-8-181.md
+  s_f767bca7d385eb::t_427a1dfa3ca72a 1-5
+plugins/yellow-morph/package.json
+  s_f767bca7d385eb::t_b895ef4a589a11 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "5a76712605f51cdd429b77eedfdee4bd73d18f79",
+  "prompts": {},
+  "sessions": {
+    "s_f767bca7d385eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1e42bc1e-42bd-432b-91ef-389ccb09db94",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
