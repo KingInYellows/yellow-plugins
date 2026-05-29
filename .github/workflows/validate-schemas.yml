@@ -8,7 +8,8 @@ on:
       - 'plugins/**'
       - '.changeset/**'
       - 'schemas/*.schema.json'
-      - 'scripts/validate-*.js'
+      - 'scripts/**/*.js'
+      - 'scripts/snippets/**'
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
       - 'docs/solutions/**'
@@ -16,11 +17,19 @@ on:
   push:
     branches:
       - main
+    # Mirror the validator-input globs from pull_request.paths so direct
+    # pushes/merges to main cannot bypass these checks. (.changeset/** is
+    # intentionally omitted — the changeset-check job is pull_request-only.)
     paths:
       - '.claude-plugin/marketplace.json'
       - 'plugins/**'
       - 'schemas/*.schema.json'
+      - 'scripts/**/*.js'
+      - 'scripts/snippets/**'
       - 'api/cli-contracts/*.json'
+      - 'packages/**/*.ts'
+      - 'docs/solutions/**'
+      - '.github/workflows/validate-schemas.yml'
   workflow_dispatch:
 
 # Cancel stale workflow runs
@@ -53,6 +62,7 @@ jobs:
           - contracts
           - examples
           - solutions
+          - authoring
 
     steps:
       - name: Checkout repository
@@ -191,6 +201,29 @@ jobs:
                 # plans/solution-doc-git-workflow.md.
                 echo "::group::Solution-doc validation"
                 node scripts/validate-solutions.js
+                echo "::endgroup::"
+                ;;
+              authoring)
+                # Authoring + meta validators that were previously only run
+                # locally via `pnpm validate:schemas`. They gate agent/skill/
+                # command authoring rules, setup:all marketplace coverage,
+                # ERROR-* code usage, and install-script snippet drift. Wiring
+                # them here closes the gap where these rules passed locally but
+                # were never enforced on a PR.
+                echo "::group::Agent/command/skill authoring rules"
+                node scripts/validate-agent-authoring.js
+                echo "::endgroup::"
+
+                echo "::group::setup:all marketplace coverage"
+                node scripts/validate-setup-all.js
+                echo "::endgroup::"
+
+                echo "::group::Error-code catalog lint"
+                node scripts/lint-error-codes.js
+                echo "::endgroup::"
+
+                echo "::group::Install-snippet drift"
+                node scripts/sync-shell-snippets.js --check
                 echo "::endgroup::"
                 ;;
               *)

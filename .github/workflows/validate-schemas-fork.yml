@@ -11,6 +11,10 @@ on:
       - '.changeset/**'
       - 'schemas/*.schema.json'
       - 'scripts/validate-*.js'
+      - 'scripts/lint-error-codes.js'
+      - 'scripts/sync-shell-snippets.js'
+      - 'scripts/snippets/**'
+      - 'scripts/lib/**'
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
       - 'docs/solutions/**'
@@ -42,6 +46,7 @@ jobs:
           - contracts
           - examples
           - solutions
+          - authoring
 
     steps:
       - name: Checkout repository
@@ -132,6 +137,16 @@ jobs:
               # contributor adding a doc with a slug collision sees the
               # same blocking signal as a same-repo contributor.
               node scripts/validate-solutions.js
+              ;;
+            authoring)
+              # Authoring + meta validators (mirror of the main workflow's
+              # `authoring` target). Fork PRs get the same enforcement so a
+              # fork contributor sees identical blocking signals for authoring
+              # rules, setup:all coverage, ERROR-* codes, and snippet drift.
+              node scripts/validate-agent-authoring.js
+              node scripts/validate-setup-all.js
+              node scripts/lint-error-codes.js
+              node scripts/sync-shell-snippets.js --check
               ;;
             *)
               echo "::error::Unknown validation target: ${{ matrix.target }}"
