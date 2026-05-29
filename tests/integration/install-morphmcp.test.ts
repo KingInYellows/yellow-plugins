@@ -85,10 +85,18 @@ describe('yellow_morph_validate_paths — path canonicalization (#269)', () => {
   });
 
   it('CLAUDE_PLUGIN_DATA with `..` traversal is rejected after canonicalization', () => {
-    // $HOME/../../etc → realpath -m resolves to /etc, which fails the
-    // HOME/tmp prefix guard. Before the fix, the raw string matched
-    // "$HOME/*" and passed.
-    const traversal = `${tmpHome}/../../etc`;
+    // tmpHome/<..×depth>/etc → realpath -m resolves to /etc, which fails the
+    // HOME/tmp prefix guard. Before the fix, the raw string matched "$HOME/*"
+    // and passed. The number of `..` segments is derived from tmpHome's own
+    // depth so the path deterministically escapes to "/etc" regardless of how
+    // deeply TMPDIR is nested: a fixed `../../` only reaches root when tmpHome
+    // is exactly /tmp/<x>, but on hosts where TMPDIR is itself under /tmp
+    // (e.g. Claude Code Web's /tmp/claude-NNNN), `../../etc` resolves to
+    // /tmp/etc — still inside the /tmp allowlist — and the rejection never
+    // fires. Computing the depth keeps this test asserting the real guard
+    // behaviour rather than coincidentally passing on /tmp-rooted TMPDIRs.
+    const depth = tmpHome.split('/').filter(Boolean).length;
+    const traversal = `${tmpHome}/${'../'.repeat(depth)}etc`;
     const result = runBash(INVOKE, {
       HOME: tmpHome,
       PATH: process.env.PATH,
