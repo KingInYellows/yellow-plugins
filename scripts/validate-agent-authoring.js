@@ -138,27 +138,52 @@ function extractFrontmatter(text) {
 //      the comment → "project" → the gate fires, matching runtime behavior.
 //   2. The comma-string list form Claude Code accepts (`disallowedTools:
 //      Write, Edit`) is now honored — see parseList.
+// Memoized on the raw frontmatter string: every agent file parses the same
+// block up to ~6 times (model/effort/memory/name + tools/disallowedTools/
+// skills), and YAML.parse is heavier than the regex parser it replaced.
+// Identical input always yields the same result, so caching is safe — and the
+// validator is spawned as a fresh child process per run (see the test harness),
+// so the Map starts empty each invocation and never leaks across runs.
+const frontmatterCache = new Map();
+
 function parseFrontmatter(frontmatter) {
   if (frontmatter == null) return null;
+  if (frontmatterCache.has(frontmatter)) {
+    return frontmatterCache.get(frontmatter);
+  }
   let data;
   try {
     data = YAML.parse(frontmatter);
   } catch {
+    // Malformed YAML caches as null so the parse-error gate fires consistently.
+    frontmatterCache.set(frontmatter, null);
     return null;
   }
-  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  const result =
+    data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+  frontmatterCache.set(frontmatter, result);
+  return result;
 }
 
-// Read a scalar frontmatter value as a string. Non-string scalars are coerced
-// (e.g. `memory: true` → "true", which is not a VALID_MEMORY_SCOPE, so the
-// scope-gate still treats memory as inactive — preserving prior behavior and
-// the W1.5b scope-gate test).
+// Read a scalar frontmatter value as a string. Primitive non-strings are
+// coerced (e.g. `memory: true` → "true", which is not a VALID_MEMORY_SCOPE, so
+// the scope-gate still treats memory as inactive — preserving prior behavior
+// and the W1.5b scope-gate test). A non-scalar node (array/object) is INVALID
+// frontmatter for a scalar field: plain String() would smuggle `model:
+// [inherit]` → "inherit" or `effort: [high]` → "high" past the V1/V2 enum
+// checks the old regex parser flagged. Returning the JSON form instead keeps
+// those checks failing loudly, and for `memory:` an array/object scope is not a
+// VALID_MEMORY_SCOPE so the W1.5b gate stays inactive — matching Claude Code,
+// which ignores a non-scalar memory value (no Read/Write/Edit auto-grant → no
+// read-only-contract risk).
 function parseScalar(frontmatter, key) {
   const data = parseFrontmatter(frontmatter);
   if (!data) return null;
   const value = data[key];
   if (value === undefined || value === null) return null;
-  return typeof value === 'string' ? value : String(value);
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 }
 
 // Read a list-typed frontmatter value (tools/disallowedTools/skills) as a

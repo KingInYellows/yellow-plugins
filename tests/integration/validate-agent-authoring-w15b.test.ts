@@ -93,6 +93,25 @@ tools:
 Body for W1.5b fixture.
 `;
 
+// memory: as a non-scalar (flow list) — Claude Code ignores a non-scalar scope
+// value, so memory is NOT active, no Read/Write/Edit auto-grant, and W1.5b must
+// NOT fire (no disallowedTools present). Guards the parseScalar non-scalar
+// rejection: an array scope must coerce to a non-VALID_MEMORY_SCOPE value, not
+// to "project".
+const REVIEW_FM_MEMORY_ARRAY_SCOPE = `---
+name: w15b-fixture
+description: W1.5b review fixture. Use when verifying a non-scalar memory scope.
+model: inherit
+memory: [project]
+tools:
+  - Read
+  - Grep
+  - Glob
+---
+
+Body for W1.5b fixture.
+`;
+
 // A review/ agent with NO memory: at all — W1.5b is a no-op (the W1.5
 // tools-list check is the only relevant rule, and Read/Grep/Glob pass it).
 const REVIEW_FM_NO_MEMORY = `---
@@ -262,6 +281,20 @@ describe('validate-agent-authoring W1.5b (memory: requires disallowedTools)', ()
       pluginsDir,
       'yellow-core/agents/review/w15b-fixture.md',
       REVIEW_FM_MEMORY_INVALID_SCOPE
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).toBe(0);
+  });
+
+  it('does NOT fire on a non-scalar scope (memory: [project]) — array not coerced to a valid scope', () => {
+    // A list memory value is ignored by Claude Code (no write auto-grant), so
+    // the read-only contract is intact and W1.5b must stay silent. Guards
+    // against String() coercing [project] → "project" and falsely activating
+    // the gate (which would demand a disallowedTools entry that isn't needed).
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/review/w15b-fixture.md',
+      REVIEW_FM_MEMORY_ARRAY_SCOPE
     );
     const result = runValidator(pluginsDir);
     expect(result.status).toBe(0);
