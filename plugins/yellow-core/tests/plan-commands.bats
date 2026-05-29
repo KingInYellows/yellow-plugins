@@ -22,8 +22,11 @@ slug_is_valid() {
 }
 
 # Filename validation (mirrors complete.md Phase 1, the CLEAN_ARG guard).
+# Tightened to the slug contract: optional YYYY-MM-DD- prefix + lowercase
+# kebab-case + .md (no underscores/dots), so a name that would derive an
+# invalid slug is rejected at the filename gate with a clear message.
 filename_is_valid() {
-  printf '%s' "$1" | grep -qE '^[a-z0-9_][a-z0-9_.-]*\.md$'
+  printf '%s' "$1" | grep -qE '^([0-9]{4}-[0-9]{2}-[0-9]{2}-)?[a-z0-9]+(-[a-z0-9]+)*\.md$'
 }
 
 # PR-number override validation (mirrors complete.md Phase 4). Strips CR/LF
@@ -165,8 +168,12 @@ EOF
   filename_is_valid "2026-05-08-plan-lifecycle-management.md"
 }
 
-@test "filename_is_valid accepts underscores and dots in the body" {
-  filename_is_valid "my_plan.v2.md"
+@test "filename_is_valid rejects underscores and dots in the body" {
+  # The filename contract mirrors the strict slug contract: underscores and
+  # dots are rejected (a dot in a slug becomes a regex wildcard in the
+  # Phase 4 headRefName boundary test). Reject early with a clear message.
+  run filename_is_valid "my_plan.v2.md"
+  [ "$status" -ne 0 ]
 }
 
 @test "filename_is_valid rejects uppercase" {

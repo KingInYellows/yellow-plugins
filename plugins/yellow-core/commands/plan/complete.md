@@ -48,11 +48,15 @@ command -v gt >/dev/null 2>&1 || { printf '[plan:complete] error: gt not install
 command -v jq >/dev/null 2>&1 || { printf '[plan:complete] error: jq not installed\n' >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { printf '[plan:complete] error: gh not authenticated (run: gh auth login)\n' >&2; exit 1; }
 # Clear any stale state from a prior aborted run. Without this, a previous
-# run that wrote .git/tmp/plan-complete.override in Phase 4 then cancelled at
-# the Phase 5 dirty-tree prompt would leave the file behind, and the NEXT run
-# for a different plan would stamp that stale PR number into its commit
-# trailer (review finding, correctness + adversarial).
-rm -f .git/tmp/plan-complete.count .git/tmp/plan-complete.override
+# run that wrote the override in Phase 4 then cancelled at the Phase 5
+# dirty-tree prompt would leave the file behind, and the NEXT run for a
+# different plan would stamp that stale PR number into its commit trailer
+# (review finding, correctness + adversarial).
+# Resolve the git tmp dir via `git rev-parse --git-path` so this works from a
+# linked worktree, where `.git` is a file (gitdir pointer) and a literal
+# `.git/tmp` path would fail with "Not a directory".
+GIT_TMP=$(git rev-parse --git-path tmp)
+rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override"
 ```
 
 ## Phase 1: Filename validation + slug derivation
@@ -71,9 +75,15 @@ if [ -z "$ARG" ]; then
 fi
 # Strip leading `plans/` for tab-completion ergonomics.
 CLEAN_ARG="${ARG#plans/}"
-# Reject path traversal, slashes, leading hyphen, and uppercase.
-if ! printf '%s' "$CLEAN_ARG" | grep -qE '^[a-z0-9_][a-z0-9_.-]*\.md$'; then
-  printf '[plan:complete] error: invalid filename %s (lowercase [a-z0-9_.-]+ + .md)\n' "$CLEAN_ARG" >&2
+# Reject path traversal, slashes, leading hyphen, and uppercase. The pattern
+# mirrors the post-derivation slug contract below (optional YYYY-MM-DD- date
+# prefix + lowercase kebab-case) so an invalid name is rejected HERE with a
+# clear message rather than passing this gate and failing later as a
+# confusing "derived slug contains invalid characters" error. Underscores
+# and dots are intentionally excluded: a dot in a slug becomes a regex
+# wildcard in the Phase 4 headRefName boundary test.
+if ! printf '%s' "$CLEAN_ARG" | grep -qE '^([0-9]{4}-[0-9]{2}-[0-9]{2}-)?[a-z0-9]+(-[a-z0-9]+)*\.md$'; then
+  printf '[plan:complete] error: invalid filename %s (optional YYYY-MM-DD- prefix + lowercase kebab-case + .md)\n' "$CLEAN_ARG" >&2
   exit 1
 fi
 # Derive slug: strip optional YYYY-MM-DD- prefix.
@@ -169,9 +179,12 @@ if [ "$COUNT" -ge 1 ]; then
 fi
 # Store COUNT for the next step. Persist via temp file because the next
 # Bash block is a fresh subprocess. (The matched-PR list is already shown
-# inline above; only COUNT is consumed downstream in Phase 7.)
-mkdir -p .git/tmp
-printf '%s\n' "$COUNT" > .git/tmp/plan-complete.count
+# inline above; only COUNT is consumed downstream in Phase 7.) Resolve the
+# git tmp dir via `git rev-parse --git-path` so it works from a linked
+# worktree where `.git` is a gitdir-pointer file, not a directory.
+GIT_TMP=$(git rev-parse --git-path tmp)
+mkdir -p "$GIT_TMP"
+printf '%s\n' "$COUNT" > "$GIT_TMP/plan-complete.count"
 ```
 
 **If `COUNT >= 1` (Gate C PASS): skip the AskUserQuestion below entirely
@@ -223,8 +236,9 @@ if ! printf '%s' "$PR_NUM" | grep -qE '^[1-9][0-9]{0,9}$'; then
   printf '[plan:complete] error: invalid PR number override %s\n' "$PR_NUM" >&2
   exit 1
 fi
-mkdir -p .git/tmp
-printf '%s\n' "$PR_NUM" > .git/tmp/plan-complete.override
+GIT_TMP=$(git rev-parse --git-path tmp)
+mkdir -p "$GIT_TMP"
+printf '%s\n' "$PR_NUM" > "$GIT_TMP/plan-complete.override"
 ```
 
 ## Phase 5: Working-tree check
@@ -273,7 +287,13 @@ set -euo pipefail
 ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
-git checkout main
+# Resolve the repo's default branch instead of hard-coding `main` — this
+# command ships in arbitrary repos whose trunk may be `master`/`develop`.
+# gh is a hard prerequisite (Phase 0); fall back to `main` if the lookup
+# returns nothing (e.g. no defaultBranchRef on a fresh repo).
+TRUNK=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
+[ -n "$TRUNK" ] || TRUNK=main
+git checkout "$TRUNK"
 gt repo sync 2>/dev/null || gt sync 2>/dev/null || \
   printf '[plan:complete] WARNING: gt sync failed; proceeding on possibly-stale trunk\n' >&2
 gt create "plan/archive-$SLUG"
@@ -298,19 +318,25 @@ set -euo pipefail
 ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
-COUNT=$(cat .git/tmp/plan-complete.count 2>/dev/null || printf '0')
+GIT_TMP=$(git rev-parse --git-path tmp)
+COUNT=$(cat "$GIT_TMP/plan-complete.count" 2>/dev/null || printf '0')
 SUBJECT="docs(plans): archive completed $SLUG plan"
-if [ -f .git/tmp/plan-complete.override ]; then
-  OVERRIDE_PR_NUM=$(cat .git/tmp/plan-complete.override)
+if [ -f "$GIT_TMP/plan-complete.override" ]; then
+  OVERRIDE_PR_NUM=$(cat "$GIT_TMP/plan-complete.override")
   BODY="Verified by /plan:complete: user-confirmed override.
 
 Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#$OVERRIDE_PR_NUM)"
 else
   BODY="Verified by /plan:complete: $COUNT merged PR(s) found via gh pr list --state merged with word-boundary post-filter on headRefName."
 fi
-git commit -m "$SUBJECT" -m "$BODY"
+# Scope the commit to the plan-rename pathspecs only. If the user had
+# pre-staged unrelated WIP and chose Proceed at the Phase 5 dirty-tree
+# prompt, a bare `git commit` would bundle that WIP into the archival
+# commit; the explicit pathspecs commit only the git mv (delete of the
+# source + add of the destination).
+git commit -m "$SUBJECT" -m "$BODY" -- "plans/$CLEAN_ARG" "plans/complete/$CLEAN_ARG"
 # Clean up temp files.
-rm -f .git/tmp/plan-complete.count .git/tmp/plan-complete.override
+rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override"
 ```
 
 The `Plan-Verifier-Override:` trailer is grep-discoverable via
