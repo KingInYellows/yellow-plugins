@@ -1,0 +1,32 @@
+examples/plugin.example.json
+  s_11679bcd4aae34::t_fde0a85f4156b5 11
+docs/plugin-template.md
+  s_11679bcd4aae34::t_ff4af01c5a194e 237
+CLAUDE.md
+  s_11679bcd4aae34::t_e0c85dfee84d43 107-112
+schemas/official-marketplace.schema.json
+  s_11679bcd4aae34::t_d814e5d7944a9a 8
+  s_11679bcd4aae34::t_4e26494b1e3f49 9
+schemas/plugin.schema.json
+  s_11679bcd4aae34::t_d9b9ed5a24ef86 171-173
+  s_11679bcd4aae34::t_686c4a498d2a41 192-193
+  s_11679bcd4aae34::t_ffa58548230629 94-104
+tests/integration/example-files-schema.test.ts
+  s_11679bcd4aae34::t_e49f51329985a2 175-260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f0d5025abff59872ba47f4881094bfe3deca6605",
+  "prompts": {},
+  "sessions": {
+    "s_11679bcd4aae34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3271bdc0-a9b0-4216-997d-929f94e40ef5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}
