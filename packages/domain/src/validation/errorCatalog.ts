@@ -87,6 +87,22 @@ export const ERROR_CODES = {
   // SOL_FRONTMATTER).
   SOL_SLUG_COLLISION: 'ERROR-SOL-001',
   SOL_FRONTMATTER_INVALID: 'ERROR-SOL-002',
+
+  // Plan Lifecycle Errors (PLAN) — scripts/validate-plans.js gates plans
+  // newly added or modified under `plans/complete/` against stray unchecked
+  // checkboxes (`- [ ]`). Catches premature archival where the plan was moved
+  // before its task list was complete. See plans/plan-lifecycle-management.md
+  // for the rationale and the PR-diff-scoping decision.
+  //
+  // Same ESM/CJS bridge constraint as SOL_*: the catalog is ESM, scripts/ is
+  // CJS, so scripts/validate-plans.js cannot `require()` these constants
+  // directly. The validator assembles the same strings via concatenation
+  // (`const PLAN = 'ERROR-' + 'PLAN'; const PLAN_001 = PLAN + '-001';`) and
+  // `scripts/lint-error-codes.js` (CODE_PATTERN /ERROR-[A-Z]+-\d+/g) does not
+  // detect split-string assembly. Any change to the entry below requires a
+  // paired edit in scripts/validate-plans.js (the constants PLAN /
+  // PLAN_STRAY_CHECKBOX).
+  PLAN_STRAY_CHECKBOX: 'ERROR-PLAN-001',
 } as const;
 
 /**
@@ -299,6 +315,9 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
     [ErrorCategory.SOLUTION_DOCS]: [
       ERROR_CODES.SOL_SLUG_COLLISION,
       ERROR_CODES.SOL_FRONTMATTER_INVALID,
+    ],
+    [ErrorCategory.PLAN_LIFECYCLE]: [
+      ERROR_CODES.PLAN_STRAY_CHECKBOX,
     ],
   };
 }

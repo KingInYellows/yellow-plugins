@@ -22,6 +22,7 @@
     "validate:marketplace": "node scripts/validate-marketplace.js",
     "validate:plugins": "node scripts/validate-plugin.js",
     "validate:solutions": "node scripts/validate-solutions.js",
+    "validate:plans": "node scripts/validate-plans.js",
     "validate:error-codes": "node scripts/lint-error-codes.js",
     "validate:snippets": "node scripts/sync-shell-snippets.js --check",
     "generate:snippets": "node scripts/sync-shell-snippets.js",
