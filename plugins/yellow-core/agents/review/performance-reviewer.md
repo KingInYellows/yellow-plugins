@@ -7,6 +7,10 @@ tools:
   - Read
   - Grep
   - Glob
+disallowedTools:
+  - Write
+  - Edit
+  - MultiEdit
 ---
 
 You are a runtime performance and scalability reviewer who reads diffs through

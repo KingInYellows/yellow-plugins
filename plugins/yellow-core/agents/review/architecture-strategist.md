@@ -8,6 +8,10 @@ tools:
   - Read
   - Grep
   - Glob
+disallowedTools:
+  - Write
+  - Edit
+  - MultiEdit
 ---
 
 <examples>

@@ -19,6 +19,18 @@ const PLUGINS_DIR = process.env.VALIDATE_PLUGINS_DIR
 // the untrusted PR diff and comment text reviewers consume.
 const REVIEW_AGENT_DENIED_TOOLS = ['Bash', 'Write', 'Edit'];
 
+// W1.5b rule: the write-capable tools that `memory:` auto-enables. A review/
+// agent with `memory:` set MUST deny these via `disallowedTools` to keep the
+// read-only contract. Subset of REVIEW_AGENT_DENIED_TOOLS minus Bash (which
+// `memory:` does not grant).
+const MEMORY_GRANTED_WRITE_TOOLS = ['Write', 'Edit'];
+
+// Valid `memory:` scope values per Claude Code docs. Only these three
+// activate per-agent memory (and the Read/Write/Edit auto-grant); any other
+// value (e.g. `memory: true`) is silently ignored by Claude Code, so W1.5b
+// must NOT fire on it — otherwise the author gets a misleading error.
+const VALID_MEMORY_SCOPES = new Set(['user', 'project', 'local']);
+
 // Documented exceptions to the read-only rule. Each entry must be a
 // plugins-relative POSIX path. Any exception requires a "Tool Surface —
 // Documented … Exception" section in the agent body explaining why the
@@ -311,6 +323,36 @@ function validateAgentFile(filePath, ctx) {
               `scripts/validate-agent-authoring.js and add a "Tool ` +
               `Surface — Documented Exception" section to the agent body.`
           );
+        }
+
+        // W1.5b — `memory:` auto-enables Read/Write/Edit regardless of the
+        // `tools:` list (per Claude Code docs), so the tools-only check
+        // above is bypassed whenever a review/ agent sets `memory:`. Such an
+        // agent MUST restore the read-only contract with a `disallowedTools`
+        // entry containing both Write and Edit. Without this, a review agent
+        // processing untrusted PR diffs runs write-capable. The 3 yellow-core
+        // security agents and the 6 yellow-review review agents already carry
+        // `disallowedTools: [Write, Edit, MultiEdit]`; this rule prevents a
+        // future review/ agent from regressing silently.
+        const memoryScope = parseScalar(frontmatter, 'memory');
+        if (memoryScope && VALID_MEMORY_SCOPES.has(memoryScope)) {
+          const disallowedLower = parseList(
+            frontmatter,
+            'disallowedTools'
+          ).map((t) => t.toLowerCase());
+          const missingDenies = MEMORY_GRANTED_WRITE_TOOLS.filter(
+            (t) => !disallowedLower.includes(t.toLowerCase())
+          );
+          if (missingDenies.length > 0) {
+            errors.push(
+              `${relative(filePath)}: review/ agent sets \`memory: ` +
+                `${memoryScope}\` (auto-enables Read/Write/Edit) but ` +
+                `\`disallowedTools\` is missing ${missingDenies.join(', ')} ` +
+                `— add \`disallowedTools: [Write, Edit, MultiEdit]\` to ` +
+                `restore the read-only contract (W1.5b rule). The \`tools:\` ` +
+                `list alone does not contain the memory-granted write access.`
+            );
+          }
         }
       }
     }
