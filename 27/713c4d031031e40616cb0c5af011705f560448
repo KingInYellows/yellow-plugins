@@ -1,0 +1,19 @@
+plugins/yellow-morph/lib/install-morphmcp.sh
+  s_1d7ebad06623ea::t_29e0351512f83d 47-58,60,67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "27713c4d031031e40616cb0c5af011705f560448",
+  "prompts": {},
+  "sessions": {
+    "s_1d7ebad06623ea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc70cc1c-2283-4107-9064-4fbf78bb603f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
