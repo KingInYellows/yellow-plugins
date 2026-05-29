@@ -1,0 +1,25 @@
+schemas/plugin.schema.json
+  s_11679bcd4aae34::t_686c4a498d2a41 192-193
+  s_11679bcd4aae34::t_d9b9ed5a24ef86 171-173
+  s_11679bcd4aae34::t_ffa58548230629 94-104
+examples/plugin.example.json
+  s_11679bcd4aae34::t_fde0a85f4156b5 11
+schemas/official-marketplace.schema.json
+  s_11679bcd4aae34::t_4e26494b1e3f49 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0b6ee3b331a5ff0f3b3d18d752fa078bfe4fc0f9",
+  "prompts": {},
+  "sessions": {
+    "s_11679bcd4aae34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3271bdc0-a9b0-4216-997d-929f94e40ef5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
