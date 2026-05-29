@@ -596,7 +596,7 @@ ToolSearch keyword: "codebase_search" (or "morph warpgrep" — same tool)
 Preferred tool name: mcp__plugin_yellow-morph_morph__codebase_search
 Fallback tool name: mcp__filesystem-with-morph__codebase_search
 Test call: <matched tool> with query: "README"
-Note: In morphmcp 0.8.165 the tool is named `codebase_search`. Older
+Note: In current morphmcp the tool is named `codebase_search`. Older
 versions exposed it as `warpgrep_codebase_search`; that name no longer
 exists.
 ```
