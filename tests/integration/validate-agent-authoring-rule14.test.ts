@@ -78,6 +78,37 @@ tools:
 Body for reviewer fixture.
 `;
 
+// Comma-string disallowedTools (single value) — a list form Claude Code
+// accepts. parseList splits it into ["AskUserQuestion"], so RULE 14's
+// exact-match .includes() is satisfied. MUST PASS.
+const PROMOTER_FM_COMMA_DENY = `---
+name: staging-promoter
+description: Promoter test fixture. Use when verifying comma-string disallowedTools.
+model: inherit
+tools:
+  - Read
+  - Write
+  - Edit
+disallowedTools: AskUserQuestion
+---
+`;
+
+// Anti-bypass guard on the comma-string path: a near-miss token must NOT
+// satisfy RULE 14. parseList yields ["AskUserQuestion-disabled"], and
+// .includes("AskUserQuestion") is array exact-match (NOT substring), so this
+// MUST FAIL — the same bypass class RULE 14 was hardened against (PR #544).
+const PROMOTER_FM_SUBSTRING_DENY = `---
+name: staging-promoter
+description: Promoter test fixture. Use when verifying RULE 14 anti-bypass.
+model: inherit
+tools:
+  - Read
+  - Write
+  - Edit
+disallowedTools: AskUserQuestion-disabled
+---
+`;
+
 // Body that satisfies RULE 14b: documents Session Notes gate AND has a
 // paragraph naming all three sections in a "Never modify|write|touch"
 // context.
@@ -173,6 +204,27 @@ describe('validate-agent-authoring RULE 14 (disallowedTools frontmatter)', () =>
       pluginsDir,
       'yellow-core/agents/workflow/staging-reviewer.md',
       REVIEWER_FM_MISSING_DENY
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/RULE 14/);
+  });
+
+  it('passes when disallowedTools uses the comma-string form (AskUserQuestion)', () => {
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/workflow/staging-promoter.md',
+      PROMOTER_FM_COMMA_DENY + PROMOTER_BODY_OK
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).toBe(0);
+  });
+
+  it('fails a near-miss comma-string token (AskUserQuestion-disabled) — anti-bypass', () => {
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/workflow/staging-promoter.md',
+      PROMOTER_FM_SUBSTRING_DENY + PROMOTER_BODY_OK
     );
     const result = runValidator(pluginsDir);
     expect(result.status).not.toBe(0);

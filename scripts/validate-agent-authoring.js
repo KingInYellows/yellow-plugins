@@ -5,6 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const YAML = require('yaml');
+
 const ROOT = path.resolve(__dirname, '..');
 // Allow tests to point the validator at a fixture tree by setting
 // VALIDATE_PLUGINS_DIR. Production runs leave it unset and use plugins/.
@@ -14,16 +16,23 @@ const PLUGINS_DIR = process.env.VALIDATE_PLUGINS_DIR
 
 // W1.5 rule: review/ agents must be read-only.
 // Any agent at plugins/<name>/agents/review/<file>.md must not list Bash,
-// Write, or Edit in its `tools:` set. Reviewers analyze; they do not act.
-// This containment limits the blast radius of prompt-injection attempts in
-// the untrusted PR diff and comment text reviewers consume.
-const REVIEW_AGENT_DENIED_TOOLS = ['Bash', 'Write', 'Edit'];
+// Write, Edit, or MultiEdit in its `tools:` set. Reviewers analyze; they do
+// not act. This containment limits the blast radius of prompt-injection
+// attempts in the untrusted PR diff and comment text reviewers consume.
+// MultiEdit is a batch file-write tool just like Write/Edit — omitting it
+// here left a fail-open path (a reviewer could list `MultiEdit` in `tools:`
+// and still mutate files); it is denied alongside Write/Edit.
+const REVIEW_AGENT_DENIED_TOOLS = ['Bash', 'Write', 'Edit', 'MultiEdit'];
 
-// W1.5b rule: the write-capable tools that `memory:` auto-enables. A review/
-// agent with `memory:` set MUST deny these via `disallowedTools` to keep the
-// read-only contract. Subset of REVIEW_AGENT_DENIED_TOOLS minus Bash (which
-// `memory:` does not grant).
-const MEMORY_GRANTED_WRITE_TOOLS = ['Write', 'Edit'];
+// W1.5b rule: the write-capable tools a review/ agent with `memory:` set MUST
+// deny via `disallowedTools` to preserve the read-only contract. `memory:`
+// auto-enables Read/Write/Edit regardless of the `tools:` list, which bypasses
+// the W1.5 `tools:` check above. MultiEdit is included defensively (it is NOT
+// memory-granted) so the deny set the shipped review agents already declare —
+// `[Write, Edit, MultiEdit]` — is enforced and stays consistent with
+// REVIEW_AGENT_DENIED_TOOLS. Named REQUIRED_DISALLOWED (not MEMORY_GRANTED_*)
+// because MultiEdit is a required deny, not a tool memory grants.
+const REVIEW_AGENT_REQUIRED_DISALLOWED_TOOLS = ['Write', 'Edit', 'MultiEdit'];
 
 // Valid `memory:` scope values per Claude Code docs. Only these three
 // activate per-agent memory (and the Read/Write/Edit auto-grant); any other
@@ -116,52 +125,68 @@ function extractFrontmatter(text) {
   return match ? match[1] : null;
 }
 
-function parseScalar(frontmatter, key) {
-  const match = frontmatter.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
-  if (!match) return null;
-  return match[1].trim().replace(/^['"]|['"]$/g, '');
+// Parse a frontmatter block with the real YAML parser (the `yaml` devDep) so
+// the validator interprets frontmatter the way Claude Code does: inline
+// comments stripped, quotes resolved, and flow/block lists normalized to
+// arrays. Returns the parsed object on success, {} for empty/scalar/array
+// frontmatter (so key lookups yield undefined → null/[]), and null when the
+// YAML is malformed (callers degrade safely; validateAgentFile surfaces a
+// clear error). Replacing the old hand-rolled regex parser fixes two bugs an
+// audit confirmed change behavior on ZERO currently-shipped files:
+//   1. `memory: project # note` previously returned "project # note" (not a
+//      valid scope), silently disabling the W1.5b read-only gate. YAML strips
+//      the comment → "project" → the gate fires, matching runtime behavior.
+//   2. The comma-string list form Claude Code accepts (`disallowedTools:
+//      Write, Edit`) is now honored — see parseList.
+function parseFrontmatter(frontmatter) {
+  if (frontmatter == null) return null;
+  let data;
+  try {
+    data = YAML.parse(frontmatter);
+  } catch {
+    return null;
+  }
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
 }
 
+// Read a scalar frontmatter value as a string. Non-string scalars are coerced
+// (e.g. `memory: true` → "true", which is not a VALID_MEMORY_SCOPE, so the
+// scope-gate still treats memory as inactive — preserving prior behavior and
+// the W1.5b scope-gate test).
+function parseScalar(frontmatter, key) {
+  const data = parseFrontmatter(frontmatter);
+  if (!data) return null;
+  const value = data[key];
+  if (value === undefined || value === null) return null;
+  return typeof value === 'string' ? value : String(value);
+}
+
+// Read a list-typed frontmatter value (tools/disallowedTools/skills) as a
+// string array. Claude Code accepts THREE forms for these fields: a YAML block
+// list, a YAML flow list (`[A, B]`), and a bare comma-separated string
+// (`A, B`) — see docs/research/all-possible-subagent-frontmatter-config.md.
+// yaml.parse returns an array for the first two and a STRING for the comma
+// form, so a string result is split on commas. Anything else (or an absent
+// key) yields []. ALWAYS returns a real array so RULE 14's exact-match
+// `.includes()` anti-bypass invariant holds on every accepted form (a naive
+// yaml.parse swap without this split would degrade RULE 14 to substring
+// matching on the comma-string form).
 function parseList(frontmatter, key) {
-  // Try inline flow form first: key: [item1, item2]
-  const inlineMatch = frontmatter.match(
-    new RegExp(`^${key}:\\s*\\[([^\\]]+)\\]`, 'm')
-  );
-  if (inlineMatch) {
-    return inlineMatch[1]
-      .split(',')
-      .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+  const data = parseFrontmatter(frontmatter);
+  if (!data) return [];
+  const value = data[key];
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item == null ? '' : String(item).trim()))
       .filter(Boolean);
   }
-
-  const lines = frontmatter.split('\n');
-  const values = [];
-  let inList = false;
-
-  for (const line of lines) {
-    if (!inList) {
-      if (new RegExp(`^${key}:\\s*$`).test(line)) {
-        inList = true;
-      }
-      continue;
-    }
-
-    const item = line.match(/^\s*-\s+(.+?)\s*$/);
-    if (item) {
-      values.push(item[1].replace(/^['"]|['"]$/g, ''));
-      continue;
-    }
-
-    if (line.trim() === '') {
-      continue;
-    }
-
-    if (!line.startsWith(' ')) {
-      break;
-    }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
-
-  return values;
+  return [];
 }
 
 function relative(filePath) {
@@ -198,6 +223,18 @@ function validateAgentFile(filePath, ctx) {
 
   if (!frontmatter) {
     errors.push(`${relative(filePath)}: missing frontmatter`);
+    return;
+  }
+
+  // Malformed YAML would make every parseScalar/parseList return null/[],
+  // silently disabling W1.5/W1.5b/V1/V2/RULE 14. Fail loud with the parser's
+  // message instead of letting the security gates go dark.
+  try {
+    YAML.parse(frontmatter);
+  } catch (e) {
+    errors.push(
+      `${relative(filePath)}: malformed YAML frontmatter — ${String(e.message).split('\n')[0]}`
+    );
     return;
   }
 
@@ -329,9 +366,9 @@ function validateAgentFile(filePath, ctx) {
         // `tools:` list (per Claude Code docs), so the tools-only check
         // above is bypassed whenever a review/ agent sets `memory:`. Such an
         // agent MUST restore the read-only contract with a `disallowedTools`
-        // entry containing both Write and Edit. Without this, a review agent
-        // processing untrusted PR diffs runs write-capable. The 3 yellow-core
-        // security agents and the 6 yellow-review review agents already carry
+        // entry denying Write, Edit, and MultiEdit. Without this, a review
+        // agent processing untrusted PR diffs runs write-capable. Every
+        // shipped memory:-bearing review agent already carries
         // `disallowedTools: [Write, Edit, MultiEdit]`; this rule prevents a
         // future review/ agent from regressing silently.
         const memoryScope = parseScalar(frontmatter, 'memory');
@@ -340,7 +377,7 @@ function validateAgentFile(filePath, ctx) {
             frontmatter,
             'disallowedTools'
           ).map((t) => t.toLowerCase());
-          const missingDenies = MEMORY_GRANTED_WRITE_TOOLS.filter(
+          const missingDenies = REVIEW_AGENT_REQUIRED_DISALLOWED_TOOLS.filter(
             (t) => !disallowedLower.includes(t.toLowerCase())
           );
           if (missingDenies.length > 0) {

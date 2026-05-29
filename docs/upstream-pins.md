@@ -4,9 +4,14 @@ Every MCP server or external binary that yellow-plugins invokes via `npx`, `uvx`
 or a bundled path is listed here with its current pinned version. Review on a
 monthly cadence (or before cutting a release) to decide whether to bump.
 
-Drift is checked automatically by `scripts/check-upstream-pins.js`, which queries
-the npm registry and prints any pin that lags the `latest` tag. Run it manually
-or hook it into CI as a non-blocking advisory.
+Drift is checked by `scripts/check-upstream-pins.js`, which queries the npm
+registry and prints any pin that lags the `latest` tag. Run it manually with
+`pnpm check:pins` (advisory — exits 0 even when drift exists; pass `--strict` or
+`--threshold N` to make it fail on drift), or rely on the weekly advisory
+workflow `.github/workflows/upstream-pins-advisory.yml` (runs Mondays and on
+manual dispatch; the drift report appears in the Actions run summary). It is
+intentionally NOT part of the blocking `validate:schemas` / `ci-status` gate —
+the per-pin `npm view` network calls would add registry flakiness to every PR.
 
 ## Policy
 
