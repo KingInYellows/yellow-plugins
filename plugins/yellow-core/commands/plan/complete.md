@@ -287,13 +287,17 @@ set -euo pipefail
 ARG="$ARGUMENTS"
 CLEAN_ARG="${ARG#plans/}"
 SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
-# Resolve the repo's default branch instead of hard-coding `main` — this
-# command ships in arbitrary repos whose trunk may be `master`/`develop`.
-# gh is a hard prerequisite (Phase 0); fall back to `main` if the lookup
-# returns nothing (e.g. no defaultBranchRef on a fresh repo).
-TRUNK=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
-[ -n "$TRUNK" ] || TRUNK=main
-git checkout "$TRUNK"
+# Check out Graphite's CONFIGURED trunk. gt stacks against its own trunk,
+# which can differ from GitHub's default branch (e.g. a repo gt-initialised
+# on `develop`); basing the archival branch on the wrong trunk would stack
+# the PR incorrectly. `gt checkout --trunk` resolves the configured trunk.
+# Fall back to the gh default branch, then `main`, if gt cannot resolve one
+# (gt is a Phase 0 prerequisite, but may be uninitialised in a fresh repo).
+if ! gt checkout --trunk 2>/dev/null; then
+  TRUNK=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
+  [ -n "$TRUNK" ] || TRUNK=main
+  git checkout "$TRUNK"
+fi
 gt repo sync 2>/dev/null || gt sync 2>/dev/null || \
   printf '[plan:complete] WARNING: gt sync failed; proceeding on possibly-stale trunk\n' >&2
 gt create "plan/archive-$SLUG"
