@@ -44,15 +44,27 @@ yellow_morph_validate_paths() {
   fi
   export CLAUDE_PLUGIN_ROOT CLAUDE_PLUGIN_DATA
 
+  # Canonicalize HOME with the same capability-gated method so the prefix
+  # guards below still match when HOME itself is a symlink (e.g.
+  # /home/alice -> /mnt/storage/alice). ROOT/DATA above are now physical
+  # paths, so a raw-HOME compare would reject a valid $HOME/.claude/... dir.
+  # Accept BOTH raw and canonical HOME prefixes: when realpath -m is absent
+  # (BSD macOS), home_canonical stays the raw value, preserving prior
+  # behaviour (fail-open).
+  local home_canonical="${HOME:-/__unset__}"
+  if [ -n "${HOME:-}" ] && canonical=$(realpath -m -- "$HOME" 2>/dev/null); then
+    home_canonical="$canonical"
+  fi
+
   case "$CLAUDE_PLUGIN_DATA" in
-    "${HOME:-/__unset__}"/*|/tmp/*) ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*) ;;
     *)
       printf 'yellow-morph: refusing — CLAUDE_PLUGIN_DATA outside HOME/tmp: %s\n' \
         "$CLAUDE_PLUGIN_DATA" >&2
       return 1 ;;
   esac
   case "$CLAUDE_PLUGIN_ROOT" in
-    "${HOME:-/__unset__}"/*|/tmp/*|/usr/*|/opt/*) ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/usr/*|/opt/*) ;;
     *)
       printf 'yellow-morph: refusing — CLAUDE_PLUGIN_ROOT unexpected prefix: %s\n' \
         "$CLAUDE_PLUGIN_ROOT" >&2
