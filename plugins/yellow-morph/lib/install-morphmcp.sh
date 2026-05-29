@@ -24,15 +24,47 @@ yellow_morph_validate_paths() {
     printf 'yellow-morph: CLAUDE_PLUGIN_DATA unset\n' >&2
     return 1
   fi
+
+  # Canonicalize before the prefix-guard so a traversal-laced value like
+  # "$HOME/../../etc" resolves to "/etc" and trips the case-guard instead
+  # of passing the naive string-prefix match on "$HOME/*". Capability test
+  # (not `command -v realpath`) because BSD realpath on stock macOS lacks
+  # the `-m` flag — `command -v` would falsely advertise a feature whose
+  # call then errors and silently leaves the raw value in place. With the
+  # capability test, fail-open posture preserves current behaviour on
+  # macOS without GNU coreutils; on Linux/WSL2/Homebrew-coreutils macOS
+  # the canonicalization runs and the export propagates the resolved
+  # paths to callers (start-morph.sh, prewarm hook, setup.md).
+  local canonical
+  if canonical=$(realpath -m -- "$CLAUDE_PLUGIN_ROOT" 2>/dev/null); then
+    CLAUDE_PLUGIN_ROOT="$canonical"
+  fi
+  if canonical=$(realpath -m -- "$CLAUDE_PLUGIN_DATA" 2>/dev/null); then
+    CLAUDE_PLUGIN_DATA="$canonical"
+  fi
+  export CLAUDE_PLUGIN_ROOT CLAUDE_PLUGIN_DATA
+
+  # Canonicalize HOME with the same capability-gated method so the prefix
+  # guards below still match when HOME itself is a symlink (e.g.
+  # /home/alice -> /mnt/storage/alice). ROOT/DATA above are now physical
+  # paths, so a raw-HOME compare would reject a valid $HOME/.claude/... dir.
+  # Accept BOTH raw and canonical HOME prefixes: when realpath -m is absent
+  # (BSD macOS), home_canonical stays the raw value, preserving prior
+  # behaviour (fail-open).
+  local home_canonical="${HOME:-/__unset__}"
+  if [ -n "${HOME:-}" ] && canonical=$(realpath -m -- "$HOME" 2>/dev/null); then
+    home_canonical="$canonical"
+  fi
+
   case "$CLAUDE_PLUGIN_DATA" in
-    "${HOME:-/__unset__}"/*|/tmp/*) ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*) ;;
     *)
       printf 'yellow-morph: refusing — CLAUDE_PLUGIN_DATA outside HOME/tmp: %s\n' \
         "$CLAUDE_PLUGIN_DATA" >&2
       return 1 ;;
   esac
   case "$CLAUDE_PLUGIN_ROOT" in
-    "${HOME:-/__unset__}"/*|/tmp/*|/usr/*|/opt/*) ;;
+    "${HOME:-/__unset__}"/*|"${home_canonical}"/*|/tmp/*|/usr/*|/opt/*) ;;
     *)
       printf 'yellow-morph: refusing — CLAUDE_PLUGIN_ROOT unexpected prefix: %s\n' \
         "$CLAUDE_PLUGIN_ROOT" >&2
