@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.2.1
+
+### Patch Changes
+
+- [#564](https://github.com/KingInYellows/yellow-plugins/pull/564)
+  [`0494696`](https://github.com/KingInYellows/yellow-plugins/commit/04946963ccaaf93f8b1818a6232fe1a39ffab9c1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Make the
+  morphmcp tool-name note in `/research:setup` version-agnostic ("In current
+  morphmcp the tool is named `codebase_search`") so it no longer pins a specific
+  morphmcp version that drifts on every bump. No behavior change.
+
 ## 3.2.0
 
 ### Minor Changes
