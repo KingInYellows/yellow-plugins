@@ -24,7 +24,7 @@ or hook it into CI as a non-blocking advisory.
 
 | Plugin           | Package                          | Pinned   | Registry | Notes                                                                   |
 | ---------------- | -------------------------------- | -------- | -------- | ----------------------------------------------------------------------- |
-| yellow-morph     | `@morphllm/morphmcp`             | `0.8.165`| npm      | Bumped 2026-04-17 from 0.8.110. No public changelog; verify empirically. **Pin tracked in `plugins/yellow-morph/package.json` deps (wrapper-based); NOT in `plugin.json` args.** |
+| yellow-morph     | `@morphllm/morphmcp`             | `0.8.181`| npm      | Bumped 2026-05-29 from 0.8.165 (tools/list verified: exposes `edit_file` + `codebase_search` + `github_codebase_search`; bump removes/renames nothing the plugin uses). No public changelog; verify empirically. **Pin tracked in `plugins/yellow-morph/package.json` deps (wrapper-based); NOT in `plugin.json` args.** |
 | yellow-research  | `@perplexity-ai/mcp-server`      | `0.8.2`  | npm      | Perplexity MCP. Requires `PERPLEXITY_API_KEY`.                          |
 | yellow-research  | `tavily-mcp`                     | `0.2.17` | npm      | Tavily research MCP. Requires `TAVILY_API_KEY`.                         |
 | yellow-research  | `exa-mcp-server`                 | `3.1.8`  | npm      | Exa MCP. Requires `EXA_API_KEY`. Tool whitelist passed as positional arg.|

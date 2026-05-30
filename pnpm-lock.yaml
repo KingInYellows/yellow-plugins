@@ -142,8 +142,8 @@ importers:
   plugins/yellow-morph:
     dependencies:
       '@morphllm/morphmcp':
-        specifier: 0.8.165
-        version: 0.8.165
+        specifier: 0.8.181
+        version: 0.8.181
 
   plugins/yellow-research: {}
 
@@ -971,13 +971,13 @@ packages:
       - supports-color
     dev: false
 
-  /@morphllm/morphmcp@0.8.165:
-    resolution: {integrity: sha512-Hn6kiSTJSbzDYw9bzyF0k/F7FlTsYeFj5NUkCl3nqPtFkV4HB6LBmhjN3GKMpaqsmw7F1Rb3i8cIfvE9MImG4g==}
+  /@morphllm/morphmcp@0.8.181:
+    resolution: {integrity: sha512-XqcynTEeODuqZ4fJQT3bHiYt1b5il2Tc0Ar6WrZKY3HVAov0Tx6AhQn1wMgsQTx5J2RFhldFfvtAfzfY5byGdA==}
     hasBin: true
     dependencies:
       '@google/generative-ai': 0.21.0
       '@modelcontextprotocol/sdk': 1.29.0(zod@3.25.76)
-      '@morphllm/morphsdk': 0.2.164(@google/generative-ai@0.21.0)(zod@3.25.76)
+      '@morphllm/morphsdk': 0.2.171(@google/generative-ai@0.21.0)(zod@3.25.76)
       '@vscode/ripgrep': 1.17.1
       axios: 1.16.0
       chalk: 5.6.2
@@ -1000,8 +1000,8 @@ packages:
       - ws
     dev: false
 
-  /@morphllm/morphsdk@0.2.164(@google/generative-ai@0.21.0)(zod@3.25.76):
-    resolution: {integrity: sha512-Fg+i6CKq6A8nB5KSOVu32hVg35OtVH0O9M9FlKOoQMpFmtFMFvKvk7etcLR9iCfFQcWfe+0eThYyEAMiVyp/xg==}
+  /@morphllm/morphsdk@0.2.171(@google/generative-ai@0.21.0)(zod@3.25.76):
+    resolution: {integrity: sha512-CAhO+bavB5sjQQTFyCkGyIldQrX68RDLOIFabuJCEj6/1wN1DI6XJQbBwhxoLPOpxT17y0yU7lbFymQHNLwwuQ==}
     engines: {node: '>=18'}
     peerDependencies:
       '@anthropic-ai/sdk': '>=0.25.0'

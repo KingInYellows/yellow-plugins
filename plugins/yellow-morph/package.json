@@ -4,6 +4,6 @@
   "private": true,
   "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
   "dependencies": {
-    "@morphllm/morphmcp": "0.8.165"
+    "@morphllm/morphmcp": "0.8.181"
   }
 }

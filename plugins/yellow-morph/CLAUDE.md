@@ -5,7 +5,7 @@ Intelligent code editing and search via Morph Fast Apply and WarpGrep.
 ## MCP Server
 
 - **morph** — Stdio transport via `bin/start-morph.sh`, which runs
-  `node @morphllm/morphmcp@0.8.165` from a per-user install in
+  `node @morphllm/morphmcp@0.8.181` from a per-user install in
   `${CLAUDE_PLUGIN_DATA}/node_modules/`.
 - Requires a Morph API key configured via plugin `userConfig` (Claude Code
   prompts for it at plugin-enable time and stores it in the system keychain
