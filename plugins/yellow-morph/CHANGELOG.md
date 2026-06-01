@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.0
+
+### Minor Changes
+
+- [#564](https://github.com/KingInYellows/yellow-plugins/pull/564)
+  [`0494696`](https://github.com/KingInYellows/yellow-plugins/commit/04946963ccaaf93f8b1818a6232fe1a39ffab9c1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Bump
+  `@morphllm/morphmcp` pin 0.8.165 → 0.8.181 (latest npm release). Verified via
+  an MCP `tools/list` probe per the upstream-pins bump checklist: 0.8.181
+  exposes `edit_file` and `codebase_search` — the two tools the plugin
+  namespaces (`mcp__plugin_yellow-morph_morph__edit_file` / `__codebase_search`)
+  — plus `github_codebase_search`. The bump removes or renames nothing the
+  plugin depends on, and the env-var surface is unchanged. Updates
+  `plugins/yellow-morph/package.json`, `package-lock.json`, the root
+  `pnpm-lock.yaml`, and the version reference in the plugin CLAUDE.md.
+
 ## 1.2.6
 
 ### Patch Changes
