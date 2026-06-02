@@ -2,10 +2,11 @@
 /**
  * check-upstream-pins.js
  *
- * Scans all plugins/*.claude-plugin/plugin.json files for pinned external
- * packages (npx -y <pkg>@<version>) and compares each pin against the
- * `latest` tag on the npm registry. Prints a drift report; exits 0 if no
- * drift exceeds the threshold, exits 1 otherwise.
+ * Scans for pinned external npm packages in three places — plugin.json
+ * mcpServers args (npx -y <pkg>@<version>), plugins/<name>/package.json exact
+ * deps, and plugins/<name>/bin/*.sh wrapper scripts (npx -y <pkg>@<version>) —
+ * and compares each pin against the `latest` tag on the npm registry. Prints a
+ * drift report; exits 0 if no drift exceeds the threshold, exits 1 otherwise.
  *
  * Usage:
  *   node scripts/check-upstream-pins.js                   # advisory (all drift reported, exit 0 unless --strict)
@@ -98,6 +99,29 @@ function extractGitPins(args) {
     if (typeof arg !== 'string') continue;
     const m = arg.match(/^git\+([^@]+)@([0-9a-f]{7,40})$/);
     if (m) pins.push({ url: m[1], sha: m[2] });
+  }
+  return pins;
+}
+
+// Extract pinned npm packages from a shell wrapper's `npx -y <pkg>@<version>`
+// invocation. Several plugins (e.g. yellow-research) launch their MCP server via
+// a bin/*.sh wrapper named in the mcpServers `command` field, so the pin lives in
+// shell source rather than in mcpServers.args or package.json. Conservative: only
+// matches an npx invocation carrying an explicit pkg@semver, so it will not pick
+// up unrelated @-strings. Optional surrounding quotes are handled.
+//
+// The match is line-anchored (`m` flag) and skips lines whose first non-space
+// char is `#` (commented-out invocations would otherwise report false drift),
+// and the span between `npx` and the package excludes shell command separators
+// (`;`, `&`, `|`) so a chained command like `npx tool && node x @a/b@1.2.3` does
+// not mis-attribute the second command's pin to npx.
+function extractNpmPinsFromShell(content) {
+  const pins = [];
+  if (typeof content !== 'string') return pins;
+  const re = /^(?!\s*#)[^\n]*?\bnpx\b[^;\n&|]*?["']?(@?[a-z0-9][a-z0-9._~/-]+)@(\d+\.\d+\.\d+[A-Za-z0-9.+-]*)["']?/gm;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    pins.push({ name: m[1], version: m[2] });
   }
   return pins;
 }
@@ -210,6 +234,32 @@ function main() {
       } catch {
         // Tolerate unparseable package.json — surface as a skipped note.
         console.error(`[check-upstream-pins] NOTE: cannot parse ${pkgPath}`);
+      }
+    }
+
+    // Also scan plugins/<name>/bin/*.sh wrapper scripts. Some plugins launch
+    // their MCP server through a shell wrapper (mcpServers `command` points at
+    // bin/<name>.sh), so the `npx -y <pkg>@<version>` pin is in shell source,
+    // not in mcpServers.args or package.json.
+    const binDir = path.join(PLUGINS_DIR, plugin, 'bin');
+    if (fs.existsSync(binDir)) {
+      let shFiles = [];
+      try {
+        shFiles = fs.readdirSync(binDir).filter((f) => f.endsWith('.sh'));
+      } catch {
+        shFiles = [];
+      }
+      for (const file of shFiles) {
+        let content;
+        try {
+          content = fs.readFileSync(path.join(binDir, file), 'utf8');
+        } catch {
+          continue;
+        }
+        for (const p of extractNpmPinsFromShell(content)) {
+          if (!NPM_NAME_OK.test(p.name)) continue;
+          report.npm.push({ plugin, serverName: `bin/${file}`, ...p });
+        }
       }
     }
   }

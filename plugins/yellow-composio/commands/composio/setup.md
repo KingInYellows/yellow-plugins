@@ -53,17 +53,19 @@ If ToolSearch returns at least one Composio tool, record which prefix is
 active and proceed to Step 3.
 
 If ToolSearch returns no Composio tools, the bundled MCP did not start.
-Because both `userConfig` fields are `required: true` (v1.2.4+), a
-*fresh* enable cannot land in the "dismissed prompt" state — Claude
-Code refuses to enable the plugin without both values. The required
-flag does NOT retroactively remediate plugins that were already
-enabled before v1.2.4, so a legacy install may still be carrying empty
-values until disabled and re-enabled. Likely causes:
+The `userConfig` fields are NOT marked `required: true` — per
+[claude-code#39827](https://github.com/anthropics/claude-code/issues/39827)
+the `required` flag does not block install; it only produces a
+confusing MCP-startup error. The actual safeguard is the
+`bin/start-composio.sh` wrapper, which exits non-zero when either value is
+empty, so the bundled MCP never registers with an empty URL (which would
+cascade-fail `claude doctor` for the other MCPs). Likely causes:
 
-- The plugin was enabled before v1.2.4 and the userConfig values were
-  never set or were dismissed at the original prompt. The required
-  flag does not back-fill them. Fix: `/plugin disable yellow-composio`
-  then `/plugin enable yellow-composio` to re-fire the prompts.
+- The `userConfig` values were never set, or were dismissed at the prompt.
+  Fix: `/plugin disable yellow-composio` then `/plugin enable
+  yellow-composio` to re-fire the prompts — or set `COMPOSIO_MCP_URL` /
+  `COMPOSIO_API_KEY` in your shell env, which the wrapper honors as a
+  fallback.
 - `${user_config.*}` substitution in `mcpServers.url`/`headers` is not
   supported by your Claude Code version (this plugin is among the first
   in the marketplace to use that pattern; see the Fallback below).
