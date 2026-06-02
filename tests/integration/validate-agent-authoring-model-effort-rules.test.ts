@@ -76,6 +76,19 @@ describe('validate-agent-authoring V1: effort enum', () => {
     expect(stderr).toMatch(/invalid effort: 'hight'/);
   });
 
+  it('errors on a non-scalar effort: [high] (array must not coerce to "high")', () => {
+    // YAML parses `effort: [high]` as a list. Plain String() coercion would
+    // smuggle it past the enum as "high"; the JSON form keeps V1 flagging it.
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/workflow/effort-array.md',
+      agentBody({ name: 'effort-array', model: 'sonnet', effort: '[high]' })
+    );
+    const { status, stderr } = runValidator(tmpRoot);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/invalid effort: '\["high"\]'/);
+  });
+
   it('passes when effort: is absent', () => {
     writeAgent(
       tmpRoot,
@@ -138,6 +151,19 @@ describe('validate-agent-authoring V2: model enum', () => {
     const { status, stderr } = runValidator(tmpRoot);
     expect(status).toBeGreaterThan(0);
     expect(stderr).toMatch(/invalid model: 'sonnet-invalid'/);
+  });
+
+  it('errors on a non-scalar model: [inherit] (array must not coerce to "inherit")', () => {
+    // `model: [inherit]` is a list, not a scalar. Coercing it with String()
+    // would yield "inherit" and pass V2; the JSON form keeps V2 flagging it.
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/workflow/model-array.md',
+      agentBody({ name: 'model-array', model: '[inherit]' })
+    );
+    const { status, stderr } = runValidator(tmpRoot);
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/invalid model: '\["inherit"\]'/);
   });
 
   it('passes when model: is absent', () => {

@@ -125,6 +125,26 @@ describe('validate-agent-authoring W1.5 read-only reviewer rule', () => {
     expect(stderr).toMatch(/Write, Edit/);
   });
 
+  it('flags MultiEdit in review agent tools (W1.5 deny-set includes MultiEdit)', () => {
+    // MultiEdit is a batch file-write tool; listing it in a review agent's
+    // tools: is the fail-open path W1.5 now closes alongside Write/Edit.
+    const multiEditViolator = REVIEW_AGENT_BASH_VIOLATOR.replace(
+      'synth-violator',
+      'multiedit-violator'
+    ).replace('  - Bash', '  - MultiEdit');
+    writeAgent(
+      tmpRoot,
+      'yellow-test/agents/review/multiedit-violator.md',
+      multiEditViolator
+    );
+
+    const { status, stderr } = runValidator(tmpRoot);
+
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/multiedit-violator\.md/);
+    expect(stderr).toMatch(/MultiEdit/);
+  });
+
   it('does NOT flag non-review agents (e.g., agents/workflow/)', () => {
     // pr-comment-resolver legitimately needs Bash and Edit; it lives under
     // agents/workflow/ not agents/review/ and Rule X does not apply.

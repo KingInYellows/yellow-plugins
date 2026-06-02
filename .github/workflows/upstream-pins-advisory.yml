@@ -1,0 +1,65 @@
+# Advisory-only upstream pin drift report (issue #268).
+#
+# This workflow is INTENTIONALLY separate from validate-schemas.yml and is NOT
+# referenced by its `ci-status` gate. check-upstream-pins.js makes synchronous
+# `npm view <pkg> version` network calls (one per pinned MCP package), which
+# would violate validate-schemas.yml's 2-minute NFR-MAINT-002 critical-path
+# SLO and add npm-registry flakiness to every PR. Drift is non-urgent, so it
+# runs on a weekly schedule and on manual dispatch and never blocks a merge.
+# See docs/upstream-pins.md for the pin policy and bump checklist.
+name: Upstream Pin Drift (advisory)
+
+on:
+  schedule:
+    # Mondays 08:00 UTC — aligns with the "monthly cadence or before a release"
+    # review guidance in docs/upstream-pins.md (weekly cron is cheap and keeps
+    # the report fresh without anyone remembering to run it).
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-pins-advisory
+  cancel-in-progress: false
+
+jobs:
+  check-pins:
+    name: Upstream pin drift report
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          clean: true
+          # No subsequent step runs authenticated git, so don't persist the
+          # checkout token into .git/config (avoids credential exposure in the
+          # workspace; zizmor artipacked).
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22.22.0'
+
+      - name: Report upstream pin drift (advisory — never fails the job)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          # check-upstream-pins.js has zero npm dependencies (node builtins plus
+          # the `npm view` binary already on the runner), so no `pnpm install`
+          # is needed. Default invocation exits 0 even when drift exists — this
+          # is the same advisory behavior as `pnpm check:pins`.
+          node scripts/check-upstream-pins.js --verbose | tee pin-drift.txt
+          {
+            echo '## Upstream pin drift report'
+            echo ''
+            echo '```'
+            cat pin-drift.txt
+            echo '```'
+            echo ''
+            echo '_Advisory only — bump pins per docs/upstream-pins.md when drift warrants. This job never blocks merges._'
+          } >> "$GITHUB_STEP_SUMMARY"

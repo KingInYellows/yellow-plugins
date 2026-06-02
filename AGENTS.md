@@ -239,11 +239,18 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 - Preferred `SKILL.md` body shape is `## What It Does`, `## When to Use`, and
   `## Usage`; use lower-level headings inside `## Usage`.
 - Review agents under `plugins/<name>/agents/review/` must be read-only: no
-  `Bash`, `Write`, or `Edit` in `tools:` unless the file is explicitly
-  allowlisted in `scripts/validate-agent-authoring.js` and includes a "Tool
-  Surface - Documented Exception" section.
+  `Bash`, `Write`, `Edit`, or `MultiEdit` in `tools:` (W1.5) unless the file is
+  explicitly allowlisted in `scripts/validate-agent-authoring.js` and includes a
+  "Tool Surface - Documented Exception" section. A review agent that sets
+  `memory:` (which auto-enables Read/Write/Edit) MUST also carry
+  `disallowedTools: [Write, Edit, MultiEdit]` to restore the read-only contract
+  (W1.5b).
 - Use `memory: project`, `memory: user`, or another supported scope. Do not use
   `memory: true`.
+- `tools:`, `disallowedTools:`, and `skills:` accept a YAML list (block or
+  `[A, B]` flow form) or a comma-separated string (`A, B`) — the validator
+  parses all three. Inline `#` comments are stripped (the validator parses real
+  YAML), so a trailing comment cannot bypass these checks.
 - If a command or agent uses deferred MCP tools, include `ToolSearch` and verify
   the real tool names after plugin installation.
 - For bundled MCP servers, derive tool names from the manifest:

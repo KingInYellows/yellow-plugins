@@ -28,6 +28,7 @@
     "generate:snippets": "node scripts/sync-shell-snippets.js",
     "validate:setup-all": "node scripts/validate-setup-all.js",
     "validate:doc-counts": "node scripts/validate-doc-counts.js",
+    "check:pins": "node scripts/check-upstream-pins.js",
     "test:lint-plugins": "bats tests/lint-plugins.bats",
     "lint:plugins": "bash scripts/lint-plugins.sh",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",

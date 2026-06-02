@@ -93,6 +93,25 @@ tools:
 Body for W1.5b fixture.
 `;
 
+// memory: as a non-scalar (flow list) — Claude Code ignores a non-scalar scope
+// value, so memory is NOT active, no Read/Write/Edit auto-grant, and W1.5b must
+// NOT fire (no disallowedTools present). Guards the parseScalar non-scalar
+// rejection: an array scope must coerce to a non-VALID_MEMORY_SCOPE value, not
+// to "project".
+const REVIEW_FM_MEMORY_ARRAY_SCOPE = `---
+name: w15b-fixture
+description: W1.5b review fixture. Use when verifying a non-scalar memory scope.
+model: inherit
+memory: [project]
+tools:
+  - Read
+  - Grep
+  - Glob
+---
+
+Body for W1.5b fixture.
+`;
+
 // A review/ agent with NO memory: at all — W1.5b is a no-op (the W1.5
 // tools-list check is the only relevant rule, and Read/Grep/Glob pass it).
 const REVIEW_FM_NO_MEMORY = `---
@@ -122,6 +141,94 @@ tools:
 ---
 
 Body for allowlisted fixture.
+`;
+
+// memory: with a trailing inline YAML comment. The pre-yaml regex parser
+// returned "project # scoped" (not a valid scope), silently disabling W1.5b —
+// the fail-open bypass. Claude Code (real YAML) strips the comment → "project"
+// → memory IS active → the deny is required. MUST FAIL.
+const REVIEW_FM_MEMORY_INLINE_COMMENT = `---
+name: w15b-fixture
+description: W1.5b review fixture. Use when verifying inline-comment handling.
+model: inherit
+memory: project # scoped to project memory
+tools:
+  - Read
+  - Grep
+  - Glob
+---
+
+Body for W1.5b fixture.
+`;
+
+// Comma-string disallowedTools — a list form Claude Code accepts. The deny set
+// is complete, so this MUST PASS (the pre-yaml parser returned [] for this
+// form and wrongly failed it).
+const REVIEW_FM_MEMORY_COMMA_DENY = `---
+name: w15b-fixture
+description: W1.5b review fixture. Use when verifying comma-string disallowedTools.
+model: inherit
+memory: project
+tools:
+  - Read
+  - Grep
+  - Glob
+disallowedTools: Write, Edit, MultiEdit
+---
+
+Body for W1.5b fixture.
+`;
+
+// Flow-list disallowedTools with a complete deny set. MUST PASS.
+const REVIEW_FM_MEMORY_FLOW_DENY = `---
+name: w15b-fixture
+description: W1.5b review fixture. Use when verifying flow-list disallowedTools.
+model: inherit
+memory: project
+tools:
+  - Read
+  - Grep
+  - Glob
+disallowedTools: [Write, Edit, MultiEdit]
+---
+
+Body for W1.5b fixture.
+`;
+
+// Denies Write and Edit but NOT MultiEdit — must fail now that W1.5b requires
+// the full [Write, Edit, MultiEdit] deny set. MUST FAIL, naming MultiEdit.
+const REVIEW_FM_MEMORY_MISSING_MULTIEDIT = `---
+name: w15b-fixture
+description: W1.5b review fixture. Use when verifying the MultiEdit requirement.
+model: inherit
+memory: project
+tools:
+  - Read
+  - Grep
+  - Glob
+disallowedTools:
+  - Write
+  - Edit
+---
+
+Body for W1.5b fixture.
+`;
+
+// Quoted scalar memory value + flow deny — quotes must resolve to the scope
+// "project" and the deny is complete. MUST PASS.
+const REVIEW_FM_MEMORY_QUOTED = `---
+name: w15b-fixture
+description: W1.5b review fixture. Use when verifying quoted memory scope.
+model: inherit
+memory: "project"
+tools:
+  - Read
+  - Grep
+  - Glob
+disallowedTools: [Write, Edit, MultiEdit]
+---
+
+Body for W1.5b fixture.
 `;
 
 let pluginsDir: string;
@@ -179,6 +286,20 @@ describe('validate-agent-authoring W1.5b (memory: requires disallowedTools)', ()
     expect(result.status).toBe(0);
   });
 
+  it('does NOT fire on a non-scalar scope (memory: [project]) — array not coerced to a valid scope', () => {
+    // A list memory value is ignored by Claude Code (no write auto-grant), so
+    // the read-only contract is intact and W1.5b must stay silent. Guards
+    // against String() coercing [project] → "project" and falsely activating
+    // the gate (which would demand a disallowedTools entry that isn't needed).
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/review/w15b-fixture.md',
+      REVIEW_FM_MEMORY_ARRAY_SCOPE
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).toBe(0);
+  });
+
   it('is a no-op when no memory: is set', () => {
     writeAgent(
       pluginsDir,
@@ -197,5 +318,94 @@ describe('validate-agent-authoring W1.5b (memory: requires disallowedTools)', ()
     );
     const result = runValidator(pluginsDir);
     expect(result.status).toBe(0);
+  });
+
+  it('fires on memory: project with a trailing inline comment (no deny) — the bypass fix', () => {
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/review/w15b-fixture.md',
+      REVIEW_FM_MEMORY_INLINE_COMMENT
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/W1\.5b/);
+  });
+
+  it('passes a complete comma-string deny (disallowedTools: Write, Edit, MultiEdit)', () => {
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/review/w15b-fixture.md',
+      REVIEW_FM_MEMORY_COMMA_DENY
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).toBe(0);
+  });
+
+  it('passes a complete flow-list deny (disallowedTools: [Write, Edit, MultiEdit])', () => {
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/review/w15b-fixture.md',
+      REVIEW_FM_MEMORY_FLOW_DENY
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).toBe(0);
+  });
+
+  it('fails a partial deny missing MultiEdit (Write + Edit present)', () => {
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/review/w15b-fixture.md',
+      REVIEW_FM_MEMORY_MISSING_MULTIEDIT
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/W1\.5b/);
+    // The error names the specifically-missing tool.
+    expect(result.stdout + result.stderr).toMatch(/MultiEdit/);
+  });
+
+  it('passes a quoted memory scope ("project") with a complete deny', () => {
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/review/w15b-fixture.md',
+      REVIEW_FM_MEMORY_QUOTED
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).toBe(0);
+  });
+});
+
+// Malformed frontmatter must fail LOUD, not silently disable the security
+// gates (which all depend on the YAML parse succeeding).
+const MALFORMED_YAML_FM = `---
+name: malformed-fixture
+description: "Malformed YAML fixture. Use when verifying the parse-error gate."
+model: inherit
+tools: [Read, Grep
+---
+
+Body for malformed fixture.
+`;
+
+describe('validate-agent-authoring malformed YAML frontmatter', () => {
+  let pluginsDir2: string;
+
+  beforeEach(() => {
+    pluginsDir2 = mkdtempSync(join(tmpdir(), 'validate-malformed-'));
+  });
+
+  afterEach(() => {
+    rmSync(pluginsDir2, { recursive: true, force: true });
+  });
+
+  it('errors with a clear message instead of silently passing', () => {
+    writeAgent(
+      pluginsDir2,
+      'yellow-core/agents/workflow/malformed-fixture.md',
+      MALFORMED_YAML_FM
+    );
+    const result = runValidator(pluginsDir2);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/malformed YAML/i);
   });
 });
