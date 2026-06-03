@@ -219,6 +219,10 @@ _t() { # _t <seconds> <cmd...>
 # Temp isolation env.
 # ----------------------------------------------------------------------------
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/yp-smoke.XXXXXX")"
+if [ -z "$TMP_ROOT" ] || [ ! -d "$TMP_ROOT" ]; then
+  printf '[smoke] Error: failed to create temp isolation directory\n' >&2
+  exit 2
+fi
 cleanup() {
   # shellcheck disable=SC2317  # reached via the EXIT trap, not inline.
   if [ "$KEEP_TEMP" -eq 1 ]; then
