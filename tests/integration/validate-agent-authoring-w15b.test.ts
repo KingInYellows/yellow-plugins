@@ -59,6 +59,24 @@ disallowedTools:
 Body for W1.5b fixture.
 `;
 
+// memory: project with an EMPTY disallowedTools list — parseList returns [], so
+// all three required denies are missing and W1.5b must fire. Guards the empty-
+// list edge of the comma/flow/block parsing.
+const REVIEW_FM_MEMORY_EMPTY_DENY = `---
+name: w15b-fixture
+description: W1.5b review fixture. Use when verifying the memory write-deny rule.
+model: inherit
+memory: project
+tools:
+  - Read
+  - Grep
+  - Glob
+disallowedTools: []
+---
+
+Body for W1.5b fixture.
+`;
+
 // Denies Write but not Edit — partial deny must still fail (Edit is
 // memory-granted and write-capable).
 const REVIEW_FM_MEMORY_PARTIAL_DENY = `---
@@ -372,6 +390,21 @@ describe('validate-agent-authoring W1.5b (memory: requires disallowedTools)', ()
     );
     const result = runValidator(pluginsDir);
     expect(result.status).toBe(0);
+  });
+
+  it('fails on an empty disallowedTools list (disallowedTools: []) — all three denies missing', () => {
+    writeAgent(
+      pluginsDir,
+      'yellow-core/agents/review/w15b-fixture.md',
+      REVIEW_FM_MEMORY_EMPTY_DENY
+    );
+    const result = runValidator(pluginsDir);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/W1\.5b/);
+    // All three required denies are absent and must be named in the error.
+    expect(result.stdout + result.stderr).toMatch(/Write/);
+    expect(result.stdout + result.stderr).toMatch(/Edit/);
+    expect(result.stdout + result.stderr).toMatch(/MultiEdit/);
   });
 });
 
