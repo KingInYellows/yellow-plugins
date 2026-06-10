@@ -64,7 +64,36 @@ patterns and style.
    - Reset todo to ready: `transition_todo_state "$TODO_PATH" "ready"`
    - Exit with error message
 
-**Implementation**: See lines 61-91 in original agent for full bash script.
+**Implementation** (run as one Bash call; substitute the actual todo path):
+
+```bash
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+TODO_PATH="<todo-path-from-step-1>"
+
+# Allowed scope: file portion of each affected_files entry (strip :line ranges)
+mapfile -t ALLOWED < <(extract_frontmatter "$TODO_PATH" | yq -r '.affected_files[]' | cut -d: -f1)
+[ "${#ALLOWED[@]}" -eq 0 ] && { printf '[debt-fixer] ERROR: no affected_files in %s\n' "$TODO_PATH" >&2; exit 1; }
+
+OUT_OF_SCOPE=0
+while IFS= read -r changed_file; do
+  [ -z "$changed_file" ] && continue
+  in_scope=0
+  for allowed in "${ALLOWED[@]}"; do
+    [ "$changed_file" = "$allowed" ] && { in_scope=1; break; }
+  done
+  if [ "$in_scope" -eq 0 ]; then
+    OUT_OF_SCOPE=1
+    printf '[debt-fixer] ERROR: Modified file outside affected_files scope: %s\n' "$changed_file" >&2
+    git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
+  fi
+done < <(git status --porcelain | cut -c4-)
+
+if [ "$OUT_OF_SCOPE" -eq 1 ]; then
+  transition_todo_state "$TODO_PATH" "ready"
+  printf '[debt-fixer] Out-of-scope edits reverted; todo reset to ready. Aborting.\n' >&2
+  exit 1
+fi
+```
 
 ### 4. Show Diff
 

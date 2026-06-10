@@ -10,8 +10,8 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_projects
   - mcp__plugin_yellow-linear_linear__list_issues
   - mcp__plugin_yellow-linear_linear__list_issue_labels
-  - mcp__plugin_yellow-linear_linear__create_issue
-  - mcp__plugin_yellow-linear_linear__create_issue_label
+  - mcp__plugin_yellow-linear_linear__save_issue
+  - mcp__plugin_yellow-linear_linear__save_issue_label
 ---
 
 # Technical Debt Linear Sync
@@ -217,13 +217,14 @@ case "$SEVERITY" in
 esac
 ```
 
-**8d. Create issue** — Call `create_issue` with:
+**8d. Create issue** — Call `save_issue` (omit `id` so a new issue is
+created) with:
 - `title`: `TITLE`
 - `description`: Full markdown description built from `DESCRIPTION` + category +
   severity context
-- `teamId`: `TEAM_ID`
-- `projectId`: `PROJECT_ID` (omit if empty)
-- `labelIds`: `[DEBT_LABEL_ID]` (omit if empty)
+- `team`: `TEAM_ID`
+- `project`: `PROJECT_ID` (omit if empty)
+- `labels`: `[DEBT_LABEL_ID]` (omit if empty)
 - `priority`: `PRIORITY`
 
 On failure: retry up to 3 times with exponential backoff (1s, 2s, 4s). On 429
@@ -232,11 +233,11 @@ error and continue to next finding (do not exit).
 
 **8e. Write back to frontmatter:**
 
-Extract `id` from the `create_issue` response, then validate before writing:
+Extract `id` from the `save_issue` response, then validate before writing:
 ```bash
 ISSUE_ID=$(printf '%s' "$CREATE_RESPONSE" | jq -r '.id // empty')
 if [ -z "$ISSUE_ID" ]; then
-  printf '[sync] ERROR: create_issue returned no ID for: %s\n' "$TITLE" >&2
+  printf '[sync] ERROR: save_issue returned no ID for: %s\n' "$TITLE" >&2
   ERROR_COUNT=$((ERROR_COUNT + 1))
   continue
 fi
