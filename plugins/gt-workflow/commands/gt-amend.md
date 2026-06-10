@@ -1,8 +1,6 @@
 ---
 name: gt-amend
-description:
-  'Amend the current branch commit: audit changes, update the commit, and
-  re-submit via Graphite'
+description: 'Fold working-tree changes into the current branch commit, audit them, and re-submit via Graphite. Use when user says "amend this", "add this to the current PR", "fold this fix in", or has follow-up edits for an already-submitted branch. Not for new work — use /smart-submit to create a new branch.'
 allowed-tools:
   - Bash
   - Read

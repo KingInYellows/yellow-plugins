@@ -1,6 +1,6 @@
 ---
 name: smart-submit
-description: "Stage, audit, commit, and submit changes via Graphite with parallel code review agents"
+description: "Stage, audit, commit, and submit uncommitted changes as a Graphite branch and PR, with parallel code-review agents. Use when user says \"submit this\", \"ship it\", \"commit and push\", or \"create a PR\", or has finished work sitting uncommitted. Not for amending an already-submitted branch — use /gt-amend."
 allowed-tools:
   - Bash
   - Read

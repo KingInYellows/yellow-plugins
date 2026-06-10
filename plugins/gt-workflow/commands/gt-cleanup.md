@@ -1,6 +1,6 @@
 ---
 name: gt-cleanup
-description: 'Scan local branches for staleness and divergence, then clean up or reconcile'
+description: 'Scan local branches for staleness and divergence, then delete or reconcile them with safeguards. Use when user says "clean up my branches", "delete merged branches", or "which branches are stale", or after a batch of PRs merged. Not for pulling trunk or restacking — use /gt-sync.'
 argument-hint: '[--stale-days N] [--dry-run]'
 allowed-tools:
   - Bash

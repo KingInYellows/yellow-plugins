@@ -1,6 +1,6 @@
 ---
 name: gt-sync
-description: 'Sync repo with trunk, restack branches, and clean up merged PRs'
+description: 'Pull latest trunk, restack all tracked branches, and untrack branches whose PRs merged. Use when user says "sync with main", "rebase my stack", or "pull latest", after PRs merge, or when gt reports "needs restack". Not for deleting stale local-only branches — use /gt-cleanup.'
 argument-hint: '[--no-delete | --force]'
 allowed-tools:
   - Bash
