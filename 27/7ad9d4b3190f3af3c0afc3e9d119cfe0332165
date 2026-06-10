@@ -1,0 +1,23 @@
+plugins/gt-workflow/commands/smart-submit.md
+  s_e0beaba782ec4e::t_c8604ba1e00cca 3
+plugins/gt-workflow/commands/gt-amend.md
+  s_e0beaba782ec4e::t_c8604ba1e00cca 3
+plugins/gt-workflow/commands/gt-cleanup.md
+  s_e0beaba782ec4e::t_c8604ba1e00cca 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "277ad9d4b3190f3af3c0afc3e9d119cfe0332165",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
