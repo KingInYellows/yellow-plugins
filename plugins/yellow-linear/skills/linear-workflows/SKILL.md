@@ -250,7 +250,7 @@ fi
 
 For commands that issue multiple writes (triage, plan-cycle):
 
-- Add a brief delay between each `update_issue` call for batches >5 items
+- Add a brief delay between each `save_issue` call for batches >5 items
 - If a 429 rate limit response occurs, pause and retry with exponential backoff
 - On partial failure, report results so far and offer to retry remaining items
 - Never leave the user guessing about state after a partial failure

@@ -8,7 +8,7 @@ allowed-tools:
   - Grep
   - AskUserQuestion
   - ToolSearch
-  - mcp__plugin_yellow-linear_linear__create_issue
+  - mcp__plugin_yellow-linear_linear__save_issue
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__get_team
   - mcp__plugin_yellow-linear_linear__list_issue_labels
@@ -63,14 +63,14 @@ no project).
 
 ### Step 5: Create Issue
 
-Call `create_issue` with:
+Call `save_issue` with:
 
 - `title` — from Step 2
 - `description` — from Step 2 + context from Step 3
-- `teamId` — from Step 1
+- `team` — from Step 1
 - `priority` — from Step 4 (if set)
-- `labelIds` — from Step 4 (if set)
-- `projectId` — from Step 4 (if set)
+- `labels` — from Step 4 (if set)
+- `project` — from Step 4 (if set)
 
 ### Step 6: Report
 

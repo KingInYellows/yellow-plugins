@@ -42,7 +42,7 @@ insights from the Linear backlog to help developers make informed decisions.
 
 **Reference:** Follow conventions in the `linear-workflows` skill for team
 detection, search patterns, and error handling. This agent is strictly read-only
-— never call write tools (`update_issue`, `create_issue`, `create_comment`).
+— never call write tools (`save_issue`, `save_comment`).
 
 ## Workflow
 

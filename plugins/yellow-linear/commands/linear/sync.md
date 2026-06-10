@@ -9,9 +9,9 @@ allowed-tools:
   - ToolSearch
   - Skill
   - mcp__plugin_yellow-linear_linear__get_issue
-  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__save_issue
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
-  - mcp__plugin_yellow-linear_linear__create_comment
+  - mcp__plugin_yellow-linear_linear__save_comment
   - mcp__plugin_yellow-linear_linear__list_comments
 ---
 
@@ -80,7 +80,7 @@ Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 
 - **If PR exists:** Check the comments fetched in Step 3 for an existing PR link
   comment matching this PR URL. If already linked, skip. Otherwise, add via
-  `mcp__plugin_yellow-linear_linear__create_comment`:
+  `mcp__plugin_yellow-linear_linear__save_comment`:
   ```
   PR linked: [PR Title](PR URL) — State: open/merged
   ```
@@ -114,7 +114,7 @@ Determine the appropriate status transition:
 If the issue is already in the suggested target status (e.g., already "In
 Review" when suggesting "In Review"), skip the transition silently.
 
-Apply via `update_issue` only after the appropriate tier check passes.
+Apply via `save_issue` only after the appropriate tier check passes.
 
 **Note:** When invoked programmatically from `/workflows:work` after PR
 submission (via Skill tool), the caller passes `--after-submit` to enable Tier 1

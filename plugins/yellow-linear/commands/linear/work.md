@@ -15,7 +15,7 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
   - mcp__plugin_yellow-linear_linear__list_comments
-  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__save_issue
 ---
 
 # Work on Linear Issue
@@ -171,8 +171,8 @@ Transition issue(s) to "In Progress" (Tier 1 — auto-apply, safe transition):
 3. Call `mcp__plugin_yellow-linear_linear__list_issue_statuses` for the issue's
    team.
 4. Find the status whose `type` is `started` (In Progress equivalent).
-5. Call `mcp__plugin_yellow-linear_linear__update_issue` with the new `stateId`
-   for each issue.
+5. Call `mcp__plugin_yellow-linear_linear__save_issue` for each issue, passing
+   the issue `id` and the new status `id` as `state`.
 6. Report: "Updated <ISSUE-ID> to In Progress."
 
 ### Step 7: Invoke Selected Command

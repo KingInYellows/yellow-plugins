@@ -11,8 +11,8 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_issues
   - mcp__plugin_yellow-linear_linear__list_initiatives
   - mcp__plugin_yellow-linear_linear__get_initiative
-  - mcp__plugin_yellow-linear_linear__list_initiative_updates
-  - mcp__plugin_yellow-linear_linear__create_initiative_update
+  - mcp__plugin_yellow-linear_linear__get_status_updates
+  - mcp__plugin_yellow-linear_linear__save_status_update
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
 ---
@@ -53,7 +53,7 @@ Query active initiatives via `mcp__plugin_yellow-linear_linear__list_initiatives
 For each initiative:
 
 - Fetch details via `mcp__plugin_yellow-linear_linear__get_initiative`
-- Fetch recent updates via `mcp__plugin_yellow-linear_linear__list_initiative_updates`
+- Fetch recent updates via `mcp__plugin_yellow-linear_linear__get_status_updates`
 - Show: name, status, last update date, health indicator
 
 ### Step 3: Surface Blockers and Risks
@@ -95,7 +95,7 @@ If yes:
 - **Validate access (C1):** Call `mcp__plugin_yellow-linear_linear__get_initiative`
   with the selected initiative ID to verify it exists and belongs to the user's
   workspace. If validation fails, report the error and stop.
-- Post via `mcp__plugin_yellow-linear_linear__create_initiative_update` with the report
+- Post via `mcp__plugin_yellow-linear_linear__save_status_update` with the report
   content
 
 ## Error Handling

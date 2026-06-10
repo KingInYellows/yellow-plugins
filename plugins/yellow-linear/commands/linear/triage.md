@@ -8,7 +8,7 @@ allowed-tools:
   - ToolSearch
   - mcp__plugin_yellow-linear_linear__list_issues
   - mcp__plugin_yellow-linear_linear__get_issue
-  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__save_issue
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__get_team
   - mcp__plugin_yellow-linear_linear__list_users
@@ -72,7 +72,7 @@ If more than 3 issues selected for changes:
 - Present summary of all planned changes
 - Require explicit confirmation via AskUserQuestion before applying
 
-**Validate and apply (C1 + H1):** Before each `update_issue` call:
+**Validate and apply (C1 + H1):** Before each `save_issue` call:
 
 1. **Validate ownership (C1):** Call `get_issue` to verify the issue exists and
    belongs to the user's workspace. If not found or access denied, skip and
@@ -86,7 +86,7 @@ If more than 3 issues selected for changes:
    Your change: Assign to @bob
    [Skip] [Override] [Cancel All]
    ```
-3. **Apply:** Call `update_issue` only for validated, non-conflicting issues.
+3. **Apply:** Call `save_issue` only for validated, non-conflicting issues.
 4. **Rate limit:** Add a brief delay between writes for batches >5 issues.
 
 ### Step 7: Summary
