@@ -68,7 +68,9 @@ runners.
 ## Core Responsibilities
 
 1. Fetch failed CI logs via `gh run view --log-failed`
-2. Apply secret redaction before analyzing (source `lib/redact.sh`)
+2. Apply secret redaction before analyzing (source
+   `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/redact.sh` and pipe logs through
+   `redact_secrets`)
 3. Match log content against failure patterns F01-F12
 4. Identify root cause with supporting log evidence
 5. Handle multi-job failures (group by pattern, prioritize setup failures)
@@ -82,7 +84,8 @@ runners.
 
 ```bash
 # Stream logs with timeout, pipe through redaction
-timeout 30 gh run view "$RUN_ID" --log-failed 2>&1 | head -n 500 | head -c 5242880
+. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/redact.sh"
+timeout 30 gh run view "$RUN_ID" --log-failed 2>&1 | head -n 500 | head -c 5242880 | redact_secrets
 ```
 
 If no run ID provided, get latest failed run:
@@ -93,7 +96,9 @@ gh run list --status failure --limit 1 --json databaseId -q '.[0].databaseId'
 
 ### Step 2: Redact Secrets
 
-Before analyzing, apply redaction patterns. Never display raw log content.
+The `redact_secrets` pipe in Step 1 already applied the redaction patterns.
+If you fetched any log content through a different path, re-run it through
+`redact_secrets` before analyzing. Never display raw log content.
 
 ### Step 3: Pattern Match
 

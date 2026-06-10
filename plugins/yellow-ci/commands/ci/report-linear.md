@@ -11,8 +11,8 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_issues
   - mcp__plugin_yellow-linear_linear__list_issue_labels
-  - mcp__plugin_yellow-linear_linear__create_issue
-  - mcp__plugin_yellow-linear_linear__create_issue_label
+  - mcp__plugin_yellow-linear_linear__save_issue
+  - mcp__plugin_yellow-linear_linear__save_issue_label
 ---
 
 # CI Report to Linear
@@ -175,11 +175,11 @@ Use `AskUserQuestion` — "Create this Linear issue? [Yes / Edit title / Cancel]
 
 ### Step 9: Create Issue
 
-Call `create_issue` with:
+Call `save_issue` (omit `id` so a new issue is created) with:
 - `title`: proposed or edited title
 - `description`: full markdown body from Step 8
-- `teamId`: `TEAM_ID`
-- `labelIds`: `[CI_LABEL_ID]` (omit if empty)
+- `team`: `TEAM_ID`
+- `labels`: `[CI_LABEL_ID]` (omit if empty)
 - `priority`: 2 (High — CI failures are high priority by default)
 
 ### Step 10: Report
@@ -202,4 +202,4 @@ To delegate implementation to Devin, run:
 | `gh` not authenticated | Exit with `gh auth login` instruction |
 | No failed run found | Exit with message, suggest explicit run ID |
 | failure-analyst returns no F-code | Use generic title "CI failure — investigation needed" |
-| 429 rate limit on `create_issue` | Exponential backoff 1s → 2s → 4s, max 3 retries |
+| 429 rate limit on `save_issue` | Exponential backoff 1s → 2s → 4s, max 3 retries |
