@@ -64,7 +64,55 @@ patterns and style.
    - Reset todo to ready: `transition_todo_state "$TODO_PATH" "ready"`
    - Exit with error message
 
-**Implementation**: See lines 61-91 in original agent for full bash script.
+**Implementation** (run as one Bash call; substitute the actual todo path):
+
+```bash
+_validate_sh="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT is unset}/lib/validate.sh"
+[ -f "$_validate_sh" ] || { printf '[debt-fixer] ERROR: validate.sh not found at %s\n' "$_validate_sh" >&2; exit 1; }
+. "$_validate_sh"
+TODO_PATH="<todo-path-from-step-1>"
+
+command -v yq >/dev/null 2>&1 || { printf '[debt-fixer] ERROR: yq not installed\n' >&2; exit 1; }
+frontmatter=$(extract_frontmatter "$TODO_PATH") \
+  || { printf '[debt-fixer] ERROR: cannot read frontmatter from %s\n' "$TODO_PATH" >&2; exit 1; }
+
+# Allowed scope: file portion of each affected_files entry (strip :line ranges)
+mapfile -t ALLOWED < <(printf '%s\n' "$frontmatter" | yq -r '.affected_files[]' | cut -d: -f1)
+[ "${#ALLOWED[@]}" -eq 0 ] && { printf '[debt-fixer] ERROR: no affected_files in %s\n' "$TODO_PATH" >&2; exit 1; }
+
+OUT_OF_SCOPE=0
+while IFS= read -r status_line; do
+  [ -z "$status_line" ] && continue
+  changed_file="${status_line:3}"
+  # Rename/copy entries are "old -> new"; the destination is the file on disk
+  case "${status_line:0:2}" in R*|C*) changed_file="${changed_file##* -> }" ;; esac
+  # The todo file itself is legitimately modified (/debt:fix transitions it to
+  # in-progress before launching this agent) — never treat it as out-of-scope
+  [ "$changed_file" = "$TODO_PATH" ] && continue
+  in_scope=0
+  for allowed in "${ALLOWED[@]}"; do
+    [ "$changed_file" = "$allowed" ] && { in_scope=1; break; }
+  done
+  if [ "$in_scope" -eq 0 ]; then
+    OUT_OF_SCOPE=1
+    printf '[debt-fixer] ERROR: Modified file outside affected_files scope: %s\n' "$changed_file" >&2
+    if git ls-files --error-unmatch -- "$changed_file" >/dev/null 2>&1; then
+      # Tracked file: restore is the only safe revert — never rm a tracked file
+      git restore --staged --worktree -- "$changed_file" \
+        || { printf '[debt-fixer] ERROR: git restore failed for %s; cannot safely revert\n' "$changed_file" >&2; exit 1; }
+    else
+      rm -f -- "$changed_file"
+    fi
+  fi
+done < <(git status --porcelain)
+
+if [ "$OUT_OF_SCOPE" -eq 1 ]; then
+  transition_todo_state "$TODO_PATH" "ready" \
+    || printf '[debt-fixer] WARNING: failed to reset todo to ready — check state manually: %s\n' "$TODO_PATH" >&2
+  printf '[debt-fixer] Out-of-scope edits reverted; todo reset to ready (see warnings above if any). Aborting.\n' >&2
+  exit 1
+fi
+```
 
 ### 4. Show Diff
 
