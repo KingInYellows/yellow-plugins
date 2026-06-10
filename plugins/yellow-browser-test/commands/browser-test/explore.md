@@ -49,27 +49,42 @@ fi
 ```
 
 Check if the server is already running, start it if not, and poll for
-readiness (uses `BASE_URL`, `DEV_SERVER_CMD`, `READY_TIMEOUT`, `READY_PATH`
-from the config parsed in Step 1):
+readiness (uses `BASE_URL`, `DEV_SERVER_CMD`, `READY_TIMEOUT`, `READY_PATH` — extract
+these from the config file parsed earlier in this step before running the
+block; fail fast with an error if any of them is empty):
 
 ```bash
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL" 2>/dev/null)
-if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+HTTP_CODE=$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" "$BASE_URL" 2>/dev/null)
+if [ "${HTTP_CODE:-0}" -ge 200 ] && [ "${HTTP_CODE:-0}" -lt 400 ]; then
   printf '[browser-test] Using existing dev server at %s\n' "$BASE_URL" >&2
   # Do NOT stop a pre-existing server when exploration finishes.
 else
+  # Intentionally unquoted: config command strings need word-splitting
   $DEV_SERVER_CMD > .claude/browser-test-server.log 2>&1 &
-  echo $! > .claude/browser-test-server.pid
+  SERVER_PID=$!
+  echo "$SERVER_PID" > .claude/browser-test-server.pid
+  sleep 1
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    printf '[browser-test] Error: Dev server exited immediately.\n' >&2
+    tail -20 .claude/browser-test-server.log >&2
+    exit 1
+  fi
   MAX_ATTEMPTS=$((READY_TIMEOUT / 2))
   ATTEMPT=0
+  LAST_CURL_ERROR=""
   while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
     ATTEMPT=$((ATTEMPT + 1))
     printf '[browser-test] Waiting for dev server (%d/%d)...\n' "$ATTEMPT" "$MAX_ATTEMPTS" >&2
-    curl -s -o /dev/null "$BASE_URL$READY_PATH" 2>/dev/null && break
+    CURL_ERR=$(mktemp)
+    if curl -s --max-time 5 -o /dev/null "$BASE_URL$READY_PATH" 2>"$CURL_ERR"; then
+      rm -f "$CURL_ERR"; break
+    fi
+    LAST_CURL_ERROR=$(cat "$CURL_ERR"); rm -f "$CURL_ERR"
     [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ] && sleep 2
   done
   if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
     printf '[browser-test] Error: Server timeout after %d seconds.\n' "$READY_TIMEOUT" >&2
+    [ -n "$LAST_CURL_ERROR" ] && printf '[browser-test] Last curl error: %s\n' "$LAST_CURL_ERROR" >&2
     tail -20 .claude/browser-test-server.log >&2
     exit 1
   fi

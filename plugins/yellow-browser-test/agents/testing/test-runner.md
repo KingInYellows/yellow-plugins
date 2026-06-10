@@ -70,7 +70,7 @@ For each non-dynamic route in config:
 1. Check dev server alive. If `.claude/browser-test-server.pid` exists (the
    calling command started the server), use the PID; otherwise (pre-existing
    server) probe the URL:
-   `if [ -f .claude/browser-test-server.pid ]; then kill -0 "$(cat .claude/browser-test-server.pid)" || { printf '[test-runner] Dev server crashed\n' >&2; exit 1; }; else curl -s -o /dev/null "$BASE_URL" || { printf '[test-runner] Dev server not reachable\n' >&2; exit 1; }; fi`
+   `if [ -f .claude/browser-test-server.pid ]; then kill -0 "$(cat .claude/browser-test-server.pid)" || { printf '[test-runner] Dev server crashed\n' >&2; exit 1; }; else curl -s --max-time 5 -o /dev/null "$BASE_URL" || { printf '[test-runner] Dev server not reachable\n' >&2; exit 1; }; fi`
 2. `agent-browser open "$BASE_URL$ROUTE"` and
    `agent-browser wait --load networkidle` — check exit codes, log errors with
    `[test-runner]` prefix
@@ -82,7 +82,9 @@ For each non-dynamic route in config:
 7. `agent-browser screenshot test-reports/screenshots/{slug}-loaded.png`
 8. Identify forms — fill with valid data, submit, verify response
 9. Try edge cases on forms (empty, very long, special characters)
-10. Record: route, pass/fail, console errors, screenshot paths, findings
+10. Record: route, outcome (`pass`, `fail`, or `skipped` — use `skipped` for
+    routes not exercised due to auth failure, dynamic-only paths, or depth
+    limits), console errors, screenshot paths, findings
 11. Write result to `test-reports/results.json` immediately (append mode) —
     preserves partial results if crash occurs
 
