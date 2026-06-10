@@ -290,7 +290,7 @@ fi
 
 ### Step 1.5: Session MCP Visibility (ToolSearch probes)
 
-Run five ToolSearch probes to capture current-session MCP visibility:
+Run four ToolSearch probes to capture current-session MCP visibility:
 
 - `list_user_organizations`
 - `list_teams`

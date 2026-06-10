@@ -42,7 +42,7 @@ Add the marketplace, then install individual plugins:
 
 ## MCP Servers & Authentication
 
-Nine plugins connect to MCP servers. Authentication requirements vary by server.
+Eight plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                |
 | ----------------- | ---------- | ------------------------------------------------------------------- |

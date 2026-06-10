@@ -11,7 +11,6 @@ enterprise deployment.
 | yellow-linear   | linear     | `https://mcp.linear.app/mcp`            | HTTP      | OAuth (browser popup)       | Issue data, team info         |
 | yellow-devin    | deepwiki   | `https://mcp.deepwiki.com/mcp`          | HTTP      | None                        | Repo names, search queries    |
 | yellow-devin    | devin      | `https://mcp.devin.ai/mcp`              | HTTP      | TBD (may require API token) | Code, task prompts            |
-| yellow-chatprd  | chatprd    | `https://app.chatprd.ai/mcp`            | HTTP      | OAuth (Clerk)               | PRD content, document data    |
 | yellow-ruvector | ruvector   | Local stdio (`npx ruvector mcp start`)  | stdio     | None (local)                | Code embeddings (local only)  |
 
 ### Plugins Without MCP Servers
@@ -26,12 +25,12 @@ enterprise deployment.
 Plugins use three authentication patterns. No `.env` files are needed — Claude
 Code handles credentials natively through OAuth and shell environment variables.
 
-### OAuth servers (yellow-linear, yellow-chatprd)
+### OAuth servers (yellow-linear)
 
 These plugins use browser-based OAuth managed entirely by Claude Code:
 
 1. On first MCP tool call, Claude Code opens a browser popup for login
-2. Authenticate with your Linear or ChatPRD account
+2. Authenticate with your Linear account
 3. Token is stored securely in your operating system's credential manager
    (macOS Keychain, Windows Credential Manager, or libsecret on Linux)
 4. To re-authenticate or revoke access: run `/mcp` → select server → "Clear
@@ -74,7 +73,6 @@ mcp.linear.app       — yellow-linear (issue management)
 mcp.context7.com     — yellow-core (library documentation)
 mcp.deepwiki.com     — yellow-devin (public repo docs)
 mcp.devin.ai         — yellow-devin (Devin orchestration)
-app.chatprd.ai       — yellow-chatprd (PRD management)
 ```
 
 ### Selective Plugin Installation
@@ -140,7 +138,7 @@ Before enabling any plugin with hooks:
 
 ## Trust Boundaries
 
-### Remote MCP Servers (yellow-linear, yellow-devin, yellow-chatprd, yellow-core)
+### Remote MCP Servers (yellow-linear, yellow-devin, yellow-core)
 
 - Data sent over HTTPS to third-party servers
 - Subject to each provider's privacy policy and terms

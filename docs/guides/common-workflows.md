@@ -30,7 +30,6 @@ missing — commands report what's unavailable rather than failing silently.
 | yellow-debt | yellow-linear (for `/debt:sync`) | Cannot push findings to Linear |
 | yellow-ci | gh CLI | All commands fail with auth error |
 | yellow-devin | `DEVIN_SERVICE_USER_TOKEN` + `DEVIN_ORG_ID` | Delegation commands fail |
-| yellow-chatprd | ChatPRD OAuth | Document commands fail |
 | yellow-linear | Linear OAuth | Issue commands fail |
 | gt-workflow | Graphite CLI | All commands fail |
 | yellow-ruvector | None | — |
@@ -50,7 +49,6 @@ First time setup:
 3. Configure credentials for optional plugins:
    - Linear: OAuth on first use — no env var needed (MCP handles it)
    - Devin: `export DEVIN_SERVICE_USER_TOKEN=cog_...` and `export DEVIN_ORG_ID=...`
-   - ChatPRD: run `/chatprd:setup`
 4. Try the daily development chain (below) on a small feature
 
 ---
