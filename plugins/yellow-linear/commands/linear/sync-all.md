@@ -10,7 +10,7 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
   - mcp__plugin_yellow-linear_linear__list_issues
   - mcp__plugin_yellow-linear_linear__get_issue
-  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__save_issue
 ---
 
 # Linear Sync-All
@@ -58,10 +58,13 @@ active-work types). Collect their `id` values for the issue query.
 
 ### Step 3: Fetch Open Issues in Active Statuses
 
-Call `list_issues` with the resolved `teamId` and the active status IDs, limit 50.
+Call `list_issues` with the resolved `team`, once per active status (pass the
+status `id` as `state`), limit 50. Merge the results and deduplicate by issue
+`id` before continuing (an issue can appear in more than one bucket).
 
-If `pageInfo.hasNextPage` is true, warn: "More than 50 active issues found — only
-the first 50 are shown. Run again after resolving these."
+If any per-status query returns `pageInfo.hasNextPage: true`, warn: "Some
+statuses have more than 50 active issues — only the first 50 per status are
+shown. Run again after resolving these."
 
 ### Step 4: Check PR Status for Each Issue
 
@@ -141,7 +144,7 @@ For each issue to update:
    in Step 5 — another process may have updated it)
 2. If current status no longer matches what was displayed: skip this issue, add
    to "conflict" list
-3. **Apply** `update_issue` with the new `stateId`
+3. **Apply** `save_issue` with the issue `id` and the new status `id` as `state`
 4. Delay 200ms between writes; on 429 or transient 5xx error from the Linear
    API: exponential backoff 1s → 2s → 4s, max 3 retries
 
@@ -164,7 +167,7 @@ user can handle them manually.
 
 ## Security Patterns
 
-- **H1**: `get_issue` re-fetch before each `update_issue` (TOCTOU guard)
+- **H1**: `get_issue` re-fetch before each `save_issue` (TOCTOU guard)
 - **M3**: Explicit `AskUserQuestion` confirmation before any writes
 - No hardcoded status names — always fetch dynamically via `list_issue_statuses`
 

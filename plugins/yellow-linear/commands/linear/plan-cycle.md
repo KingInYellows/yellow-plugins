@@ -9,7 +9,7 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_cycles
   - mcp__plugin_yellow-linear_linear__list_issues
   - mcp__plugin_yellow-linear_linear__get_issue
-  - mcp__plugin_yellow-linear_linear__update_issue
+  - mcp__plugin_yellow-linear_linear__save_issue
   - mcp__plugin_yellow-linear_linear__list_teams
   - mcp__plugin_yellow-linear_linear__list_users
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
@@ -81,7 +81,7 @@ Present summary of issues to be moved into the cycle:
 
 If more than 3 issues, require explicit confirmation via AskUserQuestion.
 
-**Validate and apply (C1 + H1):** Before each `update_issue` call:
+**Validate and apply (C1 + H1):** Before each `save_issue` call:
 
 1. **Validate ownership (C1):** Call `get_issue` to verify the issue exists and
    belongs to the user's workspace. If not found or access denied, skip and
@@ -90,7 +90,7 @@ If more than 3 issues, require explicit confirmation via AskUserQuestion.
    assignment) against what user saw in Step 4. If the issue has been moved to a
    cycle or deleted, present the conflict and let the user choose to skip or
    override.
-3. **Apply:** Call `update_issue` to set the cycle only for validated issues.
+3. **Apply:** Call `save_issue` to set the cycle only for validated issues.
 4. **Rate limit:** Add a brief delay between writes for batches >5 issues.
 
 ### Step 7: Summary

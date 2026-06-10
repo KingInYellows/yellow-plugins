@@ -9,8 +9,8 @@ tools:
   - AskUserQuestion
   - ToolSearch
   - mcp__plugin_yellow-linear_linear__get_issue
-  - mcp__plugin_yellow-linear_linear__update_issue
-  - mcp__plugin_yellow-linear_linear__create_comment
+  - mcp__plugin_yellow-linear_linear__save_issue
+  - mcp__plugin_yellow-linear_linear__save_comment
   - mcp__plugin_yellow-linear_linear__list_comments
   - mcp__plugin_yellow-linear_linear__list_issue_statuses
 ---
@@ -60,10 +60,11 @@ If no issue ID found, ask user for the issue ID.
 
 ### Step 2: Validate Issue
 
-**Security (C1):** Call `get_issue` with the extracted `issueId` to verify the
+**Security (C1):** Call `get_issue` with the extracted issue identifier as
+`id` to verify the
 issue exists in the user's workspace before any operations; if the issue is not
 found or the call fails, report this to the user and stop without calling
-`create_comment` or `update_issue`.
+`save_comment` or `save_issue`.
 
 ### Step 3: Check PR Status
 
@@ -85,7 +86,8 @@ First, fetch existing comments via `list_comments` and check if a PR link
 comment already exists for this PR URL. If a matching comment is found, skip
 adding a duplicate.
 
-If no existing PR link comment, add one via `create_comment`:
+If no existing PR link comment, add one via `save_comment` (pass the issue
+`id` as `issueId` and the text below as `body`):
 
 ```
 PR linked: [PR Title](PR URL) — State: open/merged
@@ -103,7 +105,7 @@ Determine suggested transition based on PR state:
 **IMPORTANT: DO NOT auto-update without explicit user consent.**
 
 Present the suggestion and current status to the user. Only update via
-`update_issue` after the user explicitly confirms.
+`save_issue` after the user explicitly confirms.
 
 ### Step 6: Summary
 
