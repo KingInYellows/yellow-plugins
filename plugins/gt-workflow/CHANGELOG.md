@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.4
+
+### Patch Changes
+
+- [#577](https://github.com/KingInYellows/yellow-plugins/pull/577)
+  [`1caef28`](https://github.com/KingInYellows/yellow-plugins/commit/1caef289da017cd915ab3e46c6482d8349623335)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: rewrite
+  the descriptions of gt-amend, gt-cleanup, gt-nav, gt-sync, and smart-submit to
+  include explicit "Use when..." trigger phrases and a when-NOT-to-use pointer
+  to the neighboring command — previously 5 of 7 commands described what they
+  ARE rather than when to fire, causing under-triggering in conversational
+  routing; also collapses gt-amend's multi-line description scalar
+  (silent-truncation hazard)
+
 ## 1.5.3
 
 ### Patch Changes

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.4
+
+### Patch Changes
+
+- [#573](https://github.com/KingInYellows/yellow-plugins/pull/573)
+  [`95277f7`](https://github.com/KingInYellows/yellow-plugins/commit/95277f7e1b73cfebcff9409972f4d34ab3f441d0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: add the
+  canonical report template to test-conventions (test-reporter and the skill
+  previously pointed at each other with no template existing anywhere); inline
+  the dev-server check/start/poll block in /browser-test:explore (previously a
+  dangling "same logic as /browser-test:test" reference); guard test-runner's
+  server-alive check against unset SERVER_PID with a PID-file/curl fallback
+
 ## 1.1.3
 
 ### Patch Changes

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.2
+
+### Patch Changes
+
+- [#570](https://github.com/KingInYellows/yellow-plugins/pull/570)
+  [`97cea5f`](https://github.com/KingInYellows/yellow-plugins/commit/97cea5f21595ad8f839f01357a5b1097383b7b09)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: migrate to
+  current Linear MCP tool names — `create_issue`/`update_issue` → `save_issue`,
+  `create_comment` → `save_comment`, `list_initiative_updates` →
+  `get_status_updates`, `create_initiative_update` → `save_status_update` —
+  across all command/agent bodies and allowed-tools lists, and update call prose
+  to the upsert parameter names (`id`, `state`, `team`, `labels`, `project`).
+  The old names no longer exist on the Linear MCP server, so every write
+  operation failed with "tool not found".
+
 ## 1.3.1
 
 ### Patch Changes

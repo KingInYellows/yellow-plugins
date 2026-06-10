@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.20.2
+
+### Patch Changes
+
+- [#580](https://github.com/KingInYellows/yellow-plugins/pull/580)
+  [`6ac5106`](https://github.com/KingInYellows/yellow-plugins/commit/6ac5106a5011a10efc38b0ab534b53812e10a081)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - chore: remove
+  yellow-chatprd from /setup:all coverage (config probe, MCP visibility check,
+  readiness criteria, delegated-command list, plugin-command map) and drop its
+  rows from the memory-recall/memory-remember/mcp-integration-patterns skill
+  tables — the yellow-chatprd plugin has been removed from the marketplace
+
 ## 1.20.1
 
 ### Patch Changes

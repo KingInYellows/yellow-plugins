@@ -1,6 +1,6 @@
 {
   "name": "yellow-ci",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "private": true,
   "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners"
 }

@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.2.1
+
+### Patch Changes
+
+- [#579](https://github.com/KingInYellows/yellow-plugins/pull/579)
+  [`05a5dfb`](https://github.com/KingInYellows/yellow-plugins/commit/05a5dfbca31ad2603021955a7f2f3c9b15f92c60)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: label
+  pr-test-analyzer, comment-analyzer, type-design-analyzer,
+  silent-failure-hunter, and code-simplifier descriptions as conditional
+  code-review personas with their selection criteria — previously their "Use
+  when reviewing PRs that..." phrasing was indistinguishable from the always-on
+  personas' framing, inviting unconditional dispatch
+
 ## 3.2.0
 
 ### Minor Changes

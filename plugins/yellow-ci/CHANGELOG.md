@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.5
+
+### Patch Changes
+
+- [#572](https://github.com/KingInYellows/yellow-plugins/pull/572)
+  [`2cca221`](https://github.com/KingInYellows/yellow-plugins/commit/2cca2214b65ad82b8e52c41b813010c4de5eeb0b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: replace
+  stale Linear MCP tool name in /ci:report-linear (`create_issue` → `save_issue`
+  with `team`/`labels` params); add executable validation snippets to /ci:setup
+  (sources `validate_ssh_host`/`validate_ssh_key_path` via
+  `${CLAUDE_PLUGIN_ROOT}`); wire failure-analyst log fetch through
+  `redact_secrets` instead of a prose-only redaction instruction
+
 ## 1.4.4
 
 ### Patch Changes
