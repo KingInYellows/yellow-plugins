@@ -85,6 +85,7 @@ duplicated lines). Deferred (Batch D).
 ## Per-plugin findings
 
 ### yellow-linear — OPTIMIZE
+
 - [P1] X1: entire write path stale (8 commands + linear-pr-linker agent,
   plus stale-name prose in linear-workflows SKILL.md and linear-explorer.md).
   Read path (`get_issue`, `list_*`) unaffected.
@@ -92,6 +93,7 @@ duplicated lines). Deferred (Batch D).
 - [P3] delegate.md Step 8 emits /devin:* follow-ups even without yellow-devin.
 
 ### yellow-debt — OPTIMIZE
+
 - [P1-shared] Stale `create_issue` in debt/sync.md.
 - [P2] debt-fixer.md:67 dangling stub — scope-validation bash absent. (Batch B)
 - [P2] fix.md:116 prose Task reference uses 2-segment `yellow-debt:debt-fixer`;
@@ -99,6 +101,7 @@ duplicated lines). Deferred (Batch D).
 - Scanner-vs-reviewer overlap with yellow-core holds (audit vs PR-review axis).
 
 ### yellow-ci — OPTIMIZE
+
 - [P1-shared] Stale Linear names in report-linear.md.
 - [P2] setup.md / setup-runner-targets.md tell the LLM to "validate using
   `validate_ssh_host` from lib/validate.sh" without an executable snippet.
@@ -108,6 +111,7 @@ duplicated lines). Deferred (Batch D).
 - [P3] /ci:status is a thin `gh run list` wrapper (kept: feeds diagnose).
 
 ### yellow-devin — OPTIMIZE
+
 - [P1] devin:tag primary operation unverified (V3 endpoint TBD) — deferred.
 - [P1] devin-orchestrator vs devin:delegate routing ambiguity (Batch C).
 - [P2] devin:wiki body contradicts frontmatter on ToolSearch discovery (C).
@@ -115,12 +119,14 @@ duplicated lines). Deferred (Batch D).
 - [P3] devin_org_id marked sensitive — needless keychain prompting.
 
 ### yellow-core — OPTIMIZE (Batch D/E — deferred)
+
 - [P2] Orphaned agents: test-coverage-analyst, security-lens (no dispatch path).
 - [P2] README omits 1 user-invokable skill (`multi-host-fleet`); CLAUDE.md says "Skills (13)" of 18.
 - [P2] Research agents lack output-schema contracts for /workflows:plan.
 - [P3] git-history-analyzer unwired.
 
 ### yellow-docs — OPTIMIZE
+
 - Dismissed FP: `Task` IS in docs:review allowed-tools.
 - [P2] Adversarial gate can dispatch depth="quick" for docs the agent's own
   Quick predicate rejects (Batch B).
@@ -128,17 +134,21 @@ duplicated lines). Deferred (Batch D).
 - [P2] X3 security-lens fork (Batch D).
 
 ### gt-workflow — OPTIMIZE
+
 - [P2] 5 of 7 descriptions lack "Use when..." (Batch C).
 - [P2] smart-submit --amend-on-trunk undefined (deferred).
 - [P3] Phase-0 yq + audit dispatch duplicated between smart-submit/gt-amend.
 
 ### yellow-browser-test — OPTIMIZE
+
 - [P2] Report template circular reference — no template exists (Batch B).
 - [P2] explore.md references server-start logic that only exists in test.md.
-- [P2] test-runner `kill -0 $SERVER_PID` passes silently when PID unset.
+- [P2] test-runner `kill -0 $SERVER_PID` with an unset PID errors with a
+  usage message and false-positives as "server crashed" — never a real check.
 - [P3] agent-browser pinned 0.10.0 with TODO.
 
 ### yellow-ruvector — OPTIMIZE
+
 - [P2] ~8 of ~90 MCP tools documented; brain_*/workers_*/rvlite_*/decompile_*
   subsystems invisible (deferred).
 - [P2] setup.md multi-line single-quoted description (Batch B).
@@ -147,34 +157,41 @@ duplicated lines). Deferred (Batch D).
   double recall injection on turn 1; fixed recall queries.
 
 ### yellow-codex — OPTIMIZE (Batch D/E — deferred)
+
 - [P2] codex-analyst no confirmed caller; executor→rescue freetext handoff;
   missing $schema pointer. [P3] redaction block duplicated 6×.
 
 ### yellow-mempalace — OPTIMIZE (deferred)
+
 - [P2] status/navigate/search run redundant ToolSearch; mine.md placeholder
   substitution fragile; navigate-vs-agent boundary unspecified.
 
 ### yellow-morph — OPTIMIZE (deferred)
+
 - [P2] Routing rules triplicated (2 yellow-core skills + own CLAUDE.md).
 - [P3] status HEALTHY-probe-skipped masks invalid keys.
 
 ### yellow-review — KEEP AS-IS
+
 - [P2] review-all Step 4 mirrors review-pr Steps 3a–9b (acknowledged DRY
   debt); Step 4.12 ambiguous about --non-interactive.
 - [P2] 5 conditional personas unlabeled (Batch C).
 - [P3] pr-review-workflow SKILL.md stub.
 
 ### yellow-research — KEEP AS-IS
+
 - [P2] CLAUDE.md exa off-by-default claim vs start-exa.sh enabling all 7.
 - [P3] workflows: namespace squat documented one-sided.
 
 ### yellow-council — KEEP AS-IS
+
 - [P2] council.md Steps 4–6 associative-array lifetime across subprocess
   boundary (Batch B). [P2] Dead docs/spikes/* references.
 
 ### yellow-semgrep — KEEP AS-IS (P3 polish only)
 
 ### yellow-composio — KEEP AS-IS
+
 - [P3] README says `type: http`; transport is stdio since v1.3.0.
 
 ## Remediation batches
