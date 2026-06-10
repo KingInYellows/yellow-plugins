@@ -106,3 +106,8 @@ temp/
 # Codex CLI per-developer state (sessions, cache, settings) — generated
 # locally by the Codex CLI; not part of the marketplace artifact.
 .codex/
+
+# compound-staging promotion sentinels — session-scoped crash-retry markers
+# written next to docs/solutions/ files by yellow-core's staging-promoter;
+# local pipeline state, never committed.
+*.promote-done
