@@ -11,7 +11,7 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_issues
   - mcp__plugin_yellow-linear_linear__list_issue_labels
   - mcp__plugin_yellow-linear_linear__save_issue
-  - mcp__plugin_yellow-linear_linear__save_issue_label
+  - mcp__plugin_yellow-linear_linear__create_issue_label
 ---
 
 # Technical Debt Linear Sync
@@ -189,8 +189,8 @@ SEVERITY=$(printf '%s' "$FRONTMATTER" | yq -r '.severity // ""') || { ERROR_COUN
 DESCRIPTION=$(printf '%s' "$FRONTMATTER" | yq -r '.description // ""') || { ERROR_COUNT=$((ERROR_COUNT + 1)); continue; }
 ```
 
-**8b. Dedup check — call `list_issues`** filtered by `DEBT_LABEL_ID` (if set) and
-`teamId: TEAM_ID`, limit 50. Scan results for an issue whose `title` exactly
+**8b. Dedup check — call `list_issues`** filtered by `DEBT_LABEL_ID` (if set,
+as `label`) and `team: TEAM_ID`, limit 50. Scan results for an issue whose `title` exactly
 matches `TITLE`. If found:
 - Store its `id` as `ISSUE_ID`
 - Validate `ISSUE_ID` is non-empty before write-back

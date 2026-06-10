@@ -40,7 +40,7 @@
       "name": "yellow-linear",
       "version": "*",
       "optional": true,
-      "reason": "debt:sync uses mcp__plugin_yellow-linear_linear__create_issue"
+      "reason": "debt:sync uses mcp__plugin_yellow-linear_linear__save_issue"
     }
   ]
 }

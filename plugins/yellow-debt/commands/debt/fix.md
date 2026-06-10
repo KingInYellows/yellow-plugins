@@ -113,8 +113,13 @@ fi
 
 ## Agent Orchestration
 
-After the bash block succeeds, launch `yellow-debt:remediation:debt-fixer` directly via Task with the
-updated todo path. The agent must run in its isolated worktree, read the todo
+After the bash block succeeds, launch the fixer agent directly via Task with
+the updated todo path, using this literal value:
+
+```text
+Task: debt-fixer
+subagent_type: "yellow-debt:remediation:debt-fixer"
+``` The agent must run in its isolated worktree, read the todo
 file, implement the fix, show the diff, request approval, and either commit or
 restore only the files it changed before resetting the todo to `ready`.
 
