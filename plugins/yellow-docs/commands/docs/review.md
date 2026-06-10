@@ -174,12 +174,23 @@ Input: { document_path, document_text, learnings_context, depth }
 run_in_background: true
 ```
 
-Where `depth` mirrors the agent's first-match-wins tier predicates, using
-the Step 2 metrics: `"deep"` when `WORD_COUNT > 3000` OR `REQ_COUNT > 10`
-OR `RISK_HITS >= 1`; `"quick"` only when `WORD_COUNT < 1000` AND
+Where `depth` mirrors the agent's first-match-wins tier predicates. First
+derive a narrower count matching the agent's Deep high-stakes list:
+
+```bash
+HIGH_STAKES_HITS=$(grep -ciE -- '\b(auth|authn|authz|authentication|authorization|payment|billing|migration|compliance|pii)\b' "$FULL_PATH" || true)
+```
+
+Then: `"deep"` when `WORD_COUNT > 3000` OR `REQ_COUNT > 10` OR
+`HIGH_STAKES_HITS >= 1`; `"quick"` only when `WORD_COUNT < 1000` AND
 `REQ_COUNT < 5` AND `RISK_HITS == 0` (this cannot occur when dispatch came
 through the Step 2 gate — the gate only fires when a quick condition is
-violated); otherwise `"standard"`.
+violated); otherwise `"standard"`. Lower-tier Step 2 risk hits (crypto,
+external API, secret/token handling) force dispatch but map to standard,
+matching the agent's narrower Deep predicate. The agent's remaining Deep
+trigger — proposals of new abstractions or frameworks — has no keyword
+proxy here and is intentionally delegated to the agent's own depth
+self-calibration, which may upgrade the passed `depth`.
 
 ### Step 5: Wait gate + collect findings
 
