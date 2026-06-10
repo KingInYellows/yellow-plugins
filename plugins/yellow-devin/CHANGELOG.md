@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.3.5
+
+### Patch Changes
+
+- [#578](https://github.com/KingInYellows/yellow-plugins/pull/578)
+  [`ce54fc9`](https://github.com/KingInYellows/yellow-plugins/commit/ce54fc948ac938ee231494d2d8b5d6c53dd1f243)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix:
+  disambiguate devin-orchestrator vs /devin:delegate triggers (orchestrator =
+  multi-round plan-implement-review-fix loop from an existing plan; delegate =
+  one-shot session, each now points at the other); narrow /devin:wiki trigger to
+  external GitHub repositories; remove the wiki body's "discover tool names via
+  ToolSearch, names may differ" instruction that contradicted the pinned
+  allowed-tools frontmatter
+
 ## 2.3.4
 
 ### Patch Changes

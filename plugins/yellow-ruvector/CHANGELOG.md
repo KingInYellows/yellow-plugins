@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.5
+
+### Patch Changes
+
+- [#576](https://github.com/KingInYellows/yellow-plugins/pull/576)
+  [`d0273a3`](https://github.com/KingInYellows/yellow-plugins/commit/d0273a369835a7d689fd37d3b0616afbb9e138e6)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: collapse
+  the /ruvector:setup description from a wrapped multi-line single-quoted scalar
+  to a single line — Claude Code's frontmatter parser silently truncates
+  multi-line description values, which can blank the command's marketplace
+  listing
+
 ## 1.1.4
 
 ### Patch Changes

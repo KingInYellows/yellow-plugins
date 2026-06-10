@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.5
+
+### Patch Changes
+
+- [#574](https://github.com/KingInYellows/yellow-plugins/pull/574)
+  [`c23acde`](https://github.com/KingInYellows/yellow-plugins/commit/c23acde014fed8d04be5a991c08912c966678428)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: align
+  /docs:review adversarial depth derivation with the agent's first-match-wins
+  tier predicates (the old text could pass depth="quick" for documents the
+  agent's own Quick predicate rejects); rewrite the command description to lead
+  with when-to-use trigger phrases and name the commands to use instead for
+  out-of-scope requests
+
 ## 1.3.4
 
 ### Patch Changes

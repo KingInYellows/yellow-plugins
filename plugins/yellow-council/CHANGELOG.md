@@ -1,5 +1,17 @@
 # yellow-council
 
+## 0.2.4
+
+### Patch Changes
+
+- [#575](https://github.com/KingInYellows/yellow-plugins/pull/575)
+  [`1df6023`](https://github.com/KingInYellows/yellow-plugins/commit/1df602315d3d3fa53487d5c57b4e3625bc15d64b)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: persist
+  reviewer verdicts/confidences/fenced-paths to a deterministic state file in
+  /council Step 4 and re-load it at the top of Steps 7-9 — associative arrays
+  populated in one bash block do not survive into later blocks, so the
+  report-assembly and cleanup steps previously read empty REVIEWER\_\* arrays
+
 ## 0.2.3
 
 ### Patch Changes

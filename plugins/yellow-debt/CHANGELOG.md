@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.8
+
+### Patch Changes
+
+- [#571](https://github.com/KingInYellows/yellow-plugins/pull/571)
+  [`85dab41`](https://github.com/KingInYellows/yellow-plugins/commit/85dab411886e2d9c4731775c78ef4ef7140654a7)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: replace
+  stale Linear MCP tool name in /debt:sync (`create_issue` → `save_issue` with
+  `team`/`project`/`labels` params); restore the missing file-scope-validation
+  bash block in debt-fixer Step 3 (was a dangling "see original agent" stub);
+  use canonical 3-segment `yellow-debt:remediation:debt-fixer` subagent
+  reference in /debt:fix
+
 ## 1.6.7
 
 ### Patch Changes
