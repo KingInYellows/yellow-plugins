@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.20.3
+
+### Patch Changes
+
+- [#586](https://github.com/KingInYellows/yellow-plugins/pull/586)
+  [`0493de9`](https://github.com/KingInYellows/yellow-plugins/commit/0493de9ea0ae75d945d0083d49d72ea46a99a960)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: align
+  staging-promoter slug truncation with the validate-solutions CI gate (60 → 50
+  chars) — auto-promoted docs with long titles previously passed promotion but
+  failed ERROR-SOL-002 when committed
+
 ## 1.20.2
 
 ### Patch Changes
