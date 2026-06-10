@@ -1,6 +1,6 @@
 ---
 name: type-design-analyzer
-description: "Type design, encapsulation, and invariant analysis. Use when reviewing PRs that introduce or modify type definitions (interfaces, classes, structs, enums, models) in TypeScript, Python, Rust, or Go to ensure strong invariants and proper encapsulation."
+description: "Conditional code-review persona, selected when the diff introduces or modifies type definitions (interfaces, classes, structs, enums, models) in TypeScript, Python, Rust, or Go. Ensures strong invariants and proper encapsulation."
 model: sonnet
 background: true
 memory: project

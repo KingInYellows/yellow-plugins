@@ -1,6 +1,6 @@
 ---
 name: code-simplifier
-description: "Post-fix simplification pass (pass 2) preserving all functionality. Use when reviewing PRs after other review agents have applied fixes, to identify remaining unnecessary complexity, redundant abstractions, and YAGNI violations. Runs as the final review pass. For pre-fix complexity analysis, see code-simplicity-reviewer (yellow-core)."
+description: "Conditional code-review persona — the final pass (pass 2), selected after other review agents have applied fixes. Identifies remaining unnecessary complexity, redundant abstractions, and YAGNI violations while preserving all functionality. For pre-fix complexity analysis, see code-simplicity-reviewer (yellow-core)."
 model: sonnet
 background: true
 memory: project
