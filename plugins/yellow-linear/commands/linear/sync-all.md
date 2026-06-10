@@ -62,8 +62,9 @@ Call `list_issues` with the resolved `team`, once per active status (pass the
 status `id` as `state`), limit 50. Merge the results and deduplicate by issue
 `id` before continuing (an issue can appear in more than one bucket).
 
-If `pageInfo.hasNextPage` is true, warn: "More than 50 active issues found — only
-the first 50 are shown. Run again after resolving these."
+If any per-status query returns `pageInfo.hasNextPage: true`, warn: "Some
+statuses have more than 50 active issues — only the first 50 per status are
+shown. Run again after resolving these."
 
 ### Step 4: Check PR Status for Each Issue
 
