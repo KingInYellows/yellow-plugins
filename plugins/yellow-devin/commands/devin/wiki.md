@@ -1,6 +1,6 @@
 ---
 name: devin:wiki
-description: Query DeepWiki or Devin Wiki about a repository. Use when user asks "how does X work in repo Y", "explain the architecture of Z", "search docs for", or wants to understand an external codebase.
+description: Query DeepWiki or Devin Wiki about an external GitHub repository. Use when user asks "how does X work in repo Y", "explain the architecture of <external repo>", or wants AI-generated docs for a third-party codebase. Not for the local working repository — read the code directly or use semantic search.
 argument-hint: '<question> [--repo owner/repo]'
 allowed-tools:
   - Bash
@@ -44,7 +44,8 @@ If no question provided, ask the user what they want to know.
 
 **Primary: Try Devin MCP first** (supports both public and private repos):
 
-Use ToolSearch to discover available Devin MCP tools, then call:
+Call the Devin MCP tools pinned in `allowed-tools`
+(`mcp__plugin_yellow-devin_devin__*`):
 
 - `ask_question` with the repository and question for AI-powered answers
 - `read_wiki_structure` to browse the wiki page tree if more context is needed
@@ -63,9 +64,9 @@ calls fail with auth errors, announce the fallback to DeepWiki.
 - If repo is public: use DeepWiki MCP tools (`ask_question`,
   `read_wiki_structure`, `read_wiki_contents`)
 
-**Important:** MCP tool names follow the pattern
-`mcp__plugin_{pluginName}_{serverName}__{toolName}`. Verify exact names via
-ToolSearch during first use — the actual registered names may differ.
+**Important:** The exact tool names are pinned in this command's
+`allowed-tools` frontmatter (`devin` server for primary, `deepwiki` server for
+fallback) — call them directly; no runtime discovery is needed.
 
 ### Step 4: Present Results
 

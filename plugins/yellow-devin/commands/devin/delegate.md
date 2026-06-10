@@ -1,6 +1,6 @@
 ---
 name: devin:delegate
-description: Create a Devin session with a task prompt. Use when user wants to delegate work to Devin, says "have Devin do X", "send this to Devin", or "delegate to Devin".
+description: Create a single Devin session with a task prompt (fire-and-track, no review loop). Use when user says "have Devin do X", "send this to Devin", or "delegate to Devin". For a multi-cycle plan-implement-review-fix loop driven from an existing plan, use the devin-orchestrator agent instead.
 argument-hint: '<task description> [--tags t1,t2] [--max-acu N]'
 allowed-tools:
   - Bash
