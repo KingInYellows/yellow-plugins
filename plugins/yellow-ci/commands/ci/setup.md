@@ -107,14 +107,25 @@ Ask via AskUserQuestion: "Do you use self-hosted GitHub Actions runners?
   `validate_ssh_key_path` from `hooks/scripts/lib/validate.sh` (must start with
   `~` or `/`, safe characters only, no `..` or shell metacharacters).
 
-Run both validators via the Bash tool (substitute the collected values inline;
-a non-zero exit means reject and re-prompt):
+Run both validators via the Bash tool. Pass the collected values through
+quoted heredocs — never inline them into the command line (user input
+containing quotes, `$`, or `;` must not reach the shell unquoted). A non-zero
+exit means reject and re-prompt:
 
 ```bash
 . "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh" \
-  || { printf '[ci-setup] ERROR: validate.sh not found — cannot validate runner inputs\n' >&2; exit 1; }
-validate_ssh_host "<collected-host>" || { printf '[ci-setup] Invalid SSH host\n' >&2; exit 1; }
-validate_ssh_key_path "<collected-key-path-if-any>" || { printf '[ci-setup] Invalid key path\n' >&2; exit 1; }
+  || { printf '[yellow-ci] ERROR: validate.sh not found — cannot validate runner inputs\n' >&2; exit 1; }
+COLLECTED_HOST=$(cat <<'__EOF_CI_HOST__'
+<collected-host>
+__EOF_CI_HOST__
+)
+COLLECTED_KEY=$(cat <<'__EOF_CI_KEY__'
+<collected-key-path-or-empty>
+__EOF_CI_KEY__
+)
+validate_ssh_host "$COLLECTED_HOST" || { printf '[yellow-ci] Invalid SSH host\n' >&2; exit 1; }
+[ -z "$COLLECTED_KEY" ] || validate_ssh_key_path "$COLLECTED_KEY" \
+  || { printf '[yellow-ci] Invalid key path\n' >&2; exit 1; }
 ```
 
 Validate each field before accepting. On validation failure: report the specific

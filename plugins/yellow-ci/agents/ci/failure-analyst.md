@@ -87,7 +87,7 @@ runners.
 . "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/redact.sh" \
   || { printf '[failure-analyst] ERROR: cannot source redact.sh — aborting log fetch\n' >&2; exit 1; }
 LOGS=$(set -o pipefail
-  timeout 30 gh run view "$RUN_ID" --log-failed 2>&1 | head -n 500 | head -c 5242880 | redact_secrets)
+  timeout 30 gh run view "$RUN_ID" --log-failed 2>&1 | head -n 500 | head -c 5242880 | redact_secrets | escape_fence_markers)
 FETCH_RC=$?
 if [ "$FETCH_RC" -eq 124 ]; then
   printf '[failure-analyst] WARNING: log fetch timed out after 30s — output may be truncated\n' >&2
