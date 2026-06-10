@@ -1,0 +1,31 @@
+plugins/yellow-linear/agents/workflow/linear-pr-linker.md
+  s_e0beaba782ec4e::t_52beb191122893 63-64,89-90
+plugins/yellow-linear/skills/linear-workflows/SKILL.md
+  s_e0beaba782ec4e::t_52beb191122893 251
+plugins/yellow-linear/agents/research/linear-explorer.md
+  s_e0beaba782ec4e::t_52beb191122893 45
+plugins/yellow-linear/commands/linear/delegate.md
+  s_e0beaba782ec4e::t_52beb191122893 235-236,269
+plugins/yellow-linear/commands/linear/status.md
+  s_e0beaba782ec4e::t_52beb191122893 57,91,99-101
+plugins/yellow-linear/commands/linear/sync-all.md
+  s_e0beaba782ec4e::t_52beb191122893 62-63
+plugins/yellow-linear/commands/linear/sync.md
+  s_e0beaba782ec4e::t_52beb191122893 83-84,102,118-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "563b49106802448bfbbafb7dba936ae6a30e53f0",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
