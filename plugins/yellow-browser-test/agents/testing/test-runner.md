@@ -70,7 +70,9 @@ For each non-dynamic route in config:
 1. Check dev server alive. If `.claude/browser-test-server.pid` exists (the
    calling command started the server), use the PID; otherwise (pre-existing
    server) probe the URL:
-   `if [ -f .claude/browser-test-server.pid ]; then kill -0 "$(cat .claude/browser-test-server.pid)" || { printf '[test-runner] Dev server crashed\n' >&2; exit 1; }; else curl -s --max-time 5 -o /dev/null "$BASE_URL" || { printf '[test-runner] Dev server not reachable\n' >&2; exit 1; }; fi`
+   `if [ -s .claude/browser-test-server.pid ] && kill -0 "$(cat .claude/browser-test-server.pid)" 2>/dev/null; then :; else curl -s --max-time 5 -o /dev/null "$BASE_URL" || { printf '[test-runner] Dev server not reachable (PID dead or stale and URL probe failed)\n' >&2; exit 1; }; fi`
+   (a dead or stale PID falls back to the URL probe — only fail when both
+   signals are negative)
 2. `agent-browser open "$BASE_URL$ROUTE"` and
    `agent-browser wait --load networkidle` — check exit codes, log errors with
    `[test-runner]` prefix
