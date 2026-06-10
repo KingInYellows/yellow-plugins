@@ -1,0 +1,21 @@
+docs/maintenance/catalog-release-gap.md
+  s_8f02e2fe18dfcb::t_4e2127ecd91add 3-25
+.gitignore
+  s_8f02e2fe18dfcb::t_ca07d43d121709 109-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "dde41d402815374742b2b325b3e113e7eb609719",
+  "prompts": {},
+  "sessions": {
+    "s_8f02e2fe18dfcb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "219d163a-8545-4034-b73a-1bdc47d57f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
