@@ -1,6 +1,6 @@
 ---
 name: devin:wiki
-description: Query DeepWiki or Devin Wiki about an external GitHub repository. Use when user asks "how does X work in repo Y", "explain the architecture of <external repo>", or wants AI-generated docs for a third-party codebase. Not for the local working repository — read the code directly or use semantic search.
+description: Query DeepWiki or Devin Wiki about a GitHub repository's indexed wiki. Use when user asks "how does X work in repo Y", "explain the architecture of <repo>", or wants AI-generated docs for a codebase (defaults to the origin repo when --repo is omitted). Not for quick questions answerable by reading the local code directly — use Grep/semantic search for those.
 argument-hint: '<question> [--repo owner/repo]'
 allowed-tools:
   - Bash
