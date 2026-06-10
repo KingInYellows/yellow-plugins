@@ -1,6 +1,6 @@
 ---
 name: comment-analyzer
-description: "Code comment accuracy and rot detection. Use when reviewing PRs that add or modify documentation comments, docstrings, JSDoc, or inline comments to verify they accurately reflect the code they describe."
+description: "Conditional code-review persona, selected when the diff contains doc-comment markers (/**, triple-quoted docstrings, doc annotations) or modifies .md documentation. Verifies comments accurately reflect the code they describe and flags comment rot."
 model: sonnet
 background: true
 memory: project
