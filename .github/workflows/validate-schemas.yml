@@ -720,13 +720,19 @@ jobs:
           retention-days: 7
 
   # ============================================================================
-  # BUILD VERIFICATION (Optional, runs on main branch only)
+  # BUILD VERIFICATION
+  # Runs on same-repo PRs and main pushes. `pnpm typecheck` (root tsc --noEmit)
+  # does NOT type-check packages/ source (solution-style root tsconfig with no
+  # includes) — this job's `tsc -b` is the only gate that compiles packages/
+  # before the release workflow does. A `github.ref == 'refs/heads/main'`
+  # condition previously kept it off PRs, letting a packages/ type error reach
+  # the v2.0.0 release build (fixed in PR #583).
   # ============================================================================
   build:
     name: Build Verification
     runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","pool:ares"]') }}
     timeout-minutes: 5
-    if: github.ref == 'refs/heads/main' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     needs: [validate-schemas, lint-and-typecheck, unit-tests]
 
     steps:
@@ -1161,7 +1167,7 @@ jobs:
              [ "${{ needs.contract-drift.result }}" == "success" ] && \
              [ "${{ needs.security-audit.result }}" == "success" ] && \
              [ "${{ needs.plugin-shell-tests.result }}" == "success" ] && \
-             { [ "${{ needs.build.result }}" == "success" ] || [ "${{ needs.build.result }}" == "skipped" ]; } && \
+             [ "${{ needs.build.result }}" == "success" ] && \
              { [ "${{ needs.changeset-check.result }}" == "success" ] || [ "${{ needs.changeset-check.result }}" == "skipped" ]; }; then
             echo "::notice::✅ All CI validation checks passed"
             exit 0
@@ -1175,7 +1181,7 @@ jobs:
             echo "Contract Drift: ${{ needs.contract-drift.result }}"
             echo "Security Audit: ${{ needs.security-audit.result }}"
             echo "Plugin Shell Tests: ${{ needs.plugin-shell-tests.result }}"
-            echo "Build (main only): ${{ needs.build.result }}"
+            echo "Build Verification: ${{ needs.build.result }}"
             echo "Changeset Required: ${{ needs.changeset-check.result }}"
             exit 1
           fi
