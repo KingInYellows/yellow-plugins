@@ -68,7 +68,9 @@ runners.
 ## Core Responsibilities
 
 1. Fetch failed CI logs via `gh run view --log-failed`
-2. Apply secret redaction before analyzing (source `lib/redact.sh`)
+2. Apply secret redaction before analyzing (source
+   `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/redact.sh` and pipe logs through
+   `redact_secrets`)
 3. Match log content against failure patterns F01-F12
 4. Identify root cause with supporting log evidence
 5. Handle multi-job failures (group by pattern, prioritize setup failures)
@@ -82,7 +84,18 @@ runners.
 
 ```bash
 # Stream logs with timeout, pipe through redaction
-timeout 30 gh run view "$RUN_ID" --log-failed 2>&1 | head -n 500 | head -c 5242880
+. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/redact.sh" \
+  || { printf '[failure-analyst] ERROR: cannot source redact.sh — aborting log fetch\n' >&2; exit 1; }
+LOGS=$(set -o pipefail
+  timeout 30 gh run view "$RUN_ID" --log-failed 2>&1 | head -n 500 | head -c 5242880 | redact_secrets | escape_fence_markers)
+FETCH_RC=$?
+if [ "$FETCH_RC" -eq 124 ]; then
+  printf '[failure-analyst] WARNING: log fetch timed out after 30s — output may be truncated\n' >&2
+elif [ "$FETCH_RC" -ne 0 ]; then
+  printf '[failure-analyst] ERROR: log fetch failed (exit %s) — check gh auth and run ID\n' "$FETCH_RC" >&2
+  exit 1
+fi
+printf '%s\n' "$LOGS"
 ```
 
 If no run ID provided, get latest failed run:
@@ -93,7 +106,9 @@ gh run list --status failure --limit 1 --json databaseId -q '.[0].databaseId'
 
 ### Step 2: Redact Secrets
 
-Before analyzing, apply redaction patterns. Never display raw log content.
+The `redact_secrets` pipe in Step 1 already applied the redaction patterns.
+If you fetched any log content through a different path, re-run it through
+`redact_secrets` before analyzing. Never display raw log content.
 
 ### Step 3: Pattern Match
 
