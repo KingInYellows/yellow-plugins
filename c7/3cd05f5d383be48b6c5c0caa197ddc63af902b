@@ -1,0 +1,21 @@
+.changeset/ruvector-setup-description.md
+  s_e0beaba782ec4e::t_a1de15191f855d 1-5
+plugins/yellow-ruvector/commands/ruvector/setup.md
+  s_e0beaba782ec4e::t_a1de15191f855d 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "c73cd05f5d383be48b6c5c0caa197ddc63af902b",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
