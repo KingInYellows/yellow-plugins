@@ -68,7 +68,10 @@ proceed. Your blast radius is the entire project tree under bypassPermissions.
    `docs/solutions/<category>/<slug>.md` where:
    - `<category>` ∈ { security-issues, logic-errors, build-errors,
      integration-issues, code-quality, workflow }
-   - `<slug>` matches `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 60 chars
+   - `<slug>` matches `^[a-z0-9]+(?:-[a-z0-9]+)*$`, max 50 chars
+     (must match `SLUG_MAX_LEN` in `scripts/validate-solutions.js` —
+     a longer slug passes promotion but fails the ERROR-SOL-002 CI gate
+     when the doc is later committed)
    Reject any path that does not match.
 4. **Atomic writes:** write to a sibling `.tmp` then `mv` to the final
    path so partial writes are never observable.
@@ -163,12 +166,14 @@ GIT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   exit 0
 }
 
-# Slug from first 60 chars of candidate_text, sanitized to [a-z0-9-].
+# Slug from first 50 chars of candidate_text, sanitized to [a-z0-9-].
+# 50 matches SLUG_MAX_LEN in scripts/validate-solutions.js — exceeding it
+# would write a doc that fails the ERROR-SOL-002 gate on commit.
 SLUG=$(printf '%s' "$CANDIDATE_TEXT" \
   | tr '[:upper:]' '[:lower:]' \
   | tr -c 'a-z0-9' '-' \
   | sed -E 's/-+/-/g; s/^-+//; s/-+$//' \
-  | cut -c 1-60 \
+  | cut -c 1-50 \
   | sed -E 's/-+$//')
 
 # Reject empty/short slug.
@@ -191,7 +196,7 @@ MEMORY_PATH="$HOME/.claude/projects/$(printf '%s' "$GIT_ROOT" | tr '/' '-')/memo
 # AND MUST be scoped to THIS session_id, not just slug matching.
 #
 # Why slug-only matching is wrong: a successful prior promotion of a
-# DIFFERENT staged entry can produce the same first-60-char sanitized
+# DIFFERENT staged entry can produce the same first-50-char sanitized
 # slug. Treating "slug.md + .promote-done exists" as a crash retry would
 # then skip slug-collision logic and re-write a Phase-2 doc owned by a
 # previous session, corrupting it.
@@ -246,7 +251,7 @@ same session_id and the sentinel resumes correctly.
 
 The sentinel is enriched JSON (not an empty file) so the resume guard
 can match `session_id` — a different staged entry sanitizing to the
-same 60-char slug would otherwise be wrongly treated as a crash retry,
+same 50-char slug would otherwise be wrongly treated as a crash retry,
 corrupting the prior session's doc.
 
 **Idempotency guard reuses `RESUMING_AFTER_CRASH` from Phase 1** (computed
