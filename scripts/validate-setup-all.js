@@ -25,7 +25,6 @@ const COMMAND_PLUGIN_MAP = {
   'semgrep:setup': 'yellow-semgrep',
   'research:setup': 'yellow-research',
   'linear:setup': 'yellow-linear',
-  'chatprd:setup': 'yellow-chatprd',
   'debt:setup': 'yellow-debt',
   'ci:setup': 'yellow-ci',
   'review:setup': 'yellow-review',

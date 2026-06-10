@@ -52,16 +52,6 @@
       "category": "development"
     },
     {
-      "name": "yellow-chatprd",
-      "description": "ChatPRD MCP integration with document management workflows and Linear bridging for Claude Code",
-      "version": "1.3.2",
-      "author": {
-        "name": "KingInYellows"
-      },
-      "source": "./plugins/yellow-chatprd",
-      "category": "productivity"
-    },
-    {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
       "version": "3.2.0",

@@ -117,8 +117,6 @@ importers:
 
   plugins/yellow-browser-test: {}
 
-  plugins/yellow-chatprd: {}
-
   plugins/yellow-ci: {}
 
   plugins/yellow-codex: {}
