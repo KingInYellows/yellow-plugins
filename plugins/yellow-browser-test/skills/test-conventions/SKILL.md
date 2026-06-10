@@ -89,8 +89,39 @@ During autonomous exploration, the test-runner agent MUST:
 
 ## Report Template
 
-Reports are written to `test-reports/YYYY-MM-DD-HH-MM.md`. See test-reporter
-agent for full template and GitHub issue creation flow.
+Reports are written to `test-reports/YYYY-MM-DD-HH-MM.md`. This is the
+canonical template — test-reporter follows it verbatim (GitHub issue creation
+flow lives in the test-reporter agent):
+
+```markdown
+# Browser Test Report — {YYYY-MM-DD HH:MM}
+
+- **Mode:** structured | exploratory
+- **Base URL:** {baseURL}
+- **Duration:** {Xm Ys}
+- **Results:** {passed} passed / {failed} failed / {skipped} skipped
+
+## Summary
+
+| Route | Status | Severity | Notes |
+|-------|--------|----------|-------|
+| /     | pass   | —        |       |
+
+## Failures
+
+### {route} — {one-line description}
+
+- **Severity:** critical | major | minor
+- **Screenshot:** `screenshots/{slug}.png`
+- **Repro steps:**
+  1. {step}
+- **Observed:** {what happened}
+- **Expected:** {what should happen}
+
+## Warnings
+
+- {skipped routes and non-critical observations, one bullet each}
+```
 
 **Security:** ALWAYS use AskUserQuestion before creating GitHub issues. Never
 auto-create. Warn that screenshots may contain sensitive data.

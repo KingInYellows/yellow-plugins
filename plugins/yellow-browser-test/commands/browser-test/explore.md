@@ -48,7 +48,33 @@ if ! grep -q 'devServer:' .claude/yellow-browser-test.local.md || \
 fi
 ```
 
-Start dev server if not already running (same logic as `/browser-test:test`).
+Check if the server is already running, start it if not, and poll for
+readiness (uses `BASE_URL`, `DEV_SERVER_CMD`, `READY_TIMEOUT`, `READY_PATH`
+from the config parsed in Step 1):
+
+```bash
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL" 2>/dev/null)
+if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+  printf '[browser-test] Using existing dev server at %s\n' "$BASE_URL" >&2
+  # Do NOT stop a pre-existing server when exploration finishes.
+else
+  $DEV_SERVER_CMD > .claude/browser-test-server.log 2>&1 &
+  echo $! > .claude/browser-test-server.pid
+  MAX_ATTEMPTS=$((READY_TIMEOUT / 2))
+  ATTEMPT=0
+  while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
+    ATTEMPT=$((ATTEMPT + 1))
+    printf '[browser-test] Waiting for dev server (%d/%d)...\n' "$ATTEMPT" "$MAX_ATTEMPTS" >&2
+    curl -s -o /dev/null "$BASE_URL$READY_PATH" 2>/dev/null && break
+    [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ] && sleep 2
+  done
+  if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
+    printf '[browser-test] Error: Server timeout after %d seconds.\n' "$READY_TIMEOUT" >&2
+    tail -20 .claude/browser-test-server.log >&2
+    exit 1
+  fi
+fi
+```
 
 ### Step 3: Determine Starting Point
 
