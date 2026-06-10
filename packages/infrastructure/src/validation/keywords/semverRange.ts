@@ -23,11 +23,11 @@ const validateFn: SchemaValidateFunction = (
   data: unknown
 ): boolean => {
   if (schemaValue !== true) {
-    validateFn.errors = null;
+    validateFn.errors = undefined;
     return true;
   }
   if (semver.validRange(data as string, { loose: false }) !== null) {
-    validateFn.errors = null;
+    validateFn.errors = undefined;
     return true;
   }
   validateFn.errors = [
