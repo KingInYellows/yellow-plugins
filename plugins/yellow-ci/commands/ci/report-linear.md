@@ -12,7 +12,7 @@ allowed-tools:
   - mcp__plugin_yellow-linear_linear__list_issues
   - mcp__plugin_yellow-linear_linear__list_issue_labels
   - mcp__plugin_yellow-linear_linear__save_issue
-  - mcp__plugin_yellow-linear_linear__save_issue_label
+  - mcp__plugin_yellow-linear_linear__create_issue_label
 ---
 
 # CI Report to Linear
@@ -83,7 +83,7 @@ Use the `list_teams` response from Step 1. Auto-detect from git remote repo name
 Delegate to the `failure-analyst` agent via Task:
 
 ```
-Task subagent_type: "failure-analyst"
+Task subagent_type: "yellow-ci:ci:failure-analyst"
 Pass: run ID, repo, branch (from git branch --show-current)
 Receive: structured failure report including:
   - F-code (F01–F12)

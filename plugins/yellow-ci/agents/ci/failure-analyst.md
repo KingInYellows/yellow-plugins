@@ -84,8 +84,18 @@ runners.
 
 ```bash
 # Stream logs with timeout, pipe through redaction
-. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/redact.sh"
-timeout 30 gh run view "$RUN_ID" --log-failed 2>&1 | head -n 500 | head -c 5242880 | redact_secrets
+. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/redact.sh" \
+  || { printf '[failure-analyst] ERROR: cannot source redact.sh — aborting log fetch\n' >&2; exit 1; }
+LOGS=$(set -o pipefail
+  timeout 30 gh run view "$RUN_ID" --log-failed 2>&1 | head -n 500 | head -c 5242880 | redact_secrets)
+FETCH_RC=$?
+if [ "$FETCH_RC" -eq 124 ]; then
+  printf '[failure-analyst] WARNING: log fetch timed out after 30s — output may be truncated\n' >&2
+elif [ "$FETCH_RC" -ne 0 ]; then
+  printf '[failure-analyst] ERROR: log fetch failed (exit %s) — check gh auth and run ID\n' "$FETCH_RC" >&2
+  exit 1
+fi
+printf '%s\n' "$LOGS"
 ```
 
 If no run ID provided, get latest failed run:

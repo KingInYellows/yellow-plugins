@@ -111,7 +111,8 @@ Run both validators via the Bash tool (substitute the collected values inline;
 a non-zero exit means reject and re-prompt):
 
 ```bash
-. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh"
+. "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh" \
+  || { printf '[ci-setup] ERROR: validate.sh not found — cannot validate runner inputs\n' >&2; exit 1; }
 validate_ssh_host "<collected-host>" || { printf '[ci-setup] Invalid SSH host\n' >&2; exit 1; }
 validate_ssh_key_path "<collected-key-path-if-any>" || { printf '[ci-setup] Invalid key path\n' >&2; exit 1; }
 ```
