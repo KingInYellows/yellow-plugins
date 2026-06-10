@@ -1,0 +1,26 @@
+plugins/yellow-ci/commands/ci/setup.md
+  s_e0beaba782ec4e::t_98ea17128272f8 114-115
+plugins/yellow-ci/agents/ci/failure-analyst.md
+  s_e0beaba782ec4e::t_98ea17128272f8 87-98
+plugins/yellow-ci/.claude-plugin/plugin.json
+  s_e0beaba782ec4e::t_432308f8af0b9d 39
+plugins/yellow-ci/commands/ci/report-linear.md
+  s_e0beaba782ec4e::t_02fbd291fb6ed4 86
+  s_e0beaba782ec4e::t_432308f8af0b9d 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "ad386f574d81af3cdd9805a879f05075e580b5ec",
+  "prompts": {},
+  "sessions": {
+    "s_e0beaba782ec4e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "561f84f0-03fb-40d6-b8e6-e8109ce8bc43",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
