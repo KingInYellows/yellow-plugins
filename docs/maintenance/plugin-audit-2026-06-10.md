@@ -11,8 +11,10 @@ it is present); one finding was larger than reported (stale Linear tool names
 span 4 plugins, not 1).
 
 **Remediation:** Batches A, B, C approved 2026-06-10 and staged as the gt
-stack based on this commit. yellow-chatprd was dropped from remediation and
-removed entirely (owner decision, same date).
+stack based on this commit (batch definitions in "Remediation batches" at the
+end of this document). yellow-chatprd was dropped from remediation and
+approved for removal (owner decision, same date); the removal itself lands in
+a later PR of the same stack, so the plugin is still present at this commit.
 
 ## Summary table
 
@@ -23,11 +25,11 @@ removed entirely (owner decision, same date).
 | yellow-debt | OPTIMIZE | [P1-shared] Stale `create_issue` in `debt:sync`; `debt-fixer.md` dangling "see lines 61-91 in original agent" stub where scope-validation bash should be |
 | yellow-ci | OPTIMIZE | [P1-shared] Stale Linear names in `report-linear`; commands reference shell functions the LLM cannot execute as written |
 | yellow-devin | OPTIMIZE | [P1] `devin:tag` ships self-documented-as-unverified; orchestrator/delegate trigger ambiguity |
-| yellow-core | OPTIMIZE | Orphaned agents (`test-coverage-analyst`, `security-lens`); 7 user-invokable skills missing from README; stale counts |
+| yellow-core | OPTIMIZE | Orphaned agents (`test-coverage-analyst`, `security-lens`); `multi-host-fleet` skill missing from README; stale counts |
 | yellow-docs | OPTIMIZE | `security-lens-reviewer` forks yellow-core `security-lens`; adversarial depth-gate contradiction |
 | gt-workflow | OPTIMIZE | 5 of 7 commands lack "Use when..." trigger clauses; audit logic duplicated between smart-submit and gt-amend |
 | yellow-browser-test | OPTIMIZE | Circular report-template reference (template exists nowhere); unset `$SERVER_PID` guard |
-| yellow-ruvector | OPTIMIZE | ~82 of ~90 MCP tools uncovered; setup.md description violates single-line rule; memory routing vs mempalace undocumented |
+| yellow-ruvector | OPTIMIZE | only ~8 of ~90 MCP tools documented; setup.md description violates single-line rule; memory routing vs mempalace undocumented |
 | yellow-codex | OPTIMIZE | `codex-analyst` has no confirmed caller; awk redaction block duplicated 6×; freetext executor→rescue handoff |
 | yellow-mempalace | OPTIMIZE | Redundant ToolSearch for statically-declared tools; fragile placeholder substitution in mine.md |
 | yellow-morph | OPTIMIZE | Morph routing rules in 3 places; status masks invalid keys as HEALTHY |
@@ -44,12 +46,14 @@ removed entirely (owner decision, same date).
 Verified against the live MCP registry. The Linear MCP server exposes
 `save_issue` (create+update upsert; pass `id` to update), `save_comment`,
 `save_status_update`, `get_status_updates`. The repo had zero references to
-`save_issue` and 13 command/agent files calling `create_issue` /
+`save_issue` and 15 files calling `create_issue` /
 `update_issue` / `create_comment` / `list_initiative_updates` /
 `create_initiative_update`:
 
 - yellow-linear: sync.md, sync-all.md, create.md, work.md, triage.md,
-  delegate.md, status.md, plan-cycle.md, agents/workflow/linear-pr-linker.md
+  delegate.md, status.md, plan-cycle.md, agents/workflow/linear-pr-linker.md,
+  plus stale names in instructional/prohibition prose in
+  skills/linear-workflows/SKILL.md and agents/research/linear-explorer.md
 - yellow-chatprd: link-linear.md, agents/workflow/linear-prd-bridge.md
   (resolved by plugin removal)
 - yellow-debt: sync.md
@@ -61,9 +65,10 @@ stale names also appeared in `allowed-tools`, so allowlists never matched.
 ### X2. [P2] Blank descriptions in live sessions = stale installed cache
 
 ~17 commands showed no description in a live session skill listing despite
-valid single-line frontmatter at repo HEAD. Cause: installed plugin cache
-stale relative to repo (see docs/maintenance/catalog-release-gap.md). Action
-is a cache refresh/release, not file edits.
+valid single-line frontmatter at repo HEAD. Cause: the installed plugin cache
+is stale relative to repo HEAD — releases since the last cache refresh have
+not been pulled into the local install. Action is a cache refresh
+(`/plugin marketplace update`) or a new catalog release, not file edits.
 
 ### X3. [P2] Plan-level security review exists twice
 
@@ -80,22 +85,24 @@ duplicated lines). Deferred (Batch D).
 ## Per-plugin findings
 
 ### yellow-linear — OPTIMIZE
-- [P1] X1: entire write path stale (8 commands + linear-pr-linker agent).
+- [P1] X1: entire write path stale (8 commands + linear-pr-linker agent,
+  plus stale-name prose in linear-workflows SKILL.md and linear-explorer.md).
   Read path (`get_issue`, `list_*`) unaffected.
 - [P2] `linear:sync` vs `linear-pr-linker` trigger overlap ("link to linear").
 - [P3] delegate.md Step 8 emits /devin:* follow-ups even without yellow-devin.
 
 ### yellow-debt — OPTIMIZE
 - [P1-shared] Stale `create_issue` in debt/sync.md.
-- [P2] debt-fixer.md:67 dangling stub — scope-validation bash absent.
-- [P2] fix.md:116 2-segment `yellow-debt:debt-fixer`; canonical is
-  `yellow-debt:remediation:debt-fixer`.
+- [P2] debt-fixer.md:67 dangling stub — scope-validation bash absent. (Batch B)
+- [P2] fix.md:116 prose Task reference uses 2-segment `yellow-debt:debt-fixer`;
+  canonical is `yellow-debt:remediation:debt-fixer`. (Batch B)
 - Scanner-vs-reviewer overlap with yellow-core holds (audit vs PR-review axis).
 
 ### yellow-ci — OPTIMIZE
 - [P1-shared] Stale Linear names in report-linear.md.
 - [P2] setup.md / setup-runner-targets.md tell the LLM to "validate using
   `validate_ssh_host` from lib/validate.sh" without an executable snippet.
+  (Batch B)
 - runner-cleanup `disable-model-invocation: true` verified intentional
   (blocks model auto-invocation of a destructive command); not a bug.
 - [P3] /ci:status is a thin `gh run list` wrapper (kept: feeds diagnose).
@@ -109,7 +116,7 @@ duplicated lines). Deferred (Batch D).
 
 ### yellow-core — OPTIMIZE (Batch D/E — deferred)
 - [P2] Orphaned agents: test-coverage-analyst, security-lens (no dispatch path).
-- [P2] README omits 7 user-invokable skills; CLAUDE.md says "Skills (13)" of 18.
+- [P2] README omits 1 user-invokable skill (`multi-host-fleet`); CLAUDE.md says "Skills (13)" of 18.
 - [P2] Research agents lack output-schema contracts for /workflows:plan.
 - [P3] git-history-analyzer unwired.
 
