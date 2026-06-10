@@ -224,8 +224,11 @@ so they are not persisted:
 
 ```bash
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Error: not in a git repository\n' >&2; exit 1; }
-STATE_FILE="${TMPDIR:-/tmp}/council-state-$(printf '%s' "$GIT_ROOT" | cksum | cut -d' ' -f1).tsv"
-: > "$STATE_FILE"
+# One state file per checkout, inside .git/ (not /tmp — avoids cross-user
+# collisions). Concurrent /council runs in the same checkout are NOT
+# supported: the second run truncates this file.
+STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
+: > "$STATE_FILE" || { printf '[council] Error: cannot create state file at %s\n' "$STATE_FILE" >&2; exit 1; }
 
 declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_SUMMARIES \
            REVIEWER_FENCED_PATHS REVIEWER_FINDINGS
@@ -244,7 +247,8 @@ parse_reviewer_return() {
   REVIEWER_SUMMARIES[$reviewer_name]=$summary
   REVIEWER_FENCED_PATHS[$reviewer_name]=$fenced_path
   REVIEWER_FINDINGS[$reviewer_name]=$findings
-  printf '%s\t%s\t%s\t%s\n' "$reviewer_name" "$verdict" "$confidence" "$fenced_path" >> "$STATE_FILE"
+  # A reviewer that returned nothing parseable is recorded as ERROR, not blank
+  printf '%s\t%s\t%s\t%s\n' "$reviewer_name" "${verdict:-ERROR}" "${confidence:-N/A}" "$fenced_path" >> "$STATE_FILE"
   printf '[%s] verdict=%s confidence=%s\n' "$reviewer_name" "$verdict" "$confidence"
 }
 ```
@@ -351,13 +355,20 @@ mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
 # Re-load reviewer state — fresh subprocess (Steps 8 and 9 must start with
 # this same snippet before touching REVIEWER_* arrays)
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
-STATE_FILE="${TMPDIR:-/tmp}/council-state-$(printf '%s' "$GIT_ROOT" | cksum | cut -d' ' -f1).tsv"
+STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
+[ -f "$STATE_FILE" ] || { printf '[council] Error: state file missing — Step 4 did not run\n' >&2; exit 1; }
 declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_FENCED_PATHS
 while IFS=$'\t' read -r r v c fp; do
   REVIEWER_VERDICTS[$r]=$v; REVIEWER_CONFIDENCES[$r]=$c; REVIEWER_FENCED_PATHS[$r]=$fp
 done < "$STATE_FILE"
+[ "${#REVIEWER_VERDICTS[@]}" -gt 0 ] || { printf '[council] Error: state file empty — Step 4 was interrupted; re-run /council\n' >&2; exit 1; }
 
-REPORT_CONTENT=$(printf '%s\n\n' "$SYNTHESIS_MD")
+# $SYNTHESIS_MD does not survive into this fresh subprocess — substitute the
+# Step 5 synthesis markdown inline via quoted heredoc:
+REPORT_CONTENT=$(cat <<'__EOF_COUNCIL_SYNTHESIS__'
+<substitute the Step 5 synthesis markdown here>
+__EOF_COUNCIL_SYNTHESIS__
+)
 
 # Append reviewer raw output sections from fenced_output_path files
 for reviewer in codex gemini opencode; do
@@ -400,9 +411,14 @@ Use `AskUserQuestion` with these options:
 If user selects **Cancel**:
 
 ```bash
-# Start with the Step 7 state re-load snippet, then:
+# Self-contained: fresh subprocess, so re-load state inline
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
+STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
+declare -A REVIEWER_FENCED_PATHS
+if [ -f "$STATE_FILE" ]; then
+  while IFS=$'\t' read -r r v c fp; do REVIEWER_FENCED_PATHS[$r]=$fp; done < "$STATE_FILE"
+fi
 printf '[council] Report not saved.\n'
-# Cleanup all fenced output files and the state file
 for fenced_path in "${REVIEWER_FENCED_PATHS[@]}"; do
   [ -n "$fenced_path" ] && rm -f "$fenced_path"
 done
@@ -426,7 +442,9 @@ Use the Write tool with:
 The Write tool either succeeds (file fully written) or fails (no partial
 file). No mktemp + mv staging; no `.gitignore` additions needed.
 
-After the Write tool succeeds, verify:
+After the Write tool succeeds, verify (fresh subprocess — substitute the
+literal absolute path from Step 6 for `$REPORT_PATH_ABS`, or re-run the
+Step 6 derivation first):
 
 ```bash
 if [ ! -f "$REPORT_PATH_ABS" ]; then
@@ -435,7 +453,13 @@ if [ ! -f "$REPORT_PATH_ABS" ]; then
 fi
 
 # Cleanup fenced output files and state file (content is in the report file).
-# This block must also start with the Step 7 state re-load snippet.
+# Self-contained: fresh subprocess, so re-load state inline.
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
+STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
+declare -A REVIEWER_FENCED_PATHS
+if [ -f "$STATE_FILE" ]; then
+  while IFS=$'\t' read -r r v c fp; do REVIEWER_FENCED_PATHS[$r]=$fp; done < "$STATE_FILE"
+fi
 for fenced_path in "${REVIEWER_FENCED_PATHS[@]}"; do
   [ -n "$fenced_path" ] && rm -f "$fenced_path"
 done
