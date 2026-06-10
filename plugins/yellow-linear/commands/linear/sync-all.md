@@ -59,7 +59,8 @@ active-work types). Collect their `id` values for the issue query.
 ### Step 3: Fetch Open Issues in Active Statuses
 
 Call `list_issues` with the resolved `team`, once per active status (pass the
-status `id` as `state`), limit 50. Merge the results before continuing.
+status `id` as `state`), limit 50. Merge the results and deduplicate by issue
+`id` before continuing (an issue can appear in more than one bucket).
 
 If `pageInfo.hasNextPage` is true, warn: "More than 50 active issues found — only
 the first 50 are shown. Run again after resolving these."

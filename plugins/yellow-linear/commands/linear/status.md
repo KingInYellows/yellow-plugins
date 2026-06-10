@@ -54,6 +54,7 @@ For each initiative:
 
 - Fetch details via `mcp__plugin_yellow-linear_linear__get_initiative`
 - Fetch recent updates via `mcp__plugin_yellow-linear_linear__get_status_updates`
+  (pass `type: "initiative"` and the initiative as `initiative`)
 - Show: name, status, last update date, health indicator
 
 ### Step 3: Surface Blockers and Risks
@@ -87,7 +88,7 @@ Compile all sections into a structured markdown report:
 
 Use `AskUserQuestion` to ask:
 
-- "Would you like to post this report as an initiative update to Linear?"
+- "Would you like to post this report as a status update to Linear?"
 
 If yes:
 
@@ -95,8 +96,9 @@ If yes:
 - **Validate access (C1):** Call `mcp__plugin_yellow-linear_linear__get_initiative`
   with the selected initiative ID to verify it exists and belongs to the user's
   workspace. If validation fails, report the error and stop.
-- Post via `mcp__plugin_yellow-linear_linear__save_status_update` with the report
-  content
+- Post via `mcp__plugin_yellow-linear_linear__save_status_update` with
+  `type: "initiative"`, the selected initiative as `initiative`, and the report
+  content as `body` (include `health` from the Step 3 assessment when known)
 
 ## Error Handling
 

@@ -80,7 +80,8 @@ Note: This works for Graphite-created PRs since they are GitHub PRs underneath.
 
 - **If PR exists:** Check the comments fetched in Step 3 for an existing PR link
   comment matching this PR URL. If already linked, skip. Otherwise, add via
-  `mcp__plugin_yellow-linear_linear__save_comment`:
+  `mcp__plugin_yellow-linear_linear__save_comment`, passing the issue `id` as
+  `issueId` and this text as `body`:
   ```
   PR linked: [PR Title](PR URL) — State: open/merged
   ```
@@ -98,7 +99,7 @@ Determine the appropriate status transition:
 - If PR exists and is **merged** → suggest "Done" status
 - If no PR and status is early (Backlog/Triage) → suggest "In Progress" status
 
-**Two-tier safety model** (see `linear-workflows` SKILL.md):
+**Two-tier safety model** (see `linear-workflows` skill):
 
 - **Tier 1 transitions** (`→ In Progress`, `→ In Review`, `In Review → In
   Progress`): If `--after-submit` flag is set (from Step 1) AND a PR exists for
@@ -114,7 +115,8 @@ Determine the appropriate status transition:
 If the issue is already in the suggested target status (e.g., already "In
 Review" when suggesting "In Review"), skip the transition silently.
 
-Apply via `save_issue` only after the appropriate tier check passes.
+Apply via `save_issue` (pass the issue `id` and the new status `id` as
+`state`) only after the appropriate tier check passes.
 
 **Note:** When invoked programmatically from `/workflows:work` after PR
 submission (via Skill tool), the caller passes `--after-submit` to enable Tier 1

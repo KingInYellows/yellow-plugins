@@ -232,7 +232,8 @@ whose body contains `SESSION_URL`. If found, skip comment creation and report
 **M3 confirmation**: Display the comment above via `AskUserQuestion` — "Post this
 comment to the Linear issue? [Yes / No]"
 
-If Yes: Call `save_comment` with the built body.
+If Yes: Call `save_comment` with the built body as `body` and the issue `id`
+(validated in Step 2) as `issueId`.
 
 ### Step 7: Update Status (Tier 1 Auto-Apply)
 
@@ -265,7 +266,7 @@ Next steps:
 - **C1**: `get_issue` validates issue exists before delegation
 - **H1**: Re-fetch before status transition
 - **M3**: `AskUserQuestion` before `save_comment`; `save_issue` uses Tier 1
-  auto-apply per two-tier safety model
+  auto-apply for the `→ In Progress` transition per two-tier safety model
 - **Token never echoed**: All token references use env var only; never print or
   log the token value
 - **No shell injection**: Prompt built via `jq -n --arg`, not string interpolation

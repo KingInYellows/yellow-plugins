@@ -60,7 +60,8 @@ If no issue ID found, ask user for the issue ID.
 
 ### Step 2: Validate Issue
 
-**Security (C1):** Call `get_issue` with the extracted `issueId` to verify the
+**Security (C1):** Call `get_issue` with the extracted issue identifier as
+`id` to verify the
 issue exists in the user's workspace before any operations; if the issue is not
 found or the call fails, report this to the user and stop without calling
 `save_comment` or `save_issue`.
@@ -85,7 +86,8 @@ First, fetch existing comments via `list_comments` and check if a PR link
 comment already exists for this PR URL. If a matching comment is found, skip
 adding a duplicate.
 
-If no existing PR link comment, add one via `save_comment`:
+If no existing PR link comment, add one via `save_comment` (pass the issue
+`id` as `issueId` and the text below as `body`):
 
 ```
 PR linked: [PR Title](PR URL) — State: open/merged
