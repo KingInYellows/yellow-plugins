@@ -1,6 +1,6 @@
 ---
 name: docs:review
-description: "Multi-persona review of a planning document (PRD, brainstorm, spec, ADR) using 6 always-applicable personas plus 1 conditional adversarial reviewer. Each persona returns structured findings; the orchestrator aggregates with a confidence-rubric gate."
+description: "Review a planning document (PRD, brainstorm, spec, ADR) with 6 always-on personas plus a conditional adversarial reviewer, aggregated under a confidence-rubric gate. Use when user says \"review this PRD\", \"check this spec\", \"poke holes in this plan\", or before handing a planning doc to implementation. Not for code review (/review:pr) or refreshing stale generated docs (/docs:refresh)."
 argument-hint: "<path-to-document>"
 allowed-tools:
   - Read
@@ -174,9 +174,12 @@ Input: { document_path, document_text, learnings_context, depth }
 run_in_background: true
 ```
 
-Where `depth` = `"quick"` for documents under 1000 words and no risk
-signals, `"standard"` for medium documents, `"deep"` for documents over
-3000 words OR more than 10 requirements OR high-stakes domains.
+Where `depth` mirrors the agent's first-match-wins tier predicates, using
+the Step 2 metrics: `"deep"` when `WORD_COUNT > 3000` OR `REQ_COUNT > 10`
+OR `RISK_HITS >= 1`; `"quick"` only when `WORD_COUNT < 1000` AND
+`REQ_COUNT < 5` AND `RISK_HITS == 0` (this cannot occur when dispatch came
+through the Step 2 gate — the gate only fires when a quick condition is
+violated); otherwise `"standard"`.
 
 ### Step 5: Wait gate + collect findings
 
