@@ -1,6 +1,6 @@
 ---
 name: devin-orchestrator
-description: Multi-step workflow orchestrator for Claude Code + Devin collaboration. Use when user wants a full plan-implement-review-fix cycle, says "orchestrate this with Devin", "have Devin implement my plan", or delegates a complex task that needs iterative refinement.
+description: Multi-step workflow orchestrator for Claude Code + Devin collaboration — runs a full plan-implement-review-fix loop with more than one Devin round-trip. Use when an existing plan file or spec should be implemented by Devin with iterative review, or user says "orchestrate this with Devin" or "have Devin implement my plan". Not for one-shot handoffs with no review loop — use /devin:delegate.
 model: inherit
 memory: project
 skills:
