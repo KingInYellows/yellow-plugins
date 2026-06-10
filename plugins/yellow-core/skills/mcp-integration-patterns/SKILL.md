@@ -72,7 +72,6 @@ query = "[<domain-hint>] <task-specific context>"
 | yellow-research | `[research]` |
 | yellow-browser-test | `[browser-testing]` |
 | yellow-linear | `[project-management]` |
-| yellow-chatprd | `[product-requirements]` |
 | yellow-devin | `[delegation]` |
 | gt-workflow | `[git-workflow]` |
 
@@ -169,7 +168,6 @@ strength determining whether to record automatically, prompt the user, or skip.
 | yellow-research | — | Novel findings | — |
 | yellow-devin | — | Delegation failures | — |
 | yellow-linear | — | — | Issue patterns |
-| yellow-chatprd | — | — | PRD decisions (already in doc) |
 | gt-workflow | — | — | Stack info |
 
 ### Quality Requirements

@@ -75,7 +75,6 @@ query = "[<domain-hint>] <task-specific context>"
 | yellow-research | `[research]` |
 | yellow-browser-test | `[browser-testing]` |
 | yellow-linear | `[project-management]` |
-| yellow-chatprd | `[product-requirements]` |
 | yellow-devin | `[delegation]` |
 | gt-workflow | `[git-workflow]` |
 

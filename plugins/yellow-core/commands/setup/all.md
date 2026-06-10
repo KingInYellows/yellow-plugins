@@ -142,7 +142,6 @@ fi
 
 printf '\n=== Config Files ===\n'
 [ -n "$repo_top" ] && [ -d "$repo_top/.ruvector" ] && printf '.ruvector/:                         exists\n' || printf '.ruvector/:                         missing\n'
-[ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-chatprd.local.md" ] && printf '.claude/yellow-chatprd.local.md:    exists\n' || printf '.claude/yellow-chatprd.local.md:    missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-ci.local.md" ] && printf '.claude/yellow-ci.local.md:         exists\n' || printf '.claude/yellow-ci.local.md:         missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.claude/yellow-browser-test.local.md" ] && printf '.claude/yellow-browser-test.local.md: exists\n' || printf '.claude/yellow-browser-test.local.md: missing\n'
 [ -n "$repo_top" ] && [ -f "$repo_top/.graphite.yml" ] && printf '.graphite.yml:                      exists\n' || printf '.graphite.yml:                      missing\n'
@@ -266,7 +265,7 @@ for p in sys.argv[1:]:
   fi
   if [ -n "$installed_plugins" ] || command -v python3 >/dev/null 2>&1 || command -v jq >/dev/null 2>&1; then
     # setup-all-dashboard-plugin-loop:start
-    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-chatprd yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-core; do
+    for p in gt-workflow yellow-ruvector yellow-morph yellow-devin yellow-semgrep yellow-research yellow-linear yellow-debt yellow-ci yellow-review yellow-browser-test yellow-docs yellow-composio yellow-codex yellow-council yellow-mempalace yellow-core; do
       if printf '%s\n' "$installed_plugins" | grep -Fxq "$p"; then
         printf '%-22s installed\n' "$p:"
       else
@@ -291,7 +290,7 @@ fi
 
 ### Step 1.5: Session MCP Visibility (ToolSearch probes)
 
-Run five ToolSearch probes to capture current-session MCP visibility:
+Run four ToolSearch probes to capture current-session MCP visibility:
 
 - `list_user_organizations`
 - `list_teams`
@@ -301,7 +300,6 @@ Run five ToolSearch probes to capture current-session MCP visibility:
 
 Record whether these exact tools are present in the results:
 
-- `mcp__plugin_yellow-chatprd_chatprd__list_user_organizations`
 - `mcp__plugin_yellow-linear_linear__list_teams`
 - `mcp__plugin_yellow-research_parallel__createDeepResearch`
 - `mcp__plugin_yellow-research_ast-grep__find_code`
@@ -547,13 +545,6 @@ yellow-research` to re-trigger the userConfig prompts."
 - PARTIAL: Linear MCP is visible but `gt` is missing
 - NEEDS SETUP: Linear MCP tool is not visible in the current session
 
-**yellow-chatprd:**
-
-- READY: `.claude/yellow-chatprd.local.md` exists AND
-  `mcp__plugin_yellow-chatprd_chatprd__list_user_organizations` is visible
-- PARTIAL: exactly one of config file or MCP visibility is missing
-- NEEDS SETUP: both config file and MCP visibility are missing
-
 **yellow-debt:**
 
 - READY: `git_repo` ok AND `repo_root` writable AND `git` OK AND `jq` OK AND
@@ -680,7 +671,6 @@ Marketplace Setup Dashboard
   yellow-semgrep       PARTIAL         Token set, semgrep CLI missing
   yellow-research      PARTIAL         2/6 bundled sources available
   yellow-linear        READY           Linear MCP visible, Graphite available
-  yellow-chatprd       PARTIAL         Config exists, MCP not visible this session
   yellow-debt          PARTIAL         Required tools ready, yellow-linear missing
   yellow-ci            READY           gh authenticated, runner config present
   yellow-review        PARTIAL         Review prerequisites ready, yellow-core missing
@@ -752,17 +742,16 @@ tool in this fixed order:
 5. `semgrep:setup`
 6. `research:setup`
 7. `linear:setup`
-8. `chatprd:setup`
-9. `debt:setup`
-10. `ci:setup`
-11. `review:setup`
-12. `browser-test:setup`
-13. `docs:setup`
-14. `composio:setup`
-15. `codex:setup`
-16. `council:setup`
-17. `mempalace:setup`
-18. `statusline:setup`
+8. `debt:setup`
+9. `ci:setup`
+10. `review:setup`
+11. `browser-test:setup`
+12. `docs:setup`
+13. `composio:setup`
+14. `codex:setup`
+15. `council:setup`
+16. `mempalace:setup`
+17. `statusline:setup`
 <!-- setup-all-delegated-commands:end -->
 
 Only invoke setups for plugins the user selected. Use this mapping:
@@ -775,7 +764,6 @@ Only invoke setups for plugins the user selected. Use this mapping:
 - `yellow-semgrep` → `semgrep:setup`
 - `yellow-research` → `research:setup`
 - `yellow-linear` → `linear:setup`
-- `yellow-chatprd` → `chatprd:setup`
 - `yellow-debt` → `debt:setup`
 - `yellow-ci` → `ci:setup`
 - `yellow-review` → `review:setup`

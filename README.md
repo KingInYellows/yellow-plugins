@@ -1,6 +1,6 @@
 # yellow-plugins
 
-Personal Claude Code plugin marketplace — 18 plugins for Git workflows, code
+Personal Claude Code plugin marketplace — 17 plugins for Git workflows, code
 review, CI, research, testing, documentation, code editing, security
 remediation, and cross-lineage code council.
 
@@ -24,7 +24,6 @@ Add the marketplace, then install individual plugins:
 | --------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                | 6 commands, 2 hooks, 1 MCP                     |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
-| `yellow-chatprd`      | ChatPRD MCP integration with document management and Linear bridging                                        | 4 agents, 6 commands, 1 skill, 1 MCP           |
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 8 commands, 2 skills, 1 hook         |
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                  | 3 agents, 4 commands, 1 skill                  |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                          | 2 commands, 1 skill, 1 MCP                     |
@@ -43,12 +42,11 @@ Add the marketplace, then install individual plugins:
 
 ## MCP Servers & Authentication
 
-Nine plugins connect to MCP servers. Authentication requirements vary by server.
+Eight plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                |
 | ----------------- | ---------- | ------------------------------------------------------------------- |
 | `gt-workflow`     | Graphite   | Local stdio (`gt mcp`) — requires Graphite CLI login                |
-| `yellow-chatprd`  | ChatPRD    | OAuth (browser popup on first use)                                  |
 | `yellow-composio` | Composio   | User-configured — `X-API-Key` header via `claude mcp add --transport http` |
 | `yellow-devin`    | DeepWiki   | Free for public repos; `DEVIN_SERVICE_USER_TOKEN` for private repos |
 | `yellow-devin`    | Devin      | `DEVIN_SERVICE_USER_TOKEN` & `DEVIN_ORG_ID` required                |
@@ -100,10 +98,10 @@ export DEVIN_ORG_ID="your-org-id"
 
 Never commit tokens to version control.
 
-### Linear & ChatPRD (OAuth)
+### Linear (OAuth)
 
 On first MCP tool call, Claude Code opens a browser popup to authenticate with
-your Linear or ChatPRD account. Tokens are stored in your system keychain and
+your Linear account. Tokens are stored in your system keychain and
 refresh automatically.
 
 To re-authenticate or revoke access: run `/mcp` in Claude Code, select the
@@ -263,7 +261,6 @@ yellow-plugins/
 ├── plugins/
 │   ├── gt-workflow/           # Graphite workflow (6 commands, 2 hooks, 1 MCP)
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
-│   ├── yellow-chatprd/        # ChatPRD integration (4 agents, 6 commands, 1 skill, 1 MCP)
 │   ├── yellow-ci/             # CI toolkit (4 agents, 8 commands, 2 skills, 1 hook)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)

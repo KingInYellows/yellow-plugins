@@ -7,32 +7,26 @@ patterns. Read [Common Workflows](./common-workflows.md) first.
 
 ## Product to Code Pipeline
 
-**Plugins required:** yellow-chatprd, yellow-linear, yellow-devin
-**Credentials:** ChatPRD OAuth, Linear OAuth, Devin service user (`DEVIN_SERVICE_USER_TOKEN` + `DEVIN_ORG_ID`)
+**Plugins required:** yellow-linear, yellow-devin
+**Credentials:** Linear OAuth, Devin service user (`DEVIN_SERVICE_USER_TOKEN` + `DEVIN_ORG_ID`)
 
 ### Chain
 
 ```
-/chatprd:setup → /chatprd:create → /chatprd:link-linear → /linear:delegate → /devin:status
+/linear:create → /linear:delegate → /devin:status
 ```
 
 ### Step by Step
 
-1. **`/chatprd:setup`** — Configure ChatPRD workspace (one-time setup). Sets
-   default organization and project for all ChatPRD commands. **Required before
-   any other ChatPRD command.**
+1. **`/linear:create`** — Capture the spec or feature request as a Linear
+   issue (write the PRD in your product tool of choice first; paste the
+   relevant requirements into the issue description).
 
-2. **`/chatprd:create`** — Write a PRD, spec, or one-pager in ChatPRD. Returns
-   a document ID for linking.
-
-3. **`/chatprd:link-linear`** — Create Linear issues from the PRD. Breaks the
-   spec into actionable issues with acceptance criteria.
-
-4. **`/linear:delegate`** — Delegate a Linear issue to Devin for autonomous
+2. **`/linear:delegate`** — Delegate the Linear issue to Devin for autonomous
    implementation. Reports the `SESSION_ID` directly in the "Next steps"
    section of the output.
 
-5. **`/devin:status [session-id]`** — Check Devin's progress. Use the
+3. **`/devin:status [session-id]`** — Check Devin's progress. Use the
    `SESSION_ID` reported directly in the `/linear:delegate` output — it is
    shown in the "Next steps" section.
 
@@ -40,13 +34,12 @@ patterns. Read [Common Workflows](./common-workflows.md) first.
 
 | Missing Credential | Effect | Alternative |
 |---|---|---|
-| ChatPRD OAuth | `/chatprd:create` fails | Write specs manually |
-| Linear OAuth | `/chatprd:link-linear` fails | Create issues manually |
+| Linear OAuth | `/linear:create` fails | Create issues manually |
 | `DEVIN_SERVICE_USER_TOKEN` / `DEVIN_ORG_ID` | `/linear:delegate` fails | Implement manually via `/workflows:work` |
 
 ### Without Linear
 
-Skip steps 3-5. Use `/workflows:plan` to break the PRD into implementation
+Skip steps 2-3. Use `/workflows:plan` to break the spec into implementation
 tasks, then `/workflows:work` to implement.
 
 ---

@@ -64,7 +64,6 @@ context already captured in files).
 | yellow-research | — | Novel findings | — |
 | yellow-devin | — | Delegation failures | — |
 | yellow-linear | — | — | Issue patterns |
-| yellow-chatprd | — | — | PRD decisions (already in doc) |
 | gt-workflow | — | — | Stack info |
 
 ### Quality Requirements
