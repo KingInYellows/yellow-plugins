@@ -86,6 +86,9 @@ while IFS= read -r status_line; do
   changed_file="${status_line:3}"
   # Rename/copy entries are "old -> new"; the destination is the file on disk
   case "${status_line:0:2}" in R*|C*) changed_file="${changed_file##* -> }" ;; esac
+  # The todo file itself is legitimately modified (/debt:fix transitions it to
+  # in-progress before launching this agent) — never treat it as out-of-scope
+  [ "$changed_file" = "$TODO_PATH" ] && continue
   in_scope=0
   for allowed in "${ALLOWED[@]}"; do
     [ "$changed_file" = "$allowed" ] && { in_scope=1; break; }
