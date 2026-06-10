@@ -1,6 +1,6 @@
 ---
 name: code-simplifier
-description: "Conditional code-review persona — the final pass (pass 2), selected after other review agents have applied fixes. Identifies remaining unnecessary complexity, redundant abstractions, and YAGNI violations while preserving all functionality. For pre-fix complexity analysis, see code-simplicity-reviewer (yellow-core)."
+description: "Final-pass code-review persona (pass 2) — launched after the other review agents have applied fixes, not selected from diff content. Identifies remaining unnecessary complexity, redundant abstractions, and YAGNI violations while preserving all functionality. For pre-fix complexity analysis, see code-simplicity-reviewer (yellow-core)."
 model: sonnet
 background: true
 memory: project
