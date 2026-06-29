@@ -342,5 +342,5 @@ on violations:
 ## Stack Progress
 <!-- Updated by workflows:work. Do not edit manually. -->
 - [x] 1. agent/feat/spec-decompose-frontend (completed 2026-06-29)
-- [ ] 2. agent/feat/expand-pick-next-orchestrator
+- [x] 2. agent/feat/expand-pick-next-orchestrator (completed 2026-06-29)
 - [ ] 3. agent/feat/work-polish-loop
