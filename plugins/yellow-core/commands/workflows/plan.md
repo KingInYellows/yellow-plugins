@@ -162,8 +162,10 @@ research, analysis, and structured documentation.
      and would not fit one plan file or one work session — i.e. it needs an
      explicit dependency graph and requirement-coverage guarantees across
      several independent units — stop and tell the user: "This reads as a
-     multi-subsystem effort. Run `/workflows:spec` to capture requirements, then
-     `/workflows:decompose` to break it into dependency-ordered shells." A
+     multi-subsystem effort. Run `/workflows:spec` to capture requirements,
+     `/workflows:decompose` to break it into dependency-ordered shells, then
+     `/workflows:pick-next-shell` to expand and implement the first unblocked
+     shell." A
      single COMPREHENSIVE plan goes stale mid-project at this scale.
 
 2. Create plan document at `plans/<issue-title>.md` with structure:
