@@ -93,7 +93,21 @@ cycle participant):
 
 Invoke the Skill tool with `skill: "workflows:expand-shell"` and `args` set to
 the picked shell path. This writes `plans/<shell-slug>.md` and deletes the shell
-after your approval. Then check your task list and proceed to Step 5.
+after your approval.
+
+The Skill tool returns no reliable exit status, so verify the expansion actually
+produced a plan before continuing — `/workflows:expand-shell` may stop early
+(spec-drift Stop, an unreconciled `Consumes` failure, a Revise choice, or a
+Skill error). Substitute the actual `<shell-slug>` inline:
+
+```bash
+[ -f "plans/<shell-slug>.md" ] || {
+  printf '[pick-next-shell] expand-shell did not produce plans/<shell-slug>.md — it stopped early or failed. Resolve the issue and re-run; not proceeding to learnings capture.\n' >&2
+  exit 1
+}
+```
+
+Only if the plan exists, check your task list and proceed to Step 5.
 
 ## Step 5: Capture Learnings (and optional enrich)
 
