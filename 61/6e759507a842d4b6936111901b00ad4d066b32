@@ -1,0 +1,38 @@
+plans/spec-shells-decomposition-plan.md
+  s_21cfa79e862cb2::t_5e64fd58268232 345
+plugins/yellow-core/README.md
+  s_21cfa79e862cb2::t_6066e4c76fdaa3 25-26
+plugins/yellow-core/commands/workflows/expand-shell.md
+  s_21cfa79e862cb2::t_c71c89ff26e0d8 1-146
+plugins/yellow-core/CLAUDE.md
+  s_21cfa79e862cb2::t_ca3edab7604fbe 84-90
+  s_21cfa79e862cb2::t_a3f9d238cef7fb 74
+plugins/yellow-core/commands/workflows/plan.md
+  s_21cfa79e862cb2::t_4e43e9aa785081 161-167
+README.md
+  s_21cfa79e862cb2::t_4bd12b7ee1b87a 30,267
+.changeset/spec-shells-orchestrator.md
+  s_21cfa79e862cb2::t_e9bf3c31225aad 1-15
+plugins/yellow-core/commands/workflows/pick-next-shell.md
+  s_21cfa79e862cb2::t_b9a4efe35fbda4 1-23,25-54,64-74,78-80,86-100
+  s_21cfa79e862cb2::t_ae7d8a6b793976 75-77
+  s_21cfa79e862cb2::t_51b62c377f1238 24
+  s_21cfa79e862cb2::t_79a36309166ec9 55-63
+  s_21cfa79e862cb2::t_31a99cfdff0757 81-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "616e759507a842d4b6936111901b00ad4d066b32",
+  "prompts": {},
+  "sessions": {
+    "s_21cfa79e862cb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4baa6f12-6eaf-46cd-878d-a751d4db0026",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}
