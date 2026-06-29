@@ -1,0 +1,48 @@
+README.md
+  s_21cfa79e862cb2::t_b416bca05a8e4b 30,267
+plans/spec-shells-decomposition-plan.md
+  s_21cfa79e862cb2::t_1dfbf19b845412 340
+  s_21cfa79e862cb2::t_9ff5a1e7b54f95 139-142
+  s_21cfa79e862cb2::t_95fd915b438f70 1-98,103-124,129-138,143-159,164-238,243-284,289-297
+  s_21cfa79e862cb2::t_bd4cfd8776de24 125-128
+  s_21cfa79e862cb2::t_902b47f00151f5 239-242
+  s_21cfa79e862cb2::t_0f69b0aa82bd5e 341-346
+  s_21cfa79e862cb2::t_2e886e65612179 99-102
+  s_21cfa79e862cb2::t_d5152321a36c41 305-307,309-310,319-339
+  s_21cfa79e862cb2::t_039d3e0d55306d 298-304
+  s_21cfa79e862cb2::t_85ce538c8e5f1f 285-288
+  s_21cfa79e862cb2::t_c4f64accfe495b 308,311-318
+  s_21cfa79e862cb2::t_69bb7288090a1e 160-163
+plugins/yellow-core/commands/workflows/decompose.md
+  s_21cfa79e862cb2::t_55c6f20e371321 123-129
+  s_21cfa79e862cb2::t_c27cb764c95f22 30,39-40,42-44
+  s_21cfa79e862cb2::t_f593850e653049 1-29,31-38,41,45-104,107-122,130-181
+  s_21cfa79e862cb2::t_bcdf61b2e539eb 105-106
+plugins/yellow-core/CLAUDE.md
+  s_21cfa79e862cb2::t_e51339a5d3f0c8 74,77-83
+plugins/yellow-core/commands/workflows/spec.md
+  s_21cfa79e862cb2::t_a1b50e628453f8 1-40,42,45-47,50-53,70-156
+  s_21cfa79e862cb2::t_e2a16eceb5c85b 41,43-44,48-49,54-69
+docs/brainstorms/2026-06-28-spec-shells-decomposition-brainstorm.md
+  s_21cfa79e862cb2::t_620adbb4d8d06c 1-146
+plugins/yellow-core/README.md
+  s_21cfa79e862cb2::t_b4b93e7bb65256 23-24
+.changeset/spec-shells-frontend.md
+  s_21cfa79e862cb2::t_e58cc136277b0f 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "52b8cab0cb8018b6ab6b392c6fe702a4d286552d",
+  "prompts": {},
+  "sessions": {
+    "s_21cfa79e862cb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4baa6f12-6eaf-46cd-878d-a751d4db0026",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}
