@@ -1,0 +1,19 @@
+plugins/yellow-core/commands/workflows/pick-next-shell.md
+  s_d0528420615001::t_80993fbad2b182 96-110
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "06904a4bfa6bc775aa42856f107ff19476fc308f",
+  "prompts": {},
+  "sessions": {
+    "s_d0528420615001": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0e6dcfb-cc20-4b42-83d6-7b0f2ab5c59c",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
