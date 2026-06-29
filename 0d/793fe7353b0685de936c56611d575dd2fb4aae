@@ -1,0 +1,42 @@
+plugins/yellow-core/commands/workflows/spec.md
+  s_21cfa79e862cb2::t_a1b50e628453f8 1-141
+.changeset/spec-shells-frontend.md
+  s_21cfa79e862cb2::t_e58cc136277b0f 1-13
+docs/brainstorms/2026-06-28-spec-shells-decomposition-brainstorm.md
+  s_21cfa79e862cb2::t_620adbb4d8d06c 1-146
+plans/spec-shells-decomposition-plan.md
+  s_21cfa79e862cb2::t_039d3e0d55306d 298-304
+  s_21cfa79e862cb2::t_902b47f00151f5 239-242
+  s_21cfa79e862cb2::t_c4f64accfe495b 308,311-318
+  s_21cfa79e862cb2::t_1dfbf19b845412 340
+  s_21cfa79e862cb2::t_0f69b0aa82bd5e 341-346
+  s_21cfa79e862cb2::t_69bb7288090a1e 160-163
+  s_21cfa79e862cb2::t_95fd915b438f70 1-98,103-124,129-138,143-159,164-238,243-284,289-297
+  s_21cfa79e862cb2::t_bd4cfd8776de24 125-128
+  s_21cfa79e862cb2::t_9ff5a1e7b54f95 139-142
+  s_21cfa79e862cb2::t_85ce538c8e5f1f 285-288
+  s_21cfa79e862cb2::t_2e886e65612179 99-102
+  s_21cfa79e862cb2::t_d5152321a36c41 305-307,309-310,319-339
+plugins/yellow-core/CLAUDE.md
+  s_21cfa79e862cb2::t_e51339a5d3f0c8 74,77-83
+README.md
+  s_21cfa79e862cb2::t_b416bca05a8e4b 30,267
+plugins/yellow-core/commands/workflows/decompose.md
+  s_21cfa79e862cb2::t_f593850e653049 1-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "0d793fe7353b0685de936c56611d575dd2fb4aae",
+  "prompts": {},
+  "sessions": {
+    "s_21cfa79e862cb2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4baa6f12-6eaf-46cd-878d-a751d4db0026",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
