@@ -217,6 +217,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   `WebSearch` silently when yellow-research is absent. This avoids
   duplicating the Ceramic MCP registration across plugins (single OAuth
   session).
+- **yellow-council** — `/workflows:work` Phase 3's polish loop escalates
+  persistent P1/P2 review findings to `/council review` (cross-lineage review)
+  when the review→fix loop hits its 3-iteration cap and the user chooses
+  Escalate. Without yellow-council, the Escalate option degrades gracefully —
+  only Continue/Stop are offered.
 
 ### MCP Servers (0)
 
