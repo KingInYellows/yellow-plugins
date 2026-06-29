@@ -75,13 +75,23 @@ cycle participant):
    `<slug>` — clean that shell up first" and stop. Without this check such a
    shell is neither a candidate, a cycle, nor unsatisfiable, and execution would
    fall through to Step 4 with no shell picked.
-3. **Unsatisfiable dependency.** A `depends_on` slug present in neither
-   `plans/shells/` nor `plans/complete/`. Report each by name, REMOVE its edges
-   from the graph (so it is not later miscounted as a cycle node), then offer
-   recovery via AskUserQuestion: re-run `/workflows:decompose` / edit the
-   dependent shell's frontmatter yourself / Cancel (stop and reconcile
-   manually). Then stop. (Do not offer a "treat as satisfied" option — acting on
-   it would require editing a shell, which the Rules forbid.)
+3. **In-progress or unsatisfiable dependency.** A `depends_on` slug present in
+   neither `plans/shells/` nor `plans/complete/` — split into two sub-cases so
+   an in-progress dep is not misreported as missing:
+   - **In progress:** `plans/<dep-slug>.md` exists (the dep's shell was expanded
+     and deleted, but the resulting plan has not been archived yet). Report
+     "blocked on in-progress plan `plans/<dep-slug>.md` — implement it and run
+     `/plan:complete`, then re-run `/workflows:pick-next-shell`." and stop. Do
+     NOT treat it as unsatisfiable (a dep is satisfied only once archived in
+     `plans/complete/`, but an open plan means work-in-flight, not a missing
+     requirement).
+   - **Unsatisfiable:** no plan exists anywhere for the slug. Report each by
+     name, REMOVE its edges from the graph (so it is not later miscounted as a
+     cycle node), then offer recovery via AskUserQuestion: re-run
+     `/workflows:decompose` / edit the dependent shell's frontmatter yourself /
+     Cancel (stop and reconcile manually). Then stop. (Do not offer a "treat as
+     satisfied" option — acting on it would require editing a shell, which the
+     Rules forbid.)
 4. **Cycle.** Over the remaining non-split shells, with split-state and
    unsatisfiable edges already pruned, build the dependency graph and run a
    topological pass (Kahn's algorithm — process in-degree-zero nodes; any node
