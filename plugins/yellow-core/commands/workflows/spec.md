@@ -27,6 +27,11 @@ effort, use `/workflows:plan` instead.
 
 ```bash
 mkdir -p plans/specs || {
+  printf '[spec] Error: cannot create plans/specs/. Run from project root.\n' >&2
+  exit 1
+}
+# mkdir -p exits 0 for a pre-existing dir regardless of permissions — probe writability explicitly
+[ -w plans/specs ] || {
   printf '[spec] Error: plans/specs/ not writable. Run from project root.\n' >&2
   exit 1
 }
