@@ -561,6 +561,44 @@ it at a Phase 1b checkpoint.
    - Optimize query in Z"
    ```
 
+7. **Polish loop — re-run review until clean (cap 3 iterations).** Steps 3–6 are
+   one review→fix iteration. After step 6 applies fixes, decide whether to loop
+   again. The exit decision is total — every outcome routes to exactly one of
+   these branches, so the loop never exits silently with a known P1/P2 open:
+
+   - **Clean pass → done.** If the iteration's review found zero P1/P2 findings
+     REMAINING (not merely zero NEW ones), the work is polished — exit the loop
+     and proceed to Phase 4.
+   - **Progress, under cap → loop.** If P1/P2 findings remain, a file changed
+     this iteration, and the iteration count is below the cap (3), start another
+     iteration: re-run steps 3a–6. Step 3a re-runs `mktemp -d` for a fresh run
+     directory (step 4 deleted the previous one, so the range MUST start at 3a,
+     not 3b); 3b–6 then dispatch the same four reviewer agents scoped to the
+     files changed so far, collect, and fix. A first-pass fix can introduce a
+     second-order issue in an earlier-touched file; re-reviewing the accumulated
+     changed set is how this loop catches it.
+   - **Stuck or capped → ask, never exit silently.** If an iteration produces no
+     file changes while P1/P2 still remain (the fixer cannot resolve them), OR
+     the iteration count reaches the cap (3) with P1/P2 still outstanding, do NOT
+     exit — use AskUserQuestion: "Review hasn't stabilized; N P1/P2 issue(s)
+     remain. [Continue another pass / Stop and ship as-is / Escalate to /council
+     for cross-lineage review]."
+     - **Continue another pass:** run one more iteration (steps 3a–6); the cap
+       does not reset, so this same gate fires again afterward if P1/P2 remain.
+     - **Stop and ship as-is:** exit the loop and proceed to Phase 4, AND list
+       the outstanding P1/P2 findings in the commit/PR body so the Phase 5
+       `/review:pr` pass and human reviewers see they were knowingly deferred,
+       not missed.
+     - **Escalate to /council:** invoke the Skill tool with `skill: "council"`
+       and `args` set to `"review"`, then fold its verdict back in before
+       returning to this gate. **Graceful degradation:** if the Skill invocation
+       fails for any reason (yellow-council not installed, council errors,
+       times out, or returns a partial result), report that and offer only
+       Continue/Stop.
+   - The Step 3 trivial-skip gate is evaluated once on entry to the polish loop
+     — a doc/comment/rename-only change for the whole task skips the loop
+     entirely; it is not re-evaluated per iteration.
+
 ## Phase 4: Ship It
 
 **Objective:** Submit work for review via Graphite.

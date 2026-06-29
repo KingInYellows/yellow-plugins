@@ -904,6 +904,49 @@ Verify each cross-reference resolves to the correct step after renaming.
 
 ---
 
+## Update — 2026-06-29
+
+### 21. Skill Tool Invocations Must Spell Out the Literal `skill: "name"` Value
+
+The `Skill` tool takes a `skill:` argument that must match the target command's
+frontmatter `name:` field exactly — not a description, not the plugin folder
+name, not the command filename stem.
+
+**WRONG prose:**
+
+```text
+Step 3: Invoke the expand-shell workflow via the Skill tool.
+```
+
+The LLM guesses `skill: "expand-shell"`, `skill: "workflows/expand-shell"`, or
+`skill: "yellow-core:expand-shell"` — all wrong (the real value is
+`workflows:expand-shell`).
+
+**RIGHT prose:**
+
+```text
+Step 3: Invoke the Skill tool with skill: "workflows:expand-shell" and args set to <path>.
+```
+
+**Why this matters:** This is the `Skill`-tool twin of anti-pattern #4
+(`subagent_type` must be a literal for `Task`). Both fail by the same mechanism:
+the LLM fills an implicit identifier from surrounding context instead of the
+explicit frontmatter `name:` value. Cross-plugin calls are the most dangerous
+(e.g. `/council` lives in yellow-council and its `name:` is the bare `council`,
+no colon) — graceful-degradation prose handles the plugin-absent case, but only
+if the LLM picked the right name to call in the first place.
+
+**Rule:** Any "invoke via Skill" instruction must include the literal
+`skill: "..."` string, and that value must equal the target command's `name:`
+frontmatter field exactly.
+
+**Prevention checklist additions:**
+
+- [ ] Every "invoke via Skill" instruction includes the literal `skill: "..."` string.
+- [ ] The `skill:` value matches the target command's `name:` frontmatter field exactly (check it; do not infer from a description or file path).
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2
