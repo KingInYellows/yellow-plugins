@@ -38,7 +38,11 @@ If the above exits non-zero, stop. Do not continue.
 
 Resolve the spec in this order: explicit path in `$ARGUMENTS` → explicit slug
 (`plans/specs/<slug>.md`) → the single file in `plans/specs/` if only one
-exists → most recently modified file in `plans/specs/`.
+exists → most recently modified file in `plans/specs/`. The resolved spec MUST
+live under `plans/specs/`: reject an explicit `$ARGUMENTS` path that is absolute,
+contains `..`, or otherwise resolves outside `plans/specs/`. Every shell's
+`spec:` metadata is written as `plans/specs/<spec-slug>.md`, so a spec read from
+anywhere else would leave each generated shell pointing at a missing file.
 
 ```bash
 SPEC_LIST=$(ls -t plans/specs/*.md 2>/dev/null)
