@@ -22,6 +22,8 @@ TypeScript, Python, Rust, and Go.
 | `/workflows:brainstorm` | Explore requirements through dialogue and research before planning |
 | `/workflows:spec`       | Draft a requirements spec (stable `R1..Rn` IDs + design) to `plans/specs/<slug>.md` via guided dialogue; entry point for multi-subsystem projects |
 | `/workflows:decompose`  | Break a spec into dependency-ordered shell files in `plans/shells/` with a blocking R-id coverage gate; single-shell specs bail out to `/workflows:plan` |
+| `/workflows:pick-next-shell` | Pick the lowest-numbered shell whose `depends_on` are archived in `plans/complete/`, expand it, and halt for a fresh `/workflows:work` session; reports cycles and the terminal state |
+| `/workflows:expand-shell` | Expand one shell into a concrete `- [ ]` checkbox plan in `plans/`, verifying `Consumes` against the live codebase and deleting the shell only after approval |
 | `/workflows:plan`       | Transform feature descriptions into structured plans               |
 | `/workflows:work`       | Execute work plans systematically                                  |
 | `/workflows:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |

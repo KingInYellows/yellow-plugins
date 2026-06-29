@@ -158,6 +158,13 @@ research, analysis, and structured documentation.
    - **MINIMAL:** Small changes, well-understood domain, low risk
    - **STANDARD:** Medium complexity, some unknowns, moderate risk
    - **COMPREHENSIVE:** High complexity, many unknowns, high risk
+   - **Spec-tier (escalate, do not plan here):** if the work is multi-subsystem
+     and would not fit one plan file or one work session — i.e. it needs an
+     explicit dependency graph and requirement-coverage guarantees across
+     several independent units — stop and tell the user: "This reads as a
+     multi-subsystem effort. Run `/workflows:spec` to capture requirements, then
+     `/workflows:decompose` to break it into dependency-ordered shells." A
+     single COMPREHENSIVE plan goes stale mid-project at this scale.
 
 2. Create plan document at `plans/<issue-title>.md` with structure:
 

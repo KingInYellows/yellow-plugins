@@ -27,7 +27,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 8 commands, 2 skills, 1 hook         |
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                  | 3 agents, 4 commands, 1 skill                  |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                          | 2 commands, 1 skill, 1 MCP                     |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 14 commands, 7 skills               |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 16 commands, 7 skills               |
 | `yellow-council`      | On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel             | 2 agents, 1 command, 1 skill                   |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
@@ -264,7 +264,7 @@ yellow-plugins/
 │   ├── yellow-ci/             # CI toolkit (4 agents, 8 commands, 2 skills, 1 hook)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
-│   ├── yellow-core/           # Dev toolkit (17 agents, 14 commands, 7 skills)
+│   ├── yellow-core/           # Dev toolkit (17 agents, 16 commands, 7 skills)
 │   ├── yellow-council/        # Cross-lineage code council (2 agents, 1 command, 1 skill)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)

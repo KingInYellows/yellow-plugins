@@ -71,7 +71,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   background-compounding plan); RULE 14 in
   `scripts/validate-agent-authoring.js` blocks any removal of this deny
 
-### Commands (14)
+### Commands (16)
 
 - `/workflows:brainstorm` — explore requirements through dialogue and research before planning
 - `/workflows:spec` — draft a requirements spec (stable `R1..Rn` IDs + design)
@@ -81,6 +81,13 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/workflows:decompose` — break a spec into dependency-ordered shell files in
   `plans/shells/` with a blocking R-id coverage gate and `depends_on`
   traceability; a single-shell result bails out to `/workflows:plan`
+- `/workflows:pick-next-shell` — pick the lowest-numbered shell whose
+  `depends_on` are all archived in `plans/complete/` (exact-slug oracle),
+  expand it, capture learnings, and halt for a fresh `/workflows:work` session;
+  reports cycles/unsatisfiable deps and the terminal state explicitly
+- `/workflows:expand-shell` — expand one shell into a concrete `- [ ]` checkbox
+  plan in `plans/`, verifying `Consumes` against the live codebase and deleting
+  the shell only after approval; usually invoked by `/workflows:pick-next-shell`
 - `/workflows:plan` — transform feature descriptions into structured plans
 - `/workflows:work` — execute work plans systematically
 - `/workflows:review` — session-level review of plan adherence, cross-PR
