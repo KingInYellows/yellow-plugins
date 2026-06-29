@@ -561,6 +561,29 @@ it at a Phase 1b checkpoint.
    - Optimize query in Z"
    ```
 
+7. **Polish loop — re-run review until stable (cap 3 iterations).** Steps 3–6
+   are one review→fix iteration. After step 6 applies fixes, if any file changed
+   during this iteration AND the iteration count is below the cap (3), start
+   another iteration: re-run steps 3b–6 scoped to the files changed so far (a
+   fresh `$RUN_DIR`, the same four reviewer agents, collect, fix). A first-pass
+   fix can introduce a second-order issue; this loop catches it.
+
+   - The Step 3 trivial-skip gate still applies on entry — a doc/comment/rename-
+     only change skips the loop entirely.
+   - Stop iterating as soon as an iteration produces no file changes (stable) or
+     the review pass comes back clean — i.e. zero P1/P2 findings REMAIN, not
+     merely zero NEW ones. A P1 that persists unchanged across iterations is
+     still outstanding and must keep the loop going (or hit the cap gate below);
+     never exit while a known P1/P2 is unresolved.
+   - **On reaching the cap (3 iterations) with outstanding P1/P2 issues**, do NOT
+     loop silently — use AskUserQuestion: "Review hasn't stabilized after 3
+     passes; N P1/P2 issue(s) remain. [Continue another pass / Stop and ship
+     as-is / Escalate to /council for cross-lineage review]." On Escalate,
+     invoke the Skill tool with `skill: "council"` and `args` set to `"review"`,
+     then fold its verdict back in before continuing. **Graceful degradation:**
+     if the Skill invocation fails (yellow-council not installed), report that
+     and fall back to Continue/Stop only.
+
 ## Phase 4: Ship It
 
 **Objective:** Submit work for review via Graphite.
