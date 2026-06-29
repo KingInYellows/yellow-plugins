@@ -16,7 +16,7 @@ plans/spec-shells-decomposition-plan.md
 plugins/yellow-core/commands/workflows/decompose.md
   s_21cfa79e862cb2::t_55c6f20e371321 123-129
   s_21cfa79e862cb2::t_c27cb764c95f22 30,39-40,42-44
-  s_21cfa79e862cb2::t_f593850e653049 1-29,31-38,41,45-104,107-122,130-181
+  s_21cfa79e862cb2::t_f593850e653049 1-29,1-7,8-29,31-38,41,45-104,107-122,130-181
   s_21cfa79e862cb2::t_bcdf61b2e539eb 105-106
 plugins/yellow-core/CLAUDE.md
   s_21cfa79e862cb2::t_e51339a5d3f0c8 74,77-83
