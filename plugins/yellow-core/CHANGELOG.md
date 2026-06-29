@@ -1,5 +1,52 @@
 # Changelog
 
+## 1.21.0
+
+### Minor Changes
+
+- [#588](https://github.com/KingInYellows/yellow-plugins/pull/588)
+  [`5dc0007`](https://github.com/KingInYellows/yellow-plugins/commit/5dc000769bdbd3425e4c50aa0fca267a8e8d75c2)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-core): add /workflows:spec and /workflows:decompose commands
+
+  Borrow Turbo's spec→shells decomposition front-end into yellow-core's planning
+  pipeline. `/workflows:spec` drafts a requirements spec (stable R1..Rn IDs +
+  design) to `plans/specs/<slug>.md` through guided dialogue;
+  `/workflows:decompose` breaks a spec into dependency-ordered shell files in
+  `plans/shells/` with a blocking R-id coverage gate and `depends_on`
+  traceability. Single-shell specs bail out to `/workflows:plan`. Pairs with the
+  forthcoming `/workflows:expand-shell` and `/workflows:pick-next-shell`
+  commands.
+
+- [#589](https://github.com/KingInYellows/yellow-plugins/pull/589)
+  [`37a3f92`](https://github.com/KingInYellows/yellow-plugins/commit/37a3f922a5e64e98dd232b48bed7c768a07173fe)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-core): add /workflows:expand-shell and /workflows:pick-next-shell
+
+  Complete the spec→shells pipeline. `/workflows:pick-next-shell` selects the
+  lowest-numbered shell whose `depends_on` are all archived in `plans/complete/`
+  (exact-slug match against an optional date prefix), expands it, captures
+  learnings via `/workflows:compound`, and halts for a fresh `/workflows:work`
+  session — reporting dependency cycles, unsatisfiable deps, and the terminal
+  state explicitly. `/workflows:expand-shell` turns one shell into a concrete
+  `- [ ]` checkbox plan in `plans/`, verifying every `Consumes` against the live
+  codebase and deleting the shell only after approval. Also adds a spec-tier
+  escalation hint to `/workflows:plan` for multi-subsystem work.
+
+- [#590](https://github.com/KingInYellows/yellow-plugins/pull/590)
+  [`c1c8d9a`](https://github.com/KingInYellows/yellow-plugins/commit/c1c8d9ae6ce0158942757c3a4e941d75a30e534c)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  feat(yellow-core): bounded review→fix polish loop in /workflows:work Phase 3
+
+  Wrap the four-reviewer Quality Check suite in a re-run-until-stable loop:
+  after fixes are applied, if any file changed, re-run review on the changed
+  files, capped at 3 iterations. A first-pass fix can introduce a second-order
+  issue — this catches it. The existing trivial-skip gate
+  (doc/comment/rename-only) still short-circuits the loop. On hitting the cap
+  with outstanding P1/P2 findings, an AskUserQuestion gate offers Continue /
+  Stop / Escalate to /council for cross-lineage review (graceful degradation if
+  yellow-council is absent).
+
 ## 1.20.3
 
 ### Patch Changes
