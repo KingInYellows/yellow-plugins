@@ -20,6 +20,8 @@ TypeScript, Python, Rust, and Go.
 | Command                 | Description                                                        |
 | ----------------------- | ------------------------------------------------------------------ |
 | `/workflows:brainstorm` | Explore requirements through dialogue and research before planning |
+| `/workflows:spec`       | Draft a requirements spec (stable `R1..Rn` IDs + design) to `plans/specs/<slug>.md` via guided dialogue; entry point for multi-subsystem projects |
+| `/workflows:decompose`  | Break a spec into dependency-ordered shell files in `plans/shells/` with a blocking R-id coverage gate; single-shell specs bail out to `/workflows:plan` |
 | `/workflows:plan`       | Transform feature descriptions into structured plans               |
 | `/workflows:work`       | Execute work plans systematically                                  |
 | `/workflows:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |
