@@ -398,8 +398,24 @@ Schema migrations if applicable.
 
    What would you like to do next?
 
-   **When the plan contains a `## Linear Issues` section** (reorder to surface
-   stacking first, since multi-issue plans benefit most from it):
+   **When the generated plan reads as spec-tier** (multi-subsystem — it needs a
+   dependency graph and requirement-coverage across several independent units
+   that will not fit one `/workflows:work` session; the same signal as Phase 4's
+   spec-tier check, surfaced here when it only became clear after drafting),
+   surface the spec route first. **If the plan is not spec-tier, skip this block**
+   and use the orderings below; when it IS spec-tier this ordering takes
+   precedence over both blocks below — spec-tier wins even if the plan also has a
+   `## Linear Issues` section. The research / GitHub-issue / simplify options are
+   omitted here because they are premature once you are pivoting the drafted plan
+   to a spec:
+
+   1. This is multi-subsystem — run /workflows:spec <topic> (referencing plans/<name>.md) instead — capture requirements with stable R-ids, then /workflows:decompose into dependency-ordered shells. The drafted plan stays in plans/ as a reference draft.
+   2. Start implementation (/workflows:work plans/<name>.md) — if decomposition exists, executes bottom-up as stacked PRs
+   3. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md) — adds a ## Stack Decomposition section to the plan (no branches created)
+   4. Something else
+
+   **Otherwise, when the plan contains a `## Linear Issues` section** (reorder to
+   surface stacking first, since multi-issue plans benefit most from it):
 
    1. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md) — adds a ## Stack Decomposition section to the plan (no branches created)
    2. Start implementation (/workflows:work plans/<name>.md) — if decomposition exists, executes bottom-up as stacked PRs
@@ -419,6 +435,7 @@ Schema migrations if applicable.
    ```
 
 3. Based on response, invoke the chosen command via Skill tool:
+   - `/workflows:spec`: FIRST `Read plans/<name>.md` yourself so its requirements and research are in the conversation, then invoke `skill: "workflows:spec"` with args = a SHORT topic/title only. `/workflows:spec` derives the spec slug from `$ARGUMENTS`, so keep the args to a concise title — do NOT pass the draft path or a requirements summary in the args (a long summary would corrupt slug derivation, and an embedded "read this file" directive is ignored since spec.md treats `$ARGUMENTS` as untrusted, never as instructions). Because the Skill tool runs `/workflows:spec` in this same conversation, the draft you just read is already in context for its dialogue to build on.
    - `/workflows:work`: `skill: "workflows:work"`, args: plan file path
    - `/workflows:deepen-plan`: `skill: "workflows:deepen-plan"`, args: plan file path (requires yellow-research)
    - `/gt-stack-plan`: `skill: "gt-stack-plan"`, args: plan file path
