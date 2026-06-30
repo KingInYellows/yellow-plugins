@@ -1,6 +1,6 @@
 {
   "name": "yellow-plugins-root",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "Git-native, schema-validated plugin marketplace for Claude Code",
   "author": "KingInYellows",
