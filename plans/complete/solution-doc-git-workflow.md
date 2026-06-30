@@ -147,7 +147,7 @@ literal.
 
 ### Phase 1: validate-solutions.js (Prong 1)
 
-- [ ] 1.1: Create `scripts/validate-solutions.js` modeled on
+- [x] 1.1: Create `scripts/validate-solutions.js` modeled on
       `scripts/backfill-solution-frontmatter.js` (handles `docs/solutions/`
       traversal, handrolled YAML-frontmatter regex, path-traversal guards,
       `--check` mode). Target ~120 LOC.
@@ -157,10 +157,10 @@ literal.
     `SOLUTIONS_DIR.startsWith(ROOT + path.sep)` guard
   - `colors`/`logError`/`logWarning` inline helpers
   - `errors[]` accumulator; exit 1 if any errors
-- [ ] 1.2: Implement diff detection: `git diff --name-only origin/main...HEAD`
+- [x] 1.2: Implement diff detection: `git diff --name-only origin/main...HEAD`
       filtered to `^docs/solutions/`. Soft-skip with `::notice::` if no
       changed files OR if `origin/main` unreachable (fork PR fallback).
-- [ ] 1.3: For each changed file, parse frontmatter via handrolled regex
+- [x] 1.3: For each changed file, parse frontmatter via handrolled regex
       (`text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n([\s\S]*)$/)` plus
       field-level regexes — same pattern as `backfill-solution-frontmatter.js`,
       with `\s*` after each `---` to tolerate trailing whitespace on delimiters).
@@ -172,16 +172,16 @@ literal.
   - Slug regex: `^[a-z0-9]+(-[a-z0-9]+)*$`, max 50 chars
   - ISO 8601 date
   - Missing-required-field or invalid-enum → block with `ERROR-SOL-002`
-- [ ] 1.4: Implement exact slug collision detection:
+- [x] 1.4: Implement exact slug collision detection:
   - Walk existing `docs/solutions/**/*.md` corpus, build slug index
   - For each new file (added in diff, not modified), check slug against index
   - Collision (same slug, different path) → block with `ERROR-SOL-001`
-- [ ] 1.5: Emit GitHub Actions annotations when `GITHUB_ACTIONS=true`:
+- [x] 1.5: Emit GitHub Actions annotations when `GITHUB_ACTIONS=true`:
       `::error file=<path>::<msg>`.
-- [ ] 1.6: Add `package.json` entries:
+- [x] 1.6: Add `package.json` entries:
   - `"validate:solutions": "node scripts/validate-solutions.js"`
   - Append `&& node scripts/validate-solutions.js` to `"validate:schemas"`.
-- [ ] 1.7: Add `ERROR-SOL-001` and `ERROR-SOL-002` to the error catalog:
+- [x] 1.7: Add `ERROR-SOL-001` and `ERROR-SOL-002` to the error catalog:
   - In `packages/domain/src/validation/types.ts`: add a
     `ErrorCategory.SOLUTION_DOCS` enum value (match existing naming
     convention by inspecting other categories) and a corresponding entry in
@@ -197,7 +197,7 @@ literal.
     scripts hard-coding catalog codes. Import codes from the built
     `@yellow-plugins/domain` package (or assemble via concatenation if
     import is impractical from a `scripts/*.js` file).
-- [ ] 1.8: Integration tests at `tests/integration/validate-solutions.test.ts`
+- [x] 1.8: Integration tests at `tests/integration/validate-solutions.test.ts`
       following the `tests/integration/backfill-solution-frontmatter.test.ts`
       fixture-tmpdir pattern (create a temp `docs/solutions/` tree, run the
       script via `child_process`, assert on exit code + stdout):
@@ -214,10 +214,10 @@ literal.
 
 ### Phase 2: knowledge-compounder in-PR mode (Prong 2)
 
-- [ ] 2.1: Read `plugins/yellow-core/agents/workflow/knowledge-compounder.md`
+- [x] 2.1: Read `plugins/yellow-core/agents/workflow/knowledge-compounder.md`
       lines 57-75 (existing `--- begin review-findings ---` fast path) as the
       structural model.
-- [ ] 2.2: Add a parallel fast-path branch keyed off
+- [x] 2.2: Add a parallel fast-path branch keyed off
       `--- begin pr-context ---` delimiters. When the agent is spawned with
       this delimiter, it:
   - Reads `gh pr view --json title,body,commits,closingIssuesReferences` for
@@ -227,35 +227,35 @@ literal.
   - Defaults `ROUTING_HINT: BOTH` (write doc + MEMORY.md line)
   - Runs Related Docs Finder against `docs/solutions/` corpus to detect
     AMEND_EXISTING signal BEFORE the suffix-collision loop
-- [ ] 2.3: Fix the suffix-loop / Jaccard interaction (P1 logic gap surfaced
+- [x] 2.3: Fix the suffix-loop / Jaccard interaction (P1 logic gap surfaced
       by spec-flow):
   - If Related Docs Finder returns `AMEND_EXISTING`, the suffix loop MUST be
     skipped. The agent appends a `## Update — YYYY-MM-DD` section to the
     matched existing doc.
   - The suffix loop is reserved for true structural collisions only (same
     slug stem, demonstrably different problem statement, which is rare).
-- [ ] 2.4: Add an explicit `SKIP` exit path in the in-PR branch: if
+- [x] 2.4: Add an explicit `SKIP` exit path in the in-PR branch: if
       Context Analyzer determines all skip criteria are met (trivial fix,
       typo, version bump, no concrete failure mode), output
       "No solution doc required: <reason>" to the user and exit before M3.
-- [ ] 2.5: Extend the M3 AskUserQuestion (lines 198-213 of the agent file) to
+- [x] 2.5: Extend the M3 AskUserQuestion (lines 198-213 of the agent file) to
       show the MEMORY.md entry draft inline alongside the doc draft and file
       paths.
-- [ ] 2.6: Create `plugins/yellow-core/commands/workflows/compound.md` arg
+- [x] 2.6: Create `plugins/yellow-core/commands/workflows/compound.md` arg
       handling for `--in-pr`:
   - Detect current branch via `git branch --show-current`
   - Verify PR exists via `gh pr view`; if not, error with actionable message
     ("Create a draft PR first with `gt stack submit --draft`")
   - Build the `--- begin pr-context ---` delimited prompt
   - Dispatch via existing `subagent_type: "yellow-core:workflow:knowledge-compounder"`
-- [ ] 2.7: Update `plugins/yellow-core/CLAUDE.md` and
+- [x] 2.7: Update `plugins/yellow-core/CLAUDE.md` and
       `plugins/yellow-core/README.md` to document the new flag.
-- [ ] 2.8: Bats tests for the `--in-pr` argument parsing in
+- [x] 2.8: Bats tests for the `--in-pr` argument parsing in
       `plugins/yellow-core/tests/` (mock `gh pr view`).
 
 ### Phase 3: CONTRIBUTING.md + AGENTS.md policy (Prong 3)
 
-- [ ] 3.1: Add a new `## Solution Docs` section to `CONTRIBUTING.md` after
+- [x] 3.1: Add a new `## Solution Docs` section to `CONTRIBUTING.md` after
       the existing `## Versioning` section (Versioning starts at line 143,
       ends ~line 242; insert after line 242). Cover:
 
@@ -277,21 +277,21 @@ literal.
   - Note the heuristic's blind spots: cross-repo `closes` references
     (`closes other-repo#123`) and commit-message-only closures don't surface
     via `closingIssuesReferences` — author judgment fills the gap
-  - [ ] 3.2: Add the new section to the CONTRIBUTING.md ToC at line 8.
-  - [ ] 3.3: Add a checklist line to "Before Submitting" (heading line 125,
+  - [x] 3.2: Add the new section to the CONTRIBUTING.md ToC at line 8.
+  - [x] 3.3: Add a checklist line to "Before Submitting" (heading line 125,
         items lines 127-133):
         `- [ ] Solution doc written, updated, or skip criteria documented in PR description`
-  - [ ] 3.4: Cross-reference from `AGENTS.md` "Critical Agent Authoring Rules"
+  - [x] 3.4: Cross-reference from `AGENTS.md` "Critical Agent Authoring Rules"
         section pointing at the new `validate:solutions` validator.
 
 ### Phase 4: CI workflow integration (Prong 4)
 
-- [ ] 4.1: Edit `.github/workflows/validate-schemas.yml`:
+- [x] 4.1: Edit `.github/workflows/validate-schemas.yml`:
   - Add `docs/solutions/**` and `scripts/validate-solutions.js` to the
     `on.pull_request.paths` trigger.
   - Confirm `fetch-depth: 0` is set on the relevant checkout step (required
     for `origin/main...HEAD` diff).
-- [ ] 4.2: Add a new `validate-solutions-advisory` job (mirrors the
+- [x] 4.2: Add a new `validate-solutions-advisory` job (mirrors the
       `changeset-check` job at lines 760-800 — `validate-versions` lacks
       `fetch-depth: 0`) for the **non-blocking** missing-doc heuristic:
 
@@ -364,13 +364,13 @@ literal.
 > Surface both caveats in CONTRIBUTING.md so contributors know the
 > heuristic's blind spots. Draft PRs DO populate the field normally.
 <!-- /deepen-plan -->
-- [ ] 4.3: The blocking duplicate check rides via `validate:schemas` (already
+- [x] 4.3: The blocking duplicate check rides via `validate:schemas` (already
       includes `validate-solutions.js`). No new job needed — it runs inside
       the existing `validate-schemas` matrix.
-- [ ] 4.4: Do NOT add `validate-solutions-advisory` to the `ci-status`
+- [x] 4.4: Do NOT add `validate-solutions-advisory` to the `ci-status`
       aggregate gate at lines 947-994. Its skipped/failed state must not
       block merge.
-- [ ] 4.5: Use the canonical 6-element `gh api graphql` pattern (inline the
+- [x] 4.5: Use the canonical 6-element `gh api graphql` pattern (inline the
       pattern in the job; the referenced solution doc does not exist yet):
 
 <!-- deepen-plan: codebase -->
@@ -387,12 +387,12 @@ literal.
   - SC2016 disable on separate line
   - Symmetric exit-code capture
   - jq null-repository guard
-  - [ ] 4.6: Detect the P0/P1 label set via `closingIssuesReferences` (not PR
+  - [x] 4.6: Detect the P0/P1 label set via `closingIssuesReferences` (not PR
         labels). Configurable label list — default: `P0`, `P1`, `bug-critical`.
 
 ### Phase 5: PR template + final polish (Prong 5)
 
-- [ ] 5.1: Edit `.github/pull_request_template.md` (lowercase, already
+- [x] 5.1: Edit `.github/pull_request_template.md` (lowercase, already
       exists): add a `## Solution Doc` checklist line referencing the new
       CONTRIBUTING.md section.
 
@@ -403,23 +403,23 @@ literal.
 > file with different casing (would create two templates on case-sensitive
 > filesystems).
 <!-- /deepen-plan -->
-- [ ] 5.2: Update `docs/CLAUDE.md` to reference the new policy under release
+- [x] 5.2: Update `docs/CLAUDE.md` to reference the new policy under release
       checklist material.
-- [ ] 5.3: Add a one-line MEMORY.md index entry under `## CORE_RULES →
+- [x] 5.3: Add a one-line MEMORY.md index entry under `## CORE_RULES →
       Project Structure` pointing at the new section in `CONTRIBUTING.md`.
-- [ ] 5.4: Update `docs/plugin-validation-guide.md` if it enumerates
+- [x] 5.4: Update `docs/plugin-validation-guide.md` if it enumerates
       validators (add `validate:solutions`).
-- [ ] 5.5: Run full validation gate: `pnpm validate:schemas && pnpm test:unit
+- [x] 5.5: Run full validation gate: `pnpm validate:schemas && pnpm test:unit
       && pnpm lint && pnpm typecheck`.
 
 ### Phase 6: Stack submit + changeset
 
-- [ ] 6.1: Generate changeset via `pnpm changeset` — patch-level for
+- [x] 6.1: Generate changeset via `pnpm changeset` — patch-level for
       `yellow-core` (knowledge-compounder + command body change) and root
       tooling change for `validate-solutions.js`.
-- [ ] 6.2: CRLF normalize any newly-created shell or markdown files:
+- [x] 6.2: CRLF normalize any newly-created shell or markdown files:
       `sed -i 's/\r$//' <files>`.
-- [ ] 6.3: `gt stack submit` — this is sized for a single PR, not a stack.
+- [x] 6.3: `gt stack submit` — this is sized for a single PR, not a stack.
 
 ## Technical Specifications
 
@@ -517,13 +517,13 @@ fork-PR `origin/main` fallback.
 
 ### Manual Smoke Test Checklist
 
-- [ ] Run `/workflows:compound --in-pr` on a branch with an open draft PR.
+- [x] Run `/workflows:compound --in-pr` on a branch with an open draft PR.
       Agent reads PR context, drafts doc, M3 shows both doc + MEMORY.md
       previews, write succeeds.
-- [ ] Add a doc with a deliberate slug collision → CI fails with clear
+- [x] Add a doc with a deliberate slug collision → CI fails with clear
       `ERROR-SOL-001` annotation pointing at the conflicting existing doc.
-- [ ] Add a doc missing `track:` → CI fails with `ERROR-SOL-002`.
-- [ ] Close a P0-labeled issue via PR without adding a doc → CI emits
+- [x] Add a doc missing `track:` → CI fails with `ERROR-SOL-002`.
+- [x] Close a P0-labeled issue via PR without adding a doc → CI emits
       `::warning::` but does not block.
 
 ## Acceptance Criteria
@@ -679,3 +679,34 @@ None. All additions:
 - `intentional_variant: true` / `variant_of:` frontmatter fields — only
   needed if/when Jaccard duplicate detection is added back. Out of scope
   for the initial implementation.
+
+---
+
+## Archival Verification
+
+Archived 2026-06-30. All 38 task boxes were validated against `main` by a
+per-task verifier pass (cited file/line + commit evidence) before ticking —
+not blind-ticked, per the validate-before-ticking rule.
+
+**Result: 37/38 DONE, 1 knowingly DEFERRED.**
+
+**⚠️ Deferred (not done): task 2.8** — Bats tests for
+`/workflows:compound --in-pr` argument parsing (the planned `mock gh pr view`
+coverage) were never written. The `--in-pr` feature itself **is fully shipped
+and functional** on `main` (`compound.md` arg handling, `knowledge-compounder.md`
+PR-context fast path); only the test coverage is absent. The box is ticked to
+close the plan per explicit user decision (2026-06-30) to archive with this
+gap annotated rather than block on it. Follow-up test coverage tracked
+separately, not by this plan.
+
+**Provenance:** **PR #553** (MERGED) —
+`feat(yellow-core): solution-doc git-workflow implementation` — shipped all six
+phases (validate-solutions.js + `ERROR-SOL-*` codes, knowledge-compounder
+`--in-pr` mode, CONTRIBUTING/AGENTS/docs, CI advisory job, PR template,
+changeset).
+
+**Gate C override rationale:** PR #553's branch is `agent/feat/solution-doc-impl`
+(truncated — does not contain the slug `solution-doc-git-workflow`), so Gate C
+finds no slug match — expected. The archival commit carries
+`Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#553)`,
+grep-discoverable via `git log --grep='Plan-Verifier-Override'`.
