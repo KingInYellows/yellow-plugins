@@ -1,0 +1,19 @@
+plans/complete/plan-lifecycle-management.md
+  s_b7de9b75b99767::t_f108707551a750 170,191,239,261,298,301,305,307,312,315,317,328,339,351,404,406,412,422,453,462-463,467,473,475,481,489,662-686
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "569d8f4ca4691e188387b2f6ce547037fc23dd1f",
+  "prompts": {},
+  "sessions": {
+    "s_b7de9b75b99767": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a5348d5-f435-48dc-a4e0-fae76ee62314",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
