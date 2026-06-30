@@ -149,68 +149,68 @@ on violations:
 > Run `/gt-stack-plan` after if you want these formalized as a stack.
 
 ### Phase 0: Scaffolding & guards (PR 1)
-- [ ] 0.1: `gt branch create feat-spec-shells-decomposition` (sync trunk first via `gt repo sync`).
-- [ ] 0.2: Create `plans/specs/.gitkeep` and `plans/shells/.gitkeep` so the tracked dirs exist; confirm `.gitignore` does not exclude `plans/**`.
-- [ ] 0.3: Re-confirm (already verified in research) that `scripts/validate-plans.js` is diff-scoped to `plans/complete/` and `plan:status` globs `plans/*.md` non-recursively — no exclusion code needed. Record this one-liner in the PR description.
-- [ ] 0.4: Re-read `AGENTS.md` "Critical Agent Authoring Rules" (lines ~219–293) and `plugins/yellow-core/CLAUDE.md` so frontmatter/fencing rules are in context before authoring.
+- [x] 0.1: `gt branch create feat-spec-shells-decomposition` (sync trunk first via `gt repo sync`).
+- [x] 0.2: Create `plans/specs/.gitkeep` and `plans/shells/.gitkeep` so the tracked dirs exist; confirm `.gitignore` does not exclude `plans/**`.
+- [x] 0.3: Re-confirm (already verified in research) that `scripts/validate-plans.js` is diff-scoped to `plans/complete/` and `plan:status` globs `plans/*.md` non-recursively — no exclusion code needed. Record this one-liner in the PR description.
+- [x] 0.4: Re-read `AGENTS.md` "Critical Agent Authoring Rules" (lines ~219–293) and `plugins/yellow-core/CLAUDE.md` so frontmatter/fencing rules are in context before authoring.
 
 ### Phase 1: `/workflows:spec` (PR 1)
-- [ ] 1.1: Write `plugins/yellow-core/commands/workflows/spec.md`. Mirror `brainstorm.md` (dialogue-driven sibling): pre-flight `mkdir -p plans/specs` with `[spec]` prefix + hard-stop; optional ruvector recall block (query prefix `"[spec-dialogue] "`); single-line `description:`; `allowed-tools: [Bash, Read, Glob, Grep, Write, AskUserQuestion, ToolSearch, mcp__plugin_yellow-ruvector_ruvector__hooks_recall, mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities]`.
-- [ ] 1.2: Implement the 7-step dialogue (per brief §4 spec): capture vision + derive slug (same `^[a-z0-9]+(-[a-z0-9]+)*$` contract as `plans/`, no date prefix, no underscores/dots — P2-G); collision-check `plans/specs/<slug>.md` via AskUserQuestion (overwrite / suffix / rename — P3-A); opening AskUserQuestion (1–4 items); requirements-before-design deep-dive (one AskUserQuestion at a time, explore codebase via Read/Grep/Glob); draft spec with stable `R<N>` IDs (every design element traces to ≥1 requirement, every component to a consumer); resolve open questions; Approve/Revise gate. On approve print: "Spec ready at plans/specs/<slug>.md. Run /workflows:decompose to decompose it."
+- [x] 1.1: Write `plugins/yellow-core/commands/workflows/spec.md`. Mirror `brainstorm.md` (dialogue-driven sibling): pre-flight `mkdir -p plans/specs` with `[spec]` prefix + hard-stop; optional ruvector recall block (query prefix `"[spec-dialogue] "`); single-line `description:`; `allowed-tools: [Bash, Read, Glob, Grep, Write, AskUserQuestion, ToolSearch, mcp__plugin_yellow-ruvector_ruvector__hooks_recall, mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities]`.
+- [x] 1.2: Implement the 7-step dialogue (per brief §4 spec): capture vision + derive slug (same `^[a-z0-9]+(-[a-z0-9]+)*$` contract as `plans/`, no date prefix, no underscores/dots — P2-G); collision-check `plans/specs/<slug>.md` via AskUserQuestion (overwrite / suffix / rename — P3-A); opening AskUserQuestion (1–4 items); requirements-before-design deep-dive (one AskUserQuestion at a time, explore codebase via Read/Grep/Glob); draft spec with stable `R<N>` IDs (every design element traces to ≥1 requirement, every component to a consumer); resolve open questions; Approve/Revise gate. On approve print: "Spec ready at plans/specs/<slug>.md. Run /workflows:decompose to decompose it."
 
 <!-- deepen-plan: external -->
 > **Research (requirement-ID stability):** Turbo and best-practice both use flat sequential `R1, R2, …`, fixed at first draft. To keep IDs stable as the spec evolves: when a requirement is removed, **tombstone** it (mark obsolete, keep the record, never reuse or renumber the ID) rather than renumbering — renumbering retroactively invalidates every shell's `Covers` field and the `spec-r-ids` drift guard (P2-C). EARS (`When <trigger>, the system shall …`) and user-story+acceptance forms are both valid in one spec; use EARS for testable behavior, user-stories for goals.
 <!-- /deepen-plan -->
-- [ ] 1.3: `sed -i 's/\r$//' plugins/yellow-core/commands/workflows/spec.md`; run `pnpm validate:agents`.
+- [x] 1.3: `sed -i 's/\r$//' plugins/yellow-core/commands/workflows/spec.md`; run `pnpm validate:agents`.
 
 ### Phase 2: `/workflows:decompose` (PR 1)
-- [ ] 2.1: Write `plugins/yellow-core/commands/workflows/decompose.md`. Single-line `description:`; `allowed-tools: [Bash, Read, Glob, Grep, Write, AskUserQuestion]`.
-- [ ] 2.2: Resolve source spec (explicit path → explicit slug → single file in `plans/specs/` → most recent); enumerate `R<N>` IDs (none → AskUserQuestion: re-run /workflows:spec or stop).
-- [ ] 2.3: Decompose into dependency-ordered seams (setup → data/domain → core logic → API → UI → integration). Assign NN numbers and slugs `<spec-slug>-NN-<title>`. Set each shell's `depends_on` to the **exact slugs** of prior shells it consumes (P1-A). Bundle tightly-coupled producer/consumer pairs; keep each shell reachable/integrated.
-- [ ] 2.4: Recommend shell count + confirm via AskUserQuestion (recommended first; always offer a leaner option when ≥2; round down on close calls). Single-shell bail-out: if decomposition yields one shell, write nothing — tell the user the spec is plan-shaped, use `/workflows:plan`.
-- [ ] 2.5: **Coverage gate (P1-E/P2-F):** compute and display the coverage table; hard-block on UNCOVERED / DUPLICATE-BARE / overlapping-or-gapped partial slices via AskUserQuestion. Only an all-green table proceeds.
-- [ ] 2.6: Collision-check every generated shell slug against existing `plans/`, `plans/complete/`, and `plans/shells/` files before writing (P2-D); on collision, AskUserQuestion to rename.
-- [ ] 2.7: Write shell files to `plans/shells/` per the schema above, including `spec-r-ids:` (canonical set, P2-C) and exact `depends_on`. Enforce: every `Consumes` traces to a `depends_on` shell's `Produces` or "from existing codebase". Approve/Revise gate. On approve print: "Run /workflows:pick-next-shell to start implementing."
-- [ ] 2.8: `sed -i 's/\r$//' ...decompose.md`; run `pnpm validate:agents`.
+- [x] 2.1: Write `plugins/yellow-core/commands/workflows/decompose.md`. Single-line `description:`; `allowed-tools: [Bash, Read, Glob, Grep, Write, AskUserQuestion]`.
+- [x] 2.2: Resolve source spec (explicit path → explicit slug → single file in `plans/specs/` → most recent); enumerate `R<N>` IDs (none → AskUserQuestion: re-run /workflows:spec or stop).
+- [x] 2.3: Decompose into dependency-ordered seams (setup → data/domain → core logic → API → UI → integration). Assign NN numbers and slugs `<spec-slug>-NN-<title>`. Set each shell's `depends_on` to the **exact slugs** of prior shells it consumes (P1-A). Bundle tightly-coupled producer/consumer pairs; keep each shell reachable/integrated.
+- [x] 2.4: Recommend shell count + confirm via AskUserQuestion (recommended first; always offer a leaner option when ≥2; round down on close calls). Single-shell bail-out: if decomposition yields one shell, write nothing — tell the user the spec is plan-shaped, use `/workflows:plan`.
+- [x] 2.5: **Coverage gate (P1-E/P2-F):** compute and display the coverage table; hard-block on UNCOVERED / DUPLICATE-BARE / overlapping-or-gapped partial slices via AskUserQuestion. Only an all-green table proceeds.
+- [x] 2.6: Collision-check every generated shell slug against existing `plans/`, `plans/complete/`, and `plans/shells/` files before writing (P2-D); on collision, AskUserQuestion to rename.
+- [x] 2.7: Write shell files to `plans/shells/` per the schema above, including `spec-r-ids:` (canonical set, P2-C) and exact `depends_on`. Enforce: every `Consumes` traces to a `depends_on` shell's `Produces` or "from existing codebase". Approve/Revise gate. On approve print: "Run /workflows:pick-next-shell to start implementing."
+- [x] 2.8: `sed -i 's/\r$//' ...decompose.md`; run `pnpm validate:agents`.
 
 ### Phase 3: `/workflows:expand-shell` (PR 1)
-- [ ] 3.1: Write `plugins/yellow-core/commands/workflows/expand-shell.md`. Single-line `description:`; `allowed-tools: [Bash, Read, Glob, Grep, Write, AskUserQuestion, Task]`.
-- [ ] 3.2: **Input-type + idempotency guards (P1-C, P2-A):** verify the argument is a shell file (has `spec:` and `depends_on:` frontmatter), not an already-expanded plan. If `plans/<shell-slug>.md` already exists, stop with: "Shell already expanded — plan at plans/<shell-slug>.md. Delete it and re-run to redo, or run /workflows:work." If neither shell nor plan exists, report the inconsistency and stop.
-- [ ] 3.3: Parse frontmatter (`spec`, `spec-r-ids`, `depends_on`) + body. **Spec-drift check (P2-C):** compare `spec-r-ids` against the current spec's R-id set; on mismatch, warn and offer reconcile/proceed via AskUserQuestion.
-- [ ] 3.4: **Verify Consumes against the live codebase (P1-D).** "from existing codebase" → grep/read to confirm presence; "from Shell <dep-slug>" → confirm its expanded plan is archived in `plans/complete/` (exact-match oracle) AND the artifact still exists now. On any failure, AskUserQuestion: (a) artifact renamed — provide new path, update shell; (b) show upstream PR to reconcile; (c) skip check — emit a visible `> WARNING: Consumes '<X>' not found at expand time` into the generated plan. Do not proceed silently.
-- [ ] 3.5: Pattern survey: delegate via Task to `yellow-core:research:repo-research-analyst` (and/or `yellow-core:review:pattern-recognition-specialist`), scoped to the shell's Produces/steps. Use `run_in_background: true` + a wait gate.
-- [ ] 3.6: Escalate the shell's Open Questions only (AskUserQuestion). Write the expanded plan to `plans/<shell-slug>.md` per brief §3c: checkbox tasks (`- [ ]` items) with concrete file paths + named symbols; include an `## Origin` block citing the spec path + the `Covers` R-ids (P3-D).
-- [ ] 3.7: Verify plan-vs-shell: every Produces created by a step; every Consumes referenced; every Covers R-id addressed; Context preserved; no scope creep. Revise until all pass.
-- [ ] 3.8: **Approval + safe deletion (P2-E, P3-C):** Approve/Revise gate whose prompt names BOTH actions and shows a plan summary ("Approve this plan and delete the shell file plans/shells/<file>?"). Only after approval, delete the source shell. If deletion fails, emit a visible warning instructing manual removal (the "expanded-but-not-cleaned" split state is handled by Phase 4).
-- [ ] 3.9: `sed -i 's/\r$//' ...expand-shell.md`; run `pnpm validate:agents`.
+- [x] 3.1: Write `plugins/yellow-core/commands/workflows/expand-shell.md`. Single-line `description:`; `allowed-tools: [Bash, Read, Glob, Grep, Write, AskUserQuestion, Task]`.
+- [x] 3.2: **Input-type + idempotency guards (P1-C, P2-A):** verify the argument is a shell file (has `spec:` and `depends_on:` frontmatter), not an already-expanded plan. If `plans/<shell-slug>.md` already exists, stop with: "Shell already expanded — plan at plans/<shell-slug>.md. Delete it and re-run to redo, or run /workflows:work." If neither shell nor plan exists, report the inconsistency and stop.
+- [x] 3.3: Parse frontmatter (`spec`, `spec-r-ids`, `depends_on`) + body. **Spec-drift check (P2-C):** compare `spec-r-ids` against the current spec's R-id set; on mismatch, warn and offer reconcile/proceed via AskUserQuestion.
+- [x] 3.4: **Verify Consumes against the live codebase (P1-D).** "from existing codebase" → grep/read to confirm presence; "from Shell <dep-slug>" → confirm its expanded plan is archived in `plans/complete/` (exact-match oracle) AND the artifact still exists now. On any failure, AskUserQuestion: (a) artifact renamed — provide new path, update shell; (b) show upstream PR to reconcile; (c) skip check — emit a visible `> WARNING: Consumes '<X>' not found at expand time` into the generated plan. Do not proceed silently.
+- [x] 3.5: Pattern survey: delegate via Task to `yellow-core:research:repo-research-analyst` (and/or `yellow-core:review:pattern-recognition-specialist`), scoped to the shell's Produces/steps. Use `run_in_background: true` + a wait gate.
+- [x] 3.6: Escalate the shell's Open Questions only (AskUserQuestion). Write the expanded plan to `plans/<shell-slug>.md` per brief §3c: checkbox tasks (`- [ ]` items) with concrete file paths + named symbols; include an `## Origin` block citing the spec path + the `Covers` R-ids (P3-D).
+- [x] 3.7: Verify plan-vs-shell: every Produces created by a step; every Consumes referenced; every Covers R-id addressed; Context preserved; no scope creep. Revise until all pass.
+- [x] 3.8: **Approval + safe deletion (P2-E, P3-C):** Approve/Revise gate whose prompt names BOTH actions and shows a plan summary ("Approve this plan and delete the shell file plans/shells/<file>?"). Only after approval, delete the source shell. If deletion fails, emit a visible warning instructing manual removal (the "expanded-but-not-cleaned" split state is handled by Phase 4).
+- [x] 3.9: `sed -i 's/\r$//' ...expand-shell.md`; run `pnpm validate:agents`.
 
 ### Phase 4: `/workflows:pick-next-shell` (PR 1)
-- [ ] 4.1: Write `plugins/yellow-core/commands/workflows/pick-next-shell.md`. Single-line `description:`; `allowed-tools: [Bash, Read, Glob, Skill, AskUserQuestion]`.
-- [ ] 4.2: **Missing-dir + terminal-state guards (P1-F, P2-B):** if `plans/shells/` does not exist → "No shells directory found. Run /workflows:decompose first." If it exists but is empty → terminal success: "All shells expanded and shipped — spec complete. Run /plan:status to verify." Use the `ls plans/shells/*.md >/dev/null 2>&1` existence guard before any glob.
-- [ ] 4.3: Scan: glob `plans/shells/*.md`, read frontmatter. **Split-state skip (P2-E):** if both `plans/<shell-slug>.md` and the shell file exist, skip (expanded-but-not-cleaned). A `depends_on` entry is satisfied via the exact-match oracle against `plans/complete/`. Candidates = all deps satisfied; pick lowest NN; ties → AskUserQuestion.
-- [ ] 4.4: **Deadlock / unsatisfiable detection (P1-B, P3-B):** if zero candidates but unexpanded shells remain, build the dependency graph and topo-sort. Report a cycle explicitly if found; otherwise report each `depends_on` slug present in neither `plans/shells/` nor `plans/complete/` by name, and offer recovery (treat-as-satisfied / re-decompose / edit-frontmatter). Never return silently.
-- [ ] 4.5: Orchestrate: invoke `/workflows:expand-shell` via the Skill tool with the picked shell path; then invoke `/workflows:compound` via the Skill tool to capture planning learnings (replaces Turbo's self-improve); optionally `/workflows:deepen-plan` if yellow-research is installed (skippable).
-- [ ] 4.6: Halt with: "Plan ready at plans/<shell-slug>.md. Context is likely full — run /clear, then /workflows:work plans/<shell-slug>.md. Ship it, run /plan:complete, then /workflows:pick-next-shell for the next shell." Do not auto-implement; never edit the spec.
-- [ ] 4.7: `sed -i 's/\r$//' ...pick-next-shell.md`; run `pnpm validate:agents`.
+- [x] 4.1: Write `plugins/yellow-core/commands/workflows/pick-next-shell.md`. Single-line `description:`; `allowed-tools: [Bash, Read, Glob, Skill, AskUserQuestion]`.
+- [x] 4.2: **Missing-dir + terminal-state guards (P1-F, P2-B):** if `plans/shells/` does not exist → "No shells directory found. Run /workflows:decompose first." If it exists but is empty → terminal success: "All shells expanded and shipped — spec complete. Run /plan:status to verify." Use the `ls plans/shells/*.md >/dev/null 2>&1` existence guard before any glob.
+- [x] 4.3: Scan: glob `plans/shells/*.md`, read frontmatter. **Split-state skip (P2-E):** if both `plans/<shell-slug>.md` and the shell file exist, skip (expanded-but-not-cleaned). A `depends_on` entry is satisfied via the exact-match oracle against `plans/complete/`. Candidates = all deps satisfied; pick lowest NN; ties → AskUserQuestion.
+- [x] 4.4: **Deadlock / unsatisfiable detection (P1-B, P3-B):** if zero candidates but unexpanded shells remain, build the dependency graph and topo-sort. Report a cycle explicitly if found; otherwise report each `depends_on` slug present in neither `plans/shells/` nor `plans/complete/` by name, and offer recovery (treat-as-satisfied / re-decompose / edit-frontmatter). Never return silently.
+- [x] 4.5: Orchestrate: invoke `/workflows:expand-shell` via the Skill tool with the picked shell path; then invoke `/workflows:compound` via the Skill tool to capture planning learnings (replaces Turbo's self-improve); optionally `/workflows:deepen-plan` if yellow-research is installed (skippable).
+- [x] 4.6: Halt with: "Plan ready at plans/<shell-slug>.md. Context is likely full — run /clear, then /workflows:work plans/<shell-slug>.md. Ship it, run /plan:complete, then /workflows:pick-next-shell for the next shell." Do not auto-implement; never edit the spec.
+- [x] 4.7: `sed -i 's/\r$//' ...pick-next-shell.md`; run `pnpm validate:agents`.
 
 ### Phase 5: Wire into pipeline, docs, ship (PR 1)
-- [ ] 5.1: In `plugins/yellow-core/commands/workflows/plan.md` Phase 5 (Post-Generation), add a routed option: "This is multi-subsystem — run /workflows:spec instead" when complexity reads as spec-tier.
-- [ ] 5.2: Update `plugins/yellow-core/CLAUDE.md` Commands catalog: **count actual command files** (`fd . plugins/yellow-core/commands -e md | wc -l`) and set the `### Commands (N)` heading to the true value, reconciling any pre-existing drift; add prose entries for the four new commands.
-- [ ] 5.3: Update `plugins/yellow-core/README.md` Commands table (add 4 rows) and the root `README.md` command count (line ~30 and the tree view ~267) — set to the true count, +4.
-- [ ] 5.4: `pnpm changeset` — `yellow-core` **minor**; clear CHANGELOG entry naming the four commands.
-- [ ] 5.5: Gate: `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins && pnpm test:unit && pnpm lint && pnpm typecheck` — all green.
-- [ ] 5.6: `sed -i 's/\r$//'` over all new/changed `.md`; `gt commit create` + `gt stack submit`. Verify on a clean Claude Code install (local pass ≠ remote acceptance).
+- [x] 5.1: In `plugins/yellow-core/commands/workflows/plan.md` Phase 5 (Post-Generation), add a routed option: "This is multi-subsystem — run /workflows:spec instead" when complexity reads as spec-tier.
+- [x] 5.2: Update `plugins/yellow-core/CLAUDE.md` Commands catalog: **count actual command files** (`fd . plugins/yellow-core/commands -e md | wc -l`) and set the `### Commands (N)` heading to the true value, reconciling any pre-existing drift; add prose entries for the four new commands.
+- [x] 5.3: Update `plugins/yellow-core/README.md` Commands table (add 4 rows) and the root `README.md` command count (line ~30 and the tree view ~267) — set to the true count, +4.
+- [x] 5.4: `pnpm changeset` — `yellow-core` **minor**; clear CHANGELOG entry naming the four commands.
+- [x] 5.5: Gate: `pnpm validate:schemas && pnpm validate:agents && pnpm validate:plugins && pnpm test:unit && pnpm lint && pnpm typecheck` — all green.
+- [x] 5.6: `sed -i 's/\r$//'` over all new/changed `.md`; `gt commit create` + `gt stack submit`. Verify on a clean Claude Code install (local pass ≠ remote acceptance).
 
 ### Phase 6: Bounded polish loop in `/workflows:work` (PR 2 — independent changeset)
-- [ ] 6.1: In `plugins/yellow-core/commands/workflows/work.md` Phase 3, wrap the four-reviewer suite (lines ~481–513) in a re-run-until-stable loop: after the apply step, if any file changed, re-run review on changed files; cap at 2–3 iterations. Keep the existing trivial-skip gate (lines ~445–447) narrow (doc/comment/rename-only). Preserve the `$RUN_DIR` mktemp + `*.json` collection + mandatory cleanup pattern.
-- [ ] 6.2: On hitting the cap with outstanding P1/P2, AskUserQuestion (continue / stop / escalate to `/council` for cross-lineage review) using the established three-option pattern.
-- [ ] 6.3: `pnpm changeset` (separate, yellow-core patch/minor); gate; `sed -i 's/\r$//'`; submit as an independent PR.
+- [x] 6.1: In `plugins/yellow-core/commands/workflows/work.md` Phase 3, wrap the four-reviewer suite (lines ~481–513) in a re-run-until-stable loop: after the apply step, if any file changed, re-run review on changed files; cap at 2–3 iterations. Keep the existing trivial-skip gate (lines ~445–447) narrow (doc/comment/rename-only). Preserve the `$RUN_DIR` mktemp + `*.json` collection + mandatory cleanup pattern.
+- [x] 6.2: On hitting the cap with outstanding P1/P2, AskUserQuestion (continue / stop / escalate to `/council` for cross-lineage review) using the established three-option pattern.
+- [x] 6.3: `pnpm changeset` (separate, yellow-core patch/minor); gate; `sed -i 's/\r$//'`; submit as an independent PR.
 
 ### Phase 7: Continuation-line hygiene (verify-only — no PR)
-- [ ] 7.1: Confirm the research finding (grep `plugins/*/skills/**/SKILL.md` for in-conversation `Skill(`/`skill:` invocation of another skill): **zero matches** — all cross-skill calls go through `Task`. Record "N/A — architecture sidesteps it" in the PR 1 description / brainstorm closeout. No file changes.
+- [x] 7.1: Confirm the research finding (grep `plugins/*/skills/**/SKILL.md` for in-conversation `Skill(`/`skill:` invocation of another skill): **zero matches** — all cross-skill calls go through `Task`. Record "N/A — architecture sidesteps it" in the PR 1 description / brainstorm closeout. No file changes.
 
 ### Phase 8: Closeout
-- [ ] 8.1: After PR 1 (and PR 2) merge, run `/plan:complete spec-shells-decomposition-plan.md`.
+- [x] 8.1: After PR 1 (and PR 2) merge, run `/plan:complete spec-shells-decomposition-plan.md`.
 
 ## Technical Specifications
 
@@ -344,3 +344,31 @@ on violations:
 - [x] 1. agent/feat/spec-decompose-frontend (completed 2026-06-29)
 - [x] 2. agent/feat/expand-pick-next-orchestrator (completed 2026-06-29)
 - [x] 3. agent/feat/work-polish-loop (completed 2026-06-29)
+
+## Archival Verification
+
+Archived 2026-06-30 (manual `/plan:complete`, multi-PR provenance). All 42 task
+boxes were verified complete against the merged implementation — deterministic
+gates (`validate:agents`/`plugins`/`schemas`, LF, frontmatter, changesets) plus
+per-file behavioral verification with adversarial recheck — before ticking, not
+blind-ticked.
+
+Shipped via PRs #588 (`/workflows:spec` + `/workflows:decompose`), #589
+(`/workflows:expand-shell` + `/workflows:pick-next-shell` + Phase 5 routing +
+docs), #590 (`/workflows:work` bounded polish loop), and #592 (Phase 5 spec-tier
+`/workflows:spec` routed option).
+
+Three boxes deviated from the original plan text; each verified substantively
+complete:
+
+- **2.1** — `decompose.md` omits `Glob` from `allowed-tools`. Correct: it uses
+  Bash (`ls`) for all file discovery and lists no unused tools; `validate:agents`
+  passes.
+- **4.4** — `pick-next-shell.md` deadlock-recovery menu omits the
+  `treat-as-satisfied` option. Intentional and documented in-file: that option
+  would require editing a shell, which the command's rules forbid. Cycle
+  detection, name-by-name unsatisfiable reporting, and never-return-silently are
+  all present.
+- **5.1** — the spec-tier `/workflows:spec` redirect first shipped as a Phase 4
+  early-exit (#589); the Phase 5 post-generation routed option the box specified
+  was added in **#592**, completing it to the letter.
