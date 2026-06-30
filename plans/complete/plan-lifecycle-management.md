@@ -167,7 +167,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
 >    change needed.
 <!-- /deepen-plan -->
 
-- [ ] 1.0: Register the error code across TWO files in
+- [x] 1.0: Register the error code across TWO files in
   `packages/domain/src/validation/`:
   - **`types.ts`** (~line 19): add `PLAN_LIFECYCLE = 'PLAN_LIFECYCLE'` to
     the `ErrorCategory` enum. Without this, the catalog's category-mapping
@@ -188,7 +188,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   as re-implementing them"). Required because `lint-error-codes.js` now
   runs inside the `validate:schemas` chain and will fail CI on any
   `scripts/*.js` that hard-codes an `ERROR-<CAT>-NNN` catalog string.
-- [ ] 1.1: Implement `scripts/validate-plans.js`. Behaviour:
+- [x] 1.1: Implement `scripts/validate-plans.js`. Behaviour:
   - Compute the PR-touched file set via
     `git diff --name-status -z "$BASE_REF...HEAD" -- 'plans/complete/'`
     where `BASE_REF` defaults to `origin/main` and is overridable via the
@@ -236,7 +236,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   - **Path-traversal guard:** Refuse to operate when `PLANS_DIR` resolves
     outside the project root, with a temp-dir exception for vitest
     fixtures. Use the same pattern as `validate-solutions.js` lines 60–73.
-- [ ] 1.2: Add `"validate:plans": "node scripts/validate-plans.js"` to
+- [x] 1.2: Add `"validate:plans": "node scripts/validate-plans.js"` to
   `package.json` scripts. **Do NOT add to the `validate:schemas` chain.**
   `validate:schemas` is the plugin schema gate (marketplace + plugin +
   setup-all + agent-authoring + error-codes + snippets + solutions);
@@ -258,7 +258,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
     Confirmed against `.github/workflows/validate-schemas.yml` lines 6-15.)
   Matrix-target wiring inherits the existing < 2-minute timeout, fork-PR
   gating, and per-target log artifact for free.
-- [ ] 1.3: Vitest integration test in
+- [x] 1.3: Vitest integration test in
   `tests/integration/validate-plans.test.ts`. Use the
   `PLAN_VALIDATOR_DIFF`-injection pattern (no `mkdtempSync`/bare-git-init),
   mirroring the style of `tests/integration/validate-solutions.test.ts`:
@@ -295,26 +295,26 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
 
 ### Phase 2: `/plan:status` command
 
-- [ ] 2.1: Create `plugins/yellow-core/commands/plan/status.md` with
+- [x] 2.1: Create `plugins/yellow-core/commands/plan/status.md` with
   frontmatter `name: plan:status`, single-line description with "Use when…"
   trigger clause, `argument-hint: ''`, `allowed-tools: [Bash]`.
-- [ ] 2.2: Body: bash blocks that walk `plans/*.md` and
+- [x] 2.2: Body: bash blocks that walk `plans/*.md` and
   `plans/complete/*.md`, count `- [ ]` and `- [x]` per file, format as
   plain-text table. Append `-- ready to complete` annotation when 100%
   checked AND file is in `plans/` (not `plans/complete/`).
-- [ ] 2.3: Handle edge cases: zero-task plans render as `[ 0/0 ]` with no
+- [x] 2.3: Handle edge cases: zero-task plans render as `[ 0/0 ]` with no
   annotation; missing `plans/complete/` reports `(0)`.
-- [ ] 2.4: Re-derive variables in each Bash block (every block is a fresh
+- [x] 2.4: Re-derive variables in each Bash block (every block is a fresh
   subprocess — see `MEMORY.md` "$VAR in bash code blocks").
 
 ### Phase 3: `/plan:complete` command
 
-- [ ] 3.1: Create `plugins/yellow-core/commands/plan/complete.md` with
+- [x] 3.1: Create `plugins/yellow-core/commands/plan/complete.md` with
   `allowed-tools: [Bash, Read, AskUserQuestion]`, `argument-hint: '<plan-filename>'`.
   Note: no `Task` tool — Gate C is a bash call, not an agent dispatch.
-- [ ] 3.2: Step 0 — idempotency guard: if `plans/complete/<arg>` already
+- [x] 3.2: Step 0 — idempotency guard: if `plans/complete/<arg>` already
   exists, exit with explanatory message.
-- [ ] 3.3: Step 1 — filename validation:
+- [x] 3.3: Step 1 — filename validation:
   ```bash
   CLEAN_ARG="${ARG#plans/}"
   printf '%s' "$CLEAN_ARG" | grep -qE '^[a-z0-9_][a-z0-9_.-]*\.md$'
@@ -325,7 +325,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   mixed-case filenames here would create a parity gap (filename
   validation passes, slug validation fails). Use `$CLEAN_ARG` in all
   subsequent steps.
-- [ ] 3.4: Step 2 — derive slug from filename:
+- [x] 3.4: Step 2 — derive slug from filename:
   ```bash
   SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
   printf '%s' "$SLUG" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' \
@@ -336,7 +336,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   prompt-injection of any subsequent shell context — the slug is never
   embedded in an LLM prompt, but it IS interpolated into `gh` and
   `git` commands.
-- [ ] 3.5: Step 3 — Gate A:
+- [x] 3.5: Step 3 — Gate A:
   ```bash
   UNCHECKED=$(grep -c '^[[:space:]]*- \[ \]' "plans/$CLEAN_ARG" || true)
   if [ "$UNCHECKED" -gt 0 ]; then
@@ -348,7 +348,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   legacy stray-checkbox files never reach this gate (they were archived
   before the gate existed, and the validator only inspects PR-touched
   files going forward).
-- [ ] 3.6: Step 4 — Gate C: single `gh` call.
+- [x] 3.6: Step 4 — Gate C: single `gh` call.
 
   ```bash
   MERGED=$(gh pr list \
@@ -401,15 +401,15 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   lag. `--state merged` filters on PR state, which is authoritative
   once the upstream API has caught up; users archiving plans rarely race
   with same-second merges, so propagation lag is not a practical concern.
-- [ ] 3.7: Step 5 — clean-tree check: warn (not block) if
+- [x] 3.7: Step 5 — clean-tree check: warn (not block) if
   `git status --porcelain` non-empty; AskUserQuestion to proceed.
-- [ ] 3.8: Step 6 — checkout trunk + sync before branch creation:
+- [x] 3.8: Step 6 — checkout trunk + sync before branch creation:
   ```bash
   git checkout main && gt repo sync
   ```
   Ensures the archival branch forks from `main`, not an in-progress
   feature branch.
-- [ ] 3.9: Step 7 — archival branch + staged move:
+- [x] 3.9: Step 7 — archival branch + staged move:
   ```bash
   gt branch create "plan/archive-$SLUG"
   mkdir -p plans/complete
@@ -419,7 +419,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   unstaged, so the `gt commit create` in step 3.10 would either fail or
   produce an empty commit. `git mv` records the rename in the index
   immediately, ready to commit.
-- [ ] 3.10: Step 8 — commit with override audit trail. After building
+- [x] 3.10: Step 8 — commit with override audit trail. After building
   the message body from one of the templates below, invoke
   `git commit -m "$SUBJECT" -m "$BODY"`. **Do NOT use
   `gt commit create -m "$SUBJECT" -m "$BODY"`** — it concatenates the
@@ -450,7 +450,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   `git log --grep='Plan-Verifier-Override'` for future audit. Document
   the trailer in `docs/solutions/workflow/plan-lifecycle-management.md`
   per Phase 5.3.
-- [ ] 3.11: Step 9 — submit:
+- [x] 3.11: Step 9 — submit:
   ```bash
   gt stack submit --no-interactive
   ```
@@ -459,26 +459,26 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
 
 ### Phase 4: Tests
 
-- [ ] 4.1: Vitest integration tests for `validate-plans.js` (covered in 1.3).
-- [ ] 4.2: Bats smoke tests in `plugins/yellow-core/tests/plan-commands.bats`:
+- [x] 4.1: Vitest integration tests for `validate-plans.js` (covered in 1.3).
+- [x] 4.2: Bats smoke tests in `plugins/yellow-core/tests/plan-commands.bats`:
   exercise the slug derivation regex and the Gate A `grep -c` regex on
   fixture files (smoke; not a full command-flow test). Mark with
   `@test "skip on non-Linux"` guard if needed for cross-platform CI.
-- [ ] 4.3: Manual verification checklist in plan body (no automated test
+- [x] 4.3: Manual verification checklist in plan body (no automated test
   for end-to-end command flow — too much shell + AskUserQuestion involved):
   run `/plan:status`, run `/plan:complete` against this plan after merge.
 
 ### Phase 5: Documentation
 
-- [ ] 5.1: Update `plugins/yellow-core/README.md` command catalog with
+- [x] 5.1: Update `plugins/yellow-core/README.md` command catalog with
   `/plan:status` and `/plan:complete`.
-- [ ] 5.2: Add `/plan:*` section to `plugins/yellow-core/CLAUDE.md`
+- [x] 5.2: Add `/plan:*` section to `plugins/yellow-core/CLAUDE.md`
   documenting the namespace split (`/workflows:plan` creates plans;
   `/plan:complete`/`/plan:status` are lifecycle ops on existing plans).
   Justification: the `/workflows:*` namespace is reserved for end-to-end
   workflows that produce artifacts; lifecycle ops on those artifacts get
   their own namespace.
-- [ ] 5.3: Add solutions doc `docs/solutions/workflow/plan-lifecycle-management.md`
+- [x] 5.3: Add solutions doc `docs/solutions/workflow/plan-lifecycle-management.md`
   capturing:
   - The runtime-slug-from-filename decision and why frontmatter was
     rejected.
@@ -486,7 +486,7 @@ documented in `plugins/yellow-core/CLAUDE.md` per Phase 5.2 below.
   - The `Plan-Verifier-Override:` commit trailer convention.
   - Word-boundary regex rationale (slug collision protection).
   - PR-touched-files validator scope rationale (no whole-corpus scan).
-- [ ] 5.4: Add changeset (`pnpm changeset`, minor bump for yellow-core:
+- [x] 5.4: Add changeset (`pnpm changeset`, minor bump for yellow-core:
   new commands).
 
 ## Technical Details
@@ -659,3 +659,28 @@ No new packages. `gh`, `git`, and `gt` are already required by the repo.
 - Bash hardening: `MEMORY.md` "Bash Hook & Validation Patterns" section
 - Command anti-patterns: `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md`
 - PR #484 review issues driving the first revision: `#494` (P0/P1 design), `#496` (YAGNI scope reductions)
+
+---
+
+## Archival Verification
+
+Archived 2026-06-30 after validating all 26 task boxes against `main`. The
+boxes were never ticked during execution (this predates the tick-as-you-go
+habit); they were verified — not blind-ticked — before archival, per the
+validate-before-ticking rule.
+
+**Validation method:** a per-task verifier pass cross-referenced every
+checkbox against shipped code on `main` (file/line and commit evidence).
+Result: **26/26 DONE, 0 PARTIAL, 0 MISSING.**
+
+**Provenance (both MERGED):**
+
+- **PR #556** — `feat(validate-plans): PR-diff-scoped stray-checkbox validator (#494)` — Phase 1 (validator + `ERROR-PLAN-001` error code + CI matrix wiring + Vitest integration tests).
+- **PR #557** — `feat(yellow-core): /plan:status + /plan:complete lifecycle commands` — Phases 2–5 (`/plan:status`, `/plan:complete`, bats smoke tests, docs, solutions doc, changeset applied in #565).
+
+**Gate C override rationale:** no single merged PR title/branch contains the
+slug `plan-lifecycle-management` (the work shipped under feature-named
+branches), so Gate C finds no slug match — expected. The archival commit
+carries `Plan-Verifier-Override: user-confirmed-no-pr-evidence
+(pr=#556,#557)`, grep-discoverable via
+`git log --grep='Plan-Verifier-Override'`.
