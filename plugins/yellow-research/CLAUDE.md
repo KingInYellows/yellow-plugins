@@ -118,8 +118,9 @@ unavailable or returns `result.totalResults < 3`. See
   (context7 → EXA → WebSearch); preloaded by within-plugin `code-researcher`
   via `skills:` frontmatter, inlined verbatim by cross-plugin consumers (initial:
   yellow-core `best-practices-researcher`). Sibling `reference.md` holds
-  implementer notes (distribution rationale, future RULE 13 grep, deferred
-  cache-hook contract); read on demand, not auto-injected by `skills:` preload.
+  implementer notes (distribution rationale, RULE 13 drift lint — shipped in
+  `scripts/validate-agent-authoring.js` — deferred cache-hook contract); read
+  on demand, not auto-injected by `skills:` preload.
 
 ## Prerequisites
 

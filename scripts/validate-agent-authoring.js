@@ -40,6 +40,35 @@ const REVIEW_AGENT_REQUIRED_DISALLOWED_TOOLS = ['Write', 'Edit', 'MultiEdit'];
 // must NOT fire on it — otherwise the author gets a misleading error.
 const VALID_MEMORY_SCOPES = new Set(['user', 'project', 'local']);
 
+// RULE 13 — library-context drift lint. The canonical context7 → EXA →
+// WebSearch fallback chain lives in
+// plugins/yellow-research/skills/library-context/SKILL.md. Any agent that
+// lists a context7 tool in `tools:` MUST either preload that skill
+// (`skills: [library-context]`, which injects the chain at spawn) OR carry an
+// inline copy of the safe chain — proven present by the exact drift sentinel
+// below. An agent with context7 tools but neither is a silent drift surface:
+// it queries context7 with no documented fallback when the user-level MCP is
+// absent. This turns that into a CI failure (the repo's "prose alone is
+// insufficient" enforcement philosophy — cf. W1.5/RULE 14).
+const CONTEXT7_TOOLS = new Set([
+  'mcp__context7__resolve-library-id',
+  'mcp__context7__query-docs',
+  'mcp__context7__get-library-docs',
+]);
+// The wildcard form (`mcp__server__*`, documented for `allowed-tools` in
+// docs/claude-code-plugin-research.md) grants every context7 tool at once.
+// AGENTS.md discourages wildcards in `tools:`, but RULE 13 must not silently
+// no-op if an author uses one anyway — checked as a literal alongside the
+// three exact tool names below.
+const CONTEXT7_WILDCARD_TOOL = 'mcp__context7__*';
+// The exact phrase every inlined copy of the safe chain must contain. The dash
+// is an em dash (U+2014) — written as a literal `—` here so the source is
+// unambiguous. An ASCII `--`/`-` substitution (typography auto-correct,
+// copy-from-rendered-markdown) fails this exact-substring check, which is the
+// intended catch: a corrupted sentinel means the inline copy can no longer be
+// drift-detected and must be repaired.
+const LIBRARY_CONTEXT_SENTINEL = 'context7 unavailable — falling back to';
+
 // Documented exceptions to the read-only rule. Each entry must be a
 // plugins-relative POSIX path. Any exception requires a "Tool Surface —
 // Documented … Exception" section in the agent body explaining why the
@@ -420,6 +449,56 @@ function validateAgentFile(filePath, ctx) {
     }
 
     const skills = new Set(parseList(frontmatter, 'skills'));
+
+    // RULE 13 — context7 consumers must preload library-context OR carry the
+    // inline drift sentinel. `tools` is the parsed `tools:` list, so an empty
+    // list is vacuously exempt (the "missing tools" gate above already fired).
+    // The sentinel is matched against the BODY only (frontmatter stripped, same
+    // CRLF-tolerant pattern as RULE 14b) with HTML comments also stripped —
+    // otherwise a sentinel phrase quoted only inside a `<!-- ... -->` dev note
+    // (documenting the pattern, not instructing the agent — see
+    // best-practices-researcher.md's inline-copy comment) would satisfy
+    // `.includes()` with no real fallback instruction in the agent's live
+    // prompt body. A stray sentinel in a YAML comment still cannot satisfy the
+    // rule either, since frontmatter is stripped first.
+    // Exact Set match on tool names and exact-substring match on the em-dash
+    // sentinel are both intentionally strict so an ASCII-dash corruption is
+    // caught, not silently accepted.
+    // The `skills: [library-context]` preload exemption is scoped to agents
+    // inside plugins/yellow-research/ — the plugin that owns the skill.
+    // Cross-plugin `skills:` resolution is documented as unavailable
+    // (anthropics/claude-code#15944, closed not planned — see
+    // plugins/yellow-research/skills/library-context/SKILL.md), so an agent
+    // in another plugin that merely lists `skills: [library-context]` would
+    // pass a plugin-unscoped check yet never receive the fallback chain at
+    // runtime; such agents must inline the sentinel instead.
+    if (
+      tools.some((t) => CONTEXT7_TOOLS.has(t) || t === CONTEXT7_WILDCARD_TOOL)
+    ) {
+      const body = content
+        .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
+        .replace(/<!--[\s\S]*?-->/g, '');
+      const preloadExempt =
+        pluginName === 'yellow-research' &&
+        [...skills].some((s) => s.toLowerCase() === 'library-context');
+      if (!preloadExempt && !body.includes(LIBRARY_CONTEXT_SENTINEL)) {
+        const fixHint =
+          pluginName === 'yellow-research'
+            ? `either add \`library-context\` to \`skills:\` frontmatter, ` +
+              `OR include the exact phrase \`${LIBRARY_CONTEXT_SENTINEL}\` ` +
+              `(em dash U+2014) in the agent body.`
+            : `include the exact phrase \`${LIBRARY_CONTEXT_SENTINEL}\` (em ` +
+              `dash U+2014) in the agent body — the \`skills: ` +
+              `[library-context]\` preload only satisfies this rule for ` +
+              `agents inside plugins/yellow-research/ (cross-plugin skills: ` +
+              `resolution is unavailable at runtime).`;
+        errors.push(
+          `${relative(filePath)}: references a context7 tool without a ` +
+            `documented fallback (RULE 13). Fix: ${fixHint}`
+        );
+      }
+    }
+
     const referencedSkills = new Set();
     for (const match of content.matchAll(skillReferencePattern)) {
       referencedSkills.add(match[1].toLowerCase());

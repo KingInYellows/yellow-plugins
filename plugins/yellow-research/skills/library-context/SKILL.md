@@ -193,7 +193,8 @@ or the query is exploratory, omit the version to get current docs.
 ## References
 
 For implementer-facing material that does not need to be in every spawn's
-context — distribution rationale, the future RULE 13 drift lint grep, the
-consumer enumeration, and the deferred cache-hook design — read
+context — distribution rationale, the RULE 13 drift lint (shipped in
+`scripts/validate-agent-authoring.js`), the consumer enumeration, and the
+cache contract — read
 [`reference.md`](./reference.md) on demand. The reference file is NOT
 auto-loaded by `skills:` preload.

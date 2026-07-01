@@ -56,45 +56,23 @@ rg 'context7 unavailable — falling back to' plugins/ --type md \
 Re-run before relying on the consumer enumeration below — the list drifts
 faster than this file is edited.
 
-### Future RULE 13 lint (deferred follow-up)
+### RULE 13 lint (shipped)
 
-`scripts/validate-agent-authoring.js` should grow a RULE 13 that fails CI
-when an agent file references `mcp__context7__` in its `tools:` list AND
-does NOT preload via `skills: [library-context]` AND does NOT contain the
-sentinel phrase in the body. The two-condition exemption is mandatory —
-without it, the rule false-positives on within-yellow-research consumers
-like `code-researcher` where the sentinel is injected at spawn via the
-preloaded skill, not present in the static agent body.
+`scripts/validate-agent-authoring.js` enforces this automatically. RULE 13
+fails CI when an agent file lists any of `mcp__context7__resolve-library-id`,
+`mcp__context7__query-docs`, or `mcp__context7__get-library-docs` in its
+`tools:` AND does NOT preload via `skills: [library-context]` AND does NOT
+contain the exact sentinel phrase in its body. The two-condition exemption is
+load-bearing — without it the rule false-positives on within-yellow-research
+consumers like `code-researcher` where the chain is injected at spawn via the
+preloaded skill, not present in the static agent body. The `CONTEXT7_TOOLS`
+Set and `LIBRARY_CONTEXT_SENTINEL` constant live near the top of the
+validator; fixture coverage is in
+`tests/integration/validate-agent-authoring-context7-rule.test.ts`.
 
-Pseudocode:
-
-```
-for each agent.md in plugins/*/agents/**/*.md:
-  if 'mcp__context7__' in tools list:
-    has_preload   = 'library-context' in skills frontmatter list
-    has_sentinel  = 'context7 unavailable — falling back to' in body
-    if not has_preload and not has_sentinel:
-      fail(agent.md, "context7 reference without library-context preload or sentinel block")
-```
-
-Fixture coverage the follow-up PR MUST add:
-
-- Positive: `code-researcher` (preload-exempt — has context7 in tools AND
-  `library-context` in skills; body has no sentinel — rule passes)
-- Positive: `best-practices-researcher` (inline path — has context7 in tools,
-  no preload, sentinel present in body — rule passes)
-- Negative: synthetic agent fixture with context7 in tools, no preload, no
-  sentinel — rule fails
-
-Template after W1.5 in `scripts/validate-agent-authoring.js` — locate via
-`grep -n 'W1.5' scripts/validate-agent-authoring.js` (line offsets shift
-as the validator grows; the current W1.5 implementation is ~line 290);
-approximately 15-20 lines of additional logic plus the fixture tests.
-The grep above is the runtime check the rule's negative branch performs
-per-file.
-
-Block opt-in adoption to additional plugins until RULE 13 lands — otherwise
-each new consumer is a fresh drift surface with no CI coverage.
+The manual grep above remains useful for an ad-hoc check, but CI is now the
+authoritative gate — a corrupted sentinel (ASCII `--` instead of the em dash)
+or a missing fallback fails the build, not just code review.
 
 ## Consumer enumeration (2026-05-17)
 
@@ -106,22 +84,22 @@ Initial PR consumers:
   cross-plugin: inlines the safe-chain block in its Phase 1 (cannot preload —
   see Distribution model above)
 
-Opt-in candidates for follow-up adoption (NOT in initial PR):
+### Adoption
 
-- `plugins/yellow-debt/` — scanner agents that lookup library docs while
-  classifying debt
-- `plugins/yellow-semgrep/` — finding-fixer when proposing language-idiomatic
-  fixes
-- `plugins/yellow-codex/` — research and rescue agents
-- `plugins/yellow-docs/` — doc generator when documenting library usage
-- `plugins/yellow-review/` — polyglot-reviewer and pattern-recognition agents
-- `plugins/yellow-council/` — gemini-reviewer, opencode-reviewer
-- `plugins/yellow-devin/` — devin-orchestrator
-- `plugins/yellow-browser-test/` — app-discoverer
+There is no pre-tracked adoption backlog. A 2026-06-30 review found that none
+of the other plugins (yellow-debt, yellow-semgrep, yellow-codex, yellow-docs,
+yellow-review, yellow-council, yellow-devin, yellow-browser-test) have an
+existing library-documentation-lookup step to inline the safe chain into —
+their agents do code analysis, debt scanning, CLI delegation, doc generation,
+or workflow orchestration, not library-doc lookup. Adopting `library-context`
+into any of them is therefore a per-plugin *feature* decision, not a follow-up
+refactor.
 
-Each follow-up adoption is one PR that adds the safe-chain inlined block to
-the candidate agent, includes the sentinel phrase verbatim, and adds a
-changeset entry. Should NOT land before RULE 13.
+When a future PR adds a library-doc-lookup feature to a consumer plugin, it
+adopts the safe chain as a natural part of that work: list the context7 tools,
+inline the safe-chain block from SKILL.md verbatim (sentinel and all), and add
+a changeset. RULE 13 (shipped) then enforces the sentinel on that new copy
+automatically — no separate gating step is required.
 
 ## Context7 platform facts (verified 2026-05-17)
 
