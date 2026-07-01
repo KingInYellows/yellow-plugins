@@ -170,3 +170,39 @@ When reviewing bot comments on PRs that touch agent/skill files:
 **MEMORY.md sections:**
 - "Agent Frontmatter" — `tools:` vs `allowed-tools:` migration, `skills:` preloading rule
 - "Git Workflow" — `gt log --json` does not exist
+
+---
+
+## Update — 2026-07-01
+
+### FP6: "jq `sort_by(a, b)` performs a cross-product / doubles the array" (1 bot, gemini-code-assist)
+
+**What the bot flagged:** `sort_by(.value.fetched_at, .key)` (comma-separated
+multi-key sort) in a cache-rebuild script on PR #598, claiming the filter's
+multiple outputs expand into a cross-product and double the array.
+
+**Why it's wrong:** jq's `sort_by(f)` treats multiple outputs of a single
+filter application per input as a composite sort key — the standard
+idiomatic multi-key-sort form (`sort_by(.a, .b)` sorts primarily by `.a`,
+secondarily by `.b`). It does not construct a cross-product; `sort_by`
+always preserves the input array's length.
+
+**Detection rule:** Don't trust a bot's claimed semantics for a language
+feature — reproduce with the actual interpreter before accepting or
+declining:
+
+```bash
+echo '[{"a":2,"b":1},{"a":1,"b":2},{"a":1,"b":1}]' | jq 'sort_by(.a,.b) | length'
+# => 3 (unchanged) — confirms no cross-product expansion
+```
+
+**Root cause addition:** generic heuristics trained on common jq misuse
+(e.g., `map(select(...))` cross-product footguns) misapplied to the
+syntactically similar but semantically distinct `sort_by(a, b)` multi-key
+form.
+
+**Generalized triage rule:** for any bot finding that asserts a specific
+runtime/language-feature semantic (not a style or convention claim), verify
+empirically with the actual interpreter before accepting or declining — the
+same discipline this doc already applies to `gt log --json` (FP2), extended
+here to language-feature claims.

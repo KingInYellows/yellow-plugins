@@ -10,7 +10,7 @@ components: [yellow-core]
 
 # Session-Level Review Command Patterns
 
-Seven patterns discovered while building and reviewing session-level review commands that orchestrate multi-PR analysis, fix application, and stack-aware diffing.
+Nine patterns discovered while building and reviewing session-level review commands that orchestrate multi-PR analysis, fix application, and stack-aware diffing.
 
 ---
 
@@ -209,3 +209,72 @@ gt upstack restack  # all branches already have fixes, clean rebase
 ### Why It Works
 
 When all branches in the stack have their fixes applied before restacking, the rebase operations encounter consistent content at each level. Restacking mid-loop creates a mismatch: the rebased downstream branch expects the old content, but the upstream branch has new fixes.
+
+---
+
+## Update — 2026-07-01
+
+Two more patterns from finishing out a `/review:sweep-all` pass (PR #598),
+running `/review:resolve` after the review's own findings had already
+applied fixes.
+
+## Pattern 8: Reply-and-Defer as a Third Disposition for /review:resolve
+
+### Problem
+
+`resolve-pr.md`'s disposition model is binary: fix-and-mark-resolved (Step 7),
+or leave-unresolved via a structured `CONFLICT:` sentinel (Step 5), or
+drop-as-non-actionable (Step 3c, LGTM/nit). There is no lane for a finding
+that is real, well-corroborated, and *not* resolve-time-safe — e.g. it
+requires an API signature redesign across multiple call sites, or a coupled
+trade-off a resolver can't decide unilaterally (add an eviction cap vs.
+accept unbounded growth).
+
+### Context
+
+On PR #598, 10 of 16 bot-flagged threads pointed at exactly this shape of
+issue. Neither documented disposition fit: "silently fix it" risks a
+partial/regressive patch assembled under time pressure; "decline as false
+positive" mislabels a tracked, real bug.
+
+### Solution
+
+Post a reply that states the disposition and rationale — why this isn't
+being resolved now, and where the follow-up is tracked (a doc, a linked
+issue, a noted "open" status in a solution doc) — then leave the GraphQL
+thread genuinely unresolved. This is a deliberate third outcome, not a
+degraded fix or a mislabeled decline.
+
+### Why It Works
+
+Matches ordinary human PR-review conventions, where "acknowledged, tracked
+separately" is a normal response distinct from both "fixed" and "not a bug."
+It keeps `/review:resolve`'s resolved/unresolved thread state honest — a
+thread stays open exactly when there's still real work behind it.
+
+### When to Apply
+
+Any resolve-time pipeline modeled as fix-or-decline needs a third
+"defer-with-reply" lane, or it will either force bad patches under time
+pressure or mislabel tracked bugs as false positives. This is a pipeline-design
+gap in `resolve-pr.md` as currently spec'd — Step 3c's actionability filter
+has no bucket for "real, but not resolve-safe" distinct from drop/fix.
+
+## Pattern 9: Severity and Autofix-Safety Are Orthogonal Axes
+
+`review-pr.md` Step 7 already encodes the mechanism (`safe_auto` + P0/P1
+auto-applies; P2 `safe_auto` requires promotion via added evidence;
+`gated_auto`/`manual`/`advisory` never auto-apply regardless of severity —
+see "Severity gate is deliberate" in that doc). PR #598 confirmed it in
+practice: a P2 finding tagged `safe_auto` with confidence 100 and 3-reviewer
+corroboration (silent-failure-hunter, correctness-reviewer, pr-test-analyzer
+all independently flagging the same line) was the one legitimate auto-apply,
+promoted via that corroboration per the documented rule — while a P1 finding
+tagged `gated_auto` (the tier1 rebuild-wipe bug, equally well-corroborated,
+including a live reproduction) was correctly *not* auto-applied despite
+higher severity.
+
+Worth flagging because the rule was written down and an agent still
+defaulted to naive "P0/P1 only" severity filtering mid-session until
+corrected. When triaging findings for auto-apply, check `autofix_class`
+first — severity alone is never a routing signal for auto-apply eligibility.
