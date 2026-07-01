@@ -1,0 +1,19 @@
+docs/solutions/logic-errors/periodic-rebuild-wipes-incremental-cache-state.md
+  s_eebc09b09400e0::t_a59bd9cfcd66da 1-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "dc4d89333504b4f8b44933c76c4c6c71fbf4859b",
+  "prompts": {},
+  "sessions": {
+    "s_eebc09b09400e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "05a9bca5-d3d0-493b-b35d-1084d64457fa",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
