@@ -471,7 +471,8 @@ function validateAgentFile(filePath, ctx) {
         .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
         .replace(/<!--[\s\S]*?-->/g, '');
       const preloadExempt =
-        pluginName === 'yellow-research' && skills.has('library-context');
+        pluginName === 'yellow-research' &&
+        [...skills].some((s) => s.toLowerCase() === 'library-context');
       if (!preloadExempt && !body.includes(LIBRARY_CONTEXT_SENTINEL)) {
         const fixHint =
           pluginName === 'yellow-research'

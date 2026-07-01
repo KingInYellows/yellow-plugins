@@ -219,9 +219,8 @@ rg -l 'context7 unavailable — falling back to' plugins/ --type md \
 
 ### RULE 13's `library-context` preload exemption is not scoped to the owning plugin (PR #597 review)
 
-`scripts/validate-agent-authoring.js:456-460` implements RULE 13 (context7
-tool consumers must preload `library-context` or carry the inline drift
-sentinel):
+A prior PR #597 revision implemented RULE 13 (context7 tool consumers must
+preload `library-context` or carry the inline drift sentinel) as:
 
 ```js
 if (
@@ -276,7 +275,7 @@ case proving the same fixture at a non-`yellow-research` path is correctly
 rejected, and a new FAIL fixture proving an HTML-comment-only sentinel is
 rejected. 8/8 tests green post-fix.
 
-### Sibling docs still describe RULE 13 as future/deferred
+### Sibling docs still described RULE 13 as future/deferred
 
 `plugins/yellow-research/skills/library-context/SKILL.md:196` and
 `plugins/yellow-research/CLAUDE.md:121` still read "future RULE 13 drift
@@ -285,7 +284,17 @@ flips RULE 13 to shipped and CI-enforced inside `reference.md` (which
 already says "RULE 13 lint (shipped)") and `validate-agent-authoring.js`
 itself. Neither file was touched by the PR's diff (four reviewers flagged
 this: code-simplicity, project-compliance, maintainability,
-comment-analyzer). **Still stale as of this writing** — the fix was routed
-to a follow-up commit, not applied inline. When next touching
-`library-context`, grep for `future RULE 13` before trusting either file's
-RULE 13 description.
+comment-analyzer; chatgpt-codex-connector flagged the same gap on a later
+review pass). **Fixed** — both mentions now read "RULE 13 drift lint
+(shipped in `scripts/validate-agent-authoring.js`)".
+
+### `preloadExempt` case-sensitivity mismatch (later review pass)
+
+coderabbitai found that `preloadExempt` checked `skills.has('library-context')`
+against the raw-case values from `parseList(frontmatter, 'skills')`, while the
+`referencedSkills` matching a few lines later lowercases before comparing.
+An author writing `skills: [Library-Context]` (any case variant) would
+silently fail the preload exemption despite the skill being correctly
+preloaded. **Fixed** — `preloadExempt` now does
+`[...skills].some((s) => s.toLowerCase() === 'library-context')`, matching
+the case-insensitive pattern used elsewhere in the same function.
