@@ -353,7 +353,10 @@ _lc_prewarm() {
   # wipe doc-content cache entries every ~24h re-warm.
   local existing_tier2='{}'
   if [ -f "$cache_path" ]; then
-    existing_tier2=$(jq '.tier2 // {}' "$cache_path" 2>/dev/null) || existing_tier2='{}'
+    existing_tier2=$(jq '.tier2 // {}' "$cache_path" 2>/dev/null) || {
+      _lc_log "Warning: existing cache at $cache_path failed to parse; resetting tier2 to empty (prior tier2 entries discarded)"
+      existing_tier2='{}'
+    }
   fi
 
   local cache

@@ -148,6 +148,21 @@ JSON
   [ "$output" = "/facebook/react" ]
 }
 
+@test "prewarm: logs a warning when the existing tier2 read fails to parse corrupted cache JSON" {
+  cat >"$CLAUDE_PROJECT_DIR/package.json" <<'JSON'
+{"dependencies": {"react": "^18.0.0"}}
+JSON
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  printf 'NOT VALID JSON {{' >"$cache_path"
+
+  _stub_resolve_returns
+  _stub_now_returns 1500000000
+  run _lc_prewarm
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "failed to parse" ]]
+}
+
 # --- _lc_prewarm: authenticated warm (CONTEXT7_API_KEY set) ---
 
 @test "prewarm: with CONTEXT7_API_KEY set → uses auth path (stub still returns same)" {
