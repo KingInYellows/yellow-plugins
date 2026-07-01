@@ -1,0 +1,21 @@
+plugins/yellow-core/skills/security-fencing/SKILL.md
+  s_212adc2508532d::t_404e58c6db0d70 3
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_212adc2508532d::t_348aff5b5f13a3 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "63875030acd1ca437f27d23cc35cc4c1cb102c3f",
+  "prompts": {},
+  "sessions": {
+    "s_212adc2508532d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "558412b5-abbb-4def-87b5-ef0eb4e2e1fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
