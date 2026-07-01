@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.2.3
+
+### Patch Changes
+
+- [#597](https://github.com/KingInYellows/yellow-plugins/pull/597)
+  [`b9f96da`](https://github.com/KingInYellows/yellow-plugins/commit/b9f96dafa86aaa210cd4fbe6b85f97f8569c0626)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add RULE 13 to
+  `validate-agent-authoring.js`: agents listing a context7 tool
+  (`mcp__context7__resolve-library-id`/`query-docs`/`get-library-docs`) must
+  either preload `skills: [library-context]` or carry the inline drift sentinel
+  `context7 unavailable — falling back to` (em dash U+2014). Catches a
+  corrupted/missing fallback chain at CI instead of code-review time. Also
+  de-scopes the deferred-lint promise and the speculative opt-in-adoption
+  backlog from the skill's `reference.md`.
+
 ## 3.2.2
 
 ### Patch Changes
