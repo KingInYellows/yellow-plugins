@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# lc-cache-lookup-docs — agent-facing helper to read the context7 tier2
+# (doc content) cache.
+#
+# Usage:  lc-cache-lookup-docs <library-id> <topic>
+#
+# Exits 0 always. Echoes the cached docs body on a fresh hit; echoes nothing
+# on miss / expired / cache absent / CLAUDE_PLUGIN_DATA unset / jq missing.
+# Always exit 0 — calling agents treat empty output as "cache miss, fall
+# through to mcp__context7__query-docs".
+#
+# Consumer contract: the library-context skill's Step 2 instructs preloading
+# (yellow-research) and inlining (cross-plugin) agents to run this command
+# before invoking mcp__context7__query-docs.
+
+set -uo pipefail
+
+# Resolve script directory so `_lc_lookup_docs` can find the lib regardless
+# of where the agent invokes us from.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CACHE_LIB="${SCRIPT_DIR}/../hooks/lib/context7-cache.sh"
+
+[ -f "$CACHE_LIB" ] || exit 0
+# shellcheck source=../hooks/lib/context7-cache.sh
+. "$CACHE_LIB" 2>/dev/null || exit 0
+
+command -v _lc_lookup_docs >/dev/null 2>&1 || exit 0
+
+_lc_lookup_docs "${1:-}" "${2:-}"

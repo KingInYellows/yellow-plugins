@@ -58,13 +58,14 @@ generic external sources.
 
 ### Phase 1: Curated Knowledge Check
 
-<!-- Inlined from yellow-research:library-context — adapted from the
+<!-- Inlined from yellow-research:library-context — keep in sync; verified
+     2026-06-30. Adapted from the
      "Cross-plugin (safe chain — copy verbatim)" section in
      plugins/yellow-research/skills/library-context/SKILL.md. Cross-plugin
      `skills:` resolution is unavailable (anthropics/claude-code#15944,
      closed not planned), so the block must live inline. Intentional deltas
      vs the canonical safe chain (which uses flat numbering 1/2/3):
-     (1) numbered as sub-steps 1.1/1.2/1.3/1.4 because the parent step
+     (1) numbered as sub-steps 1.1-1.5 because the parent step
      in this agent is the broader "Library documentation lookup" step —
      sub-numbering keeps the safe chain nested under that parent without
      renumbering the agent's outer Phase 1 steps; (2) Step 1.1 adds an
@@ -75,11 +76,17 @@ generic external sources.
      by 2>/dev/null || true); (3) Step 1.3 pulls in the disambiguation
      rule from SKILL.md's separate "Disambiguation" section (kept
      together here for cross-plugin consumers that don't see the rest of
-     the skill); (4) Step 1.4 names `WebFetch` alongside `WebSearch`
+     the skill); (4) Step 1.5 names `WebFetch` alongside `WebSearch`
      since this agent already lists both as built-ins; (5) annotation
      prefix is `[best-practices-researcher]` not `[library-context]` in
      the unavailable-fallback and rate-limited log strings, since this
-     agent owns the inlined safe chain.
+     agent owns the inlined safe chain; (6) Step 1.3 and Step 1.4 add
+     tier1/tier2 runtime writeback via lc-cache-write at
+     ${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-write (same
+     cross-plugin path pattern, same 2>/dev/null || true absorption) —
+     Step 1.4 was split out of the former combined
+     resolve-library-id+query-docs step so the tier2 cache-first check
+     has its own step, symmetric to Step 1.1's tier1 cache-first check.
      Drift sentinel: `context7 unavailable — falling back to` (em dash U+2014). -->
 
 1. **Library documentation lookup (safe chain):**
@@ -87,8 +94,8 @@ generic external sources.
       to a variable first to prevent shell expansion, then try the pre-warmed
       cache via `lib_name='<library-name>'; bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup" "$lib_name" 2>/dev/null || true`.
       If output is non-empty, use it as the library-id, skip the
-      `mcp__context7__resolve-library-id` call in step 1.2, and call
-      `mcp__context7__query-docs` directly with the cached library-id. Empty
+      `mcp__context7__resolve-library-id` call in step 1.3, and proceed
+      directly to step 1.4 (tier2 cache-first document lookup). Empty
       output = cache miss / helper absent /
       yellow-research not installed — proceed to step 1.2 below. The trailing
       `|| true` ensures bash exit 127 (binary absent when yellow-research is
@@ -97,18 +104,33 @@ generic external sources.
    2. Detect context7 via `ToolSearch("context7")`. If
       `mcp__context7__resolve-library-id` is not present, annotate
       `[best-practices-researcher] context7 unavailable — falling back to WebSearch`
-      (single line — the drift-detection grep is line-based) and proceed to step 1.4.
+      (single line — the drift-detection grep is line-based) and proceed to step 1.5.
    3. If context7 is present, call `mcp__context7__resolve-library-id` with
       the library name (multiple candidates → prefer exact name match; else
       pick first result and annotate the matched slug in the citation;
-      zero candidates → skip `query-docs` and proceed directly to step 1.4),
-      then call `mcp__context7__query-docs` with the resolved ID and a
-      topic string. Never call `query-docs` with a plain library name. On
-      HTTP 429 or any error message containing "rate limit" or "quota",
-      annotate `[best-practices-researcher] context7 rate-limited (60 req/hr anonymous global pool) — falling back to WebSearch`
-      (single line) and proceed to step 1.4. Do NOT retry context7 within
-      the same session.
-   4. Fall back to built-in `WebSearch` first to locate authoritative URLs
+      zero candidates → skip `query-docs` and proceed directly to step 1.5).
+      **(Optional, when yellow-research is installed)** After a successful
+      resolve, write the result back to tier1 for reuse:
+      `bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-write" tier1 "$lib_name" "$library_id" 2>/dev/null || true`
+      (advisory — always exits 0; a failed write never blocks the agent).
+      Proceed to step 1.4 with the resolved ID.
+   4. **Tier2 (doc content) cache-first lookup.** **(Optional, when
+      yellow-research is installed)** Before calling `query-docs`, try the
+      tier2 cache: `bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup-docs" "$library_id" "$topic" 2>/dev/null || true`.
+      If output is non-empty, use it directly and skip the MCP call. Empty
+      output = cache miss / expired past the 4h TTL / helper absent /
+      yellow-research not installed — call `mcp__context7__query-docs`
+      with the resolved ID and a topic string. Never call `query-docs`
+      with a plain library name. On HTTP 429 or any error message
+      containing "rate limit" or "quota", annotate
+      `[best-practices-researcher] context7 rate-limited (60 req/hr anonymous global pool) — falling back to WebSearch`
+      (single line) and proceed to step 1.5. Do NOT retry context7 within
+      the same session. **(Optional, when yellow-research is installed)**
+      After a successful `query-docs` call, write the docs body back to
+      tier2 via a temp file — this sidesteps shell quoting hazards for
+      markdown content containing backticks, `$`, or embedded newlines:
+      `docs_file=$(mktemp); printf '%s' "$docs_body" > "$docs_file"; bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-write" tier2 "$library_id" "$topic" "$docs_file" 2>/dev/null || true; rm -f "$docs_file"`.
+   5. Fall back to built-in `WebSearch` first to locate authoritative URLs
       (library name + topic as query), then use `WebFetch` to dereference
       specific URLs returned by that search. `WebFetch` is not used
       independently here — it dereferences URLs that `WebSearch` surfaced.

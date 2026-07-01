@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# lc-cache-write — agent-facing helper to write runtime hits into the
+# context7 cache (tier1 library-id or tier2 doc-content).
+#
+# Usage:
+#   lc-cache-write tier1 <name> <library-id>
+#   lc-cache-write tier2 <library-id> <topic> <docs-file>
+#
+# Tier2 docs are passed via a file path (not argv) — markdown docs bodies can
+# contain backticks, `$`, quotes, and embedded newlines that are fragile as
+# shell arguments; a file path sidesteps the quoting hazard entirely.
+#
+# Exits 0 always. Writeback is advisory: the caller's MCP round-trip already
+# succeeded, so a failed or skipped write must never surface as an error.
+
+set -uo pipefail
+
+# Resolve script directory so the writers can find the lib regardless of
+# where the agent invokes us from.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CACHE_LIB="${SCRIPT_DIR}/../hooks/lib/context7-cache.sh"
+
+[ -f "$CACHE_LIB" ] || exit 0
+# shellcheck source=../hooks/lib/context7-cache.sh
+. "$CACHE_LIB" 2>/dev/null || exit 0
+
+subcommand="${1:-}"
+case "$subcommand" in
+  tier1)
+    command -v _lc_write_tier1 >/dev/null 2>&1 || exit 0
+    _lc_write_tier1 "${2:-}" "${3:-}"
+    ;;
+  tier2)
+    command -v _lc_write_tier2 >/dev/null 2>&1 || exit 0
+    docs_file="${4:-}"
+    [ -n "$docs_file" ] && [ -f "$docs_file" ] || exit 0
+    docs_body="$(cat "$docs_file" 2>/dev/null)" || exit 0
+    _lc_write_tier2 "${2:-}" "${3:-}" "$docs_body"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
