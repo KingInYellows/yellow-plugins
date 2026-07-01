@@ -285,8 +285,8 @@ already says "RULE 13 lint (shipped)") and `validate-agent-authoring.js`
 itself. Neither file was touched by the PR's diff (four reviewers flagged
 this: code-simplicity, project-compliance, maintainability,
 comment-analyzer; chatgpt-codex-connector flagged the same gap on a later
-review pass). **Fixed** — both mentions now read "RULE 13 drift lint
-(shipped in `scripts/validate-agent-authoring.js`)".
+review pass). **Fixed** — both mentions now describe RULE 13 as shipped in
+`scripts/validate-agent-authoring.js`.
 
 ### `preloadExempt` case-sensitivity mismatch (later review pass)
 
@@ -298,3 +298,19 @@ silently fail the preload exemption despite the skill being correctly
 preloaded. **Fixed** — `preloadExempt` now does
 `[...skills].some((s) => s.toLowerCase() === 'library-context')`, matching
 the case-insensitive pattern used elsewhere in the same function.
+
+### `mcp__context7__*` wildcard bypass (later review pass)
+
+chatgpt-codex-connector found that RULE 13's tool check,
+`tools.some((t) => CONTEXT7_TOOLS.has(t))`, is an exact-string Set lookup
+against the three literal context7 tool names. An agent granting context7
+access via the `mcp__server__*` wildcard form (documented for
+`allowed-tools` in `docs/claude-code-plugin-research.md:323`, though that
+same doc discourages wildcards elsewhere) would never match any of the
+three literal strings, so RULE 13 silently never fires — a context7-capable
+agent could ship with no fallback sentinel and no CI failure. No agent in
+the repo used this form at the time (AGENTS.md already discourages
+wildcards), but the gap was real for any author who did. **Fixed** — added
+a `CONTEXT7_WILDCARD_TOOL = 'mcp__context7__*'` literal checked alongside
+the `CONTEXT7_TOOLS` Set, plus a regression fixture proving the wildcard
+form now trips RULE 13.
