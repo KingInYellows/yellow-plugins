@@ -1,6 +1,6 @@
 ---
 name: mempalace-conventions
-description: "MemPalace MCP tool naming, palace structure terminology, memory types, search patterns, KG format, error handling, and graceful degradation conventions. Use when agents or commands need mempalace integration context."
+description: "Canonical reference for how mempalace commands and agents integrate with the MemPalace MCP server. Use when authoring or maintaining a mempalace command or agent — exact tool naming, palace vocabulary, and error-handling rules live here."
 user-invokable: false
 ---
 

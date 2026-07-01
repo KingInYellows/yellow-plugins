@@ -1,6 +1,6 @@
 ---
 name: composio-patterns
-description: "Composio MCP tool patterns, Workbench batch processing, Multi-Execute, usage tracking, and graceful degradation conventions. Use when commands or agents need Composio integration context."
+description: "Canonical conventions for running batch workflows through the Composio MCP server. Use when authoring or modifying commands or agents that call Composio tools — the Workbench sandbox, Multi-Execute batching, and the local usage counter."
 user-invokable: false
 ---
 

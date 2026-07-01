@@ -1,6 +1,6 @@
 ---
 name: security-fencing
-description: "Canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files). Internal reference; agents typically include this content inline until skill-injection behavior is verified at scale."
+description: "Canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files). Use when authoring an agent that reads untrusted input — copy the appropriate variant verbatim into the agent body; output-only agents don't need it."
 user-invokable: false
 ---
 
