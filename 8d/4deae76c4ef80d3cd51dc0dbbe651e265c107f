@@ -1,0 +1,47 @@
+plugins/yellow-core/agents/research/best-practices-researcher.md
+  s_eebc09b09400e0::t_c16ef32820788d 67,78,82-88,96-97,106,110-132
+plugins/yellow-research/hooks/lib/context7-cache.sh
+  s_eebc09b09400e0::t_2497bb793b8fb3 26-27
+  s_eebc09b09400e0::t_5dde059b0243f8 89-110
+  s_eebc09b09400e0::t_2e26a9c43d9113 198-281
+plugins/yellow-research/tests/context7-cache.bats
+  s_eebc09b09400e0::t_3b61eaa9b734a7 453-711
+plugins/yellow-research/skills/library-context/reference.md
+  s_eebc09b09400e0::t_ef56cfc3fbe4f9 146,148,150-158,163-167,171-198
+plugins/yellow-research/bin/lc-cache-write
+  s_eebc09b09400e0::t_7b8bf6600e3e20 1-43
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_eebc09b09400e0::t_3f1bd380772d3d 91-95,97-118,120-125
+  s_eebc09b09400e0::t_3c3d8a450e45bb 67-77,88-89
+  s_eebc09b09400e0::t_c2c65eb8e8c2ef 90
+plugins/yellow-research/bin/lc-cache-lookup-docs
+  s_eebc09b09400e0::t_14b17ebb66549f 1-29
+.changeset/library-context-cache-loop-closure.md
+  s_eebc09b09400e0::t_818bdbb5105524 1-25
+plans/library-context-cache-loop-closure.md
+  s_3868d725b11c65::t_df2305a6a6da2c 3-9,17-30,116-131,154-169,189-206,209-235,240-252,257,262,269-285,293,354-372,382-392,397,447-458,468-521
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "8d4deae76c4ef80d3cd51dc0dbbe651e265c107f",
+  "prompts": {},
+  "sessions": {
+    "s_3868d725b11c65": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb7627ab-9742-49c3-9ced-3c4626e9976f",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_eebc09b09400e0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "05a9bca5-d3d0-493b-b35d-1084d64457fa",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
