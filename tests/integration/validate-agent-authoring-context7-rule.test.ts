@@ -137,6 +137,23 @@ tools:
 This agent has no real fallback instruction outside the dev comment above.
 `;
 
+// FAIL fixture: context7 tools granted via the `mcp__context7__*` wildcard
+// form (documented for `allowed-tools` in docs/claude-code-plugin-research.md)
+// instead of any of the three literal tool names. Proves RULE 13 catches the
+// wildcard grant rather than silently no-oping because none of the exact
+// strings appear in `tools:`.
+const WILDCARD_NEGATIVE = `---
+name: ctx7-wildcard-fixture
+description: Wildcard fixture. Use when verifying RULE 13 catches the mcp__context7__* wildcard grant.
+model: inherit
+tools:
+  - Read
+  - mcp__context7__*
+---
+
+This agent grants all context7 tools via wildcard with no documented fallback.
+`;
+
 const AGENT_PATH = 'demo/agents/research/agent.md';
 // A path rooted under yellow-research/ — the plugin that owns the
 // library-context skill. Used to prove the preload exemption still passes
@@ -216,6 +233,13 @@ describe('RULE 13 — library-context drift lint', () => {
 
   it('fails an agent whose sentinel only appears inside an HTML comment', () => {
     writeAgent(dir, AGENT_PATH, HTML_COMMENT_SENTINEL_NEGATIVE);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 13');
+  });
+
+  it('fails an agent that grants context7 tools via the mcp__context7__* wildcard', () => {
+    writeAgent(dir, AGENT_PATH, WILDCARD_NEGATIVE);
     const { status, stderr } = runValidator(dir);
     expect(status).toBe(1);
     expect(stderr).toContain('RULE 13');

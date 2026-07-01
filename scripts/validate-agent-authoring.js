@@ -55,6 +55,12 @@ const CONTEXT7_TOOLS = new Set([
   'mcp__context7__query-docs',
   'mcp__context7__get-library-docs',
 ]);
+// The wildcard form (`mcp__server__*`, documented for `allowed-tools` in
+// docs/claude-code-plugin-research.md) grants every context7 tool at once.
+// AGENTS.md discourages wildcards in `tools:`, but RULE 13 must not silently
+// no-op if an author uses one anyway — checked as a literal alongside the
+// three exact tool names below.
+const CONTEXT7_WILDCARD_TOOL = 'mcp__context7__*';
 // The exact phrase every inlined copy of the safe chain must contain. The dash
 // is an em dash (U+2014) — written as a literal `—` here so the source is
 // unambiguous. An ASCII `--`/`-` substitution (typography auto-correct,
@@ -466,7 +472,9 @@ function validateAgentFile(filePath, ctx) {
     // in another plugin that merely lists `skills: [library-context]` would
     // pass a plugin-unscoped check yet never receive the fallback chain at
     // runtime; such agents must inline the sentinel instead.
-    if (tools.some((t) => CONTEXT7_TOOLS.has(t))) {
+    if (
+      tools.some((t) => CONTEXT7_TOOLS.has(t) || t === CONTEXT7_WILDCARD_TOOL)
+    ) {
       const body = content
         .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
         .replace(/<!--[\s\S]*?-->/g, '');
