@@ -1,0 +1,28 @@
+plugins/yellow-research/skills/library-context/SKILL.md
+  s_1c74ba9d6245f4::t_23e0c48ec257ef 114-118
+docs/solutions/logic-errors/periodic-rebuild-wipes-incremental-cache-state.md
+  s_1c74ba9d6245f4::t_233f5a2bcc4a68 146-222
+  s_1c74ba9d6245f4::t_4ecc338f15d808 17-18
+plugins/yellow-research/bin/lc-cache-write
+  s_1c74ba9d6245f4::t_11cead9ab5f2e5 37
+plugins/yellow-research/skills/library-context/reference.md
+  s_1c74ba9d6245f4::t_8dc11a4e0b4ca7 166-169
+plugins/yellow-research/hooks/lib/context7-cache.sh
+  s_1c74ba9d6245f4::t_d5fbdd2b9951ad 267-273,279
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "6ad5627a6a0ec74a09009a9db4c58faf9da70d38",
+  "prompts": {},
+  "sessions": {
+    "s_1c74ba9d6245f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c39a8589-09cd-45b0-a129-94ae92a2cb42",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
