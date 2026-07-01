@@ -34,7 +34,7 @@ case "$subcommand" in
     command -v _lc_write_tier2 >/dev/null 2>&1 || exit 0
     docs_file="${4:-}"
     [ -n "$docs_file" ] && [ -f "$docs_file" ] || exit 0
-    docs_body="$(cat "$docs_file" 2>/dev/null)" || exit 0
+    docs_body="$(cat -- "$docs_file" 2>/dev/null)" || exit 0
     _lc_write_tier2 "${2:-}" "${3:-}" "$docs_body"
     ;;
   *)

@@ -111,10 +111,11 @@ file — this sidesteps shell quoting hazards for markdown content
 containing backticks, `$`, or embedded newlines:
 
 ```bash
-docs_file=$(mktemp)
-printf '%s' "$docs_body" > "$docs_file"
-bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write" tier2 "$library_id" "$topic" "$docs_file" 2>/dev/null || true
-rm -f "$docs_file"
+docs_file=$(mktemp) && {
+  printf '%s' "$docs_body" > "$docs_file"
+  bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write" tier2 "$library_id" "$topic" "$docs_file" 2>/dev/null || true
+  rm -f "$docs_file"
+}
 ```
 
 The writer is advisory and always exits 0 — a failed write never blocks

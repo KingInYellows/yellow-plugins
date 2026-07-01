@@ -14,6 +14,8 @@ tags:
   - bash
   - jq
   - yellow-research
+  - eviction-cap
+  - arg-max
 ---
 
 # Periodic Rebuild Wipes Incremental Writeback State (Snapshot vs. Accumulator)
@@ -141,3 +143,80 @@ and gets re-fetched.
 ## Related
 
 - [Bash Pipe + head Exit-Code Masking in Presence Guards](bash-pipe-head-exit-code-masking.md) — a different class of silent-failure bug (guard clause never fires), same broader theme of failures with no operator-visible signal.
+
+---
+
+## Update — 2026-07-01
+
+A second 14-persona review round on the same PR (#598) — after the tier2
+fix above landed — found the identical bug class recurring for `tier1`,
+plus a latent issue in the tier2 fix's own code. Both show that "audit
+every field the rebuild writes" (Prevention, above) is necessary but not
+sufficient on its own.
+
+### Recurrence: tier1 wiped by the same `_lc_prewarm` — still open
+
+`_lc_prewarm` rebuilds `tier1` purely from a fresh top-5-lockfile scan
+(`context7-cache.sh:329-341`) — there is no read-and-merge of the
+existing file's `tier1` before overwriting it. This PR's own
+`_lc_write_tier1` writes a runtime entry for *any* resolved library
+name, not just the top-5 the lockfile scan picks. Any tier1 entry
+written via writeback for a library outside that top-5 set is silently
+discarded on the next ~24h rebuild — the same failure shape as the tier2
+bug above, in a sibling field, in the same function, in the same PR.
+
+Confirmed independently by three reviewers: correctness-reviewer (P1,
+confidence 90), pr-test-analyzer (flagged the missing regression test),
+and codex-reviewer — who reproduced it live: wrote a tier1 entry via
+writeback, forced `_lc_prewarm`, watched the entry vanish.
+
+**Deliberately not auto-fixed.** Unlike `tier2` (LRU-capped at
+`_LC_TIER2_MAX_ENTRIES`), `tier1` has no eviction cap at all. Mirroring
+the tier2 fix — read the existing `tier1`, merge it with the fresh
+top-5 scan — would stop the wipe but trade it for unbounded growth:
+every distinct library ever resolved, across every session, accumulates
+forever with nothing to evict it. Fixing the wipe correctly requires a
+coupled decision a reviewer can't make unilaterally: add an LRU cap to
+`tier1` (mirroring the tier2 pattern) and then preserve, or make a
+deliberate, documented call that unbounded tier1 growth is acceptable
+given per-entry size. `correctness-reviewer` tagged this `gated_auto`,
+not `safe_auto` — correctly kept out of the unattended auto-apply path.
+**Status: open, unresolved as of 2026-07-01.**
+
+**Generalized lesson:** when a periodic-rebuild-vs-writeback bug is
+found and fixed for one field, check every other field the same PR adds
+writeback for — even within the *same* PR that just fixed the first
+instance and documented the "audit every field" rule. Don't assume the
+fix pattern transfers by copy-paste: a preserve-and-merge fix that's
+safe for a capped field can introduce a new failure mode (unbounded
+growth) on an uncapped one. A reviewer flagging "same bug class,
+different field" should default to `gated_auto`/`manual` whenever the
+naive mirror-fix could introduce a different failure mode, not
+`safe_auto`.
+
+### Latent bug in the tier2 fix's own code, found only via reproduction
+
+The Solution section's fix (`context7-cache.sh:363`) passes the entire
+accumulated `tier2` blob through `jq -n --argjson t2 "$existing_tier2"`
+as a shell argv argument. `tier2` is capped at 50 entries, but each
+entry's `docs` field can itself hold substantial text; a sufficiently
+large accumulated cache can approach Linux's ARG_MAX/`MAX_ARG_STRLEN`
+for a single argv element. If that limit is hit, the `jq -n` invocation
+fails; `_lc_atomic_write` has no empty-content guard, so the rebuild
+could silently write a truncated or empty cache file instead of erroring
+loudly.
+
+Thirteen of fourteen reviewer personas across both rounds read this
+exact fix code and did not flag it. `codex-reviewer` found it by
+actually running a reproduction — exercising `_lc_prewarm` against a
+large synthetic tier2 payload — not by reading the code more carefully.
+Not yet fixed; noted here as a caveat on the documented fix so a future
+reader copying this pattern for another accumulator field knows the
+argv-size risk exists. If revisited, prefer piping large JSON through
+stdin (`jq --slurpfile` or here-string) over `--argjson` for fields with
+no hard size cap.
+
+**Methodology takeaway:** for cache/state-mutation bugs, a reviewer that
+executes a minimal reproduction finds failure modes that purely static
+reading misses — even after 13 other review passes on the identical
+lines found nothing.

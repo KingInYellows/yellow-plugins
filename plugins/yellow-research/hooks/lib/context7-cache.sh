@@ -264,17 +264,19 @@ _lc_write_tier2() {
 
   local key="${id}|${topic}"
   local updated
-  # Single-pass upsert + LRU eviction. `.key` is a deterministic tie-break
-  # since sort_by is not guaranteed stable across jq versions; the
-  # `if length > $n` guard skips the O(M log M) sort on every write while
-  # under the cap. $n MUST be --argjson (a number) — --arg makes it a
-  # string and `.[:$n]` errors on a non-numeric slice bound.
+  # Single-pass upsert + LRU eviction. `(.key == $k)` is sorted before `.key`
+  # so the entry just upserted this call never loses a fetched_at tie to an
+  # older entry and gets evicted in the same call that wrote it; `.key` is
+  # the final deterministic tie-break since sort_by is not guaranteed stable
+  # across jq versions. The `if length > $n` guard skips the O(M log M) sort
+  # on every write while under the cap. $n MUST be --argjson (a number) —
+  # --arg makes it a string and `.[:$n]` errors on a non-numeric slice bound.
   updated=$(printf '%s' "$existing" | jq \
     --arg k "$key" --arg d "$docs" --argjson t "$now" --argjson n "$_LC_TIER2_MAX_ENTRIES" \
     '.tier2[$k] = {docs: $d, fetched_at: $t}
      | if (.tier2 | length) > $n then
          .tier2 |= (to_entries
-                    | sort_by(.value.fetched_at, .key)
+                    | sort_by(.value.fetched_at, (.key == $k), .key)
                     | reverse | .[:$n] | from_entries)
        else . end') || {
     _lc_log "Warning: tier2 writeback failed (jq merge error) for $key"

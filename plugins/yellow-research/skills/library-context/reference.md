@@ -163,8 +163,10 @@ writer, exposed via `${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write <tier>
 
 Both writers re-read the cache file on every call (never a caller-held
 snapshot) to minimize the multi-writer race window, then atomic-mv the
-result — see "Concurrent writes" in Edge Cases below for the accepted
-eventual-consistency trade-off. Writes are advisory: a failed writer
+result — this does not eliminate the window: two concurrent writers can
+still race between their read and their mv, and the later mv wins,
+silently dropping the earlier writer's entry (accepted eventual-consistency
+trade-off; no `flock`). Writes are advisory: a failed writer
 (disk full, permission denied, `jq` missing) is logged to stderr and
 swallowed — the caller's MCP round-trip already succeeded, so a cache
 miss on the write side never blocks the agent. `lc-cache-lookup-docs`
