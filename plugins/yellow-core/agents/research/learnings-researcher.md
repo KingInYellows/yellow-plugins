@@ -295,8 +295,8 @@ relying on that tolerance violates the contract.
 
 Invoked by:
 - `/review:pr` Step 3d — pre-pass before reviewer dispatch
-- `/workflows:plan` — informs plan with institutional knowledge
-- `/workflows:brainstorm` — surfaces prior decisions during ideation
+- `/review:review-all` — same pre-pass, run per PR in the batch
+- `/docs:review` — learnings pre-pass before document-review personas
 - Standalone via `Task` with `subagent_type: "yellow-core:research:learnings-researcher"`
 
 Output is consumed as fenced advisory prose — no downstream caller parses
