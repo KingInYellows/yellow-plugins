@@ -1,6 +1,6 @@
 ---
 name: optimize
-description: "Run a metric-driven optimization pass: parallel candidate variants scored against an LLM-as-judge analytic rubric. Use when comparing approaches against a measurable goal — anywhere 'better' can be expressed as a per-criterion rubric."
+description: "Run a metric-driven optimization pass: parallel candidate variants scored against an LLM-as-judge analytic rubric. Use when comparing approaches against a measurable goal — anywhere 'better' can be expressed as a per-criterion rubric. For session-level plan-adherence and scope-drift review, use /workflows:review instead."
 argument-hint: '[path to optimization spec YAML, or describe the optimization goal to scaffold one interactively]'
 user-invokable: true
 ---

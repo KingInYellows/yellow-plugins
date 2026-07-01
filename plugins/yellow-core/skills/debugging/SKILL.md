@@ -1,6 +1,6 @@
 ---
 name: debugging
-description: "Find root causes systematically before fixing — trace the causal chain and form hypotheses with predictions for uncertain links. Use when debugging errors, test failures, stack traces, or when stuck after failed fix attempts."
+description: "Find root causes systematically before fixing — trace the causal chain and form hypotheses with predictions for uncertain links. Use when debugging errors, test failures, stack traces, or when stuck after failed fix attempts. For delegating a stuck investigation to an independent Codex session, use /codex:rescue."
 argument-hint: '[issue reference, error message, test path, or description of broken behavior]'
 user-invokable: true
 ---
