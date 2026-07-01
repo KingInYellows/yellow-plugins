@@ -222,9 +222,9 @@ applied fixes.
 
 ### Problem
 
-`resolve-pr.md`'s disposition model is binary: fix-and-mark-resolved (Step 7),
-or leave-unresolved via a structured `CONFLICT:` sentinel (Step 5), or
-drop-as-non-actionable (Step 3c, LGTM/nit). There is no lane for a finding
+`resolve-pr.md`'s disposition model is three-way: fix-and-mark-resolved
+(Step 7), leave-unresolved via a structured `CONFLICT:` sentinel (Step 5),
+or drop-as-non-actionable (Step 3c, LGTM/nit). There is no lane for a finding
 that is real, well-corroborated, and *not* resolve-time-safe — e.g. it
 requires an API signature redesign across multiple call sites, or a coupled
 trade-off a resolver can't decide unilaterally (add an eviction cap vs.

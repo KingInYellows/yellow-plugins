@@ -110,8 +110,10 @@ Step 2 — Document lookup:
     use docs
 ```
 
-Cross-plugin (BPR) inline gets the same updates with the
-`${YELLOW_RESEARCH_ROOT:-/nonexistent}` probe pattern.
+Cross-plugin (BPR) inline gets the same updates with the established
+`${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/... 2>/dev/null || true`
+path pattern (see correction below — the earlier `YELLOW_RESEARCH_ROOT`
+proposal doesn't exist in the codebase).
 
 <!-- deepen-plan: codebase -->
 > **Codebase (correction — plan bug):** `${YELLOW_RESEARCH_ROOT:-/nonexistent}`
@@ -378,7 +380,10 @@ _lc_write_tier1() {
 4. Tier2 eviction: with `_LC_TIER2_MAX_ENTRIES=50` entries already in tier2, writing the 51st evicts the entry with the lowest `fetched_at` — the cache file always has exactly 50 entries after the write.
 5. Read TTLs honored: tier1 hits older than 24h return empty; tier2 hits older than 4h return empty.
 6. SKILL.md Step 1 instructs writeback after live `resolve-library-id`; Step 2 instructs cache-first lookup + writeback after live `query-docs`.
-7. BPR inlined block contains symmetric instructions wrapped in `${YELLOW_RESEARCH_ROOT:-/nonexistent}` probes so cross-plugin consumers gracefully skip when yellow-research absent.
+7. BPR inlined block contains symmetric instructions using
+   `bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-write" … 2>/dev/null || true`
+   (and the `…/lc-cache-lookup-docs` reader likewise) so cross-plugin
+   consumers gracefully skip when yellow-research absent.
 
    <!-- deepen-plan: codebase -->
    > **Codebase (AC correction):** `${YELLOW_RESEARCH_ROOT:-/nonexistent}`

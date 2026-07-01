@@ -155,8 +155,9 @@ writer, exposed via `${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write <tier>
   entry. Idempotent: re-writing the same name updates `fetched_at` without
   duplicating the entry.
 - `lc-cache-write tier2 <library-id> <topic> <docs-file>` — after a live
-  `query-docs` succeeds, writes the docs body (read from a file path, not
-  argv, to sidestep shell quoting hazards in markdown content) into tier2.
+  `query-docs` succeeds with a non-empty body, writes the docs body (read
+  from a file path, not argv, to sidestep shell quoting hazards in markdown
+  content) into tier2; an empty body is not written (cache stays a miss).
   When the cache already holds `_LC_TIER2_MAX_ENTRIES` (50) entries, the
   write evicts the entry with the oldest `fetched_at` in the same jq pass
   that performs the upsert.
