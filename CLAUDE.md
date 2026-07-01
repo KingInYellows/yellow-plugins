@@ -180,12 +180,15 @@ CLAUDE.md, README.md, configs):
 Enforcement differs by surface:
 
 - **Agent and command markdown** — CI-enforced by
-  `validate-agent-authoring.js` (agent frontmatter rules, `subagent_type`
-  references, the `BASH_SOURCE` ban on commands).
-- **SKILL.md** — the three-heading rule, the single-line `description:`
-  rule, and the `user-invokable` spelling are convention only: the
-  validator never applies its authoring rules to SKILL.md files, so
-  review is the gate.
+  `validate-agent-authoring.js` (agent frontmatter rules, the
+  `BASH_SOURCE` ban on commands).
+- **`subagent_type` references** — CI-enforced across ALL plugin markdown:
+  the validator's reference check walks every `.md` under `plugins/`
+  except CHANGELOG.md, SKILL.md files included.
+- **SKILL.md authoring rules** — the three-heading rule, the single-line
+  `description:` rule, and the `user-invokable` spelling are convention
+  only; the validator does not check these on SKILL.md files, so review
+  is the gate.
 
 The full list is in `AGENTS.md` ("Critical Agent Authoring Rules"); the
 most-frequently-tripped items:

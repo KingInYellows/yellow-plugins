@@ -5,6 +5,7 @@
 'yellow-composio': patch
 'yellow-mempalace': patch
 'yellow-ruvector': patch
+'yellow-review': patch
 ---
 
 docs(optimization): Tier 1 quick wins C1-C4 — self-description layer fixes.
@@ -28,6 +29,10 @@ C4: split the 168-line Subagent Failure Convention section out of
 create-agent-skills/SKILL.md (513 lines, over its own 500-line ceiling)
 into references/subagent-failure-convention.md behind a load stub that
 preserves the section heading. SKILL.md is now 365 lines.
+
+Review follow-up: review-pr.md's Step 5 citation now points at the new
+references/subagent-failure-convention.md for the "When the convention
+applies" subsection (the C4 move relocated it out of SKILL.md).
 
 Doc-only; no scripts, hooks, schemas, or CI behavior change. Root
 CLAUDE.md (C5) and root README recounts ship in the same PR without a
