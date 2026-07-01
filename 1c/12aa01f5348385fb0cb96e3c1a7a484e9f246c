@@ -1,0 +1,27 @@
+plugins/yellow-core/skills/security-fencing/SKILL.md
+  s_212adc2508532d::t_81c4d1152125b4 3
+plugins/yellow-composio/skills/composio-patterns/SKILL.md
+  s_212adc2508532d::t_51792f6de0ad7e 3
+plugins/yellow-mempalace/skills/mempalace-conventions/SKILL.md
+  s_212adc2508532d::t_227099db7bda7d 3
+plugins/yellow-codex/skills/codex-patterns/SKILL.md
+  s_212adc2508532d::t_5dd82208b16dfb 3
+plugins/yellow-research/skills/research-patterns/SKILL.md
+  s_212adc2508532d::t_15a418b6b8fc47 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "1c12aa01f5348385fb0cb96e3c1a7a484e9f246c",
+  "prompts": {},
+  "sessions": {
+    "s_212adc2508532d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "558412b5-abbb-4def-87b5-ef0eb4e2e1fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
