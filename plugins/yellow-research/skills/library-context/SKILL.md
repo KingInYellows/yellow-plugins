@@ -51,18 +51,29 @@ lib_name='<library-name>'
 cached_id=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup" "$lib_name" 2>/dev/null || true)
 ```
 
-If `cached_id` is non-empty, use it as the library-id and proceed
-invoking Step 2, still verify a context7 docs tool is available
-via ToolSearch (`mcp__context7__query-docs` or `mcp__context7__get-library-docs`) — in restricted-tool spawns or installs without context7
-via ToolSearch — in restricted-tool spawns or installs without context7
-the cached library-id is unusable; fall through to the
-Within-yellow-research fallback chain (EXA → WebSearch) in that case.
+If `cached_id` is non-empty, use it as the library-id and proceed to
+Step 2, but first verify a context7 docs tool is available via ToolSearch
+(`mcp__context7__query-docs` or `mcp__context7__get-library-docs`) — in
+restricted-tool spawns or installs without context7 the cached library-id
+is unusable; fall through to the Within-yellow-research fallback chain
+(EXA → WebSearch) in that case.
 The wrapper exits 0 on every path (cache miss, expired, helper absent,
 jq missing) — empty output is the safe fallback signal, never an error.
 
 If `cached_id` is empty, fall through to the live resolve:
 `mcp__context7__resolve-library-id <library-name>`. Returns an array of
 candidate libraries — see "Disambiguation" below for picking among them.
+
+**After a successful live resolve, write the result back to tier1** so a
+later lookup (this session or a future one) hits the cache instead of
+re-resolving:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write" tier1 "$lib_name" "$library_id" 2>/dev/null || true
+```
+
+The writer is advisory and always exits 0 — a failed write never blocks
+the agent; it only means this library's tier1 entry doesn't warm.
 
 **Cross-plugin consumers** (yellow-core agents, etc.) that inline the
 safe-chain block: the cache lookup is optional. The helper lives in
@@ -74,12 +85,45 @@ call with `2>/dev/null || true` and accept an empty result as the
 fallback signal — this absorbs both binary-absent (yellow-research not
 installed, bash exit 127) and runtime cache miss into the same branch.
 Direct context7 resolve is the correct continuation when output is empty.
+The writeback after a successful resolve uses the same cross-plugin path:
+`bash "${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-write" tier1 "$lib_name" "$library_id" 2>/dev/null || true`.
 
-### Step 2 — Document lookup
+### Step 2 — Document lookup (cache-first)
 
-Call `mcp__context7__query-docs` with the resolved library ID and a topic
-string. Never call `query-docs` with a plain library name — it requires a
-context7-compatible ID from Step 1.
+**First, check the tier2 (doc content) cache.** The reader lives at
+`${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup-docs`. Run it via Bash before
+calling `mcp__context7__query-docs`:
+
+```bash
+cached_docs=$(bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup-docs" "$library_id" "$topic" 2>/dev/null || true)
+```
+
+If `cached_docs` is non-empty, use it directly and skip the MCP call. The
+wrapper exits 0 on every path (cache miss, expired past the 4h TTL, helper
+absent, jq missing) — empty output is the safe fallback signal, never an
+error.
+
+If `cached_docs` is empty, call `mcp__context7__query-docs` with the
+resolved library ID and a topic string. Never call `query-docs` with a
+plain library name — it requires a context7-compatible ID from Step 1.
+**After a successful call, write the docs body back to tier2** via a temp
+file — this sidesteps shell quoting hazards for markdown content
+containing backticks, `$`, or embedded newlines:
+
+```bash
+docs_file=$(mktemp) && {
+  printf '%s' "$docs_body" > "$docs_file"
+  bash "${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write" tier2 "$library_id" "$topic" "$docs_file" 2>/dev/null || true
+  rm -f "$docs_file"
+}
+```
+
+The writer is advisory and always exits 0 — a failed write never blocks
+the agent; it only means this (library-id, topic) pair doesn't warm.
+**Cross-plugin consumers** reach the same wrapper via the established
+cross-plugin path: `${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup-docs`
+and `.../lc-cache-write`, with the same `2>/dev/null || true` absorption
+of bash exit 127 (yellow-research absent) into the empty/skip branch.
 
 **Tool name.** The canonical name in this repo is `mcp__context7__query-docs`.
 Older context7 installs expose `mcp__context7__get-library-docs` instead.
@@ -195,6 +239,6 @@ or the query is exploratory, omit the version to get current docs.
 For implementer-facing material that does not need to be in every spawn's
 context — distribution rationale, the RULE 13 drift lint (shipped in
 `scripts/validate-agent-authoring.js`), the consumer enumeration, and the
-cache contract — read
+tier1/tier2 cache-hook API — read
 [`reference.md`](./reference.md) on demand. The reference file is NOT
 auto-loaded by `skills:` preload.

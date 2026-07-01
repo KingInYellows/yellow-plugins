@@ -23,6 +23,8 @@ _LC_CACHE_LOADED=1
 
 _LC_API_BASE="${CONTEXT7_API_BASE:-https://context7.com/api/v1}"
 _LC_TIER1_TTL=86400        # 24h
+_LC_TIER2_TTL=14400         # 4h
+_LC_TIER2_MAX_ENTRIES=50    # LRU cap by fetched_at
 _LC_PREWARM_MAX=5           # max libraries resolved per session warm
 _LC_CURL_TIMEOUT=3          # seconds per resolve call
 _LC_LOCKFILES=(
@@ -82,6 +84,28 @@ _lc_lookup() {
   [ "$age" -lt "$_LC_TIER1_TTL" ] || return 0
 
   jq -r --arg n "$name" '.tier1[$n].library_id // empty' "$path" 2>/dev/null
+}
+
+# Look up a (library-id, topic) pair in the tier2 cache. Echoes the cached
+# docs body on a fresh hit, nothing on miss/stale/missing. Always exits 0 —
+# mirrors _lc_lookup's contract exactly.
+_lc_lookup_docs() {
+  local id="$1" topic="$2"
+  [ -n "$id" ] && [ -n "$topic" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+
+  local path
+  path=$(_lc_cache_path 2>/dev/null) || return 0
+  [ -f "$path" ] || return 0
+
+  local key="${id}|${topic}"
+  local fetched_at age
+  fetched_at=$(jq -r --arg k "$key" '.tier2[$k].fetched_at // 0' "$path" 2>/dev/null) || return 0
+  [ "$fetched_at" -gt 0 ] 2>/dev/null || return 0
+  age=$(( $(_lc_now) - fetched_at ))
+  [ "$age" -lt "$_LC_TIER2_TTL" ] || return 0
+
+  jq -r --arg k "$key" '.tier2[$k].docs // empty' "$path" 2>/dev/null
 }
 
 # Returns 0 if cache exists AND tier1 entries are fresh AND lockfile fingerprint
@@ -171,6 +195,98 @@ _lc_atomic_write() {
   mv "$tmp" "$path" || { rm -f "$tmp"; return 1; }
 }
 
+_LC_DEFAULT_CACHE='{"schema":"1","warmed_at":0,"lockfile_fingerprint":{},"tier1":{},"tier2":{}}'
+
+# Runtime writeback for tier1 — adds/updates one (name -> library_id) entry.
+# Re-reads the cache file on every call (never a caller-held snapshot) to
+# minimize the multi-writer race window; atomic-mv still means last writer
+# wins for the whole file (accepted eventual-consistency trade-off, see
+# reference.md). Advisory only: write failures are logged and swallowed —
+# the caller's MCP round-trip already succeeded, so a failed writeback must
+# never block it. Always exits 0.
+_lc_write_tier1() {
+  local name="$1" id="$2"
+  command -v jq >/dev/null 2>&1 || return 0
+  [ -n "$name" ] && [ -n "$id" ] || return 0
+
+  local path
+  path=$(_lc_cache_path 2>/dev/null) || return 0
+
+  local now
+  now=$(_lc_now)
+
+  local existing="$_LC_DEFAULT_CACHE"
+  if [ -f "$path" ]; then
+    existing=$(jq '.' "$path" 2>/dev/null) || {
+      _lc_log "Warning: existing cache at $path failed to parse; resetting to empty (prior tier1/tier2 entries discarded)"
+      existing="$_LC_DEFAULT_CACHE"
+    }
+  fi
+
+  local updated
+  # Mutate-one-key (.tier1[$n] = …), NOT `. + {tier1: …}` — the additive form
+  # would replace the whole tier1 object and reset tier2. (_lc_prewarm uses
+  # the additive form safely only because it rebuilds the whole cache once
+  # per session from a fresh in-memory object — do not copy that shape here.)
+  updated=$(printf '%s' "$existing" | jq \
+    --arg n "$name" --arg i "$id" --argjson t "$now" \
+    '.tier1[$n] = {library_id: $i, fetched_at: $t}') || {
+    _lc_log "Warning: tier1 writeback failed (jq merge error) for $name"
+    return 0
+  }
+
+  _lc_atomic_write "$path" "$updated" || _lc_log "Warning: tier1 writeback failed (atomic write error) for $name"
+  return 0
+}
+
+# Runtime writeback for tier2 — adds/updates one (library-id|topic -> docs)
+# entry, then evicts oldest-by-fetched_at entries in a single jq pass once
+# the cache exceeds _LC_TIER2_MAX_ENTRIES. Same re-read-on-every-call and
+# advisory-only contract as _lc_write_tier1. Always exits 0.
+_lc_write_tier2() {
+  local id="$1" topic="$2" docs="$3"
+  command -v jq >/dev/null 2>&1 || return 0
+  [ -n "$id" ] && [ -n "$topic" ] && [ -n "$docs" ] || return 0
+
+  local path
+  path=$(_lc_cache_path 2>/dev/null) || return 0
+
+  local now
+  now=$(_lc_now)
+
+  local existing="$_LC_DEFAULT_CACHE"
+  if [ -f "$path" ]; then
+    existing=$(jq '.' "$path" 2>/dev/null) || {
+      _lc_log "Warning: existing cache at $path failed to parse; resetting to empty (prior tier1/tier2 entries discarded)"
+      existing="$_LC_DEFAULT_CACHE"
+    }
+  fi
+
+  local key="${id}|${topic}"
+  local updated
+  # Single-pass upsert + LRU eviction. `(.key == $k)` is sorted before `.key`
+  # so the entry just upserted this call never loses a fetched_at tie to an
+  # older entry and gets evicted in the same call that wrote it; `.key` is
+  # the final deterministic tie-break since sort_by is not guaranteed stable
+  # across jq versions. The `if length > $n` guard skips the O(M log M) sort
+  # on every write while under the cap. $n MUST be --argjson (a number) —
+  # --arg makes it a string and `.[:$n]` errors on a non-numeric slice bound.
+  updated=$(printf '%s' "$existing" | jq \
+    --arg k "$key" --arg d "$docs" --argjson t "$now" --argjson n "$_LC_TIER2_MAX_ENTRIES" \
+    '.tier2[$k] = {docs: $d, fetched_at: $t}
+     | if (.tier2 | length) > $n then
+         .tier2 |= (to_entries
+                    | sort_by(.value.fetched_at, (.key == $k), .key)
+                    | reverse | .[:$n] | from_entries)
+       else . end') || {
+    _lc_log "Warning: tier2 writeback failed (jq merge error) for $key"
+    return 0
+  }
+
+  _lc_atomic_write "$path" "$updated" || _lc_log "Warning: tier2 writeback failed (atomic write error) for $key"
+  return 0
+}
+
 # Build the lockfile fingerprint object for invalidation tracking.
 _lc_lockfile_fingerprint() {
   local project="${CLAUDE_PROJECT_DIR:-$PWD}"
@@ -234,9 +350,20 @@ _lc_prewarm() {
   local fp
   fp=$(_lc_lockfile_fingerprint)
 
+  # Preserve any tier2 entries accumulated via runtime writeback — this
+  # rewarm only refreshes tier1; hardcoding tier2: {} here would silently
+  # wipe doc-content cache entries every ~24h re-warm.
+  local existing_tier2='{}'
+  if [ -f "$cache_path" ]; then
+    existing_tier2=$(jq '.tier2 // {}' "$cache_path" 2>/dev/null) || {
+      _lc_log "Warning: existing cache at $cache_path failed to parse; resetting tier2 to empty (prior tier2 entries discarded)"
+      existing_tier2='{}'
+    }
+  fi
+
   local cache
-  cache=$(jq -n --argjson w "$now" --argjson t1 "$tier1" --argjson fp "$fp" \
-    '{schema: "1", warmed_at: $w, lockfile_fingerprint: $fp, tier1: $t1, tier2: {}}')
+  cache=$(jq -n --argjson w "$now" --argjson t1 "$tier1" --argjson fp "$fp" --argjson t2 "$existing_tier2" \
+    '{schema: "1", warmed_at: $w, lockfile_fingerprint: $fp, tier1: $t1, tier2: $t2}')
 
   if _lc_atomic_write "$cache_path" "$cache"; then
     _lc_log "Warmed context7 cache: $count libraries → $cache_path"

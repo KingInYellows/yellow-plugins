@@ -148,6 +148,21 @@ JSON
   [ "$output" = "/facebook/react" ]
 }
 
+@test "prewarm: logs a warning when the existing tier2 read fails to parse corrupted cache JSON" {
+  cat >"$CLAUDE_PROJECT_DIR/package.json" <<'JSON'
+{"dependencies": {"react": "^18.0.0"}}
+JSON
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  printf 'NOT VALID JSON {{' >"$cache_path"
+
+  _stub_resolve_returns
+  _stub_now_returns 1500000000
+  run _lc_prewarm
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "failed to parse" ]]
+}
+
 # --- _lc_prewarm: authenticated warm (CONTEXT7_API_KEY set) ---
 
 @test "prewarm: with CONTEXT7_API_KEY set → uses auth path (stub still returns same)" {
@@ -168,6 +183,31 @@ JSON
   id=$(jq -r '.tier1.react.library_id' "$cache_file")
   [ "$id" = "/facebook/react" ]
   unset CONTEXT7_API_KEY
+}
+
+# --- _lc_prewarm: preserves runtime-writeback tier2 entries across rewarm ---
+
+@test "prewarm: preserves existing tier2 entries when re-warming tier1" {
+  cat >"$CLAUDE_PROJECT_DIR/package.json" <<'JSON'
+{"dependencies": {"react": "^18.0.0"}}
+JSON
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  local now
+  now=$(_lc_now)
+  # Seed a cache whose tier1 is stale (forces a rewarm) but carries a
+  # tier2 entry accumulated via runtime writeback.
+  printf '{"schema":"1","warmed_at":0,"tier1":{},"tier2":{"/facebook/react|hooks":{"docs":"cached docs","fetched_at":%s}},"lockfile_fingerprint":{}}' "$now" >"$cache_path"
+
+  _stub_resolve_returns
+  _stub_now_returns 1800000000
+  run _lc_prewarm
+  [ "$status" -eq 0 ]
+
+  run jq -r '.tier1.react.library_id' "$cache_path"
+  [ "$output" = "/facebook/react" ]
+  run jq -r '.tier2["/facebook/react|hooks"].docs' "$cache_path"
+  [ "$output" = "cached docs" ]
 }
 
 # --- _lc_resolve_library_id: token not in argv when CONTEXT7_API_KEY set ---
@@ -446,6 +486,355 @@ JSON
 
 @test "bin/lc-cache-lookup: exits 0 with empty output when no arg" {
   run bash "$BATS_TEST_DIRNAME/../bin/lc-cache-lookup"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+# --- _lc_lookup_docs: tier2 cache reader for consumer agents ---
+
+@test "lookup_docs: returns empty when cache file is absent" {
+  run _lc_lookup_docs "/facebook/react" "hooks"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "lookup_docs: returns cached docs body on fresh hit" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  local now
+  now=$(_lc_now)
+  printf '{"schema":"1","warmed_at":%s,"tier1":{},"tier2":{"/facebook/react|hooks":{"docs":"# React Hooks","fetched_at":%s}},"lockfile_fingerprint":{}}' "$now" "$now" >"$cache_path"
+
+  run _lc_lookup_docs "/facebook/react" "hooks"
+  [ "$status" -eq 0 ]
+  [ "$output" = "# React Hooks" ]
+}
+
+@test "lookup_docs: returns empty on cache miss (key not in tier2)" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  local now
+  now=$(_lc_now)
+  printf '{"schema":"1","warmed_at":%s,"tier1":{},"tier2":{"/facebook/react|hooks":{"docs":"# React Hooks","fetched_at":%s}},"lockfile_fingerprint":{}}' "$now" "$now" >"$cache_path"
+
+  run _lc_lookup_docs "/facebook/react" "missing-topic"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "lookup_docs: returns empty when cached entry is older than TIER2 TTL" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  _stub_now_returns 2000000000
+  # Entry fetched > 4h ago (14401 seconds)
+  printf '{"schema":"1","warmed_at":0,"tier1":{},"tier2":{"/facebook/react|hooks":{"docs":"# React Hooks","fetched_at":1999985599}},"lockfile_fingerprint":{}}' >"$cache_path"
+
+  run _lc_lookup_docs "/facebook/react" "hooks"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "lookup_docs: returns empty on corrupted cache JSON" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  printf 'NOT VALID JSON {{' >"$cache_path"
+
+  run _lc_lookup_docs "/facebook/react" "hooks"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "lookup_docs: returns empty when id argument is empty" {
+  run _lc_lookup_docs "" "hooks"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "lookup_docs: returns empty when topic argument is empty" {
+  run _lc_lookup_docs "/facebook/react" ""
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+# --- _lc_write_tier1: runtime writeback for tier1 ---
+
+@test "write_tier1: writes a new entry to a fresh (no file) cache" {
+  _stub_now_returns 1700000000
+  run _lc_write_tier1 "react" "/facebook/react"
+  [ "$status" -eq 0 ]
+
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  [ -f "$cache_path" ]
+  run jq -r '.tier1.react.library_id' "$cache_path"
+  [ "$output" = "/facebook/react" ]
+  run jq -r '.tier1.react.fetched_at' "$cache_path"
+  [ "$output" = "1700000000" ]
+}
+
+@test "write_tier1: updates existing entry idempotently (refreshes fetched_at)" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  _stub_now_returns 1700000000
+  _lc_write_tier1 "react" "/facebook/react"
+
+  _stub_now_returns 1700000500
+  run _lc_write_tier1 "react" "/facebook/react"
+  [ "$status" -eq 0 ]
+
+  run jq '.tier1 | length' "$cache_path"
+  [ "$output" = "1" ]
+  run jq -r '.tier1.react.fetched_at' "$cache_path"
+  [ "$output" = "1700000500" ]
+}
+
+@test "write_tier1: does not clobber existing tier2 entries" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  local now
+  now=$(_lc_now)
+  printf '{"schema":"1","warmed_at":0,"tier1":{},"tier2":{"/lodash/lodash|debounce":{"docs":"docs body","fetched_at":%s}},"lockfile_fingerprint":{}}' "$now" >"$cache_path"
+
+  run _lc_write_tier1 "react" "/facebook/react"
+  [ "$status" -eq 0 ]
+
+  run jq -r '.tier2["/lodash/lodash|debounce"].docs' "$cache_path"
+  [ "$output" = "docs body" ]
+  run jq -r '.tier1.react.library_id' "$cache_path"
+  [ "$output" = "/facebook/react" ]
+}
+
+@test "write_tier1: exits 0 silently when name or id argument is empty" {
+  run _lc_write_tier1 "" "/facebook/react"
+  [ "$status" -eq 0 ]
+  run _lc_write_tier1 "react" ""
+  [ "$status" -eq 0 ]
+}
+
+@test "write_tier1: resets to default schema and logs a warning on corrupted cache JSON" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  printf 'NOT VALID JSON {{' >"$cache_path"
+
+  run _lc_write_tier1 "react" "/facebook/react"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "failed to parse" ]]
+
+  run jq -r '.tier1.react.library_id' "$cache_path"
+  [ "$status" -eq 0 ]
+  [ "$output" = "/facebook/react" ]
+}
+
+# --- _lc_write_tier2: runtime writeback for tier2 with LRU eviction ---
+
+@test "write_tier2: writes a new entry to a fresh (no file) cache" {
+  _stub_now_returns 1700000000
+  run _lc_write_tier2 "/facebook/react" "hooks" "# React Hooks docs body"
+  [ "$status" -eq 0 ]
+
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  run jq -r '.tier2["/facebook/react|hooks"].docs' "$cache_path"
+  [ "$output" = "# React Hooks docs body" ]
+}
+
+@test "write_tier2: does not clobber existing tier1 entries" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  local now
+  now=$(_lc_now)
+  printf '{"schema":"1","warmed_at":0,"tier1":{"react":{"library_id":"/facebook/react","fetched_at":%s}},"tier2":{},"lockfile_fingerprint":{}}' "$now" >"$cache_path"
+
+  run _lc_write_tier2 "/lodash/lodash" "debounce" "docs body"
+  [ "$status" -eq 0 ]
+
+  run jq -r '.tier1.react.library_id' "$cache_path"
+  [ "$output" = "/facebook/react" ]
+  run jq -r '.tier2["/lodash/lodash|debounce"].docs' "$cache_path"
+  [ "$output" = "docs body" ]
+}
+
+@test "write_tier2: resets to default schema and logs a warning on corrupted cache JSON" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  printf 'NOT VALID JSON {{' >"$cache_path"
+
+  run _lc_write_tier2 "/facebook/react" "hooks" "docs body"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "failed to parse" ]]
+
+  run jq -r '.tier2["/facebook/react|hooks"].docs' "$cache_path"
+  [ "$status" -eq 0 ]
+  [ "$output" = "docs body" ]
+}
+
+@test "write_tier2: evicts deterministically by key when fetched_at ties at the cap" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  # 50-entry fixture with an IDENTICAL fetched_at for every entry, so the
+  # `.key` secondary sort key (not fetched_at) is what determines eviction
+  # order.
+  jq -n '{
+    schema: "1", warmed_at: 0, lockfile_fingerprint: {}, tier1: {},
+    tier2: (reduce range(0;50) as $i ({};
+      . + {("/lib/" + ($i|tostring) + "|topic"):
+             {docs: ("doc" + ($i|tostring)), fetched_at: 1000000000}}))
+  }' >"$cache_path"
+
+  _stub_now_returns 1000000000
+  run _lc_write_tier2 "/lib/NEW" "topic" "newest doc"
+  [ "$status" -eq 0 ]
+
+  run jq '.tier2 | length' "$cache_path"
+  [ "$output" = "50" ]
+  # With all fetched_at tied, sort_by(.value.fetched_at, .key) falls back to
+  # a lexicographic key sort: "/lib/0|topic" is the lone ascending-smallest
+  # key of the 51 (string comparison, not numeric — "/lib/10|topic" <
+  # "/lib/9|topic"), so it is the one entry the ascending-sort+reverse+slice
+  # drops. Every other original key, including "/lib/9|topic", survives.
+  run jq '.tier2 | has("/lib/0|topic")' "$cache_path"
+  [ "$output" = "false" ]
+  run jq '.tier2 | has("/lib/9|topic")' "$cache_path"
+  [ "$output" = "true" ]
+}
+
+@test "write_tier2: updates existing entry (idempotent, refreshes fetched_at)" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  _stub_now_returns 1700000000
+  _lc_write_tier2 "/facebook/react" "hooks" "old docs"
+
+  _stub_now_returns 1700000500
+  run _lc_write_tier2 "/facebook/react" "hooks" "new docs"
+  [ "$status" -eq 0 ]
+
+  run jq '.tier2 | length' "$cache_path"
+  [ "$output" = "1" ]
+  run jq -r '.tier2["/facebook/react|hooks"].docs' "$cache_path"
+  [ "$output" = "new docs" ]
+  run jq -r '.tier2["/facebook/react|hooks"].fetched_at' "$cache_path"
+  [ "$output" = "1700000500" ]
+}
+
+@test "write_tier2: evicts oldest entry when writing the 51st at the cap" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  # 50-entry fixture with distinct fetched_at values so "oldest evicted" is
+  # deterministic.
+  jq -n '{
+    schema: "1", warmed_at: 0, lockfile_fingerprint: {}, tier1: {},
+    tier2: (reduce range(0;50) as $i ({};
+      . + {("/lib/" + ($i|tostring) + "|topic"):
+             {docs: ("doc" + ($i|tostring)), fetched_at: (1000000000 + $i)}}))
+  }' >"$cache_path"
+
+  run jq '.tier2 | length' "$cache_path"
+  [ "$output" = "50" ]
+
+  _stub_now_returns 1000000100
+  run _lc_write_tier2 "/lib/NEW" "topic" "newest doc"
+  [ "$status" -eq 0 ]
+
+  run jq '.tier2 | length' "$cache_path"
+  [ "$output" = "50" ]
+  run jq '.tier2 | has("/lib/0|topic")' "$cache_path"
+  [ "$output" = "false" ]
+  run jq '.tier2 | has("/lib/1|topic")' "$cache_path"
+  [ "$output" = "true" ]
+  run jq '.tier2 | has("/lib/NEW|topic")' "$cache_path"
+  [ "$output" = "true" ]
+}
+
+@test "write_tier2: skips writing when docs body is empty" {
+  run _lc_write_tier2 "/facebook/react" "hooks" ""
+  [ "$status" -eq 0 ]
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  [ ! -f "$cache_path" ]
+}
+
+@test "write_tier2: exits 0 silently when id or topic argument is empty" {
+  run _lc_write_tier2 "" "hooks" "docs"
+  [ "$status" -eq 0 ]
+  run _lc_write_tier2 "/facebook/react" "" "docs"
+  [ "$status" -eq 0 ]
+}
+
+# --- bin/lc-cache-lookup-docs wrapper (agent-facing) ---
+
+@test "bin/lc-cache-lookup-docs: returns cached docs when invoked from any cwd" {
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  local now
+  now=$(_lc_now)
+  printf '{"schema":"1","warmed_at":%s,"tier1":{},"tier2":{"/facebook/react|hooks":{"docs":"cached docs body","fetched_at":%s}},"lockfile_fingerprint":{}}' "$now" "$now" >"$cache_path"
+
+  cd "$TEST_TMP"
+  run bash "$BATS_TEST_DIRNAME/../bin/lc-cache-lookup-docs" "/facebook/react" "hooks"
+  [ "$status" -eq 0 ]
+  [ "$output" = "cached docs body" ]
+}
+
+@test "bin/lc-cache-lookup-docs: exits 0 with empty output when args missing" {
+  run bash "$BATS_TEST_DIRNAME/../bin/lc-cache-lookup-docs"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+# --- bin/lc-cache-write wrapper (agent-facing) ---
+
+@test "bin/lc-cache-write: tier1 subcommand writes an entry" {
+  cd "$TEST_TMP"
+  run bash "$BATS_TEST_DIRNAME/../bin/lc-cache-write" tier1 react /facebook/react
+  [ "$status" -eq 0 ]
+
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  run jq -r '.tier1.react.library_id' "$cache_path"
+  [ "$output" = "/facebook/react" ]
+}
+
+@test "bin/lc-cache-write: tier2 subcommand reads the docs body from the file-path arg" {
+  local docs_file="$TEST_TMP/docs.md"
+  printf '# Docs with `backticks` and $dollar signs' >"$docs_file"
+
+  cd "$TEST_TMP"
+  run bash "$BATS_TEST_DIRNAME/../bin/lc-cache-write" tier2 /facebook/react hooks "$docs_file"
+  [ "$status" -eq 0 ]
+
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  run jq -r '.tier2["/facebook/react|hooks"].docs' "$cache_path"
+  [ "$output" = '# Docs with `backticks` and $dollar signs' ]
+}
+
+@test "bin/lc-cache-write: tier2 subcommand preserves quotes and multi-line content" {
+  local docs_file="$TEST_TMP/docs-quotes.md"
+  printf '# Title\n\nSome "quoted" and '"'"'single-quoted'"'"' text\nacross multiple lines.' >"$docs_file"
+
+  cd "$TEST_TMP"
+  run bash "$BATS_TEST_DIRNAME/../bin/lc-cache-write" tier2 /facebook/react hooks "$docs_file"
+  [ "$status" -eq 0 ]
+
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  run jq -r '.tier2["/facebook/react|hooks"].docs' "$cache_path"
+  [[ "$output" == *'"quoted"'* ]]
+  [[ "$output" == *"'single-quoted'"* ]]
+  [[ "$output" == *$'\n'"across multiple lines."* ]]
+}
+
+@test "bin/lc-cache-write: tier2 subcommand exits 0 without writing when the docs file is missing" {
+  cd "$TEST_TMP"
+  run bash "$BATS_TEST_DIRNAME/../bin/lc-cache-write" tier2 /facebook/react hooks "$TEST_TMP/nonexistent.md"
+  [ "$status" -eq 0 ]
+  local cache_path
+  cache_path=$(_lc_cache_path)
+  [ ! -f "$cache_path" ]
+}
+
+@test "bin/lc-cache-write: unknown subcommand exits 0 silently" {
+  run bash "$BATS_TEST_DIRNAME/../bin/lc-cache-write" bogus a b
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }

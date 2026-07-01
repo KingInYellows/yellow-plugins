@@ -121,32 +121,62 @@ automatically — no separate gating step is required.
   globally: `/plugin install context7@upstash` or via Claude Code MCP
   settings.
 
-## Cache (consumer wiring in this PR; hook shipped in PR #537)
+## Cache (tier1 wired in PR #538; tier2 + runtime writeback closed the loop)
 
-SKILL.md Step 1 now reads the pre-warmed cache via the
+SKILL.md Step 1 reads the pre-warmed cache via the
 `${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup` helper before calling
-`mcp__context7__resolve-library-id`. The helper is provided by
-yellow-research; cross-plugin consumers reach it via the established
-`${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/lc-cache-lookup` path
-pattern and absorb bash exit 127 (yellow-research not installed) into
-the empty-output branch with `2>/dev/null || true`.
+`mcp__context7__resolve-library-id`; Step 2 reads the tier2 cache via
+`${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-lookup-docs` before calling
+`mcp__context7__query-docs`. Both readers are provided by yellow-research;
+cross-plugin consumers reach them via the established
+`${CLAUDE_PLUGIN_ROOT}/../yellow-research/bin/<name>` path pattern and
+absorb bash exit 127 (yellow-research not installed) into the
+empty-output branch with `2>/dev/null || true`.
 
-**Cache shape** (defined by the SessionStart hook in PR #537,
+**Cache shape** (schema defined by the SessionStart hook in PR #537,
 `hooks/lib/context7-cache.sh`):
 
 - Location: `${CLAUDE_PLUGIN_DATA}/context7-cache-<md5_of_project_dir>.json`
 - `tier1`: `library-name → {library_id, fetched_at}` (24h TTL, capped at 5
-  libs pre-warmed per session)
-- `tier2`: `library-id|topic → {docs, fetched_at}` (4h TTL, max 50;
-  reserved for future lazy population on cache miss — not pre-warmed)
+  libs pre-warmed per session; also grows via runtime writeback for
+  libraries outside the pre-warm set)
+- `tier2`: `library-id|topic → {docs, fetched_at}` (4h TTL, max 50 entries,
+  LRU-evicted by `fetched_at`; populated lazily on cache miss, not
+  pre-warmed)
 - `lockfile_fingerprint`: mtimes of detected lockfiles for invalidation
 - `schema: "1"` for forward-compatibility
 
-The `lc-cache-lookup` reader only consults `tier1`; doc-content caching
-(tier2) is reserved for a future round where the skill's Step 2
-(`query-docs`) similarly checks the cache before the MCP call. That round
-also needs to design a cache-write contract for runtime hits (today the
-cache only fills via the SessionStart pre-warm).
+**Runtime writeback (closes the loop).** Both tiers now have a matching
+writer, exposed via `${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write <tier>
+<args...>`:
+
+- `lc-cache-write tier1 <name> <library-id>` — after a live
+  `resolve-library-id` succeeds, writes/refreshes that library's tier1
+  entry. Idempotent: re-writing the same name updates `fetched_at` without
+  duplicating the entry.
+- `lc-cache-write tier2 <library-id> <topic> <docs-file>` — after a live
+  `query-docs` succeeds with a non-empty body, writes the docs body (read
+  from a file path, not argv, to sidestep shell quoting hazards in markdown
+  content) into tier2; an empty body is not written (cache stays a miss).
+  When the cache already holds `_LC_TIER2_MAX_ENTRIES` (50) entries, the
+  write evicts the entry with the oldest `fetched_at` in the same jq pass
+  that performs the upsert.
+
+Both writers re-read the cache file on every call (never a caller-held
+snapshot) to minimize the multi-writer race window, then atomic-mv the
+result — this does not eliminate the window: two concurrent writers can
+still race between their read and their mv, and the later mv wins,
+silently dropping the earlier writer's entry (accepted eventual-consistency
+trade-off; no `flock`). Writes are advisory: a failed writer
+(disk full, permission denied, `jq` missing) is logged to stderr and
+swallowed — the caller's MCP round-trip already succeeded, so a cache
+miss on the write side never blocks the agent. `lc-cache-lookup-docs`
+enforces the tier2 TTL on read; an entry older than 4h returns empty
+(cache miss) even though it still occupies a slot until the next LRU
+eviction pass.
+
+This means the cache is no longer a static SessionStart snapshot: it
+warms with use, including for libraries never in the top-5 pre-warm set.
 
 ## Why a documentation skill, not just frontmatter preload (longer note)
 
