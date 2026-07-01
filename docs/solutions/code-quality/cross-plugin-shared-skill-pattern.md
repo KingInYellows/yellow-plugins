@@ -4,7 +4,7 @@ date: 2026-05-17
 category: code-quality
 track: knowledge
 problem: 'When should cross-plugin shared logic be inlined vs skills: frontmatter vs subagent vs bash lib'
-tags: [cross-plugin, skills, mcp, context7, inline-replication, toolsearch, fallback-chain]
+tags: [cross-plugin, skills, mcp, context7, inline-replication, toolsearch, fallback-chain, rule-13, validate-agent-authoring]
 components: [yellow-core, yellow-research, validate-agent-authoring]
 ---
 
@@ -212,3 +212,80 @@ rg -l 'context7 unavailable — falling back to' plugins/ --type md \
   | grep -v 'library-context/SKILL.md' \
   | grep -v 'library-context/reference.md'
 ```
+
+---
+
+## Update — 2026-07-01
+
+### RULE 13's `library-context` preload exemption is not scoped to the owning plugin (PR #597 review)
+
+`scripts/validate-agent-authoring.js:456-460` implements RULE 13 (context7
+tool consumers must preload `library-context` or carry the inline drift
+sentinel):
+
+```js
+if (
+  !skills.has('library-context') &&
+  !body.includes(LIBRARY_CONTEXT_SENTINEL)
+) {
+  errors.push(/* RULE 13 violation */);
+}
+```
+
+`skills.has('library-context')` alone satisfies the exemption for *any*
+plugin's agent — the check never confirms the agent's own plugin is
+`yellow-research`, the only plugin that actually owns `library-context`. Per
+the "Guidance" section above, `skills:` frontmatter pointing at another
+plugin's skill silently resolves to nothing at runtime. So an agent in a
+different plugin could set `skills: [library-context]`, pass RULE 13 in CI,
+and get a silent no-op at runtime — reproducing failure mode #1 above inside
+the very lint meant to catch it.
+
+correctness-reviewer, adversarial-reviewer, and project-compliance-reviewer
+independently converged on this in the same review pass (PR #597, "add RULE
+13 context7 drift lint"); chatgpt-codex-connector and cubic-dev-ai flagged
+the same gap as PR comments. **Fixed** — landed in PR #597 via
+`gt modify -m "fix: resolve PR #597 review comments"` (commit `3c8f6962`).
+The exemption now requires `pluginName === 'yellow-research'` in addition to
+`skills.has('library-context')`; agents outside `yellow-research` are told
+only the inline sentinel satisfies RULE 13. Verified against both real
+consumers (`code-researcher.md`, same-plugin preload; `best-practices-researcher.md`,
+inline sentinel) and a clean repo-wide `node scripts/validate-agent-authoring.js`
+run post-fix.
+
+qodo-code-review separately flagged that the sentinel `.includes()` check ran
+before stripping HTML comments, so a sentinel phrase quoted only inside a
+`<!-- ... -->` dev note could satisfy the rule with no real fallback
+instruction in the agent's live body. **Also fixed** in the same commit —
+`body.replace(/<!--[\s\S]*?-->/g, '')` now runs before the sentinel match.
+
+gemini-code-assist separately suggested replacing the exact `CONTEXT7_TOOLS`
+Set match with a `mcp__context7__` prefix match for forward-compatibility.
+**Declined by design** (see PR #597 thread reply) — the exact-match strictness
+is intentional (catches ASCII-dash-style corruption rather than silently
+accepting it) and only 2 real consumers exist today, both enumerated.
+
+**Test suite previously locked the bug in, not just missed it.**
+`tests/integration/validate-agent-authoring-context7-rule.test.ts`'s
+`PRELOAD_EXEMPT` fixture wrote to `demo/agents/research/agent.md` — plugin
+name resolved to `demo`, not `yellow-research` — so the fixture asserting
+PASS actually exercised the cross-plugin (buggy) case, not the same-plugin
+(correct) case its comment claimed to cover. **Fixed**: the fixture now
+writes to a `yellow-research/`-rooted path for the PASS case, plus a new FAIL
+case proving the same fixture at a non-`yellow-research` path is correctly
+rejected, and a new FAIL fixture proving an HTML-comment-only sentinel is
+rejected. 8/8 tests green post-fix.
+
+### Sibling docs still describe RULE 13 as future/deferred
+
+`plugins/yellow-research/skills/library-context/SKILL.md:196` and
+`plugins/yellow-research/CLAUDE.md:121` still read "future RULE 13 drift
+lint grep" / "future RULE 13 grep" as of this review — stale, since PR #597
+flips RULE 13 to shipped and CI-enforced inside `reference.md` (which
+already says "RULE 13 lint (shipped)") and `validate-agent-authoring.js`
+itself. Neither file was touched by the PR's diff (four reviewers flagged
+this: code-simplicity, project-compliance, maintainability,
+comment-analyzer). **Still stale as of this writing** — the fix was routed
+to a follow-up commit, not applied inline. When next touching
+`library-context`, grep for `future RULE 13` before trusting either file's
+RULE 13 description.
