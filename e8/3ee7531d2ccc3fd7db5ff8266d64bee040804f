@@ -1,0 +1,21 @@
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_212adc2508532d::t_6ee814addb6eb4 1-168
+plugins/yellow-core/skills/create-agent-skills/SKILL.md
+  s_212adc2508532d::t_b0b182081052d3 245-262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "e83ee7531d2ccc3fd7db5ff8266d64bee040804f",
+  "prompts": {},
+  "sessions": {
+    "s_212adc2508532d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "558412b5-abbb-4def-87b5-ef0eb4e2e1fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
