@@ -26,6 +26,12 @@ Record PASS/FAIL per row. Any FAIL means the stub wording needs
 strengthening (unconditional imperative, exact path, failure mode named)
 — not that the split should be reverted.
 
+Later tiers append companion rows (suffixed "(C9 companion)" etc.) for
+other agent behaviors CI likewise cannot observe. Those rows verify
+their own mechanism, not stub-firing — the Skip/Stop taxonomy and the
+"strengthen the stub wording" remedy above apply only to the
+stub-firing rows.
+
 ## Checklist
 
 ### yellow-core / optimize
@@ -92,10 +98,19 @@ strengthening (unconditional imperative, exact path, failure mode named)
       flipped to `- [x]` in the plan file in the same loop iteration as
       its TaskUpdate (Phase 2 step 1k writeback). Then kill the session,
       start a FRESH session, re-run `/workflows:work` on the same plan,
-      and verify it announces resume mode and starts from the first
-      unchecked box without re-executing completed steps (Phase 2 step 0).
+      and verify it announces resume mode, marks the already-done steps'
+      tasks completed in TaskList, and starts from the first unchecked
+      box without re-executing completed steps (Phase 2 step 0).
+- [ ] Re-run `/workflows:work` on a plan whose every task checkbox is
+      already `- [x]`. Verify it announces the plan is already complete
+      and proceeds directly to Phase 3 without re-executing any step.
+- [ ] Run `/workflows:work` on a plan whose implementation section is
+      fully ticked but which carries a separate unchecked checklist
+      section (e.g. `### Manual Testing Checklist`). Verify step 0 does
+      NOT treat those checklist items as the resume target.
 - [ ] Run `/workflows:work` on a prose-only plan (no task checkboxes) and
-      verify both the writeback and the resume check are silent no-ops.
+      verify the resume check announces "resume unavailable — running
+      all steps" and the writeback is a silent no-op.
 
 ### yellow-council / council-patterns (no stub-firing test)
 
