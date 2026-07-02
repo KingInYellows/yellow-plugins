@@ -1,0 +1,41 @@
+docs/testing/c6-progressive-disclosure-stub-firing-checklist.md
+  s_d5d2c44e4908a4::t_76950cdb48f5fd 3-9
+plugins/yellow-core/skills/compound-lifecycle/references/scoring-and-clustering.md
+  s_d5d2c44e4908a4::t_efdbeb12f882e5 90
+.changeset/c6-progressive-disclosure.md
+  s_d5d2c44e4908a4::t_7c015ecfe71e92 7
+AGENTS.md
+  s_d5d2c44e4908a4::t_7ef93444590e24 263-269
+plugins/yellow-core/commands/workflows/work.md
+  s_d5d2c44e4908a4::t_3bf4ab88252930 772-775,777-779
+plugins/yellow-core/references/setup-all/credential-status-and-version-drift.md
+  s_d5d2c44e4908a4::t_e4621af6ed4ac0 83
+plugins/yellow-review/commands/review/review-pr.md
+  s_d5d2c44e4908a4::t_af16397c63f274 386-388
+  s_d5d2c44e4908a4::t_235ea6c03ebefe 745-751
+plugins/yellow-review/commands/review/review-all.md
+  s_d5d2c44e4908a4::t_c35e0e46747669 90-94
+plugins/yellow-core/commands/setup/all.md
+  s_d5d2c44e4908a4::t_1628b7edcc1254 324-326
+  s_d5d2c44e4908a4::t_7d179ff40e69d3 7
+plugins/yellow-core/skills/optimize/references/judge-protocol.md
+  s_d5d2c44e4908a4::t_0fa4aff6465127 36-38
+plugins/yellow-review/references/review-pr/legacy-fallback.md
+  s_d5d2c44e4908a4::t_8d1f220c46a13b 5-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "52e53f626905641404d226ab7bfb7a509ba84b19",
+  "prompts": {},
+  "sessions": {
+    "s_d5d2c44e4908a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f268b926-dc94-480b-9c0e-d6e980fdf385",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

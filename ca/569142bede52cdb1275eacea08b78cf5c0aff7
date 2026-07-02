@@ -3,19 +3,20 @@ CLAUDE.md
 tests/integration/validate-agent-authoring-skill-rules.test.ts
   s_d5d2c44e4908a4::t_fde0f19886ce32 18-22
   s_06f6e84be5c507::t_4f2a73a55b21f1 306-310
-  s_d5d2c44e4908a4::t_3086eda222a826 291-305,311-336
+  s_d5d2c44e4908a4::t_3086eda222a826 291-305,291-336,311-336
   s_d5d2c44e4908a4::t_079f82814ef7e5 75-136
 plans/tier-2-structural-optimizations.md
   s_d5d2c44e4908a4::t_0d70960ecd605a 161-164
 scripts/validate-agent-authoring.js
   s_d5d2c44e4908a4::t_48b834be56a634 761-764
   s_d5d2c44e4908a4::t_44d0daaa7b07c3 131-138,140-141
-  s_d5d2c44e4908a4::t_adcc08231f7859 799-813
+  s_d5d2c44e4908a4::t_adcc08231f7859 797-813,799-813
   s_20a9c2bc8059f0::t_c745bc1eaf7c6b 855
   s_20a9c2bc8059f0::t_d1426c7e969a57 797-798
   s_d5d2c44e4908a4::t_d863d4d4f31675 751-753,755
   s_06f6e84be5c507::t_0247aba247277b 781-784
-  s_d5d2c44e4908a4::t_167bc1522130eb 778-780,786
+  s_d5d2c44e4908a4::t_167bc1522130eb 778-780,778-784,786
+  s_d5d2c44e4908a4::t_19b63e76c11699 855
 ---
 {
   "schema_version": "authorship/3.0.0",
