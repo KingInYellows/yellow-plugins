@@ -1,5 +1,11 @@
 # yellow-mempalace
 
+> **Status: deprecated pending removal** (maintainer decision
+> 2026-07-01, recorded in `docs/memory-routing-protocol.md`).
+> yellow-ruvector is the standard memory system — generic memory
+> capture and recall route there. Explicit `/mempalace:*` commands keep
+> working until the removal follow-up lands.
+
 Structured long-term memory with temporal knowledge graph via
 [MemPalace](https://github.com/milla-jovovich/mempalace).
 

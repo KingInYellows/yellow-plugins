@@ -25,7 +25,10 @@ explicit commands keep working.
 Rationale (from the decision discussion): the two systems are redundant
 for the core capture/recall loop, and the repo's infrastructure has
 already standardized on ruvector — ~10 command surfaces consume its
-recall/remember protocol (drift-linted as of RULE 16), hooks capture
+recall/remember protocol (RULE 16 drift-lints the protocol's canonical
+SKILL.md copies in CI; the consuming command files only paraphrase
+those constants in prose and aren't covered by that automated check —
+they get occasional manual-sweep review instead), hooks capture
 automatically, and nothing consumes mempalace content. mempalace's
 unique value (knowledge-graph triples, spatial taxonomy) is unused by
 any workflow.
@@ -35,7 +38,7 @@ any workflow.
 | Trigger phrase | Routes to | Notes |
 |----------------|-----------|-------|
 | "remember this", "save this pattern", "record this mistake", "don't forget X" | `/ruvector:learn` (user-invoked) / `ruvector-memory-manager` (agent-invoked) | The command is the user surface; the agent serves other agents' memory needs |
-| "record a decision", "add a fact", "save a memory" | yellow-ruvector (same surfaces as above) | Previously also claimed by mempalace's `memory-archivist` — narrowed by this decision |
+| "record a decision", "add a fact", "save a memory" | yellow-ruvector (same surfaces as above) | Previously claimed by mempalace's `memory-archivist` — narrowed by this decision; `/ruvector:learn`'s description now claims these phrases explicitly so they don't route nowhere |
 | "what do we know about X", "show memories", "list learnings" | `/ruvector:memory` | Cross-reference with `/mempalace:search` shipped in Tier 1 C2; superseded by this decision (ruvector is now the default for generic recall) |
 | "browse the palace", "show wings", `/mempalace:*` | yellow-mempalace | Explicit invocation only — deprecated pending removal |
 | MEMORY.md auto-memory pipeline | `staging-promoter` (background compounding) | Trigger-free; not part of this routing decision |
@@ -49,7 +52,11 @@ commands until the removal plan handles migration/export.
 ## Follow-up (out of scope here)
 
 A separate plan item covers: deprecation notice in the marketplace
-listing, palace-data export path, removal from
-`.claude-plugin/marketplace.json` + `plugins/yellow-core/commands/setup/all.md`
-(both must change together — `validate-setup-all.js`), and deletion of
-`plugins/yellow-mempalace/`.
+listing and `plugins/yellow-mempalace/.claude-plugin/plugin.json`
+description, palace-data export path, removal from
+`.claude-plugin/marketplace.json` +
+`plugins/yellow-core/commands/setup/all.md` (both must change together
+— `scripts/validate-setup-all.js`), deletion of
+`plugins/yellow-mempalace/`, and cleanup of the remaining explicit
+cross-references (e.g. `/ruvector:memory`'s palace pointer, the
+`/mempalace:mine` vs `/ruvector:index` "indexing" trigger overlap).

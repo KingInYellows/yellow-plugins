@@ -39,7 +39,7 @@ assistant: "I'll invalidate the old Redis fact and add the new caching approach.
 
 <example>
 Context: User wants to record a learning from the current session.
-user: "Write a diary entry about fixing the auth migration"
+user: "Write a palace diary entry about fixing the auth migration"
 assistant: "I'll write a diary entry capturing the session context."
 <commentary>Diary entries preserve session-level context for future recall.</commentary>
 </example>
@@ -51,13 +51,15 @@ Organize and file new memories into the MemPalace.
 
 ## When to Use
 
-Trigger when the user wants to:
+Trigger ONLY when the user explicitly invokes mempalace — a
+`/mempalace:*` command or naming the palace/knowledge graph. Generic
+"remember this" / "record a decision" / "add a fact" requests route to
+yellow-ruvector (`docs/memory-routing-protocol.md`). Explicit examples:
 
-- Save a memory ("save this to the palace", "file this memory")
-- Record a decision ("record that we chose GraphQL over REST")
+- Save to the palace ("save this to the palace", "file this memory in the palace")
 - Add a fact to the knowledge graph ("add to KG: auth uses JWT")
-- Update or invalidate a fact ("we stopped using Redis")
-- Write a diary entry ("write to diary")
+- Update or invalidate a KG fact ("invalidate in the KG: we stopped using Redis")
+- Write a diary entry in the palace ("write a palace diary entry", "add a diary entry to the palace")
 
 ## Workflow
 

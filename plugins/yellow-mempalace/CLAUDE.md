@@ -62,23 +62,29 @@ with semantic search and a temporal knowledge graph for entity relationships.
 
 ## When to Use What
 
+All rows below are explicit-invocation-only per the deprecation banner
+at the top of this file — generic memory phrasing routes to
+yellow-ruvector (`docs/memory-routing-protocol.md`).
+
 | Task | Tool | When |
 |------|------|------|
 | First install | `/mempalace:setup` | After installing plugin or on MCP errors |
 | Check palace health | `/mempalace:status` | Verify initialization, see overview |
-| Find past decisions | `/mempalace:search` | Recall verbatim content by meaning |
+| Search the palace | `/mempalace:search` | Explicitly searching palace content (generic recall → `/ruvector:memory`) |
 | Import content | `/mempalace:mine` | First-time indexing or new content |
-| Entity relationships | `/mempalace:kg` | "Who works on what?", "What changed?" |
+| Entity relationships | `/mempalace:kg` | Explicit knowledge-graph queries ("Who works on what?", "What changed?") |
 | Browse structure | `/mempalace:navigate` | Explore wings, rooms, tunnels |
-| File a memory | `memory-archivist` agent | Save decisions, facts, discoveries |
-| Explore connections | `palace-navigator` agent | Find cross-wing relationships |
+| File to the palace | `memory-archivist` agent | Explicit palace/KG filing (generic save/record → yellow-ruvector) |
+| Explore connections | `palace-navigator` agent | Cross-wing relationships within the palace |
 
 ## Cross-Plugin Notes
 
-- **Complements yellow-ruvector**: ruvector handles real-time coding intelligence
-  (passive capture, per-prompt injection, semantic code search). mempalace
-  handles long-term verbatim recall ("what did we decide 3 months ago?").
-  No hook conflicts — different lifecycle events.
+- **Superseded by yellow-ruvector** (maintainer decision 2026-07-01,
+  `docs/memory-routing-protocol.md`): ruvector is the standard memory
+  system for capture and recall. mempalace's palace/knowledge-graph
+  data stays readable via explicit `/mempalace:*` commands until the
+  removal follow-up handles migration/export. No hook conflicts —
+  mempalace ships no hooks.
 - **No hooks in v1.0.0**: Hooks deferred pending upstream security fixes
   (#110, SESSION_ID injection). All integration is MCP-only.
 
