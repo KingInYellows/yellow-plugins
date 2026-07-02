@@ -1,6 +1,6 @@
 ---
 name: mempalace:search
-description: "Search palace memories by semantic similarity with optional wing or room filter. Use when recalling past decisions, facts, or context. For per-project learned patterns and reflexions, use /ruvector:memory."
+description: "Search palace memories by semantic similarity with optional wing or room filter. Use only when the user explicitly asks to search the palace; generic recall requests (\"what do we know about X\") route to /ruvector:memory per docs/memory-routing-protocol.md."
 argument-hint: '<query> [--wing <wing>] [--room <room>]'
 allowed-tools:
   - ToolSearch
