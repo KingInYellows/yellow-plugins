@@ -1,5 +1,88 @@
 # Changelog
 
+## 1.22.2
+
+### Patch Changes
+
+- [#605](https://github.com/KingInYellows/yellow-plugins/pull/605)
+  [`ff312b4`](https://github.com/KingInYellows/yellow-plugins/commit/ff312b4baec6d207a09ac47f7c7370754ae25035)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  Progressive-disclosure splits (Tier 2 C6): move conditional and late-sequence
+  detail out of oversized skill and command files into `references/` files
+  behind imperative load stubs, verbatim (except positional cross-reference
+  words like "above"/"below" corrected for the new file locations, and the
+  review-pr Steps 9a/9b top-level skip-gate merged into one provably-equivalent
+  condition).
+  - `yellow-core/skills/optimize/SKILL.md` 461 → 297 lines (judge protocol,
+    pagination layouts, failure modes, design rationale → `references/`)
+  - `yellow-core/skills/compound-lifecycle/SKILL.md` 414 → 291 lines
+    (staleness/clustering formulas + config keys, report template, archive
+    rationale → `references/`)
+  - `yellow-council/skills/council-patterns/SKILL.md`: only the non-executed
+    Cross-References provenance bullets move (grep-confirmed unconsumed); every
+    runtime-load-bearing preloaded section stays inline
+  - New command-file pattern (no prior precedent): `/review:pr` legacy
+    fallback + Steps 9a/9b, `/workflows:work` Graphite cheat-sheet, and
+    `/setup:all` Steps 1.6/1.7 move to plugin-local `references/` dirs loaded
+    via `${CLAUDE_PLUGIN_ROOT}` stubs at their branch points
+  - Manual stub-firing e2e checklist at
+    `docs/testing/c6-progressive-disclosure-stub-firing-checklist.md`; stale
+    provenance comment in `debugging/SKILL.md` corrected
+
+- [#606](https://github.com/KingInYellows/yellow-plugins/pull/606)
+  [`3c54894`](https://github.com/KingInYellows/yellow-plugins/commit/3c54894cc7aa8495cd7743e6109ce600b91811ee)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Memory-protocol
+  drift control (Tier 2 C7): declare yellow-ruvector's `memory-query` skill the
+  canonical home of the ruvector protocol constants and put the duplicated
+  copies under a CI drift lint.
+  - `memory-query/SKILL.md` gains a Canonical Source header; yellow-core's
+    `memory-recall-pattern`, `memory-remember-pattern`, and
+    `mcp-integration-patterns` are marked replicas (their old self-canonical
+    "Design reference" blockquotes rewritten)
+  - A single ASCII sentinel line carrying the constants (recall top_k=5 / score
+    < 0.5 / top-3 / 800-char truncation / dedup top_k=1 / 0.82) is
+    byte-identical in all four files
+  - New RULE 16 in `scripts/validate-agent-authoring.js` fails CI when the
+    sentinel line diverges in any copy, a declared file lacks the sentinel or is
+    missing entirely, or an undeclared plugins/ file carries one (containment);
+    the surrounding prose restatements of the constants remain a manual sweep
+  - The ~10 consuming command files are documented as out of CI scope
+    (context-adapted paraphrases), with two divergences recorded:
+    `ruvector/search.md` top_k=10 (intentional) and `ruvector/learn.md` missing
+    dedup (open maintainer question, not silently fixed)
+
+- [#608](https://github.com/KingInYellows/yellow-plugins/pull/608)
+  [`da962f3`](https://github.com/KingInYellows/yellow-plugins/commit/da962f3056d784cc1a9276fed839eabf990881a0)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Document the
+  shared scope/mode interfaces in `docs/plugin-scope-mode-protocol.md` (Tier 2
+  C8) and add conforms-to cross-references (with an update-in-same-PR
+  obligation) in the five surface files (`review-pr.md`, `resolve-pr.md`,
+  `review-all.md`, `compound.md`, `workflows/review.md`). Docs-only: the doc
+  records CURRENT behavior (`--non-interactive` contract + forwarders,
+  `--in-pr`, the debt-scanner file interface (plain-text scope files in, JSON
+  findings out), `/workflows:review` positional-type dispatch, `/review:all`
+  scope keywords, and turbo's diff-vs-file scope as a RECOMMENDED
+  not-yet-uniform convention); no logic changes, and unifying divergent
+  semantics is recorded as an explicit non-goal.
+
+- [#607](https://github.com/KingInYellows/yellow-plugins/pull/607)
+  [`ef1094d`](https://github.com/KingInYellows/yellow-plugins/commit/ef1094d80f059e2fd72fdb1ed61ecc3d00304d74)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! -
+  Session-survivable execution state for non-stack `/workflows:work` runs (Tier
+  2 C9): Phase 2 gains an entry resume check (read the plan's task-list section;
+  announce resume mode, reconcile TaskList state for already-`[x]` steps, check
+  `git log` for commit evidence before re-running the first unchecked step, and
+  skip straight to Phase 3 when every box is already ticked) and a per-step
+  writeback (step 1k ticks the step's own checkbox in the same loop iteration as
+  its TaskUpdate, with uniqueness-anchored Edit targeting, read-back
+  verification of the intended line, and stop-and-ask escalation after 2
+  consecutive writeback failures). No parallel `## Progress` section is
+  introduced — the plan's existing checkboxes are the single progress surface,
+  keeping `validate-plans.js` and `/plan:complete` Gate A semantics unchanged. A
+  granularity guard requires task-tracking entries to match plan checkboxes
+  one-to-one. Prose-only plans (no checkboxes) degrade to the previous behavior
+  with an explicit resume-unavailable notice.
+
 ## 1.22.1
 
 ### Patch Changes
