@@ -1,0 +1,27 @@
+plugins/yellow-mempalace/CLAUDE.md
+  s_20a9c2bc8059f0::t_81ca45d5c51222 3-10
+plugins/yellow-mempalace/commands/mempalace/search.md
+  s_20a9c2bc8059f0::t_41412ceaa25848 3
+plugins/yellow-mempalace/agents/mempalace/memory-archivist.md
+  s_20a9c2bc8059f0::t_41412ceaa25848 3
+.changeset/c11-memory-routing-decision.md
+  s_20a9c2bc8059f0::t_81ca45d5c51222 1-5
+docs/memory-routing-protocol.md
+  s_20a9c2bc8059f0::t_d1043cb8bcb154 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "30d7df0d1bab1a0b12c97fb4d65a93a6fbc4c22d",
+  "prompts": {},
+  "sessions": {
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
