@@ -769,28 +769,9 @@ step 5. Phase 4 becomes a summary phase:
 
 ## Common Graphite Commands
 
-```bash
-# Create new branch
-gt create feature-name
-
-# Make a commit
-gt modify -m "feat: message"
-
-# View stack
-gt log short
-
-# Sync with trunk
-gt sync
-
-# Rebase stack
-gt upstack restack
-
-# Submit PR(s)
-gt submit --no-interactive
-
-# Amend last commit
-gt commit amend -m "new message"
-
-# Continue after fixing conflicts
-gt continue
-```
+When you need a `gt` invocation not already spelled out in the phases
+above (branch creation, commit, stack view, sync, restack, submit, amend,
+conflict continue), Read
+`${CLAUDE_PLUGIN_ROOT}/references/workflows-work/graphite-command-reference.md`
+for the exact command forms. Do not guess `gt` syntax from memory —
+several subcommands are deprecated aliases and improvised flags fail.
