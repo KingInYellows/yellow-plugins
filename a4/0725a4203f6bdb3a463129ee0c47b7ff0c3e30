@@ -1,0 +1,25 @@
+plans/tier-1-optimization-quick-wins.md
+  s_321698acdb7b31::t_bb3e05511e7982 5
+plugins/yellow-review/commands/review/review-pr.md
+  s_321698acdb7b31::t_3753fa95489586 416-419
+plugins/yellow-core/skills/create-agent-skills/SKILL.md
+  s_321698acdb7b31::t_eecb108a91133e 251
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_321698acdb7b31::t_8cf547dcdc6428 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "a40725a4203f6bdb3a463129ee0c47b7ff0c3e30",
+  "prompts": {},
+  "sessions": {
+    "s_321698acdb7b31": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5454cd44-5123-4d44-b4c0-e61d75bc0152",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
