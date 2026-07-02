@@ -183,7 +183,9 @@ assurance.
    task or split one box across several tasks: a mismatch strands boxes
    half-ticked and breaks the resume check (Phase 2 step 0). This is the
    task-tracking-entry granularity rule ("body steps should match task
-   tracking entries one-to-one", turbo SKILL-CONVENTIONS). The step
+   tracking entries one-to-one" — external turbo SKILL-CONVENTIONS
+   guidance, captured in-repo in
+   `plans/tier-2-structural-optimizations.md` item E.3). The step
    citations above are the non-stack mechanism; stack mode enforces the
    same one-to-one principle via Phase 1b step 2's per-item task
    filtering and step 6's `## Stack Progress` writeback.
@@ -306,10 +308,14 @@ Phase 3 (Quality Check) in stack summary mode.
 
 **Steps:**
 
-0. **Plan resume check (entry step):** Read the plan file, scoping this
-   check to the section the Phase 1 step 6 task list was derived from
-   (e.g. `## Implementation Plan`). Other checkbox lists elsewhere in
-   the plan (acceptance criteria, manual testing checklists) are NOT
+0. **Plan resume check (entry step, non-stack runs only):** when a
+   stack item enters this phase via Phase 1b step 3, skip this step —
+   stack items resume via `## Stack Progress` (Phase 1b steps 5-7), and
+   running this check there would misread stack rows as task boxes.
+   Otherwise: Read the plan file, scoping this check to the section the
+   Phase 1 step 6 task list was derived from (e.g.
+   `## Implementation Plan`). Other checkbox lists elsewhere in the
+   plan (acceptance criteria, manual testing checklists) are NOT
    execution steps — ignore them here and in step 1k. Then branch:
 
    - **No task checkboxes in that section** (prose-only steps, authored
@@ -317,11 +323,20 @@ Phase 3 (Quality Check) in stack summary mode.
      per-step checkboxes; resume unavailable — running all steps," and
      run all tasks normally. The per-step writeback in step 1k below is
      then a no-op.
-   - **Every box already ticked (`- [x]`):** announce that the plan is
-     already complete and skip Phase 2 entirely — proceed directly to
-     Phase 3 (Quality Check), mirroring Phase 1b's exit condition. Do
-     not re-execute anything unless the user explicitly asks for a
-     re-run.
+   - **No boxes ticked yet (`0` of `M` complete):** a fresh plan — run
+     all tasks normally from the top, the same as before per-step
+     writeback existed. Do not announce resume mode; this is the
+     ordinary (non-resume) execution path.
+   - **Every box already ticked (`- [x]`):** a prior session finished
+     writing back every box but died before reaching Phase 3. Before
+     skipping: iterate the task entries created in Phase 1 step 6 for
+     this plan's steps and mark each completed
+     (`TaskUpdate: {status: "completed"}`), mirroring the "Some boxes
+     ticked" branch below, so the tracker matches the plan file. Then
+     announce that the plan is already complete and skip Phase 2
+     entirely — proceed directly to Phase 3 (Quality Check), mirroring
+     Phase 1b's exit condition. Do not re-execute anything unless the
+     user explicitly asks for a re-run.
    - **Some boxes ticked:** announce resume mode — "Resuming <plan>:
      N of M steps already complete — skipping them." If the section's
      total box count does not match the Phase 1 task-list count, warn
@@ -329,12 +344,16 @@ Phase 3 (Quality Check) in stack summary mode.
      task entries for the already-ticked boxes completed
      (`TaskUpdate: {status: "completed"}`) so the tracker matches the
      plan file, then start execution from the FIRST unchecked (`- [ ]`)
-     box. Before re-executing that first unchecked step, check
-     `git log` for commit evidence that it already ran — a session can
-     die after step 1i's commit and step 1j's TaskUpdate but before
-     step 1k's writeback, leaving a committed step's box unticked. If
-     its commit exists, tick the box, mark its task completed, and move
-     to the next unchecked box instead of redoing the work.
+     box — and run the loop over unchecked boxes ONLY, skipping each
+     already-ticked box individually. Completed work is not guaranteed
+     to be a contiguous prefix: a failed step-1k writeback leaves an
+     earlier box unticked while later boxes are ticked. Before
+     re-executing any unchecked step, check `git log` for commit
+     evidence that it already ran — a session can die after step 1i's
+     commit and step 1j's TaskUpdate but before step 1k's writeback,
+     leaving a committed step's box unticked. If its commit exists,
+     tick the box, mark its task completed, and move to the next
+     unchecked box instead of redoing the work.
 
    Do not re-execute completed steps. This borrows the stack path's
    principle of re-deriving progress from the plan file rather than
