@@ -27,6 +27,10 @@ fixes, mark threads resolved, and push via Graphite.
 
 ### Step 1: Resolve PR Number and Parse Flags
 
+The `--non-interactive` flag contract below conforms to Interface 1 of
+`docs/plugin-scope-mode-protocol.md` (this file is a definition site);
+update that doc in the same PR if this contract changes.
+
 Split `$ARGUMENTS` on whitespace into tokens.
 
 1. **Flag token**: if any token is exactly `--non-interactive`, set
