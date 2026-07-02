@@ -137,39 +137,54 @@ const MODEL_RULE_ALLOWLIST = new Set([
 // Every file below must carry the sentinel line byte-identically (same
 // mechanism as RULE 13: exact-substring match so any corruption — a
 // changed constant, a reflowed line, a smart-quote substitution — fails
-// loudly), and NO other file under plugins/ may carry it (containment:
-// an undeclared copy would drift invisibly, which is exactly the failure
+// loudly), and no other markdown file under plugins/ (CHANGELOG.md
+// excluded, matching the shared markdownFiles walk) may carry it
+// (containment: an undeclared copy would drift invisibly — the failure
 // mode this rule exists to close — and an explicit closed file list
 // avoids RULE 13's original exemption-scoping bug, where a membership
 // check without a plugin-ownership check let cross-plugin files pass;
 // see PR #597 / commit 3c8f6962).
 //
-// The ~10 consuming COMMAND files listed in the replicas' blockquotes
-// (brainstorm.md, plan.md, compound.md, work.md, review-pr.md plus its
+// The consuming COMMAND files listed in the replicas' blockquotes
+// (recall consumers: brainstorm.md, plan.md, spec.md, workflows/review.md,
+// compound.md, work.md, review-pr.md plus its
 // references/review-pr/knowledge-compounding.md, resolve-pr.md,
-// review-all.md, ruvector/search.md, ruvector/memory.md,
-// ruvector/learn.md) are deliberately OUT of RULE 16's CI scope: they
-// inline context-adapted paraphrases (different step numbering, query
-// sources, error handlers), not sentinel copies, so byte-identity is not
-// enforceable there. Two known divergences are documented in the replica
-// blockquotes rather than linted: ruvector/search.md uses top_k=10
-// (intentional — user-facing search breadth, not the recall-before-act
-// protocol) and ruvector/learn.md carries no protocol constants at all
-// (missing the dedup check its purpose implies — flagged as a maintainer
-// question in the C7 PR, not silently "fixed").
+// review-all.md, ruvector/search.md, ruvector/memory.md; remember
+// consumers: compound.md, work.md, workflows/review.md, review-pr.md,
+// review-all.md) are exempt from the byte-identity check (1): they inline
+// context-adapted paraphrases (different step numbering, query sources,
+// error handlers), not sentinel copies, so byte-identity is not
+// enforceable there. They are still inside the containment scan (2) like
+// every other plugins/ markdown file. Two known divergences are
+// documented in the replica blockquotes rather than linted:
+// ruvector/search.md uses top_k=10 (intentional — user-facing search
+// breadth, not the recall-before-act protocol) and ruvector/learn.md
+// carries no protocol constants at all (missing the dedup check its
+// purpose implies — flagged as a maintainer question in the C7 PR, not
+// silently "fixed").
 //
 // Sentinel design: single line, ASCII only (RULE 13's em-dash sentinel
-// corruption incidents motivated avoiding non-ASCII here). Files absent
-// from the tree are skipped (fixture trees; same posture as RULE 14),
-// which also lets the red/green test desync one parameter in one fixture
-// replica and watch the rule fire.
+// corruption incidents motivated avoiding non-ASCII here). Each sentinel
+// is preceded by a `<!-- prettier-ignore -->` comment in its file —
+// .prettierrc's `proseWrap: always` + `printWidth: 80` for *.md would
+// otherwise rewrap the ~160-char line and break the exact-substring
+// match in all copies at once. Files absent from the tree are skipped
+// ONLY in fixture runs (VALIDATE_PLUGINS_DIR set); in a production run a
+// missing declared file is a hard error — otherwise deleting or renaming
+// the canonical source (or any replica) would silently disable its own
+// check while CI stays green.
 const MEMORY_PROTOCOL_SENTINEL =
   'ruvector-protocol-constants v1: recall top_k=5, discard score < 0.5, ' +
   'keep top 3, truncate 800 chars at word boundary; dedup top_k=1, skip ' +
   'if score > 0.82.';
-// Plugins-relative POSIX paths. First entry is the canonical source.
+// Plugins-relative POSIX path of the canonical source (bound explicitly,
+// not by array position, so a reorder of the list below cannot silently
+// repoint the error-message hint at a replica).
+const MEMORY_PROTOCOL_CANONICAL_FILE =
+  'yellow-ruvector/skills/memory-query/SKILL.md';
+// Plugins-relative POSIX paths: canonical source + the three replicas.
 const MEMORY_PROTOCOL_SENTINEL_FILES = [
-  'yellow-ruvector/skills/memory-query/SKILL.md',
+  MEMORY_PROTOCOL_CANONICAL_FILE,
   'yellow-core/skills/memory-recall-pattern/SKILL.md',
   'yellow-core/skills/memory-remember-pattern/SKILL.md',
   'yellow-core/skills/mcp-integration-patterns/SKILL.md',
@@ -807,29 +822,46 @@ function validateCommandFiles(commandFiles, errors) {
 // The containment check matches on the version-less prefix deliberately:
 // a stray `ruvector-protocol-constants v2:` line must be caught too.
 function validateMemoryProtocolSentinel(markdownFiles, errors) {
-  const declared = new Set(
-    MEMORY_PROTOCOL_SENTINEL_FILES.map((rel) =>
-      path.join(PLUGINS_DIR, ...rel.split('/'))
-    )
+  // Compute the declared absolute paths once; the Set serves the
+  // containment loop, the array serves the declared-file loop.
+  const declaredPaths = MEMORY_PROTOCOL_SENTINEL_FILES.map((rel) =>
+    path.join(PLUGINS_DIR, ...rel.split('/'))
   );
+  const declared = new Set(declaredPaths);
+  // Fixture runs (VALIDATE_PLUGINS_DIR set) write only the declared files
+  // a given test exercises, so absence is expected there. In a production
+  // run every declared file must exist — a deleted/renamed canonical or
+  // replica must not silently disable its own check.
+  const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
+  const strict =
+    !fixtureRun || process.env.VALIDATE_SENTINEL_STRICT === '1';
 
-  for (const rel of MEMORY_PROTOCOL_SENTINEL_FILES) {
-    const filePath = path.join(PLUGINS_DIR, ...rel.split('/'));
+  for (const filePath of declaredPaths) {
     if (!fs.existsSync(filePath)) {
-      // File not present in this tree (fixture runs) — the file itself is
-      // what's checked, not its absence. Same posture as RULE 14.
+      if (strict) {
+        errors.push(
+          `${relative(filePath)}: RULE 16 — declared sentinel file is ` +
+            `missing. Every file in MEMORY_PROTOCOL_SENTINEL_FILES ` +
+            `(scripts/validate-agent-authoring.js) must exist; if this ` +
+            `file was intentionally moved or removed, update the list ` +
+            `(and the canonical/replica blockquotes) in the same commit.`
+        );
+      }
       continue;
     }
     const content = fs.readFileSync(filePath, 'utf8');
     if (!content.includes(MEMORY_PROTOCOL_SENTINEL)) {
       errors.push(
         `${relative(filePath)}: RULE 16 — missing or corrupted memory-` +
-          `protocol sentinel. The file is a declared copy of the ruvector ` +
-          `protocol constants and must contain this exact line: ` +
-          `"${MEMORY_PROTOCOL_SENTINEL}" (canonical source: ` +
-          `plugins/${MEMORY_PROTOCOL_SENTINEL_FILES[0]}). A partial match ` +
-          `means a constant was changed in one copy only — sync all ` +
-          `copies and the validator constant in the same commit.`
+          `protocol sentinel. This declared sentinel file must contain ` +
+          `this exact line: "${MEMORY_PROTOCOL_SENTINEL}" (canonical ` +
+          `source: plugins/${MEMORY_PROTOCOL_CANONICAL_FILE}). A partial ` +
+          `match means a constant was changed in one copy only — update ` +
+          `MEMORY_PROTOCOL_SENTINEL and every file in ` +
+          `MEMORY_PROTOCOL_SENTINEL_FILES (scripts/validate-agent-` +
+          `authoring.js: ${MEMORY_PROTOCOL_SENTINEL_FILES.join(', ')}) ` +
+          `in the same commit, then sweep the consuming command files ` +
+          `listed in the replica blockquotes.`
       );
     }
   }
@@ -842,8 +874,10 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
         `${relative(filePath)}: RULE 16 — undeclared copy of the memory-` +
           `protocol sentinel. Only the files in ` +
           `MEMORY_PROTOCOL_SENTINEL_FILES (scripts/validate-agent-` +
-          `authoring.js) may carry it; add this file to the list (and ` +
-          `keep the sentinel byte-identical) or remove the line.`
+          `authoring.js) may carry it. If this file is a deliberate new ` +
+          `replica of the canonical protocol, add it to the list and ` +
+          `keep the sentinel byte-identical; otherwise remove the line ` +
+          `and paraphrase the constants instead.`
       );
     }
   }

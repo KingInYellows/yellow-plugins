@@ -31,22 +31,32 @@ handle their own context seeding.
 > replica, kept inline because cross-plugin `skills:` preload is
 > unavailable (claude-code#15944). The RULE 16 drift lint in
 > `scripts/validate-agent-authoring.js` enforces the sentinel line below
-> byte-for-byte across the canonical file and all replicas. To change a
-> constant, start at the canonical file — never edit a replica alone.
+> byte-for-byte across the canonical file and all replicas. RULE 16
+> checks ONLY the sentinel line — the Execution steps below restate the
+> same constants and must be swept manually on any change. When editing
+> inside the yellow-plugins monorepo, to change a constant start at the
+> canonical file — never edit a replica alone; the other replicas are
+> `plugins/yellow-core/skills/memory-remember-pattern/SKILL.md` and
+> `plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md`.
+> (Outside this monorepo, treat the sentinel line as authoritative; the
+> canonical file may not be installed.)
 >
 > Consuming command files adapt these constants inline as context-specific
 > paraphrases (their step numbering, query sources, and error handlers
-> differ), so they are OUT of RULE 16's CI scope — on any constant change,
-> sweep them manually:
+> differ), so they are exempt from RULE 16's byte-identity check (the
+> containment scan still covers them like all plugins/ markdown) — on any
+> constant change, sweep them manually:
 > `plugins/yellow-core/commands/workflows/brainstorm.md`,
 > `plugins/yellow-core/commands/workflows/plan.md`,
+> `plugins/yellow-core/commands/workflows/spec.md`,
+> `plugins/yellow-core/commands/workflows/review.md`,
 > `plugins/yellow-core/commands/workflows/compound.md`,
 > `plugins/yellow-core/commands/workflows/work.md`,
 > `plugins/yellow-review/commands/review/review-pr.md` (and
 > `plugins/yellow-review/references/review-pr/knowledge-compounding.md`),
 > `plugins/yellow-review/commands/review/resolve-pr.md`,
-> `plugins/yellow-review/commands/review/review-all.md` (allowed-tools only
-> — no inline steps), `plugins/yellow-ruvector/commands/ruvector/search.md`
+> `plugins/yellow-review/commands/review/review-all.md`,
+> `plugins/yellow-ruvector/commands/ruvector/search.md`
 > (INTENTIONAL divergence: `top_k=10` for user-facing search breadth — not
 > the recall-before-act protocol),
 > `plugins/yellow-ruvector/commands/ruvector/memory.md`, and
@@ -55,6 +65,7 @@ handle their own context seeding.
 > purpose implies — open maintainer question; do not silently "fix").
 
 Protocol sentinel (RULE 16, byte-identical in every copy):
+<!-- prettier-ignore -->
 ruvector-protocol-constants v1: recall top_k=5, discard score < 0.5, keep top 3, truncate 800 chars at word boundary; dedup top_k=1, skip if score > 0.82.
 
 ### Prerequisites Check

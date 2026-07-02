@@ -28,10 +28,13 @@ export interface ValidatorRun {
   stderr: string;
 }
 
-export function runValidator(pluginsDir: string): ValidatorRun {
+export function runValidator(
+  pluginsDir: string,
+  extraEnv: Record<string, string> = {}
+): ValidatorRun {
   try {
     const stdout = execFileSync('node', [VALIDATOR], {
-      env: { ...process.env, VALIDATE_PLUGINS_DIR: pluginsDir },
+      env: { ...process.env, VALIDATE_PLUGINS_DIR: pluginsDir, ...extraEnv },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });

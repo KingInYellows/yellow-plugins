@@ -4,13 +4,16 @@
  *
  * The protocol constants (recall top_k=5 / score<0.5 / top-3 / 800-char
  * truncation / dedup top_k=1 score>0.82) live in four skill files across
- * three plugins (canonical: yellow-ruvector/skills/memory-query; replicas
- * in yellow-core). RULE 16 enforces:
+ * two plugins (canonical: yellow-ruvector/skills/memory-query; three
+ * replicas in yellow-core). RULE 16 enforces:
  *   (1) every declared file that exists carries the sentinel line
  *       byte-identically (exact substring — a one-parameter desync fails);
  *   (2) no undeclared plugins/ markdown file carries the sentinel prefix
  *       (containment: an undeclared copy would drift invisibly);
- *   (3) declared files absent from the tree are skipped (fixture trees).
+ *   (3) a declared file missing from the tree is an ERROR in a real run
+ *       (a deleted replica must not pass silently); fixture runs
+ *       (VALIDATE_PLUGINS_DIR set) skip the check unless
+ *       VALIDATE_SENTINEL_STRICT=1 opts back in.
  *
  * This is the red/green test the C7 plan requires: desync one parameter
  * in one replica → lint fails; restore → passes.
@@ -161,8 +164,30 @@ describe('RULE 16 — memory-protocol drift lint', () => {
       'demo/skills/unrelated/SKILL.md',
       skillWithSentinel('unrelated', 'Nothing protocol-related here.')
     );
-    const { status, stdout } = runValidator(dir);
+    const { status, stderr } = runValidator(dir);
     expect(status).toBe(0);
-    expect(stdout).not.toContain('RULE 16');
+    expect(stderr).not.toContain('RULE 16');
+  });
+
+  it('strict mode fails when a declared sentinel file is missing', () => {
+    // 3 of the 4 declared files present — mcp-integration-patterns deleted.
+    writeAgent(dir, CANONICAL_PATH, skillWithSentinel('memory-query', SENTINEL));
+    writeAgent(
+      dir,
+      REPLICA_PATH,
+      skillWithSentinel('memory-recall-pattern', SENTINEL)
+    );
+    writeAgent(
+      dir,
+      'yellow-core/skills/memory-remember-pattern/SKILL.md',
+      skillWithSentinel('memory-remember-pattern', SENTINEL)
+    );
+    const { status, stderr } = runValidator(dir, {
+      VALIDATE_SENTINEL_STRICT: '1',
+    });
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 16');
+    expect(stderr).toContain('declared sentinel file is missing');
+    expect(stderr).toContain('mcp-integration-patterns');
   });
 });
