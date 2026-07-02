@@ -1,0 +1,71 @@
+tests/integration/validate-agent-authoring-skill-rules.test.ts
+  s_20a9c2bc8059f0::t_c773bd09469e3e 1-134,167-178,191-250,280-294
+  s_20a9c2bc8059f0::t_935a60979011b6 135-166,179-190,251-279
+plans/tier-2-structural-optimizations.md
+  s_5a1eb552192eda::t_525025d391c731 31-41
+  s_5a1eb552192eda::t_79f061af9aec79 51-73
+  s_20a9c2bc8059f0::t_81627a89e84cb1 132-135
+  s_20a9c2bc8059f0::t_c1e757bfa368f2 287,302-305,318-325
+  s_5a1eb552192eda::t_917af4daecf7bb 112-123
+  s_5a1eb552192eda::t_c567baf84f6b6f 202-214
+  s_20a9c2bc8059f0::t_dd26b217825f0d 329,344-347
+  s_20a9c2bc8059f0::t_7b092d486c6f11 270-282
+  s_5a1eb552192eda::t_627c5c374be5ba 220-230
+  s_20a9c2bc8059f0::t_2a30b6864f55ec 165-175,194-199
+  s_5a1eb552192eda::t_ca8297d0666e32 182-193
+  s_5a1eb552192eda::t_3a8f69345c8327 142-156
+  s_5a1eb552192eda::t_6e46c265f0133e 291-301
+  s_5a1eb552192eda::t_d35cedc8a8547d 334-343
+  s_5a1eb552192eda::t_3a003c5caa8aac 244-264
+  s_5a1eb552192eda::t_e0989669486f7b 407-412
+  s_5a1eb552192eda::t_7446b5f1b565c8 308-317
+  s_5a1eb552192eda::t_7cec4b87751e9a 426-437
+  s_20a9c2bc8059f0::t_ebd3c32cf22e68 157-161
+  s_20a9c2bc8059f0::t_c8f05b809445e0 217,231-237,265
+  s_20a9c2bc8059f0::t_df0009d346a26b 1-30,42-50,74-111,124-131,136-141,162-164,176-181,200-201,215-216,218-219,238-243,266-269,283-286,288-290,306-307,326-328,330-333,348-406,413-425
+scripts/validate-agent-authoring.js
+  s_20a9c2bc8059f0::t_a9b18553925118 901
+  s_20a9c2bc8059f0::t_d1426c7e969a57 746-754,759-771,775-804,817,838-841
+  s_20a9c2bc8059f0::t_0727b8a4a96259 755-758
+  s_20a9c2bc8059f0::t_3190127f9a26d6 872-879
+  s_20a9c2bc8059f0::t_034129648fb961 129-141,145-151,161
+  s_20a9c2bc8059f0::t_05590041aea924 142-144,152-160
+  s_20a9c2bc8059f0::t_ba490d8e5556d9 772-774
+  s_20a9c2bc8059f0::t_c745bc1eaf7c6b 805-816,818-837
+docs/optimization/analysis.md
+  s_f26f416df7fa54::t_44dac3655a7562 1-587
+plans/tier-3-capability-additions.md
+  s_f26f416df7fa54::t_fefc6c435a9986 1-313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "a8ee857733ccb365bdb64fe15f7b2de464b0342a",
+  "prompts": {},
+  "sessions": {
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    },
+    "s_5a1eb552192eda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "30ee96b5-fd8b-4cdc-a04b-9068d6dc9ecb",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f26f416df7fa54": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9c6f691f-ef35-40b0-8183-29ae85149641",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
