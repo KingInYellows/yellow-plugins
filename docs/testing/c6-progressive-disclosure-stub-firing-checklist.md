@@ -85,6 +85,18 @@ strengthening (unconditional imperative, exact path, failure mode named)
       dashboard). Skip-detection: a dashboard missing the version-drift
       line proves Step 1.7 was improvised away.
 
+### yellow-core / workflows-work non-stack resume (C9 companion)
+
+- [ ] Start `/workflows:work` on a plan with per-step `- [ ]` checkboxes,
+      let it complete 2+ steps, and confirm each completed step's box is
+      flipped to `- [x]` in the plan file in the same loop iteration as
+      its TaskUpdate (Phase 2 step 1k writeback). Then kill the session,
+      start a FRESH session, re-run `/workflows:work` on the same plan,
+      and verify it announces resume mode and starts from the first
+      unchecked box without re-executing completed steps (Phase 2 step 0).
+- [ ] Run `/workflows:work` on a prose-only plan (no task checkboxes) and
+      verify both the writeback and the resume check are silent no-ops.
+
 ### yellow-council / council-patterns (no stub-firing test)
 
 - [ ] No runtime verification needed: only the non-executed
