@@ -176,6 +176,15 @@ assurance.
      activeForm: "Updating documentation"
    ```
 
+   **Granularity guard:** when the plan has its own task checkboxes,
+   task-tracking entries must match them one-to-one — one plan `- [ ]`
+   box = one task entry = one Phase 2 loop iteration = one checkbox
+   writeback (Phase 2 step 1k). Do not merge several plan boxes into one
+   task or split one box across several tasks: a mismatch strands boxes
+   half-ticked and breaks the resume check (Phase 2 step 0). This is the
+   task-tracking-entry granularity rule ("body steps should match task
+   tracking entries one-to-one", turbo SKILL-CONVENTIONS).
+
 7. Display task list with TaskList.
 
 ## Phase 1b: Stack Execution Loop (stack mode only)
@@ -294,6 +303,17 @@ Phase 3 (Quality Check) in stack summary mode.
 
 **Steps:**
 
+0. **Plan resume check (entry step):** Read the plan file. If any of the
+   plan's own task checkboxes are already ticked (`- [x]`), announce
+   resume mode — "Resuming <plan>: N of M steps already complete —
+   skipping them" — and start execution from the FIRST unchecked
+   (`- [ ]`) box. Do not re-execute completed steps; this is the
+   non-stack mirror of the stack path's re-parse on revision (Phase 1b
+   step 7). If the plan has no task checkboxes at all (prose-only steps,
+   authored before per-step boxes existed), skip this check and run all
+   tasks normally — the per-step writeback in step 1k below is then a
+   no-op.
+
 1. **Task Execution Loop** - For each task:
 
    a. Mark task as in_progress:
@@ -376,6 +396,23 @@ Phase 3 (Quality Check) in stack summary mode.
    ```
    TaskUpdate: {taskId: "X", status: "completed"}
    ```
+
+   k. Tick the step's own checkbox in the plan file, in the SAME loop
+   iteration as the TaskUpdate above (one execution step = one
+   TaskUpdate = one checkbox): use the Edit tool to flip that step's
+   `- [ ]` to `- [x]` in the plan document. Do NOT add a separate
+   `## Progress` section — the plan's existing checkboxes are the single
+   progress surface (`validate-plans.js` and `/plan:complete` Gate A
+   scan checkboxes section-blind, so a parallel checkbox section would
+   corrupt both). Apply the same read-back verification as the stack
+   path (Phase 1b step 6): after the Edit, Read the plan file and verify
+   the box is ticked; on `old_string` mismatch, retry with the actual
+   file content; if the retry also fails, warn the user — "Progress
+   writeback failed for step X; execution continues, but a fresh session
+   will re-run this step" — and continue. If the plan has no checkbox
+   corresponding to this step (prose-only plan), skip silently. This
+   writeback is what makes execution state survive the session: a fresh
+   `/workflows:work` run resumes from the first unchecked box (step 0).
 
 2. **Follow Existing Patterns:**
    - Grep for similar implementations
