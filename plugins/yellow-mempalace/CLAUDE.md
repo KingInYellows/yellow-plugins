@@ -1,5 +1,13 @@
 # yellow-mempalace Plugin
 
+> **Status: deprecated pending removal** (maintainer decision 2026-07-01,
+> recorded in `docs/memory-routing-protocol.md`). yellow-ruvector is the
+> standard memory system; mempalace surfaces respond to explicit
+> `/mempalace:*` invocation only — generic "remember this" / "record a
+> decision" / recall phrases route to yellow-ruvector. Removal and
+> palace-data migration are a follow-up plan; until then the plugin keeps
+> working for explicit use.
+
 Structured long-term memory with temporal knowledge graph via MemPalace.
 Stores verbatim content in a navigable palace structure (wings/rooms/halls)
 with semantic search and a temporal knowledge graph for entity relationships.

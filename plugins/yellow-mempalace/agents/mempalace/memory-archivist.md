@@ -1,6 +1,6 @@
 ---
 name: memory-archivist
-description: "Organize and file new memories into the palace — add drawers, manage knowledge graph triples, check for duplicates, and write agent diary entries. Use when user wants to save a memory, record a decision, add a fact, or update the knowledge graph."
+description: "Organize and file new memories into the palace — add drawers, manage knowledge graph triples, check for duplicates, and write agent diary entries. Use only when the user explicitly invokes mempalace (a /mempalace:* command or naming the palace/knowledge graph); generic \"remember this\" / \"record a decision\" / \"add a fact\" requests route to yellow-ruvector per docs/memory-routing-protocol.md."
 model: inherit
 skills:
   - mempalace-conventions
