@@ -6,6 +6,21 @@ user-invokable: false
 
 # Memory Query Pattern
 
+> **Canonical Source.** This file is the canonical home of the ruvector
+> memory-protocol constants — yellow-ruvector owns the MCP tools the
+> protocol drives. The yellow-core skills `memory-recall-pattern`,
+> `memory-remember-pattern`, and `mcp-integration-patterns` are marked
+> replicas (cross-plugin `skills:` preload is unavailable,
+> claude-code#15944), each carrying the sentinel line below byte-for-byte.
+> The RULE 16 drift lint in `scripts/validate-agent-authoring.js` fails CI
+> when any copy diverges or an undeclared copy appears. To change a
+> protocol constant: edit it HERE first, then update all three replicas,
+> the `MEMORY_PROTOCOL_SENTINEL` validator constant, and the prose below
+> in the same commit.
+
+Protocol sentinel (RULE 16, byte-identical in every copy):
+ruvector-protocol-constants v1: recall top_k=5, discard score < 0.5, keep top 3, truncate 800 chars at word boundary; dedup top_k=1, skip if score > 0.82.
+
 ## What It Does
 
 Documents the canonical pattern for querying ruvector's vector memory store

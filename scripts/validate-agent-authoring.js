@@ -126,6 +126,55 @@ const MODEL_RULE_ALLOWLIST = new Set([
   'yellow-core/agents/workflow/knowledge-compounder.md',
 ]);
 
+// RULE 16 — ruvector memory-protocol drift lint. The protocol constants
+// (recall top_k=5 / score<0.5 / top-3 / 800-char truncation / dedup
+// top_k=1 score>0.82) are load-bearing at runtime and are specified in
+// FOUR skill files across two plugins, because cross-plugin `skills:`
+// preload is unavailable (claude-code#15944; ruling in
+// docs/solutions/code-quality/cross-plugin-shared-skill-pattern.md).
+// The canonical home is yellow-ruvector's memory-query skill (that plugin
+// owns the MCP tools); the three yellow-core files are marked replicas.
+// Every file below must carry the sentinel line byte-identically (same
+// mechanism as RULE 13: exact-substring match so any corruption — a
+// changed constant, a reflowed line, a smart-quote substitution — fails
+// loudly), and NO other file under plugins/ may carry it (containment:
+// an undeclared copy would drift invisibly, which is exactly the failure
+// mode this rule exists to close — and an explicit closed file list
+// avoids RULE 13's original exemption-scoping bug, where a membership
+// check without a plugin-ownership check let cross-plugin files pass;
+// see PR #597 / commit 3c8f6962).
+//
+// The ~10 consuming COMMAND files listed in the replicas' blockquotes
+// (brainstorm.md, plan.md, compound.md, work.md, review-pr.md plus its
+// references/review-pr/knowledge-compounding.md, resolve-pr.md,
+// review-all.md, ruvector/search.md, ruvector/memory.md,
+// ruvector/learn.md) are deliberately OUT of RULE 16's CI scope: they
+// inline context-adapted paraphrases (different step numbering, query
+// sources, error handlers), not sentinel copies, so byte-identity is not
+// enforceable there. Two known divergences are documented in the replica
+// blockquotes rather than linted: ruvector/search.md uses top_k=10
+// (intentional — user-facing search breadth, not the recall-before-act
+// protocol) and ruvector/learn.md carries no protocol constants at all
+// (missing the dedup check its purpose implies — flagged as a maintainer
+// question in the C7 PR, not silently "fixed").
+//
+// Sentinel design: single line, ASCII only (RULE 13's em-dash sentinel
+// corruption incidents motivated avoiding non-ASCII here). Files absent
+// from the tree are skipped (fixture trees; same posture as RULE 14),
+// which also lets the red/green test desync one parameter in one fixture
+// replica and watch the rule fire.
+const MEMORY_PROTOCOL_SENTINEL =
+  'ruvector-protocol-constants v1: recall top_k=5, discard score < 0.5, ' +
+  'keep top 3, truncate 800 chars at word boundary; dedup top_k=1, skip ' +
+  'if score > 0.82.';
+// Plugins-relative POSIX paths. First entry is the canonical source.
+const MEMORY_PROTOCOL_SENTINEL_FILES = [
+  'yellow-ruvector/skills/memory-query/SKILL.md',
+  'yellow-core/skills/memory-recall-pattern/SKILL.md',
+  'yellow-core/skills/memory-remember-pattern/SKILL.md',
+  'yellow-core/skills/mcp-integration-patterns/SKILL.md',
+];
+
 // RULE 15 (a–d) — SKILL.md authoring lint, ALL warning-tier. AGENTS.md and
 // the root CLAUDE.md document these skill-authoring conventions but until
 // this rule nothing enforced them (docs/optimization/analysis.md §3.4 calls
@@ -747,6 +796,59 @@ function validateCommandFiles(commandFiles, errors) {
   }
 }
 
+// RULE 16 — memory-protocol drift lint (see the constant block above for
+// the full rationale and scope decisions). Two checks:
+//   (1) every declared sentinel file that EXISTS must contain
+//       MEMORY_PROTOCOL_SENTINEL as an exact substring (byte-identical);
+//   (2) no other markdown file under plugins/ may contain the sentinel
+//       prefix (`ruvector-protocol-constants`) — an undeclared copy is a
+//       drift surface the lint cannot see, so it must either be added to
+//       MEMORY_PROTOCOL_SENTINEL_FILES or removed.
+// The containment check matches on the version-less prefix deliberately:
+// a stray `ruvector-protocol-constants v2:` line must be caught too.
+function validateMemoryProtocolSentinel(markdownFiles, errors) {
+  const declared = new Set(
+    MEMORY_PROTOCOL_SENTINEL_FILES.map((rel) =>
+      path.join(PLUGINS_DIR, ...rel.split('/'))
+    )
+  );
+
+  for (const rel of MEMORY_PROTOCOL_SENTINEL_FILES) {
+    const filePath = path.join(PLUGINS_DIR, ...rel.split('/'));
+    if (!fs.existsSync(filePath)) {
+      // File not present in this tree (fixture runs) — the file itself is
+      // what's checked, not its absence. Same posture as RULE 14.
+      continue;
+    }
+    const content = fs.readFileSync(filePath, 'utf8');
+    if (!content.includes(MEMORY_PROTOCOL_SENTINEL)) {
+      errors.push(
+        `${relative(filePath)}: RULE 16 — missing or corrupted memory-` +
+          `protocol sentinel. The file is a declared copy of the ruvector ` +
+          `protocol constants and must contain this exact line: ` +
+          `"${MEMORY_PROTOCOL_SENTINEL}" (canonical source: ` +
+          `plugins/${MEMORY_PROTOCOL_SENTINEL_FILES[0]}). A partial match ` +
+          `means a constant was changed in one copy only — sync all ` +
+          `copies and the validator constant in the same commit.`
+      );
+    }
+  }
+
+  for (const filePath of markdownFiles) {
+    if (declared.has(filePath)) continue;
+    const content = fs.readFileSync(filePath, 'utf8');
+    if (content.includes('ruvector-protocol-constants')) {
+      errors.push(
+        `${relative(filePath)}: RULE 16 — undeclared copy of the memory-` +
+          `protocol sentinel. Only the files in ` +
+          `MEMORY_PROTOCOL_SENTINEL_FILES (scripts/validate-agent-` +
+          `authoring.js) may carry it; add this file to the list (and ` +
+          `keep the sentinel byte-identical) or remove the line.`
+      );
+    }
+  }
+}
+
 // RULE 15 — SKILL.md authoring rules (see the constant block above for the
 // rule catalog and rationale). RULE 15 sub-rules push warning-tier findings
 // only; ctx.errors receives just the malformed-YAML structural gate below —
@@ -936,6 +1038,7 @@ function main() {
   });
   validateCommandFiles(commandFiles, errors);
   validateSkillFiles(skillFiles, { errors, warnings });
+  validateMemoryProtocolSentinel(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);
   validateMemoryWriteSectionGate(agentFiles, errors);
 
