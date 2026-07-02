@@ -1,0 +1,5 @@
+---
+'yellow-core': patch
+---
+
+Session-survivable execution state for non-stack `/workflows:work` runs (Tier 2 C9): Phase 2 gains an entry resume check (read the plan's task-list section; announce resume mode, reconcile TaskList state for already-`[x]` steps, check `git log` for commit evidence before re-running the first unchecked step, and skip straight to Phase 3 when every box is already ticked) and a per-step writeback (step 1k ticks the step's own checkbox in the same loop iteration as its TaskUpdate, with uniqueness-anchored Edit targeting, read-back verification of the intended line, and stop-and-ask escalation after 2 consecutive writeback failures). No parallel `## Progress` section is introduced — the plan's existing checkboxes are the single progress surface, keeping `validate-plans.js` and `/plan:complete` Gate A semantics unchanged. A granularity guard requires task-tracking entries to match plan checkboxes one-to-one. Prose-only plans (no checkboxes) degrade to the previous behavior with an explicit resume-unavailable notice.
