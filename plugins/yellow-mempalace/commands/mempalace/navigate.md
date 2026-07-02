@@ -1,6 +1,6 @@
 ---
 name: mempalace:navigate
-description: "Browse palace structure — list wings, rooms, and traverse cross-wing connections via tunnels. Use when exploring what memories exist or finding connections between topics."
+description: "Browse palace structure — list wings, rooms, and traverse cross-wing connections via tunnels. Use only when the user explicitly asks to browse the palace structure; generic \"what memories exist\" / \"find connections between topics\" requests route to /ruvector:memory per docs/memory-routing-protocol.md."
 argument-hint: '[wing] [--tunnels <wingA> <wingB>]'
 allowed-tools:
   - ToolSearch

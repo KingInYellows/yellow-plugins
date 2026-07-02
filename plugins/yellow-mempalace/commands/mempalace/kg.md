@@ -1,6 +1,6 @@
 ---
 name: mempalace:kg
-description: "Query, add, or invalidate temporal knowledge graph facts. Use when managing entity relationships, checking what was true at a point in time, or viewing entity timelines."
+description: "Query, add, or invalidate temporal knowledge graph facts. Use only when the user explicitly names the knowledge graph or KG (entity relationships, point-in-time facts, entity timelines); generic \"add a fact\" / \"record this\" requests route to yellow-ruvector per docs/memory-routing-protocol.md."
 argument-hint: '<action> [args...]'
 allowed-tools:
   - ToolSearch

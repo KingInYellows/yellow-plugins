@@ -1,6 +1,6 @@
 ---
 name: palace-navigator
-description: "Browse and traverse the palace structure — list wings, explore rooms, find cross-wing tunnels, and search memories by location. Use when user asks to browse palace, show wings, list rooms, find connections, or navigate the memory structure."
+description: "Browse and traverse the palace structure — list wings, explore rooms, find cross-wing tunnels, and search memories by location. Use only when the user explicitly names the palace (browse palace, show wings, list rooms, palace tunnels); generic \"find connections\" / \"what's related to X\" requests route to yellow-ruvector per docs/memory-routing-protocol.md."
 model: inherit
 skills:
   - mempalace-conventions
@@ -44,7 +44,7 @@ Browse and traverse the MemPalace structure to find memories by location.
 Trigger when the user wants to:
 
 - Browse the palace structure ("show wings", "list rooms", "what's in the palace")
-- Find connections between topics ("what connects auth and deployment?")
+- Find cross-wing tunnels ("what connects the auth wing and the infrastructure wing?", "show me palace tunnels")
 - Navigate to specific areas ("show me the auth wing")
 - Get an overview of stored memories ("how much is in the palace?")
 
