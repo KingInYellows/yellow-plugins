@@ -185,10 +185,12 @@ Enforcement differs by surface:
 - **`subagent_type` references** — CI-enforced across ALL plugin markdown:
   the validator's reference check walks every `.md` under `plugins/`
   except CHANGELOG.md (SKILL.md files are included).
-- **SKILL.md authoring rules** — the three-heading rule, the single-line
-  `description:` rule, and the `user-invokable` spelling are convention
-  only; the validator does not check these on SKILL.md files, so review
-  is the gate.
+- **SKILL.md authoring rules** — the three-heading rule and the
+  single-line `description:` rule are checked on SKILL.md files by
+  `validate-agent-authoring.js` (RULE 15b/15d) at warning tier only —
+  warnings never fail CI, so review remains the enforcement gate. The
+  `user-invokable` spelling is convention only; the validator does not
+  check it.
 
 The full list is in `AGENTS.md` ("Critical Agent Authoring Rules"); the
 most-frequently-tripped items:

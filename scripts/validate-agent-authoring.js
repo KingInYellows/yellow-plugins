@@ -126,6 +126,43 @@ const MODEL_RULE_ALLOWLIST = new Set([
   'yellow-core/agents/workflow/knowledge-compounder.md',
 ]);
 
+// RULE 15 (a–d) — SKILL.md authoring lint, ALL warning-tier. AGENTS.md and
+// the root CLAUDE.md document these skill-authoring conventions but until
+// this rule nothing enforced them (docs/optimization/analysis.md §3.4 calls
+// the authoring standard "partly aspirational"). Warning tier is deliberate:
+// several shipped skills fail 15b today, and a hard error would block
+// unrelated PRs on pre-existing debt. Warnings do NOT affect exit code (see
+// main()).
+//   15a: SKILL.md over 500 lines, measured over the whole file (frontmatter
+//        included) — matching the repo's own create-agent-skills convention.
+//        The guidance the ceiling comes from says "body" ("Keep SKILL.md
+//        body under 500 lines for optimal performance",
+//        platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices);
+//        the few frontmatter lines are deliberately counted here.
+//   15b: missing one of the three standard headings
+//        (## What It Does / ## When to Use / ## Usage).
+//   15c: `description:` without a "Use when" trigger clause — weak
+//        descriptions make Claude Code's skill selection unreliable.
+//   15d: multi-line `description:` value — block scalars (`>` / `|`),
+//        multi-line quoted strings, and wrapped plain scalars are ALL
+//        silently truncated by Claude Code's frontmatter parser (see
+//        docs/solutions/code-quality/skill-frontmatter-attribute-and-format-requirements.md).
+const SKILL_MAX_LINES = 500;
+const SKILL_REQUIRED_HEADINGS = [
+  '## What It Does',
+  '## When to Use',
+  '## Usage',
+];
+// Precompiled column-0, CRLF-tolerant anchors for the three headings —
+// the headings are constants, so build the regexes once, not per file.
+const SKILL_HEADING_PATTERNS = SKILL_REQUIRED_HEADINGS.map((heading) => ({
+  heading,
+  re: new RegExp(
+    `^${heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[ \\t]*\\r?$`,
+    'm'
+  ),
+}));
+
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
@@ -710,6 +747,128 @@ function validateCommandFiles(commandFiles, errors) {
   }
 }
 
+// RULE 15 — SKILL.md authoring rules (see the constant block above for the
+// rule catalog and rationale). RULE 15 sub-rules push warning-tier findings
+// only; ctx.errors receives just the malformed-YAML structural gate below —
+// the same fail-loud gate agent files get in validateAgentFile.
+function validateSkillFiles(skillFiles, ctx) {
+  const { errors, warnings } = ctx;
+  for (const filePath of skillFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+
+    // 15a — line ceiling. Counts logical lines: newline-separated segments,
+    // including a final unterminated line (a file with no trailing newline
+    // still counts its last line). For files that end with a trailing
+    // newline — the common case for markdown here — this equals `wc -l`; a
+    // file lacking one deliberately reports one more line than `wc -l`
+    // would, so the ceiling still sees the unterminated last line.
+    const lineCount =
+      content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
+    if (lineCount > SKILL_MAX_LINES) {
+      warnings.push(
+        `[RULE 15a advisory] ${relative(filePath)}: ${lineCount} lines ` +
+          `(ceiling ${SKILL_MAX_LINES}) — move conditional or late-sequence ` +
+          `detail into references/ files behind imperative load stubs.`
+      );
+    }
+
+    // 15b — three standard headings. Matched per-line at column 0 so a
+    // heading quoted mid-sentence or nested deeper (### What It Does) does
+    // not satisfy the rule. CRLF-tolerant tail like the other body regexes.
+    // Frontmatter and fenced code blocks are stripped first so a heading
+    // that only appears inside a fenced authoring example (e.g. a skill
+    // documenting the three-heading layout) cannot satisfy the presence
+    // check while the document's real sections are missing.
+    const body = content
+      .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
+      .replace(/^```[^\n]*\r?\n[\s\S]*?^```[ \t]*\r?$/gm, '');
+    const missingHeadings = SKILL_HEADING_PATTERNS.filter(
+      ({ re }) => !re.test(body)
+    ).map(({ heading }) => heading);
+    if (missingHeadings.length > 0) {
+      warnings.push(
+        `[RULE 15b advisory] ${relative(filePath)}: missing standard ` +
+          `heading(s) ${missingHeadings.join(', ')} — SKILL.md uses the ` +
+          `three-heading layout (## What It Does / ## When to Use / ## Usage).`
+      );
+    }
+
+    const frontmatter = extractFrontmatter(content);
+
+    // Malformed YAML would make parseScalar return null and route the file
+    // into 15c's "missing description" message — the wrong diagnosis, with
+    // the real parse error discarded. Fail loud instead, exactly like
+    // validateAgentFile does for agent files (no other pass walks SKILL.md,
+    // so this is the only place a broken skill frontmatter can surface).
+    if (frontmatter !== null) {
+      try {
+        YAML.parse(frontmatter);
+      } catch (e) {
+        errors.push(
+          `${relative(filePath)}: malformed YAML frontmatter — ${String(e.message).split('\n')[0]}`
+        );
+        continue;
+      }
+    }
+
+    const description = frontmatter
+      ? parseScalar(frontmatter, 'description')
+      : null;
+
+    // 15c — trigger clause. Literal case-insensitive "use when" keeps the
+    // rule predictable; the repo convention (Tier 1 C1, PR #601) writes
+    // trigger clauses as "Use when ...".
+    if (description === null) {
+      warnings.push(
+        `[RULE 15c advisory] ${relative(filePath)}: missing \`description:\` ` +
+          `frontmatter — add a single-line description with a "Use when" ` +
+          `trigger clause.`
+      );
+    } else if (!/use when/i.test(description)) {
+      warnings.push(
+        `[RULE 15c advisory] ${relative(filePath)}: \`description:\` lacks a ` +
+          `"Use when" trigger clause — concrete triggers make skill ` +
+          `selection reliable.`
+      );
+    }
+
+    // 15d — multi-line description. Checked against the RAW frontmatter
+    // text (not the parsed value): YAML folds block scalars, multi-line
+    // quoted strings, and wrapped plain scalars into one normal string, so
+    // only the raw form reveals the truncation hazard. Two shapes:
+    //   (a) block scalar — value starts with `>` or `|`;
+    //   (b) continuation — the line immediately after `description:` is
+    //       indented, which in a top-level frontmatter mapping can only be
+    //       a continuation of the description value (covers multi-line
+    //       quoted strings and wrapped plain scalars — the forms this repo
+    //       has actually been bitten by; both parse to a folded string, so
+    //       15c alone cannot catch them when the folded text contains
+    //       "use when").
+    // `[ \t]*` not `\s*` — \s matches the newline and would false-positive
+    // on the next line's first character. `.` in the capture tolerates a
+    // trailing `\r` on CRLF input.
+    if (frontmatter) {
+      const descLine = frontmatter.match(/^description:[ \t]*(.*)$/m);
+      if (descLine) {
+        const isBlockScalar = /^[>|]/.test(descLine[1]);
+        const afterDescLine = frontmatter.slice(
+          descLine.index + descLine[0].length
+        );
+        const hasContinuation = /^\r?\n[ \t]+\S/.test(afterDescLine);
+        if (isBlockScalar || hasContinuation) {
+          warnings.push(
+            `[RULE 15d advisory] ${relative(filePath)}: \`description:\` ` +
+              `spans multiple lines (block scalar, multi-line quoted ` +
+              `string, or wrapped plain scalar) — Claude Code silently ` +
+              `truncates multi-line descriptions; use a single-line ` +
+              `description.`
+          );
+        }
+      }
+    }
+  }
+}
+
 function main() {
   const pluginNames = new Set(
     fs
@@ -740,6 +899,14 @@ function main() {
       filePath.includes(`${path.sep}commands${path.sep}`) &&
       filePath.endsWith('.md')
   );
+  // SKILL.md manifests only — references/*.md and other files under skills/
+  // are free-form and not subject to RULE 15.
+  const skillFiles = walk(
+    PLUGINS_DIR,
+    (filePath) =>
+      filePath.includes(`${path.sep}skills${path.sep}`) &&
+      path.basename(filePath) === 'SKILL.md'
+  );
 
   logInfo(
     `Validating ${agentFiles.length} agents and ${markdownFiles.length} markdown files...`
@@ -761,6 +928,7 @@ function main() {
     errors,
   });
   validateCommandFiles(commandFiles, errors);
+  validateSkillFiles(skillFiles, { errors, warnings });
   validateStagingPromoterFrontmatter(agentFiles, errors);
   validateMemoryWriteSectionGate(agentFiles, errors);
 
