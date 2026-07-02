@@ -2,7 +2,9 @@
 
 Loaded by `/review:pr` (commands/review/review-pr.md) when
 `yellow-plugins.local.md` sets `review_pipeline: legacy`. Content moved
-verbatim from the command file (C6 progressive-disclosure split).
+verbatim from the command file (C6 progressive-disclosure split), except
+that positional words ("above"/"below") referring to sections of the
+original single file were dropped — they no longer apply here.
 
 When `yellow-plugins.local.md` sets `review_pipeline: legacy`, skip the
 persona dispatch table and use the pre-Wave-2 adaptive selection:

@@ -4,6 +4,7 @@ description: "Run setup for all installed marketplace plugins. Checks local prer
 argument-hint: ''
 allowed-tools:
   - Bash
+  - Read
   - Skill
   - AskUserQuestion
   - ToolSearch
@@ -320,7 +321,9 @@ AUTHORITATIVE classification source when present), and Step 1.7 runs the
 Do not re-derive either bash block from memory — the jq field
 extraction, the cache TTL handling, and the `sort -V` outdated
 comparison are load-bearing, and an improvised probe misclassifies
-plugins in the Step 2 dashboard.
+plugins in the Step 2 dashboard. If the Read fails (file missing, path
+unresolved), stop and report the exact path that could not be loaded —
+do not reconstruct the probes from memory or silently skip them.
 
 ### Step 2: Classify Plugin Status
 

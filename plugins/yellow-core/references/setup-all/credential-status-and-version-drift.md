@@ -80,6 +80,7 @@ else
     mkdir -p "$DRIFT_CACHE_DIR" 2>/dev/null
     if claude plugin list --json --available 2>/dev/null > "$DRIFT_CACHE.tmp"; then
       mv -f "$DRIFT_CACHE.tmp" "$DRIFT_CACHE" 2>/dev/null
+      cache_age=0  # fresh cache — otherwise the stale pre-refresh age is reported below
     else
       rm -f "$DRIFT_CACHE.tmp" 2>/dev/null
       printf 'version_drift: SKIPPED (claude plugin list --json --available failed)\n'
