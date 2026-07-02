@@ -1,6 +1,6 @@
 ---
 name: mcp-integration-patterns
-description: "Canonical patterns for ruvector recall/remember and morph discovery integration. Use when authoring commands or agents that should leverage institutional memory and advanced editing tools."
+description: "Shared patterns for ruvector recall/remember and morph discovery integration (the ruvector protocol constants are a replica of yellow-ruvector's canonical memory-query skill). Use when authoring commands or agents that should leverage institutional memory and advanced editing tools."
 user-invokable: false
 ---
 
@@ -8,7 +8,7 @@ user-invokable: false
 
 ## What It Does
 
-Canonical patterns for integrating ruvector (memory) and morph
+Shared patterns for integrating ruvector (memory) and morph
 (editing/search) across yellow-plugins commands and agents. All patterns
 degrade gracefully when tools are not installed.
 
@@ -24,15 +24,28 @@ error-handling and graceful-degradation behavior across the marketplace.
 This skill is not user-invokable. It provides shared context for
 yellow-plugins commands and agents.
 
-> **Design reference.** Each command adapts error handling and skip
-> targets to its own workflow structure. When updating parameters
-> (top_k, score cutoff, char limits), update this document AND all
-> consuming commands: `brainstorm.md`, `plan.md`, `compound.md`,
-> `work.md`, `review-pr.md`, `resolve-pr.md`, `review-all.md`
-> (allowed-tools only — no inline steps),
-> `plugins/yellow-ruvector/commands/ruvector/search.md`,
-> `plugins/yellow-ruvector/commands/ruvector/learn.md`, and
-> `plugins/yellow-ruvector/commands/ruvector/memory.md`.
+> **Replica of canonical source.** The ruvector protocol constants in the
+> patterns below are owned by
+> `plugins/yellow-ruvector/skills/memory-query/SKILL.md`; this file is a
+> marked replica, kept inline because cross-plugin `skills:` preload is
+> unavailable (claude-code#15944), enforced byte-for-byte by the RULE 16
+> drift lint in `scripts/validate-agent-authoring.js` (sentinel line
+> below). RULE 16 checks ONLY the sentinel line — the pattern prose below
+> restates the same constants and must be swept manually. When editing
+> inside the yellow-plugins monorepo, to change a constant start at the
+> canonical file — never edit a replica alone. (Outside this monorepo,
+> treat the sentinel line as authoritative.) The consuming command files
+> (`brainstorm.md`, `plan.md`, `spec.md`, `workflows/review.md`,
+> `compound.md`, `work.md`, `review-pr.md`, `resolve-pr.md`,
+> `review-all.md`, `ruvector/search.md`, `ruvector/learn.md`,
+> `ruvector/memory.md`) inline context-adapted paraphrases and are exempt
+> from RULE 16's byte-identity check — the full per-file rationale and
+> known divergences are documented in the `memory-recall-pattern` /
+> `memory-remember-pattern` replica blockquotes.
+
+Protocol sentinel (RULE 16, byte-identical in every copy):
+<!-- prettier-ignore -->
+ruvector-protocol-constants v1: recall top_k=5, discard score < 0.5, keep top 3, truncate 800 chars at word boundary; dedup top_k=1, skip if score > 0.82.
 
 ### Pattern 1: Recall-Before-Act
 
