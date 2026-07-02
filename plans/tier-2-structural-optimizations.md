@@ -158,7 +158,10 @@ enforced; three memory systems answer the same trigger phrases.
       (naming convention: one file per rule-slug) — trigger + pass cases per rule.
 - [x] A.4 Acceptance run: rules against current HEAD produce **0 errors**
       (warnings allowed and expected: 7 skills warn on RULE 15b, matching
-      the deepen-plan prediction exactly).
+      the deepen-plan prediction exactly; a review-pass fix that strips
+      fenced code blocks before the 15b check surfaced an 8th —
+      create-agent-skills, whose headings appear only inside fenced
+      authoring examples).
 
 ### Phase B (C6): progressive-disclosure splits — changesets: yellow-core, yellow-council, yellow-review
 

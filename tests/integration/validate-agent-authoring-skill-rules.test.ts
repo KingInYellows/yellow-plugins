@@ -15,6 +15,11 @@
  *   15d: folded/literal block-scalar `description: >` or `|` (Claude Code
  *        silently truncates multi-line descriptions).
  *
+ * One structural gate sits OUTSIDE the warning tier: malformed YAML
+ * frontmatter is a hard error (exit 1), mirroring validateAgentFile —
+ * otherwise a broken skill frontmatter would surface as a misleading
+ * 15c "missing description" advisory with the parse error discarded.
+ *
  * Only files named SKILL.md under a skills/ directory are in scope —
  * references/*.md companions are free-form and must not be linted.
  */
@@ -65,6 +70,68 @@ Omits the Usage heading on purpose.
 ## When to Use
 
 In RULE 15b trigger tests.
+`;
+
+// 15b trigger (two headings missing): pins the dynamic join(', ') list —
+// a regression that always reported the first/wrong heading would still
+// satisfy assertions bound to the static message tail.
+const TWO_MISSING_HEADINGS_SKILL = `---
+name: two-missing-headings-skill
+description: Two-missing fixture. Use when verifying RULE 15b lists every missing heading.
+---
+
+# Two Missing Headings Skill
+
+## What It Does
+
+Omits both When to Use and Usage on purpose.
+`;
+
+// 15b false-positive guard: the ONLY occurrence of ## Usage is inside a
+// fenced code example; the real document has no Usage section, so 15b
+// must still fire (headings inside fences must not satisfy the check).
+const FENCED_HEADING_SKILL = `---
+name: fenced-heading-skill
+description: Fenced fixture. Use when verifying 15b ignores headings inside code fences.
+---
+
+# Fenced Heading Skill
+
+## What It Does
+
+Shows the standard layout as a template:
+
+\`\`\`markdown
+## Usage
+\`\`\`
+
+## When to Use
+
+In RULE 15b fence-stripping tests.
+`;
+
+// Structural gate trigger: unparseable YAML frontmatter (unclosed quote).
+// Must be a HARD error naming the real cause, not a 15c "missing
+// description" advisory — the description key is clearly present.
+const MALFORMED_YAML_SKILL = `---
+name: malformed-skill
+description: "unclosed quote
+user-invokable: true
+---
+
+# Malformed Skill
+
+## What It Does
+
+Body content.
+
+## When to Use
+
+Body content.
+
+## Usage
+
+Body content.
 `;
 
 // 15c trigger: description present but no "Use when" clause anywhere.
@@ -221,9 +288,52 @@ describe('RULE 15 — SKILL.md authoring lint (warning-tier)', () => {
     const { status, stdout } = runValidator(dir);
     expect(status).toBe(0);
     expect(stdout).toContain('RULE 15b');
-    expect(stdout).toContain('## Usage');
-    // The two present headings must not be reported missing.
-    expect(stdout).not.toContain('## What It Does,');
+    // Bind to the DYNAMIC segment (between "heading(s)" and the em-dash) —
+    // the static message tail lists all three heading names, so a bare
+    // toContain('## Usage') would pass regardless of what was reported.
+    expect(stdout).toContain('heading(s) ## Usage —');
+  });
+
+  it('warns (15b) listing every missing heading when two are absent', () => {
+    writeAgent(dir, SKILL_PATH, TWO_MISSING_HEADINGS_SKILL);
+    const { status, stdout } = runValidator(dir);
+    expect(status).toBe(0);
+    expect(stdout).toContain('heading(s) ## When to Use, ## Usage —');
+  });
+
+  it('warns (15b) when a heading exists only inside a fenced code block', () => {
+    writeAgent(dir, SKILL_PATH, FENCED_HEADING_SKILL);
+    const { status, stdout } = runValidator(dir);
+    expect(status).toBe(0);
+    expect(stdout).toContain('heading(s) ## Usage —');
+  });
+
+  it('recognizes headings and 15d continuations in CRLF-terminated files', () => {
+    // Compliant skill in CRLF: 15b must still see all three headings.
+    writeAgent(dir, SKILL_PATH, COMPLIANT_SKILL.replace(/\n/g, '\r\n'));
+    const crlfCompliant = runValidator(dir);
+    expect(crlfCompliant.status).toBe(0);
+    expect(crlfCompliant.stdout).not.toContain('RULE 15');
+
+    // Quoted multi-line description in CRLF: 15d must still fire.
+    writeAgent(
+      dir,
+      SKILL_PATH,
+      QUOTED_MULTILINE_DESCRIPTION_SKILL.replace(/\n/g, '\r\n')
+    );
+    const crlfQuoted = runValidator(dir);
+    expect(crlfQuoted.status).toBe(0);
+    expect(crlfQuoted.stdout).toContain('RULE 15d');
+  });
+
+  it('fails hard (exit 1) on malformed YAML frontmatter, naming the real cause', () => {
+    writeAgent(dir, SKILL_PATH, MALFORMED_YAML_SKILL);
+    const result = runValidator(dir);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/malformed YAML/i);
+    // The description key IS present — the misleading 15c advisory must
+    // not fire on a file whose real problem is a YAML parse error.
+    expect(result.stdout).not.toContain('RULE 15c');
   });
 
   it('warns (15c) when the description lacks a "Use when" clause', () => {
