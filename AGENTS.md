@@ -260,6 +260,13 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
 - Markdown commands must use `${CLAUDE_PLUGIN_ROOT}` or a concrete script path
   for plugin-local file access. Do not source plugin files through `BASH_SOURCE`
   in command markdown.
+- Command-level progressive disclosure: when a command file's conditional or
+  late-sequence detail moves out of the file, it lives at the plugin root as
+  `references/<slug>/<file>.md`, where `<slug>` is the command's frontmatter
+  `name:` with `:` replaced by `-` (e.g. `setup:all` → `references/setup-all/`).
+  Load it via an imperative `Read ${CLAUDE_PLUGIN_ROOT}/references/<slug>/...`
+  stub at the branch point, and add `Read` to the command's `allowed-tools:`.
+  Skills instead use skill-relative `references/` paths (sibling to SKILL.md).
 
 ## Security & Prompt-Injection Rules
 
