@@ -1,10 +1,12 @@
 # C6 progressive-disclosure — manual e2e stub-firing checklist
 
-CI can verify that every load stub names an existing file and that every
-`references/` file is named by at least one stub (see the acceptance
-criteria in the Tier 2 plan), but it CANNOT observe the core C6
-mechanism: an agent actually Reading a reference file at runtime. This
-checklist is the manual verification gate, following the same method
+CI COULD verify that every load stub names an existing file and that
+every `references/` file is named by at least one stub (the Tier 2
+plan's acceptance criteria assume such a check), but no automated
+stub↔reference validator exists yet — for now that property is verified
+by one-time manual grep. CI also CANNOT observe the core C6 mechanism:
+an agent actually Reading a reference file at runtime. This checklist is
+the manual verification gate for both, following the same method
 accepted for yellow-council (PR #3,
 `docs/testing/yellow-council-manual-tests.md`).
 

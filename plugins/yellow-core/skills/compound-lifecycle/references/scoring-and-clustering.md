@@ -87,6 +87,7 @@ compound_lifecycle:
     w3: 0.2   # embedding_age_days weight (ruvector-only)
     w4: 0.1   # days_since_retrieved weight (ruvector-only)
     threshold: 100  # composite score above this is stale
+    citation_gate: 5  # inbound_refs at/above this → Keep without scoring (5a)
   overlap:
     bm25_percentile: 90      # surface pairs above this rank percentile
     cosine_review: 0.78      # ruvector cosine — review-suggestion floor

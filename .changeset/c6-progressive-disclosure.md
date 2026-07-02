@@ -4,7 +4,7 @@
 'yellow-review': patch
 ---
 
-Progressive-disclosure splits (Tier 2 C6): move conditional and late-sequence detail out of oversized skill and command files into `references/` files behind imperative load stubs, verbatim.
+Progressive-disclosure splits (Tier 2 C6): move conditional and late-sequence detail out of oversized skill and command files into `references/` files behind imperative load stubs, verbatim (except positional cross-reference words like "above"/"below" corrected for the new file locations, and the review-pr Steps 9a/9b top-level skip-gate merged into one provably-equivalent condition).
 
 - `yellow-core/skills/optimize/SKILL.md` 461 → 297 lines (judge protocol, pagination layouts, failure modes, design rationale → `references/`)
 - `yellow-core/skills/compound-lifecycle/SKILL.md` 414 → 291 lines (staleness/clustering formulas + config keys, report template, archive rationale → `references/`)
