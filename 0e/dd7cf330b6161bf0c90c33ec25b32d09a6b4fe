@@ -1,0 +1,29 @@
+docs/plugin-scope-mode-protocol.md
+  s_20a9c2bc8059f0::t_42157bb73c4049 1-136
+.changeset/c8-scope-mode-protocol-crossrefs.md
+  s_20a9c2bc8059f0::t_3f449a16a07931 1-6
+plugins/yellow-review/commands/review/review-pr.md
+  s_20a9c2bc8059f0::t_8cc69bbf40ed25 34-36
+plugins/yellow-core/commands/workflows/compound.md
+  s_20a9c2bc8059f0::t_e305b37b054f1d 56-58
+plugins/yellow-core/commands/workflows/review.md
+  s_20a9c2bc8059f0::t_18878fc42bb5f7 33-35
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_20a9c2bc8059f0::t_179b4f1accc386 30-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "0edd7cf330b6161bf0c90c33ec25b32d09a6b4fe",
+  "prompts": {},
+  "sessions": {
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
