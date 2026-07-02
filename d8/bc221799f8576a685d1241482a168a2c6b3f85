@@ -1,0 +1,37 @@
+plugins/yellow-mempalace/agents/mempalace/memory-archivist.md
+  s_d5d2c44e4908a4::t_7f4c07c4ee2626 54-57,59,61
+plugins/yellow-mempalace/agents/mempalace/palace-navigator.md
+  s_d5d2c44e4908a4::t_eb9523412d595e 3
+plugins/yellow-mempalace/commands/mempalace/navigate.md
+  s_d5d2c44e4908a4::t_4721c240137fb1 3
+docs/memory-routing-protocol.md
+  s_d5d2c44e4908a4::t_bafd9b61ee97ef 53-60
+  s_d5d2c44e4908a4::t_81505e4f7548c6 28-32
+  s_d5d2c44e4908a4::t_95134d8beda049 39
+plugins/yellow-mempalace/CLAUDE.md
+  s_d5d2c44e4908a4::t_c65c2c989d6006 65-68,73,75,77-78,82-87
+plugins/yellow-ruvector/commands/ruvector/learn.md
+  s_d5d2c44e4908a4::t_468a2aa6276eb1 3
+.changeset/c11-memory-routing-decision.md
+  s_d5d2c44e4908a4::t_3279e0bcd08eaa 3,6
+plugins/yellow-mempalace/commands/mempalace/kg.md
+  s_d5d2c44e4908a4::t_2dc51bc53bffa9 3
+plugins/yellow-mempalace/README.md
+  s_d5d2c44e4908a4::t_87cefb9f7b21f7 3-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "d8bc221799f8576a685d1241482a168a2c6b3f85",
+  "prompts": {},
+  "sessions": {
+    "s_d5d2c44e4908a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f268b926-dc94-480b-9c0e-d6e980fdf385",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
