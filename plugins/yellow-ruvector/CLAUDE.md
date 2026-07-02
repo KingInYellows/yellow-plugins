@@ -54,7 +54,8 @@ ruvector.
   catalog
 - `agent-learning` — Learning triggers, quality gates, retrieval strategy
 - `memory-query` — Standard pattern for querying ruvector institutional memory
-  before acting
+  before acting; canonical home of the ruvector protocol constants (RULE 16
+  drift lint enforces its sentinel line across the yellow-core replicas)
 
 ### Hooks (5)
 
