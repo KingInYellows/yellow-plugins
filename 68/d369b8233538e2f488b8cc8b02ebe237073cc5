@@ -1,0 +1,59 @@
+tests/integration/validate-agent-authoring-skill-rules.test.ts
+  s_06f6e84be5c507::t_074dad053e0b7f 113-137
+  s_d5d2c44e4908a4::t_3086eda222a826 343-357,360,365-395
+  s_d5d2c44e4908a4::t_079f82814ef7e5 75-112,138-161
+  s_06f6e84be5c507::t_4f2a73a55b21f1 363-364
+  s_d5d2c44e4908a4::t_fde0f19886ce32 18-22
+  s_06f6e84be5c507::t_dd6a5b4c9decaf 259-269,271-272
+  s_06f6e84be5c507::t_74e64148808d85 361,458-460
+  s_20a9c2bc8059f0::t_935a60979011b6 270,273-285
+  s_06f6e84be5c507::t_7a511638a7e63a 358-359,452-457
+  s_06f6e84be5c507::t_9a772e617d02a6 362
+plans/tier-2-structural-optimizations.md
+  s_d5d2c44e4908a4::t_0d70960ecd605a 161-164
+CLAUDE.md
+  s_d5d2c44e4908a4::t_b41d541b05da23 188-193
+scripts/validate-agent-authoring.js
+  s_d5d2c44e4908a4::t_44d0daaa7b07c3 131-138,140-141
+  s_06f6e84be5c507::t_0247aba247277b 787
+  s_d5d2c44e4908a4::t_167bc1522130eb 778-786,789
+  s_06f6e84be5c507::t_2b0f34dd0e02bf 843-851,862-863
+  s_20a9c2bc8059f0::t_d1426c7e969a57 800-801
+  s_d5d2c44e4908a4::t_48b834be56a634 761-764
+  s_20a9c2bc8059f0::t_c745bc1eaf7c6b 861
+  s_d5d2c44e4908a4::t_19b63e76c11699 860
+  s_d5d2c44e4908a4::t_d863d4d4f31675 751-753,755
+  s_d5d2c44e4908a4::t_adcc08231f7859 802-816
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "68d369b8233538e2f488b8cc8b02ebe237073cc5",
+  "prompts": {},
+  "sessions": {
+    "s_06f6e84be5c507": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a19a1858-879b-4543-aca3-325f7151d1ca",
+        "model": "unknown"
+      },
+      "human_author": null
+    },
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    },
+    "s_d5d2c44e4908a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f268b926-dc94-480b-9c0e-d6e980fdf385",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
