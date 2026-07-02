@@ -44,7 +44,7 @@ without structural change.
   168 lines). Live consumers cite it **by heading name**:
   `plugins/yellow-core/commands/workflows/work.md:479` and
   `plugins/yellow-review/commands/review/review-pr.md:415-417` (the latter
-  also cites the `### When the convention applies` subsection).
+  also cites the `## When the convention applies` subsection).
 - **C5.** Root `CLAUDE.md:180-191`: the "Plugin authoring" block's lead-in
   claims the rules below are "enforced by `validate-agent-authoring.js`", but
   that script never opens SKILL.md files — `validateAgentFile()` runs only on
@@ -136,7 +136,7 @@ without structural change.
 - [ ] 4.1 Create
       `plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md`
       containing lines 243–411 verbatim (headings unchanged, including
-      `### When the convention applies`).
+      `## When the convention applies`).
 - [ ] 4.2 Replace the section in SKILL.md with a CE-style load stub that (a)
       keeps the `## Subagent Failure Convention` heading, (b) states what the
       reference contains and the failure mode of skipping it, (c) instructs

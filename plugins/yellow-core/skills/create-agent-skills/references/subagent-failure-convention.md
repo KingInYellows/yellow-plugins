@@ -10,7 +10,7 @@ but is not yet shipped.
 
 **Community-adopted workaround: the output-file convention.**
 
-### When the convention applies
+## When the convention applies
 
 Use this convention for orchestrators spawning **prose-emitting**
 agents — `/workflows:work` Phase 3 reviewers are canonical. Prose
@@ -31,7 +31,7 @@ a workflow that can enforce file-backed results.
 The convention's scope, in one line: **prose-emitting orchestrators
 need it; compact-return-JSON orchestrators don't.**
 
-### For subagent authors
+## For subagent authors
 
 Instruct the subagent (in its system prompt or spawning prompt) to write a
 structured result file before exiting:
@@ -90,7 +90,7 @@ no `.json` file and treats the agent as failed — the partial `.tmp` is
 invisible. Lock files are unnecessary because each agent owns a unique
 filename.
 
-### For orchestrator authors
+## For orchestrator authors
 
 1. Create a unique run directory at the start of the workflow:
 
@@ -160,7 +160,7 @@ file parses correctly but `.status` is null or absent.
    document the retention in the orchestrator's user-visible output
    (so the user knows where the residue lives).
 
-### Why files and not stdout
+## Why files and not stdout
 
 Stdout parsing is unreliable — the Task tool may suppress trailing output,
 agents may emit unstructured prose alongside the JSON, and context
