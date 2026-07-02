@@ -1,6 +1,6 @@
 ---
 name: mcp-integration-patterns
-description: "Shared patterns for ruvector recall/remember and morph discovery integration (ruvector protocol constants replicate yellow-ruvector's canonical memory-query skill). Use when authoring commands or agents that should leverage institutional memory and advanced editing tools."
+description: "Shared patterns for ruvector recall/remember and morph discovery integration (the ruvector protocol constants are a replica of yellow-ruvector's canonical memory-query skill). Use when authoring commands or agents that should leverage institutional memory and advanced editing tools."
 user-invokable: false
 ---
 
@@ -27,17 +27,24 @@ yellow-plugins commands and agents.
 > **Replica of canonical source.** The ruvector protocol constants in the
 > patterns below are owned by
 > `plugins/yellow-ruvector/skills/memory-query/SKILL.md`; this file is a
-> marked replica enforced byte-for-byte by the RULE 16 drift lint in
-> `scripts/validate-agent-authoring.js` (sentinel line below). To change a
-> constant, start at the canonical file — never edit a replica alone. The
-> consuming command files (`brainstorm.md`, `plan.md`, `compound.md`,
-> `work.md`, `review-pr.md`, `resolve-pr.md`, `review-all.md`,
-> `ruvector/search.md`, `ruvector/learn.md`, `ruvector/memory.md`) inline
-> context-adapted paraphrases and are out of RULE 16's CI scope — the full
-> per-file rationale and known divergences are documented in the
+> marked replica, kept inline because cross-plugin `skills:` preload is
+> unavailable (claude-code#15944), enforced byte-for-byte by the RULE 16
+> drift lint in `scripts/validate-agent-authoring.js` (sentinel line
+> below). RULE 16 checks ONLY the sentinel line — the pattern prose below
+> restates the same constants and must be swept manually. When editing
+> inside the yellow-plugins monorepo, to change a constant start at the
+> canonical file — never edit a replica alone. (Outside this monorepo,
+> treat the sentinel line as authoritative.) The consuming command files
+> (`brainstorm.md`, `plan.md`, `spec.md`, `workflows/review.md`,
+> `compound.md`, `work.md`, `review-pr.md`, `resolve-pr.md`,
+> `review-all.md`, `resolve-stack.md`, `ruvector/search.md`,
+> `ruvector/learn.md`, `ruvector/memory.md`) inline context-adapted
+> paraphrases and are exempt from RULE 16's byte-identity check — the
+> full per-file rationale and known divergences are documented in the
 > `memory-recall-pattern` / `memory-remember-pattern` replica blockquotes.
 
 Protocol sentinel (RULE 16, byte-identical in every copy):
+<!-- prettier-ignore -->
 ruvector-protocol-constants v1: recall top_k=5, discard score < 0.5, keep top 3, truncate 800 chars at word boundary; dedup top_k=1, skip if score > 0.82.
 
 ### Pattern 1: Recall-Before-Act

@@ -164,7 +164,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `mcp-health-probe` — canonical MCP server health classification (OFFLINE /
   DEGRADED / HEALTHY plus PRESENT (untested) refinement) for
   `/<plugin>:status` commands (internal)
-- `mcp-integration-patterns` — shared ruvector recall/remember and morph discovery patterns; the ruvector protocol constants are a RULE 16-linted replica of yellow-ruvector's canonical `memory-query` skill (internal)
+- `mcp-integration-patterns` — shared ruvector recall/remember and morph discovery patterns; its copy of the ruvector protocol constants is a RULE 16-linted replica of yellow-ruvector's canonical `memory-query` skill (internal)
 - `memory-recall-pattern` — Recall-Before-Act pattern for ruvector: query
   past learnings via `hooks_recall` at workflow start (internal)
 - `memory-remember-pattern` — Tiered-Remember-After-Act pattern for

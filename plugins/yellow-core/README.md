@@ -88,7 +88,7 @@ TypeScript, Python, Rust, and Go.
 | `ideation`            | Generate 3 grounded approaches with the Toulmin warrant contract (evidence + linking principle + idea), filtered through MIDAS three-phase generation, then route the chosen approach into `brainstorm-orchestrator` via Task |
 | `local-config`        | Defines the `yellow-plugins.local.md` per-project config file schema — per-project overrides for review pipeline behavior, reviewer set narrowing, depth controls, and focus-area filtering |
 | `mcp-health-probe`    | Canonical MCP server health classification (OFFLINE / DEGRADED / HEALTHY plus PRESENT (untested) refinement) for `/<plugin>:status` commands                      |
-| `mcp-integration-patterns` | Canonical patterns for ruvector recall/remember and morph discovery integration                                                                              |
+| `mcp-integration-patterns` | Shared patterns for ruvector recall/remember and morph discovery integration — its protocol constants are a RULE 16-linted replica of yellow-ruvector's canonical `memory-query` skill |
 | `memory-recall-pattern` | Recall-Before-Act pattern for ruvector — query past learnings via `hooks_recall` at workflow start                                                              |
 | `memory-remember-pattern` | Tiered-Remember-After-Act pattern for ruvector — record learnings via `hooks_remember` at workflow completion with Auto/Prompted/Skip signal-strength tiers   |
 | `morph-discovery-pattern` | Morph discovery + fallback pattern — discover `edit_file` and `warpgrep` at runtime via ToolSearch, fall back to Edit/Grep when yellow-morph is missing       |
