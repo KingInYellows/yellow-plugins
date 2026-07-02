@@ -1,0 +1,25 @@
+plugins/yellow-core/commands/workflows/work.md
+  s_20a9c2bc8059f0::t_85a1f84c70dbd1 179-187
+  s_20a9c2bc8059f0::t_4dbdef2e0aca4a 306-316
+  s_20a9c2bc8059f0::t_f197bbffb21d5f 400-416
+.changeset/c9-work-writeback-resume.md
+  s_20a9c2bc8059f0::t_7507d7a82b7729 1-5
+docs/testing/c6-progressive-disclosure-stub-firing-checklist.md
+  s_20a9c2bc8059f0::t_b3a333f4910741 88-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "416e298c3d330c372b981290dd45b110aa499a81",
+  "prompts": {},
+  "sessions": {
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
