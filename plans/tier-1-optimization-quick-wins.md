@@ -2,7 +2,7 @@
 
 Source: `docs/optimization/analysis.md` §4 Tier 1 (approved 2026-07-01).
 Detail level: STANDARD. Doc-only changes — no scripts, hooks, schemas, or CI
-behavior change. Every item below is independently revertable.
+behavior change. Every item below is independently revertible.
 
 ## Problem Statement
 

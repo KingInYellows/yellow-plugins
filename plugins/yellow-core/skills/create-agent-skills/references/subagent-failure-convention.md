@@ -1,4 +1,4 @@
-## Subagent Failure Convention (Output-File Pattern)
+# Subagent Failure Convention (Output-File Pattern)
 
 When an orchestrator spawns a subagent via the Task tool, the Task tool's
 return value is not always reliable for distinguishing partial success

@@ -248,7 +248,7 @@ success from complete failure. The community-adopted workaround is the
 output-file convention: each agent atomically writes a per-run result
 file with a `status` field, and the orchestrator trusts only those files.
 
-Read `references/subagent-failure-convention.md` before wiring an
+Read [references/subagent-failure-convention.md](./references/subagent-failure-convention.md) before wiring an
 orchestrator or subagent to this convention. It defines when the
 convention applies and when to skip it (see "When the convention
 applies" there — prose emitters need it; compact-return-JSON

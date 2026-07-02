@@ -413,9 +413,10 @@ pipeline (`review_pipeline: persona`, the default).
 > Step 5 collects findings via TaskOutput because each reviewer emits
 > compact-return JSON per the schema in this file (see "Compact-return
 > enforcement" below). The Subagent Failure Convention's file-based
-> RUN_DIR pattern (see `yellow-core:create-agent-skills`
-> `references/subagent-failure-convention.md` §"When the convention
-> applies" — SKILL.md §Subagent Failure Convention is the load stub) is
+> RUN_DIR pattern (see
+> `plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md`
+> §"When the convention applies" — SKILL.md §Subagent Failure Convention
+> is the load stub) is
 > reserved for prose-emitting orchestrators like `/workflows:work`
 > Phase 3. Compact-return JSON already gives Step 6 a deterministic
 > failure signal — malformed/missing schema fields drop the entire
