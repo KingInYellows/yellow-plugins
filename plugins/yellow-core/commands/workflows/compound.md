@@ -53,6 +53,9 @@ If the above exits non-zero, stop. Do not proceed.
 
 ### Step 2: Route on flag
 
+The `--in-pr` flag contract below is documented as Interface 2 of
+`docs/plugin-scope-mode-protocol.md`.
+
 Parse `$ARGUMENTS` to detect the `--in-pr` flag. If the literal token
 `--in-pr` appears anywhere in `$ARGUMENTS` (space-separated), proceed to
 **Step 2a: In-PR Mode**. Otherwise, proceed to **Step 2b: Standard Mode**

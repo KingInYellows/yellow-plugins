@@ -30,7 +30,9 @@ Complements `/review:pr` (per-PR code quality) — does not duplicate it.
 
 #$ARGUMENTS
 
-Parse the argument to determine review mode.
+Parse the argument to determine review mode. (This positional-type
+dispatch is documented as Interface 4 of
+`docs/plugin-scope-mode-protocol.md`.)
 
 **If argument is a file path** (check file existence first):
 
