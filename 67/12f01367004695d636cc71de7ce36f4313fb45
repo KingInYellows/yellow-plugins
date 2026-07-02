@@ -1,0 +1,19 @@
+plans/complete/tier-1-optimization-quick-wins.md
+  s_aeff7ae0360f8a::t_575baa262e951a 79,82,85,88,90,95,98,100,102,107,112,117,122,128,136,140,145,152,161,163-164,166,170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "6712f01367004695d636cc71de7ce36f4313fb45",
+  "prompts": {},
+  "sessions": {
+    "s_aeff7ae0360f8a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b421df5b-6b03-4f63-8862-767efff55258",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
