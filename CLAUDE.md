@@ -184,7 +184,7 @@ Enforcement differs by surface:
   `BASH_SOURCE` ban on commands).
 - **`subagent_type` references** — CI-enforced across ALL plugin markdown:
   the validator's reference check walks every `.md` under `plugins/`
-  except CHANGELOG.md, SKILL.md files included.
+  except CHANGELOG.md (SKILL.md files are included).
 - **SKILL.md authoring rules** — the three-heading rule, the single-line
   `description:` rule, and the `user-invokable` spelling are convention
   only; the validator does not check these on SKILL.md files, so review
