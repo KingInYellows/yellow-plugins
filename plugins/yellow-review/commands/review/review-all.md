@@ -37,6 +37,10 @@ fixes, comment resolution, and learning compounding.
 
 ### Step 1: Resolve PR List
 
+The `scope=stack|all|PR#` keyword grammar below conforms to Interface 5
+of `docs/plugin-scope-mode-protocol.md` (this file is the definition
+site); update that doc in the same PR if this contract changes.
+
 Parse `$ARGUMENTS` to determine scope:
 
 **scope=stack** (default if empty or "stack"):

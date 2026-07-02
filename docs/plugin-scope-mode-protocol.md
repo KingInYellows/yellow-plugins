@@ -2,9 +2,16 @@
 
 The scope and mode conventions that yellow-plugins command surfaces
 currently share. This document records CURRENT behavior — it is
-descriptive, not aspirational; every contract below is quoted from a
-shipped surface. Sibling of `docs/plugin-credential-status-protocol.md`
-(same structure: contract → adopters → non-adopters).
+descriptive, not aspirational; every contract below is derived from a
+shipped surface (the tables normalize source prose into structured
+form; the command files remain authoritative). Coverage is the
+review-pipeline and workflow command family — unrelated surfaces with
+their own flag grammars (e.g. `/mempalace:mine --mode`,
+`/docs:diagram [scope]`) are out of frame. Sibling of
+`docs/plugin-credential-status-protocol.md` (same
+descriptive-not-aspirational framing; that doc lists its adopters and
+non-adopters inside its closing section rather than as top-level
+headings).
 
 **Non-goal (explicit):** unifying the divergent semantics documented
 below is future work, not part of the PR that introduced this document.
@@ -23,7 +30,7 @@ flag accept responsibility for pushes and skipped confirmation prompts.
 | Token | exactly `--non-interactive`, whitespace-separated in `$ARGUMENTS` |
 | Parsing | split on whitespace; remove the flag token; any OTHER `--`-prefixed token is a hard error (`unknown flag`) |
 | Default | OFF |
-| Effect (`/review:pr`) | suppresses the Step 9 push-confirmation prompt and the Step 9b "save learnings" prompt (P2 memory writes are skipped, not prompted) |
+| Effect (`/review:pr`) | suppresses the push-confirmation prompt and the "save learnings" prompt (P2 memory writes are skipped, not prompted) — the command file's flag handling names the exact gate steps |
 | Effect (`/review:resolve`) | suppresses the spawn-cap, CONFLICT, and push-confirmation gates |
 
 Defined identically in
@@ -42,10 +49,11 @@ Defined identically in
 
 ### Non-adopters (interactive-only surfaces)
 
-`/workflows:work`, `/workflows:review`, `/workflows:compound`,
-`/debt:audit`, and all setup commands have no `--non-interactive` mode
-today. Their gates (AskUserQuestion checkpoints, push confirmations) are
-always live.
+`/review:all`, `/workflows:work`, `/workflows:review`,
+`/workflows:compound`, `/debt:audit`, and all setup commands have no
+`--non-interactive` mode today. Their gates (AskUserQuestion
+checkpoints, push confirmations) are always live. (`/review:all` has
+its own scope grammar — Interface 5 below.)
 
 ## Interface 2: `--in-pr` flag
 
@@ -81,7 +89,7 @@ Canonical definition:
 `plugins/yellow-debt/skills/debt-conventions/SKILL.md` § "Scanner Output
 Schema (v2.0)". This protocol doc does not duplicate the schema — the
 skill is the single source; consult it for field-level detail
-(`staleness_score`, `severity`, `files_skipped_malformed`, etc.).
+(`category`, `severity`, `effort`, `failure_scenario`, etc.).
 
 ### Adopters
 
@@ -107,9 +115,34 @@ Defined in `plugins/yellow-core/commands/workflows/review.md` Step 1
 
 ### Adopters
 
-`/workflows:review` only. Other commands that accept a positional target
-(`/review:pr` PR-number-or-blank, `/workflows:work` plan path) validate a
-single expected type rather than dispatching across types.
+`/workflows:review` only. The two nearest comparisons do not dispatch
+across types: `/review:pr` accepts PR#/URL/branch/blank but resolves
+every shape to the same PR-number extraction and downstream route, and
+`/workflows:work` validates a single expected type (a plan path).
+`/review:all`'s `scope=` values are keyword dispatch, not type dispatch
+(Interface 5 below).
+
+## Interface 5: `scope=` keyword values (`/review:all`)
+
+`/review:all` selects its PR set via a positional `scope` keyword
+rather than a flag.
+
+### Contract
+
+Canonical definition:
+`plugins/yellow-review/commands/review/review-all.md` Step 1 ("Resolve
+PR List") — `stack` (the default when the argument is empty or
+"stack") walks the current Graphite stack base→tip, `all` reviews
+every open non-draft PR authored by the caller, and a numeric `PR#` is
+a single-PR convenience alias. This doc does not restate the per-scope
+resolution steps; the command file is the single source.
+
+### Adopters
+
+`/review:all` only. It does not accept `--non-interactive` (its push
+gates are always live). Its `scope=stack` traversal follows the shared
+`stack-traversal` skill, while the `scope=all` and `scope=PR#` branches
+are review-all-specific (per the command file's own inline comment).
 
 ## RECOMMENDED (not yet uniform): diff-scope vs file-scope
 
@@ -127,7 +160,7 @@ marked not-yet-uniform; adopting it on existing surfaces is out of scope
 
 ## Adding a new scope/mode surface
 
-1. Prefer one of the four interfaces above over inventing a new flag
+1. Prefer one of the five interfaces above over inventing a new flag
    grammar; `--non-interactive` parsing (Interface 1) is the template for
    any new boolean mode flag (exact token, whitespace split, unknown-flag
    hard error, OFF default).
