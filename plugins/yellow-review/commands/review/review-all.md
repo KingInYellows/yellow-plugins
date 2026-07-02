@@ -87,7 +87,11 @@ with raw git." Continue in degraded mode.
      either file, update both. The inline form below enumerates the same
      Wave 2 persona pipeline, learnings pre-pass, confidence-rubric
      aggregation, knowledge compounding, and ruvector remember as
-     /review:pr; details remain canonical in review-pr.md. -->
+     /review:pr. Step-level detail remains canonical in review-pr.md,
+     which loads its legacy-fallback and Steps 9a/9b detail from
+     plugins/yellow-review/references/review-pr/{legacy-fallback,
+     knowledge-compounding}.md — when editing those reference files,
+     re-check this file's inline paraphrases too. -->
 
 ### Step 4: Sequential Review Loop
 

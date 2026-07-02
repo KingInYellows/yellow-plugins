@@ -308,16 +308,9 @@ option if concurrent invocations become possible.
 
 ### Cross-References
 
-- `yellow-codex:codex-patterns` — Codex CLI invocation conventions, exit
-  code catalog, sandbox/approval modes. yellow-council reuses these for the
-  Codex reviewer leg via Task spawn — do not duplicate the codex-patterns
-  content here.
-- `docs/spikes/gemini-cli-output-format-2026-05-04.md` — verified Gemini CLI
-  v0.40+ invocation: `gemini -p "..." --approval-mode plan --skip-trust -o text`.
-  Do NOT use `--yolo` (issue #13561).
-- `docs/spikes/opencode-cli-format-json-2026-05-04.md` — verified OpenCode
-  CLI v1.14+ invocation: `opencode run --format json --variant high "..."`
-  plus `opencode session delete <id>` cleanup.
+Provenance pointers (codex-patterns reuse, the Gemini and OpenCode CLI
+spike docs) are in `references/cross-references.md` — non-executed
+background, deliberately kept out of the preload budget.
 
 ### Reviewer-Specific CLI Flag Pattern
 
