@@ -25,21 +25,37 @@ context already captured in files).
 
 ## Usage
 
-> **Design reference.** Each command adapts the signal classification and
-> dedup strategy to its own workflow outcomes. When updating tier rules,
-> dedup windows, or the signal classification table, update this document
-> AND all consuming commands:
+> **Replica of canonical source.** The protocol constants in this pattern
+> (dedup `top_k=1`, `score > 0.82`) are owned by
+> `plugins/yellow-ruvector/skills/memory-query/SKILL.md` (yellow-ruvector
+> owns the MCP tools); this yellow-core file is a marked replica, kept
+> inline because cross-plugin `skills:` preload is unavailable
+> (claude-code#15944). The RULE 16 drift lint in
+> `scripts/validate-agent-authoring.js` enforces the sentinel line below
+> byte-for-byte across the canonical file and all replicas. To change a
+> constant, start at the canonical file — never edit a replica alone.
+>
+> Consuming command files adapt the tier rules and dedup strategy inline
+> as context-specific paraphrases, so they are OUT of RULE 16's CI scope —
+> on any constant or tier-rule change, sweep them manually:
 > `plugins/yellow-core/commands/workflows/brainstorm.md`,
 > `plugins/yellow-core/commands/workflows/plan.md`,
 > `plugins/yellow-core/commands/workflows/compound.md`,
 > `plugins/yellow-core/commands/workflows/work.md`,
-> `plugins/yellow-review/commands/review/review-pr.md`,
+> `plugins/yellow-review/commands/review/review-pr.md` (and
+> `plugins/yellow-review/references/review-pr/knowledge-compounding.md`),
 > `plugins/yellow-review/commands/review/resolve-pr.md`,
 > `plugins/yellow-review/commands/review/review-all.md` (allowed-tools only
-> — no inline steps), and `plugins/yellow-ruvector/commands/ruvector/learn.md`.
+> — no inline steps), and
+> `plugins/yellow-ruvector/commands/ruvector/learn.md` (KNOWN DRIFT:
+> carries no protocol constants and lacks the recall-based dedup its
+> purpose implies — open maintainer question; do not silently "fix").
 >
 > (`plugins/yellow-ruvector/commands/ruvector/memory.md` is read-only and only
 > calls `hooks_recall` — see `memory-recall-pattern` skill instead.)
+
+Protocol sentinel (RULE 16, byte-identical in every copy):
+ruvector-protocol-constants v1: recall top_k=5, discard score < 0.5, keep top 3, truncate 800 chars at word boundary; dedup top_k=1, skip if score > 0.82.
 
 ### Signal Classification Table
 

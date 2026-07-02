@@ -25,21 +25,37 @@ handle their own context seeding.
 
 ## Usage
 
-> **Design reference.** Each command adapts error handling and skip targets
-> to its own workflow structure. When updating recall parameters (top_k,
-> score cutoff, char limits) or the advisory template, update this document
-> AND all consuming commands:
+> **Replica of canonical source.** The protocol constants in this pattern
+> are owned by `plugins/yellow-ruvector/skills/memory-query/SKILL.md`
+> (yellow-ruvector owns the MCP tools); this yellow-core file is a marked
+> replica, kept inline because cross-plugin `skills:` preload is
+> unavailable (claude-code#15944). The RULE 16 drift lint in
+> `scripts/validate-agent-authoring.js` enforces the sentinel line below
+> byte-for-byte across the canonical file and all replicas. To change a
+> constant, start at the canonical file — never edit a replica alone.
+>
+> Consuming command files adapt these constants inline as context-specific
+> paraphrases (their step numbering, query sources, and error handlers
+> differ), so they are OUT of RULE 16's CI scope — on any constant change,
+> sweep them manually:
 > `plugins/yellow-core/commands/workflows/brainstorm.md`,
 > `plugins/yellow-core/commands/workflows/plan.md`,
 > `plugins/yellow-core/commands/workflows/compound.md`,
 > `plugins/yellow-core/commands/workflows/work.md`,
-> `plugins/yellow-review/commands/review/review-pr.md`,
+> `plugins/yellow-review/commands/review/review-pr.md` (and
+> `plugins/yellow-review/references/review-pr/knowledge-compounding.md`),
 > `plugins/yellow-review/commands/review/resolve-pr.md`,
 > `plugins/yellow-review/commands/review/review-all.md` (allowed-tools only
-> — no inline steps), `plugins/yellow-ruvector/commands/ruvector/search.md`,
+> — no inline steps), `plugins/yellow-ruvector/commands/ruvector/search.md`
+> (INTENTIONAL divergence: `top_k=10` for user-facing search breadth — not
+> the recall-before-act protocol),
 > `plugins/yellow-ruvector/commands/ruvector/memory.md`, and
-> `plugins/yellow-ruvector/commands/ruvector/learn.md` (uses recall for
-> dedup before remember).
+> `plugins/yellow-ruvector/commands/ruvector/learn.md` (KNOWN DRIFT:
+> carries no protocol constants and lacks the recall-based dedup its
+> purpose implies — open maintainer question; do not silently "fix").
+
+Protocol sentinel (RULE 16, byte-identical in every copy):
+ruvector-protocol-constants v1: recall top_k=5, discard score < 0.5, keep top 3, truncate 800 chars at word boundary; dedup top_k=1, skip if score > 0.82.
 
 ### Prerequisites Check
 
