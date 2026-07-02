@@ -1,0 +1,36 @@
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_d5d2c44e4908a4::t_f992cdbbfe33bd 31-32
+docs/plugin-scope-mode-protocol.md
+  s_d5d2c44e4908a4::t_6e8689c6f0f2ea 33
+  s_d5d2c44e4908a4::t_ba7bc4055ec1d1 118-145
+  s_d5d2c44e4908a4::t_cf186b01b6eab6 5-14
+  s_d5d2c44e4908a4::t_068c71540f869d 92
+  s_d5d2c44e4908a4::t_35374e359c98c3 52-56
+  s_d5d2c44e4908a4::t_c81615e6620f5e 163
+.changeset/c8-scope-mode-protocol-crossrefs.md
+  s_d5d2c44e4908a4::t_b3fc30b59b284d 6
+plugins/yellow-review/commands/review/review-pr.md
+  s_d5d2c44e4908a4::t_3d3f64c91ff101 35-36
+plugins/yellow-core/commands/workflows/compound.md
+  s_d5d2c44e4908a4::t_4256dcc1cf8ec6 56-58
+plugins/yellow-review/commands/review/review-all.md
+  s_d5d2c44e4908a4::t_b3b889978d089d 40-43
+plugins/yellow-core/commands/workflows/review.md
+  s_d5d2c44e4908a4::t_6508e746c605bf 33-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "9f305c6234c059d81c9cec59481935083ca53879",
+  "prompts": {},
+  "sessions": {
+    "s_d5d2c44e4908a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f268b926-dc94-480b-9c0e-d6e980fdf385",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
