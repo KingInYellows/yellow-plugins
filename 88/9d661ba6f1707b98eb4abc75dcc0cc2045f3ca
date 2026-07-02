@@ -14,7 +14,7 @@ plugins/yellow-core/skills/memory-remember-pattern/SKILL.md
   s_20a9c2bc8059f0::t_783116dfcbaab0 59
   s_20a9c2bc8059f0::t_c7ea90fbbf76d9 28-40,45-46,49-52,57-58
 scripts/validate-agent-authoring.js
-  s_20a9c2bc8059f0::t_bf64395101f2d1 129-177
+  s_20a9c2bc8059f0::t_bf64395101f2d1 129-177,129-131,133-177
   s_20a9c2bc8059f0::t_92c390bfb903d8 1004
   s_20a9c2bc8059f0::t_6801bcd4ea18b1 795-847
 .changeset/c7-memory-protocol-drift-lint.md
