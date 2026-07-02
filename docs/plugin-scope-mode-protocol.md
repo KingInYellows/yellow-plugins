@@ -37,6 +37,14 @@ Defined identically in
 `plugins/yellow-review/commands/review/review-pr.md` Step 1 and
 `plugins/yellow-review/commands/review/resolve-pr.md` Step 1.
 
+Known gap (current behavior, recorded not resolved — see the non-goal
+above): `--non-interactive` does NOT suppress `/review:pr` Step 9a's
+knowledge-compounder dispatch, which fires whenever P0/P1/P2 findings
+exist; that agent's own M3 confirmation uses AskUserQuestion before any
+solution-doc write, so a fully-unattended caller can still encounter
+one prompt. (Step 9b's memory writes ARE non-interactive-aware: P2
+recording is skipped rather than prompted.)
+
 ### Adopters
 
 | Surface | Role |
@@ -76,12 +84,14 @@ Defined in `plugins/yellow-core/commands/workflows/compound.md` Step 2.
 
 `/workflows:compound` only. No other surface accepts `--in-pr`.
 
-## Interface 3: Debt scanner JSON-file interface
+## Interface 3: Debt scanner file interface
 
-Scope/mode for `/debt:audit` scanners is passed via a JSON file contract
-rather than flags: the orchestrator writes a scan-scope config, each
-scanner agent writes findings JSON conforming to the Scanner Output
-Schema v2.0, and the synthesizer merges the files.
+Scope/mode for `/debt:audit` scanners is passed via a file contract
+rather than flags: the orchestrator writes plain-text scope files
+(`.debt/file-list.txt`, `.debt/scanners-to-run.txt`, and optional
+`.debt/severity-filter.txt`), each scanner agent writes findings JSON
+conforming to the Scanner Output Schema v2.0 to
+`.debt/scanner-output/`, and the synthesizer merges the JSON files.
 
 ### Contract
 
@@ -149,8 +159,11 @@ are review-all-specific (per the command file's own inline comment).
 turbo's skill conventions define a scope interface worth adopting for
 FUTURE surfaces that operate on "the current change": resolve scope in
 three branches — explicit path argument → that file; dirty working tree →
-the diff; clean tree → the branch diff against trunk (see turbo
-`claude/skills/simplify-code/SKILL.md` for the concrete 3-branch shape).
+the diff; clean tree → the branch diff against trunk. The concrete
+3-branch shape lives in the EXTERNAL turbo project's
+`claude/skills/simplify-code/SKILL.md` — not a file in this repository;
+the citation trail is recorded in
+`plans/tier-2-structural-optimizations.md`.
 
 No yellow-plugins surface implements this today — `/review:pr` always
 diffs a PR, `/workflows:review` takes a plan file, `/debt:audit` scans a
