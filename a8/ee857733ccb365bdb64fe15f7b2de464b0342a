@@ -1,5 +1,5 @@
 tests/integration/validate-agent-authoring-skill-rules.test.ts
-  s_20a9c2bc8059f0::t_c773bd09469e3e 1-134,167-178,191-250,280-294
+  s_20a9c2bc8059f0::t_c773bd09469e3e 1-134,167-178,191-250,191-253,280-294,283-294
   s_20a9c2bc8059f0::t_935a60979011b6 135-166,179-190,251-279
 plans/tier-2-structural-optimizations.md
   s_5a1eb552192eda::t_525025d391c731 31-41
