@@ -76,56 +76,56 @@ without structural change.
 
 ### Phase 1: C1 — description rewrites (5 files)
 
-- [ ] 1.1 `security-fencing/SKILL.md:3` — keep the WHAT clause; replace the
+- [x] 1.1 `security-fencing/SKILL.md:3` — keep the WHAT clause; replace the
       "agents typically include this content inline…" aside with a "Use
       when…" trigger distilled from the body's own `## When to Use` (line 38).
-- [ ] 1.2 `research-patterns/SKILL.md:4` — replace the 6-topic enumeration
+- [x] 1.2 `research-patterns/SKILL.md:4` — replace the 6-topic enumeration
       with a lookup-reference WHAT clause + "Use when…" trigger (authoring or
       modifying yellow-research commands/agents that write research output).
-- [ ] 1.3 `codex-patterns/SKILL.md:3` — replace topic enumeration + vacuous
+- [x] 1.3 `codex-patterns/SKILL.md:3` — replace topic enumeration + vacuous
       WHEN with concrete trigger (authoring agents/commands that shell out to
       the `codex` CLI: invocation, parsing, approval modes).
-- [ ] 1.4 `composio-patterns/SKILL.md:3` — same treatment (batch workflows via
+- [x] 1.4 `composio-patterns/SKILL.md:3` — same treatment (batch workflows via
       Composio MCP: Workbench, Multi-Execute, usage tracking).
-- [ ] 1.5 `mempalace-conventions/SKILL.md:3` — lightest touch: lead with a
+- [x] 1.5 `mempalace-conventions/SKILL.md:3` — lightest touch: lead with a
       real WHAT clause, keep the existing WHEN, drop the topic list.
 
 ### Phase 2: C2 — negative-disambiguation clauses (invokable side only)
 
-- [ ] 2.1 `optimize/SKILL.md:3` — append clause distinguishing from
+- [x] 2.1 `optimize/SKILL.md:3` — append clause distinguishing from
       `/workflows:review` (rubric-scored variant comparison vs. session-level
       plan-adherence review).
-- [ ] 2.2 `debugging/SKILL.md:3` — append "…for delegating a stuck
+- [x] 2.2 `debugging/SKILL.md:3` — append "…for delegating a stuck
       investigation to an independent Codex session, use `/codex:rescue`."
-- [ ] 2.3 `session-history/SKILL.md:3` — append clause vs. ruvector recall
+- [x] 2.3 `session-history/SKILL.md:3` — append clause vs. ruvector recall
       (raw prior-session transcripts vs. distilled learnings in ruvector).
-- [ ] 2.4 `plugins/yellow-ruvector/commands/ruvector/memory.md:3` and
+- [x] 2.4 `plugins/yellow-ruvector/commands/ruvector/memory.md:3` and
       `plugins/yellow-mempalace/commands/mempalace/search.md:3` — one clause
       each pointing at the other (ruvector = per-project learned
       patterns/reflexions; mempalace = structured palace/knowledge-graph
       memory). Keep each clause to one sentence.
-- [ ] 2.5 Confirm no file appears in both Phase 1 and Phase 2 edit sets (the
+- [x] 2.5 Confirm no file appears in both Phase 1 and Phase 2 edit sets (the
       mempalace C2 target is the `search` command, not the conventions skill).
 
 ### Phase 3: C3 — catalog + integration drift (yellow-core)
 
-- [ ] 3.1 `plugins/yellow-core/CLAUDE.md:134` — "Skills (13)" → "Skills (18)";
+- [x] 3.1 `plugins/yellow-core/CLAUDE.md:134` — "Skills (13)" → "Skills (18)";
       insert the 5 missing entries alphabetically (slots verified: after
       `local-config` line 148 / before-and-after `mcp-integration-patterns`
       line 149 / before `optimize` line 150), one-line summaries derived from
       each skill's own `description:` frontmatter.
-- [ ] 3.2 `plugins/yellow-core/README.md` Skills table (~lines 79-92) — add
+- [x] 3.2 `plugins/yellow-core/README.md` Skills table (~lines 79-92) — add
       the 9 missing rows (brainstorming, local-config, mcp-health-probe,
       mcp-integration-patterns, memory-recall-pattern, memory-remember-pattern,
       morph-discovery-pattern, multi-host-fleet, security-fencing), same
       source of truth.
-- [ ] 3.3 `learnings-researcher.md:294-300` — remove the `/workflows:plan` and
+- [x] 3.3 `learnings-researcher.md:294-300` — remove the `/workflows:plan` and
       `/workflows:brainstorm` bullets (re-verify first:
       `grep -rn "learnings-researcher" plugins/yellow-core/commands/workflows/`
       must return no dispatch); keep `/review:pr` and standalone-Task bullets;
       add the two real extra dispatch sites (`/review:review-all`,
       `/docs:review`) if kept as a list.
-- [ ] 3.4 Root `README.md:30` and `:267` — yellow-core row/tree say "17
+- [x] 3.4 Root `README.md:30` and `:267` — yellow-core row/tree say "17
       agents, 16 commands, 7 skills"; actual is 21 agents, 16 commands, 18
       skills (verified 2026-07-01). Recount every plugin row against disk
       while there (yellow-ci row says 8 commands; 9 exist). Root README is
@@ -133,23 +133,23 @@ without structural change.
 
 ### Phase 4: C4 — create-agent-skills split
 
-- [ ] 4.1 Create
+- [x] 4.1 Create
       `plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md`
       containing lines 243–411 verbatim (headings unchanged, including
       `## When the convention applies`).
-- [ ] 4.2 Replace the section in SKILL.md with a CE-style load stub that (a)
+- [x] 4.2 Replace the section in SKILL.md with a CE-style load stub that (a)
       keeps the `## Subagent Failure Convention` heading, (b) states what the
       reference contains and the failure mode of skipping it, (c) instructs
       "Read `references/subagent-failure-convention.md`", and (d) keeps no
       improvisable detail. Result must be < 500 lines.
-- [ ] 4.3 Verify both live citations still resolve: `work.md:479` and
+- [x] 4.3 Verify both live citations still resolve: `work.md:479` and
       `review-pr.md:415-417` reference the section by name — heading is
       preserved in the stub; no edits needed there unless wording says "in
       this file".
 
 ### Phase 5: C5 — root CLAUDE.md enforcement claim
 
-- [ ] 5.1 Rewrite `CLAUDE.md:180-181` lead-in as a per-surface enforcement
+- [x] 5.1 Rewrite `CLAUDE.md:180-181` lead-in as a per-surface enforcement
       matrix: agent frontmatter rules → CI-enforced by
       `validate-agent-authoring.js`; SKILL.md rules (three headings,
       single-line description, `user-invokable` spelling) → convention,
@@ -158,16 +158,16 @@ without structural change.
 
 ### Phase 6: Validation + ship
 
-- [ ] 6.1 Hand-check: `grep -rE '^description: [>|]' plugins/*/skills/*/SKILL.md`
+- [x] 6.1 Hand-check: `grep -rE '^description: [>|]' plugins/*/skills/*/SKILL.md`
       returns empty; every edited description is one physical line.
-- [ ] 6.2 `wc -l plugins/yellow-core/skills/create-agent-skills/SKILL.md` < 500.
-- [ ] 6.3 CI baseline: `pnpm validate:schemas && pnpm test:unit && pnpm lint
+- [x] 6.2 `wc -l plugins/yellow-core/skills/create-agent-skills/SKILL.md` < 500.
+- [x] 6.3 CI baseline: `pnpm validate:schemas && pnpm test:unit && pnpm lint
       && pnpm typecheck`.
-- [ ] 6.4 One combined changeset, all patch (PR #507 template, `git show
+- [x] 6.4 One combined changeset, all patch (PR #507 template, `git show
       0cae8920`): yellow-core, yellow-research, yellow-codex, yellow-composio,
       yellow-mempalace, yellow-ruvector. Root CLAUDE.md (C5) needs no
       changeset.
-- [ ] 6.5 LF normalize, single PR via `gt` (`gt branch create` +
+- [x] 6.5 LF normalize, single PR via `gt` (`gt branch create` +
       `gt modify -c` + `gt submit --no-interactive`).
 
 ## Technical Details
