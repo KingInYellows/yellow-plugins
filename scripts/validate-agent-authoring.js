@@ -128,13 +128,17 @@ const MODEL_RULE_ALLOWLIST = new Set([
 
 // RULE 15 (a–d) — SKILL.md authoring lint, ALL warning-tier. AGENTS.md and
 // the root CLAUDE.md document these skill-authoring conventions but until
-// this rule nothing enforced them (docs/optimization/analysis.md §3.5:
-// "claimed-but-not-enforced"). Warning tier is deliberate: several shipped
-// skills fail 15b today, and a hard error would block unrelated PRs on
-// pre-existing debt. Warnings do NOT affect exit code (see main()).
-//   15a: SKILL.md body over 500 lines — official guidance ("Keep SKILL.md
+// this rule nothing enforced them (docs/optimization/analysis.md §3.4 calls
+// the authoring standard "partly aspirational"). Warning tier is deliberate:
+// several shipped skills fail 15b today, and a hard error would block
+// unrelated PRs on pre-existing debt. Warnings do NOT affect exit code (see
+// main()).
+//   15a: SKILL.md over 500 lines, measured over the whole file (frontmatter
+//        included) — matching the repo's own create-agent-skills convention.
+//        The guidance the ceiling comes from says "body" ("Keep SKILL.md
 //        body under 500 lines for optimal performance",
-//        platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices).
+//        platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices);
+//        the few frontmatter lines are deliberately counted here.
 //   15b: missing one of the three standard headings
 //        (## What It Does / ## When to Use / ## Usage).
 //   15c: `description:` without a "Use when" trigger clause — weak
@@ -744,18 +748,20 @@ function validateCommandFiles(commandFiles, errors) {
 }
 
 // RULE 15 — SKILL.md authoring rules (see the constant block above for the
-// rule catalog and rationale). Pushes warning-tier findings only; ctx.errors
-// is accepted for signature parity with the other validate* passes but no
-// RULE 15 sub-rule is error-tier.
+// rule catalog and rationale). RULE 15 sub-rules push warning-tier findings
+// only; ctx.errors receives just the malformed-YAML structural gate below —
+// the same fail-loud gate agent files get in validateAgentFile.
 function validateSkillFiles(skillFiles, ctx) {
-  const { warnings } = ctx;
+  const { errors, warnings } = ctx;
   for (const filePath of skillFiles) {
     const content = fs.readFileSync(filePath, 'utf8');
 
     // 15a — line ceiling. Counts logical lines: newline-separated segments,
     // including a final unterminated line (a file with no trailing newline
-    // still counts its last line). For LF-terminated files — the repo norm,
-    // enforced by .gitattributes — this equals `wc -l`.
+    // still counts its last line). For files that end with a trailing
+    // newline — the common case for markdown here — this equals `wc -l`; a
+    // file lacking one deliberately reports one more line than `wc -l`
+    // would, so the ceiling still sees the unterminated last line.
     const lineCount =
       content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
     if (lineCount > SKILL_MAX_LINES) {
@@ -769,8 +775,18 @@ function validateSkillFiles(skillFiles, ctx) {
     // 15b — three standard headings. Matched per-line at column 0 so a
     // heading quoted mid-sentence or nested deeper (### What It Does) does
     // not satisfy the rule. CRLF-tolerant tail like the other body regexes.
+    // Frontmatter and fenced code blocks are stripped first so a heading
+    // that only appears inside a fenced authoring example (e.g. a skill
+    // documenting the three-heading layout) cannot satisfy the presence
+    // check while the document's real sections are missing. Fence markers
+    // are matched with up to 3 leading spaces of indent (CommonMark still
+    // treats a ```-fence indented 1-3 spaces as a fence; 4+ spaces is an
+    // indented code block, a distinct construct this rule doesn't target).
+    const body = content
+      .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
+      .replace(/^[ \t]{0,3}```[^\n]*\r?\n[\s\S]*?^[ \t]{0,3}```[ \t]*\r?$/gm, '');
     const missingHeadings = SKILL_HEADING_PATTERNS.filter(
-      ({ re }) => !re.test(content)
+      ({ re }) => !re.test(body)
     ).map(({ heading }) => heading);
     if (missingHeadings.length > 0) {
       warnings.push(
@@ -781,6 +797,23 @@ function validateSkillFiles(skillFiles, ctx) {
     }
 
     const frontmatter = extractFrontmatter(content);
+
+    // Malformed YAML would make parseScalar return null and route the file
+    // into 15c's "missing description" message — the wrong diagnosis, with
+    // the real parse error discarded. Fail loud instead, exactly like
+    // validateAgentFile does for agent files (no other pass walks SKILL.md,
+    // so this is the only place a broken skill frontmatter can surface).
+    if (frontmatter !== null) {
+      try {
+        YAML.parse(frontmatter);
+      } catch (e) {
+        errors.push(
+          `${relative(filePath)}: malformed YAML frontmatter — ${String(e.message).split('\n')[0]}`
+        );
+        continue;
+      }
+    }
+
     const description = frontmatter
       ? parseScalar(frontmatter, 'description')
       : null;
@@ -807,13 +840,15 @@ function validateSkillFiles(skillFiles, ctx) {
     // quoted strings, and wrapped plain scalars into one normal string, so
     // only the raw form reveals the truncation hazard. Two shapes:
     //   (a) block scalar — value starts with `>` or `|`;
-    //   (b) continuation — the line immediately after `description:` is
-    //       indented, which in a top-level frontmatter mapping can only be
-    //       a continuation of the description value (covers multi-line
-    //       quoted strings and wrapped plain scalars — the forms this repo
-    //       has actually been bitten by; both parse to a folded string, so
-    //       15c alone cannot catch them when the folded text contains
-    //       "use when").
+    //   (b) continuation — an indented line follows `description:`, which
+    //       in a top-level frontmatter mapping can only be a continuation
+    //       of the description value (covers multi-line quoted strings and
+    //       wrapped plain scalars — the forms this repo has actually been
+    //       bitten by; both parse to a folded string, so 15c alone cannot
+    //       catch them when the folded text contains "use when"). Blank
+    //       lines between `description:` and the indented continuation are
+    //       tolerated — YAML permits them inside a quoted scalar, so a
+    //       blank separator must not let the continuation slip past.
     // `[ \t]*` not `\s*` — \s matches the newline and would false-positive
     // on the next line's first character. `.` in the capture tolerates a
     // trailing `\r` on CRLF input.
@@ -822,9 +857,11 @@ function validateSkillFiles(skillFiles, ctx) {
       if (descLine) {
         const isBlockScalar = /^[>|]/.test(descLine[1]);
         const afterDescLine = frontmatter.slice(
-          frontmatter.indexOf(descLine[0]) + descLine[0].length
+          descLine.index + descLine[0].length
         );
-        const hasContinuation = /^\r?\n[ \t]+\S/.test(afterDescLine);
+        const hasContinuation = /^\r?\n(?:[ \t]*\r?\n)*[ \t]+\S/.test(
+          afterDescLine
+        );
         if (isBlockScalar || hasContinuation) {
           warnings.push(
             `[RULE 15d advisory] ${relative(filePath)}: \`description:\` ` +
