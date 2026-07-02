@@ -1,0 +1,51 @@
+CLAUDE.md
+  s_d5d2c44e4908a4::t_b41d541b05da23 188-193
+tests/integration/validate-agent-authoring-skill-rules.test.ts
+  s_d5d2c44e4908a4::t_fde0f19886ce32 18-22
+  s_06f6e84be5c507::t_4f2a73a55b21f1 306-310
+  s_d5d2c44e4908a4::t_3086eda222a826 291-305,311-336
+  s_d5d2c44e4908a4::t_079f82814ef7e5 75-136
+plans/tier-2-structural-optimizations.md
+  s_d5d2c44e4908a4::t_0d70960ecd605a 161-164
+scripts/validate-agent-authoring.js
+  s_d5d2c44e4908a4::t_48b834be56a634 761-764
+  s_d5d2c44e4908a4::t_44d0daaa7b07c3 131-138,140-141
+  s_d5d2c44e4908a4::t_adcc08231f7859 799-813
+  s_20a9c2bc8059f0::t_c745bc1eaf7c6b 855
+  s_20a9c2bc8059f0::t_d1426c7e969a57 797-798
+  s_d5d2c44e4908a4::t_d863d4d4f31675 751-753,755
+  s_06f6e84be5c507::t_0247aba247277b 781-784
+  s_d5d2c44e4908a4::t_167bc1522130eb 778-780,786
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "ca569142bede52cdb1275eacea08b78cf5c0aff7",
+  "prompts": {},
+  "sessions": {
+    "s_06f6e84be5c507": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a19a1858-879b-4543-aca3-325f7151d1ca",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_20a9c2bc8059f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a9bce35f-11dd-4e07-897e-617d6508985a",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    },
+    "s_d5d2c44e4908a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f268b926-dc94-480b-9c0e-d6e980fdf385",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
