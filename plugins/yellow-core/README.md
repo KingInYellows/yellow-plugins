@@ -80,12 +80,21 @@ TypeScript, Python, Rust, and Go.
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `agent-native-architecture` | Reference for five agent-native architecture principles: action parity, context parity, shared workspace, primitives over workflows, dynamic context injection (applied by `yellow-review:review:agent-native-reviewer`)                                            |
 | `agent-native-audit`        | Step-by-step audit checklist for evaluating an existing codebase against agent-native principles — capability mapping, noun test, anti-pattern catalog                                                                                                              |
+| `brainstorming`       | Reference guide for iterative brainstorm dialogues — question techniques, YAGNI, approach exploration, and research escalation                                    |
 | `compound-lifecycle`  | Audit, refresh, and consolidate `docs/solutions/` with composite-scored staleness detection, BM25+cosine overlap clustering, and archive superseded entries       |
 | `create-agent-skills` | Guidance for creating skills and agents                                                                                                                           |
 | `debugging`           | Systematic root-cause debugging with causal-chain gate, prediction-for-uncertain-links hypotheses, three-failed-attempts smart escalation, and conditional defense-in-depth |
 | `git-worktree`        | Git worktree management for parallel development                                                                                                                  |
 | `ideation`            | Generate 3 grounded approaches with the Toulmin warrant contract (evidence + linking principle + idea), filtered through MIDAS three-phase generation, then route the chosen approach into `brainstorm-orchestrator` via Task |
+| `local-config`        | Defines the `yellow-plugins.local.md` per-project config file schema — per-project overrides for review pipeline behavior, reviewer set narrowing, depth controls, and focus-area filtering |
+| `mcp-health-probe`    | Canonical MCP server health classification (OFFLINE / DEGRADED / HEALTHY plus PRESENT (untested) refinement) for `/<plugin>:status` commands                      |
+| `mcp-integration-patterns` | Canonical patterns for ruvector recall/remember and morph discovery integration                                                                              |
+| `memory-recall-pattern` | Recall-Before-Act pattern for ruvector — query past learnings via `hooks_recall` at workflow start                                                              |
+| `memory-remember-pattern` | Tiered-Remember-After-Act pattern for ruvector — record learnings via `hooks_remember` at workflow completion with Auto/Prompted/Skip signal-strength tiers   |
+| `morph-discovery-pattern` | Morph discovery + fallback pattern — discover `edit_file` and `warpgrep` at runtime via ToolSearch, fall back to Edit/Grep when yellow-morph is missing       |
+| `multi-host-fleet`    | Multi-host plugin credential and config reference — canonical shell env var names for every credential-bearing plugin (new workstation, CI/devcontainer, fleet replication, secrets manager) |
 | `optimize`            | Metric-driven optimization with parallel candidate variants and an LLM-as-judge analytic rubric (per-criterion 1-5 scoring + two-run order-swap + style-bias self-check); optional `knowledge-compounder` hand-off writes the winner to `docs/solutions/optimizations/` |
+| `security-fencing`    | Canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files) — single source of truth for the inlined `CRITICAL SECURITY RULES` block |
 | `session-history`     | Cross-vendor session-history user surface — dispatches the `session-historian` agent against Claude Code + Devin + Codex backends with availability detection and graceful degradation per backend |
 
 ## MCP Servers

@@ -177,9 +177,21 @@ CLAUDE.md, README.md, configs):
 
 ### Plugin authoring — what the validators care about
 
-Frontmatter and authoring rules below are enforced by
-`validate-agent-authoring.js`. The full list is in `AGENTS.md` ("Critical
-Agent Authoring Rules"); the most-frequently-tripped items:
+Enforcement differs by surface:
+
+- **Agent and command markdown** — CI-enforced by
+  `validate-agent-authoring.js` (agent frontmatter rules, the
+  `BASH_SOURCE` ban on commands).
+- **`subagent_type` references** — CI-enforced across ALL plugin markdown:
+  the validator's reference check walks every `.md` under `plugins/`
+  except CHANGELOG.md (SKILL.md files are included).
+- **SKILL.md authoring rules** — the three-heading rule, the single-line
+  `description:` rule, and the `user-invokable` spelling are convention
+  only; the validator does not check these on SKILL.md files, so review
+  is the gate.
+
+The full list is in `AGENTS.md` ("Critical Agent Authoring Rules"); the
+most-frequently-tripped items:
 
 - Agent frontmatter uses `tools:`, NOT `allowed-tools:`
 - Skill frontmatter attribute is `user-invokable` (with k), NOT

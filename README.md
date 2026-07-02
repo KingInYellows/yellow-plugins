@@ -22,21 +22,21 @@ Add the marketplace, then install individual plugins:
 
 | Plugin                | Description                                                                                                 | Components                                     |
 | --------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                | 6 commands, 2 hooks, 1 MCP                     |
+| `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                | 7 commands, 2 hooks, 1 MCP                     |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
-| `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 8 commands, 2 skills, 1 hook         |
+| `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 9 commands, 2 skills, 1 hook         |
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                  | 3 agents, 4 commands, 1 skill                  |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                          | 2 commands, 1 skill, 1 MCP                     |
-| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 17 agents, 16 commands, 7 skills               |
-| `yellow-council`      | On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel             | 2 agents, 1 command, 1 skill                   |
+| `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 21 agents, 16 commands, 18 skills              |
+| `yellow-council`      | On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel             | 2 agents, 2 commands, 1 skill                  |
 | `yellow-debt`         | Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns            | 7 agents, 6 commands, 1 skill, 1 hook          |
 | `yellow-devin`        | Devin.AI V3 API integration — delegate tasks, manage sessions, research codebases via DeepWiki              | 1 agent, 9 commands, 1 skill, 2 MCPs           |
-| `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 3 agents, 5 commands, 1 skill                  |
+| `yellow-docs`         | Documentation audit, generation, and Mermaid diagram creation for any repository                            | 10 agents, 6 commands, 1 skill                 |
 | `yellow-linear`       | Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents           | 3 agents, 9 commands, 1 skill, 1 MCP           |
 | `yellow-mempalace`    | Structured long-term memory with temporal knowledge graph via MemPalace                                     | 2 agents, 6 commands, 2 skills, 1 MCP          |
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                       | 2 commands, 1 MCP                              |
-| `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 1 skill, 6 MCPs          |
-| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 14 agents, 4 commands, 1 skill                 |
+| `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 2 skills, 6 MCPs         |
+| `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 16 agents, 7 commands, 2 skills                |
 | `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform   | 2 agents, 5 commands, 1 skill, 1 MCP           |
 
@@ -259,21 +259,21 @@ yellow-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json       # Plugin catalog
 ├── plugins/
-│   ├── gt-workflow/           # Graphite workflow (6 commands, 2 hooks, 1 MCP)
+│   ├── gt-workflow/           # Graphite workflow (7 commands, 2 hooks, 1 MCP)
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
-│   ├── yellow-ci/             # CI toolkit (4 agents, 8 commands, 2 skills, 1 hook)
+│   ├── yellow-ci/             # CI toolkit (4 agents, 9 commands, 2 skills, 1 hook)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
-│   ├── yellow-core/           # Dev toolkit (17 agents, 16 commands, 7 skills)
-│   ├── yellow-council/        # Cross-lineage code council (2 agents, 1 command, 1 skill)
+│   ├── yellow-core/           # Dev toolkit (21 agents, 16 commands, 18 skills)
+│   ├── yellow-council/        # Cross-lineage code council (2 agents, 2 commands, 1 skill)
 │   ├── yellow-debt/           # Debt audit (7 agents, 6 commands, 1 skill, 1 hook)
 │   ├── yellow-devin/          # Devin.AI (1 agent, 9 commands, 1 skill, 2 MCPs)
-│   ├── yellow-docs/           # Documentation (3 agents, 5 commands, 1 skill)
+│   ├── yellow-docs/           # Documentation (10 agents, 6 commands, 1 skill)
 │   ├── yellow-linear/         # Linear PM (3 agents, 9 commands, 1 skill, 1 MCP)
 │   ├── yellow-mempalace/      # MemPalace memory (2 agents, 6 commands, 2 skills, 1 MCP)
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
-│   ├── yellow-research/       # Deep research (2 agents, 4 commands, 1 skill, 6 MCPs)
-│   ├── yellow-review/         # PR review (14 agents, 4 commands, 1 skill)
+│   ├── yellow-research/       # Deep research (2 agents, 4 commands, 2 skills, 6 MCPs)
+│   ├── yellow-review/         # PR review (16 agents, 7 commands, 2 skills)
 │   ├── yellow-ruvector/       # Vector memory (2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP)
 │   └── yellow-semgrep/        # Semgrep remediation (2 agents, 5 commands, 1 skill, 1 MCP)
 ├── packages/                  # Validation tooling (domain, infrastructure, cli)

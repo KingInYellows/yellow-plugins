@@ -1,6 +1,6 @@
 ---
 name: ruvector:memory
-description: "Browse and search stored memories and learnings. Use when user says \"show memories\", \"what do we know about X\", \"list learnings\", \"browse reflexions\", or wants to view stored agent knowledge."
+description: "Browse and search stored memories and learnings. Use when user says \"show memories\", \"what do we know about X\", \"list learnings\", \"browse reflexions\", or wants to view stored agent knowledge. This browses per-project learned patterns and reflexions; for structured palace/knowledge-graph memory, use /mempalace:search."
 argument-hint: '[filter]'
 allowed-tools:
   - ToolSearch

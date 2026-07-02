@@ -1,7 +1,7 @@
 ---
 name: research-patterns
 user-invokable: false
-description: "Reference conventions for yellow-research plugin — slug naming, output format, source selection, API key setup, graceful degradation, and when to compound findings."
+description: "Reference conventions for how yellow-research derives slugs, formats reports, and saves output under docs/research/. Use when authoring or modifying yellow-research commands or agents that write research output."
 ---
 
 # Research Patterns

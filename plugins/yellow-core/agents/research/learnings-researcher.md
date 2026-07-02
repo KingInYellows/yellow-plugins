@@ -1,6 +1,6 @@
 ---
 name: learnings-researcher
-description: "Searches docs/solutions/ for past learnings relevant to a PR diff or planning context, returning a fenced advisory block of distilled findings. Use when running review:pr, /workflows:plan, or /workflows:brainstorm — surfaces prior bugs, architecture patterns, design decisions, and conventions so institutional knowledge carries forward into the current work."
+description: "Searches docs/solutions/ for past learnings relevant to a PR diff or planning context, returning a fenced advisory block of distilled findings. Use when running /review:pr, /review:review-all, or /docs:review — surfaces prior bugs, architecture patterns, design decisions, and conventions so institutional knowledge carries forward into the current work."
 model: haiku
 effort: low
 tools:
@@ -295,8 +295,8 @@ relying on that tolerance violates the contract.
 
 Invoked by:
 - `/review:pr` Step 3d — pre-pass before reviewer dispatch
-- `/workflows:plan` — informs plan with institutional knowledge
-- `/workflows:brainstorm` — surfaces prior decisions during ideation
+- `/review:review-all` — same pre-pass, run per PR in the batch
+- `/docs:review` — learnings pre-pass before document-review personas
 - Standalone via `Task` with `subagent_type: "yellow-core:research:learnings-researcher"`
 
 Output is consumed as fenced advisory prose — no downstream caller parses

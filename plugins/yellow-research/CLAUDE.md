@@ -112,8 +112,9 @@ unavailable or returns `result.totalResults < 3`. See
 
 ### Skills
 
-- `research-patterns` — Reference: slug naming, source selection, API key setup,
-  graceful degradation, when to compound findings.
+- `research-patterns` — Reference conventions for authoring yellow-research
+  output: slug naming, report format, save location, source selection, API
+  key setup, graceful degradation, and when to compound findings.
 - `library-context` — Canonical fallback chain for library documentation lookup
   (context7 → EXA → WebSearch); preloaded by within-plugin `code-researcher`
   via `skills:` frontmatter, inlined verbatim by cross-plugin consumers (initial:

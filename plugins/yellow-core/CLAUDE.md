@@ -131,7 +131,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   CLAUDE.md
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (13)
+### Skills (18)
 
 - `agent-native-architecture` — reference for the five agent-native
   architecture principles (action parity, context parity, shared workspace,
@@ -161,7 +161,23 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   `brainstorm-orchestrator` via Task. Strict-warrant mode auto-engages for
   security/auth/data-migration domains
 - `local-config` — yellow-plugins.local.md per-project config schema (internal)
+- `mcp-health-probe` — canonical MCP server health classification (OFFLINE /
+  DEGRADED / HEALTHY plus PRESENT (untested) refinement) for
+  `/<plugin>:status` commands (internal)
 - `mcp-integration-patterns` — canonical patterns for ruvector recall/remember and morph discovery integration (internal)
+- `memory-recall-pattern` — Recall-Before-Act pattern for ruvector: query
+  past learnings via `hooks_recall` at workflow start (internal)
+- `memory-remember-pattern` — Tiered-Remember-After-Act pattern for
+  ruvector: record learnings via `hooks_remember` at workflow completion
+  with Auto/Prompted/Skip signal-strength tiers (internal)
+- `morph-discovery-pattern` — morph discovery + fallback pattern: discover
+  `edit_file` and `warpgrep` at runtime via ToolSearch, prefer them for
+  large edits and intent-based search, fall back to Edit/Grep silently
+  when yellow-morph is missing (internal)
+- `multi-host-fleet` — multi-host plugin credential and config reference:
+  canonical shell env var names for every credential-bearing plugin, for
+  new-workstation setup, CI/devcontainer config, and fleet credential
+  replication
 - `optimize` — run a metric-driven optimization pass with parallel candidate
   variants and an LLM-as-judge analytic rubric. Two-run order-swap recovers
   positional-bias variance; per-criterion scoring (1-5) outperforms holistic;
