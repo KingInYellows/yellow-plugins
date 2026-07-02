@@ -1,0 +1,32 @@
+CLAUDE.md
+  s_d5d2c44e4908a4::t_b41d541b05da23 188-193
+plans/tier-2-structural-optimizations.md
+  s_d5d2c44e4908a4::t_0d70960ecd605a 161-164
+tests/integration/validate-agent-authoring-skill-rules.test.ts
+  s_d5d2c44e4908a4::t_079f82814ef7e5 75-136
+  s_d5d2c44e4908a4::t_fde0f19886ce32 18-22
+  s_d5d2c44e4908a4::t_3086eda222a826 291-336
+scripts/validate-agent-authoring.js
+  s_d5d2c44e4908a4::t_48b834be56a634 761-764
+  s_d5d2c44e4908a4::t_adcc08231f7859 797-813
+  s_d5d2c44e4908a4::t_19b63e76c11699 855
+  s_d5d2c44e4908a4::t_44d0daaa7b07c3 131-138,140-141
+  s_d5d2c44e4908a4::t_d863d4d4f31675 751-753,755
+  s_d5d2c44e4908a4::t_167bc1522130eb 778-784,786
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.8",
+  "base_commit_sha": "6a05b9f29028ed48ef026d249c3ff0caab907866",
+  "prompts": {},
+  "sessions": {
+    "s_d5d2c44e4908a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f268b926-dc94-480b-9c0e-d6e980fdf385",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
