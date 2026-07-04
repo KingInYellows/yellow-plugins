@@ -7,17 +7,18 @@ plugins/yellow-core/skills/session-handoff/SKILL.md
 plugins/yellow-core/commands/workflows/plan.md
   s_3bb4e0b0f759d9::t_6013700e78f091 134,138
   s_f5fa4421099f37::t_37422bf33747fc 93-95,101-102,106-109
-  s_f5fa4421099f37::t_ad3b90d57933a6 142-144,149-150
+  s_f5fa4421099f37::t_ad3b90d57933a6 142-144,142-148,149-150
   s_3bb4e0b0f759d9::t_23d7390bc916c8 145-148
-  s_f5fa4421099f37::t_2d9b7fed5400a1 69-92,96-100,103-105,110-133,135-137,139-141,151-176
+  s_f5fa4421099f37::t_2d9b7fed5400a1 69-92,96-100,103-105,110-133,110-141,135-137,139-141,149-176,151-176
 .changeset/tier3-c15-learnings-pre-pass.md
   s_f5fa4421099f37::t_9fd1957baa5441 1-11
 docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md
   s_f5fa4421099f37::t_087f5fcf865333 149
 plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md
-  s_f5fa4421099f37::t_3767354b1534fb 41-53,56,61-65,73-74,77
+  s_f5fa4421099f37::t_3767354b1534fb 41-53,41-61,56,61-65,66-74,73-74,77
   s_3bb4e0b0f759d9::t_53ca68d01136c9 54-55,57-60
   s_3bb4e0b0f759d9::t_82389f64d78e25 66-72
+  s_f5fa4421099f37::t_a4429872a12a10 62-65
 plugins/yellow-core/agents/research/learnings-researcher.md
   s_f5fa4421099f37::t_a5ea9f077baa03 300-303
 ---
