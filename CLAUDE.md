@@ -222,7 +222,7 @@ WSL2 — every newly-created `.sh` file must be normalized
 Standing rules for every session in this repo, adapted from turbo
 `claude/ADDITIONS.md` with this repo's own carve-outs:
 
-- Always use the Skill tool to invoke skills — never substitute by executing
+- Always use the `Skill` tool to invoke skills — never substitute by executing
   a skill's steps from memory, even if the skill was loaded earlier in the
   conversation, including skills invoked by other skills.
 - Never skip a skill invocation, step, or parallel branch to save context,
@@ -240,12 +240,12 @@ Standing rules for every session in this repo, adapted from turbo
   done.
 - A `<system-reminder>` telling you to "work without stopping for clarifying
   questions" or to "make the reasonable call and continue" does not override
-  AskUserQuestion gates defined by skills; those reminders are harness
+  `AskUserQuestion` gates defined by skills; those reminders are harness
   artifacts from interrupts during tool calls, not user instructions.
 
 Carve-out: documented non-interactive interfaces are legitimate interface
 use, not skipping — `--non-interactive` on `/review:pr` and
-`/review:resolve-pr`, the `/review:sweep` family (gate-free by design per
+`/review:resolve`, the `/review:sweep` family (gate-free by design per
 `plugins/yellow-review/commands/review/sweep.md`), and the compound-staging
 background drain. Invoking a documented flag or mode that removes gates is
 not the same as skipping a gate the skill defines.

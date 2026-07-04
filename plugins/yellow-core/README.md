@@ -95,6 +95,7 @@ TypeScript, Python, Rust, and Go.
 | `multi-host-fleet`    | Multi-host plugin credential and config reference — canonical shell env var names for every credential-bearing plugin (new workstation, CI/devcontainer, fleet replication, secrets manager) |
 | `optimize`            | Metric-driven optimization with parallel candidate variants and an LLM-as-judge analytic rubric (per-criterion 1-5 scoring + two-run order-swap + style-bias self-check); optional `knowledge-compounder` hand-off writes the winner to `docs/solutions/optimizations/` |
 | `security-fencing`    | Canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files) — single source of truth for the inlined `CRITICAL SECURITY RULES` block |
+| `session-handoff`     | Write a tracked session-handoff artifact at `plans/handoff/<date>-<slug>.md` — six fields (current task, workflow status, active artifact, open decisions, in-flight changes, next action), secret-redacted via `cs_redact_secrets` |
 | `session-history`     | Cross-vendor session-history user surface — dispatches the `session-historian` agent against Claude Code + Devin + Codex backends with availability detection and graceful degradation per backend |
 
 ## MCP Servers

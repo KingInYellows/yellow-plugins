@@ -74,7 +74,7 @@ precedent and would need its own drain carve-out
       system-reminder auto-continue nudges do not override skill-defined
       AskUserQuestion gates.
 - [ ] 1.2 Explicit carve-out sentence: documented non-interactive interfaces
-      (`--non-interactive` on `/review:pr`/`/review:resolve-pr`, `/review:sweep`
+      (`--non-interactive` on `/review:pr`/`/review:resolve`, `/review:sweep`
       family, the compound-staging drain) are legitimate interface use, not
       skipping (turbo rule :12's own logic; sweep is gate-free by design per
       `plugins/yellow-review/commands/review/sweep.md:3,17`).
@@ -85,11 +85,13 @@ precedent and would need its own drain carve-out
       `# CLAUDE.md` H1 (two H1s from an old concat — verified by SpecFlow).
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** Duplicate H1 confirmed and still unfixed — root `CLAUDE.md` has
-> `# CLAUDE.md` at line 1 and again at line 228 (the old behavioral-guidelines
-> concat). For 1.2: `sweep.md:3` reads "no gates, no per-step prompts" and
-> `:17` "no human gates anywhere — sweep is fire-and-forget by design" —
-> "gate-free by design" is a fair paraphrase, not a verbatim quote.
+> **Codebase:** Duplicate H1 confirmed and fixed in this commit — root
+> `CLAUDE.md` had `# CLAUDE.md` at line 1 and again at line 228 (the old
+> behavioral-guidelines concat); the second H1 is now retitled
+> `## Behavioral Guidelines`. For 1.2: `sweep.md:3` reads "no gates, no
+> per-step prompts" and `:17` "no human gates anywhere — sweep is
+> fire-and-forget by design" — "gate-free by design" is a fair paraphrase,
+> not a verbatim quote.
 <!-- /deepen-plan -->
 
 - [ ] 1.5 No changeset (root file). Record in the section header that rules
@@ -200,29 +202,19 @@ lesson generalized).
 ### Phase 4 (C16): run-artifact convention at the /research:deep boundary — changeset: yellow-research
 
 Narrowed twice from the analysis-doc wording (verified): `review-pr.md` is a
-documented deliberate exemption ("prose-emitting orchestrators need it;
-compact-return-JSON orchestrators don't" —
-`create-agent-skills/SKILL.md:257-274`, echoed at `review-pr.md:410-423`);
-`research-conductor`'s internal fan-out is parallel MCP tool calls, not Task
-dispatch. The convention applies at the **`/research:deep` command ⇄
-research-conductor agent boundary** — a prose-emitting subagent returning a
-long research synthesis inline, exactly CE's issue-#956 failure shape
-(CE `skills/ce-compound/SKILL.md:96-110`).
-
-<!-- deepen-plan: codebase -->
-> **Codebase:** One factual correction — "research-conductor's internal fan-out
-> is parallel MCP tool calls, not Task dispatch" is wrong:
-> `research-conductor.md:9` lists `Task` in tools and `:136-142` explicitly
-> dispatches concurrent queries via Task. The scoping conclusion still holds
-> (those inner Task calls wrap MCP query invocations, not prose-emitting
-> personas, so they don't carry the summary-collapse risk), but fix the
-> preamble rationale before shipping. Return shape confirmed as the issue-#956
-> failure: `research-conductor.md:215` "Do not save to a file — the
-> /research:deep command handles writing" + `deep.md:89` writes the inline
-> return. Citation drift: the exemption text is at
-> `create-agent-skills/SKILL.md:254` and `review-pr.md:~396-411` (content
-> verbatim, lines shifted by Tier 1 PRs).
-<!-- /deepen-plan -->
+documented deliberate exemption ("prose emitters need it; compact-return-JSON
+orchestrators don't" — `create-agent-skills/SKILL.md:254`, echoed at
+`review-pr.md:396-411`); `research-conductor`'s internal fan-out dispatches
+concurrent MCP queries via `Task` (`Task` listed in tools at
+`research-conductor.md:9`, dispatch at `:136-142`), but those inner Task calls
+wrap MCP query invocations rather than prose-emitting personas, so they don't
+carry the summary-collapse risk the exemption addresses. The convention
+applies at the **`/research:deep` command ⇄ research-conductor agent
+boundary** — a prose-emitting subagent returning a long research synthesis
+inline, exactly CE's issue-#956 failure shape (CE
+`skills/ce-compound/SKILL.md:96-110`; confirmed by `research-conductor.md:215`
+"Do not save to a file — the /research:deep command handles writing", which
+`deep.md:89` then writes to `docs/research/<slug>.md`).
 
 - [ ] 4.1 `plugins/yellow-research/commands/research/deep.md`: generate
       RUN_DIR (CE pattern: `date +%Y%m%d-%H%M%S` + 4 urandom hex bytes) under
@@ -265,8 +257,10 @@ long research synthesis inline, exactly CE's issue-#956 failure shape
 > data directory (survives plugin updates), alongside `CLAUDE_PLUGIN_ROOT`.
 > This resolves the repo's internal doc contradiction in
 > `credential-status.sh`'s favor.
-> See: https://code.claude.com/docs/en/plugins-reference (Environment
+> See: [Claude Code plugins reference][plugins-reference] (Environment
 > variables → Persistent data directory).
+
+[plugins-reference]: https://code.claude.com/docs/en/plugins-reference
 <!-- /deepen-plan -->
 
 ### Phase 5 (C17): repo-profile cache — changeset: yellow-core (+ consumers as adopted)
@@ -295,7 +289,7 @@ long research synthesis inline, exactly CE's issue-#956 failure shape
 > persist (anthropics/claude-code#51398) — on that surface the cache degrades
 > to per-session cold starts, which the 5.5 optimization-only contract already
 > tolerates.
-> See: https://code.claude.com/docs/en/plugins-reference
+> See: [Claude Code plugins reference][plugins-reference]
 <!-- /deepen-plan -->
 
 - [ ] 5.2 Keying + freshness = CE protocol
@@ -309,18 +303,18 @@ long research synthesis inline, exactly CE's issue-#956 failure shape
       resolved by design (head-sha changes → miss).
 
 <!-- deepen-plan: external -->
-> **Research:** The shallow-clone hazard is real and *silent*: shallow
+> **Research:** The shallow-clone hazard is real and _silent_: shallow
 > boundary commits are grafted as parentless, so `git rev-list
 > --max-parents=0 HEAD` succeeds but returns the boundary commit — the value
 > shifts with clone depth, with no error to catch. Gate keying on `git
 > rev-parse --is-shallow-repository` returning `false` and treat `true` as
-> NO-CACHE (or fall back to a remote-URL hash). Detached HEAD needs no
-> special-casing — rev-list traversal is identical. Multi-root repos
-> (unrelated-history merges) are why "lexicographic first" matters; hashing
-> the full sorted root set is marginally more robust.
-> See: https://git-scm.com/docs/shallow,
-> https://git-scm.com/docs/git-rev-parse,
-> https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/
+> NO-CACHE. Detached HEAD needs no special-casing — rev-list traversal is
+> identical. Multi-root repos (unrelated-history merges) are why
+> "lexicographic first" matters; hashing the full sorted root set is
+> marginally more robust.
+> See: [Git shallow docs](https://git-scm.com/docs/shallow),
+> [git rev-parse docs](https://git-scm.com/docs/git-rev-parse),
+> [Get up to speed with partial clone and shallow clone](https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/)
 <!-- /deepen-plan -->
 
 - [ ] 5.3 **Hard design constraint — single writer per key**: one
@@ -482,7 +476,9 @@ C13 spec runs whenever — its output plans separately.
 > pre-snapshot). Only CE `CONCEPTS.md` changed after the snapshot (+9 lines on
 > 2026-07-03 — an unrelated `/ce-explain` catalog row, not a mechanism
 > change). The copied mechanics are current; no re-clone needed.
-> See: https://github.com/EveryInc/compound-engineering-plugin/compare/db21ba2...main
+> See: [compound-engineering-plugin comparison (db21ba2...main)][ce-diff]
+>
+> [ce-diff]: https://github.com/EveryInc/compound-engineering-plugin/compare/db21ba2...main
 <!-- /deepen-plan -->
 
 - `docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md`
@@ -490,14 +486,11 @@ C13 spec runs whenever — its output plans separately.
 - `docs/solutions/logic-errors/periodic-rebuild-wipes-incremental-cache-state.md`
   (the bug C17's single-writer constraint excludes)
 - `plugins/yellow-review/commands/review/review-pr.md:177-288,410-423`
-- `plans/tier-1-optimization-quick-wins.md` (C3 coordination),
-  `plans/tier-2-structural-optimizations.md` (C10 warning rules complement C12)
+- `plans/complete/tier-1-optimization-quick-wins.md` (C3 coordination),
+  `plans/complete/tier-2-structural-optimizations.md` (C10 warning rules complement C12)
 
 <!-- deepen-plan: codebase -->
-> **Codebase:** Both tier plans have been archived — cite
-> `plans/complete/tier-1-optimization-quick-wins.md` and
-> `plans/complete/tier-2-structural-optimizations.md` (cosmetic path
-> staleness). Line-number citations into `review-pr.md` and
+> **Codebase:** Line-number citations into `review-pr.md` and
 > `create-agent-skills/SKILL.md` drifted ~14 lines after Tier 1 landed —
 > re-grep rather than trust exact ranges.
 <!-- /deepen-plan -->

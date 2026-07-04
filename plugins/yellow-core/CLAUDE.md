@@ -131,7 +131,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   CLAUDE.md
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (18)
+### Skills (19)
 
 - `agent-native-architecture` — reference for the five agent-native
   architecture principles (action parity, context parity, shared workspace,
@@ -184,6 +184,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   style-bias self-check flags rationale drift. Optional `knowledge-compounder`
   hand-off writes the winner to `docs/solutions/optimizations/`
 - `security-fencing` — canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files); single source of truth for the inlined `CRITICAL SECURITY RULES` block (internal)
+- `session-handoff` — write a tracked session-handoff artifact at
+  `plans/handoff/<date>-<slug>.md` (six fields: current task, workflow
+  status, active artifact, open decisions, in-flight changes, next action),
+  secret-redacted via `cs_redact_secrets`, so a fresh session resumes
+  without re-deriving context
 - `session-history` — cross-vendor session-history user surface — dispatches
   the `session-historian` agent against Claude Code + Devin + Codex
   backends with availability detection and graceful degradation per backend
