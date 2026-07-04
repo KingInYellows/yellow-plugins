@@ -1,0 +1,63 @@
+plugins/yellow-core/CLAUDE.md
+  s_f5fa4421099f37::t_7bf5b7cd7587aa 187-191
+  s_f5fa4421099f37::t_f12a56ce320fdf 134
+CLAUDE.md
+  s_3bb4e0b0f759d9::t_877bc3ccc48c92 225
+  s_f5fa4421099f37::t_294085e9a94983 243,248
+.changeset/tier3-c14-session-handoff.md
+  s_f5fa4421099f37::t_6b63b0073ba598 1-9
+plans/tier-3-capability-additions.md
+  s_3bb4e0b0f759d9::t_e6a6b0edcc184f 205-211
+  s_3bb4e0b0f759d9::t_f94323d5c4eecc 88-94
+  s_3bb4e0b0f759d9::t_8b069dd634c960 262-263
+  s_e5dd379758fe78::t_f743bf98f99486 215-217,489-490
+  s_3bb4e0b0f759d9::t_37130d4ba96414 306
+  s_3bb4e0b0f759d9::t_b9fa259cc1671e 480-481
+  s_3bb4e0b0f759d9::t_5b30ca9dba4a94 212-214
+  s_f5fa4421099f37::t_d64c028323f0fd 493
+  s_f5fa4421099f37::t_eca63256e5bb6f 313-315
+  s_f5fa4421099f37::t_5b18a5cbfc3c44 260,292,312
+  s_f5fa4421099f37::t_971867957bf27d 311
+  s_e5dd379758fe78::t_f7abb7096799f4 316-317
+  s_f5fa4421099f37::t_7096a12fa9d661 479
+  s_3bb4e0b0f759d9::t_55c9c8900d7ad6 77
+plugins/yellow-core/README.md
+  s_f5fa4421099f37::t_91035bfd3610da 98
+plugins/yellow-core/skills/session-handoff/SKILL.md
+  s_f5fa4421099f37::t_ac767c3ac09ea4 51-56
+  s_3bb4e0b0f759d9::t_de23ed87569ed5 73-75,80-85,88-94
+  s_f5fa4421099f37::t_e905608a371d4e 1-2,4-50,57-72,76-79,86-87,95-107
+  s_3bb4e0b0f759d9::t_cb2842de6f1494 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f9a5f28acd2a26a1ef26fdee4dec34d96732932e",
+  "prompts": {},
+  "sessions": {
+    "s_3bb4e0b0f759d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5447bbb-d745-4066-b5bb-7844331ee952",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_e5dd379758fe78": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-af807cb81591e007c",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
