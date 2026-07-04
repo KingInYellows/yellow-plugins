@@ -1,0 +1,81 @@
+.changeset/tier3-c17-repo-profile-cache.md
+  s_f5fa4421099f37::t_849b5c9e5b73e4 1-14
+plugins/yellow-core/lib/repo-profile.sh
+  s_f5fa4421099f37::t_9d978070e18aaa 26-29
+  s_3bb4e0b0f759d9::t_e3484c31c9c2f7 10-13
+  s_3bb4e0b0f759d9::t_1453c8ce49e187 23-25
+  s_f5fa4421099f37::t_b0c6e9ffc33adf 77
+  s_f5fa4421099f37::t_7f9c09b338e5f1 1-9,14-22,30-45,47-76,78-88,97-104,106-115,117-130,132-133,148-153,155
+  s_f5fa4421099f37::t_9d18ca67999ece 154
+  s_3bb4e0b0f759d9::t_effef527d3a315 134-147
+  s_f5fa4421099f37::t_a3d235d00b4683 131
+  s_3bb4e0b0f759d9::t_1069ee1c5cc465 105,116
+  s_3bb4e0b0f759d9::t_2bcd7a6b5962b6 46
+  s_3bb4e0b0f759d9::t_74b19939299239 89-96
+plugins/yellow-research/commands/research/deep.md
+  s_3bb4e0b0f759d9::t_c557c1525a9727 108-110
+  s_6959c35d9893ee::t_6cf2e1e0ddc529 111,113-116,118-122
+  s_3bb4e0b0f759d9::t_b30ee65a584225 87
+  s_3bb4e0b0f759d9::t_be257e5016ce8f 129-130,132
+  s_3bb4e0b0f759d9::t_97478322c04342 101-102,106-107
+plugins/yellow-research/agents/research/research-conductor.md
+  s_f5fa4421099f37::t_edeb2591236d6b 218-226
+  s_3bb4e0b0f759d9::t_aee19cca62f40c 227-229,236-239
+plugins/yellow-core/tests/repo-profile.bats
+  s_3bb4e0b0f759d9::t_b765a95953952f 58-59
+  s_f5fa4421099f37::t_6ea5d37b13615a 75
+  s_3bb4e0b0f759d9::t_0a7e56d8add1f2 138-139
+  s_f5fa4421099f37::t_29c95409994013 186,193-199
+  s_f5fa4421099f37::t_456883b9125a75 1-57,60-74,76-137,140-185,187-192
+plugins/yellow-core/CLAUDE.md
+  s_f5fa4421099f37::t_fe5fd78eda6173 214-221
+plugins/yellow-core/commands/workflows/plan.md
+  s_f5fa4421099f37::t_d13666fe055d57 190-199,214
+  s_f5fa4421099f37::t_7b9ebb05e322e3 200-206
+  s_3bb4e0b0f759d9::t_e805fb3058a733 207-213,215-218
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_1d5751b7853b24::t_6b4a30eca4aaf8 24
+  s_3bb4e0b0f759d9::t_a45925c1611415 17-20
+  s_3bb4e0b0f759d9::t_1c5c768974317d 21-23
+  s_3bb4e0b0f759d9::t_aa7f1b9d1e6b99 122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "21e279a8d577d4f5be6ae9f31004de5129cf894b",
+  "prompts": {},
+  "sessions": {
+    "s_1d5751b7853b24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a7195efbc59d34244",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_3bb4e0b0f759d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5447bbb-d745-4066-b5bb-7844331ee952",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_6959c35d9893ee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a56ccca1f9de18233",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
