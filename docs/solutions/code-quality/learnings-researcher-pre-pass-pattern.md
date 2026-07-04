@@ -146,7 +146,7 @@ To add a new orchestrator with the same pre-pass:
 
    ```
    Task(
-     subagent_type: "yellow-core:learnings-researcher",
+     subagent_type: "yellow-core:research:learnings-researcher",
      description: "Past learnings pre-pass",
      prompt: "<work-context>"
    )
