@@ -39,6 +39,18 @@ security taxonomy and escalates to `/workflows:spec`.
   is an older commit that predates the feature — do not use it for C18;
   flag it for a snapshot refresh separately.
 
+<!-- deepen-plan: codebase -->
+> **Codebase:** Verified — both reference clones still exist at the cited SHAs
+> and the load-bearing citations line-match exactly (CE `ce-compound/SKILL.md:356`
+> "Phase 2.4: Vocabulary Capture", issue-#956 text at `:107`; turbo
+> `self-improve/SKILL.md:75,100-106`). The vendored
+> `RESEARCH/upstream-snapshots/e5b397c9.../` CE snapshot contains no
+> "Vocabulary Capture"/"Phase 2.4"/"CONCEPTS.md" anywhere — the
+> snapshot-refresh flag stands. Also confirmed: `staging-reviewer.md:406` and
+> `staging-promoter.md:96-97,146-151` match the taxonomy citations verbatim,
+> and `plans/specs/` exists (empty) as the established home for the C13 spec.
+<!-- /deepen-plan -->
+
 ## Implementation Plan
 
 ### Phase 1 (C12): behavioral-rules block — repo-level first
@@ -71,6 +83,15 @@ precedent and would need its own drain carve-out
       internals.
 - [ ] 1.4 While editing root CLAUDE.md: fix the pre-existing duplicate
       `# CLAUDE.md` H1 (two H1s from an old concat — verified by SpecFlow).
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** Duplicate H1 confirmed and still unfixed — root `CLAUDE.md` has
+> `# CLAUDE.md` at line 1 and again at line 228 (the old behavioral-guidelines
+> concat). For 1.2: `sweep.md:3` reads "no gates, no per-step prompts" and
+> `:17` "no human gates anywhere — sweep is fire-and-forget by design" —
+> "gate-free by design" is a fair paraphrase, not a verbatim quote.
+<!-- /deepen-plan -->
+
 - [ ] 1.5 No changeset (root file). Record in the section header that rules
       were adapted from turbo ADDITIONS.md with the repo's own carve-outs.
 
@@ -94,6 +115,14 @@ lesson generalized).
       — pure sourceable stdin/stdout filter). Document its coverage gap in the
       skill (pattern-based; does not catch prose-described credentials —
       instruct the model not to restate secret values in task descriptions).
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** Confirmed — `cs_redact_secrets()` spans
+> `compound-staging.sh:116-150` (one line past the cited range), a pure
+> `sed -E` stdin/stdout pipeline with no side effects; sourceable as planned.
+> `plans/handoff/` confirmed net-new — no collision with existing skills.
+<!-- /deepen-plan -->
+
 - [ ] 2.3 Do NOT extend `validate-solutions.js` to this path (wrong shape —
       hardcoded depth-4 + solutions frontmatter schema). No CI gate in v1.
 - [ ] 2.4 Resume side: one paragraph in the skill telling a fresh session to
@@ -102,6 +131,14 @@ lesson generalized).
 - [ ] 2.5 Catalog sync: yellow-core CLAUDE.md skill count (18 → 19 if Tier 1
       C3 landed; otherwise include both fixes), README tables. **Sequence
       after Tier 1 C3 or absorb its count fix.**
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** Contingency resolved — Tier 1 C3 has landed and is archived
+> (`plans/complete/tier-1-optimization-quick-wins.md`, tasks 3.1/3.2 checked);
+> `plugins/yellow-core/CLAUDE.md` already reads "### Skills (18)". Task 2.5 is
+> the 18 → 19 increment only; no dual fix, no sequencing wait.
+<!-- /deepen-plan -->
+
 - [ ] 2.6 Changeset (minor — new capability), validators, LF normalize.
 
 ### Phase 3 (C15): learnings pre-pass for plan + brainstorm — changesets: yellow-core, yellow-research(docs only if touched)
@@ -118,16 +155,44 @@ lesson generalized).
       empty-detection + fencing + graceful-degrade verbatim from
       `review-pr.md:177-288` (degrade block `:283-287`). `Task` is already in
       plan.md allowed-tools (`:11`).
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** `plan.md:11` (Task in allowed-tools) and the ruvector recall at
+> `:49-67` confirmed exactly; `learnings-researcher.md:26` confirms empty Diff
+> is supported; the `:149` two-segment bug (task 3.1) is confirmed still
+> present. Line drift in the copy source: the sanitization block is now
+> `review-pr.md:181-289` and the degrade block starts at `:287` (Tier 1 PRs
+> shifted it) — re-grep at implementation time rather than trusting cited
+> ranges.
+<!-- /deepen-plan -->
+
 - [ ] 3.3 `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md`:
       same pre-pass early in the dialogue flow, before the first question
       round (`Task` already in tools `:11`). Findings feed question framing;
       fenced as reference-only.
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** `Task` confirmed in tools at `:11`. The first question round is
+> "Phase 1: Initial Questions (max 5)" at line 41, preceded by "Phase 0:
+> Clarity Assessment" (`:30-40`) which confirms TOPIC. Since the pre-pass needs
+> a confirmed TOPIC to build its `<work-context>` block, insert it at the end
+> of Phase 0 / start of Phase 1 — not before Phase 0.
+<!-- /deepen-plan -->
+
 - [ ] 3.4 Restore the accurate Integration list in `learnings-researcher.md`
       (this phase makes the `/workflows:plan` + brainstorm claims TRUE).
       **Hard coordination with Tier 1 C3.3, which edits the same lines
       (`:294-300`)**: if C3.3 already landed (claims removed), re-add them
       here; if not landed, do both edits in whichever PR ships first and drop
       the other's task.
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** Coordination resolved — C3.3 already landed: the Integration
+> list at `learnings-researcher.md:294-300` now names only `/review:pr`,
+> `/review:review-all`, `/docs:review`, and standalone Task. The "re-add them
+> here" branch is the one that applies; drop the not-landed branch.
+<!-- /deepen-plan -->
+
 - [ ] 3.5 Ordering note in both files: pre-pass runs alongside ruvector recall
       — the two sources are complementary (distilled learnings docs vs vector
       recall), not redundant; keep both.
@@ -144,10 +209,37 @@ research-conductor agent boundary** — a prose-emitting subagent returning a
 long research synthesis inline, exactly CE's issue-#956 failure shape
 (CE `skills/ce-compound/SKILL.md:96-110`).
 
+<!-- deepen-plan: codebase -->
+> **Codebase:** One factual correction — "research-conductor's internal fan-out
+> is parallel MCP tool calls, not Task dispatch" is wrong:
+> `research-conductor.md:9` lists `Task` in tools and `:136-142` explicitly
+> dispatches concurrent queries via Task. The scoping conclusion still holds
+> (those inner Task calls wrap MCP query invocations, not prose-emitting
+> personas, so they don't carry the summary-collapse risk), but fix the
+> preamble rationale before shipping. Return shape confirmed as the issue-#956
+> failure: `research-conductor.md:215` "Do not save to a file — the
+> /research:deep command handles writing" + `deep.md:89` writes the inline
+> return. Citation drift: the exemption text is at
+> `create-agent-skills/SKILL.md:254` and `review-pr.md:~396-411` (content
+> verbatim, lines shifted by Tier 1 PRs).
+<!-- /deepen-plan -->
+
 - [ ] 4.1 `plugins/yellow-research/commands/research/deep.md`: generate
       RUN_DIR (CE pattern: `date +%Y%m%d-%H%M%S` + 4 urandom hex bytes) under
       the session scratchpad or `${CLAUDE_PLUGIN_DATA}`; pass the path into
       the research-conductor Task prompt.
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** Drop the `${CLAUDE_PLUGIN_DATA}` alternative here — RUN_DIR is
+> ephemeral per-run scratch, and the repo's canonical convention
+> (`create-agent-skills/references/subagent-failure-convention.md:98-100`,
+> fresh from Tier 1 C4) mandates `mktemp -d -t run-XXXXXXXX` under
+> `$TMPDIR`/`/tmp` for RUN_DIR; CE's own RUN_DIR precedent is also /tmp-based
+> (`/tmp/compound-engineering/ce-compound/<run-id>/`). Use the session
+> scratchpad / mktemp exclusively. (`CLAUDE_PLUGIN_DATA` remains correct for
+> Phase 5's persistent cache — different use case.)
+<!-- /deepen-plan -->
+
 - [ ] 4.2 `research-conductor.md`: write the full synthesis to
       `$RUN_DIR/synthesis.md` and return a compact confirmation + path;
       inline-return fallback ONLY when the artifact write fails (CE rule:
@@ -160,6 +252,23 @@ long research synthesis inline, exactly CE's issue-#956 failure shape
       `create-agent-skills/references/` post-Tier-1-C4) with this adopter and
       the exemption list, so scope stays discoverable.
 
+<!-- deepen-plan: codebase -->
+> **Codebase:** Confirmed already true — Tier 1 C4 landed; the convention
+> lives at `create-agent-skills/references/subagent-failure-convention.md`
+> (168 lines) with a load-stub at `SKILL.md:243`.
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: external -->
+> **Research:** While editing that reference file, fix its stale claim
+> (`:98-100`) that `CLAUDE_PLUGIN_DATA` is "not a documented Claude Code
+> runtime env var" — it IS officially documented as the plugin's persistent
+> data directory (survives plugin updates), alongside `CLAUDE_PLUGIN_ROOT`.
+> This resolves the repo's internal doc contradiction in
+> `credential-status.sh`'s favor.
+> See: https://code.claude.com/docs/en/plugins-reference (Environment
+> variables → Persistent data directory).
+<!-- /deepen-plan -->
+
 ### Phase 5 (C17): repo-profile cache — changeset: yellow-core (+ consumers as adopted)
 
 - [ ] 5.1 New helper `plugins/yellow-core/lib/repo-profile.sh` (yellow-core
@@ -169,6 +278,26 @@ long research synthesis inline, exactly CE's issue-#956 failure shape
       — NOT `/tmp` (no persistent-cache precedent uses /tmp; context7-cache
       uses CLAUDE_PLUGIN_DATA, yellow-ci uses ~/.cache; /tmp retention is a
       documented data-residue concern).
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** Convention match confirmed — `lib/` has exactly
+> `validate-fs.sh`, `compound-staging.sh`, `credential-status.sh`, each with a
+> 1:1 bats suite in `tests/`. `credential-status.sh:37-46` already implements
+> the exact `${CLAUDE_PLUGIN_DATA}`-with-`~/.cache`-fallback resolution
+> proposed here — reuse it nearly verbatim. yellow-ci's `~/.cache` precedent
+> also verified (`resolve-runner-targets.sh:49`, `session-start.sh:40,57`).
+<!-- /deepen-plan -->
+
+<!-- deepen-plan: external -->
+> **Research:** Storage choice validated — `CLAUDE_PLUGIN_DATA` is officially
+> documented as the persistent per-plugin data directory. One caveat: in
+> Cowork Desktop it currently resolves to a session-scoped path that does not
+> persist (anthropics/claude-code#51398) — on that surface the cache degrades
+> to per-session cold starts, which the 5.5 optimization-only contract already
+> tolerates.
+> See: https://code.claude.com/docs/en/plugins-reference
+<!-- /deepen-plan -->
+
 - [ ] 5.2 Keying + freshness = CE protocol
       (CE `skills/ce-plan/references/repo-profile-cache.md:27-59`): root-sha =
       first root commit (`git rev-list --max-parents=0 HEAD` lexicographic
@@ -178,6 +307,22 @@ long research synthesis inline, exactly CE's issue-#956 failure shape
       lockfiles, root instruction/doc files, workflow/topology sources).
       Over-invalidation is the accepted failure direction. Rebase staleness is
       resolved by design (head-sha changes → miss).
+
+<!-- deepen-plan: external -->
+> **Research:** The shallow-clone hazard is real and *silent*: shallow
+> boundary commits are grafted as parentless, so `git rev-list
+> --max-parents=0 HEAD` succeeds but returns the boundary commit — the value
+> shifts with clone depth, with no error to catch. Gate keying on `git
+> rev-parse --is-shallow-repository` returning `false` and treat `true` as
+> NO-CACHE (or fall back to a remote-URL hash). Detached HEAD needs no
+> special-casing — rev-list traversal is identical. Multi-root repos
+> (unrelated-history merges) are why "lexicographic first" matters; hashing
+> the full sorted root set is marginally more robust.
+> See: https://git-scm.com/docs/shallow,
+> https://git-scm.com/docs/git-rev-parse,
+> https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/
+<!-- /deepen-plan -->
+
 - [ ] 5.3 **Hard design constraint — single writer per key**: one
       compute-and-atomic-write (tmp+mv) of the whole profile object per miss;
       NO consumer may incrementally patch subfields of an existing entry.
@@ -208,6 +353,14 @@ long research synthesis inline, exactly CE's issue-#956 failure shape
       (adapt CE's conservative bar: clear core nouns seed, borderline waits;
       class/file names dressed as entities excluded —
       CE `skills/ce-compound/SKILL.md:356-374`).
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** All knowledge-compounder citations exact — `:226` "## Routing
+> Decision", `:261-290` "## M3 Confirmation" with "before **any writes**" at
+> `:263`, and the Phase 1 header "Parallel Extraction (5 Subagents)" at `:56`
+> (so this is genuinely the 6th). `docs/CONCEPTS.md` confirmed net-new.
+<!-- /deepen-plan -->
+
 - [ ] 6.2 Write target `docs/CONCEPTS.md`, seeded with CE's bootstrap preamble
       adapted: "Shared domain vocabulary for this project… accretes as
       /workflows:compound processes learnings; direct edits are fine.
@@ -283,6 +436,15 @@ C18 M/low (interactive-only, M3-gated) · C13 spec-escalation (not sized here).
   not error on missing directory.
 - C17 detached HEAD / shallow clone: `rev-list --max-parents=0` may differ —
   treat any keying-derivation failure as NO-CACHE.
+
+<!-- deepen-plan: external -->
+> **Research:** Note the shallow-clone failure mode is silent, not an error —
+> in a shallow clone `rev-list --max-parents=0` returns a wrong-but-valid SHA,
+> so "treat any keying-derivation failure as NO-CACHE" never fires. It needs
+> the proactive `git rev-parse --is-shallow-repository` check from 5.2, not
+> just error trapping. Detached HEAD, by contrast, genuinely needs no handling.
+<!-- /deepen-plan -->
+
 - C18 M3 rejection: user declining the compound write also declines the
   CONCEPTS edit (single gate, atomic decision).
 
@@ -295,6 +457,14 @@ Phase 6 (C18) after Tier 3 Phase 3 is not required — independent, but both
 touch knowledge-compounder docs ecosystem; coordinate if concurrent.
 C13 spec runs whenever — its output plans separately.
 
+<!-- deepen-plan: codebase -->
+> **Codebase:** The Tier 1 C3 prerequisite is already satisfied — both Tier 1
+> and Tier 2 are fully landed and archived in `plans/complete/`. All six
+> phases are unblocked and can start immediately; the only remaining
+> coordination is the intra-plan kind (Phase 3/Phase 6 both touch the
+> knowledge ecosystem).
+<!-- /deepen-plan -->
+
 ## References
 
 - `docs/optimization/analysis.md` §2, §3.6, §4 Tier 3
@@ -304,6 +474,17 @@ C13 spec runs whenever — its output plans separately.
   `:356-374` (Phase 2.4 vocabulary capture),
   `skills/ce-plan/references/repo-profile-cache.md` (full protocol),
   `CONCEPTS.md:1-3` (bootstrap preamble)
+
+<!-- deepen-plan: external -->
+> **Research:** Upstream freshness (checked 2026-07-04): all three cited turbo
+> files are unchanged since 2026-05-25 or earlier; CE `ce-compound/SKILL.md`
+> and `repo-profile-cache.md` were last touched 2026-06-29 (PR #1027,
+> pre-snapshot). Only CE `CONCEPTS.md` changed after the snapshot (+9 lines on
+> 2026-07-03 — an unrelated `/ce-explain` catalog row, not a mechanism
+> change). The copied mechanics are current; no re-clone needed.
+> See: https://github.com/EveryInc/compound-engineering-plugin/compare/db21ba2...main
+<!-- /deepen-plan -->
+
 - `docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md`
   (template; fix `:149` first)
 - `docs/solutions/logic-errors/periodic-rebuild-wipes-incremental-cache-state.md`
@@ -311,3 +492,12 @@ C13 spec runs whenever — its output plans separately.
 - `plugins/yellow-review/commands/review/review-pr.md:177-288,410-423`
 - `plans/tier-1-optimization-quick-wins.md` (C3 coordination),
   `plans/tier-2-structural-optimizations.md` (C10 warning rules complement C12)
+
+<!-- deepen-plan: codebase -->
+> **Codebase:** Both tier plans have been archived — cite
+> `plans/complete/tier-1-optimization-quick-wins.md` and
+> `plans/complete/tier-2-structural-optimizations.md` (cosmetic path
+> staleness). Line-number citations into `review-pr.md` and
+> `create-agent-skills/SKILL.md` drifted ~14 lines after Tier 1 landed —
+> re-grep rather than trust exact ranges.
+<!-- /deepen-plan -->
