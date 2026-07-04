@@ -1,0 +1,47 @@
+plugins/yellow-core/skills/session-handoff/SKILL.md
+  s_3bb4e0b0f759d9::t_cb2842de6f1494 3
+  s_f5fa4421099f37::t_f8e9fb5ff16bf4 84-85
+  s_f5fa4421099f37::t_697c6a0d4e3e9e 88-94
+  s_3bb4e0b0f759d9::t_5f5735faa31c6b 113-120
+  s_f5fa4421099f37::t_e905608a371d4e 73-75,80-83
+plugins/yellow-core/commands/workflows/plan.md
+  s_3bb4e0b0f759d9::t_6013700e78f091 134,138
+  s_f5fa4421099f37::t_37422bf33747fc 93-95,101-102,106-109
+  s_f5fa4421099f37::t_ad3b90d57933a6 142-144,149-150
+  s_3bb4e0b0f759d9::t_23d7390bc916c8 145-148
+  s_f5fa4421099f37::t_2d9b7fed5400a1 69-92,96-100,103-105,110-133,135-137,139-141,151-176
+.changeset/tier3-c15-learnings-pre-pass.md
+  s_f5fa4421099f37::t_9fd1957baa5441 1-11
+docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md
+  s_f5fa4421099f37::t_087f5fcf865333 149
+plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md
+  s_f5fa4421099f37::t_3767354b1534fb 41-53,56,61-65,73-74,77
+  s_3bb4e0b0f759d9::t_53ca68d01136c9 54-55,57-60
+  s_3bb4e0b0f759d9::t_82389f64d78e25 66-72
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_f5fa4421099f37::t_a5ea9f077baa03 300-303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f6fe284a84a923deb9435e5e015de48c2769515e",
+  "prompts": {},
+  "sessions": {
+    "s_3bb4e0b0f759d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5447bbb-d745-4066-b5bb-7844331ee952",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
