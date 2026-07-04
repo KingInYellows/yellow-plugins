@@ -1,0 +1,56 @@
+.changeset/tier3-c16-research-run-artifact.md
+  s_f5fa4421099f37::t_fb86f1096332dd 1-14
+plugins/yellow-core/commands/workflows/plan.md
+  s_f5fa4421099f37::t_2d9b7fed5400a1 134,138
+  s_3bb4e0b0f759d9::t_23d7390bc916c8 145-148
+plugins/yellow-research/commands/research/deep.md
+  s_f5fa4421099f37::t_f7d2191c8eab71 125-126
+  s_f5fa4421099f37::t_683c9e749f5a8e 81-86,88-95,99-100,123-124,127-128
+  s_3bb4e0b0f759d9::t_b30ee65a584225 87
+  s_3bb4e0b0f759d9::t_97478322c04342 101-102,106-122
+plugins/yellow-research/agents/research/research-conductor.md
+  s_f5fa4421099f37::t_d74fa87001b366 11
+  s_3bb4e0b0f759d9::t_aee19cca62f40c 218-225
+  s_f5fa4421099f37::t_edeb2591236d6b 216-217,226-230
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_f5fa4421099f37::t_106be5e6c6d6d9 16,25-28,31-38
+  s_3bb4e0b0f759d9::t_a45925c1611415 17-24
+  s_1d5751b7853b24::t_056689ebcfe4c9 111-115
+plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md
+  s_f5fa4421099f37::t_3767354b1534fb 57
+  s_f5fa4421099f37::t_a4429872a12a10 66-72
+  s_f5fa4421099f37::t_18574e70542c60 58-60
+  s_3bb4e0b0f759d9::t_53ca68d01136c9 54-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a43a8edef87f4f9a35532ddbe55243909f2407e4",
+  "prompts": {},
+  "sessions": {
+    "s_1d5751b7853b24": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a7195efbc59d34244",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_3bb4e0b0f759d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5447bbb-d745-4066-b5bb-7844331ee952",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
