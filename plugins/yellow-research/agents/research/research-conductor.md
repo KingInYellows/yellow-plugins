@@ -8,6 +8,7 @@ memory: project
 tools:
   - Task
   - ToolSearch
+  - Write
   - mcp__plugin_yellow-research_ceramic__ceramic_search
   - mcp__plugin_yellow-research_exa__web_search_exa
   - mcp__plugin_yellow-research_exa__web_search_advanced_exa
@@ -212,5 +213,18 @@ Synthesize all results into this format:
 - [Title](URL) — what was found here
 ```
 
-Return the complete markdown to the caller. Do not save to a file — the
-`/research:deep` command handles writing.
+## Returning the report
+
+If the spawning prompt provided a run-dir path: use the Write tool to save
+the complete markdown report to `<run_dir>/synthesis.md`, then return ONLY
+a compact confirmation:
+
+```
+SYNTHESIS_WRITTEN: <run_dir>/synthesis.md (<N> sources, <M> sections)
+```
+
+Return the full report inline ONLY when the artifact write did not succeed
+(no run-dir provided, or the Write failed) — never return both the
+confirmation and the full report. The `/research:deep` command reads the
+artifact back and handles writing `docs/research/<slug>.md`; do not write
+`docs/research/` paths yourself.

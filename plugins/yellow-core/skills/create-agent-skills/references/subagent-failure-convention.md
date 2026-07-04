@@ -13,16 +13,29 @@ but is not yet shipped.
 ## When the convention applies
 
 Use this convention for orchestrators spawning **prose-emitting**
-agents — `/workflows:work` Phase 3 reviewers are canonical. Prose
-stdout cannot be deterministically parsed for partial-failure
-signals; the file-based result + `status` field is the structural
-signal.
+agents. Prose stdout cannot be deterministically parsed for
+partial-failure signals; the file-based result + `status` field is the
+structural signal.
+
+Current adopters:
+
+- `/workflows:work` Phase 3 reviewers (canonical) — structured JSON
+  result files per reviewer agent
+- `/research:deep` ⇄ `research-conductor` (yellow-research) — a single
+  prose-emitting subagent returning a long research synthesis; the
+  conductor writes `<run_dir>/synthesis.md` and returns a compact
+  confirmation + path, with inline return only when the artifact write
+  fails
 
 Skip when every spawned agent returns strict structured JSON validated
-against a documented schema. `/review:pr` Step 5 is the canonical
-compact-return JSON case: reviewers emit schema-bound findings through
-TaskOutput, so adding `$RUN_DIR` there would duplicate the return
-contract.
+against a documented schema, or already returns a compact status line.
+Documented exemptions:
+
+- `/review:pr` Step 5 — the canonical compact-return JSON case:
+  reviewers emit schema-bound findings through TaskOutput, so adding
+  `$RUN_DIR` there would duplicate the return contract.
+- `staging-promoter` (yellow-core) — already returns a compact status
+  line; same shape as the compact-return exemption.
 
 If an orchestrator mixes compact-return agents with prose emitters, use
 this convention only for the prose emitters or split those emitters into
@@ -95,8 +108,11 @@ filename.
 1. Create a unique run directory at the start of the workflow:
 
    ```bash
-   # Uses $TMPDIR (or /tmp). Avoids CLAUDE_PLUGIN_DATA — not a
-   # documented Claude Code runtime env var; rely on the OS tempdir instead.
+   # Uses $TMPDIR (or /tmp). Avoids CLAUDE_PLUGIN_DATA — that variable IS
+   # documented, but as the plugin's PERSISTENT data directory (survives
+   # plugin updates; see code.claude.com/docs/en/plugins-reference), which
+   # is the wrong home for ephemeral per-run scratch. Rely on the OS
+   # tempdir instead.
    RUN_DIR=$(mktemp -d -t run-XXXXXXXX) && printf '%s\n' "$RUN_DIR"
    ```
 

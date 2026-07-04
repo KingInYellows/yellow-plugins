@@ -78,15 +78,54 @@ mkdir -p docs/research
 
 ### Step 4: Research
 
-Delegate to the `research-conductor` agent with the topic. The conductor will:
+Create a per-run artifact directory FIRST (before the Task spawn). Bash
+variables do not survive across separate Bash tool calls — capture the
+path this command prints and substitute the **literal value** into the
+Task prompt (never the variable name):
+
+```bash
+RUN_DIR=$(mktemp -d -t research-deep-XXXXXXXX) && printf '%s\n' "$RUN_DIR"
+```
+
+If the captured path is empty (`mktemp` failed), skip the artifact
+convention and delegate without a run-dir — the conductor then returns the
+synthesis inline (fallback in Step 5).
+
+Delegate to the `research-conductor` agent with the topic AND the literal
+run-dir path. The conductor will:
 - Triage complexity (simple/moderate/complex)
 - Dispatch parallel queries to appropriate sources
 - Handle async Parallel Task and EXA deep research polling
-- Return synthesized markdown
+- Write the full synthesis to `<run_dir>/synthesis.md` and return a compact
+  confirmation + artifact path (inline return only when the artifact write
+  fails — see the Subagent Failure Convention in yellow-core's
+  `create-agent-skills/references/subagent-failure-convention.md`)
 
 ### Step 5: Save Output
 
-Write the conductor's output to `docs/research/<slug>.md`.
+If the conductor returned a compact confirmation + path: Read
+`<run_dir>/synthesis.md` and Write its content to `docs/research/<slug>.md`.
+
+If the conductor returned the synthesis inline (artifact write failed, or
+no run-dir was provided in Step 4): write the inline return to
+`docs/research/<slug>.md` as before.
+
+If the confirmation names an artifact that is missing or empty AND no
+inline synthesis was returned: report "[research:deep] Error: conductor
+confirmed an artifact that does not exist — no research output to save."
+Never write an empty file to `docs/research/`.
+
+After the target file is written (or on any early exit once the run dir
+exists), clean up — with a path-shape guard so a mistyped or hallucinated
+path can never be deleted:
+
+```bash
+case "<literal mktemp path>" in
+  "${TMPDIR:-/tmp}"/research-deep-*) rm -rf -- "<literal mktemp path>" ;;
+  /tmp/research-deep-*) rm -rf -- "<literal mktemp path>" ;;
+  *) printf '[research:deep] Skipping cleanup: unexpected run-dir shape\n' >&2 ;;
+esac
+```
 
 Report to user:
 ```
