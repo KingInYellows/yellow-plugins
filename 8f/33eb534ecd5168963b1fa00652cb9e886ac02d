@@ -1,0 +1,26 @@
+.changeset/tier3-c16-research-run-artifact.md
+  s_f5fa4421099f37::t_fb86f1096332dd 1-14
+plugins/yellow-research/agents/research/research-conductor.md
+  s_f5fa4421099f37::t_edeb2591236d6b 215-229
+plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md
+  s_f5fa4421099f37::t_106be5e6c6d6d9 16-28,31-38
+  s_f5fa4421099f37::t_1d9d662d204ecf 111-115
+plugins/yellow-research/commands/research/deep.md
+  s_f5fa4421099f37::t_683c9e749f5a8e 81-95,99-102,106-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8f33eb534ecd5168963b1fa00652cb9e886ac02d",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
