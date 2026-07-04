@@ -1,6 +1,6 @@
 ---
 name: session-handoff
-description: "Write a session-handoff artifact at plans/handoff/<YYYY-MM-DD>-<slug>.md capturing current task, workflow status, active artifact, open decisions, in-flight changes, and next action so a fresh session can resume without re-deriving context. Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\", \"pick up where we left off next time\", or a session is approaching a context/compaction boundary mid-task. Not the shells halt-pattern — /workflows:pick-next-shell halts by design after writing its expansion artifact and needs no handoff; use this for free-form session state only."
+description: "Write a session-handoff artifact at plans/handoff/<YYYY-MM-DD>-<slug>.md capturing current task, workflow status, active artifact, open decisions, in-flight changes, and next action so a fresh session can resume without re-deriving context. Use when the user says \"create a handoff\", \"save session state\", \"handoff before compact\", \"pick up where we left off next time\", or a session is approaching a context/compaction boundary mid-task. Not the shell halt pattern — /workflows:pick-next-shell halts by design after writing its expansion artifact and needs no handoff; use this for free-form session state only."
 user-invokable: true
 ---
 
@@ -70,18 +70,28 @@ conversation makes the answer clear.
 ### Step 3: Redact and write
 
 Compose the full artifact body (lead with `# Handoff: <Task Title>`, close
-with the next concrete action), write it to a scratchpad temp file, then
-filter it through the shared redactor into the tracked path:
+with the next concrete action), then pipe it directly through the shared
+redactor into the tracked path in one command — never write the unredacted
+body to its own file:
 
 ```bash
 mkdir -p plans/handoff
 source "${CLAUDE_PLUGIN_ROOT}/lib/compound-staging.sh"
-cs_redact_secrets < "<scratchpad-draft-path>" > "plans/handoff/<YYYY-MM-DD>-<slug>.md"
-rm -f "<scratchpad-draft-path>"
+date="$(date +%Y-%m-%d)"
+slug="<slug derived/validated in Step 1>"
+cs_redact_secrets > "plans/handoff/${date}-${slug}.md" <<'__EOF_HANDOFF_BODY__'
+# Handoff: <Task Title>
+... composed body from Step 2 ...
+__EOF_HANDOFF_BODY__
 ```
 
-Delete the unredacted draft in the same call — it holds the pre-redaction
-content and must not outlive the redacted artifact.
+The heredoc delimiter is single-quoted so the body is captured literally (no
+`$variable` expansion). No unredacted draft is written to a named path
+anywhere in the repo, and there is no separate draft file to delete —
+redaction happens inline as part of writing the artifact. (The shell may
+still spool the heredoc body to its own auto-removed private temp file as an
+implementation detail of `<<`; that file is never repo-local or
+user-addressable, unlike the scratchpad path this replaces.)
 
 **Coverage gap:** `cs_redact_secrets` is pattern-based (vendor token
 prefixes, `password=`/`token=`-style assignments, Bearer/basic auth, PEM
@@ -100,7 +110,14 @@ statement so the path forward is visible at a glance.
 ### Resuming from a handoff
 
 A fresh session asked to "pick up where we left off" should read the newest
-`plans/handoff/*.md` (`ls -t plans/handoff/*.md | head -1`), treat its
+`plans/handoff/*.md`:
+
+```bash
+HANDOFFS=$(ls -t plans/handoff/*.md 2>/dev/null); if [ -z "$HANDOFFS" ]; then echo "No handoffs found"; else echo "$HANDOFFS" | head -n 1; fi
+```
+
+If no handoffs are found, tell the user there is nothing to resume from and
+ask them to describe the task directly. Otherwise, treat the newest file's
 next-action line as the starting point, and verify the in-flight-changes
 list against live `git status` before acting — the working tree may have
 moved since the handoff was written. Deleting consumed handoff files is

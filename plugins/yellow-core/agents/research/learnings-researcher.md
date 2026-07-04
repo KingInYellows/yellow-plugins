@@ -297,6 +297,10 @@ Invoked by:
 - `/review:pr` Step 3d — pre-pass before reviewer dispatch
 - `/review:review-all` — same pre-pass, run per PR in the batch
 - `/docs:review` — learnings pre-pass before document-review personas
+- `/workflows:plan` Phase 1 — pre-pass alongside the ruvector recall
+  (empty Diff field)
+- `/workflows:brainstorm` (`brainstorm-orchestrator` Phase 0b) — pre-pass
+  after TOPIC confirmation, before the first question round
 - Standalone via `Task` with `subagent_type: "yellow-core:research:learnings-researcher"`
 
 Output is consumed as fenced advisory prose — no downstream caller parses
