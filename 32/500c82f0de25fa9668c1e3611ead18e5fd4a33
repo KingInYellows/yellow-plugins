@@ -1,0 +1,26 @@
+plugins/yellow-core/CLAUDE.md
+  s_f5fa4421099f37::t_7bf5b7cd7587aa 187-191
+  s_f5fa4421099f37::t_f12a56ce320fdf 134
+.changeset/tier3-c14-session-handoff.md
+  s_f5fa4421099f37::t_6b63b0073ba598 1-9
+plugins/yellow-core/README.md
+  s_f5fa4421099f37::t_91035bfd3610da 98
+plugins/yellow-core/skills/session-handoff/SKILL.md
+  s_f5fa4421099f37::t_e905608a371d4e 1-99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "32500c82f0de25fa9668c1e3611ead18e5fd4a33",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
