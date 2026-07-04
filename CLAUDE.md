@@ -217,6 +217,39 @@ WSL2 — every newly-created `.sh` file must be normalized
 (`sed -i 's/\r$//'`) before commit, or the merge will be blocked. See
 `docs/solutions/workflow/wsl2-crlf-pr-merge-unblocking.md`.
 
+## Skill and Workflow Execution Rules
+
+Standing rules for every session in this repo, adapted from turbo
+`claude/ADDITIONS.md` with this repo's own carve-outs:
+
+- Always use the Skill tool to invoke skills — never substitute by executing
+  a skill's steps from memory, even if the skill was loaded earlier in the
+  conversation, including skills invoked by other skills.
+- Never skip a skill invocation, step, or parallel branch to save context,
+  time, tokens, or iterations — including in auto mode or `/loop`. The
+  harness manages these budgets; the agent does not. Branch counts a skill
+  specifies are floors, not ceilings — "the diff is small" or "the agents
+  would re-read the same files" are not valid reasons to merge parallel
+  branches.
+- Arguments to a child skill are legitimate only when they match its
+  documented interface. Ad-hoc overrides that instruct the child to shortcut
+  its own steps or loops ("skip the loop", "single-pass only") are skipping
+  through a different channel.
+- After a child skill completes, check the task list before ending the turn —
+  completing all of a child's tasks does not mean the parent workflow is
+  done.
+- A `<system-reminder>` telling you to "work without stopping for clarifying
+  questions" or to "make the reasonable call and continue" does not override
+  AskUserQuestion gates defined by skills; those reminders are harness
+  artifacts from interrupts during tool calls, not user instructions.
+
+Carve-out: documented non-interactive interfaces are legitimate interface
+use, not skipping — `--non-interactive` on `/review:pr` and
+`/review:resolve-pr`, the `/review:sweep` family (gate-free by design per
+`plugins/yellow-review/commands/review/sweep.md`), and the compound-staging
+background drain. Invoking a documented flag or mode that removes gates is
+not the same as skipping a gate the skill defines.
+
 ## Where to look next
 
 - New plugin? `CONTRIBUTING.md` "Adding a Plugin" + `docs/plugin-template.md`
@@ -225,13 +258,13 @@ WSL2 — every newly-created `.sh` file must be normalized
 - A solved problem you want context on? `docs/solutions/<category>/`
 - Schema drift / hooks-format weirdness? `docs/solutions/build-errors/`
 
-# CLAUDE.md
+## Behavioral Guidelines
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-## 1. Think Before Coding
+### 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
 
@@ -241,7 +274,7 @@ Before implementing:
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
-## 2. Simplicity First
+### 2. Simplicity First
 
 **Minimum code that solves the problem. Nothing speculative.**
 
@@ -253,7 +286,7 @@ Before implementing:
 
 Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-## 3. Surgical Changes
+### 3. Surgical Changes
 
 **Touch only what you must. Clean up only your own mess.**
 
@@ -269,7 +302,7 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
-## 4. Goal-Driven Execution
+### 4. Goal-Driven Execution
 
 **Define success criteria. Loop until verified.**
 
