@@ -24,7 +24,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.22.2",
+      "version": "1.23.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -114,7 +114,7 @@
     {
       "name": "yellow-research",
       "description": "Deep research plugin with Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
-      "version": "3.3.1",
+      "version": "3.4.0",
       "author": {
         "name": "KingInYellows"
       },

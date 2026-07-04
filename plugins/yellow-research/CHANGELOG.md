@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.4.0
+
+### Minor Changes
+
+- [#615](https://github.com/KingInYellows/yellow-plugins/pull/615)
+  [`e6b1ac7`](https://github.com/KingInYellows/yellow-plugins/commit/e6b1ac77ea71da5e93831abcd3d603faa51d70ca)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Adopt the
+  run-artifact convention at the `/research:deep` ⇄ `research-conductor`
+  boundary: the command creates a per-run directory via `mktemp`, the conductor
+  writes the full synthesis to `<run_dir>/synthesis.md` and returns a compact
+  confirmation + path (inline return only when the artifact write fails), and
+  the command reads the artifact back before writing `docs/research/<slug>.md`.
+  yellow-core: the Subagent Failure Convention reference gains an
+  adopter/exemption list and corrects its stale claim that `CLAUDE_PLUGIN_DATA`
+  is undocumented (it is documented — as the persistent data dir, which is why
+  RUN_DIR still must not use it).
+
 ## 3.3.1
 
 ### Patch Changes

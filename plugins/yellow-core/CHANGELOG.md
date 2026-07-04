@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.23.0
+
+### Minor Changes
+
+- [#613](https://github.com/KingInYellows/yellow-plugins/pull/613)
+  [`ad3d4de`](https://github.com/KingInYellows/yellow-plugins/commit/ad3d4dee024f0c9cf2ee2209ad7554854cd94456)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `session-handoff` skill: writes a tracked handoff artifact at
+  `plans/handoff/<YYYY-MM-DD>-<slug>.md` (current task, workflow status, active
+  artifact, open decisions, in-flight changes, next action) with all free-text
+  content piped through `cs_redact_secrets` before it touches the tracked file.
+  Includes resume guidance for fresh sessions. Catalogs updated to 19 skills.
+
+- [#614](https://github.com/KingInYellows/yellow-plugins/pull/614)
+  [`ecff7fa`](https://github.com/KingInYellows/yellow-plugins/commit/ecff7faed456f76591400592a2b228504139d8bf)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  `learnings-researcher` pre-pass to `/workflows:plan` (Phase 1, sibling of the
+  ruvector recall) and `brainstorm-orchestrator` (new Phase 0b after TOPIC
+  confirmation): docs/solutions/ learnings are retrieved at planning and
+  brainstorm time with the same sanitization, two-condition empty-detection,
+  fencing, and never-abort degrade contract as `/review:pr` Step 3d. The agent's
+  Integration list now names the true dispatch set; fixes the two-segment
+  `subagent_type` in the pre-pass pattern doc.
+
+- [#616](https://github.com/KingInYellows/yellow-plugins/pull/616)
+  [`5a00305`](https://github.com/KingInYellows/yellow-plugins/commit/5a003059416fa0e64c3a4dca51fffa7136256f5f)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add
+  `lib/repo-profile.sh`: a git-SHA-keyed repo-orientation profile cache (CE
+  protocol adapted). Key = lexicographically-first root commit + HEAD, with a
+  proactive `--is-shallow-repository` guard (shallow rev-list silently returns
+  the boundary commit — no error to trap); HIT requires schema-version match and
+  no dirty profile-input path (conservative superset, over-invalidation
+  accepted). Atomic whole-object tmp+mv writes, single writer per key;
+  docs/solutions/ enumeration is never cached. Degrades to NO-CACHE everywhere —
+  the cache never blocks. First consumer wired: `/workflows:plan` Phase 2 passes
+  the profile to research agents as advisory context. 17-test bats suite
+  included.
+
+### Patch Changes
+
+- [#615](https://github.com/KingInYellows/yellow-plugins/pull/615)
+  [`e6b1ac7`](https://github.com/KingInYellows/yellow-plugins/commit/e6b1ac77ea71da5e93831abcd3d603faa51d70ca)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Adopt the
+  run-artifact convention at the `/research:deep` ⇄ `research-conductor`
+  boundary: the command creates a per-run directory via `mktemp`, the conductor
+  writes the full synthesis to `<run_dir>/synthesis.md` and returns a compact
+  confirmation + path (inline return only when the artifact write fails), and
+  the command reads the artifact back before writing `docs/research/<slug>.md`.
+  yellow-core: the Subagent Failure Convention reference gains an
+  adopter/exemption list and corrects its stale claim that `CLAUDE_PLUGIN_DATA`
+  is undocumented (it is documented — as the persistent data dir, which is why
+  RUN_DIR still must not use it).
+
 ## 1.22.2
 
 ### Patch Changes
