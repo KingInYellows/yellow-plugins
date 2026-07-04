@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.24.1
+
+### Patch Changes
+
+- [#620](https://github.com/KingInYellows/yellow-plugins/pull/620)
+  [`0403017`](https://github.com/KingInYellows/yellow-plugins/commit/04030170c6137eefe7558b40f1a1824cc3abb2ff)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Wording
+  follow-up for the tier3 C18 CONCEPTS.md vocabulary capture (#617):
+  `docs/CONCEPTS.md` grammar fix ("Accretes" → "It accretes"), and
+  `knowledge-compounder.md` rewords the `TERM:/KIND:/DEFINITION:` shorthand to
+  spelled-out field names for clarity. No behavior change.
+
 ## 1.24.0
 
 ### Minor Changes
