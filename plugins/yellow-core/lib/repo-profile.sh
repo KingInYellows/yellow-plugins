@@ -7,7 +7,10 @@
 # ce-plan/references/repo-profile-cache.md.
 #
 #   rp_get        → prints "HIT" + profile JSON | "MISS" + write path | "NO-CACHE"
-#   rp_put <file> → atomic tmp+mv whole-object write at the current key
+#   rp_put <file> [expected-entry] → atomic tmp+mv whole-object write at the
+#                   current key. Pass the write path printed by the earlier
+#                   rp_get MISS as [expected-entry] so the write is rejected
+#                   if HEAD moved between the get and the put (see rp_put).
 #
 # Hard rules:
 #   - Single writer per key: one compute-and-atomic-write of the WHOLE
@@ -17,8 +20,9 @@
 #   - Never cached: docs/solutions/ enumeration and question-specific
 #     grounding. Consumers must re-derive those fresh on every run.
 #   - Degradation: outside git / shallow clone / unwritable cache /
-#     malformed entry / missing jq → NO-CACHE (exit 0). The cache is an
-#     optimization, never a correctness dependency.
+#     malformed entry / missing jq / no writable storage root (both
+#     CLAUDE_PLUGIN_DATA and HOME unset) → NO-CACHE (exit 0). The cache is
+#     an optimization, never a correctness dependency.
 #
 # Note: this file is intended to be sourced. It MUST NOT alter the
 # caller's shell options (no top-level `set -e`, `set -u`,
@@ -35,11 +39,15 @@ RP_SCHEMA_VERSION=1
 # directory, survives plugin updates) when set; ~/.cache fallback otherwise
 # (credential-status.sh and yellow-ci precedent). Never /tmp — this is a
 # persistent cache and /tmp retention is a documented data-residue concern.
+# Non-zero return (caller treats as NO-CACHE) when both CLAUDE_PLUGIN_DATA
+# and HOME are unset/empty, rather than falling back to /tmp.
 rp_cache_root() {
   if [ -n "${CLAUDE_PLUGIN_DATA:-}" ]; then
     printf '%s/repo-profile' "$CLAUDE_PLUGIN_DATA"
+  elif [ -n "${HOME:-}" ]; then
+    printf '%s/.cache/yellow-plugins/repo-profile' "$HOME"
   else
-    printf '%s/.cache/yellow-plugins/repo-profile' "${HOME:-/tmp}"
+    return 1
   fi
 }
 
@@ -82,11 +90,14 @@ rp_inputs_dirty() {
   local status_out
   status_out=$(git status --porcelain --untracked-files=all 2>/dev/null) || return 0
   [ -z "$status_out" ] && return 1
-  # cut strips the two status columns + space. On a porcelain rename line
-  # ("old -> new") the $-anchored regex only matches the NEW-side name; a
-  # rename AWAY from an input name is caught at the next head-sha change,
-  # not here — accepted staleness bound, not a freshness guarantee.
-  printf '%s\n' "$status_out" | cut -c4- | grep -qE "$(_rp_input_regex)"
+  # cut strips the two status columns + space. git double-quotes paths
+  # containing unusual characters (spaces, backslashes, non-ASCII) — strip
+  # the quotes so the $-anchored regex can match. Rename lines ("old ->
+  # new") are split on " -> " so BOTH sides are tested: a rename AWAY from
+  # an input name must invalidate too, since a staged rename does not move
+  # HEAD (no next-head-sha-change to catch it later).
+  printf '%s\n' "$status_out" | cut -c4- | tr -d '"' \
+    | awk '{gsub(/ -> /, "\n"); print}' | grep -qE "$(_rp_input_regex)"
 }
 
 # rp_get — prints exactly one of:
@@ -95,7 +106,7 @@ rp_inputs_dirty() {
 #   NO-CACHE   (cache unusable this run: derive fresh, skip put)
 # Always exits 0 — the cache never blocks the caller.
 rp_get() {
-  local key root_sha head_sha entry entry_dir
+  local key root_sha head_sha entry entry_dir cache_root
   if ! command -v jq >/dev/null 2>&1; then
     printf 'NO-CACHE\n'
     return 0
@@ -104,9 +115,13 @@ rp_get() {
     printf 'NO-CACHE\n'
     return 0
   fi
+  if ! cache_root=$(rp_cache_root); then
+    printf 'NO-CACHE\n'
+    return 0
+  fi
   root_sha=${key%% *}
   head_sha=${key##* }
-  entry_dir="$(rp_cache_root)/${root_sha}"
+  entry_dir="${cache_root}/${root_sha}"
   entry="${entry_dir}/${head_sha}.json"
   if [ -f "$entry" ] \
     && jq -e . "$entry" >/dev/null 2>&1 \
@@ -124,24 +139,34 @@ rp_get() {
   return 0
 }
 
-# rp_put <json-file> — validate and atomically install the WHOLE profile
-# object at the current key (write .tmp in the same directory, then mv).
-# Refuses to write when any profile-input path is dirty: an entry derived
-# from transient dirty state would later be served as a false HIT once the
-# tree is reverted to clean at the same HEAD. Non-zero on any failure;
-# callers MUST treat failure as a skipped optimization, never an error.
+# rp_put <json-file> [expected-entry] — validate and atomically install the
+# WHOLE profile object at the current key (write .tmp in the same directory,
+# then mv). Refuses to write when any profile-input path is dirty: an entry
+# derived from transient dirty state would later be served as a false HIT
+# once the tree is reverted to clean at the same HEAD. Non-zero on any
+# failure; callers MUST treat failure as a skipped optimization, never an
+# error.
+#
+# [expected-entry], if passed, MUST be the write path printed by the rp_get
+# MISS call that triggered this derivation. rp_put re-derives the key from
+# the CURRENT HEAD (not the one rp_get saw) and refuses the write when the
+# re-derived entry path differs from [expected-entry] — HEAD moved between
+# the get and this put, so the profile in hand was derived for a repo state
+# that is no longer current and must not be written under the new key.
 rp_put() {
-  local src="${1:-}" key root_sha head_sha entry entry_dir tmp
+  local src="${1:-}" expected="${2:-}" key root_sha head_sha entry entry_dir tmp cache_root
   { [ -n "$src" ] && [ -f "$src" ]; } || return 1
   command -v jq >/dev/null 2>&1 || return 1
   jq -e . "$src" >/dev/null 2>&1 || return 1
   [ "$(jq -r '.profile_schema_version // empty' "$src" 2>/dev/null)" = "$RP_SCHEMA_VERSION" ] || return 1
   key=$(rp_derive_key) || return 1
   rp_inputs_dirty && return 1
+  cache_root=$(rp_cache_root) || return 1
   root_sha=${key%% *}
   head_sha=${key##* }
-  entry_dir="$(rp_cache_root)/${root_sha}"
+  entry_dir="${cache_root}/${root_sha}"
   entry="${entry_dir}/${head_sha}.json"
+  { [ -n "$expected" ] && [ "$entry" != "$expected" ]; } && return 1
   mkdir -p "$entry_dir" 2>/dev/null || return 1
   chmod 700 "$entry_dir" 2>/dev/null || :
   tmp="${entry}.tmp.$$"

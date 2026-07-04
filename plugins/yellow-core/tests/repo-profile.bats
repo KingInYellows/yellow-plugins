@@ -55,7 +55,8 @@ teardown() {
   # the guard must be the is-shallow-repository check, not error trapping.
   git -C "$REPO" commit -q --allow-empty -m second
   SHALLOW="$WORK/shallow"
-  git clone -q --depth 1 "file://$REPO" "$SHALLOW" 2>/dev/null
+  run git clone -q -c protocol.file.allow=always --depth 1 "file://$REPO" "$SHALLOW"
+  [ "$status" -eq 0 ]
   cd "$SHALLOW"
   run rp_derive_key
   [ "$status" -ne 0 ]
@@ -134,6 +135,21 @@ teardown() {
   printf 'changed\n' >> "$REPO/src/app.js"
   run rp_get
   [ "${lines[0]}" = "HIT" ]
+}
+
+@test "untracked profile-input path with a space in its directory blocks a HIT (quoted porcelain path)" {
+  rp_put "$PROFILE"
+  mkdir -p "$REPO/dir with space"
+  printf '{}\n' > "$REPO/dir with space/package.json"
+  run rp_get
+  [ "${lines[0]}" = "MISS" ]
+}
+
+@test "staged rename away from a profile-input path blocks a HIT" {
+  rp_put "$PROFILE"
+  git -C "$REPO" mv package.json package.bak
+  run rp_get
+  [ "${lines[0]}" = "MISS" ]
 }
 
 # --- entry validation ---

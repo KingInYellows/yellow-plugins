@@ -200,12 +200,20 @@ End of conversation context. Respond only based on the task instructions above.
    ```
    If no match, output: `NO_MATCH`
 5. **Prevention Strategist** — produces prevention checklist
-6. **Vocabulary Extractor** — FIRST reads
+6. **Vocabulary Extractor** — the orchestrator resolves
    `${CLAUDE_PLUGIN_ROOT}/references/knowledge-compounder/concepts-vocabulary.md`
-   (unconditional — do not pre-judge from memory that nothing qualifies),
-   then scans the extracted solution content and the surrounding
-   conversation for qualifying domain terms per those criteria. Returns
-   either `NO_QUALIFYING_TERMS` or one `TERM:/KIND:/DEFINITION:` block per
+   to a literal absolute path and substitutes it into this subagent's Task
+   prompt (a spawned subagent cannot expand the variable itself — same
+   literal-path rule as the RUN_DIR convention). The subagent FIRST reads
+   that criteria file (unconditional — do not pre-judge from memory that
+   nothing qualifies) and, when `docs/CONCEPTS.md` exists, reads it too so
+   `KIND: new|refinement` is derived from the actual file state rather
+   than guessed. It then scans the conversation context it was given (the
+   same Phase 1 input as its siblings — the solution doc does not exist
+   yet at extraction time) for qualifying domain terms per those criteria.
+   Returns `VOCAB_REFERENCE_UNREADABLE` (alone) when the criteria file
+   cannot be read — never criteria-from-memory — otherwise either
+   `NO_QUALIFYING_TERMS` or one `TERM:/KIND:/DEFINITION:` block per
    candidate (see the reference's output contract). Proposes candidates
    only — it never writes `docs/CONCEPTS.md` itself.
 
@@ -217,7 +225,8 @@ After all 6 subagents complete:
 - Category Classifier returned CATEGORY_FAILED → STOP
 - Related Docs Finder failed → continue with warning, leave section as placeholder
 - Prevention Strategist failed → continue with warning, leave section as placeholder
-- Vocabulary Extractor failed → continue with warning; M3 preview records
+- Vocabulary Extractor failed or returned `VOCAB_REFERENCE_UNREADABLE` →
+  continue with warning; M3 preview records
   `CONCEPTS.md: not scanned (extractor failed)`
 
 If stopping, print the specific error and exit. Do not proceed to M3.
@@ -287,8 +296,9 @@ paths) before approving:
   line that will be inserted, including the topic heading and bullet text,
   in a fenced block
 - **CONCEPTS.md line** — exactly one of: `CONCEPTS.md: +N terms /
-  M refinements` (with the candidate `TERM:/DEFINITION:` blocks shown in a
-  fenced block), `CONCEPTS.md: no qualifying terms`, or the not-scanned
+  M refinements` (with the candidate `TERM:/KIND:/DEFINITION:` blocks shown
+  in a fenced block, so the approver can verify the new/refinement split
+  behind the count), `CONCEPTS.md: no qualifying terms`, or the not-scanned
   variants from Phase 1. Always present — the explicit no-result record is
   the audit signal that the vocabulary criteria were consulted. The single
   M3 gate covers this write atomically: the user declining the compound
@@ -316,10 +326,19 @@ After user confirmation, write files sequentially.
 
 ### CONCEPTS.md Vocabulary Write
 
+**Run this write LAST in Phase 2** — only after the solution-doc (or
+AMEND_EXISTING) and MEMORY.md writes have succeeded — so a failure in those
+steps cannot leave orphaned glossary entries for a solution that was never
+persisted. The M3 gate covers the user-decline case; this ordering rule
+covers write-time failures.
+
 When the approved M3 preview carried candidate terms (`+N terms /
 M refinements`): the orchestrator (never the subagent) applies them to
-`docs/CONCEPTS.md` — append new terms, refine existing entries in place. If
-the file does not exist, create it with the bootstrap preamble:
+`docs/CONCEPTS.md` — append new terms, refine existing entries in place.
+If a candidate resolves a naming ambiguity, add or update the "Flagged
+ambiguities" tail section per the criteria file. If the file does not
+exist, create it with the bootstrap preamble (keep this template in sync
+with the seeded `docs/CONCEPTS.md` preamble):
 
 ```markdown
 # Concepts
@@ -331,9 +350,12 @@ only, not a spec or catch-all.
 ```
 
 Out of scope by design: the background-drain path never writes
-`docs/CONCEPTS.md` (`staging-promoter`'s write scope is frozen by RULE 14b)
-and compound-lifecycle refresh integration is deferred — glossary capture
-stays interactive-only until proven.
+`docs/CONCEPTS.md` — `staging-promoter`'s documented write scope is
+`docs/solutions/` plus the MEMORY.md `## Session Notes` gate, and RULE 14b
+lints only that MEMORY.md gate (no CI rule guards a future CONCEPTS.md
+write, so extending `staging-promoter` there requires an explicit design
+decision, not just a lint pass). Compound-lifecycle refresh integration is
+deferred — glossary capture stays interactive-only until proven.
 
 ### AMEND_EXISTING Route
 

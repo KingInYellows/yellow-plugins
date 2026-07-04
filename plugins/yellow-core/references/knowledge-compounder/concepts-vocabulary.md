@@ -20,8 +20,10 @@ not vocabulary. Conservatism is about quality, not count.
 
 ## Where terms come from
 
-Scan the newly written solution doc **and** the surrounding conversation —
-qualifying terms often live in the conversation rather than the doc itself.
+Scan the extracted solution content **and** the surrounding conversation —
+qualifying terms often live in the conversation rather than the solution
+itself. (The solution doc does not exist yet at Phase 1 extraction time;
+the conversation context is the primary source.)
 A scoped run defines only terms it actually investigated; it does not reach
 for repo-wide nouns it never touched. (A repo-wide bootstrap glossary is an
 explicit user request, not a side effect of one compound run.)
