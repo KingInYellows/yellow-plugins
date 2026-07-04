@@ -1,0 +1,27 @@
+plugins/yellow-core/tests/repo-profile.bats
+  s_f5fa4421099f37::t_456883b9125a75 1-189
+plugins/yellow-core/commands/workflows/plan.md
+  s_f5fa4421099f37::t_d13666fe055d57 188-213
+plugins/yellow-core/CLAUDE.md
+  s_f5fa4421099f37::t_fe5fd78eda6173 214-221
+plugins/yellow-core/lib/repo-profile.sh
+  s_f5fa4421099f37::t_7f9c09b338e5f1 1-139
+.changeset/tier3-c17-repo-profile-cache.md
+  s_f5fa4421099f37::t_849b5c9e5b73e4 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "7c5b3eac7df497cc1396130690ea6a6940e7d560",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
