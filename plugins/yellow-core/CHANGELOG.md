@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.24.0
+
+### Minor Changes
+
+- [#617](https://github.com/KingInYellows/yellow-plugins/pull/617)
+  [`8f86123`](https://github.com/KingInYellows/yellow-plugins/commit/8f861239e9e1149826578e43f4556b48e9aa4b74)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - CONCEPTS.md
+  vocabulary capture: `knowledge-compounder` Phase 1 gains a 6th extraction
+  subagent (Vocabulary Extractor) that proposes glossary candidates per a new
+  `references/knowledge-compounder/concepts-vocabulary.md` criteria file
+  (conservative bar — clear core nouns qualify, borderline waits, implementation
+  identifiers excluded). Only the orchestrator writes `docs/CONCEPTS.md`, inside
+  the existing M3 gate; the M3 preview always carries an explicit CONCEPTS line
+  (+N terms / no qualifying terms / not scanned). `docs/CONCEPTS.md` seeded with
+  the bootstrap preamble. Background-drain path unchanged (staging-promoter
+  write scope frozen).
+
 ## 1.23.0
 
 ### Minor Changes
