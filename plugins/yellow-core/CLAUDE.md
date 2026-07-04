@@ -211,6 +211,14 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   via `_VALIDATE_FS_LOADED` guard; safe to source twice from test setup +
   runtime hook chain. Canonical bats coverage at
   `plugins/yellow-core/tests/validate-fs.bats`
+- `repo-profile.sh` — git-SHA-keyed repo-orientation profile cache
+  (`rp_get`/`rp_put`): root-sha + head-sha key with proactive shallow-clone
+  guard, conservative dirty-input invalidation, atomic whole-object tmp+mv
+  writes (single writer per key — subfield patching is forbidden by
+  contract), NO-CACHE degradation everywhere. Storage:
+  `${CLAUDE_PLUGIN_DATA}` → `~/.cache/yellow-plugins/repo-profile/`.
+  First consumer: `/workflows:plan` Phase 2. Bats coverage at
+  `plugins/yellow-core/tests/repo-profile.bats`
 
 ### Optional Plugin Dependencies
 

@@ -84,7 +84,7 @@ path this command prints and substitute the **literal value** into the
 Task prompt (never the variable name):
 
 ```bash
-RUN_DIR=$(mktemp -d -t research-deep-XXXXXXXX) && printf '%s\n' "$RUN_DIR"
+RUN_DIR=$(mktemp -d -t research-deep-XXXXXXXX 2>/dev/null); printf '%s\n' "$RUN_DIR"
 ```
 
 If the captured path is empty (`mktemp` failed), skip the artifact
@@ -98,30 +98,38 @@ run-dir path. The conductor will:
 - Handle async Parallel Task and EXA deep research polling
 - Write the full synthesis to `<run_dir>/synthesis.md` and return a compact
   confirmation + artifact path (inline return only when the artifact write
-  fails — see the Subagent Failure Convention in yellow-core's
-  `create-agent-skills/references/subagent-failure-convention.md`)
+  fails — see the Subagent Failure Convention in
+  `plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md`)
 
 ### Step 5: Save Output
 
-If the conductor returned a compact confirmation + path: Read
-`<run_dir>/synthesis.md` and Write its content to `docs/research/<slug>.md`.
+Treat `SYNTHESIS_WRITTEN:` as the only valid confirmation prefix — ignore
+any other returned text as a confirmation. If the conductor's return
+starts with `SYNTHESIS_WRITTEN:`: always read from the literal
+`<run_dir>/synthesis.md` path captured in Step 4 (never a different path
+echoed back in the confirmation text), and Write its content to
+`docs/research/<slug>.md`.
 
-If the conductor returned the synthesis inline (artifact write failed, or
-no run-dir was provided in Step 4): write the inline return to
-`docs/research/<slug>.md` as before.
+If the conductor returned the synthesis inline instead (artifact write
+failed, or no run-dir was provided in Step 4): write the inline return to
+`docs/research/<slug>.md` as before — unless it is empty or
+whitespace-only, in which case treat it as no synthesis (see below).
 
-If the confirmation names an artifact that is missing or empty AND no
-inline synthesis was returned: report "[research:deep] Error: conductor
-confirmed an artifact that does not exist — no research output to save."
-Never write an empty file to `docs/research/`.
+If the artifact at `<run_dir>/synthesis.md` is missing or empty, or the
+inline return is empty or whitespace-only, and no valid content exists on
+either path: report "[research:deep] Error: conductor confirmed an
+artifact that does not exist — no research output to save." Never write
+an empty file to `docs/research/`.
 
 After the target file is written (or on any early exit once the run dir
 exists), clean up — with a path-shape guard so a mistyped or hallucinated
 path can never be deleted:
 
 ```bash
+_tmpdir="${TMPDIR:-/tmp}"
+_tmpdir="${_tmpdir%/}"
 case "<literal mktemp path>" in
-  "${TMPDIR:-/tmp}"/research-deep-*) rm -rf -- "<literal mktemp path>" ;;
+  "$_tmpdir"/research-deep-*) rm -rf -- "<literal mktemp path>" ;;
   /tmp/research-deep-*) rm -rf -- "<literal mktemp path>" ;;
   *) printf '[research:deep] Skipping cleanup: unexpected run-dir shape\n' >&2 ;;
 esac

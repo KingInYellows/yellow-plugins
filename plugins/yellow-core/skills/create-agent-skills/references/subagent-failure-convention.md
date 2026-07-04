@@ -14,8 +14,14 @@ but is not yet shipped.
 
 Use this convention for orchestrators spawning **prose-emitting**
 agents. Prose stdout cannot be deterministically parsed for
-partial-failure signals; the file-based result + `status` field is the
-structural signal.
+partial-failure signals; a file-based result is the structural signal.
+The concrete marker differs by adopter shape: JSON-result adopters
+(e.g. `/workflows:work` reviewers, below) signal via a `status` field
+inside the result file, while file-based-artifact adopters (e.g.
+`/research:deep`, below) signal via a fixed-prefix confirmation line
+(`SYNTHESIS_WRITTEN:`) plus the artifact's existence on disk. The
+`status` field is not universal across adopters — it applies only to
+the JSON-shaped ones.
 
 Current adopters:
 
@@ -113,7 +119,7 @@ filename.
    # plugin updates; see code.claude.com/docs/en/plugins-reference), which
    # is the wrong home for ephemeral per-run scratch. Rely on the OS
    # tempdir instead.
-   RUN_DIR=$(mktemp -d -t run-XXXXXXXX) && printf '%s\n' "$RUN_DIR"
+   RUN_DIR=$(mktemp -d -t run-XXXXXXXX 2>/dev/null); printf '%s\n' "$RUN_DIR"
    ```
 
    Capture the printed path. Bash variables do NOT survive across
