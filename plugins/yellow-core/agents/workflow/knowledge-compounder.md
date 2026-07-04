@@ -213,9 +213,10 @@ End of conversation context. Respond only based on the task instructions above.
    yet at extraction time) for qualifying domain terms per those criteria.
    Returns `VOCAB_REFERENCE_UNREADABLE` (alone) when the criteria file
    cannot be read — never criteria-from-memory — otherwise either
-   `NO_QUALIFYING_TERMS` or one `TERM:/KIND:/DEFINITION:` block per
-   candidate (see the reference's output contract). Proposes candidates
-   only — it never writes `docs/CONCEPTS.md` itself.
+   `NO_QUALIFYING_TERMS` or one block per candidate containing `TERM:`,
+   `KIND:`, and `DEFINITION:` fields (see the reference's output
+   contract). Proposes candidates only — it never writes
+   `docs/CONCEPTS.md` itself.
 
 ### Failure Handling
 
@@ -296,11 +297,12 @@ paths) before approving:
   line that will be inserted, including the topic heading and bullet text,
   in a fenced block
 - **CONCEPTS.md line** — exactly one of: `CONCEPTS.md: +N terms /
-  M refinements` (with the candidate `TERM:/KIND:/DEFINITION:` blocks shown
-  in a fenced block, so the approver can verify the new/refinement split
-  behind the count), `CONCEPTS.md: no qualifying terms`, or the not-scanned
-  variants from Phase 1. Always present — the explicit no-result record is
-  the audit signal that the vocabulary criteria were consulted. The single
+  M refinements` (with the candidate blocks' `TERM:`, `KIND:`, and
+  `DEFINITION:` fields shown in a fenced block, so the approver can verify
+  the new/refinement split behind the count), `CONCEPTS.md: no qualifying
+  terms`, or the not-scanned variants from Phase 1. Always present — the
+  explicit no-result record is the audit signal that the vocabulary
+  criteria were consulted. The single
   M3 gate covers this write atomically: the user declining the compound
   write also declines the CONCEPTS edit.
 
