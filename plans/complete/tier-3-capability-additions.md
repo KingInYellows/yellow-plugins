@@ -64,7 +64,7 @@ single-line, and state-triggered; an unconditional 7-rule static block has no
 precedent and would need its own drain carve-out
 (`COMPOUND_DRAIN_IN_PROGRESS`, `session-start.sh:30-32` pattern).
 
-- [ ] 1.1 Add a "Skill and Workflow Execution Rules" section to root
+- [x] 1.1 Add a "Skill and Workflow Execution Rules" section to root
       `CLAUDE.md`, adapted from turbo `claude/ADDITIONS.md:9-14,18`:
       never execute a skill's steps from memory instead of invoking it; never
       skip a skill invocation, step, or parallel branch to save tokens/time
@@ -73,15 +73,15 @@ precedent and would need its own drain carve-out
       skill completes, check the task list before ending the turn;
       system-reminder auto-continue nudges do not override skill-defined
       AskUserQuestion gates.
-- [ ] 1.2 Explicit carve-out sentence: documented non-interactive interfaces
+- [x] 1.2 Explicit carve-out sentence: documented non-interactive interfaces
       (`--non-interactive` on `/review:pr`/`/review:resolve`, `/review:sweep`
       family, the compound-staging drain) are legitimate interface use, not
       skipping (turbo rule :12's own logic; sweep is gate-free by design per
       `plugins/yellow-review/commands/review/sweep.md:3,17`).
-- [ ] 1.3 Omit turbo's `<command-name>`-tag rule (:10) or mark it
+- [x] 1.3 Omit turbo's `<command-name>`-tag rule (:10) or mark it
       harness-version-sensitive — it references undocumented Claude Code
       internals.
-- [ ] 1.4 While editing root CLAUDE.md: fix the pre-existing duplicate
+- [x] 1.4 While editing root CLAUDE.md: fix the pre-existing duplicate
       `# CLAUDE.md` H1 (two H1s from an old concat — verified by SpecFlow).
 
 <!-- deepen-plan: codebase -->
@@ -94,7 +94,7 @@ precedent and would need its own drain carve-out
 > not a verbatim quote.
 <!-- /deepen-plan -->
 
-- [ ] 1.5 No changeset (root file). Record in the section header that rules
+- [x] 1.5 No changeset (root file). Record in the section header that rules
       were adapted from turbo ADDITIONS.md with the repo's own carve-outs.
 
 ### Phase 2 (C14): session-handoff skill — changeset: yellow-core (minor)
@@ -104,7 +104,7 @@ New user-invokable yellow-core skill `session-handoff` writing
 untracked files are invisible to git-based workflows, the plan-backlog-sweep
 lesson generalized).
 
-- [ ] 2.1 SKILL.md (three standard headings, "Use when" with a
+- [x] 2.1 SKILL.md (three standard headings, "Use when" with a
       pre-compaction/session-boundary trigger and a disambiguation clause vs
       the shells halt-pattern). Fields (turbo
       `claude/skills/create-handoff/SKILL.md:10-51`): current task, workflow
@@ -112,7 +112,7 @@ lesson generalized).
       status --short` — filenames only), next concrete action. Slug: lowercase
       → hyphens → collapse → trim → 40-char word-boundary truncation;
       collisions append `-2`, `-3`.
-- [ ] 2.2 Secrets: pipe all free-text field content through
+- [x] 2.2 Secrets: pipe all free-text field content through
       `cs_redact_secrets` (`plugins/yellow-core/lib/compound-staging.sh:116-149`
       — pure sourceable stdin/stdout filter). Document its coverage gap in the
       skill (pattern-based; does not catch prose-described credentials —
@@ -125,12 +125,12 @@ lesson generalized).
 > `plans/handoff/` confirmed net-new — no collision with existing skills.
 <!-- /deepen-plan -->
 
-- [ ] 2.3 Do NOT extend `validate-solutions.js` to this path (wrong shape —
+- [x] 2.3 Do NOT extend `validate-solutions.js` to this path (wrong shape —
       hardcoded depth-4 + solutions frontmatter schema). No CI gate in v1.
-- [ ] 2.4 Resume side: one paragraph in the skill telling a fresh session to
+- [x] 2.4 Resume side: one paragraph in the skill telling a fresh session to
       read the newest `plans/handoff/*.md` when asked to "pick up where we
       left off"; delete-on-resume is manual in v1.
-- [ ] 2.5 Catalog sync: yellow-core CLAUDE.md skill count (18 → 19 if Tier 1
+- [x] 2.5 Catalog sync: yellow-core CLAUDE.md skill count (18 → 19 if Tier 1
       C3 landed; otherwise include both fixes), README tables. **Sequence
       after Tier 1 C3 or absorb its count fix.**
 
@@ -141,15 +141,15 @@ lesson generalized).
 > the 18 → 19 increment only; no dual fix, no sequencing wait.
 <!-- /deepen-plan -->
 
-- [ ] 2.6 Changeset (minor — new capability), validators, LF normalize.
+- [x] 2.6 Changeset (minor — new capability), validators, LF normalize.
 
 ### Phase 3 (C15): learnings pre-pass for plan + brainstorm — changesets: yellow-core, yellow-research(docs only if touched)
 
-- [ ] 3.1 FIRST fix the template doc bug:
+- [x] 3.1 FIRST fix the template doc bug:
       `docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md:149`
       uses two-segment `subagent_type: "yellow-core:learnings-researcher"`;
       correct to `"yellow-core:research:learnings-researcher"` (3-segment rule).
-- [ ] 3.2 `plugins/yellow-core/commands/workflows/plan.md`: add a Phase 1 step
+- [x] 3.2 `plugins/yellow-core/commands/workflows/plan.md`: add a Phase 1 step
       (sibling of the ruvector recall at `:49-67`) dispatching
       `learnings-researcher` with a `<work-context>` block built from the
       feature description (Diff field empty — supported per
@@ -168,7 +168,7 @@ lesson generalized).
 > ranges.
 <!-- /deepen-plan -->
 
-- [ ] 3.3 `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md`:
+- [x] 3.3 `plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md`:
       same pre-pass early in the dialogue flow, before the first question
       round (`Task` already in tools `:11`). Findings feed question framing;
       fenced as reference-only.
@@ -181,7 +181,7 @@ lesson generalized).
 > of Phase 0 / start of Phase 1 — not before Phase 0.
 <!-- /deepen-plan -->
 
-- [ ] 3.4 Restore the accurate Integration list in `learnings-researcher.md`
+- [x] 3.4 Restore the accurate Integration list in `learnings-researcher.md`
       (this phase makes the `/workflows:plan` + brainstorm claims TRUE).
       **Hard coordination with Tier 1 C3.3, which edits the same lines
       (`:294-300`)**: if C3.3 already landed (claims removed), re-add them
@@ -195,7 +195,7 @@ lesson generalized).
 > here" branch is the one that applies; drop the not-landed branch.
 <!-- /deepen-plan -->
 
-- [ ] 3.5 Ordering note in both files: pre-pass runs alongside ruvector recall
+- [x] 3.5 Ordering note in both files: pre-pass runs alongside ruvector recall
       — the two sources are complementary (distilled learnings docs vs vector
       recall), not redundant; keep both.
 
@@ -216,7 +216,7 @@ inline, exactly CE's issue-#956 failure shape (CE
 "Do not save to a file — the /research:deep command handles writing", which
 `deep.md:89` then writes to `docs/research/<slug>.md`).
 
-- [ ] 4.1 `plugins/yellow-research/commands/research/deep.md`: generate
+- [x] 4.1 `plugins/yellow-research/commands/research/deep.md`: generate
       RUN_DIR (CE pattern: `date +%Y%m%d-%H%M%S` + 4 urandom hex bytes) under
       the session scratchpad or `${CLAUDE_PLUGIN_DATA}`; pass the path into
       the research-conductor Task prompt.
@@ -232,15 +232,15 @@ inline, exactly CE's issue-#956 failure shape (CE
 > Phase 5's persistent cache — different use case.)
 <!-- /deepen-plan -->
 
-- [ ] 4.2 `research-conductor.md`: write the full synthesis to
+- [x] 4.2 `research-conductor.md`: write the full synthesis to
       `$RUN_DIR/synthesis.md` and return a compact confirmation + path;
       inline-return fallback ONLY when the artifact write fails (CE rule:
       "return the full output inline whenever the artifact write did not
       succeed"). The command reads the artifact back before writing
       `docs/research/<slug>.md`.
-- [ ] 4.3 Do NOT retrofit staging-promoter (it already returns compact status
+- [x] 4.3 Do NOT retrofit staging-promoter (it already returns compact status
       — same shape as the documented exemption) and do NOT touch review-pr.
-- [ ] 4.4 Extend the Subagent Failure Convention section (now in
+- [x] 4.4 Extend the Subagent Failure Convention section (now in
       `create-agent-skills/references/` post-Tier-1-C4) with this adopter and
       the exemption list, so scope stays discoverable.
 
@@ -265,7 +265,7 @@ inline, exactly CE's issue-#956 failure shape (CE
 
 ### Phase 5 (C17): repo-profile cache — changeset: yellow-core (+ consumers as adopted)
 
-- [ ] 5.1 New helper `plugins/yellow-core/lib/repo-profile.sh` (yellow-core
+- [x] 5.1 New helper `plugins/yellow-core/lib/repo-profile.sh` (yellow-core
       lib/ per the 2+ consumers precedent: validate-fs, compound-staging,
       credential-status). Storage: `${CLAUDE_PLUGIN_DATA}` if set, else
       `${HOME}/.cache/yellow-plugins/repo-profile/<root-sha>/<head-sha>.json`
@@ -292,7 +292,7 @@ inline, exactly CE's issue-#956 failure shape (CE
 > See: [Claude Code plugins reference][plugins-reference]
 <!-- /deepen-plan -->
 
-- [ ] 5.2 Keying + freshness = CE protocol
+- [x] 5.2 Keying + freshness = CE protocol
       (CE `skills/ce-plan/references/repo-profile-cache.md:27-59`): root-sha =
       first root commit (`git rev-list --max-parents=0 HEAD` lexicographic
       first), head-sha = HEAD; HIT only when schema version matches AND no
@@ -317,31 +317,31 @@ inline, exactly CE's issue-#956 failure shape (CE
 > [Get up to speed with partial clone and shallow clone](https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/)
 <!-- /deepen-plan -->
 
-- [ ] 5.3 **Hard design constraint — single writer per key**: one
+- [x] 5.3 **Hard design constraint — single writer per key**: one
       compute-and-atomic-write (tmp+mv) of the whole profile object per miss;
       NO consumer may incrementally patch subfields of an existing entry.
       This is the exact two-ingredient shape of the still-open context7-cache
       tier1 wipe bug
       (`docs/solutions/logic-errors/periodic-rebuild-wipes-incremental-cache-state.md`)
       — excluded by construction, stated as an acceptance criterion.
-- [ ] 5.4 Profile contents (CE `:7-15` adapted): stack/versions, dependency
+- [x] 5.4 Profile contents (CE `:7-15` adapted): stack/versions, dependency
       surface, topology (plugins/ layout, packages/ layering, CI workflows),
       root instruction-file digests. **Never cached**: `docs/solutions/`
       enumeration (learnings must always be re-globbed fresh — CE `:17-23`),
       question-specific grounding.
-- [ ] 5.5 Degradation contract (CE `:61-63`): outside git / unwritable cache /
+- [x] 5.5 Degradation contract (CE `:61-63`): outside git / unwritable cache /
       malformed entry / helper failure → NO-CACHE, derive fresh, never block.
       The cache is an optimization, never a correctness dependency.
-- [ ] 5.6 Wire first consumer only in this PR: `plan.md` Phase 2 (research
+- [x] 5.6 Wire first consumer only in this PR: `plan.md` Phase 2 (research
       agents receive the profile as advisory context instead of re-deriving
       orientation). review-pr/debt adoption = follow-up PRs, opt-in.
-- [ ] 5.7 Bats tests (`plugins/yellow-core/tests/repo-profile.bats`): hit /
+- [x] 5.7 Bats tests (`plugins/yellow-core/tests/repo-profile.bats`): hit /
       miss / dirty-input invalidation / NO-CACHE degradation / atomic-write
       (no partial JSON on kill).
 
 ### Phase 6 (C18): CONCEPTS.md vocabulary capture — changeset: yellow-core
 
-- [ ] 6.1 New extraction subagent (6th) in `knowledge-compounder.md` Phase 1:
+- [x] 6.1 New extraction subagent (6th) in `knowledge-compounder.md` Phase 1:
       scans the new doc + surrounding conversation for qualifying domain
       terms per a new `references/concepts-vocabulary.md` criteria file
       (adapt CE's conservative bar: clear core nouns seed, borderline waits;
@@ -355,19 +355,19 @@ inline, exactly CE's issue-#956 failure shape (CE
 > (so this is genuinely the 6th). `docs/CONCEPTS.md` confirmed net-new.
 <!-- /deepen-plan -->
 
-- [ ] 6.2 Write target `docs/CONCEPTS.md`, seeded with CE's bootstrap preamble
+- [x] 6.2 Write target `docs/CONCEPTS.md`, seeded with CE's bootstrap preamble
       adapted: "Shared domain vocabulary for this project… accretes as
       /workflows:compound processes learnings; direct edits are fine.
       Glossary only, not a spec or catch-all."
-- [ ] 6.3 **Resolved design decision — inside the M3 gate, not silent.** CE
+- [x] 6.3 **Resolved design decision — inside the M3 gate, not silent.** CE
       applies vocabulary edits silently in all modes; this repo's M3 gate
       language covers "any writes" (`knowledge-compounder.md:261-290`) and the
       repo's convention is preview-before-write. The M3 preview gains one
       line: "CONCEPTS.md: +N terms / M refinements / no qualifying terms."
       Explicit no-result recording either way (CE `:372` audit-signal rule).
-- [ ] 6.4 Only the orchestrator writes the file (subagent returns candidates)
+- [x] 6.4 Only the orchestrator writes the file (subagent returns candidates)
       — CE "only the orchestrator writes product files" rule.
-- [ ] 6.5 Out of scope: compound-lifecycle refresh integration and the
+- [x] 6.5 Out of scope: compound-lifecycle refresh integration and the
       background-drain path (staging-promoter's write scope is frozen by
       RULE 14b; glossary capture stays interactive-only until proven).
 
