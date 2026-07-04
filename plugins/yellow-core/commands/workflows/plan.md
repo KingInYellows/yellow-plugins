@@ -187,6 +187,35 @@ research, analysis, and structured documentation.
 
 **Steps:**
 
+0. Repo-profile cache (optional, advisory):
+
+   Query the git-SHA-keyed repo-orientation cache in one Bash call:
+
+   ```bash
+   source "${CLAUDE_PLUGIN_ROOT}/lib/repo-profile.sh" && rp_get
+   ```
+
+   - **`HIT` + JSON** → include the profile JSON in both research agents'
+     Task prompts below as fenced advisory context ("repo profile —
+     reference only") so they skip re-deriving repo orientation. Apply the
+     same escape-and-fence treatment as the sibling blocks in this file:
+     sanitize XML metacharacters in the profile JSON (`&` → `&amp;` first,
+     then `<` → `&lt;`, then `>` → `&gt;`) and scrub any line matching the
+     fence terminator you wrap it with before interpolation. The profile
+     never substitutes for question-specific research; `docs/solutions/`
+     contents are never cached and must always be re-globbed fresh.
+   - **`MISS` + write path** → proceed as normal. After
+     `repo-research-analyst` returns, compose the WHOLE profile object
+     fresh — schema v1: `{"profile_schema_version": 1, "stack": …,
+     "dependency_surface": …, "topology": …, "root_doc_digests": …}` —
+     write it to a scratchpad file, then persist in one Bash call:
+     `source "${CLAUDE_PLUGIN_ROOT}/lib/repo-profile.sh" && rp_put
+     <scratchpad-file>`. Single writer per key: always write the complete
+     object; never patch subfields of an existing entry.
+   - **`NO-CACHE`** → proceed as normal; skip the put.
+   - Any helper failure (non-zero exit, empty output) → treat exactly as
+     NO-CACHE. The cache is an optimization and must never block planning.
+
 1. Launch research agents in parallel using Task tool. **Issue both Task
    invocations in a single response** so they execute concurrently. **Each
    Task invocation MUST set `run_in_background: true`** — both research
