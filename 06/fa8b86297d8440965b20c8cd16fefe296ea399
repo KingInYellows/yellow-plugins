@@ -1,0 +1,58 @@
+CLAUDE.md
+  s_f5fa4421099f37::t_b020059215063a 261
+  s_3bb4e0b0f759d9::t_d9bca13f502483 243
+  s_f5fa4421099f37::t_035ac8322021e8 277
+  s_f5fa4421099f37::t_3ce2ee82c0362b 305
+  s_3bb4e0b0f759d9::t_3c86d9cec81a8c 248
+  s_f5fa4421099f37::t_294085e9a94983 220-224,226-242,244-247,249-252
+  s_f5fa4421099f37::t_835e1d3b24a908 289
+  s_3bb4e0b0f759d9::t_877bc3ccc48c92 225
+  s_f5fa4421099f37::t_101d4651af1d5c 267
+plans/tier-3-capability-additions.md
+  s_3bb4e0b0f759d9::t_e7a322cb5475f3 282
+  s_3bb4e0b0f759d9::t_37130d4ba96414 300
+  s_3bb4e0b0f759d9::t_92e03e3e7e81e5 477,480
+  s_f5fa4421099f37::t_5b18a5cbfc3c44 42-53,86,94,118-125,134-141,158-168,173-181,188-195,212-226,231-242,255-271,281,283-299,318,356,440,442-447,460-467,478-479,481-483,496
+  s_3bb4e0b0f759d9::t_f94323d5c4eecc 87-93
+  s_f5fa4421099f37::t_971867957bf27d 315-317
+  s_f5fa4421099f37::t_eca63256e5bb6f 319-321
+  s_f5fa4421099f37::t_f837443686cdee 357-359
+  s_f5fa4421099f37::t_1756314369c410 439
+  s_f5fa4421099f37::t_871109874e4275 441
+  s_f5fa4421099f37::t_7096a12fa9d661 484-486
+  s_f5fa4421099f37::t_c1987f6913a726 495
+  s_f5fa4421099f37::t_d64c028323f0fd 497-499
+  s_e5dd379758fe78::t_f7abb7096799f4 310-314,322-325,360-363,487,500-503
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "06fa8b86297d8440965b20c8cd16fefe296ea399",
+  "prompts": {},
+  "sessions": {
+    "s_3bb4e0b0f759d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f5447bbb-d745-4066-b5bb-7844331ee952",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_e5dd379758fe78": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-af807cb81591e007c",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
