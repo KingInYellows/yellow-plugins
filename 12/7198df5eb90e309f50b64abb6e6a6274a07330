@@ -1,0 +1,30 @@
+plugins/yellow-core/commands/workflows/plan.md
+  s_f5fa4421099f37::t_37422bf33747fc 93-95,101-102,106-109
+  s_f5fa4421099f37::t_ad3b90d57933a6 142-148
+  s_f5fa4421099f37::t_2d9b7fed5400a1 69-92,96-100,103-105,110-141,149-176
+plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md
+  s_f5fa4421099f37::t_a4429872a12a10 62-65
+  s_f5fa4421099f37::t_3767354b1534fb 41-61,66-74,77
+.changeset/tier3-c15-learnings-pre-pass.md
+  s_f5fa4421099f37::t_9fd1957baa5441 1-11
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_f5fa4421099f37::t_a5ea9f077baa03 300-303
+docs/solutions/code-quality/learnings-researcher-pre-pass-pattern.md
+  s_f5fa4421099f37::t_087f5fcf865333 149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "127198df5eb90e309f50b64abb6e6a6274a07330",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}
