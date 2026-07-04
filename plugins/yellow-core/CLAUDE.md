@@ -50,7 +50,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 - `spec-flow-analyzer` — user flow analysis, gap identification
 - `brainstorm-orchestrator` — iterative brainstorm dialogue with research integration
-- `knowledge-compounder` — extract and document solved problems to docs/solutions/ and MEMORY.md
+- `knowledge-compounder` — extract and document solved problems to docs/solutions/ and MEMORY.md; a 6th Phase 1 subagent (Vocabulary Extractor) proposes `docs/CONCEPTS.md` glossary candidates per `references/knowledge-compounder/concepts-vocabulary.md`, written by the orchestrator only, inside the M3 gate (interactive-only — the background drain never writes CONCEPTS.md)
 - `session-historian` — cross-vendor session search across Claude Code (local
   JSONL), Devin (REST API via MCP), and Codex (local
   directory-per-session). BM25 + optional ruvector cosine + recency fused

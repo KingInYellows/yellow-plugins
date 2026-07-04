@@ -188,9 +188,9 @@ Reviews all your open non-draft PRs.
 ```
 
 Run after solving a significant problem. Captures the solution in
-`docs/solutions/<category>/<slug>.md` and/or `MEMORY.md`. Uses 5 parallel
-subagents to extract problem, solution, related docs, prevention steps, and
-category.
+`docs/solutions/<category>/<slug>.md` and/or `MEMORY.md`. Uses 6 parallel
+subagents to extract problem, solution, related docs, prevention steps,
+category, and vocabulary candidates (for `docs/CONCEPTS.md`).
 
 ### Automatic Capture
 

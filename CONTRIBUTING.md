@@ -410,10 +410,12 @@ closing keywords do not trigger the warning. Author judgment fills the gap.
 
 Without `--in-pr`, `/workflows:compound` extracts the solution from the
 **live conversation context** (the in-session transcript). That mode runs
-the full 5-subagent extraction pipeline and is best when the learning was
+the full 6-subagent extraction pipeline and is best when the learning was
 just figured out and the PR body has not yet been written.
 
-With `--in-pr`, the agent skips the 5-subagent pipeline and uses the PR
+
+With `--in-pr`, the agent skips the 6-subagent pipeline and uses the PR
+
 body + commit subjects directly as the canonical source. Use `--in-pr`
 once the PR description is in good shape; use the bare command earlier,
 while the analysis is still in your head.

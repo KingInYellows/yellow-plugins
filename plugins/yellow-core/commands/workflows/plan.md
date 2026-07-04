@@ -204,14 +204,20 @@ research, analysis, and structured documentation.
      fence terminator you wrap it with before interpolation. The profile
      never substitutes for question-specific research; `docs/solutions/`
      contents are never cached and must always be re-globbed fresh.
-   - **`MISS` + write path** → proceed as normal. After
-     `repo-research-analyst` returns, compose the WHOLE profile object
-     fresh — schema v1: `{"profile_schema_version": 1, "stack": …,
-     "dependency_surface": …, "topology": …, "root_doc_digests": …}` —
-     write it to a scratchpad file, then persist in one Bash call:
+   - **`MISS` + write path** → note the write path (the second line of the
+     `rp_get` output) verbatim — it is the expected-entry argument for the
+     `rp_put` call below. Proceed as normal. After `repo-research-analyst`
+     returns, compose the WHOLE profile object fresh — schema v1:
+     `{"profile_schema_version": 1, "stack": …, "dependency_surface": …,
+     "topology": …, "root_doc_digests": …}` — write it to a scratchpad
+     file, then persist in one Bash call:
      `source "${CLAUDE_PLUGIN_ROOT}/lib/repo-profile.sh" && rp_put
-     <scratchpad-file>`. Single writer per key: always write the complete
-     object; never patch subfields of an existing entry.
+     <scratchpad-file> <write-path>`, passing the noted write path as the
+     second argument. `rp_put` re-derives the key from HEAD at write time
+     and rejects the write if it no longer matches the write path — this
+     guards against HEAD moving between this `rp_get` and the `rp_put`
+     call. Single writer per key: always write the complete object; never
+     patch subfields of an existing entry.
    - **`NO-CACHE`** → proceed as normal; skip the put.
    - Any helper failure (non-zero exit, empty output) → treat exactly as
      NO-CACHE. The cache is an optimization and must never block planning.
