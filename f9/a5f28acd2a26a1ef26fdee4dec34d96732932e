@@ -26,8 +26,9 @@ plugins/yellow-core/README.md
 plugins/yellow-core/skills/session-handoff/SKILL.md
   s_f5fa4421099f37::t_ac767c3ac09ea4 51-56
   s_3bb4e0b0f759d9::t_de23ed87569ed5 73-75,80-85,88-94
-  s_f5fa4421099f37::t_e905608a371d4e 1-2,4-50,57-72,76-79,86-87,95-107
+  s_f5fa4421099f37::t_e905608a371d4e 1-2,1-50,4-50,57-72,57-79,76-79,81,81-82,85-107,86-87,86-107,95-107
   s_3bb4e0b0f759d9::t_cb2842de6f1494 3
+  s_f5fa4421099f37::t_697c6a0d4e3e9e 80,82-84
 ---
 {
   "schema_version": "authorship/3.0.0",
