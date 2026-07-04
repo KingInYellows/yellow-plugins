@@ -1,0 +1,29 @@
+plugins/yellow-core/references/knowledge-compounder/concepts-vocabulary.md
+  s_f5fa4421099f37::t_d7bfdacd6e73ce 23-26
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_f5fa4421099f37::t_98e749a7e1da86 203,205-216
+  s_f5fa4421099f37::t_721394dc468e77 353-358
+  s_f5fa4421099f37::t_41d39c8b9ddd22 299-301
+  s_f5fa4421099f37::t_143411522051b3 329-334,337-341
+  s_f5fa4421099f37::t_a4a671e5b981f4 228-229
+CONTRIBUTING.md
+  s_f5fa4421099f37::t_c8996c64f9b579 413
+docs/guides/common-workflows.md
+  s_f5fa4421099f37::t_bde04626741d9e 191-193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "0216f200ca8dff1050b2c4c20b42052e3df36dfc",
+  "prompts": {},
+  "sessions": {
+    "s_f5fa4421099f37": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c3a2630b-c176-4d90-a6bf-182aae3c4ece",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
