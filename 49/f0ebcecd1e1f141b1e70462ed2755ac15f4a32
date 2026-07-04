@@ -1,0 +1,19 @@
+plans/complete/tier-3-capability-additions.md
+  s_93a0c477a92102::t_7ef2d08cbd3b66 67,76,81,84,97,107,115,128,130,133,144,148,152,171,184,198,219,235,241,243,268,295,320,327,332,335,338,344,358,362,368,370
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "49f0ebcecd1e1f141b1e70462ed2755ac15f4a32",
+  "prompts": {},
+  "sessions": {
+    "s_93a0c477a92102": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9888fbb-a486-4822-98df-9e45769b934a",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
