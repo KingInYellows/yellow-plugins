@@ -1,0 +1,19 @@
+plugins/yellow-composio/README.md
+  s_8c0b4886545c65::t_2d5cfa186253f1 115-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "b3cec2410ea9b15ea3414dcad0e49ad55a9e43ec",
+  "prompts": {},
+  "sessions": {
+    "s_8c0b4886545c65": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5641b84-6ce4-4b8a-a230-6cd60544e2b0",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
