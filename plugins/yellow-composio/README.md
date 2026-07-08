@@ -83,9 +83,14 @@ the full migration walk-through.
 
 ## How It Works
 
-This plugin bundles a `type: http` Composio MCP server via `plugin.json`.
-Tools appear under `mcp__plugin_yellow-composio_composio-server__*` after
-the `userConfig` prompts are answered. The plugin also provides:
+This plugin bundles a `command`-type stdio Composio MCP server via
+`plugin.json` — a small wrapper (`bin/start-composio.sh`) resolves the
+credentials and execs a Node.js proxy (`bin/composio-proxy.mjs`) that bridges
+stdio MCP JSON-RPC to Composio's HTTPS endpoint. Node.js 18+ must be on PATH
+for the bundled server to start (the Claude.ai-native and manual
+`claude mcp add` prefixes do not require it). Tools appear under
+`mcp__plugin_yellow-composio_composio-server__*` after the `userConfig`
+prompts are answered. The plugin also provides:
 
 - **Setup validation** -- Confirms Composio is configured and reachable
 - **Usage tracking** -- Local counter since Composio has no billing API
