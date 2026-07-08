@@ -112,6 +112,9 @@ they fall back to existing local approaches with zero user-visible difference.
 - Composio account ([composio.dev](https://composio.dev))
 - A Composio MCP URL and API key (entered via `userConfig` on plugin enable,
   or via a manual `claude mcp add` fallback)
+- Node.js 18+ on PATH (required for the bundled MCP server, which runs
+  `node bin/composio-proxy.mjs`; not needed for the Claude.ai-native or
+  manual `claude mcp add` prefixes)
 - `jq` (recommended for usage tracking)
 
 ## License
