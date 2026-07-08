@@ -24,7 +24,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.24.1",
+      "version": "1.24.2",
       "author": {
         "name": "KingInYellows"
       },
@@ -104,7 +104,7 @@
     {
       "name": "yellow-composio",
       "description": "Optional Composio accelerator for batch workflows with usage tracking",
-      "version": "2.0.3",
+      "version": "2.0.4",
       "author": {
         "name": "KingInYellows"
       },
