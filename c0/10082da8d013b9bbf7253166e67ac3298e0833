@@ -1,0 +1,41 @@
+README.md
+  s_9196351f66972e::t_4ebf358d92be73 50
+plugins/yellow-core/commands/setup/all.md
+  s_9196351f66972e::t_542af3356defe5 501-509
+plugins/yellow-composio/README.md
+  s_9196351f66972e::t_c85427b3842da6 86-93
+plugins/yellow-composio/commands/composio/setup.md
+  s_9196351f66972e::t_98b5ef4f1056d9 59-60,62,64
+  s_9196351f66972e::t_fc1d7b3041fc91 22-23,31-40,44-46
+  s_9196351f66972e::t_6e972ff6ff5315 300-301
+  s_9196351f66972e::t_a04de14ec6a5a9 176-180
+  s_9196351f66972e::t_4875318c6bdf91 203-212
+  s_9196351f66972e::t_4f41694fb54cfc 69-73,75-78,80-82,84-90,92-129,132-148,150-151,153-159,168-169
+plugins/yellow-composio/commands/composio/status.md
+  s_9196351f66972e::t_e404ad368e0f53 133-134,136-146
+  s_9196351f66972e::t_ed819bd5ca17f3 155
+  s_9196351f66972e::t_4bd7c9bbed317d 40
+.changeset/composio-setup-accuracy.md
+  s_9196351f66972e::t_427a0f5cc3cb27 1-20
+.changeset/setup-all-composio-node-wording.md
+  s_9196351f66972e::t_f39c45797511df 1-9
+plugins/yellow-composio/CLAUDE.md
+  s_9196351f66972e::t_53c3fdcb2fdae9 41-46
+  s_9196351f66972e::t_3daab81b857315 33-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c010082da8d013b9bbf7253166e67ac3298e0833",
+  "prompts": {},
+  "sessions": {
+    "s_9196351f66972e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e0fbd80d-c7fe-4d30-9b97-83d9f5fc4eb1",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
