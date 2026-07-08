@@ -37,6 +37,7 @@ fi
 # jq is required for JSON parsing throughout this command
 if ! command -v jq >/dev/null 2>&1; then
   printf '[yellow-composio] jq is required for usage dashboard. Install jq and retry.\n'
+  printf '  Install: brew install jq (macOS) or apt-get install jq (Linux)\n'
   exit 1
 fi
 
@@ -129,9 +130,20 @@ jq -r --arg m "$MONTH" '
 
 Quick ToolSearch for `"COMPOSIO_REMOTE_WORKBENCH"` to check if the MCP server
 is still available. Do NOT execute a Composio tool call -- just verify the tool
-is discoverable.
+is discoverable (this dashboard deliberately makes no live calls, to conserve
+Composio quota — the very budget this command exists to track).
 
-Report: "connected" if found, "offline" if not found.
+Classify per the `mcp-health-probe` vocabulary. Because no live probe is run
+here AND the bundled wrapper validates only credential *presence* at startup
+(an invalid key surfaces as a 401 at tool-invocation time, not at startup),
+tool visibility means "loaded but unverified," not "authenticated":
+
+- Tools discoverable → **PRESENT (untested)** — the MCP is loaded; validity is
+  unverified until first use. (Run `/composio:setup` for a live HEALTHY /
+  DEGRADED probe.)
+- Tools not discoverable → **OFFLINE** — the MCP server did not start. Run
+  `/composio:setup` to diagnose (missing node, unconfigured credentials, or a
+  restart-needed state).
 
 ### Step 5: Display dashboard
 
@@ -140,7 +152,7 @@ Assemble results from Steps 1-4 into a formatted dashboard:
 ```text
 Composio Usage Dashboard
 ========================
-MCP Server:        [connected|offline]
+MCP Server:        [PRESENT (untested)|OFFLINE]
 Current Month:     [month name]
 Executions:        [total] / [threshold] ([pct]%)
 Daily Average:     [avg] calls/day

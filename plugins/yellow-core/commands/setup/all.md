@@ -496,10 +496,23 @@ Define `composio_creds_present` as: status file shows BOTH `composio_mcp_url`
 and `composio_api_key` `present == true`, OR (status file absent AND both
 `COMPOSIO_MCP_URL` and `COMPOSIO_API_KEY` are set in shell env).
 
-- READY: `jq` OK AND `node` OK AND Composio MCP tools visible via ToolSearch
-  AND `composio_creds_present` AND `.claude/composio-usage.json` exists
-- PARTIAL: `composio_creds_present` but MCP tools not visible yet (Claude
-  Code restart needed) OR usage counter missing OR `node` missing
+- READY: `jq` OK AND Composio MCP tools visible via ToolSearch AND
+  `composio_creds_present` AND `.claude/composio-usage.json` exists.
+  (No `node` gate here: visible tools already imply either the bundled
+  server started — so node was adequate — or a legacy prefix is serving
+  them, for which node is irrelevant.)
+- PARTIAL: `composio_creds_present` AND one of:
+  - MCP tools not visible yet AND `node18_check` not `ok` (missing, OR
+    present but older than v18), AND you intend to use the bundled prefix →
+    install or upgrade to Node.js 18+ (the bundled wrapper runs
+    `node bin/composio-proxy.mjs`, whose proxy calls the global `fetch()`
+    API that needs Node 18+; a restart or disable/enable cannot fix a
+    missing or too-old binary). Not needed if using the Claude.ai-native or
+    manual `claude mcp add` prefix.
+  - MCP tools not visible yet → Claude Code restart needed to pick up the
+    newly-configured credentials
+  - usage counter (`.claude/composio-usage.json`) missing → run
+    `/composio:setup`
 - NEEDS SETUP: status file shows either credential as `source: absent`, OR
   status file missing AND at least one of `COMPOSIO_MCP_URL` /
   `COMPOSIO_API_KEY` is unset. In either case the wrapper will exit

@@ -30,16 +30,20 @@ NOT block install — it merely produces a confusing MCP-startup error. The
 wrapper's hard exit on empty values is the actual safeguard. The
 SessionStart hook (`hooks/check-mcp-url.sh`) also writes a
 `credential-status.json` consumed by `/setup:all` for dashboard
-classification.
+classification and by `/composio:setup`'s own remediation branch (when no
+Composio tools are visible, setup reads it to distinguish "credentials
+never configured" from "restart needed").
 
 The plugin still detects externally-configured Composio MCPs as a
 migration aid (`mcp__claude_ai_composio__*` for the Claude.ai native
 integration, `mcp__composio-server__*` for manual `.mcp.json` setups
 predating this plugin). Detection runs in `/composio:setup` and is
-independent of the bundled MCP — for new enables it cannot activate
-against an empty bundled `userConfig` because `required: true` blocks
-that state, but legacy pre-v1.2.4 installs may still be in it until
-re-enabled.
+independent of the bundled MCP. Because `required: true` was removed from
+the bundled `userConfig` (its non-zero wrapper exit is the safeguard, per
+the note above), a fresh enable with empty credentials starts no bundled
+tools at all — while an externally-configured `mcp__claude_ai_composio__*`
+or `mcp__composio-server__*` MCP remains independently detectable and
+usable.
 
 The plugin provides:
 
