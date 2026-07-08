@@ -32,18 +32,27 @@ else
 fi
 
 if command -v node >/dev/null 2>&1; then
-  printf '[yellow-composio] node: ok (%s)\n' "$(node --version 2>/dev/null)"
+  node_ver=$(node --version 2>/dev/null)
+  node_major=$(printf '%s' "$node_ver" | sed 's/^v//' | cut -d. -f1)
+  if [ "${node_major:-0}" -ge 18 ]; then
+    printf '[yellow-composio] node: ok (%s)\n' "$node_ver"
+  else
+    printf '[yellow-composio] node: TOO OLD (%s) -- required for the bundled MCP path only.\n' "$node_ver"
+    printf '  The bundled proxy (bin/composio-proxy.mjs) calls the global fetch() API,\n'
+    printf '  which needs Node 18+. Not needed for the Claude.ai-native or manual\n'
+    printf '  "claude mcp add" prefixes. Upgrade from https://nodejs.org if you use the bundle.\n'
+  fi
 else
   printf '[yellow-composio] node: NOT FOUND -- required for the bundled MCP path only.\n'
   printf '  The bundled server runs "node bin/composio-proxy.mjs"; without node it\n'
-  printf '  cannot start. Not needed for the Claude.ai-native or manual claude-mcp-add\n'
-  printf '  prefixes. Install Node.js 18+ from https://nodejs.org if you use the bundle.\n'
+  printf '  cannot start. Not needed for the Claude.ai-native or manual "claude mcp add"\n'
+  printf '  prefix. Install Node.js 18+ from https://nodejs.org if you use the bundle.\n'
 fi
 ```
 
-Both are soft prerequisites -- setup continues without them. A missing
-`node` only matters for the bundled MCP prefix (see Step 2 for what it means
-when no tools are found).
+Both are soft prerequisites -- setup continues without them. A missing or
+too-old `node` only matters for the bundled MCP prefix (see Step 2 for what
+it means when no tools are found).
 
 ### Step 2: Check Composio MCP tools
 
@@ -82,9 +91,18 @@ Run this diagnostic to determine which case applies. It is self-contained
 subprocess:
 
 ```bash
-# Re-derive node presence (Step 1 ran in a separate subprocess).
+# Re-derive node presence (Step 1 ran in a separate subprocess). The bundled
+# proxy calls global fetch(), which requires Node 18+; an old node on PATH
+# is treated the same as a missing one. Scoped to the bundled prefix only --
+# the Claude.ai-native and manual prefixes don't need node.
 if command -v node >/dev/null 2>&1; then
-  printf 'node: ok (%s)\n' "$(node --version 2>/dev/null)"
+  node_ver=$(node --version 2>/dev/null)
+  node_major=$(printf '%s' "$node_ver" | sed 's/^v//' | cut -d. -f1)
+  if [ "${node_major:-0}" -ge 18 ]; then
+    printf 'node: ok (%s)\n' "$node_ver"
+  else
+    printf 'node: too_old (%s)\n' "$node_ver"
+  fi
 else
   printf 'node: MISSING\n'
 fi
@@ -94,8 +112,8 @@ fi
 STATUS_FILE="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/yellow-composio}/credential-status.json"
 if [ -f "$STATUS_FILE" ] && command -v jq >/dev/null 2>&1; then
   if jq -e . "$STATUS_FILE" >/dev/null 2>&1; then
-    PRESENT=$(jq '[.credentials[] | select(.present == true)] | length' "$STATUS_FILE" 2>/dev/null)
-    TOTAL=$(jq '.credentials | length' "$STATUS_FILE" 2>/dev/null)
+    PRESENT=$(jq '[.credentials[]? | select(.present == true)] | length' "$STATUS_FILE" 2>/dev/null)
+    TOTAL=$(jq '(.credentials // []) | length' "$STATUS_FILE" 2>/dev/null)
     printf 'credentials: %s/%s present (per credential-status.json)\n' "$PRESENT" "$TOTAL"
   else
     # Malformed JSON: never assume "absent" from a parse failure.
@@ -118,12 +136,20 @@ Interpret the diagnostic and give remediation in this priority order (the
 first matching case wins — later fixes cannot help until earlier ones are
 resolved):
 
-1. **node MISSING** — install Node.js 18+ (https://nodejs.org). Nothing
-   else can fix the bundled MCP path until `node` is on PATH; the wrapper's
-   `exec node ...` line cannot run without it. (If you use the
+1. **node MISSING or too_old** — install or upgrade to Node.js 18+
+   (https://nodejs.org). Nothing else can fix the bundled MCP path until
+   `node` 18+ is on PATH: when missing, the wrapper's `exec node ...` line
+   cannot run at all; when too old, `node bin/composio-proxy.mjs` starts but
+   its calls to the global `fetch()` API fail. (If you use the
    Claude.ai-native or manual prefix instead, node is not required — skip to
    the Last resort block below.)
-2. **credentials not present** (status file shows fewer than 2 present, OR
+2. **status unknown** (the credentials line reads "status file present but
+   unparseable" or "status file present but jq unavailable") — presence
+   cannot be determined from a file that couldn't be read. Install jq
+   (`brew install jq` or `apt-get install jq`) if that's the cause, or
+   inspect `$STATUS_FILE` for corruption. If it persists, restart Claude
+   Code and re-run /composio:setup so the SessionStart hook rewrites it.
+3. **credentials not present** (status file shows fewer than 2 present, OR
    no status file and shell env vars unset) — the `userConfig` values were
    never set or were dismissed at the prompt. Re-fire the keychain-backed
    prompts, or export the shell env vars for dotfile-managed fleets:
@@ -137,14 +163,14 @@ resolved):
        npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID --client claude
    Fleet alternative: export COMPOSIO_MCP_URL and COMPOSIO_API_KEY in your
    shell — the wrapper honors them as a fallback.
-3. **credentials present but tools still invisible** (status file shows both
+4. **credentials present but tools still invisible** (status file shows both
    present AND node ok) — the bundled MCP registers at session start, so a
    restart is needed to pick up newly-configured credentials. Restart Claude
    Code, then re-run /composio:setup. If you recently set the URL, first
    confirm it begins with `https://` — the wrapper rejects a non-HTTPS URL
    (see the SessionStart warning), which also presents as "credentials
    present but tools invisible" and a restart alone will not fix it.
-4. **status file missing but you just enabled the plugin** — no SessionStart
+5. **status file missing but you just enabled the plugin** — no SessionStart
    has fired yet to write the status file. Restart Claude Code (or
    disable/enable) and re-run /composio:setup.
 
