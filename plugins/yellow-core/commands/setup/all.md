@@ -496,11 +496,14 @@ Define `composio_creds_present` as: status file shows BOTH `composio_mcp_url`
 and `composio_api_key` `present == true`, OR (status file absent AND both
 `COMPOSIO_MCP_URL` and `COMPOSIO_API_KEY` are set in shell env).
 
-- READY: `jq` OK AND `node18_check` ok AND Composio MCP tools visible via
-  ToolSearch AND `composio_creds_present` AND `.claude/composio-usage.json`
-  exists
+- READY: `jq` OK AND Composio MCP tools visible via ToolSearch AND
+  `composio_creds_present` AND `.claude/composio-usage.json` exists.
+  (No `node` gate here: visible tools already imply either the bundled
+  server started — so node was adequate — or a legacy prefix is serving
+  them, for which node is irrelevant.)
 - PARTIAL: `composio_creds_present` AND one of:
-  - `node18_check` not `ok` (missing, OR present but older than v18) →
+  - MCP tools not visible yet AND `node18_check` not `ok` (missing, OR
+    present but older than v18), AND you intend to use the bundled prefix →
     install or upgrade to Node.js 18+ (the bundled wrapper runs
     `node bin/composio-proxy.mjs`, whose proxy calls the global `fetch()`
     API that needs Node 18+; a restart or disable/enable cannot fix a
