@@ -7,9 +7,11 @@ probes exactly as written — the jq field extraction, cache TTL, and
 
 ## Step 1.6: Credential Status Files
 
-Credential-bearing plugins (yellow-research, yellow-composio, yellow-semgrep)
-emit a `credential-status.json` from a SessionStart hook so the dashboard
-can classify them accurately without probing the system keychain. See
+Credential-bearing plugins — exactly those listed in the marker-delimited
+`for plugin in ...` loop below, which CI validates against the hooks that
+actually emit the file — write a `credential-status.json` from a SessionStart
+hook so the dashboard can classify them accurately without probing the
+system keychain. See
 `docs/plugin-credential-status-protocol.md`. yellow-morph will join the
 protocol in a follow-up; until then its classification block reads
 Step 1's env+userConfig probe directly.
@@ -19,6 +21,7 @@ Run one Bash block to read each plugin's status file:
 ```bash
 printf '\n=== Credential Status Files ===\n'
 PLUGIN_DATA_DIR="$HOME/.claude/plugins/data"
+# setup-all-credential-status-plugins:start
 for plugin in yellow-research yellow-composio yellow-semgrep; do
   status_file="$PLUGIN_DATA_DIR/$plugin/credential-status.json"
   if [ -f "$status_file" ] && command -v jq >/dev/null 2>&1; then
@@ -41,6 +44,7 @@ EOF
     printf '%-22s no status file (restart Claude Code or /plugin disable && enable)\n' "$plugin:"
   fi
 done
+# setup-all-credential-status-plugins:end
 ```
 
 The status file is the AUTHORITATIVE source for classification. When it
@@ -128,6 +132,8 @@ EOF
     fi
     cache_age_hours=$(( cache_age / 3600 ))
     printf 'version_drift_cache_age_h: %s\n' "${cache_age_hours:-0}"
+  elif [ -f "$DRIFT_CACHE" ]; then
+    printf 'version_drift: SKIPPED (jq not found)\n'
   fi
 fi
 ```

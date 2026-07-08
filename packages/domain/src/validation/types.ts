@@ -25,6 +25,7 @@ export enum ErrorCategory {
   NETWORK = 'NETWORK',
   SOLUTION_DOCS = 'SOLUTION_DOCS',
   PLAN_LIFECYCLE = 'PLAN_LIFECYCLE',
+  SETUP_COVERAGE = 'SETUP_COVERAGE',
 }
 
 /** Structured validation error with specification traceability. */

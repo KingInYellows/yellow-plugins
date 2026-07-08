@@ -103,8 +103,20 @@ elif grep -qE '"morph_api_key"[[:space:]]*:' "${HOME}/.claude/.credentials.json"
 else
   printf 'MORPH_API_KEY:             NOT SET (run /morph:setup if you configured via keychain)\n'
 fi
-[ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ] && printf 'DEVIN_SERVICE_USER_TOKEN:  set\n' || printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET\n'
-[ -n "${DEVIN_ORG_ID:-}" ] && printf 'DEVIN_ORG_ID:              set\n' || printf 'DEVIN_ORG_ID:              NOT SET\n'
+if [ -n "${DEVIN_SERVICE_USER_TOKEN:-}" ]; then
+  printf 'DEVIN_SERVICE_USER_TOKEN:  set (shell env)\n'
+elif grep -qE '"devin_service_user_token"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
+  printf 'DEVIN_SERVICE_USER_TOKEN:  set (userConfig)\n'
+else
+  printf 'DEVIN_SERVICE_USER_TOKEN:  NOT SET (run /devin:setup if you configured via keychain)\n'
+fi
+if [ -n "${DEVIN_ORG_ID:-}" ]; then
+  printf 'DEVIN_ORG_ID:              set (shell env)\n'
+elif grep -qE '"devin_org_id"[[:space:]]*:' "${HOME}/.claude/.credentials.json" 2>/dev/null; then
+  printf 'DEVIN_ORG_ID:              set (userConfig)\n'
+else
+  printf 'DEVIN_ORG_ID:              NOT SET (run /devin:setup if you configured via keychain)\n'
+fi
 [ -n "${SEMGREP_APP_TOKEN:-}" ] && printf 'SEMGREP_APP_TOKEN:         set\n' || printf 'SEMGREP_APP_TOKEN:         NOT SET\n'
 [ -n "${OPENAI_API_KEY:-}" ] && printf 'OPENAI_API_KEY:            set\n' || printf 'OPENAI_API_KEY:            NOT SET\n'
 [ -n "${EXA_API_KEY:-}" ] && printf 'EXA_API_KEY:               set\n' || printf 'EXA_API_KEY:               NOT SET\n'
@@ -291,9 +303,9 @@ fi
 
 ### Step 1.5: Session MCP Visibility (ToolSearch probes)
 
+<!-- setup-all-toolsearch-probes:start -->
 Run four ToolSearch probes to capture current-session MCP visibility:
 
-- `list_user_organizations`
 - `list_teams`
 - `parallel__createDeepResearch`
 - `ast-grep__find_code`
@@ -305,6 +317,7 @@ Record whether these exact tools are present in the results:
 - `mcp__plugin_yellow-research_parallel__createDeepResearch`
 - `mcp__plugin_yellow-research_ast-grep__find_code`
 - `mcp__plugin_yellow-research_ceramic__ceramic_search`
+<!-- setup-all-toolsearch-probes:end -->
 
 ToolSearch reflects current-session visibility only. If a plugin was installed
 after the session started, the tool may remain invisible until Claude Code is
@@ -328,6 +341,17 @@ do not reconstruct the probes from memory or silently skip them.
 ### Step 2: Classify Plugin Status
 
 Classify each installed plugin as **READY**, **PARTIAL**, or **NEEDS SETUP**.
+
+If Step 1 printed `plugin_cache: NOT FOUND` OR `plugin_cache_warning: unable
+to inspect plugin cache`, STOP before classifying: in both branches no
+installed-status lines were emitted, so installed state is unknown for every
+plugin — do NOT read the absence of a plugin's line as `NOT INSTALLED`.
+Report the matching cause — "Plugin cache directory not found at
+~/.claude/plugins/cache — cannot determine installed plugins. Fix the cache
+path (or reinstall plugins) and re-run /setup:all." or "Plugin cache exists
+but cannot be inspected (need python3 or jq) — install one and re-run
+/setup:all." — and stop.
+
 If a plugin shows `NOT INSTALLED` in the Installed Plugins section, classify it
 as **NOT INSTALLED** and skip all other checks for that plugin.
 
@@ -374,9 +398,20 @@ path" and rely on `/morph:status` for authoritative OFFLINE detection.
 
 **yellow-devin:**
 
-- READY: `curl` OK AND `jq` OK AND `DEVIN_SERVICE_USER_TOKEN` set AND
-  `DEVIN_ORG_ID` set
-- NEEDS SETUP: any READY condition not met
+Credentials may come from shell env vars or the plugin's `userConfig`
+prompt, but 8 of 9 devin commands read `$DEVIN_SERVICE_USER_TOKEN` /
+`$DEVIN_ORG_ID` directly via curl — only shell env is fully functional.
+Classification derives from the two Step 1 rows (`set (shell env)` /
+`set (userConfig)` / `NOT SET`). On macOS, userConfig values live in the
+system keychain and are invisible to Step 1's file grep — a keychain-only
+credential shows `NOT SET`; `/devin:setup` is the authoritative check.
+
+- READY: `curl` OK AND `jq` OK AND both rows show `set (shell env)`
+- PARTIAL: `curl` OK AND `jq` OK AND both rows resolved, but at least one
+  only as `set (userConfig)` — detail: "userConfig is set but the shell env
+  var is unset; /devin:* commands call curl directly and will return 401.
+  Export the vars (or see /devin:setup)."
+- NEEDS SETUP: `curl` missing OR `jq` missing OR either row `NOT SET`
 
 **yellow-semgrep:**
 
@@ -432,17 +467,23 @@ yellow-research` to re-trigger the userConfig prompts."
 **yellow-debt:**
 
 - READY: `git_repo` ok AND `repo_root` writable AND `git` OK AND `jq` OK AND
-  `yq` OK AND `realpath` OK AND `flock` OK AND `gt` OK AND `yellow-linear`
-  installed
-- PARTIAL: all required local checks pass, but `yellow-linear` is NOT INSTALLED
-- NEEDS SETUP: any required local check fails
+  `yq` OK AND `realpath` OK AND `flock` OK AND `gt` OK AND `yellow-core`
+  installed AND `yellow-linear` installed
+- PARTIAL: all required local checks pass AND `yellow-core` installed, but
+  `yellow-linear` is NOT INSTALLED (optional — only `/debt:sync` needs it)
+- NEEDS SETUP: any required local check fails OR `yellow-core` is NOT
+  INSTALLED (non-optional dependency: debt commands source
+  `validate_file_path()` from yellow-core/lib/validate-fs.sh and fail
+  without it)
 
 **yellow-ci:**
 
 - READY: `gh` OK AND `jq` OK AND `ssh` OK AND `gh_auth` OK AND
-  `.claude/yellow-ci.local.md` exists
+  `.claude/yellow-ci.local.md` exists AND `yellow-linear` installed
 - PARTIAL: `gh` OK AND `jq` OK AND config exists, but `ssh` is missing or
-  `gh_auth` is not authenticated
+  `gh_auth` is not authenticated — OR all other READY conditions hold but
+  `yellow-linear` is NOT INSTALLED (optional — only `/ci:report-linear`
+  needs it)
 - NEEDS SETUP: `gh` missing OR `jq` missing OR config missing
 
 **yellow-review:**
@@ -555,6 +596,7 @@ and `composio_api_key` `present == true`, OR (status file absent AND both
 
 Display the dashboard in this order:
 
+<!-- setup-all-dashboard-example:start -->
 ```text
 Marketplace Setup Dashboard
 ===========================
@@ -575,11 +617,13 @@ Marketplace Setup Dashboard
   yellow-docs          READY           git available, repo is a git repository
   yellow-composio      PARTIAL         MCP visible, usage counter missing
   yellow-codex         PARTIAL         codex v0.118.0 found, OPENAI_API_KEY not set
+  yellow-council       PARTIAL         1 of 3 reviewer CLIs installed (codex only)
   yellow-mempalace     NEEDS SETUP     mempalace binary missing from PATH
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true
 
   Summary: X ready, Y partial, Z need setup
 ```
+<!-- setup-all-dashboard-example:end -->
 
 Be specific in the Detail column. Name the missing tool, env var, config file,
 or bundled research source count rather than using generic labels.
@@ -687,9 +731,14 @@ If a Skill invocation fails, record it and continue:
 
 ### Step 5: Final Summary
 
-After all selected setups have run, re-run the same Bash dashboard from Step 1
-and the same ToolSearch probes from Step 1.5. Re-classify every plugin using
-the same rules and show only status changes:
+After all selected setups have run, re-run the same Bash dashboard from Step 1,
+the same ToolSearch probes from Step 1.5, AND the Step 1.6/1.7 probes from
+`${CLAUDE_PLUGIN_ROOT}/references/setup-all/credential-status-and-version-drift.md`
+— a setup run can re-trigger userConfig prompts or restart MCP servers, so
+credential-status files may have changed mid-command; skipping 1.6/1.7 here
+would show stale before/after rows for exactly the plugins most likely to have
+changed (yellow-research, yellow-semgrep, yellow-composio). Re-classify every
+plugin using the same rules and show only status changes:
 
 ```text
 Setup Complete — Before/After
@@ -725,7 +774,7 @@ All installed marketplace plugins are fully configured.
 |---|---|---|
 | Dashboard Bash call fails | "Dashboard check failed. Verify shell environment." | Stop |
 | ToolSearch probe missing expected tool | Record plugin as PARTIAL or NEEDS SETUP based on the rules above | Continue |
-| Plugin cache not found | "plugin_cache: NOT FOUND" | Continue with local checks only; installed status may be inaccurate |
+| Plugin cache not found or uninspectable (no python3/jq) | "Plugin cache directory not found at ~/.claude/plugins/cache — cannot determine installed plugins." / "Plugin cache exists but cannot be inspected (need python3 or jq)." | Stop before Step 2 classification |
 | Skill invocation fails | "`<plugin>` setup: FAILED (<error>)`" | Record and continue |
 | User cancels during interactive setup | Show partial before/after for completed setups | Stop after summary |
 | All installed plugins already READY | "All installed plugins are configured." | Offer statusline refresh only when yellow-core is installed |
