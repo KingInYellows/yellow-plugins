@@ -1,0 +1,21 @@
+plugins/yellow-core/commands/setup/all.md
+  s_8c0b4886545c65::t_e5aea60f8427bc 499-503,505-506
+.changeset/setup-all-composio-node-wording.md
+  s_8c0b4886545c65::t_ad09b019fce7a0 9-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a3473f969e84b66dd440d7317210ad93ba8774fd",
+  "prompts": {},
+  "sessions": {
+    "s_8c0b4886545c65": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5641b84-6ce4-4b8a-a230-6cd60544e2b0",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
