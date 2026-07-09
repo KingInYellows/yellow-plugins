@@ -78,10 +78,13 @@ Instructions:
 OUTPUT_FILE=$(mktemp /tmp/codex-analyst-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-analyst-err-XXXXXX.txt)
 
-# mcp_servers is intentionally left at user config: the MCP OAuth stall that
-# motivates -c 'mcp_servers={}' was only ever observed on `exec review`.
+# mcp_servers={} clears the MCP tool surface: analysis runs read-only over
+# untrusted code, and -s only sandboxes shell commands — it does not fence
+# user-configured MCP tools (a write-capable MCP server would bypass
+# "read-only").
 timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
+  -c 'mcp_servers={}' \
   -s read-only \
   --ephemeral \
   --json \
@@ -93,9 +96,9 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       printf '[codex-analyst] Timed out after 5 minutes\n'
     elif [ "$codex_exit" -eq 2 ]; then
       # Exit 2 is also clap's argument-parse error — check before blaming auth
-      if grep -q "unexpected argument" "$STDERR_FILE" 2>/dev/null; then
+      if grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$STDERR_FILE" 2>/dev/null; then
         printf '[codex-analyst] CLI argument parse error (flag drift?):\n'
-        head -2 "$STDERR_FILE" 2>/dev/null
+        grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null
       else
         printf '[codex-analyst] Auth failed\n'
       fi

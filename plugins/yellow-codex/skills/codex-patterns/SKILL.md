@@ -29,8 +29,10 @@ codex exec review \
 
 `-a`/`-s` do not exist on the `exec review` subcommand (argument-parse error,
 exit 2, on codex-cli 0.140.0) — set posture via `-c` config overrides, which
-take precedence over `~/.codex/config.toml`. `-c 'mcp_servers={}'` disables
-configured MCP servers that can otherwise stall on OAuth.
+take precedence over `~/.codex/config.toml`. `-c 'mcp_servers={}'` clears the
+configured MCP tool surface (stdio servers are not launched; on 0.140.0
+remote-URL servers still log fast-failing auth errors at startup but do not
+stall the run) — added because MCP OAuth could otherwise stall `exec review`.
 
 Optional: add `--output-schema "$SCHEMA_FILE"` for structured JSON enforcement.
 Add `--title "Review for PR #N"` for context.
@@ -64,10 +66,13 @@ codex exec \
   "$ANALYSIS_PROMPT"
 ```
 
-Plain `codex exec` (rescue/execution and analysis above) intentionally does
-NOT pass `-c 'mcp_servers={}'`: the MCP OAuth stall that motivates the
-override was only ever observed on `exec review`, and plain exec keeps the
-user's configured MCP servers available.
+On plain `codex exec`, `-c 'mcp_servers={}'` is applied selectively: the
+Analysis invocation passes it because analysis runs read-only over untrusted
+code and `-s` only sandboxes model-generated shell commands — it does not
+fence user-configured MCP tools (a write-capable MCP server would otherwise
+bypass "read-only"). Rescue/Execution intentionally keep the user's MCP
+servers available (those contexts are write-capable by design, and the MCP
+OAuth stall was only ever observed on `exec review` as of 0.140.0).
 
 ## Approval Modes (`approval_policy`)
 

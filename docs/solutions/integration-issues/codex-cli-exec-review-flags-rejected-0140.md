@@ -106,10 +106,15 @@ accepted by both `exec` and `exec review`. Empirically, a
 `-c 'sandbox_mode="read-only"'` override measurably beats a permissive
 `~/.codex/config.toml` (`danger-full-access`) in the emitted startup
 header — confirming it is a real override, not a silent parse-success
-no-op that falls back to config defaults. Checking stderr for the literal
-substring `unexpected argument` before assuming exit 2 means "auth
-failure" works because that string is clap's fixed error vocabulary for a
-reject-at-parse — a reliable signal regardless of which flag was rejected.
+no-op that falls back to config defaults. Checking stderr for clap's
+parse-error vocabulary before assuming exit 2 means "auth failure" works
+because those strings are stable regardless of which flag was rejected —
+but `unexpected argument` alone is only the vocabulary for an unknown
+flag. Other parse-error shapes share exit 2 with different wording
+(empirically on 0.140.0: `invalid value '<x>' for '--sandbox
+<SANDBOX_MODE>'`), so handlers must match the broader set
+(`unexpected argument|invalid value|unrecognized subcommand|required
+arguments`) or a differently-shaped drift recreates the misdiagnosis.
 
 ## Prevention
 

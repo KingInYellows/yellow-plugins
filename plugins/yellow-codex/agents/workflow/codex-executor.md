@@ -78,8 +78,9 @@ Instructions:
 OUTPUT_FILE=$(mktemp /tmp/codex-executor-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-executor-err-XXXXXX.txt)
 
-# mcp_servers is intentionally left at user config: the MCP OAuth stall that
-# motivates -c 'mcp_servers={}' was only ever observed on `exec review`.
+# mcp_servers is intentionally left at user config (this context is
+# write-capable by design): the MCP OAuth stall that motivates
+# -c 'mcp_servers={}' was only ever observed on `exec review` (as of 0.140.0).
 timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
   -s workspace-write \
@@ -92,9 +93,9 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
       printf '[codex-executor] Timed out after 5 minutes\n'
     elif [ "$codex_exit" -eq 2 ]; then
       # Exit 2 is also clap's argument-parse error — check before blaming auth
-      if grep -q "unexpected argument" "$STDERR_FILE" 2>/dev/null; then
+      if grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$STDERR_FILE" 2>/dev/null; then
         printf '[codex-executor] CLI argument parse error (flag drift?):\n'
-        head -2 "$STDERR_FILE" 2>/dev/null
+        grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null
       else
         printf '[codex-executor] Auth failed\n'
       fi

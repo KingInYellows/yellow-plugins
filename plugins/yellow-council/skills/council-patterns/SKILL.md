@@ -316,7 +316,7 @@ background, deliberately kept out of the preload budget.
 
 **Codex** (via `Task(subagent_type="yellow-codex:review:codex-reviewer")`):
 - 300s timeout (yellow-codex's own cap; council's 600s does NOT propagate)
-- Read-only mode via `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"' --ephemeral` (`-s`/`-a` do not parse on `exec review`, codex-cli 0.140.0)
+- Read-only mode via `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -c 'mcp_servers={}' --ephemeral` (`-s`/`-a` do not parse on `exec review`, codex-cli 0.140.0)
 - Pack must use the existing yellow-codex review prompt structure
 
 **Gemini** (direct bash):

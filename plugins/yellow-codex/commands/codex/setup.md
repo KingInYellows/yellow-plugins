@@ -183,14 +183,19 @@ If codex is installed and auth is configured, run a quick test:
 
 ```bash
 if command -v codex >/dev/null 2>&1; then
-  test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -s read-only -m gpt-5.4-mini "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>/dev/null) || true
+  SETUP_ERR_FILE=$(mktemp /tmp/codex-setup-err-XXXXXX.txt)
+  test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -s read-only -m gpt-5.4-mini "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>"$SETUP_ERR_FILE") || true
   if printf '%s' "$test_output" | grep -qi "yellow-codex-setup-ok"; then
     printf '[yellow-codex] Test invocation: ok\n'
   elif [ -n "$test_output" ]; then
     printf '[yellow-codex] Test invocation: response received (model accessible)\n'
+  elif grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$SETUP_ERR_FILE" 2>/dev/null; then
+    printf '[yellow-codex] Test invocation: CLI argument parse error (flag drift?):\n' >&2
+    grep -m2 -E "^error:" "$SETUP_ERR_FILE" 2>/dev/null >&2
   else
     printf '[yellow-codex] Test invocation: no response (check auth and network)\n' >&2
   fi
+  rm -f "$SETUP_ERR_FILE"
 fi
 ```
 

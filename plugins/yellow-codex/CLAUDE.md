@@ -15,8 +15,9 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 ## Required Environment
 
 - **Codex CLI** (`codex`) — v0.140.0+. The invocation forms in this plugin are
-  empirically verified on 0.140.0; earlier CLIs accepted `-a`/`-s` on
-  `codex exec`, which 0.140.0 rejects at argument parse, so the old floor
+  empirically verified on 0.140.0; earlier CLIs accepted `-a` on `codex exec`
+  and `-a`/`-s` on `codex exec review`, which 0.140.0 rejects at argument
+  parse (`-s` remains valid on plain `codex exec`), so the old floor
   (v0.118.0) cannot be verified against the current syntax. Install via
   `npm install -g @openai/codex` (requires Node 22+),
   `brew install --cask codex` (macOS), or download from GitHub Releases.
