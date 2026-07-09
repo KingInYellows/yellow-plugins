@@ -326,11 +326,25 @@ state by `scripts/validate-setup-all.js`.
   list, and plugin-command mapping in sync with
   `.claude-plugin/marketplace.json`.
 - Keep delegated setup order aligned with dashboard order.
-- When adding a new plugin, wire its setup command into `COMMAND_PLUGIN_MAP` in
-  `scripts/validate-setup-all.js` and update marketplace state in the same
-  change.
+- When adding a new plugin, add a row to the
+  `<!-- setup-all-plugin-command-map:start/end -->` section in `all.md` (the
+  validator derives the command→plugin map from that markdown and checks it
+  against the real command file's location) and update marketplace state in
+  the same change.
+- The validator also enforces three marker-guarded sections beyond the
+  original four: the Step 1.5 ToolSearch probe list
+  (`setup-all-toolsearch-probes`, `ERROR-SETUP-005` — query bullets,
+  recorded tool names, and the stated count must move together, and any
+  `mcp__plugin_*` name referenced in the classification section must be
+  probed), the Step 1.6 credential-status plugin list in
+  `references/setup-all/credential-status-and-version-drift.md`
+  (`setup-all-credential-status-plugins`, `ERROR-SETUP-006` — must match the
+  hooks that actually emit credential-status), and the illustrative dashboard
+  example (`setup-all-dashboard-example`, `ERROR-SETUP-007` — must list
+  exactly the marketplace plugin set).
 - When removing or renaming a plugin, remove stale setup references, command
-  mappings, marketplace entries, and docs in the same change.
+  mappings, probe-list entries, dashboard-example rows, marketplace entries,
+  and docs in the same change.
 
 ## Documentation Expectations
 

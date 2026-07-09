@@ -103,6 +103,31 @@ export const ERROR_CODES = {
   // paired edit in scripts/validate-plans.js (the constants PLAN /
   // PLAN_STRAY_CHECKBOX).
   PLAN_STRAY_CHECKBOX: 'ERROR-PLAN-001',
+
+  // Setup Coverage Errors (SETUP) — scripts/validate-setup-all.js gates
+  // plugins/yellow-core/commands/setup/all.md (and its Steps 1.6/1.7
+  // reference file) against the marketplace: marker-delimited sections must
+  // exist, plugin coverage/order must match marketplace.json, the delegated
+  // command map must match real command files, the Step 1.5 ToolSearch probe
+  // list must be internally consistent, the credential-status plugin list
+  // must match hooks that actually emit credential-status, and the
+  // illustrative dashboard example must list every marketplace plugin.
+  //
+  // Same ESM/CJS bridge constraint as SOL_*/PLAN_*: the catalog is ESM,
+  // scripts/ is CJS, so scripts/validate-setup-all.js cannot `require()`
+  // these constants directly. The validator assembles the same strings via
+  // concatenation (`const SETUP = 'ERROR-' + 'SETUP';`) and
+  // `scripts/lint-error-codes.js` (CODE_PATTERN /ERROR-[A-Z]+-\d+/g) does
+  // not detect split-string assembly. Any change to the entries below
+  // requires a paired edit in scripts/validate-setup-all.js (the SETUP_*
+  // constants).
+  SETUP_MISSING_MARKERS: 'ERROR-SETUP-001',
+  SETUP_COVERAGE_DRIFT: 'ERROR-SETUP-002',
+  SETUP_DELEGATION_DRIFT: 'ERROR-SETUP-003',
+  SETUP_ORDER_DRIFT: 'ERROR-SETUP-004',
+  SETUP_PROBE_LIST_DRIFT: 'ERROR-SETUP-005',
+  SETUP_CREDENTIAL_LIST_DRIFT: 'ERROR-SETUP-006',
+  SETUP_EXAMPLE_DRIFT: 'ERROR-SETUP-007',
 } as const;
 
 /**
@@ -318,6 +343,15 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
     ],
     [ErrorCategory.PLAN_LIFECYCLE]: [
       ERROR_CODES.PLAN_STRAY_CHECKBOX,
+    ],
+    [ErrorCategory.SETUP_COVERAGE]: [
+      ERROR_CODES.SETUP_MISSING_MARKERS,
+      ERROR_CODES.SETUP_COVERAGE_DRIFT,
+      ERROR_CODES.SETUP_DELEGATION_DRIFT,
+      ERROR_CODES.SETUP_ORDER_DRIFT,
+      ERROR_CODES.SETUP_PROBE_LIST_DRIFT,
+      ERROR_CODES.SETUP_CREDENTIAL_LIST_DRIFT,
+      ERROR_CODES.SETUP_EXAMPLE_DRIFT,
     ],
   };
 }
