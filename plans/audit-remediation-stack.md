@@ -193,7 +193,7 @@ Branch: `agent/fix/codex-exec-review-flags` (off main, bottom of stack).
       (`DEVIN_SERVICE_USER_TOKEN`/`DEVIN_ORG_ID` required; installing
       yellow-devin is one way to obtain them, not a hard plugin dependency),
       matching `delegate.md:36-38`'s actual behavior. Changeset patch.
-- [ ] 1c `agent/fix/browser-test-readme-link` — fix(yellow-browser-test):
+- [x] 1c `agent/fix/browser-test-readme-link` — fix(yellow-browser-test):
       `plugins/yellow-browser-test/README.md:15` — replace
       `ArcadeLabsInc/agent-browser` (404) with `vercel-labs/agent-browser`
       (verified live). Changeset patch.
