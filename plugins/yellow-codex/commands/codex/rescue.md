@@ -77,6 +77,9 @@ ${RECENT_COMMITS}
 ${TASK_DESCRIPTION}
 --- end task-description ---"
 
+# mcp_servers is intentionally left at user config (here and in the retry
+# below): the MCP OAuth stall that motivates -c 'mcp_servers={}' was only
+# ever observed on `exec review`.
 timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
   -s workspace-write \

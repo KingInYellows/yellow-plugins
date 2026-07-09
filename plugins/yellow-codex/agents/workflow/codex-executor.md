@@ -78,6 +78,8 @@ Instructions:
 OUTPUT_FILE=$(mktemp /tmp/codex-executor-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-executor-err-XXXXXX.txt)
 
+# mcp_servers is intentionally left at user config: the MCP OAuth stall that
+# motivates -c 'mcp_servers={}' was only ever observed on `exec review`.
 timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
   -s workspace-write \

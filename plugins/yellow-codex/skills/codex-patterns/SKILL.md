@@ -64,6 +64,11 @@ codex exec \
   "$ANALYSIS_PROMPT"
 ```
 
+Plain `codex exec` (rescue/execution and analysis above) intentionally does
+NOT pass `-c 'mcp_servers={}'`: the MCP OAuth stall that motivates the
+override was only ever observed on `exec review`, and plain exec keeps the
+user's configured MCP servers available.
+
 ## Approval Modes (`approval_policy`)
 
 | Mode | Behavior | When to Use |
