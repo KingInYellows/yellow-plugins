@@ -385,10 +385,36 @@ const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 // Fence markers are matched with up to 3 leading spaces of indent
 // (CommonMark still treats a ```-fence indented 1-3 spaces as a fence;
 // 4+ spaces is an indented code block, a distinct construct).
+// Implemented as a line scan rather than a single multiline regex: the lazy
+// [\s\S]*? close-fence search was measurably quadratic on files with many
+// near-miss ``` lines, and this helper now runs on every markdown file, not
+// just SKILL.md. Semantics match the old regex: each opener pairs with the
+// next bare-``` closer line; an unclosed trailing fence is left in place.
 function stripFencedContent(content) {
-  return content
+  const lines = content
     .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
-    .replace(/^[ \t]{0,3}```[^\n]*\r?\n[\s\S]*?^[ \t]{0,3}```[ \t]*\r?$/gm, '');
+    .split('\n');
+  const opener = /^[ \t]{0,3}```/;
+  const closer = /^[ \t]{0,3}```[ \t]*\r?$/;
+  const kept = [];
+  let inFence = false;
+  let fenceStart = -1;
+  for (const line of lines) {
+    if (!inFence) {
+      if (opener.test(line)) {
+        inFence = true;
+        fenceStart = kept.length;
+      }
+      kept.push(line); // provisional when opening — kept only if unclosed
+    } else if (closer.test(line)) {
+      kept.length = fenceStart; // drop opener..closer inclusive
+      kept.push(''); // preserve the blank the old regex replacement left
+      inFence = false;
+    } else {
+      kept.push(line); // provisional fence content — kept only if unclosed
+    }
+  }
+  return kept.join('\n');
 }
 
 // Map final agent-name segment → Set of fully-qualified 3-segment refs.
@@ -398,11 +424,23 @@ function stripFencedContent(content) {
 // incidental prose never trip them.
 function buildLastSegmentIndex(pluginAgents) {
   const index = new Map();
+  const twoSegOnly = new Map();
   for (const ref of pluginAgents) {
     const parts = ref.split(':');
-    if (parts.length !== 3) continue;
-    if (!index.has(parts[2])) index.set(parts[2], new Set());
-    index.get(parts[2]).add(ref);
+    if (parts.length === 3) {
+      if (!index.has(parts[2])) index.set(parts[2], new Set());
+      index.get(parts[2]).add(ref);
+    } else if (parts.length === 2) {
+      if (!twoSegOnly.has(parts[1])) twoSegOnly.set(parts[1], new Set());
+      twoSegOnly.get(parts[1]).add(ref);
+    }
+  }
+  // A flat agent (agents/<name>.md, no subdirectory) registers only the
+  // 2-segment form. Fall back to it per segment so such agents still gate
+  // the colon-less/bareword checks; when a 3-segment form exists it wins so
+  // suggestions always name the runtime dispatch form.
+  for (const [last, refs] of twoSegOnly) {
+    if (!index.has(last)) index.set(last, refs);
   }
   return index;
 }
