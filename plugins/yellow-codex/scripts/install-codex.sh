@@ -29,7 +29,7 @@ success() {
 }
 # <<< generated: install-helpers <<<
 
-readonly MIN_CODEX_VERSION="0.118.0"
+readonly MIN_CODEX_VERSION="0.140.0"
 readonly MIN_NODE_MAJOR=22
 
 cleanup() {

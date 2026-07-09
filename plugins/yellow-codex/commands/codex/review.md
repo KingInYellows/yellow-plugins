@@ -100,9 +100,13 @@ else
   CODEX_CMD+=(--uncommitted)
 fi
 
+# -a/-s do not exist on the `exec review` subcommand (parse error, exit 2, on
+# codex-cli 0.140.0); posture is set via -c overrides, which take precedence
+# over ~/.codex/config.toml. mcp_servers={} avoids MCP OAuth stalls.
 CODEX_CMD+=(
-  -a never
-  -s read-only
+  -c 'approval_policy="never"'
+  -c 'sandbox_mode="read-only"'
+  -c 'mcp_servers={}'
   --ephemeral
   --json
   -m "${CODEX_MODEL:-gpt-5.4}"
@@ -115,7 +119,13 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" 2>"$STDERR_FILE" || 
   if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
     printf '[yellow-codex] Error: review timed out after 5 minutes.\n'
   elif [ "$codex_exit" -eq 2 ]; then
-    printf '[yellow-codex] Error: authentication failed. Run /codex:setup.\n'
+    # Exit 2 is also clap's argument-parse error — check before blaming auth
+    if grep -q "unexpected argument" "$STDERR_FILE" 2>/dev/null; then
+      printf '[yellow-codex] Error: CLI rejected the invocation (argument parse error — flag drift?):\n'
+      head -2 "$STDERR_FILE" 2>/dev/null
+    else
+      printf '[yellow-codex] Error: authentication failed. Run /codex:setup.\n'
+    fi
   elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Rate limited. Retrying in 5 seconds...\n'
     sleep 5

@@ -44,7 +44,7 @@ and never auto-commits. The user decides what to do with the verdicts.
   `--dangerously-skip-permissions` (OpenCode), or `--sandbox workspace-write`
   (Codex). Read-only behavior is enforced via prompt design + safe defaults
   (Gemini `--approval-mode plan`, OpenCode default permissions, Codex
-  `--sandbox read-only -a never`).
+  `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"'`).
 - **Path validation.** All `--paths` and file inputs validated via SKILL
   pattern (regex + `..` reject + existence check) before constructing shell
   args.

@@ -78,7 +78,7 @@ ${TASK_DESCRIPTION}
 --- end task-description ---"
 
 timeout --signal=TERM --kill-after=10 300 codex exec \
-  -a never \
+  -c 'approval_policy="never"' \
   -s workspace-write \
   --json \
   -m "${CODEX_MODEL:-gpt-5.4}" \
@@ -88,12 +88,18 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[yellow-codex] Codex timed out after 5 minutes.\n'
     elif [ "$codex_exit" -eq 2 ]; then
-      printf '[yellow-codex] Authentication failed. Run /codex:setup.\n'
+      # Exit 2 is also clap's argument-parse error — check before blaming auth
+      if grep -q "unexpected argument" "$STDERR_FILE" 2>/dev/null; then
+        printf '[yellow-codex] CLI rejected the invocation (argument parse error — flag drift?):\n'
+        head -2 "$STDERR_FILE" 2>/dev/null
+      else
+        printf '[yellow-codex] Authentication failed. Run /codex:setup.\n'
+      fi
     elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
       printf '[yellow-codex] Rate limited. Retrying in 5 seconds...\n'
       sleep 5
       timeout --signal=TERM --kill-after=10 300 codex exec \
-        -a never \
+        -c 'approval_policy="never"' \
         -s workspace-write \
         --json \
         -m "${CODEX_MODEL:-gpt-5.4}" \

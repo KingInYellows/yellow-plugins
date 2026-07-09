@@ -122,11 +122,15 @@ response immediately.
 OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-reviewer-err-XXXXXX.txt)
 
+# -a/-s do not exist on the `exec review` subcommand (parse error, exit 2, on
+# codex-cli 0.140.0); posture is set via -c overrides, which take precedence
+# over ~/.codex/config.toml. mcp_servers={} avoids MCP OAuth stalls.
 timeout --signal=TERM --kill-after=10 300 codex exec review \
   --base "$BASE_REF" \
-  -a never \
+  -c 'approval_policy="never"' \
+  -c 'sandbox_mode="read-only"' \
+  -c 'mcp_servers={}' \
   --json \
-  -s read-only \
   --ephemeral \
   -m "${CODEX_MODEL:-gpt-5.4}" \
   -o "$OUTPUT_FILE" \

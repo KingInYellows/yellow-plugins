@@ -48,10 +48,10 @@ Then re-run /codex:setup
 
 If the user chooses **No**: show manual install instructions and continue.
 
-**If codex IS found**, check the version meets the minimum (v0.118.0+):
+**If codex IS found**, check the version meets the minimum (v0.140.0+):
 
 ```bash
-MIN_CODEX_VERSION="0.118.0"
+MIN_CODEX_VERSION="0.140.0"
 codex_version_output=$(codex --version 2>/dev/null || true)
 installed_version=$(printf '%s\n' "$codex_version_output" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true)
 version_gte() {
@@ -183,7 +183,7 @@ If codex is installed and auth is configured, run a quick test:
 
 ```bash
 if command -v codex >/dev/null 2>&1; then
-  test_output=$(timeout 15 codex exec --ephemeral -a never -s read-only -m gpt-5.4-mini "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>/dev/null) || true
+  test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -s read-only -m gpt-5.4-mini "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>/dev/null) || true
   if printf '%s' "$test_output" | grep -qi "yellow-codex-setup-ok"; then
     printf '[yellow-codex] Test invocation: ok\n'
   elif [ -n "$test_output" ]; then
@@ -218,7 +218,7 @@ If any step had a warning, list warnings at the bottom.
 | Condition | Message | Action |
 |---|---|---|
 | `codex` not found (Step 0) | AskUserQuestion: install now? | Offer install or show manual instructions |
-| `codex` below v0.118.0 (Step 0) | AskUserQuestion: upgrade now? | Offer upgrade |
+| `codex` below v0.140.0 (Step 0) | AskUserQuestion: upgrade now? | Offer upgrade |
 | Install script fails (Step 0) | "codex installation failed" | Warn, continue to Step 1 |
 | Node < 22 | "v22+ required for Codex CLI" | Warn, suggest standalone binary |
 | No auth configured | "No authentication configured" | Show both auth methods |

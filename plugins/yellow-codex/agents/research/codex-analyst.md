@@ -79,7 +79,7 @@ OUTPUT_FILE=$(mktemp /tmp/codex-analyst-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-analyst-err-XXXXXX.txt)
 
 timeout --signal=TERM --kill-after=10 300 codex exec \
-  -a never \
+  -c 'approval_policy="never"' \
   -s read-only \
   --ephemeral \
   --json \
@@ -90,7 +90,13 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[codex-analyst] Timed out after 5 minutes\n'
     elif [ "$codex_exit" -eq 2 ]; then
-      printf '[codex-analyst] Auth failed\n'
+      # Exit 2 is also clap's argument-parse error — check before blaming auth
+      if grep -q "unexpected argument" "$STDERR_FILE" 2>/dev/null; then
+        printf '[codex-analyst] CLI argument parse error (flag drift?):\n'
+        head -2 "$STDERR_FILE" 2>/dev/null
+      else
+        printf '[codex-analyst] Auth failed\n'
+      fi
     else
       printf '[codex-analyst] Error: exit code %d\n' "$codex_exit"
     fi
