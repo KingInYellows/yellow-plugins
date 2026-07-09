@@ -43,7 +43,8 @@ cycles, and documents.
   "What Next?" routing after planning.
 - `/linear:status` — Generate project and initiative health report
 - `/linear:delegate` — Delegate a Linear issue to a Devin AI session (requires
-  yellow-devin plugin)
+  `DEVIN_SERVICE_USER_TOKEN` + `DEVIN_ORG_ID` env vars; installing yellow-devin
+  is one way to obtain them, not a hard plugin dependency)
 
 ### Agents (3)
 
@@ -87,9 +88,11 @@ For advanced workflows, agents can call Linear MCP tools directly (e.g.,
   brainstorm doc but cannot invoke planning commands; suggests manual workflow.
 - **gt-workflow** (optional) — `/linear:work` routes to `/gt-stack-plan` via
   Skill tool. Without it, suggests manual branch creation with `gt create`.
-- **yellow-devin** — Required for `/linear:delegate` command (delegates Linear
-  issues to Devin AI sessions). Without it, `/linear:delegate` will report that
-  the yellow-devin plugin is not installed.
+- **yellow-devin** (optional) — `/linear:delegate` validates the
+  `DEVIN_SERVICE_USER_TOKEN` and `DEVIN_ORG_ID` environment variables, not
+  plugin presence (see `delegate.md` Step 1); installing yellow-devin is one
+  way to obtain those credentials. Without them, `/linear:delegate` reports
+  which variables to set and how to install yellow-devin.
 
 ## Known Limitations
 

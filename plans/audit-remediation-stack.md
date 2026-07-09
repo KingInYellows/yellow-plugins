@@ -186,7 +186,7 @@ Branch: `agent/fix/codex-exec-review-flags` (off main, bottom of stack).
       explicit no-write-via-Bash clause (gap #10; `disallowedTools` alone
       does not stop `bash -c "echo x > file"`). Changeset patch;
       `validate:agents`.
-- [ ] 1b `agent/docs/linear-delegate-dependency-truth` — docs(yellow-linear):
+- [x] 1b `agent/docs/linear-delegate-dependency-truth` — docs(yellow-linear):
       fix BOTH restatements in `plugins/yellow-linear/CLAUDE.md` — the
       Cross-Plugin Dependencies bullet (lines 90-92) AND the commands-catalog
       line for `/linear:delegate` (gap #11) — to the env-var framing
