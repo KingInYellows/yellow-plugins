@@ -1,0 +1,19 @@
+docs/solutions/code-quality/subagent-ref-registry-gated-fence-aware-checks.md
+  s_90cee544007013::t_23466830325326 1-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "0b6d49b7698a48e5211fce25a94e7f58124390fa",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
