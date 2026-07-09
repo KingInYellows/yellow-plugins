@@ -300,7 +300,7 @@ Branch: `agent/feat/subagent-ref-hardening` (one PR — red→green inside it).
       red-then-fixed case.
 - [x] 2.8 PR description: call out the innocent-bystander effect (gap #12) —
       open PRs rebasing onto this will red if they carry the old patterns.
-- [ ] 2.9 Changesets: yellow-ci patch + yellow-browser-test patch (the
+- [x] 2.9 Changesets: yellow-ci patch + yellow-browser-test patch (the
       validator itself is root `scripts/`, no changeset). Solution doc: yes
       (new rule; RULE 13/16 precedent), via `--in-pr`. CI baseline gate.
 
