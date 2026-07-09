@@ -176,7 +176,7 @@ Branch: `agent/fix/codex-exec-review-flags` (off main, bottom of stack).
 
 ### Wave 1 — four independent small PRs (stacked after Wave 0)
 
-- [ ] 1a `agent/fix/doc-auditor-write-deny` — fix(yellow-docs):
+- [x] 1a `agent/fix/doc-auditor-write-deny` — fix(yellow-docs):
       add `disallowedTools: [Write, Edit, MultiEdit]` to
       `plugins/yellow-docs/agents/analysis/doc-auditor.md` (copy field format
       from `plugins/yellow-review/agents/review/comment-analyzer.md:1-15`).
