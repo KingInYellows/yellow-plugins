@@ -1,0 +1,23 @@
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_525f3d26652401 194
+plugins/yellow-browser-test/README.md
+  s_90cee544007013::t_1a68c2a89b522b 15
+.changeset/w1c-browser-test-readme-link.md
+  s_90cee544007013::t_987411768e95a2 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "5a6bb62f6cb8ed2b5a592282dd2e6bd79c5e37d6",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
