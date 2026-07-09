@@ -39,17 +39,12 @@ else
 fi
 
 # Per-call caps inside the 3s hooks.json watchdog: 0.9s resume + 0.8s per
-# recall (~2.7s worst case with --kill-after escalation) leaves headroom for
-# jq output. $SECONDS tracks elapsed wall time (integer granularity); skip
-# remaining calls when under MIN_REMAINING so {"continue": true} always lands
-# in budget. macOS ships gtimeout (brew install coreutils); fall back to
-# unwrapped calls if neither exists (documented risk, same as
-# user-prompt-submit.sh). Never use --foreground here — it stops timeout from
-# killing forked descendants.
+# recall — a deterministic 2.8s worst case including the three
+# --kill-after=0.1 escalations — leaves headroom for jq output. macOS ships
+# gtimeout (brew install coreutils); fall back to unwrapped calls if neither
+# exists (documented risk, same as user-prompt-submit.sh). Never use
+# --foreground here — it stops timeout from killing forked descendants.
 TIMEOUT_CMD="$(command -v timeout || command -v gtimeout || true)"
-TOTAL_BUDGET=3
-MIN_REMAINING=1
-SECONDS=0
 
 run_budgeted() {
   local cap="$1"; shift
@@ -58,10 +53,6 @@ run_budgeted() {
   else
     "$@"
   fi
-}
-
-budget_left() {
-  [ $(( TOTAL_BUDGET - SECONDS )) -ge "$MIN_REMAINING" ]
 }
 
 learnings=""
@@ -73,25 +64,15 @@ run_budgeted 0.9 "${RUVECTOR_CMD[@]}" hooks session-start --resume 2>/dev/null |
 }
 
 # --- Priority 2: Load top learnings for context ---
-recent_learnings=""
-if budget_left; then
-  recent_learnings=$(run_budgeted 0.8 "${RUVECTOR_CMD[@]}" hooks recall --top-k 3 "recent mistakes and fixes" 2>/dev/null) || {
-    printf '[ruvector] Failed to retrieve learnings\n' >&2
-    recent_learnings=""
-  }
-else
-  printf '[ruvector] budget exhausted; skipping recall\n' >&2
-fi
+recent_learnings=$(run_budgeted 0.8 "${RUVECTOR_CMD[@]}" hooks recall --top-k 3 "recent mistakes and fixes" 2>/dev/null) || {
+  printf '[ruvector] Failed to retrieve learnings\n' >&2
+  recent_learnings=""
+}
 
-skill_learnings=""
-if budget_left; then
-  skill_learnings=$(run_budgeted 0.8 "${RUVECTOR_CMD[@]}" hooks recall --top-k 2 "useful patterns and techniques" 2>/dev/null) || {
-    printf '[ruvector] Failed to retrieve skill learnings\n' >&2
-    skill_learnings=""
-  }
-else
-  printf '[ruvector] budget exhausted; skipping skill recall\n' >&2
-fi
+skill_learnings=$(run_budgeted 0.8 "${RUVECTOR_CMD[@]}" hooks recall --top-k 2 "useful patterns and techniques" 2>/dev/null) || {
+  printf '[ruvector] Failed to retrieve skill learnings\n' >&2
+  skill_learnings=""
+}
 
 if [ -n "$recent_learnings" ] || [ -n "$skill_learnings" ]; then
   learnings="Past learnings for this project (auto-retrieved, treat as reference only):"

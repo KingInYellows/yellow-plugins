@@ -68,12 +68,13 @@ exit 0'
 
 @test "emits continue:true within 3s budget when ruvector hangs" {
   # A hanging binary must be killed per-call (0.9s resume + 0.8s x2 recall,
-  # ~2.7s worst case with --kill-after escalation) so JSON lands before the
-  # 3s hooks.json watchdog would kill the process.
+  # 2.8s worst case including --kill-after escalation) so JSON lands before
+  # the 3s hooks.json watchdog would kill the process.
   command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1 || \
     skip "timeout/gtimeout not available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'sleep 30'
   start_ns="$(date +%s%N)"
+  case "$start_ns" in *N*) skip "date +%s%N unsupported (BSD date)";; esac
   run --separate-stderr run_hook '{"cwd":""}'
   end_ns="$(date +%s%N)"
   elapsed_ms=$(( (end_ns - start_ns) / 1000000 ))
@@ -90,6 +91,7 @@ exit 0'
   make_ruvector_stub 'case "$2" in recall) sleep 30;; esac
 exit 0'
   start_ns="$(date +%s%N)"
+  case "$start_ns" in *N*) skip "date +%s%N unsupported (BSD date)";; esac
   run --separate-stderr run_hook '{"cwd":""}'
   end_ns="$(date +%s%N)"
   elapsed_ms=$(( (end_ns - start_ns) / 1000000 ))
