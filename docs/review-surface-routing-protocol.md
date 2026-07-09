@@ -1,0 +1,62 @@
+# Review Surface Routing Protocol
+
+Which review surface fires for which trigger and situation. Sibling of
+`docs/memory-routing-protocol.md`, `docs/plugin-credential-status-protocol.md`,
+and `docs/plugin-scope-mode-protocol.md`. This records a **maintainer
+decision, deliberately NOT decided by the implementer** — the 2026-07-09
+full-marketplace audit found seven overlapping review entry points with no
+recorded routing decision; this document frames the decision without making
+it.
+
+## Decision
+
+**PENDING — maintainer to fill in.** The table below enumerates the seven
+entry points and drafts a routing column with the implementer's observed
+de-facto usage as a starting point. Each `(draft)` cell is a proposal, not a
+ruling; replace with the maintainer's decision and delete this paragraph
+when ruled.
+
+## Trigger routing table
+
+| Entry point | Owner plugin | What it actually does | Routes-from triggers (draft) |
+|---|---|---|---|
+| `/smart-submit` audit | gt-workflow | 3 parallel audit agents (code review, security, silent failures) on UNCOMMITTED work, then stage/commit/submit | "submit this", "ship it" — pre-commit gate, not a review destination (draft) |
+| `/review:pr` | yellow-review | Adaptive multi-agent review of one OPEN PR (tiered persona pipeline, learnings pre-pass, confidence-rubric aggregation, auto-applies P1/P2 fixes) | "review PR #N", "review this PR" — the default single-PR review surface (draft) |
+| `/council` | yellow-council | Cross-lineage advisory fan-out to Codex + Gemini + OpenCode CLIs; consensus verdict, no fix application | "second opinion", "cross-check with other models", `/workflows:work` polish-loop escalation (draft) |
+| `/codex:review` | yellow-codex | Single supplementary Codex CLI review of diff or PR; P1/P2/P3 findings | "what does Codex think" — standalone second opinion; also auto-spawned INSIDE `/review:pr` when installed and diff > 100 lines (draft) |
+| `/devin:review-prs` | yellow-devin | Devin cloud sessions review and remediate a batch of PRs remotely | "have Devin review my PRs" — explicit Devin invocation only, never auto-routed (draft) |
+| `/workflows:review` | yellow-core | SESSION-level review: plan adherence, cross-PR coherence, scope drift, autonomous P1 fix loop | "review this session/plan against the plan" — plan-file scope; redirects PR-number args to `/review:pr` (draft) |
+| `/docs:review` | yellow-docs | Multi-persona review of a PLANNING DOCUMENT (PRD, brainstorm, spec, ADR) | "review this plan/spec/PRD" (document path, not PR) (draft) |
+
+Open routing questions the maintainer should rule on:
+
+1. **"review my changes" (uncommitted, no PR)** — `/smart-submit`'s audit is
+   the only surface covering uncommitted work, but it couples review with
+   submission. Should a review-only alias exist, or is coupling intentional?
+2. **`/codex:review` vs `/council`** — both are second-opinion surfaces; codex
+   is one lineage, council is three. Is `/codex:review` still a distinct
+   user-facing surface, or should "second opinion" always route to `/council`
+   (which subsumes the Codex leg)?
+3. **Auto-escalation** — `/workflows:work`'s polish loop already escalates to
+   `/council` on a stuck review cap. Should `/review:pr` gain the same
+   escalation, or stay single-surface?
+4. **Batch review** — `/review:all` and `/review:sweep-all` (yellow-review)
+   vs `/devin:review-prs` (yellow-devin) both cover "review many PRs". Local
+   vs cloud is the de-facto split; is that the ruling?
+
+## Domain model
+
+Overlapping with distinct primary axes rather than redundant: the seven
+surfaces split by **target** (uncommitted work / one PR / many PRs / a
+session / a planning document) and by **lineage** (Claude-internal personas
+/ Codex / three-CLI council / Devin cloud). No pair is a strict subset;
+the closest to redundant is `/codex:review` ⊂ `/council` (question 2).
+
+## Follow-up (out of scope here)
+
+- Once ruled: sweep each entry point's `description:` frontmatter so trigger
+  phrases match the ruling (same canonical-source→mirror discipline as
+  `docs/solutions/code-quality/multi-doc-schema-rename-drift.md`).
+- Wave 3 of the 2026-07-09 audit (deferred) holds the related persona
+  retirement decisions: security-lens pairing, `test-coverage-analyst` /
+  `git-history-analyzer` wiring, CLI-readiness reviewer retargeting.
