@@ -298,8 +298,8 @@ If no runner targets config exists, omit this block entirely. The
 runner-assignment agent handles the absence gracefully (label-only scoring).
 
 Use the Task tool to spawn the `runner-assignment` agent
-(subagent_type: `"runner-assignment"`). Pass the fenced inventory, `OWNER/REPO`,
-and the load sample timestamp as context.
+(subagent_type: `"yellow-ci:ci:runner-assignment"`). Pass the fenced
+inventory, `OWNER/REPO`, and the load sample timestamp as context.
 
 **Failure handler:** If the agent returns an error or produces no output:
 

@@ -147,7 +147,7 @@ AskUserQuestion: "About to test {N} routes at {baseURL}. Proceed?"
 If user confirms, spawn the `test-runner` agent in structured mode:
 
 ```
-Task(test-runner): "Run structured browser tests. Config at .claude/yellow-browser-test.local.md. Write results to test-reports/results.json. Test mode: structured."
+Task(subagent_type="yellow-browser-test:testing:test-runner"): "Run structured browser tests. Config at .claude/yellow-browser-test.local.md. Write results to test-reports/results.json. Test mode: structured."
 ```
 
 ### Step 6: Generate Report
@@ -155,7 +155,7 @@ Task(test-runner): "Run structured browser tests. Config at .claude/yellow-brows
 After tests complete, spawn the `test-reporter` agent:
 
 ```
-Task(test-reporter): "Generate report from test-reports/results.json. Write report and offer GitHub issue creation."
+Task(subagent_type="yellow-browser-test:testing:test-reporter"): "Generate report from test-reports/results.json. Write report and offer GitHub issue creation."
 ```
 
 ### Step 7: Cleanup

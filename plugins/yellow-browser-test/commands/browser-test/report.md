@@ -28,7 +28,7 @@ If not found: "No test results found. Run `/browser-test:test` or
 Spawn the `test-reporter` agent:
 
 ```
-Task(test-reporter): "Generate report from test-reports/results.json. Write markdown report and offer GitHub issue creation for failures."
+Task(subagent_type="yellow-browser-test:testing:test-reporter"): "Generate report from test-reports/results.json. Write markdown report and offer GitHub issue creation for failures."
 ```
 
 ### Step 3: Display Summary
