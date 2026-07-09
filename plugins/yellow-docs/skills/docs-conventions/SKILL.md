@@ -6,7 +6,20 @@ user-invokable: false
 
 # Documentation Conventions
 
-Shared patterns for yellow-docs agents and commands.
+## What It Does
+
+Shared patterns for yellow-docs agents and commands: templates, diagram type
+selection, staleness detection, and severity classification.
+
+## When to Use
+
+Use when yellow-docs agents need doc generation or audit context. Preloaded
+by doc-auditor, doc-generator, and diagram-architect.
+
+## Usage
+
+Reference the sections below as preloaded context — this skill documents
+conventions; it is not an executable workflow.
 
 ## Severity Classification
 

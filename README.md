@@ -42,7 +42,7 @@ Add the marketplace, then install individual plugins:
 
 ## MCP Servers & Authentication
 
-Eight plugins connect to MCP servers. Authentication requirements vary by server.
+Nine plugins connect to MCP servers. Authentication requirements vary by server.
 
 | Plugin            | MCP Server | Auth                                                                |
 | ----------------- | ---------- | ------------------------------------------------------------------- |
@@ -60,6 +60,9 @@ Eight plugins connect to MCP servers. Authentication requirements vary by server
 | `yellow-research` | ast-grep   | No API key — requires local `ast-grep` binary                       |
 | `yellow-ruvector` | ruvector   | Local stdio — no auth required                                      |
 | `yellow-semgrep`  | semgrep    | `SEMGREP_APP_TOKEN` required                                        |
+
+`yellow-mempalace` also bundles an MCP server (local stdio) but is deprecated
+pending removal per `docs/memory-routing-protocol.md`.
 
 ### Context7 (user-level MCP)
 
@@ -124,9 +127,9 @@ health and tool availability.
 
 ### yellow-research (API keys)
 
-Bundles five MCP servers for multi-source deep research. Three search providers
-require API keys. The Parallel Task MCP uses OAuth and `ast-grep` requires a
-local binary instead of a key.
+Bundles six MCP servers for multi-source deep research. Three search providers
+require API keys. Ceramic and the Parallel Task MCP use OAuth, and `ast-grep`
+requires a local binary instead of a key.
 
 ```bash
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
@@ -142,6 +145,8 @@ environment variables at startup.
   [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api)
 - **Tavily:** [app.tavily.com](https://app.tavily.com)
 - **EXA:** [dashboard.exa.ai](https://dashboard.exa.ai)
+- **Ceramic:** No API key needed for the MCP — OAuth 2.1 (browser popup on
+  first `ceramic_search` use)
 - **Parallel Task MCP:** No API key needed — Claude Code handles authentication
   automatically
 - **ast-grep MCP:** No API key needed — install the `ast-grep` binary locally or

@@ -6,6 +6,22 @@ user-invokable: false
 
 # Semgrep Conventions for yellow-semgrep Plugin
 
+## What It Does
+
+Shared conventions for Semgrep integration — triage state mappings, API
+patterns, the fix strategy decision tree, rate limits, and security rules.
+
+## When to Use
+
+Use when commands or agents need Semgrep-specific validation, error handling,
+or API reference. Loaded automatically by the consumers listed under "When
+This Skill Loads" below.
+
+## Usage
+
+Reference the sections below as preloaded context — this skill documents
+conventions; it is not an executable workflow.
+
 ## When This Skill Loads
 
 Loaded automatically by:

@@ -6,8 +6,23 @@ user-invokable: false
 
 # CI Conventions for Yellow-CI Plugin
 
+## What It Does
+
 Shared knowledge for analyzing GitHub Actions CI failures on self-hosted
-runners.
+runners: validation rules, failure patterns (F01-F12), the error catalog,
+and security patterns.
+
+## When to Use
+
+Use when agents or commands need CI-specific validation or pattern-matching
+reference. Loaded automatically by the consumers listed under "When This
+Skill Loads" below.
+
+## Usage
+
+Reference this skill for validation patterns, failure categories, and security
+rules — it documents conventions, not an executable workflow. Load specific
+reference files for detailed catalogs.
 
 ## When This Skill Loads
 
@@ -19,11 +34,6 @@ Loaded automatically by:
 - `/ci:diagnose` command when processing run IDs
 - `/ci:lint-workflows` command when checking rules
 - `/ci:runner-health`, `/ci:runner-cleanup` when validating runner names
-
-## Usage
-
-Reference this skill for validation patterns, failure categories, and security
-rules. Load specific reference files for detailed catalogs.
 
 ## Core Failure Categories
 

@@ -6,8 +6,20 @@ user-invokable: false
 
 # Composio Integration Patterns
 
+## What It Does
+
 Reference conventions for yellow-composio plugin -- tool patterns, batch
 processing, usage tracking, graceful degradation, and security rules.
+
+## When to Use
+
+Use when authoring or modifying commands or agents that call Composio tools --
+the Workbench sandbox, Multi-Execute batching, and the local usage counter.
+
+## Usage
+
+Reference the sections below as preloaded context; start with the Overview
+for the three-prefix tool discovery order.
 
 ## Overview
 
