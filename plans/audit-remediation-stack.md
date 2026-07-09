@@ -164,11 +164,11 @@ Branch: `agent/fix/codex-exec-review-flags` (off main, bottom of stack).
 > forward stability holds.
 <!-- /deepen-plan -->
 
-- [ ] 0.8 AMEND (not duplicate)
+- [x] 0.8 AMEND (not duplicate)
       `docs/solutions/**/codex-cli-review-flags-and-mcp-stall.md` with the
       verified fix + sandbox-default finding, via `/workflows:compound
       --in-pr` on the draft PR.
-- [ ] 0.9 Changeset: yellow-codex `patch` (+ yellow-council `patch` iff 0.6
+- [x] 0.9 Changeset: yellow-codex `patch` (+ yellow-council `patch` iff 0.6
       edited). Run `pnpm validate:schemas && pnpm validate:agents`. Commit
       via `gt`, submit.
 
