@@ -197,7 +197,7 @@ Branch: `agent/fix/codex-exec-review-flags` (off main, bottom of stack).
       `plugins/yellow-browser-test/README.md:15` — replace
       `ArcadeLabsInc/agent-browser` (404) with `vercel-labs/agent-browser`
       (verified live). Changeset patch.
-- [ ] 1d `agent/fix/ruvector-hook-timeout-budgets` — fix(yellow-ruvector):
+- [x] 1d `agent/fix/ruvector-hook-timeout-budgets` — fix(yellow-ruvector):
       two patterns, per-file by budget class:
       - `hooks/scripts/post-tool-use.sh:32-39` (1s budget): copy the
         **skip-npx** pattern verbatim from `pre-tool-use.sh:31-37` (require

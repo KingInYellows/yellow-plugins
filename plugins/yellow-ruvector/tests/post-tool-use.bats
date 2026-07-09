@@ -98,3 +98,19 @@ run_hook_failing_ruvector() {
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true' > /dev/null
 }
+
+@test "skips silently when binary absent even if npx present (no npx fallback)" {
+  # npx resolution (~2700ms) would blow the 1s PostToolUse budget; the hook
+  # must skip entirely, never invoking npx.
+  NPX_BIN="$(mktemp -d)"
+  MARKER="$NPX_BIN/npx-was-called"
+  printf '#!/bin/sh\ntouch "%s"\nexit 0\n' "$MARKER" > "$NPX_BIN/npx"
+  chmod +x "$NPX_BIN/npx"
+  input='{"tool_name":"Edit","tool_input":{"file_path":"file.txt"}}'
+  run bash -c 'printf "%s" "$1" | PATH="$2:/usr/bin:/bin" CLAUDE_PROJECT_DIR="$3" bash "$4"' \
+    _ "$input" "$NPX_BIN" "$PROJECT_ROOT" "$HOOK_SCRIPT"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ ! -f "$MARKER" ]
+  rm -rf "$NPX_BIN"
+}

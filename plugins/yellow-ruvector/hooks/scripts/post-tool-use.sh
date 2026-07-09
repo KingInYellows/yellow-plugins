@@ -29,13 +29,13 @@ if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit
 fi
 
-# Resolve ruvector command: prefer direct binary (62ms) over npx (2700ms)
+# Resolve ruvector command: require direct binary for PostToolUse (1s budget).
+# npx resolution (~2700ms) exceeds the timeout and would be killed, so skip
+# entirely when the binary is absent (same pattern as pre-tool-use.sh).
 if command -v ruvector >/dev/null 2>&1; then
   RUVECTOR_CMD=(ruvector)
-elif command -v npx >/dev/null 2>&1; then
-  RUVECTOR_CMD=(npx --no ruvector)
 else
-  json_exit "Warning: neither ruvector nor npx found"
+  json_exit
 fi
 
 # Parse fields using NUL-delimited output (avoids eval)
