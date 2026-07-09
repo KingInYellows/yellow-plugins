@@ -1,0 +1,21 @@
+docs/solutions/code-quality/subagent-ref-registry-gated-fence-aware-checks.md
+  s_90cee544007013::t_23466830325326 1-155
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_9f3972cf8f2872 301
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "ea87208fa09368994dc5340846087b741f7278f3",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}
