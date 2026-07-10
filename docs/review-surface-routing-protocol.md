@@ -4,13 +4,13 @@ Which review surface fires for which trigger and situation. Sibling of
 `docs/memory-routing-protocol.md`, `docs/plugin-credential-status-protocol.md`,
 and `docs/plugin-scope-mode-protocol.md`. This records a **maintainer
 decision, deliberately NOT decided by the implementer** — the 2026-07-09
-full-marketplace audit found seven overlapping review entry points with no
+full-marketplace audit found eight overlapping review entry points with no
 recorded routing decision; this document frames the decision without making
 it.
 
 ## Decision
 
-**PENDING — maintainer to fill in.** The table below enumerates the seven
+**PENDING — maintainer to fill in.** The table below enumerates the eight
 entry points and drafts a routing column with the implementer's observed
 de-facto usage as a starting point. Each `(draft)` cell is a proposal, not a
 ruling; replace with the maintainer's decision and delete this paragraph
@@ -21,6 +21,7 @@ when ruled.
 | Entry point | Owner plugin | What it actually does | Routes-from triggers (draft) |
 |---|---|---|---|
 | `/smart-submit` audit | gt-workflow | 3 parallel audit agents (code review, security, silent failures) on UNCOMMITTED work, then stage/commit/submit | "submit this", "ship it" — pre-commit gate, not a review destination (draft) |
+| `/gt-amend` audit | gt-workflow | 1–3 parallel audit agents on UNCOMMITTED follow-up edits, then amend the current branch commit/re-submit | "amend this", "add this to the current PR", "fold this fix in" — existing-PR follow-up gate, not a review destination (draft) |
 | `/review:pr` | yellow-review | Adaptive multi-agent review of one OPEN PR (tiered persona pipeline, learnings pre-pass, confidence-rubric aggregation, auto-applies P0/P1 `safe_auto` fixes) | "review PR #N", "review this PR" — the default single-PR review surface (draft) |
 | `/council` | yellow-council | Cross-lineage advisory fan-out to Codex + Gemini + OpenCode CLIs; consensus verdict, no fix application | "second opinion", "cross-check with other models", `/workflows:work` polish-loop escalation (draft) |
 | `/codex:review` | yellow-codex | Single supplementary Codex CLI review of diff or PR; P1/P2/P3 findings | "what does Codex think" — standalone second opinion; NOTE: `/review:pr` auto-spawns the `codex-reviewer` agent (not this command) when yellow-codex is installed and diff > 100 lines (draft) |
@@ -45,9 +46,11 @@ when ruled.
 
 ### Open routing questions the maintainer should rule on
 
-1. **"review my changes" (uncommitted, no PR)** — `/smart-submit`'s audit is
-   the only surface covering uncommitted work, but it couples review with
-   submission. Should a review-only alias exist, or is coupling intentional?
+1. **"review my changes" (uncommitted)** — `/smart-submit` audits new work
+   before committing and submitting it, while `/gt-amend` audits follow-up
+   edits before folding them into the current branch commit and re-submitting
+   an existing PR. Both couple review with submission. Should a review-only
+   alias exist, or is that coupling intentional?
 2. **`/codex:review` vs `/council`** — both are second-opinion surfaces; codex
    is one lineage, council is three. Is `/codex:review` still a distinct
    user-facing surface, or should "second opinion" always route to `/council`
@@ -63,7 +66,7 @@ when ruled.
 
 ## Domain model
 
-Overlapping with distinct primary axes rather than redundant: the seven
+Overlapping with distinct primary axes rather than redundant: the eight
 surfaces split by **target** (uncommitted work / one PR / many PRs,
 optionally Devin-authored / a session / a planning document) and by
 **lineage** (Claude-internal personas / Codex / three-CLI council). The one
