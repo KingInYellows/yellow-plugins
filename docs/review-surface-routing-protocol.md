@@ -67,10 +67,11 @@ Overlapping with distinct primary axes rather than redundant: the seven
 surfaces split by **target** (uncommitted work / one PR / many PRs,
 optionally Devin-authored / a session / a planning document) and by
 **lineage** (Claude-internal personas / Codex / three-CLI council). The one
-strict-subset pair is
-`/codex:review` ⊂ `/council` — its single Codex lineage is subsumed by
-council's three-CLI fan-out (question 2); every other pair overlaps without
-one strictly containing another.
+closest-overlap pair is `/codex:review` and `/council`: council includes a
+Codex reviewer leg and adds Gemini and OpenCode, while `/codex:review` adds
+explicit PR, branch, and `--staged` targeting plus structured P1/P2/P3 output.
+Neither command surface strictly contains the other (question 2); every pair
+overlaps without strict containment.
 
 ## Follow-up (out of scope here)
 
