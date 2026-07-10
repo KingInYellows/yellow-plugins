@@ -91,9 +91,8 @@ findings).
 
 **Wave 0 — Cross-cutting bug fix (blocks trustworthy review of everything after it).**
 Finding #1 (Codex CLI flag-order bug) ships as **one PR** touching
-yellow-codex (7 call sites + canonical `skills/codex-patterns/SKILL.md`),
-yellow-review (`review-pr.md:363` silent-empty Codex leg), and
-yellow-council (`skills/council-patterns/SKILL.md:317-319`), with one
+yellow-codex (7 call sites + canonical `skills/codex-patterns/SKILL.md`)
+and yellow-council (`skills/council-patterns/SKILL.md:317-319`), with one
 changeset per plugin inside that PR. Rationale: `/review:pr`'s Codex leg is
 currently silently swallowing findings — every subsequent PR in this stack
 gets reviewed by a tool that's quietly broken until this lands first.

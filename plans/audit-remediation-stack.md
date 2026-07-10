@@ -52,13 +52,15 @@ over `plugins/**.md`** (silently truncates frontmatter descriptions).
 
 ### Key design decisions (gap-analysis resolutions)
 
-- **Flag fix default = hoist, not drop** (gap #1/P0): move `-a never
-  -s read-only` to top-level position (`codex -a never -s read-only exec
-  review ...`), which is verified to parse and preserves the explicit
-  read-only/non-interactive invariant. "Drop the flags" is acceptable ONLY if
-  task 0.1's empirical check proves the subcommand's default sandbox is
-  read-only + non-interactive. Never trade broken-but-safe for
-  working-but-less-sandboxed.
+- **Flag fix default = `-c` config overrides, not drop** (gap #1/P0): on
+  `codex exec review`, set posture via `-c 'approval_policy="never"'` and
+  `-c 'sandbox_mode="read-only"'` (verified to parse, since `-a`/`-s` do not
+  exist on that subcommand) rather than hoisting `-a`/`-s` to top-level
+  position; on plain `codex exec`, `-s workspace-write` remains a valid
+  top-level flag alongside `-c 'approval_policy="never"'`. "Drop the flags"
+  is acceptable ONLY if task 0.1's empirical check proves the subcommand's
+  default sandbox is read-only + non-interactive. Never trade broken-but-safe
+  for working-but-less-sandboxed.
 - **OAuth-stall mitigation joins Wave 0** (gap #5): append
   `-c 'mcp_servers={}'` to `codex exec review` invocations per
   `docs/solutions/.../codex-cli-review-flags-and-mcp-stall.md` — same root

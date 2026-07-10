@@ -8,6 +8,8 @@ tags: [codex-cli, cli-flag-drift, argument-parsing, exit-code-misclassification,
 components: [yellow-codex]
 ---
 
+# codex exec/exec review reject -a/-s flags on codex-cli 0.140.0
+
 ## Problem
 
 On codex-cli 0.140.0, the `-a`/`--ask-for-approval` flag — and, on the

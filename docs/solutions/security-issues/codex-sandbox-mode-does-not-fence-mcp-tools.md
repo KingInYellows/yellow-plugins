@@ -20,8 +20,10 @@ tags:
 read as "this invocation cannot write anything." It cannot — but only for
 model-generated **shell commands**. The CLI's own `--help` scopes `-s` to
 "the sandbox policy to use when executing model-generated shell commands."
-MCP servers configured in `~/.codex/config.toml` run as separate processes
-and their tools are NOT constrained by the sandbox.
+Locally-configured (stdio) MCP servers in `~/.codex/config.toml` run as
+separate processes and their tools are NOT constrained by the sandbox;
+remote-URL servers have different startup behavior (see "Scope caveat"
+below).
 
 ## Symptoms
 
