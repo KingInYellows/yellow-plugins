@@ -13,6 +13,34 @@ and this project adheres to
 
 ---
 
+## [2.0.4] - 2026-07-10
+
+### Fixed
+
+- **yellow-docs 1.3.6** — Restored the doc-auditor's read-only contract by
+  denying write tools and limiting its documented Bash exception to Git
+  history inspection.
+- **yellow-browser-test 1.1.5** — Repaired the agent-browser prerequisite link
+  and replaced six unresolved shorthand task dispatches with fully qualified
+  subagent references.
+- **yellow-ci 1.4.6** — Fully qualified the runner-assignment subagent used by
+  `/ci:setup-self-hosted`.
+- **yellow-ruvector 1.1.8** — Enforced deterministic hook timeout budgets,
+  removed slow `npx` fallbacks, and added hanging-binary regression coverage.
+
+### Changed
+
+- **yellow-linear 1.3.3** — Corrected `/linear:delegate` documentation to
+  describe its credential requirements instead of a hard yellow-devin plugin
+  dependency.
+- Standardized the required skill headings across yellow-ci, yellow-codex,
+  yellow-composio, yellow-core, yellow-docs, yellow-research, and
+  yellow-semgrep.
+- Synchronized marketplace documentation for yellow-research's Ceramic MCP
+  integration, current MCP counts, and yellow-mempalace's deprecation status.
+
+---
+
 ## [1.2.0] - 2026-03-12
 
 ### Added
