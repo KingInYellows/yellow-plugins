@@ -2,9 +2,9 @@
 
 How yellow-research's bundled MCP servers coexist with claude.ai native
 connectors that expose the same providers. Sibling of
-`docs/memory-routing-protocol.md` and
-`docs/review-surface-routing-protocol.md`. Recorded after the 2026-07-09
-full-marketplace audit surfaced the overlap as an undocumented coherence gap.
+[memory-routing-protocol.md](memory-routing-protocol.md). Recorded after the
+2026-07-09 full-marketplace audit surfaced the overlap as an undocumented
+coherence gap.
 
 ## The overlap
 
@@ -24,7 +24,8 @@ against a provider account.
 ## Priority order
 
 Modeled on yellow-composio's three-prefix priority list
-(`plugins/yellow-composio/commands/composio/setup.md`, Step 2). When
+([plugins/yellow-composio/commands/composio/setup.md](../plugins/yellow-composio/commands/composio/setup.md),
+Step 2). When
 discovering Tavily or EXA tools via ToolSearch, prefer prefixes in this
 order:
 
