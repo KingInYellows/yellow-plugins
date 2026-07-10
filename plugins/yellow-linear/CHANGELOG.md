@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.3
+
+### Patch Changes
+
+- [#630](https://github.com/KingInYellows/yellow-plugins/pull/630)
+  [`ea6b47b`](https://github.com/KingInYellows/yellow-plugins/commit/ea6b47bbb51ab44431fcf3433d8896e7d4466fba)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - docs: correct
+  both CLAUDE.md restatements of the `/linear:delegate` dependency — the command
+  validates the `DEVIN_SERVICE_USER_TOKEN`/`DEVIN_ORG_ID` environment variables
+  (delegate.md Step 1), not yellow-devin plugin presence; installing
+  yellow-devin is one way to obtain the credentials, not a hard plugin
+  dependency.
+
 ## 1.3.2
 
 ### Patch Changes
