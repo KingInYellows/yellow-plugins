@@ -136,7 +136,7 @@ AskUserQuestion: "About to explore app starting from {starting_route} at {baseUR
 If user confirms, spawn the `test-runner` agent in exploratory mode:
 
 ```
-Task(subagent_type="yellow-browser-test:testing:test-runner"): "Run exploratory browser tests. Config at .claude/yellow-browser-test.local.md. Write results to test-reports/results.json. Test mode: exploratory. Starting route: {route}."
+Task(subagent_type="yellow-browser-test:testing:test-runner"): "Run exploratory browser tests. Config at .claude/yellow-browser-test.local.md. Write results to test-reports/results.json. Test mode: exploratory. Starting route: {starting_route}."
 ```
 
 The agent will:
