@@ -75,7 +75,7 @@ proceed to Step 6 (Review and Confirm Config) with user-provided values.
 Spawn the `app-discoverer` agent to analyze the codebase:
 
 ```
-Task(app-discoverer): "Discover dev server command, base URL, routes, and auth flow for this project."
+Task(subagent_type="yellow-browser-test:testing:app-discoverer"): "Discover dev server command, base URL, routes, and auth flow for this project."
 ```
 
 The agent will return the discovered configuration.

@@ -368,6 +368,82 @@ function logSuccess(message) {
 const skillReferencePattern = /`([a-z0-9][a-z0-9-]*)`\s+skill\b/gi;
 const pluginSubagentPattern =
   /subagent_type\s*(?:=|:)\s*["']?([a-z0-9-]+:[a-z0-9-]+(?::[a-z0-9-]+)?)["']?/g;
+// Colon-less subagent_type values (e.g. `subagent_type: "runner-assignment"`)
+// are invisible to pluginSubagentPattern (which requires >=1 colon) and fail
+// silently at runtime. Optional backticks/quotes cover inline-code-wrapped
+// values; the negative lookahead stops partial matches against the first
+// segment of a fully-qualified colon-ful reference.
+const colonlessSubagentPattern =
+  /subagent_type\s*(?:=|:)\s*[`"']*([a-z0-9-]+)(?![a-z0-9:-])/g;
+// Task(bareword): shorthand (e.g. `Task(test-runner): "..."`) — not a real
+// dispatch form; the canonical form is Task(subagent_type="plugin:dir:name").
+const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
+
+// Strip YAML frontmatter and fenced code blocks. Shared by RULE 15b and the
+// colon-less/bareword subagent reference checks (fence-aware: teaching docs
+// show illustrative examples inside fences and must not trip the checks).
+// Fence markers are matched with up to 3 leading spaces of indent
+// (CommonMark still treats a ```-fence indented 1-3 spaces as a fence;
+// 4+ spaces is an indented code block, a distinct construct).
+// Implemented as a line scan rather than a single multiline regex: the lazy
+// [\s\S]*? close-fence search was measurably quadratic on files with many
+// near-miss ``` lines, and this helper now runs on every markdown file, not
+// just SKILL.md. Semantics match the old regex: each opener pairs with the
+// next bare-``` closer line; an unclosed trailing fence is left in place.
+function stripFencedContent(content) {
+  const lines = content
+    .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
+    .split('\n');
+  const opener = /^[ \t]{0,3}```/;
+  const closer = /^[ \t]{0,3}```[ \t]*\r?$/;
+  const kept = [];
+  let inFence = false;
+  let fenceStart = -1;
+  for (const line of lines) {
+    if (!inFence) {
+      if (opener.test(line)) {
+        inFence = true;
+        fenceStart = kept.length;
+      }
+      kept.push(line); // provisional when opening — kept only if unclosed
+    } else if (closer.test(line)) {
+      kept.length = fenceStart; // drop opener..closer inclusive
+      kept.push(''); // preserve the blank the old regex replacement left
+      inFence = false;
+    } else {
+      kept.push(line); // provisional fence content — kept only if unclosed
+    }
+  }
+  return kept.join('\n');
+}
+
+// Map final agent-name segment → Set of fully-qualified 3-segment refs.
+// The colon-less/bareword checks gate on registry membership (RULE 13
+// lesson: membership logic must be anchored to actual plugin ownership,
+// not token shape) so built-in agent types like "general-purpose" and
+// incidental prose never trip them.
+function buildLastSegmentIndex(pluginAgents) {
+  const index = new Map();
+  const twoSegOnly = new Map();
+  for (const ref of pluginAgents) {
+    const parts = ref.split(':');
+    if (parts.length === 3) {
+      if (!index.has(parts[2])) index.set(parts[2], new Set());
+      index.get(parts[2]).add(ref);
+    } else if (parts.length === 2) {
+      if (!twoSegOnly.has(parts[1])) twoSegOnly.set(parts[1], new Set());
+      twoSegOnly.get(parts[1]).add(ref);
+    }
+  }
+  // A flat agent (agents/<name>.md, no subdirectory) registers only the
+  // 2-segment form. Fall back to it per segment so such agents still gate
+  // the colon-less/bareword checks; when a 3-segment form exists it wins so
+  // suggestions always name the runtime dispatch form.
+  for (const [last, refs] of twoSegOnly) {
+    if (!index.has(last)) index.set(last, refs);
+  }
+  return index;
+}
 
 // Validate a single agent .md file. Pushes findings into ctx.errors /
 // ctx.warnings and registers discovered agent names in ctx.pluginAgents.
@@ -640,6 +716,7 @@ function buildTwoToThreeSegmentMap(pluginAgents) {
 // advisory info logs for legacy 2-segment dispatch forms.
 function validateSubagentReferences(markdownFiles, ctx) {
   const { pluginNames, pluginAgents, twoToThreeSegment, errors } = ctx;
+  const lastSegmentIndex = buildLastSegmentIndex(pluginAgents);
   for (const filePath of markdownFiles) {
     const content = fs.readFileSync(filePath, 'utf8');
     for (const match of content.matchAll(pluginSubagentPattern)) {
@@ -666,6 +743,34 @@ function validateSubagentReferences(markdownFiles, ctx) {
           );
         }
       }
+    }
+
+    // Fence-aware scans: illustrative examples inside fenced code blocks are
+    // exempt (teaching docs deliberately show them), so both checks run on
+    // fence-stripped content only. Real dispatch sites converted to the
+    // canonical subagent_type="plugin:dir:name" form are covered by the
+    // raw-content registry scan above regardless of fencing. Note RULE 15b
+    // shares this fence-stripping (stripFencedContent).
+    const prose = stripFencedContent(content);
+    for (const match of prose.matchAll(colonlessSubagentPattern)) {
+      const bare = match[1];
+      const candidates = lastSegmentIndex.get(bare);
+      if (!candidates) continue;
+      const suggestion = [...candidates].map((r) => `"${r}"`).join(' or ');
+      errors.push(
+        `${relative(filePath)}: colon-less subagent_type "${bare}" — the runtime requires the fully-qualified 3-segment form; use ${suggestion}`
+      );
+    }
+    for (const match of prose.matchAll(taskBarewordPattern)) {
+      const bare = match[1];
+      const candidates = lastSegmentIndex.get(bare);
+      if (!candidates) continue;
+      const suggestion = [...candidates]
+        .map((r) => `Task(subagent_type="${r}")`)
+        .join(' or ');
+      errors.push(
+        `${relative(filePath)}: Task(${bare}): shorthand is not a real dispatch form — use the canonical ${suggestion} form`
+      );
     }
   }
 }
@@ -911,16 +1016,12 @@ function validateSkillFiles(skillFiles, ctx) {
     // 15b — three standard headings. Matched per-line at column 0 so a
     // heading quoted mid-sentence or nested deeper (### What It Does) does
     // not satisfy the rule. CRLF-tolerant tail like the other body regexes.
-    // Frontmatter and fenced code blocks are stripped first so a heading
-    // that only appears inside a fenced authoring example (e.g. a skill
-    // documenting the three-heading layout) cannot satisfy the presence
-    // check while the document's real sections are missing. Fence markers
-    // are matched with up to 3 leading spaces of indent (CommonMark still
-    // treats a ```-fence indented 1-3 spaces as a fence; 4+ spaces is an
-    // indented code block, a distinct construct this rule doesn't target).
-    const body = content
-      .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
-      .replace(/^[ \t]{0,3}```[^\n]*\r?\n[\s\S]*?^[ \t]{0,3}```[ \t]*\r?$/gm, '');
+    // Frontmatter and fenced code blocks are stripped first (shared
+    // stripFencedContent helper) so a heading that only appears inside a
+    // fenced authoring example (e.g. a skill documenting the three-heading
+    // layout) cannot satisfy the presence check while the document's real
+    // sections are missing.
+    const body = stripFencedContent(content);
     const missingHeadings = SKILL_HEADING_PATTERNS.filter(
       ({ re }) => !re.test(body)
     ).map(({ heading }) => heading);

@@ -257,16 +257,16 @@ Branch: `agent/fix/codex-exec-review-flags` (off main, bottom of stack).
 
 Branch: `agent/feat/subagent-ref-hardening` (one PR — red→green inside it).
 
-- [ ] 2.1 In `scripts/validate-agent-authoring.js`: broaden detection so
+- [x] 2.1 In `scripts/validate-agent-authoring.js`: broaden detection so
       colon-less `subagent_type:` values (invisible to
       `pluginSubagentPattern` at :369-370 today) are captured and **error**.
       Respect the RULE 13 lesson: any membership/allowlist logic must check
       plugin-directory ownership, not just pattern shape.
-- [ ] 2.2 Add a second check for the `Task(bareword):` shorthand (e.g.
+- [x] 2.2 Add a second check for the `Task(bareword):` shorthand (e.g.
       `/Task\(\s*[a-z0-9-]+\s*\)\s*:/`) → error directing authors to the
       canonical `Task(subagent_type="plugin:dir:name")` form
       (model: `plugins/yellow-core/commands/workflows/work.md:242`).
-- [ ] 2.3 Make BOTH checks fence-aware: strip fenced code blocks before
+- [x] 2.3 Make BOTH checks fence-aware: strip fenced code blocks before
       matching (gap #7 — teaching docs show illustrative examples in fences;
       `validateSubagentReferences` at :641-671 currently scans raw content).
       Note in the PR that RULE 15b shares this blind spot; fixing 15b is
@@ -283,24 +283,24 @@ Branch: `agent/feat/subagent-ref-hardening` (one PR — red→green inside it).
 > not novel logic.
 <!-- /deepen-plan -->
 
-- [ ] 2.4 Fix `plugins/yellow-ci/commands/ci/setup-self-hosted.md:300-303`
+- [x] 2.4 Fix `plugins/yellow-ci/commands/ci/setup-self-hosted.md:300-303`
       → `subagent_type: "yellow-ci:ci:runner-assignment"`.
-- [ ] 2.5 Fix all 6 yellow-browser-test sites to canonical explicit form:
+- [x] 2.5 Fix all 6 yellow-browser-test sites to canonical explicit form:
       `commands/browser-test/setup.md:78` (app-discoverer),
       `test.md:150,158`, `explore.md:139,157`, `report.md:31`
       (test-runner / test-reporter) →
       `yellow-browser-test:testing:{app-discoverer,test-runner,test-reporter}`.
-- [ ] 2.6 Repo-wide grep for any other newly-red site before submitting; the
+- [x] 2.6 Repo-wide grep for any other newly-red site before submitting; the
       validator must pass green on the full tree in this PR.
-- [ ] 2.7 Tests: new `tests/integration/validate-agent-authoring-subagent-refs.test.ts`
+- [x] 2.7 Tests: new `tests/integration/validate-agent-authoring-subagent-refs.test.ts`
       following the RULE 16 shape
       (`validate-agent-authoring-memory-protocol-rule.test.ts`, harness
       `writeAgent`/`runValidator`): green case, colon-less red case, bareword
       shorthand red case, fenced-example false-positive case (must pass),
       red-then-fixed case.
-- [ ] 2.8 PR description: call out the innocent-bystander effect (gap #12) —
+- [x] 2.8 PR description: call out the innocent-bystander effect (gap #12) —
       open PRs rebasing onto this will red if they carry the old patterns.
-- [ ] 2.9 Changesets: yellow-ci patch + yellow-browser-test patch (the
+- [x] 2.9 Changesets: yellow-ci patch + yellow-browser-test patch (the
       validator itself is root `scripts/`, no changeset). Solution doc: yes
       (new rule; RULE 13/16 precedent), via `--in-pr`. CI baseline gate.
 
