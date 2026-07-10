@@ -21,10 +21,10 @@ when ruled.
 | Entry point | Owner plugin | What it actually does | Routes-from triggers (draft) |
 |---|---|---|---|
 | `/smart-submit` audit | gt-workflow | 3 parallel audit agents (code review, security, silent failures) on UNCOMMITTED work, then stage/commit/submit | "submit this", "ship it" — pre-commit gate, not a review destination (draft) |
-| `/review:pr` | yellow-review | Adaptive multi-agent review of one OPEN PR (tiered persona pipeline, learnings pre-pass, confidence-rubric aggregation, auto-applies P1/P2 fixes) | "review PR #N", "review this PR" — the default single-PR review surface (draft) |
+| `/review:pr` | yellow-review | Adaptive multi-agent review of one OPEN PR (tiered persona pipeline, learnings pre-pass, confidence-rubric aggregation, auto-applies P0/P1 `safe_auto` fixes) | "review PR #N", "review this PR" — the default single-PR review surface (draft) |
 | `/council` | yellow-council | Cross-lineage advisory fan-out to Codex + Gemini + OpenCode CLIs; consensus verdict, no fix application | "second opinion", "cross-check with other models", `/workflows:work` polish-loop escalation (draft) |
 | `/codex:review` | yellow-codex | Single supplementary Codex CLI review of diff or PR; P1/P2/P3 findings | "what does Codex think" — standalone second opinion; also auto-spawned INSIDE `/review:pr` when installed and diff > 100 lines (draft) |
-| `/devin:review-prs` | yellow-devin | Devin cloud sessions review and remediate a batch of PRs remotely | "have Devin review my PRs" — explicit Devin invocation only, never auto-routed (draft) |
+| `/devin:review-prs` | yellow-devin | Reviews a batch of Devin-authored PRs LOCALLY via yellow-review's multi-agent pipeline (gh-based fallback if absent); remediation is a per-PR choice — fix locally, message the Devin cloud session, or comment on the PR | "review my Devin PRs", "check Devin's work" — explicit invocation only, never auto-routed (draft) |
 | `/workflows:review` | yellow-core | SESSION-level review: plan adherence, cross-PR coherence, scope drift, autonomous P1 fix loop | "review this session/plan against the plan" — plan-file scope; redirects PR-number args to `/review:pr` (draft) |
 | `/docs:review` | yellow-docs | Multi-persona review of a PLANNING DOCUMENT (PRD, brainstorm, spec, ADR) | "review this plan/spec/PRD" (document path, not PR) (draft) |
 
