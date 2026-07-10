@@ -195,8 +195,9 @@ to a script solely for testability would be scope creep. Verify by review:
    branch, while the distinct **API-error** remedy tells them to fix `gh`
    access or retry.
 4. Classifier reuses `compound.md`'s exact stderr match strings.
-5. Exit code captured explicitly (temp-file pattern), checked before any string
-   comparison — no pipe.
+5. Exit code captured explicitly (temp-file pattern), then classified in the
+   same Bash block before any later tool call — no state is lost across
+   subprocesses and no pipe masks the `gh` exit.
 6. Hard-stop fires **identically** in interactive and `--non-interactive` modes;
    no mode-branching for this check (unlike Steps 4/5/6).
 7. `docs/plugin-scope-mode-protocol.md` Interface 1 **unchanged** — the reasoning
