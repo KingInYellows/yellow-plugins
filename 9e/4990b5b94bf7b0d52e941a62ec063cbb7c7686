@@ -1,0 +1,23 @@
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_90cee544007013::t_6e2d48b5ec53c7 88-91,93
+docs/solutions/security-issues/codex-sandbox-mode-does-not-fence-mcp-tools.md
+  s_90cee544007013::t_0a54660ef8c8ab 1-58
+plugins/yellow-codex/commands/codex/setup.md
+  s_90cee544007013::t_d67f2583cf81d9 230
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9e4990b5b94bf7b0d52e941a62ec063cbb7c7686",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
