@@ -29,6 +29,18 @@ run_hook() {
   printf '%s' "$1" | PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
 }
 
+# Mirrors session-start.sh's own TIMEOUT_CMD resolution + GNU-compatibility
+# probe (command -v timeout || gtimeout, then --kill-after=0.1 0.1 true).
+# BusyBox/Alpine's timeout applet has no --kill-after flag, so `command -v
+# timeout` alone is not sufficient: it succeeds there while the hook still
+# falls back to unwrapped calls, which would let a hanging stub run past
+# these tests' budget assertions.
+gnu_timeout_available() {
+  local tcmd
+  tcmd="$(command -v timeout || command -v gtimeout || true)"
+  [ -n "$tcmd" ] && "$tcmd" --kill-after=0.1 0.1 true >/dev/null 2>&1
+}
+
 @test "outputs continue:true with a healthy silent ruvector" {
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}'
@@ -70,8 +82,8 @@ exit 0'
   # A hanging binary must be killed per-call (0.9s resume + 0.8s x2 recall,
   # 2.8s worst case including --kill-after escalation) so JSON lands before
   # the 3s hooks.json watchdog would kill the process.
-  command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1 || \
-    skip "timeout/gtimeout not available; unwrapped-call fallback is a documented risk"
+  gnu_timeout_available || \
+    skip "no GNU-compatible timeout available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'sleep 30'
   start_s="$(date +%s)"
   run --separate-stderr run_hook '{"cwd":""}'
@@ -85,8 +97,8 @@ exit 0'
 @test "hanging recall still emits continue:true when session-start succeeds fast" {
   # Mixed case: resume returns instantly, both recalls hang — the per-call
   # caps must bound each recall independently.
-  command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1 || \
-    skip "timeout/gtimeout not available; unwrapped-call fallback is a documented risk"
+  gnu_timeout_available || \
+    skip "no GNU-compatible timeout available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'case "$2" in recall) sleep 30;; esac
 exit 0'
   start_s="$(date +%s)"
