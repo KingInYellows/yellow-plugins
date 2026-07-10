@@ -1,0 +1,28 @@
+docs/solutions/code-quality/sibling-pr-batch-forward-reference-false-positive.md
+  s_5c58f5f7a1d68b::t_e7bac99da55f92 103
+  s_172c867615bbcf::t_513a979c5fa612 46-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f1203686b770b7ac667d94b3cf5e122fbaec4024",
+  "prompts": {},
+  "sessions": {
+    "s_172c867615bbcf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d0213fc2-d57b-4418-bedf-51913aa81e71",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_5c58f5f7a1d68b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cbfed5b-52e2-4227-8f40-e1b74f2c3883",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
