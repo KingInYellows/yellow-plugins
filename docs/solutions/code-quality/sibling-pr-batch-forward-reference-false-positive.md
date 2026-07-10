@@ -43,8 +43,8 @@ on a PR known to be part of a sibling batch:
 1. Identify the sibling PR(s) the reference plausibly targets from the batch
    list (e.g. `#628`-`#636`).
 2. Verify empirically — do not take the reviewer's isolated view at face value:
-   `gh pr view <sibling-pr-number> --json files` (or
-   `gh pr diff <sibling> --name-only`) against each candidate.
+   `gh api "repos/{owner}/{repo}/pulls/<sibling-pr-number>/files" --paginate --jq '.[].filename'`
+   against each candidate.
 3. **This check must be able to fail.** If no sibling delivers the referent,
    the finding is genuine — fix it normally. The lesson is "verify sibling
    delivery before declining," not "always decline sibling-batch findings."
@@ -100,5 +100,5 @@ the reference.
 
 ```bash
 # Verify a sibling PR actually delivers the referenced file
-gh pr view 635 --json files --jq '.files[].path' | grep -F 'review-surface-routing-protocol.md'
+gh api "repos/{owner}/{repo}/pulls/635/files" --paginate --jq '.[].filename' | grep -F 'review-surface-routing-protocol.md'
 ```
