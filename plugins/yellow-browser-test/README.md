@@ -12,7 +12,7 @@ flows, exploratory testing, and bug reporting.
 
 ## Prerequisites
 
-- [agent-browser](https://github.com/ArcadeLabsInc/agent-browser) CLI installed
+- [agent-browser](https://github.com/vercel-labs/agent-browser) CLI installed
   (`npm install -g agent-browser`)
 - Chromium-based browser available
 - Dev server for your app (auto-detected during setup)
