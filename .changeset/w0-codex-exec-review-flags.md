@@ -10,4 +10,5 @@ end-to-end on 0.140.0 and proven to override a permissive
 `~/.codex/config.toml`. Adds `-c 'mcp_servers={}'` to `exec review`
 invocations (MCP OAuth-stall mitigation), distinguishes exit-2 argument-parse
 errors from authentication failures in every error handler, and bumps the
-documented CLI floor to v0.140.0.
+documented CLI floor to v0.140.0. The setup quick test now skips execution
+when neither API-key nor Codex-login authentication is configured.

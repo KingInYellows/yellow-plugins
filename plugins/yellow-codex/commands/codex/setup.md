@@ -182,7 +182,20 @@ fi
 If codex is installed and auth is configured, run a quick test:
 
 ```bash
-if command -v codex >/dev/null 2>&1; then
+auth_ok=0
+if [ -n "${OPENAI_API_KEY:-}" ]; then
+  auth_ok=1
+elif command -v codex >/dev/null 2>&1; then
+  # Re-probe here because separate Bash tool calls do not share shell state.
+  if login_status=$(codex login status 2>&1); then login_exit=0; else login_exit=$?; fi
+  if [ "$login_exit" -eq 0 ] && printf '%s' "$login_status" | grep -qi '^logged in'; then
+    auth_ok=1
+  elif [ -f "${HOME}/.codex/auth.json" ]; then
+    auth_ok=1
+  fi
+fi
+
+if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
   SETUP_ERR_FILE=$(mktemp /tmp/codex-setup-err-XXXXXX.txt)
   test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -s read-only -m gpt-5.4-mini "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>"$SETUP_ERR_FILE") || true
   if printf '%s' "$test_output" | grep -qi "yellow-codex-setup-ok"; then
@@ -196,6 +209,8 @@ if command -v codex >/dev/null 2>&1; then
     printf '[yellow-codex] Test invocation: no response (check auth and network)\n' >&2
   fi
   rm -f "$SETUP_ERR_FILE"
+else
+  printf '[yellow-codex] Test invocation: skipped (codex CLI or authentication unavailable)\n'
 fi
 ```
 
