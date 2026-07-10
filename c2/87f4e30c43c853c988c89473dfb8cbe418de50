@@ -1,0 +1,38 @@
+plans/review-resolve-branch-correctness-guard.md
+  s_dc83b1fbd011a7::t_d8aa4a5fb78ad8 116,129-136
+  s_dc83b1fbd011a7::t_a42ce24740ec2b 162
+  s_dc83b1fbd011a7::t_d70f92bb87e980 169-172
+  s_dc83b1fbd011a7::t_073c61228b5046 160
+  s_dc83b1fbd011a7::t_adf9e33fee125b 206-210
+  s_dc83b1fbd011a7::t_647c63599f219a 235-237,239-245
+  s_dc83b1fbd011a7::t_a8bfc54d43c58d 152
+  s_dc83b1fbd011a7::t_d5744e7f4112df 124
+  s_dc83b1fbd011a7::t_1ab43e9a1563aa 1-115,117,119-120,122-123,125-127,137-151,153-157,159,161,163-168,173-205,211-234,238,246-265
+  s_dc83b1fbd011a7::t_1d6e2788f9139c 158
+  s_dc83b1fbd011a7::t_9e33720472ea57 118
+  s_dc83b1fbd011a7::t_df288701ee9278 128
+  s_dc83b1fbd011a7::t_d056ef5b00ad00 121
+plugins/yellow-review/commands/review/resolve-pr.md
+  s_dc83b1fbd011a7::t_7c29481012605e 392-396
+  s_dc83b1fbd011a7::t_a9466f2ef13cca 68-122
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_dc83b1fbd011a7::t_3c62b870fd631d 259
+.changeset/review-resolve-branch-guard.md
+  s_dc83b1fbd011a7::t_2148f25caaeefc 1-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "c287f4e30c43c853c988c89473dfb8cbe418de50",
+  "prompts": {},
+  "sessions": {
+    "s_dc83b1fbd011a7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "87d3a760-eb9b-450d-92f0-9ec6d706ab3e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
