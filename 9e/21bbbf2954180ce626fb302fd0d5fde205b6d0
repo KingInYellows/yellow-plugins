@@ -1,0 +1,28 @@
+docs/research-connector-overlap.md
+  s_f9e7cd42c1be8d::t_238a78936b1260 27-28
+  s_ba50b9e76f88b2::t_cdf811f5c670ee 5-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "9e21bbbf2954180ce626fb302fd0d5fde205b6d0",
+  "prompts": {},
+  "sessions": {
+    "s_ba50b9e76f88b2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-af2334308acd581a6",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f9e7cd42c1be8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e8bb2e20-dd32-436e-bb85-0de586aba14f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
