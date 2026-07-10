@@ -1,0 +1,20 @@
+plugins/yellow-linear/CLAUDE.md
+  s_fa9988b4873e85::t_c388433bb15e00 93-99
+  s_fa9988b4873e85::t_2a3c8925bf7e95 46-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f4ce0235594a0084f8557174f7613bc2cf4b1da5",
+  "prompts": {},
+  "sessions": {
+    "s_fa9988b4873e85": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1758e9-a313-4c9b-83de-f29d8df73d82",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
