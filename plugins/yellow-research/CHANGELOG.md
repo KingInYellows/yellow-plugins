@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.4.1
+
+### Patch Changes
+
+- [#636](https://github.com/KingInYellows/yellow-plugins/pull/636)
+  [`95b182c`](https://github.com/KingInYellows/yellow-plugins/commit/95b182c18575a5dc5277058da7dc172b970323fe)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - docs: document
+  the bundled-Tavily/EXA vs claude.ai native-connector overlap — new
+  `docs/research-connector-overlap.md` records the three-tier prefix priority
+  order (bundled preferred), and the plugin README cross-links it.
+
 ## 3.4.0
 
 ### Minor Changes
