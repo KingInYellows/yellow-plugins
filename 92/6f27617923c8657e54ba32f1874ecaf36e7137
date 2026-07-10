@@ -1,0 +1,31 @@
+plugins/yellow-ruvector/hooks/scripts/post-tool-use.sh
+  s_90cee544007013::t_8fc4e5faf5978d 32-34,38
+plugins/yellow-ruvector/hooks/scripts/session-start.sh
+  s_90cee544007013::t_989e0f44912d55 32-34,38,41-66,71-72,76-94
+plugins/yellow-ruvector/tests/post-tool-use.bats
+  s_90cee544007013::t_41aa685528cffc 101-116
+plugins/yellow-ruvector/tests/session-start.bats
+  s_90cee544007013::t_ad302f2505aef1 77
+  s_90cee544007013::t_495a6f7806d43c 1-76,78-92,94-99
+  s_90cee544007013::t_d8c352de1193d7 93
+.changeset/w1d-ruvector-hook-timeout-budgets.md
+  s_90cee544007013::t_1af0338739a921 1-14
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_9f25f0a72187fd 200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "926f27617923c8657e54ba32f1874ecaf36e7137",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
