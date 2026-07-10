@@ -11,4 +11,6 @@ end-to-end on 0.140.0 and proven to override a permissive
 invocations (MCP OAuth-stall mitigation), distinguishes exit-2 argument-parse
 errors from authentication failures in every error handler, and bumps the
 documented CLI floor to v0.140.0. The setup quick test now skips execution
-when neither API-key nor Codex-login authentication is configured.
+when neither API-key nor Codex-login authentication is configured, and the
+canonical review guidance no longer combines targeted selectors with the
+mutually-exclusive positional prompt.

@@ -36,8 +36,10 @@ stall the run) — added because MCP OAuth could otherwise stall `exec review`.
 
 Optional: add `--output-schema "$SCHEMA_FILE"` for structured JSON enforcement.
 Add `--title "Review for PR #N"` for context.
-Pass custom review instructions as the positional `[PROMPT]` argument
-(`--instructions` does not exist on `exec review` and fails to parse).
+For a prompt-only review, omit `--base`, `--uncommitted`, and `--commit`, then
+pass custom review instructions as the positional `[PROMPT]` argument. Codex
+treats those target selectors and `[PROMPT]` as mutually exclusive;
+`--instructions` does not exist on `exec review` and fails to parse.
 
 ### Rescue / Execution (write-capable)
 
