@@ -28,7 +28,13 @@ when ruled.
 | `/workflows:review` | yellow-core | SESSION-level review: plan adherence, cross-PR coherence, scope drift, autonomous P1 fix loop | "review this session/plan against the plan" — plan-file scope; redirects PR-number args to `/review:pr` (draft) |
 | `/docs:review` | yellow-docs | Multi-persona review of a PLANNING DOCUMENT (PRD, brainstorm, spec, ADR) | "review this plan/spec/PRD" (document path, not PR) (draft) |
 
-Open routing questions the maintainer should rule on:
+> **Scope of this table:** the batch-review surfaces `/review:all` and
+> `/review:sweep-all` (yellow-review, local) are deliberately NOT given rows
+> here — their routing vs `/devin:review-prs` (cloud) is itself an open
+> decision (question 4 below). The follow-up frontmatter sweep must still
+> cover them once question 4 is ruled, so they are not silently skipped.
+
+### Open routing questions the maintainer should rule on
 
 1. **"review my changes" (uncommitted, no PR)** — `/smart-submit`'s audit is
    the only surface covering uncommitted work, but it couples review with
@@ -49,8 +55,10 @@ Open routing questions the maintainer should rule on:
 Overlapping with distinct primary axes rather than redundant: the seven
 surfaces split by **target** (uncommitted work / one PR / many PRs / a
 session / a planning document) and by **lineage** (Claude-internal personas
-/ Codex / three-CLI council / Devin cloud). No pair is a strict subset;
-the closest to redundant is `/codex:review` ⊂ `/council` (question 2).
+/ Codex / three-CLI council / Devin cloud). The one strict-subset pair is
+`/codex:review` ⊂ `/council` — its single Codex lineage is subsumed by
+council's three-CLI fan-out (question 2); every other pair overlaps without
+one strictly containing another.
 
 ## Follow-up (out of scope here)
 
