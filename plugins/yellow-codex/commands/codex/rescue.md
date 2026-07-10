@@ -77,8 +77,12 @@ ${RECENT_COMMITS}
 ${TASK_DESCRIPTION}
 --- end task-description ---"
 
+# mcp_servers is intentionally left at user config, here and in the retry
+# below (this context is write-capable by design): the MCP OAuth stall that
+# motivates -c 'mcp_servers={}' was only ever observed on `exec review`
+# (as of 0.140.0).
 timeout --signal=TERM --kill-after=10 300 codex exec \
-  -a never \
+  -c 'approval_policy="never"' \
   -s workspace-write \
   --json \
   -m "${CODEX_MODEL:-gpt-5.4}" \
@@ -88,12 +92,18 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
       printf '[yellow-codex] Codex timed out after 5 minutes.\n'
     elif [ "$codex_exit" -eq 2 ]; then
-      printf '[yellow-codex] Authentication failed. Run /codex:setup.\n'
+      # Exit 2 is also clap's argument-parse error — check before blaming auth
+      if grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$STDERR_FILE" 2>/dev/null; then
+        printf '[yellow-codex] CLI rejected the invocation (argument parse error — flag drift?):\n'
+        grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null
+      else
+        printf '[yellow-codex] Authentication failed. Run /codex:setup.\n'
+      fi
     elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
       printf '[yellow-codex] Rate limited. Retrying in 5 seconds...\n'
       sleep 5
       timeout --signal=TERM --kill-after=10 300 codex exec \
-        -a never \
+        -c 'approval_policy="never"' \
         -s workspace-write \
         --json \
         -m "${CODEX_MODEL:-gpt-5.4}" \
@@ -227,7 +237,8 @@ If changes were applied, suggest running the full test suite.
 | `codex` not found | "codex CLI not found. Run /codex:setup first." | Stop |
 | Empty task description | AskUserQuestion for description | Continue |
 | Timeout (5 min) | "Codex timed out" | Report, suggest smaller scope |
-| Auth failure (exit 2) | "Authentication failed" | Suggest /codex:setup |
+| Argument parse error (exit 2 + parse error on stderr) | "CLI rejected the invocation (flag drift?)" | Report clap error line |
+| Auth failure (exit 2, no parse error on stderr) | "Authentication failed" | Suggest /codex:setup |
 | Rate limit | Retry once after 5s | Report if still limited |
 | Empty output | "Codex returned no analysis" | Report, suggest retry |
 | Applied changes break tests | Report failures, offer revert | User decides |

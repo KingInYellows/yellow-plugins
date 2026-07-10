@@ -18,23 +18,34 @@ All non-interactive Codex invocations use `codex exec` (not the interactive TUI)
 ```bash
 codex exec review \
   --base "$BASE_REF" \
-  -a never \
-  -s read-only \
+  -c 'approval_policy="never"' \
+  -c 'sandbox_mode="read-only"' \
+  -c 'mcp_servers={}' \
   --ephemeral \
   --json \
   -m "${CODEX_MODEL:-gpt-5.4}" \
   -o "$OUTPUT_FILE"
 ```
 
+`-a`/`-s` do not exist on the `exec review` subcommand (argument-parse error,
+exit 2, on codex-cli 0.140.0) — set posture via `-c` config overrides, which
+take precedence over `~/.codex/config.toml`. `-c 'mcp_servers={}'` clears the
+configured MCP tool surface (stdio servers are not launched; on 0.140.0
+remote-URL servers still log fast-failing auth errors at startup but do not
+stall the run) — added because MCP OAuth could otherwise stall `exec review`.
+
 Optional: add `--output-schema "$SCHEMA_FILE"` for structured JSON enforcement.
 Add `--title "Review for PR #N"` for context.
-Add `--instructions "Focus on security"` for steerable review.
+For a prompt-only review, omit `--base`, `--uncommitted`, and `--commit`, then
+pass custom review instructions as the positional `[PROMPT]` argument. Codex
+treats those target selectors and `[PROMPT]` as mutually exclusive;
+`--instructions` does not exist on `exec review` and fails to parse.
 
 ### Rescue / Execution (write-capable)
 
 ```bash
 timeout --signal=TERM --kill-after=10 300 codex exec \
-  -a never \
+  -c 'approval_policy="never"' \
   -s workspace-write \
   --json \
   -m "${CODEX_MODEL:-gpt-5.4}" \
@@ -48,7 +59,8 @@ Note: NOT ephemeral — rescue sessions may be resumed with `codex exec resume`.
 
 ```bash
 codex exec \
-  -a never \
+  -c 'approval_policy="never"' \
+  -c 'mcp_servers={}' \
   -s read-only \
   --ephemeral \
   --json \
@@ -57,7 +69,15 @@ codex exec \
   "$ANALYSIS_PROMPT"
 ```
 
-## Approval Modes (`-a` / `--ask-for-approval`)
+On plain `codex exec`, `-c 'mcp_servers={}'` is applied selectively: the
+Analysis invocation passes it because analysis runs read-only over untrusted
+code and `-s` only sandboxes model-generated shell commands — it does not
+fence user-configured MCP tools (a write-capable MCP server would otherwise
+bypass "read-only"). Rescue/Execution intentionally keep the user's MCP
+servers available (those contexts are write-capable by design, and the MCP
+OAuth stall was only ever observed on `exec review` as of 0.140.0).
+
+## Approval Modes (`approval_policy`)
 
 | Mode | Behavior | When to Use |
 |------|----------|-------------|
@@ -65,7 +85,12 @@ codex exec \
 | `on-request` | Prompt on-demand | Interactive rescue tasks |
 | `untrusted` | Pause before every command | Untrusted code analysis |
 
-**Deprecated:** `--approval-mode` and `on-failure` mode. Use `-a` flag instead.
+On codex-cli 0.140.0 the `-a`/`--ask-for-approval` flag exists only at the
+top level (`codex -a never …`); both `codex exec` and `codex exec review`
+reject it at argument parse (exit 2). Non-interactive invocations set the
+mode via `-c 'approval_policy="never"'` instead.
+
+**Deprecated:** `--approval-mode` and `on-failure` mode.
 
 ## Sandbox Modes (`-s` / `--sandbox`)
 
@@ -74,6 +99,11 @@ codex exec \
 | `read-only` | No file writes, no commands | Review, analysis |
 | `workspace-write` | Can write to workspace | Debugging (with user approval) |
 | `danger-full-access` | Full system access | **NEVER use from plugin** |
+
+`-s` is valid on plain `codex exec` but NOT on `codex exec review` — set the
+sandbox there via `-c 'sandbox_mode="read-only"'`. Always pass the mode
+explicitly: the effective default comes from `~/.codex/config.toml` and may
+be `danger-full-access`.
 
 Convenience alias: `--full-auto` sets `-a on-request -s workspace-write`.
 
@@ -204,7 +234,7 @@ Or ensure `.codexignore` is populated in the project root.
 |-----------|---------|----------|
 | 0 | Success | Parse output |
 | 1 | General error (includes 429 rate limit) | Parse stderr for "rate_limit_exceeded" |
-| 2 | Authentication failed | Run `/codex:setup`, check OPENAI_API_KEY |
+| 2 | Argument parse error OR authentication failure | If stderr matches `unexpected argument`, `invalid value`, `unrecognized subcommand`, or `required arguments`, the invocation itself is wrong (CLI flag drift) — fix the command; otherwise run `/codex:setup`, check OPENAI_API_KEY |
 | 3 | Configuration error | Check ~/.codex/config.toml |
 | 4 | Model/API error | Try different model |
 | 124 | Timeout (from `timeout` utility) | Suggest smaller scope |

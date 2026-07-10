@@ -13,7 +13,7 @@ independent code review, debugging/rescue capabilities, and codebase research.
 
 ## Prerequisites
 
-- **Codex CLI** (`codex`) v0.118.0+ via `npm install -g @openai/codex`,
+- **Codex CLI** (`codex`) v0.140.0+ via `npm install -g @openai/codex`,
   `brew install --cask codex`, or GitHub Releases (requires Node 22+)
 - **Authentication** -- `OPENAI_API_KEY` env var or `codex login` OAuth
 
@@ -56,7 +56,7 @@ identically without `yellow-codex` installed.
 ## Limitations
 
 - Large diffs (>128K tokens) cause hard errors -- no built-in truncation
-- Codex CLI is actively evolving (v0.118.0+) -- flags may change
+- Codex CLI is actively evolving (v0.140.0+) -- flags may change
 - Each invocation uses OpenAI API tokens; concurrent use may trigger rate limits
 - `--output-schema` may be ignored with certain model variants
 

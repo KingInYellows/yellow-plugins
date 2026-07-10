@@ -122,17 +122,39 @@ response immediately.
 OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-reviewer-err-XXXXXX.txt)
 
+# -a/-s do not exist on the `exec review` subcommand (parse error, exit 2, on
+# codex-cli 0.140.0); posture is set via -c overrides, which take precedence
+# over ~/.codex/config.toml. mcp_servers={} clears the MCP tool surface —
+# stdio servers are not launched; on 0.140.0 remote-URL servers still log
+# fast-failing auth errors at startup but do not stall the run.
 timeout --signal=TERM --kill-after=10 300 codex exec review \
   --base "$BASE_REF" \
-  -a never \
+  -c 'approval_policy="never"' \
+  -c 'sandbox_mode="read-only"' \
+  -c 'mcp_servers={}' \
   --json \
-  -s read-only \
   --ephemeral \
   -m "${CODEX_MODEL:-gpt-5.4}" \
   -o "$OUTPUT_FILE" \
   2>"$STDERR_FILE" || {
     codex_exit=$?
-    # Handle errors per codex-patterns skill error catalog
+    # Diagnostics mirror the codex-patterns skill error catalog. A silent
+    # nonzero exit here empties the Codex review leg with no signal.
+    if [ "$codex_exit" -eq 124 ] || [ "$codex_exit" -eq 137 ]; then
+      printf '[codex-reviewer] Timed out after 5 minutes\n'
+    elif [ "$codex_exit" -eq 2 ]; then
+      # Exit 2 is also clap's argument-parse error — check before blaming auth
+      if grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$STDERR_FILE" 2>/dev/null; then
+        printf '[codex-reviewer] CLI argument parse error (flag drift?):\n'
+        grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null
+      else
+        printf '[codex-reviewer] Auth failed\n'
+      fi
+    elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
+      printf '[codex-reviewer] Rate limited\n'
+    else
+      printf '[codex-reviewer] Error: exit code %d\n' "$codex_exit"
+    fi
   }
 
 REVIEW_OUTPUT=$(cat "$OUTPUT_FILE" 2>/dev/null || true)

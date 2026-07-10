@@ -563,10 +563,10 @@ and `composio_api_key` `present == true`, OR (status file absent AND both
 
 **yellow-codex:**
 
-- READY: `codex` binary found in PATH AND version >= 0.118.0 AND
+- READY: `codex` binary found in PATH AND version >= 0.140.0 AND
   (`OPENAI_API_KEY` set OR `~/.codex/auth.json` exists)
-- PARTIAL: `codex` binary found AND version >= 0.118.0, but auth not configured
-- NEEDS SETUP: `codex` binary not found OR version < 0.118.0
+- PARTIAL: `codex` binary found AND version >= 0.140.0, but auth not configured
+- NEEDS SETUP: `codex` binary not found OR version < 0.140.0
 
 **yellow-council:**
 
@@ -616,7 +616,7 @@ Marketplace Setup Dashboard
   yellow-browser-test  NEEDS SETUP     agent-browser missing
   yellow-docs          READY           git available, repo is a git repository
   yellow-composio      PARTIAL         MCP visible, usage counter missing
-  yellow-codex         PARTIAL         codex v0.118.0 found, OPENAI_API_KEY not set
+  yellow-codex         PARTIAL         codex v0.140.0 found, OPENAI_API_KEY not set
   yellow-council       PARTIAL         1 of 3 reviewer CLIs installed (codex only)
   yellow-mempalace     NEEDS SETUP     mempalace binary missing from PATH
   yellow-core          PARTIAL         statusLine installed, disableAllHooks=true

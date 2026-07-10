@@ -14,9 +14,13 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 
 ## Required Environment
 
-- **Codex CLI** (`codex`) — v0.118.0+. Install via `npm install -g @openai/codex`
-  (requires Node 22+), `brew install --cask codex` (macOS), or download from
-  GitHub Releases.
+- **Codex CLI** (`codex`) — v0.140.0+. The invocation forms in this plugin are
+  empirically verified on 0.140.0; earlier CLIs accepted `-a` on `codex exec`
+  and `-a`/`-s` on `codex exec review`, which 0.140.0 rejects at argument
+  parse (`-s` remains valid on plain `codex exec`), so the old floor
+  (v0.118.0) cannot be verified against the current syntax. Install via
+  `npm install -g @openai/codex` (requires Node 22+),
+  `brew install --cask codex` (macOS), or download from GitHub Releases.
 - **Authentication** — One of:
   - `OPENAI_API_KEY` environment variable (`sk-` or `sk-proj-` prefix)
   - ChatGPT OAuth via `codex login` (v0.118+ stores state in the OS
@@ -31,7 +35,10 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 - **Sandbox modes:** `read-only` for review and analysis; `workspace-write` for
   rescue and execution (Codex needs write access to debug, run tests, and stage
   proposed fixes). Never use `danger-full-access`.
-- **Approval mode:** Always `-a never` for non-interactive agent use.
+- **Approval mode:** Always `-c 'approval_policy="never"'` for non-interactive
+  agent use (`-a` exists only at the top level on 0.140.0; `codex exec` and
+  `codex exec review` reject it). On `exec review`, sandbox is likewise set
+  via `-c 'sandbox_mode="read-only"'`.
 - **Session persistence:** `--ephemeral` for review/analysis (prevent session
   accumulation), non-ephemeral for rescue (may want resume).
 - **Output parsing:** Use `-o <file>` for final message capture. Use `--json`
@@ -100,7 +107,7 @@ Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
 
 ## Known Limitations
 
-- **Codex CLI is actively evolving** (v0.118.0+) — flags and behavior may change
+- **Codex CLI is actively evolving** (v0.140.0+) — flags and behavior may change
 - **No built-in diff truncation** — large diffs (>128K tokens) cause hard errors.
   Pre-flight size check required.
 - **No binary file filtering** — Codex cannot review binary files. Use

@@ -48,10 +48,10 @@ Then re-run /codex:setup
 
 If the user chooses **No**: show manual install instructions and continue.
 
-**If codex IS found**, check the version meets the minimum (v0.118.0+):
+**If codex IS found**, check the version meets the minimum (v0.140.0+):
 
 ```bash
-MIN_CODEX_VERSION="0.118.0"
+MIN_CODEX_VERSION="0.140.0"
 codex_version_output=$(codex --version 2>/dev/null || true)
 installed_version=$(printf '%s\n' "$codex_version_output" | grep -Eo '[0-9]+(\.[0-9]+)+' | head -n1 || true)
 version_gte() {
@@ -182,15 +182,35 @@ fi
 If codex is installed and auth is configured, run a quick test:
 
 ```bash
-if command -v codex >/dev/null 2>&1; then
-  test_output=$(timeout 15 codex exec --ephemeral -a never -s read-only -m gpt-5.4-mini "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>/dev/null) || true
+auth_ok=0
+if [ -n "${OPENAI_API_KEY:-}" ]; then
+  auth_ok=1
+elif command -v codex >/dev/null 2>&1; then
+  # Re-probe here because separate Bash tool calls do not share shell state.
+  if login_status=$(codex login status 2>&1); then login_exit=0; else login_exit=$?; fi
+  if [ "$login_exit" -eq 0 ] && printf '%s' "$login_status" | grep -qi '^logged in'; then
+    auth_ok=1
+  elif [ -f "${HOME}/.codex/auth.json" ]; then
+    auth_ok=1
+  fi
+fi
+
+if command -v codex >/dev/null 2>&1 && [ "$auth_ok" -eq 1 ]; then
+  SETUP_ERR_FILE=$(mktemp /tmp/codex-setup-err-XXXXXX.txt)
+  test_output=$(timeout 15 codex exec --ephemeral -c 'approval_policy="never"' -s read-only -m gpt-5.4-mini "Reply with exactly: yellow-codex-setup-ok" -o /dev/stdout 2>"$SETUP_ERR_FILE") || true
   if printf '%s' "$test_output" | grep -qi "yellow-codex-setup-ok"; then
     printf '[yellow-codex] Test invocation: ok\n'
   elif [ -n "$test_output" ]; then
     printf '[yellow-codex] Test invocation: response received (model accessible)\n'
+  elif grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$SETUP_ERR_FILE" 2>/dev/null; then
+    printf '[yellow-codex] Test invocation: CLI argument parse error (flag drift?):\n' >&2
+    grep -m2 -E "^error:" "$SETUP_ERR_FILE" 2>/dev/null >&2
   else
     printf '[yellow-codex] Test invocation: no response (check auth and network)\n' >&2
   fi
+  rm -f "$SETUP_ERR_FILE"
+else
+  printf '[yellow-codex] Test invocation: skipped (codex CLI or authentication unavailable)\n'
 fi
 ```
 
@@ -218,8 +238,9 @@ If any step had a warning, list warnings at the bottom.
 | Condition | Message | Action |
 |---|---|---|
 | `codex` not found (Step 0) | AskUserQuestion: install now? | Offer install or show manual instructions |
-| `codex` below v0.118.0 (Step 0) | AskUserQuestion: upgrade now? | Offer upgrade |
+| `codex` below v0.140.0 (Step 0) | AskUserQuestion: upgrade now? | Offer upgrade |
 | Install script fails (Step 0) | "codex installation failed" | Warn, continue to Step 1 |
 | Node < 22 | "v22+ required for Codex CLI" | Warn, suggest standalone binary |
 | No auth configured | "No authentication configured" | Show both auth methods |
+| Test invocation parse error (Step 4, parse error on stderr) | "CLI argument parse error (flag drift?)" | Report clap error line |
 | Test invocation fails | "no response (check auth and network)" | Warn, suggest re-auth |
