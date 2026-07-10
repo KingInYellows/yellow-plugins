@@ -58,6 +58,7 @@ Note: NOT ephemeral — rescue sessions may be resumed with `codex exec resume`.
 ```bash
 codex exec \
   -c 'approval_policy="never"' \
+  -c 'mcp_servers={}' \
   -s read-only \
   --ephemeral \
   --json \
@@ -231,7 +232,7 @@ Or ensure `.codexignore` is populated in the project root.
 |-----------|---------|----------|
 | 0 | Success | Parse output |
 | 1 | General error (includes 429 rate limit) | Parse stderr for "rate_limit_exceeded" |
-| 2 | Argument parse error OR authentication failure | If stderr contains `unexpected argument`, the invocation itself is wrong (CLI flag drift) — fix the command; otherwise run `/codex:setup`, check OPENAI_API_KEY |
+| 2 | Argument parse error OR authentication failure | If stderr matches `unexpected argument`, `invalid value`, `unrecognized subcommand`, or `required arguments`, the invocation itself is wrong (CLI flag drift) — fix the command; otherwise run `/codex:setup`, check OPENAI_API_KEY |
 | 3 | Configuration error | Check ~/.codex/config.toml |
 | 4 | Model/API error | Try different model |
 | 124 | Timeout (from `timeout` utility) | Suggest smaller scope |

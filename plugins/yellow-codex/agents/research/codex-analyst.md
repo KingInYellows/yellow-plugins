@@ -81,7 +81,8 @@ STDERR_FILE=$(mktemp /tmp/codex-analyst-err-XXXXXX.txt)
 # mcp_servers={} clears the MCP tool surface: analysis runs read-only over
 # untrusted code, and -s only sandboxes shell commands — it does not fence
 # user-configured MCP tools (a write-capable MCP server would bypass
-# "read-only").
+# "read-only"). Scope (0.140.0): stdio servers are not launched; remote-URL
+# servers still log fast-failing auth errors at startup but do not stall the run.
 timeout --signal=TERM --kill-after=10 300 codex exec \
   -c 'approval_policy="never"' \
   -c 'mcp_servers={}' \
