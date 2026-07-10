@@ -1,0 +1,24 @@
+plans/audit-remediation-stack.md
+  s_90cee544007013::t_9b49536a1e39ca 179
+.changeset/w1a-doc-auditor-write-deny.md
+  s_90cee544007013::t_2038452e8c6492 1-9
+plugins/yellow-docs/agents/analysis/doc-auditor.md
+  s_90cee544007013::t_53d62765a70984 35-48
+  s_90cee544007013::t_b08f9dc1a9f821 14-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "1b5092dbf46490e59c9d1864a19c5a7ab787e792",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  }
+}
