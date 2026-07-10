@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.8
+
+### Patch Changes
+
+- [#632](https://github.com/KingInYellows/yellow-plugins/pull/632)
+  [`59cc3d4`](https://github.com/KingInYellows/yellow-plugins/commit/59cc3d42e001c88452e55a20750999b94f91fd89)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: enforce
+  hook time budgets on the npx-fallback path. post-tool-use.sh now requires the
+  direct `ruvector` binary (npx resolution ~2700ms blows the 1s watchdog) — same
+  skip-npx pattern as pre-tool-use.sh. session-start.sh drops its npx fallback
+  and timeout-wraps each of its three CLI calls (0.9s resume + 0.8s per recall,
+  `--kill-after=0.1`, deterministic 2.8s worst case inside the 3s watchdog) via
+  fixed per-call caps, so `{"continue": true}` always lands in time. New
+  `tests/session-start.bats` proves the contract against a hanging binary (first
+  bats suite in the repo simulating a hang, not just a failure);
+  post-tool-use.bats gains a no-npx-fallback regression test.
+
 ## 1.1.7
 
 ### Patch Changes

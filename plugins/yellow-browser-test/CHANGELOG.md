@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.5
+
+### Patch Changes
+
+- [#631](https://github.com/KingInYellows/yellow-plugins/pull/631)
+  [`f7fc2d8`](https://github.com/KingInYellows/yellow-plugins/commit/f7fc2d87f26a30bc2e6ffbcc301254d240895871)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: README
+  prerequisite link pointed at ArcadeLabsInc/agent-browser (404); now points at
+  vercel-labs/agent-browser (verified live).
+
+- [#633](https://github.com/KingInYellows/yellow-plugins/pull/633)
+  [`99dd605`](https://github.com/KingInYellows/yellow-plugins/commit/99dd605cbf72e9ec138627c56bd51224ac985017)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: all six
+  `Task(bareword):` dispatch sites (app-discoverer, test-runner, test-reporter
+  across setup/test/explore/report commands) now use the canonical
+  `Task(subagent_type="yellow-browser-test:testing:<name>")` form the Task
+  runtime actually resolves.
+
 ## 1.1.4
 
 ### Patch Changes

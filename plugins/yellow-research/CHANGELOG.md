@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.4.2
+
+### Patch Changes
+
+- [#634](https://github.com/KingInYellows/yellow-plugins/pull/634)
+  [`c7b5ae2`](https://github.com/KingInYellows/yellow-plugins/commit/c7b5ae251853e8e3c1f95872b0752bc1083d2ab5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Audit doc-drift
+  sweep (2026-07-09 full-marketplace audit, Wave 4): add the three standard
+  SKILL.md headings (`## What It Does` / `## When to Use` / `## Usage`) to the 8
+  skills flagged by RULE 15b — yellow-ci `ci-conventions`
+  - `diagnose-ci`, yellow-codex `codex-patterns`, yellow-composio
+    `composio-patterns`, yellow-core `create-agent-skills`, yellow-docs
+    `docs-conventions`, yellow-research `research-patterns`, yellow-semgrep
+    `semgrep-conventions` — clearing every RULE 15b advisory warning. Also adds
+    Ceramic to yellow-research's marketplace.json description (mirroring
+    plugin.json), and fixes the root README MCP counts against mechanical counts
+    (nine MCP-bundling plugins, six yellow-research servers) with a one-line
+    yellow-mempalace deprecation footnote under the MCP table.
+
 ## 3.4.1
 
 ### Patch Changes
