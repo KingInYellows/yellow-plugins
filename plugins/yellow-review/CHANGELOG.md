@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.2.4
+
+### Patch Changes
+
+- [#638](https://github.com/KingInYellows/yellow-plugins/pull/638)
+  [`56c419b`](https://github.com/KingInYellows/yellow-plugins/commit/56c419ba3602bd5b3c01bd93539cd6e25fd9f59e)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Add a
+  correct-branch precondition to `/review:resolve`. When a PR number is passed
+  explicitly, the command now verifies the checked-out branch maps to that PR
+  (via `gh pr view --json number`) before resolving, committing, or pushing, and
+  hard-stops with a distinct message when the current branch maps to a different
+  PR, has no associated PR, or the check itself errors (fail-closed) —
+  preventing fixes from being committed to the wrong branch. The precondition is
+  mode-independent (fires the same with and without `--non-interactive`) and is
+  recorded as a convention in the pr-review-workflow skill. Explicit numeric PR
+  tokens are canonicalized before comparison, and `gh` error text is fenced as
+  untrusted reference output with auth/network-specific retry guidance. Capture,
+  comparison, and hard-stop handling stay in one Bash call so subprocess-local
+  state cannot be lost before enforcement.
+
 ## 3.2.3
 
 ### Patch Changes
