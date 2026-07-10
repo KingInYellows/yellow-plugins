@@ -30,15 +30,20 @@ run_hook() {
 }
 
 # Mirrors session-start.sh's own TIMEOUT_CMD resolution + GNU-compatibility
-# probe (command -v timeout || gtimeout, then --kill-after=0.1 0.1 true).
-# BusyBox/Alpine's timeout applet has no --kill-after flag, so `command -v
-# timeout` alone is not sufficient: it succeeds there while the hook still
-# falls back to unwrapped calls, which would let a hanging stub run past
-# these tests' budget assertions.
+# probe: try each of timeout/gtimeout and accept the first that supports
+# --kill-after=0.1 0.1 true. BusyBox/Alpine's timeout applet has no
+# --kill-after flag, so `command -v timeout` alone is not sufficient: it
+# succeeds there while the hook still falls back to unwrapped calls, which
+# would let a hanging stub run past these tests' budget assertions. A non-GNU
+# `timeout` may also precede a working `gtimeout` on PATH, so both candidates
+# must be probed.
 gnu_timeout_available() {
-  local tcmd
-  tcmd="$(command -v timeout || command -v gtimeout || true)"
-  [ -n "$tcmd" ] && "$tcmd" --kill-after=0.1 0.1 true >/dev/null 2>&1
+  local name tcmd
+  for name in timeout gtimeout; do
+    tcmd="$(command -v "$name" || true)"
+    [ -n "$tcmd" ] && "$tcmd" --kill-after=0.1 0.1 true >/dev/null 2>&1 && return 0
+  done
+  return 1
 }
 
 @test "outputs continue:true with a healthy silent ruvector" {
