@@ -1,0 +1,20 @@
+docs/review-surface-routing-protocol.md
+  s_fa9988b4873e85::t_9ede46c1c83b6d 27
+  s_fa9988b4873e85::t_b1dc763e9cb5a9 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d14a0ce0c49e7bdefa46d0545ae4348cd937fbd8",
+  "prompts": {},
+  "sessions": {
+    "s_fa9988b4873e85": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1758e9-a313-4c9b-83de-f29d8df73d82",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
