@@ -81,7 +81,7 @@ mirroring `resolve-stack.md` Step 3):
 | **Match** | exit 0 AND resolved PR == `<N>` | proceed to Step 3 |
 | **Wrong branch** | exit 0 AND resolved PR ≠ `<N>` | hard error: "current branch maps to PR #<got>, not #<N>; checkout #<N>'s branch first (`gt checkout <branch>` / `gh pr checkout <N>`)". Stop. |
 | **No PR on branch** | exit ≠ 0 AND stderr matches `no pull requests found` / `no open pull requests` / `no pull requests associated` | hard error: "current branch has no associated PR; checkout #<N>'s branch first". Stop. |
-| **API error** | exit ≠ 0, any other stderr | fail-closed hard error: "could not verify branch for PR #<N> (gh error): <stderr>". Stop. |
+| **API error** | exit ≠ 0, any other stderr | fail-closed hard error with stderr fenced as untrusted reference text. Tell the user to fix `gh` access or retry, not to switch branches. Stop. |
 
 The distinct **API-error** outcome (G2) is essential: without it, a transient
 auth/rate-limit/network failure would masquerade as "wrong branch" — the exact
@@ -190,9 +190,10 @@ to a script solely for testability would be scope creep. Verify by review:
 
 1. New step sits literally **after Step 2 (clean-tree), before Step 3**.
 2. No-arg path **explicitly skips** the check (not "runs, trivially passes").
-3. **Three** outcome messages present verbatim; each remedy tells the user to
-   `gt checkout` / `gh pr checkout` the correct branch; the **API-error message
-   is distinct** from both wrong-branch messages.
+3. **Three** error-outcome messages present verbatim: mismatch and no-PR
+   remedies tell the user to `gt checkout` / `gh pr checkout` the correct
+   branch, while the distinct **API-error** remedy tells them to fix `gh`
+   access or retry.
 4. Classifier reuses `compound.md`'s exact stderr match strings.
 5. Exit code captured explicitly (temp-file pattern), checked before any string
    comparison — no pipe.
@@ -218,6 +219,8 @@ to a script solely for testability would be scope creep. Verify by review:
   assuming it lands in the "no PR" bucket.
 - **Branch associated with >1 PR** — `gh pr view` picks the current-branch PR;
   equality against `<N>` still holds if that PR is `<N>`.
+- **Explicit PR number with leading zeroes** — Step 1 canonicalizes the token
+  before comparison, so `00123` matches `gh`'s canonical `123` output.
 - **Wrong branch AND dirty tree** — Step 2 fires first ("stash"); mildly less
   precise message but non-blocking (ordering is deliberate: cheap local check
   before any network call).

@@ -256,7 +256,8 @@ Paraphrasing re-introduces the drift this skill is meant to prevent (see
 | Error                     | Action                                                        |
 | ------------------------- | ------------------------------------------------------------- |
 | Dirty working directory   | Error: "Uncommitted changes detected. Commit or stash first." |
-| Wrong branch for PR       | Hard-stop if the checked-out branch doesn't map to the explicit `<PR#>` (fail-closed on check errors). See `/review:resolve` Step 2b. |
+| Wrong branch for PR       | Hard-stop on a different/no associated PR; checkout the target branch. See `/review:resolve` Step 2b. |
+| Branch verification failure | Hard-stop on `gh` auth/rate/network errors; restore access and retry. |
 | `gt submit` failure       | Report error, suggest `gt stack` to diagnose                  |
 | Merge conflict on restack | Abort restack, report to user for manual resolution           |
 | `gt track` failure        | Warn and proceed with raw git (degraded mode)                 |
