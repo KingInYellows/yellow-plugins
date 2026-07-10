@@ -174,3 +174,54 @@ check instead of writing the assertion from memory:
   root cause (trusting a summary instead of re-deriving ground truth)
   found in a prior PR's review pass, for verifying *reviewer* claims
   rather than the PR author's own claims
+
+---
+
+## Update — 2026-07-09
+
+**New context:** PR #632 (`fix(yellow-ruvector): enforce hook budgets —
+skip-npx + per-call timeouts`) surfaced the same substitution — prose
+describing code, never mechanically re-verified — in a regular code PR, not
+a doc-fix PR. The mechanism differs enough to note explicitly.
+
+### Finding: A Changeset Description Went Stale From Mid-PR Churn, Not From a False Assertion
+
+The changeset `.changeset/w1d-ruvector-hook-timeout-budgets.md` (which ships
+verbatim into `CHANGELOG.md`) was written in commit `5a347d4c` to describe a
+`$SECONDS`-based remaining-budget guard in `session-start.sh`. That guard
+was **true when the changeset was written** — the commit adding it landed in
+the same push. A later, review-driven commit (`8f306701`) removed the guard
+as decorative (three reviewers converged: integer-second `$SECONDS`
+granularity is useless against the sub-second per-call caps that stayed
+authoritative), but the changeset prose was never re-synced. The stale claim
+survived until a subsequent review round (comment-analyzer, reliability,
+correctness, maintainability, plus codex git-archaeology — 12+ reviewers
+converged, anchor 100) traced the guard through git history and confirmed it
+had been deliberately removed, not merely undocumented. Fixed in `011af2cd`
+by correcting the changeset to describe the shipped fixed per-call caps (and
+fixing an already-inconsistent worst-case figure, 2.7s vs. the
+arithmetically correct 2.8s, in the same pass).
+
+**Distinct root cause:** the earlier findings in this doc are about
+assertions made *from memory or prediction* that were wrong from the start.
+This one was correct at the moment it was written — it went stale because a
+**later commit in the same PR** changed the code the prose described, and
+nothing re-diffed the prose against the PR's final state. The mechanical
+check needed here is different in kind: not "verify the claim against
+ground truth" (it was checked once, correctly) but "re-verify PR-lifecycle
+artifacts — changesets, PR bodies, commit messages — against the tip of the
+branch whenever a later commit touches the same code they describe."
+
+**Prevention (in addition to the existing checklist):**
+
+4. **"This changeset/PR-body/commit-message paragraph describes the shipped
+   behavior"** — after any commit that alters or removes something an
+   earlier commit in the same PR added, re-read every PR-lifecycle prose
+   artifact (`.changeset/*.md`, PR body, squash-worthy commit messages) that
+   referenced the changed code and re-diff it against the current tip.
+   Changesets are especially exposed because they are typically written
+   once, early, alongside the first implementation commit, and are easy to
+   forget during later review-driven rework — see
+   `docs/solutions/workflow/changeset-release-pipeline-silent-failures.md`
+   for the release-pipeline consequences of stale/incorrect changeset
+   content reaching `CHANGELOG.md` unreviewed.
