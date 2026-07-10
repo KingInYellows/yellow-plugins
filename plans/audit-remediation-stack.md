@@ -363,6 +363,14 @@ Branch: `agent/docs/audit-doc-drift-sweep`. Depends on Wave 0 (same-file:
 
 ### Post-stack — two routing-decision docs (separate PRs, after Wave 4)
 
+> **Tick state (why 5.1/5.2 are checked in this PR):** both docs are
+> delivered by sibling PRs — #635 (`review-surface-routing-protocol.md`)
+> and #636 (`research-connector-overlap.md`) — which branch off `main`
+> independently (not stacked) and do not edit this plan file. They are
+> checked here because this Wave-4 PR is the sole editor of this plan.
+> The ticks are accurate once the full set merges; do NOT archive this
+> plan via `/plan:complete` until #635 and #636 have merged.
+
 - [x] 5.1 `docs/review-surface-routing-protocol.md` — model on
       `docs/memory-routing-protocol.md`'s 5-section skeleton (framing with
       "maintainer decision, deliberately NOT decided by the implementer" →
