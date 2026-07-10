@@ -156,3 +156,11 @@ Executive summary of findings.
 If a source MCP is unavailable (key not set, rate limited, connection error),
 the plugin skips that source and continues with the rest. Research never fails
 completely if at least one source is reachable.
+
+## Native Connector Overlap
+
+Tavily and EXA may also be reachable via claude.ai native connectors
+(`mcp__claude_ai_Tavily__*` / `mcp__claude_ai_Exa__*`) in the same session.
+The bundled servers are preferred; see
+[`docs/research-connector-overlap.md`](../../docs/research-connector-overlap.md)
+for the priority order and rationale.
