@@ -23,16 +23,25 @@ when ruled.
 | `/smart-submit` audit | gt-workflow | 3 parallel audit agents (code review, security, silent failures) on UNCOMMITTED work, then stage/commit/submit | "submit this", "ship it" — pre-commit gate, not a review destination (draft) |
 | `/review:pr` | yellow-review | Adaptive multi-agent review of one OPEN PR (tiered persona pipeline, learnings pre-pass, confidence-rubric aggregation, auto-applies P0/P1 `safe_auto` fixes) | "review PR #N", "review this PR" — the default single-PR review surface (draft) |
 | `/council` | yellow-council | Cross-lineage advisory fan-out to Codex + Gemini + OpenCode CLIs; consensus verdict, no fix application | "second opinion", "cross-check with other models", `/workflows:work` polish-loop escalation (draft) |
-| `/codex:review` | yellow-codex | Single supplementary Codex CLI review of diff or PR; P1/P2/P3 findings | "what does Codex think" — standalone second opinion; also auto-spawned INSIDE `/review:pr` when installed and diff > 100 lines (draft) |
+| `/codex:review` | yellow-codex | Single supplementary Codex CLI review of diff or PR; P1/P2/P3 findings | "what does Codex think" — standalone second opinion; NOTE: `/review:pr` auto-spawns the `codex-reviewer` agent (not this command) when yellow-codex is installed and diff > 100 lines (draft) |
 | `/devin:review-prs` | yellow-devin | Reviews a batch of Devin-authored PRs LOCALLY via yellow-review's multi-agent pipeline (gh-based fallback if absent); remediation is a per-PR choice — fix locally, message the Devin cloud session, or comment on the PR | "review my Devin PRs", "check Devin's work" — explicit invocation only, never auto-routed (draft) |
 | `/workflows:review` | yellow-core | SESSION-level review: plan adherence, cross-PR coherence, scope drift, autonomous P1 fix loop | "review this session/plan against the plan" — plan-file scope; redirects PR-number args to `/review:pr` (draft) |
 | `/docs:review` | yellow-docs | Multi-persona review of a PLANNING DOCUMENT (PRD, brainstorm, spec, ADR) | "review this plan/spec/PRD" (document path, not PR) (draft) |
 
 > **Scope of this table:** the batch-review surfaces `/review:all` and
-> `/review:sweep-all` (yellow-review, local) are deliberately NOT given rows
-> here — their routing vs `/devin:review-prs` (cloud) is itself an open
-> decision (question 4 below). The follow-up frontmatter sweep must still
-> cover them once question 4 is ruled, so they are not silently skipped.
+> `/review:sweep-all` (yellow-review) are deliberately NOT given rows here —
+> their routing vs `/devin:review-prs` (yellow-devin) is itself an open
+> decision, since the real discriminator is whether the PRs are
+> Devin-authored, not local vs cloud (question 4 below). The follow-up
+> frontmatter sweep must still cover them once question 4 is ruled, so they
+> are not silently skipped.
+>
+> `/review:sweep` (yellow-review) is also deliberately NOT given its own row
+> — it wraps the `/review:pr` row above with `/review:resolve` into one
+> unattended single-PR review-and-cleanup pass, so its trigger phrases
+> overlap with `/review:pr`'s. The follow-up frontmatter sweep must decide
+> whether "review and clean up this PR" routes to `/review:pr` alone or to
+> `/review:sweep`, so it is not silently skipped either.
 
 ### Open routing questions the maintainer should rule on
 
@@ -47,15 +56,18 @@ when ruled.
    `/council` on a stuck review cap. Should `/review:pr` gain the same
    escalation, or stay single-surface?
 4. **Batch review** — `/review:all` and `/review:sweep-all` (yellow-review)
-   vs `/devin:review-prs` (yellow-devin) both cover "review many PRs". Local
-   vs cloud is the de-facto split; is that the ruling?
+   vs `/devin:review-prs` (yellow-devin) both cover "review many PRs", and
+   both review locally via yellow-review's multi-agent pipeline. The real
+   discriminator is whether the PRs are Devin-authored, not local vs cloud;
+   is that the ruling?
 
 ## Domain model
 
 Overlapping with distinct primary axes rather than redundant: the seven
-surfaces split by **target** (uncommitted work / one PR / many PRs / a
-session / a planning document) and by **lineage** (Claude-internal personas
-/ Codex / three-CLI council / Devin cloud). The one strict-subset pair is
+surfaces split by **target** (uncommitted work / one PR / many PRs,
+optionally Devin-authored / a session / a planning document) and by
+**lineage** (Claude-internal personas / Codex / three-CLI council). The one
+strict-subset pair is
 `/codex:review` ⊂ `/council` — its single Codex lineage is subsumed by
 council's three-CLI fan-out (question 2); every other pair overlaps without
 one strictly containing another.
