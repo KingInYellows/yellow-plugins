@@ -6,6 +6,21 @@ description: "Reference conventions for how yellow-research derives slugs, forma
 
 # Research Patterns
 
+## What It Does
+
+Reference conventions for how yellow-research derives slugs, formats reports,
+and saves output under `docs/research/`.
+
+## When to Use
+
+Use when authoring or modifying yellow-research commands or agents that write
+research output.
+
+## Usage
+
+Reference the sections below as preloaded context — this skill documents
+conventions; it is not an executable workflow.
+
 ## Slug Naming
 
 Convert the research topic to a slug for the output filename:

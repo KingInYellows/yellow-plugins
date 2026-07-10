@@ -7,8 +7,20 @@ user-invokable: true
 
 # Create Agent Skills
 
+## What It Does
+
 Expert guidance for creating Claude Code skills and agents with proper
 structure, frontmatter, and best practices.
+
+## When to Use
+
+Use when working with SKILL.md files, authoring new skills, creating slash
+commands, or designing agent workflows.
+
+## Usage
+
+Invoke as `/create-agent-skills [skill-name|agent-name]`, or read the
+sections below as authoring reference.
 
 ## Commands vs Skills
 

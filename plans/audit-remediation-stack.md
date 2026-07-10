@@ -326,7 +326,7 @@ Recorded defaults from the brainstorm:
 Branch: `agent/docs/audit-doc-drift-sweep`. Depends on Wave 0 (same-file:
 `codex-patterns/SKILL.md`).
 
-- [ ] 4.1 Re-derive the SKILL.md heading roster at execution time via grep
+- [x] 4.1 Re-derive the SKILL.md heading roster at execution time via grep
       over `plugins/*/skills/*/SKILL.md` (do NOT trust this list blindly).
       Current verified roster (8): yellow-ci `ci-conventions` +
       `diagnose-ci`, yellow-codex `codex-patterns`, yellow-composio
@@ -335,18 +335,18 @@ Branch: `agent/docs/audit-doc-drift-sweep`. Depends on Wave 0 (same-file:
       `create-agent-skills` (headings exist only inside its fenced template —
       add real ones). Add the missing `## What It Does` / `## When to Use` /
       `## Usage` headings to each, restructuring minimally (hand-edit only).
-- [ ] 4.2 Root `README.md:45`: "Eight plugins" → "Nine plugins"; add the
+- [x] 4.2 Root `README.md:45`: "Eight plugins" → "Nine plugins"; add the
       one-line mempalace footnote under the MCP table (decision above).
-- [ ] 4.3 Root `README.md:127`: "five MCP servers" → "six"; add Ceramic to
+- [x] 4.3 Root `README.md:127`: "five MCP servers" → "six"; add Ceramic to
       the prose list at lines 131-148.
-- [ ] 4.4 `.claude-plugin/marketplace.json` yellow-research `description`:
+- [x] 4.4 `.claude-plugin/marketplace.json` yellow-research `description`:
       add Ceramic, mirroring `plugins/yellow-research/.claude-plugin/plugin.json:5`
       (README table rows already correct — marketplace.json is the only
       Ceramic gap).
-- [ ] 4.5 Verify every prose count touched against a fresh `ls | wc -l` /
+- [x] 4.5 Verify every prose count touched against a fresh `ls | wc -l` /
       `jq` count — never carry a count forward from the previous file
       version.
-- [ ] 4.6 Changeset: one multi-plugin file (patch × ~7 plugins), precedent
+- [x] 4.6 Changeset: one multi-plugin file (patch × ~7 plugins), precedent
       `.changeset/c7-memory-protocol-drift-lint.md`. yellow-codex appearing
       in both Wave 0 and Wave 4 changesets composes fine at
       `changeset version`. No solution doc — covered by
@@ -363,7 +363,15 @@ Branch: `agent/docs/audit-doc-drift-sweep`. Depends on Wave 0 (same-file:
 
 ### Post-stack — two routing-decision docs (separate PRs, after Wave 4)
 
-- [ ] 5.1 `docs/review-surface-routing-protocol.md` — model on
+> **Tick state (why 5.1/5.2 are checked in this PR):** both docs are
+> delivered by sibling PRs — #635 (`review-surface-routing-protocol.md`)
+> and #636 (`research-connector-overlap.md`) — which branch off `main`
+> independently (not stacked) and do not edit this plan file. They are
+> checked here because this Wave-4 PR is the sole editor of this plan.
+> The ticks are accurate once the full set merges; do NOT archive this
+> plan via `/plan:complete` until #635 and #636 have merged.
+
+- [x] 5.1 `docs/review-surface-routing-protocol.md` — model on
       `docs/memory-routing-protocol.md`'s 5-section skeleton (framing with
       "maintainer decision, deliberately NOT decided by the implementer" →
       Decision → trigger-routing table → domain model → Follow-ups).
@@ -371,7 +379,7 @@ Branch: `agent/docs/audit-doc-drift-sweep`. Depends on Wave 0 (same-file:
       `/review:pr`, `/council`, `/codex:review`, `/devin:review-prs`,
       `/workflows:review`, `/docs:review`. Draft the table structure; leave
       routing decisions to the maintainer.
-- [ ] 5.2 `docs/research-connector-overlap.md` — bundled Tavily/EXA vs
+- [x] 5.2 `docs/research-connector-overlap.md` — bundled Tavily/EXA vs
       claude.ai native connectors; structural model:
       `plugins/yellow-composio/commands/composio/setup.md:59-73`
       (three-prefix priority list). Cross-link from yellow-research README.

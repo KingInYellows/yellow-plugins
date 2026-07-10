@@ -6,8 +6,20 @@ user-invokable: false
 
 # Codex CLI Patterns
 
+## What It Does
+
 Shared reference for all yellow-codex commands and agents. Documents the correct
 CLI flags, output parsing, error handling, and security conventions.
+
+## When to Use
+
+Use when authoring or modifying commands or agents that invoke `codex exec` —
+choosing flags, sandbox and approval modes, and parsing its output.
+
+## Usage
+
+Copy the invocation patterns below verbatim; every other yellow-codex file
+copies from this skill, so fix drift here first.
 
 ## CLI Invocation Patterns
 

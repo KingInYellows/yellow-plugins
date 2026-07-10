@@ -6,8 +6,10 @@ user-invokable: true
 
 # Diagnosing CI Failures on Self-Hosted Runners
 
-Understanding and resolving GitHub Actions workflow failures on self-hosted
-self-hosted runners.
+## What It Does
+
+Explains how to understand and resolve GitHub Actions workflow failures on
+self-hosted runners, including the F01-F12 failure-pattern catalog.
 
 ## When to Use
 
