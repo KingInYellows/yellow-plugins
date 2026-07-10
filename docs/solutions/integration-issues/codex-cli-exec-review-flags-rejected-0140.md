@@ -85,10 +85,12 @@ real auth failure by grepping stderr before choosing a message:
 
 ```bash
 elif [ "$codex_exit" -eq 2 ]; then
-  # Exit 2 is also clap's argument-parse error — check before blaming auth
-  if grep -q "unexpected argument" "$STDERR_FILE" 2>/dev/null; then
+  # Exit 2 is also clap's argument-parse error — check before blaming auth.
+  # Match clap's full parse-error vocabulary, not just "unexpected argument";
+  # display only clap error lines (allowlist) to respect the redaction rule.
+  if grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$STDERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Error: CLI rejected the invocation (argument parse error — flag drift?):\n'
-    head -2 "$STDERR_FILE" 2>/dev/null
+    grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null
   else
     printf '[yellow-codex] Error: authentication failed. Run /codex:setup.\n'
   fi

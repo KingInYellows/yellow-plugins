@@ -227,4 +227,5 @@ If any step had a warning, list warnings at the bottom.
 | Install script fails (Step 0) | "codex installation failed" | Warn, continue to Step 1 |
 | Node < 22 | "v22+ required for Codex CLI" | Warn, suggest standalone binary |
 | No auth configured | "No authentication configured" | Show both auth methods |
+| Test invocation parse error (Step 4, parse error on stderr) | "CLI argument parse error (flag drift?)" | Report clap error line |
 | Test invocation fails | "no response (check auth and network)" | Warn, suggest re-auth |
