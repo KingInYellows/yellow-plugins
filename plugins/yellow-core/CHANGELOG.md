@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.24.4
+
+### Patch Changes
+
+- [#628](https://github.com/KingInYellows/yellow-plugins/pull/628)
+  [`811ae11`](https://github.com/KingInYellows/yellow-plugins/commit/811ae114f1bd4eb75cda5c5bb8d40149ceb5b9f5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - docs: sync the
+  yellow-codex CLI version floor in the setup:all dashboard (0.118.0 → 0.140.0,
+  4 occurrences) with the floor documented across yellow-codex — review
+  follow-up on the codex exec flag migration.
+
 ## 1.24.3
 
 ### Patch Changes

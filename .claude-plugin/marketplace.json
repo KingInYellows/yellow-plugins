@@ -24,7 +24,7 @@
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.24.3",
+      "version": "1.24.4",
       "author": {
         "name": "KingInYellows"
       },
@@ -154,7 +154,7 @@
     {
       "name": "yellow-codex",
       "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "author": {
         "name": "KingInYellows"
       },
@@ -164,7 +164,7 @@
     {
       "name": "yellow-council",
       "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "author": {
         "name": "KingInYellows"
       },
