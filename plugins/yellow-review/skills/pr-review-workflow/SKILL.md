@@ -256,6 +256,7 @@ Paraphrasing re-introduces the drift this skill is meant to prevent (see
 | Error                     | Action                                                        |
 | ------------------------- | ------------------------------------------------------------- |
 | Dirty working directory   | Error: "Uncommitted changes detected. Commit or stash first." |
+| Wrong branch for PR       | Hard-stop if the checked-out branch doesn't map to the explicit `<PR#>` (fail-closed on check errors). See `/review:resolve` Step 2b. |
 | `gt submit` failure       | Report error, suggest `gt stack` to diagnose                  |
 | Merge conflict on restack | Abort restack, report to user for manual resolution           |
 | `gt track` failure        | Warn and proceed with raw git (degraded mode)                 |
@@ -291,6 +292,9 @@ commits on one branch. Push via `gt submit --no-interactive`.
 - **Restack**: `gt upstack restack` (abort on conflict, report to user)
 - **Checkout**: `gt checkout <branch>`
 - **View stack**: `gt log`
+- **Verify branch before resolving a specific PR**: hard-stop if the checked-out
+  branch doesn't map to the target PR — see the Git/Graphite Errors table
+  ("Wrong branch for PR") and `/review:resolve` Step 2b.
 
 ### Non-Graphite PR Adoption
 

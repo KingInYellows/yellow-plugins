@@ -65,6 +65,62 @@ git status --porcelain
 If non-empty: error "Uncommitted changes detected. Please commit or stash before
 running resolve." and stop.
 
+### Step 2b: Verify Correct Branch
+
+**Skip this step entirely when the PR number was derived from the current branch
+in Step 1** (no explicit PR-number token was passed in `$ARGUMENTS`). In that
+path the checked-out branch already maps to the PR by construction, so
+re-querying would only add a failure surface to a known-good path.
+
+**When a PR number was passed explicitly**, confirm the checked-out branch
+actually corresponds to that PR *before* fetching comments or mutating anything.
+Otherwise the resolvers would edit this branch, `gt modify` (Step 6) would amend
+*this* branch's commit, and `gt submit` would push it — landing PR #`<PR#>`'s
+fixes on the wrong branch while Step 7 marks its threads resolved with no fix
+reaching the PR.
+
+Resolve the current branch's PR with the same call Step 1 uses, capturing stderr
+and the exit code explicitly. Do **not** pipe the command into `jq`/`grep` — a
+pipe masks the non-zero exit (see
+`docs/solutions/logic-errors/bash-pipe-head-exit-code-masking.md`; this mirrors
+the exit-safe capture in `/review:resolve-stack` Step 3):
+
+```bash
+BV_ERR=$(mktemp)
+CUR_PR=$(gh pr view --json number -q .number 2>"$BV_ERR")
+BV_EC=$?
+```
+
+Classify the result (`<PR#>` is the explicitly-passed target). In every outcome
+below, `rm -f "$BV_ERR"` before proceeding or stopping:
+
+1. **`BV_EC` = 0 and `CUR_PR` = `<PR#>`** — correct branch. Proceed to Step 3.
+2. **`BV_EC` = 0 and `CUR_PR` ≠ `<PR#>`** — wrong branch. Report
+   `[review:resolve] Error: current branch maps to PR #<CUR_PR>, not #<PR#>.
+   Checkout PR #<PR#>'s branch first (gt checkout <branch> / gh pr checkout
+   <PR#>).` and stop.
+3. **`BV_EC` ≠ 0 and `"$BV_ERR"` contains** `no pull requests found`,
+   `no open pull requests`, or `no pull requests associated` (case-insensitive
+   substring — the same strings `/workflows:compound` uses to classify this
+   state) — the current branch has no associated PR. Report
+   `[review:resolve] Error: current branch has no associated PR. Checkout PR
+   #<PR#>'s branch first (gt checkout <branch> / gh pr checkout <PR#>).` and
+   stop.
+4. **`BV_EC` ≠ 0 with any other stderr** — the check could not run (auth, rate
+   limit, network). **Fail closed**: report `[review:resolve] Error: could not
+   verify branch for PR #<PR#> (gh error): <contents of "$BV_ERR">.` and stop.
+   Do not assume the branch is correct.
+
+This is a mode-independent precondition: it fires identically with and without
+`--non-interactive` (like the unknown-flag hard error in Step 1) and is **not**
+one of the `AskUserQuestion` gates `--non-interactive` suppresses — so it is not
+listed in that flag's gate set and `docs/plugin-scope-mode-protocol.md`
+Interface 1 is unchanged. A hard exit here cannot abort a
+`/review:resolve-stack` or `/review:sweep` invocation — the `Skill` tool returns
+no exit status, so neither caller can catch it programmatically. Under
+`/review:resolve-stack`, the walk's own Step 3 self-verify re-fetch then flags
+this PR's comments as still unresolved and continues to the next PR.
+
 ### Step 3: Fetch Unresolved Comments
 
 Determine repo from git remote:
@@ -334,6 +390,11 @@ Present summary:
 - **PR not found**: "PR #X not found. Verify the number and your repo access."
 - **Dirty working directory**: "Uncommitted changes detected. Commit or stash
   first."
+- **Wrong branch for PR** (explicit `<PR#>` only): the checked-out branch maps
+  to a different PR, has no associated PR, or the branch check could not run
+  (fail-closed). Checkout the PR's branch first (`gt checkout <branch>` /
+  `gh pr checkout <PR#>`) — resolving from the wrong branch would commit fixes
+  to the wrong PR. See Step 2b.
 - **Script not found**: "GraphQL scripts missing. Verify yellow-review plugin is
   installed."
 - **Resolver failures**: Report which comments could not be resolved and why.
