@@ -1,5 +1,25 @@
 # yellow-codex
 
+## 0.2.6
+
+### Patch Changes
+
+- [#628](https://github.com/KingInYellows/yellow-plugins/pull/628)
+  [`811ae11`](https://github.com/KingInYellows/yellow-plugins/commit/811ae114f1bd4eb75cda5c5bb8d40149ceb5b9f5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - fix: codex-cli
+  0.140.0 rejects `-a`/`-s` on `exec review` (and `-a` on plain `exec`) at
+  argument parse, silently emptying every Codex review leg. All invocation sites
+  now set posture via `-c` config overrides (`approval_policy="never"`,
+  `sandbox_mode="read-only"` on review), verified end-to-end on 0.140.0 and
+  proven to override a permissive `~/.codex/config.toml`. Adds
+  `-c 'mcp_servers={}'` to `exec review` invocations (MCP OAuth-stall
+  mitigation), distinguishes exit-2 argument-parse errors from authentication
+  failures in every error handler, and bumps the documented CLI floor to
+  v0.140.0. The setup quick test now skips execution when neither API-key nor
+  Codex-login authentication is configured, and the canonical review guidance no
+  longer combines targeted selectors with the mutually-exclusive positional
+  prompt.
+
 ## 0.2.5
 
 ### Patch Changes

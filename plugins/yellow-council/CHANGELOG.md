@@ -1,5 +1,16 @@
 # yellow-council
 
+## 0.2.6
+
+### Patch Changes
+
+- [#628](https://github.com/KingInYellows/yellow-plugins/pull/628)
+  [`811ae11`](https://github.com/KingInYellows/yellow-plugins/commit/811ae114f1bd4eb75cda5c5bb8d40149ceb5b9f5)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - docs: align the
+  Codex reviewer-leg read-only invocation description with the `-c`
+  config-override form (`sandbox_mode="read-only"`, `approval_policy="never"`) —
+  `-s`/`-a` no longer parse on `codex exec review` as of codex-cli 0.140.0.
+
 ## 0.2.5
 
 ### Patch Changes
