@@ -39,14 +39,14 @@ order:
    with remaining sources).
 
 yellow-research's agents already reference the bundled names explicitly in
-`allowed-tools`, so the bundled path is the de-facto primary today; this
+their `tools` frontmatter, so the bundled path is the de-facto primary today; this
 document makes the ordering explicit rather than changing behavior.
 
 ## Practical notes
 
 - **Double-billing risk is low but real**: a session with both surfaces
   active can hit the same provider twice for one research question if an
-  agent free-searches with ToolSearch instead of using its `allowed-tools`
+  agent free-searches with ToolSearch instead of using its `tools`
   list. Agents should not mix prefixes within one run.
 - **No dual-OAuth issue** (unlike the context7 precedent that led to
   unbundling): Tavily/EXA bundled servers use API keys, not OAuth, so
@@ -58,7 +58,10 @@ document makes the ordering explicit rather than changing behavior.
 ## Follow-up (out of scope here)
 
 - If a maintainer decides the native connectors should be primary instead,
-  the change surface is the ToolSearch guidance in
-  `plugins/yellow-research/skills/research-patterns/SKILL.md` and the
-  `allowed-tools` lists of `research-conductor` and `code-researcher` —
-  sweep all in one PR (multi-doc drift discipline).
+  the bundled-preferred assertion currently lives in several coupled
+  surfaces: this document's own "Priority order" section, the "Native
+  Connector Overlap" section of `plugins/yellow-research/README.md`, and the
+  `tools` lists of `research-conductor` and `code-researcher` (which name the
+  bundled tools explicitly). New ToolSearch priority guidance, if added,
+  would go in `plugins/yellow-research/skills/research-patterns/SKILL.md`.
+  Sweep all in one PR (multi-doc drift discipline).
