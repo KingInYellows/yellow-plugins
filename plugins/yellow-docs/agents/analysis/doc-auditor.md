@@ -40,6 +40,8 @@ surface is exactly:
 
 - `git log` / `git blame` — staleness detection (doc vs. source timestamps)
 - `git ls-files` — `.gitignore`-respecting file enumeration
+- `git rev-parse` — repository and history presence detection (e.g. for the
+  "no git history → skip staleness detection" fallback)
 
 `disallowedTools` cannot block writes routed through a shell (e.g.
 `bash -c "echo x > file"`), so this is an explicit contract: never use Bash
