@@ -73,14 +73,13 @@ exit 0'
   command -v timeout >/dev/null 2>&1 || command -v gtimeout >/dev/null 2>&1 || \
     skip "timeout/gtimeout not available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'sleep 30'
-  start_ns="$(date +%s%N)"
-  case "$start_ns" in *N*) skip "date +%s%N unsupported (BSD date)";; esac
+  start_s="$(date +%s)"
   run --separate-stderr run_hook '{"cwd":""}'
-  end_ns="$(date +%s%N)"
-  elapsed_ms=$(( (end_ns - start_ns) / 1000000 ))
+  end_s="$(date +%s)"
+  elapsed_s=$(( end_s - start_s ))
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true' > /dev/null
-  [ "$elapsed_ms" -lt 3000 ]
+  [ "$elapsed_s" -le 3 ]
 }
 
 @test "hanging recall still emits continue:true when session-start succeeds fast" {
@@ -90,12 +89,11 @@ exit 0'
     skip "timeout/gtimeout not available; unwrapped-call fallback is a documented risk"
   make_ruvector_stub 'case "$2" in recall) sleep 30;; esac
 exit 0'
-  start_ns="$(date +%s%N)"
-  case "$start_ns" in *N*) skip "date +%s%N unsupported (BSD date)";; esac
+  start_s="$(date +%s)"
   run --separate-stderr run_hook '{"cwd":""}'
-  end_ns="$(date +%s%N)"
-  elapsed_ms=$(( (end_ns - start_ns) / 1000000 ))
+  end_s="$(date +%s)"
+  elapsed_s=$(( end_s - start_s ))
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true' > /dev/null
-  [ "$elapsed_ms" -lt 3000 ]
+  [ "$elapsed_s" -le 3 ]
 }

@@ -46,6 +46,19 @@ fi
 # --foreground here — it stops timeout from killing forked descendants.
 TIMEOUT_CMD="$(command -v timeout || command -v gtimeout || true)"
 
+# BusyBox's timeout applet (common on Alpine) only supports
+# `timeout [-t SECS] [-s SIG] PROG [ARGS]` — no --kill-after flag — and exits
+# with a usage error if passed one, which would make every run_budgeted call
+# below fail before ruvector ever runs. Probe for GNU-compatible support and
+# fall back to the unwrapped path if the probe fails.
+if [ -n "$TIMEOUT_CMD" ] && ! "$TIMEOUT_CMD" --kill-after=0.1 0.1 true >/dev/null 2>&1; then
+  TIMEOUT_CMD=""
+fi
+
+if [ -z "$TIMEOUT_CMD" ]; then
+  printf '[ruvector] no GNU-compatible timeout found; session-start CLI calls run without per-call budget enforcement\n' >&2
+fi
+
 run_budgeted() {
   local cap="$1"; shift
   if [ -n "$TIMEOUT_CMD" ]; then
