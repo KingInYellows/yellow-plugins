@@ -1,0 +1,19 @@
+.changeset/w1d-ruvector-hook-timeout-budgets.md
+  s_fa9988b4873e85::t_cd30de6b5c82ad 9-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "faa59eb7a7d4840cf7848c1d3451461457b0efd3",
+  "prompts": {},
+  "sessions": {
+    "s_fa9988b4873e85": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1758e9-a313-4c9b-83de-f29d8df73d82",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

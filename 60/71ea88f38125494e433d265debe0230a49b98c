@@ -1,0 +1,22 @@
+plugins/yellow-ruvector/tests/session-start.bats
+  s_90cee544007013::t_adf5330dab182e 71-72,77
+  s_90cee544007013::t_c5a8f900b4c844 94
+plugins/yellow-ruvector/hooks/scripts/session-start.sh
+  s_90cee544007013::t_28ce2a06b415a6 42-46,67-70,72-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "6071ea88f38125494e433d265debe0230a49b98c",
+  "prompts": {},
+  "sessions": {
+    "s_90cee544007013": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d95b1cf6-3cc7-4a62-970d-d3963a81d8d3",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
