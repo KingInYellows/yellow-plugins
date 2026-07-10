@@ -1,0 +1,19 @@
+plugins/yellow-browser-test/commands/browser-test/explore.md
+  s_fa9988b4873e85::t_e7d292efb6a295 139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "84a3f763c8a60d54bb141d0b6de362c565ba8584",
+  "prompts": {},
+  "sessions": {
+    "s_fa9988b4873e85": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fe1758e9-a313-4c9b-83de-f29d8df73d82",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
