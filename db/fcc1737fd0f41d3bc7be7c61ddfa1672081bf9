@@ -1,0 +1,55 @@
+catalog/plugins/yellow-morph.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-60
+catalog/plugins/yellow-mempalace.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-37
+catalog/plugins/yellow-codex.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-27
+catalog/plugins/gt-workflow.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-67
+catalog/plugins/yellow-research.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-117
+catalog/plugins/yellow-linear.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-33
+catalog/plugins/yellow-browser-test.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-26
+catalog/catalog.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-44
+catalog/plugins/yellow-council.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-29
+catalog/plugins/yellow-composio.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-65
+catalog/plugins/yellow-core.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-53
+catalog/plugins/yellow-docs.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-26
+catalog/README.md
+  s_7d4f7a1773f734::t_faf16882f8648f 1-43
+catalog/plugins/yellow-debt.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-53
+catalog/plugins/yellow-devin.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-50
+catalog/plugins/yellow-ci.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-48
+catalog/plugins/yellow-review.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-26
+catalog/plugins/yellow-semgrep.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-66
+catalog/plugins/yellow-ruvector.json
+  s_7d4f7a1773f734::t_89c943a09c1e1d 1-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "dbfcc1737fd0f41d3bc7be7c61ddfa1672081bf9",
+  "prompts": {},
+  "sessions": {
+    "s_7d4f7a1773f734": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "425136f0-a7c5-4a17-a8b1-1f7dbbfde418",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
