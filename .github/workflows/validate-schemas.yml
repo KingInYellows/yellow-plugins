@@ -674,7 +674,7 @@ jobs:
             # UI-label metadata mentioning "token" or "API key" describing
             # what the field is, not its value — the Claude Code remote
             # validator requires `"title":` on every userConfig entry).
-            SENSITIVE=$(grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ --include="*.json" \
+            SENSITIVE=$(grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ catalog/ --include="*.json" \
               | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{user_config\.|"description":|"title":' \
               || true)
             if [ -n "$SENSITIVE" ]; then

@@ -89,4 +89,4 @@ function buildMarketplace(catalog, sources, pkgs) {
   };
 }
 
-module.exports = { buildPluginManifest, buildMarketplace, OPTIONAL_MANIFEST_KEYS };
+module.exports = { buildPluginManifest, buildMarketplace };

@@ -33,6 +33,14 @@ const { generateManifests } = require('../../scripts/generate-manifests.js');
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SCRIPT = join(REPO_ROOT, 'scripts', 'generate-manifests.js');
 
+// Derived from the live plugin inventory (+1 for marketplace.json) rather
+// than a hardcoded literal, matching the by-name/not-by-count discipline of
+// the characterization suite.
+const TARGET_COUNT =
+  readdirSync(join(REPO_ROOT, 'plugins'), { withFileTypes: true }).filter((e) =>
+    e.isDirectory()
+  ).length + 1;
+
 const fixtureRoots: string[] = [];
 afterAll(() => {
   for (const root of fixtureRoots) {
@@ -109,7 +117,7 @@ describe('byte-identity and determinism', () => {
     const result = generateManifests({ mode: 'check' });
     expect(result.status).toBe('ok');
     expect(result.diffs).toEqual([]);
-    expect(result.checked).toBe(18);
+    expect(result.checked).toBe(TARGET_COUNT);
   });
 
   it('two consecutive apply runs are byte-equal and the second writes nothing', () => {
@@ -237,7 +245,7 @@ describe('--check stale-artifact detection (subprocess)', () => {
     writeFileSync(marketplaceTarget, marketplaceBytes, 'utf8');
     const clean = runCli(root, ['--check']);
     expect(clean.status).toBe(0);
-    expect(clean.stdout).toContain('All 18 generated files match');
+    expect(clean.stdout).toContain(`All ${TARGET_COUNT} generated files match`);
   });
 
   it('reports a missing target as drift', () => {
