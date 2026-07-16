@@ -22,10 +22,12 @@
 
 'use strict';
 
-const { readFileSync, writeFileSync, renameSync, unlinkSync } = require('fs');
+const { readFileSync } = require('fs');
 const { join } = require('path');
 
 const semver = require('semver');
+
+const { atomicWrite } = require('./lib/generate/write');
 
 const ROOT = join(__dirname, '..');
 const PKG_PATH = join(ROOT, 'package.json');
@@ -37,17 +39,6 @@ const bump = process.argv[2];
 if (!bump || !VALID_BUMPS.has(bump)) {
   console.error('[catalog-version] Usage: node scripts/catalog-version.js <major|minor|patch>');
   process.exit(1);
-}
-
-function atomicWrite(filePath, content) {
-  const tmp = filePath + '.tmp';
-  writeFileSync(tmp, content, 'utf8');
-  try {
-    renameSync(tmp, filePath);
-  } catch (e) {
-    try { unlinkSync(tmp); } catch (_) { /* ignore cleanup errors */ }
-    throw new Error(`[atomicWrite] rename ${tmp} -> ${filePath} failed: ${e.message}`);
-  }
 }
 
 // --- Read package.json ---

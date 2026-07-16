@@ -26,6 +26,8 @@
     "validate:error-codes": "node scripts/lint-error-codes.js",
     "validate:snippets": "node scripts/sync-shell-snippets.js --check",
     "generate:snippets": "node scripts/sync-shell-snippets.js",
+    "validate:generated": "node scripts/generate-manifests.js --check",
+    "generate:manifests": "node scripts/generate-manifests.js",
     "validate:setup-all": "node scripts/validate-setup-all.js",
     "validate:doc-counts": "node scripts/validate-doc-counts.js",
     "check:pins": "node scripts/check-upstream-pins.js",

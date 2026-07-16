@@ -19,12 +19,19 @@
  *   - Missing or invalid version in package.json -> exit 1
  *   - Plugin directory not in marketplace.json -> exit 1
  *   - Count < marketplace.plugins.length -> exit 1
+ *
+ * The drift detection + logging below is this script's own contract; the
+ * actual file rewrites are delegated to generateManifests() so plugin.json
+ * and marketplace.json are always regenerated from the catalog/ sources.
  */
 
 'use strict';
 
-const { readFileSync, writeFileSync, readdirSync, renameSync, unlinkSync, statSync, existsSync } = require('fs');
-const { join, resolve, sep } = require('path');
+const { readFileSync, readdirSync, statSync, existsSync } = require('fs');
+const { join, resolve } = require('path');
+
+const { generateManifests } = require('./generate-manifests');
+const { assertWithinRoot } = require('./lib/generate/write');
 
 const ROOT = resolve(__dirname, '..');
 const PLUGINS_DIR = join(ROOT, 'plugins');
@@ -32,25 +39,6 @@ const MARKETPLACE_PATH = join(ROOT, '.claude-plugin', 'marketplace.json');
 
 const DRY_RUN = process.argv.includes('--dry-run') || process.argv.includes('--verify');
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
-
-function assertWithinRoot(filePath, rootDir) {
-  const canonical = resolve(filePath);
-  const rootCanonical = resolve(rootDir);
-  if (canonical !== rootCanonical && !canonical.startsWith(rootCanonical + sep)) {
-    throw new Error(`[sync-manifests] Path traversal detected: ${filePath}`);
-  }
-}
-
-function atomicWrite(filePath, content) {
-  const tmp = filePath + '.tmp';
-  writeFileSync(tmp, content, 'utf8');
-  try {
-    renameSync(tmp, filePath); // atomic on Linux when on same filesystem
-  } catch (e) {
-    try { unlinkSync(tmp); } catch (_) { /* ignore cleanup errors */ }
-    throw new Error(`[atomicWrite] rename ${tmp} -> ${filePath} failed: ${e.message}`);
-  }
-}
 
 // --- Load marketplace.json first (needed for count assertion) ---
 let marketplace;
@@ -159,17 +147,12 @@ for (const [name, version] of Object.entries(pluginVersions)) {
     console.log(
       `${DRY_RUN ? '[DRY RUN] Would sync' : 'Synced'} ${name} plugin.json: ${old} -> ${version}`
     );
-    if (!DRY_RUN) {
-      manifest.version = version;
-      atomicWrite(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-    }
     syncedPlugins++;
   }
 }
 
 // --- Sync marketplace.json ---
 let syncedMarketplace = 0;
-let marketplaceDirty = false;
 
 for (const plugin of marketplace.plugins) {
   const version = pluginVersions[plugin.name];
@@ -186,16 +169,19 @@ for (const plugin of marketplace.plugins) {
     console.log(
       `${DRY_RUN ? '[DRY RUN] Would sync' : 'Synced'} marketplace.json ${plugin.name}: ${old} -> ${version}`
     );
-    if (!DRY_RUN) {
-      plugin.version = version;
-      marketplaceDirty = true;
-    }
     syncedMarketplace++;
   }
 }
 
-if (!DRY_RUN && marketplaceDirty) {
-  atomicWrite(MARKETPLACE_PATH, JSON.stringify(marketplace, null, 2) + '\n');
+// --- Regenerate drifted manifests from the catalog/ sources ---
+if (!DRY_RUN && (syncedPlugins > 0 || syncedMarketplace > 0)) {
+  const result = generateManifests({ mode: 'apply' });
+  if (result.status === 'error') {
+    for (const error of result.errors) {
+      console.error(`[sync-manifests] ERROR: ${error}`);
+    }
+    process.exit(1);
+  }
 }
 
 const mode = DRY_RUN ? 'Dry run complete' : 'Complete';
