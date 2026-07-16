@@ -1,0 +1,25 @@
+scripts/lib/generate/emit-claude.js
+  s_7d4f7a1773f734::t_0c166704295bc3 92
+.github/workflows/validate-schemas.yml
+  s_7d4f7a1773f734::t_00d21a5acb9b8b 677
+tests/integration/generate-manifests.test.ts
+  s_7d4f7a1773f734::t_e44bef8f136fca 248
+  s_7d4f7a1773f734::t_cd734afba896f7 36-43
+  s_7d4f7a1773f734::t_30574eab010460 120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "19c4b29598ad80dc35dc9f1408ffe2c2d1135ff8",
+  "prompts": {},
+  "sessions": {
+    "s_7d4f7a1773f734": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "425136f0-a7c5-4a17-a8b1-1f7dbbfde418",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
