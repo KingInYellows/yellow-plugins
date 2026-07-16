@@ -111,6 +111,12 @@ jobs:
             if git ls-remote --tags origin "refs/tags/${CURRENT_TAG}" 2>/dev/null \
                  | grep -qF "refs/tags/${CURRENT_TAG}"; then
               echo "No pending changesets and ${CURRENT_TAG} already exists — nothing to do"
+              # Q3 guard (docs/maintenance/catalog-release-gap.md): fail loudly
+              # when plugin versions moved past the last catalog snapshot —
+              # "plugins changed but catalog didn't" must be distinguished from
+              # "legitimately nothing changed". Needs the fetch-depth: 0
+              # checkout above for the tag comparison.
+              node scripts/validate-catalog-track.js
               echo "run_changesets=false" >> "$GITHUB_OUTPUT"
               echo "should_publish=false" >> "$GITHUB_OUTPUT"
             else
