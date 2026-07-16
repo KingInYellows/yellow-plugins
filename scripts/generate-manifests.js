@@ -191,7 +191,9 @@ function main() {
   }
   const mode = args.includes('--check') ? 'check' : args.includes('--dry-run') ? 'dry-run' : 'apply';
 
-  const result = generateManifests({ mode });
+  // Test hook (validator-harness precedent): point the CLI at a fixture tree.
+  const rootDir = process.env.GENERATE_MANIFESTS_ROOT || DEFAULT_ROOT;
+  const result = generateManifests({ mode, rootDir });
 
   if (result.status === 'error') {
     for (const error of result.errors) {
