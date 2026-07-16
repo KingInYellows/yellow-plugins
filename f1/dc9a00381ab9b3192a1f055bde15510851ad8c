@@ -1,0 +1,23 @@
+scripts/generate-manifests.js
+  s_7d4f7a1773f734::t_0157d644091323 194-196
+tests/integration/validate-catalog-track.test.ts
+  s_7d4f7a1773f734::t_1412c6d74da303 1-85
+tests/integration/generate-manifests.test.ts
+  s_7d4f7a1773f734::t_593aec9a37ce0e 1-270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f1dc9a00381ab9b3192a1f055bde15510851ad8c",
+  "prompts": {},
+  "sessions": {
+    "s_7d4f7a1773f734": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "425136f0-a7c5-4a17-a8b1-1f7dbbfde418",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
