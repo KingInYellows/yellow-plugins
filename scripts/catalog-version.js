@@ -27,7 +27,7 @@ const { join } = require('path');
 
 const semver = require('semver');
 
-const { atomicWrite } = require('./lib/generate/write');
+const { atomicWrite, serializeJson } = require('./lib/generate/write');
 
 const ROOT = join(__dirname, '..');
 const PKG_PATH = join(ROOT, 'package.json');
@@ -67,6 +67,6 @@ if (!next) {
 }
 
 pkg.version = next;
-atomicWrite(PKG_PATH, JSON.stringify(pkg, null, 2) + '\n');
+atomicWrite(PKG_PATH, serializeJson(pkg));
 
 console.log(`[catalog-version] Bumped catalog version: ${current} -> ${next}`);

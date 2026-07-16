@@ -27,8 +27,9 @@ const { execFileSync } = require('child_process');
 const { readFileSync, readdirSync, existsSync } = require('fs');
 const { join, resolve } = require('path');
 
+const { NAME_RE } = require('./lib/generate/write');
+
 const ROOT = resolve(__dirname, '..');
-const NAME_RE = /^[a-zA-Z0-9_-]+$/;
 const SEMVER_RE = /^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$/;
 
 /**
@@ -107,8 +108,15 @@ function readVersionsAtTag(tag) {
     let raw;
     try {
       raw = git(['show', `${tag}:plugins/${name}/package.json`]);
-    } catch (_) {
-      continue; // directory existed at the tag without a package.json
+    } catch (err) {
+      const stderr = err.stderr ? err.stderr.toString() : '';
+      if (/does not exist|exists on disk, but not in/.test(stderr)) {
+        continue; // directory existed at the tag without a package.json
+      }
+      // Any other git failure means the comparison itself is unreliable —
+      // surface it via main()'s comparison-failure handler, never as a
+      // misleading "plugin added/removed" verdict.
+      throw err;
     }
     versions[name] = JSON.parse(raw).version;
   }
@@ -131,10 +139,20 @@ function main() {
   try {
     execFileSync('git', ['rev-parse', '-q', '--verify', `refs/tags/${tag}`], {
       cwd: ROOT,
-      stdio: 'ignore',
+      stdio: ['ignore', 'ignore', 'pipe'],
     });
-  } catch (_) {
-    tagExists = false;
+  } catch (err) {
+    if (err.status === 1) {
+      // `-q --verify` exits 1 with no output when the ref genuinely does
+      // not exist — the only condition that legitimately skips the check.
+      tagExists = false;
+    } else {
+      const stderr = err.stderr ? err.stderr.toString().trim() : err.message;
+      console.error(
+        `[validate-catalog-track] git rev-parse for ${tag} failed (status ${err.status}): ${stderr}`
+      );
+      process.exit(1);
+    }
   }
 
   if (!tagExists) {

@@ -22,9 +22,12 @@
 const { readFileSync, readdirSync, lstatSync, existsSync } = require('fs');
 const { join } = require('path');
 
-const { assertWithinRoot } = require('./write');
+const { assertWithinRoot, NAME_RE } = require('./write');
 
-const NAME_RE = /^[a-zA-Z0-9_-]+$/;
+// Top-level catalog.json keys the emitters dereference unconditionally.
+// Checked here so a malformed catalog.json fails with a clean structured
+// error instead of a TypeError inside buildMarketplace.
+const REQUIRED_CATALOG_KEYS = ['name', 'description', 'owner', 'metadata', 'pluginOrder', 'targets'];
 
 /**
  * Read + parse one JSON file with symlink rejection. Returns a
@@ -61,6 +64,19 @@ function loadCatalog(catalogDir) {
 
   const data = read.data;
   const errors = [];
+  for (const key of REQUIRED_CATALOG_KEYS) {
+    if (!(key in data)) {
+      errors.push(`catalog.json: missing required key "${key}"`);
+    }
+  }
+  if (
+    'targets' in data &&
+    (!data.targets ||
+      !data.targets.claude ||
+      typeof data.targets.claude.marketplaceSchema !== 'string')
+  ) {
+    errors.push('catalog.json: "targets.claude.marketplaceSchema" must be a string');
+  }
   if (!Array.isArray(data.pluginOrder) || data.pluginOrder.length === 0) {
     errors.push('catalog.json: "pluginOrder" must be a non-empty array');
   } else {
@@ -152,4 +168,4 @@ function loadPluginSources(catalogDir, pluginOrder) {
   return { status: 'ok', sources };
 }
 
-module.exports = { loadCatalog, loadPluginSources, NAME_RE };
+module.exports = { loadCatalog, loadPluginSources };

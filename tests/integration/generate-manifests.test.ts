@@ -131,6 +131,142 @@ describe('byte-identity and determinism', () => {
     expect(second.written).toEqual([]);
     expect(readAllTargets(root)).toEqual(afterFirst);
   });
+
+  it('apply mode corrects a stale target and reports it in written', () => {
+    const root = makeFixtureRoot();
+    const target = join(root, 'plugins', 'yellow-core', '.claude-plugin', 'plugin.json');
+    const original = readFileSync(target, 'utf8');
+    writeFileSync(target, original.replace('"MIT"', '"Apache-2.0"'), 'utf8');
+
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('ok');
+    expect(result.written).toContain('plugins/yellow-core/.claude-plugin/plugin.json');
+    expect(readFileSync(target, 'utf8')).toBe(original);
+  });
+});
+
+describe('target enablement', () => {
+  it('a claude:false plugin is excluded from both plugin.json generation and the marketplace', () => {
+    const root = makeFixtureRoot();
+    const sourcePath = join(root, 'catalog', 'plugins', 'yellow-docs.json');
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    source.targets.claude = false;
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
+
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('ok');
+    // One fewer target: yellow-docs's plugin.json is not generated at all.
+    expect(result.checked).toBe(TARGET_COUNT - 1);
+    expect(result.diffs.some((d: { path: string }) => d.path.includes('yellow-docs'))).toBe(false);
+    // The committed marketplace still lists it, so the generated one differs.
+    expect(
+      result.diffs.some((d: { path: string }) => d.path === '.claude-plugin/marketplace.json')
+    ).toBe(true);
+  });
+});
+
+describe('source value-shape validation', () => {
+  function mutateSource(root: string, mutate: (source: Record<string, unknown>) => void): void {
+    const sourcePath = join(root, 'catalog', 'plugins', 'yellow-core.json');
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    mutate(source);
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
+  }
+
+  it('rejects a string-shaped author (would emit "author": {} in the marketplace)', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      s.author = 'KingInYellows';
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: "author" must be an object with a string "name"'
+    );
+  });
+
+  it('rejects a non-boolean targets flag (would silently drop the plugin)', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      (s.targets as Record<string, unknown>).claude = 'true';
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: "targets.claude" must be a boolean'
+    );
+  });
+
+  it('rejects a source missing marketplace.category', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      delete (s.marketplace as Record<string, unknown>).category;
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: missing required key "marketplace.category"'
+    );
+  });
+});
+
+describe('catalog.json validation', () => {
+  function mutateCatalog(root: string, mutate: (catalog: Record<string, unknown>) => void): void {
+    const catalogPath = join(root, 'catalog', 'catalog.json');
+    const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
+    mutate(catalog);
+    writeFileSync(catalogPath, JSON.stringify(catalog, null, 2) + '\n', 'utf8');
+  }
+
+  it('reports a missing catalog.json cleanly', () => {
+    const root = makeFixtureRoot();
+    rmSync(join(root, 'catalog', 'catalog.json'));
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors.some((e: string) => e.startsWith('catalog not found at'))).toBe(true);
+  });
+
+  it('rejects a missing top-level required key', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      delete c.owner;
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain('catalog.json: missing required key "owner"');
+  });
+
+  it('rejects a missing targets.claude.marketplaceSchema', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      delete (c.targets as { claude: Record<string, unknown> }).claude.marketplaceSchema;
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog.json: "targets.claude.marketplaceSchema" must be a string'
+    );
+  });
+
+  it('rejects an empty pluginOrder', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      c.pluginOrder = [];
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain('catalog.json: "pluginOrder" must be a non-empty array');
+  });
+
+  it('rejects a duplicate pluginOrder entry', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      (c.pluginOrder as string[]).push('yellow-core');
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain('catalog.json: duplicate pluginOrder entry "yellow-core"');
+  });
 });
 
 describe('inventory and order cross-checks (explicit names, both directions)', () => {

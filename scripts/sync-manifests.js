@@ -31,9 +31,13 @@ const { readFileSync, readdirSync, statSync, existsSync } = require('fs');
 const { join, resolve } = require('path');
 
 const { generateManifests } = require('./generate-manifests');
-const { assertWithinRoot } = require('./lib/generate/write');
+const { assertWithinRoot, NAME_RE } = require('./lib/generate/write');
 
-const ROOT = resolve(__dirname, '..');
+// Test hook shared with generate-manifests.js: point both scripts at the
+// same fixture tree so their coupled apply path can be exercised end-to-end.
+const ROOT = process.env.GENERATE_MANIFESTS_ROOT
+  ? resolve(process.env.GENERATE_MANIFESTS_ROOT)
+  : resolve(__dirname, '..');
 const PLUGINS_DIR = join(ROOT, 'plugins');
 const MARKETPLACE_PATH = join(ROOT, '.claude-plugin', 'marketplace.json');
 
@@ -66,7 +70,7 @@ if (!existsSync(PLUGINS_DIR)) {
 
 for (const name of readdirSync(PLUGINS_DIR)) {
   // Security: reject suspicious directory names (path traversal guard)
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+  if (!NAME_RE.test(name)) {
     console.warn(`[sync-manifests] Skipping suspicious directory name: "${name}"`);
     continue;
   }
@@ -175,7 +179,7 @@ for (const plugin of marketplace.plugins) {
 
 // --- Regenerate drifted manifests from the catalog/ sources ---
 if (!DRY_RUN && (syncedPlugins > 0 || syncedMarketplace > 0)) {
-  const result = generateManifests({ mode: 'apply' });
+  const result = generateManifests({ mode: 'apply', rootDir: ROOT });
   if (result.status === 'error') {
     for (const error of result.errors) {
       console.error(`[sync-manifests] ERROR: ${error}`);

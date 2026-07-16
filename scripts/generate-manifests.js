@@ -26,7 +26,7 @@ const { readFileSync } = require('fs');
 const { join, relative, resolve } = require('path');
 
 const { loadCatalog, loadPluginSources } = require('./lib/generate/catalog-reader');
-const { buildPluginManifest, buildMarketplace } = require('./lib/generate/emit-claude');
+const { buildPluginManifest, buildMarketplace, isClaudeEnabled } = require('./lib/generate/emit-claude');
 const { assertWithinRoot, atomicWrite, serializeJson } = require('./lib/generate/write');
 
 const DEFAULT_ROOT = resolve(__dirname, '..');
@@ -52,6 +52,28 @@ function validateSource(name, source, errors) {
         errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.${key}"`);
       }
     }
+  }
+  // Value-shape checks: a string-shaped author would silently emit
+  // "author": {} into the marketplace, and a non-boolean target flag would
+  // silently drop the plugin from generation — both must fail loud here.
+  if (
+    'author' in source &&
+    (typeof source.author !== 'object' ||
+      source.author === null ||
+      typeof source.author.name !== 'string')
+  ) {
+    errors.push(
+      `catalog/plugins/${name}.json: "author" must be an object with a string "name"`
+    );
+  }
+  if ('targets' in source && source.targets !== null && typeof source.targets === 'object') {
+    for (const target of ['claude', 'codex']) {
+      if (typeof source.targets[target] !== 'boolean') {
+        errors.push(`catalog/plugins/${name}.json: "targets.${target}" must be a boolean`);
+      }
+    }
+  } else if ('targets' in source) {
+    errors.push(`catalog/plugins/${name}.json: "targets" must be an object`);
   }
 }
 
@@ -134,7 +156,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const targets = [];
   for (const name of catalog.pluginOrder) {
     const source = sources[name];
-    if (!source.targets || source.targets.claude !== true) {
+    if (!isClaudeEnabled(source)) {
       continue;
     }
     const targetPath = join(rootDir, 'plugins', name, '.claude-plugin', 'plugin.json');
@@ -198,6 +220,11 @@ function main() {
   if (result.status === 'error') {
     for (const error of result.errors) {
       console.error(`[generate-manifests] ERROR: ${error}`);
+    }
+    if (result.written.length > 0) {
+      console.error(
+        `[generate-manifests] Note: ${result.written.length} target(s) were rewritten before the error: ${result.written.join(', ')}`
+      );
     }
     process.exit(1);
   }

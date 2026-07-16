@@ -1,6 +1,6 @@
 # Catalog / Release track gap — follow-up note
 
-**Status:** mostly resolved 2026-06-10 (see Outcome) · **Logged:** 2026-06-03 · **Trigger:** PR #566 → Version PR #567
+**Status:** resolved 2026-07-16 (see Outcome) · **Logged:** 2026-06-03 · **Trigger:** PR #566 → Version PR #567
 
 ## Outcome (2026-06-10)
 
@@ -19,10 +19,14 @@ release:
   recovered via `workflow_dispatch` + `force_publish=true`, validating the
   documented recovery path.)
 
-**Still open (Q3, optional):** no CI guard exists for the silent-skip case — a
-Version PR that bumps plugins without a catalog bump still skips the publish
-phase without failing anything. Revisit only if the silent skip bites again;
-the per-plugin marketplace serving from `main` is unaffected either way.
+**Q3 resolved (2026-07-16, PR #644):** the CI guard now exists —
+`scripts/validate-catalog-track.js` fails when any plugin version moved past
+the last catalog tag (`v<root-version>`) while the root `package.json` did
+not advance. It is wired into `pnpm release:check` and into
+`version-packages.yml`'s Detect-phase "nothing to do" branch, so "plugins
+changed but catalog didn't" now fails loudly instead of silently skipping
+the publish phase. Known residual: the guard is bypassed on the documented
+`force_publish=true` manual-recovery path (pre-existing override mechanism).
 
 ## Summary
 

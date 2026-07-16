@@ -25,6 +25,15 @@ const OPTIONAL_MANIFEST_KEYS = [
 ];
 
 /**
+ * Single source of truth for Claude-target membership — used by both the
+ * per-plugin manifest loop in generate-manifests.js and buildMarketplace
+ * below so the two lists can never diverge.
+ */
+function isClaudeEnabled(source) {
+  return Boolean(source.targets) && source.targets.claude === true;
+}
+
+/**
  * Build one `plugins/<name>/.claude-plugin/plugin.json` object.
  *
  * @param {object} source - Parsed catalog/plugins/<name>.json.
@@ -64,7 +73,7 @@ function buildMarketplace(catalog, sources, pkgs) {
   const plugins = [];
   for (const name of catalog.pluginOrder) {
     const source = sources[name];
-    if (!source.targets || source.targets.claude !== true) {
+    if (!isClaudeEnabled(source)) {
       continue;
     }
     plugins.push({
@@ -89,4 +98,4 @@ function buildMarketplace(catalog, sources, pkgs) {
   };
 }
 
-module.exports = { buildPluginManifest, buildMarketplace };
+module.exports = { buildPluginManifest, buildMarketplace, isClaudeEnabled };
