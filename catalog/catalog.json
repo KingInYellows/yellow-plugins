@@ -1,0 +1,44 @@
+{
+  "name": "yellow-plugins",
+  "description": "Personal curated collection of Claude Code plugins for development productivity and code quality",
+  "owner": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "metadata": {
+    "description": "Git-native, schema-validated plugin marketplace for Claude Code",
+    "version": "1.1.0"
+  },
+  "pluginOrder": [
+    "gt-workflow",
+    "yellow-core",
+    "yellow-linear",
+    "yellow-devin",
+    "yellow-review",
+    "yellow-ruvector",
+    "yellow-browser-test",
+    "yellow-debt",
+    "yellow-ci",
+    "yellow-composio",
+    "yellow-research",
+    "yellow-morph",
+    "yellow-semgrep",
+    "yellow-docs",
+    "yellow-codex",
+    "yellow-council",
+    "yellow-mempalace"
+  ],
+  "targets": {
+    "claude": {
+      "marketplaceSchema": "https://anthropic.com/claude-code/marketplace.schema.json"
+    },
+    "codex": {
+      "displayName": "Yellow Plugins",
+      "category": "Developer Tools",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    }
+  }
+}

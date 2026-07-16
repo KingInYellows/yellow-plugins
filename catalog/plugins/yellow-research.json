@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Deep research plugin with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-research",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "deep-research",
+    "ceramic",
+    "perplexity",
+    "exa",
+    "tavily",
+    "ast-grep",
+    "mcp"
+  ],
+  "outputStyles": "./output-styles",
+  "userConfig": {
+    "perplexity_api_key": {
+      "type": "string",
+      "title": "Perplexity API key",
+      "description": "Optional Perplexity API key. Get one at https://www.perplexity.ai/settings/api. Without a key, perplexity MCP will fail at startup and those tools are skipped — other sources (tavily, exa, parallel, ast-grep) continue to work. Stored in system keychain.",
+      "sensitive": true
+    },
+    "tavily_api_key": {
+      "type": "string",
+      "title": "Tavily API key",
+      "description": "Optional Tavily API key. Get one at https://app.tavily.com. Tavily MCP starts without a key but tool calls return runtime errors — key required for actual searches. Stored in system keychain.",
+      "sensitive": true
+    },
+    "exa_api_key": {
+      "type": "string",
+      "title": "Exa API key",
+      "description": "Optional Exa API key. Get one at https://dashboard.exa.ai. Exa MCP starts without a key but tool calls return runtime errors — key required for actual searches. Stored in system keychain.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "perplexity": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-perplexity.sh",
+      "args": [],
+      "env": {
+        "PERPLEXITY_API_KEY_USERCONFIG": "${user_config.perplexity_api_key}",
+        "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY:-}",
+        "PERPLEXITY_TIMEOUT_MS": "${PERPLEXITY_TIMEOUT_MS:-600000}"
+      }
+    },
+    "tavily": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-tavily.sh",
+      "args": [],
+      "env": {
+        "TAVILY_API_KEY_USERCONFIG": "${user_config.tavily_api_key}",
+        "TAVILY_API_KEY": "${TAVILY_API_KEY:-}"
+      }
+    },
+    "exa": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-exa.sh",
+      "args": [],
+      "env": {
+        "EXA_API_KEY_USERCONFIG": "${user_config.exa_api_key}",
+        "EXA_API_KEY": "${EXA_API_KEY:-}"
+      }
+    },
+    "parallel": {
+      "type": "http",
+      "url": "https://task-mcp.parallel.ai/mcp"
+    },
+    "ceramic": {
+      "type": "http",
+      "url": "https://mcp.ceramic.ai/mcp"
+    },
+    "ast-grep": {
+      "command": "uvx",
+      "args": [
+        "--python",
+        "3.13",
+        "--from",
+        "git+https://github.com/ast-grep/ast-grep-mcp@674272f1adb56fd1fe48a546952c7ffbe72c09e6",
+        "ast-grep-server"
+      ]
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": ">=1.17.1",
+      "optional": false,
+      "reason": "hooks/write-credential-status.sh sources yellow-core/lib/credential-status.sh for credential_hook_scaffold — first available in yellow-core 1.17.1"
+    }
+  ],
+  "marketplace": {
+    "category": "productivity",
+    "source": "./plugins/yellow-research"
+  },
+  "targets": {
+    "claude": true,
+    "codex": false
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-docs",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "documentation",
+    "docs",
+    "mermaid",
+    "audit",
+    "generation"
+  ],
+  "marketplace": {
+    "category": "development",
+    "source": "./plugins/yellow-docs"
+  },
+  "targets": {
+    "claude": true,
+    "codex": false
+  }
+}

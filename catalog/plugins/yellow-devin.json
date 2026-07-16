@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-devin",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "devin",
+    "deepwiki",
+    "delegation",
+    "orchestration",
+    "ai-collaboration"
+  ],
+  "userConfig": {
+    "devin_service_user_token": {
+      "type": "string",
+      "title": "Devin service user token",
+      "description": "Devin V3 service user token (cog_ prefix). Create at Devin Enterprise Settings > Service Users. Stored in system keychain.",
+      "sensitive": true
+    },
+    "devin_org_id": {
+      "type": "string",
+      "title": "Devin organization ID",
+      "description": "Devin organization ID. Find at Devin Enterprise Settings > Organizations.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    "devin": {
+      "type": "http",
+      "url": "https://mcp.devin.ai/mcp"
+    }
+  },
+  "marketplace": {
+    "category": "development",
+    "source": "./plugins/yellow-devin"
+  },
+  "targets": {
+    "claude": true,
+    "codex": false
+  }
+}

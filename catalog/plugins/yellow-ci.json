@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-ci",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "ci",
+    "github-actions",
+    "self-hosted",
+    "runner",
+    "diagnosis"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "yellow-linear",
+      "version": "*",
+      "optional": true,
+      "reason": "ci:report-linear uses mcp__plugin_yellow-linear_linear__save_issue"
+    }
+  ],
+  "marketplace": {
+    "category": "development",
+    "source": "./plugins/yellow-ci"
+  },
+  "targets": {
+    "claude": true,
+    "codex": false
+  }
+}

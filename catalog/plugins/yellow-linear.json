@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-linear",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "linear",
+    "project-management",
+    "issues",
+    "productivity",
+    "pm"
+  ],
+  "outputStyles": "./output-styles",
+  "mcpServers": {
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    }
+  },
+  "marketplace": {
+    "category": "productivity",
+    "source": "./plugins/yellow-linear"
+  },
+  "targets": {
+    "claude": true,
+    "codex": false
+  }
+}
