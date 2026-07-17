@@ -7,17 +7,16 @@ on:
   pull_request:
     paths:
       - '.claude-plugin/marketplace.json'
+      - '.agents/**'
       - 'plugins/**'
       - 'catalog/**'
       - '.changeset/**'
       - 'schemas/*.schema.json'
-      - 'scripts/validate-*.js'
-      - 'scripts/lint-error-codes.js'
-      - 'scripts/sync-shell-snippets.js'
+      - 'scripts/**/*.js'
       - 'scripts/snippets/**'
-      - 'scripts/lib/**'
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
+      - 'packages/**/*.json'
       - 'docs/solutions/**'
       - '.github/workflows/validate-schemas-fork.yml'
 
@@ -48,6 +47,8 @@ jobs:
           - examples
           - solutions
           - authoring
+          - codex
+          - generated
 
     steps:
       - name: Checkout repository
@@ -149,6 +150,33 @@ jobs:
               node scripts/lint-error-codes.js
               node scripts/sync-shell-snippets.js --check
               ;;
+            codex)
+              # Codex-artifact schema validation + the R15 exposure lint
+              # (mirror of the main workflow's `codex` target). Fork PRs
+              # need parity so a fork contributor changing catalog/ or
+              # committed .agents/ artifacts sees the same blocking signal.
+              node scripts/validate-codex.js
+              ;;
+            generated)
+              # Schema conformance gate (mirror of the main workflow's
+              # `generated` target): AJV-validate catalog/ sources directly,
+              # since the generator only checks fields it dereferences.
+              ajv validate \
+                -s schemas/catalog.schema.json \
+                -d catalog/catalog.json \
+                -c ajv-formats --strict=true --all-errors
+              for plugin in catalog/plugins/*.json; do
+                ajv validate \
+                  -s schemas/catalog-plugin.schema.json \
+                  -d "$plugin" \
+                  -c ajv-formats --strict=true --all-errors
+              done
+
+              # Drift gate: regenerated Claude + Codex artifact bytes must
+              # match the committed catalog/ sources exactly (mirror of the
+              # main workflow's `generated` target).
+              node scripts/generate-manifests.js --check
+              ;;
             *)
               echo "::error::Unknown validation target: ${{ matrix.target }}"
               exit 1
@@ -217,16 +245,25 @@ jobs:
     name: Version Consistency Check
     if: github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install ${PNPM_INSTALL_FLAGS}
 
       - name: Run version consistency check
         run: node scripts/validate-versions.js

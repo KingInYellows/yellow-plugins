@@ -1,0 +1,14 @@
+{
+  "SessionStart": [
+    {
+      "matcher": "*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash ./hooks/session-start.sh",
+          "timeout": 5
+        }
+      ]
+    }
+  ]
+}

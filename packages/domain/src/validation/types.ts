@@ -26,6 +26,7 @@ export enum ErrorCategory {
   SOLUTION_DOCS = 'SOLUTION_DOCS',
   PLAN_LIFECYCLE = 'PLAN_LIFECYCLE',
   SETUP_COVERAGE = 'SETUP_COVERAGE',
+  DISTRIBUTION = 'DISTRIBUTION',
 }
 
 /** Structured validation error with specification traceability. */
@@ -59,7 +60,6 @@ export interface DomainValidationResult {
  * infrastructure layer implements it using AJV.
  */
 export interface IValidator {
-  validateMarketplace(data: unknown): DomainValidationResult;
   /** `pluginId` is optional and only enriches error messages. */
   validatePluginManifest(
     data: unknown,

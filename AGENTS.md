@@ -67,7 +67,16 @@ Use pnpm only. `preinstall` enforces Node and pnpm through
 - `pnpm test:integration`: Run Vitest for `tests/integration/`.
 - `pnpm validate:schemas`: Run marketplace, plugin, setup-all,
   agent-authoring, error-code re-implementation, install-script snippet
-  drift, and solution-doc slug-collision/frontmatter validation in one pass.
+  drift, solution-doc slug-collision/frontmatter, generated-artifact
+  byte-identity drift (`catalog/` -> `.claude-plugin/` + `.agents/`), and
+  Codex artifact/exposure-lint validation in one pass.
+- `pnpm validate:generated`: `--check` mode of `generate-manifests.js` —
+  fails if `.claude-plugin/` or `.agents/plugins/` drift from `catalog/`
+  sources.
+- `pnpm validate:codex`: AJV schema validation plus exposure lint for
+  Codex-target artifacts (`.agents/plugins/`, `.codex-plugin/`).
+- `pnpm generate:manifests`: Apply mode — regenerate `.claude-plugin/` and
+  `.agents/plugins/` from `catalog/` sources.
 - `pnpm validate:error-codes`: Scan `scripts/*.js` for hard-coded `ERROR-*`
   codes that re-implement entries from `packages/domain/src/errorCatalog.ts`.
 - `pnpm validate:snippets`: Check `--check` mode of `sync-shell-snippets.js`

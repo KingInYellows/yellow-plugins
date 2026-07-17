@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/codex-marketplace.schema.json",
+  "title": "Codex Marketplace Schema",
+  "description": "Schema for the generated .agents/plugins/marketplace.json — the Codex-target counterpart to .claude-plugin/marketplace.json, listing only Codex-enabled plugins with no version field (R5).",
+  "$comment": "Repo-derived schema, not an official OpenAI schema, from the July 2026 Codex plugin contract. The per-entry shape (name, source.{source,path}, category, policy.{installation,authentication}) is empirically verified in docs/research/2026-07-16-codex-plugin-contract-spike.md's 'Incidental observations' ('.agents/plugins/marketplace.json with version-less entries ... installs and lists'). The root-level displayName field is inferred from R5's wording, not independently spiked — re-verify against a real `codex plugin marketplace add` + `codex plugin list --available --json` round-trip in the Step 15 CI job and correct this schema if the live CLI disagrees.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "displayName", "plugins"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "const": "yellow-plugins"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plugins": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/CodexPluginEntry" },
+      "description": "Filtered to Codex-enabled plugins only, in catalog canonical order (R5). May be empty (the committed empty-state artifact before any plugin enables Codex)."
+    }
+  },
+  "definitions": {
+    "CodexPluginEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "category", "source", "policy"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "path"],
+          "properties": {
+            "source": { "type": "string", "const": "local" },
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Marketplace-relative path to the plugin directory, e.g. './plugins/<name>'."
+            }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["installation", "authentication"],
+          "properties": {
+            "installation": { "type": "string", "enum": ["AVAILABLE"] },
+            "authentication": { "type": "string", "enum": ["ON_INSTALL"] }
+          }
+        }
+      },
+      "description": "No version field — additionalProperties:false above already rejects one; the Codex marketplace snapshot is version-less by design (R5, R12)."
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/codex-plugin.schema.json",
+  "title": "Codex Plugin Manifest Schema",
+  "description": "Schema for the generated plugins/<name>/.codex-plugin/plugin.json — the Codex-target counterpart to plugins/<name>/.claude-plugin/plugin.json (R6).",
+  "$comment": "Repo-derived schema, not an official OpenAI schema, from the July 2026 Codex plugin contract. required name/interface.displayName/interface.category/version/description come from R6 directly. The 'skills' manifest-relative path field implements R7 ('an explicit manifest-relative choice, not an assumed convention') using this repo's existing Claude-side field name for the analogous concept (schemas/plugin.schema.json's 'skills' property). The 'hooks' string-path field is empirically confirmed accepted by the Codex manifest parser (docs/research/2026-07-16-codex-plugin-contract-spike.md finding (d)), though hook execution itself is currently inert (plugin_hooks feature 'removed' on codex-cli 0.144.1) — the field is still emitted for forward compatibility per R20. The 'mcpServers' shape is not independently spiked for Codex in this shell (no plugin enables Codex yet; gt-workflow's MCP wiring is shell 04's concern) and is left permissive pending that verification. Re-verify all of the above against a real `codex plugin add` + `codex plugin list --json` round-trip in the Step 15 CI job and correct this schema if the live CLI disagrees.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "interface", "description"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 1,
+      "description": "Must match the plugin's directory name and its package.json 'name' (sole version/name authority, R3)."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Sourced from package.json (R6)."
+    },
+    "interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName", "category"],
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 }
+      }
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Target-specific description override from the catalog when present, else the shared description (R6)."
+    },
+    "skills": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:\\./)?(?!.*\\.\\.)(?:(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+/?|(?:[A-Za-z0-9._-]+/)+)$",
+      "description": "Manifest-relative path to the normalized Codex skill tree, e.g. './codex/skills' (R7). Directory-path pattern mirrored from schemas/plugin.schema.json's 'relativeDir' definition (no absolute prefixes, no '..' traversal)."
+    },
+    "hooks": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:\\./)?(?!.*\\.\\.)[A-Za-z0-9._/-]+\\.[A-Za-z0-9]+$",
+      "description": "Manifest-relative path to the Codex hook config file, e.g. './hooks/codex-hooks.json'. Codex-only — never an inline object (R20). Currently inert pending upstream plugin_hooks support; emitted for forward compatibility. File-path pattern mirrored from schemas/plugin.schema.json's 'relativeFile' definition (no absolute prefixes, no '..' traversal)."
+    },
+    "mcpServers": {
+      "description": "Pass-through, not independently validated by this schema in this shell — see $comment."
+    }
+  }
+}

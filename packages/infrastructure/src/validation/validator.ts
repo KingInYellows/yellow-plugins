@@ -38,7 +38,7 @@ function normalizeCompatibilityVersion(
  *
  * Usage:
  * 1. Initialize with schema paths
- * 2. Call validateMarketplace() or validatePluginManifest()
+ * 2. Call validatePluginManifest()
  * 3. Receive domain-level validation results with spec-aligned error codes
  *
  * @example
@@ -46,7 +46,7 @@ function normalizeCompatibilityVersion(
  * const validator = new SchemaValidator();
  * await validator.initialize();
  *
- * const result = validator.validateMarketplace(marketplaceData);
+ * const result = validator.validatePluginManifest(pluginData);
  * if (result.status === ValidationStatus.ERROR) {
  *   result.errors.forEach(err => {
  *     console.error(`[${err.code}] ${err.path}: ${err.message}`);
@@ -66,8 +66,8 @@ export class SchemaValidator implements IValidator {
   /**
    * Initialize validator by loading schemas
    *
-   * Loads marketplace and plugin schemas from the schemas/ directory.
-   * Must be called before validation methods.
+   * Loads the plugin schema from the schemas/ directory. Must be called
+   * before validation methods.
    *
    * @param schemaDir - Directory containing schema files (defaults to 'schemas')
    * @throws Error if schemas cannot be loaded
@@ -76,10 +76,6 @@ export class SchemaValidator implements IValidator {
     const schemaPath = resolve(process.cwd(), schemaDir);
 
     try {
-      await this.factory.loadSchemaFromFile(
-        'marketplace',
-        `${schemaPath}/marketplace.schema.json`
-      );
       await this.factory.loadSchemaFromFile(
         'plugin',
         `${schemaPath}/plugin.schema.json`
@@ -93,34 +89,6 @@ export class SchemaValidator implements IValidator {
         }`
       );
     }
-  }
-
-  /**
-   * Validate a marketplace index file
-   *
-   * @param data - Marketplace data to validate
-   * @returns Validation result with detailed errors
-   * @throws Error if validator not initialized
-   */
-  validateMarketplace(data: unknown): DomainValidationResult {
-    this.ensureInitialized();
-
-    const result = this.factory.validate('marketplace', data);
-
-    return {
-      status: result.valid ? ValidationStatus.SUCCESS : ValidationStatus.ERROR,
-      errors: result.errors.map((err) =>
-        ValidationErrorFactory.schemaError(
-          err.path,
-          err.message,
-          err.keyword,
-          err.params
-        )
-      ),
-      warnings: [],
-      entityName: 'marketplace',
-      validatedAt: new Date(),
-    };
   }
 
   /**
@@ -329,7 +297,7 @@ export class SchemaValidator implements IValidator {
  * @example
  * ```typescript
  * const validator = await createValidator();
- * const result = validator.validateMarketplace(data);
+ * const result = validator.validatePluginManifest(data);
  * ```
  */
 export async function createValidator(

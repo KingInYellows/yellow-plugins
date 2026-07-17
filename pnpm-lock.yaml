@@ -64,10 +64,6 @@ importers:
         version: 2.9.0
 
   packages/cli:
-    dependencies:
-      '@yellow-plugins/infrastructure':
-        specifier: workspace:*
-        version: link:../infrastructure
     devDependencies:
       '@types/node':
         specifier: ^22.19.15

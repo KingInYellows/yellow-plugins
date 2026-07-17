@@ -33,7 +33,7 @@ files carry no in-JSON "generated" marker — drift enforcement runs via
   `$schema`), the marketplace entry fields (`marketplace.category`,
   `marketplace.source`, plus `marketplace.description` ONLY when the
   marketplace listing text differs from the plugin description), and target
-  enablement (`targets: {"claude": true, "codex": false}`).
+  enablement (`targets: {"claude": true, "codex": {"enabled": false}}`).
 
 ## Versions
 
