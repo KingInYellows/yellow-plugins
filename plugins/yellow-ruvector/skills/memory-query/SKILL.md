@@ -108,18 +108,25 @@ ERROR-FIX: <error signature> | FIX: <fix text> | SOURCE: <doc path> — <one-lin
   (archived docs excluded), idempotent via the standard dedup constant
   above. Seeding is manual — new solution docs are invisible until the
   next run. The seeder MUST verify `hooks_stats` reports an `intel_path`
-  inside the project root before writing (global-store pollution guard).
+  inside the project root before writing (global-store pollution guard),
+  and MUST finish with `ruvector hooks reembed` — mixed embedding
+  provenance (hash-embedded entries vs ONNX semantic queries) degrades
+  recall scores to near zero until re-embedded (ADR-210 stamping).
 - **Retrieval floor for error queries:**
 
   <!-- prettier-ignore -->
-  ruvector-error-fix-constants v1 (provisional): recall top_k=5, discard score < 0.35, keep top 3, truncate 800 chars at word boundary.
+  ruvector-error-fix-constants v1: recall top_k=5, discard score < 0.40, keep top 3, truncate 800 chars at word boundary.
 
   The floor is LOWER than the generic 0.5 recall floor because short error
   queries against longer stored entries are asymmetric-length matching,
   where all-MiniLM-L6-v2 cosine scores compress toward the middle
-  (sbert.net symmetric-model guidance). Marked provisional until the
-  seeded-corpus calibration pass replaces it with an empirically observed
-  value; update this line and every inline consumer in the same commit.
+  (sbert.net symmetric-model guidance). Calibrated 2026-07-17 against the
+  seeded 32-entry corpus: 10/10 top-1 accuracy including paraphrase
+  queries; correct-hit scores 0.485-0.786 (two correct hits below 0.5 —
+  the generic floor WOULD have discarded them); unrelated-query noise
+  topped out at 0.291. 0.40 is the gap midpoint. Re-calibrate if the
+  embedder or entry format changes; update this line and every inline
+  consumer in the same commit.
 - Consumers: the yellow-core `debugging` skill step 1.4 (inline replica of
   this pattern); `/review:resolve` Step 3b surfaces ERROR-FIX entries via
   its existing generic query (piggyback — no dedicated step). When an

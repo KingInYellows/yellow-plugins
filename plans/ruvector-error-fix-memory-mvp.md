@@ -279,7 +279,7 @@ Canary entry left in HOME store (self-describing, inert).
 
 ### Phase 4: Quality
 
-- [ ] 4.1: Retrieval spot checks with REAL error strings (not doc titles),
+- [x] 4.1: Retrieval spot checks with REAL error strings (not doc titles),
       5-10 known repeats: `"Unable to create '.git/index.lock': File
       exists"` → gt-sync-exit-128 doc; CRLF merge-block; npm-view stderr;
       etc. Record scores; adjust nothing blindly — if < 0.5 across the
@@ -289,13 +289,13 @@ Canary entry left in HOME store (self-describing, inert).
       calibrate the error-fix floor (candidate range 0.35-0.5, or top-1/
       top-2 margin) from these observations and record the chosen constant
       in the Phase 3 protocol block.
-- [ ] 4.2: Non-interference check: run representative existing recall
+- [x] 4.2: Non-interference check: run representative existing recall
       queries (brainstorm/plan/work Phase 1, resolve-pr Step 3b) before/
       after seeding; confirm seeded entries don't displace previously
       useful top-3 results.
-- [ ] 4.3: Degradation matrix verified: plugin absent → silent skip; MCP
+- [x] 4.3: Degradation matrix verified: plugin absent → silent skip; MCP
       down → retry-once → silent skip; healthy-but-cold → silent-normal.
-- [ ] 4.4: Validators + changeset: `pnpm validate:schemas`,
+- [x] 4.4: Validators + changeset: `pnpm validate:schemas`,
       `validate:agents`, `pnpm validate:generated` (new gate from PR #644 —
       should be a no-op since this plan touches no generated manifests);
       LF normalize; changeset = **yellow-ruvector minor** (new command +

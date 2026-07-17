@@ -96,7 +96,38 @@ For each extracted entry:
    the retry fails, count as `failed` and continue with the next entry.
    Do NOT retry on validation or parameter errors.
 
-### Step 6: Report
+### Step 6: Embedding provenance (ADR-210) — unlock and re-embed
+
+Three provenance behaviors matter, all observed live on 0.2.34:
+
+1. **Legacy stores are write-locked.** If any store call fails with
+   `ERR_LEGACY_STORE_READONLY` ("predates embedding provenance"), the
+   store has vectors but no provenance stamp. Unlock it, then retry the
+   failed entries:
+
+   ```bash
+   npx -y ruvector@0.2.34 hooks reembed --dry-run   # inspect first
+   npx -y ruvector@0.2.34 hooks reembed             # re-embed + stamp provenance
+   ```
+
+2. **A version-skewed global binary silently clobbers the stamp.** If an
+   older global `ruvector` (pre-ADR-210, e.g. 0.2.25) is on PATH, its
+   passive-capture hooks rewrite the store after every tool call and
+   reset the provenance stamp to null — re-locking the store within
+   seconds of the reembed. Verify `ruvector --version` matches the pinned
+   version BEFORE seeding; upgrade with
+   `npm install -g ruvector@0.2.34 --ignore-scripts` if not.
+3. **After a reembed to ONNX, hash-path writes are refused.** Seeding
+   after an ONNX reembed requires semantic-mode writes so the active
+   embedder matches the stamped provenance. Report any residual
+   provenance-mismatch failures in the summary rather than retrying
+   blindly.
+
+If `reembed` is unavailable or fails, report it — seeded entries remain
+findable but semantic match quality is degraded until a successful
+re-embed.
+
+### Step 7: Report
 
 Print a summary table:
 
