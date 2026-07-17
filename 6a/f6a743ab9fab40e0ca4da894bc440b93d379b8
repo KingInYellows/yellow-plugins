@@ -1,0 +1,43 @@
+plugins/yellow-ruvector/CLAUDE.md
+  s_7ed434e75cb861::t_43096ac63e71c6 21-26
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_7ed434e75cb861::t_71d64a09dfd5c1 136-139
+  s_7ed434e75cb861::t_e77bc00326543b 115-119,121
+  s_7ed434e75cb861::t_f79d30c61a6a35 153-159
+  s_7ed434e75cb861::t_b694c68473b9dc 92-94
+  s_7ed434e75cb861::t_03f472596a279b 15
+  s_7ed434e75cb861::t_52e6b7987a04b3 63-70
+  s_7ed434e75cb861::t_46f2ea7c9b88c3 193-197
+plugins/yellow-core/skills/debugging/SKILL.md
+  s_7ed434e75cb861::t_7d0b785d438c1d 151-153
+plugins/yellow-ruvector/skills/memory-query/SKILL.md
+  s_7ed434e75cb861::t_c60ded009651eb 131-138
+plugins/yellow-ruvector/tests/session-start.bats
+  s_7ed434e75cb861::t_fa94a8eeb5ad85 19-21
+  s_7ed434e75cb861::t_5cc519bcc2baa3 246-248,253
+  s_7ed434e75cb861::t_fc584c6103dedc 176-245,249-252,254
+docs/security.md
+  s_7ed434e75cb861::t_c663ffead5ab37 14
+  s_7ed434e75cb861::t_f25b3a50b5759a 171
+  s_7ed434e75cb861::t_a824d15e5915da 192-193,196,200-202
+  s_7ed434e75cb861::t_b34631cd714a79 117
+  s_7ed434e75cb861::t_c99d0d832ee3a0 126-132
+plugins/yellow-ruvector/hooks/scripts/session-start.sh
+  s_7ed434e75cb861::t_9c80aee8cb841b 38,44-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "6af6a743ab9fab40e0ca4da894bc440b93d379b8",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
