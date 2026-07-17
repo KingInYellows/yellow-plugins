@@ -208,3 +208,38 @@ Always include:
 ```bash
 url="${url}&$(jq -nr --arg org "$DEVIN_ORG_ID" '@uri "org_ids=\($org)"')"
 ```
+
+---
+
+## Update — 2026-07-16
+
+While planning the Claude Code + Codex plugin pilot, primary-source
+verification of the current Claude Code plugin docs
+(code.claude.com/docs/en/plugins-reference, fetched 2026-07-16) found that
+upstream now documents **both** `hooks` and `mcpServers` as accepting
+`string | array | object`, with file-path examples for each, and states
+"Plugin MCP servers work identically to user-configured servers."
+
+This appears to reopen the question this doc closed in February 2026: has
+Claude Code's remote validator started accepting a file-path string for
+`hooks` — the exact case the Feb 2026 finding said was rejected?
+
+Two explanations fit the evidence and neither is confirmed:
+
+- The remote validator changed between Feb and Jul 2026.
+- The Feb 2026 finding was scoped to a stricter surface (e.g. `claude plugin
+  validate` / marketplace submission) that coexists with the currently
+  documented general contract.
+
+**Do not resolve this from docs alone.** An empirical re-test is a committed
+spike in the pilot spec: R17(e) (file-referenced `mcpServers` install/validate
+acceptance) and R17(f) (`hooks` string-path acceptance against current Claude
+Code CLI). Until that spike lands, keep the local schema's inline-only
+constraint for `hooks` as-is — safe under either explanation. If the spike
+confirms the remote validator now accepts a `hooks` file path, this doc's
+Root Cause framing (asymmetric hooks vs mcpServers support) should be
+corrected in a follow-up edit, not just annotated.
+
+Related: `plans/specs/claude-code-codex-plugin-pilot.md` R17(e)(f) — this
+addendum is the durable record of *why* the spike exists, independent of
+whether the plan file itself is later archived via `/plan:complete`.
