@@ -119,6 +119,13 @@ Two write paths exist:
 2. `pending-updates.jsonl` read-then-truncate from the memory-manager
    agent — interleaving sessions can silently drop entries.
 
+**Observed live (2026-07-17):** this is not theoretical — a long-lived
+MCP server process holding a pre-seed in-memory snapshot saved after a
+CLI-side batch write and silently erased all 32 freshly seeded entries
+(last-writer-wins, wholesale). Quiesce every ruvector process (sessions
+AND lingering `ruvector mcp` servers) before any batch write that must
+survive.
+
 A `flock` wrapper at the plugin layer is **not viable**: both write paths
 run inside the ruvector MCP server process, not in shell wrappers we
 control. `flock`-ing the MCP server start serializes all MCP tool calls

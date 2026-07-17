@@ -11,6 +11,8 @@ allowed-tools:
   - Bash(npx -y ruvector@0.2.34 hooks reembed:*)
   - Bash(ruvector --version:*)
   - Bash(npm install -g ruvector@0.2.34:*)
+  - Bash(pgrep -f:*)
+  - Bash(grep -c ERROR-FIX:*)
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
@@ -45,10 +47,22 @@ re-run after new solution docs land.
 
 ### Step 2: Concurrency guard
 
-Cross-process write safety is undocumented for the ruvector store. Use
-AskUserQuestion: "Seeding writes many entries. Confirm no other Claude
-Code session is actively writing this project's ruvector store right now?"
-Options: "Yes, proceed" / "No, stop". Stop on "No".
+The store is a flat JSON file with no locking — **last writer wins,
+wholesale**. A process holding a pre-seed in-memory snapshot (including a
+lingering MCP server from an earlier session) can silently erase every
+seeded entry when it next saves; observed live during development. Two
+checks:
+
+1. Run `pgrep -f 'ruvector mcp'` — if any process is running against this
+   project, report it and instruct the user to end those sessions first.
+2. Use AskUserQuestion: "Seeding writes many entries. Confirm no other
+   Claude Code session is actively writing this project's ruvector store
+   right now?" Options: "Yes, proceed" / "No, stop". Stop on "No".
+
+After Step 7's report, re-verify durability: `grep -c 'ERROR-FIX:'
+.ruvector/intelligence.json`. If the count has dropped to zero, a stale
+writer clobbered the store — quiesce all ruvector processes and re-run
+(the command is idempotent).
 
 ### Step 3: Enumerate the eligible corpus (count at run time)
 
