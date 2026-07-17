@@ -37,8 +37,12 @@ re-run after new solution docs land.
    `/ruvector:status` and try again." and stop.
 3. **Store-scoping check (do not skip):** call
    `mcp__plugin_yellow-ruvector_ruvector__hooks_stats()` and inspect the
-   `intel_path` field. If it is absent, or does not resolve to a path
-   inside the current project root, STOP and report:
+   `intel_path` field. Accept a path inside the current project root,
+   AND — when the project's `.ruvector` is a symlink (a healed worktree)
+   — a path inside the symlink's target directory (the main checkout's
+   shared store; `intel_path` may report either the symlink path or its
+   resolved target). If the field is absent, or resolves anywhere else
+   (e.g. `~/.ruvector`), STOP and report:
    "ruvector is using a non-project store (<intel_path>). Seeding would
    pollute a store shared across projects. This happens when the MCP
    server started before `.ruvector/` existed — start a fresh session and
@@ -144,9 +148,15 @@ For each extracted entry:
    Do NOT retry on validation or parameter errors.
    **`ERR_LEGACY_STORE_READONLY` is store-wide, not per-entry:** on the
    FIRST occurrence, abort the loop immediately (do not retry it and do
-   not attempt the remaining entries — every one will fail identically),
-   run the Step 6 unlock, then resume the loop from the first unstored
-   entry.
+   not attempt the remaining entries — every one will fail identically)
+   and run the Step 6 unlock. Then do NOT resume through this same
+   session's MCP tools: the reembed rewrote the store on disk while this
+   session's MCP server may still hold the pre-reembed snapshot, and its
+   next save would clobber everything (the same-run clobber Step 2
+   describes — this exact sequence lost 32 entries once). Report the
+   unlock as done and instruct the user to re-run the command in a fresh
+   session; the dedup check makes the re-run resume from the first
+   unstored entry automatically.
 
 ### Step 6: Embedding provenance (ADR-210) — unlock and re-embed
 

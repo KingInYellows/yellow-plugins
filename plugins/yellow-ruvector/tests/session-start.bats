@@ -246,3 +246,17 @@ exit 0'
   [ -n "$replica" ]
   [ "$canon" = "$replica" ]
 }
+
+@test "store-heal resolves the worktree root from a nested launch directory" {
+  # A session launched from a subdirectory inside a worktree must still
+  # heal <worktree-root>/.ruvector (codex P1: nested cwd skipped the heal).
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  make_worktree heal-nested
+  mkdir -p "$PROJECT_ROOT/wt/pkg/sub"
+  make_ruvector_stub 'exit 0'
+  run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt/pkg/sub"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ -L "$PROJECT_ROOT/wt/.ruvector" ]
+  [ "$(readlink "$PROJECT_ROOT/wt/.ruvector")" = "$PROJECT_ROOT/.ruvector" ]
+}

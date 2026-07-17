@@ -35,24 +35,41 @@ RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 # projects that never initialized ruvector. --path-format=absolute needs
 # git >= 2.31; on older git the rev-parse fails and the heal is skipped
 # silently (pre-heal behavior, no breakage).
-if [ -f "$PROJECT_DIR/.git" ] && { [ ! -e "$RUVECTOR_DIR" ] || { [ -d "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR" ]; }; }; then
-  git_common_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || git_common_dir=""
-  git_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-dir 2>/dev/null) || git_dir=""
-  if [ -n "$git_common_dir" ] && [ -n "$git_dir" ] && [ "$git_common_dir" != "$git_dir" ]; then
-    main_root=$(dirname "$git_common_dir")
-    if [ -d "${main_root}/.ruvector" ] && [ "$main_root" != "$PROJECT_DIR" ]; then
-      if [ -d "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR" ]; then
-        # Pre-existing plain directory: never auto-replace (may hold real
-        # per-worktree data — same preservation rule as worktree-manager's
-        # link_ruvector_db). Warn so the divergence is visible, not silent.
-        printf '[ruvector] Warning: %s is a plain directory diverged from the shared store %s/.ruvector — merge or relink manually\n' "$RUVECTOR_DIR" "$main_root" >&2
-      else
-        # -sfn: heal a dangling symlink too (ln -s alone EEXISTs on a dead
-        # link, silently leaving the global-store fallback in place). Safe:
-        # this branch only runs when the entry is absent or a symlink —
-        # never a real directory.
-        ln -sfn "${main_root}/.ruvector" "$RUVECTOR_DIR" 2>/dev/null \
-          || printf '[ruvector] Warning: worktree store-heal could not link %s\n' "$RUVECTOR_DIR" >&2
+if [ ! -e "$RUVECTOR_DIR" ] || { [ -d "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR" ]; }; then
+  # Resolve the worktree root the heal should target. Cheap paths first:
+  # a .git FILE at PROJECT_DIR is the linked-worktree signature; a .git
+  # DIRECTORY is an ordinary checkout (skip, zero subprocesses). No .git
+  # entry at all can mean a nested launch dir inside a worktree — one
+  # rev-parse resolves it (fails instantly outside any repo).
+  heal_root=""
+  if [ -f "$PROJECT_DIR/.git" ]; then
+    heal_root="$PROJECT_DIR"
+  elif [ ! -e "$PROJECT_DIR/.git" ]; then
+    heal_root=$(git -C "$PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null) || heal_root=""
+    if [ -n "$heal_root" ] && [ ! -f "$heal_root/.git" ]; then
+      heal_root=""  # enclosing root is an ordinary checkout, not a worktree
+    fi
+  fi
+  if [ -n "$heal_root" ]; then
+    heal_target="${heal_root}/.ruvector"
+    git_common_dir=$(git -C "$heal_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || git_common_dir=""
+    git_dir=$(git -C "$heal_root" rev-parse --path-format=absolute --git-dir 2>/dev/null) || git_dir=""
+    if [ -n "$git_common_dir" ] && [ -n "$git_dir" ] && [ "$git_common_dir" != "$git_dir" ]; then
+      main_root=$(dirname "$git_common_dir")
+      if [ -d "${main_root}/.ruvector" ] && [ "$main_root" != "$heal_root" ]; then
+        if [ -d "$heal_target" ] && [ ! -L "$heal_target" ]; then
+          # Pre-existing plain directory: never auto-replace (may hold real
+          # per-worktree data — same preservation rule as worktree-manager's
+          # link_ruvector_db). Warn so the divergence is visible, not silent.
+          printf '[ruvector] Warning: %s is a plain directory diverged from the shared store %s/.ruvector — merge or relink manually\n' "$heal_target" "$main_root" >&2
+        else
+          # -sfn: heal a dangling symlink too (ln -s alone EEXISTs on a dead
+          # link, silently leaving the global-store fallback in place). Safe:
+          # this branch only runs when the entry is absent or a symlink —
+          # never a real directory.
+          ln -sfn "${main_root}/.ruvector" "$heal_target" 2>/dev/null \
+            || printf '[ruvector] Warning: worktree store-heal could not link %s\n' "$heal_target" >&2
+        fi
       fi
     fi
   fi

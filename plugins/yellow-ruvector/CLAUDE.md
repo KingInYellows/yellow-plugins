@@ -152,7 +152,14 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
 - `.ruvector/` is shared across git worktrees via a symlink injected by
   yellow-core's `worktree-manager.sh` at worktree creation time; for
   worktrees created by other tooling, `session-start.sh` heals the
-  missing link before the MCP server can cache a fallback store path. Concurrent
+  missing link (resolving the worktree root even from a nested launch
+  dir) before the MCP server can cache a fallback store path.
+- **Nested-launch scoping limitation:** a session started from a
+  subdirectory (not the project/worktree root) gives the MCP server a
+  nested cwd; ruvector 0.2.34's `getIntelPath()` does no upward search,
+  so the server may still resolve the machine-global `~/.ruvector` even
+  after the hook heals the root — an upstream limitation the hook cannot
+  fix. Start sessions from the project root when memory scoping matters. Concurrent
   worktree sessions writing to the same DB may race; the ruvector CLI's
   internal session queue provides partial serialization within a single
   process, but cross-process write safety is not documented. Avoid running
