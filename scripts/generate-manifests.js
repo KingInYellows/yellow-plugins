@@ -46,12 +46,14 @@ function validateSource(name, source, errors) {
       errors.push(`catalog/plugins/${name}.json: missing required key "${key}"`);
     }
   }
-  if (source.marketplace) {
+  if ('marketplace' in source && source.marketplace !== null && typeof source.marketplace === 'object') {
     for (const key of ['category', 'source']) {
       if (!(key in source.marketplace)) {
         errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.${key}"`);
       }
     }
+  } else if ('marketplace' in source) {
+    errors.push(`catalog/plugins/${name}.json: "marketplace" must be an object`);
   }
   // Value-shape checks: a string-shaped author would silently emit
   // "author": {} into the marketplace, and a non-boolean target flag would

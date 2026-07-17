@@ -208,6 +208,30 @@ describe('source value-shape validation', () => {
       'catalog/plugins/yellow-core.json: missing required key "marketplace.category"'
     );
   });
+
+  it('rejects a null marketplace (would crash buildMarketplace, not skip validation)', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      s.marketplace = null;
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: "marketplace" must be an object'
+    );
+  });
+
+  it('rejects a primitive marketplace (would throw inside validateSource itself)', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      s.marketplace = 'oops';
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: "marketplace" must be an object'
+    );
+  });
 });
 
 describe('catalog.json validation', () => {

@@ -89,20 +89,24 @@ reviewer/executor, not authoring plugins Codex itself loads.
   (manifest-relative — a custom path like `codex/skills/` is a choice, not a
   convention).
 
-## Unverified (do not build on without an empirical check)
+## Previously unverified — resolved by the 2026-07-16 spike
 
-Pending the pilot's PR1 spike (`plans/specs/claude-code-codex-plugin-pilot.md`
-R17(a)(b)(c)):
+The pilot's R17 spike
+(`docs/research/2026-07-16-codex-plugin-contract-spike.md`) resolved all
+three items empirically on codex-cli 0.144.1:
 
-1. `$ARGUMENTS` interpolation in Codex skills — absent from primary docs; one
-   third-party source states runtime expansion cannot be statically converted
-   from Claude commands. Plan a prompt-text argument fallback.
-2. `codex plugin list --available --json` — only the interactive `/plugins`
-   browser is documented; verify with `codex plugin list --help` before
-   scripting CI against it.
-3. The exact `agents/openai.yaml` field for marking a skill non-implicit
-   (`allow_implicit_invocation` is third-party-sourced; the file location
-   itself is primary-confirmed).
+1. `$ARGUMENTS` interpolation in Codex skills — **no such primitive** (spike
+   finding (a)). Arguments arrive as verbatim prompt text; port pattern is to
+   reference "the argument text the user provided after the skill name" in
+   SKILL.md prose. Skills are namespaced `<plugin-name>:<skill-name>` in the
+   model's context.
+2. `codex plugin list --available --json` — **exists and works** (spike
+   finding (b)); documented in `codex plugin list --help` with a verbatim
+   example. Safe to script CI against.
+3. The `agents/openai.yaml` non-implicit-invocation field — **moot on
+   0.144.1** (spike finding (c)): the file is not parsed from plugins at all
+   (even invalid YAML produces no error). Treat `allow_implicit_invocation`
+   as nonexistent until a future CLI parses the file.
 
 ## Related Docs
 

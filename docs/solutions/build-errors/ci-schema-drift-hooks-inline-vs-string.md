@@ -48,6 +48,10 @@ field.
 
 ## Root Cause
 
+> **2026-07 update:** the validator asymmetry described below was
+> time-scoped — it no longer reproduces on current Claude Code (2.1.211).
+> See "Update — 2026-07-16" at the end of this doc.
+
 Two validators for the same `plugin.json` field diverged:
 
 | Validator | Expected `hooks` format |
@@ -231,15 +235,21 @@ Two explanations fit the evidence and neither is confirmed:
   validate` / marketplace submission) that coexists with the currently
   documented general contract.
 
-**Do not resolve this from docs alone.** An empirical re-test is a committed
-spike in the pilot spec: R17(e) (file-referenced `mcpServers` install/validate
-acceptance) and R17(f) (`hooks` string-path acceptance against current Claude
-Code CLI). Until that spike lands, keep the local schema's inline-only
-constraint for `hooks` as-is — safe under either explanation. If the spike
-confirms the remote validator now accepts a `hooks` file path, this doc's
-Root Cause framing (asymmetric hooks vs mcpServers support) should be
-corrected in a follow-up edit, not just annotated.
+**Resolved 2026-07-16 — the spike landed in the same PR.**
+`docs/research/2026-07-16-codex-plugin-contract-spike.md` findings (e) and
+(f), verified against Claude Code 2.1.211: a file-referenced `mcpServers`
+AND a string file path for `hooks` both pass `claude plugin validate` and a
+clean install. The Feb 2026 inline-only rejection **no longer reproduces** —
+the Root Cause table above is a correct historical record of the Feb–Jul
+2026 window, but the asymmetry it describes (hooks inline-only vs mcpServers
+file-path) is gone on current CLI versions.
+
+Consequence: this repo's local `schemas/plugin.schema.json` constraint on
+`hooks` shape is now a **local policy decision**, not a remote-validator
+requirement. Loosening it (or keeping it strict for reviewability) is a
+separate choice deferred to the pilot's later shells; nothing upstream
+forces either.
 
 Related: `plans/specs/claude-code-codex-plugin-pilot.md` R17(e)(f) — this
-addendum is the durable record of *why* the spike exists, independent of
+addendum is the durable record of *why* the spike existed, independent of
 whether the plan file itself is later archived via `/plan:complete`.
