@@ -119,7 +119,7 @@ plugin-port shells consume instead of re-deriving external contract facts.
   `loadCatalog()` and `loadPluginSources()` returning discriminated-union
   results (`marketplace-reader.js` precedent), enforcing the
   `^[a-zA-Z0-9_-]+$` name allowlist, `assertWithinRoot` containment,
-  rejecting symlinked source files (`lstatSync`) (final source files only —
+  rejecting symlinked source files (`openSync(..., O_NOFOLLOW)`) (final source files only —
   symlinked parent/ancestor directories are followed; hardening deferred
   alongside the documented atomicWrite/.tmp and package.json symlink P3s),
   and cross-checking catalog order entries against `catalog/plugins/*.json`

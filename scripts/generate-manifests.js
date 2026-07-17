@@ -40,24 +40,55 @@ const REQUIRED_SOURCE_KEYS = [
   'keywords', 'marketplace', 'targets',
 ];
 
+// Required fields the emitters splice verbatim into the generated manifest
+// or marketplace as a JSON string. A null/number/array value here would emit
+// a schema-invalid manifest while apply mode still reported status: 'ok', so
+// the value shape — not just key presence — is checked. (All of these are
+// also in REQUIRED_SOURCE_KEYS, so presence is enforced by the loop above.)
+const REQUIRED_STRING_KEYS = [
+  '$schema', 'description', 'homepage', 'repository', 'license',
+];
+
 function validateSource(name, source, errors) {
   for (const key of REQUIRED_SOURCE_KEYS) {
     if (!(key in source)) {
       errors.push(`catalog/plugins/${name}.json: missing required key "${key}"`);
     }
   }
+  // Value-shape checks for every field the builders dereference — enumerated
+  // exhaustively (not just the fields a single reviewer named) so a later
+  // "description": null or "keywords": "x" can't reach a generated manifest.
+  for (const key of REQUIRED_STRING_KEYS) {
+    if (key in source && typeof source[key] !== 'string') {
+      errors.push(`catalog/plugins/${name}.json: "${key}" must be a string`);
+    }
+  }
+  if (
+    'keywords' in source &&
+    (!Array.isArray(source.keywords) ||
+      !source.keywords.every((k) => typeof k === 'string'))
+  ) {
+    errors.push(`catalog/plugins/${name}.json: "keywords" must be an array of strings`);
+  }
   if ('marketplace' in source && source.marketplace !== null && typeof source.marketplace === 'object') {
     for (const key of ['category', 'source']) {
       if (!(key in source.marketplace)) {
         errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.${key}"`);
+      } else if (typeof source.marketplace[key] !== 'string') {
+        errors.push(`catalog/plugins/${name}.json: "marketplace.${key}" must be a string`);
       }
+    }
+    // marketplace.description is optional (falls back to source.description),
+    // but when present the emitter uses it verbatim, so it must be a string.
+    if ('description' in source.marketplace && typeof source.marketplace.description !== 'string') {
+      errors.push(`catalog/plugins/${name}.json: "marketplace.description" must be a string`);
     }
   } else if ('marketplace' in source) {
     errors.push(`catalog/plugins/${name}.json: "marketplace" must be an object`);
   }
-  // Value-shape checks: a string-shaped author would silently emit
-  // "author": {} into the marketplace, and a non-boolean target flag would
-  // silently drop the plugin from generation — both must fail loud here.
+  // A string-shaped author would silently emit "author": {} into the
+  // marketplace, and a non-boolean target flag would silently drop the
+  // plugin from generation — both must fail loud here.
   if (
     'author' in source &&
     (typeof source.author !== 'object' ||
@@ -133,6 +164,13 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
     } catch (err) {
       errors.push(`cannot read plugins/${name}/package.json: ${err.message}`);
+      continue;
+    }
+    // Valid JSON with a null/array/scalar root parses fine but would throw a
+    // TypeError on pkg.name below, escaping the documented { status: 'error' }
+    // contract with an uncaught stack trace (mirrors catalog-reader's guard).
+    if (pkg === null || typeof pkg !== 'object' || Array.isArray(pkg)) {
+      errors.push(`plugins/${name}/package.json: top-level value must be an object`);
       continue;
     }
     if (pkg.name !== name) {

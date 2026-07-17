@@ -251,9 +251,10 @@ commit added the spike's findings but never opened the two consumer docs
 to apply them, so the repo briefly shipped a resolved question still
 labeled unresolved in two other files. Fixed in the same PR's next review
 round (commit `16d830d`) by rewriting both docs' "Unverified"/pending
-sections into resolved-with-pointers, using the spike's actual findings
-(e), (f) rather than re-asserting the old "must not resolve from docs
-alone" caution.
+sections into resolved-with-pointers, using the spike's actual findings —
+(a)–(c) for the manifest-and-hook-contract doc and (e)–(f) for the
+ci-schema-drift hooks-path re-test — rather than re-asserting the old
+"must not resolve from docs alone" caution.
 
 **Distinct root cause:** Findings 1–3 are about a claim being wrong (from
 the start, or gone stale mid-PR). This one is about a **self-declared

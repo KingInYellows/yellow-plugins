@@ -668,10 +668,13 @@ jobs:
             echo "::group::Scanning for secrets in manifests"
             # Exclusions: "permissionScopes" literal; JSON userConfig field
             # declarations (lines ending in `: {` are object-typed field
-            # openings, not secret values); ${ANYTHING} shell/template
-            # expansions (${user_config.*} and same-named env var
-            # passthroughs like "MORPH_API_KEY": "${MORPH_API_KEY:-}" are
-            # substituted at runtime, never literal secrets); `"description":`
+            # openings, not secret values); variable/template expansions with
+            # NO literal default — ${user_config.*}, a bare ${VAR}, an empty
+            # default ${VAR:-}, or a variable/reference default like
+            # "MORPH_API_KEY": "${MORPH_API_KEY:-}" (runtime-substituted,
+            # never literal secrets). A literal-string fallback such as
+            # "${VAR:-ghp_realkey}" is deliberately NOT exempted, since that
+            # default could itself be a committed credential; `"description":`
             # and `"title":` lines (documentation / UI-label metadata
             # mentioning "token" or "API key" describing what the field is,
             # not its value — the Claude Code remote validator requires
@@ -683,7 +686,7 @@ jobs:
             # reported below — never the full matched line, which could
             # contain a real secret value.
             SENSITIVE=$(grep -rniE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ catalog/ --include="*.json" \
-              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{[A-Za-z_]|"description":|"title":' \
+              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{[A-Za-z_][A-Za-z0-9_.]*(:-(\$\{?[A-Za-z_][A-Za-z0-9_.]*\}?)?)?\}|"description":|"title":' \
               | grep -viE '(api[_-]?key|password|token|secret)[A-Za-z]' \
               || true)
             if [ -n "$SENSITIVE" ]; then

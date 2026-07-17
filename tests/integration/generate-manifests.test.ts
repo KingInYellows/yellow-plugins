@@ -232,6 +232,42 @@ describe('source value-shape validation', () => {
       'catalog/plugins/yellow-core.json: "marketplace" must be an object'
     );
   });
+
+  it('rejects a null required string field (would emit "description": null)', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      s.description = null;
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: "description" must be a string'
+    );
+  });
+
+  it('rejects a non-array keywords (would emit a schema-invalid manifest)', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      s.keywords = 'not-an-array';
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: "keywords" must be an array of strings'
+    );
+  });
+
+  it('rejects a non-string marketplace.source (nested value the emitter splices)', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      (s.marketplace as Record<string, unknown>).source = 42;
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: "marketplace.source" must be a string'
+    );
+  });
 });
 
 describe('catalog.json validation', () => {
@@ -290,6 +326,18 @@ describe('catalog.json validation', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors).toContain('catalog.json: duplicate pluginOrder entry "yellow-core"');
+  });
+
+  it('rejects a non-object top-level catalog.json (array)', () => {
+    const root = makeFixtureRoot();
+    writeFileSync(
+      join(root, 'catalog', 'catalog.json'),
+      JSON.stringify(['not', 'an', 'object'], null, 2) + '\n',
+      'utf8'
+    );
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain('catalog.json: top-level value must be an object');
   });
 });
 
@@ -360,6 +408,20 @@ describe('catalog source safety', () => {
     expect(
       result.errors.some((e: string) => e.startsWith('catalog/plugins/yellow-core.json:'))
     ).toBe(true);
+  });
+
+  it('rejects a non-object top-level plugin source (scalar)', () => {
+    const root = makeFixtureRoot();
+    writeFileSync(
+      join(root, 'catalog', 'plugins', 'yellow-core.json'),
+      JSON.stringify('not-an-object') + '\n',
+      'utf8'
+    );
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: top-level value must be an object'
+    );
   });
 });
 
