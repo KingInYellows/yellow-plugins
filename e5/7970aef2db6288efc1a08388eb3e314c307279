@@ -1,0 +1,109 @@
+packages/domain/tsconfig.json
+  s_76944981fdcfae::t_17305f28920f4c 9
+catalog/plugins/yellow-review.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+catalog/plugins/yellow-council.json
+  s_76944981fdcfae::t_5250d751e74c1f 27-29
+catalog/plugins/yellow-linear.json
+  s_76944981fdcfae::t_5250d751e74c1f 31-33
+catalog/plugins/yellow-devin.json
+  s_76944981fdcfae::t_5250d751e74c1f 48-50
+catalog/plugins/yellow-research.json
+  s_76944981fdcfae::t_5250d751e74c1f 115-117
+packages/domain/src/validation/errorCatalog.ts
+  s_76944981fdcfae::t_3c555cf8dffaf1 371-380
+  s_76944981fdcfae::t_d027e83a0dc7ca 138-145
+  s_76944981fdcfae::t_bd2a3cc5720325 16-22
+catalog/plugins/yellow-ci.json
+  s_76944981fdcfae::t_5250d751e74c1f 46-48
+catalog/plugins/yellow-docs.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+.agents/plugins/marketplace.json
+  s_76944981fdcfae::t_a04285ddd2672b 1-5
+catalog/plugins/yellow-debt.json
+  s_76944981fdcfae::t_5250d751e74c1f 51-53
+catalog/plugins/yellow-mempalace.json
+  s_76944981fdcfae::t_5250d751e74c1f 35-37
+schemas/catalog-plugin.schema.json
+  s_76944981fdcfae::t_ccdc5bac782cb9 1-124
+scripts/generate-manifests.js
+  s_76944981fdcfae::t_42205069a2d447 35-41
+  s_76944981fdcfae::t_84b733d6d67393 294-335
+  s_76944981fdcfae::t_4fd3bc78a81ae0 136-137,139,145-190
+  s_76944981fdcfae::t_bd34fcdf5a98f8 5-6,11-15
+  s_76944981fdcfae::t_740edb00dd95bd 191-192
+catalog/plugins/yellow-semgrep.json
+  s_76944981fdcfae::t_5250d751e74c1f 64-66
+catalog/plugins/yellow-browser-test.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+packages/domain/src/validation/error-codes.json
+  s_76944981fdcfae::t_fee034e525f249 1-10
+catalog/plugins/yellow-codex.json
+  s_76944981fdcfae::t_5250d751e74c1f 25-27
+schemas/codex-hooks.schema.json
+  s_76944981fdcfae::t_01b58f733b8fb1 1-41
+catalog/plugins/yellow-morph.json
+  s_76944981fdcfae::t_5250d751e74c1f 58-60
+schemas/codex-plugin.schema.json
+  s_76944981fdcfae::t_56063a23f4f9c7 1-50
+catalog/plugins/yellow-composio.json
+  s_76944981fdcfae::t_5250d751e74c1f 63-65
+docs/solutions/code-quality/raw-text-scan-inline-to-import-blind-spot.md
+  s_76944981fdcfae::t_08bfd29019a782 1-101
+packages/domain/src/validation/types.ts
+  s_76944981fdcfae::t_bd3b856e8df42e 29
+tests/integration/generate-manifests.test.ts
+  s_76944981fdcfae::t_28f2db8dd28283 75-81,92
+  s_76944981fdcfae::t_34c37587835d5f 36-38,44
+scripts/lib/generate/emit-codex.js
+  s_76944981fdcfae::t_4e63cf8182ae04 214-215,218
+  s_76944981fdcfae::t_274857154d88c5 25
+  s_76944981fdcfae::t_08f96c819629d9 1-22,26-213,216-217,219-236
+  s_76944981fdcfae::t_e45794551351a1 23-24
+docs/solutions/workflow/spec-shells-dependency-oracle-plans-complete.md
+  s_76944981fdcfae::t_edc64a52cd35f3 87-133
+schemas/catalog.schema.json
+  s_76944981fdcfae::t_d2b4fbcfb5c518 72,79,87
+  s_76944981fdcfae::t_8c7cb30087f129 1-54,56-71,73-78,80-86,88-92
+  s_76944981fdcfae::t_973f5fe971c3f9 55
+catalog/plugins/yellow-ruvector.json
+  s_76944981fdcfae::t_5250d751e74c1f 99-101
+catalog/plugins/gt-workflow.json
+  s_76944981fdcfae::t_5250d751e74c1f 65-67
+catalog/plugins/yellow-core.json
+  s_76944981fdcfae::t_5250d751e74c1f 51-53
+plans/claude-code-codex-plugin-pilot-02-codex-tooling.md
+  s_76944981fdcfae::t_01981c5e9e919c 404-407
+  s_76944981fdcfae::t_dd25d24d8fcacd 187,194-198
+  s_76944981fdcfae::t_0bc5aa37cfc626 283,287-298
+  s_76944981fdcfae::t_3857dcea9268a1 240-245
+  s_76944981fdcfae::t_9cf0b85178683d 1-93,112-174,176-178,188-193,200-204,216-224,229,232-239,262-267,284-286,299-303,305-306,311-351,356-403,408-451
+  s_76944981fdcfae::t_82189c005aedbf 199,205-214
+  s_76944981fdcfae::t_05dc54be08f74c 94-111
+  s_76944981fdcfae::t_1a85a43ab1fcac 215
+  s_76944981fdcfae::t_8ec19dbb4efe7e 261,268-282
+  s_76944981fdcfae::t_3c616af95f63a9 304,307-310
+  s_76944981fdcfae::t_3702a3eb8891b8 175,179-186
+  s_76944981fdcfae::t_f8e1785c92ff6d 246-260
+  s_76944981fdcfae::t_dda481b51e0a17 352-355
+  s_76944981fdcfae::t_e9e577c8716c01 225-228,230-231
+schemas/codex-marketplace.schema.json
+  s_76944981fdcfae::t_2646ba9dbb231d 1-66,68-70
+  s_76944981fdcfae::t_878c0ac54ea62b 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e57970aef2db6288efc1a08388eb3e314c307279",
+  "prompts": {},
+  "sessions": {
+    "s_76944981fdcfae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1ea2e22-178b-47c9-ac16-a3fc091bd7f0",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
