@@ -265,7 +265,7 @@ describe('source value-shape validation', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors).toContain(
-      'catalog/plugins/yellow-core.json: "marketplace.source" must be a string path or a { source, url } object'
+      'catalog/plugins/yellow-core.json: "marketplace.source" must be a string path or a { source: "url", url } object'
     );
   });
 
@@ -280,6 +280,18 @@ describe('source value-shape validation', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('ok');
     expect(result.errors.some((e: string) => e.includes('marketplace.source'))).toBe(false);
+  });
+
+  it('rejects an object marketplace.source that is not { source: "url", url }', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      (s.marketplace as Record<string, unknown>).source = { source: 'url' }; // missing url
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog/plugins/yellow-core.json: object "marketplace.source" must be { source: "url", url: <string> }'
+    );
   });
 });
 
@@ -360,9 +372,7 @@ describe('catalog.json validation', () => {
     });
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
-    expect(result.errors).toContain(
-      'catalog.json: "owner" must be an object with a string "name"'
-    );
+    expect(result.errors).toContain('catalog.json: "owner" must be an object');
   });
 
   it('rejects a null catalog description (identity field spliced verbatim)', () => {
@@ -373,6 +383,38 @@ describe('catalog.json validation', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors).toContain('catalog.json: "description" must be a string');
+  });
+
+  it('rejects an empty catalog name (schema minLength: 1)', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      c.name = '';
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain('catalog.json: "name" must be a non-empty string');
+  });
+
+  it('rejects an empty owner name (schema minLength: 1)', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      (c.owner as Record<string, unknown>).name = '';
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain('catalog.json: "owner.name" must be a non-empty string');
+  });
+
+  it('rejects a non-semver metadata.version', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      (c.metadata as Record<string, unknown>).version = 'not-a-version';
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog.json: "metadata.version" must be a version string (e.g. "1.2.3")'
+    );
   });
 });
 

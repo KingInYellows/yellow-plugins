@@ -88,28 +88,50 @@ function loadCatalog(catalogDir) {
     }
   }
   // Value-shape checks for the identity fields buildMarketplace splices
-  // verbatim into marketplace.json — a null/wrong-typed value here would emit
-  // a schema-invalid marketplace while apply mode still returned status: 'ok'.
-  if ('name' in data && typeof data.name !== 'string') {
-    errors.push('catalog.json: "name" must be a string');
+  // verbatim into marketplace.json. These mirror the constraints in
+  // schemas/official-marketplace.schema.json that a hand-authored catalog.json
+  // can violate — name/owner.name minLength, metadata sub-field types — so the
+  // generator fails with a source-level error instead of emitting a
+  // schema-invalid marketplace under status: 'ok'. Format-level rules
+  // (uri/email) remain the AJV schema gate's job.
+  if ('name' in data && (typeof data.name !== 'string' || data.name.length === 0)) {
+    errors.push('catalog.json: "name" must be a non-empty string');
   }
   if ('description' in data && typeof data.description !== 'string') {
     errors.push('catalog.json: "description" must be a string');
   }
-  if (
-    'owner' in data &&
-    (data.owner === null ||
-      typeof data.owner !== 'object' ||
-      Array.isArray(data.owner) ||
-      typeof data.owner.name !== 'string')
-  ) {
-    errors.push('catalog.json: "owner" must be an object with a string "name"');
+  if ('owner' in data) {
+    const owner = data.owner;
+    if (owner === null || typeof owner !== 'object' || Array.isArray(owner)) {
+      errors.push('catalog.json: "owner" must be an object');
+    } else {
+      if (typeof owner.name !== 'string' || owner.name.length === 0) {
+        errors.push('catalog.json: "owner.name" must be a non-empty string');
+      }
+      if ('url' in owner && typeof owner.url !== 'string') {
+        errors.push('catalog.json: "owner.url" must be a string');
+      }
+      if ('email' in owner && typeof owner.email !== 'string') {
+        errors.push('catalog.json: "owner.email" must be a string');
+      }
+    }
   }
-  if (
-    'metadata' in data &&
-    (data.metadata === null || typeof data.metadata !== 'object' || Array.isArray(data.metadata))
-  ) {
-    errors.push('catalog.json: "metadata" must be an object');
+  if ('metadata' in data) {
+    const metadata = data.metadata;
+    if (metadata === null || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      errors.push('catalog.json: "metadata" must be an object');
+    } else {
+      if ('description' in metadata && typeof metadata.description !== 'string') {
+        errors.push('catalog.json: "metadata.description" must be a string');
+      }
+      if (
+        'version' in metadata &&
+        (typeof metadata.version !== 'string' ||
+          !/^[0-9]+\.[0-9]+\.[0-9]+$/.test(metadata.version))
+      ) {
+        errors.push('catalog.json: "metadata.version" must be a version string (e.g. "1.2.3")');
+      }
+    }
   }
   if (
     'targets' in data &&

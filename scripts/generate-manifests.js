@@ -82,12 +82,21 @@ function validateSource(name, source, errors) {
     // scalar/array/null that could never serialize to a valid entry.
     if (!('source' in mp)) {
       errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.source"`);
-    } else if (
-      typeof mp.source !== 'string' &&
-      (mp.source === null || typeof mp.source !== 'object' || Array.isArray(mp.source))
-    ) {
+    } else if (typeof mp.source === 'string') {
+      if (mp.source.length === 0) {
+        errors.push(`catalog/plugins/${name}.json: "marketplace.source" string path must be non-empty`);
+      }
+    } else if (mp.source !== null && typeof mp.source === 'object' && !Array.isArray(mp.source)) {
+      // Object form must match the schema's oneOf branch exactly:
+      // { source: "url", url: <string> } (official-marketplace.schema.json).
+      if (mp.source.source !== 'url' || typeof mp.source.url !== 'string') {
+        errors.push(
+          `catalog/plugins/${name}.json: object "marketplace.source" must be { source: "url", url: <string> }`
+        );
+      }
+    } else {
       errors.push(
-        `catalog/plugins/${name}.json: "marketplace.source" must be a string path or a { source, url } object`
+        `catalog/plugins/${name}.json: "marketplace.source" must be a string path or a { source: "url", url } object`
       );
     }
     // marketplace.description is optional (falls back to source.description),
