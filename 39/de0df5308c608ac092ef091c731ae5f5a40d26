@@ -1,0 +1,26 @@
+plugins/yellow-ruvector/CLAUDE.md
+  s_7ed434e75cb861::t_7db46eff8926cf 155-162
+plugins/yellow-ruvector/hooks/scripts/session-start.sh
+  s_7ed434e75cb861::t_6388813a518215 38-72
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_7ed434e75cb861::t_fac259963058c3 40-45
+  s_7ed434e75cb861::t_b600bf37302e73 151-159
+plugins/yellow-ruvector/tests/session-start.bats
+  s_7ed434e75cb861::t_2ad1dd07d2a361 249-262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "39de0df5308c608ac092ef091c731ae5f5a40d26",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
