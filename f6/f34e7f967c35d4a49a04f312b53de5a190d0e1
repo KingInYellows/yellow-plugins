@@ -1,0 +1,31 @@
+plugins/yellow-ruvector/scripts/install.sh
+  s_7ed434e75cb861::t_878d3d971fa11f 187,198,203
+plugins/yellow-ruvector/tests/session-start.bats
+  s_7ed434e75cb861::t_094f31bdc1b6af 129
+  s_7ed434e75cb861::t_44c116a1dd601f 29-30
+  s_7ed434e75cb861::t_1debd386ee2440 148-160
+plans/ruvector-error-fix-memory-mvp.md
+  s_7ed434e75cb861::t_9805b41ce041b5 133-144
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_7ed434e75cb861::t_28f958ac4a4f9f 107-111
+  s_7ed434e75cb861::t_ca05790bebc398 11
+  s_7ed434e75cb861::t_7dcc92bfa02274 82-90
+plugins/yellow-ruvector/hooks/scripts/session-start.sh
+  s_7ed434e75cb861::t_bac62c3cd25bc4 33-38,44-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f6f34e7f967c35d4a49a04f312b53de5a190d0e1",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
