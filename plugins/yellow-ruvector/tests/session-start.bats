@@ -158,3 +158,16 @@ exit 0'
   [ -n "$catalog_spec" ]
   [ "ruvector@${install_default}" = "$catalog_spec" ]
 }
+
+@test "version pin in seed-solutions.md command doc matches install.sh" {
+  # The command doc hardcodes concrete npx specs (it ships to installs
+  # that have no catalog/ to reference) — every occurrence must match the
+  # single source default in install.sh.
+  install_default=$(grep -oE '^RUVECTOR_DEFAULT_VERSION="[^"]+"' \
+    "$BATS_TEST_DIRNAME/../scripts/install.sh" | cut -d'"' -f2)
+  [ -n "$install_default" ]
+  doc="$BATS_TEST_DIRNAME/../commands/ruvector/seed-solutions.md"
+  specs=$(grep -oE 'ruvector@[0-9][0-9.]*' "$doc" | sort -u)
+  [ -n "$specs" ]
+  [ "$specs" = "ruvector@${install_default}" ]
+}
