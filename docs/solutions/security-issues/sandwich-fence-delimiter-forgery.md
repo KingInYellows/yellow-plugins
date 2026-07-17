@@ -158,6 +158,34 @@ This is a secondary control only — the primary fix is pre-interpolation scrubb
       untrusted variable interpolation adjacent to fence delimiters (detection
       gap as of 2026-05-04 — not yet automated)
 
+## Update — 2026-07-17: one scrub regex, multiple renderer wordings
+
+A seed-time fence-delimiter scrub
+(`plugins/yellow-ruvector/commands/ruvector/seed-solutions.md`) was
+calibrated against a single renderer's exact wording — `--- begin
+<label> ---`, as emitted by `user-prompt-submit.sh` — using the anchored
+pattern `^--- (begin|end) .* ---$`. The same ruvector store is also
+rendered by `session-start.sh`, which spells the same semantic delimiter
+with a different word order: `--- <label> (begin) ---`. A forged pair
+using that second wording would have matched neither branch of the old
+regex and passed the scrub untouched into storage — reintroducing
+exactly the fence-breakout this scrub exists to prevent, the next time
+that stored entry is recalled and re-rendered by `session-start.sh`.
+
+**Fix:** broadened to `^---.*\b(begin|end)\b.*---$`, matching either
+word order generically instead of enumerating exact renderer strings.
+
+**General rule (an additional coverage axis, alongside "scrub ALL
+untrusted inputs" in the checklist below):** when more than one call
+site independently formats the same semantic marker instead of sharing
+one rendering function, a scrub regex verified against only the call
+site you happened to test will miss a sibling using different wording
+for the same concept. Before finalizing a detection regex for content
+that a shared store will redisplay through multiple renderers, grep
+every renderer that reads from that store for its exact
+delimiter-formatting code — not just the one exercised in your test
+fixture.
+
 ## Related
 
 - `docs/solutions/security-issues/prompt-injection-defense-layering-2026.md` —

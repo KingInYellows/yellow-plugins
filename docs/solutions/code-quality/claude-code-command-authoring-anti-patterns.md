@@ -947,6 +947,55 @@ frontmatter field exactly.
 
 ---
 
+## Update — 2026-07-17
+
+### 22. Scoped Bash Grant: a Literal Colon in the Prefix Collides with the `:*` Wildcard
+
+**WRONG:**
+
+```yaml
+allowed-tools:
+  - Bash(grep -c ERROR-FIX:*)
+```
+
+**RIGHT:**
+
+```yaml
+allowed-tools:
+  - Bash(grep -c *)
+```
+
+**Rule:** `Bash(prefix:*)` grants are meant to allow any invocation
+starting with the literal `prefix`. When the command being scoped needs
+a colon inside its own fixed argument — here, `grep -c 'ERROR-FIX:'
+.ruvector/intelligence.json` searches for the literal string
+`ERROR-FIX:`, which legitimately contains a colon — that colon collides
+with the grant's own `:*` wildcard-boundary convention plus how the real
+invocation gets quoted, and in practice the grant did not reliably
+prefix-match the command it was written to cover. This is easy to write
+and easy to approve in review: the English intent ("only allow counting
+`ERROR-FIX` occurrences") reads correctly, and the mismatch only shows up
+once the tool call actually runs. 7 independent review personas
+converged on this exact case
+(`plugins/yellow-ruvector/commands/ruvector/seed-solutions.md`) before it
+was caught.
+
+Widen the wildcard boundary to before any colon that could appear in a
+literal argument, rather than trying to encode a colon-containing
+literal inside the fixed prefix. The step prose in the same command file
+(mechanical extraction only, doc content never executed) is what keeps
+the broadened grant safely scoped in practice — the grant text alone
+cannot substitute for that.
+
+**Prevention checklist additions:**
+
+- [ ] Any `Bash(prefix:*)` grant's fixed `prefix` segment is checked for
+      literal colons in arguments the real invocation will contain
+      (tags, labels, timestamps) — if present, widen the wildcard
+      boundary rather than encoding the colon into the prefix.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2

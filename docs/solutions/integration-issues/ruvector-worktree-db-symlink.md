@@ -207,6 +207,46 @@ missing, it creates the symlink itself before the MCP server can cache a
 fallback path. The worktree-manager injection above remains the primary
 mechanism; the hook heal covers worktrees created by any other tooling.
 
+### Follow-up (same day): `ln -s` alone doesn't heal a dangling symlink
+
+`test -e` and `ln` disagree about a dangling symlink, and that gap
+silently defeated the heal above for one specific case. `[ -e
+"$RUVECTOR_DIR" ]` (like `-d`, and like `touch`) *dereferences* the
+symlink and reports on the target — a dangling symlink's target is
+missing, so `-e` says "false" (nothing here). But plain `ln -s TARGET
+LINKNAME` (no `-f`) checks the NEAR end: any existing directory entry
+at `LINKNAME`, symlink or not, makes it fail `EEXIST`. So the heal's
+outer guard correctly entered the branch (`-e` said "nothing there"),
+but the `ln -s ... 2>/dev/null || warn` call then failed on the
+dangling link every session — the warning looked identical to any
+other "couldn't link" cause, the symlink itself was never repaired,
+and the process kept resolving the stale global-store fallback the
+heal exists to prevent.
+
+**Fix:** `ln -sfn` — `-f` removes the existing destination entry first
+(clearing the dangling link), `-n` treats a destination that is already
+a symlink as the file to replace rather than a directory to write
+inside. The branch that reaches this call is now also gated to skip a
+pre-existing PLAIN directory entirely (warn-only — it may hold real
+per-worktree data, same preservation rule as `worktree-manager.sh`'s
+`link_ruvector_db`) so the force-replace only ever touches an absent
+path or an existing symlink, never a real directory.
+
+**General rule:** `-e`/`-d` (and `touch`) dereference a symlink and
+report on the far end; `ln` (without `-f`) and `mkdir` check the near
+end — any existing directory entry at that exact path — and fail
+regardless of what it points to. A dangling symlink is "doesn't exist"
+to the former and "already exists" to the latter. When a self-healing
+script needs to tell "truly absent" from "a broken pointer" from "a
+real file already there," add `[ -L "$path" ]` (lstat, never
+dereferences) to the guard — each of the three states needs different
+handling (create, force-relink, warn-and-preserve).
+
+New bats coverage in `plugins/yellow-ruvector/tests/session-start.bats`:
+dangling-symlink heal, plain-directory warn-and-preserve, no-op when the
+main checkout also lacks `.ruvector`, and a stubbed-git fallback for
+git < 2.31 (no `--path-format` support).
+
 ## References
 
 - Brainstorm: `docs/brainstorms/2026-05-05-ruvector-worktree-db-sharing-brainstorm.md`
