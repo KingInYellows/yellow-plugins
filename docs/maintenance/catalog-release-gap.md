@@ -85,9 +85,9 @@ assume a Release cut when it didn't).
 ## Key files
 
 `.github/workflows/version-packages.yml` · `scripts/catalog-version.js` ·
-`scripts/ci/release-tags.sh` · `scripts/generate-release-notes.js` ·
-`docs/CLAUDE.md` · `.changeset/config.json` · root `package.json` ·
-`CONTRIBUTING.md`
+`scripts/validate-catalog-track.js` · `scripts/ci/release-tags.sh` ·
+`scripts/generate-release-notes.js` · `docs/CLAUDE.md` ·
+`.changeset/config.json` · root `package.json` · `CONTRIBUTING.md`
 
 ## Next-session kickoff prompt
 

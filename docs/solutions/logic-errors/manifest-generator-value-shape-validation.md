@@ -156,3 +156,59 @@ minimum bar for claiming a drift-correction code path is covered.
 - See also `docs/maintenance/catalog-release-gap.md` (Q3, resolved in
   this PR) and `docs/research/2026-07-16-codex-plugin-contract-spike.md`
   (sibling research doc from the same PR, not duplicated here).
+
+## Update — 2026-07-16 (second review round, same PR)
+
+A second `/review:pr` pass on the same diff (four personas: correctness,
+adversarial, architecture, silent-failure-hunter — independently converged,
+P1) found a **third occurrence of the exact bug class this doc describes**,
+in the same function the first round had just hardened.
+`validateSource()` (`scripts/generate-manifests.js:49`) checked `author` and
+`targets` for value-shape (this doc's original Problem), but a third
+unconditionally-dereferenced field in the same function —
+`source.marketplace` — was still gated by a bare truthy check
+(`if (source.marketplace) { ... }`). A `null` or primitive
+(`"marketplace": "oops"`) value passed straight through: `null` is falsy so
+the block was silently skipped (no error, no crash — the exact "vanishes
+cleanly" failure mode), and a truthy primitive like a non-empty string
+would have entered the block and crashed on `key in source.marketplace`
+(`TypeError: Cannot use 'in' operator`).
+
+**Why the first pass missed it:** the first round's finding and fix were
+scoped to the two fields review comments had specifically named
+(`author`, `targets`). Nothing in that pass's process asked "does this
+function have any *other* unconditionally-dereferenced fields?" —
+`validateSource()`'s only value-shape-hardened field left unaudited was
+found by a second, independent review round on the same file, not by
+re-reading the function's own field list.
+
+**Fix** (mirrors the existing `targets` guard exactly):
+
+```js
+if ('marketplace' in source && source.marketplace !== null && typeof source.marketplace === 'object') {
+  for (const key of ['category', 'source']) {
+    if (!(key in source.marketplace)) {
+      errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.${key}"`);
+    }
+  }
+} else if ('marketplace' in source) {
+  errors.push(`catalog/plugins/${name}.json: "marketplace" must be an object`);
+}
+```
+
+Plus two regression tests: a `null` marketplace (would have silently
+skipped validation) and a primitive marketplace (would have thrown inside
+`validateSource` itself, before any of its own error-collection logic
+runs).
+
+**Generalized lesson — the one this update adds:** when a review finding
+identifies one value-shape bug in a function, the fix scope must be "audit
+every field this function unconditionally dereferences," not "fix the
+field(s) named in the finding." A guard sweep that stops at the reported
+instances leaves siblings of the same bug in the same function for a
+*later* review round to catch — which is exactly what happened here. The
+practical check: for any function doing presence/shape validation, list
+every key you see referenced past a truthy/presence check
+(`source.X`, `source.X.Y`, `for (const k of [...]) source.X[k]`) and
+confirm each one has an explicit `typeof`/`null` guard before the fix is
+considered complete — not just the ones a reviewer already named.

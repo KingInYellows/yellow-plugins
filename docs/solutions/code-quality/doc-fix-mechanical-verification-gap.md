@@ -225,3 +225,49 @@ branch whenever a later commit touches the same code they describe."
    `docs/solutions/workflow/changeset-release-pipeline-silent-failures.md`
    for the release-pipeline consequences of stale/incorrect changeset
    content reaching `CHANGELOG.md` unreviewed.
+
+---
+
+## Update — 2026-07-16
+
+**New context:** PR #644 (codex-pilot shell 01, "neutral catalog generation
+foundation") shipped a research spike
+(`docs/research/2026-07-16-codex-plugin-contract-spike.md`) in the same
+commit as two solution docs that spike was meant to resolve
+(`docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`
+and `docs/solutions/build-errors/ci-schema-drift-hooks-inline-vs-string.md`).
+Both still read "pending the spike" / "do not resolve this from docs
+alone" **after** the spike landed with its findings — even though the
+spike doc's own header stated `Consumes/updates: [those two docs]`. Two
+reviewer personas (comment-analyzer, project-standards) independently
+caught it in the next review round.
+
+### Finding 4: A Doc's Own "Consumes/Updates" Header Named a Contract the Same Commit Didn't Execute
+
+The spike doc wasn't a passive research note — its frontmatter/header
+explicitly declared which other docs it was responsible for updating once
+its findings landed. That declaration is a checklist, not a citation: the
+commit added the spike's findings but never opened the two consumer docs
+to apply them, so the repo briefly shipped a resolved question still
+labeled unresolved in two other files. Fixed in the same PR's next review
+round (commit `16d830d`) by rewriting both docs' "Unverified"/pending
+sections into resolved-with-pointers, using the spike's actual findings
+(e), (f) rather than re-asserting the old "must not resolve from docs
+alone" caution.
+
+**Distinct root cause:** Findings 1–3 are about a claim being wrong (from
+the start, or gone stale mid-PR). This one is about a **self-declared
+cross-document contract** — a doc explicitly stating "I update these other
+docs" — going unexecuted within the very commit that could have satisfied
+it. The mechanical check isn't "is this claim true" but "does this commit
+do everything the new/changed doc's own header says it does."
+
+**Prevention (in addition to the existing checklist):**
+
+5. **A doc has a "Consumes"/"Updates"/"Resolves" header naming other
+   files** — before closing out the commit, open every named file and
+   confirm the described update actually happened in this commit, not a
+   future one. Landing the spike/source-of-truth doc without touching its
+   declared consumers is the same failure as checklist item 3 above (a
+   citation not re-verified after a change), but triggered by the *new*
+   doc's own promise rather than an existing citation elsewhere.
