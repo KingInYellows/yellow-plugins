@@ -130,11 +130,11 @@ skill. Decisions locked with the user (2026-07-17):
 > scores look semantic, not hash-degenerate).
 <!-- /deepen-plan -->
 
-- [ ] 0.3: Check worktree behavior: confirm whether `.ruvector` should be a
+- [x] 0.3: Check worktree behavior: confirm whether `.ruvector` should be a
       symlink here (worktree-manager.sh) and whether seeding from a
       worktree lands in the shared store. Note findings; do not fix
       yellow-core's worktree-manager.sh in this PR.
-- [ ] 0.4: Fix the `memory.rvdb` doc drift in
+- [x] 0.4: Fix the `memory.rvdb` doc drift in
       `plugins/yellow-ruvector/CLAUDE.md` to match observed reality.
 
 <!-- deepen-plan: codebase -->
@@ -171,12 +171,12 @@ Canary entry left in HOME store (self-describing, inert).
       pinned version so the CLI-hook path (global binary) matches. Keep
       `RUVECTOR_STORAGE_PATH` env (documents intent) but document it as
       inert at 0.2.34.
-- [ ] 0b.2: `session-start.sh` worktree store-heal: before the existing
+- [x] 0b.2: `session-start.sh` worktree store-heal: before the existing
       `.ruvector`-missing early-exit, if inside a git worktree whose main
       checkout has `.ruvector/` and the local dir is absent, create the
       symlink (restores the documented shared-store contract at the hook
       level; yellow-core's worktree-manager.sh untouched). Bats coverage.
-- [ ] 0b.3: Post-fix verification: pinned spec resolves 0.2.34
+- [x] 0b.3: Post-fix verification: pinned spec resolves 0.2.34
       (`npx -y ruvector@0.2.34 --version`); process-level canary — from a
       dir WITH `.ruvector/` present, a fresh 0.2.34 process selects the
       project store (`hooks_stats` intel_path echo); worktree heal links
@@ -185,7 +185,7 @@ Canary entry left in HOME store (self-describing, inert).
 
 ### Phase 1: Seeding
 
-- [ ] 1.1: New command `plugins/yellow-ruvector/commands/ruvector/seed-solutions.md`
+- [x] 1.1: New command `plugins/yellow-ruvector/commands/ruvector/seed-solutions.md`
       — seeds recall memory from a repo's `docs/solutions/` (generic: the
       compound workflow creates that directory in any repo). Rationale for
       a command over a documented procedure: idempotent re-seeding is an
@@ -203,7 +203,7 @@ Canary entry left in HOME store (self-describing, inert).
 > ambiguous.
 <!-- /deepen-plan -->
 
-- [ ] 1.2: Eligibility filter: `track: bug` docs only (43 of 105), exclude
+- [x] 1.2: Eligibility filter: `track: bug` docs only (43 of 105), exclude
       `docs/solutions/archived/`. Report explicit counts:
       eligible / seeded / flagged-for-manual-review.
 
@@ -214,7 +214,7 @@ Canary entry left in HOME store (self-describing, inert).
 > at run time, and treat the numbers here as a snapshot for scoping only.
 <!-- /deepen-plan -->
 
-- [ ] 1.3: Extraction: content = `ERROR-FIX: <error signature> | FIX:
+- [x] 1.3: Extraction: content = `ERROR-FIX: <error signature> | FIX:
       <fix text> | SOURCE: <doc path> — <one-line problem summary>`.
       Fix-text fallback chain: `## Fix` → `## Solution` → flag for manual
       review (46% of corpus lacks both — flagged docs are skipped and
@@ -230,7 +230,7 @@ Canary entry left in HOME store (self-describing, inert).
 > documents multiple distinct error signatures, emit multiple entries.
 <!-- /deepen-plan -->
 
-- [ ] 1.4: Idempotency: before each `hooks_remember`, dedup-check via
+- [x] 1.4: Idempotency: before each `hooks_remember`, dedup-check via
       `hooks_recall(top_k=1)`, skip if score > 0.82 (existing protocol
       constant). Require no concurrent active sessions before seeding
       (cross-process write safety is undocumented — known limitation).
