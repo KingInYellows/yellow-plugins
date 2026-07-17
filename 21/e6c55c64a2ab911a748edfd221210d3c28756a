@@ -1,0 +1,22 @@
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_7ed434e75cb861::t_a7ebd73e4db26e 14-15
+  s_7ed434e75cb861::t_2a8c0c277d8a73 50-65
+docs/solutions/integration-issues/ruvector-worktree-db-symlink.md
+  s_7ed434e75cb861::t_7bbb47651e9ad5 122-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "21e6c55c64a2ab911a748edfd221210d3c28756a",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
