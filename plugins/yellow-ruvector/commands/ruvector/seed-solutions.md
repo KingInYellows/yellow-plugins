@@ -248,8 +248,13 @@ See `ruvector-conventions` skill for the error catalog.
   continues. Re-running (fresh session) after the cause is fixed
   converges (dedup).
 - **Legacy-store unlock (mid-run):** `ERR_LEGACY_STORE_READONLY` aborts
-  the loop after Step 6's unlock; already-seeded entries are safe but
-  the run is incomplete — `STATUS: NEEDS_FRESH_SESSION` is printed and
-  a fresh-session re-run resumes from the first unstored entry
-  automatically. Distinct from "Non-project store" (full stop, no
-  unlock) and "Storage failure mid-run" (per-entry, continues).
+  the loop immediately; Step 6's unlock runs right after. Already-seeded
+  entries are safe but the run is incomplete — `STATUS:
+  NEEDS_FRESH_SESSION` is printed and a fresh-session re-run resumes
+  from the first unstored entry automatically. Distinct from
+  "Non-project store" (full stop, no unlock) and "Storage failure
+  mid-run" (per-entry, continues).
+- **Durability shortfall (post-run):** Step 8's re-count below the
+  expected total prints `STATUS: CLOBBERED` — a stale writer restored an
+  old snapshot; quiesce all ruvector processes and re-run in a fresh
+  session.

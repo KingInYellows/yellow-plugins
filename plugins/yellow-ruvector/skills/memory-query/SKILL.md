@@ -108,7 +108,9 @@ ERROR-FIX: <error signature> | FIX: <fix text> | SOURCE: <doc path> — <one-lin
   (archived docs excluded), idempotent via the standard dedup constant
   above. Seeding is manual — new solution docs are invisible until the
   next run. The seeder MUST verify `hooks_stats` reports an `intel_path`
-  inside the project root before writing (global-store pollution guard),
+  inside the project root — or, for a healed worktree whose `.ruvector`
+  is a symlink, inside the `readlink`-resolved target (never `~/.ruvector`;
+  deny wins) — before writing (global-store pollution guard),
   and MUST finish with `ruvector hooks reembed` — mixed embedding
   provenance (hash-embedded entries vs ONNX semantic queries) degrades
   recall scores to near zero until re-embedded (ADR-210 stamping).
