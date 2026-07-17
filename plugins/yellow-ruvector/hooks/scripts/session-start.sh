@@ -24,6 +24,24 @@ CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // ""' 2>/dev/null) || CWD=""
 PROJECT_DIR="${CWD:-${CLAUDE_PROJECT_DIR:-${PWD}}}"
 RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 
+# Worktree store-heal: a git-worktree session can start before .ruvector
+# exists locally even when the main checkout has one (worktree-manager's
+# symlink injection can be bypassed). The MCP server caches its store path
+# at first use, so a missing dir at server start silently selects the
+# machine-global ~/.ruvector for the whole session. Restore the documented
+# shared-store contract by linking to the main checkout's store. No-op for
+# non-worktree checkouts and for projects that never initialized ruvector.
+if [ ! -e "$RUVECTOR_DIR" ]; then
+  git_common_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || git_common_dir=""
+  git_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-dir 2>/dev/null) || git_dir=""
+  if [ -n "$git_common_dir" ] && [ -n "$git_dir" ] && [ "$git_common_dir" != "$git_dir" ]; then
+    main_root=$(dirname "$git_common_dir")
+    if [ -d "${main_root}/.ruvector" ] && [ "$main_root" != "$PROJECT_DIR" ]; then
+      ln -s "${main_root}/.ruvector" "$RUVECTOR_DIR" 2>/dev/null || true
+    fi
+  fi
+fi
+
 # Exit silently if ruvector is not initialized in this project
 if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit

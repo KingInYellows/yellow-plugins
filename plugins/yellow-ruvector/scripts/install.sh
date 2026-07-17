@@ -29,7 +29,13 @@ success() {
 }
 # <<< generated: install-helpers <<<
 
-RUVECTOR_DEFAULT_VERSION="latest"
+# Pinned: MCP server (plugin.json npx spec) and CLI-hook path (this global
+# install) must run the same version. 0.2.34 is the verified baseline —
+# earlier globals (e.g. 0.2.25) have a getIntelPath() that silently selects
+# the machine-global ~/.ruvector store when the project dir lacks .ruvector/
+# at process start. Bump BOTH here and in catalog/plugins/yellow-ruvector.json
+# (mcpServers args) together, re-verifying tool contracts per plan.
+RUVECTOR_DEFAULT_VERSION="0.2.34"
 RUVECTOR_VERSION=""
 REQUIRED_NODE_VERSION="22.22.0"
 

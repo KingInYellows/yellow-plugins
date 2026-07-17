@@ -114,3 +114,33 @@ exit 0'
   echo "$output" | jq -e '.continue == true' > /dev/null
   [ "$elapsed_s" -le 3 ]
 }
+
+@test "worktree store-heal links .ruvector from the main checkout" {
+  # A git worktree whose .ruvector is missing must get a symlink to the main
+  # checkout's store BEFORE the .ruvector-missing early-exit, so the lazily
+  # started MCP server never caches the machine-global ~/.ruvector fallback.
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-test
+  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  make_ruvector_stub 'exit 0'
+  run bash -c "printf '%s' '{\"cwd\":\"\"}' | PATH=\"$MOCK_BIN:\$PATH\" CLAUDE_PROJECT_DIR=\"$PROJECT_ROOT/wt\" bash \"$HOOK_SCRIPT\""
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ -L "$PROJECT_ROOT/wt/.ruvector" ]
+  [ "$(readlink "$PROJECT_ROOT/wt/.ruvector")" = "$PROJECT_ROOT/.ruvector" ]
+}
+
+@test "store-heal is a no-op for a non-worktree checkout without .ruvector" {
+  # Opt-in semantics preserved: a plain checkout that never initialized
+  # ruvector must NOT gain a .ruvector dir or symlink from the hook.
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  rm -rf "$RUVECTOR_DIR"
+  git -C "$PROJECT_ROOT" init -q
+  make_ruvector_stub 'exit 0'
+  run run_hook '{"cwd":""}'
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ ! -e "$RUVECTOR_DIR" ]
+}
