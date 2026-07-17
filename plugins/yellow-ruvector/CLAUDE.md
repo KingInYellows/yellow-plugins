@@ -6,7 +6,9 @@ ruvector.
 ## MCP Server
 
 - **ruvector** — Stdio transport via `npx ruvector mcp start`
-- Storage: `.ruvector/intelligence/memory.rvdb` (rvlite format) in project root
+- Storage: `.ruvector/intelligence.json` (flat JSON) in project root —
+  earlier docs claimed `intelligence/memory.rvdb` (rvlite); verified wrong
+  against 0.2.34 source and on-disk reality (2026-07-17)
 - Embedding model: all-MiniLM-L6-v2 (384 dimensions, ONNX WASM runtime)
 - Lifecycle: starts on first MCP tool call (lazy init by Claude Code), shuts
   down on session end

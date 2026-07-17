@@ -112,8 +112,10 @@ Two simultaneous Claude Code sessions (one in main, one in a worktree, or
 two worktrees) both spawn an MCP server process pointing at the same DB.
 Two write paths exist:
 
-1. Direct MCP writes to `intelligence/memory.rvdb` from per-session
-   `hooks_remember` calls.
+1. Direct MCP writes to `intelligence.json` from per-session
+   `hooks_remember` calls. (Path corrected 2026-07-17: storage is the flat
+   `.ruvector/intelligence.json`, not `intelligence/memory.rvdb` — the
+   rvdb path never existed on disk in any observed version.)
 2. `pending-updates.jsonl` read-then-truncate from the memory-manager
    agent — interleaving sessions can silently drop entries.
 
@@ -171,6 +173,32 @@ the rollout window. They resolve correctly to the main DB (still useful)
 and are removed naturally when `git worktree remove` deletes the worktree
 directory (POSIX `unlink` on the symlink entry). No data migration
 required.
+
+## Addendum (2026-07-17): the failure mode is worse than "silent no-op", and a second heal layer now exists
+
+Observed live in worktree `.claude/worktrees/ruvector` (created by Claude
+Code's native worktree tooling, NOT `worktree-manager.sh` — so the
+injection above never fired): `.ruvector` was absent at session start, and
+the session's MCP server did **not** merely no-op. Two compounding facts:
+
+1. The unpinned `npx ruvector mcp start` resolved a stale **global 0.2.25**
+   binary, whose `getIntelPath()` — lacking 0.2.34's `.claude`-dir check —
+   fell back to the **machine-global `~/.ruvector/intelligence.json`** when
+   the project dir had no `.ruvector/` at first use, and cached that choice
+   for the process lifetime.
+2. Every `hooks_remember`/`hooks_recall` MCP call in such a session
+   silently read/wrote the cross-project global store — worse than the
+   documented no-op, because writes LOOK successful and pollute a store
+   shared by every project on the machine.
+
+Fixes shipped with the I1 error-fix-memory PR: the npx spec is pinned
+(`npx -y ruvector@0.2.34 mcp start`, via `catalog/plugins/yellow-ruvector.json`
+→ generated `plugin.json`), `install.sh` defaults to the same version, and
+`session-start.sh` now performs a **store-heal** — if the session runs in a
+git worktree whose main checkout has `.ruvector/` and the local entry is
+missing, it creates the symlink itself before the MCP server can cache a
+fallback path. The worktree-manager injection above remains the primary
+mechanism; the hook heal covers worktrees created by any other tooling.
 
 ## References
 
