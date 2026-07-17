@@ -11,7 +11,7 @@ enterprise deployment.
 | yellow-linear   | linear     | `https://mcp.linear.app/mcp`            | HTTP      | OAuth (browser popup)       | Issue data, team info         |
 | yellow-devin    | deepwiki   | `https://mcp.deepwiki.com/mcp`          | HTTP      | None                        | Repo names, search queries    |
 | yellow-devin    | devin      | `https://mcp.devin.ai/mcp`              | HTTP      | TBD (may require API token) | Code, task prompts            |
-| yellow-ruvector | ruvector   | Local stdio (`npx ruvector mcp start`)  | stdio     | None (local)                | Code embeddings (local only)  |
+| yellow-ruvector | ruvector   | Local stdio (`npx -y ruvector@0.2.34 mcp start`) | stdio | None (local)          | Code embeddings (local only)  |
 
 ### Plugins Without MCP Servers
 
@@ -114,7 +114,7 @@ yellow-ruvector has the most hooks. Its shell scripts:
 
 | Hook                | Event             | Script                  | Time Budget | What It Does                      |
 | ------------------- | ----------------- | ----------------------- | ----------- | --------------------------------- |
-| session-start       | SessionStart      | `session-start.sh`      | 3s          | Flush stale queue, load learnings |
+| session-start       | SessionStart      | `session-start.sh`      | 3s          | Worktree store-heal, flush stale queue, load learnings |
 | user-prompt-submit  | UserPromptSubmit  | `user-prompt-submit.sh` | 50ms        | Recall relevant memories          |
 | post-tool-use       | PostToolUse       | `post-tool-use.sh`      | 50ms        | Append file changes to queue      |
 | stop                | Stop              | `stop.sh`               | N/A         | Delegate queue flush to agent     |
@@ -123,6 +123,13 @@ yellow-ruvector has the most hooks. Its shell scripts:
 
 - All scripts validate input via shared `lib/validate.sh`
 - Path traversal rejected (`..`, `/`, `~` in arguments)
+- `session-start.sh`'s worktree store-heal creates a symlink
+  `<worktree>/.ruvector -> <main-checkout>/.ruvector` only when the
+  session runs in a linked git worktree (`.git` is a file), the local
+  entry is absent or a dangling symlink, and the main checkout has a
+  store. The link target derives from `git rev-parse --git-common-dir`
+  (never user input); a pre-existing plain directory is never replaced
+  (warn-only)
 - Queue files are append-only JSONL with `flock` for concurrency safety
 - No network calls in any hook script
 - Scripts run with user's permissions (no escalation)
@@ -161,7 +168,7 @@ Plugins that execute shell commands:
 | yellow-linear       | `git`, `gh`                          | Branch detection, PR context         |
 | yellow-devin        | `curl`, `jq`, `git`, `gh`            | Devin API calls, JSON construction   |
 | yellow-review       | `gt`, `gh`, `git`, `jq`              | PR management, GraphQL queries       |
-| yellow-ruvector     | `npx`, `npm`, `jq`, `git`            | ruvector CLI, hook scripts           |
+| yellow-ruvector     | `npx`, `npm`, `jq`, `git`, `pgrep`, `grep` | ruvector CLI, hook scripts, seed-solutions guards |
 | yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh` | Browser automation, setup            |
 | yellow-debt         | `git`, `gt`, `jq`, `yq`              | Codebase analysis, commit generation |
 | gt-workflow         | `gt`, `git`                          | Branch and PR management             |
@@ -182,15 +189,17 @@ include prompt injection defenses:
 
 ### yellow-ruvector
 
-Installs `ruvector` globally via npm:
+Installs `ruvector` globally via npm, version-pinned (an unpinned global
+was the root cause of a machine-global store-pollution incident):
 
 ```bash
-npm install -g ruvector
+npm install -g ruvector@0.2.34 --ignore-scripts
 ```
 
 **Mitigation:** Review package before installation. The `install.sh` script
-performs dependency checks and error handling but does not use
-`--ignore-scripts`.
+performs dependency checks and error handling and installs with
+`--ignore-scripts`; the pinned default (`RUVECTOR_DEFAULT_VERSION`) must
+match the catalog npx spec — bats tests enforce the sync.
 
 ### yellow-browser-test
 

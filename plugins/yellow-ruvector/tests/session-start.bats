@@ -16,7 +16,9 @@ setup() {
 }
 
 teardown() {
-  rm -rf "$PROJECT_ROOT" "$MOCK_BIN"
+  # Retry once: external tooling (checkpoint watchers) can race rm -rf by
+  # writing into fresh .git dirs; a raced cleanup must not fail the test.
+  rm -rf "$PROJECT_ROOT" "$MOCK_BIN" 2>/dev/null || { sleep 0.3; rm -rf "$PROJECT_ROOT" "$MOCK_BIN" 2>/dev/null || true; }
 }
 
 make_ruvector_stub() {
@@ -170,4 +172,83 @@ exit 0'
   specs=$(grep -oE 'ruvector@[0-9][0-9.]*' "$doc" | sort -u)
   [ -n "$specs" ]
   [ "$specs" = "ruvector@${install_default}" ]
+}
+
+@test "store-heal replaces a dangling .ruvector symlink (ln -sfn)" {
+  # ln -s alone EEXISTs on a dead link, silently leaving the global-store
+  # fallback in place — the exact failure mode the heal exists to close.
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-dangling
+  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  ln -s "$PROJECT_ROOT/does-not-exist" "$PROJECT_ROOT/wt/.ruvector"
+  make_ruvector_stub 'exit 0'
+  run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ "$(readlink "$PROJECT_ROOT/wt/.ruvector")" = "$PROJECT_ROOT/.ruvector" ]
+}
+
+@test "store-heal warns but never replaces a plain-directory .ruvector in a worktree" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-plaindir
+  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  mkdir -p "$PROJECT_ROOT/wt/.ruvector"
+  echo '{"marker":true}' > "$PROJECT_ROOT/wt/.ruvector/intelligence.json"
+  make_ruvector_stub 'exit 0'
+  run --separate-stderr run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ -d "$PROJECT_ROOT/wt/.ruvector" ]
+  [ ! -L "$PROJECT_ROOT/wt/.ruvector" ]
+  grep -q 'marker' "$PROJECT_ROOT/wt/.ruvector/intelligence.json"
+  echo "$stderr" | grep -q 'diverged from the shared store'
+}
+
+@test "store-heal is a no-op when the main checkout also lacks .ruvector" {
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  rm -rf "$RUVECTOR_DIR"
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-nostore
+  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  make_ruvector_stub 'exit 0'
+  run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ ! -e "$PROJECT_ROOT/wt/.ruvector" ]
+}
+
+@test "store-heal skips silently when git lacks --path-format (git < 2.31 fallback)" {
+  # The heal comment documents graceful skip on old git; prove it with a
+  # stub git that rejects --path-format the way git < 2.31 does.
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-oldgit
+  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  printf '#!/bin/sh\nfor a in "$@"; do case "$a" in --path-format=*) echo "error: unknown option" >&2; exit 129;; esac; done\nexec /usr/bin/git "$@"\n' > "$MOCK_BIN/git"
+  chmod +x "$MOCK_BIN/git"
+  make_ruvector_stub 'exit 0'
+  run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ ! -e "$PROJECT_ROOT/wt/.ruvector" ]
+}
+
+@test "error-fix retrieval floor is synchronized between memory-query and debugging skill" {
+  # The 0.40 floor is duplicated by inline-replication (cross-plugin skills:
+  # does not resolve). RULE 16 does not cover this constant yet; this test
+  # is the drift guard until it does.
+  canon=$(grep 'ruvector-error-fix-constants' \
+    "$BATS_TEST_DIRNAME/../skills/memory-query/SKILL.md" \
+    | grep -oE 'discard score < [0-9.]+')
+  replica=$(grep -oE 'discard score < [0-9.]+' \
+    "$BATS_TEST_DIRNAME/../../yellow-core/skills/debugging/SKILL.md" | sort -u)
+  [ -n "$canon" ]
+  [ -n "$replica" ]
+  [ "$canon" = "$replica" ]
 }

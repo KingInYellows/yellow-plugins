@@ -128,10 +128,14 @@ ERROR-FIX: <error signature> | FIX: <fix text> | SOURCE: <doc path> — <one-lin
   embedder or entry format changes; update this line and every inline
   consumer in the same commit.
 - Consumers: the yellow-core `debugging` skill step 1.4 (inline replica of
-  this pattern); `/review:resolve` Step 3b surfaces ERROR-FIX entries via
-  its existing generic query (piggyback — no dedicated step). When an
-  entry's `SOURCE:` doc is available locally, read it before acting on
-  the one-line fix.
+  this pattern, 0.40 floor — the fullest-coverage consumer);
+  `/review:resolve` Step 3b surfaces ERROR-FIX entries via its existing
+  generic query (piggyback — no dedicated step; note its unchanged 0.5
+  floor will drop some correct low-scoring matches, ~2/10 in the
+  calibration set, so the piggyback is lossy by design). When an entry's
+  `SOURCE:` doc is available locally, read it before acting on the
+  one-line fix — after checking the path resolves inside the project
+  (relative, no `..`, no leading `/` or `~`).
 
 ### XML Injection Format
 
