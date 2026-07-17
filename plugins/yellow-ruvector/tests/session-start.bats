@@ -32,6 +32,15 @@ run_hook() {
   printf '%s' "$1" | PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="${2:-$PROJECT_ROOT}" bash "$HOOK_SCRIPT"
 }
 
+make_worktree() {
+  # $1 = branch name. Shared setup for the heal tests: init a repo in
+  # PROJECT_ROOT, add a linked worktree at wt/, strip its .ruvector.
+  git -C "$PROJECT_ROOT" init -q
+  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b "$1"
+  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+}
+
 # Mirrors session-start.sh's own TIMEOUT_CMD resolution + GNU-compatibility
 # probe: try each of timeout/gtimeout and accept the first that supports
 # --kill-after=0.1 0.1 true. BusyBox/Alpine's timeout applet has no
@@ -123,10 +132,7 @@ exit 0'
   # checkout's store BEFORE the .ruvector-missing early-exit, so the lazily
   # started MCP server never caches the machine-global ~/.ruvector fallback.
   command -v git >/dev/null 2>&1 || skip "git not available"
-  git -C "$PROJECT_ROOT" init -q
-  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
-  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-test
-  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  make_worktree heal-test
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
@@ -178,10 +184,7 @@ exit 0'
   # ln -s alone EEXISTs on a dead link, silently leaving the global-store
   # fallback in place — the exact failure mode the heal exists to close.
   command -v git >/dev/null 2>&1 || skip "git not available"
-  git -C "$PROJECT_ROOT" init -q
-  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
-  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-dangling
-  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  make_worktree heal-dangling
   ln -s "$PROJECT_ROOT/does-not-exist" "$PROJECT_ROOT/wt/.ruvector"
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
@@ -192,10 +195,7 @@ exit 0'
 
 @test "store-heal warns but never replaces a plain-directory .ruvector in a worktree" {
   command -v git >/dev/null 2>&1 || skip "git not available"
-  git -C "$PROJECT_ROOT" init -q
-  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
-  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-plaindir
-  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  make_worktree heal-plaindir
   mkdir -p "$PROJECT_ROOT/wt/.ruvector"
   echo '{"marker":true}' > "$PROJECT_ROOT/wt/.ruvector/intelligence.json"
   make_ruvector_stub 'exit 0'
@@ -211,10 +211,7 @@ exit 0'
 @test "store-heal is a no-op when the main checkout also lacks .ruvector" {
   command -v git >/dev/null 2>&1 || skip "git not available"
   rm -rf "$RUVECTOR_DIR"
-  git -C "$PROJECT_ROOT" init -q
-  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
-  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-nostore
-  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  make_worktree heal-nostore
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
@@ -226,10 +223,7 @@ exit 0'
   # The heal comment documents graceful skip on old git; prove it with a
   # stub git that rejects --path-format the way git < 2.31 does.
   command -v git >/dev/null 2>&1 || skip "git not available"
-  git -C "$PROJECT_ROOT" init -q
-  git -C "$PROJECT_ROOT" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
-  git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-oldgit
-  rm -rf "$PROJECT_ROOT/wt/.ruvector"
+  make_worktree heal-oldgit
   printf '#!/bin/sh\nfor a in "$@"; do case "$a" in --path-format=*) echo "error: unknown option" >&2; exit 129;; esac; done\nexec /usr/bin/git "$@"\n' > "$MOCK_BIN/git"
   chmod +x "$MOCK_BIN/git"
   make_ruvector_stub 'exit 0'
