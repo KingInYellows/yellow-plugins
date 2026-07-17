@@ -1,0 +1,49 @@
+plans/ruvector-error-fix-memory-mvp.md
+  s_7ed434e75cb861::t_e6025a6efa1802 152-167,169-185
+  s_7ed434e75cb861::t_9b625ca0f0d9e0 99
+  s_7ed434e75cb861::t_05f318c753a7d0 168
+  s_7ed434e75cb861::t_d849f22900c5cf 136
+  s_7ed434e75cb861::t_29370a2d1aa5ee 107
+  s_7ed434e75cb861::t_fdaf1efbd9b9ff 96-98
+  s_7ed434e75cb861::t_19d19c7cdb1fe2 100-102,104-106
+  s_7ed434e75cb861::t_d8196faaa9e857 108-110,133-135
+  s_7ed434e75cb861::t_d052400cae7475 137-139,149-151
+  s_7ed434e75cb861::t_7b5430cb53a004 186-188
+  s_76944981fdcfae::t_9422a8b60e59ae 1-95,103,111-132,140-148,189-384
+docs/brainstorms/2026-07-17-which-untapped-ruvector-mcp-tool-familie-brainstorm.md
+  s_bd17cf98dff78e::t_9ff4c05e0d57d4 1-279
+docs/research/ruvector-latest-featureset-and-plugin-ideation.md
+  s_7ed434e75cb861::t_23b0a2f34b71d0 1-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "735f716d361ca0595f8dca98cae2072642e74095",
+  "prompts": {},
+  "sessions": {
+    "s_76944981fdcfae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1ea2e22-178b-47c9-ac16-a3fc091bd7f0",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_bd17cf98dff78e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a2251807a00a3514b",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
