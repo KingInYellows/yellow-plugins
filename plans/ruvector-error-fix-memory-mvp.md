@@ -237,7 +237,7 @@ Canary entry left in HOME store (self-describing, inert).
 
 ### Phase 2: Debugging-skill wiring
 
-- [ ] 2.1: Add step **1.4 "Query institutional memory (optional)"** to
+- [x] 2.1: Add step **1.4 "Query institutional memory (optional)"** to
       `plugins/yellow-core/skills/debugging/SKILL.md` — after 1.3 (trace),
       before 2.2 (hypotheses). Inline-replicate the FULL guard pattern
       (fast-path `test -d .ruvector` → ToolSearch → `hooks_capabilities`
@@ -257,24 +257,24 @@ Canary entry left in HOME store (self-describing, inert).
 > constant the error-fix protocol block defines, not automatically 0.5.
 <!-- /deepen-plan -->
 
-- [ ] 2.2: Query construction rule for the debugging context: query = the
+- [x] 2.2: Query construction rule for the debugging context: query = the
       parsed error message/signature from Phase 0 Triage (not raw
       `$ARGUMENTS`, which may be a full stack trace), capped at 300 chars.
-- [ ] 2.3: **Causal-chain guard sentence:** recalled fixes are input to
+- [x] 2.3: **Causal-chain guard sentence:** recalled fixes are input to
       hypothesis-forming (2.2), never a bypass of the causal-chain gate
       (2.3). A past fix does not exempt the skill from explaining the
       causal chain (Core Principle #1).
 
 ### Phase 3: Canonical documentation
 
-- [ ] 3.1: New section `## Error→Fix Seeding Pattern` in
+- [x] 3.1: New section `## Error→Fix Seeding Pattern` in
       `plugins/yellow-ruvector/skills/memory-query/SKILL.md`: the content
       convention, eligibility rules, dedup constants, and a new
       query-construction table row for the debugging context. Must NOT
       touch the existing RULE 16 sentinel line or its 4-file list; the 3
       yellow-core replicas mirror the recall/remember protocol only and
       are not updated.
-- [ ] 3.2: Update `plugins/yellow-ruvector/CLAUDE.md` + `README.md`
+- [x] 3.2: Update `plugins/yellow-ruvector/CLAUDE.md` + `README.md`
       (new command, ERROR-FIX convention, re-seed limitation).
 
 ### Phase 4: Quality

@@ -5,7 +5,12 @@ ruvector.
 
 ## MCP Server
 
-- **ruvector** — Stdio transport via `npx ruvector mcp start`
+- **ruvector** — Stdio transport via `npx -y ruvector@0.2.34 mcp start`
+  (version-pinned: unpinned npx resolves whatever global is installed —
+  a stale 0.2.25 global silently selected the machine-global `~/.ruvector`
+  store from worktree sessions. Bump the pin in
+  `catalog/plugins/yellow-ruvector.json` + `scripts/install.sh` together
+  and re-verify tool contracts)
 - Storage: `.ruvector/intelligence.json` (flat JSON) in project root —
   earlier docs claimed `intelligence/memory.rvdb` (rvlite); verified wrong
   against 0.2.34 source and on-disk reality (2026-07-17)
@@ -35,7 +40,7 @@ ruvector.
 
 ## Plugin Components
 
-### Commands (6)
+### Commands (7)
 
 - `/ruvector:setup` — Install ruvector and initialize `.ruvector/` directory
 - `/ruvector:index` — Index codebase for semantic search
@@ -43,6 +48,11 @@ ruvector.
 - `/ruvector:status` — Show ruvector health, DB stats, and queue status
 - `/ruvector:learn` — Record a learning, mistake, or pattern for future sessions
 - `/ruvector:memory` — Browse and search stored memories and learnings
+- `/ruvector:seed-solutions` — Batch-seed `ERROR-FIX:` entries from a
+  repo's `track: bug` solution docs into recall memory (idempotent;
+  gated on `intel_path` resolving inside the project root). Re-run
+  manually after new solution docs land — seeded entries do not track
+  the corpus automatically
 
 ### Agents (2)
 
@@ -135,7 +145,9 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
 - No offline MCP fallback — if ruvector MCP is down, search and memory
   operations fail gracefully
 - `.ruvector/` is shared across git worktrees via a symlink injected by
-  yellow-core's `worktree-manager.sh` at worktree creation time. Concurrent
+  yellow-core's `worktree-manager.sh` at worktree creation time; for
+  worktrees created by other tooling, `session-start.sh` heals the
+  missing link before the MCP server can cache a fallback store path. Concurrent
   worktree sessions writing to the same DB may race; the ruvector CLI's
   internal session queue provides partial serialization within a single
   process, but cross-process write safety is not documented. Avoid running

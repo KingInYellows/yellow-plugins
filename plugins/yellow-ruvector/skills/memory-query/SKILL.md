@@ -70,6 +70,7 @@ skip the memory query and continue. Do not surface to user.
 |---|---|---|
 | PR review | First 300 chars of PR body; fallback: title + file categories + top 3 file basenames | 300 |
 | Plan/work | Text under `## Overview` heading; fallback: first 500 chars of plan body | 500 |
+| Debugging | Parsed error message or error signature from triage — never raw `$ARGUMENTS` or full stack traces | 300 |
 
 Never use raw diffs as query strings — semantic quality degrades with noisy tokens.
 
@@ -87,6 +88,43 @@ When storing new entries via hooks_remember, first check for near-duplicates:
 - Call hooks_recall with query=content, top_k=1
 - If score > 0.82: skip storage ("near-duplicate")
 - If hooks_recall errors: skip to failure handler with "dedup-check-failed"
+
+### Error→Fix Entries (Seeding + Retrieval)
+
+Institutional error→fix knowledge is stored in the SAME recall store under
+a content convention, not a separate namespace (the MCP schema has no
+namespace parameter — do not invent one):
+
+```
+ERROR-FIX: <error signature> | FIX: <fix text> | SOURCE: <doc path> — <one-line problem summary>
+```
+
+- The literal error signature comes FIRST — bi-encoder embeddings pool
+  over tokens, so front-loading the signature maximizes match quality for
+  short error queries. One entry per distinct error signature; a doc
+  documenting several errors yields several entries. `type` is always
+  `context`.
+- Seeded by `/ruvector:seed-solutions` from `track: bug` solution docs
+  (archived docs excluded), idempotent via the standard dedup constant
+  above. Seeding is manual — new solution docs are invisible until the
+  next run. The seeder MUST verify `hooks_stats` reports an `intel_path`
+  inside the project root before writing (global-store pollution guard).
+- **Retrieval floor for error queries:**
+
+  <!-- prettier-ignore -->
+  ruvector-error-fix-constants v1 (provisional): recall top_k=5, discard score < 0.35, keep top 3, truncate 800 chars at word boundary.
+
+  The floor is LOWER than the generic 0.5 recall floor because short error
+  queries against longer stored entries are asymmetric-length matching,
+  where all-MiniLM-L6-v2 cosine scores compress toward the middle
+  (sbert.net symmetric-model guidance). Marked provisional until the
+  seeded-corpus calibration pass replaces it with an empirically observed
+  value; update this line and every inline consumer in the same commit.
+- Consumers: the yellow-core `debugging` skill step 1.4 (inline replica of
+  this pattern); `/review:resolve` Step 3b surfaces ERROR-FIX entries via
+  its existing generic query (piggyback — no dedicated step). When an
+  entry's `SOURCE:` doc is available locally, read it before acting on
+  the one-line fix.
 
 ### XML Injection Format
 
