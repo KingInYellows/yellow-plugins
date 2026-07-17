@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Optional Composio accelerator for batch workflows with usage tracking",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-composio",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "composio",
+    "batch-processing",
+    "workbench",
+    "usage-tracking",
+    "mcp"
+  ],
+  "userConfig": {
+    "composio_mcp_url": {
+      "type": "string",
+      "title": "Composio MCP URL",
+      "description": "Per-customer Composio MCP endpoint. Generate via the Composio dashboard or `npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID`. Looks like https://mcp.composio.dev/<id> or https://connect.composio.dev/mcp. MUST start with `https://` — the start-composio.sh wrapper rejects non-HTTPS URLs to prevent cleartext key leak. Alternatively set the `COMPOSIO_MCP_URL` shell env var for multi-host fleets (the wrapper honors it as a fallback when this userConfig is empty). If you have neither yet, disable yellow-composio via /plugin until you do — the wrapper exits non-zero on empty values, which keeps `claude doctor` from cascade-failing other MCPs.",
+      "sensitive": false
+    },
+    "composio_api_key": {
+      "type": "string",
+      "title": "Composio API key",
+      "description": "Composio API key from https://app.composio.dev/settings. Sent as the X-API-Key header on every MCP request. Stored in the system keychain. Alternatively set `COMPOSIO_API_KEY` in shell env — the start-composio.sh wrapper honors it as a fallback when this userConfig is empty. Invalid keys produce a 401 at runtime from Composio.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "composio-server": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-composio.sh",
+      "env": {
+        "COMPOSIO_MCP_URL_USERCONFIG": "${user_config.composio_mcp_url}",
+        "COMPOSIO_MCP_URL": "${COMPOSIO_MCP_URL:-}",
+        "COMPOSIO_API_KEY_USERCONFIG": "${user_config.composio_api_key}",
+        "COMPOSIO_API_KEY": "${COMPOSIO_API_KEY:-}"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/check-mcp-url.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "marketplace": {
+    "category": "productivity",
+    "source": "./plugins/yellow-composio"
+  },
+  "targets": {
+    "claude": true,
+    "codex": false
+  }
+}

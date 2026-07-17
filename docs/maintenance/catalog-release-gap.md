@@ -1,6 +1,6 @@
 # Catalog / Release track gap — follow-up note
 
-**Status:** mostly resolved 2026-06-10 (see Outcome) · **Logged:** 2026-06-03 · **Trigger:** PR #566 → Version PR #567
+**Status:** resolved 2026-07-16 (see Outcome) · **Logged:** 2026-06-03 · **Trigger:** PR #566 → Version PR #567
 
 ## Outcome (2026-06-10)
 
@@ -19,10 +19,14 @@ release:
   recovered via `workflow_dispatch` + `force_publish=true`, validating the
   documented recovery path.)
 
-**Still open (Q3, optional):** no CI guard exists for the silent-skip case — a
-Version PR that bumps plugins without a catalog bump still skips the publish
-phase without failing anything. Revisit only if the silent skip bites again;
-the per-plugin marketplace serving from `main` is unaffected either way.
+**Q3 resolved (2026-07-16, PR #644):** the CI guard now exists —
+`scripts/validate-catalog-track.js` fails when any plugin version moved past
+the last catalog tag (`v<root-version>`) while the root `package.json` did
+not advance. It is wired into `pnpm release:check` and into
+`version-packages.yml`'s Detect-phase "nothing to do" branch, so "plugins
+changed but catalog didn't" now fails loudly instead of silently skipping
+the publish phase. Known residual: the guard is bypassed on the documented
+`force_publish=true` manual-recovery path (pre-existing override mechanism).
 
 ## Summary
 
@@ -51,8 +55,9 @@ stayed at `1.2.7`, `v1.2.7` already existed → "nothing to do" → publish skip
 
 The `catalog-version.js` step was not run as part of #566, so the release never
 "armed." `docs/CLAUDE.md` (~L48–82) documents the step as *"bump root catalog
-version (required for release tags)"* but **no CI guard fails the build when a
-release bumps plugins without a catalog bump** — so the skip is silent.
+version (required for release tags)"* but at the time (pre-2026-07-16) **no CI
+guard failed the build when a release bumped plugins without a catalog bump**
+— so the skip was silent. Resolved by the Q3 guard — see Outcome above.
 
 ## Is it actually broken?
 
@@ -61,10 +66,14 @@ Likely **working as designed.** The catalog (`v1.2.7`) is far behind the plugins
 Releases are cut **deliberately and infrequently**, batching per-plugin tags
 when they happen. The plugins are released the moment they land on `main`; the
 tags + GitHub Release are an archival/snapshot layer cut at the next catalog
-bump. The genuine gap is the **silent** nature of the skip (no guard, easy to
-assume a Release cut when it didn't).
+bump. The genuine gap was the **silent** nature of the skip (no guard, easy to
+assume a Release cut when it didn't) — closed by the Q3 guard, see Outcome
+above.
 
 ## Options (pick one)
+
+_Historical (pre-2026-07-16) decision point. Option 2 was the one implemented
+— see Outcome above._
 
 1. **Cut the snapshot now** — small PR running `node scripts/catalog-version.js
    patch` (`1.2.7` → `1.2.8`); on merge it arms the publish phase the blessed
@@ -72,6 +81,7 @@ assume a Release cut when it didn't).
    `workflow_dispatch` on `version-packages.yml` with `force_publish=true`.
 2. **Add a CI guard** — fail (or auto-bump) when a release changes any
    `plugins/*/package.json` version without a corresponding catalog bump.
+   **Implemented 2026-07-16 (PR #644)** as `scripts/validate-catalog-track.js`.
 3. **Leave it** — document that the current infrequent-snapshot cadence is
    intentional; no action.
 
@@ -81,11 +91,15 @@ assume a Release cut when it didn't).
 ## Key files
 
 `.github/workflows/version-packages.yml` · `scripts/catalog-version.js` ·
-`scripts/ci/release-tags.sh` · `scripts/generate-release-notes.js` ·
-`docs/CLAUDE.md` · `.changeset/config.json` · root `package.json` ·
-`CONTRIBUTING.md`
+`scripts/validate-catalog-track.js` · `scripts/ci/release-tags.sh` ·
+`scripts/generate-release-notes.js` · `docs/CLAUDE.md` ·
+`.changeset/config.json` · root `package.json` · `CONTRIBUTING.md`
 
 ## Next-session kickoff prompt
+
+_Historical — all three questions below are now resolved (Q1/Q2: 2026-06-10;
+Q3: 2026-07-16, PR #644). Retained for reference on how the investigation was
+originally scoped._
 
 ```
 Sort out the catalog/Release versioning track in yellow-plugins

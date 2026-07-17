@@ -1,0 +1,1058 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw bytes 1`] = `
+"{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "yellow-plugins",
+  "description": "Personal curated collection of Claude Code plugins for development productivity and code quality",
+  "owner": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "metadata": {
+    "description": "Git-native, schema-validated plugin marketplace for Claude Code",
+    "version": "1.1.0"
+  },
+  "plugins": [
+    {
+      "name": "gt-workflow",
+      "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
+      "version": "1.5.4",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/gt-workflow",
+      "category": "development"
+    },
+    {
+      "name": "yellow-core",
+      "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
+      "version": "1.24.5",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-core",
+      "category": "development"
+    },
+    {
+      "name": "yellow-linear",
+      "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
+      "version": "1.3.3",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-linear",
+      "category": "productivity"
+    },
+    {
+      "name": "yellow-devin",
+      "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+      "version": "2.3.5",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-devin",
+      "category": "development"
+    },
+    {
+      "name": "yellow-review",
+      "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
+      "version": "3.2.4",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-review",
+      "category": "development"
+    },
+    {
+      "name": "yellow-ruvector",
+      "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
+      "version": "1.1.8",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-ruvector",
+      "category": "development"
+    },
+    {
+      "name": "yellow-browser-test",
+      "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting",
+      "version": "1.1.5",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-browser-test",
+      "category": "testing"
+    },
+    {
+      "name": "yellow-debt",
+      "description": "Technical debt audit and remediation with parallel scanner agents for AI-generated code patterns",
+      "version": "1.6.8",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-debt",
+      "category": "development"
+    },
+    {
+      "name": "yellow-ci",
+      "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
+      "version": "1.4.6",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-ci",
+      "category": "development"
+    },
+    {
+      "name": "yellow-composio",
+      "description": "Optional Composio accelerator for batch workflows with usage tracking",
+      "version": "2.0.5",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-composio",
+      "category": "productivity"
+    },
+    {
+      "name": "yellow-research",
+      "description": "Deep research plugin with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
+      "version": "3.4.2",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-research",
+      "category": "productivity"
+    },
+    {
+      "name": "yellow-morph",
+      "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
+      "version": "1.3.0",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-morph",
+      "category": "development"
+    },
+    {
+      "name": "yellow-semgrep",
+      "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
+      "version": "4.1.2",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-semgrep",
+      "category": "development"
+    },
+    {
+      "name": "yellow-docs",
+      "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+      "version": "1.3.6",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-docs",
+      "category": "development"
+    },
+    {
+      "name": "yellow-codex",
+      "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
+      "version": "0.2.7",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-codex",
+      "category": "development"
+    },
+    {
+      "name": "yellow-council",
+      "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
+      "version": "0.2.6",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-council",
+      "category": "development"
+    },
+    {
+      "name": "yellow-mempalace",
+      "description": "Structured long-term memory with temporal knowledge graph via MemPalace",
+      "version": "1.1.4",
+      "author": {
+        "name": "KingInYellows"
+      },
+      "source": "./plugins/yellow-mempalace",
+      "category": "development"
+    }
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugin inventory (explicit sorted names) 1`] = `
+[
+  "gt-workflow",
+  "yellow-browser-test",
+  "yellow-ci",
+  "yellow-codex",
+  "yellow-composio",
+  "yellow-core",
+  "yellow-council",
+  "yellow-debt",
+  "yellow-devin",
+  "yellow-docs",
+  "yellow-linear",
+  "yellow-mempalace",
+  "yellow-morph",
+  "yellow-research",
+  "yellow-review",
+  "yellow-ruvector",
+  "yellow-semgrep",
+]
+`;
+
+exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "gt-workflow",
+  "version": "1.5.4",
+  "description": "Graphite-native workflow commands for stacked PR development. Provides smart commit-and-submit with parallel audit agents, stack planning, sync, and navigation — all through the gt CLI.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins/tree/main/plugins/gt-workflow",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "graphite",
+    "graphite-cli",
+    "gt",
+    "git",
+    "stacked-prs",
+    "smart-commits",
+    "sync",
+    "conventional-commits",
+    "workflow",
+    "pull-requests"
+  ],
+  "outputStyles": "./output-styles",
+  "mcpServers": {
+    "graphite": {
+      "command": "gt",
+      "args": [
+        "mcp"
+      ]
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/check-git-push.sh",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/check-commit-message.sh",
+            "timeout": 1
+          }
+        ]
+      }
+    ]
+  }
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-browser-test/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-browser-test",
+  "version": "1.1.5",
+  "description": "Autonomous web app testing with agent-browser — auto-discovery, structured flows, exploratory testing, and bug reporting",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-browser-test",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "browser",
+    "e2e",
+    "agent-browser",
+    "autonomous-qa"
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-ci/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-ci",
+  "version": "1.4.6",
+  "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-ci",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "ci",
+    "github-actions",
+    "self-hosted",
+    "runner",
+    "diagnosis"
+  ],
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "yellow-linear",
+      "version": "*",
+      "optional": true,
+      "reason": "ci:report-linear uses mcp__plugin_yellow-linear_linear__save_issue"
+    }
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-codex/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-codex",
+  "version": "0.2.7",
+  "description": "OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-codex",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "openai",
+    "code-review",
+    "ai-agent",
+    "rescue",
+    "analysis"
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-composio/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-composio",
+  "version": "2.0.5",
+  "description": "Optional Composio accelerator for batch workflows with usage tracking",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-composio",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "composio",
+    "batch-processing",
+    "workbench",
+    "usage-tracking",
+    "mcp"
+  ],
+  "userConfig": {
+    "composio_mcp_url": {
+      "type": "string",
+      "title": "Composio MCP URL",
+      "description": "Per-customer Composio MCP endpoint. Generate via the Composio dashboard or \`npx @composio/mcp@latest setup YOUR_CUSTOMER_ID YOUR_APP_ID\`. Looks like https://mcp.composio.dev/<id> or https://connect.composio.dev/mcp. MUST start with \`https://\` — the start-composio.sh wrapper rejects non-HTTPS URLs to prevent cleartext key leak. Alternatively set the \`COMPOSIO_MCP_URL\` shell env var for multi-host fleets (the wrapper honors it as a fallback when this userConfig is empty). If you have neither yet, disable yellow-composio via /plugin until you do — the wrapper exits non-zero on empty values, which keeps \`claude doctor\` from cascade-failing other MCPs.",
+      "sensitive": false
+    },
+    "composio_api_key": {
+      "type": "string",
+      "title": "Composio API key",
+      "description": "Composio API key from https://app.composio.dev/settings. Sent as the X-API-Key header on every MCP request. Stored in the system keychain. Alternatively set \`COMPOSIO_API_KEY\` in shell env — the start-composio.sh wrapper honors it as a fallback when this userConfig is empty. Invalid keys produce a 401 at runtime from Composio.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "composio-server": {
+      "command": "\${CLAUDE_PLUGIN_ROOT}/bin/start-composio.sh",
+      "env": {
+        "COMPOSIO_MCP_URL_USERCONFIG": "\${user_config.composio_mcp_url}",
+        "COMPOSIO_MCP_URL": "\${COMPOSIO_MCP_URL:-}",
+        "COMPOSIO_API_KEY_USERCONFIG": "\${user_config.composio_api_key}",
+        "COMPOSIO_API_KEY": "\${COMPOSIO_API_KEY:-}"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/check-mcp-url.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-core",
+  "version": "1.24.5",
+  "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-core",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "research",
+    "typescript",
+    "python",
+    "rust",
+    "go"
+  ],
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-council/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-council",
+  "version": "0.2.6",
+  "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-council",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "council",
+    "multi-llm",
+    "code-review",
+    "cross-lineage",
+    "gemini",
+    "opencode",
+    "codex",
+    "advisory"
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-debt/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-debt",
+  "version": "1.6.8",
+  "description": "Technical debt audit and remediation with parallel scanner agents. Use when you need to assess codebase health, identify AI-generated debt patterns, prioritize findings, and systematically remediate technical debt.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-debt",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "code-quality",
+    "scanner"
+  ],
+  "outputStyles": "./output-styles",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": "*",
+      "optional": false,
+      "reason": "validate_file_path() is sourced from yellow-core/lib/validate-fs.sh; debt commands fail without it"
+    },
+    {
+      "name": "yellow-linear",
+      "version": "*",
+      "optional": true,
+      "reason": "debt:sync uses mcp__plugin_yellow-linear_linear__save_issue"
+    }
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-devin/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-devin",
+  "version": "2.3.5",
+  "description": "Devin.AI V3 API integration — delegate tasks, manage sessions, review and remediate PRs, research codebases via DeepWiki, orchestrate plan-implement-review chains",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-devin",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "devin",
+    "deepwiki",
+    "delegation",
+    "orchestration",
+    "ai-collaboration"
+  ],
+  "userConfig": {
+    "devin_service_user_token": {
+      "type": "string",
+      "title": "Devin service user token",
+      "description": "Devin V3 service user token (cog_ prefix). Create at Devin Enterprise Settings > Service Users. Stored in system keychain.",
+      "sensitive": true
+    },
+    "devin_org_id": {
+      "type": "string",
+      "title": "Devin organization ID",
+      "description": "Devin organization ID. Find at Devin Enterprise Settings > Organizations.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "deepwiki": {
+      "type": "http",
+      "url": "https://mcp.deepwiki.com/mcp"
+    },
+    "devin": {
+      "type": "http",
+      "url": "https://mcp.devin.ai/mcp"
+    }
+  }
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-docs/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-docs",
+  "version": "1.3.6",
+  "description": "Documentation audit, generation, and Mermaid diagram creation for any repository",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-docs",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "documentation",
+    "docs",
+    "mermaid",
+    "audit",
+    "generation"
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-linear/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-linear",
+  "version": "1.3.3",
+  "description": "Linear MCP integration with PM workflows for issues, projects, initiatives, cycles, and documents",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-linear",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "linear",
+    "project-management",
+    "issues",
+    "productivity",
+    "pm"
+  ],
+  "outputStyles": "./output-styles",
+  "mcpServers": {
+    "linear": {
+      "type": "http",
+      "url": "https://mcp.linear.app/mcp"
+    }
+  }
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-mempalace/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-mempalace",
+  "version": "1.1.4",
+  "description": "Structured long-term memory with temporal knowledge graph via MemPalace",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-mempalace",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "knowledge-graph",
+    "ai-memory",
+    "mcp",
+    "chromadb"
+  ],
+  "mcpServers": {
+    "mempalace": {
+      "command": "mempalace-mcp",
+      "args": [],
+      "env": {
+        "PYTHONWARNINGS": "ignore",
+        "TRANSFORMERS_VERBOSITY": "error",
+        "TOKENIZERS_PARALLELISM": "false"
+      }
+    }
+  }
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-morph/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-morph",
+  "version": "1.3.0",
+  "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-morph",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "code-editing",
+    "code-search",
+    "fast-apply",
+    "warpgrep",
+    "morph"
+  ],
+  "userConfig": {
+    "morph_api_key": {
+      "type": "string",
+      "title": "Morph API key",
+      "description": "Morph API key (get one at https://morphllm.com — free tier 250K credits/month). Stored in system keychain or ~/.claude/.credentials.json.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "morph": {
+      "command": "\${CLAUDE_PLUGIN_ROOT}/bin/start-morph.sh",
+      "args": [],
+      "env": {
+        "MORPH_API_KEY_USERCONFIG": "\${user_config.morph_api_key}",
+        "MORPH_API_KEY": "\${MORPH_API_KEY:-}",
+        "DISABLED_TOOLS": "github_codebase_search",
+        "WORKSPACE_MODE": "true"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/prewarm-morph.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-research/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-research",
+  "version": "3.4.2",
+  "description": "Deep research plugin with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCP servers. Code research inline; deep research saved to docs/research/.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-research",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "deep-research",
+    "ceramic",
+    "perplexity",
+    "exa",
+    "tavily",
+    "ast-grep",
+    "mcp"
+  ],
+  "outputStyles": "./output-styles",
+  "userConfig": {
+    "perplexity_api_key": {
+      "type": "string",
+      "title": "Perplexity API key",
+      "description": "Optional Perplexity API key. Get one at https://www.perplexity.ai/settings/api. Without a key, perplexity MCP will fail at startup and those tools are skipped — other sources (tavily, exa, parallel, ast-grep) continue to work. Stored in system keychain.",
+      "sensitive": true
+    },
+    "tavily_api_key": {
+      "type": "string",
+      "title": "Tavily API key",
+      "description": "Optional Tavily API key. Get one at https://app.tavily.com. Tavily MCP starts without a key but tool calls return runtime errors — key required for actual searches. Stored in system keychain.",
+      "sensitive": true
+    },
+    "exa_api_key": {
+      "type": "string",
+      "title": "Exa API key",
+      "description": "Optional Exa API key. Get one at https://dashboard.exa.ai. Exa MCP starts without a key but tool calls return runtime errors — key required for actual searches. Stored in system keychain.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "perplexity": {
+      "command": "\${CLAUDE_PLUGIN_ROOT}/bin/start-perplexity.sh",
+      "args": [],
+      "env": {
+        "PERPLEXITY_API_KEY_USERCONFIG": "\${user_config.perplexity_api_key}",
+        "PERPLEXITY_API_KEY": "\${PERPLEXITY_API_KEY:-}",
+        "PERPLEXITY_TIMEOUT_MS": "\${PERPLEXITY_TIMEOUT_MS:-600000}"
+      }
+    },
+    "tavily": {
+      "command": "\${CLAUDE_PLUGIN_ROOT}/bin/start-tavily.sh",
+      "args": [],
+      "env": {
+        "TAVILY_API_KEY_USERCONFIG": "\${user_config.tavily_api_key}",
+        "TAVILY_API_KEY": "\${TAVILY_API_KEY:-}"
+      }
+    },
+    "exa": {
+      "command": "\${CLAUDE_PLUGIN_ROOT}/bin/start-exa.sh",
+      "args": [],
+      "env": {
+        "EXA_API_KEY_USERCONFIG": "\${user_config.exa_api_key}",
+        "EXA_API_KEY": "\${EXA_API_KEY:-}"
+      }
+    },
+    "parallel": {
+      "type": "http",
+      "url": "https://task-mcp.parallel.ai/mcp"
+    },
+    "ceramic": {
+      "type": "http",
+      "url": "https://mcp.ceramic.ai/mcp"
+    },
+    "ast-grep": {
+      "command": "uvx",
+      "args": [
+        "--python",
+        "3.13",
+        "--from",
+        "git+https://github.com/ast-grep/ast-grep-mcp@674272f1adb56fd1fe48a546952c7ffbe72c09e6",
+        "ast-grep-server"
+      ]
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": ">=1.17.1",
+      "optional": false,
+      "reason": "hooks/write-credential-status.sh sources yellow-core/lib/credential-status.sh for credential_hook_scaffold — first available in yellow-core 1.17.1"
+    }
+  ]
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-review/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-review",
+  "version": "3.2.4",
+  "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review. Graphite-native workflow.",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-review",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "pr",
+    "code-review",
+    "graphite"
+  ],
+  "outputStyles": "./output-styles"
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-ruvector/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-ruvector",
+  "version": "1.1.8",
+  "description": "Persistent vector memory and semantic code search for Claude Code agents via ruvector",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-ruvector",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "vector-search",
+    "agent-memory",
+    "semantic-search",
+    "embeddings",
+    "self-learning"
+  ],
+  "mcpServers": {
+    "ruvector": {
+      "command": "npx",
+      "args": [
+        "ruvector",
+        "mcp",
+        "start"
+      ],
+      "env": {
+        "RUVECTOR_STORAGE_PATH": "\${PWD}/.ruvector/"
+      }
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-tool-use.sh",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/user-prompt-submit.sh",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-tool-use.sh",
+            "timeout": 1
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+"
+`;
+
+exports[`manifest byte-identity baseline > plugins/yellow-semgrep/.claude-plugin/plugin.json raw bytes 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "yellow-semgrep",
+  "version": "4.1.2",
+  "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-semgrep",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "semgrep",
+    "security",
+    "sast",
+    "remediation",
+    "mcp"
+  ],
+  "userConfig": {
+    "semgrep_app_token": {
+      "type": "string",
+      "title": "Semgrep app token",
+      "description": "Semgrep API token (sgp_ prefix). Must have Web API scope. Create at Semgrep Organization Settings > API Tokens. Stored in system keychain.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "semgrep": {
+      "command": "\${CLAUDE_PLUGIN_ROOT}/bin/start-semgrep.sh",
+      "args": [],
+      "env": {
+        "SEMGREP_APP_TOKEN_USERCONFIG": "\${user_config.semgrep_app_token}",
+        "SEMGREP_APP_TOKEN": "\${SEMGREP_APP_TOKEN:-}"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": ">=1.17.1",
+      "optional": false,
+      "reason": "hooks/write-credential-status.sh sources yellow-core/lib/credential-status.sh for credential_hook_scaffold — first available in yellow-core 1.17.1"
+    }
+  ]
+}
+"
+`;

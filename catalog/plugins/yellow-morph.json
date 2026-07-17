@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Intelligent code editing and search via Morph Fast Apply and WarpGrep",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-morph",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "code-editing",
+    "code-search",
+    "fast-apply",
+    "warpgrep",
+    "morph"
+  ],
+  "userConfig": {
+    "morph_api_key": {
+      "type": "string",
+      "title": "Morph API key",
+      "description": "Morph API key (get one at https://morphllm.com — free tier 250K credits/month). Stored in system keychain or ~/.claude/.credentials.json.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "morph": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-morph.sh",
+      "args": [],
+      "env": {
+        "MORPH_API_KEY_USERCONFIG": "${user_config.morph_api_key}",
+        "MORPH_API_KEY": "${MORPH_API_KEY:-}",
+        "DISABLED_TOOLS": "github_codebase_search",
+        "WORKSPACE_MODE": "true"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/prewarm-morph.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "marketplace": {
+    "category": "development",
+    "source": "./plugins/yellow-morph"
+  },
+  "targets": {
+    "claude": true,
+    "codex": false
+  }
+}

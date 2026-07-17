@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "description": "Semgrep security finding remediation — fetch, fix, and verify 'to fix' findings from the Semgrep AppSec Platform",
+  "author": {
+    "name": "KingInYellows",
+    "url": "https://github.com/KingInYellows"
+  },
+  "homepage": "https://github.com/KingInYellows/yellow-plugins#yellow-semgrep",
+  "repository": "https://github.com/KingInYellows/yellow-plugins",
+  "license": "MIT",
+  "keywords": [
+    "semgrep",
+    "security",
+    "sast",
+    "remediation",
+    "mcp"
+  ],
+  "userConfig": {
+    "semgrep_app_token": {
+      "type": "string",
+      "title": "Semgrep app token",
+      "description": "Semgrep API token (sgp_ prefix). Must have Web API scope. Create at Semgrep Organization Settings > API Tokens. Stored in system keychain.",
+      "sensitive": true
+    }
+  },
+  "mcpServers": {
+    "semgrep": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-semgrep.sh",
+      "args": [],
+      "env": {
+        "SEMGREP_APP_TOKEN_USERCONFIG": "${user_config.semgrep_app_token}",
+        "SEMGREP_APP_TOKEN": "${SEMGREP_APP_TOKEN:-}"
+      }
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/write-credential-status.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "name": "yellow-core",
+      "version": ">=1.17.1",
+      "optional": false,
+      "reason": "hooks/write-credential-status.sh sources yellow-core/lib/credential-status.sh for credential_hook_scaffold — first available in yellow-core 1.17.1"
+    }
+  ],
+  "marketplace": {
+    "category": "development",
+    "source": "./plugins/yellow-semgrep"
+  },
+  "targets": {
+    "claude": true,
+    "codex": false
+  }
+}
