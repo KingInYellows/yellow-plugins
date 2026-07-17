@@ -1,0 +1,119 @@
+catalog/plugins/yellow-linear.json
+  s_76944981fdcfae::t_5250d751e74c1f 31-33
+catalog/plugins/yellow-council.json
+  s_76944981fdcfae::t_5250d751e74c1f 27-29
+catalog/plugins/yellow-research.json
+  s_76944981fdcfae::t_5250d751e74c1f 115-117
+catalog/plugins/gt-workflow.json
+  s_76944981fdcfae::t_5250d751e74c1f 65-67
+catalog/plugins/yellow-ci.json
+  s_76944981fdcfae::t_5250d751e74c1f 46-48
+packages/domain/tsconfig.json
+  s_76944981fdcfae::t_17305f28920f4c 9
+schemas/catalog-plugin.schema.json
+  s_76944981fdcfae::t_ccdc5bac782cb9 1-124
+catalog/plugins/yellow-ruvector.json
+  s_76944981fdcfae::t_5250d751e74c1f 99-101
+catalog/plugins/yellow-devin.json
+  s_76944981fdcfae::t_5250d751e74c1f 48-50
+packages/domain/src/validation/types.ts
+  s_76944981fdcfae::t_bd3b856e8df42e 29
+packages/domain/src/validation/error-codes.json
+  s_76944981fdcfae::t_fee034e525f249 1-10
+catalog/plugins/yellow-codex.json
+  s_76944981fdcfae::t_5250d751e74c1f 25-27
+scripts/lib/generate/emit-codex.js
+  s_76944981fdcfae::t_08f96c819629d9 1-22,26-213,216-217,219-236
+  s_76944981fdcfae::t_e45794551351a1 23-24
+  s_76944981fdcfae::t_274857154d88c5 25
+  s_76944981fdcfae::t_4e63cf8182ae04 214-215,218
+scripts/lint-error-codes.js
+  s_76944981fdcfae::t_fe63e56137a62e 106-129
+  s_76944981fdcfae::t_926ea7cfcc9767 137
+  s_76944981fdcfae::t_50f4da0d8c8e7f 130,133-136,138
+  s_76944981fdcfae::t_b6ef1e0b376911 176-180
+  s_76944981fdcfae::t_9b97bc77748ac9 12-20,27-32,42-45
+  s_76944981fdcfae::t_6ed65dff6def4c 64-67,79-80,82-104
+  s_76944981fdcfae::t_525a1395943d7e 68-78,81
+catalog/plugins/yellow-debt.json
+  s_76944981fdcfae::t_5250d751e74c1f 51-53
+schemas/codex-hooks.schema.json
+  s_76944981fdcfae::t_01b58f733b8fb1 1-41
+schemas/catalog.schema.json
+  s_76944981fdcfae::t_8c7cb30087f129 1-54,56-71,73-78,80-86,88-92
+  s_76944981fdcfae::t_973f5fe971c3f9 55
+  s_76944981fdcfae::t_d2b4fbcfb5c518 72,79,87
+catalog/plugins/yellow-docs.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+plans/claude-code-codex-plugin-pilot-02-codex-tooling.md
+  s_76944981fdcfae::t_9cf0b85178683d 1-93,116-178,180-182,192-197,204-208,220-228,233,236-243,266-271,288-290,304-306,333-373,378-425,431-474
+  s_76944981fdcfae::t_e9e577c8716c01 229-232,234-235
+  s_76944981fdcfae::t_4295d81494756c 303,307-317
+  s_76944981fdcfae::t_e3002c1b631fe3 426-430
+  s_76944981fdcfae::t_1a85a43ab1fcac 219
+  s_76944981fdcfae::t_0bc5aa37cfc626 287,291-302
+  s_76944981fdcfae::t_82189c005aedbf 203,209-218
+  s_76944981fdcfae::t_3702a3eb8891b8 179,183-190
+  s_76944981fdcfae::t_dd25d24d8fcacd 191,198-202
+  s_76944981fdcfae::t_3857dcea9268a1 244-249
+  s_76944981fdcfae::t_588dd4942565ec 318-332
+  s_76944981fdcfae::t_8ec19dbb4efe7e 265,272-286
+  s_76944981fdcfae::t_f8e1785c92ff6d 250-264
+  s_76944981fdcfae::t_dda481b51e0a17 374-377
+  s_76944981fdcfae::t_c6761e19970532 94-95,97-115
+  s_76944981fdcfae::t_05dc54be08f74c 96
+catalog/plugins/yellow-mempalace.json
+  s_76944981fdcfae::t_5250d751e74c1f 35-37
+schemas/codex-plugin.schema.json
+  s_76944981fdcfae::t_56063a23f4f9c7 1-50
+catalog/plugins/yellow-core.json
+  s_76944981fdcfae::t_5250d751e74c1f 51-53
+catalog/plugins/yellow-browser-test.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+docs/solutions/code-quality/raw-text-scan-inline-to-import-blind-spot.md
+  s_76944981fdcfae::t_08bfd29019a782 1-101
+packages/domain/src/validation/errorCatalog.ts
+  s_76944981fdcfae::t_bd2a3cc5720325 16-22
+  s_76944981fdcfae::t_d027e83a0dc7ca 138-145
+  s_76944981fdcfae::t_3c555cf8dffaf1 371-380
+schemas/codex-marketplace.schema.json
+  s_76944981fdcfae::t_878c0ac54ea62b 67
+  s_76944981fdcfae::t_2646ba9dbb231d 1-66,68-70
+catalog/plugins/yellow-morph.json
+  s_76944981fdcfae::t_5250d751e74c1f 58-60
+docs/solutions/workflow/spec-shells-dependency-oracle-plans-complete.md
+  s_76944981fdcfae::t_edc64a52cd35f3 87-133
+catalog/plugins/yellow-review.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+catalog/plugins/yellow-composio.json
+  s_76944981fdcfae::t_5250d751e74c1f 63-65
+catalog/plugins/yellow-semgrep.json
+  s_76944981fdcfae::t_5250d751e74c1f 64-66
+.agents/plugins/marketplace.json
+  s_76944981fdcfae::t_a04285ddd2672b 1-5
+scripts/generate-manifests.js
+  s_76944981fdcfae::t_84b733d6d67393 294-335
+  s_76944981fdcfae::t_740edb00dd95bd 191-192
+  s_76944981fdcfae::t_bd34fcdf5a98f8 5-6,11-15
+  s_76944981fdcfae::t_42205069a2d447 35-41
+  s_76944981fdcfae::t_4fd3bc78a81ae0 136-137,139,145-190
+tests/integration/generate-manifests.test.ts
+  s_76944981fdcfae::t_34c37587835d5f 36-38,44
+  s_76944981fdcfae::t_28f2db8dd28283 75-81,92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b623d771402db7537e7c60cef958ddd74145fbcc",
+  "prompts": {},
+  "sessions": {
+    "s_76944981fdcfae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1ea2e22-178b-47c9-ac16-a3fc091bd7f0",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
