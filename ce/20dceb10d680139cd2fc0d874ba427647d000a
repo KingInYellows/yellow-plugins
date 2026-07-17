@@ -1,0 +1,32 @@
+plans/ruvector-error-fix-memory-mvp.md
+  s_7ed434e75cb861::t_0c1b9214fef59f 240,260,263,270,277
+plugins/yellow-ruvector/CLAUDE.md
+  s_7ed434e75cb861::t_74e263b79cb9a8 43
+  s_7ed434e75cb861::t_74f9b8d676fb72 148-150
+  s_7ed434e75cb861::t_746f91119f4107 8-13
+  s_7ed434e75cb861::t_84c4ee51d7fb46 51-55
+plugins/yellow-core/skills/debugging/SKILL.md
+  s_7ed434e75cb861::t_5ab525f161fd9a 118-152
+plugins/yellow-ruvector/skills/memory-query/SKILL.md
+  s_7ed434e75cb861::t_d11eef72a1cc64 73
+  s_7ed434e75cb861::t_528c8c8dc4d2bb 92-128
+plugins/yellow-ruvector/README.md
+  s_7ed434e75cb861::t_a7db2dd4492adc 42
+  s_7ed434e75cb861::t_68055b5ad01ac2 60-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ce20dceb10d680139cd2fc0d874ba427647d000a",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
