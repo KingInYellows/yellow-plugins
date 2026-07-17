@@ -71,16 +71,28 @@ function validateSource(name, source, errors) {
     errors.push(`catalog/plugins/${name}.json: "keywords" must be an array of strings`);
   }
   if ('marketplace' in source && source.marketplace !== null && typeof source.marketplace === 'object') {
-    for (const key of ['category', 'source']) {
-      if (!(key in source.marketplace)) {
-        errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.${key}"`);
-      } else if (typeof source.marketplace[key] !== 'string') {
-        errors.push(`catalog/plugins/${name}.json: "marketplace.${key}" must be a string`);
-      }
+    const mp = source.marketplace;
+    if (!('category' in mp)) {
+      errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.category"`);
+    } else if (typeof mp.category !== 'string') {
+      errors.push(`catalog/plugins/${name}.json: "marketplace.category" must be a string`);
+    }
+    // marketplace.source is oneOf [string path, { source: 'url', url }] per
+    // schemas/official-marketplace.schema.json — accept both; reject only a
+    // scalar/array/null that could never serialize to a valid entry.
+    if (!('source' in mp)) {
+      errors.push(`catalog/plugins/${name}.json: missing required key "marketplace.source"`);
+    } else if (
+      typeof mp.source !== 'string' &&
+      (mp.source === null || typeof mp.source !== 'object' || Array.isArray(mp.source))
+    ) {
+      errors.push(
+        `catalog/plugins/${name}.json: "marketplace.source" must be a string path or a { source, url } object`
+      );
     }
     // marketplace.description is optional (falls back to source.description),
     // but when present the emitter uses it verbatim, so it must be a string.
-    if ('description' in source.marketplace && typeof source.marketplace.description !== 'string') {
+    if ('description' in mp && typeof mp.description !== 'string') {
       errors.push(`catalog/plugins/${name}.json: "marketplace.description" must be a string`);
     }
   } else if ('marketplace' in source) {

@@ -257,7 +257,7 @@ describe('source value-shape validation', () => {
     );
   });
 
-  it('rejects a non-string marketplace.source (nested value the emitter splices)', () => {
+  it('rejects a scalar marketplace.source (neither string path nor { source, url })', () => {
     const root = makeFixtureRoot();
     mutateSource(root, (s) => {
       (s.marketplace as Record<string, unknown>).source = 42;
@@ -265,8 +265,21 @@ describe('source value-shape validation', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors).toContain(
-      'catalog/plugins/yellow-core.json: "marketplace.source" must be a string'
+      'catalog/plugins/yellow-core.json: "marketplace.source" must be a string path or a { source, url } object'
     );
+  });
+
+  it('accepts an object-form marketplace.source ({ source: "url", url }) — remote entry', () => {
+    const root = makeFixtureRoot();
+    mutateSource(root, (s) => {
+      (s.marketplace as Record<string, unknown>).source = {
+        source: 'url',
+        url: 'https://example.com/plugin',
+      };
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('ok');
+    expect(result.errors.some((e: string) => e.includes('marketplace.source'))).toBe(false);
   });
 });
 
@@ -338,6 +351,28 @@ describe('catalog.json validation', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors).toContain('catalog.json: top-level value must be an object');
+  });
+
+  it('rejects a null owner (would emit "owner": null into the marketplace)', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      c.owner = null;
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'catalog.json: "owner" must be an object with a string "name"'
+    );
+  });
+
+  it('rejects a null catalog description (identity field spliced verbatim)', () => {
+    const root = makeFixtureRoot();
+    mutateCatalog(root, (c) => {
+      c.description = null;
+    });
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain('catalog.json: "description" must be a string');
   });
 });
 

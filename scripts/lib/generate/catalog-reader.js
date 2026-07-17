@@ -87,6 +87,30 @@ function loadCatalog(catalogDir) {
       errors.push(`catalog.json: missing required key "${key}"`);
     }
   }
+  // Value-shape checks for the identity fields buildMarketplace splices
+  // verbatim into marketplace.json — a null/wrong-typed value here would emit
+  // a schema-invalid marketplace while apply mode still returned status: 'ok'.
+  if ('name' in data && typeof data.name !== 'string') {
+    errors.push('catalog.json: "name" must be a string');
+  }
+  if ('description' in data && typeof data.description !== 'string') {
+    errors.push('catalog.json: "description" must be a string');
+  }
+  if (
+    'owner' in data &&
+    (data.owner === null ||
+      typeof data.owner !== 'object' ||
+      Array.isArray(data.owner) ||
+      typeof data.owner.name !== 'string')
+  ) {
+    errors.push('catalog.json: "owner" must be an object with a string "name"');
+  }
+  if (
+    'metadata' in data &&
+    (data.metadata === null || typeof data.metadata !== 'object' || Array.isArray(data.metadata))
+  ) {
+    errors.push('catalog.json: "metadata" must be an object');
+  }
   if (
     'targets' in data &&
     (!data.targets ||
