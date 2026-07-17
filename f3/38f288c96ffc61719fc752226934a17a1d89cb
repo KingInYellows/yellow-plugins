@@ -1,0 +1,58 @@
+catalog/README.md
+  s_2d24882eac6a53::t_86f8577b1d672d 7
+  s_2d24882eac6a53::t_c0dafc71e82992 17-19
+  s_2d24882eac6a53::t_4c73ff2866938c 40-43
+docs/CONCEPTS.md
+  s_2d24882eac6a53::t_d09071b9d968d3 11-13,16-17
+scripts/generate-manifests.js
+  s_2d24882eac6a53::t_365cec1240ddb5 193-199
+  s_2d24882eac6a53::t_354f043738462e 224-238
+  s_2d24882eac6a53::t_ee6fc6d5762f7a 26
+  s_2d24882eac6a53::t_e0b18dd30affa1 25
+plans/claude-code-codex-plugin-pilot-01-neutral-generation.md
+  s_2d24882eac6a53::t_9537b518a761b3 122-126
+  s_2d24882eac6a53::t_dc9a5d479ea8ec 26-29
+docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md
+  s_2d24882eac6a53::t_11ff2b938893e0 64-69
+scripts/lib/generate/catalog-reader.js
+  s_2d24882eac6a53::t_0d36922e3dab14 15-17
+  s_2d24882eac6a53::t_f4ee8462bb2ce3 24
+  s_2d24882eac6a53::t_72baa729dfe6a3 181-184
+  s_2d24882eac6a53::t_24b29d922f053d 81-83
+  s_2d24882eac6a53::t_9a00eeff0c27e4 37-41,44-54,57,60-61
+.github/workflows/validate-schemas-fork.yml
+  s_2d24882eac6a53::t_282c8fa375b97b 11
+plans/specs/claude-code-codex-plugin-pilot.md
+  s_2d24882eac6a53::t_5d4bff8d13e9d2 198-205
+.github/workflows/validate-schemas.yml
+  s_2d24882eac6a53::t_cd2f15666ee9b5 682-685,690,692-693
+  s_2d24882eac6a53::t_e119a357806754 691
+  s_2d24882eac6a53::t_09b925e158a050 671-681,686-687
+docs/maintenance/catalog-release-gap.md
+  s_2d24882eac6a53::t_5cd92fe19b7160 69-71
+  s_2d24882eac6a53::t_9c198ffc9cf659 75-77,84
+  s_2d24882eac6a53::t_e3c13c6cc342f2 58-60
+  s_2d24882eac6a53::t_5456bb0e3f9d99 100-103
+plans/shells/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_2d24882eac6a53::t_2ef6c8163e9ad5 4
+  s_2d24882eac6a53::t_74fa96ddd6fd89 24-28
+schemas/plugin.schema.json
+  s_2d24882eac6a53::t_11d97700cbb8cb 96
+  s_2d24882eac6a53::t_89a1b3d3c9a827 192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f338f288c96ffc61719fc752226934a17a1d89cb",
+  "prompts": {},
+  "sessions": {
+    "s_2d24882eac6a53": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef2da5c3-f774-442b-abf7-0bae6a1c34c9",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
