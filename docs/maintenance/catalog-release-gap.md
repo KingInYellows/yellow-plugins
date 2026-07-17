@@ -55,8 +55,9 @@ stayed at `1.2.7`, `v1.2.7` already existed → "nothing to do" → publish skip
 
 The `catalog-version.js` step was not run as part of #566, so the release never
 "armed." `docs/CLAUDE.md` (~L48–82) documents the step as *"bump root catalog
-version (required for release tags)"* but **no CI guard fails the build when a
-release bumps plugins without a catalog bump** — so the skip is silent.
+version (required for release tags)"* but at the time (pre-2026-07-16) **no CI
+guard failed the build when a release bumped plugins without a catalog bump**
+— so the skip was silent. Resolved by the Q3 guard — see Outcome above.
 
 ## Is it actually broken?
 
@@ -65,10 +66,14 @@ Likely **working as designed.** The catalog (`v1.2.7`) is far behind the plugins
 Releases are cut **deliberately and infrequently**, batching per-plugin tags
 when they happen. The plugins are released the moment they land on `main`; the
 tags + GitHub Release are an archival/snapshot layer cut at the next catalog
-bump. The genuine gap is the **silent** nature of the skip (no guard, easy to
-assume a Release cut when it didn't).
+bump. The genuine gap was the **silent** nature of the skip (no guard, easy to
+assume a Release cut when it didn't) — closed by the Q3 guard, see Outcome
+above.
 
 ## Options (pick one)
+
+_Historical (pre-2026-07-16) decision point. Option 2 was the one implemented
+— see Outcome above._
 
 1. **Cut the snapshot now** — small PR running `node scripts/catalog-version.js
    patch` (`1.2.7` → `1.2.8`); on merge it arms the publish phase the blessed
@@ -76,6 +81,7 @@ assume a Release cut when it didn't).
    `workflow_dispatch` on `version-packages.yml` with `force_publish=true`.
 2. **Add a CI guard** — fail (or auto-bump) when a release changes any
    `plugins/*/package.json` version without a corresponding catalog bump.
+   **Implemented 2026-07-16 (PR #644)** as `scripts/validate-catalog-track.js`.
 3. **Leave it** — document that the current infrequent-snapshot cadence is
    intentional; no action.
 
@@ -90,6 +96,10 @@ assume a Release cut when it didn't).
 `.changeset/config.json` · root `package.json` · `CONTRIBUTING.md`
 
 ## Next-session kickoff prompt
+
+_Historical — all three questions below are now resolved (Q1/Q2: 2026-06-10;
+Q3: 2026-07-16, PR #644). Retained for reference on how the investigation was
+originally scoped._
 
 ```
 Sort out the catalog/Release versioning track in yellow-plugins

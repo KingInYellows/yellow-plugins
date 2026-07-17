@@ -23,8 +23,10 @@ plugin-port shells consume instead of re-deriving external contract facts.
   `JSON.stringify(obj, null, 2) + '\n'` — exactly as `scripts/sync-manifests.js:164,198`.
   Key order in every plugin.json: `$schema, name, version, description,
   author, homepage, repository, license, keywords, [outputStyles],
-  [mcpServers], [hooks], [dependencies]` ($schema always first; 17/17 have
-  it). `repository` is a bare string in plugin.json (object form only in root
+  [userConfig], [mcpServers], [hooks], [dependencies]` ($schema always first;
+  17/17 have it; corrected post-implementation — five manifests carry
+  `userConfig` between `outputStyles` and `mcpServers`, per
+  `scripts/lib/generate/emit-claude.js`). `repository` is a bare string in plugin.json (object form only in root
   package.json) — preserve per-plugin as-is. Marketplace root:
   `$schema, name, description, owner{name,url}, metadata{description,
   version: "1.1.0"}, plugins[]`; per entry `name, description, version,
@@ -117,9 +119,11 @@ plugin-port shells consume instead of re-deriving external contract facts.
   `loadCatalog()` and `loadPluginSources()` returning discriminated-union
   results (`marketplace-reader.js` precedent), enforcing the
   `^[a-zA-Z0-9_-]+$` name allowlist, `assertWithinRoot` containment,
-  rejecting symlinked source files (`lstatSync`), and cross-checking
-  catalog order entries against `catalog/plugins/*.json` by explicit name
-  key both directions (R1, R2; glob-counting anti-pattern).
+  rejecting symlinked source files (`lstatSync`) (final source files only —
+  symlinked parent/ancestor directories are followed; hardening deferred
+  alongside the documented atomicWrite/.tmp and package.json symlink P3s),
+  and cross-checking catalog order entries against `catalog/plugins/*.json`
+  by explicit name key both directions (R1, R2; glob-counting anti-pattern).
 - [x] Step 7: Create `scripts/lib/generate/emit-claude.js` — pure builders
   `buildPluginManifest(source, pkg)` (emits the exact key order from the
   Pattern Survey, omitting absent optional fields) and

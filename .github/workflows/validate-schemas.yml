@@ -668,17 +668,29 @@ jobs:
             echo "::group::Scanning for secrets in manifests"
             # Exclusions: "permissionScopes" literal; JSON userConfig field
             # declarations (lines ending in `: {` are object-typed field
-            # openings, not secret values); ${user_config.*} template
-            # references (substituted at runtime, not literal secrets);
-            # `"description":` and `"title":` lines (documentation /
-            # UI-label metadata mentioning "token" or "API key" describing
-            # what the field is, not its value — the Claude Code remote
-            # validator requires `"title":` on every userConfig entry).
-            SENSITIVE=$(grep -rE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ catalog/ --include="*.json" \
-              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{user_config\.|"description":|"title":' \
+            # openings, not secret values); ${ANYTHING} shell/template
+            # expansions (${user_config.*} and same-named env var
+            # passthroughs like "MORPH_API_KEY": "${MORPH_API_KEY:-}" are
+            # substituted at runtime, never literal secrets); `"description":`
+            # and `"title":` lines (documentation / UI-label metadata
+            # mentioning "token" or "API key" describing what the field is,
+            # not its value — the Claude Code remote validator requires
+            # `"title":` on every userConfig entry); a matched keyword
+            # immediately followed by another letter (e.g. "token" inside
+            # TOKENIZERS_PARALLELISM) is a word-continuation, not a hit.
+            # Matching is otherwise case-insensitive to also catch keys like
+            # MORPH_API_KEY; on a hit, only file:line + credential type are
+            # reported below — never the full matched line, which could
+            # contain a real secret value.
+            SENSITIVE=$(grep -rniE '(api[_-]?key|password|token|secret)' .claude-plugin/ plugins/ catalog/ --include="*.json" \
+              | grep -vE '"permissionScopes"|:[[:space:]]*\{[[:space:]]*$|\$\{[A-Za-z_]|"description":|"title":' \
+              | grep -viE '(api[_-]?key|password|token|secret)[A-Za-z]' \
               || true)
             if [ -n "$SENSITIVE" ]; then
-              echo "$SENSITIVE"
+              echo "$SENSITIVE" | while IFS=: read -r sfile sline scontent; do
+                ctype=$(grep -oiE '(api[_-]?key|password|token|secret)' <<< "$scontent" | sort -u | paste -sd, -)
+                echo "${sfile}:${sline}: potential ${ctype} [REDACTED]"
+              done
               echo "::error::Potential sensitive data found in manifest files"
               exit 1
             else

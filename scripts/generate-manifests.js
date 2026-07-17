@@ -22,8 +22,8 @@
 
 'use strict';
 
-const { readFileSync } = require('fs');
-const { join, relative, resolve } = require('path');
+const { existsSync, mkdirSync, readFileSync, statSync } = require('fs');
+const { dirname, join, relative, resolve } = require('path');
 
 const { loadCatalog, loadPluginSources } = require('./lib/generate/catalog-reader');
 const { buildPluginManifest, buildMarketplace, isClaudeEnabled } = require('./lib/generate/emit-claude');
@@ -190,8 +190,13 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     const rel = relative(rootDir, target.path);
     result.diffs.push({ path: rel, state: current === null ? 'missing' : 'differs' });
     if (mode === 'apply') {
-      atomicWrite(target.path, target.bytes);
-      result.written.push(rel);
+      try {
+        mkdirSync(dirname(target.path), { recursive: true });
+        atomicWrite(target.path, target.bytes);
+        result.written.push(rel);
+      } catch (err) {
+        errors.push(`cannot write ${target.path}: ${err.message}`);
+      }
     }
   }
   if (errors.length > 0) {
@@ -216,7 +221,21 @@ function main() {
   const mode = args.includes('--check') ? 'check' : args.includes('--dry-run') ? 'dry-run' : 'apply';
 
   // Test hook (validator-harness precedent): point the CLI at a fixture tree.
-  const rootDir = process.env.GENERATE_MANIFESTS_ROOT || DEFAULT_ROOT;
+  // Resolved to an absolute path (keeps join()/relative() below well-defined
+  // for relative overrides) and required to already exist as a directory —
+  // a fail-fast guard against typos/misconfiguration, not an allowlist (an
+  // allowlist would reject the mkdtemp fixture roots the integration suites
+  // depend on).
+  let rootDir = DEFAULT_ROOT;
+  if (process.env.GENERATE_MANIFESTS_ROOT) {
+    rootDir = resolve(process.env.GENERATE_MANIFESTS_ROOT);
+    if (!existsSync(rootDir) || !statSync(rootDir).isDirectory()) {
+      console.error(
+        `[generate-manifests] ERROR: GENERATE_MANIFESTS_ROOT is not an existing directory: ${process.env.GENERATE_MANIFESTS_ROOT}`
+      );
+      process.exit(1);
+    }
+  }
   const result = generateManifests({ mode, rootDir });
 
   if (result.status === 'error') {

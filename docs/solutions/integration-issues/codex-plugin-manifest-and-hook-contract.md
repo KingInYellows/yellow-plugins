@@ -61,9 +61,12 @@ reviewer/executor, not authoring plugins Codex itself loads.
 - PreToolUse denial shape:
   `{"hookSpecificOutput": {"hookEventName": "PreToolUse",
   "permissionDecision": "deny", "permissionDecisionReason": "..."}}`.
-- `continue` is unsupported **only** on PreToolUse and PermissionRequest; it
-  IS supported (with `continue: false` halting) on SessionStart,
-  UserPromptSubmit, PreCompact, PostCompact, SubagentStop, and Stop — so a
+- `continue` is unsupported on PreToolUse and PermissionRequest (parsed but
+  ignored). SubagentStart also parses `continue: false` but it does **not**
+  stop the subagent from starting — it's silently ignored there too, so
+  don't treat the unsupported set above as exhaustive. `continue: false`
+  DOES halt further processing on SessionStart, UserPromptSubmit,
+  PostToolUse, PreCompact, PostCompact, SubagentStop, and Stop — so a
   SessionStart hook emitting `{"continue": true}` works unmodified on both
   hosts.
 - The manifest may point `hooks` at an alternate file

@@ -8,12 +8,13 @@ only, not a spec or catch-all.
 ## shell
 
 A structured markdown stub, one per future work session, that
-`/workflows:decompose` produces to claim a disjoint subset of a spec's
-requirement IDs together with its produces/consumes/depends-on wiring,
-without yet committing to concrete file paths. It is not executable itself:
+`/workflows:decompose` produces to record a spec's requirement coverage
+together with its produces/consumes/depends-on wiring, without yet
+committing to concrete file paths. It is not executable itself:
 `/workflows:pick-next-shell` expands a shell into a concrete checkbox plan
 and deletes the stub, and a coverage gate blocks writing any shell until
-every requirement ID across all shells is claimed exactly once.
+every requirement ID is covered either by one bare claim or complete,
+non-overlapping partial claims across all shells.
 
 ## spec-tier
 

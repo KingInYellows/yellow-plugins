@@ -1,7 +1,7 @@
 ---
 spec: plans/specs/claude-code-codex-plugin-pilot.md
 spec-r-ids: [R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16, R17, R18, R19, R20, R21, R22, R23, R24, R25, R26, R27, R28, R29, R30, R31, R32, R33, R34, R35, R36, R37, R38, R39, R40, R41, R42, R43, R44, R45]
-depends_on: [claude-code-codex-plugin-pilot-01-neutral-generation, claude-code-codex-plugin-pilot-02-codex-tooling, claude-code-codex-plugin-pilot-04-gt-workflow-pilot]
+depends_on: [claude-code-codex-plugin-pilot-01-neutral-generation, claude-code-codex-plugin-pilot-02-codex-tooling, claude-code-codex-plugin-pilot-03-yellow-core-pilot, claude-code-codex-plugin-pilot-04-gt-workflow-pilot]
 ---
 
 # Plan: yellow-ci Read-Mostly Codex Pilot and Close-Out
@@ -21,8 +21,11 @@ and the explicit non-advertising of repo-wide Codex support.
 
 - yellow-ci Codex enablement: skills ci-setup, ci-setup-runner-targets,
   ci-status, ci-diagnose, ci-lint-workflows, ci-runner-health plus existing
-  ci-conventions and diagnose-ci, with the two reference skills marked
-  non-implicit via the spike-confirmed openai.yaml field
+  ci-conventions and diagnose-ci; the two reference skills' non-implicit
+  marking via `agents/openai.yaml` is deferred pending upstream Codex
+  support (the R17(c) spike found the file is not parsed by plugins on
+  codex-cli 0.144.1), with SKILL.md description phrasing as the interim
+  lever to discourage implicit invocation
 - Skill references folding failure-analyst and relevant runner-diagnostics
   instructions into built-in Codex delegation (agents stay Claude-only)
 - Preview-and-confirm gates before SSH/config writes and workflow lint fixes;

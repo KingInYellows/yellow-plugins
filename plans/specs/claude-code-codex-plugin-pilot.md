@@ -195,8 +195,14 @@ behavioral parity against the existing bash hooks.
 - **R29.** yellow-ci's Codex exposure shall be the operational skills
   `ci-setup`, `ci-setup-runner-targets`, `ci-status`, `ci-diagnose`,
   `ci-lint-workflows`, `ci-runner-health` plus the existing `ci-conventions`
-  and `diagnose-ci`, with the two reference-oriented skills marked
-  non-implicit via `agents/openai.yaml` (field name per R17(c)).
+  and `diagnose-ci`. The R17(c) spike found `agents/openai.yaml` is not
+  parsed from plugins at all on codex-cli 0.144.1 (even invalid YAML
+  produces no error), so no functioning non-implicit-invocation mechanism
+  exists today. Until a future CLI parses the file (re-verify via a live
+  spike, e.g. `codex features list`, before implementing), the two
+  reference-oriented skills shall rely on SKILL.md description phrasing as
+  the interim lever to discourage implicit invocation; the
+  `agents/openai.yaml` field marking is deferred pending upstream support.
 - **R30.** `failure-analyst` and relevant `runner-diagnostics` instructions
   shall be folded into skill references consumed via built-in Codex
   delegation; the agents themselves stay Claude-only.

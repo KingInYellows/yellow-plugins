@@ -12,14 +12,16 @@
  * Safety properties (R1, R2):
  *   - every plugin name must match the `^[a-zA-Z0-9_-]+$` allowlist
  *   - every derived path is containment-checked via `assertWithinRoot`
- *   - symlinked source files are rejected (`lstatSync`)
+ *   - symlinked source files are rejected atomically with the read, via
+ *     `openSync(..., O_NOFOLLOW)` (POSIX-only; this repo's CI is Linux and
+ *     dev is WSL2)
  *   - the catalog order and `catalog/plugins/*.json` are cross-checked by
  *     explicit name key in BOTH directions — an order entry with no source
  *     file and a source file missing from the order both fail by name
  *     (never by count).
  */
 
-const { readFileSync, readdirSync, lstatSync, existsSync } = require('fs');
+const { readFileSync, readdirSync, openSync, closeSync, constants } = require('fs');
 const { join } = require('path');
 
 const { assertWithinRoot, NAME_RE } = require('./write');
@@ -32,18 +34,31 @@ const REQUIRED_CATALOG_KEYS = ['name', 'description', 'owner', 'metadata', 'plug
 /**
  * Read + parse one JSON file with symlink rejection. Returns a
  * discriminated union; never throws for expected failure shapes.
+ *
+ * The open (with O_NOFOLLOW) and the read happen on the same file
+ * descriptor, so there is no TOCTOU window between the symlink check and
+ * the read: a symlink swapped in after a separate lstat/exists check would
+ * no longer bypass the rejection.
  */
 function readJsonSource(filePath) {
-  if (!existsSync(filePath)) {
-    return { status: 'missing' };
-  }
-  if (lstatSync(filePath).isSymbolicLink()) {
-    return { status: 'invalid', error: 'symlinked source files are not allowed' };
+  let fd;
+  try {
+    fd = openSync(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return { status: 'missing' };
+    }
+    if (err.code === 'ELOOP') {
+      return { status: 'invalid', error: 'symlinked source files are not allowed' };
+    }
+    return { status: 'invalid', error: err.message };
   }
   try {
-    return { status: 'ok', data: JSON.parse(readFileSync(filePath, 'utf8')) };
+    return { status: 'ok', data: JSON.parse(readFileSync(fd, 'utf8')) };
   } catch (err) {
     return { status: 'invalid', error: err.message };
+  } finally {
+    closeSync(fd);
   }
 }
 
@@ -63,6 +78,9 @@ function loadCatalog(catalogDir) {
   }
 
   const data = read.data;
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    return { status: 'invalid', path, errors: ['catalog.json: top-level value must be an object'] };
+  }
   const errors = [];
   for (const key of REQUIRED_CATALOG_KEYS) {
     if (!(key in data)) {
@@ -158,6 +176,10 @@ function loadPluginSources(catalogDir, pluginOrder) {
       errors.push(
         `catalog/plugins/${name}.json: ${read.status === 'missing' ? 'file disappeared during read' : read.error}`
       );
+      continue;
+    }
+    if (read.data === null || typeof read.data !== 'object' || Array.isArray(read.data)) {
+      errors.push(`catalog/plugins/${name}.json: top-level value must be an object`);
       continue;
     }
     sources[name] = read.data;

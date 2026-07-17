@@ -4,7 +4,7 @@ This directory is the source of truth for the generated distribution
 artifacts:
 
 - `.claude-plugin/marketplace.json`
-- `plugins/<name>/.claude-plugin/plugin.json` (all plugins)
+- `plugins/<name>/.claude-plugin/plugin.json` (Claude-enabled plugins)
 
 Do NOT edit those files directly — edit the sources here and regenerate:
 
@@ -14,8 +14,9 @@ pnpm validate:generated    # drift check: fails while any generated file differs
 ```
 
 Both manifest schemas set `additionalProperties: false`, so the generated
-files carry no in-JSON "generated" marker — drift enforcement lives entirely
-in `pnpm validate:generated` (same model as `pnpm validate:snippets`).
+files carry no in-JSON "generated" marker — drift enforcement runs via
+`pnpm validate:generated` and the byte-identity integration test in CI
+(same model as `pnpm validate:snippets`).
 
 ## Layout
 
@@ -36,8 +37,9 @@ in `pnpm validate:generated` (same model as `pnpm validate:snippets`).
 
 ## Versions
 
-Catalog sources carry NO `name` or `version` keys. `plugins/<name>/package.json`
-remains the sole version authority (see `scripts/validate-versions.js`); the
-generator reads versions from there at emit time. The `metadata.version` in
+Per-plugin catalog source files carry no top-level plugin `name` or `version`
+keys. `plugins/<name>/package.json` remains the sole version authority (see
+`scripts/validate-versions.js`); the generator reads versions from there at
+emit time. The `metadata.version` in
 `catalog.json` is the marketplace metadata version — a third, independent
 knob (it is neither the root `package.json` version nor any plugin version).
