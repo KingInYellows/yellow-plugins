@@ -12,7 +12,8 @@ allowed-tools:
   - Bash(ruvector --version:*)
   - Bash(npm install -g ruvector@0.2.34:*)
   - Bash(pgrep -f:*)
-  - Bash(grep -c *)
+  - Bash(grep -o *)
+  - Bash(readlink -f .ruvector:*)
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
@@ -37,12 +38,14 @@ re-run after new solution docs land.
    `/ruvector:status` and try again." and stop.
 3. **Store-scoping check (do not skip):** call
    `mcp__plugin_yellow-ruvector_ruvector__hooks_stats()` and inspect the
-   `intel_path` field. Accept a path inside the current project root,
-   AND — when the project's `.ruvector` is a symlink (a healed worktree)
-   — a path inside the symlink's target directory (the main checkout's
-   shared store; `intel_path` may report either the symlink path or its
-   resolved target). If the field is absent, or resolves anywhere else
-   (e.g. `~/.ruvector`), STOP and report:
+   `intel_path` field. Then resolve the local store's real location with
+   `readlink -f .ruvector` (granted). Accept `intel_path` ONLY when it is
+   inside the current project root OR inside the `readlink`-resolved
+   target directory — and in the symlink case, additionally require that
+   the resolved target is NOT under `~/.ruvector` (the deny example
+   always wins over the symlink allowance; a manually-created symlink to
+   the global store must still STOP). If the field is absent or resolves
+   anywhere else, STOP and report:
    "ruvector is using a non-project store (<intel_path>). Seeding would
    pollute a store shared across projects. This happens when the MCP
    server started before `.ruvector/` existed — start a fresh session and
@@ -63,15 +66,15 @@ checks:
    Claude Code session is actively writing this project's ruvector store
    right now?" Options: "Yes, proceed" / "No, stop". Stop on "No".
 
-After Step 7's report, re-verify durability: `grep -c 'ERROR-FIX:'
-.ruvector/intelligence.json`. Compare against the TOTAL the report
-claims should exist (pre-existing entries + newly seeded) — a stale
-writer's snapshot can restore a non-zero-but-wrong count, so "not zero"
-is not "intact". On any shortfall, quiesce all ruvector processes and
-re-run (the command is idempotent). Note the clobber can also happen
-WITHIN a single run: Step 6's reembed is a separate process rewriting
-the store while this session's own MCP server may still hold an older
-in-memory snapshot.
+**Baseline capture (feeds Step 8):** before writing anything, record the
+pre-existing entry count:
+`grep -o 'ERROR-FIX:' .ruvector/intelligence.json | wc -l`
+(occurrence count, not `grep -c` line count — a compact single-line
+store would collapse every entry onto one line). Zero/`file missing` is
+a valid baseline. Note the clobber can also happen WITHIN a single run:
+Step 6's reembed is a separate process rewriting the store while this
+session's own MCP server may still hold an older in-memory snapshot —
+the durability re-check in Step 8 exists for exactly this.
 
 ### Step 3: Enumerate the eligible corpus (count at run time)
 
@@ -153,10 +156,13 @@ For each extracted entry:
    session's MCP tools: the reembed rewrote the store on disk while this
    session's MCP server may still hold the pre-reembed snapshot, and its
    next save would clobber everything (the same-run clobber Step 2
-   describes — this exact sequence lost 32 entries once). Report the
-   unlock as done and instruct the user to re-run the command in a fresh
-   session; the dedup check makes the re-run resume from the first
-   unstored entry automatically.
+   describes). Print the literal line `STATUS: NEEDS_FRESH_SESSION` (a
+   greppable sentinel for wrappers), report the unlock as done with the
+   partial counts accumulated so far, and instruct the user to re-run the
+   command in a fresh session; the dedup check makes the re-run resume
+   from the first unstored entry automatically. On this abort path,
+   Step 7's provenance line must come from the reembed CLI's own stdout —
+   never from a further `hooks_stats` MCP call.
 
 ### Step 6: Embedding provenance (ADR-210) — unlock and re-embed
 
@@ -166,12 +172,22 @@ corpus threshold; a smaller seeded corpus that never trips
 `ERR_LEGACY_STORE_READONLY` stays hash-embedded, silently defeating the
 paraphrase-matching value this feature was calibrated for.
 
+**After the reembed, the no-MCP-writes rule applies for the REST of the
+session** — the same-run clobber risk is symmetric between the abort path
+and this normal-completion path (this session's MCP server may hold a
+pre-reembed snapshot either way). Finish with Steps 7-8 (report +
+durability re-check, reads only) and defer ANY further store writes —
+including unrelated `hooks_remember` calls later in the session — to a
+fresh session.
+
 Three further provenance behaviors matter, all observed live on 0.2.34:
 
 1. **Legacy stores are write-locked.** If any store call fails with
    `ERR_LEGACY_STORE_READONLY` ("predates embedding provenance"), the
-   store has vectors but no provenance stamp. Unlock it, then retry the
-   failed entries:
+   store has vectors but no provenance stamp. Unlock it — but do NOT
+   retry entries in this session (see Step 5.2: report
+   `STATUS: NEEDS_FRESH_SESSION` and let a fresh session's dedup check
+   resume automatically):
 
    ```bash
    npx -y ruvector@0.2.34 hooks reembed --dry-run   # inspect first
@@ -210,7 +226,17 @@ Print a summary table:
 
 Remind: seeding is manual — new solution docs are invisible to recall
 until this command is re-run. Re-running is safe (dedup skips existing
-entries).
+entries; per Steps 5.2/6, any re-run happens in a fresh session).
+
+### Step 8: Durability re-check
+
+Re-count: `grep -o 'ERROR-FIX:' .ruvector/intelligence.json | wc -l`.
+Expected = Step 2's baseline + Step 7's `seeded` count. A stale writer's
+snapshot can restore a non-zero-but-wrong count, so "not zero" is not
+"intact" — compare against the expected total exactly. On any shortfall,
+print `STATUS: CLOBBERED` and instruct: quiesce all ruvector processes
+(sessions AND lingering `ruvector mcp` servers) and re-run in a fresh
+session (idempotent).
 
 ## Error Handling
 
@@ -219,4 +245,11 @@ See `ruvector-conventions` skill for the error catalog.
 - **MCP unavailable:** "ruvector not available. Run `/ruvector:setup`."
 - **Non-project store:** stop per Step 1.3 — never seed a global store.
 - **Storage failure mid-run:** per-entry `failed` count; the run
-  continues. Re-running after the cause is fixed converges (dedup).
+  continues. Re-running (fresh session) after the cause is fixed
+  converges (dedup).
+- **Legacy-store unlock (mid-run):** `ERR_LEGACY_STORE_READONLY` aborts
+  the loop after Step 6's unlock; already-seeded entries are safe but
+  the run is incomplete — `STATUS: NEEDS_FRESH_SESSION` is printed and
+  a fresh-session re-run resumes from the first unstored entry
+  automatically. Distinct from "Non-project store" (full stop, no
+  unlock) and "Storage failure mid-run" (per-entry, continues).

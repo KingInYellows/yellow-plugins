@@ -38,9 +38,11 @@ RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 if [ ! -e "$RUVECTOR_DIR" ] || { [ -d "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR" ]; }; then
   # Resolve the worktree root the heal should target. Cheap paths first:
   # a .git FILE at PROJECT_DIR is the linked-worktree signature; a .git
-  # DIRECTORY is an ordinary checkout (skip, zero subprocesses). No .git
-  # entry at all can mean a nested launch dir inside a worktree — one
-  # rev-parse resolves it (fails instantly outside any repo).
+  # DIRECTORY at PROJECT_DIR is an ordinary checkout launched from its
+  # root (skip, zero subprocesses). No .git entry at all can mean a
+  # nested launch dir inside a worktree — one rev-parse resolves it
+  # (fails instantly outside any repo; a subdir launch of an ordinary
+  # checkout also pays this single fast call before being excluded).
   heal_root=""
   if [ -f "$PROJECT_DIR/.git" ]; then
     heal_root="$PROJECT_DIR"

@@ -159,12 +159,17 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
   nested cwd; ruvector 0.2.34's `getIntelPath()` does no upward search,
   so the server may still resolve the machine-global `~/.ruvector` even
   after the hook heals the root — an upstream limitation the hook cannot
-  fix. Start sessions from the project root when memory scoping matters. Concurrent
-  worktree sessions writing to the same DB may race; the ruvector CLI's
-  internal session queue provides partial serialization within a single
-  process, but cross-process write safety is not documented. Avoid running
-  simultaneous Claude Code sessions with active `hooks_remember` or
-  `/ruvector:index` operations on the same project
+  fix. The hook's OWN recall/session-start CLI calls are also skipped in
+  this case (deliberately — running them from the nested cwd would hit
+  the global store), so a nested-launch session gets no memory injection;
+  the healed symlink benefits future root-launched sessions. Start
+  sessions from the project root when memory scoping matters
+- Concurrent worktree sessions writing to the same DB may race; the
+  ruvector CLI's internal session queue provides partial serialization
+  within a single process, but cross-process write safety is not
+  documented. Avoid running simultaneous Claude Code sessions with
+  active `hooks_remember` or `/ruvector:index` operations on the same
+  project
 - MCP cold start adds 300-1500ms on first tool call after session start
 - Hook recall uses hash embeddings (not ONNX semantic) — paraphrased queries
   (e.g., "fix the bug" vs "correct the error") score near-zero similarity.

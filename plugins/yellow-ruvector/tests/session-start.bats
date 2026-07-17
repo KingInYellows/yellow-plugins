@@ -259,4 +259,9 @@ exit 0'
   echo "$output" | jq -e '.continue == true' > /dev/null
   [ -L "$PROJECT_ROOT/wt/.ruvector" ]
   [ "$(readlink "$PROJECT_ROOT/wt/.ruvector")" = "$PROJECT_ROOT/.ruvector" ]
+  # Pin the documented nested-launch limitation: the heal plants the
+  # symlink for FUTURE root-launched sessions, but THIS session's own
+  # recall is deliberately skipped (running the CLI from the nested cwd
+  # would hit the global store) — output must carry no systemMessage.
+  echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
 }
