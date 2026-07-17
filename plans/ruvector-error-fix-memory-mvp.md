@@ -130,6 +130,18 @@ skill. Decisions locked with the user (2026-07-17):
 > scores look semantic, not hash-degenerate).
 <!-- /deepen-plan -->
 
+<!-- deepen-plan: codebase -->
+> **Codebase (RESOLUTION, 2026-07-17 execution):** the annotation above is
+> superseded — the conflict resolved POSITIVE during implementation. The
+> shipped 0.2.34 package (not its GitHub docs) contains `hooks reembed`
+> whose `--help` cites ADR-210 verbatim, and `ERR_LEGACY_STORE_READONLY`
+> fired live 32 times during seeding (legacy stores are write-locked until
+> reembed). Observed timings: reembed of ~170 entries took 12-17s. The
+> seed-solutions command's Step 6 documents the verified behavior; shipped
+> package source outranks repo docs for this vendor (5th doc-drift
+> instance).
+<!-- /deepen-plan -->
+
 - [x] 0.3: Check worktree behavior: confirm whether `.ruvector` should be a
       symlink here (worktree-manager.sh) and whether seeding from a
       worktree lands in the shared store. Note findings; do not fix

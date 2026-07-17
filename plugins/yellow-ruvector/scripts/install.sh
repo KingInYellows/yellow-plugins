@@ -184,7 +184,7 @@ elif npm_output=$(npm "${install_args[@]}" --prefix "${HOME:?HOME not set}/.loca
   fi
 else
   printf '%s\n' "$npm_output" >&2
-  error "npm install failed. Try: npm install -g ruvector --ignore-scripts"
+  error "npm install failed. Try: npm install -g ruvector@${install_version} --ignore-scripts"
 fi
 
 # --- Verify installation (global binary required) ---
@@ -195,12 +195,12 @@ if ! command -v ruvector >/dev/null 2>&1; then
   if [ -n "$npm_global_prefix" ] && [ -x "${npm_global_bin}/ruvector" ]; then
     error "ruvector installed at ${npm_global_bin}/ruvector but that directory is not in PATH. Add to your shell profile: export PATH=\"${npm_global_bin}:\$PATH\""
   fi
-  error "ruvector global binary not found in PATH after install. Hooks with 1-second budgets require the global binary (npx adds ~1900ms overhead). Try: npm install -g ruvector --ignore-scripts"
+  error "ruvector global binary not found in PATH after install. Hooks with 1-second budgets require the global binary (npx adds ~1900ms overhead). Try: npm install -g ruvector@${install_version} --ignore-scripts"
 fi
 
 installed_version=$(ruvector --version 2>/dev/null || true)
 if [ -z "$installed_version" ]; then
-  error "ruvector binary found but 'ruvector --version' failed. Try reinstalling: npm install -g ruvector --ignore-scripts"
+  error "ruvector binary found but 'ruvector --version' failed. Try reinstalling: npm install -g ruvector@${install_version} --ignore-scripts"
 fi
 
 if [ "$install_path" = "local" ]; then

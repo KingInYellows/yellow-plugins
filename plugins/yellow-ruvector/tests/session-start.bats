@@ -26,7 +26,8 @@ make_ruvector_stub() {
 }
 
 run_hook() {
-  printf '%s' "$1" | PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="$PROJECT_ROOT" bash "$HOOK_SCRIPT"
+  # $1 = hook stdin JSON; $2 (optional) = CLAUDE_PROJECT_DIR override
+  printf '%s' "$1" | PATH="$MOCK_BIN:$PATH" CLAUDE_PROJECT_DIR="${2:-$PROJECT_ROOT}" bash "$HOOK_SCRIPT"
 }
 
 # Mirrors session-start.sh's own TIMEOUT_CMD resolution + GNU-compatibility
@@ -125,7 +126,7 @@ exit 0'
   git -C "$PROJECT_ROOT" worktree add -q "$PROJECT_ROOT/wt" -b heal-test
   rm -rf "$PROJECT_ROOT/wt/.ruvector"
   make_ruvector_stub 'exit 0'
-  run bash -c "printf '%s' '{\"cwd\":\"\"}' | PATH=\"$MOCK_BIN:\$PATH\" CLAUDE_PROJECT_DIR=\"$PROJECT_ROOT/wt\" bash \"$HOOK_SCRIPT\""
+  run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true' > /dev/null
   [ -L "$PROJECT_ROOT/wt/.ruvector" ]
@@ -143,4 +144,17 @@ exit 0'
   [ "$status" -eq 0 ]
   echo "$output" | jq -e '.continue == true' > /dev/null
   [ ! -e "$RUVECTOR_DIR" ]
+}
+
+@test "version pin is synchronized between install.sh and the catalog npx spec" {
+  # The MCP server (catalog npx args) and the CLI-hook path (install.sh
+  # global default) must run the same ruvector version — skew lets a
+  # pre-ADR-210 binary clobber the store's embedding-provenance stamp.
+  install_default=$(grep -oE '^RUVECTOR_DEFAULT_VERSION="[^"]+"' \
+    "$BATS_TEST_DIRNAME/../scripts/install.sh" | cut -d'"' -f2)
+  catalog_spec=$(grep -oE '"ruvector@[0-9][^"]*"' \
+    "$BATS_TEST_DIRNAME/../../../catalog/plugins/yellow-ruvector.json" | tr -d '"')
+  [ -n "$install_default" ]
+  [ -n "$catalog_spec" ]
+  [ "ruvector@${install_default}" = "$catalog_spec" ]
 }

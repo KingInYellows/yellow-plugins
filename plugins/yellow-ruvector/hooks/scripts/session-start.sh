@@ -30,14 +30,19 @@ RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 # at first use, so a missing dir at server start silently selects the
 # machine-global ~/.ruvector for the whole session. Restore the documented
 # shared-store contract by linking to the main checkout's store. No-op for
-# non-worktree checkouts and for projects that never initialized ruvector.
-if [ ! -e "$RUVECTOR_DIR" ]; then
+# non-worktree checkouts (a linked worktree's .git is a FILE, so the cheap
+# -f gate skips both git subprocesses for ordinary checkouts) and for
+# projects that never initialized ruvector. --path-format=absolute needs
+# git >= 2.31; on older git the rev-parse fails and the heal is skipped
+# silently (pre-heal behavior, no breakage).
+if [ ! -e "$RUVECTOR_DIR" ] && [ -f "$PROJECT_DIR/.git" ]; then
   git_common_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || git_common_dir=""
   git_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-dir 2>/dev/null) || git_dir=""
   if [ -n "$git_common_dir" ] && [ -n "$git_dir" ] && [ "$git_common_dir" != "$git_dir" ]; then
     main_root=$(dirname "$git_common_dir")
     if [ -d "${main_root}/.ruvector" ] && [ "$main_root" != "$PROJECT_DIR" ]; then
-      ln -s "${main_root}/.ruvector" "$RUVECTOR_DIR" 2>/dev/null || true
+      ln -s "${main_root}/.ruvector" "$RUVECTOR_DIR" 2>/dev/null \
+        || printf '[ruvector] Warning: worktree store-heal could not link %s\n' "$RUVECTOR_DIR" >&2
     fi
   fi
 fi
