@@ -138,6 +138,9 @@ previous.
 - No P1/P2 findings in latest round
 - False positive rate >30%
 - Remaining findings are optimizations, not bugs
+- Resolving and pushing has already produced one extra round of bot
+  threads on the fix commits themselves — bound to at most one further
+  round rather than looping (see "Update — 2026-07-17" below)
 
 **Recommended:** Two rounds is optimal for most PRs. Third round only if round 2
 found 5+ P1/P2 findings.
@@ -152,3 +155,33 @@ found 5+ P1/P2 findings.
 5. **Subprocess optimization checklist:** Replace `printf | grep` with
    `[[ =~ ]]`, `printf | cut` with `${BASH_REMATCH}`, `printf | tr` with
    `case $'\n'`
+
+## Update — 2026-07-17
+
+### Pattern: Bounded One-Extra-Round Policy for Post-Push Re-Review Waves
+
+**Problem:** `/review:resolve` on PR #647 ran a 13-cluster parallel
+resolver pass plus a 3-thread follow-up wave, pushing fix commits each
+time. Each push produced NEW bot review threads on the fix commits
+themselves — a resolve-then-push cycle does not converge to zero new
+findings on its own, because the fixes are new diffs the bots haven't
+seen yet.
+
+**Why it's different from the Diminishing Returns pattern above:** that
+pattern tracks FP rate across successive *review* rounds on the same
+diff. This is about *resolve* rounds — each one changes the diff, so
+every round guarantees at least one more round of bot scrutiny. Treating
+"keep resolving until zero new threads" as the stop condition risks an
+unbounded loop, since a fix commit can itself always attract a comment.
+
+**Solution:** a bounded one-extra-round policy — resolve, push, verify
+the resulting threads, then stop regardless of whether the verification
+round produced further findings. On PR #647 this left zero unresolved
+threads in practice (the extra round's findings were genuine and
+resolve-safe), but the bound itself is what prevents an open-ended loop
+on PRs where they aren't.
+
+**Prevention:** any `/review:resolve` or `/review:sweep` pipeline that
+pushes fix commits should cap re-verification at one extra round by
+default, not "loop until clean" — a resolve cycle inherently generates
+new review surface, unlike a passive re-review of a static diff.

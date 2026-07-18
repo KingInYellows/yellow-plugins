@@ -994,6 +994,72 @@ cannot substitute for that.
       (tags, labels, timestamps) — if present, widen the wildcard
       boundary rather than encoding the colon into the prefix.
 
+### 23. Allowlist-of-One Needs No Runtime Validation — Drop the Argument Instead
+
+**WRONG:**
+
+```markdown
+1. Directory: `$ARGUMENTS` if provided (validate: relative path, no `..`,
+   no leading `/` or `~`; reject otherwise), else `docs/solutions`.
+```
+
+**RIGHT:**
+
+```markdown
+1. Directory: always the literal `docs/solutions` — this command takes no
+   path argument. Ignore any `$ARGUMENTS` value entirely.
+```
+
+**Rule:** `seed-solutions.md` accepted an optional path override and
+described its validation in prose ("reject otherwise") rather than
+routing it through the shared `validate-fs.sh` lib. Prose-only validation
+of a user-derived path is exactly what AGENTS.md's path-traversal rule
+bans — but the deeper fix here isn't "call the shared validator instead,"
+it's noticing the valid input space is exactly one value (`docs/solutions`)
+and the command never had a real reason to accept an override at all.
+Deleting the argument removes the entire attack surface a validator would
+otherwise have to close, and is strictly simpler than adding a call to
+`validate-fs.sh` for a parameter no caller needs.
+
+**Prevention checklist additions:**
+
+- [ ] Before writing (or fixing) validation for a command argument, check
+      whether the legitimate input space is a single fixed value. If so,
+      hardcode it and drop the argument — don't validate an override
+      nothing needs.
+
+### 24. A Concurrency Guard Must Not Hard-Stop on Its Own Expected Process
+
+**WRONG:** treating `pgrep -f 'ruvector mcp'` finding any match as "another
+session is writing, abort" and hard-stopping the command.
+
+**RIGHT:** report the match count as informational context for an
+`AskUserQuestion` confirmation, with an explicit expected baseline.
+
+**Rule:** `seed-solutions.md`'s Step 2 concurrency guard checks for other
+processes holding a stale in-memory snapshot of the store before a batch
+write. A hard-stop-on-any-match design self-defeats immediately: Step 1
+already started this session's own lazily-launched MCP server, so the
+guard's own target process is *always* present by the time Step 2 runs —
+the check can never pass. `pgrep -f` compounds this: it matches the full
+command line, so a shell ancestor whose invocation happens to contain the
+literal text being searched for (here, `ruvector mcp` — this very command's
+own name) can add a second harmless match. The fix is to stop treating the
+process count as a boolean gate at all — report it as context ("N
+processes found, 1 is expected: this session's own server") and let a
+human confirm, rather than encoding "zero matches" as the pass condition
+for a check that structurally cannot see zero.
+
+**Prevention checklist additions:**
+
+- [ ] Any guard that greps/pgreps for "other instances of X" before a
+      destructive or non-idempotent operation must account for the
+      current session's own expected match (a lazily-started server,
+      a sidecar process) before treating any match as a stop condition.
+- [ ] `pgrep -f` matches the full command line, including shell ancestors
+      whose own invocation text happens to contain the search string —
+      don't assume match count == distinct external process count.
+
 ---
 
 ## Related Documentation
