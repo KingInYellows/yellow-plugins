@@ -100,7 +100,6 @@ directory, not the live shared one.
   for anything that shells out to the same backing store or API — a grep
   across the plugin's `hooks/` directory for the resource's CLI/API name
   is a cheap check before declaring an invariant complete.
-  is a cheap check before declaring an invariant complete.
 - A command's own remaining steps are part of "the rest of the session"
   an invariant claims to cover. If Step N declares a write-freeze and
   Steps N+1..M are still Bash/Edit/Write calls, check whether those tool
