@@ -113,6 +113,38 @@ visibility into whether it actually reached the desired end state.
   surface the actual resulting mode/state explicitly so a silently
   incomplete upgrade is visible, not just absent from the error count.
 
+## Update — 2026-07-17 (round 2): a sibling counting bug in the same command
+
+A second review round on the same command found a different bug in the
+adjacent durability-verification logic (Step 2/Step 8 in
+`seed-solutions.md`): the re-check used `grep -c 'ERROR-FIX:'
+.ruvector/intelligence.json` and compared the result to "zero" to detect a
+stale-writer clobber. `grep -c` counts **matching lines**, not
+occurrences — on a compact, single-line JSON store (the common case for
+`intelligence.json`), every entry collapses onto line 1, so `grep -c`
+returns `1` regardless of whether the file holds 1 entry or 32. A clobber
+that dropped most entries but left at least one `ERROR-FIX:` string
+anywhere in the file would report a non-zero, "looks fine" count.
+
+**Fix:** switched to occurrence counting (`grep -o 'ERROR-FIX:' file | wc
+-l`), plus capturing an explicit baseline count *before* seeding (Step 2)
+and comparing Step 8's re-check against `baseline + seeded`, not just
+against zero — the same "don't compare against a fixed constant when the
+real expected value is computable" fix that generalizes beyond this one
+command.
+
+**General rule, distinct from this doc's main lesson but sharing its root
+shape:** a check whose *counting primitive* silently degrades under a
+common data shape (single-line/minified files, in this case) can pass
+clean while the condition it exists to catch is actually present — the
+same "the check ran and reported success, but success was measured
+wrong" failure shape as the main lesson above, just at the level of the
+counting tool rather than the trigger condition. When verifying a count
+in shell, default to an occurrence-counting idiom (`grep -o ... | wc -l`,
+or a tool-native count) over `grep -c`, and ask what the file's realistic
+shape is (pretty-printed vs. minified/single-line) before trusting a
+line-based count as a proxy for an occurrence count.
+
 ## Related
 
 - `docs/solutions/logic-errors/bash-pipe-head-exit-code-masking.md` — a
