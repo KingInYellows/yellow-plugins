@@ -1105,6 +1105,50 @@ shell executes it as two independently-authorized programs.
       list in the same edit — a counting-logic fix and a permissions fix
       are easy to treat as separate tasks and ship only one.
 
+### 26. Editing a Command's Literal Invocation Text Requires Re-Checking Its Own Bash Grant
+
+**WRONG:**
+
+```yaml
+allowed-tools:
+  - Bash(npx -y ruvector@0.2.34 hooks reembed:*)
+```
+
+```bash
+npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run
+```
+
+**RIGHT:**
+
+```yaml
+allowed-tools:
+  - Bash(npx -y --ignore-scripts ruvector@0.2.34 hooks reembed:*)
+```
+
+**Rule:** `Bash(prefix:*)` grants match by literal string prefix against
+the invocation actually run. Inserting a flag *anywhere before* the
+wildcard boundary — here, adding a supply-chain-safety `--ignore-scripts`
+flag to an `npx` invocation — changes the literal prefix text the real
+command produces, so the old grant silently stops matching even though
+the edit reads as "just adding a safety flag," not "changing the command
+this permission covers." This is a different failure shape from #22
+(a colon inside a fixed *argument* collides with the wildcard boundary
+convention) and #25 (a *second* executable introduced by a pipe has no
+grant of its own): here the same single executable's own grant goes
+stale because the executable's own invocation text changed underneath it.
+`plugins/yellow-ruvector/commands/ruvector/seed-solutions.md` (commit
+`994c9f44`) is a positive example — the grant and the command text were
+updated together in the same edit, which is the discipline this item
+generalizes, not a case where it shipped broken.
+
+**Prevention checklist additions:**
+
+- [ ] Any edit that inserts, removes, or reorders a flag/argument in a
+      command's prose *before* the point a `Bash(prefix:*)` grant's
+      wildcard begins must re-diff that grant against the new literal
+      text in the same edit — command-line text and its `allowed-tools`
+      grant are a coupled pair, not two independent artifacts.
+
 ---
 
 ## Related Documentation
