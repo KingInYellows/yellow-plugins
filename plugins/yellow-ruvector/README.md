@@ -39,6 +39,7 @@ Persistent vector memory and semantic code search for Claude Code agents via
 | `/ruvector:status`              | Show ruvector health, DB stats, and queue status       |
 | `/ruvector:learn [description]` | Record a learning, mistake, or pattern                 |
 | `/ruvector:memory [filter]`     | Browse and search stored memories                      |
+| `/ruvector:seed-solutions`      | Seed ERROR-FIX memory from `track: bug` solution docs  |
 
 ## Agents
 
@@ -56,6 +57,10 @@ Persistent vector memory and semantic code search for Claude Code agents via
 - **Passive capture:** Hooks automatically track file changes and bash outcomes
   in a local queue. The queue is flushed to ruvector on session end or next
   session start.
+- **Error→fix memory:** `/ruvector:seed-solutions` imports a repo's
+  `track: bug` solution docs as `ERROR-FIX:` entries so debugging and
+  review flows can recall past fixes semantically. Seeding is manual —
+  re-run it after new solution docs land.
 - **MCP integration:** ruvector runs as a stdio MCP server, discovered via
   ToolSearch.
 

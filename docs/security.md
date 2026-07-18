@@ -11,7 +11,17 @@ enterprise deployment.
 | yellow-linear   | linear     | `https://mcp.linear.app/mcp`            | HTTP      | OAuth (browser popup)       | Issue data, team info         |
 | yellow-devin    | deepwiki   | `https://mcp.deepwiki.com/mcp`          | HTTP      | None                        | Repo names, search queries    |
 | yellow-devin    | devin      | `https://mcp.devin.ai/mcp`              | HTTP      | TBD (may require API token) | Code, task prompts            |
-| yellow-ruvector | ruvector   | Local stdio (`npx ruvector mcp start`)  | stdio     | None (local)                | Code embeddings (local only)  |
+| yellow-ruvector | ruvector   | Local stdio (`npx -y ruvector@0.2.34 mcp start`) | stdio | None (local)          | Code embeddings (local only)  |
+
+The `ruvector` stdio command is only network-free once `npx` has a warm npm
+exec-cache entry for the pinned version — `npx` resolves from local project
+dependencies, then the npm exec cache, and does **not** consult global
+installs, so the global binary from [Local npm
+Dependencies](#local-npm-dependencies) does not by itself prevent this
+fetch. On a cold-cache machine it fetches `ruvector@0.2.34` from the npm
+registry first; warm the cache with a one-time online run (`npx -y
+--ignore-scripts ruvector@0.2.34 --version`) or by starting the MCP server
+once while online.
 
 ### Plugins Without MCP Servers
 
@@ -58,7 +68,9 @@ These servers require no configuration. They work immediately after plugin
 installation:
 
 - **context7** (yellow-core) — public library documentation endpoint
-- **ruvector** (yellow-ruvector) — local stdio server, no network calls
+- **ruvector** (yellow-ruvector) — local stdio server, no auth configuration
+  (its `npx` startup command can still reach the npm registry on a cold
+  machine — see [MCP Servers Inventory](#mcp-servers-inventory) above)
 - **deepwiki** (yellow-devin) — public repository documentation endpoint
 
 ## Enterprise Rollout Recommendations
@@ -93,7 +105,15 @@ These plugins work entirely offline with no external network calls:
 
 - `gt-workflow` — Graphite CLI wrapper
 - `yellow-debt` — Local codebase analysis
-- `yellow-ruvector` — Local vector search (stdio MCP, no network)
+- `yellow-ruvector` — Local vector search (stdio MCP, no network at
+  runtime). Exception: MCP startup runs `npx -y ruvector@0.2.34`, which
+  hits the npm registry on first use unless the npm exec cache already
+  holds `ruvector@0.2.34` from a prior online run. The global install that
+  `install.sh` performs serves the CLI-hook path only — it does **not**
+  satisfy this npx resolution, so a cold-cache offline machine fails MCP
+  startup even with the global binary present. Warm the cache once while
+  online (see the "Local npm Dependencies" section below) to avoid the
+  fetch at MCP startup.
 
 ## Hook Safety
 
@@ -114,7 +134,7 @@ yellow-ruvector has the most hooks. Its shell scripts:
 
 | Hook                | Event             | Script                  | Time Budget | What It Does                      |
 | ------------------- | ----------------- | ----------------------- | ----------- | --------------------------------- |
-| session-start       | SessionStart      | `session-start.sh`      | 3s          | Flush stale queue, load learnings |
+| session-start       | SessionStart      | `session-start.sh`      | 3s          | Worktree store-heal, flush stale queue, load learnings |
 | user-prompt-submit  | UserPromptSubmit  | `user-prompt-submit.sh` | 50ms        | Recall relevant memories          |
 | post-tool-use       | PostToolUse       | `post-tool-use.sh`      | 50ms        | Append file changes to queue      |
 | stop                | Stop              | `stop.sh`               | N/A         | Delegate queue flush to agent     |
@@ -123,6 +143,13 @@ yellow-ruvector has the most hooks. Its shell scripts:
 
 - All scripts validate input via shared `lib/validate.sh`
 - Path traversal rejected (`..`, `/`, `~` in arguments)
+- `session-start.sh`'s worktree store-heal creates a symlink
+  `<worktree>/.ruvector -> <main-checkout>/.ruvector` only when the
+  session runs in a linked git worktree (`.git` is a file), the local
+  entry is absent or a dangling symlink, and the main checkout has a
+  store. The link target derives from `git rev-parse --git-common-dir`
+  (never user input); a pre-existing non-symlink path (directory or regular file) is never replaced
+  (warn-only)
 - Queue files are append-only JSONL with `flock` for concurrency safety
 - No network calls in any hook script
 - Scripts run with user's permissions (no escalation)
@@ -161,7 +188,7 @@ Plugins that execute shell commands:
 | yellow-linear       | `git`, `gh`                          | Branch detection, PR context         |
 | yellow-devin        | `curl`, `jq`, `git`, `gh`            | Devin API calls, JSON construction   |
 | yellow-review       | `gt`, `gh`, `git`, `jq`              | PR management, GraphQL queries       |
-| yellow-ruvector     | `npx`, `npm`, `jq`, `git`            | ruvector CLI, hook scripts           |
+| yellow-ruvector     | `npx`, `npm`, `jq`, `git`, `pgrep`, `grep` | ruvector CLI, hook scripts, seed-solutions guards |
 | yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh` | Browser automation, setup            |
 | yellow-debt         | `git`, `gt`, `jq`, `yq`              | Codebase analysis, commit generation |
 | gt-workflow         | `gt`, `git`                          | Branch and PR management             |
@@ -182,15 +209,20 @@ include prompt injection defenses:
 
 ### yellow-ruvector
 
-Installs `ruvector` globally via npm:
+Installs `ruvector` globally via npm, version-pinned (an unpinned global
+was the root cause of a machine-global store-pollution incident):
 
 ```bash
-npm install -g ruvector
+npm install -g ruvector@0.2.34 --ignore-scripts
 ```
 
 **Mitigation:** Review package before installation. The `install.sh` script
-performs dependency checks and error handling but does not use
-`--ignore-scripts`.
+performs dependency checks and error handling and installs with
+`--ignore-scripts`; the MCP server's own npx launch spec (catalog →
+`plugin.json` args) and the `seed-solutions` reembed commands carry
+`--ignore-scripts` as well, so the lazily-fetched npx path is covered, not
+just the global install. The pinned default (`RUVECTOR_DEFAULT_VERSION`)
+must match the catalog npx spec — bats tests enforce the sync.
 
 ### yellow-browser-test
 

@@ -5,13 +5,31 @@ ruvector.
 
 ## MCP Server
 
-- **ruvector** — Stdio transport via `npx ruvector mcp start`
-- Storage: `.ruvector/intelligence/memory.rvdb` (rvlite format) in project root
+- **ruvector** — Stdio transport via `npx -y ruvector@0.2.34 mcp start`
+  (version-pinned: unpinned npx resolves whatever global is installed —
+  a stale 0.2.25 global silently selected the machine-global `~/.ruvector`
+  store from worktree sessions. Bump the pin in
+  `catalog/plugins/yellow-ruvector.json` + `scripts/install.sh` together
+  and re-verify tool contracts)
+- First MCP start needs network unless the npm exec cache already holds
+  `ruvector@0.2.34` from a prior online run — global install alone does
+  **not** satisfy npx resolution, only the CLI-hook path; the pin trades
+  offline-first-start for the store-pollution fix above; see
+  `docs/security.md` "Local npm Dependencies"
+- Storage: `.ruvector/intelligence.json` (flat JSON) in project root —
+  earlier docs claimed `intelligence/memory.rvdb` (rvlite); verified wrong
+  against 0.2.34 source and on-disk reality (2026-07-17)
 - Embedding model: all-MiniLM-L6-v2 (384 dimensions, ONNX WASM runtime)
 - Lifecycle: starts on first MCP tool call (lazy init by Claude Code), shuts
   down on session end
 - If crashed mid-session: surface error and suggest running
-  `npx ruvector mcp start` to verify
+  `npx -y --ignore-scripts ruvector@0.2.34 mcp start` to verify (always
+  the pinned spec — the unpinned form resolves whatever global is
+  installed)
+- `RUVECTOR_STORAGE_PATH` in plugin.json is **inert at 0.2.34** — the env
+  var appears nowhere in the installed package (full-source grep); store
+  resolution is `getIntelPath()`'s cwd-based logic. Kept as
+  documentation-of-intent in case upstream honors it later
 - First call after session start may be slow (300-1500ms cold start)
 
 ## Conventions
@@ -33,7 +51,7 @@ ruvector.
 
 ## Plugin Components
 
-### Commands (6)
+### Commands (7)
 
 - `/ruvector:setup` — Install ruvector and initialize `.ruvector/` directory
 - `/ruvector:index` — Index codebase for semantic search
@@ -41,6 +59,11 @@ ruvector.
 - `/ruvector:status` — Show ruvector health, DB stats, and queue status
 - `/ruvector:learn` — Record a learning, mistake, or pattern for future sessions
 - `/ruvector:memory` — Browse and search stored memories and learnings
+- `/ruvector:seed-solutions` — Batch-seed `ERROR-FIX:` entries from a
+  repo's `track: bug` solution docs into recall memory (idempotent;
+  gated on `intel_path` resolving inside the project root). Re-run
+  manually after new solution docs land — seeded entries do not track
+  the corpus automatically
 
 ### Agents (2)
 
@@ -133,12 +156,33 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
 - No offline MCP fallback — if ruvector MCP is down, search and memory
   operations fail gracefully
 - `.ruvector/` is shared across git worktrees via a symlink injected by
-  yellow-core's `worktree-manager.sh` at worktree creation time. Concurrent
-  worktree sessions writing to the same DB may race; the ruvector CLI's
-  internal session queue provides partial serialization within a single
-  process, but cross-process write safety is not documented. Avoid running
-  simultaneous Claude Code sessions with active `hooks_remember` or
-  `/ruvector:index` operations on the same project
+  yellow-core's `worktree-manager.sh` at worktree creation time; for
+  worktrees created by other tooling, `session-start.sh` heals the
+  missing link (resolving the worktree root even from a nested launch
+  dir). This heal takes effect for the NEXT session's MCP process — the
+  MCP server initializes lazily on first tool call and can race ahead of
+  this hook (or may already be running from a still-open session), so
+  the CURRENT session can still have the machine-global `~/.ruvector`
+  fallback cached and keep writing there until a fresh session picks up
+  the healed symlink. `/ruvector:seed-solutions`'s Step 1.4 store-scoping
+  check is the guard for this window — it STOPs before any seeding write
+  if `intel_path` resolves outside the project root.
+- **Nested-launch scoping limitation:** a session started from a
+  subdirectory (not the project/worktree root) gives the MCP server a
+  nested cwd; ruvector 0.2.34's `getIntelPath()` does no upward search,
+  so the server may still resolve the machine-global `~/.ruvector` even
+  after the hook heals the root — an upstream limitation the hook cannot
+  fix. The hook's OWN recall/session-start CLI calls are also skipped in
+  this case (deliberately — running them from the nested cwd would hit
+  the global store), so a nested-launch session gets no memory injection;
+  the healed symlink benefits future root-launched sessions. Start
+  sessions from the project root when memory scoping matters
+- Concurrent worktree sessions writing to the same DB may race; the
+  ruvector CLI's internal session queue provides partial serialization
+  within a single process, but cross-process write safety is not
+  documented. Avoid running simultaneous Claude Code sessions with
+  active `hooks_remember` or `/ruvector:index` operations on the same
+  project
 - MCP cold start adds 300-1500ms on first tool call after session start
 - Hook recall uses hash embeddings (not ONNX semantic) — paraphrased queries
   (e.g., "fix the bug" vs "correct the error") score near-zero similarity.

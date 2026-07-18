@@ -206,3 +206,45 @@ runtime/language-feature semantic (not a style or convention claim), verify
 empirically with the actual interpreter before accepting or declining — the
 same discipline this doc already applies to `gt log --json` (FP2), extended
 here to language-feature claims.
+
+## Update — 2026-07-18
+
+### FP7: "X is missing from Y" claims generated from a stale hunk view
+
+**What the bot flagged:** during a `/review:sweep-all` pass, a resolve round
+pushed fix commits and a bot (CodeRabbit) posted a new thread claiming
+several MCP tool entries were missing from a command's `allowed-tools`
+frontmatter. The specific file and line numbers behind this instance were
+not independently re-verified while writing this doc — the transferable
+mechanism below is what's load-bearing, not that one instance's exact
+coordinates.
+
+**Why this class of finding is suspect:** a bot commenting on a push that
+lands *during* a resolve/review pipeline is reviewing whatever diff/hunk
+view it fetched at comment-generation time, which can lag the actual
+content at `HEAD` by one push if the bot's webhook processing or diff
+cache hasn't caught up. A "missing" claim generated from that lag reads
+identically to a genuine finding — the bot has no way to signal "my view
+of this file might be stale."
+
+**Detection rule:** for any bot claim of the shape "X is missing/absent
+from file Y," re-check Y at current `HEAD` directly (`Read`/`grep` the
+live file, not the bot's quoted excerpt or diff snippet) before accepting
+or declining. When the PR has had multiple pushes, also resolve the
+commit the bot actually reviewed (its review-run metadata or the push
+timestamp closest to the comment) and check Y there too — comparing both
+revisions distinguishes "bot saw a stale view" (present at its commit
+AND at HEAD → decline) from "valid at its commit, fixed since" (decline
+with a pointer to the fixing commit) and from "regressed after its
+commit" (accept against HEAD, not the bot's snapshot). This is the same "verify against ground truth, not the
+bot's framing" discipline FP2 and FP6 already establish, applied here to
+existence claims instead of tool-recommendation or language-semantic
+claims — the specific thing that needs verifying is different (presence
+in the current file, not a runtime's actual behavior) but the triage
+posture is identical: never take a bot's premise as true without an
+independent check.
+
+**Generalized rule:** treat "reviewed the current file" and "reviewed the
+diff view generated at some point during a multi-push session" as
+different levels of evidence — a bot's comment timestamp being after your
+push does not guarantee its content view is too.

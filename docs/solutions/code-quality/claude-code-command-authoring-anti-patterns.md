@@ -947,6 +947,210 @@ frontmatter field exactly.
 
 ---
 
+## Update — 2026-07-17
+
+### 22. Scoped Bash Grant: a Literal Colon in the Prefix Collides with the `:*` Wildcard
+
+**WRONG:**
+
+```yaml
+allowed-tools:
+  - Bash(grep -c ERROR-FIX:*)
+```
+
+**RIGHT:**
+
+```yaml
+allowed-tools:
+  - Bash(grep -c *)
+```
+
+**Rule:** `Bash(prefix:*)` grants are meant to allow any invocation
+starting with the literal `prefix`. When the command being scoped needs
+a colon inside its own fixed argument — here, `grep -c 'ERROR-FIX:'
+.ruvector/intelligence.json` searches for the literal string
+`ERROR-FIX:`, which legitimately contains a colon — that colon collides
+with the grant's own `:*` wildcard-boundary convention plus how the real
+invocation gets quoted, and in practice the grant did not reliably
+prefix-match the command it was written to cover. This is easy to write
+and easy to approve in review: the English intent ("only allow counting
+`ERROR-FIX` occurrences") reads correctly, and the mismatch only shows up
+once the tool call actually runs. 7 independent review personas
+converged on this exact case
+(`plugins/yellow-ruvector/commands/ruvector/seed-solutions.md`) before it
+was caught.
+
+Widen the wildcard boundary to before any colon that could appear in a
+literal argument, rather than trying to encode a colon-containing
+literal inside the fixed prefix. The step prose in the same command file
+(mechanical extraction only, doc content never executed) is what keeps
+the broadened grant safely scoped in practice — the grant text alone
+cannot substitute for that.
+
+**Prevention checklist additions:**
+
+- [ ] Any `Bash(prefix:*)` grant's fixed `prefix` segment is checked for
+      literal colons in arguments the real invocation will contain
+      (tags, labels, timestamps) — if present, widen the wildcard
+      boundary rather than encoding the colon into the prefix.
+
+### 23. Allowlist-of-One Needs No Runtime Validation — Drop the Argument Instead
+
+**WRONG:**
+
+```markdown
+1. Directory: `$ARGUMENTS` if provided (validate: relative path, no `..`,
+   no leading `/` or `~`; reject otherwise), else `docs/solutions`.
+```
+
+**RIGHT:**
+
+```markdown
+1. Directory: always the literal `docs/solutions` — this command takes no
+   path argument. Ignore any `$ARGUMENTS` value entirely.
+```
+
+**Rule:** `seed-solutions.md` accepted an optional path override and
+described its validation in prose ("reject otherwise") rather than
+routing it through the shared `validate-fs.sh` lib. Prose-only validation
+of a user-derived path is exactly what AGENTS.md's path-traversal rule
+bans — but the deeper fix here isn't "call the shared validator instead,"
+it's noticing the valid input space is exactly one value (`docs/solutions`)
+and the command never had a real reason to accept an override at all.
+Deleting the argument removes the entire attack surface a validator would
+otherwise have to close, and is strictly simpler than adding a call to
+`validate-fs.sh` for a parameter no caller needs.
+
+**Prevention checklist additions:**
+
+- [ ] Before writing (or fixing) validation for a command argument, check
+      whether the legitimate input space is a single fixed value. If so,
+      hardcode it and drop the argument — don't validate an override
+      nothing needs.
+
+### 24. A Concurrency Guard Must Not Hard-Stop on Its Own Expected Process
+
+**WRONG:** treating `pgrep -f 'ruvector mcp'` finding any match as "another
+session is writing, abort" and hard-stopping the command.
+
+**RIGHT:** report the match count as informational context for an
+`AskUserQuestion` confirmation, with an explicit expected baseline.
+
+**Rule:** `seed-solutions.md`'s Step 2 concurrency guard checks for other
+processes holding a stale in-memory snapshot of the store before a batch
+write. A hard-stop-on-any-match design self-defeats immediately: Step 1
+already started this session's own lazily-launched MCP server, so the
+guard's own target process is *always* present by the time Step 2 runs —
+the check can never pass. `pgrep -f` compounds this: it matches the full
+command line, so a shell ancestor whose invocation happens to contain the
+literal text being searched for (here, `ruvector mcp` — this very command's
+own name) can add a second harmless match. The fix is to stop treating the
+process count as a boolean gate at all — report it as context ("N
+processes found, 1 is expected: this session's own server") and let a
+human confirm, rather than encoding "zero matches" as the pass condition
+for a check that structurally cannot see zero.
+
+**Prevention checklist additions:**
+
+- [ ] Any guard that greps/pgreps for "other instances of X" before a
+      destructive or non-idempotent operation must account for the
+      current session's own expected match (a lazily-started server,
+      a sidecar process) before treating any match as a stop condition.
+- [ ] `pgrep -f` matches the full command line, including shell ancestors
+      whose own invocation text happens to contain the search string —
+      don't assume match count == distinct external process count.
+
+### 25. A Bash Grant Must Cover Every Stage of a Pipe, Not Just the First Command
+
+**WRONG:**
+
+```yaml
+allowed-tools:
+  - Bash(grep -o *)
+```
+
+```bash
+grep -o 'ERROR-FIX:' .ruvector/intelligence.json | wc -l
+```
+
+**RIGHT:**
+
+```yaml
+allowed-tools:
+  - Bash(grep -o *)
+  - Bash(wc -l:*)
+```
+
+**Rule:** the permission engine matches each piped subcommand
+independently against the `allowed-tools` list — a grant for the head of
+a pipeline does not implicitly cover its tail. `seed-solutions.md`
+Steps 2 and 8 switched from `grep -c` to `grep -o ... | wc -l` to fix the
+line-vs-occurrence counting bug documented in
+`docs/solutions/logic-errors/reactive-trigger-threshold-blind-spot.md`
+("round 2"), but the frontmatter only granted `Bash(grep -o *)`; `wc -l`
+had no grant of its own, so the corrected command would have hit a
+permission prompt (or been silently blocked in non-interactive contexts)
+the first time it actually ran. The bug is easy to introduce because the
+English reads as one operation ("count occurrences") even though the
+shell executes it as two independently-authorized programs.
+
+**Prevention checklist additions:**
+
+- [ ] When a command's Bash grants are written or edited, list every
+      distinct executable name that appears anywhere in a piped shell
+      invocation in that command's prose — not just the first — and
+      confirm each one has its own `allowed-tools` entry.
+- [ ] Any time a fix changes a piped command's shape (adding a stage,
+      swapping `grep -c` for `grep -o | wc -l`, etc.), re-check the grant
+      list in the same edit — a counting-logic fix and a permissions fix
+      are easy to treat as separate tasks and ship only one.
+
+### 26. Editing a Command's Literal Invocation Text Requires Re-Checking Its Own Bash Grant
+
+**WRONG:**
+
+```yaml
+allowed-tools:
+  - Bash(npx -y ruvector@0.2.34 hooks reembed:*)
+```
+
+```bash
+npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run
+```
+
+**RIGHT:**
+
+```yaml
+allowed-tools:
+  - Bash(npx -y --ignore-scripts ruvector@0.2.34 hooks reembed:*)
+```
+
+**Rule:** `Bash(prefix:*)` grants match by literal string prefix against
+the invocation actually run. Inserting a flag *anywhere before* the
+wildcard boundary — here, adding a supply-chain-safety `--ignore-scripts`
+flag to an `npx` invocation — changes the literal prefix text the real
+command produces, so the old grant silently stops matching even though
+the edit reads as "just adding a safety flag," not "changing the command
+this permission covers." This is a different failure shape from #22
+(a colon inside a fixed *argument* collides with the wildcard boundary
+convention) and #25 (a *second* executable introduced by a pipe has no
+grant of its own): here the same single executable's own grant goes
+stale because the executable's own invocation text changed underneath it.
+`plugins/yellow-ruvector/commands/ruvector/seed-solutions.md` (commit
+`994c9f44`) is a positive example — the grant and the command text were
+updated together in the same edit, which is the discipline this item
+generalizes, not a case where it shipped broken.
+
+**Prevention checklist additions:**
+
+- [ ] Any edit that inserts, removes, or reorders a flag/argument in a
+      command's prose *before* the point a `Bash(prefix:*)` grant's
+      wildcard begins must re-diff that grant against the new literal
+      text in the same edit — command-line text and its `allowed-tools`
+      grant are a coupled pair, not two independent artifacts.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2

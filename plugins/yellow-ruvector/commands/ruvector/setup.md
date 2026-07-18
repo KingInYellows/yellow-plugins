@@ -15,9 +15,9 @@ Install the ruvector CLI and initialize `.ruvector/` for the current project.
 
 ## CLI Reference (verified against v0.1.96+)
 
-- `npx ruvector hooks init` — Initialize `.ruvector/` directory
+- `ruvector hooks init` — Initialize `.ruvector/` directory
 - `npx ruvector mcp start` — Start the MCP server (stdio transport)
-- `npx ruvector doctor` — System health check
+- `ruvector doctor` — System health check
 
 **Commands that do NOT exist:** `ruvector init`, `ruvector mcp-server`.
 
@@ -51,10 +51,28 @@ printf '\n=== .gitignore ===\n' && \
 
 - Node.js missing or < 22.22.0 → stop, report install URL
 - ruvector not installed → proceed to Step 2a (install)
-- ruvector installed but `.ruvector/` missing → proceed to Step 2b (init only)
-- Everything present → skip to Step 3 (verify)
+- ruvector installed but version doesn't match the pinned baseline
+  (0.2.34 — see `RUVECTOR_DEFAULT_VERSION` in `scripts/install.sh`) → run
+  the version gate below, then proceed to Step 2a (install/upgrade)
+- ruvector installed, version matches, but `.ruvector/` missing → proceed
+  to Step 2b (init only)
+- Everything present and version matches → skip to Step 3 (verify)
 
-### Step 2a: Install ruvector (only if not installed)
+**Version gate (do not treat a version-mismatched binary as ready):** the
+MCP server (`plugin.json`) is pinned to `ruvector@0.2.34`. A stale global
+binary keeps running its own passive-capture hooks
+(`pre-tool-use.sh`/`post-tool-use.sh`), which can silently reset storage
+provenance or select the machine-global `~/.ruvector` store instead of the
+project's `.ruvector/` — rerunning setup without this gate would leave that
+skew in place. If the installed version does not match 0.2.34, use
+AskUserQuestion: "ruvector's global binary is out of date (found <version>,
+need 0.2.34). Upgrading replaces the machine-wide binary other hooks and
+sessions depend on. Proceed?" Options: "Yes, upgrade" / "No, stop". On
+"Yes, upgrade", proceed to Step 2a — `install.sh` upgrades the global
+binary to the pin. On "No, stop", stop setup and report the mismatch; do
+not proceed to Step 2b or Step 3 with a stale binary.
+
+### Step 2a: Install or upgrade ruvector (not installed, or version mismatch)
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/install.sh"
@@ -63,12 +81,21 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/install.sh"
 If install fails, report the error and suggest:
 `npm install -g ruvector --ignore-scripts`
 
+If Step 2a's output includes `Installed to ~/.local prefix`, it only
+exported `~/.local/bin` into that child script's own process — this
+command's own subsequent Bash tool calls still start from the original
+`PATH` and would hit `command not found` on the bare `ruvector` calls below.
+Steps 2b and 3 prepend `export PATH="$HOME/.local/bin:$PATH"` unconditionally
+to stay correct in that case; it is a no-op when the global install path was
+used.
+
 ### Step 2b: Initialize + gitignore (ONE Bash call)
 
 Combine initialization and .gitignore update:
 
 ```bash
-npx ruvector hooks init --minimal --no-claude-md --no-permissions --no-env --no-mcp --no-statusline && \
+export PATH="$HOME/.local/bin:$PATH"
+ruvector hooks init --minimal --no-claude-md --no-permissions --no-env --no-mcp --no-statusline && \
 (grep -q '\.ruvector' .gitignore 2>/dev/null || printf '\n# ruvector vector storage (per-developer)\n.ruvector/\n' >> .gitignore) && \
 printf '\nInitialized .ruvector/ and updated .gitignore\n'
 ```
@@ -83,8 +110,9 @@ If `.ruvector/` already exists, skip this step entirely.
 Run health check and hook status in a single command:
 
 ```bash
+export PATH="$HOME/.local/bin:$PATH"
 printf '=== Doctor ===\n'
-npx ruvector doctor 2>&1 || printf '(doctor exited non-zero — see above)\n'
+ruvector doctor 2>&1 || printf '(doctor exited non-zero — see above)\n'
 
 printf '\n=== Hook Scripts ===\n'
 PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"

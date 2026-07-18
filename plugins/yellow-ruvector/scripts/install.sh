@@ -29,7 +29,13 @@ success() {
 }
 # <<< generated: install-helpers <<<
 
-RUVECTOR_DEFAULT_VERSION="latest"
+# Pinned: MCP server (plugin.json npx spec) and CLI-hook path (this global
+# install) must run the same version. 0.2.34 is the verified baseline —
+# earlier globals (e.g. 0.2.25) have a getIntelPath() that silently selects
+# the machine-global ~/.ruvector store when the project dir lacks .ruvector/
+# at process start. Bump BOTH here and in catalog/plugins/yellow-ruvector.json
+# (mcpServers args) together, re-verifying tool contracts per plan.
+RUVECTOR_DEFAULT_VERSION="0.2.34"
 RUVECTOR_VERSION=""
 REQUIRED_NODE_VERSION="22.22.0"
 
@@ -102,6 +108,13 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+if [ -n "$RUVECTOR_VERSION" ] && [ "$RUVECTOR_VERSION" != "$RUVECTOR_DEFAULT_VERSION" ]; then
+  warning "--version ${RUVECTOR_VERSION} overrides the pinned ${RUVECTOR_DEFAULT_VERSION} baseline."
+  warning "The plugin MCP server (catalog/plugins/yellow-ruvector.json) stays pinned to ${RUVECTOR_DEFAULT_VERSION}."
+  warning "A CLI/MCP version mismatch can silently reintroduce the store-skew bug this pin exists to prevent (see comment above)."
+  warning "Only use --version for deliberate testing, and re-verify tool contracts before relying on the mismatch."
+fi
 
 # --- Dependency checks ---
 check_dependency() {
@@ -178,7 +191,7 @@ elif npm_output=$(npm "${install_args[@]}" --prefix "${HOME:?HOME not set}/.loca
   fi
 else
   printf '%s\n' "$npm_output" >&2
-  error "npm install failed. Try: npm install -g ruvector --ignore-scripts"
+  error "npm install failed. Try: npm install -g ruvector@${install_version} --ignore-scripts"
 fi
 
 # --- Verify installation (global binary required) ---
@@ -189,12 +202,24 @@ if ! command -v ruvector >/dev/null 2>&1; then
   if [ -n "$npm_global_prefix" ] && [ -x "${npm_global_bin}/ruvector" ]; then
     error "ruvector installed at ${npm_global_bin}/ruvector but that directory is not in PATH. Add to your shell profile: export PATH=\"${npm_global_bin}:\$PATH\""
   fi
-  error "ruvector global binary not found in PATH after install. Hooks with 1-second budgets require the global binary (npx adds ~1900ms overhead). Try: npm install -g ruvector --ignore-scripts"
+  error "ruvector global binary not found in PATH after install. Hooks with 1-second budgets require the global binary (npx adds ~1900ms overhead). Try: npm install -g ruvector@${install_version} --ignore-scripts"
 fi
 
 installed_version=$(ruvector --version 2>/dev/null || true)
 if [ -z "$installed_version" ]; then
-  error "ruvector binary found but 'ruvector --version' failed. Try reinstalling: npm install -g ruvector --ignore-scripts"
+  error "ruvector binary found but 'ruvector --version' failed. Try reinstalling: npm install -g ruvector@${install_version} --ignore-scripts"
+fi
+
+resolved_path=$(command -v ruvector)
+printf 'Resolved binary: %s (version %s)\n' "$resolved_path" "$installed_version"
+
+# When multiple global-prefix or version-manager installations exist, npm can
+# update one copy while `ruvector` on PATH still resolves an older copy
+# installed earlier. Require the reported version to match the pin so this
+# PATH-shadowing skew can't silently pass verification. Skipped for
+# --version latest, which has no fixed pin to compare against.
+if [ "$install_version" != "latest" ] && [ "$installed_version" != "$install_version" ]; then
+  error "ruvector at ${resolved_path} reports version ${installed_version}, but the pinned install version is ${install_version}. Another ruvector install earlier on PATH (a different npm global prefix or version manager such as nvm/fnm) is likely shadowing the freshly installed copy. Run 'npm ls -g ruvector' and check other npm prefixes, then ensure the pinned copy resolves first on PATH — a CLI/MCP version mismatch can silently reintroduce the store-skew bug this pin exists to prevent."
 fi
 
 if [ "$install_path" = "local" ]; then

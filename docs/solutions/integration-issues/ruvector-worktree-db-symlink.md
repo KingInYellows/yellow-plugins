@@ -112,10 +112,19 @@ Two simultaneous Claude Code sessions (one in main, one in a worktree, or
 two worktrees) both spawn an MCP server process pointing at the same DB.
 Two write paths exist:
 
-1. Direct MCP writes to `intelligence/memory.rvdb` from per-session
-   `hooks_remember` calls.
+1. Direct MCP writes to `intelligence.json` from per-session
+   `hooks_remember` calls. (Path corrected 2026-07-17: storage is the flat
+   `.ruvector/intelligence.json`, not `intelligence/memory.rvdb` — the
+   rvdb path never existed on disk in any observed version.)
 2. `pending-updates.jsonl` read-then-truncate from the memory-manager
    agent — interleaving sessions can silently drop entries.
+
+**Observed live (2026-07-17):** this is not theoretical — a long-lived
+MCP server process holding a pre-seed in-memory snapshot saved after a
+CLI-side batch write and silently erased all 32 freshly seeded entries
+(last-writer-wins, wholesale). Quiesce every ruvector process (sessions
+AND lingering `ruvector mcp` servers) before any batch write that must
+survive.
 
 A `flock` wrapper at the plugin layer is **not viable**: both write paths
 run inside the ruvector MCP server process, not in shell wrappers we
@@ -171,6 +180,73 @@ the rollout window. They resolve correctly to the main DB (still useful)
 and are removed naturally when `git worktree remove` deletes the worktree
 directory (POSIX `unlink` on the symlink entry). No data migration
 required.
+
+## Addendum (2026-07-17): the failure mode is worse than "silent no-op", and a second heal layer now exists
+
+Observed live in worktree `.claude/worktrees/ruvector` (created by Claude
+Code's native worktree tooling, NOT `worktree-manager.sh` — so the
+injection above never fired): `.ruvector` was absent at session start, and
+the session's MCP server did **not** merely no-op. Two compounding facts:
+
+1. The unpinned `npx ruvector mcp start` resolved a stale **global 0.2.25**
+   binary, whose `getIntelPath()` — lacking 0.2.34's `.claude`-dir check —
+   fell back to the **machine-global `~/.ruvector/intelligence.json`** when
+   the project dir had no `.ruvector/` at first use, and cached that choice
+   for the process lifetime.
+2. Every `hooks_remember`/`hooks_recall` MCP call in such a session
+   silently read/wrote the cross-project global store — worse than the
+   documented no-op, because writes LOOK successful and pollute a store
+   shared by every project on the machine.
+
+Fixes shipped with the I1 error-fix-memory PR: the npx spec is pinned
+(`npx -y ruvector@0.2.34 mcp start`, via `catalog/plugins/yellow-ruvector.json`
+→ generated `plugin.json`), `install.sh` defaults to the same version, and
+`session-start.sh` now performs a **store-heal** — if the session runs in a
+git worktree whose main checkout has `.ruvector/` and the local entry is
+missing, it creates the symlink itself before the MCP server can cache a
+fallback path. The worktree-manager injection above remains the primary
+mechanism; the hook heal covers worktrees created by any other tooling.
+
+### Follow-up (same day): `ln -s` alone doesn't heal a dangling symlink
+
+`test -e` and `ln` disagree about a dangling symlink, and that gap
+silently defeated the heal above for one specific case. `[ -e
+"$RUVECTOR_DIR" ]` (like `-d`, and like `touch`) *dereferences* the
+symlink and reports on the target — a dangling symlink's target is
+missing, so `-e` says "false" (nothing here). But plain `ln -s TARGET
+LINKNAME` (no `-f`) checks the NEAR end: any existing directory entry
+at `LINKNAME`, symlink or not, makes it fail `EEXIST`. So the heal's
+outer guard correctly entered the branch (`-e` said "nothing there"),
+but the `ln -s ... 2>/dev/null || warn` call then failed on the
+dangling link every session — the warning looked identical to any
+other "couldn't link" cause, the symlink itself was never repaired,
+and the process kept resolving the stale global-store fallback the
+heal exists to prevent.
+
+**Fix:** `ln -sfn` — `-f` removes the existing destination entry first
+(clearing the dangling link), `-n` treats a destination that is already
+a symlink as the file to replace rather than a directory to write
+inside. The branch that reaches this call is now also gated to skip ANY
+pre-existing non-symlink entry — plain directory or regular file —
+entirely (warn-only — it may hold real per-worktree data, same
+preservation rule as `worktree-manager.sh`'s `link_ruvector_db`) so the
+force-replace only ever touches an absent path or an existing symlink,
+never a real directory or file.
+
+**General rule:** `-e`/`-d` (and `touch`) dereference a symlink and
+report on the far end; `ln` (without `-f`) and `mkdir` check the near
+end — any existing directory entry at that exact path — and fail
+regardless of what it points to. A dangling symlink is "doesn't exist"
+to the former and "already exists" to the latter. When a self-healing
+script needs to tell "truly absent" from "a broken pointer" from "a
+real file already there," add `[ -L "$path" ]` (lstat, never
+dereferences) to the guard — each of the three states needs different
+handling (create, force-relink, warn-and-preserve).
+
+New bats coverage in `plugins/yellow-ruvector/tests/session-start.bats`:
+dangling-symlink heal, plain-directory warn-and-preserve, no-op when the
+main checkout also lacks `.ruvector`, and a stubbed-git fallback for
+git < 2.31 (no `--path-format` support).
 
 ## References
 

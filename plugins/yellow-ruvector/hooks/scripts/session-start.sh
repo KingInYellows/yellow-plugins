@@ -24,6 +24,72 @@ CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // ""' 2>/dev/null) || CWD=""
 PROJECT_DIR="${CWD:-${CLAUDE_PROJECT_DIR:-${PWD}}}"
 RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 
+# Worktree store-heal: a git-worktree session can start before .ruvector
+# exists locally even when the main checkout has one (worktree-manager's
+# symlink injection can be bypassed). The MCP server caches its store path
+# at first use, so a missing dir at server start silently selects the
+# machine-global ~/.ruvector for the whole session. Restore the documented
+# shared-store contract by linking to the main checkout's store. No-op for
+# non-worktree checkouts (a linked worktree's .git is a FILE, so the cheap
+# -f gate skips both git subprocesses for ordinary checkouts) and for
+# projects that never initialized ruvector. --path-format=absolute needs
+# git >= 2.31; on older git the rev-parse fails and the heal is skipped
+# silently (pre-heal behavior, no breakage).
+#
+# Timing: this heal takes effect for the NEXT session's MCP process. The
+# MCP server initializes lazily on first tool call, which can race ahead
+# of this hook (SessionStart hooks run in parallel across plugins), or it
+# may already be running from a still-open session. Either way the CURRENT
+# session's server can have the machine-global HOME fallback cached
+# already, so in-session MCP reads/writes can still land in ~/.ruvector
+# until a fresh session picks up the now-healed symlink.
+# ruvector:seed-solutions's Step 1.4 store-scoping check is the guard for
+# this window — it STOPs before any seeding write if intel_path resolves
+# outside the project root.
+if [ ! -e "$RUVECTOR_DIR" ] || { [ -e "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR" ]; }; then
+  # Resolve the worktree root the heal should target. Cheap paths first:
+  # a .git FILE at PROJECT_DIR is the linked-worktree signature; a .git
+  # DIRECTORY at PROJECT_DIR is an ordinary checkout launched from its
+  # root (skip, zero subprocesses). No .git entry at all can mean a
+  # nested launch dir inside a worktree — one rev-parse resolves it
+  # (fails instantly outside any repo; a subdir launch of an ordinary
+  # checkout also pays this single fast call before being excluded).
+  heal_root=""
+  if [ -f "$PROJECT_DIR/.git" ]; then
+    heal_root="$PROJECT_DIR"
+  elif [ ! -e "$PROJECT_DIR/.git" ]; then
+    heal_root=$(git -C "$PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null) || heal_root=""
+    if [ -n "$heal_root" ] && [ ! -f "$heal_root/.git" ]; then
+      heal_root=""  # enclosing root is an ordinary checkout, not a worktree
+    fi
+  fi
+  if [ -n "$heal_root" ]; then
+    heal_target="${heal_root}/.ruvector"
+    git_common_dir=$(git -C "$heal_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || git_common_dir=""
+    git_dir=$(git -C "$heal_root" rev-parse --path-format=absolute --git-dir 2>/dev/null) || git_dir=""
+    if [ -n "$git_common_dir" ] && [ -n "$git_dir" ] && [ "$git_common_dir" != "$git_dir" ]; then
+      main_root=$(dirname "$git_common_dir")
+      if [ -d "${main_root}/.ruvector" ] && [ "$main_root" != "$heal_root" ]; then
+        if [ -e "$heal_target" ] && [ ! -L "$heal_target" ]; then
+          # Pre-existing plain directory OR regular file: never auto-replace
+          # (may hold real per-worktree data — same preservation rule as
+          # worktree-manager's link_ruvector_db). Warn so the divergence is
+          # visible, not silent. ln -sfn is only ever reached when the
+          # entry is absent or already a symlink.
+          printf '[ruvector] Warning: %s is a non-symlink path diverged from the shared store %s/.ruvector — merge or relink manually\n' "$heal_target" "$main_root" >&2
+        else
+          # -sfn: heal a dangling symlink too (ln -s alone EEXISTs on a dead
+          # link, silently leaving the global-store fallback in place). Safe:
+          # this branch only runs when the entry is absent or a symlink —
+          # never a real directory.
+          ln -sfn "${main_root}/.ruvector" "$heal_target" 2>/dev/null \
+            || printf '[ruvector] Warning: worktree store-heal could not link %s\n' "$heal_target" >&2
+        fi
+      fi
+    fi
+  fi
+fi
+
 # Exit silently if ruvector is not initialized in this project
 if [ ! -d "$RUVECTOR_DIR" ]; then
   json_exit

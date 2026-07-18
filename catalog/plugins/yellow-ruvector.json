@@ -19,7 +19,9 @@
     "ruvector": {
       "command": "npx",
       "args": [
-        "ruvector",
+        "-y",
+        "--ignore-scripts",
+        "ruvector@0.2.34",
         "mcp",
         "start"
       ],
