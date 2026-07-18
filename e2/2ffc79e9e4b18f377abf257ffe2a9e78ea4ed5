@@ -1,0 +1,43 @@
+plugins/yellow-ruvector/tests/session-start.bats
+  s_7ed434e75cb861::t_cf565b0980b3e7 226,228
+plugins/yellow-ruvector/CLAUDE.md
+  s_7ed434e75cb861::t_de775bd33165df 14-17
+plugins/yellow-ruvector/skills/memory-query/SKILL.md
+  s_7ed434e75cb861::t_77494c2d37fe51 114-117
+plans/ruvector-error-fix-memory-mvp.md
+  s_7ed434e75cb861::t_7b99f653327b0f 335-337
+docs/security.md
+  s_7ed434e75cb861::t_dbb096c52fa399 104-109
+  s_7ed434e75cb861::t_49be037865dd69 16-21
+  s_7ed434e75cb861::t_7760a8352eea96 67-69
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_7ed434e75cb861::t_6b9c409b9c28fa 18
+  s_7ed434e75cb861::t_49c857e4eaa1ca 64-79
+  s_7ed434e75cb861::t_2cbdeb155936d7 219-222,228
+  s_7ed434e75cb861::t_498bd4e25c61a3 223-227
+  s_7ed434e75cb861::t_b8d4bf4486ae6f 44-46
+  s_7ed434e75cb861::t_2fadae20fbc3d9 47-58
+  s_7ed434e75cb861::t_c0a35433f9b83f 89-101
+  s_7ed434e75cb861::t_0a7c124b8ce8cd 16-17
+  s_7ed434e75cb861::t_0f4091a5084688 283-287
+docs/brainstorms/2026-07-17-which-untapped-ruvector-mcp-tool-familie-brainstorm.md
+  s_7ed434e75cb861::t_8f1478ceedf1f9 6-16
+plugins/yellow-ruvector/scripts/install.sh
+  s_7ed434e75cb861::t_7ced09ce90002f 112-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e22ffc79e9e4b18f377abf257ffe2a9e78ea4ed5",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
