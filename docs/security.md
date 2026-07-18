@@ -141,7 +141,7 @@ yellow-ruvector has the most hooks. Its shell scripts:
   session runs in a linked git worktree (`.git` is a file), the local
   entry is absent or a dangling symlink, and the main checkout has a
   store. The link target derives from `git rev-parse --git-common-dir`
-  (never user input); a pre-existing plain directory is never replaced
+  (never user input); a pre-existing non-symlink path (directory or regular file) is never replaced
   (warn-only)
 - Queue files are append-only JSONL with `flock` for concurrency safety
 - No network calls in any hook script

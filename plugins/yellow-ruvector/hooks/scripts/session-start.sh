@@ -35,7 +35,7 @@ RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 # projects that never initialized ruvector. --path-format=absolute needs
 # git >= 2.31; on older git the rev-parse fails and the heal is skipped
 # silently (pre-heal behavior, no breakage).
-if [ ! -e "$RUVECTOR_DIR" ] || { [ -d "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR" ]; }; then
+if [ ! -e "$RUVECTOR_DIR" ] || { [ -e "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR" ]; }; then
   # Resolve the worktree root the heal should target. Cheap paths first:
   # a .git FILE at PROJECT_DIR is the linked-worktree signature; a .git
   # DIRECTORY at PROJECT_DIR is an ordinary checkout launched from its
@@ -59,11 +59,13 @@ if [ ! -e "$RUVECTOR_DIR" ] || { [ -d "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR
     if [ -n "$git_common_dir" ] && [ -n "$git_dir" ] && [ "$git_common_dir" != "$git_dir" ]; then
       main_root=$(dirname "$git_common_dir")
       if [ -d "${main_root}/.ruvector" ] && [ "$main_root" != "$heal_root" ]; then
-        if [ -d "$heal_target" ] && [ ! -L "$heal_target" ]; then
-          # Pre-existing plain directory: never auto-replace (may hold real
-          # per-worktree data — same preservation rule as worktree-manager's
-          # link_ruvector_db). Warn so the divergence is visible, not silent.
-          printf '[ruvector] Warning: %s is a plain directory diverged from the shared store %s/.ruvector — merge or relink manually\n' "$heal_target" "$main_root" >&2
+        if [ -e "$heal_target" ] && [ ! -L "$heal_target" ]; then
+          # Pre-existing plain directory OR regular file: never auto-replace
+          # (may hold real per-worktree data — same preservation rule as
+          # worktree-manager's link_ruvector_db). Warn so the divergence is
+          # visible, not silent. ln -sfn is only ever reached when the
+          # entry is absent or already a symlink.
+          printf '[ruvector] Warning: %s is a non-symlink path diverged from the shared store %s/.ruvector — merge or relink manually\n' "$heal_target" "$main_root" >&2
         else
           # -sfn: heal a dangling symlink too (ln -s alone EEXISTs on a dead
           # link, silently leaving the global-store fallback in place). Safe:

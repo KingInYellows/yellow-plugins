@@ -1,7 +1,7 @@
 ---
 name: ruvector:seed-solutions
 description: "Seed ruvector recall memory with ERROR-FIX entries extracted from a repo's docs/solutions/ corpus. Use when user says \"seed solutions\", \"seed error memory\", \"import solution docs into ruvector\", or after new solution docs land and the seeded error memory needs a manual refresh. Not for recording a single new learning — that is /ruvector:learn."
-argument-hint: '[solutions directory, default docs/solutions]'
+argument-hint: '(no arguments — seeds from docs/solutions)'
 allowed-tools:
   - ToolSearch
   - AskUserQuestion
@@ -112,8 +112,11 @@ the durability re-check in Step 8 exists for exactly this.
 
 ### Step 3: Enumerate the eligible corpus (count at run time)
 
-1. Directory: `$ARGUMENTS` if provided (validate: relative path, no `..`,
-   no leading `/` or `~`; reject otherwise), else `docs/solutions`.
+1. Directory: always the literal `docs/solutions` — this command takes no
+   path argument. Ignore any `$ARGUMENTS` value entirely (an allowlist of
+   exactly one path needs no runtime validation, and prose-only validation
+   of user-derived paths is banned by AGENTS.md's security rules; repos
+   keeping solutions elsewhere are out of scope for this command).
 2. Glob `<dir>/*/*.md`. Exclude any path containing `/archived/`.
 3. For each file, Read the frontmatter. Keep only docs with `track: bug`.
    Everything else (`track: knowledge`, `track: feature`, missing track)
@@ -263,6 +266,16 @@ Print a summary table:
 Remind: seeding is manual — new solution docs are invisible to recall
 until this command is re-run. Re-running is safe (dedup skips existing
 entries; per Steps 5.2/6, any re-run happens in a fresh session).
+
+**Correction-propagation limitation:** when an already-seeded doc's fix
+text is later CORRECTED, the re-run usually skips the updated entry as a
+near-duplicate (score > 0.82) — or, below the threshold, stores it
+alongside the stale one. The MCP surface has no delete/replace-by-id, so
+corrections cannot propagate in place. Current remediation: quiesce all
+ruvector processes and reset the ERROR-FIX corpus out-of-band (edit
+`.ruvector/intelligence.json` to drop `ERROR-FIX:` entries, or a full
+store re-import), then re-seed fresh. State this in the report whenever
+the run skipped entries whose source docs changed since the last seed.
 
 ### Step 8: Durability re-check
 

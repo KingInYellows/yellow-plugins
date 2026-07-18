@@ -226,11 +226,12 @@ heal exists to prevent.
 **Fix:** `ln -sfn` — `-f` removes the existing destination entry first
 (clearing the dangling link), `-n` treats a destination that is already
 a symlink as the file to replace rather than a directory to write
-inside. The branch that reaches this call is now also gated to skip a
-pre-existing PLAIN directory entirely (warn-only — it may hold real
-per-worktree data, same preservation rule as `worktree-manager.sh`'s
-`link_ruvector_db`) so the force-replace only ever touches an absent
-path or an existing symlink, never a real directory.
+inside. The branch that reaches this call is now also gated to skip ANY
+pre-existing non-symlink entry — plain directory or regular file —
+entirely (warn-only — it may hold real per-worktree data, same
+preservation rule as `worktree-manager.sh`'s `link_ruvector_db`) so the
+force-replace only ever touches an absent path or an existing symlink,
+never a real directory or file.
 
 **General rule:** `-e`/`-d` (and `touch`) dereference a symlink and
 report on the far end; `ln` (without `-f`) and `mkdir` check the near

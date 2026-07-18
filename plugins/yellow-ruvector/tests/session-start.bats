@@ -266,3 +266,19 @@ exit 0'
   # would hit the global store) — output must carry no systemMessage.
   echo "$output" | jq -e 'has("systemMessage") | not' > /dev/null
 }
+
+@test "store-heal warns but never replaces a regular-file .ruvector in a worktree" {
+  # A regular FILE at .ruvector (not just a plain dir) must be preserved
+  # with a warning — never removed by ln -sfn.
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  make_worktree heal-regfile
+  echo "not-a-store" > "$PROJECT_ROOT/wt/.ruvector"
+  make_ruvector_stub 'exit 0'
+  run --separate-stderr run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.continue == true' > /dev/null
+  [ -f "$PROJECT_ROOT/wt/.ruvector" ]
+  [ ! -L "$PROJECT_ROOT/wt/.ruvector" ]
+  grep -q 'not-a-store' "$PROJECT_ROOT/wt/.ruvector"
+  echo "$stderr" | grep -q 'diverged from the shared store'
+}
