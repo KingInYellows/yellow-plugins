@@ -1,0 +1,28 @@
+docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md
+  s_e88a9e9b03bbc7::t_dd504605ff570c 126-158,163-169
+  s_e88a9e9b03bbc7::t_b9f46013d000e9 92-125,159-162
+docs/solutions/code-quality/mailbox-teammate-result-delivery-requires-explicit-sendmessage.md
+  s_e88a9e9b03bbc7::t_8c696e0e5c1a7d 1-100
+docs/solutions/workflow/worktree-confined-batch-pipeline-branch-held-elsewhere.md
+  s_e88a9e9b03bbc7::t_24234b597fec85 1-102
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_e88a9e9b03bbc7::t_ad02efd20e1c67 1108-1151
+docs/solutions/code-quality/automated-bot-review-false-positives.md
+  s_e88a9e9b03bbc7::t_fce0ee2e019a67 209-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "8453f47337155848d52dcab149c7f74dae43a2cf",
+  "prompts": {},
+  "sessions": {
+    "s_e88a9e9b03bbc7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea07ea8a-ae12-4a63-bb37-07e2f6f92a57",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
