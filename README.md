@@ -37,7 +37,7 @@ Add the marketplace, then install individual plugins:
 | `yellow-morph`        | Intelligent code editing and search via Morph Fast Apply and WarpGrep                                       | 2 commands, 1 MCP                              |
 | `yellow-research`     | Deep research with Ceramic, Perplexity, Tavily, EXA, Parallel Task, and ast-grep MCPs                       | 2 agents, 4 commands, 2 skills, 6 MCPs         |
 | `yellow-review`       | Multi-agent PR review with adaptive agent selection, parallel comment resolution, and stack review          | 16 agents, 7 commands, 2 skills                |
-| `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP |
+| `yellow-ruvector`     | Persistent vector memory and semantic code search for Claude Code agents via ruvector                       | 2 agents, 7 commands, 3 skills, 5 hooks, 1 MCP |
 | `yellow-semgrep`      | Semgrep security finding remediation — fetch, fix, and verify "to fix" findings from the Semgrep platform   | 2 agents, 5 commands, 1 skill, 1 MCP           |
 
 ## MCP Servers & Authentication
@@ -279,7 +279,7 @@ yellow-plugins/
 │   ├── yellow-morph/          # Morph code editing and search (2 commands, 1 MCP)
 │   ├── yellow-research/       # Deep research (2 agents, 4 commands, 2 skills, 6 MCPs)
 │   ├── yellow-review/         # PR review (16 agents, 7 commands, 2 skills)
-│   ├── yellow-ruvector/       # Vector memory (2 agents, 6 commands, 3 skills, 5 hooks, 1 MCP)
+│   ├── yellow-ruvector/       # Vector memory (2 agents, 7 commands, 3 skills, 5 hooks, 1 MCP)
 │   └── yellow-semgrep/        # Semgrep remediation (2 agents, 5 commands, 1 skill, 1 MCP)
 ├── packages/                  # Validation tooling (domain, infrastructure, cli)
 ├── schemas/                   # JSON schemas
