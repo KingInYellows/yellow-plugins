@@ -1,6 +1,6 @@
 ---
 name: plan:complete
-description: 'Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies a same-named merged PR exists. Use when a plan is fully shipped and ready to move from plans/ to plans/complete/.'
+description: 'Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence via a strict slug match with a loose token-coverage fallback. Use when a plan is fully shipped and ready to move from plans/ to plans/complete/.'
 argument-hint: '<plan-filename>'
 allowed-tools:
   - Bash
@@ -18,10 +18,16 @@ Archives a single open plan from `plans/<arg>.md` to
   `validate-plans.js` CI gate enforces the same rule on archived files in
   the diff; running `/plan:complete` locally catches the same issue
   before commit.
-- **Gate C** (evidence): queries GitHub for a merged PR whose title and
-  branch contain the slug derived from the filename. PASS when at least
-  one match exists; NO-EVIDENCE prompts the user to confirm with a PR
-  number override (audit-trail trailer captures the decision).
+- **Gate C** (evidence): tiered merged-PR match. The strict tier queries
+  GitHub for a merged PR whose title and branch contain the full slug
+  with word boundaries. When it finds nothing (branch names rarely carry
+  the full plan slug), a loose tier scores the 100 most recent merged
+  PRs by slug-token coverage over branch + title: a UNIQUE PR containing
+  all slug tokens except at most one (all of them for slugs of ≤3
+  tokens) passes without prompting, recorded via a
+  `Plan-Verifier-LooseMatch:` commit trailer. Ambiguous (2+) or zero
+  loose matches prompt the user for a PR-number override
+  (`Plan-Verifier-Override:` trailer captures the decision).
 
 This command does NOT delete the source file or push directly to main —
 it creates an archival branch (`plan/archive-<slug>`), records the
@@ -56,7 +62,7 @@ gh auth status >/dev/null 2>&1 || { printf '[plan:complete] error: gh not authen
 # linked worktree, where `.git` is a file (gitdir pointer) and a literal
 # `.git/tmp` path would fail with "Not a directory".
 GIT_TMP=$(git rev-parse --git-path tmp)
-rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override"
+rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override" "$GIT_TMP/plan-complete.loose"
 ```
 
 ## Phase 1: Filename validation + slug derivation
@@ -148,7 +154,9 @@ GitHub's `in:title` qualifier is token-based and case-insensitive
 (hyphens split tokens — `in:title "foo-bar"` matches a PR titled
 `foo bar`), so the title search is a COARSE pre-filter only; the
 authoritative match comes from the `--jq` post-filter on `headRefName`
-which enforces a word boundary (`^|$|/|_|-`) around `$SLUG`.
+which enforces a word boundary (`^|$|/|_|-`) around `$SLUG`. This strict
+tier runs first; the loose token-coverage tier below handles the common
+case where the branch name carries only part of the slug.
 
 ```bash
 set -euo pipefail
@@ -159,6 +167,10 @@ SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
 # rather than silently collapsing to "no PR found" → spurious override
 # prompt (review finding, pattern-recognition P1). A genuine empty result
 # is `[]` with exit 0; a real failure prints to GH_ERR and we warn.
+# `2>|` (not `2>`): mktemp pre-creates the file, and under zsh noclobber a
+# plain `2>` onto an existing file fails — collapsing every run to "[]"
+# and forcing a spurious override prompt. See
+# docs/solutions/logic-errors/zsh-noclobber-mktemp-stderr-redirect.md.
 GH_ERR=$(mktemp)
 # shellcheck disable=SC2016
 MERGED=$(gh pr list \
@@ -166,14 +178,14 @@ MERGED=$(gh pr list \
   --state merged \
   --limit 100 \
   --json number,title,headRefName,url \
-  --jq '[.[] | select(.headRefName | test("(^|[/_-])'"$SLUG"'($|[/_-])"))]' 2>"$GH_ERR") || {
+  --jq '[.[] | select(.headRefName | test("(^|[/_-])'"$SLUG"'($|[/_-])"))]' 2>|"$GH_ERR") || {
   printf '[plan:complete] WARNING: gh pr list failed (auth/network?): %s\n' "$(cat "$GH_ERR")" >&2
   printf '[plan:complete] Treating as no-evidence; you will be prompted to confirm or cancel.\n' >&2
   MERGED='[]'
 }
 rm -f "$GH_ERR"
 COUNT=$(printf '%s' "$MERGED" | jq 'length' 2>/dev/null || printf '0')
-printf '[plan:complete] Gate C: %d merged PR(s) match slug %s with word boundary\n' "$COUNT" "$SLUG"
+printf '[plan:complete] Gate C strict tier: %d merged PR(s) match slug %s with word boundary\n' "$COUNT" "$SLUG"
 if [ "$COUNT" -ge 1 ]; then
   printf '%s\n' "$MERGED" | jq -r '.[] | "  #\(.number) — \(.title)\n    \(.url)"'
 fi
@@ -187,20 +199,96 @@ mkdir -p "$GIT_TMP"
 printf '%s\n' "$COUNT" > "$GIT_TMP/plan-complete.count"
 ```
 
-**If `COUNT >= 1` (Gate C PASS): skip the AskUserQuestion below entirely
-and proceed directly to Phase 5.** Only when `COUNT == 0` do you prompt.
+**If `COUNT >= 1` (Gate C strict PASS): skip the loose tier and the
+AskUserQuestion below entirely and proceed directly to Phase 5.**
 
-If `COUNT == 0`, prompt the user via `AskUserQuestion` with the
+**If `COUNT == 0`, run the loose tier below.** Branch names rarely carry
+the full plan slug (e.g. branch `agent/feat/ruvector-error-fix-memory`
+for plan slug `ruvector-error-fix-memory-mvp`), so strict-tier misses
+are routine for legitimately-completed plans. The loose tier fetches the
+100 most recently created merged PRs (plans are archived close to their
+PR's merge, so the recency window is acceptable; older evidence can
+still be supplied via the override prompt) and scores each by slug-token
+coverage over the union of branch-name and title tokens. The threshold
+is all-but-one slug token — full coverage for slugs of ≤3 tokens, where
+dropping a token would let generic tokens (`yellow`, `plugin`) match
+unrelated PRs. Verified against live repo data (2026-07-18):
+`ruvector-error-fix-memory-mvp` and
+`review-resolve-branch-correctness-guard` each uniquely matched their
+real PR at 5/5 and 4/5 coverage, while the short-slug FP probe
+`yellow-rtk-plugin` — which a plain 2/3 threshold wrongly matched to an
+unrelated removal PR — correctly returned no match.
+
+```bash
+set -euo pipefail
+ARG="$ARGUMENTS"
+CLEAN_ARG="${ARG#plans/}"
+SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
+GIT_TMP=$(git rev-parse --git-path tmp)
+mkdir -p "$GIT_TMP"
+GH_ERR=$(mktemp)
+RECENT=$(gh pr list \
+  --state merged \
+  --limit 100 \
+  --json number,title,headRefName,url 2>|"$GH_ERR") || {
+  printf '[plan:complete] WARNING: gh pr list failed (auth/network?): %s\n' "$(cat "$GH_ERR")" >&2
+  RECENT='[]'
+}
+rm -f "$GH_ERR"
+# Unique-ify tokens so a repeated slug token cannot double-count toward
+# the threshold. The Phase 1 slug regex guarantees lowercase [a-z0-9-],
+# so splitting on "-" is total.
+TOKS=$(printf '%s' "$SLUG" | jq -R 'split("-") | unique')
+# All-but-one coverage via integer math: hits >= total - 1 for slugs of
+# >=4 tokens; hits == total for <=3 tokens (see the FP note above).
+LOOSE=$(printf '%s' "$RECENT" | jq --argjson toks "$TOKS" '
+  [ .[]
+    | . as $pr
+    | (($pr.headRefName + " " + $pr.title) | ascii_downcase | [scan("[a-z0-9]+")]) as $words
+    | ($toks | map(select(. as $t | $words | index($t))) | length) as $hits
+    | select($hits >= (($toks | length) - (if ($toks | length) >= 4 then 1 else 0 end)))
+    | $pr + {hits: $hits, total: ($toks | length)} ]')
+LCOUNT=$(printf '%s' "$LOOSE" | jq 'length' 2>/dev/null || printf '0')
+if [ "$LCOUNT" -eq 1 ]; then
+  printf '[plan:complete] Gate C LOOSE PASS: unique token-coverage match:\n'
+  printf '%s\n' "$LOOSE" | jq -r '.[] | "  #\(.number) — \(.title)\n    \(.url) [branch: \(.headRefName), coverage \(.hits)/\(.total)]"'
+  printf '%s\n' "$LOOSE" | jq -r '.[0] | "pr=#\(.number) coverage=\(.hits)/\(.total)"' >| "$GIT_TMP/plan-complete.loose"
+elif [ "$LCOUNT" -ge 2 ]; then
+  printf '[plan:complete] Gate C LOOSE AMBIGUOUS: %d merged PRs reach the token-coverage threshold:\n' "$LCOUNT"
+  printf '%s\n' "$LOOSE" | jq -r '.[] | "  #\(.number) — \(.title)\n    \(.url) [branch: \(.headRefName), coverage \(.hits)/\(.total)]"'
+else
+  printf '[plan:complete] Gate C NO-EVIDENCE: no merged PR reaches the loose token-coverage threshold.\n'
+fi
+```
+
+**Loose-tier outcomes:**
+
+- **`LOOSE PASS` (exactly one match):** skip the AskUserQuestion below
+  and proceed directly to Phase 5 — no prompt. The evidence is printed
+  above and recorded for the `Plan-Verifier-LooseMatch:` commit trailer
+  in Phase 7. Uniqueness is the safety valve: a single qualifying PR
+  among the last 100 merged is strong evidence; anything ambiguous
+  still prompts.
+- **`LOOSE AMBIGUOUS` (2 or more matches):** prompt via the
+  AskUserQuestion below, and include the candidate list (PR numbers +
+  titles from the block's output) in the question text so the user can
+  type the right number.
+- **`NO-EVIDENCE` (zero matches):** prompt via the AskUserQuestion
+  below.
+
+Prompt the user via `AskUserQuestion` with the
 following options. **The label of the free-text option MUST be the
 literal string `Other`** — per MEMORY.md "AskUserQuestion 'Other' is
 the ONLY free-text button", any other label (e.g.,
 `Confirm with PR number`) shows as a click-only option and does NOT
 open a text input.
 
-**AskUserQuestion (only if `COUNT == 0`):**
+**AskUserQuestion (only if the loose tier did NOT produce a unique
+match):**
 
-- Question: `No merged PR found whose title and branch contain the
-  slug "<SLUG>". Provide a PR number to confirm, or cancel.`
+- Question: `No unique merged-PR evidence found for slug "<SLUG>"
+  (strict and loose tiers). Provide a PR number to confirm, or cancel.`
+  — for `LOOSE AMBIGUOUS`, append the candidate list.
 - Header: `Override`
 - Options:
   - Label: `Other` — Description: `Provide the PR number that
@@ -325,11 +413,20 @@ SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
 GIT_TMP=$(git rev-parse --git-path tmp)
 COUNT=$(cat "$GIT_TMP/plan-complete.count" 2>/dev/null || printf '0')
 SUBJECT="docs(plans): archive completed $SLUG plan"
+# Evidence priority: an explicit user override beats a loose match beats
+# the strict count — the override file only exists when the user was
+# prompted (loose tier not unique), and the loose file only exists when
+# the strict tier found nothing.
 if [ -f "$GIT_TMP/plan-complete.override" ]; then
   OVERRIDE_PR_NUM=$(cat "$GIT_TMP/plan-complete.override")
   BODY="Verified by /plan:complete: user-confirmed override.
 
 Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#$OVERRIDE_PR_NUM)"
+elif [ -f "$GIT_TMP/plan-complete.loose" ]; then
+  LOOSE_INFO=$(cat "$GIT_TMP/plan-complete.loose")
+  BODY="Verified by /plan:complete: unique loose match — all-but-one slug-token coverage on a recent merged PR's branch+title.
+
+Plan-Verifier-LooseMatch: $LOOSE_INFO"
 else
   BODY="Verified by /plan:complete: $COUNT merged PR(s) found via gh pr list --state merged with word-boundary post-filter on headRefName."
 fi
@@ -340,12 +437,12 @@ fi
 # source + add of the destination).
 git commit -m "$SUBJECT" -m "$BODY" -- "plans/$CLEAN_ARG" "plans/complete/$CLEAN_ARG"
 # Clean up temp files.
-rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override"
+rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override" "$GIT_TMP/plan-complete.loose"
 ```
 
-The `Plan-Verifier-Override:` trailer is grep-discoverable via
-`git log --grep='Plan-Verifier-Override'` for future audit. The
-default (Gate C PASS) path omits the trailer.
+The `Plan-Verifier-Override:` and `Plan-Verifier-LooseMatch:` trailers
+are grep-discoverable via `git log --grep='Plan-Verifier-'` for future
+audit. The default (Gate C strict PASS) path omits any trailer.
 
 ## Phase 8: Submit
 
