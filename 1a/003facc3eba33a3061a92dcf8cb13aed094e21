@@ -1,0 +1,238 @@
+.agents/plugins/marketplace.json
+  s_76944981fdcfae::t_a04285ddd2672b 1-5
+catalog/plugins/yellow-browser-test.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+packages/domain/src/validation/errorCatalog.ts
+  s_76944981fdcfae::t_d027e83a0dc7ca 140-147
+  s_76944981fdcfae::t_bd2a3cc5720325 11-13,15,19
+  s_76944981fdcfae::t_3c555cf8dffaf1 373-382
+  s_76944981fdcfae::t_d04d33e972edaf 14,16-18
+plans/claude-code-codex-plugin-pilot-02-codex-tooling.md
+  s_76944981fdcfae::t_05dc54be08f74c 96
+  s_76944981fdcfae::t_8ec19dbb4efe7e 265,272-286
+  s_76944981fdcfae::t_4295d81494756c 303,307-317
+  s_76944981fdcfae::t_2f91c31d4a16b1 454,456,458-481
+  s_76944981fdcfae::t_82189c005aedbf 203,209-218
+  s_76944981fdcfae::t_8b2cc2b52f633a 333,335-341,343-359
+  s_76944981fdcfae::t_38f0b1d7393a5c 372-390
+  s_76944981fdcfae::t_bdba4a07d26e4b 431-453
+  s_76944981fdcfae::t_3702a3eb8891b8 179,183-190
+  s_76944981fdcfae::t_9cf0b85178683d 1-93,116-178,180-182,192-197,204-208,220-228,233,236-243,266-271,288-290,304-306,334,342,361-363,392-394,422-424,455,457,483-491,530-543,549-592
+  s_76944981fdcfae::t_0f5f73290422c6 360,364-371
+  s_76944981fdcfae::t_1a85a43ab1fcac 219
+  s_76944981fdcfae::t_f8e1785c92ff6d 250-264
+  s_76944981fdcfae::t_cfd9183e63b29a 421,425-430
+  s_76944981fdcfae::t_f87d919e273e42 404-420
+  s_76944981fdcfae::t_14467c7a19a95c 482,492-529
+  s_76944981fdcfae::t_e3002c1b631fe3 544-548
+  s_76944981fdcfae::t_cefd9e6977d9c0 391,395-403
+  s_76944981fdcfae::t_e9e577c8716c01 229-232,234-235
+  s_76944981fdcfae::t_3857dcea9268a1 244-249
+  s_76944981fdcfae::t_c6761e19970532 94-95,97-115
+  s_76944981fdcfae::t_588dd4942565ec 318-332
+  s_76944981fdcfae::t_dd25d24d8fcacd 191,198-202
+  s_76944981fdcfae::t_0bc5aa37cfc626 287,291-302
+catalog/plugins/yellow-research.json
+  s_76944981fdcfae::t_5250d751e74c1f 115-117
+AGENTS.md
+  s_76944981fdcfae::t_2c354ad0edaa52 70-79
+packages/domain/tsconfig.json
+  s_76944981fdcfae::t_17305f28920f4c 9
+schemas/catalog.schema.json
+  s_76944981fdcfae::t_d2b4fbcfb5c518 72,79,87
+  s_76944981fdcfae::t_973f5fe971c3f9 55
+  s_76944981fdcfae::t_8c7cb30087f129 1-54,56-71,73-78,80-86,88-92
+scripts/generate-manifests.js
+  s_76944981fdcfae::t_bd34fcdf5a98f8 5-6,11-15
+  s_9b59ddf8ef5762::t_12e1da5a4f90a9 18-20
+  s_76944981fdcfae::t_740edb00dd95bd 216-217
+  s_76944981fdcfae::t_84b733d6d67393 319-355,414-418
+  s_9b59ddf8ef5762::t_0e44cb903edb41 391-397,401-402
+  s_76944981fdcfae::t_42205069a2d447 37-43
+  s_9b59ddf8ef5762::t_72ed9c4c378c60 356-385,399,404-413
+  s_9b59ddf8ef5762::t_067902b898491f 32
+  s_76944981fdcfae::t_4fd3bc78a81ae0 138-139,141,147-161,170-198,215
+  s_9b59ddf8ef5762::t_c23027a87d2a14 225
+  s_9b59ddf8ef5762::t_35c7408ea9801b 162-169,199-214
+  s_9b59ddf8ef5762::t_da8f80738e6f97 403,430-447
+  s_9b59ddf8ef5762::t_2d125d2459207f 386-390,398,400
+schemas/codex-hooks.schema.json
+  s_76944981fdcfae::t_01b58f733b8fb1 1-41
+packages/infrastructure/src/validation/README.md
+  s_76944981fdcfae::t_fb177dc444b80b 59
+  s_76944981fdcfae::t_9755414aa0d9fd 242
+  s_76944981fdcfae::t_6dc6d585679725 191-192
+  s_76944981fdcfae::t_d3df7f332e504b 170-171
+  s_76944981fdcfae::t_84b385f5d0d609 203-205
+  s_76944981fdcfae::t_85b60821ed69e5 114
+  s_76944981fdcfae::t_a3bb8242a435e0 141
+package.json
+  s_76944981fdcfae::t_0c6a4d875dd389 30
+  s_76944981fdcfae::t_b2bcf9b0175bad 20
+catalog/plugins/yellow-debt.json
+  s_76944981fdcfae::t_5250d751e74c1f 51-53
+catalog/plugins/yellow-composio.json
+  s_76944981fdcfae::t_5250d751e74c1f 63-65
+catalog/plugins/yellow-ci.json
+  s_76944981fdcfae::t_5250d751e74c1f 46-48
+packages/infrastructure/src/validation/validator.ts
+  s_76944981fdcfae::t_2d22aa5a111759 41,49
+  s_76944981fdcfae::t_a1066a282fbedf 300
+  s_76944981fdcfae::t_70ad3e533cbe1e 69-70
+catalog/plugins/yellow-mempalace.json
+  s_76944981fdcfae::t_5250d751e74c1f 35-37
+catalog/plugins/gt-workflow.json
+  s_76944981fdcfae::t_5250d751e74c1f 65-67
+catalog/plugins/yellow-docs.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+catalog/plugins/yellow-devin.json
+  s_76944981fdcfae::t_5250d751e74c1f 48-50
+scripts/lint-error-codes.js
+  s_76944981fdcfae::t_b6ef1e0b376911 176-180
+  s_76944981fdcfae::t_9b97bc77748ac9 12-20,27-32,42-45
+  s_76944981fdcfae::t_fe63e56137a62e 106-129
+  s_76944981fdcfae::t_6ed65dff6def4c 64-67,79-80,82-104
+  s_76944981fdcfae::t_926ea7cfcc9767 137
+  s_76944981fdcfae::t_525a1395943d7e 68-78,81
+  s_76944981fdcfae::t_50f4da0d8c8e7f 130,133-136,138
+tests/integration/generate-manifests.test.ts
+  s_76944981fdcfae::t_34c37587835d5f 36-38,44
+  s_76944981fdcfae::t_28f2db8dd28283 75-81,92
+packages/domain/src/validation/types.ts
+  s_76944981fdcfae::t_bd3b856e8df42e 29
+tests/integration/example-files-schema.test.ts
+  s_76944981fdcfae::t_516289e8d8c0b2 11-12,14,17-18
+  s_76944981fdcfae::t_e81658f608e761 10,13,15-16
+packages/cli/README.md
+  s_76944981fdcfae::t_9da09351871b7c 3-8
+  s_9b59ddf8ef5762::t_21905560c122ef 13
+docs/solutions/code-quality/raw-text-scan-inline-to-import-blind-spot.md
+  s_76944981fdcfae::t_08bfd29019a782 1-101
+packages/domain/src/validation/error-codes.json
+  s_76944981fdcfae::t_fee034e525f249 1-10
+CLAUDE.md
+  s_76944981fdcfae::t_4ab66a81a5efca 106-114
+  s_76944981fdcfae::t_e9e8d35e32773b 33,38,42-44
+examples/codex-plugin.example.json
+  s_76944981fdcfae::t_37d657a83f9257 1-11
+examples/codex-marketplace.example.json
+  s_76944981fdcfae::t_b64ac06a712a8a 1-13
+scripts/validate-versions.js
+  s_9b59ddf8ef5762::t_e4158bf27da978 167-176,179-183,185-187,189-190
+  s_9b59ddf8ef5762::t_9794404f33045f 249
+  s_76944981fdcfae::t_7d0665596a1c26 5-13,29-38,46-48,52
+  s_9b59ddf8ef5762::t_adc833a98e5eff 311
+  s_76944981fdcfae::t_6d3854d9bb4d3b 65-80,83-101,103-123,125-134,137-142,145,147-154,156-159,161-165,177-178,184,191-195,199-212,216-248,269-277,280-307,310,312-324,327-332,334-336,339-345,348-349,352
+  s_9b59ddf8ef5762::t_94b35fdae08789 250-268
+.github/workflows/validate-schemas.yml
+  s_9b59ddf8ef5762::t_b7f7eff7497623 28
+  s_9b59ddf8ef5762::t_381db5d44e13f8 8
+  s_9b59ddf8ef5762::t_6e825f160259ec 345-350,354-357
+  s_76944981fdcfae::t_b353227f71670e 306-328,331-344,351-353,358-430
+  s_76944981fdcfae::t_bb746e5c03acb1 72-73
+  s_76944981fdcfae::t_822c241f532764 329-330
+  s_76944981fdcfae::t_a9fb38278f46f6 247-265
+packages/cli/src/index.ts
+  s_76944981fdcfae::t_c573a75bb45bc7 6,8-13,30,32
+  s_9b59ddf8ef5762::t_8fa740ec951cde 16,19-21,25-28,38-41,43
+  s_9b59ddf8ef5762::t_1e14ab416d8013 34
+schemas/codex-plugin.schema.json
+  s_9b59ddf8ef5762::t_1e14ab416d8013 51-52
+  s_76944981fdcfae::t_56063a23f4f9c7 1-38,41-44,47-50
+  s_9b59ddf8ef5762::t_1a4fe362d9b477 39-40,45-46
+scripts/validate-codex.js
+  s_9b59ddf8ef5762::t_0cac679f67624b 278,284-292
+  s_9b59ddf8ef5762::t_964b45294e10ee 257,260
+  s_9b59ddf8ef5762::t_86b6352ba85c9d 62
+  s_9b59ddf8ef5762::t_6e5ef100bae679 311
+  s_9b59ddf8ef5762::t_58e3204b6c93d9 318
+  s_76944981fdcfae::t_c5568848b9f4c2 1-20,24-61,64-100,108-123,131-137,145-192,197-256,258-259,261-277,279-283,293-310,312-317,319-374
+  s_9b59ddf8ef5762::t_35b7cd3e81a79b 21-23
+  s_9b59ddf8ef5762::t_63dd9e08b65187 101-107,124-130,138-144
+  s_9b59ddf8ef5762::t_b866dda8dc8e29 63
+  s_9b59ddf8ef5762::t_1e14ab416d8013 375-389
+  s_9b59ddf8ef5762::t_3ad9c56273d1d4 193-196
+catalog/plugins/yellow-linear.json
+  s_76944981fdcfae::t_5250d751e74c1f 31-33
+catalog/plugins/yellow-core.json
+  s_76944981fdcfae::t_5250d751e74c1f 51-53
+schemas/codex-marketplace.schema.json
+  s_76944981fdcfae::t_2646ba9dbb231d 3-6,9,11,13,15-17,21-22,26,29,33-34,38,42,44-55,57-64,66
+  s_76944981fdcfae::t_878c0ac54ea62b 67
+docs/solutions/workflow/spec-shells-dependency-oracle-plans-complete.md
+  s_76944981fdcfae::t_edc64a52cd35f3 87-133
+catalog/README.md
+  s_9b59ddf8ef5762::t_b624cb78cb0cf5 36
+catalog/plugins/yellow-council.json
+  s_76944981fdcfae::t_5250d751e74c1f 27-29
+catalog/plugins/yellow-semgrep.json
+  s_76944981fdcfae::t_5250d751e74c1f 64-66
+catalog/plugins/yellow-morph.json
+  s_76944981fdcfae::t_5250d751e74c1f 58-60
+catalog/plugins/yellow-ruvector.json
+  s_76944981fdcfae::t_5250d751e74c1f 101-103
+tests/integration/generate-manifests-codex.test.ts
+  s_76944981fdcfae::t_9f210c30cc1cbf 1-22,24-314
+  s_76944981fdcfae::t_17e07b332d3622 23
+tests/integration/codex-schema-examples.test.ts
+  s_76944981fdcfae::t_1ea2f34db46713 1-181
+examples/codex-hooks.example.json
+  s_76944981fdcfae::t_c5d2cd8ce8b625 1-14
+scripts/lib/generate/emit-codex.js
+  s_9b59ddf8ef5762::t_245e208a5ceb07 28
+  s_9b59ddf8ef5762::t_02a22924ef9dc7 176-192
+  s_9b59ddf8ef5762::t_aa3f114bad6042 172-175
+  s_9b59ddf8ef5762::t_f930e87d9a04f9 235-252
+  s_9b59ddf8ef5762::t_3dbec668c0662f 314
+  s_9b59ddf8ef5762::t_2f763d572f3f1d 151-155
+  s_9b59ddf8ef5762::t_93ce1e704d43e6 166
+  s_76944981fdcfae::t_274857154d88c5 25
+  s_9b59ddf8ef5762::t_c6b558024aa81d 211-232
+  s_9b59ddf8ef5762::t_eb55a6b90bd08b 23-24
+  s_76944981fdcfae::t_08f96c819629d9 1-22,26-27,29,34-150,162-165,167-171,200-210,233,253-291,294,306,308-313,315-323
+  s_9b59ddf8ef5762::t_814394d0855679 295-304,307
+  s_76944981fdcfae::t_b1ed23f960f294 30-33
+  s_b79d714b0c0157::t_187c625c63460f 234
+  s_76944981fdcfae::t_4e63cf8182ae04 292-293,305
+  s_9b59ddf8ef5762::t_156dd23276baca 156-161,193-199
+catalog/plugins/yellow-review.json
+  s_76944981fdcfae::t_5250d751e74c1f 24-26
+catalog/plugins/yellow-codex.json
+  s_76944981fdcfae::t_5250d751e74c1f 25-27
+schemas/catalog-plugin.schema.json
+  s_9b59ddf8ef5762::t_1e14ab416d8013 125-137
+  s_9b59ddf8ef5762::t_7709197a9e420c 86-98
+  s_76944981fdcfae::t_ccdc5bac782cb9 1-85,99-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "1a003facc3eba33a3061a92dcf8cb13aed094e21",
+  "prompts": {},
+  "sessions": {
+    "s_76944981fdcfae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e1ea2e22-178b-47c9-ac16-a3fc091bd7f0",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_9b59ddf8ef5762": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "625727e4-3050-4be8-b76d-8fcb6aa7602e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    },
+    "s_b79d714b0c0157": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aa908c5e03b5ecd08",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
