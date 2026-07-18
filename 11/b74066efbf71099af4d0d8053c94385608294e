@@ -1,0 +1,30 @@
+docs/security.md
+  s_e88a9e9b03bbc7::t_180046be1cb1c9 110-116
+  s_e88a9e9b03bbc7::t_ff18b73864d831 16-24
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_e88a9e9b03bbc7::t_c41b661cd4fc2a 42-67
+  s_e88a9e9b03bbc7::t_e0da567312f48c 251
+  s_e88a9e9b03bbc7::t_f462639857921b 323-328
+plugins/yellow-ruvector/CLAUDE.md
+  s_e88a9e9b03bbc7::t_0ae3e9de3109aa 14-16
+plugins/yellow-ruvector/commands/ruvector/setup.md
+  s_e88a9e9b03bbc7::t_48eb1b82f5ba26 105
+  s_e88a9e9b03bbc7::t_76fc58736c5828 18,20
+  s_e88a9e9b03bbc7::t_8614d11ae5e6cf 89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "11b74066efbf71099af4d0d8053c94385608294e",
+  "prompts": {},
+  "sessions": {
+    "s_e88a9e9b03bbc7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea07ea8a-ae12-4a63-bb37-07e2f6f92a57",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
