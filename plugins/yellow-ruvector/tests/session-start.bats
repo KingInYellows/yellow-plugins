@@ -223,8 +223,9 @@ exit 0'
   # The heal comment documents graceful skip on old git; prove it with a
   # stub git that rejects --path-format the way git < 2.31 does.
   command -v git >/dev/null 2>&1 || skip "git not available"
+  real_git="$(command -v git)"
   make_worktree heal-oldgit
-  printf '#!/bin/sh\nfor a in "$@"; do case "$a" in --path-format=*) echo "error: unknown option" >&2; exit 129;; esac; done\nexec /usr/bin/git "$@"\n' > "$MOCK_BIN/git"
+  printf '#!/bin/sh\nfor a in "$@"; do case "$a" in --path-format=*) echo "error: unknown option" >&2; exit 129;; esac; done\nexec %s "$@"\n' "$real_git" > "$MOCK_BIN/git"
   chmod +x "$MOCK_BIN/git"
   make_ruvector_stub 'exit 0'
   run run_hook '{"cwd":""}' "$PROJECT_ROOT/wt"

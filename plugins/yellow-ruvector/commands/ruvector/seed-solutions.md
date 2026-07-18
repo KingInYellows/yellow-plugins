@@ -13,7 +13,9 @@ allowed-tools:
   - Bash(npm install -g ruvector@0.2.34:*)
   - Bash(pgrep -f:*)
   - Bash(grep -o *)
-  - Bash(readlink -f .ruvector:*)
+  - Bash(cd .ruvector:*)
+  - Bash(pwd -P:*)
+  - Bash(git rev-parse --path-format=absolute --git-common-dir:*)
   - mcp__plugin_yellow-ruvector_ruvector__hooks_remember
   - mcp__plugin_yellow-ruvector_ruvector__hooks_recall
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
@@ -39,18 +41,42 @@ re-run after new solution docs land.
 3. **Store-scoping check (do not skip):** call
    `mcp__plugin_yellow-ruvector_ruvector__hooks_stats()` and inspect the
    `intel_path` field. Then resolve the local store's real location with
-   `readlink -f .ruvector` (granted). Accept `intel_path` ONLY when it is
-   inside the current project root OR inside the `readlink`-resolved
-   target directory — and in the symlink case, additionally require that
-   the resolved target is NOT under `~/.ruvector` (the deny example
-   always wins over the symlink allowance; a manually-created symlink to
-   the global store must still STOP). If the field is absent or resolves
-   anywhere else, STOP and report:
+   `cd .ruvector && pwd -P` (granted; portable — `readlink -f` is GNU-only
+   and fails with `illegal option -- f` on macOS/BSD). Accept `intel_path`
+   ONLY when it is inside the current project root OR inside the resolved
+   target directory — and in the symlink case, the allowance is scoped to
+   exactly the healed worktree store, not to "anything outside
+   `~/.ruvector`": run `git rev-parse --path-format=absolute
+   --git-common-dir` (granted), strip the trailing `/.git` to get the main
+   checkout root, and require the `pwd -P`-resolved target equal
+   `<main-checkout-root>/.ruvector` exactly — the same derivation
+   `session-start.sh`'s heal uses (see
+   docs/solutions/integration-issues/ruvector-worktree-db-symlink.md). A
+   symlink pointing anywhere else — another project's `.ruvector`,
+   `~/.ruvector`, or any other path — must STOP; do not accept it merely
+   for being outside `~/.ruvector`. If the field is absent, the git check
+   fails, or `intel_path` resolves anywhere else, STOP and report:
    "ruvector is using a non-project store (<intel_path>). Seeding would
    pollute a store shared across projects. This happens when the MCP
    server started before `.ruvector/` existed — start a fresh session and
    retry. See docs/solutions/integration-issues/ruvector-worktree-db-symlink.md."
    Never seed a store outside the project root.
+4. **Version gate (before any store write):** run `ruvector --version`
+   and compare it against the pinned version (0.2.34). A stale global
+   binary's passive-capture hooks (`pre-tool-use.sh` / `post-tool-use.sh`)
+   rewrite the store on every tool call throughout Step 5's loop, so a
+   mismatch caught only in Step 6 — after that loop already ran — is too
+   late for entries already written. If the version doesn't match, print
+   the exact remediation command,
+   `npm install -g ruvector@0.2.34 --ignore-scripts`, and use
+   AskUserQuestion: "ruvector's global binary is out of date (found
+   <version>, need 0.2.34). Upgrading replaces the machine-wide binary
+   other hooks and sessions depend on. Proceed?" Options: "Yes, upgrade" /
+   "No, stop". Only run the upgrade after explicit confirmation — never
+   automatically. After a confirmed upgrade, re-run `ruvector --version`
+   to confirm the match before continuing to Step 2. On "No, stop" (or a
+   confirmed upgrade that still doesn't match), stop and report the
+   mismatch instead of seeding against a stale binary.
 
 ### Step 2: Concurrency guard
 
@@ -60,11 +86,19 @@ lingering MCP server from an earlier session) can silently erase every
 seeded entry when it next saves; observed live during development. Two
 checks:
 
-1. Run `pgrep -f 'ruvector mcp'` — if any process is running against this
-   project, report it and instruct the user to end those sessions first.
-2. Use AskUserQuestion: "Seeding writes many entries. Confirm no other
-   Claude Code session is actively writing this project's ruvector store
-   right now?" Options: "Yes, proceed" / "No, stop". Stop on "No".
+1. Run `pgrep -f 'ruvector mcp'` — informational only, not a stop
+   condition. At least one match is expected here: Step 1 already
+   confirmed this session's own MCP server is running, so it will show
+   up in the list. `-f` matches the full command line, so a shell
+   ancestor whose own invocation happens to contain the literal text
+   `ruvector mcp` (e.g. this very command) can add a harmless extra
+   match too. Report the match count as context for the question below
+   — do not tell the user to end sessions based on pgrep output alone.
+2. Use AskUserQuestion, citing the pgrep count: "Seeding writes many
+   entries. pgrep found <N> process(es) matching 'ruvector mcp' (1 is
+   expected — this session's own server). Confirm no OTHER Claude Code
+   session is actively writing this project's ruvector store right
+   now?" Options: "Yes, proceed" / "No, stop". Stop on "No".
 
 **Baseline capture (feeds Step 8):** before writing anything, record the
 pre-existing entry count:
@@ -182,7 +216,16 @@ fresh session.
 
 Three further provenance behaviors matter, all observed live on 0.2.34:
 
-1. **Legacy stores are write-locked.** If any store call fails with
+1. **A version-skewed global binary silently clobbers the stamp.** If an
+   older global `ruvector` (pre-ADR-210, e.g. 0.2.25) is on PATH, its
+   passive-capture hooks rewrite the store after every tool call and
+   reset the provenance stamp to null — re-locking the store within
+   seconds of the reembed. Step 1.4's version gate already confirmed
+   `ruvector --version` matched the pinned version (with explicit
+   confirmation before any upgrade) before Step 5's loop even started, so
+   this should already be clean here; if it drifted again mid-run, report
+   the residual mismatch rather than re-running the upgrade blind.
+2. **Legacy stores are write-locked.** If any store call fails with
    `ERR_LEGACY_STORE_READONLY` ("predates embedding provenance"), the
    store has vectors but no provenance stamp. Unlock it — but do NOT
    retry entries in this session (see Step 5.2: report
@@ -194,13 +237,6 @@ Three further provenance behaviors matter, all observed live on 0.2.34:
    npx -y ruvector@0.2.34 hooks reembed             # re-embed + stamp provenance
    ```
 
-2. **A version-skewed global binary silently clobbers the stamp.** If an
-   older global `ruvector` (pre-ADR-210, e.g. 0.2.25) is on PATH, its
-   passive-capture hooks rewrite the store after every tool call and
-   reset the provenance stamp to null — re-locking the store within
-   seconds of the reembed. Verify `ruvector --version` matches the pinned
-   version BEFORE seeding; upgrade with
-   `npm install -g ruvector@0.2.34 --ignore-scripts` if not.
 3. **After a reembed to ONNX, hash-path writes are refused.** Seeding
    after an ONNX reembed requires semantic-mode writes so the active
    embedder matches the stamped provenance. Report any residual
@@ -244,6 +280,11 @@ See `ruvector-conventions` skill for the error catalog.
 
 - **MCP unavailable:** "ruvector not available. Run `/ruvector:setup`."
 - **Non-project store:** stop per Step 1.3 — never seed a global store.
+- **Stale global binary (pre-run):** Step 1.4's version gate stops before
+  Step 2 if `ruvector --version` mismatches and the user declines the
+  upgrade (or a confirmed upgrade still doesn't match) — never seed
+  against a binary whose passive-capture hooks could reset the
+  provenance stamp mid-run.
 - **Storage failure mid-run:** per-entry `failed` count; the run
   continues. Re-running (fresh session) after the cause is fixed
   converges (dedup).

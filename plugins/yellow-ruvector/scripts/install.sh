@@ -109,6 +109,13 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ -n "$RUVECTOR_VERSION" ] && [ "$RUVECTOR_VERSION" != "$RUVECTOR_DEFAULT_VERSION" ]; then
+  warning "--version ${RUVECTOR_VERSION} overrides the pinned ${RUVECTOR_DEFAULT_VERSION} baseline."
+  warning "The plugin MCP server (catalog/plugins/yellow-ruvector.json) stays pinned to ${RUVECTOR_DEFAULT_VERSION}."
+  warning "A CLI/MCP version mismatch can silently reintroduce the store-skew bug this pin exists to prevent (see comment above)."
+  warning "Only use --version for deliberate testing, and re-verify tool contracts before relying on the mismatch."
+fi
+
 # --- Dependency checks ---
 check_dependency() {
   local cmd="$1"

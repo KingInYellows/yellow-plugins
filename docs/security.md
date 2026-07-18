@@ -13,6 +13,12 @@ enterprise deployment.
 | yellow-devin    | devin      | `https://mcp.devin.ai/mcp`              | HTTP      | TBD (may require API token) | Code, task prompts            |
 | yellow-ruvector | ruvector   | Local stdio (`npx -y ruvector@0.2.34 mcp start`) | stdio | None (local)          | Code embeddings (local only)  |
 
+The `ruvector` stdio command is only network-free once `npx` resolves a
+cached or globally installed match for the pinned version; on a cold
+machine it fetches `ruvector@0.2.34` from the npm registry first. Pre-install
+via the steps in [Local npm Dependencies](#local-npm-dependencies) to avoid
+that fetch at MCP startup.
+
 ### Plugins Without MCP Servers
 
 - **gt-workflow** — Pure CLI wrapper for Graphite, no network calls
@@ -58,7 +64,9 @@ These servers require no configuration. They work immediately after plugin
 installation:
 
 - **context7** (yellow-core) — public library documentation endpoint
-- **ruvector** (yellow-ruvector) — local stdio server, no network calls
+- **ruvector** (yellow-ruvector) — local stdio server, no auth configuration
+  (its `npx` startup command can still reach the npm registry on a cold
+  machine — see [MCP Servers Inventory](#mcp-servers-inventory) above)
 - **deepwiki** (yellow-devin) — public repository documentation endpoint
 
 ## Enterprise Rollout Recommendations
@@ -93,7 +101,12 @@ These plugins work entirely offline with no external network calls:
 
 - `gt-workflow` — Graphite CLI wrapper
 - `yellow-debt` — Local codebase analysis
-- `yellow-ruvector` — Local vector search (stdio MCP, no network)
+- `yellow-ruvector` — Local vector search (stdio MCP, no network at
+  runtime). Exception: MCP startup runs `npx -y ruvector@0.2.34`, which
+  hits the npm registry on first use unless `ruvector@0.2.34` is already
+  present locally (the global install `install.sh` performs, or npm's
+  exec cache from a prior run) — see the "Local npm Dependencies" section
+  below.
 
 ## Hook Safety
 

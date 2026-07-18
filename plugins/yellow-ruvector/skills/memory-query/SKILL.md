@@ -111,9 +111,10 @@ ERROR-FIX: <error signature> | FIX: <fix text> | SOURCE: <doc path> — <one-lin
   inside the project root — or, for a healed worktree whose `.ruvector`
   is a symlink, inside the `readlink`-resolved target (never `~/.ruvector`;
   deny wins) — before writing (global-store pollution guard),
-  and MUST finish with `ruvector hooks reembed` — mixed embedding
-  provenance (hash-embedded entries vs ONNX semantic queries) degrades
-  recall scores to near zero until re-embedded (ADR-210 stamping).
+  and MUST finish with `npx -y ruvector@0.2.34 hooks reembed` (pinned —
+  see seed-solutions.md Step 6) — mixed embedding provenance
+  (hash-embedded entries vs ONNX semantic queries) degrades recall
+  scores to near zero until re-embedded (ADR-210 stamping).
 - **Retrieval floor for error queries:**
 
   <!-- prettier-ignore -->

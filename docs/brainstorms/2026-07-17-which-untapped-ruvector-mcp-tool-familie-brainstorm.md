@@ -3,6 +3,17 @@
 **Date:** 2026-07-17
 **Grounding:** `docs/research/ruvector-latest-featureset-and-plugin-ideation.md` (deep research, already complete — not re-derived here)
 
+> **Status (superseded in part, 2026-07-17 post-implementation):** I1's tool
+> contract below (`hooks_error_record`/`hooks_error_suggest` — see "Three
+> candidates were surveyed" and Key Decision 1) was source-verified unfit
+> during implementation: no score/confidence ever reaches the caller and
+> results don't persist across sessions. The shipped design pivoted to
+> `hooks_remember`/`hooks_recall` ("Path B"). See
+> `plans/ruvector-error-fix-memory-mvp.md` ("Path decision") for the full
+> rationale. The rest of this document (the I1/I2/I3 comparison, the
+> decision to build I1 first, and the guardrails) stands unchanged as the
+> historical decision record.
+
 ## What We're Building
 
 A decision on **which of RuVector's untapped MCP tool families to wire into

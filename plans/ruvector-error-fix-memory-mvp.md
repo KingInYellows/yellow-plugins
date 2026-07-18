@@ -332,7 +332,9 @@ Canary entry left in HOME store (self-describing, inert).
 
 ## Acceptance Criteria
 
-1. Phase 0 canary passes: project-scoped write+read isolation confirmed.
+1. Phase 0 canary passes: project-scoped write+read isolation confirmed at
+   process level (0b.3); full fresh-session MCP canary is a PR follow-up
+   verification, not yet re-run — non-blocking per the Phase 0b scope.
 2. Seed run reports eligible/seeded/flagged counts (expect ~44 eligible at
    run time).
 3. Smoke: a seeded doc's error text recalls that entry in top 3, with a
