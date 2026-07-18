@@ -11,8 +11,9 @@ ruvector.
   store from worktree sessions. Bump the pin in
   `catalog/plugins/yellow-ruvector.json` + `scripts/install.sh` together
   and re-verify tool contracts)
-- First MCP start needs network unless `ruvector@0.2.34` is already
-  present locally (global install or npm's exec cache) — the pin trades
+- First MCP start needs network unless the npm exec cache already holds
+  `ruvector@0.2.34` from a prior online run — global install alone does
+  **not** satisfy npx resolution, only the CLI-hook path; the pin trades
   offline-first-start for the store-pollution fix above; see
   `docs/security.md` "Local npm Dependencies"
 - Storage: `.ruvector/intelligence.json` (flat JSON) in project root —

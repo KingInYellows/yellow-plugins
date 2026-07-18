@@ -13,11 +13,15 @@ enterprise deployment.
 | yellow-devin    | devin      | `https://mcp.devin.ai/mcp`              | HTTP      | TBD (may require API token) | Code, task prompts            |
 | yellow-ruvector | ruvector   | Local stdio (`npx -y ruvector@0.2.34 mcp start`) | stdio | None (local)          | Code embeddings (local only)  |
 
-The `ruvector` stdio command is only network-free once `npx` resolves a
-cached or globally installed match for the pinned version; on a cold
-machine it fetches `ruvector@0.2.34` from the npm registry first. Pre-install
-via the steps in [Local npm Dependencies](#local-npm-dependencies) to avoid
-that fetch at MCP startup.
+The `ruvector` stdio command is only network-free once `npx` has a warm npm
+exec-cache entry for the pinned version — `npx` resolves from local project
+dependencies, then the npm exec cache, and does **not** consult global
+installs, so the global binary from [Local npm
+Dependencies](#local-npm-dependencies) does not by itself prevent this
+fetch. On a cold-cache machine it fetches `ruvector@0.2.34` from the npm
+registry first; warm the cache with a one-time online run (`npx -y
+--ignore-scripts ruvector@0.2.34 --version`) or by starting the MCP server
+once while online.
 
 ### Plugins Without MCP Servers
 
@@ -103,10 +107,13 @@ These plugins work entirely offline with no external network calls:
 - `yellow-debt` — Local codebase analysis
 - `yellow-ruvector` — Local vector search (stdio MCP, no network at
   runtime). Exception: MCP startup runs `npx -y ruvector@0.2.34`, which
-  hits the npm registry on first use unless `ruvector@0.2.34` is already
-  present locally (the global install `install.sh` performs, or npm's
-  exec cache from a prior run) — see the "Local npm Dependencies" section
-  below.
+  hits the npm registry on first use unless the npm exec cache already
+  holds `ruvector@0.2.34` from a prior online run. The global install that
+  `install.sh` performs serves the CLI-hook path only — it does **not**
+  satisfy this npx resolution, so a cold-cache offline machine fails MCP
+  startup even with the global binary present. Warm the cache once while
+  online (see the "Local npm Dependencies" section below) to avoid the
+  fetch at MCP startup.
 
 ## Hook Safety
 

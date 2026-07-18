@@ -39,7 +39,32 @@ re-run after new solution docs land.
 2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
    If it errors, report "ruvector not available right now. Check
    `/ruvector:status` and try again." and stop.
-3. **Store-scoping check (do not skip):** call
+3. **Version gate (before any store write; runs first to minimize
+   pre-gate exposure):** run `ruvector --version` and compare it against
+   the pinned version (0.2.34). A stale global binary's passive-capture
+   hooks (`pre-tool-use.sh` / `post-tool-use.sh`) fire unconditionally on
+   every Bash tool call this command makes — including sub-step 4's
+   `cd`/`pwd`/`git` calls below and Step 5's store-write loop — and can
+   rewrite the store or reset provenance before a later check catches the
+   mismatch (a mismatch caught only in Step 6, after Step 5's loop
+   already ran, is too late for entries already written). Running this
+   check first, as the FIRST Bash call in the workflow, shrinks pre-gate
+   exposure to exactly this one unavoidable call. Full quiescing of the
+   passive hooks from inside this command isn't possible today — there is
+   no kill-switch env var, so this one stale-binary write can still land
+   before this check returns (see
+   docs/solutions/logic-errors/write-freeze-invariant-omits-passive-hook-path.md).
+   If the version doesn't match, print the exact remediation command,
+   `npm install -g ruvector@0.2.34 --ignore-scripts`, and use
+   AskUserQuestion: "ruvector's global binary is out of date (found
+   <version>, need 0.2.34). Upgrading replaces the machine-wide binary
+   other hooks and sessions depend on. Proceed?" Options: "Yes, upgrade" /
+   "No, stop". Only run the upgrade after explicit confirmation — never
+   automatically. After a confirmed upgrade, re-run `ruvector --version`
+   to confirm the match before continuing to sub-step 4. On "No, stop"
+   (or a confirmed upgrade that still doesn't match), stop and report the
+   mismatch instead of seeding against a stale binary.
+4. **Store-scoping check (do not skip):** call
    `mcp__plugin_yellow-ruvector_ruvector__hooks_stats()` and inspect the
    `intel_path` field. Then resolve the local store's real location with
    `cd .ruvector && pwd -P` (granted; portable — `readlink -f` is GNU-only
@@ -62,22 +87,6 @@ re-run after new solution docs land.
    server started before `.ruvector/` existed — start a fresh session and
    retry. See docs/solutions/integration-issues/ruvector-worktree-db-symlink.md."
    Never seed a store outside the project root.
-4. **Version gate (before any store write):** run `ruvector --version`
-   and compare it against the pinned version (0.2.34). A stale global
-   binary's passive-capture hooks (`pre-tool-use.sh` / `post-tool-use.sh`)
-   rewrite the store on every tool call throughout Step 5's loop, so a
-   mismatch caught only in Step 6 — after that loop already ran — is too
-   late for entries already written. If the version doesn't match, print
-   the exact remediation command,
-   `npm install -g ruvector@0.2.34 --ignore-scripts`, and use
-   AskUserQuestion: "ruvector's global binary is out of date (found
-   <version>, need 0.2.34). Upgrading replaces the machine-wide binary
-   other hooks and sessions depend on. Proceed?" Options: "Yes, upgrade" /
-   "No, stop". Only run the upgrade after explicit confirmation — never
-   automatically. After a confirmed upgrade, re-run `ruvector --version`
-   to confirm the match before continuing to Step 2. On "No, stop" (or a
-   confirmed upgrade that still doesn't match), stop and report the
-   mismatch instead of seeding against a stale binary.
 
 ### Step 2: Concurrency guard
 
@@ -239,7 +248,7 @@ Three further provenance behaviors matter, all observed live on 0.2.34:
    older global `ruvector` (pre-ADR-210, e.g. 0.2.25) is on PATH, its
    passive-capture hooks rewrite the store after every tool call and
    reset the provenance stamp to null — re-locking the store within
-   seconds of the reembed. Step 1.4's version gate already confirmed
+   seconds of the reembed. Step 1.3's version gate already confirmed
    `ruvector --version` matched the pinned version (with explicit
    confirmation before any upgrade) before Step 5's loop even started, so
    this should already be clean here; if it drifted again mid-run, report
@@ -311,12 +320,12 @@ session (idempotent).
 See `ruvector-conventions` skill for the error catalog.
 
 - **MCP unavailable:** "ruvector not available. Run `/ruvector:setup`."
-- **Non-project store:** stop per Step 1.3 — never seed a global store.
-- **Stale global binary (pre-run):** Step 1.4's version gate stops before
-  Step 2 if `ruvector --version` mismatches and the user declines the
-  upgrade (or a confirmed upgrade still doesn't match) — never seed
-  against a binary whose passive-capture hooks could reset the
-  provenance stamp mid-run.
+- **Non-project store:** stop per Step 1.4 — never seed a global store.
+- **Stale global binary (pre-run):** Step 1.3's version gate stops before
+  Step 1.4's store-scoping check and Step 2 if `ruvector --version`
+  mismatches and the user declines the upgrade (or a confirmed upgrade
+  still doesn't match) — never seed against a binary whose
+  passive-capture hooks could reset the provenance stamp mid-run.
 - **Storage failure mid-run:** per-entry `failed` count; the run
   continues. Re-running (fresh session) after the cause is fixed
   converges (dedup).

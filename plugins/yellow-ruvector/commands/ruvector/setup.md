@@ -15,9 +15,9 @@ Install the ruvector CLI and initialize `.ruvector/` for the current project.
 
 ## CLI Reference (verified against v0.1.96+)
 
-- `npx ruvector hooks init` — Initialize `.ruvector/` directory
+- `ruvector hooks init` — Initialize `.ruvector/` directory
 - `npx ruvector mcp start` — Start the MCP server (stdio transport)
-- `npx ruvector doctor` — System health check
+- `ruvector doctor` — System health check
 
 **Commands that do NOT exist:** `ruvector init`, `ruvector mcp-server`.
 
@@ -86,7 +86,7 @@ If install fails, report the error and suggest:
 Combine initialization and .gitignore update:
 
 ```bash
-npx ruvector hooks init --minimal --no-claude-md --no-permissions --no-env --no-mcp --no-statusline && \
+ruvector hooks init --minimal --no-claude-md --no-permissions --no-env --no-mcp --no-statusline && \
 (grep -q '\.ruvector' .gitignore 2>/dev/null || printf '\n# ruvector vector storage (per-developer)\n.ruvector/\n' >> .gitignore) && \
 printf '\nInitialized .ruvector/ and updated .gitignore\n'
 ```
@@ -102,7 +102,7 @@ Run health check and hook status in a single command:
 
 ```bash
 printf '=== Doctor ===\n'
-npx ruvector doctor 2>&1 || printf '(doctor exited non-zero — see above)\n'
+ruvector doctor 2>&1 || printf '(doctor exited non-zero — see above)\n'
 
 printf '\n=== Hook Scripts ===\n'
 PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:?CLAUDE_PLUGIN_ROOT must be set}"
