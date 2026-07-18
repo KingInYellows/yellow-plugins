@@ -81,11 +81,20 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/install.sh"
 If install fails, report the error and suggest:
 `npm install -g ruvector --ignore-scripts`
 
+If Step 2a's output includes `Installed to ~/.local prefix`, it only
+exported `~/.local/bin` into that child script's own process — this
+command's own subsequent Bash tool calls still start from the original
+`PATH` and would hit `command not found` on the bare `ruvector` calls below.
+Steps 2b and 3 prepend `export PATH="$HOME/.local/bin:$PATH"` unconditionally
+to stay correct in that case; it is a no-op when the global install path was
+used.
+
 ### Step 2b: Initialize + gitignore (ONE Bash call)
 
 Combine initialization and .gitignore update:
 
 ```bash
+export PATH="$HOME/.local/bin:$PATH"
 ruvector hooks init --minimal --no-claude-md --no-permissions --no-env --no-mcp --no-statusline && \
 (grep -q '\.ruvector' .gitignore 2>/dev/null || printf '\n# ruvector vector storage (per-developer)\n.ruvector/\n' >> .gitignore) && \
 printf '\nInitialized .ruvector/ and updated .gitignore\n'
@@ -101,6 +110,7 @@ If `.ruvector/` already exists, skip this step entirely.
 Run health check and hook status in a single command:
 
 ```bash
+export PATH="$HOME/.local/bin:$PATH"
 printf '=== Doctor ===\n'
 ruvector doctor 2>&1 || printf '(doctor exited non-zero — see above)\n'
 
