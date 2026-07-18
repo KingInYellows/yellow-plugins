@@ -39,7 +39,7 @@ Persistent vector memory and semantic code search for Claude Code agents via
 | `/ruvector:status`              | Show ruvector health, DB stats, and queue status       |
 | `/ruvector:learn [description]` | Record a learning, mistake, or pattern                 |
 | `/ruvector:memory [filter]`     | Browse and search stored memories                      |
-| `/ruvector:seed-solutions [dir]` | Seed ERROR-FIX memory from `track: bug` solution docs |
+| `/ruvector:seed-solutions`      | Seed ERROR-FIX memory from `track: bug` solution docs  |
 
 ## Agents
 

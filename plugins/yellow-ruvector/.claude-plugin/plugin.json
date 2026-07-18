@@ -22,6 +22,7 @@
       "command": "npx",
       "args": [
         "-y",
+        "--ignore-scripts",
         "ruvector@0.2.34",
         "mcp",
         "start"

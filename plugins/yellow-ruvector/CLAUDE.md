@@ -22,8 +22,9 @@ ruvector.
 - Lifecycle: starts on first MCP tool call (lazy init by Claude Code), shuts
   down on session end
 - If crashed mid-session: surface error and suggest running
-  `npx -y ruvector@0.2.34 mcp start` to verify (always the pinned spec —
-  the unpinned form resolves whatever global is installed)
+  `npx -y --ignore-scripts ruvector@0.2.34 mcp start` to verify (always
+  the pinned spec — the unpinned form resolves whatever global is
+  installed)
 - `RUVECTOR_STORAGE_PATH` in plugin.json is **inert at 0.2.34** — the env
   var appears nowhere in the installed package (full-source grep); store
   resolution is `getIntelPath()`'s cwd-based logic. Kept as

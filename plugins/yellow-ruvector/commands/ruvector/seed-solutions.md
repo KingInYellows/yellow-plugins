@@ -8,11 +8,12 @@ allowed-tools:
   - Glob
   - Grep
   - Read
-  - Bash(npx -y ruvector@0.2.34 hooks reembed:*)
+  - Bash(npx -y --ignore-scripts ruvector@0.2.34 hooks reembed:*)
   - Bash(ruvector --version:*)
   - Bash(npm install -g ruvector@0.2.34:*)
   - Bash(pgrep -f:*)
   - Bash(grep -o *)
+  - Bash(wc -l:*)
   - Bash(cd .ruvector:*)
   - Bash(pwd -P:*)
   - Bash(git rev-parse --path-format=absolute --git-common-dir:*)
@@ -236,8 +237,8 @@ Three further provenance behaviors matter, all observed live on 0.2.34:
    resume automatically):
 
    ```bash
-   npx -y ruvector@0.2.34 hooks reembed --dry-run   # inspect first
-   npx -y ruvector@0.2.34 hooks reembed             # re-embed + stamp provenance
+   npx -y --ignore-scripts ruvector@0.2.34 hooks reembed --dry-run   # inspect first
+   npx -y --ignore-scripts ruvector@0.2.34 hooks reembed             # re-embed + stamp provenance
    ```
 
 3. **After a reembed to ONNX, hash-path writes are refused.** Seeding

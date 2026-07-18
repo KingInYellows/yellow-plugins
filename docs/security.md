@@ -211,8 +211,11 @@ npm install -g ruvector@0.2.34 --ignore-scripts
 
 **Mitigation:** Review package before installation. The `install.sh` script
 performs dependency checks and error handling and installs with
-`--ignore-scripts`; the pinned default (`RUVECTOR_DEFAULT_VERSION`) must
-match the catalog npx spec — bats tests enforce the sync.
+`--ignore-scripts`; the MCP server's own npx launch spec (catalog →
+`plugin.json` args) and the `seed-solutions` reembed commands carry
+`--ignore-scripts` as well, so the lazily-fetched npx path is covered, not
+just the global install. The pinned default (`RUVECTOR_DEFAULT_VERSION`)
+must match the catalog npx spec — bats tests enforce the sync.
 
 ### yellow-browser-test
 

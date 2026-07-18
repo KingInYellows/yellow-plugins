@@ -12,7 +12,7 @@ resolution silently wrote the machine-global ~/.ruvector store from
 worktree sessions); install.sh defaults to the same pin; session-start.sh
 heals a worktree's missing or dangling `.ruvector` symlink — resolving
 the worktree root even from nested launch dirs — before the MCP server
-can cache a fallback store path (10 new bats tests incl. version-pin and
+can cache a fallback store path (11 new bats tests incl. version-pin and
 0.40-floor drift guards); canonical Error→Fix
 protocol section + calibrated 0.40 retrieval floor in memory-query
 SKILL.md; storage-path doc drift fixed. yellow-core: debugging skill gains
