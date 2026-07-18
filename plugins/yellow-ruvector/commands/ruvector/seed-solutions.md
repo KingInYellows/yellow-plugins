@@ -187,7 +187,7 @@ For each eligible doc:
    front-loaded tokens), composed only from the already-scrubbed fields
    above:
 
-   ```
+   ```text
    ERROR-FIX: <error signature> | FIX: <fix text> | SOURCE: <doc path> — <one-line problem summary>
    ```
 

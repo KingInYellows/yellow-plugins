@@ -152,7 +152,7 @@ without a `Bash(wc -l:*)` grant in the command's `allowed-tools` —
 the permission engine authorizes each piped subcommand independently,
 so covering `grep -o` did not implicitly cover `wc -l`. See
 `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md`
-#25 for the general rule (any pipe-shape fix must be re-checked against
+anti-pattern 25 for the general rule (any pipe-shape fix must be re-checked against
 the grant list in the same edit).
 
 ## Related

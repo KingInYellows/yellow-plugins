@@ -35,6 +35,17 @@ RUVECTOR_DIR="${PROJECT_DIR}/.ruvector"
 # projects that never initialized ruvector. --path-format=absolute needs
 # git >= 2.31; on older git the rev-parse fails and the heal is skipped
 # silently (pre-heal behavior, no breakage).
+#
+# Timing: this heal takes effect for the NEXT session's MCP process. The
+# MCP server initializes lazily on first tool call, which can race ahead
+# of this hook (SessionStart hooks run in parallel across plugins), or it
+# may already be running from a still-open session. Either way the CURRENT
+# session's server can have the machine-global HOME fallback cached
+# already, so in-session MCP reads/writes can still land in ~/.ruvector
+# until a fresh session picks up the now-healed symlink.
+# ruvector:seed-solutions's Step 1.4 store-scoping check is the guard for
+# this window — it STOPs before any seeding write if intel_path resolves
+# outside the project root.
 if [ ! -e "$RUVECTOR_DIR" ] || { [ -e "$RUVECTOR_DIR" ] && [ ! -L "$RUVECTOR_DIR" ]; }; then
   # Resolve the worktree root the heal should target. Cheap paths first:
   # a .git FILE at PROJECT_DIR is the linked-worktree signature; a .git

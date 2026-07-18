@@ -159,7 +159,14 @@ commands (`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`).
   yellow-core's `worktree-manager.sh` at worktree creation time; for
   worktrees created by other tooling, `session-start.sh` heals the
   missing link (resolving the worktree root even from a nested launch
-  dir) before the MCP server can cache a fallback store path.
+  dir). This heal takes effect for the NEXT session's MCP process — the
+  MCP server initializes lazily on first tool call and can race ahead of
+  this hook (or may already be running from a still-open session), so
+  the CURRENT session can still have the machine-global `~/.ruvector`
+  fallback cached and keep writing there until a fresh session picks up
+  the healed symlink. `/ruvector:seed-solutions`'s Step 1.4 store-scoping
+  check is the guard for this window — it STOPs before any seeding write
+  if `intel_path` resolves outside the project root.
 - **Nested-launch scoping limitation:** a session started from a
   subdirectory (not the project/worktree root) gives the MCP server a
   nested cwd; ruvector 0.2.34's `getIntelPath()` does no upward search,

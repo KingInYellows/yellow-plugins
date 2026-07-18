@@ -29,19 +29,25 @@ This harness supports two distinct ways of running a subagent, and they have
 1. **Synchronous `Task`-tool subagents** (spawned and awaited within the
    same turn). Their final text is captured as the tool's return value and
    is automatically visible to the calling agent — no explicit instruction
-   is needed for the result to reach the caller. This is what the harness
-   contract documents: "the result returned by the agent is not visible to
-   the user... you should send a text message back to the user" describes
-   the *caller's* job of relaying that already-delivered result onward, not
-   the subagent's job of delivering it in the first place.
+   is needed for the result to reach the caller. The harness prompt's
+   "the result returned by the agent is not visible to the user... you
+   should send a text message back to the user" describes the *caller's*
+   job of relaying that already-delivered result onward, not the
+   subagent's job of delivering it in the first place. (Delivery
+   semantics here describe behavior observed in this repo's sessions as
+   of 2026-07 — there is no versioned harness contract or regression
+   test pinning them; re-verify empirically if the harness changes.)
 2. **Addressable "mailbox" teammate agents** — spawned as long-lived named
    peers (reachable afterward via `SendMessage({to: name, ...})`), the model
    used for large parallel fan-outs like a 20-persona review sweep. A
    teammate finishing its assigned work and simply stopping does **not**
-   deliver anything to the orchestrator. Nothing in the harness auto-routes
-   a teammate's final turn text to whoever spawned it — the teammate's
-   output only reaches the orchestrator if the teammate explicitly calls
-   `SendMessage` to hand it over.
+   deliver anything to the orchestrator. In every observed instance
+   (this repo, 2026-07: a 20-reviewer fan-out plus multiple resolver and
+   compounder waves), nothing auto-routed a teammate's final turn text
+   to whoever spawned it — the teammate's output only reached the
+   orchestrator when the teammate explicitly called `SendMessage` to
+   hand it over. Same caveat as above: session-observed behavior, not a
+   versioned guarantee.
 
 ## Problem
 

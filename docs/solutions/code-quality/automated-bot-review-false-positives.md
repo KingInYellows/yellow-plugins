@@ -230,7 +230,13 @@ of this file might be stale."
 **Detection rule:** for any bot claim of the shape "X is missing/absent
 from file Y," re-check Y at current `HEAD` directly (`Read`/`grep` the
 live file, not the bot's quoted excerpt or diff snippet) before accepting
-or declining. This is the same "verify against ground truth, not the
+or declining. When the PR has had multiple pushes, also resolve the
+commit the bot actually reviewed (its review-run metadata or the push
+timestamp closest to the comment) and check Y there too — comparing both
+revisions distinguishes "bot saw a stale view" (present at its commit
+AND at HEAD → decline) from "valid at its commit, fixed since" (decline
+with a pointer to the fixing commit) and from "regressed after its
+commit" (accept against HEAD, not the bot's snapshot). This is the same "verify against ground truth, not the
 bot's framing" discipline FP2 and FP6 already establish, applied here to
 existence claims instead of tool-recommendation or language-semantic
 claims — the specific thing that needs verifying is different (presence

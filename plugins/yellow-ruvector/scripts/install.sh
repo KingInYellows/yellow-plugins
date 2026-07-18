@@ -210,6 +210,18 @@ if [ -z "$installed_version" ]; then
   error "ruvector binary found but 'ruvector --version' failed. Try reinstalling: npm install -g ruvector@${install_version} --ignore-scripts"
 fi
 
+resolved_path=$(command -v ruvector)
+printf 'Resolved binary: %s (version %s)\n' "$resolved_path" "$installed_version"
+
+# When multiple global-prefix or version-manager installations exist, npm can
+# update one copy while `ruvector` on PATH still resolves an older copy
+# installed earlier. Require the reported version to match the pin so this
+# PATH-shadowing skew can't silently pass verification. Skipped for
+# --version latest, which has no fixed pin to compare against.
+if [ "$install_version" != "latest" ] && [ "$installed_version" != "$install_version" ]; then
+  error "ruvector at ${resolved_path} reports version ${installed_version}, but the pinned install version is ${install_version}. Another ruvector install earlier on PATH (a different npm global prefix or version manager such as nvm/fnm) is likely shadowing the freshly installed copy. Run 'npm ls -g ruvector' and check other npm prefixes, then ensure the pinned copy resolves first on PATH — a CLI/MCP version mismatch can silently reintroduce the store-skew bug this pin exists to prevent."
+fi
+
 if [ "$install_path" = "local" ]; then
   if [ "$path_needs_update" = "true" ]; then
     success "ruvector ${installed_version} installed to ~/.local/bin — restart your shell to use it"

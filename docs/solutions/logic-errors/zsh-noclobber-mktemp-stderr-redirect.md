@@ -161,7 +161,7 @@ one, run the grep it prescribes as a mandatory last step of the same PR,
 not as a suggestion left for whoever reads the doc next — treat "0
 remaining instances" as part of the fix's own done-criteria, not a
 separate, optional follow-up task that can silently never happen. This
-sweep found 16+ live instances across 8 plugins nearly five months after
+sweep found 16+ live instances across 7 plugins nearly five months after
 the pattern was first documented — the gap compounds the longer the sweep
 is deferred, since every new command/skill/agent written in the meantime
 had nothing wrong with it locally (each one independently reinvented the
