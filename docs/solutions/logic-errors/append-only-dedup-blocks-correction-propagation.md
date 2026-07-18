@@ -70,8 +70,9 @@ complexity:
 
 - Tag each seeded entry with a stable identity key (e.g. the source doc's
   path + a content hash) so a re-seed can detect "this doc changed since
-  last seeded" and explicitly needs a delete-then-reinsert, even if the
-  underlying store has no native delete-by-id.
+  last seeded." Identity tagging is detection-only — it flags the stale
+  entry but cannot remove it; removal still requires a delete/update
+  primitive on the store or the documented out-of-band reset.
 - If the store truly has no delete/replace primitive reachable from the
   tools in scope, document the out-of-band remediation path explicitly
   (as `seed-solutions.md` now does) rather than letting users discover

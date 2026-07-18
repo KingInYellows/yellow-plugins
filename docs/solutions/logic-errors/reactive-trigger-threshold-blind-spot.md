@@ -145,6 +145,16 @@ or a tool-native count) over `grep -c`, and ask what the file's realistic
 shape is (pretty-printed vs. minified/single-line) before trusting a
 line-based count as a proxy for an occurrence count.
 
+## Update — 2026-07-18 (round 3): the counting fix itself needed a permissions fix
+
+The round-2 fix above (`grep -o 'ERROR-FIX:' file | wc -l`) shipped
+without a `Bash(wc -l:*)` grant in the command's `allowed-tools` —
+the permission engine authorizes each piped subcommand independently,
+so covering `grep -o` did not implicitly cover `wc -l`. See
+`docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md`
+#25 for the general rule (any pipe-shape fix must be re-checked against
+the grant list in the same edit).
+
 ## Related
 
 - `docs/solutions/logic-errors/bash-pipe-head-exit-code-masking.md` — a
@@ -155,3 +165,6 @@ line-based count as a proxy for an occurrence count.
 - `docs/solutions/integration-issues/ruvector-worktree-db-symlink.md` — same
   PR, same file's sibling fix (dangling-symlink heal); another case of a
   guard's happy-path condition not covering every real state.
+- `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md`
+  #25 — the grant-per-pipe-stage bug the round-2 counting fix above
+  introduced.

@@ -175,11 +175,14 @@ every round guarantees at least one more round of bot scrutiny. Treating
 unbounded loop, since a fix commit can itself always attract a comment.
 
 **Solution:** a bounded one-extra-round policy — resolve, push, verify
-the resulting threads, then stop regardless of whether the verification
-round produced further findings. On PR #647 this left zero unresolved
-threads in practice (the extra round's findings were genuine and
-resolve-safe), but the bound itself is what prevents an open-ended loop
-on PRs where they aren't.
+the resulting threads, then stop the automatic loop regardless of
+whether the verification round produced further findings. The bound
+caps the automation, not the safety review: anything still open at the
+stop point (especially P1/P2 or security findings) must be surfaced in
+the final report for explicit follow-up or escalation, never silently
+dropped. On PR #647 this left zero unresolved threads in practice (the
+extra round's findings were genuine and resolve-safe), but the bound
+itself is what prevents an open-ended loop on PRs where they aren't.
 
 **Prevention:** any `/review:resolve` or `/review:sweep` pipeline that
 pushes fix commits should cap re-verification at one extra round by

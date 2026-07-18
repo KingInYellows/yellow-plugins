@@ -1060,6 +1060,51 @@ for a check that structurally cannot see zero.
       whose own invocation text happens to contain the search string —
       don't assume match count == distinct external process count.
 
+### 25. A Bash Grant Must Cover Every Stage of a Pipe, Not Just the First Command
+
+**WRONG:**
+
+```yaml
+allowed-tools:
+  - Bash(grep -o *)
+```
+
+```bash
+grep -o 'ERROR-FIX:' .ruvector/intelligence.json | wc -l
+```
+
+**RIGHT:**
+
+```yaml
+allowed-tools:
+  - Bash(grep -o *)
+  - Bash(wc -l:*)
+```
+
+**Rule:** the permission engine matches each piped subcommand
+independently against the `allowed-tools` list — a grant for the head of
+a pipeline does not implicitly cover its tail. `seed-solutions.md`
+Steps 2 and 8 switched from `grep -c` to `grep -o ... | wc -l` to fix the
+line-vs-occurrence counting bug documented in
+`docs/solutions/logic-errors/reactive-trigger-threshold-blind-spot.md`
+("round 2"), but the frontmatter only granted `Bash(grep -o *)`; `wc -l`
+had no grant of its own, so the corrected command would have hit a
+permission prompt (or been silently blocked in non-interactive contexts)
+the first time it actually ran. The bug is easy to introduce because the
+English reads as one operation ("count occurrences") even though the
+shell executes it as two independently-authorized programs.
+
+**Prevention checklist additions:**
+
+- [ ] When a command's Bash grants are written or edited, list every
+      distinct executable name that appears anywhere in a piped shell
+      invocation in that command's prose — not just the first — and
+      confirm each one has its own `allowed-tools` entry.
+- [ ] Any time a fix changes a piped command's shape (adding a stage,
+      swapping `grep -c` for `grep -o | wc -l`, etc.), re-check the grant
+      list in the same edit — a counting-logic fix and a permissions fix
+      are easy to treat as separate tasks and ship only one.
+
 ---
 
 ## Related Documentation

@@ -290,8 +290,11 @@ alongside the stale one. The MCP surface has no delete/replace-by-id, so
 corrections cannot propagate in place. Current remediation: quiesce all
 ruvector processes and reset the ERROR-FIX corpus out-of-band (edit
 `.ruvector/intelligence.json` to drop `ERROR-FIX:` entries, or a full
-store re-import), then re-seed fresh. State this in the report whenever
-the run skipped entries whose source docs changed since the last seed.
+store re-import), then re-seed fresh. The command tracks no source
+identity (path/content hash), so it cannot tell which skipped
+near-duplicates stem from corrected docs — include this limitation note
+in every report whose summary table has a nonzero skipped-duplicate
+count.
 
 ### Step 8: Durability re-check
 
