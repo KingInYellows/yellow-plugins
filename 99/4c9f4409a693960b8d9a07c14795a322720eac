@@ -1,0 +1,33 @@
+plugins/yellow-ruvector/CLAUDE.md
+  s_e88a9e9b03bbc7::t_348fef103f8c69 25-27
+plugins/yellow-ruvector/commands/ruvector/seed-solutions.md
+  s_e88a9e9b03bbc7::t_4409e277d8ba09 16
+  s_e88a9e9b03bbc7::t_0e7062df1a96bc 11
+  s_e88a9e9b03bbc7::t_d349501de57c27 240-241
+.changeset/ruvector-error-fix-memory.md
+  s_e88a9e9b03bbc7::t_5381c2c6a2354b 15
+docs/security.md
+  s_e88a9e9b03bbc7::t_90b01d4778ece5 214-218
+plugins/yellow-ruvector/.claude-plugin/plugin.json
+  s_e88a9e9b03bbc7::t_e7aa569160a4e6 25
+plugins/yellow-ruvector/README.md
+  s_e88a9e9b03bbc7::t_b41bc9d7c48402 42
+catalog/plugins/yellow-ruvector.json
+  s_e88a9e9b03bbc7::t_224ae0820b9f8f 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "994c9f4409a693960b8d9a07c14795a322720eac",
+  "prompts": {},
+  "sessions": {
+    "s_e88a9e9b03bbc7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea07ea8a-ae12-4a63-bb37-07e2f6f92a57",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
