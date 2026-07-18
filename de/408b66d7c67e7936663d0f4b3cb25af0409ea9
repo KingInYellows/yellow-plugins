@@ -1,0 +1,19 @@
+plans/complete/ruvector-error-fix-memory-mvp.md
+  s_550106f167fc82::t_e6563f8f03ad7d 1-398
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "de408b66d7c67e7936663d0f4b3cb25af0409ea9",
+  "prompts": {},
+  "sessions": {
+    "s_550106f167fc82": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb05a88a-df3e-4c58-b1c1-713fe009a6f6",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
