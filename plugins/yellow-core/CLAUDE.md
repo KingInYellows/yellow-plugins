@@ -111,10 +111,14 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   `/plan:complete` and `/workflows:plan` (see "Plan namespace split"
   below)
 - `/plan:complete` — archive a single open plan with two safety gates:
-  Gate A scans for unchecked `- [ ]` boxes; Gate C queries GitHub for
-  a merged PR whose title and branch contain the slug derived from the
-  filename (server-side `--state merged` + `--jq` word-boundary
-  post-filter on `headRefName`). NO-EVIDENCE prompts the user via
+  Gate A scans for unchecked `- [ ]` boxes; Gate C verifies merged-PR
+  evidence in two tiers: a strict tier (server-side `--state merged` +
+  `--jq` word-boundary post-filter of the full slug on `headRefName`),
+  then a loose tier scoring the 100 most recent merged PRs by
+  slug-token coverage over branch + title — a unique PR containing all
+  slug tokens except at most one (all of them for slugs of ≤3 tokens)
+  passes without prompting, captured in a `Plan-Verifier-LooseMatch:`
+  commit trailer. Ambiguous or zero loose matches prompt the user via
   `AskUserQuestion` "Other" label for a PR-number override; the
   decision is captured in a `Plan-Verifier-Override:` commit trailer.
   Archival branch is `plan/archive-<slug>`; submitted via
