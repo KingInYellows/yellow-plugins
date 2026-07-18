@@ -1,0 +1,19 @@
+plugins/yellow-ruvector/commands/ruvector/setup.md
+  s_80708b4746aa08::t_266c2dfb676a4d 84-91,97,113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "ba88bd2f7098fcb8813837a0c9147144fd8155b2",
+  "prompts": {},
+  "sessions": {
+    "s_80708b4746aa08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aresolver-setup-md-b292a1723e5a0359",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
