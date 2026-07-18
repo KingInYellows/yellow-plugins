@@ -1,0 +1,32 @@
+docs/solutions/logic-errors/append-only-dedup-blocks-correction-propagation.md
+  s_e88a9e9b03bbc7::t_d89a9735bbf7ae 1-88
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_7ed434e75cb861::t_3d13f6b1e33eab 997-1062
+docs/solutions/code-quality/multi-agent-re-review-false-positive-patterns.md
+  s_7ed434e75cb861::t_63a33b29aa4ca7 158-187
+  s_7ed434e75cb861::t_8ca7aba45e9e8e 141-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "8798e04c30eff48e9cfd375ae5d9a25ffa5f6ecb",
+  "prompts": {},
+  "sessions": {
+    "s_7ed434e75cb861": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "79c9d95a-5e6c-49aa-b866-5b82db987d49",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e88a9e9b03bbc7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea07ea8a-ae12-4a63-bb37-07e2f6f92a57",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
