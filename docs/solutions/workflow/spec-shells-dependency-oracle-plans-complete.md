@@ -84,3 +84,53 @@ reading side (`pick-next-shell`, `expand-shell`) can match them precisely.
 - `docs/brainstorms/2026-06-28-spec-shells-decomposition-brainstorm.md` — the
   decision record for the port.
 - Turbo source: `tobihagemann/turbo` `claude/skills/{draft-spec,draft-shells,expand-shell,pick-next-shell}/SKILL.md`.
+
+---
+
+## Update — 2026-07-17
+
+Observed while expanding `claude-code-codex-plugin-pilot-02-codex-tooling`,
+whose dependency (`...-01-neutral-generation`) was already archived in
+`plans/complete/`. Two follow-ups to the "Diverged archives" pitfall above:
+what to do once divergence is confirmed, and a related order-of-operations
+lesson for resolving a survey subagent's "open question."
+
+### Absorb low-risk divergence in-plan; escalate only spec-level conflicts
+
+The "Diverged archives" pitfall says `expand-shell` must re-verify each
+`Consumes` against the live codebase, not just the archive — but it doesn't
+say what to do once a mismatch is found. In this case the archived
+dependency shell had, by its own design, delivered a simplified placeholder
+for a field the parent spec's Design section already documented in a richer
+shape (a plain boolean where Design expected an object). Since the archived
+shell cannot be edited (`expand-shell`'s rules forbid touching completed
+plans), the correction has nowhere to land except the current shell's plan —
+even if the current shell's own `Produces` list never itemized it.
+
+Two paths exist once divergence is confirmed:
+
+- **Absorb it in the current plan** when the fix is a mechanical, value-only
+  migration that stays inert until a later shell turns it on, and doesn't
+  touch any contract the archived shell's own output already proved (e.g. a
+  byte-identity guarantee on a code path the migration doesn't read from).
+  Add it as an explicit task under the current shell's Produces/steps, citing
+  the parent-spec requirement it grounds, and rerun the plan's consistency
+  checks. If that traceability cannot be established, escalate via
+  `AskUserQuestion` instead of absorbing the work silently.
+- **Escalate via `AskUserQuestion`** when the two sources disagree on intent
+  (not just interim-vs-final shape), or the correction could touch behavior
+  the archived shell's contract depends on.
+
+The dividing line is risk and reversibility, not surprise — a mismatch being
+unexpected doesn't by itself make it escalation-worthy.
+
+### Check the spec's own Requirements/Design text before escalating a subagent's open question
+
+Research subagents surveying the codebase before shell expansion sometimes
+flag "open questions" about design choices that look ambiguous from the code
+alone. Before treating one as a real gap needing user input, re-read the
+parent spec's own Requirements/Design sections first — a subagent scoped to
+codebase survey wasn't necessarily handed the full spec text, and the spec
+frequently pre-answers exactly what it raised. A shell's own
+"Open Questions: None" section is not proof no answer exists elsewhere; it
+only means the shell author didn't carry one forward.

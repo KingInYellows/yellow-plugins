@@ -3,66 +3,45 @@
 /**
  * @yellow-plugins/cli
  *
- * Minimal CLI for validating marketplace and plugin schemas.
+ * Minimal CLI for validating plugin schemas.
  * Install/browse/rollback/publish commands have been removed
- * as Claude Code handles those natively.
+ * as Claude Code handles those natively. Marketplace validation
+ * (validate / validate:marketplace) was retired in R45 — the legacy
+ * nested-shape schemas/marketplace.schema.json it validated against was
+ * unused in CI; scripts/validate-marketplace.js plus
+ * schemas/official-marketplace.schema.json remain the sole marketplace
+ * gates.
  *
  * Usage:
- *   pnpm cli validate              # Validate .claude-plugin/marketplace.json
- *   pnpm cli validate:marketplace  # Validate only marketplace.json
- *   pnpm cli validate:plugins      # Show how to run the plugin manifest validator script
+ *   pnpm cli validate:plugins  # Run the plugin manifest validator script and exit with its status
  */
 
-import { createValidator } from '@yellow-plugins/infrastructure';
+import { spawnSync } from 'child_process';
+import { dirname, join, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 export const version = '2.0.0';
 
-async function main(): Promise<void> {
-  const command = process.argv[2] || 'validate';
+// Repo root is three levels up from this file (packages/cli/src or
+// packages/cli/dist), independent of the caller's working directory.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-  if (
-    !['validate', 'validate:marketplace', 'validate:plugins'].includes(command)
-  ) {
+function main(): void {
+  const command = process.argv[2] || 'validate:plugins';
+
+  if (command !== 'validate:plugins') {
     console.error(`Unknown command: ${command}`);
-    console.error(
-      'Usage: pnpm cli validate | pnpm cli validate:marketplace | pnpm cli validate:plugins'
-    );
+    console.error('Usage: pnpm cli validate:plugins');
     process.exit(1);
   }
 
-  try {
-    if (command === 'validate' || command === 'validate:marketplace') {
-      const validator = await createValidator();
-      const { readFileSync } = await import('fs');
-      const { resolve } = await import('path');
+  const result = spawnSync('node', [join(REPO_ROOT, 'scripts', 'validate-plugin.js')], {
+    cwd: REPO_ROOT,
+    stdio: 'inherit',
+  });
 
-      const marketplacePath = resolve(
-        process.cwd(),
-        '.claude-plugin/marketplace.json'
-      );
-      const data = JSON.parse(readFileSync(marketplacePath, 'utf-8'));
-      const result = validator.validateMarketplace(data);
-
-      console.log(`Marketplace: ${result.status}`);
-      if (result.errors.length > 0) {
-        result.errors.forEach((e) =>
-          console.error(`  [${e.code}] ${e.path}: ${e.message}`)
-        );
-        process.exitCode = 1;
-      }
-    }
-    if (command === 'validate' || command === 'validate:plugins') {
-      console.log(
-        '\nPlugin validation delegated to: node scripts/validate-plugin.js'
-      );
-    }
-  } catch (error) {
-    console.error(
-      'Validation failed:',
-      error instanceof Error ? error.message : error
-    );
-    process.exit(1);
-  }
+  process.exit(result.status ?? 1);
 }
 
 main();
+

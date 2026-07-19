@@ -32,6 +32,8 @@
   },
   "targets": {
     "claude": true,
-    "codex": false
+    "codex": {
+      "enabled": false
+    }
   }
 }

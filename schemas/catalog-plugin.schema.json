@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/catalog-plugin.schema.json",
+  "title": "Neutral Catalog Plugin Source Schema",
+  "description": "Schema for catalog/plugins/<name>.json — shared plugin metadata, per-target enablement, and target-specific overrides that scripts/lib/generate/emit-claude.js and emit-codex.js read to build the generated Claude and Codex artifacts. Does not re-validate the full internal shape of pass-through Claude component fields (outputStyles, mcpServers, hooks, userConfig, dependencies) — schemas/plugin.schema.json already validates those exhaustively on the generated .claude-plugin/plugin.json output; this schema only guards the catalog-specific fields (marketplace, targets) that have no downstream re-check.",
+  "$comment": "Repo-derived schema, not an official Anthropic or OpenAI schema. The targets.codex override block (interface, description, skillAllowlist, componentPaths) is derived from the July 2026 Codex plugin contract recorded in docs/research/2026-07-16-codex-plugin-contract-spike.md; no plugin populates it yet (all 17 sources carry targets.codex.enabled: false as of this PR) — fields are validated unconditionally so a later shell's override cannot reach a generated manifest silently malformed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "description", "author", "homepage", "repository", "license", "keywords", "marketplace", "targets"],
+  "properties": {
+    "$schema": { "type": "string", "format": "uri" },
+    "description": { "type": "string", "minLength": 1 },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "email": { "type": "string", "format": "email" }
+      }
+    },
+    "homepage": { "type": "string", "format": "uri" },
+    "repository": { "type": "string", "minLength": 1 },
+    "license": { "type": "string", "minLength": 1 },
+    "keywords": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "outputStyles": {
+      "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
+    },
+    "mcpServers": {
+      "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
+    },
+    "hooks": {
+      "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
+    },
+    "userConfig": {
+      "type": "object",
+      "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Pass-through Claude component field; see schemas/plugin.schema.json for its full shape."
+    },
+    "marketplace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "source"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Overrides the top-level description in the generated marketplace entry when present."
+        },
+        "category": { "type": "string", "minLength": 1 },
+        "source": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "url"],
+              "properties": {
+                "source": { "type": "string", "const": "url" },
+                "url": { "type": "string", "format": "uri" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "targets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claude", "codex"],
+      "properties": {
+        "claude": {
+          "type": "boolean",
+          "description": "Claude-target enablement. Unlike targets.codex, this stays a bare boolean — the Claude emitter carries no per-plugin overrides."
+        },
+        "codex": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled"],
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "enabled": { "const": true }
+                },
+                "required": ["enabled"]
+              },
+              "then": {
+                "required": ["interface"],
+                "properties": {
+                  "interface": true
+                }
+              }
+            }
+          ],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "interface": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["displayName", "category"],
+              "properties": {
+                "displayName": { "type": "string", "minLength": 1 },
+                "category": { "type": "string", "minLength": 1 }
+              },
+              "description": "Required once targets.codex.enabled is true (buildCodexPluginManifest dereferences both fields unconditionally); optional while enabled is false."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Overrides the top-level description in the generated Codex manifest when present."
+            },
+            "skillAllowlist": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Skill directory names under skills/ that buildCodexSkillTree copies into plugins/<name>/codex/skills/. Skills not listed here are excluded from the Codex distribution (R7)."
+            },
+            "componentPaths": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "skills": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Manifest-relative path the generated Codex plugin manifest declares for its skill tree (R7: 'an explicit manifest-relative choice, not an assumed convention')."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

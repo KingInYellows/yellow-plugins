@@ -7,14 +7,15 @@
  *   - examples/plugin-minimal.example.json   -> schemas/plugin.schema.json
  *   - examples/plugin-extended.example.json  -> schemas/plugin.schema.json
  *
- * Marketplace examples are intentionally NOT covered here:
- * `examples/marketplace.example.json` is sourced from the upstream
- * marketplace fixture and does not match this repo's local
- * `schemas/marketplace.schema.json` shape (uses upstream `name`-based
- * identifiers; local schema requires the legacy `id` field). That
- * pre-existing drift is out of scope for PR-B; the test file scoping
- * to `plugin*.json` prefix keeps the validator-keyword surface
- * exercised without inheriting the unrelated marketplace mismatch.
+ * Marketplace examples are intentionally NOT covered by the discovery
+ * loop above: it is scoped to the `plugin*.json` prefix. The marketplace
+ * *schema* is exercised separately below (the
+ * "official-marketplace.schema.json additionalProperties:false" describe
+ * block) against the live `.claude-plugin/marketplace.json` — the sole
+ * marketplace schema gate since the legacy nested-shape
+ * `schemas/marketplace.schema.json` was retired (R45 of the Codex pilot).
+ * `examples/marketplace.example.json` itself is validated in CI's
+ * validate-schemas.yml via the ajv CLI, not in this file.
  *
  * This test prevents plugin example files from drifting out of sync with
  * `schemas/plugin.schema.json` changes. Before this test,

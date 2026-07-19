@@ -8,6 +8,15 @@
  * @module domain/validation/errorCatalog
  */
 
+// DIST_* codes (R14): the first category sourced from a plain-JSON registry
+// consumed by both this ESM stack (import, resolveJsonModule + the "with"
+// import-attribute below) and the CJS scripts/ stack (readFileSync +
+// JSON.parse — see scripts/lint-error-codes.js's CATALOG_FILES scan)
+// instead of inline literals + the string-concatenation workaround the
+// SOL_*/PLAN_*/SETUP_* categories below still use. Like those categories,
+// the codes are referenced by name in error messages, not emitted literally
+// by any script yet — scripts/validate-codex.js does not read this registry.
+import distCodes from './error-codes.json' with { type: 'json' };
 import {
   ErrorCategory,
   ErrorSeverity,
@@ -128,6 +137,14 @@ export const ERROR_CODES = {
   SETUP_PROBE_LIST_DRIFT: 'ERROR-SETUP-005',
   SETUP_CREDENTIAL_LIST_DRIFT: 'ERROR-SETUP-006',
   SETUP_EXAMPLE_DRIFT: 'ERROR-SETUP-007',
+
+  // Codex Distribution Errors (DIST) — see ./error-codes.json for the
+  // canonical values; re-exported here (not redeclared as literals) so
+  // scripts/lint-error-codes.js's CATALOG must scan error-codes.json too
+  // (this file's raw text no longer contains the literal ERROR-DIST-*
+  // strings once they move behind an import — see
+  // docs/solutions/code-quality/raw-text-scan-inline-to-import-blind-spot.md).
+  ...distCodes,
 } as const;
 
 /**
@@ -352,6 +369,16 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.SETUP_PROBE_LIST_DRIFT,
       ERROR_CODES.SETUP_CREDENTIAL_LIST_DRIFT,
       ERROR_CODES.SETUP_EXAMPLE_DRIFT,
+    ],
+    [ErrorCategory.DISTRIBUTION]: [
+      ERROR_CODES.DIST_MALFORMED_CATALOG_SOURCE,
+      ERROR_CODES.DIST_INVENTORY_ORDER_MISMATCH,
+      ERROR_CODES.DIST_GENERATED_ARTIFACT_DRIFT,
+      ERROR_CODES.DIST_INVALID_GENERATED_MANIFEST,
+      ERROR_CODES.DIST_UNSUPPORTED_SURFACE_EXPOSED,
+      ERROR_CODES.DIST_HOOK_CONTRACT_VIOLATION,
+      ERROR_CODES.DIST_WINDOWS_PATH_PORTABILITY_FAILURE,
+      ERROR_CODES.DIST_MCP_AUTH_CONFIG_FAILURE,
     ],
   };
 }

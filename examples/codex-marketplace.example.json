@@ -1,0 +1,13 @@
+{
+  "name": "yellow-plugins",
+  "interface": { "displayName": "Yellow Plugins" },
+  "plugins": [
+    {
+      "name": "hello-world",
+      "description": "Example Codex-enabled plugin.",
+      "category": "Developer Tools",
+      "source": { "source": "local", "path": "./plugins/hello-world" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" }
+    }
+  ]
+}

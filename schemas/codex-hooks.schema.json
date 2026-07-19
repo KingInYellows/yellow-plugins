@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kingin-yellows.dev/schemas/codex-hooks.schema.json",
+  "title": "Codex Hooks Config Schema",
+  "description": "Schema for the generated plugins/<name>/hooks/codex-hooks.json — referenced by plugins/<name>/.codex-plugin/plugin.json's 'hooks' field (R20).",
+  "$comment": "Repo-derived schema, not an official OpenAI schema. docs/research/2026-07-16-codex-plugin-contract-spike.md finding (d) confirms the manifest's 'hooks' string-path pointer is accepted by the parser, but hook execution itself is currently inert (plugin_hooks feature 'removed' on codex-cli 0.144.1), so this file's internal shape has never been exercised by a live Codex session. The top-level 'hooks' wrapper and the 'statusMessage' field are confirmed against a live fetch of learn.chatgpt.com/docs/build-plugins on 2026-07-19 (the documented default hooks/hooks.json example: {\"hooks\": {\"SessionStart\": [{\"hooks\": [{\"type\": \"command\", \"command\": ..., \"statusMessage\": ...}]}]}}). That example omits 'matcher' entirely and the doc text doesn't say whether it's required or even valid, so this schema keeps 'matcher' as this repo's pre-existing optional field (mirroring schemas/plugin.schema.json's inlineHooks) rather than dropping it on unconfirmed grounds. 'timeout' is likewise kept as optional (ported from the Claude hooks shape, not contradicted by the doc's non-exhaustive field list) alongside the newly-confirmed 'statusMessage'. Re-verify and correct when upstream restores plugin_hooks and a live round-trip becomes possible.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hooks"],
+  "properties": {
+    "hooks": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hooks"],
+          "properties": {
+            "matcher": {
+              "type": "string",
+              "minLength": 1
+            },
+            "hooks": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "command"],
+                "properties": {
+                  "type": { "type": "string", "const": "command" },
+                  "command": { "type": "string", "minLength": 1 },
+                  "timeout": { "type": "number", "exclusiveMinimum": 0 },
+                  "statusMessage": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z]+$"
+      }
+    }
+  }
+}

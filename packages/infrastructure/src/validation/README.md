@@ -56,7 +56,7 @@ const factory = new AjvValidatorFactory();
 // Load schemas
 await factory.loadSchemaFromFile(
   'marketplace',
-  './schemas/marketplace.schema.json'
+  './schemas/official-marketplace.schema.json'
 );
 await factory.loadSchemaFromFile('plugin', './schemas/plugin.schema.json');
 
@@ -83,9 +83,6 @@ Domain-level validator implementing `IValidator` interface.
 
 ```typescript
 const validator = await createValidator();
-
-// Validate marketplace
-const result = validator.validateMarketplace(marketplaceData);
 
 // Validate plugin manifest
 const result = validator.validatePluginManifest(pluginData, 'hookify');
@@ -114,36 +111,7 @@ See `docs/contracts/error-codes.md` for complete catalog.
 
 ## Usage Examples
 
-### Example 1: Validate Marketplace Index
-
-```typescript
-import { createValidator } from '@yellow-plugins/infrastructure/validation';
-
-const validator = await createValidator();
-
-const marketplaceData = {
-  schemaVersion: '1.0.0',
-  marketplace: {
-    name: 'My Marketplace',
-    author: 'username',
-    updatedAt: '2026-01-11T10:00:00Z'
-  },
-  plugins: [...]
-};
-
-const result = validator.validateMarketplace(marketplaceData);
-
-if (result.status === ValidationStatus.SUCCESS) {
-  console.log('✅ Valid marketplace');
-} else {
-  console.error('❌ Validation errors:');
-  result.errors.forEach(err => {
-    console.error(`  [${err.code}] ${err.path}: ${err.message}`);
-  });
-}
-```
-
-### Example 2: Validate Plugin Manifest
+### Example 1: Validate Plugin Manifest
 
 ```typescript
 const pluginData = {
@@ -170,7 +138,7 @@ if (result.status === ValidationStatus.ERROR) {
 }
 ```
 
-### Example 3: Check Compatibility
+### Example 2: Check Compatibility
 
 ```typescript
 const compatibility = {
@@ -199,9 +167,8 @@ const result = validator.validateCompatibility(compatibility, environment);
 
 The validator has been designed to work with the provided example files:
 
-1. **examples/marketplace.example.json** - Valid marketplace index
-2. **examples/plugin.example.json** - Full plugin manifest (hookify)
-3. **examples/plugin-minimal.example.json** - Minimal plugin manifest
+1. **examples/plugin.example.json** - Full plugin manifest (hookify)
+2. **examples/plugin-minimal.example.json** - Minimal plugin manifest
 
 ### Manual Validation Test
 
@@ -217,19 +184,12 @@ import { readFile } from 'fs/promises';
 
 const validator = await createValidator();
 
-// Test marketplace
-const marketplace = JSON.parse(
-  await readFile('examples/marketplace.example.json', 'utf-8')
-);
-const result1 = validator.validateMarketplace(marketplace);
-console.log('Marketplace:', result1.status); // Should be SUCCESS
-
 // Test plugin
 const plugin = JSON.parse(
   await readFile('examples/plugin.example.json', 'utf-8')
 );
-const result2 = validator.validatePluginManifest(plugin, 'hookify');
-console.log('Plugin:', result2.status); // Should be SUCCESS
+const result = validator.validatePluginManifest(plugin, 'hookify');
+console.log('Plugin:', result.status); // Should be SUCCESS
 ```
 
 ## Acceptance Criteria Status
@@ -237,10 +197,12 @@ console.log('Plugin:', result2.status); // Should be SUCCESS
 ✅ **All criteria met for I1.T3**:
 
 1. ✅ **Validator executes against provided example files**
-   - SchemaValidator accepts and validates marketplace.example.json
    - SchemaValidator accepts and validates plugin.example.json
    - SchemaValidator accepts and validates plugin-minimal.example.json
    - No schema validation errors for valid examples
+   - (Marketplace validation was retired in R45 — `SchemaValidator.validateMarketplace()`
+     no longer exists; `scripts/validate-marketplace.js` plus
+     `schemas/official-marketplace.schema.json` remain the sole marketplace gates.)
 
 2. ✅ **Error catalog cross-references Section 4 rulebook codes**
    - ERROR_CODES maps to specification error scenarios
@@ -277,7 +239,7 @@ console.log('Plugin:', result2.status); // Should be SUCCESS
   - `diagrams/data-erd.puml` - Entity relationship diagram
 
 - **Schemas**: `schemas/`
-  - `marketplace.schema.json` - Marketplace validation rules
+  - `official-marketplace.schema.json` - Marketplace validation rules
   - `plugin.schema.json` - Plugin manifest validation rules
 
 ## Next Steps

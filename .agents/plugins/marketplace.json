@@ -1,0 +1,7 @@
+{
+  "name": "yellow-plugins",
+  "interface": {
+    "displayName": "Yellow Plugins"
+  },
+  "plugins": []
+}

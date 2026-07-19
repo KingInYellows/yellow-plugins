@@ -33,13 +33,15 @@ const { generateManifests } = require('../../scripts/generate-manifests.js');
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SCRIPT = join(REPO_ROOT, 'scripts', 'generate-manifests.js');
 
-// Derived from the live plugin inventory (+1 for marketplace.json) rather
+// Derived from the live plugin inventory (+1 for marketplace.json, +1 for
+// the Codex marketplace at .agents/plugins/marketplace.json, which is
+// always emitted — empty-state when no plugin is Codex-enabled) rather
 // than a hardcoded literal, matching the by-name/not-by-count discipline of
 // the characterization suite.
 const TARGET_COUNT =
   readdirSync(join(REPO_ROOT, 'plugins'), { withFileTypes: true }).filter((e) =>
     e.isDirectory()
-  ).length + 1;
+  ).length + 2;
 
 const fixtureRoots: string[] = [];
 afterAll(() => {
@@ -70,6 +72,13 @@ function makeFixtureRoot(): string {
       join(root, 'plugins', name, '.claude-plugin', 'plugin.json')
     );
   }
+  // No plugin is Codex-enabled in the live repo yet, so the committed Codex
+  // marketplace is the empty-state artifact regardless of which plugin's
+  // catalog source the fixture goes on to mutate.
+  cpSync(
+    join(REPO_ROOT, '.agents', 'plugins', 'marketplace.json'),
+    join(root, '.agents', 'plugins', 'marketplace.json')
+  );
   return root;
 }
 
@@ -80,6 +89,7 @@ function targetPaths(root: string): string[] {
     .sort();
   return [
     join(root, '.claude-plugin', 'marketplace.json'),
+    join(root, '.agents', 'plugins', 'marketplace.json'),
     ...plugins.map((n) => join(root, 'plugins', n, '.claude-plugin', 'plugin.json')),
   ];
 }

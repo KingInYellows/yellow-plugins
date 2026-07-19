@@ -141,6 +141,36 @@ function loadCatalog(catalogDir) {
   ) {
     errors.push('catalog.json: "targets.claude.marketplaceSchema" must be a string');
   }
+  // buildCodexMarketplace (emit-codex.js) dereferences targets.codex.{displayName,
+  // category,policy} unconditionally — even when zero plugins are Codex-enabled,
+  // since the empty-state marketplace artifact still carries a root displayName
+  // (schemas/catalog.schema.json's "targets.codex" required list). Checked here
+  // so a missing/malformed block fails with a structured error instead of an
+  // uncaught TypeError (or a silently schema-invalid marketplace) inside the emitter.
+  if ('targets' in data) {
+    const codex = data.targets && data.targets.codex;
+    if (codex === null || typeof codex !== 'object' || Array.isArray(codex)) {
+      errors.push('catalog.json: "targets.codex" must be an object');
+    } else {
+      if (typeof codex.displayName !== 'string' || codex.displayName.length === 0) {
+        errors.push('catalog.json: "targets.codex.displayName" must be a non-empty string');
+      }
+      if (typeof codex.category !== 'string' || codex.category.length === 0) {
+        errors.push('catalog.json: "targets.codex.category" must be a non-empty string');
+      }
+      const policy = codex.policy;
+      if (policy === null || typeof policy !== 'object' || Array.isArray(policy)) {
+        errors.push('catalog.json: "targets.codex.policy" must be an object');
+      } else {
+        if (typeof policy.installation !== 'string') {
+          errors.push('catalog.json: "targets.codex.policy.installation" must be a string');
+        }
+        if (typeof policy.authentication !== 'string') {
+          errors.push('catalog.json: "targets.codex.policy.authentication" must be a string');
+        }
+      }
+    }
+  }
   if (!Array.isArray(data.pluginOrder) || data.pluginOrder.length === 0) {
     errors.push('catalog.json: "pluginOrder" must be a non-empty array');
   } else {

@@ -1,0 +1,11 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "interface": {
+    "displayName": "Hello World",
+    "category": "Developer Tools"
+  },
+  "description": "Example Codex plugin manifest with a single skill and hooks.",
+  "skills": "./codex/skills",
+  "hooks": "./hooks/codex-hooks.json"
+}

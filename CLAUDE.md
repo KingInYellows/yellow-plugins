@@ -30,15 +30,18 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + codex
 pnpm validate:marketplace     # .claude-plugin/marketplace.json only
 pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace
 pnpm validate:agents          # agent-authoring rules only
-pnpm validate:versions        # cross-manifest version drift check
+pnpm validate:versions        # cross-manifest version drift check (Claude three-way + Codex two-way)
 pnpm validate:error-codes     # scripts/ must use ERROR-* codes from errorCatalog.ts
 pnpm validate:snippets        # install-script generated blocks match scripts/snippets/ sources
 pnpm validate:solutions       # diff-scoped slug-collision + frontmatter gate for docs/solutions/
+pnpm validate:generated       # catalog/ -> .claude-plugin/ + .agents/ byte-identity drift check
+pnpm validate:codex           # Codex artifact validation + exposure lint
+pnpm generate:manifests       # regenerate .claude-plugin/ + .agents/ from catalog/ sources
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
 
 pnpm release:check            # validate:schemas + validate:versions + typecheck
@@ -100,10 +103,15 @@ validators in `scripts/`:
 
 ### Schemas
 
-`schemas/marketplace.schema.json` and `schemas/plugin.schema.json` are the
-local schemas. The Claude Code remote validator can diverge — local CI
-passing does NOT guarantee install acceptance. Always test on a clean
-Claude Code install before publishing breaking schema changes.
+`schemas/plugin.schema.json` is the local plugin-manifest schema. The
+Claude Code remote validator can diverge — local CI passing does NOT
+guarantee install acceptance. Always test on a clean Claude Code install
+before publishing breaking schema changes. (The legacy nested-shape
+`schemas/marketplace.schema.json` and its `SchemaValidator.
+validateMarketplace()` consumer were retired — see R45 of the Codex pilot
+spec; `scripts/validate-marketplace.js` plus
+`schemas/official-marketplace.schema.json` below remain the sole
+marketplace gates.)
 `schemas/official-marketplace.schema.json` is mirrored from upstream but is
 also an active CI gate — `validate-schemas.yml` validates
 `.claude-plugin/marketplace.json` and `examples/marketplace.example.json`
