@@ -21,7 +21,7 @@
  */
 
 const { readFileSync, openSync, closeSync, constants, realpathSync, readdirSync, lstatSync } = require('fs');
-const { join, sep } = require('path');
+const { join } = require('path');
 
 const { assertWithinRoot, NAME_RE } = require('./write');
 
@@ -65,7 +65,7 @@ function buildCodexMarketplace(catalog, sources) {
   }
   return {
     name: catalog.name,
-    displayName: catalog.targets.codex.displayName,
+    interface: { displayName: catalog.targets.codex.displayName },
     plugins,
   };
 }
@@ -112,19 +112,20 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
  * Translate a plugin's inline Claude hooks (`source.hooks`) into the
  * generated `hooks/codex-hooks.json` shape. Pure — no I/O.
  *
- * Structurally, Claude's inline hooks (object keyed by event name, each
- * value an array of { matcher, hooks: [{ type, command, timeout? }] }) are
- * already the same shape schemas/codex-hooks.schema.json expects, so this
- * is a normalizing pass-through rather than a semantic rewrite. Command
- * strings (e.g. `${CLAUDE_PLUGIN_ROOT}/...`) are copied unmodified — Codex
- * variable-substitution semantics for hook commands are unverified (the
- * spike found hooks currently never execute at all, R20/spike finding d),
- * so there is nothing to test a rewrite against yet.
+ * Claude's inline hooks (object keyed by event name, each value an array of
+ * { matcher, hooks: [{ type, command, timeout? }] }) are wrapped in a
+ * top-level "hooks" key to match the documented Codex hook file shape
+ * (confirmed against a live fetch of learn.chatgpt.com/docs/build-plugins,
+ * 2026-07-19 — the default hooks/hooks.json file nests its event map under
+ * "hooks"). Command strings (e.g. `${CLAUDE_PLUGIN_ROOT}/...`) are copied
+ * unmodified — Codex variable-substitution semantics for hook commands are
+ * unverified (the spike found hooks currently never execute at all,
+ * R20/spike finding d), so there is nothing to test a rewrite against yet.
  *
  * Returns null when the plugin has no hooks — schemas/codex-hooks.schema.json
- * requires minProperties: 1, so an empty file would be schema-invalid; the
- * caller must not write a file (or set the manifest's "hooks" pointer) in
- * that case.
+ * requires the nested "hooks" object to have minProperties: 1, so an empty
+ * file would be schema-invalid; the caller must not write a file (or set
+ * the manifest's "hooks" pointer) in that case.
  */
 function buildCodexHookConfig(source) {
   const raw = source.hooks;
@@ -148,7 +149,7 @@ function buildCodexHookConfig(source) {
       merged[event] = (merged[event] || []).concat(defs);
     }
   }
-  return Object.keys(merged).length > 0 ? merged : null;
+  return Object.keys(merged).length > 0 ? { hooks: merged } : null;
 }
 
 /**
@@ -233,14 +234,25 @@ function buildCodexSkillTree(rootDir, name, source) {
     // that follows would otherwise miss that case, since the resolved
     // target still lands inside pluginRootReal. The realpath check stays as
     // a secondary defense for a symlinked ancestor above skillDir (e.g. a
-    // symlinked skills/ itself), which lstat(skillDir) alone can't see.
+    // symlinked skills/ itself), which lstat(skillDir) alone can't see — but
+    // a prefix/containment comparison against pluginRootReal is not enough:
+    // an in-plugin ancestor symlink (e.g. plugins/<name>/skills itself
+    // pointing at ANOTHER directory still inside the same plugin root, such
+    // as plugins/<name>/skills -> plugins/<name>/other) resolves to a path
+    // that still starts with pluginRootReal, silently bypassing the
+    // allowlist (R-review). The canonical location of an allowlisted skill
+    // is always exactly pluginRootReal/skills/<skillName>, so compare
+    // against that literal expected path instead of a prefix — this rejects
+    // ANY symlink anywhere on skillDir's path (leaf or ancestor, in-plugin
+    // or external).
     try {
       if (lstatSync(skillDir).isSymbolicLink()) {
         errors.push(`plugins/${name}/skills/${skillName}: symlinked skill directories (including a symlinked ancestor such as skills/) are not allowed`);
         continue;
       }
       const skillDirReal = realpathSync(skillDir);
-      if (skillDirReal !== pluginRootReal && !skillDirReal.startsWith(pluginRootReal + sep)) {
+      const skillDirExpected = join(pluginRootReal, 'skills', skillName);
+      if (skillDirReal !== skillDirExpected) {
         errors.push(`plugins/${name}/skills/${skillName}: symlinked skill directories (including a symlinked ancestor such as skills/) are not allowed`);
         continue;
       }
@@ -308,6 +320,16 @@ function buildCodexSkillTree(rootDir, name, source) {
     }
     if (parsed === null || typeof parsed !== 'object' || typeof parsed.name !== 'string' || typeof parsed.description !== 'string') {
       errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: frontmatter must have string "name" and "description"`);
+      continue;
+    }
+    // The allowlist and the stale-artifact sweep both reason about the
+    // directory name (skillName), not the frontmatter's runtime identifier
+    // (parsed.name) — the existing skill authoring pass never compares the
+    // two. Left unchecked, a catalog typo or rename could expose a
+    // differently-named skill under an allowlisted directory, so reject
+    // rather than silently emit a name that disagrees with the allowlist.
+    if (parsed.name !== skillName) {
+      errors.push(`plugins/${name}/skills/${skillName}/SKILL.md: frontmatter "name" ("${parsed.name}") must match the allowlisted directory name ("${skillName}")`);
       continue;
     }
     // `body` retains its own leading blank line (the regex match ends right

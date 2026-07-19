@@ -191,6 +191,17 @@ const DIRECT_CHECKS = [
     pattern: /\bsubagent_type\b/g,
     message: 'subagent_type is a Claude-only Task-tool parameter; Codex has no agent-dispatch equivalent (per the spec, delegation instructs built-in worker/explorer instead).',
   },
+  {
+    name: 'claude-env-var-reference',
+    // Canonical list of Claude Code hook/runtime env vars (see
+    // docs/solutions/code-quality/claude-code-bare-flag-and-hook-recursion-guard.md
+    // item 6): CLAUDE_PROJECT_DIR, CLAUDE_PLUGIN_ROOT, CLAUDE_PLUGIN_DATA,
+    // CLAUDE_ENV_FILE, CLAUDE_EFFORT, CLAUDE_CODE_REMOTE. \b before CLAUDE_
+    // matches after both "$" and "${" (neither is a word character), so this
+    // catches the bare name, "$NAME", and "${NAME}" forms in one pattern.
+    pattern: /\bCLAUDE_(?:PLUGIN_ROOT|PLUGIN_DATA|PROJECT_DIR|ENV_FILE|EFFORT|CODE_REMOTE)\b/g,
+    message: 'Claude Code hook/runtime environment variables (e.g. ${CLAUDE_PLUGIN_ROOT}) exist only in the Claude plugin runtime and are unset in a Codex session; rewrite to avoid referencing them.',
+  },
 ];
 
 // A leading "/" followed by a lowercase command-name token, optionally
@@ -388,6 +399,14 @@ function collectCodexExposedFiles(rootDir, name, source) {
     return { files, errors };
   }
 
+  // Build set of expected skills from the allowlist so we can detect missing
+  // generated files. Declared outside the existsSync(skillsDir) guard below
+  // so a fully-deleted skills directory (not just a missing individual skill
+  // subdirectory) is still caught as a missing-skill error rather than
+  // silently skipping the check.
+  const allowlist = (codex && codex.skillAllowlist) || [];
+  const foundSkills = new Set();
+
   if (existsSync(skillsDir)) {
     const pluginRootReal = realpathSync(pluginRoot);
     const skillsDirReal = realpathSync(skillsDir);
@@ -395,12 +414,22 @@ function collectCodexExposedFiles(rootDir, name, source) {
       errors.push(`plugins/${name}/targets.codex.componentPaths.skills ("${skillsPath}"): symlinked skills directories (including a symlinked ancestor) are not allowed`);
       return { files, errors };
     }
+
     for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const skillFile = join(skillsDir, entry.name, 'SKILL.md');
       if (existsSync(skillFile)) {
         files.push(skillFile);
+        foundSkills.add(entry.name);
       }
+    }
+  }
+
+  // Report missing skills that are in the allowlist but not generated.
+  const skillsRelPath = skillsDir.slice(rootDir.length + 1);
+  for (const skillName of allowlist) {
+    if (!foundSkills.has(skillName)) {
+      errors.push(`${skillsRelPath}/${skillName}/SKILL.md: missing generated skill file (declared in targets.codex.skillAllowlist) — run \`pnpm generate:manifests\` first`);
     }
   }
   return { files, errors };

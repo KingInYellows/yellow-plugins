@@ -26,7 +26,7 @@ export const version = '2.0.0';
 // packages/cli/dist), independent of the caller's working directory.
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-async function main(): Promise<void> {
+function main(): void {
   const command = process.argv[2] || 'validate:plugins';
 
   if (command !== 'validate:plugins') {
@@ -44,3 +44,4 @@ async function main(): Promise<void> {
 }
 
 main();
+

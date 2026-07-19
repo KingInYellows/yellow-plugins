@@ -289,6 +289,63 @@ describe('symlink and path-escape rejection (mirrors catalog-reader.js)', () => 
       result.errors.some((e: string) => e.includes('symlinked skill directories') && e.includes('allowed'))
     ).toBe(true);
   });
+
+  it('rejects a symlinked skills/ ancestor that redirects INSIDE the same plugin root', () => {
+    // Fresh evidence (round 4): the realpath containment check only rejected
+    // skillDirReal values OUTSIDE pluginRootReal. When plugins/<name>/skills
+    // itself is a symlink to a DIFFERENT directory still inside the same
+    // plugin root (e.g. skills -> other-content), the resolved skillDir
+    // still starts with pluginRootReal + sep, so the old containment check
+    // passed it through — unlike the earlier "symlinked skills/ ancestor"
+    // test (external target) and "in-plugin symlinked skill directory" test
+    // (skillName leaf itself symlinked), neither of which cover an ancestor
+    // symlink redirecting to another in-plugin directory. Live repro:
+    // symlink plugins/<name>/skills to a sibling plugins/<name>/other-content
+    // directory containing an allowlisted-named skill with different content.
+    const root = makeCodexFixtureRoot([
+      { name: 'in-plugin-ancestor-plugin', codexEnabled: true, skillAllowlist: ['allowed'] },
+    ]);
+    mkdirSync(join(root, 'plugins', 'in-plugin-ancestor-plugin', 'other-content', 'allowed'), { recursive: true });
+    writeFileSync(
+      join(root, 'plugins', 'in-plugin-ancestor-plugin', 'other-content', 'allowed', 'SKILL.md'),
+      '---\nname: allowed\ndescription: "smuggled"\n---\n\nBody.\n',
+      'utf8'
+    );
+    symlinkSync(
+      join(root, 'plugins', 'in-plugin-ancestor-plugin', 'other-content'),
+      join(root, 'plugins', 'in-plugin-ancestor-plugin', 'skills')
+    );
+
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(
+      result.errors.some((e: string) => e.includes('symlinked skill directories') && e.includes('allowed'))
+    ).toBe(true);
+  });
+});
+
+describe('skill frontmatter "name" vs. allowlisted directory name mismatch', () => {
+  it('rejects a SKILL.md whose frontmatter "name" disagrees with its allowlisted directory name', () => {
+    // The allowlist and the stale-artifact sweep both reason about the
+    // directory name only — a catalog typo or rename in SKILL.md's
+    // frontmatter "name" would otherwise expose the wrong skill name under
+    // Codex while both layers still believe "foo" was copied.
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'name-mismatch-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['foo'],
+        skills: { foo: { name: 'bar', description: 'Mismatched name.' } },
+      },
+    ]);
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(
+      result.errors.some(
+        (e: string) => e.includes('frontmatter "name"') && e.includes('"bar"') && e.includes('"foo"')
+      )
+    ).toBe(true);
+  });
 });
 
 describe('componentPaths.skills emptiness validation', () => {
@@ -493,7 +550,7 @@ describe('generator hook-authority rule (R20)', () => {
     const codexHooks = JSON.parse(
       readFileSync(join(root, 'plugins', 'hook-plugin', 'hooks', 'codex-hooks.json'), 'utf8')
     );
-    expect(codexHooks).toEqual(inlineHooks);
+    expect(codexHooks).toEqual({ hooks: inlineHooks });
     expect(JSON.stringify(codexHooks)).not.toContain('DECOY-NEVER-READ');
 
     const codexManifest = JSON.parse(

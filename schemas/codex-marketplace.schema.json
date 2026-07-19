@@ -3,18 +3,25 @@
   "$id": "https://kingin-yellows.dev/schemas/codex-marketplace.schema.json",
   "title": "Codex Marketplace Schema",
   "description": "Schema for the generated .agents/plugins/marketplace.json — the Codex-target counterpart to .claude-plugin/marketplace.json, listing only Codex-enabled plugins with no version field (R5).",
-  "$comment": "Repo-derived schema, not an official OpenAI schema, from the July 2026 Codex plugin contract. The per-entry shape (name, source.{source,path}, category, policy.{installation,authentication}) is empirically verified in docs/research/2026-07-16-codex-plugin-contract-spike.md's 'Incidental observations' ('.agents/plugins/marketplace.json with version-less entries ... installs and lists'). The root-level displayName field is inferred from R5's wording, not independently spiked — re-verify against a real `codex plugin marketplace add` + `codex plugin list --available --json` round-trip in the Step 15 CI job and correct this schema if the live CLI disagrees.",
+  "$comment": "Repo-derived schema, not an official OpenAI schema, from the July 2026 Codex plugin contract. The per-entry shape (name, source.{source,path}, category, policy.{installation,authentication}) is empirically verified in docs/research/2026-07-16-codex-plugin-contract-spike.md's 'Incidental observations' ('.agents/plugins/marketplace.json with version-less entries ... installs and lists'). The interface.displayName nesting is confirmed against a live fetch of learn.chatgpt.com/docs/build-plugins on 2026-07-19 ('Use top-level `name` to identify the marketplace. Use `interface.displayName` for the marketplace title shown in the ChatGPT desktop app.') — supersedes the prior root-level displayName field, which was inferred from R5's wording and not independently spiked.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "displayName", "plugins"],
+  "required": ["name", "interface", "plugins"],
   "properties": {
     "name": {
       "type": "string",
       "const": "yellow-plugins"
     },
-    "displayName": {
-      "type": "string",
-      "minLength": 1
+    "interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName"],
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "plugins": {
       "type": "array",

@@ -1,6 +1,6 @@
 {
   "name": "yellow-plugins",
-  "displayName": "Yellow Plugins",
+  "interface": { "displayName": "Yellow Plugins" },
   "plugins": [
     {
       "name": "hello-world",

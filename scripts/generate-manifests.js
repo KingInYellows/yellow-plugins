@@ -474,6 +474,18 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     if (skillsDirWithinPlugin) {
       try {
         const skillsDirReal = realpathSync(skillsDir);
+        // Reject symlinked skillsDir itself (even when the target is inside
+        // the plugin) before the sweep: a symlink to references/ or another
+        // non-generated directory would cause the sweep to delete real files
+        // outside the generator-owned tree. Compare resolved vs. unresolved
+        // paths to detect when skillsDir itself or an ancestor is a symlink.
+        const skillsDirResolved = resolve(skillsDir);
+        if (skillsDirReal !== skillsDirResolved) {
+          skillsDirWithinPlugin = false;
+          errors.push(
+            `catalog/plugins/${name}.json: "targets.codex.componentPaths.skills" ("${skillsPath}") is or contains a symlink — symlinked skills directories are not allowed in generated output`
+          );
+        }
         for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
           if (entry.isDirectory()) {
             staleCandidates.push(join(skillsDir, entry.name, 'SKILL.md'));

@@ -129,8 +129,13 @@ describe('codex-marketplace.schema.json — negative cases', () => {
   });
 
   it('accepts the committed empty-state artifact shape (plugins: [])', () => {
-    const empty = { name: 'yellow-plugins', displayName: 'Yellow Plugins', plugins: [] };
+    const empty = { name: 'yellow-plugins', interface: { displayName: 'Yellow Plugins' }, plugins: [] };
     expect(factory.validate('codex-marketplace', empty).valid).toBe(true);
+  });
+
+  it('rejects a root-level displayName field (must be nested under interface)', () => {
+    const d = { name: 'yellow-plugins', displayName: 'Yellow Plugins', plugins: [] };
+    expect(factory.validate('codex-marketplace', d).valid).toBe(false);
   });
 
   it('rejects an entry carrying a version field (Codex marketplace is version-less, R5/R12)', () => {
@@ -165,17 +170,35 @@ describe('codex-hooks.schema.json — negative cases', () => {
     expect(factory.validate('codex-hooks', base).valid).toBe(true);
   });
 
-  it('rejects an empty object (minProperties: 1 — an empty hooks file must not be emitted)', () => {
+  it('rejects an empty object (missing the required top-level "hooks" key)', () => {
     expect(factory.validate('codex-hooks', {}).valid).toBe(false);
   });
 
+  it('rejects an unwrapped event map (must be nested under a top-level "hooks" key)', () => {
+    const d = { SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'x' }] }] };
+    expect(factory.validate('codex-hooks', d).valid).toBe(false);
+  });
+
+  it('rejects an empty nested hooks object (minProperties: 1 — an empty hooks file must not be emitted)', () => {
+    expect(factory.validate('codex-hooks', { hooks: {} }).valid).toBe(false);
+  });
+
   it('rejects a hook entry missing command', () => {
-    const d = { SessionStart: [{ matcher: '*', hooks: [{ type: 'command' }] }] };
+    const d = { hooks: { SessionStart: [{ matcher: '*', hooks: [{ type: 'command' }] }] } };
     expect(factory.validate('codex-hooks', d).valid).toBe(false);
   });
 
   it('rejects a hook type other than "command"', () => {
-    const d = { SessionStart: [{ matcher: '*', hooks: [{ type: 'script', command: 'x' }] }] };
+    const d = { hooks: { SessionStart: [{ matcher: '*', hooks: [{ type: 'script', command: 'x' }] }] } };
     expect(factory.validate('codex-hooks', d).valid).toBe(false);
+  });
+
+  it('accepts an entry omitting matcher and using statusMessage instead of timeout (doc-confirmed shape)', () => {
+    const d = {
+      hooks: {
+        SessionStart: [{ hooks: [{ type: 'command', command: 'python3 ${PLUGIN_ROOT}/hooks/session_start.py', statusMessage: 'Loading plugin context' }] }],
+      },
+    };
+    expect(factory.validate('codex-hooks', d).valid).toBe(true);
   });
 });
