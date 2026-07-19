@@ -166,3 +166,62 @@ which, per git docs, "concatenates as separate paragraphs" (subject
 - Merge-queue propagation gotcha:
   [`docs/solutions/integration-issues/merge-queue-closed-pr-null-mergedat-detection.md`](../integration-issues/merge-queue-closed-pr-null-mergedat-detection.md)
 - Validator template reference: `scripts/validate-solutions.js` (#553)
+
+---
+
+## Update — 2026-07-19
+
+Gate C evolved beyond the single-tier design above. The "Decision" §3
+snippet ("single `gh` call, no agent") is now the **strict tier only**
+— two more tiers were added on top, each still a single deterministic
+API call, no agent:
+
+- **Loose token-coverage tier (PR #651, undocumented until now):**
+  when the strict tier finds zero matches — routine, since real branch
+  names rarely carry the full plan slug — Gate C scores the 100 most
+  recent merged PRs by slug-token coverage over branch + title. A
+  UNIQUE PR covering all slug tokens but one (all of them for slugs of
+  ≤3 tokens) auto-passes, recorded via a `Plan-Verifier-LooseMatch:`
+  trailer. Ambiguous or zero matches still prompt.
+
+- **File-provenance tier (PR #656, this update):** runs FIRST, before
+  strict and loose. Both slug-match tiers pattern-match a merged PR's
+  branch name/title against the derived slug — text-similarity
+  heuristics, blind to what the PR's diff actually touched. That blind
+  spot is routine, not theoretical: a plan expanded from a shell and
+  implemented in the same PR (`/workflows:expand-shell` +
+  `/workflows:work` bundled into one PR) gets a branch name derived
+  from the FEATURE, not the plan slug. Confirmed case: plan slug
+  `claude-code-codex-plugin-pilot-02-codex-tooling` merged via branch
+  `agent/feat/codex-pilot-02-codex-tooling`, sharing only 4 of the
+  slug's 7 tokens — below even the loose tier's all-but-one threshold,
+  despite the PR being unambiguous completion evidence.
+
+  The provenance tier sidesteps text matching entirely: it asks git +
+  GitHub directly "which merged PR last touched this exact file?"
+
+  ```bash
+  FILE_SHA=$(git log -1 --format=%H origin/main -- "plans/$CLEAN_ARG")
+  PULLS=$(gh api "repos/$OWNERREPO/commits/$FILE_SHA/pulls" \
+    --jq '[.[] | select(.merged_at != null) | {number, title, url: .html_url}]')
+  ```
+
+  A UNIQUE merged PR associated with that commit (`PCOUNT == 1`)
+  auto-passes without prompting — skipping strict, loose, and the
+  override prompt entirely — recorded via a
+  `Plan-Verifier-FileProvenance: pr=#<N> sha=<FILE_SHA>` commit
+  trailer. `PCOUNT == 0` (uncommitted file, or `git fetch`/`gh api`
+  failure) or `PCOUNT >= 2` (rebase/cherry-pick history) falls through
+  to the strict tier unchanged — uniqueness is the same safety valve
+  the loose tier already relies on.
+
+  This is still consistent with §3's original design collapse — one
+  API call, no agent, no 8-row truth table — just querying
+  `commits/{sha}/pulls` instead of `pr list --search`. The rejected
+  approach was an *agent* scoring multiple signals; the provenance
+  tier is one more deterministic `gh api` call slotted ahead of the
+  existing ones, same shape as strict and loose.
+
+Gate C is now three tiers, evaluated in order: **provenance → strict →
+loose → AskUserQuestion override**, each short-circuiting on a unique
+pass. At most one of the three trailers appears per archival commit.
