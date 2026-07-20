@@ -1,6 +1,6 @@
 {
   "name": "yellow-core",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "interface": {
     "displayName": "Yellow Core",
     "category": "Developer Tools"
