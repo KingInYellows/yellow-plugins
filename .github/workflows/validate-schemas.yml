@@ -336,12 +336,11 @@ jobs:
   # real, unpinned external tool. Advisory-only (not in ci-status's `needs`
   # list, mirroring upstream-pins-advisory.yml's non-blocking pattern for
   # live/unpinned external-tool checks): a transient upstream Codex CLI
-  # issue must not block unrelated PRs from merging. No plugin is
-  # Codex-enabled as of this PR, so "install each enabled plugin" is
-  # currently a zero-iteration no-op — this job's real job right now is
-  # proving the empty-state marketplace contract (add + list + zero
-  # available pilots) works against the live CLI before shell 03 enables
-  # the first plugin.
+  # issue must not block unrelated PRs from merging. yellow-core (shell 03)
+  # is the first Codex-enabled plugin, so this job verifies a named
+  # membership check (its 3 skills, never a bare count) against the live
+  # CLI, then installs and verifies every Codex-enabled plugin the catalog
+  # currently declares.
   codex-install-verification:
     name: Codex Install Verification (${{ matrix.os }})
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -404,27 +403,43 @@ jobs:
           export CODEX_HOME
           echo "CODEX_HOME=$CODEX_HOME" >> "$GITHUB_ENV"
 
-          codex plugin marketplace add "$(pwd)" --name yellow-plugins-local
+          # No --name flag: current Codex CLI (verified against 0.144.6)
+          # derives the registered marketplace name from the marketplace
+          # manifest's own "name" field (catalog.name, "yellow-plugins")
+          # rather than accepting one on the command line — `codex plugin
+          # marketplace add [OPTIONS] <SOURCE>` has no such option.
+          codex plugin marketplace add "$(pwd)"
 
           AVAILABLE_JSON="$(codex plugin list --available --json)"
           echo "$AVAILABLE_JSON"
 
-          # Empty-state assertion: no plugin is Codex-enabled as of this PR,
-          # so the local marketplace must list zero available pilots. Once
-          # shell 03 enables yellow-core, this assertion becomes a named
-          # membership check instead (never a count) per this repo's
-          # by-name/not-by-count discipline — tracked as follow-up when that
-          # shell lands, not implemented speculatively here.
-          AVAILABLE_COUNT="$(node -e "console.log(JSON.parse(process.argv[1]).available.length)" "$AVAILABLE_JSON")"
-          if [ "$AVAILABLE_COUNT" != "0" ]; then
-            echo "::error::Expected 0 available Codex pilots (empty-state marketplace), found $AVAILABLE_COUNT"
-            exit 1
-          fi
-          echo "::notice::Empty-state Codex marketplace verified: 0 available pilots, as expected before any plugin enables Codex"
+          # Named-membership check (never a bare count, per this repo's
+          # by-name/not-by-count discipline): the live CLI's "available" set
+          # must exactly match the catalog's own Codex-enabled plugin names.
+          EXPECTED_JSON="$(node -e "
+            const { loadCatalog, loadPluginSources } = require('./scripts/lib/generate/catalog-reader');
+            const { isCodexEnabled } = require('./scripts/lib/generate/emit-codex');
+            const catalog = loadCatalog('catalog').data;
+            const sources = loadPluginSources('catalog', catalog.pluginOrder).sources;
+            const enabled = catalog.pluginOrder.filter((n) => isCodexEnabled(sources[n]));
+            console.log(JSON.stringify(enabled));
+          ")"
+          echo "Codex-enabled plugins per the catalog: $EXPECTED_JSON"
+          node -e "
+            const expected = JSON.parse(process.argv[1]).slice().sort();
+            const actual = JSON.parse(process.argv[2]).available.map((p) => p.name).sort();
+            const same = expected.length === actual.length && expected.every((n, i) => n === actual[i]);
+            if (!same) {
+              console.error('::error::Available Codex pilots ' + JSON.stringify(actual) + ' do not match the catalog\'s Codex-enabled plugins ' + JSON.stringify(expected));
+              process.exit(1);
+            }
+            console.log('::notice::Codex marketplace membership verified: ' + JSON.stringify(actual));
+          " "$EXPECTED_JSON" "$AVAILABLE_JSON"
 
-      - name: Install and verify each Codex-enabled plugin (currently none)
+      - name: Install and verify each Codex-enabled plugin
         run: |
           set -euo pipefail
+          MARKETPLACE_NAME="$(node -e "console.log(require('./catalog/catalog.json').name)")"
           ENABLED_JSON="$(node -e "
             const { loadCatalog, loadPluginSources } = require('./scripts/lib/generate/catalog-reader');
             const { isCodexEnabled } = require('./scripts/lib/generate/emit-codex');
@@ -440,7 +455,7 @@ jobs:
           " | while read -r name; do
             [ -z "$name" ] && continue
             echo "::group::Installing $name"
-            codex plugin add "${name}@yellow-plugins-local"
+            codex plugin add "${name}@${MARKETPLACE_NAME}"
             codex plugin list --json | node -e "
               const data = JSON.parse(require('fs').readFileSync(0, 'utf8'));
               const entry = data.installed.find((p) => p.pluginId.startsWith(process.argv[1] + '@'));
