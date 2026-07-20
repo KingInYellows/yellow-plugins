@@ -1,0 +1,33 @@
+plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/a-partial.md
+  s_f72a80507cb29d::t_ec6114b5fcb375 1-6
+plugins/yellow-core/tests/fixtures/plan-status/zero-task/plans/prose-only.md
+  s_f72a80507cb29d::t_5603d19e3e37ac 1-3
+plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/c-fresh.md
+  s_f72a80507cb29d::t_50544b36cfa767 1-4
+plugins/yellow-core/tests/fixtures/plan-status/empty.golden.txt
+  s_f72a80507cb29d::t_7147a767e2b303 1-3
+plugins/yellow-core/tests/fixtures/plan-status/mixed.golden.txt
+  s_f72a80507cb29d::t_7147a767e2b303 1-11
+plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/b-complete.md
+  s_f72a80507cb29d::t_cb94da2c23122e 1-5
+plugins/yellow-core/tests/fixtures/plan-status/zero-task.golden.txt
+  s_f72a80507cb29d::t_7147a767e2b303 1-6
+plugins/yellow-core/tests/fixtures/plan-status/mixed/plans/complete/z-archived.md
+  s_f72a80507cb29d::t_918445388a9e74 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "d50985116dc3cea5ff6c9a75f45bbf166fb7b38a",
+  "prompts": {},
+  "sessions": {
+    "s_f72a80507cb29d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01d4e06a-64f4-4e2c-8acc-2fb47de6d75d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
