@@ -27,7 +27,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.25.0",
+      "version": "1.26.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -436,7 +436,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "1.25.0",
+  "version": "1.26.0",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",
