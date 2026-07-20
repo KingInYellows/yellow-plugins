@@ -174,7 +174,7 @@ skill — with a parity gate proving identical behavior.
       `bats plugins/yellow-core/tests/plan-commands.bats` from inside
       `plugins/yellow-core/` per repo bats convention.
 
-- [ ] Step 7: Confirm CI install-verification. After pushing, confirm the
+- [x] Step 7: Confirm CI install-verification. After pushing, confirm the
       `CODEX_HOME` install-verification job(s) in
       `.github/workflows/validate-schemas.yml` pass for the now-single-entry
       Codex marketplace (this is CI-side, not locally reproducible — verify
