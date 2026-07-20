@@ -170,8 +170,8 @@ skill — with a parity gate proving identical behavior.
       exposure lint, including the `slash-command-syntax` check against the
       new skill body). Run the CI baseline gate: `pnpm validate:schemas &&
       pnpm test:unit && pnpm lint && pnpm typecheck`. Run
-      `bats plugins/yellow-core/tests/plan-status-parity.bats` and
-      `bats plugins/yellow-core/tests/plan-commands.bats` from inside
+      `bats tests/plan-status-parity.bats` and
+      `bats tests/plan-commands.bats` from inside
       `plugins/yellow-core/` per repo bats convention.
 
 - [x] Step 7: Confirm CI install-verification. After pushing, confirm the
@@ -207,10 +207,10 @@ skill — with a parity gate proving identical behavior.
 
 ## Verification
 
-- `bats plugins/yellow-core/tests/plan-status-parity.bats` (run from
+- `bats tests/plan-status-parity.bats` (run from
   `plugins/yellow-core/`) -> expected: all assertions pass, byte-identical
   output vs. the Step 1 golden fixtures for all three scenarios.
-- `bats plugins/yellow-core/tests/plan-commands.bats` (run from
+- `bats tests/plan-commands.bats` (run from
   `plugins/yellow-core/`) -> expected: existing tests still pass unchanged
   (only the stale comment moved).
 - `pnpm generate:manifests` -> expected: creates/updates

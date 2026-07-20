@@ -1235,8 +1235,8 @@ body (`SKILL.md`) is bash-only — as `plan-status/SKILL.md` is — dropping
 skill body needs to run, even though nothing about the skill itself changed.
 `plugins/yellow-core/commands/plan/status.md` shipped exactly this gap when
 an earlier commit converted it from `allowed-tools: [Bash]` to
-`allowed-tools: [Skill]`; caught by `plugin-contract-reviewer` during PR
-#658 review and restored to `[Bash, Skill]`.
+`allowed-tools: [Skill]`; caught by `plugin-contract-reviewer` during PR `#658`
+review and restored to `[Bash, Skill]`.
 
 This is a different failure shape from #17 (Task over Agent) and #25 (every
 pipe stage needs its own grant): here a single delegation call (`Skill`) was

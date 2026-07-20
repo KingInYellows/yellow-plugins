@@ -33,10 +33,13 @@ to ever set `targets.codex.enabled: true`) via `/workflows:expand-shell`, a
 repo-research pattern survey of `scripts/lib/generate/emit-codex.js` and
 `scripts/validate-codex.js` turned up several load-bearing asymmetries in
 how the Codex distribution pipeline generates and lints skill files —
-asymmetries that produce **zero CI signal today** only because every one
-of the 17 `catalog/plugins/*.json` entries still has
-`targets.codex.enabled: false`. All findings below were verified directly
-against source at HEAD (not taken on a session summary's word alone).
+asymmetries that produced **zero CI signal** for as long as every one of
+the 17 `catalog/plugins/*.json` entries had `targets.codex.enabled: false`.
+Findings 1-4 were verified against source before yellow-core flipped
+`enabled: true`; finding 6 was found afterward, against yellow-core's real
+Codex-exposed content — see "Why This Matters" below. All findings were
+verified directly against source at HEAD (not taken on a session summary's
+word alone).
 
 ## Guidance
 
@@ -94,7 +97,7 @@ skill-tree builder — it currently doesn't.
 `references/` subdirectory, a `schema.yaml`, anything. The generator aborts
 for that skill with an explicit error:
 
-```
+```text
 plugins/<name>/skills/<skillName>: has sidecar file(s) not yet supported
 for Codex (<list>) — only SKILL.md is copied
 ```
@@ -148,7 +151,7 @@ reimplementations elsewhere. `plugins/yellow-core/tests/plan-commands.bats`
 re-implements a command's inline bash/grep logic as bats functions
 annotated with comments like:
 
-```
+```bash
 # Gate A grep (mirrors complete.md Phase 3). ...
 # Checked-box count (mirrors status.md, case-insensitive for GFM [X]).
 ```
@@ -196,7 +199,7 @@ Claude-only hooks out of its Codex exposure should set
 `targets.codex.includeHooks: false` in its catalog source — don't assume
 enabling Codex is hooks-neutral.
 
-### 6. Content-leak class: the exposure lint and the emit pipeline both have blind spots for cross-references, found on the pilot's first real content pass
+### 6. Content-leak blind spots in exposure lint and Codex emission
 
 Reviewing yellow-core's first live Codex allowlist (`agent-native-architecture`,
 `agent-native-audit`, `plan-status`) against real, pre-existing skill prose
