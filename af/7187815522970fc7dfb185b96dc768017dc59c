@@ -1,0 +1,27 @@
+scripts/lib/generate/emit-codex.js
+  s_f72a80507cb29d::t_768372140c3de6 129-135,138-141
+catalog/plugins/yellow-core.json
+  s_f72a80507cb29d::t_13cefb9fe6cfc3 53
+tests/integration/generate-manifests-codex.test.ts
+  s_f72a80507cb29d::t_a490774fc350ac 91-93
+  s_f72a80507cb29d::t_016a1ca23cad2d 567-597
+  s_f72a80507cb29d::t_3536cdc7e915c8 53
+schemas/catalog-plugin.schema.json
+  s_f72a80507cb29d::t_7f58a77e39bf81 104-107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "af7187815522970fc7dfb185b96dc768017dc59c",
+  "prompts": {},
+  "sessions": {
+    "s_f72a80507cb29d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01d4e06a-64f4-4e2c-8acc-2fb47de6d75d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
