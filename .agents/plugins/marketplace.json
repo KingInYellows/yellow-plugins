@@ -3,5 +3,19 @@
   "interface": {
     "displayName": "Yellow Plugins"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "yellow-core",
+      "description": "Three read-only reference and dashboard skills — agent-native architecture principles, an agent-native audit checklist, and a plan-status dashboard. Excludes all of yellow-core's commands, agents, hooks, and other skills.",
+      "category": "Developer Tools",
+      "source": {
+        "source": "local",
+        "path": "./plugins/yellow-core"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    }
+  ]
 }
