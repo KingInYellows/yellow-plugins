@@ -49,7 +49,16 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "interface": {
+        "displayName": "Yellow Core",
+        "category": "Developer Tools"
+      },
+      "description": "Three read-only reference and dashboard skills — agent-native architecture principles, an agent-native audit checklist, and a plan-status dashboard. Excludes all of yellow-core's commands, agents, hooks, and other skills.",
+      "skillAllowlist": ["agent-native-architecture", "agent-native-audit", "plan-status"],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      }
     }
   }
 }
