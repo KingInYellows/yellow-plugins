@@ -211,7 +211,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
 
 ## Implementation
 
-- [ ] Step 1: Capture the hook-behavior baseline **before** touching
+- [x] Step 1: Capture the hook-behavior baseline **before** touching
   `check-git-push.sh` or `check-commit-message.sh`. Create
   `plugins/gt-workflow/tests/fixtures/hooks/` with one stdin-payload file
   per representative case: git-push plain block, git-push via `;`/`&&`/`$(...)`
