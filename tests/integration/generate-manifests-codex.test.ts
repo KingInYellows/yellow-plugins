@@ -50,6 +50,7 @@ interface PluginFixtureOpts {
   name: string;
   version?: string;
   codexEnabled?: boolean;
+  includeHooks?: boolean;
   skillAllowlist?: string[];
   componentPathsSkills?: string;
   hooks?: Record<string, unknown>;
@@ -87,6 +88,9 @@ function makeCodexFixtureRoot(plugins: PluginFixtureOpts[]): string {
     const codexTarget: Record<string, unknown> = { enabled: Boolean(p.codexEnabled) };
     if (p.codexEnabled) {
       codexTarget.interface = { displayName: p.name, category: 'Developer Tools' };
+      if (p.includeHooks !== undefined) {
+        codexTarget.includeHooks = p.includeHooks;
+      }
       if (p.skillAllowlist) {
         codexTarget.skillAllowlist = p.skillAllowlist;
       }
@@ -557,6 +561,37 @@ describe('generator hook-authority rule (R20)', () => {
       readFileSync(join(root, 'plugins', 'hook-plugin', '.codex-plugin', 'plugin.json'), 'utf8')
     );
     expect(codexManifest.hooks).toBe('./hooks/codex-hooks.json');
+  });
+});
+
+describe('targets.codex.includeHooks opt-out (R22)', () => {
+  it('omits hooks/codex-hooks.json and the manifest "hooks" field when includeHooks is false', () => {
+    // R22: a plugin can need Codex enablement (skills) while its Claude-side
+    // hooks (e.g. background-compounding SessionStart/Stop) must stay out of
+    // its Codex exposure entirely. Without this opt-out, R20's unconditional
+    // carryover would silently include them the moment codex.enabled flips.
+    const inlineHooks = {
+      SessionStart: [{ matcher: '*', hooks: [{ type: 'command', command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh', timeout: 3 }] }],
+    };
+    const root = makeCodexFixtureRoot([
+      { name: 'no-hooks-plugin', codexEnabled: true, includeHooks: false, hooks: inlineHooks },
+    ]);
+
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('ok');
+    expect(result.written).not.toContain('plugins/no-hooks-plugin/hooks/codex-hooks.json');
+    expect(existsSync(join(root, 'plugins', 'no-hooks-plugin', 'hooks', 'codex-hooks.json'))).toBe(false);
+
+    // The Claude manifest is unaffected — its own hooks stay intact.
+    const claudeManifest = JSON.parse(
+      readFileSync(join(root, 'plugins', 'no-hooks-plugin', '.claude-plugin', 'plugin.json'), 'utf8')
+    );
+    expect(claudeManifest.hooks).toEqual(inlineHooks);
+
+    const codexManifest = JSON.parse(
+      readFileSync(join(root, 'plugins', 'no-hooks-plugin', '.codex-plugin', 'plugin.json'), 'utf8')
+    );
+    expect(codexManifest.hooks).toBeUndefined();
   });
 });
 

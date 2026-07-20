@@ -101,6 +101,10 @@
           ],
           "properties": {
             "enabled": { "type": "boolean" },
+            "includeHooks": {
+              "type": "boolean",
+              "description": "Per-plugin opt-out for hook carryover into the generated Codex manifest (R20 default: true/unset carries the plugin's inline Claude hooks into hooks/codex-hooks.json). Set to false when a plugin's Codex exposure must exclude hooks it still needs on the Claude side (R22)."
+            },
             "interface": {
               "type": "object",
               "additionalProperties": false,
