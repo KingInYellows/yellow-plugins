@@ -1,0 +1,21 @@
+plugins/yellow-core/tests/plan-status-parity.bats
+  s_f72a80507cb29d::t_6031130e00c0d8 1-81
+plugins/yellow-core/tests/plan-commands.bats
+  s_f72a80507cb29d::t_3aa4d05912f6d2 47-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "54ed6370e821d88c0ca2de917a393051c713f195",
+  "prompts": {},
+  "sessions": {
+    "s_f72a80507cb29d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01d4e06a-64f4-4e2c-8acc-2fb47de6d75d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
