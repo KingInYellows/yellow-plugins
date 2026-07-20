@@ -1151,6 +1151,111 @@ generalizes, not a case where it shipped broken.
 
 ---
 
+## Update — 2026-07-20
+
+### 27. Reviewer Agreement Count Is Not a Correctness Signal
+
+**WRONG:** Treating N-of-M persona/bot reviewers converging on a finding as
+itself sufficient grounds to apply the fix — or, symmetrically, to wave off a
+low-count finding without checking it.
+
+**RIGHT:** Verify the underlying claim against shipped precedent, live
+behavior, or source of truth, regardless of how many reviewers agree in
+either direction.
+
+**Why this matters:** Two same-shaped signals point opposite ways in this
+repo's own review history:
+
+- PR #528 (`feat/review-resolve-stack`): 4 of 7 persona reviewers
+  (maintainability, cli-readiness, pattern-recognition, project-standards)
+  independently raised a P1 claiming "the `Skill` tool can only load
+  `SKILL.md` files, so `Skill(skill: "review:resolve")` silently fails." This
+  was false — `sweep.md` ships that exact invocation, disproven by the
+  available-skills list and a live in-session call. All four reasoned from
+  the same wrong mental model; only project-compliance got it right. See
+  `feedback_skill_tool_invokes_commands.md` (memory).
+- PR #539: 8 of 15 persona reviewers independently flagged that `Skill` has
+  no exit-code API, so wrapper commands can't detect mid-loop failure — a
+  real platform gap, fixed by renaming `swept` → `attempted` in summary
+  output (see `docs/solutions/code-quality/skill-tool-no-exit-code-wrapper-workaround.md`).
+- Anti-pattern #22 above: 7 of 7 reviewers converged on a real
+  colon/wildcard-boundary bug.
+
+Agreement count was high in all three; only two of the three findings were
+true. The count measures how many reviewers share a mental model — right or
+wrong — not how many independently confirmed the claim against the code.
+
+**Rule:** When multiple reviewers converge on a finding about this repo's
+commands/skills/tools, check the claim itself (shipped precedent, a live
+invocation, the actual source) before acting on it. Never substitute the
+agreement count for that check, whether the count is high (don't auto-apply)
+or low (don't auto-dismiss).
+
+**Prevention checklist additions:**
+
+- [ ] Before applying or dismissing a finding backed by multiple converging
+      reviewers, independently verify the underlying factual claim against
+      shipped code/behavior — the number of reviewers who agree is not
+      itself evidence of correctness.
+
+---
+
+### 28. Narrowing `allowed-tools` to `[Skill]` Drops the Bash Grant the Invoked Skill's Body Needs
+
+**WRONG:**
+
+```yaml
+# plugins/yellow-core/commands/plan/status.md
+allowed-tools:
+  - Skill
+```
+
+```markdown
+## Usage
+
+Invoke the `Skill` tool with `skill: "plan-status"`.
+```
+
+**RIGHT:**
+
+```yaml
+allowed-tools:
+  - Bash
+  - Skill
+```
+
+**Rule:** When a command is refactored into a "thin skill wrapper" — the
+command's own body does nothing but invoke `Skill` — it's tempting to narrow
+`allowed-tools` down to `[Skill]` on the reasoning that the command itself no
+longer calls Bash directly. But the command's `allowed-tools` list gates
+every tool actually invoked over the course of that turn, not just the tool
+named in the command's own top-level instruction. If the invoked skill's own
+body (`SKILL.md`) is bash-only — as `plan-status/SKILL.md` is — dropping
+`Bash` from the wrapper command's `allowed-tools` removes the grant that
+skill body needs to run, even though nothing about the skill itself changed.
+`plugins/yellow-core/commands/plan/status.md` shipped exactly this gap when
+an earlier commit converted it from `allowed-tools: [Bash]` to
+`allowed-tools: [Skill]`; caught by `plugin-contract-reviewer` during PR
+#658 review and restored to `[Bash, Skill]`.
+
+This is a different failure shape from #17 (Task over Agent) and #25 (every
+pipe stage needs its own grant): here a single delegation call (`Skill`) was
+assumed to be self-contained, when the thing it delegates to has its own
+tool requirements that don't automatically travel with it.
+
+**Prevention checklist additions:**
+
+- [ ] Before narrowing a command's `allowed-tools` because it "just calls
+      Skill now," read the invoked skill's own `SKILL.md` body and list
+      every tool it actually uses (Bash, Read, Write, etc.) — the wrapper
+      command's `allowed-tools` must include all of them, not just `Skill`.
+- [ ] Treat a "convert command to thin skill wrapper" refactor as a
+      permissions-affecting change, not a pure rename — re-derive
+      `allowed-tools` from the skill body's actual tool usage instead of
+      assuming it collapses to `[Skill]`.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2
