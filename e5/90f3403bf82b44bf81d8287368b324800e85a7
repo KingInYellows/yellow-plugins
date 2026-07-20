@@ -1,0 +1,30 @@
+docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md
+  s_a89472768439e8::t_a3ec9210d01e0a 1-14,16-19,22-165,196-199,207-217,220-230,235-241
+  s_f72a80507cb29d::t_471da38b683bbb 166-195
+  s_f72a80507cb29d::t_d29b0873d61816 200-206,218-219,231-234
+  s_f72a80507cb29d::t_139021622a48cf 15,20-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "e590f3403bf82b44bf81d8287368b324800e85a7",
+  "prompts": {},
+  "sessions": {
+    "s_a89472768439e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd0962b8-8242-4c88-a254-01f9e6d54223",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f72a80507cb29d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "01d4e06a-64f4-4e2c-8acc-2fb47de6d75d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
