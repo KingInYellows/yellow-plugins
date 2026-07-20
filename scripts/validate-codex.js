@@ -41,11 +41,10 @@
  *      schemas/codex-plugin.schema.json's `mcpServers` field is explicitly
  *      pass-through/unvalidated pending a live `codex plugin add` /
  *      `codex plugin list --json` spike (see that schema's $comment); (c)
- *      no plugin sets codex.enabled: true yet (every
- *      catalog/plugins/<name>.json has targets.codex.enabled === false as
- *      of this writing), so there is no real Codex-exposed artifact to
- *      validate the check's shape against. Implement once a real
- *      Codex-enabled plugin exists and the mcpServers contract is spiked.
+ *      yellow-core is, as of this writing, the only Codex-enabled plugin
+ *      and declares no mcpServers, so this check still has nothing
+ *      non-trivial to validate against. Implement once a Codex-enabled
+ *      plugin declares mcpServers and the contract is spiked.
  *
  * Exit codes:
  *   0 - no schema violations, no exposure-lint violations

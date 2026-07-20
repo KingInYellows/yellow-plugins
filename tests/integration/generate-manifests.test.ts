@@ -29,19 +29,53 @@ import { describe, it, expect, afterAll } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { generateManifests } = require('../../scripts/generate-manifests.js');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { loadCatalog, loadPluginSources } = require('../../scripts/lib/generate/catalog-reader.js');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { isCodexEnabled, buildCodexHookConfig, buildCodexSkillTree } = require('../../scripts/lib/generate/emit-codex.js');
 
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SCRIPT = join(REPO_ROOT, 'scripts', 'generate-manifests.js');
 
 // Derived from the live plugin inventory (+1 for marketplace.json, +1 for
 // the Codex marketplace at .agents/plugins/marketplace.json, which is
-// always emitted — empty-state when no plugin is Codex-enabled) rather
-// than a hardcoded literal, matching the by-name/not-by-count discipline of
-// the characterization suite.
+// always emitted) rather than a hardcoded literal, matching the
+// by-name/not-by-count discipline of the characterization suite. Any real
+// Codex-enabled plugin (R22) adds its own manifest + optional hooks file +
+// skill-tree files on top — counted below via the same pure emit-codex.js
+// functions the real generator uses, so this never needs a manual bump as
+// more plugins flip codex.enabled: true.
+function countRealCodexTargets(): number {
+  const { data: catalog } = loadCatalog(join(REPO_ROOT, 'catalog'));
+  const { sources } = loadPluginSources(join(REPO_ROOT, 'catalog'), catalog.pluginOrder);
+  let count = 0;
+  for (const name of catalog.pluginOrder) {
+    const source = sources[name];
+    if (!isCodexEnabled(source)) continue;
+    count += 1; // .codex-plugin/plugin.json
+    if (buildCodexHookConfig(source) !== null) count += 1; // hooks/codex-hooks.json
+    const skillTree = buildCodexSkillTree(REPO_ROOT, name, source);
+    if (skillTree.status === 'ok') count += skillTree.targets.length;
+  }
+  return count;
+}
+
+// Fixture-scoped count: every fixture built by makeFixtureRoot() below
+// forces targets.codex.enabled: false on every copied plugin source (so
+// fixtures stay self-contained without needing to also copy each plugin's
+// skills/ directory), so fixture-based scenarios never have Codex-target
+// extras to account for.
 const TARGET_COUNT =
   readdirSync(join(REPO_ROOT, 'plugins'), { withFileTypes: true }).filter((e) =>
     e.isDirectory()
   ).length + 2;
+
+// Real-repo-scoped count: used only by the "byte-identity and determinism"
+// test below, which runs generateManifests() in-process against REPO_ROOT
+// itself (not a fixture) — so it must include whatever real Codex targets
+// the live catalog actually produces (R22 makes this non-zero as of
+// yellow-core).
+const REAL_TARGET_COUNT = TARGET_COUNT + countRealCodexTargets();
 
 const fixtureRoots: string[] = [];
 afterAll(() => {
@@ -71,13 +105,36 @@ function makeFixtureRoot(): string {
       join(REPO_ROOT, 'plugins', name, '.claude-plugin', 'plugin.json'),
       join(root, 'plugins', name, '.claude-plugin', 'plugin.json')
     );
+    // This suite exercises Claude-target generation only (Codex-specific
+    // scenarios live in generate-manifests-codex.test.ts's self-contained
+    // fixtures) — force every copied catalog source's targets.codex.enabled
+    // to false so a live plugin actually flipping Codex on (e.g. yellow-core,
+    // R22) can't drag Codex-only targets (skill tree, .codex-plugin/plugin.json)
+    // into this file's Claude-only TARGET_COUNT/diff assertions. Without this,
+    // a --check run here would also try to read plugins/<name>/skills/ off
+    // disk for buildCodexSkillTree, which this loop deliberately never copies.
+    const sourcePath = join(root, 'catalog', 'plugins', `${name}.json`);
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    if (source.targets && source.targets.codex) {
+      source.targets.codex = { enabled: false };
+    }
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
   }
-  // No plugin is Codex-enabled in the live repo yet, so the committed Codex
-  // marketplace is the empty-state artifact regardless of which plugin's
-  // catalog source the fixture goes on to mutate.
-  cpSync(
-    join(REPO_ROOT, '.agents', 'plugins', 'marketplace.json'),
-    join(root, '.agents', 'plugins', 'marketplace.json')
+  // Every fixture source above is forced Codex-disabled, so the Codex
+  // marketplace is always the empty-state artifact — derive it from the
+  // fixture's own copied catalog.json rather than assuming the live repo's
+  // current .agents/plugins/marketplace.json is still empty-state (it isn't,
+  // once any real plugin sets codex.enabled: true).
+  const catalogJson = JSON.parse(readFileSync(join(root, 'catalog', 'catalog.json'), 'utf8'));
+  mkdirSync(join(root, '.agents', 'plugins'), { recursive: true });
+  writeFileSync(
+    join(root, '.agents', 'plugins', 'marketplace.json'),
+    JSON.stringify(
+      { name: catalogJson.name, interface: { displayName: catalogJson.targets.codex.displayName }, plugins: [] },
+      null,
+      2
+    ) + '\n',
+    'utf8'
   );
   return root;
 }
@@ -127,7 +184,7 @@ describe('byte-identity and determinism', () => {
     const result = generateManifests({ mode: 'check' });
     expect(result.status).toBe('ok');
     expect(result.diffs).toEqual([]);
-    expect(result.checked).toBe(TARGET_COUNT);
+    expect(result.checked).toBe(REAL_TARGET_COUNT);
   });
 
   it('two consecutive apply runs are byte-equal and the second writes nothing', () => {

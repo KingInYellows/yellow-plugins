@@ -1,0 +1,11 @@
+Open plans (plans/):
+File                                                         Progress
+----                                                         --------
+plans/a-partial.md                                           [ 2/4 ]
+plans/b-complete.md                                          [ 3/3 ]  -- ready to complete
+plans/c-fresh.md                                             [ 0/2 ]
+
+Archived plans (plans/complete/): (1)
+File                                                         Progress
+----                                                         --------
+plans/complete/z-archived.md                                 [ 2/2 ]

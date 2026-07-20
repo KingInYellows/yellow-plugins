@@ -126,8 +126,19 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
  * requires the nested "hooks" object to have minProperties: 1, so an empty
  * file would be schema-invalid; the caller must not write a file (or set
  * the manifest's "hooks" pointer) in that case.
+ *
+ * Also returns null when `targets.codex.includeHooks` is explicitly `false`
+ * — a per-plugin opt-out (default unset/true preserves R20's original
+ * unconditional-carryover behavior). Exists because R22 requires a
+ * skills-only Codex exposure for a plugin (yellow-core) whose Claude side
+ * still needs its own hooks; there was previously no way to enable Codex
+ * for such a plugin without also exposing them.
  */
 function buildCodexHookConfig(source) {
+  const codex = source.targets && source.targets.codex;
+  if (codex && codex.includeHooks === false) {
+    return null;
+  }
   const raw = source.hooks;
   if (raw === undefined || raw === null) {
     return null;

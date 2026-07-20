@@ -1,7 +1,6 @@
 ---
 name: agent-native-audit
-description: "Audit checklist for evaluating an existing codebase against agent-native architecture principles to identify parity gaps. Use when auditing for agent-native readiness, before adding a new agent capability, or when triaging agent-behavior regressions."
-user-invokable: false
+description: Audit checklist for evaluating an existing codebase against agent-native architecture principles to identify parity gaps. Use when auditing for agent-native readiness, before adding a new agent capability, or when triaging agent-behavior regressions.
 ---
 
 ## What It Does

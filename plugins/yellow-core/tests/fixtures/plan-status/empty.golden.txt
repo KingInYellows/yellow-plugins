@@ -1,0 +1,3 @@
+plans/ is empty (no open plans).
+
+Archived plans (plans/complete/): (0) — directory does not exist yet.

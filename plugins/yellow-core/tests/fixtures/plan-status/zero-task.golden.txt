@@ -1,0 +1,6 @@
+Open plans (plans/):
+File                                                         Progress
+----                                                         --------
+plans/prose-only.md                                          [ 0/0 ]
+
+Archived plans (plans/complete/): (0)

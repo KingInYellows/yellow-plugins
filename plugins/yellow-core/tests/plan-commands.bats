@@ -44,7 +44,8 @@ headref_matches_slug() {
   printf '%s' "$1" | grep -qE "(^|[/_-])$2($|[/_-])"
 }
 
-# Checked-box count (mirrors status.md, case-insensitive for GFM [X]).
+# Checked-box count (mirrors plugins/yellow-core/skills/plan-status/SKILL.md,
+# case-insensitive for GFM [X]).
 count_checked() {
   grep -ciE '^[[:space:]]*- \[x\]' "$1" 2>/dev/null || true
 }
