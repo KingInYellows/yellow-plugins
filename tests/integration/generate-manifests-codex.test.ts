@@ -593,6 +593,21 @@ describe('targets.codex.includeHooks opt-out (R22)', () => {
     );
     expect(codexManifest.hooks).toBeUndefined();
   });
+
+  it('rejects a non-boolean includeHooks instead of silently falling through to the default carryover behavior', () => {
+    // buildCodexHookConfig() only skips carryover on a strict `=== false`
+    // check, so a typo'd string value ("false") would otherwise pass
+    // through undetected and carry hooks over anyway.
+    const root = makeCodexFixtureRoot([{ name: 'bad-includehooks-plugin', codexEnabled: true }]);
+    const catalogPath = join(root, 'catalog', 'plugins', 'bad-includehooks-plugin.json');
+    const catalogSource = JSON.parse(readFileSync(catalogPath, 'utf8'));
+    catalogSource.targets.codex.includeHooks = 'false';
+    writeJson(catalogPath, catalogSource);
+
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors.some((e: string) => e.includes('includeHooks') && e.includes('boolean'))).toBe(true);
+  });
 });
 
 describe('validateArtifacts — declared-but-missing hooks file (P2)', () => {

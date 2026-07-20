@@ -3,6 +3,7 @@ name: plan:status
 description: 'Show a per-file checkbox progress dashboard of plans/ (open) and plans/complete/ (archived). Use when reviewing which plans are ready to archive or checking work-in-flight at a glance.'
 argument-hint: ''
 allowed-tools:
+  - Bash
   - Skill
 ---
 

@@ -182,6 +182,13 @@ function validateCodexTarget(name, codex, errors) {
   if ('description' in codex && typeof codex.description !== 'string') {
     errors.push(`catalog/plugins/${name}.json: "targets.codex.description" must be a string`);
   }
+  // buildCodexHookConfig() only skips hook carryover on a strict
+  // `codex.includeHooks === false` check — a non-boolean value (e.g. a
+  // string "false") silently falls through to the default carryover
+  // behavior instead of the intended opt-out, so it must fail validation.
+  if ('includeHooks' in codex && typeof codex.includeHooks !== 'boolean') {
+    errors.push(`catalog/plugins/${name}.json: "targets.codex.includeHooks" must be a boolean`);
+  }
   if (
     'skillAllowlist' in codex &&
     (!Array.isArray(codex.skillAllowlist) ||

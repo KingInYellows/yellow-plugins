@@ -13,12 +13,15 @@ tags:
   - ci-gap
   - golden-fixture
   - hooks
+  - content-leak
 components:
   - scripts/lib/generate/emit-codex.js
   - scripts/validate-codex.js
+  - scripts/generate-manifests.js
   - plugins/yellow-core/tests/plan-commands.bats
   - tests/integration/generate-manifests-codex.test.ts
   - schemas/catalog-plugin.schema.json
+  - plugins/yellow-core/skills/agent-native-audit/SKILL.md
 ---
 
 # Codex distribution pipeline: silent gaps until codex.enabled flips
@@ -86,10 +89,10 @@ skill-tree builder — it currently doesn't.
 
 ### 2. Sidecar-file hard rejection (fails loud, not silent)
 
-`buildCodexSkillTree()` (`emit-codex.js:268-284`) rejects **any** skill
-directory containing files other than `SKILL.md` — a `references/`
-subdirectory, a `schema.yaml`, anything. The generator aborts for that
-skill with an explicit error:
+`buildCodexSkillTree()` (`scripts/lib/generate/emit-codex.js`) rejects
+**any** skill directory containing files other than `SKILL.md` — a
+`references/` subdirectory, a `schema.yaml`, anything. The generator aborts
+for that skill with an explicit error:
 
 ```
 plugins/<name>/skills/<skillName>: has sidecar file(s) not yet supported
@@ -151,7 +154,7 @@ annotated with comments like:
 ```
 
 (confirmed via `grep -n "mirrors" plugins/yellow-core/tests/plan-commands.bats`
-— 6 call sites). A third, separately-maintained reimplementation like this
+— 7 call sites). A third, separately-maintained reimplementation like this
 can silently drift from the command it mirrors, with nothing catching the
 divergence.
 
@@ -193,16 +196,63 @@ Claude-only hooks out of its Codex exposure should set
 `targets.codex.includeHooks: false` in its catalog source — don't assume
 enabling Codex is hooks-neutral.
 
+### 6. Content-leak class: the exposure lint and the emit pipeline both have blind spots for cross-references, found on the pilot's first real content pass
+
+Reviewing yellow-core's first live Codex allowlist (`agent-native-architecture`,
+`agent-native-audit`, `plan-status`) against real, pre-existing skill prose
+(not synthetic fixtures) surfaced two related-but-distinct gaps that a
+schema/fixture-only test suite can't catch, because both require real
+content to trigger:
+
+- **Registry-gated slash-command check misses plugin-qualified references.**
+  `scripts/validate-codex.js`'s `SLASH_COMMAND_PATTERN` greedily captures an
+  entire colon-chain after a leading `/` (e.g. `/yellow-debt:debt:audit`
+  captures `yellow-debt:debt:audit` as one string), but
+  `buildCommandNameRegistry()` only ever registers the bare, unprefixed
+  `name:` frontmatter value (`debt:audit`). The registry lookup can never
+  match a plugin-qualified reference, so this class of reference — the
+  dominant convention this repo actually uses for cross-plugin mentions —
+  passes the exposure lint silently. `agent-native-audit/SKILL.md` shipped
+  exactly this pattern in this same PR before being caught by review and
+  reworded to prose; the underlying registry gap itself was **deferred, not
+  fixed**, since a proper fix means threading `pluginName` through the
+  registry builder, confirming no other consumer of `commandNames` breaks,
+  and adding a regression test — a focused validator PR, not a pilot
+  bolt-on.
+- **Codex-side skill copies inherit Claude-oriented cross-references
+  verbatim.** Both `agent-native-architecture` and `agent-native-audit`
+  have "What This Skill Doesn't Cover" sections pointing at other
+  Claude-only skills/agents (`yellow-core:create-agent-skills`,
+  `yellow-review:review:agent-native-reviewer`, etc.) that are correct and
+  useful on the Claude side but don't exist in a Codex installation. These
+  are not slash-command syntax (so the lint above is silent by design, not
+  by bug) and not functionally broken — just dead pointers for a Codex
+  reader. Fixing this by editing the canonical source would degrade the
+  Claude-side skill to satisfy the Codex copy; the real fix is
+  generator-level (transform or strip cross-references at Codex-emit time,
+  in `buildCodexSkillTree()`), which belongs in the same follow-up as the
+  registry gap above, not as a one-off content edit.
+
+**Action:** before allowlisting a *pre-existing* skill for Codex for the
+first time (as opposed to authoring new Codex-aware content), grep it for
+slash-command syntax **and** plugin/skill/agent cross-references, the same
+way this PR's Pattern Survey scrubbed `plan-status` — don't assume a skill
+that's been fine on the Claude side for years is Codex-safe by default.
+Treat `pnpm validate:codex` passing as necessary, not sufficient, until the
+registry gap above is fixed.
+
 ## Why This Matters
 
 yellow-core (plan shell 03) is the first plugin in this repo that will ever
 set `codex.enabled: true` — every prior "Codex-enabled" state in this repo
-has been synthetic/untested. All four code-level gaps above (1-3, plus the
-hooks-carryover asymmetry in 5) were invisible to `pnpm validate:schemas`,
-`pnpm test:unit`, `pnpm lint`, `pnpm typecheck`, and even `pnpm
-validate:codex` as previously exercised, because the CI baseline had never
-run against a real Codex-enabled plugin. The first PR that flips
-`codex.enabled: true` for any plugin is exactly where these land — expect
+has been synthetic/untested. All code-level gaps above (1-3, the
+hooks-carryover asymmetry in 5, and the content-leak class in 6) were
+invisible to `pnpm validate:schemas`, `pnpm test:unit`, `pnpm lint`, `pnpm
+typecheck`, and even `pnpm validate:codex` as previously exercised, because
+the CI baseline had never run against a real Codex-enabled plugin with real
+skill content. The first PR that flips `codex.enabled: true` for any plugin
+— and, separately, the first PR that allowlists a *pre-existing* skill
+rather than newly-authored content — is exactly where these land; expect
 friction there, not before.
 
 ## When to Apply
@@ -211,27 +261,44 @@ Any time a plugin author or reviewer:
 
 - Enables Codex distribution for a plugin (`targets.codex.enabled: true` in
   `catalog/plugins/<name>.json`)
-- Allowlists a skill for Codex (`skillAllowlist`)
+- Allowlists a skill for Codex (`skillAllowlist`), especially a
+  *pre-existing* skill never written with Codex distribution in mind
 - Authors or ports content into a Codex-exposed skill body
 - Designs a before/after behavior-parity gate for logic that can't be
   shared via a sourceable file inside a Codex-targeted skill directory
 - Enables Codex for a plugin that also declares inline Claude `hooks` and
   needs to keep them out of its Codex exposure (`includeHooks: false`)
+- Extends `catalog/plugins/<name>.json`'s `targets.codex` block with a new
+  field — add both a manual `typeof` check in
+  `generate-manifests.js`'s `validateCodexTarget()` (matching the existing
+  per-field checks) and a mutate-then-apply regression test, not just a
+  schema `type` constraint (the schema's AJV gate runs in a separate CI
+  matrix leg, not in `pnpm validate:schemas`/`validate:generated`)
 
 ## Examples
 
-- `scripts/lib/generate/emit-codex.js:83-109` — `buildCodexPluginManifest`
+- `scripts/lib/generate/emit-codex.js` — `buildCodexPluginManifest`
   (manifest `"skills"` field, non-defaulted)
-- `scripts/lib/generate/emit-codex.js:176-358` — `buildCodexSkillTree`
-  (defaults `componentPaths.skills`; sidecar rejection at lines 268-284)
-- `scripts/validate-codex.js:441-478` — `runExposureLint`
-  (`codex.enabled` gate at line 449)
+- `scripts/lib/generate/emit-codex.js` — `buildCodexSkillTree`
+  (defaults `componentPaths.skills`; hard-rejects sidecar files)
+- `scripts/validate-codex.js` — `runExposureLint` (gated on
+  `codex.enabled`)
 - `plugins/yellow-core/tests/plan-commands.bats` — hand-copied mirror
-  pattern (e.g. lines 8, 13, 19, 24, 32, 47, 172)
+  pattern (7 call sites, per the `grep -n "mirrors"` count above)
 - `scripts/lib/generate/emit-codex.js` — `buildCodexHookConfig`'s
   `includeHooks === false` opt-out guard
 - `tests/integration/generate-manifests-codex.test.ts` — "targets.codex.includeHooks
-  opt-out (R22)"
+  opt-out (R22)"; "rejects a non-boolean includeHooks..."
+- `scripts/generate-manifests.js` — `validateCodexTarget()`'s per-field
+  manual type checks (the pattern the `includeHooks` fix now matches)
+- `scripts/validate-codex.js` — `SLASH_COMMAND_PATTERN` /
+  `buildCommandNameRegistry` (deferred: plugin-qualified reference blind
+  spot, finding 6)
+- `plugins/yellow-core/skills/agent-native-audit/SKILL.md` — the
+  `/yellow-debt:debt:audit` reference reworded to prose (fixed, finding 6)
+- `plugins/yellow-core/codex/skills/agent-native-architecture/SKILL.md`,
+  `plugins/yellow-core/codex/skills/agent-native-audit/SKILL.md` — dead
+  cross-references to non-Codex-enabled skills/agents (deferred, finding 6)
 
 ## Related Docs
 

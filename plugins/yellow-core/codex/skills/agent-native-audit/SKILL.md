@@ -10,8 +10,8 @@ architecture maturity. Where `agent-native-architecture` codifies the
 principles, this skill codifies the audit *process* — what to inventory,
 what to measure, what to flag. The
 `yellow-review:review:agent-native-reviewer` agent uses this checklist for
-incremental PR reviews; `/yellow-debt:debt:audit`-style full audits use it
-for codebase-wide assessments.
+incremental PR reviews; full audits (such as yellow-debt's audit workflow)
+use it for codebase-wide assessments.
 
 ## When to Use
 
