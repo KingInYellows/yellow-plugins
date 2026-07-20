@@ -105,7 +105,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/compound:review-staged` — manually drain the background-compounding
   staging ledger ahead of the SessionStart auto-drain threshold;
   AskUserQuestion M3 gate before any bulk write
-- `/plan:status` — read-only dashboard of `plans/` (open) and
+- `/plan:status` — thin wrapper over the `plan-status` skill (invokes it via
+  the `Skill` tool); read-only dashboard of `plans/` (open) and
   `plans/complete/` (archived) with per-file checkbox progress; 100%
   open plans annotated `-- ready to complete`. Sibling of
   `/plan:complete` and `/workflows:plan` (see "Plan namespace split"
@@ -143,7 +144,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   CLAUDE.md
 - `/worktree:cleanup` — scan git worktrees, classify by state, and remove stale worktrees with safeguards
 
-### Skills (19)
+### Skills (20)
 
 - `agent-native-architecture` — reference for the five agent-native
   architecture principles (action parity, context parity, shared workspace,
@@ -195,6 +196,11 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   positional-bias variance; per-criterion scoring (1-5) outperforms holistic;
   style-bias self-check flags rationale drift. Optional `knowledge-compounder`
   hand-off writes the winner to `docs/solutions/optimizations/`
+- `plan-status` — canonical read-only dashboard of `plans/` (open) and
+  `plans/complete/` (archived) with per-file checkbox progress; the
+  `/plan:status` command is a thin wrapper over this skill. One of
+  yellow-core's three Codex-distributed skills (see "Codex Distribution"
+  below)
 - `security-fencing` — canonical prompt-injection hardening block for agents that analyze untrusted content (source code, CI logs, workflow files); single source of truth for the inlined `CRITICAL SECURITY RULES` block (internal)
 - `session-handoff` — write a tracked session-handoff artifact at
   `plans/handoff/<date>-<slug>.md` (six fields: current task, workflow
@@ -204,6 +210,22 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `session-history` — cross-vendor session-history user surface — dispatches
   the `session-historian` agent against Claude Code + Devin + Codex
   backends with availability detection and graceful degradation per backend
+
+### Codex Distribution
+
+yellow-core is the first plugin in this repo to set `targets.codex.enabled:
+true` (`catalog/plugins/yellow-core.json`) — the first non-empty Codex
+marketplace state (`.agents/plugins/marketplace.json`). Its Codex exposure
+is a deliberately narrow, read-only allowlist of exactly three skills:
+`agent-native-architecture`, `agent-native-audit`, and `plan-status`. Every
+other component — all 21 agents, both hooks, background compounding,
+`setup:all`, statusline setup, MCP helpers, `lib/` executables, and the
+remaining skills — is excluded. `targets.codex.includeHooks: false` in the
+catalog source keeps yellow-core's Stop/SessionStart hooks (needed for
+background compounding on the Claude side) out of the generated Codex
+manifest entirely — see
+`docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md`
+for why that opt-out exists.
 
 ### Shared Libraries
 
