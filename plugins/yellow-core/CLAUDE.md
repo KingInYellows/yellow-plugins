@@ -112,19 +112,27 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   below)
 - `/plan:complete` — archive a single open plan with two safety gates:
   Gate A scans for unchecked `- [ ]` boxes; Gate C verifies merged-PR
-  evidence in two tiers: a strict tier (server-side `--state merged` +
-  `--jq` word-boundary post-filter of the full slug on `headRefName`),
-  then a loose tier scoring the 100 most recent merged PRs by
-  slug-token coverage over branch + title — a unique PR containing all
-  slug tokens except at most one (all of them for slugs of ≤3 tokens)
-  passes without prompting, captured in a `Plan-Verifier-LooseMatch:`
-  commit trailer. Ambiguous or zero loose matches prompt the user via
-  `AskUserQuestion` "Other" label for a PR-number override; the
-  decision is captured in a `Plan-Verifier-Override:` commit trailer.
-  Archival branch is `plan/archive-<slug>`; submitted via
-  `gt submit --no-interactive`. The companion PR-diff-scoped
-  validator `scripts/validate-plans.js` enforces the same
-  no-stray-checkbox rule on archived files in CI
+  evidence in three tiers. A file-provenance tier runs first: it finds
+  the commit that most recently touched the plan file on the repository's
+  configured trunk and looks up its merged PR(s) via
+  `gh api repos/{owner}/{repo}/commits/{sha}/pulls` — a unique match
+  passes without prompting, captured in a `Plan-Verifier-FileProvenance:`
+  commit trailer. This catches the routine case where a plan was
+  expanded from a shell and implemented in the same PR, so the branch
+  name carries too few slug tokens for either slug-match tier. When
+  provenance finds no commit or an ambiguous PR set, a strict tier
+  (server-side `--state merged` + `--jq` word-boundary post-filter of
+  the full slug on `headRefName`) runs, then a loose tier scoring the
+  100 most recent merged PRs by slug-token coverage over branch +
+  title — a unique PR containing all slug tokens except at most one
+  (all of them for slugs of ≤3 tokens) passes without prompting,
+  captured in a `Plan-Verifier-LooseMatch:` commit trailer. Ambiguous
+  or zero loose matches prompt the user via `AskUserQuestion` "Other"
+  label for a PR-number override; the decision is captured in a
+  `Plan-Verifier-Override:` commit trailer. Archival branch is
+  `plan/archive-<slug>`; submitted via `gt submit --no-interactive`.
+  The companion PR-diff-scoped validator `scripts/validate-plans.js`
+  enforces the same no-stray-checkbox rule on archived files in CI
 - `/statusline:setup` — generate and install an adaptive statusline showing context, git, MCP health
 - `/setup:all` — run setup for all installed marketplace plugins with unified dashboard
 - `/setup:claude-web` — audit a repository and scaffold the files Claude Code
