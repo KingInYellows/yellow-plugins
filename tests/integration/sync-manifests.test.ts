@@ -51,6 +51,19 @@ function makeFixtureRoot(): string {
       join(REPO_ROOT, 'plugins', name, '.claude-plugin', 'plugin.json'),
       join(root, 'plugins', name, '.claude-plugin', 'plugin.json')
     );
+    // This suite exercises sync-manifests.js's Claude-side version-drift
+    // delegation only; it never copies plugins/<name>/skills/, so force every
+    // copied catalog source Codex-disabled here too (mirrors the identical
+    // fix in generate-manifests.test.ts) so a live plugin flipping
+    // codex.enabled: true (R22) can't make the delegated generateManifests()
+    // call fail trying to build a Codex skill tree from files this fixture
+    // never copied.
+    const sourcePath = join(root, 'catalog', 'plugins', `${name}.json`);
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    if (source.targets && source.targets.codex) {
+      source.targets.codex = { enabled: false };
+    }
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
   }
   return root;
 }
