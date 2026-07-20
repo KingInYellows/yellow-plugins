@@ -190,7 +190,7 @@ skill — with a parity gate proving identical behavior.
       change a plugin" step 4 ("Update the plugin's README.md and CLAUDE.md
       if behavior changed").
 
-- [ ] Step 9: Manual Codex-app acceptance (human step, not automatable from
+- [x] Step 9: Manual Codex-app acceptance (human step, not automatable from
       this session). Install the plugin in a Codex app session and confirm
       exactly three skills are visible — `agent-native-architecture`,
       `agent-native-audit`, `plan-status` — with nothing else exposed (no
