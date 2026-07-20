@@ -179,10 +179,12 @@ API call, no agent:
 - **Loose token-coverage tier (PR #651, undocumented until now):**
   when the strict tier finds zero matches — routine, since real branch
   names rarely carry the full plan slug — Gate C scores the 100 most
-  recent merged PRs by slug-token coverage over branch + title. A
-  UNIQUE PR covering all slug tokens but one (all of them for slugs of
-  ≤3 tokens) auto-passes, recorded via a `Plan-Verifier-LooseMatch:`
-  trailer. Ambiguous or zero matches still prompt.
+  recently created merged PRs (`gh pr list --state merged --limit 100`,
+  which orders by creation time, not merge time) by slug-token coverage
+  over branch + title. A UNIQUE PR covering all slug tokens but one (all
+  of them for slugs of ≤3 tokens) auto-passes, recorded via a
+  `Plan-Verifier-LooseMatch:` trailer. Ambiguous or zero matches still
+  prompt.
 
 - **File-provenance tier (PR #656, this update):** runs FIRST, before
   strict and loose. Both slug-match tiers pattern-match a merged PR's
@@ -201,9 +203,12 @@ API call, no agent:
   GitHub directly "which merged PR last touched this exact file?"
 
   ```bash
-  FILE_SHA=$(git log -1 --format=%H origin/main -- "plans/$CLEAN_ARG")
+  TRUNK=$(gt trunk 2>/dev/null | tr -d '[:space:]' || true)
+  [ -n "$TRUNK" ] || TRUNK=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
+  [ -n "$TRUNK" ] || TRUNK=main
+  FILE_SHA=$(git log -1 --format=%H "origin/$TRUNK" -- "plans/$CLEAN_ARG")
   PULLS=$(gh api "repos/$OWNERREPO/commits/$FILE_SHA/pulls" \
-    --jq '[.[] | select(.merged_at != null) | {number, title, url: .html_url}]')
+    --jq '[.[] | select(.state == "closed") | {number, title, url: .html_url}]')
   ```
 
   A UNIQUE merged PR associated with that commit (`PCOUNT == 1`)
@@ -216,12 +221,13 @@ API call, no agent:
   the loose tier already relies on.
 
   This is still consistent with §3's original design collapse — one
-  API call, no agent, no 8-row truth table — just querying
-  `commits/{sha}/pulls` instead of `pr list --search`. The rejected
-  approach was an *agent* scoring multiple signals; the provenance
-  tier is one more deterministic `gh api` call slotted ahead of the
-  existing ones, same shape as strict and loose.
+  provenance lookup API call, no agent, no 8-row truth table — just
+  querying `commits/{sha}/pulls` instead of `pr list --search`. The
+  rejected approach was an *agent* scoring multiple signals; the
+  provenance tier is one more deterministic `gh api` call slotted
+  ahead of the existing ones, same shape as strict and loose.
 
 Gate C is now three tiers, evaluated in order: **provenance → strict →
-loose → AskUserQuestion override**, each short-circuiting on a unique
-pass. At most one of the three trailers appears per archival commit.
+loose → AskUserQuestion override**, with provenance and loose short-circuiting
+only on unique matches; strict passes on any match. At most one of the three
+trailers appears per archival commit.

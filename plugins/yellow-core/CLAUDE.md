@@ -113,8 +113,8 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `/plan:complete` — archive a single open plan with two safety gates:
   Gate A scans for unchecked `- [ ]` boxes; Gate C verifies merged-PR
   evidence in three tiers. A file-provenance tier runs first: it finds
-  the commit that most recently touched the plan file on `origin/main`
-  and looks up its merged PR(s) via
+  the commit that most recently touched the plan file on the repository's
+  configured trunk and looks up its merged PR(s) via
   `gh api repos/{owner}/{repo}/commits/{sha}/pulls` — a unique match
   passes without prompting, captured in a `Plan-Verifier-FileProvenance:`
   commit trailer. This catches the routine case where a plan was

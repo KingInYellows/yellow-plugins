@@ -20,8 +20,8 @@ Archives a single open plan from `plans/<arg>.md` to
   before commit.
 - **Gate C** (evidence): tiered merged-PR match. A file-provenance tier
   runs first: it finds the commit that most recently touched the plan
-  file on `origin/main` and looks up the merged PR(s) GitHub associates
-  with that commit — exact, not fuzzy. A unique match passes without
+  file on the repo's trunk branch and looks up the merged PR(s) GitHub
+  associates with that commit — exact, not fuzzy. A unique match passes without
   prompting, recorded via a `Plan-Verifier-FileProvenance:` commit
   trailer. When that tier finds no commit or an ambiguous set of PRs
   (rare — e.g. history rewrites, cherry-picks), the strict tier queries
@@ -172,22 +172,47 @@ CLEAN_ARG="${ARG#plans/}"
 GIT_TMP=$(git rev-parse --git-path tmp)
 mkdir -p "$GIT_TMP"
 OWNERREPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)
-# origin/main, not local HEAD: the local checkout may be on a stale or
+# Resolve the repo's actual trunk instead of assuming 'main' — same
+# fallback chain as Phase 6 (gt, then gh, then main), but via the
+# non-mutating `gt trunk` query rather than `gt checkout --trunk`: this
+# phase runs before the Phase 5 dirty-tree gate, so it must not check
+# out a branch.
+TRUNK=$(gt trunk 2>/dev/null | tr -d '[:space:]' || true)
+if [ -z "$TRUNK" ]; then
+  TRUNK=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)
+fi
+[ -n "$TRUNK" ] || TRUNK=main
+# origin/$TRUNK, not local HEAD: the local checkout may be on a stale or
 # unrelated branch when /plan:complete runs (Phase 6 doesn't sync trunk
 # until after Gate C), so `git log` must start from a ref guaranteed to
 # carry the merge commit rather than defaulting to a possibly-behind HEAD.
-git fetch origin main --quiet 2>/dev/null || \
-  printf '[plan:complete] WARNING: git fetch origin main failed; provenance tier may see a stale history\n' >&2
-FILE_SHA=$(git log -1 --format=%H origin/main -- "plans/$CLEAN_ARG" 2>/dev/null || true)
+# A failed fetch must not fall through to reading a stale origin/$TRUNK —
+# that could still produce a unique (but outdated) provenance match and
+# bypass Gate C, so a fetch failure forces FILE_SHA empty here instead of
+# only warning and continuing.
+if ! git fetch origin "$TRUNK" --quiet 2>/dev/null; then
+  printf '[plan:complete] WARNING: git fetch origin %s failed; provenance tier skipped (stale history risk)\n' "$TRUNK" >&2
+  FILE_SHA=
+else
+  FILE_SHA=$(git log -1 --format=%H "origin/$TRUNK" -- "plans/$CLEAN_ARG" 2>/dev/null || true)
+fi
 PCOUNT=0
 if [ -n "$FILE_SHA" ] && [ -n "$OWNERREPO" ]; then
   GH_ERR=$(mktemp)
   # GitHub's commits/{sha}/pulls endpoint returns every PR a commit is
-  # associated with (open, closed-unmerged, merged) — filter to merged
-  # only, since an open or abandoned PR touching the file is not
-  # completion evidence.
+  # associated with (open, closed-unmerged, merged). Filter on
+  # `state == "closed"` rather than `merged_at != null`: a merge-queue
+  # merge can leave `merged_at` null for a short propagation window
+  # after the commit has already landed on origin/$TRUNK (which the
+  # `git log` above already proves), so gating on `merged_at` risks a
+  # false NO-EVIDENCE result right after a queue merge. A closed PR
+  # whose exact commit SHA is verified on trunk is de facto merged — an
+  # open PR is excluded by `state`, and an ejected/closed-unmerged PR's
+  # commits don't land on trunk under that same SHA (barring the
+  # rebase/cherry-pick edge case, which the PCOUNT>=2 ambiguous
+  # fallback below already treats as unsafe to auto-pass).
   PULLS=$(gh api "repos/$OWNERREPO/commits/$FILE_SHA/pulls" \
-    --jq '[.[] | select(.merged_at != null) | {number, title, url: .html_url}]' 2>|"$GH_ERR") || {
+    --jq '[.[] | select(.state == "closed") | {number, title, url: .html_url}]' 2>|"$GH_ERR") || {
     printf '[plan:complete] WARNING: gh api commits/pulls lookup failed: %s\n' "$(cat "$GH_ERR")" >&2
     PULLS='[]'
   }
@@ -196,7 +221,10 @@ if [ -n "$FILE_SHA" ] && [ -n "$OWNERREPO" ]; then
 fi
 printf '[plan:complete] Gate C provenance tier: %d merged PR(s) associated with the commit that last touched plans/%s\n' "$PCOUNT" "$CLEAN_ARG"
 if [ "$PCOUNT" -ge 1 ]; then
-  printf '%s\n' "$PULLS" | jq -r '.[] | "  #\(.number) — \(.title)\n    \(.url)"'
+  # Strip control characters from GitHub-controlled title/url fields
+  # before they hit the terminal — an untrusted PR title could otherwise
+  # smuggle ANSI/terminal escape sequences into this command's output.
+  printf '%s\n' "$PULLS" | jq -r '.[] | "  #\(.number) — \(.title | gsub("[[:cntrl:]]"; ""))\n    \(.url | gsub("[[:cntrl:]]"; ""))"'
 fi
 if [ "$PCOUNT" -eq 1 ]; then
   printf '%s\n' "$PULLS" | jq -r --arg sha "$FILE_SHA" '.[0] | "pr=#\(.number) sha=\($sha)"' >| "$GIT_TMP/plan-complete.provenance"
@@ -482,27 +510,27 @@ SLUG=$(basename "$CLEAN_ARG" .md | sed 's/^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-//')
 GIT_TMP=$(git rev-parse --git-path tmp)
 COUNT=$(cat "$GIT_TMP/plan-complete.count" 2>/dev/null || printf '0')
 SUBJECT="docs(plans): archive completed $SLUG plan"
-# Evidence priority: an explicit user override beats a loose match beats
-# a provenance match beats the strict count. In practice at most one of
+# Evidence priority: an explicit user override beats a provenance match
+# beats a loose match beats the strict count. In practice at most one of
 # these files exists per run — each tier that passes uniquely skips every
-# tier after it (provenance skips strict+loose+override; loose PASS skips
-# override) — but the explicit order is kept as defense in depth rather
-# than relying on that invariant holding across future edits.
+# tier after it (provenance skips strict+loose; loose PASS skips override)
+# — but the explicit order is kept as defense in depth rather than relying
+# on that invariant holding across future edits.
 if [ -f "$GIT_TMP/plan-complete.override" ]; then
   OVERRIDE_PR_NUM=$(cat "$GIT_TMP/plan-complete.override")
   BODY="Verified by /plan:complete: user-confirmed override.
 
 Plan-Verifier-Override: user-confirmed-no-pr-evidence (pr=#$OVERRIDE_PR_NUM)"
-elif [ -f "$GIT_TMP/plan-complete.loose" ]; then
-  LOOSE_INFO=$(cat "$GIT_TMP/plan-complete.loose")
-  BODY="Verified by /plan:complete: unique loose match — all-but-one slug-token coverage on a recent merged PR's branch+title.
-
-Plan-Verifier-LooseMatch: $LOOSE_INFO"
 elif [ -f "$GIT_TMP/plan-complete.provenance" ]; then
   PROVENANCE_INFO=$(cat "$GIT_TMP/plan-complete.provenance")
   BODY="Verified by /plan:complete: unique file-provenance match — the merged PR GitHub associates with the commit that last touched this plan file.
 
 Plan-Verifier-FileProvenance: $PROVENANCE_INFO"
+elif [ -f "$GIT_TMP/plan-complete.loose" ]; then
+  LOOSE_INFO=$(cat "$GIT_TMP/plan-complete.loose")
+  BODY="Verified by /plan:complete: unique loose match — all-but-one slug-token coverage on a recent merged PR's branch+title.
+
+Plan-Verifier-LooseMatch: $LOOSE_INFO"
 else
   BODY="Verified by /plan:complete: $COUNT merged PR(s) found via gh pr list --state merged with word-boundary post-filter on headRefName."
 fi
