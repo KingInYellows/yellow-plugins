@@ -102,7 +102,7 @@ classify_branch() {
       ;;
   esac
   local age_days=$(( (now - committer_date_unix) / 86400 ))
-  if [ "$age_days" -ge "$stale_days" ]; then
+  if [ "$age_days" -gt "$stale_days" ]; then
     echo "stale"
   else
     echo "clean"
@@ -225,6 +225,23 @@ delete_branch_with_fallback() {
   # 1 day old vs a 30-day threshold
   run classify_branch "refs/remotes/origin/x" "" 1700000000 1700086400 30
   [ "$output" = "clean" ]
+}
+
+@test "classify_branch: exactly at the stale-days boundary is clean, not stale" {
+  # SKILL.md Phase 3 Step 5 spec is strict "AGE_DAYS > STALE_DAYS" — a branch
+  # exactly at the threshold (30 days old vs a 30-day threshold) must stay
+  # clean. Regression test for a prior -ge/-gt mismatch between this mirror
+  # and the shipped skill (caught by review, not by the fixture-based test
+  # above, which used far-from-boundary values).
+  local now=$((1700000000 + 30 * 86400))
+  run classify_branch "refs/remotes/origin/x" "" 1700000000 "$now" 30
+  [ "$output" = "clean" ]
+}
+
+@test "classify_branch: one day past the stale-days boundary is stale" {
+  local now=$((1700000000 + 31 * 86400))
+  run classify_branch "refs/remotes/origin/x" "" 1700000000 "$now" 30
+  [ "$output" = "stale" ]
 }
 
 @test "classify_branch: full mixed fixture classifies every line correctly" {

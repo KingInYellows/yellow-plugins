@@ -101,21 +101,11 @@ Use the `Task` tool to launch the selected prompts in parallel in a
 
 #### On Codex
 
-> **Unverified:** the exact tool/syntax a Codex skill uses to delegate work
-> to the built-in `worker` or `explorer` agents is not confirmed as of this
-> writing — `docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`
-> establishes that plugins cannot ship custom TOML agents and that `worker`
-> and `explorer` are the available built-ins, but not the invocation syntax
-> a skill body uses to reach them. Until confirmed against a live Codex
-> session, treat the following as best-effort guidance, not a verified
-> contract: delegate each selected prompt to a separate `worker` agent
-> invocation (Codex's closest analogue to Claude's `general-purpose`
-> subagent), running them concurrently where the host allows it. If Codex
-> has no concurrent-dispatch primitive available to a skill, run the
-> prompts sequentially instead — falling back to sequential execution
-> changes latency, not audit correctness. Flag this gap for follow-up
-> verification (e.g. a live rescue-style test session on Codex) rather than
-> silently trusting the syntax below.
+> **Unverified — confirm before relying on this in production** (delegation
+> syntax not yet confirmed against a live Codex session; see
+> `docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`).
+> Delegate each selected prompt to a separate `worker` agent invocation,
+> running concurrently if the host supports it, otherwise sequentially.
 
 ### Phase 3: Gate Check
 

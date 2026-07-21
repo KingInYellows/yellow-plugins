@@ -165,23 +165,30 @@ function rewriteClaudeEntrypoint(command) {
 }
 
 /**
- * Apply rewriteClaudeEntrypoint to every hook definition's "command" field
- * nested under a single matcher group, preserving key order and every
- * other field. Non-command-bearing or malformed groups pass through
- * unchanged, mirroring withCommandWindows' defensive shape below.
+ * Apply transformHookDef to every hook definition nested under a single
+ * matcher group, preserving key order and every other field. Non-array
+ * `.hooks` (malformed or absent) passes the group through unchanged.
+ * Shared by rewriteEntrypointsInGroup (below) and addCommandWindows so the
+ * group-walking/defensive-guard shape exists in exactly one place.
  */
-function rewriteEntrypointsInGroup(group) {
+function mapHooksInGroup(group, transformHookDef) {
   if (group === null || typeof group !== 'object' || !Array.isArray(group.hooks)) {
     return group;
   }
-  return {
-    ...group,
-    hooks: group.hooks.map((hookDef) =>
-      hookDef !== null && typeof hookDef === 'object' && typeof hookDef.command === 'string'
-        ? { ...hookDef, command: rewriteClaudeEntrypoint(hookDef.command) }
-        : hookDef
-    ),
-  };
+  return { ...group, hooks: group.hooks.map(transformHookDef) };
+}
+
+/**
+ * Apply rewriteClaudeEntrypoint to every hook definition's "command" field
+ * nested under a single matcher group. Non-command-bearing hook defs pass
+ * through unchanged, mirroring withCommandWindows' defensive shape below.
+ */
+function rewriteEntrypointsInGroup(group) {
+  return mapHooksInGroup(group, (hookDef) =>
+    hookDef !== null && typeof hookDef === 'object' && typeof hookDef.command === 'string'
+      ? { ...hookDef, command: rewriteClaudeEntrypoint(hookDef.command) }
+      : hookDef
+  );
 }
 
 /**
@@ -215,12 +222,7 @@ function withCommandWindows(hookDef) {
 function addCommandWindows(merged) {
   const result = {};
   for (const [event, groups] of Object.entries(merged)) {
-    result[event] = groups.map((group) => {
-      if (group === null || typeof group !== 'object' || !Array.isArray(group.hooks)) {
-        return group;
-      }
-      return { ...group, hooks: group.hooks.map(withCommandWindows) };
-    });
+    result[event] = groups.map((group) => mapHooksInGroup(group, withCommandWindows));
   }
   return result;
 }

@@ -281,10 +281,14 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   Claude-only entrypoint, the skill is what both Claude and Codex actually
   execute) must include `Skill` in `allowed-tools:` alongside its other
   tools — never as a replacement for them (command-authoring anti-pattern
-  #28) — and a same-plugin `skills/<name>/SKILL.md` must exist. Enforced by
-  `scripts/validate-agent-authoring.js` RULE 17, scoped to `## Usage`
-  section content only so unrelated cross-plugin `skill: "..."` references
-  elsewhere in a larger document (e.g. a multi-phase workflow command citing
+  #28). `scripts/validate-agent-authoring.js` RULE 17 enforces two of these
+  checks automatically: that `Skill` is present in `allowed-tools:`, and
+  that a same-plugin `skills/<name>/SKILL.md` exists. It does NOT verify
+  that the wrapper's original tools were preserved alongside `Skill` (the
+  "never as a replacement" half above) — that remains a manual-review
+  concern per the validator's own inline comment. RULE 17 is scoped to
+  `## Usage` section content only so unrelated cross-plugin `skill: "..."`
+  references elsewhere in a larger document (e.g. a multi-phase workflow command citing
   another plugin's skill as one step) are not flagged.
 
 ## Security & Prompt-Injection Rules
