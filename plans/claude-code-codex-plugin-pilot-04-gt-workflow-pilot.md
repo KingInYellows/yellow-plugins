@@ -273,7 +273,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   `entrypoint-claude.js`/`entrypoint-codex.js` so Step 6's generator change
   (populating `commandWindows` with the same command string) has a documented
   rationale.
-- [ ] Step 5: Point `catalog/plugins/gt-workflow.json`'s `hooks` block at the
+- [x] Step 5: Point `catalog/plugins/gt-workflow.json`'s `hooks` block at the
   new Node entrypoints — replace `"command": "bash
   ${CLAUDE_PLUGIN_ROOT}/hooks/check-git-push.sh"` with `"command": "node
   ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook
