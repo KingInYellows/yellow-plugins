@@ -331,7 +331,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   original tools listed in the Pattern Survey table above (do not drop
   Bash/Read/Write/etc.), and replace the body with "Invoke the `Skill` tool
   with `skill: "<name>"`." per the shell-03 idiom.
-- [ ] Step 10: Consolidate the audit-agent prompts. Create
+- [x] Step 10: Consolidate the audit-agent prompts. Create
   `plugins/gt-workflow/skills/audit-review/SKILL.md` containing the
   `quick-code-review`, `quick-security-scan`, `quick-error-check` prompt
   text currently duplicated in `smart-submit.md` and `gt-amend.md`

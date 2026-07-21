@@ -116,57 +116,27 @@ git diff
 
 Store this output as `$DIFF_OUTPUT` and pass it to each audit agent below.
 
-#### 1. Spawn Parallel Auditors
+#### 1. Run the Audit
 
-Determine the number of audit agents to spawn: use `$GW_AUDIT_AGENTS` if set
-(1-3), otherwise default to 3. If the count is 1, spawn only
-**quick-code-review**. If 2, spawn **quick-code-review** and
-**quick-security-scan**. If 3, spawn all three.
+Invoke the `Skill` tool with `skill: "audit-review"`, passing `$DIFF_OUTPUT`
+and `$GW_AUDIT_AGENTS` as context. It runs the appropriate quick-code-review
+/ quick-security-scan / quick-error-check prompts (1-3 of them, per
+`$GW_AUDIT_AGENTS`) and returns a CRITICAL / MINOR / CLEAN verdict with
+file:line findings.
 
-Use the Task tool to launch agents in parallel in a **single message**:
-
-**quick-code-review** (subagent_type: `general-purpose`):
-
-> Analyze the following diff for mock/stub code, unfinished TODOs, commented-out
-> blocks, or obvious logic errors.
->
-> Diff:
->
-> ```
-> $DIFF_OUTPUT
-> ```
->
-> Report file:line findings. If nothing found, say "CLEAN".
-
-**quick-security-scan** (subagent_type: `general-purpose`):
-
-> Scan the following diff for hardcoded credentials, API keys, tokens, private
-> keys, PII, or sensitive config files.
->
-> Diff:
->
-> ```
-> $DIFF_OUTPUT
-> ```
->
-> Be extremely strict. Report file:line findings. If nothing found, say "CLEAN".
-
-**quick-error-check** (subagent_type: `general-purpose`):
-
-> Analyze the following diff for empty catch blocks, swallowed errors, fallback
-> values without logging, or missing error boundaries.
->
-> Diff:
->
-> ```
-> $DIFF_OUTPUT
-> ```
->
-> Report file:line findings. If nothing found, say "CLEAN".
+> **Note:** `audit-review`'s prompt bodies are the fuller versions
+> originally written for `smart-submit` (numbered checklists per prompt)
+> rather than this skill's previous shorter one-liners — consolidating the
+> two callers onto one skill meant picking a single canonical wording, and
+> the richer version was kept. The audit is stricter as a result; this is
+> an intentional side effect of Step 10 of the Codex-pilot plan, not a
+> behavior change to fix.
 
 #### 2. Gate Check
 
-Synthesize findings.
+If `audit-review` reports a dispatch failure (an audit failed to run or
+timed out), inform the user which audit is missing and ask whether to
+proceed with partial results or abort.
 
 **IF CRITICAL ISSUES**: Show them and ask via `AskUserQuestion`:
 

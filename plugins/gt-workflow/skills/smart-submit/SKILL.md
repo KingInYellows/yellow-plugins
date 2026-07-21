@@ -156,76 +156,19 @@ git diff
 
 Store this output as `$DIFF_OUTPUT` (pass it as context to each agent below).
 
-#### 1. Spawn Parallel Auditors
+#### 1. Run the Audit
 
-Determine the number of audit agents to spawn: use `$GW_AUDIT_AGENTS` if set
-(1-3), otherwise default to 3. If the count is 1, spawn only
-**quick-code-review**. If 2, spawn **quick-code-review** and
-**quick-security-scan**. If 3, spawn all three.
-
-Use the Task tool to launch agents in parallel in a **single message**, passing
-`$DIFF_OUTPUT` as context to each:
-
-**quick-code-review** (subagent_type: `general-purpose`):
-
-> Analyze the following uncommitted diff for:
->
-> 1. Mock/stub code in production paths
-> 2. Placeholder or TODO implementations that shouldn't be committed
-> 3. Commented-out code blocks
-> 4. Obvious logic errors
->
-> Diff:
->
-> ```
-> $DIFF_OUTPUT
-> ```
->
-> Report findings as a list with file:line references. If nothing found, say
-> "CLEAN".
-
-**quick-security-scan** (subagent_type: `general-purpose`):
-
-> Scan the following uncommitted diff for:
->
-> 1. Hardcoded credentials, API keys, tokens, or secrets
-> 2. Private keys or certificates
-> 3. PII exposure (emails, passwords in plaintext)
-> 4. .env files or sensitive config being committed
->
-> Diff:
->
-> ```
-> $DIFF_OUTPUT
-> ```
->
-> Be extremely strict. Report findings with file:line references. If nothing
-> found, say "CLEAN".
-
-**quick-error-check** (subagent_type: `general-purpose`):
-
-> Analyze the following uncommitted diff for:
->
-> 1. Empty catch/except blocks
-> 2. Swallowed errors (caught but not logged or re-thrown)
-> 3. Fallback values without logging
-> 4. Missing error boundaries or error handling
->
-> Diff:
->
-> ```
-> $DIFF_OUTPUT
-> ```
->
-> Report findings with file:line references. If nothing found, say "CLEAN".
+Invoke the `Skill` tool with `skill: "audit-review"`, passing `$DIFF_OUTPUT`
+and `$GW_AUDIT_AGENTS` as context. It runs the appropriate quick-code-review
+/ quick-security-scan / quick-error-check prompts (1-3 of them, per
+`$GW_AUDIT_AGENTS`) and returns a CRITICAL / MINOR / CLEAN verdict with
+file:line findings.
 
 #### 2. Gate Check
 
-First, verify all spawned agents completed successfully. If any agent failed to
-run or timed out, inform the user which audit is missing and ask whether to
+If `audit-review` reports a dispatch failure (an audit failed to run or
+timed out), inform the user which audit is missing and ask whether to
 proceed with partial results or abort.
-
-Synthesize findings from all spawned agents.
 
 **IF CRITICAL ISSUES** (secrets, production mocks, silent failures):
 
