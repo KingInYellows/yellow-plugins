@@ -258,14 +258,24 @@ Generated artifacts (`pnpm generate:manifests`, never hand-edited):
 `codex/skills/<name>/SKILL.md` (ten directories, frontmatter normalized to
 `name` + single-line `description` only).
 
-Two syntax gaps remain unverified against a live Codex session (flagged
-inline where relevant, not silently assumed): the exact
-`worker`/`explorer` built-in-agent delegation syntax a skill body uses
-(`audit-review`'s Codex dispatch section), and whether the Codex-side
+A live `codex plugin add` install/inspect/uninstall round-trip (codex-cli
+0.144.6, isolated `CODEX_HOME`) confirmed: the plugin installs cleanly from
+a local marketplace; all ten `codex/skills/*/SKILL.md` files, the
+`.codex-plugin/plugin.json` manifest, and `.mcp.json` are byte-identical to
+the committed generated artifacts at the installed path;
+`hooks/codex-hooks.json` correctly references `entrypoint-codex.js`; and
+`codex mcp list` shows the `graphite` server as `enabled` — the Codex-side
 `mcpServers` manifest pointer this shell added to `buildCodexPluginManifest`
-actually causes Codex to load the shared `.mcp.json`. Both are called out
-in the PR description's manual Codex-app acceptance checklist rather than
-assumed to work.
+does cause Codex to discover the shared `.mcp.json`, resolving that prior
+uncertainty.
+
+One syntax gap remains unverified — no Codex auth credentials were
+available in the environment that ran the round-trip (confirmed via
+`codex doctor`), so a live authenticated model session was out of reach:
+the exact `worker`/`explorer` built-in-agent delegation syntax a skill body
+uses (`audit-review`'s Codex dispatch section). This is called out in the
+PR description's manual Codex-app acceptance checklist rather than assumed
+to work.
 
 ## Stack Decomposition Format
 
