@@ -347,7 +347,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   it differs from this description). Update `smart-submit`'s and
   `gt-amend`'s new canonical skills (Step 9) to invoke this skill instead of
   inlining the three prompts.
-- [ ] Step 11: Port the two output-styles into cross-host skills. Create
+- [x] Step 11: Port the two output-styles into cross-host skills. Create
   `plugins/gt-workflow/skills/stack-decomposition-format/SKILL.md` from
   `output-styles/stack-decomposition.md`'s content (the machine-readable
   `## Stack Decomposition` section contract) and

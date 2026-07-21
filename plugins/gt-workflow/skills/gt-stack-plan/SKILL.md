@@ -156,6 +156,8 @@ PR should:
 
 #### 2. Present the Stack Plan
 
+Follow the display guidance defined by the `stack-plan-style` skill (base-to-tip
+tree, one branch per node, intent/commit-type/dependency notes per branch).
 Output the plan in this format:
 
 ```
@@ -201,7 +203,9 @@ Use AskUserQuestion to ask the user:
 #### 1. Build the Structured Decomposition
 
 Convert the visual stack plan from Phase 2 Step 2 into the structured
-`## Stack Decomposition` format defined in `output-styles/stack-decomposition.md`.
+`## Stack Decomposition` format defined by the `stack-decomposition-format`
+skill (invoke the `Skill` tool with `skill: "stack-decomposition-format"` if
+the exact field contract is needed).
 
 For each stack item, produce:
 
