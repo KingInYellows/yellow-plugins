@@ -1,0 +1,25 @@
+plugins/gt-workflow/hooks/scripts/entrypoint-claude.js
+  s_4febf2cbaf48e8::t_829d3b140333ec 11
+plugins/gt-workflow/hooks/scripts/entrypoint-codex.js
+  s_4febf2cbaf48e8::t_829d3b140333ec 9
+plugins/gt-workflow/hooks/scripts/lib/run-hook.js
+  s_4febf2cbaf48e8::t_829d3b140333ec 4-5
+.eslintrc.cjs
+  s_4febf2cbaf48e8::t_802b735631314a 126-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "00f21ca04bb165dabda7222c85af17752a5324da",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
