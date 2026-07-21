@@ -61,9 +61,19 @@ reviewer/executor, not authoring plugins Codex itself loads.
   SubagentStop, Stop.
 - Hook **stdin is snake_case** (`hook_event_name`, `tool_name`, `tool_input`,
   `tool_response`, `cwd`, `session_id`) while hook **output is camelCase**
-  (`hookSpecificOutput.permissionDecision`). Claude's hook envelope is
-  camelCase both ways, so cross-host adapters must case-transform on the
-  Codex leg only — budget for it explicitly.
+  (`hookSpecificOutput.permissionDecision`). **Correction (2026-07-20):**
+  Claude's hook stdin is ALSO snake_case — confirmed against
+  code.claude.com/docs/en/hooks and against this repo's own
+  `check-commit-message.sh`, which reads `.tool_input.command` and
+  `.tool_result.exit_code` directly and is the currently-functioning
+  behavior captured in `plugins/gt-workflow/tests/fixtures/hooks/`. Only
+  hook OUTPUT is camelCase on both hosts; a prior version of this doc
+  claimed Claude's input was camelCase too — that was wrong. Cross-host
+  adapters must case-transform snake_case→camelCase on BOTH legs for
+  input, not the Codex leg only. The output-side split is unaffected:
+  Claude's PreToolUse denial is exit-2 + stderr (no JSON at all, see
+  below), while PostToolUse/warn output and Codex's PreToolUse denial both
+  use camelCase JSON.
 - PreToolUse denial shape:
   `{"hookSpecificOutput": {"hookEventName": "PreToolUse",
   "permissionDecision": "deny", "permissionDecisionReason": "..."}}`.

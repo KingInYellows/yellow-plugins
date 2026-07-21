@@ -228,7 +228,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   golden-fixture shape). These goldens are the parity harness's comparison
   target in Step 7 — no need to keep the old bash scripts running in
   parallel indefinitely.
-- [ ] Step 2: Write the host-agnostic policy modules. Create
+- [x] Step 2: Write the host-agnostic policy modules. Create
   `plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js` and
   `plugins/gt-workflow/hooks/scripts/lib/policy-check-commit-message.js`,
   each exporting a pure function `(camelCaseEnvelope) => { decision:
