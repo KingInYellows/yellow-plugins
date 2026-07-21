@@ -1,8 +1,8 @@
 'use strict';
 
-const { checkGitPush } = require('./policy-check-git-push.js');
-const { checkCommitMessage } = require('./policy-check-commit-message.js');
 const { snakeToCamelEnvelope } = require('./envelope.js');
+const { checkCommitMessage } = require('./policy-check-commit-message.js');
+const { checkGitPush } = require('./policy-check-git-push.js');
 
 const HOOK_EVENTS = {
   'check-git-push': 'PreToolUse',

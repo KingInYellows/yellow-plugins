@@ -7,8 +7,8 @@
 // populates the generated Codex hook config's `commandWindows` field with
 // this same command string on that basis.
 
-const { runHook } = require('./lib/run-hook.js');
 const { formatClaudeOutput } = require('./lib/envelope.js');
+const { runHook } = require('./lib/run-hook.js');
 
 runHook(process.argv.slice(2), formatClaudeOutput).catch((err) => {
   process.stderr.write(String((err && err.stack) || err) + '\n');
