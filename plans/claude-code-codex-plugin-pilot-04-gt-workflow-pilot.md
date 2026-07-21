@@ -413,7 +413,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   list) so `bats tests/` from inside the plugin directory picks them up,
   matching the existing yellow-ci/yellow-debt/yellow-review/yellow-ruvector
   convention.
-- [ ] Step 15: Documentation close-out for this shell.
+- [x] Step 15: Documentation close-out for this shell.
   Update `plugins/gt-workflow/CLAUDE.md`: replace the bash-hooks description
   under `## Hooks` with the Node-runtime description (policy modules +
   entrypoints + envelope), add a "Codex Distribution" subsection mirroring

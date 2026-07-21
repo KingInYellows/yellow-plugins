@@ -276,6 +276,16 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   Load it via an imperative `Read ${CLAUDE_PLUGIN_ROOT}/references/<slug>/...`
   stub at the branch point, and add `Read` to the command's `allowed-tools:`.
   Skills instead use skill-relative `references/` paths (sibling to SKILL.md).
+- A thin-wrapper command whose `## Usage` section reads "Invoke the `Skill`
+  tool with `skill: "<name>"`." (the cross-host pattern: the command is a
+  Claude-only entrypoint, the skill is what both Claude and Codex actually
+  execute) must include `Skill` in `allowed-tools:` alongside its other
+  tools — never as a replacement for them (command-authoring anti-pattern
+  #28) — and a same-plugin `skills/<name>/SKILL.md` must exist. Enforced by
+  `scripts/validate-agent-authoring.js` RULE 17, scoped to `## Usage`
+  section content only so unrelated cross-plugin `skill: "..."` references
+  elsewhere in a larger document (e.g. a multi-phase workflow command citing
+  another plugin's skill as one step) are not flagged.
 
 ## Security & Prompt-Injection Rules
 
