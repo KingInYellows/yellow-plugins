@@ -399,7 +399,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   `plugins/gt-workflow/codex/skills/*/SKILL.md` (ten dirs, generator-copied,
   do not hand-author). Run `pnpm validate:generated` and `pnpm
   validate:codex` to confirm.
-- [ ] Step 14: Fake-executable tests. Create
+- [x] Step 14: Fake-executable tests. Create
   `plugins/gt-workflow/tests/mocks/git` and `plugins/gt-workflow/tests/mocks/gt`
   following `plugins/yellow-review/tests/mocks/gh`'s pattern-match-on-`"$*"`
   + canned-fixture-JSON shape, with fixtures under

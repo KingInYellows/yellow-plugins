@@ -1,0 +1,7 @@
+orphaned-branch|||1700000000
+gone-branch|refs/remotes/origin/gone-branch|[gone]|1700000000
+diverged-branch|refs/remotes/origin/diverged-branch|[ahead 2, behind 3]|1700000000
+behind-branch|refs/remotes/origin/behind-branch|[behind 5]|1700000000
+ahead-branch|refs/remotes/origin/ahead-branch|[ahead 3]|1700000000
+stale-clean-branch|refs/remotes/origin/stale-clean-branch||100000000
+fresh-clean-branch|refs/remotes/origin/fresh-clean-branch||2000000000

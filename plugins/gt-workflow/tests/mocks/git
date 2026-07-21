@@ -1,0 +1,68 @@
+#!/bin/sh
+# Mock git CLI for bats tests. Pattern-matches on "$*" (mirrors
+# plugins/yellow-review/tests/mocks/gh). Configurable via env vars set by
+# the calling test's setup(), not fixture-file selection alone, since most
+# of what these tests exercise is control flow (was gt/git invoked at all,
+# with what args) rather than parsing structured CLI output.
+set -eu
+
+ALL_ARGS="$*"
+LOG_FILE="${MOCK_GIT_LOG:-/dev/null}"
+printf 'git %s\n' "$ALL_ARGS" >>"$LOG_FILE"
+
+case "$ALL_ARGS" in
+  "rev-parse --show-toplevel"*)
+    printf '%s\n' "${MOCK_REPO_TOP:-/tmp/mock-repo}"
+    ;;
+  "rev-parse --is-inside-work-tree"*)
+    exit 0
+    ;;
+  "branch --show-current"*)
+    printf '%s\n' "${MOCK_CURRENT_BRANCH:-feature/example}"
+    ;;
+  "for-each-ref"*"refs/heads/"*)
+    if [ -n "${MOCK_GIT_BRANCHES_FIXTURE:-}" ]; then
+      cat "$MOCK_GIT_BRANCHES_FIXTURE"
+    fi
+    ;;
+  "fetch --prune"*)
+    exit 0
+    ;;
+  "status --short"*)
+    printf '%s' "${MOCK_GIT_STATUS_SHORT:-}"
+    ;;
+  "diff --stat"* | "diff --cached --stat"*)
+    printf '%s' "${MOCK_GIT_DIFF_STAT:-}"
+    ;;
+  "diff --name-only"*)
+    printf '%s' "${MOCK_GIT_DIFF_NAMES:-}"
+    ;;
+  "diff --cached"*)
+    printf '%s' "${MOCK_GIT_DIFF_CACHED:-}"
+    ;;
+  "diff"*)
+    printf '%s' "${MOCK_GIT_DIFF:-}"
+    ;;
+  "ls-files --others --exclude-standard"*)
+    printf '%s' "${MOCK_GIT_UNTRACKED:-}"
+    ;;
+  "branch -D "*)
+    branch="${ALL_ARGS#branch -D }"
+    case "$branch" in
+      *FAILDELETE*)
+        printf 'error: branch '"'"'%s'"'"' not fully merged\n' "$branch" >&2
+        exit 1
+        ;;
+      *)
+        printf 'Deleted branch %s.\n' "$branch"
+        ;;
+    esac
+    ;;
+  "add -- "*)
+    exit 0
+    ;;
+  *)
+    printf 'Mock git: unhandled arguments: %s\n' "$ALL_ARGS" >&2
+    exit 1
+    ;;
+esac

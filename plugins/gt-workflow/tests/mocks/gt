@@ -1,0 +1,73 @@
+#!/bin/sh
+# Mock gt (Graphite) CLI for bats tests. Pattern-matches on "$*" (mirrors
+# plugins/yellow-review/tests/mocks/gh). Every invocation is appended to
+# $MOCK_GT_LOG so tests can assert whether a state-changing command (submit,
+# restack, delete, get) was invoked at all — the main thing these tests
+# check, since the skills' actual dispatch/confirmation logic is agent
+# orchestration that bats cannot exercise (see each *.bats file's header).
+set -eu
+
+ALL_ARGS="$*"
+LOG_FILE="${MOCK_GT_LOG:-/dev/null}"
+printf 'gt %s\n' "$ALL_ARGS" >>"$LOG_FILE"
+
+case "$ALL_ARGS" in
+  trunk*)
+    printf '%s\n' "${MOCK_TRUNK:-main}"
+    ;;
+  "log short"*)
+    exit 0
+    ;;
+  "delete "*)
+    branch="${ALL_ARGS#delete }"
+    branch="${branch%% *}"
+    case "$branch" in
+      *NOTTRACKED*)
+        printf 'error: branch not tracked by Graphite\n' >&2
+        exit 1
+        ;;
+      *FAILDELETE*)
+        printf 'error: could not delete branch\n' >&2
+        exit 1
+        ;;
+      *)
+        printf 'Deleted %s\n' "$branch"
+        ;;
+    esac
+    ;;
+  "get "*)
+    branch="${ALL_ARGS#get }"
+    branch="${branch%% *}"
+    case "$branch" in
+      *CONFLICT*)
+        printf 'error: merge conflict syncing %s\n' "$branch" >&2
+        exit 1
+        ;;
+      *)
+        printf 'Synced %s\n' "$branch"
+        ;;
+    esac
+    ;;
+  "submit "*|submit)
+    exit 0
+    ;;
+  "stack restack"*)
+    exit 0
+    ;;
+  "modify "*)
+    exit 0
+    ;;
+  "create "*)
+    exit 0
+    ;;
+  "commit amend"*)
+    exit 0
+    ;;
+  "pr"*)
+    printf 'https://github.com/example/repo/pull/1\n'
+    ;;
+  *)
+    printf 'Mock gt: unhandled arguments: %s\n' "$ALL_ARGS" >&2
+    exit 1
+    ;;
+esac

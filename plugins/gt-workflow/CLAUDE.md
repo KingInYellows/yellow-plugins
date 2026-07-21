@@ -155,6 +155,36 @@ without `-r`).
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
 
+## Testing
+
+Bats shell tests live in `tests/` — run `bats tests/` from inside this
+plugin directory (see root `CLAUDE.md`'s bats list).
+
+- `tests/hook-parity.bats` — parity gate proving the Node hook runtime
+  (`hooks/scripts/entrypoint-claude.js`) reproduces the deleted bash hooks'
+  behavior exactly, against golden fixtures in `tests/fixtures/hooks/`.
+- `tests/gt-cleanup.bats` — the deterministic bash embedded in
+  `skills/gt-cleanup/SKILL.md`: flag parsing, branch classification, the
+  batch-cap-15 review queue, the `gt get` conflict-stop path, and the
+  `gt delete` not-tracked fallback. Fixture:
+  `tests/fixtures/gt-cleanup/branches-mixed.txt`.
+- `tests/smart-submit.bats` / `tests/gt-amend.bats` — the deterministic
+  bash embedded in the matching `SKILL.md` (Phase 0's `.graphite.yml`
+  clamping, Phase 4's submit-flag construction) plus the `--dry-run` /
+  `--no-submit` guarantee that `gt submit` is never invoked on those paths.
+
+`tests/mocks/git` and `tests/mocks/gt` are pattern-match-on-`"$*"` fake
+executables (mirrors `plugins/yellow-review/tests/mocks/gh`), logging every
+invocation to `$MOCK_GIT_LOG` / `$MOCK_GT_LOG` so tests can assert a
+state-changing command was (or was never) invoked.
+
+**Scope limitation** (matches `plugins/yellow-core/tests/plan-commands.bats`'s
+own documented limitation): these suites cover only the deterministic bash a
+skill's body embeds. The agent-orchestrated control flow around it — audit
+dispatch via the `audit-review` skill, `AskUserQuestion` confirmation gates,
+PR-status `gh` lookups — is interpreted by an LLM reading the markdown, not
+executed as a script, and cannot be exercised in bats.
+
 ## Stack Decomposition Format
 
 `gt-stack-plan` produces a `## Stack Decomposition` section in plan documents.

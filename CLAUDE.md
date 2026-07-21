@@ -51,7 +51,8 @@ pnpm apply:changesets         # version + run scripts/sync-manifests.js
 
 Run a single Vitest file: `pnpm vitest run path/to/file.test.ts`.
 Bats shell tests live in `plugins/yellow-ci`, `yellow-debt`, `yellow-review`,
-and `yellow-ruvector` — run `bats tests/` from inside the plugin directory.
+`yellow-ruvector`, and `gt-workflow` — run `bats tests/` from inside the
+plugin directory.
 
 The CI baseline gate is `pnpm validate:schemas && pnpm test:unit && pnpm lint
 && pnpm typecheck`.
