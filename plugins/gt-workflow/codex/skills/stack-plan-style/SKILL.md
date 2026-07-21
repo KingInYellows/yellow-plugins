@@ -1,7 +1,6 @@
 ---
 name: stack-plan-style
-description: 'Display guidance for presenting a stacked-PR plan — ordered branch tree with intent, commit type, and dependency notes. Use when gt-stack-plan presents a stack plan for user confirmation.'
-user-invokable: false
+description: Display guidance for presenting a stacked-PR plan — ordered branch tree with intent, commit type, and dependency notes. Use when gt-stack-plan presents a stack plan for user confirmation.
 ---
 
 ## What It Does

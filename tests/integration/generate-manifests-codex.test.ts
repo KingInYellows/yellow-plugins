@@ -584,11 +584,15 @@ describe('generator hook-authority rule (R20)', () => {
 });
 
 describe('commandWindows emission (Windows command override)', () => {
-  it('adds commandWindows immediately after command on every hook definition, unchanged from command', () => {
+  it('adds commandWindows immediately after command on every hook definition, matching the (possibly entrypoint-rewritten) command', () => {
     // Node entrypoints are platform-uniform (see entrypoint-claude.js's
-    // header comment) — commandWindows is always the same string as command,
-    // never a distinct Windows-specific invocation, for every hook this repo
-    // currently ships.
+    // header comment) — commandWindows is always the same string as the
+    // final "command" value, never a distinct Windows-specific invocation,
+    // for every hook this repo currently ships. A command referencing the
+    // Claude-only entrypoint-claude.js is rewritten to entrypoint-codex.js
+    // before commandWindows is derived (Codex-pilot shell 04, Step 13) — so
+    // commandWindows must match the REWRITTEN command, not the catalog's
+    // original literal value.
     const inlineHooks = {
       PreToolUse: [
         {
@@ -609,8 +613,12 @@ describe('commandWindows emission (Windows command override)', () => {
     expect(result.status).toBe('ok');
 
     const codexHooks = JSON.parse(readFileSync(join(root, 'plugins', 'windows-hook-plugin', 'hooks', 'codex-hooks.json'), 'utf8'));
-    expect(codexHooks.hooks.PreToolUse[0].hooks[0].commandWindows).toBe(inlineHooks.PreToolUse[0].hooks[0].command);
-    expect(codexHooks.hooks.PostToolUse[0].hooks[0].commandWindows).toBe(inlineHooks.PostToolUse[0].hooks[0].command);
+    const rewrittenPreToolUseCommand = inlineHooks.PreToolUse[0].hooks[0].command.replace('entrypoint-claude.js', 'entrypoint-codex.js');
+    const rewrittenPostToolUseCommand = inlineHooks.PostToolUse[0].hooks[0].command.replace('entrypoint-claude.js', 'entrypoint-codex.js');
+    expect(codexHooks.hooks.PreToolUse[0].hooks[0].command).toBe(rewrittenPreToolUseCommand);
+    expect(codexHooks.hooks.PreToolUse[0].hooks[0].commandWindows).toBe(rewrittenPreToolUseCommand);
+    expect(codexHooks.hooks.PostToolUse[0].hooks[0].command).toBe(rewrittenPostToolUseCommand);
+    expect(codexHooks.hooks.PostToolUse[0].hooks[0].commandWindows).toBe(rewrittenPostToolUseCommand);
     // Key order: commandWindows sits immediately after command.
     expect(Object.keys(codexHooks.hooks.PreToolUse[0].hooks[0])).toEqual(['type', 'command', 'commandWindows', 'timeout']);
 

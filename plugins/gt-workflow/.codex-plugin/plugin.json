@@ -1,0 +1,12 @@
+{
+  "name": "gt-workflow",
+  "version": "1.5.4",
+  "interface": {
+    "displayName": "Graphite Workflow",
+    "category": "Developer Tools"
+  },
+  "description": "Graphite-native workflow skills for stacked PR development — commit auditing, stack planning, sync, and navigation, invoked as Codex skills through the gt CLI.",
+  "skills": "./codex/skills",
+  "hooks": "./hooks/codex-hooks.json",
+  "mcpServers": "./.mcp.json"
+}

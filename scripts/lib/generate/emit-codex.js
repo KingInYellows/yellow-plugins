@@ -127,9 +127,12 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
  * (confirmed against a live fetch of learn.chatgpt.com/docs/build-plugins,
  * 2026-07-19 — the default hooks/hooks.json file nests its event map under
  * "hooks"). Command strings (e.g. `${CLAUDE_PLUGIN_ROOT}/...`) are copied
- * unmodified — Codex variable-substitution semantics for hook commands are
- * unverified (the spike found hooks currently never execute at all,
- * R20/spike finding d), so there is nothing to test a rewrite against yet.
+ * unmodified EXCEPT for a literal `entrypoint-claude.js` ->
+ * `entrypoint-codex.js` filename swap (see rewriteClaudeEntrypoint below) —
+ * Codex variable-substitution semantics for `${CLAUDE_PLUGIN_ROOT}` itself
+ * are unverified (the spike found hooks currently never execute at all,
+ * R20/spike finding d), so there is nothing to test a deeper rewrite
+ * against yet.
  *
  * Returns null when the plugin has no hooks — schemas/codex-hooks.schema.json
  * requires the nested "hooks" object to have minProperties: 1, so an empty
@@ -143,6 +146,44 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
  * still needs its own hooks; there was previously no way to enable Codex
  * for such a plugin without also exposing them.
  */
+/**
+ * Rewrite a Claude-specific hook entrypoint filename to its Codex
+ * counterpart, following the entrypoint-claude.js / entrypoint-codex.js
+ * naming convention established in plugins/gt-workflow/hooks/scripts/
+ * (Codex-pilot shell 04) — the two files are identical thin wrappers
+ * except for which envelope formatter (formatClaudeOutput vs.
+ * formatCodexOutput) they pass to the shared runHook(). A catalog
+ * source's hook commands are Claude-authored by construction (this repo
+ * only tests hooks live on Claude), so this filename swap is the one
+ * host-specific correction applied when carrying those commands into the
+ * generated Codex hook config — everything else (args, the
+ * `${CLAUDE_PLUGIN_ROOT}` variable itself) is left untouched per the
+ * unverified-substitution-semantics note below.
+ */
+function rewriteClaudeEntrypoint(command) {
+  return command.replace(/entrypoint-claude\.js/g, 'entrypoint-codex.js');
+}
+
+/**
+ * Apply rewriteClaudeEntrypoint to every hook definition's "command" field
+ * nested under a single matcher group, preserving key order and every
+ * other field. Non-command-bearing or malformed groups pass through
+ * unchanged, mirroring withCommandWindows' defensive shape below.
+ */
+function rewriteEntrypointsInGroup(group) {
+  if (group === null || typeof group !== 'object' || !Array.isArray(group.hooks)) {
+    return group;
+  }
+  return {
+    ...group,
+    hooks: group.hooks.map((hookDef) =>
+      hookDef !== null && typeof hookDef === 'object' && typeof hookDef.command === 'string'
+        ? { ...hookDef, command: rewriteClaudeEntrypoint(hookDef.command) }
+        : hookDef
+    ),
+  };
+}
+
 /**
  * Insert a `commandWindows` field immediately after `command` on a single
  * hook definition, copying `command`'s value verbatim (R-review: Node
@@ -207,7 +248,7 @@ function buildCodexHookConfig(source) {
       if (!Array.isArray(defs) || defs.length === 0) {
         continue;
       }
-      merged[event] = (merged[event] || []).concat(defs);
+      merged[event] = (merged[event] || []).concat(defs.map(rewriteEntrypointsInGroup));
     }
   }
   return Object.keys(merged).length > 0 ? { hooks: addCommandWindows(merged) } : null;

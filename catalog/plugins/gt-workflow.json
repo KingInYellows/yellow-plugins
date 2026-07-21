@@ -56,7 +56,27 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "interface": {
+        "displayName": "Graphite Workflow",
+        "category": "Developer Tools"
+      },
+      "description": "Graphite-native workflow skills for stacked PR development — commit auditing, stack planning, sync, and navigation, invoked as Codex skills through the gt CLI.",
+      "skillAllowlist": [
+        "gt-setup",
+        "gt-nav",
+        "gt-stack-plan",
+        "gt-sync",
+        "smart-submit",
+        "gt-amend",
+        "gt-cleanup",
+        "audit-review",
+        "stack-decomposition-format",
+        "stack-plan-style"
+      ],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      }
     }
   }
 }

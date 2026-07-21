@@ -1,7 +1,6 @@
 ---
 name: gt-setup
-description: 'Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.'
-user-invokable: false
+description: Validate Graphite CLI prerequisites and configure settings for AI agent workflows. Use when first installing the plugin, after Graphite auth changes, or when gt commands fail.
 ---
 
 ## What It Does

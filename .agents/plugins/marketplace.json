@@ -5,6 +5,19 @@
   },
   "plugins": [
     {
+      "name": "gt-workflow",
+      "description": "Graphite-native workflow skills for stacked PR development — commit auditing, stack planning, sync, and navigation, invoked as Codex skills through the gt CLI.",
+      "category": "Developer Tools",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gt-workflow"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      }
+    },
+    {
       "name": "yellow-core",
       "description": "Three read-only reference and dashboard skills — agent-native architecture principles, an agent-native audit checklist, and a plan-status dashboard. Excludes all of yellow-core's commands, agents, hooks, and other skills.",
       "category": "Developer Tools",

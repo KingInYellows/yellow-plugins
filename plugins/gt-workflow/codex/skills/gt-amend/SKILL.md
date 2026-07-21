@@ -1,7 +1,6 @@
 ---
 name: gt-amend
-description: 'Fold working-tree changes into the current branch commit, audit them, and re-submit via Graphite. Use when user says "amend this", "add this to the current PR", "fold this fix in", or has follow-up edits for an already-submitted branch. Not for starting new work — use the smart-submit skill instead.'
-user-invokable: false
+description: Fold working-tree changes into the current branch commit, audit them, and re-submit via Graphite. Use when user says "amend this", "add this to the current PR", "fold this fix in", or has follow-up edits for an already-submitted branch. Not for starting new work — use the smart-submit skill instead.
 ---
 
 ## What It Does

@@ -381,7 +381,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   `scripts/lib/generate/emit-codex.js` at this step — verify which is
   correct before writing the code (see the Pattern Survey's flagged
   uncertainty).
-- [ ] Step 13: Enable Codex in the catalog source. Add a `targets.codex`
+- [x] Step 13: Enable Codex in the catalog source. Add a `targets.codex`
   block to `catalog/plugins/gt-workflow.json` mirroring
   `catalog/plugins/yellow-core.json`'s shape: `enabled: true`,
   `interface: {displayName: "Graphite Workflow", category: "..."}` (pick a
