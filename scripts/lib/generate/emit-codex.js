@@ -134,6 +134,47 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
  * still needs its own hooks; there was previously no way to enable Codex
  * for such a plugin without also exposing them.
  */
+/**
+ * Insert a `commandWindows` field immediately after `command` on a single
+ * hook definition, copying `command`'s value verbatim (R-review: Node
+ * entrypoints are platform-uniform, so the Windows override is just the
+ * same invocation — see entrypoint-claude.js's header comment). Preserves
+ * every other field and its original position; returns non-command-bearing
+ * entries unchanged rather than assuming a fixed {type, command, timeout}
+ * shape, since schemas/plugin.schema.json's inlineHooks definition does not
+ * constrain the inner hook-entry shape.
+ */
+function withCommandWindows(hookDef) {
+  if (hookDef === null || typeof hookDef !== 'object' || typeof hookDef.command !== 'string') {
+    return hookDef;
+  }
+  const result = {};
+  for (const [key, value] of Object.entries(hookDef)) {
+    result[key] = value;
+    if (key === 'command') {
+      result.commandWindows = value;
+    }
+  }
+  return result;
+}
+
+/**
+ * Apply withCommandWindows to every hook definition nested under every
+ * matcher group of every event in a merged hooks map.
+ */
+function addCommandWindows(merged) {
+  const result = {};
+  for (const [event, groups] of Object.entries(merged)) {
+    result[event] = groups.map((group) => {
+      if (group === null || typeof group !== 'object' || !Array.isArray(group.hooks)) {
+        return group;
+      }
+      return { ...group, hooks: group.hooks.map(withCommandWindows) };
+    });
+  }
+  return result;
+}
+
 function buildCodexHookConfig(source) {
   const codex = source.targets && source.targets.codex;
   if (codex && codex.includeHooks === false) {
@@ -160,7 +201,7 @@ function buildCodexHookConfig(source) {
       merged[event] = (merged[event] || []).concat(defs);
     }
   }
-  return Object.keys(merged).length > 0 ? { hooks: merged } : null;
+  return Object.keys(merged).length > 0 ? { hooks: addCommandWindows(merged) } : null;
 }
 
 /**

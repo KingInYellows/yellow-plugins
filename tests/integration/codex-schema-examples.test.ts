@@ -201,4 +201,25 @@ describe('codex-hooks.schema.json — negative cases', () => {
     };
     expect(factory.validate('codex-hooks', d).valid).toBe(true);
   });
+
+  it('accepts a hook entry carrying commandWindows alongside command (gt-workflow Codex pilot, shell 04)', () => {
+    const d = {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash',
+            hooks: [
+              {
+                type: 'command',
+                command: 'node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-codex.js --hook check-git-push',
+                commandWindows: 'node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-codex.js --hook check-git-push',
+                timeout: 1,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    expect(factory.validate('codex-hooks', d).valid).toBe(true);
+  });
 });

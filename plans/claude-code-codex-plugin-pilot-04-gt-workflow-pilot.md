@@ -282,7 +282,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   local-policy constraint (do NOT switch `hooks` to a file-path string).
   Run `pnpm generate:manifests` so `.claude-plugin/plugin.json` picks up the
   change, then `pnpm validate:generated` to confirm byte-identity.
-- [ ] Step 6: Add `commandWindows` emission to `buildCodexHookConfig` in
+- [x] Step 6: Add `commandWindows` emission to `buildCodexHookConfig` in
   `scripts/lib/generate/emit-codex.js` — for each translated hook entry, set
   `commandWindows` to the same command string as `command` (per Step 4's
   platform-uniformity rationale), keeping output deterministic
