@@ -304,7 +304,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   matches the shell's "rewritten" framing) and update
   `plugins/gt-workflow/hooks/hooks.json`'s `_comment` mirror to reference the
   new Node commands.
-- [ ] Step 8: Add a generic wrapper→canonical-skill drift check as RULE 17 in
+- [x] Step 8: Add a generic wrapper→canonical-skill drift check as RULE 17 in
   `scripts/validate-agent-authoring.js` (RULE 16 is the current highest,
   confirmed via `grep -n "RULE 1[0-9]" scripts/validate-agent-authoring.js`):
   for every command markdown file whose body contains `skill: "<name>"`
