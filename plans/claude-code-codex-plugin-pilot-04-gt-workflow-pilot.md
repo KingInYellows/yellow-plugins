@@ -241,7 +241,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   no `console.*` — pure functions, matching `emit-codex.js`'s
   "no I/O, no timestamps" convention (module header comment) so the parity
   harness can call them directly as well as through the entrypoints.
-- [ ] Step 3: Write the envelope adapter and entrypoints. Create
+- [x] Step 3: Write the envelope adapter and entrypoints. Create
   `plugins/gt-workflow/hooks/scripts/lib/envelope.js` exporting a
   `snakeToCamelEnvelope(rawJson)` transform (only used on the Codex leg —
   Claude's stdin is already camelCase) plus per-host output formatters:
@@ -264,7 +264,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   through / exit 0; `check-commit-message.sh`: malformed JSON or missing `jq`
   → skip validation / `{"continue": true}`) — do not unify these into one
   blanket rule, they differ intentionally per hook.
-- [ ] Step 4: Windows command variants. In
+- [x] Step 4: Windows command variants. In
   `plugins/gt-workflow/hooks/scripts/lib/envelope.js` or a small sibling
   module, confirm (or add) that the Node entrypoints require no
   platform-specific branching — `node <path> --hook <name>` is
