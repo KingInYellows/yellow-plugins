@@ -425,7 +425,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   three-heading rule, `${CLAUDE_PLUGIN_ROOT}`) — if the audit-review skill's
   host-specific delegation syntax (Step 10) turns out to need a new
   authoring rule, add it here.
-- [ ] Step 16: Manual Codex-app acceptance evidence. Document (in the PR
+- [x] Step 16: Manual Codex-app acceptance evidence. Document (in the PR
   description, not a repo file) the checks performed: `codex plugin add`
   installs cleanly from the local marketplace; the ten skills are visible
   and their `SKILL.md` content matches; hook config passes manifest
