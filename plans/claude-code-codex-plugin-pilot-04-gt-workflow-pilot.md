@@ -314,7 +314,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   `plugins/yellow-core/commands/plan/status.md`. Add/update the corresponding
   fixture case in whatever test file exercises
   `validate-agent-authoring.js`'s existing RULE 16 (same file, same pattern).
-- [ ] Step 9: Convert all seven commands into canonical skills. For each of
+- [x] Step 9: Convert all seven commands into canonical skills. For each of
   `gt-setup`, `gt-nav`, `gt-stack-plan`, `gt-sync`, `smart-submit`,
   `gt-amend`, `gt-cleanup`: create
   `plugins/gt-workflow/skills/<name>/SKILL.md` with the three standard
