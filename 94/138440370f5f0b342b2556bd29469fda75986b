@@ -1,0 +1,26 @@
+plugins/gt-workflow/skills/stack-plan-style/SKILL.md
+  s_4febf2cbaf48e8::t_5f36ce560e6d59 1-31
+plugins/gt-workflow/skills/gt-stack-plan/SKILL.md
+  s_4febf2cbaf48e8::t_a139fa7b369a09 159-160
+  s_4febf2cbaf48e8::t_35150c4a845216 206-208
+plugins/gt-workflow/skills/stack-decomposition-format/SKILL.md
+  s_4febf2cbaf48e8::t_7ee7b80722ef5a 1-154
+plans/claude-code-codex-plugin-pilot-04-gt-workflow-pilot.md
+  s_4febf2cbaf48e8::t_293aadfa8459ed 350
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "94138440370f5f0b342b2556bd29469fda75986b",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
