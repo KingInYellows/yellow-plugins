@@ -1,0 +1,98 @@
+plugins/gt-workflow/skills/gt-nav/SKILL.md
+  s_4febf2cbaf48e8::t_3272bc6b26a427 3
+plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-2,4-147,151-168,170-296,298-304,306-311,313-459,461-479,481-503,505-514,516-525,528-548
+  s_4febf2cbaf48e8::t_e314b683336356 3,148-150,169,297,305,312,460,480,504,515,526-527
+plugins/gt-workflow/skills/audit-review/SKILL.md
+  s_4febf2cbaf48e8::t_4a24ff5520724d 100-101
+  s_4febf2cbaf48e8::t_48b2479637b27d 118
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_4febf2cbaf48e8::t_946cdf059ab79b 169
+  s_4febf2cbaf48e8::t_a529c4544bfc46 171
+  s_4febf2cbaf48e8::t_020b93731d1da3 159,162-163,172-173,271
+  s_4febf2cbaf48e8::t_c63cdd2ddfc838 420,425
+plugins/gt-workflow/codex/skills/stack-decomposition-format/SKILL.md
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-153
+plugins/gt-workflow/skills/smart-submit/SKILL.md
+  s_4febf2cbaf48e8::t_431d6e27799ad2 3
+plugins/gt-workflow/codex/skills/gt-stack-plan/SKILL.md
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-34,37-113,117-242,244-252
+  s_4febf2cbaf48e8::t_e314b683336356 35-36,114-116,243
+plugins/gt-workflow/.codex-plugin/plugin.json
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-12
+plugins/gt-workflow/hooks/codex-hooks.json
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-8,11-21,24-30
+  s_4febf2cbaf48e8::t_63e08205a8051a 9-10,22-23
+plugins/gt-workflow/codex/skills/audit-review/SKILL.md
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-98,101-116,118-148
+  s_4febf2cbaf48e8::t_e314b683336356 99-100,117
+plugins/gt-workflow/codex/skills/gt-nav/SKILL.md
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-2,4-136
+  s_4febf2cbaf48e8::t_e314b683336356 3
+plugins/gt-workflow/codex/skills/smart-submit/SKILL.md
+  s_4febf2cbaf48e8::t_e314b683336356 3
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-2,4-315
+plans/claude-code-codex-plugin-pilot-04-gt-workflow-pilot.md
+  s_4febf2cbaf48e8::t_4745425b20fe52 384
+scripts/lib/generate/emit-codex.js
+  s_4febf2cbaf48e8::t_f6f148785cba6b 251
+  s_4febf2cbaf48e8::t_9257d2d5f5c723 130-135
+  s_4febf2cbaf48e8::t_49d3088434c144 149-186
+plugins/gt-workflow/skills/gt-amend/SKILL.md
+  s_4febf2cbaf48e8::t_a01301d045854f 3
+catalog/plugins/gt-workflow.json
+  s_4febf2cbaf48e8::t_31b85a755ff31e 59-79
+plugins/gt-workflow/codex/skills/gt-amend/SKILL.md
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-2,4-216
+  s_4febf2cbaf48e8::t_e314b683336356 3
+plugins/gt-workflow/codex/skills/gt-sync/SKILL.md
+  s_4febf2cbaf48e8::t_e314b683336356 3
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-2,4-156
+plugins/gt-workflow/skills/stack-plan-style/SKILL.md
+  s_4febf2cbaf48e8::t_62f7784366899d 25
+plugins/gt-workflow/skills/gt-stack-plan/SKILL.md
+  s_4febf2cbaf48e8::t_2264533e4f45f8 36-37
+  s_4febf2cbaf48e8::t_473857a3ad17f0 115-117
+  s_4febf2cbaf48e8::t_c5fa859c5597d0 244
+plugins/gt-workflow/codex/skills/stack-plan-style/SKILL.md
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-23,25-30
+  s_4febf2cbaf48e8::t_e314b683336356 24
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_4febf2cbaf48e8::t_272a1196994ca6 170
+  s_4febf2cbaf48e8::t_fae6a29de9e842 149-151
+  s_4febf2cbaf48e8::t_8b16058474df88 461
+  s_4febf2cbaf48e8::t_aec1ffc7045ebf 505
+  s_4febf2cbaf48e8::t_394feadeffc3f0 516
+  s_4febf2cbaf48e8::t_7e5fa44a7ff433 527-528
+  s_4febf2cbaf48e8::t_2a1cf0706400ae 298
+  s_4febf2cbaf48e8::t_9f735aac38c1a3 3
+  s_4febf2cbaf48e8::t_5989b8fe75864e 313
+  s_4febf2cbaf48e8::t_ac59e8a81551f7 306
+  s_4febf2cbaf48e8::t_c37dffe8872c48 481
+plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
+  s_4febf2cbaf48e8::t_2afb0da98b590c 1-157,159-160,163-167,169,173-269,271-418,420-423,425-428
+  s_4febf2cbaf48e8::t_e314b683336356 158,161-162,168,170-172,270,419,424
+.agents/plugins/marketplace.json
+  s_4febf2cbaf48e8::t_2afb0da98b590c 8-19
+  s_4febf2cbaf48e8::t_80a73b6802e21c 7
+plugins/gt-workflow/skills/gt-sync/SKILL.md
+  s_4febf2cbaf48e8::t_f4a964adc0e936 3
+tests/integration/generate-manifests-codex.test.ts
+  s_4febf2cbaf48e8::t_3cd8a24252b91f 587,589-595,616-621
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "189f5dd1e397b38d3571cfab1868bbd2a3d71b50",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
