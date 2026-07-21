@@ -105,6 +105,15 @@ function buildCodexPluginManifest(source, pkg, hookConfig) {
   if (hookConfig !== null) {
     manifest.hooks = './hooks/codex-hooks.json';
   }
+  // Shared MCP declaration (R7 philosophy: explicit pointer, not assumed
+  // auto-discovery). Only the file-reference form is passed through — an
+  // inline mcpServers object is a Claude-only shape this shell never
+  // spiked for Codex. String-shape "not independently spiked for Codex in
+  // this shell" per schemas/codex-plugin.schema.json's $comment; re-verify
+  // against a live `codex plugin add` before trusting this field fires.
+  if (typeof source.mcpServers === 'string') {
+    manifest.mcpServers = source.mcpServers;
+  }
   return manifest;
 }
 

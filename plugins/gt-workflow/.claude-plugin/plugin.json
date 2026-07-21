@@ -23,14 +23,7 @@
     "pull-requests"
   ],
   "outputStyles": "./output-styles",
-  "mcpServers": {
-    "graphite": {
-      "command": "gt",
-      "args": [
-        "mcp"
-      ]
-    }
-  },
+  "mcpServers": "./.mcp.json",
   "hooks": {
     "PreToolUse": [
       {

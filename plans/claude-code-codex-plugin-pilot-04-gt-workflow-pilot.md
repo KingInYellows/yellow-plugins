@@ -361,7 +361,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   "./output-styles"` field and the two source files in place — Claude still
   benefits from the native output-style mechanism; the new skills are the
   Codex-reachable copy, not a replacement of the Claude-side feature.
-- [ ] Step 12: Shared MCP declaration. Create
+- [x] Step 12: Shared MCP declaration. Create
   `plugins/gt-workflow/.mcp.json` containing the server definition currently
   inline in the manifest (`{"graphite": {"command": "gt", "args":
   ["mcp"]}}` — confirm the exact top-level shape, bare server-map vs.
