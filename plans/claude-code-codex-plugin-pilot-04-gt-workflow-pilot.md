@@ -434,7 +434,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   non-firing hook as a failure); the `.mcp.json`-declared `graphite` server
   is discoverable (or explicitly note if it is not, per Step 12's
   uncertainty). This is a human step, not automatable from this repo.
-- [ ] Step 17: Delivery. Run `pnpm validate:schemas`, `pnpm test:unit`,
+- [x] Step 17: Delivery. Run `pnpm validate:schemas`, `pnpm test:unit`,
   `pnpm lint`, `pnpm typecheck`, and `bats tests/` from inside
   `plugins/gt-workflow/`. Run `pnpm changeset`, select `gt-workflow: minor`,
   write a summary covering the Codex skill/hook/MCP pilot. Commit via `gt
