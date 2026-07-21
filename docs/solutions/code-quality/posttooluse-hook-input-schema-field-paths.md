@@ -10,6 +10,24 @@ tags:
 
 # PostToolUse Hook Input Schema Field Paths
 
+> **Correction (2026-07-20):** the "PreToolUse path" column below (`.command`
+> at root level) is itself unverified against a primary source — it was
+> copied from `check-git-push.sh`'s own header comment, not confirmed
+> against Claude Code's actual behavior. Official docs
+> (code.claude.com/docs/en/hooks, fetched live 2026-07-20) show PreToolUse
+> input nesting `command` under `tool_input` — the SAME shape as
+> PostToolUse, not a different root-level shape. This repo's own
+> `plugins/yellow-ruvector/hooks/scripts/pre-tool-use.sh` (a currently
+> working PreToolUse hook) independently corroborates this: it reads
+> `.tool_input.command` and `.tool_input.file_path`, not root-level
+> equivalents. Read `.tool_input.command` for BOTH PreToolUse and
+> PostToolUse; the table's "PreToolUse path" column is preserved below only
+> as a record of what `check-git-push.sh` actually read (and, per
+> characterization-testing scope in the gt-workflow Codex pilot shell 04,
+> continues to read in its Node port) — not as guidance for new hooks. See
+> `docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`'s
+> 2026-07-20 update for the related envelope-case-transform correction.
+
 ## Problem
 
 PostToolUse hooks receive a different JSON schema than PreToolUse hooks. A

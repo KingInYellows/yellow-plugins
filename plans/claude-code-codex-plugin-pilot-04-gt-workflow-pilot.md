@@ -291,7 +291,7 @@ workflow-file edits needed. The same workflow's `codex` matrix target runs
   the existing `emit-codex.js` tests (search `find packages -iname
   "*emit-codex*"` or `packages/*/test*` for the existing suite) covering the
   new field.
-- [ ] Step 7: Write the parity harness at
+- [x] Step 7: Write the parity harness at
   `plugins/gt-workflow/tests/hook-parity.bats`. For each fixture in
   `plugins/gt-workflow/tests/fixtures/hooks/`, pipe its stdin into `node
   ${PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook <policy>` and
