@@ -237,14 +237,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
     "pull-requests"
   ],
   "outputStyles": "./output-styles",
-  "mcpServers": {
-    "graphite": {
-      "command": "gt",
-      "args": [
-        "mcp"
-      ]
-    }
-  },
+  "mcpServers": "./.mcp.json",
   "hooks": {
     "PreToolUse": [
       {
@@ -252,7 +245,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/check-git-push.sh",
+            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-git-push",
             "timeout": 1
           }
         ]
@@ -264,7 +257,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/check-commit-message.sh",
+            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-commit-message",
             "timeout": 1
           }
         ]

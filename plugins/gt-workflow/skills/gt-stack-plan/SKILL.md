@@ -241,7 +241,11 @@ graph. Set `<!-- stack-trunk: -->` to the trunk branch from Phase 1 Step 3.
 Tell the user:
 
 - Where the decomposition was saved (plan file path or `.gt-stack-plan.md`)
-- "Run the `workflows:work` skill with `<path>` to execute the stack bottom-up"
+- On Claude Code: "Run the `workflows:work` skill with `<path>` to execute
+  the stack bottom-up." On Codex, `workflows:work` is not exposed (not in
+  yellow-core's Codex `skillAllowlist`) — instead: "Execute the stack
+  decomposition manually, submitting each branch with `gt submit
+  --no-interactive`."
 - If Linear issues present: list the issue-to-branch mapping
 
 ### Success Criteria
