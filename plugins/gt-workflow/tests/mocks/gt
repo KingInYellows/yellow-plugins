@@ -63,7 +63,7 @@ case "$ALL_ARGS" in
   "commit amend"*)
     exit 0
     ;;
-  "pr"*)
+  pr|"pr "*)
     printf 'https://github.com/example/repo/pull/1\n'
     ;;
   *)

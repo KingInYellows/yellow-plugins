@@ -147,11 +147,16 @@ Phase 3.
 
 #### 0. Capture the Diff Once
 
-Before spawning auditors, capture the full diff so all agents can use it
-without redundant calls:
+Before spawning auditors, capture the full diff — staged and unstaged — so
+all agents can use it without redundant calls. Use `git diff HEAD` rather
+than a bare `git diff`: a bare `git diff` only shows unstaged changes, so
+any changes the user staged with `git add` before invoking this skill would
+be silently excluded from the audit while still ending up in the commit
+(Phase 3 generates the commit message from `git diff --cached` and commits
+the full index).
 
 ```bash
-git diff
+git diff HEAD
 ```
 
 Store this output as `$DIFF_OUTPUT` (pass it as context to each agent below).

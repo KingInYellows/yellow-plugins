@@ -157,8 +157,8 @@ delete_branch_with_fallback() {
 }
 
 @test "parse_flags: --dry-run sets DRY_RUN" {
-  run parse_flags --dry-run
-  [ "$status" -eq 0 ]
+  parse_flags --dry-run
+  [ "$DRY_RUN" = "true" ]
 }
 
 @test "parse_flags: --stale-days N sets STALE_DAYS" {

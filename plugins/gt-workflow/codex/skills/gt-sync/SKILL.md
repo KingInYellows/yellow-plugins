@@ -19,8 +19,9 @@ branches, and cleans up merged PRs.
 
 Optional arguments:
 
-- `--no-delete` — Skip deleting merged branches by passing `--no-delete` through
-  to `gt sync` so it does not prompt for deletions
+- `--no-delete` — Skip deleting merged branches by passing `--no-interactive`
+  through to `gt sync` so it does not prompt for (or perform) deletions (`gt
+  sync` has no `--no-delete` flag itself)
 - `--force` — Restack even if the stack appears clean (still stopping at
   conflicts for manual resolution) instead of skipping Phase 2 when there are no
   divergence markers
@@ -56,7 +57,7 @@ Run Graphite repo sync to pull the latest trunk and identify merged branches.
 If `--no-delete` was passed:
 
 ```bash
-gt sync --no-delete
+gt sync --no-interactive
 ```
 
 Otherwise:

@@ -22,21 +22,31 @@ const WARN_MESSAGE =
   'Consider: gt modify -m "type(scope): description"';
 
 function extractFirstMFlagValue(command) {
-  const doubleQuoted = command.match(/-m "([^"]*)"/);
+  // [^"\n] / [^'\n] (not just [^"] / [^']): JS negated character classes
+  // match newlines by default, unlike grep's per-line matching in the
+  // deleted bash hook. Excluding \n keeps a literal multiline -m value
+  // unmatched here, same as the bash version silently skipping validation
+  // for it (grep could never see a complete quoted pair on one line).
+  const doubleQuoted = command.match(/-m "([^"\n]*)"/);
   if (doubleQuoted) return doubleQuoted[1];
 
-  const singleQuoted = command.match(/-m '([^']*)'/);
+  const singleQuoted = command.match(/-m '([^'\n]*)'/);
   if (singleQuoted) return singleQuoted[1];
 
   return '';
 }
 
 /**
- * @param {{toolInput?: {command?: string}, toolResult?: {exitCode?: number}}} camelCaseEnvelope
+ * @param {{toolInput?: {command?: string}, toolResult?: {exitCode?: number}, toolResponse?: {exitCode?: number}}} camelCaseEnvelope
  * @returns {{decision: 'allow'|'warn', message: string|null}}
  */
 function checkCommitMessage(camelCaseEnvelope) {
-  const command = camelCaseEnvelope.toolInput?.command ?? '';
+  // Type-checked, not just `?? ''`: a non-string command (object, number,
+  // array from a malformed envelope) would otherwise reach .includes()/
+  // .match() below and throw, and this PostToolUse hook MUST always emit
+  // its {"continue": true} response — an uncaught throw here skips that.
+  const command =
+    typeof camelCaseEnvelope.toolInput?.command === 'string' ? camelCaseEnvelope.toolInput.command : '';
 
   const isGtCommitCommand =
     command.includes('gt modify') ||
@@ -46,9 +56,13 @@ function checkCommitMessage(camelCaseEnvelope) {
     return { decision: 'allow', message: null };
   }
 
-  // Absent exit_code defaults to 0 — "fail-closed" here means "run the
-  // validation when uncertain" rather than skip it.
-  const exitCode = camelCaseEnvelope.toolResult?.exitCode ?? 0;
+  // Claude's result envelope key is `tool_result` (-> toolResult); Codex's
+  // documented hook stdin uses `tool_response` (-> toolResponse) instead —
+  // see docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md.
+  // Check both before falling back. Absent exit_code defaults to 0 —
+  // "fail-closed" here means "run the validation when uncertain" rather
+  // than skip it.
+  const exitCode = camelCaseEnvelope.toolResult?.exitCode ?? camelCaseEnvelope.toolResponse?.exitCode ?? 0;
   if (Number(exitCode) !== 0) {
     return { decision: 'allow', message: null };
   }

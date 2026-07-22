@@ -1029,8 +1029,12 @@ function validateSkillWrapperDrift(commandFiles, errors) {
     const body = fmBlockMatch ? content.slice(fmBlockMatch[0].length) : content;
     const usageSection = extractUsageSection(body);
 
+    // Fence-strip before matching (shared stripFencedContent helper) so a
+    // fenced code-block example inside "## Usage" (e.g. illustrating the
+    // `skill: "..."` syntax without actually invoking it) isn't mistaken
+    // for a live wrapper invocation.
     const skillNames = new Set();
-    for (const match of usageSection.matchAll(SKILL_REF_RE)) {
+    for (const match of stripFencedContent(usageSection).matchAll(SKILL_REF_RE)) {
       skillNames.add(match[1]);
     }
     if (skillNames.size === 0) continue;

@@ -107,6 +107,9 @@ printf '\n=== Convention Files ===\n'
 printf '\n=== Merge Queue Compatibility ===\n'
 # Capture stderr from gh probes so failure diagnostics survive (vs silent 2>/dev/null).
 mq_err_log=$(mktemp 2>/dev/null) || mq_err_log=""
+# Trap covers interruption (e.g. a Bash-tool timeout); the explicit rm at the
+# end of this block still handles normal completion.
+[ -n "$mq_err_log" ] && trap 'rm -f "$mq_err_log"' EXIT
 # No `gh auth status` precheck: it exits non-zero if ANY known host has stale
 # auth, which produces false COULD NOT CHECK results on multi-host setups
 # (gh.com + ghe.example.com). Let `gh repo view` be the auth probe — it's

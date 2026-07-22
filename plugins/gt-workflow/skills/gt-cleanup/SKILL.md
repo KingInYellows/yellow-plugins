@@ -83,6 +83,7 @@ fi
 command -v gt >/dev/null 2>&1 || { echo "ERROR: gt CLI not found. Install from https://graphite.dev/docs/graphite-cli"; exit 1; }
 command -v gh >/dev/null 2>&1 || { echo "ERROR: gh CLI not found. Install from https://cli.github.com"; exit 1; }
 command -v git >/dev/null 2>&1 || { echo "ERROR: git not found"; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "ERROR: jq not found. Install from https://jqlang.github.io/jq/"; exit 1; }
 ```
 
 #### 3. Validate Git Repo
@@ -214,7 +215,7 @@ HAS_OPEN=$(printf '%s' "$PR_JSON" | jq 'any(.[]; .state == "OPEN")')
 ALL_TERMINAL=$(printf '%s' "$PR_JSON" \
   | jq 'length > 0 and all(.[]; .state == "CLOSED" or .state == "MERGED")')
 CLOSED_NOT_MERGED=$(printf '%s' "$PR_JSON" \
-  | jq 'any(.[]; .state == "CLOSED")')
+  | jq 'all(.[]; .state != "MERGED") and any(.[]; .state == "CLOSED")')
 ```
 
 **Do NOT suppress stderr.** Add a `sleep 0.2` between lookups to avoid
@@ -231,11 +232,13 @@ Then classify:
 - `HAS_OPEN == true`: branch has an active PR — exclude from **Closed PR**
   and **Stale** categories.
 - `ALL_TERMINAL == true`: branch is a **Closed PR** candidate. If
-  `CLOSED_NOT_MERGED == true` (any PR has `state == "CLOSED"` — meaning
-  closed without landing, which could be queue-ejected, abandoned, or
-  cancelled), additionally tag the branch as `closed_not_merged=true` for
-  use in Phase 4. PRs that landed have `state == "MERGED"` and never
-  trigger this tag.
+  `CLOSED_NOT_MERGED == true` (no PR on the branch reached `state ==
+  "MERGED"`, and at least one has `state == "CLOSED"` — meaning closed
+  without landing, which could be queue-ejected, abandoned, or cancelled),
+  additionally tag the branch as `closed_not_merged=true` for use in
+  Phase 4. A branch with a mix of a `MERGED` PR and a `CLOSED` PR (e.g. one
+  landed, an earlier attempt was abandoned) is excluded from this tag since
+  the branch's work did land.
 - `PR_COUNT == 0`: not a closed-PR candidate (may still be stale).
 
 #### 5. Staleness Check

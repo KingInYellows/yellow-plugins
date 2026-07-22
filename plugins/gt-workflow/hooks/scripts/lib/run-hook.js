@@ -26,10 +26,22 @@ function parseHookArg(argv) {
   return name;
 }
 
+// Bound stdin to 64KB, matching the deleted check-commit-message.sh's
+// `head -c 65536` cap — a verbose Bash tool_result must not make the hook
+// buffer unbounded input or blow its execution timeout.
+const MAX_STDIN_BYTES = 65536;
+
 function readStdin(stream) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
+    let total = 0;
+    stream.on('data', (chunk) => {
+      if (total >= MAX_STDIN_BYTES) return;
+      const remaining = MAX_STDIN_BYTES - total;
+      const bounded = chunk.length > remaining ? chunk.subarray(0, remaining) : chunk;
+      chunks.push(bounded);
+      total += bounded.length;
+    });
     stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     stream.on('error', reject);
   });

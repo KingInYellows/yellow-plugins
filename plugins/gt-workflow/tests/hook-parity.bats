@@ -78,7 +78,7 @@ assert_stdout_matches_golden() {
 }
 
 assert_parity() {
-  local hook="$1" case="$2" fixdir="$FIXTURE_ROOT/$3"
+  local hook="$1" case="$2" fixdir="$FIXTURE_ROOT/$1"
   local golden="$fixdir/$case.golden.txt"
 
   run --separate-stderr run_entrypoint "$hook" "$fixdir/$case.stdin"
@@ -91,23 +91,23 @@ assert_parity() {
 # --- check-git-push ---
 
 @test "check-git-push: plain-block matches golden" {
-  assert_parity check-git-push plain-block check-git-push
+  assert_parity check-git-push plain-block
 }
 
 @test "check-git-push: metachar-semicolon matches golden" {
-  assert_parity check-git-push metachar-semicolon check-git-push
+  assert_parity check-git-push metachar-semicolon
 }
 
 @test "check-git-push: metachar-and matches golden" {
-  assert_parity check-git-push metachar-and check-git-push
+  assert_parity check-git-push metachar-and
 }
 
 @test "check-git-push: metachar-subshell matches golden" {
-  assert_parity check-git-push metachar-subshell check-git-push
+  assert_parity check-git-push metachar-subshell
 }
 
 @test "check-git-push: allowed-non-push matches golden" {
-  assert_parity check-git-push allowed-non-push check-git-push
+  assert_parity check-git-push allowed-non-push
 }
 
 @test "check-git-push: malformed-json matches golden (exit code + stdout only)" {
@@ -126,39 +126,47 @@ assert_parity() {
 }
 
 @test "check-git-push: null-envelope does not crash (regression, PR #661)" {
-  assert_parity check-git-push null-envelope check-git-push
+  assert_parity check-git-push null-envelope
 }
 
 # --- check-commit-message ---
 
 @test "check-commit-message: conventional-allow-silent matches golden" {
-  assert_parity check-commit-message conventional-allow-silent check-commit-message
+  assert_parity check-commit-message conventional-allow-silent
 }
 
 @test "check-commit-message: non-conventional-warn matches golden" {
-  assert_parity check-commit-message non-conventional-warn check-commit-message
+  assert_parity check-commit-message non-conventional-warn
 }
 
 @test "check-commit-message: multi-m-first-only matches golden" {
-  assert_parity check-commit-message multi-m-first-only check-commit-message
+  assert_parity check-commit-message multi-m-first-only
 }
 
 @test "check-commit-message: double-quoted-m matches golden" {
-  assert_parity check-commit-message double-quoted-m check-commit-message
+  assert_parity check-commit-message double-quoted-m
 }
 
 @test "check-commit-message: single-quoted-m matches golden" {
-  assert_parity check-commit-message single-quoted-m check-commit-message
+  assert_parity check-commit-message single-quoted-m
 }
 
 @test "check-commit-message: nonzero-exit-skip matches golden" {
-  assert_parity check-commit-message nonzero-exit-skip check-commit-message
+  assert_parity check-commit-message nonzero-exit-skip
 }
 
 @test "check-commit-message: missing-exit-code-validates matches golden" {
-  assert_parity check-commit-message missing-exit-code-validates check-commit-message
+  assert_parity check-commit-message missing-exit-code-validates
 }
 
 @test "check-commit-message: null-envelope does not crash (regression, PR #661)" {
-  assert_parity check-commit-message null-envelope check-commit-message
+  assert_parity check-commit-message null-envelope
+}
+
+@test "check-commit-message: codex-tool-response-nonzero-exit-skip matches golden (regression, PR #661)" {
+  # Codex's documented hook stdin uses tool_response (not Claude's
+  # tool_result) for the result envelope. Not a bash-parity fixture — no
+  # deleted bash script ever read this field; it proves the Node policy
+  # honors Codex's exit_code shape instead of always defaulting to 0.
+  assert_parity check-commit-message codex-tool-response-nonzero-exit-skip
 }

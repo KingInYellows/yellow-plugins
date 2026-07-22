@@ -34,7 +34,7 @@ case "$ALL_ARGS" in
   "diff --stat"* | "diff --cached --stat"*)
     printf '%s' "${MOCK_GIT_DIFF_STAT:-}"
     ;;
-  "diff --name-only"*)
+  "diff --name-only"* | "diff --cached --name-only"*)
     printf '%s' "${MOCK_GIT_DIFF_NAMES:-}"
     ;;
   "diff --cached"*)
