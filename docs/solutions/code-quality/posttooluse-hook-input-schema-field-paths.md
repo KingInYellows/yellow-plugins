@@ -28,6 +28,25 @@ tags:
 > `docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`'s
 > 2026-07-20 update for the related envelope-case-transform correction.
 
+> **Update (2026-07-22):** The 2026-07-20 correction above establishes that
+> PreToolUse should read `.tool_input.command`, matching PostToolUse — but
+> knowing the right path and enforcing it are different problems.
+> `plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js:28` reads
+> `camelCaseEnvelope.command` (root-level) by design: its own header comment
+> states this "reproduces plugins/gt-workflow/hooks/check-git-push.sh's logic
+> exactly, including reading `command` at the envelope's top level (not
+> `toolInput.command`) ... per this shell's characterization-testing
+> charter; it is not corrected here." Real PreToolUse envelopes nest under
+> `tool_input.command` (per the correction above), so this hook's git-push
+> blocker never fires against a live Claude Code or Codex PreToolUse call —
+> it only ever matched the shape the bash original (and the fixtures ported
+> from it) assumed. See
+> `docs/solutions/code-quality/golden-fixture-parity-vs-contract-correctness.md`
+> for why the parity harness validating this port never caught it. As of
+> this writing this is an open finding pending a maintainer decision: fix
+> the field path (breaking the characterization-testing charter) or keep it
+> as documented, deliberately-preserved bash-parity behavior.
+
 ## Problem
 
 PostToolUse hooks receive a different JSON schema than PreToolUse hooks. A

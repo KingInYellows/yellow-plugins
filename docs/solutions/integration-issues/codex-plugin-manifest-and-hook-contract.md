@@ -64,9 +64,13 @@ reviewer/executor, not authoring plugins Codex itself loads.
   (`hookSpecificOutput.permissionDecision`). **Correction (2026-07-20):**
   Claude's hook stdin is ALSO snake_case — confirmed against
   code.claude.com/docs/en/hooks and against this repo's own
-  `check-commit-message.sh`, which reads `.tool_input.command` and
-  `.tool_result.exit_code` directly and is the currently-functioning
-  behavior captured in `plugins/gt-workflow/tests/fixtures/hooks/`. Only
+  `check-commit-message.sh`, which read `.tool_input.command` and
+  `.tool_result.exit_code` directly — behavior captured in
+  `plugins/gt-workflow/tests/fixtures/hooks/`. That bash script was deleted
+  in commit `ca3112cf` ("test(gt-workflow): add hook-parity harness, delete
+  superseded bash hooks"), superseded by
+  `plugins/gt-workflow/hooks/scripts/lib/policy-check-commit-message.js`,
+  which reproduces the same field paths. Only
   hook OUTPUT is camelCase on both hosts; a prior version of this doc
   claimed Claude's input was camelCase too — that was wrong. Cross-host
   adapters must case-transform snake_case→camelCase on BOTH legs for
@@ -169,8 +173,10 @@ The PreToolUse denial shape documented above
 (`hookSpecificOutput.permissionDecision: "deny"`) is Codex-specific. Claude
 Code's PreToolUse hooks block via **exit code 2 with a stderr message** —
 there is no JSON envelope in the block path at all. Confirmed by reading
-this repo's live `plugins/gt-workflow/hooks/check-git-push.sh`, whose
-header states the contract directly: "Exit 0 → allow the action. Exit 2 →
+this repo's `plugins/gt-workflow/hooks/check-git-push.sh` (deleted in
+commit `ca3112cf`, superseded by
+`plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js`), whose
+header stated the contract directly: "Exit 0 → allow the action. Exit 2 →
 block the action and show the message on stderr to the user." A migration
 plan that treats "port a PreToolUse blocking hook from Claude to Codex" as
 "change the JSON field names" misses that Claude's side isn't JSON-based
