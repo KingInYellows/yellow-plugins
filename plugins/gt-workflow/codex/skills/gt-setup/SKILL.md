@@ -156,7 +156,7 @@ fi
 **Failures (hard stop)** — stop after reporting all that apply:
 
 - `gt` missing: "Graphite CLI is required. Install it from https://graphite.dev/docs/cli and re-run `gt-setup`."
-- `jq` missing: "jq is required for gt-workflow hooks. Install it from https://jqlang.github.io/jq/download/."
+- `jq` missing: "jq is required by gt-workflow (the gt-cleanup skill uses it to parse PR-status JSON). Install it from https://jqlang.github.io/jq/download/."
 - `git_repo` not ok: "gt-workflow must be run inside a git repository."
 - `auth_config` missing: "Graphite auth was not detected. Run `gt auth` or sign in through the Graphite CLI, then re-run `gt-setup`."
 - `repo_config` missing OR `gt_trunk` unavailable: "This repository is not initialized for Graphite. Run `gt init`, confirm `gt trunk` works, then re-run `gt-setup`."
