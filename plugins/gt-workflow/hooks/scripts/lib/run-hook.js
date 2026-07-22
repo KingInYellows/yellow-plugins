@@ -35,14 +35,26 @@ function readStdin(stream) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let total = 0;
+    let truncated = false;
     stream.on('data', (chunk) => {
-      if (total >= MAX_STDIN_BYTES) return;
+      if (total >= MAX_STDIN_BYTES) {
+        truncated = true;
+        return;
+      }
       const remaining = MAX_STDIN_BYTES - total;
-      const bounded = chunk.length > remaining ? chunk.subarray(0, remaining) : chunk;
-      chunks.push(bounded);
-      total += bounded.length;
+      if (chunk.length > remaining) {
+        truncated = true;
+        chunks.push(chunk.subarray(0, remaining));
+        total = MAX_STDIN_BYTES;
+      } else {
+        chunks.push(chunk);
+        total += chunk.length;
+      }
     });
-    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    stream.on('end', () => resolve({
+      content: Buffer.concat(chunks).toString('utf8'),
+      truncated
+    }));
     stream.on('error', reject);
   });
 }
@@ -50,6 +62,11 @@ function readStdin(stream) {
 /**
  * Shared read-stdin / parse / policy-dispatch flow for both entrypoints.
  * `formatOutput(hookEvent, result)` is the only host-specific piece.
+ *
+ * Stdin is capped at 64KB to prevent DoS from unbounded input. Truncation
+ * is fail-closed for check-git-push (deny) to prevent a large malicious
+ * payload starting with "git push" from bypassing the blocker via
+ * truncation + parse failure.
  *
  * Malformed JSON preserves each hook's original fail-open/fail-closed
  * direction rather than a blanket rule: check-git-push.sh allows through
@@ -69,7 +86,20 @@ async function runHook(argv, formatOutput) {
   const hookEvent = HOOK_EVENTS[hookName];
   const policy = POLICIES[hookName];
 
-  const raw = await readStdin(process.stdin);
+  const { content: raw, truncated } = await readStdin(process.stdin);
+
+  // Fail closed for check-git-push if input was truncated — a large payload
+  // starting with "git push" could be truncated, fail to parse, and bypass
+  // the blocker if we treated truncation as a parse failure (which is
+  // fail-open for this hook). PR #661 review comment.
+  if (truncated && hookName === 'check-git-push') {
+    const result = {
+      decision: 'deny',
+      message: '⛔  Hook input exceeded 64KB size limit. Cannot verify command safety.',
+    };
+    formatOutput(hookEvent, result);
+    return;
+  }
 
   let envelope;
   try {

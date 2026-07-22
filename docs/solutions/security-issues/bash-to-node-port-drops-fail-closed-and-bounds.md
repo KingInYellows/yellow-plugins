@@ -61,6 +61,15 @@ path in `entrypoint-claude.js`. Reinstate a stdin size cap in
 ports should include an explicit "exit-code contract" and "bounds/limits"
 section, not just "output matches."
 
+**Update (PR #661 review):** The 64KB stdin cap was reinstated in the
+initial port. During code review, a security issue was identified: when
+input exceeded 64KB and was truncated, the resulting malformed JSON would
+trigger fail-open behavior for `check-git-push`, allowing a large payload
+starting with `git push` to bypass the blocker. This was fixed to fail
+closed (deny) on truncation for the PreToolUse hook specifically, while
+preserving the original fail-open behavior for PostToolUse's parse
+failures.
+
 ## Related Documentation
 
 - [golden-fixture-parity-vs-contract-correctness.md](../code-quality/golden-fixture-parity-vs-contract-correctness.md) —
