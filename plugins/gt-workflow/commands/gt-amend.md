@@ -18,4 +18,7 @@ folding it into the current branch commit via `gt commit amend`.
 
 ## Usage
 
-Invoke the `Skill` tool with `skill: "gt-amend"`.
+Invoke the `Skill` tool with `skill: "gt-amend"`. Pass the args string
+`$ARGUMENTS` (literal — substitute the actual argument text the user
+provided after the command name, if any) so flags like `--no-submit` or
+`--no-verify` reach the skill.

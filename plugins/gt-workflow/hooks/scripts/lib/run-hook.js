@@ -43,6 +43,14 @@ function readStdin(stream) {
  * direction rather than a blanket rule: check-git-push.sh allows through
  * silently (exit 0, no output); check-commit-message.sh skips validation
  * but still emits `{"continue": true}`.
+ *
+ * A syntactically-valid-but-non-object JSON payload (e.g. a bare `null`)
+ * parses successfully and so must be caught separately from the
+ * try/catch above — passing it straight to a policy function crashes on
+ * `envelope.command`/`envelope.toolInput` (review-caught regression,
+ * PR #661). Routed through the same fail-open/fail-closed branch as a
+ * parse failure, since both represent "the hook received something it
+ * cannot use as an envelope."
  */
 async function runHook(argv, formatOutput) {
   const hookName = parseHookArg(argv);
@@ -55,6 +63,10 @@ async function runHook(argv, formatOutput) {
   try {
     envelope = JSON.parse(raw);
   } catch {
+    envelope = undefined;
+  }
+
+  if (envelope === null || typeof envelope !== 'object') {
     if (hookName === 'check-git-push') {
       return;
     }

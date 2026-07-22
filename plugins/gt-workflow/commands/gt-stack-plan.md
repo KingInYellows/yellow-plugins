@@ -22,4 +22,7 @@ small and reviewable.
 
 ## Usage
 
-Invoke the `Skill` tool with `skill: "gt-stack-plan"`.
+Invoke the `Skill` tool with `skill: "gt-stack-plan"`. Pass the args string
+`$ARGUMENTS` (literal — substitute the actual argument text the user
+provided after the command name, if any) so the skill sees the feature
+description or plan-file path.

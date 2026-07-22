@@ -14,4 +14,7 @@ Visualize your current Graphite stack and quickly navigate between branches.
 
 ## Usage
 
-Invoke the `Skill` tool with `skill: "gt-nav"`.
+Invoke the `Skill` tool with `skill: "gt-nav"`. Pass the args string
+`$ARGUMENTS` (literal — substitute the actual argument text the user
+provided after the command name, if any) so flags like `--pr`, `--top`,
+or `--bottom` reach the skill.

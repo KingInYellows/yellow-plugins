@@ -16,4 +16,7 @@ actions. Complements `/gt-sync` which handles merged branches.
 
 ## Usage
 
-Invoke the `Skill` tool with `skill: "gt-cleanup"`.
+Invoke the `Skill` tool with `skill: "gt-cleanup"`. Pass the args string
+`$ARGUMENTS` (literal — substitute the actual argument text the user
+provided after the command name, if any) so flags like `--dry-run` or
+`--stale-days N` reach the skill.

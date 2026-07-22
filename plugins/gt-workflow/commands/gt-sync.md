@@ -14,4 +14,7 @@ up merged PRs.
 
 ## Usage
 
-Invoke the `Skill` tool with `skill: "gt-sync"`.
+Invoke the `Skill` tool with `skill: "gt-sync"`. Pass the args string
+`$ARGUMENTS` (literal — substitute the actual argument text the user
+provided after the command name, if any) so flags like `--no-delete` or
+`--force` reach the skill.

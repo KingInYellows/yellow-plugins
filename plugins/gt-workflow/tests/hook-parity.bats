@@ -29,6 +29,14 @@
 # implementation detail the Node port (which uses JSON.parse, not jq) has no
 # equivalent for; EXIT_CODE and STDOUT (both empty) still prove the
 # fail-open decision matches.
+#
+# null-envelope (both hooks) is NOT a bash-parity fixture — it is a
+# regression test for a Node-only crash a code review caught (PR #661):
+# JSON.parse('null') succeeds without throwing, so a bare `null` stdin
+# payload skipped the parse-failure catch block and crashed on
+# `null.command`/`null.toolInput` inside the policy function. Its golden
+# reflects run-hook.js's actual fixed output directly (there is no deleted
+# bash script to have captured a "true" answer from for this case).
 
 bats_require_minimum_version 1.5.0
 
@@ -117,6 +125,10 @@ assert_parity() {
   skip "Node's entrypoint has no jq dependency; this fixture documents prior bash-only behavior only"
 }
 
+@test "check-git-push: null-envelope does not crash (regression, PR #661)" {
+  assert_parity check-git-push null-envelope check-git-push
+}
+
 # --- check-commit-message ---
 
 @test "check-commit-message: conventional-allow-silent matches golden" {
@@ -145,4 +157,8 @@ assert_parity() {
 
 @test "check-commit-message: missing-exit-code-validates matches golden" {
   assert_parity check-commit-message missing-exit-code-validates check-commit-message
+}
+
+@test "check-commit-message: null-envelope does not crash (regression, PR #661)" {
+  assert_parity check-commit-message null-envelope check-commit-message
 }
