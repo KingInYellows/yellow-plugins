@@ -1,0 +1,28 @@
+docs/solutions/security-issues/substring-regex-command-denylist-evasion.md
+  s_5b2f0f27df2bce::t_e1533fc5eaa51b 1-58
+docs/solutions/code-quality/golden-fixture-parity-vs-contract-correctness.md
+  s_5b2f0f27df2bce::t_7e14fc88b7ffd5 1-65
+docs/solutions/code-quality/posttooluse-hook-input-schema-field-paths.md
+  s_5b2f0f27df2bce::t_82878be252d8ba 31-49
+docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md
+  s_5b2f0f27df2bce::t_9bc46d842d4dab 176-179
+  s_5b2f0f27df2bce::t_85ad963b314340 67-73
+docs/solutions/security-issues/bash-to-node-port-drops-fail-closed-and-bounds.md
+  s_5b2f0f27df2bce::t_1aaf8de4700645 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "26caeda80cc8726172044ae0ecd12579caa60592",
+  "prompts": {},
+  "sessions": {
+    "s_5b2f0f27df2bce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ff24ef3b-32f8-4a70-8362-caddc660ad44",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
