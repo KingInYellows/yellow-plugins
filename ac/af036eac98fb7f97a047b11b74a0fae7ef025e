@@ -1,0 +1,25 @@
+plugins/gt-workflow/README.md
+  s_5b2f0f27df2bce::t_5a902744797452 154-155
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_5b2f0f27df2bce::t_27c2f867d5d4ac 160
+plugins/gt-workflow/commands/gt-amend.md
+  s_5b2f0f27df2bce::t_f7b00677b29277 4
+plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
+  s_5b2f0f27df2bce::t_d865f7a75c9507 159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "acaf036eac98fb7f97a047b11b74a0fae7ef025e",
+  "prompts": {},
+  "sessions": {
+    "s_5b2f0f27df2bce": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ff24ef3b-32f8-4a70-8362-caddc660ad44",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
