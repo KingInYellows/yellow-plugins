@@ -1,0 +1,44 @@
+plugins/gt-workflow/commands/gt-nav.md
+  s_4febf2cbaf48e8::t_55cba061a8c61b 17-20
+plugins/gt-workflow/commands/gt-stack-plan.md
+  s_4febf2cbaf48e8::t_1863151079daab 25-28
+plugins/gt-workflow/commands/gt-sync.md
+  s_4febf2cbaf48e8::t_0b31e05b020708 17-20
+plugins/gt-workflow/hooks/scripts/lib/run-hook.js
+  s_4febf2cbaf48e8::t_1f31987e7345d8 46-53,66-69
+plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/null-envelope.stdin
+  s_4febf2cbaf48e8::t_976f6008689146 1
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/null-envelope.golden.txt
+  s_4febf2cbaf48e8::t_bc4c907a9f419b 1-3
+plugins/gt-workflow/tests/fixtures/hooks/check-git-push/null-envelope.stdin
+  s_4febf2cbaf48e8::t_976f6008689146 1
+plugins/gt-workflow/commands/gt-cleanup.md
+  s_4febf2cbaf48e8::t_ffe529bd03b2ec 19-22
+plugins/gt-workflow/commands/smart-submit.md
+  s_4febf2cbaf48e8::t_308238f547937e 23-26
+  s_4febf2cbaf48e8::t_ee5bcc52b90f2f 4
+plugins/gt-workflow/tests/fixtures/hooks/check-commit-message/null-envelope.golden.txt
+  s_4febf2cbaf48e8::t_ca29a6329f6b8e 1-4
+plugins/gt-workflow/commands/gt-amend.md
+  s_4febf2cbaf48e8::t_ba2e505ce75cc0 21-24
+plugins/gt-workflow/tests/hook-parity.bats
+  s_4febf2cbaf48e8::t_6d686580daaf6d 161-163
+  s_4febf2cbaf48e8::t_8198428c043782 32-39
+  s_4febf2cbaf48e8::t_b27987c5b18e6c 128-131,164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "896102b3c4c234d174a58143844a647fb8118f02",
+  "prompts": {},
+  "sessions": {
+    "s_4febf2cbaf48e8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d23ca73c-fd2a-46f4-889f-6981b8f85443",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
