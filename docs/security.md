@@ -119,14 +119,25 @@ These plugins work entirely offline with no external network calls:
 
 ### Plugins with Hooks
 
-Four plugins execute shell-based hooks:
+Four plugins execute hooks (yellow-ruvector and yellow-debt are shell; yellow-ci
+and gt-workflow run a dependency-free Node runtime):
 
 | Plugin | Hook Events | Purpose |
 |---|---|---|
 | yellow-ruvector | SessionStart, UserPromptSubmit, PostToolUse, Stop | Memory recall, edit tracking, session lifecycle |
-| yellow-ci | SessionStart | Check for recent CI failures (cached, 3s budget) |
+| yellow-ci | SessionStart | Check for recent CI failures (Node runtime, cached, 3s budget) |
 | yellow-debt | SessionStart | Remind about high/critical debt findings |
 | gt-workflow | PreToolUse, PostToolUse | Block `git push`, validate commit messages |
+
+**yellow-ci SessionStart (Node port).** Ported from `session-start.sh` to a
+dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated by
+`tests/hook-parity.bats`. It is **fail-open** — always emits valid
+`{"continue": true}` JSON and never blocks startup. Runtime cache writes were
+relocated to a plugin-data dir (`${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}`)
+with a read-only fallback to the legacy `${HOME}/.cache/yellow-ci`. The hook is
+carried into the generated Codex manifest (`hooks/codex-hooks.json`) but is
+**inert on Codex** — `plugin_hooks` is `removed` on codex-cli 0.144.x — so its
+Codex-side behavior is schema/unit/parity-tested, not live-verified.
 
 ### yellow-ruvector Hooks (detailed)
 

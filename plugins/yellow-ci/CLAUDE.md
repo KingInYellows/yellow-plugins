@@ -192,3 +192,56 @@ bodies.
   skip if yellow-ruvector not installed.
 - **morph** — Preferred for applying code fixes to large files (>200 lines).
   Discovered via ToolSearch at runtime; falls back to built-in Edit silently.
+
+## Codex Distribution
+
+`targets.codex.enabled: true` in `catalog/plugins/yellow-ci.json` — the **third**
+plugin in this repo to enable Codex (after yellow-core and gt-workflow),
+producing the final canonical order `[gt-workflow, yellow-core, yellow-ci]`. See
+the canonical [`docs/codex-distribution.md`](../../docs/codex-distribution.md).
+
+**8 allowlisted skills** (6 operational + 2 reference): `ci-setup`,
+`ci-setup-runner-targets`, `ci-status`, `ci-diagnose`, `ci-lint-workflows`,
+`ci-runner-health`, `ci-conventions`, `diagnose-ci`. Each operational skill is
+the shared implementation; its `/ci:*` command is a thin wrapper (Claude-side
+surface). `includeHooks` is left default (`true`) so the SessionStart hook
+carries — but see the inertness note below.
+
+**Deferred / absent from Codex (R33):** the `/ci:runner-cleanup`,
+`/ci:setup-self-hosted`, and `/ci:report-linear` commands, the
+`runner-assignment` and `workflow-optimizer` agents, and the
+yellow-linear/ruvector/morph integrations stay Claude-only.
+
+**R30 fold:** `failure-analyst` (F01-F12 diagnosis) and the relevant
+`runner-diagnostics` deep-investigation are folded **inline** into the
+`ci-diagnose` / `ci-runner-health` skill bodies as host-neutral prose, with a
+built-in Codex `worker`/`explorer` delegation section (no `subagent_type`). The
+agents themselves stay Claude-only.
+
+**Host-neutral config (R31 × R15):** the shared skill bodies never name
+`.claude/` or `${CLAUDE_PLUGIN_ROOT}` (they'd fail the exposure lint) — they
+anchor on the global `~/.config/yellow-ci/` config and describe per-repo
+overrides in prose. The concrete `.claude/`-rooted config and env-var handling
+live in the non-linted layer (the command wrappers + bash libs + the Node hook).
+
+**SessionStart hook — Node port + cache (R34-R38):** the hook is a dependency-free
+Node runtime (`hooks/scripts/`), replicated per-plugin, verified byte/semantic
+parity against the deleted `session-start.sh` via `tests/hook-parity.bats`. Cache
+writes relocated to a plugin-data dir with a read-only legacy fallback (see
+"Cache Locations"). The hook is carried into `hooks/codex-hooks.json` (with a
+`commandWindows` twin) but **inert on Codex today** — `plugin_hooks` is `removed`
+on codex-cli 0.144.x.
+
+**`allow_implicit_invocation` deferral (A9):** on codex-cli 0.144.6 Codex *does*
+honor `skills/<name>/agents/openai.yaml` `policy.allow_implicit_invocation`
+(reversing the 0.144.1 finding), but shipping it is a sidecar blocked by this
+repo's SKILL.md-only generator. The two reference skills (`ci-conventions`,
+`diagnose-ci`) use description-phrasing as the interim non-implicit lever
+instead. See
+[`codex-plugin-manifest-and-hook-contract.md`](../../docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md).
+
+Generated artifacts (`pnpm generate:manifests`, never hand-edited):
+`.codex-plugin/plugin.json`, `hooks/codex-hooks.json`,
+`codex/skills/<8>/SKILL.md`. `ci-conventions`'s `references/` were relocated to
+`plugins/yellow-ci/references/` (loaded by the Claude-only agents via
+`${CLAUDE_PLUGIN_ROOT}`) so its skill dir is SKILL.md-only and generator-clean.
