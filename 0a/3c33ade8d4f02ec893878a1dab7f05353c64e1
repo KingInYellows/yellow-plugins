@@ -1,0 +1,23 @@
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_16148e0f870c99 234
+plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md
+  s_17bd29452ea753::t_5dbbe7565b0130 1-124
+plugins/yellow-ci/commands/ci/lint-workflows.md
+  s_17bd29452ea753::t_9f019abaf3d49c 12,17-18,20,22-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "0a3c33ade8d4f02ec893878a1dab7f05353c64e1",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
