@@ -1,0 +1,24 @@
+plugins/yellow-ci/skills/ci-conventions/SKILL.md
+  s_17bd29452ea753::t_3a8eaa047c0a39 31-36
+  s_17bd29452ea753::t_3b9a1db27e69fc 79-83
+  s_17bd29452ea753::t_e53fb8671feca5 3
+  s_17bd29452ea753::t_74bb8bfb4a6fe3 126-127
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_9e73ef6af752d4 287,289-294
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "207fd5e936d9f659bf52d1fc6d33a007f8c5af8c",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
