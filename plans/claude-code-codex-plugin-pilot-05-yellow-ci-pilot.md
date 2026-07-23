@@ -284,8 +284,14 @@ unverified-gap note (R42).
   R33-deferred/Codex-unavailable commands; reword `description:` to discourage
   implicit invocation (R29 interim lever — "reference guide, not an executable
   action").
-- [ ] Reword `plugins/yellow-ci/skills/ci-conventions/SKILL.md` `description:`
+- [x] Reword `plugins/yellow-ci/skills/ci-conventions/SKILL.md` `description:`
   for the same non-implicit lever (already reference-phrased; light touch).
+  NOTE (deviation): the task text said "light touch (description only)", but the
+  body also carried lint-fatal `.claude/` paths (per-repo override, error-catalog
+  E04/E05) and `/ci:*` slash-commands ("When This Skill Loads"). R15 + the plan's
+  own Verification grep require zero `.claude/`/slash leaks in every exposed
+  skill, so the body was host-neutralized too (config path/cache described
+  generically; error-catalog paths generalized; consumers named in prose).
 - [ ] R29 openai.yaml re-verification: run a live spike on the CURRENT target
   codex-cli (`codex features list`; a fixture skill with
   `agents/openai.yaml` `allow_implicit_invocation: false`). If honored, add
