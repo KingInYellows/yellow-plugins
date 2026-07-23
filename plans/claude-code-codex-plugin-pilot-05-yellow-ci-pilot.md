@@ -339,7 +339,7 @@ unverified-gap note (R42).
   `JSON.parse('null')` guard, guaranteed-JSON fail-open); thin
   `entrypoint-claude.js` + `entrypoint-codex.js`. Normalize LF endings
   (`sed -i 's/\r$//'`).
-- [ ] Point the authoritative Claude hook config at the Node entrypoint: edit
+- [x] Point the authoritative Claude hook config at the Node entrypoint: edit
   `catalog/plugins/yellow-ci.json` `hooks.SessionStart[0].hooks[0].command` to
   `node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js` (keep
   `timeout: 3`). Update `plugins/yellow-ci/hooks/hooks.json` non-authoritative
