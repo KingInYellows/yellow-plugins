@@ -39,6 +39,10 @@ Otherwise:
 - Find all files matching `.github/workflows/*.yml` and
   `.github/workflows/*.yaml`.
 - If none found: "No workflow files found in `.github/workflows/`".
+- For each matched file, verify its resolved path is within
+  `.github/workflows/` (reject a symlink that resolves outside the
+  directory) before reading or editing it — the same check as the
+  named-file branch above.
 
 ### Step 2: Read and Analyze
 
@@ -47,8 +51,10 @@ For each workflow file, check these rules:
 **Errors (must fix):**
 
 - **W01:** Job without `timeout-minutes` → suggest `timeout-minutes: 60`
-- **W07:** Missing `runs-on: self-hosted` label when repo uses self-hosted
-  runners
+- **W07:** Missing `runs-on: self-hosted` label on a directly defined job
+  when repo uses self-hosted runners; skip jobs with
+  `uses: ./.github/workflows/` since their runner labels are defined by the
+  called workflow
 - **W13:** Using `actions/cache@v2` or `@v3` → upgrade to `@v4`
 
 **Warnings (should fix):**

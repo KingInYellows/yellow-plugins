@@ -66,8 +66,9 @@ gh auth status 2>&1
 
 ### Step 3: Check Existing Config
 
-Check whether the runner SSH config file already exists and begins with a
-`schema:` line. If it does, read it, count runners
+Check whether the runner SSH config file already exists and its YAML front
+matter (after the opening `---` delimiter) contains a `schema: 1` line. If it
+does, read it, count runners
 (`awk '/^[[:space:]]*- name:/{c++} END{print c+0}'` — always emits one integer),
 list the runner names, and ask via `AskUserQuestion`: "Runner config already
 exists (N runner(s): …). Reconfigure?"
@@ -143,10 +144,10 @@ directory first if it does not exist. Obtain the timestamp with
 
 ### Step 6: Validate the Written Config
 
-Confirm the written file begins with `schema:`. Then re-read it and verify: the
-`schema: 1` header is present, the runner count matches the number collected in
-Step 4, and each runner name entered appears verbatim. On any mismatch, report
-it and stop.
+Confirm the written file's YAML front matter (after the opening `---`
+delimiter) contains `schema: 1`. Then re-read it and verify: the runner count
+matches the number collected in Step 4, and each runner name entered appears
+verbatim. On any mismatch, report it and stop.
 
 ### Step 7: Report
 

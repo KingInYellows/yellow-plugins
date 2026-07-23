@@ -7,11 +7,17 @@ const { runSessionStart } = require('./session-start-core.js');
 // not buffer unbounded input or blow the 3s budget.
 const MAX_STDIN_BYTES = 65536;
 
+// Bound the WAIT itself, not just the byte count: if the host never closes
+// its end of stdin (pipe left open, TTY, etc.), 'end' never fires and the
+// await would hang past the fail-open budget. The drained payload is
+// discarded either way (see runHook), so cutting the wait short is safe.
+const STDIN_READ_TIMEOUT_MS = 250;
+
 function readStdin(stream) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let total = 0;
-    stream.on('data', (chunk) => {
+    const onData = (chunk) => {
       if (total >= MAX_STDIN_BYTES) return;
       const remaining = MAX_STDIN_BYTES - total;
       if (chunk.length > remaining) {
@@ -21,9 +27,31 @@ function readStdin(stream) {
         chunks.push(chunk);
         total += chunk.length;
       }
-    });
-    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    stream.on('error', reject);
+    };
+    const cleanup = () => {
+      clearTimeout(timer);
+      stream.removeListener('data', onData);
+      stream.removeListener('end', onEnd);
+      stream.removeListener('error', onError);
+    };
+    const onEnd = () => {
+      cleanup();
+      resolve(Buffer.concat(chunks).toString('utf8'));
+    };
+    const onError = (err) => {
+      cleanup();
+      reject(err);
+    };
+    stream.on('data', onData);
+    stream.on('end', onEnd);
+    stream.on('error', onError);
+    const timer = setTimeout(() => {
+      cleanup();
+      stream.pause();
+      if (typeof stream.unref === 'function') stream.unref();
+      resolve(Buffer.concat(chunks).toString('utf8'));
+    }, STDIN_READ_TIMEOUT_MS);
+    if (typeof timer.unref === 'function') timer.unref();
   });
 }
 

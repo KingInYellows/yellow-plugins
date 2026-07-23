@@ -53,12 +53,14 @@ If the argument text after the skill name contains a run ID (digits only):
 If it contains `--repo`:
 
 - Extract `owner/repo`; validate the format (exactly one `/`, alphanumeric plus
-  hyphens and dots).
+  hyphens and dots). Pass it as `--repo <owner/repo>` on every `gh run list`/
+  `gh run view` call in this skill so the override is honored instead of the
+  detected origin repo.
 
 If no arguments, fetch the latest failed run:
 
 ```bash
-gh run list --status failure --limit 1 --json databaseId,displayTitle,headBranch,conclusion -q '.[0]'
+gh run list --status failure --limit 1 --json databaseId -q '.[0].databaseId // empty'
 ```
 
 If none found: "No recent CI failures found. List recent runs with the
