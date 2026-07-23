@@ -43,9 +43,21 @@ rt_local_path() {
   printf '%s' ".claude/yellow-ci-runner-targets.yaml"
 }
 
-# Resolve the cache directory
+# Resolve the cache directory (R38). WRITES go to a plugin-data location; this
+# matches the Node SessionStart hook's newCacheDir() so the routing-summary the
+# hook reads is produced at the same place. env-var resolution lives in this
+# (non-exposure-linted) lib layer; Codex sets CLAUDE_PLUGIN_DATA for plugin-hook
+# compat.
 # Usage: rt_cache_dir
 rt_cache_dir() {
+  printf '%s' "${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}"
+}
+
+# Legacy cache directory — READ-ONLY fallback target (R38). New writes never go
+# here; the SessionStart hook and merged-config readers fall back to it only
+# when the new location has no cache yet.
+# Usage: rt_legacy_cache_dir
+rt_legacy_cache_dir() {
   printf '%s' "${HOME}/.cache/yellow-ci"
 }
 
@@ -252,9 +264,9 @@ rt_extract_rules() {
 # Requires: bash 4.3+ (associative arrays + `local -n` namerefs in emit_runner_json)
 #
 # Usage: resolve_runner_targets
-# Side effects:
-#   - Writes ~/.cache/yellow-ci/routing-summary.txt
-#   - Writes ~/.cache/yellow-ci/runner-targets-merged.json
+# Side effects (R38 — writes to the plugin-data cache dir from rt_cache_dir):
+#   - Writes <rt_cache_dir>/routing-summary.txt
+#   - Writes <rt_cache_dir>/runner-targets-merged.json
 # Returns 0 on success, 1 if no config found (graceful degradation)
 resolve_runner_targets() {
   # emit_runner_json() uses `local -n` namerefs, which require Bash 4.3+
