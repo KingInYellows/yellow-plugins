@@ -365,8 +365,10 @@ unverified-gap note (R42).
   `routing-summary.txt`, `runner-targets-merged.json`) so the routing-summary
   the Node hook reads is produced at the new location. Keep `.claude/`
   per-repo override reads intact (R31; this lib is not exposure-linted).
-- [ ] Document the cache locations + fallback in `plugins/yellow-ci/CLAUDE.md`
+- [x] Document the cache locations + fallback in `plugins/yellow-ci/CLAUDE.md`
   and `skills/ci-conventions/SKILL.md` (host-neutral phrasing).
+  (ci-conventions body was made host-neutral in A8; CLAUDE.md gets a "Cache
+  Locations (R38)" subsection here.)
 
 ### Phase D — Catalog enablement + regenerate (R39, R5, R19)
 

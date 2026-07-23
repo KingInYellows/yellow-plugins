@@ -143,6 +143,22 @@ routing_rules:
 Resolution: local file wins per runner name, routing_rules replace wholesale.
 Routing summary surfaced via session-start hook `systemMessage`.
 
+### Cache Locations (R38)
+
+Runtime cache (routing summary + merged runner-targets JSON, and the
+SessionStart hook's 60s result cache) is **written** under a plugin-data
+directory, resolved as
+`${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}`. On
+**read**, the new location is preferred and the legacy
+`${HOME}/.cache/yellow-ci/` path is used only as a **read-only** fallback (it is
+never written again). Both the Node SessionStart hook
+(`hooks/scripts/lib/session-start-core.js`, `newCacheDir()`) and the shell
+resolver (`hooks/scripts/lib/resolve-runner-targets.sh`, `rt_cache_dir()`) use
+this same shape so the routing summary the hook reads is produced where it looks
+first. Codex sets `CLAUDE_PLUGIN_DATA` for plugin-hook compatibility; this
+env-var handling lives in the hook/lib layer, never in Codex-exposed skill
+bodies.
+
 ## Security Rules
 
 1. Never display unredacted CI log content — always run through
