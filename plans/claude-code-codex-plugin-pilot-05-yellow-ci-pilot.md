@@ -485,7 +485,10 @@ unverified-gap note (R42).
   only; and a live authenticated model session invoking the skills + the
   `worker`/`explorer` delegation was not run (the delegation syntax stays marked
   "unverified" in the skill bodies).
-- [ ] Submit as stacked PR 5 via Graphite (`gt`), bottom of the pilot stack.
+- [x] Submit as stacked PR 5 via Graphite (`gt`), bottom of the pilot stack.
+  Submitted as standalone PR #664 off `main` (shells 01-04 already merged, so the
+  "bottom of stack" is moot); PR body carries the R42 evidence + gaps + openai.yaml
+  deferral + redact.sh scope note.
 
 ## Verification
 
