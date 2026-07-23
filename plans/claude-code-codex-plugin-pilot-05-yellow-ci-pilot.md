@@ -258,7 +258,7 @@ unverified-gap note (R42).
   targets only" message. Convert `commands/ci/setup.md` to a wrapper
   (`allowed-tools: [Bash, Read, Write, AskUserQuestion, Skill]`, `$ARGUMENTS`
   passthrough).
-- [ ] Author `plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md` from
+- [x] Author `plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md` from
   `commands/ci/setup-runner-targets.md`: host-neutral body operating on the
   global `~/.config/yellow-ci/runner-targets.yaml`; per-repo override described
   in prose (no literal `.claude/`); inline schema validation
