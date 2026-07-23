@@ -292,7 +292,7 @@ unverified-gap note (R42).
   own Verification grep require zero `.claude/`/slash leaks in every exposed
   skill, so the body was host-neutralized too (config path/cache described
   generically; error-catalog paths generalized; consumers named in prose).
-- [ ] R29 openai.yaml re-verification: run a live spike on the CURRENT target
+- [x] R29 openai.yaml re-verification: run a live spike on the CURRENT target
   codex-cli (`codex features list`; a fixture skill with
   `agents/openai.yaml` `allow_implicit_invocation: false`). If honored, add
   `plugins/yellow-ci/agents/openai.yaml` marking `ci-conventions` and
@@ -300,6 +300,24 @@ unverified-gap note (R42).
   keep the description-phrasing lever and document the deferral in the plugin
   CLAUDE.md. Update `docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`
   with the re-verified finding.
+  RESULT (0.144.6): `allow_implicit_invocation` IS now honored (reverses the
+  0.144.1 finding) — the binary validates `policy.allow_implicit_invocation`,
+  and real plugins (zoom) ship it per-skill at `skills/<name>/agents/openai.yaml`.
+  But shipping it is blocked by OUR generator (`emit-codex.js` copies SKILL.md
+  only and rejects sidecars), not by Codex — so the marking stays deferred with a
+  CORRECTED reason; the description-phrasing lever (A7/A8) is retained.
+  `plugin_hooks` still `removed`. Contract doc updated ("Update — 2026-07-23 (b)").
+  Plugin CLAUDE.md deferral note lands in F3. Discovered prerequisite (see the
+  A9-prime item below): `ci-conventions` had a `references/` sidecar that the same
+  generator guard rejects, so it must be relocated before D2.
+
+- [x] A9-prime (discovered prerequisite for D2, not in the original shell):
+  `ci-conventions` is R29-mandated for Codex exposure but its `skills/ci-conventions/references/`
+  sidecar dir trips `emit-codex.js`'s SKILL.md-only guard. Relocate the three
+  reference files out of the skill dir to a plugin-level `references/` path (the
+  contained fix; no shared-generator change), and repoint the Claude-only
+  `failure-analyst`/`runner-diagnostics` agents and the `ci-conventions` body at
+  the new location so the skill dir is SKILL.md-only and generator-clean.
 
 ### Phase B — SessionStart Node runtime port (R34, R35, R36, R37)
 
