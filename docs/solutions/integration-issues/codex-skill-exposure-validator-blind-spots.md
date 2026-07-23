@@ -20,6 +20,9 @@ components:
 
 # Codex-Exposed Skills Assume Claude-Only Capabilities With No Validator Coverage
 
+> **Canonical distribution doc:** see [Codex Distribution](../../codex-distribution.md)
+> for the overall neutral-catalog model this fits into.
+
 ## Context
 
 PR #661 converted gt-workflow into a full Claude Code + OpenAI Codex

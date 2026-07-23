@@ -421,13 +421,13 @@ unverified-gap note (R42).
 
 ### Phase F — Documentation close-out (R40, R41)
 
-- [ ] Establish exactly ONE canonical neutral-catalog/distribution doc (R40):
+- [x] Establish exactly ONE canonical neutral-catalog/distribution doc (R40):
   create `docs/codex-distribution.md` (or promote
   `docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md`
   with canonical framing), and add cross-references to it from every other
   Codex doc (`codex-plugin-manifest-and-hook-contract.md`, the spike doc, the
   new hook-envelope write-up).
-- [ ] Author the cross-host hook-envelope solution write-up under
+- [x] Author the cross-host hook-envelope solution write-up under
   `docs/solutions/integration-issues/` (R40 — currently only inline in
   gt-workflow CLAUDE.md): the snake_case→camel envelope, the shared
   `run-hook`/entrypoint split, SessionStart `{"continue": true}` on both hosts,

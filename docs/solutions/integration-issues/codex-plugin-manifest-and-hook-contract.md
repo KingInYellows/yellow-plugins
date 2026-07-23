@@ -18,6 +18,9 @@ components:
 
 # OpenAI Codex plugin manifest, marketplace, and hook contract
 
+> **Canonical distribution doc:** see [Codex Distribution](../../codex-distribution.md)
+> for the overall neutral-catalog model this fits into.
+
 ## Context
 
 While planning a Claude Code + Codex dual-host plugin pilot, primary-source

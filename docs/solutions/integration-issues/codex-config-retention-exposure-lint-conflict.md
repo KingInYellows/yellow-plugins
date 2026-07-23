@@ -18,6 +18,9 @@ components:
 
 # Codex exposure-lint vs Claude `.claude/`-config retention: host-neutral skill bodies
 
+> **Canonical distribution doc:** see [Codex Distribution](../../codex-distribution.md)
+> for the overall neutral-catalog model this fits into.
+
 ## Context
 
 While expanding shell 5 of 5 in the Claude Code + Codex dual-host pilot for
