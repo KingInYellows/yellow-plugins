@@ -277,7 +277,7 @@ unverified-gap note (R42).
   (`StrictHostKeyChecking=accept-new`, `BatchMode=yes`, key-only, no `-A`).
   Convert `commands/ci/runner-health.md` to a wrapper (`allowed-tools:
   [Bash, Read, AskUserQuestion, Skill]`, `$ARGUMENTS` passthrough).
-- [ ] Reword `plugins/yellow-ci/skills/diagnose-ci/SKILL.md` (reference skill):
+- [x] Reword `plugins/yellow-ci/skills/diagnose-ci/SKILL.md` (reference skill):
   remove ALL literal slash-command syntax (`/ci:status`, `/ci:diagnose`,
   `/ci:runner-health`, `/ci:runner-cleanup`, `/ci:lint-workflows`,
   `/ci:setup-self-hosted`) → host-neutral prose that stops recommending
