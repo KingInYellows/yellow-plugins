@@ -17,6 +17,11 @@ redact_secrets() {
   # re-match a value that is already a '[REDACTED:...]' label from an earlier
   # specific rule — otherwise `token=ghp_...` would be redacted to
   # `[REDACTED:github-token]` and then clobbered back to a bare `[REDACTED]`.
+  # Deliberate trade-off: this also skips a real secret whose value literally
+  # starts with '[' (e.g. `password=[raw]`). Such values are rare, and every
+  # known secret FORMAT (ghp_/ghs_/github_pat/AWS/JWT/npm/pypi/docker/bearer)
+  # is still caught by the specific rules above regardless of position — only
+  # the unlabeled catch-all skips a leading-'[' value.
   output=$(sed \
     -e 's/ghp_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
