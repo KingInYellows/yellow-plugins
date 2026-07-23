@@ -1,6 +1,6 @@
 ---
 name: ci-conventions
-description: "Shared conventions for CI analysis — validation rules, failure patterns, error catalog, and security patterns. Use when agents or commands need CI-specific validation or pattern matching reference."
+description: 'Shared CI conventions reference (not an executable action) — validation rules, failure patterns (F01-F12), error catalog, and security patterns. Consult when agents or commands need CI-specific validation or pattern-matching reference.'
 user-invokable: false
 ---
 
@@ -28,12 +28,12 @@ reference files for detailed catalogs.
 
 Loaded automatically by:
 
-- `failure-analyst` agent during log analysis
-- `workflow-optimizer` agent during optimization
-- `runner-diagnostics` agent during investigation
-- `/ci:diagnose` command when processing run IDs
-- `/ci:lint-workflows` command when checking rules
-- `/ci:runner-health`, `/ci:runner-cleanup` when validating runner names
+- the `failure-analyst` agent during log analysis
+- the `workflow-optimizer` agent during optimization
+- the `runner-diagnostics` agent during investigation
+- the CI diagnosis skill when processing run IDs
+- the workflow-lint skill when checking rules
+- the runner-health and runner-cleanup workflows when validating runner names
 
 ## Core Failure Categories
 
@@ -76,9 +76,11 @@ metadata for CI workflow optimization. Schema version: 1.
 
 **Paths:**
 - Global: `${XDG_CONFIG_HOME:-$HOME/.config}/yellow-ci/runner-targets.yaml`
-- Per-repo: `.claude/yellow-ci-runner-targets.yaml`
-- Cache: `~/.cache/yellow-ci/routing-summary.txt` (pre-rendered for hook)
-- Cache: `~/.cache/yellow-ci/runner-targets-merged.json` (merged config for agents)
+- Per-repo override: an optional repo-local override file, host-resolved by the
+  plugin (on Claude Code, the repo-local plugin config)
+- Cache: the plugin's routing cache — a pre-rendered routing-summary plus a
+  merged-config JSON — written under a host-resolved plugin data directory, with
+  a read-only fallback to the legacy cache location
 
 **Resolution:** local → global → merge by runner `name` (local wins per-name).
 `routing_rules` from local replace global wholesale. If local has no
@@ -121,8 +123,8 @@ output in prompt injection fences.
 | E01  | diagnose       | No failed runs found for %s                        |
 | E02  | runner-health  | SSH connection timeout: %s (%ds)                   |
 | E03  | runner-cleanup | Runner executing job, cleanup blocked: %s          |
-| E04  | config         | Invalid YAML in .claude/yellow-ci.local.md         |
-| E05  | config         | Config not found: .claude/yellow-ci.local.md       |
+| E04  | config         | Invalid YAML in the runner SSH config              |
+| E05  | config         | Config not found: the runner SSH config            |
 | E06  | validate       | Invalid runner name: %s (must match [a-z0-9-])     |
 | E07  | validate       | Invalid run ID: %s (digits only, no leading zeros) |
 | E08  | validate       | SSH host not in private range: %s                  |
