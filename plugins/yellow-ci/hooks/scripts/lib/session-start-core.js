@@ -76,7 +76,9 @@ function commandExists(cmd, env) {
 }
 
 function ghAuthOk(env) {
-  const res = spawnSync('gh', ['auth', 'status'], { env, stdio: 'ignore' });
+  // Bound with a timeout like ghRunList — otherwise a hung `gh auth status`
+  // could blow the hook's 3s budget before the run-list call even starts.
+  const res = spawnSync('gh', ['auth', 'status'], { env, stdio: 'ignore', timeout: 1000 });
   return !res.error && res.status === 0;
 }
 
@@ -101,7 +103,9 @@ function cacheKeyFor(cwd) {
 }
 
 function writeCacheAtomic(cacheFile, content, warn) {
-  const tmp = `${cacheFile}.tmp`;
+  // PID-suffixed tmp (like resolve-runner-targets.sh's `.tmp.$$`) so two
+  // concurrent SessionStart hooks on the same cwd don't race on one tmp file.
+  const tmp = `${cacheFile}.tmp.${process.pid}`;
   try {
     fs.writeFileSync(tmp, content);
   } catch {
@@ -144,20 +148,13 @@ function runSessionStart({ cwd, env }) {
     return done(routingSummary);
   }
 
-  const writeCacheDir = newCacheDir(env);
-  try {
-    fs.mkdirSync(writeCacheDir, { recursive: true });
-  } catch {
-    warn(`[yellow-ci] Warning: Cannot create cache directory ${writeCacheDir}`);
-    return done(routingSummary);
-  }
-
   const cacheFileName = `last-check-${cacheKeyFor(cwd)}`;
-  const writeCacheFile = path.join(writeCacheDir, cacheFileName);
   const readCacheFile = resolveCacheReadPath(env, cacheFileName);
 
   // Cache freshness (60s TTL). Read prefers the new location and falls back
-  // READ-ONLY to a legacy cache file (R38).
+  // READ-ONLY to a legacy cache file (R38). Checked BEFORE creating the write
+  // dir, so a fresh cache (new OR legacy) is still served even when the new
+  // plugin-data dir cannot be created.
   try {
     const st = fs.statSync(readCacheFile);
     const ageSec = Math.floor(Date.now() / 1000) - Math.floor(st.mtimeMs / 1000);
@@ -211,7 +208,16 @@ function runSessionStart({ cwd, env }) {
     output = output ? `${output}\n${failureMsg}` : failureMsg;
   }
 
-  writeCacheAtomic(writeCacheFile, output, warn);
+  // Write the result cache (best-effort). Create the plugin-data write dir only
+  // now — it is needed only for writing, so a mkdir failure must NOT suppress
+  // the freshly-computed output (the failure info still surfaces).
+  const writeCacheDir = newCacheDir(env);
+  try {
+    fs.mkdirSync(writeCacheDir, { recursive: true });
+    writeCacheAtomic(path.join(writeCacheDir, cacheFileName), output, warn);
+  } catch {
+    warn(`[yellow-ci] Warning: Cannot create cache directory ${writeCacheDir}`);
+  }
   return done(output);
 }
 

@@ -1,6 +1,5 @@
 'use strict';
 
-const { snakeToCamelEnvelope } = require('./envelope.js');
 const { runSessionStart } = require('./session-start-core.js');
 
 // Bound stdin to 64KB. The bash hook ignored stdin entirely; the Node port
@@ -35,28 +34,20 @@ function readStdin(stream) {
  *
  * SessionStart is fail-OPEN and must ALWAYS emit valid JSON and never block
  * startup (mirrors session-start.sh's `set -uo pipefail` with a guaranteed
- * `json_exit` on every path). So:
- *  - stdin is parsed defensively; a malformed OR bare-`null` payload
- *    (JSON.parse('null') succeeds and `typeof null === 'object'`, so it is
- *    guarded explicitly) does NOT change behavior — the SessionStart logic
- *    reads cwd/$HOME/`gh`, not the envelope.
- *  - any unexpected error is swallowed and turned into an empty-message
- *    result, so the caller still emits `{"continue": true}`.
+ * `json_exit` on every path). Stdin is drained and bounded to 64KB but NOT
+ * parsed — the SessionStart logic reads cwd/$HOME/`gh`, not the envelope, so a
+ * malformed or bare-`null` payload cannot change behavior (unlike an
+ * envelope-consuming hook such as gt-workflow's PreToolUse, which needs the
+ * snakeToCamelEnvelope normalization + null guard). Any unexpected error is
+ * swallowed into an empty-message result so the caller still emits
+ * `{"continue": true}`.
  */
 async function runHook(formatOutput) {
   let result;
   try {
-    const raw = await readStdin(process.stdin);
-    let envelope;
-    try {
-      envelope = JSON.parse(raw);
-    } catch {
-      envelope = undefined;
-    }
-    // JSON.parse('null') / non-object payloads: guard before normalizing.
-    if (envelope !== null && typeof envelope === 'object') {
-      snakeToCamelEnvelope(envelope); // R35 normalization (unused by SessionStart)
-    }
+    // Drain + bound stdin so the process never hangs on unread input; the
+    // payload is intentionally not parsed (the envelope is unused here).
+    await readStdin(process.stdin);
     result = runSessionStart({ cwd: process.cwd(), env: process.env });
   } catch (err) {
     process.stderr.write(

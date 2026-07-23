@@ -57,11 +57,23 @@ Three-layer plugin where each layer is independently useful:
 - `runner-assignment` — Runner selection and `runs-on` optimization (spawned by
   `/ci:setup-self-hosted`)
 
-### Skills (2)
+### Skills (8)
 
+Six operational skills back the thin `/ci:*` command wrappers (each
+`user-invokable: false`; the command is the Claude-side user surface, Codex
+reaches the skill directly), plus the two reference skills:
+
+- `ci-setup` — Verify prerequisites and configure the runner SSH config
+- `ci-setup-runner-targets` — Configure runner pool targets, routing rules, and
+  semantic metadata
+- `ci-status` — Show recent CI workflow run status
+- `ci-diagnose` — Diagnose a CI failure now (F01-F12), with the failure-analyst
+  diagnosis folded in
+- `ci-lint-workflows` — Lint workflows for W01-W14 pitfalls (preview + confirm)
+- `ci-runner-health` — SSH runner health check with folded runner-diagnostics
 - `ci-conventions` — Shared patterns, validation rules, error catalog, failure
-  patterns
-- `diagnose-ci` — User-invocable CI debugging workflow guide
+  patterns (reference)
+- `diagnose-ci` — CI debugging workflow guide (reference)
 
 ### Hooks (1)
 

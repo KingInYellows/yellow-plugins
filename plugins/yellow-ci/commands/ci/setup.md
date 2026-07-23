@@ -18,9 +18,13 @@ Verify prerequisites and optionally configure the self-hosted runner SSH config.
 
 On Claude Code, the plugin's runner SSH config file is
 `.claude/yellow-ci.local.md` (repo-local). Existing-config detection reads it;
-new config is written there. The stricter shell validators live in
-`${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh` (`validate_ssh_host`,
-`validate_ssh_key_path`, …) and may be sourced to double-check collected inputs.
+new config is written there. Enforce input validation with the executed shell
+gate, not just the skill's prose: source
+`${CLAUDE_PLUGIN_ROOT}/hooks/scripts/lib/validate.sh` and **invoke
+`validate_ssh_host` and `validate_ssh_key_path` via Bash on every collected host
+and key path before accepting it** — reject and re-prompt on a non-zero exit
+(this preserves the pre-conversion `|| exit 1` gate; the skill's regex prose is
+the host-neutral fallback for Codex, where the lib is unavailable).
 
 ## Usage
 

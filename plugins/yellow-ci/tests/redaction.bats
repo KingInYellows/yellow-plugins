@@ -174,3 +174,26 @@ more log"
   [[ "$result" == *"Bearer [REDACTED]"* ]]
   [[ "$result" == *"[ESCAPED] begin"* ]]
 }
+
+# --- Label-clobber-guard trade-off (documented) ---
+
+@test "redact: leading-'[' generic value is intentionally NOT redacted (documented trade-off)" {
+  # The generic key/value catch-all excludes values whose first char is '[' so
+  # it cannot clobber a specific [REDACTED:<label>] marker from an earlier rule.
+  # Deliberate, narrow trade-off (see redact.sh comment): a raw *generic* secret
+  # whose value literally starts with '[' escapes ONLY the generic catch-all —
+  # every specific secret-FORMAT rule still fires. Asserting it keeps the
+  # trade-off test-visible so any future regex change here fails CI.
+  result=$(echo "password=[rawsecretvalue123]" | redact_secrets)
+  [[ "$result" == *"password=[rawsecretvalue123]"* ]]
+}
+
+@test "redact: specific labeled redaction survives the generic catch-all (label not clobbered)" {
+  # Regression guard for the label-clobber bug this PR fixed: a 'token='-prefixed
+  # ghp_ secret must stay [REDACTED:github-token], not be flattened to bare
+  # [REDACTED] by the generic 'token=<value>' rule.
+  result=$(echo "token=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh1234" | redact_secrets)
+  [[ "$result" == *"[REDACTED:github-token]"* ]]
+  [[ "$result" != *"ghp_"* ]]
+  [[ "$result" != *"[REDACTED]"* ]]
+}

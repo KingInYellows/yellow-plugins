@@ -107,7 +107,9 @@ reach the shell unquoted). Validate each field before accepting it.
 **Preview first (R32).** Render the exact config content (schema header, each
 `- name:` runner block with `host`/`user`/optional `ssh_key`, and the `defaults`
 block) and show it to the user. Then ask via `AskUserQuestion`: "Write this
-runner config? [Write / Edit / Cancel]". Only write after explicit confirmation.
+runner config? [Write / Edit / Cancel]". Only write after explicit
+confirmation; on a host without `AskUserQuestion`, obtain an equivalent explicit
+user confirmation first — never write config without one.
 
 Config shape (with runners):
 
