@@ -433,7 +433,7 @@ unverified-gap note (R42).
   `run-hook`/entrypoint split, SessionStart `{"continue": true}` on both hosts,
   the 64KB bound + `JSON.parse('null')` guard, and the host-neutral-skill-body
   vs non-linted-hook-layer split from the Design Decision above.
-- [ ] Update `plugins/yellow-ci/CLAUDE.md` (add a "Codex Distribution" section:
+- [x] Update `plugins/yellow-ci/CLAUDE.md` (add a "Codex Distribution" section:
   8 allowlisted skills, Node hook port, cache relocation, R33 deferrals, R30
   fold, host-neutral config note), `AGENTS.md` (yellow-ci as the third
   Codex-enabled plugin), and `docs/security.md` hooks table (Node port + cache
