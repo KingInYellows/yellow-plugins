@@ -16,6 +16,19 @@ and deletes the stub, and a coverage gate blocks writing any shell until
 every requirement ID is covered either by one bare claim or complete,
 non-overlapping partial claims across all shells.
 
+## exposure lint
+
+A CI check (`pnpm validate:codex`) that rejects Claude-only constructs —
+Claude-only tool/env-var references, slash-command syntax, hard-coded
+cross-plugin identifiers — found anywhere in a plugin's Codex-exposed
+content, so a Codex session never encounters an instruction or reference
+it cannot resolve. Its scope is narrower than "everything Codex might
+read": it scans only the generated Codex plugin manifest and skill tree
+(or a plugin's configured skill-path override), never the
+hook/lib/command-wrapper layer behind those skills — code in that layer
+may reference Claude-only paths freely since Codex never executes it
+directly.
+
 ## spec-tier
 
 The escalation path `/workflows:plan` takes for a feature too
