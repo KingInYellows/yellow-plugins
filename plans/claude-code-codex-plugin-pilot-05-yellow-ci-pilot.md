@@ -349,8 +349,9 @@ unverified-gap note (R42).
   emits `{"continue": true}` (never a PreToolUse-style `continue` omission).
   Verified after D2 generation: command + commandWindows both
   `node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-codex.js`, timeout 3.
-- [ ] Delete `plugins/yellow-ci/hooks/scripts/session-start.sh` only after the
-  parity harness (Phase E) is green.
+- [x] Delete `plugins/yellow-ci/hooks/scripts/session-start.sh` only after the
+  parity harness (Phase E) is green. (Done after E2 hook-parity.bats went green;
+  CLAUDE.md Hooks listing updated to the Node runtime.)
 
 ### Phase C — Cache relocation (R38)
 
@@ -392,21 +393,31 @@ unverified-gap note (R42).
 
 ### Phase E — Fake-executable + parity tests (R43, R37)
 
-- [ ] Add PATH-stub fake executables under `plugins/yellow-ci/tests/mocks/`:
+- [x] Add PATH-stub fake executables under `plugins/yellow-ci/tests/mocks/`:
   `gh` and `ssh` (yellow-review/gt-workflow shape — `#!/bin/sh`, `set -eu`,
   log to `${MOCK_<NAME>_LOG:-/dev/null}`, `case "$*"` pattern match, canned
   output incl. rate-limit + malformed-JSON responses, fall through to an
   explicit `unhandled arguments` error + exit 1).
-- [ ] Add `plugins/yellow-ci/tests/hook-parity.bats` — pipe each fixture stdin
+- [x] Add `plugins/yellow-ci/tests/hook-parity.bats` — pipe each fixture stdin
   through the Node entrypoints (`entrypoint-claude.js` and
   `entrypoint-codex.js`) and diff stdout + exit code against the goldens
   (JSON-semantic where output is JSON).
-- [ ] Add bats coverage for the R43 fake-exec matrix (using the `gh`/`ssh`
+- [x] Add bats coverage for the R43 fake-exec matrix (using the `gh`/`ssh`
   mocks, no external writes): failure diagnosis, rate limits, malformed
   responses, runner-target validation, and non-Linux probe rejection. Keep
   `tests/redaction.bats` (redaction of the 13+ `redact.sh` patterns) and
   `tests/resolve-runner-targets.bats` passing after the cache relocation.
-- [ ] Run `bats tests/` from `plugins/yellow-ci/` — all suites green.
+  `fake-exec.bats` covers the SSH-safety contract shape + connection-failure
+  categorization + runner-target validation; the gh-driven failure/rate-limit/
+  malformed cases are covered end-to-end by `hook-parity.bats`; the SSH probe
+  ORCHESTRATION + non-Linux skip are markdown-scoped (documented skip, gt-workflow
+  precedent). DISCOVERED + FIXED a pre-existing `redact.sh` bug (unrelated to this
+  PR): the generic key/value catch-all clobbered specific `[REDACTED:<label>]`
+  redactions back to a bare `[REDACTED]` (4 redaction.bats cases had been failing
+  on main); fixed by excluding already-`[`-prefixed values — no secret leak (the
+  secret was always redacted; only the label was lost).
+- [x] Run `bats tests/` from `plugins/yellow-ci/` — all suites green. (166 pass,
+  0 fail, 1 documented skip after the redact.sh fix.)
 
 ### Phase F — Documentation close-out (R40, R41)
 

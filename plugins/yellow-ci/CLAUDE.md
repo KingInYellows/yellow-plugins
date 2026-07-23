@@ -65,8 +65,12 @@ Three-layer plugin where each layer is independently useful:
 
 ### Hooks (1)
 
-- `session-start.sh` — Detect CI context, check for recent failures (60s cache,
-  3s budget)
+- `SessionStart` (Node runtime under `hooks/scripts/`) — Detect CI context,
+  check for recent failures (60s cache, 3s budget). Ported from the original
+  `session-start.sh` to a dependency-free Node runtime shared across hosts
+  (`entrypoint-claude.js` / `entrypoint-codex.js` → `lib/run-hook.js` →
+  `lib/session-start-core.js`); see "Codex Distribution" below. Carried into the
+  Codex manifest but inert on Codex today (`plugin_hooks` removed).
 
 ## When to Use What
 
