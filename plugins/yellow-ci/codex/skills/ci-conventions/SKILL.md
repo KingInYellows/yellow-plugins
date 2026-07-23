@@ -113,8 +113,8 @@ patterns.
 
 ## Secret Redaction
 
-13+ regex patterns for redacting secrets from CI logs. Always apply
-`redact_secrets()` from `lib/redact.sh` before displaying any log content. Wrap
+13+ regex patterns for redacting secrets from CI logs. Always apply the
+plugin's `redact_secrets` routine before displaying any log content. Wrap
 output in prompt injection fences.
 
 ## Error Catalog

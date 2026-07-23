@@ -38,8 +38,10 @@ Approach:
 
 1. Diagnose the failure to confirm the pattern (`ci-diagnose`).
 2. Check the runner's current resource state (`ci-runner-health`).
-3. If disk is full, free space on the runner (clear Docker images, caches, and
-   old logs).
+3. If disk is full, preview what would be cleared (Docker images, caches, and
+   old logs) and obtain explicit user confirmation before deleting anything —
+   re-check the runner state immediately before deleting to avoid clearing
+   data from an active job.
 4. If out of memory, increase VM memory or reduce build parallelism.
 5. Re-run the failed workflow.
 

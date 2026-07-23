@@ -119,8 +119,9 @@ These plugins work entirely offline with no external network calls:
 
 ### Plugins with Hooks
 
-Four plugins execute hooks (yellow-ruvector and yellow-debt are shell; yellow-ci
-and gt-workflow run a dependency-free Node runtime):
+Nine plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
+yellow-composio, yellow-morph, yellow-research, and yellow-semgrep are shell;
+yellow-ci and gt-workflow run a dependency-free Node runtime:
 
 | Plugin | Hook Events | Purpose |
 |---|---|---|
@@ -128,6 +129,11 @@ and gt-workflow run a dependency-free Node runtime):
 | yellow-ci | SessionStart | Check for recent CI failures (Node runtime, cached, 3s budget) |
 | yellow-debt | SessionStart | Remind about high/critical debt findings |
 | gt-workflow | PreToolUse, PostToolUse | Block `git push`, validate commit messages |
+| yellow-core | SessionStart, Stop | Drain the background compounding-pipeline staging queue; capture session transcript tail |
+| yellow-composio | SessionStart | Warn if `composio_mcp_url` is non-HTTPS (advisory only) |
+| yellow-morph | SessionStart | Pre-warm `@morphllm/morphmcp` install for fast first tool call |
+| yellow-research | SessionStart | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all` |
+| yellow-semgrep | SessionStart | Emit `credential-status.json` for `/setup:all` |
 
 **yellow-ci SessionStart (Node port).** Ported from `session-start.sh` to a
 dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated by
