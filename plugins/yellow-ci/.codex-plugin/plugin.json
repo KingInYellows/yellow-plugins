@@ -1,0 +1,11 @@
+{
+  "name": "yellow-ci",
+  "version": "1.4.6",
+  "interface": {
+    "displayName": "Yellow CI",
+    "category": "Developer Tools"
+  },
+  "description": "CI failure diagnosis, GitHub Actions workflow linting, self-hosted runner setup and health skills, invoked as Codex skills. Read-mostly: SSH/config writes and workflow-lint fixes always preview and confirm first.",
+  "skills": "./codex/skills",
+  "hooks": "./hooks/codex-hooks.json"
+}

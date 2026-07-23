@@ -344,9 +344,11 @@ unverified-gap note (R42).
   `node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js` (keep
   `timeout: 3`). Update `plugins/yellow-ci/hooks/hooks.json` non-authoritative
   mirror to match.
-- [ ] Verify the generated `plugins/yellow-ci/hooks/codex-hooks.json` declares
+- [x] Verify the generated `plugins/yellow-ci/hooks/codex-hooks.json` declares
   `SessionStart` → `entrypoint-codex.js` WITH a `commandWindows` twin (R36) and
   emits `{"continue": true}` (never a PreToolUse-style `continue` omission).
+  Verified after D2 generation: command + commandWindows both
+  `node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-codex.js`, timeout 3.
 - [ ] Delete `plugins/yellow-ci/hooks/scripts/session-start.sh` only after the
   parity harness (Phase E) is green.
 
@@ -372,21 +374,21 @@ unverified-gap note (R42).
 
 ### Phase D — Catalog enablement + regenerate (R39, R5, R19)
 
-- [ ] Edit `catalog/plugins/yellow-ci.json` `targets.codex`: set
+- [x] Edit `catalog/plugins/yellow-ci.json` `targets.codex`: set
   `enabled: true`; add `interface: {displayName: "Yellow CI", category:
   "Developer Tools"}`, a `description`, `skillAllowlist: [ci-setup,
   ci-setup-runner-targets, ci-status, ci-diagnose, ci-lint-workflows,
   ci-runner-health, ci-conventions, diagnose-ci]`, and
   `componentPaths: {skills: "./codex/skills"}`. Leave `includeHooks` at its
   default `true`.
-- [ ] Run `pnpm generate:manifests` to regenerate
+- [x] Run `pnpm generate:manifests` to regenerate
   `plugins/yellow-ci/.codex-plugin/plugin.json`,
   `plugins/yellow-ci/hooks/codex-hooks.json`, and
   `plugins/yellow-ci/codex/skills/<8>/SKILL.md` (frontmatter normalized to
   `name` + single-line `description`). Never hand-edit these.
-- [ ] Confirm `.agents/plugins/marketplace.json` lists the Codex plugins in
+- [x] Confirm `.agents/plugins/marketplace.json` lists the Codex plugins in
   canonical order `[gt-workflow, yellow-core, yellow-ci]` (computed from
-  `catalog.json` `pluginOrder`).
+  `catalog.json` `pluginOrder`). Verified: `[gt-workflow, yellow-core, yellow-ci]`.
 
 ### Phase E — Fake-executable + parity tests (R43, R37)
 
