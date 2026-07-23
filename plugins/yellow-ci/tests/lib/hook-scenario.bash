@@ -19,16 +19,28 @@ HOOK_SCENARIO_MOCKS_DEFAULT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../mocks" && p
 HOOK_SCENARIO_ROUTING_TEXT='[yellow-ci] Runner routing: prefer pool:ares for heavy CI; pool:atlas for lightweight checks.'
 HOOK_SCENARIO_CACHED_TEXT='[yellow-ci] CACHED: 1 recent failure(s) on branch(es): cached-branch. Use /ci:diagnose to investigate.'
 
-# Build a PATH dir containing only the coreutils the hook needs, deliberately
-# excluding `gh`, so `command -v gh` fails even though the real gh is installed.
+# Build a PATH dir that mirrors the current PATH but EXCLUDES `gh`, so
+# `command -v gh` fails even though the real gh is installed — while every other
+# tool (coreutils, node, jq, and whatever the bats harness itself shells out to,
+# e.g. mktemp) stays available. Symlinks every executable found on the current
+# PATH except any named `gh`; first-seen wins (PATH order preserved).
 _hook_scenario_bin_without_gh() {
   local dir="$1/nogh-bin"
   mkdir -p "$dir"
-  local tool p
-  for tool in sh bash env node jq dirname pwd mkdir md5sum md5 cut stat date cat mv rm head tr tail timeout grep printf awk; do
-    if p=$(command -v "$tool" 2>/dev/null); then
-      ln -sf "$p" "$dir/$tool"
-    fi
+  local d f name
+  local oldifs="$IFS"
+  IFS=:
+  set -- $PATH
+  IFS="$oldifs"
+  for d in "$@"; do
+    [ -d "$d" ] || continue
+    for f in "$d"/*; do
+      [ -x "$f" ] || continue
+      name=$(basename "$f")
+      [ "$name" = "gh" ] && continue
+      [ -e "$dir/$name" ] && continue
+      ln -s "$f" "$dir/$name" 2>/dev/null || true
+    done
   done
   printf '%s' "$dir"
 }
