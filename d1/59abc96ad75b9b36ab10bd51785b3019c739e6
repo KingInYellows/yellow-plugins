@@ -1,0 +1,59 @@
+plugins/yellow-ci/hooks/scripts/lib/run-hook.js
+  s_17bd29452ea753::t_3310d9cdaf7da9 37-43,48-50
+plugins/yellow-ci/agents/ci/runner-assignment.md
+  s_17bd29452ea753::t_ab905878b18fe9 51
+plugins/yellow-ci/hooks/scripts/lib/session-start-core.js
+  s_17bd29452ea753::t_2185d772da55a8 79-81
+  s_17bd29452ea753::t_2e9188a092170d 106-108
+  s_17bd29452ea753::t_fe2a2aeab8032b 155-157
+  s_17bd29452ea753::t_482e2deabc3e57 211-220
+plugins/yellow-ci/codex/skills/ci-setup/SKILL.md
+  s_17bd29452ea753::t_7267d6c7275125 110-112
+plugins/yellow-ci/tests/redaction.bats
+  s_235ada1c09c969::t_4b1993de1fe0c9 177-199
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_17bd29452ea753::t_7267d6c7275125 47-49
+plugins/yellow-ci/codex/skills/ci-lint-workflows/SKILL.md
+  s_17bd29452ea753::t_7267d6c7275125 104-105
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_17bd29452ea753::t_48a2871f6ade02 48-50
+plugins/yellow-ci/agents/ci/workflow-optimizer.md
+  s_17bd29452ea753::t_d20a93a27d99ef 48
+  s_17bd29452ea753::t_4ef540d4cbf4be 57
+plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md
+  s_17bd29452ea753::t_7267d6c7275125 108-109
+plugins/yellow-ci/CLAUDE.md
+  s_17bd29452ea753::t_075d9fb3029a5b 60-73,75-76
+plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md
+  s_17bd29452ea753::t_79f5b76ea05558 109-110
+plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md
+  s_17bd29452ea753::t_b011b61524f4b5 105-106
+plugins/yellow-ci/skills/ci-setup/SKILL.md
+  s_17bd29452ea753::t_634c7abfd7ce9f 111-113
+plugins/yellow-ci/commands/ci/setup.md
+  s_17bd29452ea753::t_a0d775216898af 21-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d159abc96ad75b9b36ab10bd51785b3019c739e6",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_235ada1c09c969": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f9100-87cc-7841-bb0f-cbcf07ba0561",
+        "model": "gpt-5.4"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
