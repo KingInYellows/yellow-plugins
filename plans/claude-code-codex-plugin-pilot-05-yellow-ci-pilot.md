@@ -438,11 +438,18 @@ unverified-gap note (R42).
   fold, host-neutral config note), `AGENTS.md` (yellow-ci as the third
   Codex-enabled plugin), and `docs/security.md` hooks table (Node port + cache
   relocation + Codex-hook-inertness note).
-- [ ] No-advertising sweep (R41): grep root `README.md` and docs for any
+- [x] No-advertising sweep (R41): grep root `README.md` and docs for any
   repository-wide Codex compatibility claim; confirm yellow-ci carries no
   blanket "Codex-compatible" badge and that unsupported plugins remain absent
   from the Codex marketplace. Confirm R44 — the two untracked working-tree
   files are never touched.
+  R41: README's only Codex mentions are `yellow-codex`/`yellow-council` (plugins
+  that USE the Codex CLI as a tool), not a repo-wide compatibility claim; no
+  badge; `docs/codex-distribution.md` states the no-advertising policy explicitly;
+  the Codex marketplace lists ONLY [gt-workflow, yellow-core, yellow-ci]. R44:
+  working tree clean, no untracked files — the pair R44 protected was committed in
+  #644 (`git log` on the spec) before these planning files existed, so it is
+  satisfied by default (never touched a stray file).
 
 ### Phase G — Delivery (R39, R42)
 
