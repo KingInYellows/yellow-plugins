@@ -266,7 +266,7 @@ unverified-gap note (R42).
   before config writes. Convert `commands/ci/setup-runner-targets.md` to a
   wrapper (`allowed-tools: [Bash, Read, Write, AskUserQuestion, Skill]`, keep
   `model: sonnet`, `$ARGUMENTS` passthrough).
-- [ ] Author `plugins/yellow-ci/skills/ci-runner-health/SKILL.md` from
+- [x] Author `plugins/yellow-ci/skills/ci-runner-health/SKILL.md` from
   `commands/ci/runner-health.md`: host-neutral body — read runner SSH config
   host-neutrally (no literal `.claude/`); remove the `/ci:runner-cleanup`
   slash-ref (R33-deferred, Codex-unavailable) → prose; FOLD the relevant
