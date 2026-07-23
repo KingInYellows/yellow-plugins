@@ -37,9 +37,9 @@ Loaded automatically by:
 
 ## Core Failure Categories
 
-12 failure categories (F01-F12) cover self-hosted runner issues. For detailed
-pattern matching with log signals and suggested fixes, load
-`references/failure-patterns.md`.
+12 failure categories (F01-F12) cover self-hosted runner issues. The plugin's
+failure-pattern reference documents each category in full, with log signals,
+severity levels, and suggested fixes.
 
 Quick grep patterns:
 
@@ -58,8 +58,9 @@ Quick grep patterns:
 
 ## Validation Schemas
 
-All inputs validated before use in paths or SSH commands. For complete regex
-patterns and edge cases, load `references/security-patterns.md`.
+All inputs validated before use in paths or SSH commands. The plugin's
+security-patterns reference documents the complete regex patterns and edge
+cases.
 
 Quick reference:
 
@@ -107,8 +108,9 @@ and tabs are NOT supported by the shell parser.
 
 ## Linter Rules
 
-14 rules (W01-W14) for workflow linting. For detailed specifications with
-auto-fix logic and ecosystem patterns, load `references/linter-rules.md`.
+14 rules (W01-W14) for workflow linting. The plugin's linter-rules reference
+documents the detailed specifications with auto-fix logic and ecosystem
+patterns.
 
 ## Secret Redaction
 
