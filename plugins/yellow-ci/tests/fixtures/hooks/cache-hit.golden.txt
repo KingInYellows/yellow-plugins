@@ -1,0 +1,7 @@
+EXIT_CODE=0
+--- STDOUT ---
+{
+  "systemMessage": "[yellow-ci] CACHED: 1 recent failure(s) on branch(es): cached-branch. Use /ci:diagnose to investigate.",
+  "continue": true
+}
+--- STDERR ---
