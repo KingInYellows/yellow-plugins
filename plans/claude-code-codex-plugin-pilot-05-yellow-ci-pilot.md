@@ -249,7 +249,7 @@ unverified-gap note (R42).
   failure-analyst delegation) + `model: sonnet`: `allowed-tools:
   [Bash, Read, Grep, Glob, AskUserQuestion, Task, Skill]`, `$ARGUMENTS`
   passthrough.
-- [ ] Author `plugins/yellow-ci/skills/ci-setup/SKILL.md` from
+- [x] Author `plugins/yellow-ci/skills/ci-setup/SKILL.md` from
   `commands/ci/setup.md`: host-neutral body — no literal `.claude/`, no
   `${CLAUDE_PLUGIN_ROOT}` sourcing; inline prerequisite/SSH-config validation
   as prose; reference the global `~/.config/yellow-ci/` config; describe the
