@@ -1,0 +1,72 @@
+#!/bin/sh
+# Fake `gh` for yellow-ci hook + fake-exec tests. Pattern-matches on "$*",
+# logs every invocation to ${MOCK_GH_LOG:-/dev/null}, and returns canned
+# output driven by env vars so a single mock covers every scenario:
+#
+#   MOCK_GH_AUTH     ok | unauthed        (default ok)   -> `gh auth status` exit
+#   MOCK_GH_RUNLIST  empty | failures |                  (default empty)
+#                    malformed | ratelimit               -> `gh run list` output
+#
+# Any argument shape not handled below is a test-authoring error, so it
+# fails loudly (unhandled arguments + exit 1) rather than silently
+# returning success.
+set -eu
+
+printf '%s\n' "$*" >>"${MOCK_GH_LOG:-/dev/null}"
+
+case "$1" in
+  auth)
+    # `gh auth status` — exit non-zero when unauthed.
+    if [ "${MOCK_GH_AUTH:-ok}" = "unauthed" ]; then
+      printf 'You are not logged into any GitHub hosts.\n' >&2
+      exit 1
+    fi
+    printf 'github.com\n  Logged in to github.com account mockuser\n' >&2
+    exit 0
+    ;;
+  run)
+    # `gh run list --status failure ... -q '<filter>'` — gh applies the -q
+    # jq filter itself, so emit the already-filtered array shape.
+    case "${MOCK_GH_RUNLIST:-empty}" in
+      empty)
+        printf '[]\n'
+        ;;
+      failures)
+        printf '%s\n' '[{"databaseId":101,"headBranch":"main","displayTitle":"CI","conclusion":"failure","updatedAt":"2026-07-23T00:00:00Z"},{"databaseId":102,"headBranch":"main","displayTitle":"CI","conclusion":"failure","updatedAt":"2026-07-23T00:01:00Z"},{"databaseId":103,"headBranch":"feature-x","displayTitle":"CI","conclusion":"failure","updatedAt":"2026-07-23T00:02:00Z"}]'
+        ;;
+      malformed)
+        # Non-array garbage — exercises the `type == "array"` guard.
+        printf 'not-json-at-all{\n'
+        ;;
+      ratelimit)
+        printf 'gh: API rate limit exceeded\n' >&2
+        exit 1
+        ;;
+      *)
+        printf 'mock gh: unknown MOCK_GH_RUNLIST=%s\n' "${MOCK_GH_RUNLIST:-}" >&2
+        exit 1
+        ;;
+    esac
+    exit 0
+    ;;
+  api)
+    # `gh api rate_limit` / `gh api repos/... ` — minimal canned responses.
+    case "$*" in
+      *rate_limit*)
+        printf '{"resources":{"core":{"remaining":0,"reset":1784800000}}}\n'
+        ;;
+      *actions/runners*)
+        printf '{"runners":[]}\n'
+        ;;
+      *)
+        printf 'mock gh: unhandled api call: %s\n' "$*" >&2
+        exit 1
+        ;;
+    esac
+    exit 0
+    ;;
+  *)
+    printf 'mock gh: unhandled arguments: %s\n' "$*" >&2
+    exit 1
+    ;;
+esac

@@ -1,0 +1,7 @@
+EXIT_CODE=0
+--- STDOUT ---
+{
+  "systemMessage": "[yellow-ci] Runner routing: prefer pool:ares for heavy CI; pool:atlas for lightweight checks.\n[yellow-ci] CI: 3 recent failure(s) on branch(es): feature-x, main. Use /ci:diagnose to investigate.",
+  "continue": true
+}
+--- STDERR ---

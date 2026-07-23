@@ -1,0 +1,7 @@
+EXIT_CODE=0
+--- STDOUT ---
+{
+  "systemMessage": "[yellow-ci] Runner routing: prefer pool:ares for heavy CI; pool:atlas for lightweight checks.",
+  "continue": true
+}
+--- STDERR ---

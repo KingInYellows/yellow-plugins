@@ -321,7 +321,7 @@ unverified-gap note (R42).
 
 ### Phase B — SessionStart Node runtime port (R34, R35, R36, R37)
 
-- [ ] Capture golden fixtures from the CURRENT `session-start.sh` behavior
+- [x] Capture golden fixtures from the CURRENT `session-start.sh` behavior
   (before any deletion) under
   `plugins/yellow-ci/tests/fixtures/hooks/`: `no-workflows`,
   `routing-summary-present`, `routing-summary-absent`, `gh-missing`,
