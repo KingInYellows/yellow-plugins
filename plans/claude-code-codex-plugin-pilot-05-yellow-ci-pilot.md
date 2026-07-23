@@ -453,12 +453,18 @@ unverified-gap note (R42).
 
 ### Phase G — Delivery (R39, R42)
 
-- [ ] `pnpm changeset` → `'yellow-ci': minor` with a one-paragraph summary and
+- [x] `pnpm changeset` → `'yellow-ci': minor` with a one-paragraph summary and
   the trailing `<!-- markdownlint-disable-file MD041 -->`.
-- [ ] Run the full per-PR gate: `pnpm validate:schemas`, `pnpm
+- [x] Run the full per-PR gate: `pnpm validate:schemas`, `pnpm
   validate:versions`, `pnpm validate:generated`, `pnpm validate:codex`,
   `pnpm test:unit`, `pnpm test:integration`, `pnpm lint`, `pnpm typecheck`, and
   `bats tests/` in `plugins/yellow-ci/`. All green.
+  All green. Two gate fixes folded in: (1) reordered requires in
+  session-start-core.js (eslint import/order); (2) updated the
+  generate-manifests characterization snapshot — 3 lines were PRE-EXISTING drift
+  from #662's version bump (gt-workflow 1.5.4→1.6.0, yellow-core 1.26.0→1.27.0,
+  frozen at shell-04 de669b89), 1 line is this PR's yellow-ci hook command
+  (bash→node). validate:generated confirms generated == catalog.
 - [ ] Manual Codex-app acceptance (R42): `codex plugin add` round-trip in an
   isolated `CODEX_HOME` — install clean, exactly the 8 allowlisted skills
   visible (nothing else), `.codex-plugin/plugin.json` +

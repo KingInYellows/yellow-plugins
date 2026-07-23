@@ -17,11 +17,11 @@
  * routing summary (or empty) — it never throws to the caller.
  */
 
+const { spawnSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const crypto = require('crypto');
-const { spawnSync } = require('child_process');
 
 // --- Cache location (R38) -------------------------------------------------
 // WRITES go to a plugin-data directory; READS prefer that new path and fall
