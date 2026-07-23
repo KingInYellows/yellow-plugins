@@ -182,3 +182,22 @@ plan that treats "port a PreToolUse blocking hook from Claude to Codex" as
 "change the JSON field names" misses that Claude's side isn't JSON-based
 for this case at all — the two hosts use categorically different blocking
 mechanisms, not just different envelope shapes.
+
+---
+
+## Update — 2026-07-23
+
+While expanding shell 05 (`claude-code-codex-plugin-pilot-05-yellow-ci-pilot`),
+research toward the "Previously unverified" section's item 3
+(`agents/openai.yaml` moot on 0.144.1) surfaced a possible replacement
+mechanism for non-implicit skill invocation: current Codex documentation
+and the `openai/codex` source reportedly also parse a
+`disable-model-invocation` SKILL.md frontmatter field, distinct from the
+`agents/openai.yaml` file this doc already covers. This claim is
+**reported, not independently verified against a live CLI in this repo** —
+the same gap `allow_implicit_invocation` had before the 2026-07-16 spike
+disproved it on 0.144.1. Until spiked: keep SKILL.md description-phrasing
+as the working non-implicit-invocation lever (per the existing spike
+finding above), and add a live-CLI re-verification step for
+`disable-model-invocation` to any plan that would ship `agents/openai.yaml`
+or frontmatter changes depending on it.
