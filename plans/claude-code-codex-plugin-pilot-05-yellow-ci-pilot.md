@@ -231,7 +231,7 @@ unverified-gap note (R42).
   body. Then convert `commands/ci/status.md` to a thin wrapper — `allowed-tools:
   [Bash, Skill]`, keep `model: haiku`, body invokes `Skill` with
   `skill: "ci-status"` and the literal `$ARGUMENTS` passthrough sentence.
-- [ ] Author `plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md` from
+- [x] Author `plugins/yellow-ci/skills/ci-lint-workflows/SKILL.md` from
   `commands/ci/lint-workflows.md`: reword its `$ARGUMENTS` to
   "the argument text after the skill name" prose; keep W01-W14 lint logic; add
   an R32 preview-and-confirm gate before any `Edit`-based workflow lint fix.
