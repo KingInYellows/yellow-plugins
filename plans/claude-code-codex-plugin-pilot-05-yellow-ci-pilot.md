@@ -327,7 +327,7 @@ unverified-gap note (R42).
   `routing-summary-present`, `routing-summary-absent`, `gh-missing`,
   `gh-unauthed`, `cache-hit`, `cache-miss-failures`, `malformed-gh-json`,
   `rate-limited-gh` — each `<case>.stdin` + `<case>.golden.txt`.
-- [ ] Author yellow-ci's own Node runtime under
+- [x] Author yellow-ci's own Node runtime under
   `plugins/yellow-ci/hooks/scripts/` (dependency-free Node >=22.22; no
   cross-plugin import — R34): `lib/envelope.js`
   (SessionStart `formatOutput` → `{"continue": true[, "systemMessage"]}` on both
