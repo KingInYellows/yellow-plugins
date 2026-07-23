@@ -14,15 +14,19 @@ setup() {
   # shellcheck source=../hooks/scripts/lib/resolve-runner-targets.sh
   . "${SCRIPT_DIR}/lib/resolve-runner-targets.sh"
 
-  # Isolate HOME (cache dir) and XDG_CONFIG_HOME (global config) per test.
+  # Isolate HOME, XDG_CONFIG_HOME (global config) and XDG_DATA_HOME (R38 cache
+  # dir) per test; unset CLAUDE_PLUGIN_DATA so the cache stays under the sandbox.
   TEST_HOME="$(mktemp -d)"
   TEST_XDG="$(mktemp -d)"
   TEST_WORK="$(mktemp -d)"
   export HOME="$TEST_HOME"
   export XDG_CONFIG_HOME="$TEST_XDG"
+  export XDG_DATA_HOME="$TEST_HOME/.local/share"
+  unset CLAUDE_PLUGIN_DATA
   GLOBAL_CFG="$TEST_XDG/yellow-ci/runner-targets.yaml"
   LOCAL_CFG="$TEST_WORK/.claude/yellow-ci-runner-targets.yaml"
-  CACHE_DIR="$TEST_HOME/.cache/yellow-ci"
+  # R38: cache now lives under the plugin-data dir (rt_cache_dir), not ~/.cache.
+  CACHE_DIR="$XDG_DATA_HOME/yellow-ci"
   mkdir -p "$(dirname "$GLOBAL_CFG")" "$(dirname "$LOCAL_CFG")"
   cd "$TEST_WORK"
 }

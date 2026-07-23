@@ -360,7 +360,7 @@ unverified-gap note (R42).
   READ-ONLY to the legacy `${HOME}/.cache/yellow-ci/…` (never write the legacy
   path again). Preserve the bounded `md5(PWD)` cache-key logic. Define the
   exact path shape once in `session-start-core.js` and reuse.
-- [ ] Apply the same new-write / legacy-read-fallback relocation to
+- [x] Apply the same new-write / legacy-read-fallback relocation to
   `hooks/scripts/lib/resolve-runner-targets.sh` (`rt_cache_dir()`,
   `routing-summary.txt`, `runner-targets-merged.json`) so the routing-summary
   the Node hook reads is produced at the new location. Keep `.claude/`
