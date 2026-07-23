@@ -465,13 +465,26 @@ unverified-gap note (R42).
   from #662's version bump (gt-workflow 1.5.4→1.6.0, yellow-core 1.26.0→1.27.0,
   frozen at shell-04 de669b89), 1 line is this PR's yellow-ci hook command
   (bash→node). validate:generated confirms generated == catalog.
-- [ ] Manual Codex-app acceptance (R42): `codex plugin add` round-trip in an
+- [x] Manual Codex-app acceptance (R42): `codex plugin add` round-trip in an
   isolated `CODEX_HOME` — install clean, exactly the 8 allowlisted skills
   visible (nothing else), `.codex-plugin/plugin.json` +
   `codex/skills/**` byte-identical to committed generated artifacts,
   `codex-hooks.json` references `entrypoint-codex.js` (execution expected inert
   on the target CLI, not a failure), hook review/trust exercised. Record
   evidence and any in-environment-unverifiable gaps in the PR description.
+  DONE (codex-cli 0.144.6, isolated CODEX_HOME): `marketplace add <repo>` then
+  `plugin add yellow-ci@yellow-plugins` installed clean (1.4.6, enabled);
+  `plugin list` shows exactly the 3 Codex plugins in canonical order. Installed
+  `codex/skills/**` (all 8: ci-setup, ci-setup-runner-targets, ci-status,
+  ci-diagnose, ci-lint-workflows, ci-runner-health, ci-conventions, diagnose-ci —
+  nothing else), `.codex-plugin/plugin.json`, and `hooks/codex-hooks.json` were
+  BYTE-IDENTICAL to the committed generated artifacts; codex-hooks.json
+  references `entrypoint-codex.js`; installed skills exposure-lint clean.
+  UNVERIFIABLE GAPS (for the PR body): no hook TRUST prompt fired (hooks are inert
+  on Codex — `plugin_hooks` removed), so live hook firing is schema/parity-tested
+  only; and a live authenticated model session invoking the skills + the
+  `worker`/`explorer` delegation was not run (the delegation syntax stays marked
+  "unverified" in the skill bodies).
 - [ ] Submit as stacked PR 5 via Graphite (`gt`), bottom of the pilot stack.
 
 ## Verification
