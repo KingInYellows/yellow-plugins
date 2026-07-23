@@ -225,7 +225,7 @@ unverified-gap note (R42).
 
 ### Phase A — Operational skills + reference-skill non-implicit marking (R29, R31, R32, R33)
 
-- [ ] Author `plugins/yellow-ci/skills/ci-status/SKILL.md` from
+- [x] Author `plugins/yellow-ci/skills/ci-status/SKILL.md` from
   `commands/ci/status.md` (cleanest — no `.claude/`/`$ARGUMENTS`/slash refs):
   `user-invokable: false`, single-line description, three headings, host-neutral
   body. Then convert `commands/ci/status.md` to a thin wrapper — `allowed-tools:
