@@ -1,6 +1,9 @@
 # Claude Flow generated files
 .claude/
 .mcp.json
+# gt-workflow's .mcp.json is a plugin-distributed shared MCP declaration
+# (Codex-pilot shell 04, Step 12), not a local dev config — track it.
+!plugins/gt-workflow/.mcp.json
 claude-flow.config.json
 .swarm/
 .hive-mind/

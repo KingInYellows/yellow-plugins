@@ -272,3 +272,17 @@ do everything the new/changed doc's own header says it does."
    declared consumers is the same failure as checklist item 3 above (a
    citation not re-verified after a change), but triggered by the *new*
    doc's own promise rather than an existing citation elsewhere.
+
+---
+
+## Update — 2026-07-22
+
+**5th recurrence** (PR #661, gt-workflow Codex-pilot conversion, shell 04):
+`plugins/gt-workflow/README.md` and `plugins/gt-workflow/skills/gt-setup/SKILL.md`
+still attributed the `jq` requirement to the PreToolUse/PostToolUse hooks
+after the same PR rewrote those hooks from bash+jq to Node — a mechanical
+grep for `jq` across the plugin's docs post-rewrite would have caught it;
+the docs were left asserted-unchanged instead. Flagged by
+project-compliance-reviewer, P2, routed to Residual Actionable Work
+(out of the review's P0/P1-only auto-apply scope) rather than fixed in the
+same PR. Prior recurrences: PR #601 (this doc's origin), #632, #644, #658.

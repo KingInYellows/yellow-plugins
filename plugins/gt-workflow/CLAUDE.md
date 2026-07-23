@@ -5,6 +5,9 @@ Graphite-native workflow commands for stacked PR development.
 ## MCP Server
 
 - **Graphite** — Bundled stdio server via `gt mcp` (requires gt CLI v1.6.7+)
+- Declared in `.mcp.json` at the plugin root (shared by both hosts) —
+  `plugin.json`'s `mcpServers` field points at `"./.mcp.json"` rather than
+  inlining the server def, so Claude and Codex read one declaration
 - Authentication: Inherited from `gt` CLI auth — no separate token required
 - Tool prefix: `mcp__plugin_gt-workflow_graphite__`
 - Tool names must be discovered empirically via ToolSearch after installation
@@ -71,6 +74,14 @@ one minor release, then remove the bare form in the next major.
 
 ## Plugin Commands
 
+Each command below is a thin wrapper (`commands/<name>.md`) that invokes a
+same-named canonical skill (`skills/<name>/SKILL.md`) via the `Skill` tool —
+the shell-03 wrapper idiom (see
+`plugins/yellow-core/commands/plan/status.md` for the precedent this repo's
+RULE 17 validator checks against). The skill body is the actual
+implementation and is what both Claude (via the command) and Codex (skill
+invoked directly, no command layer) execute.
+
 - `/gt-setup` — validate Graphite CLI, configure AI agent settings, generate `.graphite.yml` convention file
 - `/smart-submit` — Audit + commit + submit in one flow
 - `/gt-amend` — Audit + amend current branch commit + re-submit (quick fix path)
@@ -79,6 +90,18 @@ one minor release, then remove the bare form in the next major.
   reconcile; optionally offers worktree cleanup via yellow-core
 - `/gt-sync` — Sync repo, restack, clean up
 - `/gt-nav` — Visualize and navigate the stack
+
+Three additional skills exist with no command wrapper (Claude Code reaches
+them only via cross-references from the seven skills above, or the `Skill`
+tool directly; Codex reaches all ten identically since it has no command
+layer):
+
+- `audit-review` — the `quick-code-review`/`quick-security-scan`/
+  `quick-error-check` audit prompts, consolidated out of `smart-submit` and
+  `gt-amend` so both invoke one shared implementation
+- `stack-decomposition-format` / `stack-plan-style` — cross-host copies of
+  the two `output-styles/*.md` files (Codex has no `outputStyles` manifest
+  field), referenced by `gt-stack-plan`
 
 ## Submit Paths
 
@@ -149,11 +172,110 @@ without `-r`).
 
 ## Hooks
 
+Both hooks run through a shared cross-host Node runtime under
+`hooks/scripts/` rather than standalone bash scripts (the original
+`check-git-push.sh` / `check-commit-message.sh` were deleted once
+`tests/hook-parity.bats` proved byte/semantic-equivalent behavior):
+
+- `hooks/scripts/lib/policy-check-git-push.js` /
+  `lib/policy-check-commit-message.js` — pure decision functions
+  (`camelCaseEnvelope -> {decision, message}`), host-agnostic
+- `hooks/scripts/lib/envelope.js` — `snakeToCamelEnvelope` (both hosts'
+  stdin is snake_case, only output differs — see
+  `docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md`),
+  plus `formatClaudeOutput`/`formatCodexOutput` (Claude's PreToolUse deny is
+  exit-2 + stderr; Codex's is a `hookSpecificOutput` JSON envelope — see the
+  same doc's "different mechanism per host" note)
+- `hooks/scripts/lib/run-hook.js` — shared `runHook(argv, formatOutput)`:
+  reads stdin, transforms the envelope, dispatches to the matching policy,
+  formats output; preserves each hook's original fail-open/fail-closed
+  behavior on parse failure
+- `hooks/scripts/entrypoint-claude.js` / `entrypoint-codex.js` — thin
+  per-host wrappers (~13 lines) calling `runHook` with the matching
+  formatter
+
+Behavior (unchanged from the original bash hooks):
+
 - **PreToolUse (Bash)** — Backstop that blocks raw `git push` and points the
   workflow back to `gt submit --no-interactive`
 - **PostToolUse (Bash)** — Warns when a `gt commit`, `gt modify`, or
   `gt create` command uses a non-conventional commit message (warn-only, never
   blocks execution)
+
+Hooks are carried into the generated Codex manifest
+(`hooks/codex-hooks.json`, `targets.codex.includeHooks` left at its default
+of `true` — unlike yellow-core, which opts out) but currently **never
+fire** on Codex: `plugin_hooks` is stage `removed` on codex-cli 0.144.1 (see
+the manifest-and-hook-contract doc's "Update — 2026-07-20" section). This is
+schema/unit-tested but not live end-to-end verifiable right now.
+
+## Testing
+
+Bats shell tests live in `tests/` — run `bats tests/` from inside this
+plugin directory (see root `CLAUDE.md`'s bats list).
+
+- `tests/hook-parity.bats` — parity gate proving the Node hook runtime
+  (`hooks/scripts/entrypoint-claude.js`) reproduces the deleted bash hooks'
+  behavior exactly, against golden fixtures in `tests/fixtures/hooks/`.
+- `tests/gt-cleanup.bats` — the deterministic bash embedded in
+  `skills/gt-cleanup/SKILL.md`: flag parsing, branch classification, the
+  batch-cap-15 review queue, the `gt get` conflict-stop path, and the
+  `gt delete` not-tracked fallback. Fixture:
+  `tests/fixtures/gt-cleanup/branches-mixed.txt`.
+- `tests/smart-submit.bats` / `tests/gt-amend.bats` — the deterministic
+  bash embedded in the matching `SKILL.md` (Phase 0's `.graphite.yml`
+  clamping, Phase 4's submit-flag construction) plus the `--dry-run` /
+  `--no-submit` guarantee that `gt submit` is never invoked on those paths.
+
+`tests/mocks/git` and `tests/mocks/gt` are pattern-match-on-`"$*"` fake
+executables (mirrors `plugins/yellow-review/tests/mocks/gh`), logging every
+invocation to `$MOCK_GIT_LOG` / `$MOCK_GT_LOG` so tests can assert a
+state-changing command was (or was never) invoked.
+
+**Scope limitation** (matches `plugins/yellow-core/tests/plan-commands.bats`'s
+own documented limitation): these suites cover only the deterministic bash a
+skill's body embeds. The agent-orchestrated control flow around it — audit
+dispatch via the `audit-review` skill, `AskUserQuestion` confirmation gates,
+PR-status `gh` lookups — is interpreted by an LLM reading the markdown, not
+executed as a script, and cannot be exercised in bats.
+
+## Codex Distribution
+
+`targets.codex.enabled: true` in `catalog/plugins/gt-workflow.json` — the
+second plugin in this repo (after yellow-core) to enable Codex. Unlike
+yellow-core's narrow read-only allowlist, gt-workflow exposes its **entire**
+skill surface: all ten skills are allowlisted —
+`gt-setup`, `gt-nav`, `gt-stack-plan`, `gt-sync`, `smart-submit`, `gt-amend`,
+`gt-cleanup`, `audit-review`, `stack-decomposition-format`,
+`stack-plan-style` — since gt-workflow's commands are thin wrappers with no
+Claude-only logic of their own (contrast yellow-core, which excludes 17 of
+its 20 skills along with all 21 agents and both hooks). `includeHooks` is
+left at its default (`true`, not `false` like yellow-core) — see "Hooks"
+above for why they're carried but currently inert.
+
+Generated artifacts (`pnpm generate:manifests`, never hand-edited):
+`.codex-plugin/plugin.json`, `hooks/codex-hooks.json`,
+`codex/skills/<name>/SKILL.md` (ten directories, frontmatter normalized to
+`name` + single-line `description` only).
+
+A live `codex plugin add` install/inspect/uninstall round-trip (codex-cli
+0.144.6, isolated `CODEX_HOME`) confirmed: the plugin installs cleanly from
+a local marketplace; all ten `codex/skills/*/SKILL.md` files, the
+`.codex-plugin/plugin.json` manifest, and `.mcp.json` are byte-identical to
+the committed generated artifacts at the installed path;
+`hooks/codex-hooks.json` correctly references `entrypoint-codex.js`; and
+`codex mcp list` shows the `graphite` server as `enabled` — the Codex-side
+`mcpServers` manifest pointer this shell added to `buildCodexPluginManifest`
+does cause Codex to discover the shared `.mcp.json`, resolving that prior
+uncertainty.
+
+One syntax gap remains unverified — no Codex auth credentials were
+available in the environment that ran the round-trip (confirmed via
+`codex doctor`), so a live authenticated model session was out of reach:
+the exact `worker`/`explorer` built-in-agent delegation syntax a skill body
+uses (`audit-review`'s Codex dispatch section). This is called out in the
+PR description's manual Codex-app acceptance checklist rather than assumed
+to work.
 
 ## Stack Decomposition Format
 
@@ -168,7 +290,10 @@ Format contract:
 - `workflows:work` writes a `## Stack Progress` section to track completion
 
 See `output-styles/stack-decomposition.md` for the full specification with
-examples for all topologies.
+examples for all topologies. The `stack-decomposition-format` skill is an
+identical Codex-reachable copy (Codex has no `outputStyles` manifest field);
+both stay in sync manually — there is no generator step deriving one from
+the other.
 
 ### Input Integrations
 

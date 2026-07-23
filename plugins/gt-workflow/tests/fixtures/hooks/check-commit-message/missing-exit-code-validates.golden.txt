@@ -1,0 +1,7 @@
+EXIT_CODE=0
+--- STDOUT ---
+{
+  "continue": true,
+  "systemMessage": "[gt-workflow] Commit message does not follow conventional commits. Consider: gt modify -m \"type(scope): description\""
+}
+--- STDERR ---

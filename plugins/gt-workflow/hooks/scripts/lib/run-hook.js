@@ -1,0 +1,124 @@
+'use strict';
+
+const { snakeToCamelEnvelope } = require('./envelope.js');
+const { checkCommitMessage } = require('./policy-check-commit-message.js');
+const { checkGitPush } = require('./policy-check-git-push.js');
+
+const HOOK_EVENTS = {
+  'check-git-push': 'PreToolUse',
+  'check-commit-message': 'PostToolUse',
+};
+
+const POLICIES = {
+  'check-git-push': checkGitPush,
+  'check-commit-message': checkCommitMessage,
+};
+
+function parseHookArg(argv) {
+  const idx = argv.indexOf('--hook');
+  if (idx === -1 || idx === argv.length - 1) {
+    throw new Error('Missing required --hook <check-git-push|check-commit-message> argument');
+  }
+  const name = argv[idx + 1];
+  if (!HOOK_EVENTS[name]) {
+    throw new Error(`Unknown --hook value "${name}"`);
+  }
+  return name;
+}
+
+// Bound stdin to 64KB, matching the deleted check-commit-message.sh's
+// `head -c 65536` cap — a verbose Bash tool_result must not make the hook
+// buffer unbounded input or blow its execution timeout.
+const MAX_STDIN_BYTES = 65536;
+
+function readStdin(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let total = 0;
+    let truncated = false;
+    stream.on('data', (chunk) => {
+      if (total >= MAX_STDIN_BYTES) {
+        truncated = true;
+        return;
+      }
+      const remaining = MAX_STDIN_BYTES - total;
+      if (chunk.length > remaining) {
+        truncated = true;
+        chunks.push(chunk.subarray(0, remaining));
+        total = MAX_STDIN_BYTES;
+      } else {
+        chunks.push(chunk);
+        total += chunk.length;
+      }
+    });
+    stream.on('end', () => resolve({
+      content: Buffer.concat(chunks).toString('utf8'),
+      truncated
+    }));
+    stream.on('error', reject);
+  });
+}
+
+/**
+ * Shared read-stdin / parse / policy-dispatch flow for both entrypoints.
+ * `formatOutput(hookEvent, result)` is the only host-specific piece.
+ *
+ * Stdin is capped at 64KB to prevent DoS from unbounded input. Truncation
+ * is fail-closed for check-git-push (deny) to prevent a large malicious
+ * payload starting with "git push" from bypassing the blocker via
+ * truncation + parse failure.
+ *
+ * Malformed JSON preserves each hook's original fail-open/fail-closed
+ * direction rather than a blanket rule: check-git-push.sh allows through
+ * silently (exit 0, no output); check-commit-message.sh skips validation
+ * but still emits `{"continue": true}`.
+ *
+ * A syntactically-valid-but-non-object JSON payload (e.g. a bare `null`)
+ * parses successfully and so must be caught separately from the
+ * try/catch above — passing it straight to a policy function crashes on
+ * `envelope.command`/`envelope.toolInput` (review-caught regression,
+ * PR #661). Routed through the same fail-open/fail-closed branch as a
+ * parse failure, since both represent "the hook received something it
+ * cannot use as an envelope."
+ */
+async function runHook(argv, formatOutput) {
+  const hookName = parseHookArg(argv);
+  const hookEvent = HOOK_EVENTS[hookName];
+  const policy = POLICIES[hookName];
+
+  const { content: raw, truncated } = await readStdin(process.stdin);
+
+  // Fail closed for check-git-push if input was truncated — a large payload
+  // starting with "git push" could be truncated, fail to parse, and bypass
+  // the blocker if we treated truncation as a parse failure (which is
+  // fail-open for this hook). PR #661 review comment.
+  if (truncated && hookName === 'check-git-push') {
+    const result = {
+      decision: 'deny',
+      message: '⛔  Hook input exceeded 64KB size limit. Cannot verify command safety.',
+    };
+    formatOutput(hookEvent, result);
+    return;
+  }
+
+  let envelope;
+  try {
+    envelope = JSON.parse(raw);
+  } catch {
+    envelope = undefined;
+  }
+
+  if (envelope === null || typeof envelope !== 'object') {
+    if (hookName === 'check-git-push') {
+      return;
+    }
+    process.stdout.write(JSON.stringify({ continue: true }) + '\n');
+    return;
+  }
+
+  const camelEnvelope = snakeToCamelEnvelope(envelope);
+  const result = policy(camelEnvelope);
+  formatOutput(hookEvent, result);
+}
+
+module.exports = { runHook };

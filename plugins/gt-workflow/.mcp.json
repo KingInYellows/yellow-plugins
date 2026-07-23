@@ -1,0 +1,6 @@
+{
+  "graphite": {
+    "command": "gt",
+    "args": ["mcp"]
+  }
+}

@@ -1256,6 +1256,67 @@ tool requirements that don't automatically travel with it.
 
 ---
 
+### 29. Skill-Wrapper Commands Must Explicitly Pass `$ARGUMENTS` Through to the Invoked Skill
+
+**WRONG:**
+
+```markdown
+## Usage
+
+Invoke the `Skill` tool with `skill: "smart-submit"`.
+```
+
+**RIGHT:**
+
+```markdown
+## Usage
+
+Invoke the `Skill` tool with `skill: "smart-submit"`. Pass the args string
+`$ARGUMENTS` (literal — substitute the actual argument text the user
+provided after the command name, if any) so flags like `--dry-run` or
+`--no-verify` reach the skill.
+```
+
+**Rule:** Converting a command to the shell-03 thin-skill-wrapper idiom
+(command body does nothing but invoke `Skill`) drops any user-typed
+arguments unless the wrapper's `## Usage` text explicitly instructs the
+model to pass `$ARGUMENTS` through. Six gt-workflow commands
+(`smart-submit`, `gt-amend`, `gt-cleanup`, `gt-sync`, `gt-nav`,
+`gt-stack-plan`) were converted to this idiom without the passthrough
+instruction — every flag a user typed after the command name (`--dry-run`,
+`--no-verify`, etc.) was silently dropped, since the `Skill` tool has no
+implicit way to see the command's own invocation text. Caught by three
+corroborating reviewers (`cli-readiness-reviewer`, `plugin-contract-reviewer`,
+`project-standards-reviewer`) in PR #661.
+
+The established precedent already exists in this repo —
+`plugins/yellow-review/commands/review/sweep.md` reads `$ARGUMENTS`
+explicitly for its own dispatch — but that precedent was not applied when
+gt-workflow's seven commands were converted to skill wrappers in an earlier
+PR. Every future thin-skill-wrapper conversion must carry the same
+`$ARGUMENTS` passthrough sentence, not just commands with pre-existing
+argument handling.
+
+This is a different failure shape from #28 (narrowing `allowed-tools` drops
+a *permission* the invoked skill needs): here the wrapper has every
+permission it needs, but drops *data* (the user's own argument text) on the
+way to the skill.
+
+**Prevention checklist additions:**
+
+- [ ] When converting a command to a thin `Skill`-tool wrapper, check
+      whether the command accepts arguments. If it does (or might — most
+      commands accept optional flags), the `## Usage` text must explicitly
+      say to pass `$ARGUMENTS` through, using the literal wording pattern
+      from `plugins/yellow-review/commands/review/sweep.md` or the fixed
+      gt-workflow commands.
+- [ ] Grep the command file for `$ARGUMENTS` after any Skill-wrapper
+      conversion — its absence in a command that used to parse flags is a
+      signal the passthrough was dropped, not that the command no longer
+      needs it.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2

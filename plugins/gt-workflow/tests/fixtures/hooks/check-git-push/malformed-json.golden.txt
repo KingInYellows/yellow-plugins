@@ -1,0 +1,4 @@
+EXIT_CODE=0
+--- STDOUT ---
+--- STDERR ---
+jq: parse error: Invalid numeric literal at line 1, column 5

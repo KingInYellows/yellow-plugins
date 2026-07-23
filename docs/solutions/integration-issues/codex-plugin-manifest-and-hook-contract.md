@@ -50,14 +50,34 @@ reviewer/executor, not authoring plugins Codex itself loads.
 
 ### Hooks
 
+> **2026-07-20 update:** the contract below describes hook events,
+> envelopes, and trust — it does not mean hooks execute. On codex-cli
+> 0.144.1, hooks distributed via a Codex plugin never fire (`plugin_hooks`
+> is stage `removed`). See "Update — 2026-07-20" at the end of this doc
+> before building on live hook delivery.
+
 - Ten events exist: SessionStart, SubagentStart, PreToolUse,
   PermissionRequest, PostToolUse, PreCompact, PostCompact, UserPromptSubmit,
   SubagentStop, Stop.
 - Hook **stdin is snake_case** (`hook_event_name`, `tool_name`, `tool_input`,
   `tool_response`, `cwd`, `session_id`) while hook **output is camelCase**
-  (`hookSpecificOutput.permissionDecision`). Claude's hook envelope is
-  camelCase both ways, so cross-host adapters must case-transform on the
-  Codex leg only — budget for it explicitly.
+  (`hookSpecificOutput.permissionDecision`). **Correction (2026-07-20):**
+  Claude's hook stdin is ALSO snake_case — confirmed against
+  code.claude.com/docs/en/hooks and against this repo's own
+  `check-commit-message.sh`, which read `.tool_input.command` and
+  `.tool_result.exit_code` directly — behavior captured in
+  `plugins/gt-workflow/tests/fixtures/hooks/`. That bash script was deleted
+  in commit `ca3112cf` ("test(gt-workflow): add hook-parity harness, delete
+  superseded bash hooks"), superseded by
+  `plugins/gt-workflow/hooks/scripts/lib/policy-check-commit-message.js`,
+  which reproduces the same field paths. Only
+  hook OUTPUT is camelCase on both hosts; a prior version of this doc
+  claimed Claude's input was camelCase too — that was wrong. Cross-host
+  adapters must case-transform snake_case→camelCase on BOTH legs for
+  input, not the Codex leg only. The output-side split is unaffected:
+  Claude's PreToolUse denial is exit-2 + stderr (no JSON at all, see
+  below), while PostToolUse/warn output and Codex's PreToolUse denial both
+  use camelCase JSON.
 - PreToolUse denial shape:
   `{"hookSpecificOutput": {"hookEventName": "PreToolUse",
   "permissionDecision": "deny", "permissionDecisionReason": "..."}}`.
@@ -119,3 +139,46 @@ three items empirically on codex-cli 0.144.1:
 - [CI schema drift: local vs remote validator](../build-errors/ci-schema-drift-hooks-inline-vs-string.md)
   — the Claude-side contract-drift counterpart, updated 2026-07-16 with the
   reopened hooks file-path question
+
+---
+
+## Update — 2026-07-20
+
+While expanding shell 04 (`claude-code-codex-plugin-pilot-04-gt-workflow-pilot`)
+into a concrete plan, two facts surfaced that the "Previously unverified"
+section above never absorbed — that section folded in spike findings (a),
+(b), (c) only. (e) and (f) are already covered by
+`ci-schema-drift-hooks-inline-vs-string.md`'s own 2026-07-16 update; finding
+(d) belongs here.
+
+### Codex plugin hooks are inert on codex-cli 0.144.1 (spike finding (d))
+
+A manifest's `hooks` pointer (inline or the `./hooks/codex-hooks.json`
+override) is accepted by the parser and the plugin installs with no
+validation error — but no hook ever fires. `codex features list` shows
+`hooks` and `plugins` as stable/true but **`plugin_hooks` as
+removed/false**. A SessionStart hook writing a sentinel file did not fire
+across multiple live `codex exec` sessions, even after force-enabling
+`features.plugin_hooks=true` in `config.toml` and passing
+`--enable plugin_hooks`. Consequence: Codex-side hook runtime work can be
+schema/unit-tested but not live end-to-end verified right now — do not gate
+delivery on live Codex hook firing, and treat any generated
+`codex-hooks.json` as inert until upstream restores the feature. Re-check
+`codex features list | grep plugin_hooks` on any future CLI version before
+relying on this.
+
+### PreToolUse blocking is a different mechanism per host, not a field-name change
+
+The PreToolUse denial shape documented above
+(`hookSpecificOutput.permissionDecision: "deny"`) is Codex-specific. Claude
+Code's PreToolUse hooks block via **exit code 2 with a stderr message** —
+there is no JSON envelope in the block path at all. Confirmed by reading
+this repo's `plugins/gt-workflow/hooks/check-git-push.sh` (deleted in
+commit `ca3112cf`, superseded by
+`plugins/gt-workflow/hooks/scripts/lib/policy-check-git-push.js`), whose
+header stated the contract directly: "Exit 0 → allow the action. Exit 2 →
+block the action and show the message on stderr to the user." A migration
+plan that treats "port a PreToolUse blocking hook from Claude to Codex" as
+"change the JSON field names" misses that Claude's side isn't JSON-based
+for this case at all — the two hosts use categorically different blocking
+mechanisms, not just different envelope shapes.

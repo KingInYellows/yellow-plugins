@@ -988,6 +988,86 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
   }
 }
 
+// RULE 17 — wrapper -> canonical-skill drift lint. A command markdown file
+// using the shell-03 wrapper idiom ("Invoke the `Skill` tool with `skill:
+// "<name>"`.") must have a matching skills/<name>/SKILL.md in the SAME
+// plugin, and the wrapper's own "allowed-tools" frontmatter must include
+// "Skill". Generic (not gt-workflow-specific) — also covers
+// plugins/yellow-core/commands/plan/status.md. This only checks that
+// "Skill" is PRESENT in allowed-tools, not that the wrapper's original
+// tools were preserved alongside it (anti-pattern #28: dropping Bash from
+// a wrapper whose invoked skill body runs Bash loses the grant) — the set
+// of "original tools" a wrapper needs isn't independently knowable from
+// the file alone, so that remains a manual-review concern.
+//
+// Scoped to the content of a "## Usage" section ONLY, not the whole body —
+// a naive whole-body scan false-flagged pre-existing, unrelated
+// cross-plugin composition references (e.g.
+// plugins/yellow-core/commands/workflows/work.md invoking
+// `skill: "smart-submit"` as one step of a much larger multi-phase
+// document, where smart-submit belongs to a DIFFERENT plugin — a
+// legitimate pattern this rule was never meant to validate). Every false
+// positive found empirically lacked a "## Usage" heading entirely, while
+// the shell-03 precedent (plan/status.md) and every wrapper this rule
+// targets structure their body as descriptive prose followed by a
+// "## Usage" section whose content IS the skill-invocation sentence.
+const SKILL_REF_RE = /\bskill:\s*"([a-zA-Z0-9_-]+)"/g;
+
+function extractUsageSection(body) {
+  const headingMatch = body.match(/^## Usage[ \t]*\r?\n/m);
+  if (!headingMatch) return '';
+  const rest = body.slice(headingMatch.index + headingMatch[0].length);
+  const nextHeadingMatch = rest.match(/^#{1,6} /m);
+  return nextHeadingMatch ? rest.slice(0, nextHeadingMatch.index) : rest;
+}
+
+function validateSkillWrapperDrift(commandFiles, errors) {
+  for (const filePath of commandFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const fmBlockMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+    const frontmatter = fmBlockMatch ? extractFrontmatter(content) : null;
+    const body = fmBlockMatch ? content.slice(fmBlockMatch[0].length) : content;
+    const usageSection = extractUsageSection(body);
+
+    // Fence-strip before matching (shared stripFencedContent helper) so a
+    // fenced code-block example inside "## Usage" (e.g. illustrating the
+    // `skill: "..."` syntax without actually invoking it) isn't mistaken
+    // for a live wrapper invocation.
+    const skillNames = new Set();
+    for (const match of stripFencedContent(usageSection).matchAll(SKILL_REF_RE)) {
+      skillNames.add(match[1]);
+    }
+    if (skillNames.size === 0) continue;
+
+    // Derive plugin name from the path relative to PLUGINS_DIR (not ROOT)
+    // so this works with VALIDATE_PLUGINS_DIR fixture trees — mirrors
+    // validateAgentFile's pluginName derivation.
+    const relSegments = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    const pluginName = relSegments[0];
+
+    const allowedTools = parseList(frontmatter, 'allowed-tools');
+    if (!allowedTools.includes('Skill')) {
+      errors.push(
+        `${relative(filePath)}: RULE 17 — body invokes the Skill tool ` +
+          `(\`skill: "..."\`) but "allowed-tools" frontmatter does not ` +
+          `include "Skill" — add it alongside the command's existing ` +
+          `tools (do not replace them; see command-authoring anti-pattern #28)`
+      );
+    }
+
+    for (const skillName of skillNames) {
+      const skillFile = path.join(PLUGINS_DIR, pluginName, 'skills', skillName, 'SKILL.md');
+      if (!fs.existsSync(skillFile)) {
+        errors.push(
+          `${relative(filePath)}: RULE 17 — references skill "${skillName}" ` +
+            `via \`skill: "${skillName}"\` but plugins/${pluginName}/skills/` +
+            `${skillName}/SKILL.md does not exist`
+        );
+      }
+    }
+  }
+}
+
 // RULE 15 — SKILL.md authoring rules (see the constant block above for the
 // rule catalog and rationale). RULE 15 sub-rules push warning-tier findings
 // only; ctx.errors receives just the malformed-YAML structural gate below —
@@ -1172,6 +1252,7 @@ function main() {
     errors,
   });
   validateCommandFiles(commandFiles, errors);
+  validateSkillWrapperDrift(commandFiles, errors);
   validateSkillFiles(skillFiles, { errors, warnings });
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);

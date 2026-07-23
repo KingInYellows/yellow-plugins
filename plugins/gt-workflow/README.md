@@ -151,8 +151,8 @@ When `yq` is absent, commands fall back to defaults.
 - [Graphite CLI](https://graphite.dev/docs/graphite-cli) (`gt`) v1.6.7+
   installed and authenticated
 - Git repository initialized with Graphite (`gt init`)
-- [`jq`](https://jqlang.github.io/jq/) installed (used by the `git push` guard
-  hook)
+- [`jq`](https://jqlang.github.io/jq/) installed (used by `/gt-cleanup` to
+  parse PR-status JSON)
 - [`gh`](https://cli.github.com/) (GitHub CLI) installed and authenticated (used
   by `/gt-cleanup` for PR status lookups)
 - [`yq`](https://kislyuk.github.io/yq/) (optional) — needed to read

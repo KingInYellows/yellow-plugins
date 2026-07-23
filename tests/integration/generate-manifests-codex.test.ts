@@ -554,13 +554,81 @@ describe('generator hook-authority rule (R20)', () => {
     const codexHooks = JSON.parse(
       readFileSync(join(root, 'plugins', 'hook-plugin', 'hooks', 'codex-hooks.json'), 'utf8')
     );
-    expect(codexHooks).toEqual({ hooks: inlineHooks });
+    // codex-hooks.json carries a commandWindows field (same value as
+    // command) that source.hooks itself does not — see the commandWindows
+    // describe block below for a focused test of that transform.
+    expect(codexHooks).toEqual({
+      hooks: {
+        SessionStart: [
+          {
+            matcher: '*',
+            hooks: [
+              {
+                type: 'command',
+                command: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh',
+                commandWindows: 'bash ${CLAUDE_PLUGIN_ROOT}/real.sh',
+                timeout: 3,
+              },
+            ],
+          },
+        ],
+      },
+    });
     expect(JSON.stringify(codexHooks)).not.toContain('DECOY-NEVER-READ');
 
     const codexManifest = JSON.parse(
       readFileSync(join(root, 'plugins', 'hook-plugin', '.codex-plugin', 'plugin.json'), 'utf8')
     );
     expect(codexManifest.hooks).toBe('./hooks/codex-hooks.json');
+  });
+});
+
+describe('commandWindows emission (Windows command override)', () => {
+  it('adds commandWindows immediately after command on every hook definition, matching the (possibly entrypoint-rewritten) command', () => {
+    // Node entrypoints are platform-uniform (see entrypoint-claude.js's
+    // header comment) — commandWindows is always the same string as the
+    // final "command" value, never a distinct Windows-specific invocation,
+    // for every hook this repo currently ships. A command referencing the
+    // Claude-only entrypoint-claude.js is rewritten to entrypoint-codex.js
+    // before commandWindows is derived (Codex-pilot shell 04, Step 13) — so
+    // commandWindows must match the REWRITTEN command, not the catalog's
+    // original literal value.
+    const inlineHooks = {
+      PreToolUse: [
+        {
+          matcher: 'Bash',
+          hooks: [{ type: 'command', command: 'node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-git-push', timeout: 1 }],
+        },
+      ],
+      PostToolUse: [
+        {
+          matcher: 'Bash',
+          hooks: [{ type: 'command', command: 'node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js --hook check-commit-message', timeout: 1 }],
+        },
+      ],
+    };
+    const root = makeCodexFixtureRoot([{ name: 'windows-hook-plugin', codexEnabled: true, hooks: inlineHooks }]);
+
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('ok');
+
+    const codexHooks = JSON.parse(readFileSync(join(root, 'plugins', 'windows-hook-plugin', 'hooks', 'codex-hooks.json'), 'utf8'));
+    const rewrittenPreToolUseCommand = inlineHooks.PreToolUse[0].hooks[0].command.replace('entrypoint-claude.js', 'entrypoint-codex.js');
+    const rewrittenPostToolUseCommand = inlineHooks.PostToolUse[0].hooks[0].command.replace('entrypoint-claude.js', 'entrypoint-codex.js');
+    expect(codexHooks.hooks.PreToolUse[0].hooks[0].command).toBe(rewrittenPreToolUseCommand);
+    expect(codexHooks.hooks.PreToolUse[0].hooks[0].commandWindows).toBe(rewrittenPreToolUseCommand);
+    expect(codexHooks.hooks.PostToolUse[0].hooks[0].command).toBe(rewrittenPostToolUseCommand);
+    expect(codexHooks.hooks.PostToolUse[0].hooks[0].commandWindows).toBe(rewrittenPostToolUseCommand);
+    // Key order: commandWindows sits immediately after command.
+    expect(Object.keys(codexHooks.hooks.PreToolUse[0].hooks[0])).toEqual(['type', 'command', 'commandWindows', 'timeout']);
+
+    // Determinism: regenerating (a second apply run) produces byte-identical
+    // output — required for Codex's hash-keyed hook trust to stay stable.
+    const firstBytes = readFileSync(join(root, 'plugins', 'windows-hook-plugin', 'hooks', 'codex-hooks.json'), 'utf8');
+    const second = generateManifests({ mode: 'apply', rootDir: root });
+    expect(second.status).toBe('ok');
+    const secondBytes = readFileSync(join(root, 'plugins', 'windows-hook-plugin', 'hooks', 'codex-hooks.json'), 'utf8');
+    expect(secondBytes).toBe(firstBytes);
   });
 });
 
