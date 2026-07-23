@@ -238,7 +238,7 @@ unverified-gap note (R42).
   Convert `commands/ci/lint-workflows.md` to a wrapper (`allowed-tools:
   [Bash, Read, Glob, Grep, Edit, AskUserQuestion, Skill]`, `$ARGUMENTS`
   passthrough).
-- [ ] Author `plugins/yellow-ci/skills/ci-diagnose/SKILL.md` from
+- [x] Author `plugins/yellow-ci/skills/ci-diagnose/SKILL.md` from
   `commands/ci/diagnose.md`: reword `$ARGUMENTS`; replace the `/ci:status`
   slash-ref with prose; FOLD the `failure-analyst` F01-F12 diagnosis inline as
   host-neutral prose with a built-in Codex worker/explorer delegation section
