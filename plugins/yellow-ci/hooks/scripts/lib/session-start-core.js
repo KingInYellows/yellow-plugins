@@ -23,20 +23,37 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 
-// --- Cache location -------------------------------------------------------
-// Legacy path, matching the original bash hook. Phase C / R38 relocates cache
-// WRITES to a plugin-data dir (${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-…}}) with
-// a READ-ONLY fallback to this legacy path. Both are defined here so that
-// change stays contained to this module. Reads currently use the legacy path
-// only; writes too — B2 reproduces the bash goldens exactly, C1 relocates.
+// --- Cache location (R38) -------------------------------------------------
+// WRITES go to a plugin-data directory; READS prefer that new path and fall
+// back READ-ONLY to the legacy `${HOME}/.cache/yellow-ci` location (the legacy
+// path is never written again). The env-var resolution lives in this
+// (non-exposure-linted) hook layer; Codex sets CLAUDE_PLUGIN_DATA for
+// plugin-hook compat. Defined once here and reused for every cache file.
+function newCacheDir(env) {
+  if (env.CLAUDE_PLUGIN_DATA) return env.CLAUDE_PLUGIN_DATA;
+  const base = env.XDG_DATA_HOME || path.join(env.HOME || os.homedir(), '.local', 'share');
+  return path.join(base, 'yellow-ci');
+}
+
 function legacyCacheDir(env) {
   return path.join(env.HOME || os.homedir(), '.cache', 'yellow-ci');
+}
+
+// Resolve a readable path for a cache file: prefer the new location, fall back
+// READ-ONLY to the legacy one. Returns the new path when neither exists so
+// callers' stat/read fail consistently against the write location.
+function resolveCacheReadPath(env, filename) {
+  const newPath = path.join(newCacheDir(env), filename);
+  if (fs.existsSync(newPath)) return newPath;
+  const legacyPath = path.join(legacyCacheDir(env), filename);
+  if (fs.existsSync(legacyPath)) return legacyPath;
+  return newPath;
 }
 
 function readRoutingSummary(env) {
   try {
     // head -c 500 — bounded by BYTES, like the bash hook.
-    const buf = fs.readFileSync(path.join(legacyCacheDir(env), 'routing-summary.txt'));
+    const buf = fs.readFileSync(resolveCacheReadPath(env, 'routing-summary.txt'));
     return buf.subarray(0, 500).toString('utf8');
   } catch {
     return '';
@@ -127,25 +144,28 @@ function runSessionStart({ cwd, env }) {
     return done(routingSummary);
   }
 
-  const cacheDir = legacyCacheDir(env);
+  const writeCacheDir = newCacheDir(env);
   try {
-    fs.mkdirSync(cacheDir, { recursive: true });
+    fs.mkdirSync(writeCacheDir, { recursive: true });
   } catch {
-    warn(`[yellow-ci] Warning: Cannot create cache directory ${cacheDir}`);
+    warn(`[yellow-ci] Warning: Cannot create cache directory ${writeCacheDir}`);
     return done(routingSummary);
   }
 
-  const cacheFile = path.join(cacheDir, `last-check-${cacheKeyFor(cwd)}`);
+  const cacheFileName = `last-check-${cacheKeyFor(cwd)}`;
+  const writeCacheFile = path.join(writeCacheDir, cacheFileName);
+  const readCacheFile = resolveCacheReadPath(env, cacheFileName);
 
-  // Cache freshness (60s TTL).
+  // Cache freshness (60s TTL). Read prefers the new location and falls back
+  // READ-ONLY to a legacy cache file (R38).
   try {
-    const st = fs.statSync(cacheFile);
+    const st = fs.statSync(readCacheFile);
     const ageSec = Math.floor(Date.now() / 1000) - Math.floor(st.mtimeMs / 1000);
     if (ageSec < 60) {
       try {
-        return done(fs.readFileSync(cacheFile, 'utf8'));
+        return done(fs.readFileSync(readCacheFile, 'utf8'));
       } catch {
-        warn(`[yellow-ci] Warning: Cannot read cache file ${cacheFile}`);
+        warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
         return done(routingSummary);
       }
     }
@@ -191,7 +211,7 @@ function runSessionStart({ cwd, env }) {
     output = output ? `${output}\n${failureMsg}` : failureMsg;
   }
 
-  writeCacheAtomic(cacheFile, output, warn);
+  writeCacheAtomic(writeCacheFile, output, warn);
   return done(output);
 }
 

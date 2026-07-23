@@ -352,7 +352,7 @@ unverified-gap note (R42).
 
 ### Phase C — Cache relocation (R38)
 
-- [ ] Relocate the Node hook's cache writes to a plugin-data location with a
+- [x] Relocate the Node hook's cache writes to a plugin-data location with a
   read-only legacy fallback: write under
   `${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}/…`
   (env vars live in the non-linted hook layer; Codex sets `CLAUDE_PLUGIN_DATA`

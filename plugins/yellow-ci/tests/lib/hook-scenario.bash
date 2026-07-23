@@ -39,6 +39,11 @@ hook_scenario_setup() {
   local home="$sandbox/home" work="$sandbox/work"
   mkdir -p "$home/.cache/yellow-ci" "$work"
   export HOME="$home"
+  # Keep the R38 new-cache path sandbox-scoped and EMPTY by default, so the
+  # legacy-read fallback is exercised. Individual cases may pre-seed either the
+  # legacy ($HOME/.cache/yellow-ci) or new ($XDG_DATA_HOME/yellow-ci) location.
+  export XDG_DATA_HOME="$home/.local/share"
+  unset CLAUDE_PLUGIN_DATA
   export MOCK_GH_AUTH=ok MOCK_GH_RUNLIST=empty
   export PATH="$mocks:$PATH"
 
