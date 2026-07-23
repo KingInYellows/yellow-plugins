@@ -1,0 +1,28 @@
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_bcbe5dbe71858f::t_67080b35030420 272-276
+  s_bcbe5dbe71858f::t_8ab1da7883f62e 1-271,277-470
+docs/solutions/integration-issues/codex-config-retention-exposure-lint-conflict.md
+  s_bcbe5dbe71858f::t_bb2770c35b40de 1-121
+docs/solutions/integration-issues/codex-plugin-manifest-and-hook-contract.md
+  s_bcbe5dbe71858f::t_58636b211b3984 185-203
+docs/solutions/workflow/spec-shells-dependency-oracle-plans-complete.md
+  s_bcbe5dbe71858f::t_a12a8ccf7dcb75 137-167
+docs/CONCEPTS.md
+  s_bcbe5dbe71858f::t_69440162586175 19-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c8948048230fc19f68e6814854f5ad1adb094b37",
+  "prompts": {},
+  "sessions": {
+    "s_bcbe5dbe71858f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d5de212c-bc69-4877-b12e-60bc391f17c9",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
