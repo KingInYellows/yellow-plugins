@@ -1,0 +1,198 @@
+'use strict';
+
+/**
+ * I/O module replicating plugins/yellow-ci/hooks/scripts/session-start.sh.
+ *
+ * Detects CI context and surfaces recent-failure + runner-routing context as a
+ * SessionStart `systemMessage`. Dependency-free Node (no `jq` — uses
+ * JSON.parse). Budget contract unchanged: routing cache read is cheap,
+ * `gh run list` is bounded to a 2s timeout, results cached for 60s.
+ *
+ * Returns `{ systemMessage: string, stderr: string[] }`. An empty
+ * systemMessage means "emit {"continue": true} with no message". stderr lines
+ * mirror the original hook's `>&2` warnings (compared by the parity harness).
+ *
+ * Faithful to the bash hook's degrade-safely contract: any missing tool,
+ * unauthenticated `gh`, failed API call, or unreadable cache falls back to the
+ * routing summary (or empty) — it never throws to the caller.
+ */
+
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const crypto = require('crypto');
+const { spawnSync } = require('child_process');
+
+// --- Cache location -------------------------------------------------------
+// Legacy path, matching the original bash hook. Phase C / R38 relocates cache
+// WRITES to a plugin-data dir (${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-…}}) with
+// a READ-ONLY fallback to this legacy path. Both are defined here so that
+// change stays contained to this module. Reads currently use the legacy path
+// only; writes too — B2 reproduces the bash goldens exactly, C1 relocates.
+function legacyCacheDir(env) {
+  return path.join(env.HOME || os.homedir(), '.cache', 'yellow-ci');
+}
+
+function readRoutingSummary(env) {
+  try {
+    // head -c 500 — bounded by BYTES, like the bash hook.
+    const buf = fs.readFileSync(path.join(legacyCacheDir(env), 'routing-summary.txt'));
+    return buf.subarray(0, 500).toString('utf8');
+  } catch {
+    return '';
+  }
+}
+
+// `command -v <cmd>` equivalent: scan PATH for an executable of that name.
+function commandExists(cmd, env) {
+  const dirs = (env.PATH || '').split(path.delimiter);
+  for (const dir of dirs) {
+    if (!dir) continue;
+    try {
+      fs.accessSync(path.join(dir, cmd), fs.constants.X_OK);
+      return true;
+    } catch {
+      // not here; keep scanning
+    }
+  }
+  return false;
+}
+
+function ghAuthOk(env) {
+  const res = spawnSync('gh', ['auth', 'status'], { env, stdio: 'ignore' });
+  return !res.error && res.status === 0;
+}
+
+function ghRunList(env) {
+  const res = spawnSync(
+    'gh',
+    [
+      'run', 'list', '--status', 'failure', '--limit', '3',
+      '--json', 'databaseId,headBranch,displayTitle,conclusion,updatedAt',
+      '-q', '[.[] | select(.conclusion == "failure")]',
+    ],
+    { env, encoding: 'utf8', timeout: 2000 }
+  );
+  if (res.error || res.status !== 0) {
+    return { failed: true, stdout: '' };
+  }
+  return { failed: false, stdout: res.stdout || '' };
+}
+
+function cacheKeyFor(cwd) {
+  return crypto.createHash('md5').update(cwd).digest('hex').slice(0, 32);
+}
+
+function writeCacheAtomic(cacheFile, content, warn) {
+  const tmp = `${cacheFile}.tmp`;
+  try {
+    fs.writeFileSync(tmp, content);
+  } catch {
+    warn(`[yellow-ci] Warning: Cannot write cache to ${tmp}`);
+    return;
+  }
+  try {
+    fs.renameSync(tmp, cacheFile);
+  } catch {
+    warn(`[yellow-ci] Warning: Cache write failed for ${cacheFile}`);
+    try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
+  }
+}
+
+/**
+ * @param {{cwd: string, env: NodeJS.ProcessEnv}} ctx
+ * @returns {{systemMessage: string, stderr: string[]}}
+ */
+function runSessionStart({ cwd, env }) {
+  const stderr = [];
+  const warn = (line) => stderr.push(line);
+  const done = (systemMessage) => ({ systemMessage: systemMessage || '', stderr });
+
+  // Early exit for non-CI projects.
+  try {
+    if (!fs.statSync(path.join(cwd, '.github', 'workflows')).isDirectory()) {
+      return done('');
+    }
+  } catch {
+    return done('');
+  }
+
+  // Routing context (read before gh checks so it surfaces even without gh).
+  const routingSummary = readRoutingSummary(env);
+
+  if (!commandExists('gh', env)) {
+    return done(routingSummary);
+  }
+  if (!ghAuthOk(env)) {
+    return done(routingSummary);
+  }
+
+  const cacheDir = legacyCacheDir(env);
+  try {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  } catch {
+    warn(`[yellow-ci] Warning: Cannot create cache directory ${cacheDir}`);
+    return done(routingSummary);
+  }
+
+  const cacheFile = path.join(cacheDir, `last-check-${cacheKeyFor(cwd)}`);
+
+  // Cache freshness (60s TTL).
+  try {
+    const st = fs.statSync(cacheFile);
+    const ageSec = Math.floor(Date.now() / 1000) - Math.floor(st.mtimeMs / 1000);
+    if (ageSec < 60) {
+      try {
+        return done(fs.readFileSync(cacheFile, 'utf8'));
+      } catch {
+        warn(`[yellow-ci] Warning: Cannot read cache file ${cacheFile}`);
+        return done(routingSummary);
+      }
+    }
+  } catch {
+    // no cache file — fall through to fetch
+  }
+
+  // Cache miss: fetch recent failed runs.
+  const { failed, stdout: failedJson } = ghRunList(env);
+  if (failed) {
+    return done(routingSummary);
+  }
+
+  // Parse.
+  let failureCount = 0;
+  let branches = '';
+  const trimmed = failedJson.trim();
+  if (trimmed !== '' && trimmed !== '[]' && trimmed !== 'null') {
+    let parsed;
+    try {
+      parsed = JSON.parse(failedJson);
+    } catch {
+      parsed = undefined;
+    }
+    if (Array.isArray(parsed)) {
+      failureCount = parsed.length;
+      const uniqueBranches = [...new Set(
+        parsed.map((r) => r && r.headBranch).filter((b) => typeof b === 'string' && b.length > 0)
+      )].sort();
+      branches = uniqueBranches.join(', ');
+    } else {
+      warn('[yellow-ci] Warning: Unexpected GitHub API response format');
+      failureCount = 0;
+    }
+  }
+
+  // Assemble output: routing summary first, then a conditional failure line.
+  let output = routingSummary || '';
+  if (failureCount > 0) {
+    const failureMsg = branches
+      ? `[yellow-ci] CI: ${failureCount} recent failure(s) on branch(es): ${branches}. Use /ci:diagnose to investigate.`
+      : `[yellow-ci] CI: ${failureCount} recent failure(s) detected. Use /ci:diagnose to investigate.`;
+    output = output ? `${output}\n${failureMsg}` : failureMsg;
+  }
+
+  writeCacheAtomic(cacheFile, output, warn);
+  return done(output);
+}
+
+module.exports = { runSessionStart };
