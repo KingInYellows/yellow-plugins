@@ -1,0 +1,24 @@
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_17bd29452ea753::t_6e32e6a207d46b 1-119,121,124-126,131-146
+  s_17bd29452ea753::t_75c2afe1835e23 120,122-123,127-130
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_bbf0f4076d574c 269
+plugins/yellow-ci/commands/ci/runner-health.md
+  s_17bd29452ea753::t_fcc8fe012fbf50 9,14-15,17,19-21,23,25-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "29ca0f293febbd523441be40e9adcc0f02f9fba5",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
