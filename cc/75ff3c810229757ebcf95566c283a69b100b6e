@@ -1,0 +1,29 @@
+plans/claude-code-codex-plugin-pilot-05-yellow-ci-pilot.md
+  s_17bd29452ea753::t_67e720f297d079 330
+plugins/yellow-ci/hooks/scripts/lib/envelope.js
+  s_17bd29452ea753::t_44a52a66cfec9b 1-56
+plugins/yellow-ci/hooks/scripts/entrypoint-codex.js
+  s_17bd29452ea753::t_e96dafe48d8a91 1-24
+plugins/yellow-ci/hooks/scripts/entrypoint-claude.js
+  s_17bd29452ea753::t_ce0d7c9d0730eb 1-21
+plugins/yellow-ci/hooks/scripts/lib/session-start-core.js
+  s_17bd29452ea753::t_9623b6727a2a9e 1-198
+plugins/yellow-ci/hooks/scripts/lib/run-hook.js
+  s_17bd29452ea753::t_5f79c116ba4456 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "cc75ff3c810229757ebcf95566c283a69b100b6e",
+  "prompts": {},
+  "sessions": {
+    "s_17bd29452ea753": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b62cf75a-db1b-4120-8dc1-95302e77ceb6",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
