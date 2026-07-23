@@ -45,7 +45,9 @@ available names if not found). Otherwise, target all configured runners.
 ### Step 3: Preview, Then Probe (R32)
 
 **Preview first.** List the target runner(s) and the read-only health commands
-that will run over SSH, then confirm via `AskUserQuestion` before connecting.
+that will run over SSH, then confirm via `AskUserQuestion` before connecting. On
+a host without `AskUserQuestion`, obtain an equivalent explicit user confirmation
+first — never connect without one.
 
 **SSH safety contract (mandatory):** `StrictHostKeyChecking=accept-new`,
 `BatchMode=yes`, `ConnectTimeout=3`, `ServerAliveInterval=60`, key-based auth

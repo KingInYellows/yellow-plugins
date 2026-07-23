@@ -106,7 +106,8 @@ their labels pre-populated as `preferred_selector`).
 
 **Preview first (R32).** Render the exact canonical YAML and show it. Then ask
 via `AskUserQuestion`: "Save this configuration? [Save / Edit / Cancel]". Only
-write after explicit confirmation.
+write after explicit confirmation; on a host without `AskUserQuestion`, obtain an
+equivalent explicit user confirmation first — never write config without one.
 
 Canonical format (2-space indent, block sequences only):
 

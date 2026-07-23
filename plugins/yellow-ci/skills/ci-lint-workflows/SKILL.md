@@ -102,7 +102,8 @@ confirms:
 - Then ask, using `AskUserQuestion`: "Apply auto-fixes? [Apply all / Select
   individually / Skip]".
 - Only after explicit confirmation, apply each approved fix with the `Edit`
-  tool.
+  tool. On a host without `AskUserQuestion`, obtain an equivalent explicit user
+  confirmation first — never edit a workflow file without one.
 - After applying, re-read the file to verify it is still valid YAML.
 
 ### Error Handling
