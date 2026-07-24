@@ -24,7 +24,7 @@ Add the marketplace, then install individual plugins:
 | --------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
 | `gt-workflow`         | Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation                | 7 commands, 2 hooks, 1 MCP                     |
 | `yellow-browser-test` | Autonomous web app testing with agent-browser — auto-discovery, structured flows, and bug reporting         | 3 agents, 4 commands, 2 skills                 |
-| `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 9 commands, 2 skills, 1 hook         |
+| `yellow-ci`           | CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners | 4 agents, 9 commands, 8 skills, 1 hook         |
 | `yellow-codex`        | OpenAI Codex CLI wrapper with review, rescue, and analysis agents for workflow integration                  | 3 agents, 4 commands, 1 skill                  |
 | `yellow-composio`     | Composio MCP integration with usage tracking and budget guardrails                                          | 2 commands, 1 skill, 1 MCP                     |
 | `yellow-core`         | Dev toolkit with review agents, research agents, and workflow commands for TS/Py/Rust/Go                    | 21 agents, 16 commands, 18 skills              |
@@ -266,7 +266,7 @@ yellow-plugins/
 ├── plugins/
 │   ├── gt-workflow/           # Graphite workflow (7 commands, 2 hooks, 1 MCP)
 │   ├── yellow-browser-test/   # Browser testing (3 agents, 4 commands, 2 skills)
-│   ├── yellow-ci/             # CI toolkit (4 agents, 9 commands, 2 skills, 1 hook)
+│   ├── yellow-ci/             # CI toolkit (4 agents, 9 commands, 8 skills, 1 hook)
 │   ├── yellow-codex/          # Codex CLI wrapper (3 agents, 4 commands, 1 skill)
 │   ├── yellow-composio/       # Composio MCP (2 commands, 1 skill, 1 MCP)
 │   ├── yellow-core/           # Dev toolkit (21 agents, 16 commands, 18 skills)

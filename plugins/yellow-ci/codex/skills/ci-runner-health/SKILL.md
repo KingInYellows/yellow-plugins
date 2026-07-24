@@ -63,10 +63,46 @@ same rules `ci-setup` enforces when writing the config:
   as a literal tilde path and silently fail the probe. Accepting only the
   forms that are actually expanded keeps validation and expansion in step.
 
-Reject and **skip** any runner entry that fails validation — report it by
-name with the specific failing field, do not select it as a target, and never
-pass its `host`/`user`/`ssh_key` to `ssh`. Carry the skip forward into the
-Step 6 report alongside the other per-runner results.
+**Run this as a real check, not as a reading comprehension exercise.** The
+rules above describe intent; this snippet enforces it. Run it for every entry
+before that entry is selected, and act on its exit status — a config can be
+hand-edited or prompt-injected, so validation that exists only as prose for the
+model to honour is not a control:
+
+```bash
+validate_runner_entry() {  # $1=name $2=host $3=user $4=ssh_key (may be empty)
+  local name="$1" host="$2" user="$3" key="${4-}"
+  printf '%s' "$name$host$user$key" | LC_ALL=C grep -q '[^[:print:]]' && {
+    printf '[yellow-ci] reject %s: control characters in entry\n' "$name" >&2; return 1; }
+  case "$host" in
+    *[\;\&\|\$\`\'\"\\]*) printf '[yellow-ci] reject %s: shell metacharacter in host\n' "$name" >&2; return 1 ;;
+  esac
+  printf '%s' "$host" | LC_ALL=C grep -Eq \
+    '^(10\.[0-9]{1,3}(\.[0-9]{1,3}){2}|127\.[0-9]{1,3}(\.[0-9]{1,3}){2}|192\.168(\.[0-9]{1,3}){2}|172\.(1[6-9]|2[0-9]|3[01])(\.[0-9]{1,3}){2}|[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9-]+)*\.(internal|local|lan|corp|home|intra|private))$' || {
+    printf '[yellow-ci] reject %s: host not a private IPv4 or internal FQDN\n' "$name" >&2; return 1; }
+  printf '%s' "$user" | LC_ALL=C grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || {
+    printf '[yellow-ci] reject %s: invalid user\n' "$name" >&2; return 1; }
+  if [ -n "$key" ]; then
+    case "$key" in
+      '~/'*|/*) : ;;
+      *) printf '[yellow-ci] reject %s: ssh_key must start with ~/ or /\n' "$name" >&2; return 1 ;;
+    esac
+    case "$key" in *..*) printf '[yellow-ci] reject %s: ssh_key traversal\n' "$name" >&2; return 1 ;; esac
+    [ "${#key}" -le 256 ] || { printf '[yellow-ci] reject %s: ssh_key too long\n' "$name" >&2; return 1; }
+    printf '%s' "$key" | LC_ALL=C grep -Eq '^[A-Za-z0-9_./~-]+$' || {
+      printf '[yellow-ci] reject %s: ssh_key has disallowed characters\n' "$name" >&2; return 1; }
+  fi
+  return 0
+}
+```
+
+Reject and **skip** any entry for which `validate_runner_entry` returns
+non-zero — report it by name with the field the function named, do not select
+it as a target, and never pass its `host`/`user`/`ssh_key` to `ssh`. Carry the
+skip forward into the Step 6 report alongside the other per-runner results.
+This mirrors `validate_ssh_host` / `validate_ssh_user` / `validate_ssh_key_path`
+in the plugin's shell validation library, which is not reachable on every host —
+when it *is* reachable, prefer it and keep this as the fallback.
 
 ### Step 3: Determine Targets
 

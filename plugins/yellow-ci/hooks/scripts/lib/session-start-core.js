@@ -102,14 +102,37 @@ function sanitizeBranchName(name) {
     .slice(0, 120);
 }
 
+// The manifest gives this hook a 3s timeout. The two `gh` calls are
+// SEQUENTIAL, so fixed per-call timeouts must be budgeted against the whole
+// hook, not each other: a 1000ms auth call plus a 2000ms list call already
+// reaches 3000ms before Node startup and the stdin read are counted, so a slow
+// (but succeeding) auth followed by a stalled list would blow the budget and
+// the host would kill the hook mid-write.
+//
+// Instead, both calls draw from one shared deadline measured from process
+// start, and each gets whatever is left minus a reserve for teardown (writing
+// the cache and emitting JSON). If the budget is already exhausted, the call
+// is skipped rather than started.
+const HOOK_BUDGET_MS = 3000;
+const HOOK_RESERVE_MS = 400; // cache write + JSON emit + exit
+const HOOK_START_MS = Date.now();
+
+function remainingBudgetMs() {
+  return HOOK_BUDGET_MS - HOOK_RESERVE_MS - (Date.now() - HOOK_START_MS);
+}
+
 function ghAuthOk(env) {
-  // Bound with a timeout like ghRunList — otherwise a hung `gh auth status`
-  // could blow the hook's 3s budget before the run-list call even starts.
-  const res = spawnSync('gh', ['auth', 'status'], { env, stdio: 'ignore', timeout: 1000 });
+  // Cap the auth probe at 1s, but never let it run past the shared deadline.
+  const budget = Math.min(1000, remainingBudgetMs());
+  if (budget <= 0) return false;
+  const res = spawnSync('gh', ['auth', 'status'], { env, stdio: 'ignore', timeout: budget });
   return !res.error && res.status === 0;
 }
 
 function ghRunList(env) {
+  // Whatever the auth probe left, capped at the original 2s.
+  const budget = Math.min(2000, remainingBudgetMs());
+  if (budget <= 0) return { failed: true, stdout: '' };
   const res = spawnSync(
     'gh',
     [
@@ -117,7 +140,7 @@ function ghRunList(env) {
       '--json', 'databaseId,headBranch,displayTitle,conclusion,updatedAt',
       '-q', '[.[] | select(.conclusion == "failure")]',
     ],
-    { env, encoding: 'utf8', timeout: 2000 }
+    { env, encoding: 'utf8', timeout: budget }
   );
   if (res.error || res.status !== 0) {
     return { failed: true, stdout: '' };
