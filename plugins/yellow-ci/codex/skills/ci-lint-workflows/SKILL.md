@@ -52,16 +52,19 @@ For each workflow file, check these rules:
 
 - **W01:** Job without `timeout-minutes` → suggest `timeout-minutes: 60`
 - **W07:** Missing `runs-on: self-hosted` label on a directly defined job
-  when repo uses self-hosted runners; skip jobs with
-  `uses: ./.github/workflows/` since their runner labels are defined by the
-  called workflow
+  when repo uses self-hosted runners; skip reusable-workflow caller jobs
+  (`uses:` pointing to either a local `./.github/workflows/...` file or a
+  remote `owner/repo/.github/workflows/file.yml@ref`) since their runner
+  labels are defined by the called workflow
 - **W13:** Using `actions/cache@v2` or `@v3` → upgrade to `@v4`
 
 **Warnings (should fix):**
 
 - **W02:** Package install step without caching → suggest ecosystem-appropriate
   cache
-- **W03:** Hardcoded `/home/runner/` paths → use `${{ github.workspace }}`
+- **W03:** Hardcoded `/home/runner/work/` paths → use
+  `${{ github.workspace }}`; do not rewrite unrelated `/home/runner/*` paths
+  (caches, tool installs, runner-service paths)
 - **W04:** PR-triggered workflow without `concurrency` group
 - **W05:** Docker usage without cleanup step
 - **W06:** `ubuntu-latest` in repo with self-hosted runner jobs

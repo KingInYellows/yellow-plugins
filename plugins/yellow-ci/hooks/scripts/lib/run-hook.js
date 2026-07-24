@@ -33,6 +33,10 @@ function readStdin(stream) {
       stream.removeListener('data', onData);
       stream.removeListener('end', onEnd);
       stream.removeListener('error', onError);
+      // A stream error arriving after cleanup (e.g. a late EPIPE) would
+      // otherwise be an unhandled 'error' event and crash the process,
+      // breaking the fail-open contract. Swallow it once settled.
+      stream.on('error', () => {});
     };
     const onEnd = () => {
       cleanup();

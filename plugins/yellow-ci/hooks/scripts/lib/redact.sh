@@ -25,6 +25,8 @@ redact_secrets() {
   output=$(sed \
     -e 's/ghp_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
+    -e 's/gho_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
+    -e 's/ghr_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/[REDACTED:github-pat]/g' \
     -e 's/AKIA[0-9A-Z]\{16\}/[REDACTED:aws-access-key]/g' \
     -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=[REDACTED:aws-secret]/gI' \
