@@ -23,12 +23,19 @@ setup() {
   : >"$MOCK_SSH_LOG"
 }
 
-# The exact SSH-safety options the runner-health playbook uses.
+# The exact SSH-safety options the runner-health playbook uses. Keep this list
+# in step with the `ssh_opts` array in skills/ci-runner-health/SKILL.md — the
+# last four were added when the playbook stopped relying on the invoking user's
+# ssh_config for key-only auth.
 ssh_health() {
   ssh -o StrictHostKeyChecking=accept-new \
       -o BatchMode=yes \
       -o ConnectTimeout=3 \
       -o ServerAliveInterval=60 \
+      -o ForwardAgent=no \
+      -o PreferredAuthentications=publickey \
+      -o PasswordAuthentication=no \
+      -o KbdInteractiveAuthentication=no \
       "$1" 'echo probe'
 }
 

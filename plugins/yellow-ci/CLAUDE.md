@@ -113,7 +113,12 @@ reaches the skill directly), plus the two reference skills:
 
 ### Runner SSH Config
 
-Runner SSH config in `.claude/yellow-ci.local.md`:
+Runner SSH config in `.claude/yellow-ci.local.md` on Claude Code, where the
+invoking command supplies that repo-local path. The `ci-setup` and
+`ci-runner-health` skill bodies are host-neutral and fall back to
+`${XDG_CONFIG_HOME:-$HOME/.config}/yellow-ci/yellow-ci.local.md` when no
+invoking command supplies a path (direct invocation on Codex) — same basename,
+so setup and health-check always operate on the same file:
 
 ```yaml
 ---
