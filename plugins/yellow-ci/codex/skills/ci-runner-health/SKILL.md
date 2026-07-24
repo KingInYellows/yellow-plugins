@@ -165,8 +165,11 @@ fi
 
 # `timeout` is GNU coreutils; macOS ships without it (Homebrew installs it
 # as `gtimeout`, if installed at all). Detect once here — every probe below
-# runs under "$TIMEOUT_CMD" rather than a bare `timeout`, which would exit
-# 127 on stock macOS and be miscategorized as a connection failure.
+# runs under "${TIMEOUT_CMD:-timeout}" rather than a bare `timeout`, which
+# would exit 127 on stock macOS and be miscategorized as a connection failure.
+# The probes live in later blocks, same as `ssh_opts` above; the `:-timeout`
+# default means that if this assignment ever fails to reach them, they fall
+# back to the historical bare-`timeout` behavior instead of expanding empty.
 if command -v timeout >/dev/null 2>&1; then
   TIMEOUT_CMD=timeout
 elif command -v gtimeout >/dev/null 2>&1; then
@@ -184,7 +187,7 @@ Linux-only command below. Do not discard stderr here (per this plugin's
 is what Step 5 categorizes:
 
 ```bash
-runner_os=$("$TIMEOUT_CMD" 10 ssh "${ssh_opts[@]}" "$user@$host" -- uname -s 2>&1)
+runner_os=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" -- uname -s 2>&1)
 os_probe_status=$?
 ```
 
@@ -205,7 +208,7 @@ stream to the caller.** Runner stdout/stderr is untrusted, and streaming it
 would bypass both the redaction step and the `runner-output` fence below:
 
 ```bash
-HEALTH_OUT=$("$TIMEOUT_CMD" 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'HEALTHCHECK'
+HEALTH_OUT=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'HEALTHCHECK'
 echo "=== DISK ==="
 df -h / /home 2>/dev/null | tail -n +2
 echo "=== MEMORY ==="
@@ -279,7 +282,7 @@ log content before it is ever quoted or fenced:
 
 ```bash
 set -o pipefail
-RUNNER_LOG=$("$TIMEOUT_CMD" 10 ssh "${ssh_opts[@]}" "$user@$host" -- \
+RUNNER_LOG=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" -- \
   journalctl -u 'actions.runner.*' --since '1 hour ago' --no-pager -n 20 2>&1)
 JOURNAL_STATUS=$?
 # Reject a failed retrieval BEFORE redaction. Because stderr is folded in by
