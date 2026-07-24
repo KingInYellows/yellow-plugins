@@ -55,9 +55,13 @@ same rules `ci-setup` enforces when writing the config:
   metacharacters (`;`, `&`, `|`, `$`, `` ` ``, `'`, `"`, `\`). Public IPs and
   public-TLD hostnames are rejected — private network only.
 - **`user`** — must match `^[a-z_][a-z0-9_-]{0,31}$` (1-32 chars).
-- **`ssh_key`** (optional) — if present, must start with `~` or `/`, be at
+- **`ssh_key`** (optional) — if present, must start with `~/` or `/`, be at
   most 256 chars, contain no newlines, no `..` traversal, and only
   `[a-zA-Z0-9_./~-]` characters. Empty/absent is valid (use the default key).
+  Reject the `~user/...` form: it would pass a looser "starts with `~`" check
+  but the expansion below only resolves `~/`, so such a key would reach `ssh`
+  as a literal tilde path and silently fail the probe. Accepting only the
+  forms that are actually expanded keeps validation and expansion in step.
 
 Reject and **skip** any runner entry that fails validation — report it by
 name with the specific failing field, do not select it as a target, and never
@@ -106,9 +110,10 @@ ssh_opts=(
   -o KbdInteractiveAuthentication=no
 )
 if [ -n "$ssh_key" ]; then
-  # Validation accepts a leading '~', but a tilde inside a quoted variable is
+  # Validation accepts a leading '~/', but a tilde inside a quoted variable is
   # NOT expanded by the shell — ssh would look for a literal "~/..." path and
-  # fail. Expand it explicitly before use.
+  # fail. Expand it explicitly before use. Step 2 rejects the `~user/...` form
+  # precisely because it is not expanded here.
   case "$ssh_key" in
     "~/"*) ssh_key="$HOME/${ssh_key#\~/}" ;;
     "~")   ssh_key="$HOME" ;;
@@ -239,7 +244,7 @@ REDACTED_LOG=$(printf '%s\n' "$RUNNER_LOG" | sed \
   -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
   -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
   -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
-  -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED\(:[a-z-]\{1,\}\)\{0,1\}\]\([[:space:]]\|$\)/\1\2\x01REDACTED\3]\4/gI' \
+  -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED\(:[a-z-]\{1,\}\)\{0,1\}\]\([^[:alnum:]_]\|$\)/\1\2\x01REDACTED\3]\4/gI' \
   -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\x01[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
   -e 's/\x01REDACTED/[REDACTED/g' \
   -e 's/--- begin/[ESCAPED] begin/g' \

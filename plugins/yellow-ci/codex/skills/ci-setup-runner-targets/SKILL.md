@@ -142,13 +142,23 @@ routing_rules:
 Omit `best_for`/`avoid_for`/`notes` entirely when empty (never write empty
 arrays). Obtain the timestamp with `date -u +%Y-%m-%dT%H:%M:%SZ`.
 
-After writing, **regenerate the plugin's merged routing cache** (the
-routing-summary the session-start hook reads, plus the merged-config JSON). On
-Claude Code the invoking command runs this via the plugin's runner-targets
-resolution library, merging the global config with any per-repo override; with
-no invoking command (Step 2's global-only path), it is produced from the
-global config alone. The cache location is host-resolved by the plugin — do
-not hard-code it here.
+After writing, the plugin's merged routing cache (the routing-summary the
+session-start hook reads, plus the merged-config JSON) needs to be
+regenerated. How that happens depends on whether an invoking command is
+present:
+
+- **With an invoking command** (Claude Code): the command runs the plugin's
+  runner-targets resolution library directly, merging the global config with
+  any per-repo override, and writes the cache to the host-resolved location.
+  Confirm regeneration with the user as part of Step 5.
+- **Without an invoking command** (direct invocation): the resolution library
+  is not reachable from this skill, so **do not claim the cache was
+  regenerated**. Say plainly that the config was saved and that the cache will
+  be rebuilt automatically on the next session where the plugin's session-start
+  hook runs, which reads the same global config just written. No manual step is
+  required, and no stale cache is left asserted as fresh.
+
+Never hard-code the cache location here — it is host-resolved by the plugin.
 
 ### Step 5: Validate and Report
 

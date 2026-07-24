@@ -29,7 +29,8 @@ redact_secrets() {
   #      `<key>=[REDACTED:<label>]` (produced by one of the specific rules
   #      above) to `<key>=\x01REDACTED...`, swapping the leading '[' for the
   #      sentinel byte. It matches ONLY a COMPLETE marker — the closing ']'
-  #      must be followed by whitespace or end-of-line, and any label must be
+  #      must be followed by a non-alphanumeric delimiter (whitespace, `,`, `&`,
+  #      `;`, quote, etc.) or end-of-line, and any label must be
   #      [a-z-]+. That precision is the security boundary: a forged value such
   #      as `password=[REDACTEDsecret]`, `password=[REDACTED-secret]`, or
   #      `password=[REDACTED:evil]moresecret` does NOT match, so it falls
@@ -64,7 +65,7 @@ redact_secrets() {
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
-    -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED\(:[a-z-]\{1,\}\)\{0,1\}\]\([[:space:]]\|$\)/\1\2\x01REDACTED\3]\4/gI' \
+    -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED\(:[a-z-]\{1,\}\)\{0,1\}\]\([^[:alnum:]_]\|$\)/\1\2\x01REDACTED\3]\4/gI' \
     -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\x01[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
     -e 's/\x01REDACTED/[REDACTED/g' \
   ) || {

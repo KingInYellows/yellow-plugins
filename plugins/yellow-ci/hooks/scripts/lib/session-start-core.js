@@ -61,15 +61,25 @@ function readRoutingSummary(env) {
 }
 
 // `command -v <cmd>` equivalent: scan PATH for an executable of that name.
+// On Windows the executable is `gh.exe`, not `gh`, so a bare `<dir>/<cmd>`
+// probe reports "missing" even on a normal install and the hook silently
+// suppresses CI context. Try each PATHEXT suffix (plus the bare name, for
+// the POSIX case) before giving up.
 function commandExists(cmd, env) {
   const dirs = (env.PATH || '').split(path.delimiter);
+  const exts =
+    process.platform === 'win32'
+      ? ['', ...(env.PATHEXT || '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)]
+      : [''];
   for (const dir of dirs) {
     if (!dir) continue;
-    try {
-      fs.accessSync(path.join(dir, cmd), fs.constants.X_OK);
-      return true;
-    } catch {
-      // not here; keep scanning
+    for (const ext of exts) {
+      try {
+        fs.accessSync(path.join(dir, cmd + ext), fs.constants.X_OK);
+        return true;
+      } catch {
+        // not here; keep scanning
+      }
     }
   }
   return false;

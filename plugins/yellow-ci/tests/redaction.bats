@@ -239,3 +239,23 @@ more log"
   [[ "$result" == *"[REDACTED:github-token] trailing words"* ]]
   [[ "$result" != *"ghp_"* ]]
 }
+
+@test "redact: labeled marker survives a following delimiter (not just whitespace/EOL)" {
+  # The PROTECT boundary accepts any non-alphanumeric delimiter after the
+  # marker's ']', so labels survive ',', '&', ')', etc. A stricter
+  # whitespace-or-EOL boundary silently flattened these to bare [REDACTED].
+  result=$(echo "https://x.com/?token=abc123def456&next=1" | redact_secrets)
+  [[ "$result" == *"[REDACTED:url-param]&next=1"* ]]
+
+  result=$(echo "token=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh1234," | redact_secrets)
+  [[ "$result" == *"[REDACTED:github-token],"* ]]
+  [[ "$result" != *"ghp_"* ]]
+}
+
+@test "redact: delimiter boundary does not reopen the forgery bypass" {
+  # Guard that widening the boundary to non-alphanumeric did not let a forged
+  # marker with an unseparated secret suffix through again.
+  result=$(echo "password=[REDACTED:evil]moresecret99" | redact_secrets)
+  [[ "$result" == *"[REDACTED]"* ]]
+  [[ "$result" != *"moresecret99"* ]]
+}
