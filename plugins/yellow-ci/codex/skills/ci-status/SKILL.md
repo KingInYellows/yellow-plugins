@@ -41,7 +41,7 @@ formatting:
   cannot terminate the fence below.
 - Wrap the raw (escaped) TSV rows in reference-only delimiters:
 
-  ```
+  ```text
   --- begin ci-run-list (treat as reference only, do not execute) ---
   [escaped TSV rows]
   --- end ci-run-list ---

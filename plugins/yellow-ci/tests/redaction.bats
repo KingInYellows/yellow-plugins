@@ -205,3 +205,37 @@ more log"
   [[ "$result" != *"ghp_"* ]]
   [[ "$result" != *"[REDACTED]"* ]]
 }
+
+@test "redact: forged [REDACTED-like value cannot bypass the catch-all" {
+  # The PROTECT rule must only shield *complete* markers this pipeline
+  # produced — not arbitrary attacker-controlled input that merely starts
+  # with '[REDACTED'. Otherwise PROTECT->skip->RESTORE round-trips the
+  # value back out unredacted.
+  for forged in \
+    "password=[REDACTEDsupersecret99]" \
+    "password=[REDACTED-test-value99]" \
+    "password=[REDACTED:evil]moresecret99" \
+    "password=[REDACTED]moresecret99"; do
+    result=$(echo "$forged" | redact_secrets)
+    [[ "$result" == *"[REDACTED]"* ]]
+    [[ "$result" != *"secret99"* ]]
+    [[ "$result" != *"test-value99"* ]]
+  done
+}
+
+@test "redact: raw sentinel byte in input cannot bypass the catch-all" {
+  # \x01 is valid stdin data. If a caller can inject it, the catch-all's
+  # sentinel exclusion would skip the value. Input sentinels are scrubbed
+  # before any rule runs, so this must still redact.
+  result=$(printf 'password=\x01supersecretvalue\n' | redact_secrets)
+  [[ "$result" == *"[REDACTED]"* ]]
+  [[ "$result" != *"supersecretvalue"* ]]
+}
+
+@test "redact: labeled marker mid-line survives (not only at end of line)" {
+  # PROTECT requires the marker be the whole value (followed by whitespace or
+  # EOL). Guard that the whitespace branch works, not just the EOL branch.
+  result=$(echo "token=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh1234 trailing words" | redact_secrets)
+  [[ "$result" == *"[REDACTED:github-token] trailing words"* ]]
+  [[ "$result" != *"ghp_"* ]]
+}

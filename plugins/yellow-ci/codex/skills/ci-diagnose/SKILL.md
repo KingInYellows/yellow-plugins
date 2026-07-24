@@ -33,9 +33,18 @@ gh auth status 2>&1 | head -n 3
 
 If not authenticated: "GitHub CLI not authenticated. Run: `gh auth login`".
 
-Check repository context — resolve the origin remote explicitly, accept only
-`github.com` remotes (SSH or HTTPS), and fail closed to `NO_REMOTE` on any
-command failure or non-GitHub host:
+**Parse `--repo` first.** If the argument text after the skill name contains
+`--repo owner/name`, extract it into `REPO_OVERRIDE` and validate the format
+now (exactly one `/`, alphanumeric plus hyphens and dots); report the format
+error and stop if it is invalid. An explicit override is a complete repository
+context on its own, so when `REPO_OVERRIDE` is set, **skip the origin-remote
+detection below entirely** and proceed to Step 2 — otherwise the advertised
+override could never be used from outside a GitHub checkout, which is exactly
+when it is most useful.
+
+When no override was given, check repository context — resolve the origin
+remote explicitly, accept only `github.com` remotes (SSH or HTTPS), and fail
+closed to `NO_REMOTE` on any command failure or non-GitHub host:
 
 ```bash
 REMOTE_URL=$(git remote get-url origin 2>/dev/null)
@@ -57,8 +66,9 @@ isn't a `github.com` SSH (`git@github.com:owner/repo(.git)`) or HTTPS
 (`https://github.com/owner/repo(.git)`) remote — including other hosts such
 as GitLab — falls through to `NO_REMOTE` as well.
 
-If `$REPO_CONTEXT` is `NO_REMOTE`: "Not in a Git repository with a GitHub
-remote. Navigate to your project root."
+If `$REPO_CONTEXT` is `NO_REMOTE` **and no `--repo` override was given**: "Not
+in a Git repository with a GitHub remote. Navigate to your project root, or
+pass `--repo owner/name`."
 
 ### Step 2: Resolve Run ID
 
@@ -68,11 +78,8 @@ If the argument text after the skill name contains a run ID (digits only):
   9007199254740991). If invalid: "Invalid run ID. Must be a positive integer
   (e.g., 123456789)".
 
-If it contains `--repo`:
-
-- Extract `owner/repo` into `REPO_OVERRIDE`; validate the format (exactly one
-  `/`, alphanumeric plus hyphens and dots). If invalid: report the format
-  error and stop. If `--repo` was not given, leave `REPO_OVERRIDE` unset/empty.
+`REPO_OVERRIDE` was already extracted and validated in Step 1 (it gates the
+origin-remote check there); if `--repo` was not given it is unset/empty.
 
 Set `REPO_ARGS` once, before any `gh` call, so every `gh run list`/`gh run
 view` invocation in this skill (this step, Step 3, and Step 4a) honors the
@@ -132,9 +139,23 @@ lines (capped at ~5 MiB total) — unlike a `head -n 500 | head -c ...`
 pipeline, it never closes the pipe early, so `gh` is never killed by SIGPIPE
 on a log longer than the bound. With `pipefail` set, `$FETCH_STATUS`
 therefore reflects a genuine fetch failure (124 from `timeout`, or `gh`'s own
-non-zero exit) — not truncation. Treat *any* non-zero `$FETCH_STATUS` as a
-fetch failure and do not treat `$LOG_CONTENT` as complete. Never print, `cat`,
-or otherwise display `$LOG_CONTENT` — proceed directly to 4b.
+non-zero exit) — not truncation.
+
+**Reject a failed fetch before treating the output as evidence.** On a failed
+fetch `$LOG_CONTENT` may hold `gh`'s error text rather than logs (stderr is
+folded in by `2>&1`), so diagnosing from it would report a fabricated root
+cause:
+
+```bash
+if [ "$FETCH_STATUS" -ne 0 ] || [ -z "$LOG_CONTENT" ]; then
+  # 124 = timeout; anything else = gh failure. Report and stop.
+  echo "Could not fetch logs for run $RUN_ID (status $FETCH_STATUS). Not diagnosing."
+  # Stop here. Do not continue to 4b/4c/4d/4e/4f.
+fi
+```
+
+Never print, `cat`, or otherwise display `$LOG_CONTENT` — proceed directly
+to 4b.
 
 **4b. Redact secrets BEFORE any display or analysis (mandatory).** This skill
 ships no separate library on every host, so the redaction pipeline is
@@ -145,6 +166,7 @@ verbatim:
 REDACTED_LOG=$(
   set -o pipefail
   printf '%s' "$LOG_CONTENT" | sed \
+    -e 's/\x01/?/g' \
     -e 's/ghp_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/gho_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
@@ -161,7 +183,7 @@ REDACTED_LOG=$(
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
-    -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED/\1\2\x01REDACTED/gI' \
+    -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED\(:[a-z-]\{1,\}\)\{0,1\}\]\([[:space:]]\|$\)/\1\2\x01REDACTED\3]\4/gI' \
     -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\x01[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
     -e 's/\x01REDACTED/[REDACTED/g' \
     | sed -e 's/--- begin/[ESCAPED] begin/g' -e 's/--- end/[ESCAPED] end/g'
@@ -169,7 +191,7 @@ REDACTED_LOG=$(
 REDACT_STATUS=$?
 ```
 
-This masks (13+ patterns): GitHub tokens (`ghp_`, `ghs_`, `gho_`, `ghr_`,
+This masks (13+ patterns): GitHub tokens (`ghp_`, `ghs_`, `gho_`, `ghr_`, `ghu_`,
 `github_pat_`), AWS access keys (`AKIA…`) and secret keys, bearer/authorization
 headers, private key blocks (`-----BEGIN … PRIVATE KEY-----`), JWTs,
 npm/pypi/docker tokens, URL query-string credentials, and any

@@ -22,17 +22,32 @@ redact_secrets() {
   #
   # To keep that label-clobber protection without exempting real secrets, a
   # PROTECT/RESTORE sentinel pair brackets the catch-all below:
-  #   1. PROTECT rewrites an already-redacted `<key>=[REDACTED` (produced by
-  #      one of the specific rules above) to `<key>=\x01REDACTED`, swapping
-  #      the leading '[' for the sentinel byte.
+  #   0. SCRUB replaces any \x01 already present in the INPUT with '?'. The
+  #      sentinel must be unforgeable — \x01 is legal stdin data, and without
+  #      this a caller could inject one and ride the exclusion in step 2.
+  #   1. PROTECT rewrites an already-redacted `<key>=[REDACTED]` or
+  #      `<key>=[REDACTED:<label>]` (produced by one of the specific rules
+  #      above) to `<key>=\x01REDACTED...`, swapping the leading '[' for the
+  #      sentinel byte. It matches ONLY a COMPLETE marker — the closing ']'
+  #      must be followed by whitespace or end-of-line, and any label must be
+  #      [a-z-]+. That precision is the security boundary: a forged value such
+  #      as `password=[REDACTEDsecret]`, `password=[REDACTED-secret]`, or
+  #      `password=[REDACTED:evil]moresecret` does NOT match, so it falls
+  #      through to the catch-all and is redacted.
   #   2. The catch-all's value pattern excludes the sentinel, so it skips
   #      any value PROTECT just touched, while still matching a raw
   #      '['-prefixed secret (which never gets the sentinel).
   #   3. RESTORE converts the sentinel back to '[', turning
   #      `<key>=\x01REDACTED` back into `<key>=[REDACTED`.
-  # sed applies -e scripts in order per line, so PROTECT -> catch-all ->
-  # RESTORE run in that sequence within this single invocation.
+  # sed applies -e scripts in order per line, so SCRUB -> PROTECT -> catch-all
+  # -> RESTORE run in that sequence within this single invocation.
+  #
+  # Portability: \x01 is a GNU sed escape. This pipeline is already GNU-only
+  # (it uses \| alternation in BRE and the I case-insensitivity flag), so this
+  # adds no new constraint — but it does mean BSD/macOS sed is unsupported.
+  # tests/redaction.bats covers the forged-marker and injected-sentinel cases.
   output=$(sed \
+    -e 's/\x01/?/g' \
     -e 's/ghp_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/gho_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
@@ -49,7 +64,7 @@ redact_secrets() {
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
-    -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED/\1\2\x01REDACTED/gI' \
+    -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED\(:[a-z-]\{1,\}\)\{0,1\}\]\([[:space:]]\|$\)/\1\2\x01REDACTED\3]\4/gI' \
     -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\x01[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
     -e 's/\x01REDACTED/[REDACTED/g' \
   ) || {
