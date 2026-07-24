@@ -1,0 +1,47 @@
+plugins/yellow-ci/hooks/scripts/lib/redact.sh
+  s_3c47fcc8a84b34::t_2a73e5b251c367 25-36,42-48
+  s_3c47fcc8a84b34::t_a50473d2bac8d5 67
+  s_3c47fcc8a84b34::t_598a54f81e6e10 50
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_3c47fcc8a84b34::t_99e2121dad4e97 36-47,69-71,81-82,142-158,169,186,194
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_3c47fcc8a84b34::t_2e7d63e1602310 143-159
+  s_3c47fcc8a84b34::t_0ff367b269a521 170
+  s_3c47fcc8a84b34::t_e6706a5142a57d 187
+  s_3c47fcc8a84b34::t_4fe534e159b251 195
+  s_3c47fcc8a84b34::t_ab09c3486484a5 37-48
+  s_3c47fcc8a84b34::t_31172d306597e6 70-72
+  s_3c47fcc8a84b34::t_7fc42d7d0404da 82-83
+plugins/yellow-ci/tests/redaction.bats
+  s_3c47fcc8a84b34::t_331f7c99435653 208-241
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_3c47fcc8a84b34::t_a1bda79250d4ec 216-224
+  s_3c47fcc8a84b34::t_29bc4131aa516a 110-116
+  s_3c47fcc8a84b34::t_50dace37a48e73 243
+  s_3c47fcc8a84b34::t_0ff367b269a521 226
+  s_3c47fcc8a84b34::t_810617fdde695e 250-252,254-255
+  s_3c47fcc8a84b34::t_3a9c34e7b6fcc9 170
+  s_3c47fcc8a84b34::t_eb925bd09248fa 147
+plugins/yellow-ci/skills/ci-status/SKILL.md
+  s_3c47fcc8a84b34::t_5a5a66b637b277 45
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_3c47fcc8a84b34::t_99e2121dad4e97 109-115,146,169,215-223,225,242,249-251,253-254
+plugins/yellow-ci/codex/skills/ci-status/SKILL.md
+  s_3c47fcc8a84b34::t_99e2121dad4e97 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8b80e7c624d0c252a68d1c9d2123ab7ce905ee95",
+  "prompts": {},
+  "sessions": {
+    "s_3c47fcc8a84b34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a3350f9-732c-413a-b730-a60b1c74be10",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
