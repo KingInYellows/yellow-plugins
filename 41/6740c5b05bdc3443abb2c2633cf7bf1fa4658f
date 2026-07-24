@@ -1,0 +1,23 @@
+plugins/yellow-ci/tests/fake-exec.bats
+  s_3c47fcc8a84b34::t_619b4ec0f051eb 26-29,35-38
+plugins/yellow-ci/CLAUDE.md
+  s_3c47fcc8a84b34::t_3b3a1bbbf84ee4 116-121
+plugins/yellow-ci/README.md
+  s_3c47fcc8a84b34::t_d4a9ac59bdcf28 109-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "416740c5b05bdc3443abb2c2633cf7bf1fa4658f",
+  "prompts": {},
+  "sessions": {
+    "s_3c47fcc8a84b34": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5a3350f9-732c-413a-b730-a60b1c74be10",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
