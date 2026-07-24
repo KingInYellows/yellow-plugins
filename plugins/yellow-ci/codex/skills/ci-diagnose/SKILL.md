@@ -35,12 +35,12 @@ If not authenticated: "GitHub CLI not authenticated. Run: `gh auth login`".
 
 **Parse `--repo` first.** If the argument text after the skill name contains
 `--repo owner/name`, extract it into `REPO_OVERRIDE` and validate the format
-now (exactly one `/`, alphanumeric plus hyphens and dots); report the format
-error and stop if it is invalid. An explicit override is a complete repository
-context on its own, so when `REPO_OVERRIDE` is set, **skip the origin-remote
-detection below entirely** and proceed to Step 2 — otherwise the advertised
-override could never be used from outside a GitHub checkout, which is exactly
-when it is most useful.
+now (exactly one `/`, alphanumeric plus hyphens, dots, and underscores);
+report the format error and stop if it is invalid. An explicit override is a
+complete repository context on its own, so when `REPO_OVERRIDE` is set,
+**skip the origin-remote detection below entirely** and proceed to Step 2 —
+otherwise the advertised override could never be used from outside a GitHub
+checkout, which is exactly when it is most useful.
 
 When no override was given, check repository context — resolve the origin
 remote explicitly, accept only `github.com` remotes (SSH or HTTPS), and fail
@@ -137,9 +137,22 @@ self-contained on any host.
 
 **4a. Fetch the failed logs (bounded) — capture only, never print.**
 
+`timeout` is GNU coreutils and is absent on stock macOS (where it may exist
+as `gtimeout` via Homebrew, if installed at all); detect the available
+variant first so the fetch does not silently exit 127 and get mistaken for a
+genuine fetch failure:
+
 ```bash
 set -o pipefail
-LOG_CONTENT=$(timeout 30 gh run view "$RUN_ID" --log-failed "${REPO_ARGS[@]}" 2>&1 \
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=timeout
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=gtimeout
+else
+  echo "Prerequisite missing: neither 'timeout' nor 'gtimeout' found on PATH. Install GNU coreutils (macOS: brew install coreutils) and retry."
+  exit 1
+fi
+LOG_CONTENT=$("$TIMEOUT_CMD" 30 gh run view "$RUN_ID" --log-failed "${REPO_ARGS[@]}" 2>&1 \
   | awk -v max_lines=500 -v max_bytes=5242880 '
       { if (NR <= max_lines && bytes + length($0) + 1 <= max_bytes) { print; bytes += length($0) + 1 } }
     ')

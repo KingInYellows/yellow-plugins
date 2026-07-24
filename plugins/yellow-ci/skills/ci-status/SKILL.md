@@ -37,7 +37,11 @@ RUN_ROWS=$(gh run list --limit 5 --json databaseId,status,conclusion,headBranch,
 RUN_STATUS=$?
 ```
 
-Do not print, `cat`, or echo `$RUN_ROWS` — carry it into step 2.
+If `$RUN_STATUS` is non-zero, `gh run list` failed — stop here and go to step 3
+("Handle Failures") instead of step 2; do not attempt to format or fence
+`$RUN_ROWS` in that case. Only when `$RUN_STATUS` is zero does an empty
+`$RUN_ROWS` mean "no runs found" (also handled in step 3). Otherwise, do not
+print, `cat`, or echo `$RUN_ROWS` — carry it into step 2.
 
 ### 2. Fence Before Formatting (mandatory)
 
@@ -69,12 +73,12 @@ formatting:
 
 ### 3. Handle Failures
 
-If `gh` fails:
+If `$RUN_STATUS` from step 1 is non-zero (`gh` failed):
 
 - Check `gh auth status` — the user may need to authenticate.
 - Confirm you are inside a GitHub repository with a remote.
 
-If no runs are found:
+If `$RUN_STATUS` is zero but no runs are found (`$RUN_ROWS` is empty):
 
 > No workflow runs found. This repository may not have GitHub Actions
 > configured.

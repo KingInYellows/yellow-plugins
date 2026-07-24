@@ -16,6 +16,14 @@
 # defect, reproducing it faithfully would just preserve the defect. Any future
 # divergence should be recorded here with its reason, never silently re-baselined.
 #
+# DELIBERATE DIVERGENCE (routing-summary-present, gh-missing, gh-unauthed,
+# cache-miss-failures, malformed-gh-json, rate-limited-gh): the original
+# interpolated the routing-summary cache straight into the systemMessage too.
+# That cache embeds `best_for` free text from a user-writable runner-targets
+# config, so it is attacker-influenceable the same way branch names are — the
+# Node runtime defangs it and wraps it in a reference-only fence, and those
+# goldens were re-captured to match.
+#
 # STDOUT is compared JSON-semantically (jq -S -c) because the bash hook emitted
 # jq's pretty multi-line JSON while the Node port emits compact JSON — the
 # decision is what must match, not the byte formatting. STDERR and EXIT_CODE are
