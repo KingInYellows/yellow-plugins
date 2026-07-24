@@ -234,13 +234,8 @@ JOURNAL_STATUS=$?
 if [ "$JOURNAL_STATUS" -ne 0 ] || [ -z "$RUNNER_LOG" ]; then
   printf '[yellow-ci] Could not retrieve runner-agent logs from %s (status %s); not quoting output.\n' \
     "$host" "$JOURNAL_STATUS" >&2
-  RUNNER_LOG=""
   REDACTED_LOG=""
-  # Skip the sanitization block below entirely. Do NOT let it run on an empty
-  # RUNNER_LOG: `printf '%s\n' ""` emits a bare newline, so $REDACTED_LOG would
-  # come back non-empty and a blank fenced block would be reported as though it
-  # were real runner output.
-fi
+else
 REDACTED_LOG=$(printf '%s\n' "$RUNNER_LOG" | sed \
   -e 's/\x01/?/g' \
   -e 's/ghp_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
@@ -264,6 +259,7 @@ REDACTED_LOG=$(printf '%s\n' "$RUNNER_LOG" | sed \
   -e 's/\x01REDACTED/[REDACTED/g' \
   -e 's/--- begin/[ESCAPED] begin/g' \
   -e 's/--- end/[ESCAPED] end/g') || REDACTED_LOG='[REDACTED: sanitization failed]'
+fi
 ```
 
 Fail closed on both failure modes: if the SSH retrieval failed (non-zero
