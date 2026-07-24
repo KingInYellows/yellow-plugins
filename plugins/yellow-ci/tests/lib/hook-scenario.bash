@@ -76,6 +76,7 @@ hook_scenario_setup() {
     gh-missing) export PATH="$(_hook_scenario_bin_without_gh "$sandbox")" ;;
     gh-unauthed) export MOCK_GH_AUTH=unauthed ;;
     cache-miss-failures) export MOCK_GH_RUNLIST=failures ;;
+    hostile-branch) export MOCK_GH_RUNLIST=hostile-branch ;;
     malformed-gh-json) export MOCK_GH_RUNLIST=malformed ;;
     rate-limited-gh) export MOCK_GH_RUNLIST=ratelimit ;;
   esac
