@@ -55,7 +55,9 @@ rt_cache_dir() {
 
 # Legacy cache directory — READ-ONLY fallback target (R38). New writes never go
 # here; the SessionStart hook and merged-config readers fall back to it only
-# when the new location has no cache yet.
+# when the new location has no cache yet. Exception: stale-cache cleanup below
+# also removes files here on config removal/invalidation, so the read-fallback
+# doesn't keep resurfacing a deleted config's routing data indefinitely.
 # Usage: rt_legacy_cache_dir
 rt_legacy_cache_dir() {
   printf '%s' "${HOME}/.cache/yellow-ci"
@@ -285,6 +287,8 @@ resolve_runner_targets() {
   local_path=$(rt_local_path)
   local cache_dir
   cache_dir=$(rt_cache_dir)
+  local legacy_cache_dir
+  legacy_cache_dir=$(rt_legacy_cache_dir)
 
   local has_global=0
   local has_local=0
@@ -294,9 +298,12 @@ resolve_runner_targets() {
 
   # Graceful degradation: no config
   if [ "$has_global" -eq 0 ] && [ "$has_local" -eq 0 ]; then
-    # Clean up stale cache
+    # Clean up stale cache — both locations, so the legacy read-fallback
+    # doesn't keep resurfacing deleted routing rules (R38).
     rm -f "${cache_dir}/routing-summary.txt" 2>/dev/null
     rm -f "${cache_dir}/runner-targets-merged.json" 2>/dev/null
+    rm -f "${legacy_cache_dir}/routing-summary.txt" 2>/dev/null
+    rm -f "${legacy_cache_dir}/runner-targets-merged.json" 2>/dev/null
     return 1
   fi
 
@@ -311,9 +318,13 @@ resolve_runner_targets() {
   fi
 
   if [ "$has_global" -eq 0 ] && [ "$has_local" -eq 0 ]; then
-    # Clean up stale cache when no valid config remains
+    # Clean up stale cache when no valid config remains — both locations, so
+    # the legacy read-fallback doesn't keep resurfacing deleted routing rules
+    # (R38).
     rm -f "${cache_dir}/routing-summary.txt" 2>/dev/null
     rm -f "${cache_dir}/runner-targets-merged.json" 2>/dev/null
+    rm -f "${legacy_cache_dir}/routing-summary.txt" 2>/dev/null
+    rm -f "${legacy_cache_dir}/runner-targets-merged.json" 2>/dev/null
     return 1
   fi
 
