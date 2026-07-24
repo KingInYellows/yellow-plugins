@@ -17,7 +17,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "gt-workflow",
       "description": "Graphite-native workflow commands for stacked PRs, smart commits, sync, and stack navigation",
-      "version": "1.5.4",
+      "version": "1.6.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -27,7 +27,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-core",
       "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
-      "version": "1.26.0",
+      "version": "1.27.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -215,7 +215,7 @@ exports[`manifest byte-identity baseline > plugins/gt-workflow/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "gt-workflow",
-  "version": "1.5.4",
+  "version": "1.6.0",
   "description": "Graphite-native workflow commands for stacked PR development. Provides smart commit-and-submit with parallel audit agents, stack planning, sync, and navigation — all through the gt CLI.",
   "author": {
     "name": "KingInYellows",
@@ -318,7 +318,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ci/.claude-plugin/plug
         "hooks": [
           {
             "type": "command",
-            "command": "bash \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "command": "node \${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js",
             "timeout": 3
           }
         ]
@@ -429,7 +429,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-core/.claude-plugin/pl
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-core",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "description": "Dev toolkit with review agents, research agents, and workflow commands for TypeScript, Python, Rust, and Go",
   "author": {
     "name": "KingInYellows",

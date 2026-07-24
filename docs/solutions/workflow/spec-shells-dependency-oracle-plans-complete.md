@@ -134,3 +134,34 @@ codebase survey wasn't necessarily handed the full spec text, and the spec
 frequently pre-answers exactly what it raised. A shell's own
 "Open Questions: None" section is not proof no answer exists elsewhere; it
 only means the shell author didn't carry one forward.
+
+---
+
+## Update — 2026-07-23
+
+While expanding shell 05 of the Claude Code + Codex dual-host pilot
+(`claude-code-codex-plugin-pilot-05-yellow-ci-pilot`), the shell's own
+"Open Questions: None" had missed a genuine conflict between two of the
+parent spec's own requirements (config-path retention vs. the Codex
+exposure lint — see
+[the resolution](../integration-issues/codex-config-retention-exposure-lint-conflict.md)).
+Two lessons for `expand-shell` itself, not the underlying Codex conflict:
+
+### A shell's "Open Questions: None" can hide a real conflict, not just a false one
+
+The 2026-07-17 update above covered the opposite case: a subagent-raised
+"open question" that turned out to be pre-answered by the parent spec and
+shouldn't have been escalated. This is the mirror case — the shell
+explicitly declared no open questions, but a genuine cross-requirement
+conflict existed in the parent spec's own text that no prior shell had
+surfaced. Verify against the spec text and the actual enforcing code before
+either dismissing or escalating a subagent's framing.
+
+### A verified spec conflict is a legitimate expand-shell gate, not "re-opening a settled decision"
+
+Step 5 forbids re-opening settled design decisions. A newly *verified*
+conflict between two of the parent spec's own requirements is not that —
+it belongs in the same category as the existing spec-drift (Step 2) and
+Consumes-failure (Step 3) gates, distinguished by: has the conflict been
+confirmed against the actual enforcing source, not merely asserted by a
+survey subagent's "blocking" label?

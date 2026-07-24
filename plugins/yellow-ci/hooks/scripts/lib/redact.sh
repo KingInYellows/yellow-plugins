@@ -12,9 +12,21 @@
 # 13+ patterns covering common CI secret formats
 redact_secrets() {
   local output
+  # NOTE: the final generic key/value catch-all's value pattern begins with
+  # [^[[:space:]] (first char is neither '[' nor whitespace) so it does NOT
+  # re-match a value that is already a '[REDACTED:...]' label from an earlier
+  # specific rule — otherwise `token=ghp_...` would be redacted to
+  # `[REDACTED:github-token]` and then clobbered back to a bare `[REDACTED]`.
+  # Deliberate trade-off: this also skips a real secret whose value literally
+  # starts with '[' (e.g. `password=[raw]`). Such values are rare, and every
+  # known secret FORMAT (ghp_/ghs_/github_pat/AWS/JWT/npm/pypi/docker/bearer)
+  # is still caught by the specific rules above regardless of position — only
+  # the unlabeled catch-all skips a leading-'[' value.
   output=$(sed \
     -e 's/ghp_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
+    -e 's/gho_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
+    -e 's/ghr_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/[REDACTED:github-pat]/g' \
     -e 's/AKIA[0-9A-Z]\{16\}/[REDACTED:aws-access-key]/g' \
     -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=[REDACTED:aws-secret]/gI' \
@@ -26,7 +38,7 @@ redact_secrets() {
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
-    -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^[:space:]]\{8,\}/\1=[REDACTED]/gI' \
+    -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^[[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
   ) || {
     printf '[yellow-ci] ERROR: Secret redaction failed, suppressing output\n' >&2
     printf '[REDACTED: sanitization failed]\n'

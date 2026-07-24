@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/entrypoint-claude.js",
             "timeout": 3
           }
         ]
@@ -44,7 +44,25 @@
   "targets": {
     "claude": true,
     "codex": {
-      "enabled": false
+      "enabled": true,
+      "interface": {
+        "displayName": "Yellow CI",
+        "category": "Developer Tools"
+      },
+      "description": "CI failure diagnosis, GitHub Actions workflow linting, self-hosted runner setup and health skills, invoked as Codex skills. Read-mostly: SSH/config writes and workflow-lint fixes always preview and confirm first.",
+      "skillAllowlist": [
+        "ci-setup",
+        "ci-setup-runner-targets",
+        "ci-status",
+        "ci-diagnose",
+        "ci-lint-workflows",
+        "ci-runner-health",
+        "ci-conventions",
+        "diagnose-ci"
+      ],
+      "componentPaths": {
+        "skills": "./codex/skills"
+      }
     }
   }
 }

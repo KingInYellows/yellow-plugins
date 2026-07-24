@@ -18,6 +18,9 @@ components:
 
 # OpenAI Codex plugin manifest, marketplace, and hook contract
 
+> **Canonical distribution doc:** see [Codex Distribution](../../codex-distribution.md)
+> for the overall neutral-catalog model this fits into.
+
 ## Context
 
 While planning a Claude Code + Codex dual-host plugin pilot, primary-source
@@ -182,3 +185,85 @@ plan that treats "port a PreToolUse blocking hook from Claude to Codex" as
 "change the JSON field names" misses that Claude's side isn't JSON-based
 for this case at all — the two hosts use categorically different blocking
 mechanisms, not just different envelope shapes.
+
+---
+
+## Update — 2026-07-23
+
+While expanding shell 05 (`claude-code-codex-plugin-pilot-05-yellow-ci-pilot`),
+research toward the "Previously unverified" section's item 3
+(`agents/openai.yaml` moot on 0.144.1) surfaced a possible replacement
+mechanism for non-implicit skill invocation: current Codex documentation
+and the `openai/codex` source reportedly also parse a
+`disable-model-invocation` SKILL.md frontmatter field, distinct from the
+`agents/openai.yaml` file this doc already covers. This claim is
+**reported, not independently verified against a live CLI in this repo** —
+the same gap `allow_implicit_invocation` had before the 2026-07-16 spike
+disproved it on 0.144.1. Until spiked: keep SKILL.md description-phrasing
+as the working non-implicit-invocation lever (per the existing spike
+finding above), and add a live-CLI re-verification step for
+`disable-model-invocation` to any plan that would ship `agents/openai.yaml`
+or frontmatter changes depending on it.
+
+---
+
+## Update — 2026-07-23 (b): live re-verification on codex-cli 0.144.6
+
+Shell 05's R29 re-verify clause was run live against **codex-cli 0.144.6**
+(auth `chatgpt`, model `gpt-5.6-luna`). Two findings, one of which **reverses**
+the 0.144.1 result above.
+
+### `allow_implicit_invocation` IS honored on 0.144.6 (reverses spike finding (c))
+
+The 0.144.1 spike found `agents/openai.yaml` "not parsed from plugins at all."
+On 0.144.6 that is no longer true:
+
+- The `codex` binary parses and validates the field — it enforces
+  `"policy.allow_implicit_invocation must be a boolean"` and reads
+  `policy.get("allow_implicit_invocation")`.
+- Real installed plugins ship it, at a **per-skill** path
+  `skills/<skill-name>/agents/openai.yaml` (NOT a single top-level
+  `plugins/<name>/agents/openai.yaml` as earlier plans assumed). Schema:
+
+  ```yaml
+  interface:
+    display_name: "…"
+    short_description: "…"
+    # default_prompt / dependencies optional
+  policy:
+    allow_implicit_invocation: false
+  ```
+
+  The bundled `zoom` plugin ships `allow_implicit_invocation: false` for real
+  skills; `openai-developers` ships `true`. So the mechanism the spec deferred
+  "pending upstream support" now exists upstream.
+
+### …but shipping it is blocked by THIS repo's generator, not by Codex
+
+The blocker is now on our side. `scripts/lib/generate/emit-codex.js`
+(`buildCodexSkillTree`) copies **only `SKILL.md`** per skill and **rejects any
+allowlisted skill whose directory contains sidecar files** ("has sidecar
+file(s) not yet supported for Codex … only SKILL.md is copied"). A per-skill
+`agents/openai.yaml` is exactly such a sidecar, so it cannot reach the generated
+`codex/skills/<name>/` tree without extending the generator (copy sidecars +
+widen its stale-artifact sweep). That generator change is shared neutral-catalog
+infrastructure (shells 01/02), out of scope for the yellow-ci pilot.
+
+**Corrected deferral reason.** The `agents/openai.yaml` non-implicit marking
+stays deferred — but now because **our generator emits SKILL.md only**, not
+because Codex fails to parse it (the earlier "still unparsed by Codex" framing is
+wrong as of 0.144.6). The interim lever is unchanged: SKILL.md description
+phrasing frames `ci-conventions` and `diagnose-ci` as reference guides (see
+their reworded descriptions). Enabling the real marking is a two-part follow-up:
+(1) teach `emit-codex.js` to copy `agents/openai.yaml` (and other sidecars) into
+the generated tree, (2) add the per-skill `agents/openai.yaml` files. The
+`disable-model-invocation` frontmatter claim from Update (a) remains
+independently unverified.
+
+### `plugin_hooks` still `removed` on 0.144.6 (re-confirms finding (d))
+
+`codex features list` on 0.144.6 still shows `plugin_hooks` as **removed/false**
+(while `hooks`, `plugins`, `plugin_sharing`, `remote_plugin`, `multi_agent` are
+stable/true). Plugin-shipped hooks — including yellow-ci's ported SessionStart —
+remain carried-but-inert on Codex. Do not gate delivery on live Codex hook
+firing.

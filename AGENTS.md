@@ -275,7 +275,13 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   `name:` with `:` replaced by `-` (e.g. `setup:all` → `references/setup-all/`).
   Load it via an imperative `Read ${CLAUDE_PLUGIN_ROOT}/references/<slug>/...`
   stub at the branch point, and add `Read` to the command's `allowed-tools:`.
-  Skills instead use skill-relative `references/` paths (sibling to SKILL.md).
+  Skills instead use skill-relative `references/` paths (sibling to SKILL.md) —
+  EXCEPT a **Codex-exposed** skill, whose directory must be SKILL.md-only: the
+  generator (`emit-codex.js`) copies only `SKILL.md` and rejects any allowlisted
+  skill with sidecar files. Relocate references out of such a skill's directory
+  (e.g. `plugins/yellow-ci/references/`, loaded by Claude-only agents via
+  `${CLAUDE_PLUGIN_ROOT}`). Three plugins enable Codex today, in canonical order:
+  `gt-workflow`, `yellow-core`, `yellow-ci`; see `docs/codex-distribution.md`.
 - A thin-wrapper command whose `## Usage` section reads "Invoke the `Skill`
   tool with `skill: "<name>"`." (the cross-host pattern: the command is a
   Claude-only entrypoint, the skill is what both Claude and Codex actually

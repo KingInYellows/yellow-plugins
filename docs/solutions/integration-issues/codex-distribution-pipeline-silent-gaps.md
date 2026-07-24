@@ -26,6 +26,9 @@ components:
 
 # Codex distribution pipeline: silent gaps until codex.enabled flips
 
+> **Canonical distribution doc:** see [Codex Distribution](../../codex-distribution.md)
+> for the overall neutral-catalog model this fits into.
+
 ## Context
 
 While expanding plan shell 03 (yellow-core — the first plugin in this repo
