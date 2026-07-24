@@ -153,10 +153,13 @@ present:
   Confirm regeneration with the user as part of Step 5.
 - **Without an invoking command** (direct invocation): the resolution library
   is not reachable from this skill, so **do not claim the cache was
-  regenerated**. Say plainly that the config was saved and that the cache will
-  be rebuilt automatically on the next session where the plugin's session-start
-  hook runs, which reads the same global config just written. No manual step is
-  required, and no stale cache is left asserted as fresh.
+  regenerated, and do not promise it will be rebuilt automatically** — the
+  session-start hook only *reads* the cached routing summary, it does not
+  regenerate it. Tell the user plainly that the config was saved but the
+  routing cache is now stale (or absent), and that routing hints will not
+  reflect this change until the plugin's runner-targets resolution runs on a
+  host that provides it. That is the accurate state; inventing a rebuild path
+  here would leave the user trusting stale routing.
 
 Never hard-code the cache location here — it is host-resolved by the plugin.
 

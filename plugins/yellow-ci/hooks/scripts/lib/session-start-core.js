@@ -92,7 +92,10 @@ function commandExists(cmd, env) {
 // hostile branch cannot dominate the startup message.
 function sanitizeBranchName(name) {
   return name
-    .replace(/[\r\n\t]+/g, ' ')
+    // \p{White_Space} (not just \r\n\t) so U+2028/U+2029 and other Unicode
+    // separators cannot render the name as extra instruction-like lines
+    // inside the fence.
+    .replace(/\p{White_Space}+/gu, ' ')
     .replace(/---\s*(begin|end)/gi, '[ESCAPED] $1')
     .replace(/[`$<>]/g, '')
     .trim()
@@ -218,6 +221,9 @@ function runSessionStart({ cwd, env }) {
           .map((r) => r && r.headBranch)
           .filter((b) => typeof b === 'string' && b.length > 0)
           .map(sanitizeBranchName)
+          // Re-filter: a name made entirely of stripped characters sanitizes
+          // to '', which would otherwise render as a stray ", " in the list.
+          .filter(Boolean)
       )].sort();
       branches = uniqueBranches.join(', ');
     } else {

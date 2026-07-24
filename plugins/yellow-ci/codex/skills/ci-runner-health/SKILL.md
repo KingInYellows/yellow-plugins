@@ -145,10 +145,12 @@ problem, not evidence of a non-Linux runner, so it must not be mislabeled as
 - **`$os_probe_status` is 0 and `$runner_os` is `Linux`** — proceed to the
   health probe below.
 
-For each runner that reaches the probe:
+For each runner that reaches the probe — **capture the output, never let it
+stream to the caller.** Runner stdout/stderr is untrusted, and streaming it
+would bypass both the redaction step and the `runner-output` fence below:
 
 ```bash
-timeout 10 ssh "${ssh_opts[@]}" "$user@$host" << 'HEALTHCHECK'
+HEALTH_OUT=$(timeout 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'HEALTHCHECK'
 echo "=== DISK ==="
 df -h / /home 2>/dev/null | tail -n +2
 echo "=== MEMORY ==="
@@ -163,7 +165,14 @@ systemctl is-active actions.runner.* 2>/dev/null || echo "inactive"
 echo "=== NETWORK ==="
 curl -sI --connect-timeout 3 https://github.com -o /dev/null -w 'GitHub: %{http_code}\n' 2>/dev/null || echo "GitHub: unreachable"
 HEALTHCHECK
+)
+HEALTH_STATUS=$?
 ```
+
+`$HEALTH_OUT` must go through the same redaction pipeline used for the
+runner-agent journal below before any part of it is quoted, and may only be
+presented inside the `runner-output` fence. On a non-zero `$HEALTH_STATUS`,
+categorize per Step 5 and do not present the captured text as health data.
 
 Use adaptive parallelism: 1-3 runners at once; 4-10 runners max 5 concurrent;
 10+ in batches of half the runner count. Connection timeout 3s; wrap each probe
@@ -225,6 +234,11 @@ if [ "$JOURNAL_STATUS" -ne 0 ] || [ -z "$RUNNER_LOG" ]; then
   printf '[yellow-ci] Could not retrieve runner-agent logs from %s (status %s); not quoting output.\n' \
     "$host" "$JOURNAL_STATUS" >&2
   RUNNER_LOG=""
+  REDACTED_LOG=""
+  # Skip the sanitization block below entirely. Do NOT let it run on an empty
+  # RUNNER_LOG: `printf '%s\n' ""` emits a bare newline, so $REDACTED_LOG would
+  # come back non-empty and a blank fenced block would be reported as though it
+  # were real runner output.
 fi
 REDACTED_LOG=$(printf '%s\n' "$RUNNER_LOG" | sed \
   -e 's/\x01/?/g' \
