@@ -32,7 +32,9 @@ If the argument text after the skill name specifies a file:
 - Verify the resolved path is within `.github/workflows/`. Respond: "Path must
   point to a file inside `.github/workflows/`."
 - Verify the file exists; respond "File not found: `<path>`" if missing.
-- Lint that file only.
+- Lint that file only for file-local rules; for W06/W07, also inspect the
+  other workflow files needed to establish whether the repository uses
+  self-hosted runners, without reporting findings from those files.
 
 Otherwise:
 
@@ -50,7 +52,11 @@ For each workflow file, check these rules:
 
 **Errors (must fix):**
 
-- **W01:** Job without `timeout-minutes` → suggest `timeout-minutes: 60`
+- **W01:** Job without `timeout-minutes` → suggest `timeout-minutes: 60`;
+  skip reusable-workflow caller jobs (`uses:` pointing to either a local
+  `./.github/workflows/...` file or a remote
+  `owner/repo/.github/workflows/file.yml@ref`) since caller jobs don't
+  support `timeout-minutes` — it is owned by the called workflow
 - **W07:** Missing `runs-on: self-hosted` label on a directly defined job
   when repo uses self-hosted runners; skip reusable-workflow caller jobs
   (`uses:` pointing to either a local `./.github/workflows/...` file or a

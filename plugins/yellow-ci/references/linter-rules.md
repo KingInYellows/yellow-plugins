@@ -32,7 +32,11 @@ Note: W09 removed (continue-on-error: false is implicit default).
 Jobs without timeout can run indefinitely on self-hosted runners, blocking other
 jobs.
 
-**Detection:** Job definition without `timeout-minutes` key.
+**Detection:** Job definition without `timeout-minutes` key; skip
+reusable-workflow caller jobs (`uses:` pointing to either a local
+`./.github/workflows/...` file or a remote
+`owner/repo/.github/workflows/file.yml@ref`) since caller jobs don't support
+`timeout-minutes` — it is owned by the called workflow.
 
 **Fix:**
 
@@ -131,7 +135,10 @@ specific pool selectors from `preferred_selector` instead of generic guidance.
 **Severity:** Error | **Auto-fix:** No
 
 **Detection:** Job without `runs-on` containing `self-hosted` when repo is
-configured for self-hosted runners.
+configured for self-hosted runners; skip reusable-workflow caller jobs
+(`uses:` pointing to either a local `./.github/workflows/...` file or a
+remote `owner/repo/.github/workflows/file.yml@ref`) since their runner
+labels are defined by the called workflow.
 
 **Future:** When runner targets config is available, this rule can distinguish
 between intentional `ubuntu-latest` usage and misconfigured jobs using the

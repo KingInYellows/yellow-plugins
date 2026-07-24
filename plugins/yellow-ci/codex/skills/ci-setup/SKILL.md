@@ -20,8 +20,11 @@ This skill is wizard-driven and takes no arguments; the argument text after the
 skill name (if any) is available as context.
 
 **Config location.** This skill operates on *the plugin's runner SSH config
-file*. Its concrete path is host-resolved — the invoking command supplies the
-path for the current host (on Claude Code, the repo-local plugin config). Never
+file*, `yellow-ci.local.md`. When an invoking command supplies a host-resolved
+path (on Claude Code, the repo-local plugin config), use that path. Otherwise
+— for example, on direct invocation with no invoking command — fall back to
+the host-neutral default:
+`${XDG_CONFIG_HOME:-$HOME/.config}/yellow-ci/yellow-ci.local.md`. Never
 hard-code a host-specific config directory into this body.
 
 **Runner scope.** yellow-ci targets **Linux** self-hosted runners. Windows/macOS
@@ -152,9 +155,12 @@ verbatim. On any mismatch, report it and stop.
 ### Step 7: Report
 
 Report prerequisites, GitHub CLI account/scopes, and the runner config summary
-(where it was written, runner count, names), then advise: the config contains
-runner hostnames — if this is a shared repository, add the config to
-`.gitignore` to avoid committing host details.
+(where it was written, runner count, names). If the config was written to a
+repo-local path (an invoking command's host-resolved path inside the
+repository), advise: the config contains runner hostnames — if this is a
+shared repository, add the config to `.gitignore` to avoid committing host
+details. The host-neutral fallback location lives outside the repository, so
+this advice does not apply when the config was written there.
 
 ### Error Handling
 

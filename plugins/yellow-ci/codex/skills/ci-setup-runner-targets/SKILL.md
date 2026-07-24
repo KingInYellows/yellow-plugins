@@ -38,13 +38,22 @@ and stops; **Yes** continues.
 
 ### Step 2: Choose Target Location
 
-Ask via `AskUserQuestion`: "Where should the runner targets config be saved?"
+If an invoking command is present to resolve a per-repository override path
+for this host, ask via `AskUserQuestion`: "Where should the runner targets
+config be saved?"
 
 - **Global** (`${XDG_CONFIG_HOME:-$HOME/.config}/yellow-ci/`) — applies to all
   repos; recommended for org-wide pools.
-- **This repo only** — a per-repository override (path resolved by the invoking
-  command for this host). Use when this repo needs different routing than the
-  global defaults.
+- **This repo only** — a per-repository override (path resolved by the
+  invoking command for this host). Use when this repo needs different routing
+  than the global defaults.
+
+With no invoking command to resolve a per-repository path (for example, on
+direct invocation), save to the global location only — the per-repo override
+is merged into the routing cache by the plugin's runner-targets resolution
+library, which reads from a fixed, invoking-command-supplied path and has no
+host-neutral fallback of its own; do not invent an alternate per-repo path
+here, since the cache-merge step would never read it.
 
 Create the target directory if needed.
 
@@ -136,8 +145,10 @@ arrays). Obtain the timestamp with `date -u +%Y-%m-%dT%H:%M:%SZ`.
 After writing, **regenerate the plugin's merged routing cache** (the
 routing-summary the session-start hook reads, plus the merged-config JSON). On
 Claude Code the invoking command runs this via the plugin's runner-targets
-resolution library; on other hosts it is produced from the global config. The
-cache location is host-resolved by the plugin — do not hard-code it here.
+resolution library, merging the global config with any per-repo override; with
+no invoking command (Step 2's global-only path), it is produced from the
+global config alone. The cache location is host-resolved by the plugin — do
+not hard-code it here.
 
 ### Step 5: Validate and Report
 

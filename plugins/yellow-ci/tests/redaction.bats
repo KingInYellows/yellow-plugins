@@ -20,6 +20,12 @@ setup() {
   [[ "$result" == *"[REDACTED:github-token]"* ]]
 }
 
+@test "redact: GitHub App user access token (ghu_)" {
+  result=$(echo "ghu_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh1234" | redact_secrets)
+  [[ "$result" == *"[REDACTED:github-token]"* ]]
+  [[ "$result" != *"ghu_"* ]]
+}
+
 @test "redact: GitHub fine-grained PAT" {
   result=$(echo "github_pat_ABCDEFGHIJKLMNOPQRSTas" | redact_secrets)
   [[ "$result" == *"[REDACTED:github-pat]"* ]]
@@ -175,17 +181,19 @@ more log"
   [[ "$result" == *"[ESCAPED] begin"* ]]
 }
 
-# --- Label-clobber-guard trade-off (documented) ---
+# --- Label-clobber-guard sentinel (documented) ---
 
-@test "redact: leading-'[' generic value is intentionally NOT redacted (documented trade-off)" {
-  # The generic key/value catch-all excludes values whose first char is '[' so
-  # it cannot clobber a specific [REDACTED:<label>] marker from an earlier rule.
-  # Deliberate, narrow trade-off (see redact.sh comment): a raw *generic* secret
-  # whose value literally starts with '[' escapes ONLY the generic catch-all —
-  # every specific secret-FORMAT rule still fires. Asserting it keeps the
-  # trade-off test-visible so any future regex change here fails CI.
+@test "redact: bracket-prefixed generic secret value IS redacted (sentinel fix)" {
+  # The generic key/value catch-all excludes only whitespace and a sentinel
+  # control byte (\x01) from the value's first char — not '[' — so a real
+  # secret whose value starts with '[' is no longer exempted from redaction.
+  # Regression guard: this used to be a documented trade-off (leading-'['
+  # values silently skipped the catch-all); the PROTECT/RESTORE sentinel
+  # pair in redact.sh now closes that gap without clobbering specific labels
+  # (see the next test).
   result=$(echo "password=[rawsecretvalue123]" | redact_secrets)
-  [[ "$result" == *"password=[rawsecretvalue123]"* ]]
+  [[ "$result" == *"[REDACTED]"* ]]
+  [[ "$result" != *"rawsecretvalue123"* ]]
 }
 
 @test "redact: specific labeled redaction survives the generic catch-all (label not clobbered)" {
