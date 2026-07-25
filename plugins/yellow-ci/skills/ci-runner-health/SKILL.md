@@ -185,11 +185,20 @@ fi
 field, so probe cheaply over the same hardened contract before running any
 Linux-only command below. Do not discard stderr here (per this plugin's
 "never suppress with `2>/dev/null`" rule) — a connection failure's error text
-is what Step 5 categorizes:
+is what Step 5 categorizes. Capture stdout and stderr into **separate**
+variables instead of merging them with `2>&1`: on a runner's first
+connection, `StrictHostKeyChecking=accept-new` makes OpenSSH write a
+`Warning: Permanently added '...' to the list of known hosts.` line to
+stderr while `uname -s` writes `Linux` to stdout, and merging the two would
+corrupt the exact-match comparison below, wrongly skipping a healthy new
+runner as non-Linux:
 
 ```bash
-runner_os=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" -- uname -s 2>&1)
+runner_os_err_file=$(mktemp)
+runner_os=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" -- uname -s 2>|"$runner_os_err_file")
 os_probe_status=$?
+runner_os_err=$(cat "$runner_os_err_file")
+rm -f "$runner_os_err_file"
 ```
 
 Branch three ways on the result — a failed or empty probe is a connection
@@ -198,7 +207,7 @@ problem, not evidence of a non-Linux runner, so it must not be mislabeled as
 
 - **`$os_probe_status` non-zero or `$runner_os` empty** — the connection
   itself failed. Categorize it per Step 5 (timeout/auth failed/refused) using
-  `$runner_os`'s captured error text; do not run the health commands.
+  `$runner_os_err`'s captured stderr text; do not run the health commands.
 - **`$os_probe_status` is 0 and `$runner_os` is not exactly `Linux`** — skip
   this runner with "Linux runner targets only" and move to the next target.
 - **`$os_probe_status` is 0 and `$runner_os` is `Linux`** — proceed to the
