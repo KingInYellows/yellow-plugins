@@ -194,7 +194,18 @@ corrupt the exact-match comparison below, wrongly skipping a healthy new
 runner as non-Linux:
 
 ```bash
-runner_os_err_file=$(mktemp)
+runner_os_err_file=$(mktemp) || {
+  printf '[yellow-ci] Error: could not create a temporary file for the OS probe (mktemp failed — check that /tmp is writable and has free space).\n' >&2
+  exit 1
+}
+# Trap covers interruption (e.g. a Bash-tool timeout) between mktemp and the
+# explicit rm below; each runner's probe is its own self-contained invocation
+# (adaptive parallelism runs separate processes, never backgrounded `&` jobs
+# sharing this shell), so this EXIT trap is scoped to that single process and
+# cannot clobber another runner's handler or delete a file still in use. The
+# explicit rm -f after cat below still handles normal completion; the trap is
+# a no-op then since the file is already gone.
+trap 'rm -f "$runner_os_err_file"' EXIT
 runner_os=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" -- uname -s 2>|"$runner_os_err_file")
 os_probe_status=$?
 runner_os_err=$(cat "$runner_os_err_file")

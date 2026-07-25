@@ -259,3 +259,26 @@ more log"
   [[ "$result" == *"[REDACTED]"* ]]
   [[ "$result" != *"moresecret99"* ]]
 }
+
+@test "redact: raw value that exactly matches the marker grammar is still fully redacted" {
+  # A logged credential whose RAW value happens to equal the marker grammar
+  # exactly (`[REDACTED]` or `[REDACTED:label]`, nothing else) must not
+  # survive as a labeled marker it never earned. Protection is tied to
+  # provenance (which specific rule produced it), not to shape, so this
+  # falls through to the generic catch-all like any other secret-shaped
+  # value instead of round-tripping through the sentinel unredacted.
+  result=$(echo "token=[REDACTED:github-token]" | redact_secrets)
+  [[ "$result" == *"[REDACTED]"* ]]
+  [[ "$result" != *"[REDACTED:github-token]"* ]]
+}
+
+@test "redact: marker-shaped prefix does not shield a real secret suffix after a delimiter" {
+  # A value that starts with marker-shaped text followed by a non-alphanumeric
+  # delimiter and then real secret content must still be fully redacted. A
+  # shape-based protection rule could stop at the delimiter and leave the
+  # trailing real secret in cleartext; provenance-based protection can't,
+  # since the prefix was never produced by a specific rule to begin with.
+  result=$(echo "password=[REDACTED].therealsecretvalue123456" | redact_secrets)
+  [[ "$result" == *"[REDACTED]"* ]]
+  [[ "$result" != *"therealsecretvalue123456"* ]]
+}

@@ -76,13 +76,16 @@ For each runner target (loop until done), collect and validate:
 3. **Mode** — one of `jit_ephemeral`, `persistent`.
 4. **Preferred selector** — comma-separated `runs-on` labels; validate each
    against `^[a-zA-Z0-9][a-zA-Z0-9._:-]*$` (max 10 labels).
-5. **Best for** — comma-separated workload tags (free text; reject any value
-   containing a literal `|` — the runner-targets cache uses `|` as its internal
-   field delimiter, and an unescaped `|` would shift values between
-   `best_for`/`avoid_for`/`notes` in the merged routing data).
-6. **Avoid for** — comma-separated tags (optional, free text; same `|`
+5. **Best for** — comma-separated workload tags (free text; reject any single
+   item containing a literal `|` or `,` — the runner-targets cache uses `|` as
+   its internal field delimiter and joins/splits each list field on `,`, so a
+   comma embedded in one item's text would be indistinguishable from an item
+   separator and silently split into multiple entries, while an unescaped `|`
+   would shift values between `best_for`/`avoid_for`/`notes` in the merged
+   routing data).
+6. **Avoid for** — comma-separated tags (optional, free text; same `|`/`,`
    rejection as best for).
-7. **Notes** — operational notes (optional, free text; same `|` rejection).
+7. **Notes** — operational notes (optional, free text; same `|`/`,` rejection).
 
 After all targets, collect routing rules (one per line, empty line to finish).
 Enforce a maximum of 20 targets and 20 rules. Show a summary and confirm before
@@ -98,7 +101,8 @@ Validate the content against the runner-targets schema: `schema: 1`; each
 target has a DNS-safe `name`, a `type` of `pool`/`static-family`/`static-host`,
 a `mode` of `jit_ephemeral`/`persistent`, `preferred_selector` labels matching
 `^[a-zA-Z0-9][a-zA-Z0-9._:-]*$`, `best_for`/`avoid_for`/`notes` values
-containing no literal `|` (see Step 3a), and at most 20 targets / 20 rules.
+containing no literal `|` or `,` (see Step 3a), and at most 20 targets / 20
+rules.
 Config files must use canonical format (2-space indent, block sequences only —
 no flow syntax `[a, b]`, no multi-line scalars, no tabs). On failure, report
 the specific error and re-prompt; on success, show a parsed summary.
@@ -177,8 +181,8 @@ raw API values straight through:
 - `name` matches `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` (2-64, DNS-safe).
 - Each `preferred_selector` label matches `^[a-zA-Z0-9][a-zA-Z0-9._:-]*$`
   (max 10 labels).
-- Once filled in, `best_for`/`avoid_for`/`notes` contain no literal `|` (see
-  Step 3a).
+- Once filled in, `best_for`/`avoid_for`/`notes` contain no literal `|` or `,`
+  (see Step 3a).
 - The 20-target / 20-rule maximum applies across discovered and
   manually-added entries combined.
 
