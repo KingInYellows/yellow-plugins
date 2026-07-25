@@ -126,3 +126,46 @@ assert_parity_both() {
   [ "$(grep -o -- '--- begin ci-branches' <<<"$msg" | wc -l)" -eq 1 ]
   [ "$(grep -o -- '--- end ci-branches' <<<"$msg" | wc -l)" -eq 1 ]
 }
+
+@test "SessionStart: symlinked last-check cache is not followed" {
+  # Not a parity case — the R38 plugin-data cache is new; the bash original
+  # never had this file. Its filename is predictable (md5 of cwd) inside a
+  # user-writable directory, so a local process could plant a symlink there
+  # before this hook runs and have an arbitrary file's bytes spliced into
+  # systemMessage. Seed a genuine cache-hit, then swap the file for a symlink
+  # to a "secret" file: the hit must be rejected (falls through to a live,
+  # mocked fetch) rather than echoing the secret's content.
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/symlink-lastcheck-XXXXXX")"
+  hook_scenario_setup cache-hit "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+
+  local key
+  key=$(printf '%s' "$PWD" | md5sum | cut -c1-32)
+  local secret="$sandbox/secret.txt"
+  printf 'SECRET-FILE-CONTENT-DO-NOT-LEAK\n' >"$secret"
+  ln -sfn "$secret" "$HOME/.local/share/yellow-ci/last-check-$key"
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  local msg; msg=$(printf '%s' "$output" | jq -r '.systemMessage')
+  [[ "$msg" != *"SECRET-FILE-CONTENT-DO-NOT-LEAK"* ]]
+}
+
+@test "SessionStart: symlinked routing-summary cache is not followed" {
+  # Same vector as the last-check test above, at the sibling cache file
+  # (routing-summary.txt) read by readRoutingSummary — same predictable
+  # filename, same user-writable directory, same symlink risk.
+  local sandbox; sandbox="$(mktemp -d "$BATS_TEST_TMPDIR/symlink-routing-XXXXXX")"
+  hook_scenario_setup routing-summary-present "$sandbox"
+  cd "$HOOK_SCENARIO_WORKDIR"
+
+  local secret="$sandbox/secret.txt"
+  printf 'SECRET-FILE-CONTENT-DO-NOT-LEAK\n' >"$secret"
+  mkdir -p "$HOME/.local/share/yellow-ci"
+  ln -sfn "$secret" "$HOME/.local/share/yellow-ci/routing-summary.txt"
+
+  run node "$SCRIPTS_DIR/entrypoint-claude.js" </dev/null
+  [ "$status" -eq 0 ]
+  local msg; msg=$(printf '%s' "$output" | jq -r '.systemMessage')
+  [[ "$msg" != *"SECRET-FILE-CONTENT-DO-NOT-LEAK"* ]]
+}

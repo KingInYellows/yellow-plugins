@@ -55,8 +55,24 @@ redact_secrets() {
   # Portability: \x01 is a GNU sed escape. This pipeline is already GNU-only
   # (it uses \| alternation in BRE and the I case-insensitivity flag), so this
   # adds no new constraint — but it does mean BSD/macOS sed is unsupported.
+  # This library is documented Linux-only in scope, but a BSD sed found on
+  # PATH would not error on these constructs — it would silently fail to
+  # match them and let secrets through unredacted — so guard with the same
+  # GNU-sed detection used by the Codex-exposed skills that inline this same
+  # pipeline (ci-diagnose, ci-runner-health SKILL.md) rather than leave a
+  # silent-failure path here even though it is out of documented scope.
   # tests/redaction.bats covers the forged-marker and injected-sentinel cases.
-  output=$(sed \
+  local sed_cmd
+  if sed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
+    sed_cmd=sed
+  elif command -v gsed >/dev/null 2>&1 && gsed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
+    sed_cmd=gsed
+  else
+    printf '[yellow-ci] ERROR: redact_secrets requires GNU sed; found only a non-GNU sed and no gsed on PATH. Suppressing output.\n' >&2
+    printf '[REDACTED: sanitization failed]\n'
+    return 1
+  fi
+  output=$("$sed_cmd" \
     -e 's/\x01/?/g' \
     -e 's/ghp_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
     -e 's/ghs_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \

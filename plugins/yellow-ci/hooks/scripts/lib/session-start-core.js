@@ -50,10 +50,43 @@ function resolveCacheReadPath(env, filename) {
   return newPath;
 }
 
-function readRoutingSummary(env) {
+// Open `file` refusing to follow a trailing symlink: O_NOFOLLOW where the
+// platform supports it (a no-op OR elsewhere, e.g. Windows — `X | undefined`
+// reduces to `X`). Both cache files this module reads
+// (routing-summary.txt and last-check-<md5(cwd)>) live at a predictable
+// filename inside a user-writable directory (see newCacheDir), so without
+// this a local process could plant a symlink to an arbitrary file the
+// current uid can read (e.g. an SSH key) and have its bytes spliced into
+// systemMessage. defangUntrustedText does not neutralize this: it only
+// strips a handful of punctuation characters, and base64-shaped secret
+// content contains none of them. fstat-on-fd (not stat-on-path) means the
+// caller's checks and the eventual read can't be raced apart by swapping the
+// path between calls. Returns null on any failure (missing, symlink rejected
+// via ELOOP, permission). Caller MUST close the returned fd.
+function openNoFollow(file) {
   try {
+    const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0);
+    const fd = fs.openSync(file, flags);
+    return { fd, st: fs.fstatSync(fd) };
+  } catch {
+    return null;
+  }
+}
+
+// POSIX-only: rejects a same-path regular file planted by a different local
+// user. uid has no Windows equivalent, so the check is skipped there
+// (process.getuid is undefined on win32).
+function ownedByUs(st) {
+  return typeof process.getuid !== 'function' || st.uid === process.getuid();
+}
+
+function readRoutingSummary(env) {
+  const opened = openNoFollow(resolveCacheReadPath(env, 'routing-summary.txt'));
+  if (!opened) return '';
+  try {
+    if (!opened.st.isFile() || !ownedByUs(opened.st)) return '';
     // head -c 500 — bounded by BYTES, like the bash hook.
-    const buf = fs.readFileSync(resolveCacheReadPath(env, 'routing-summary.txt'));
+    const buf = fs.readFileSync(opened.fd);
     const raw = buf.subarray(0, 500).toString('utf8');
     // The routing cache embeds `best_for` free text from a user-writable
     // runner-targets config (resolve-runner-targets.sh), so it is untrusted
@@ -63,6 +96,8 @@ function readRoutingSummary(env) {
     return fenceReferenceOnly('ci-routing', defangUntrustedText(raw));
   } catch {
     return '';
+  } finally {
+    try { fs.closeSync(opened.fd); } catch { /* best effort */ }
   }
 }
 
@@ -183,6 +218,32 @@ function cacheKeyFor(cwd) {
   return crypto.createHash('md5').update(cwd).digest('hex').slice(0, 32);
 }
 
+// Read the last-check result cache, refusing anything but a fresh regular
+// file we own (see openNoFollow/ownedByUs above). `{hit: false}` covers "no
+// cache file", "stale", "a symlink" (rejected via O_NOFOLLOW/ELOOP), and
+// "owned by someone else" — the caller treats all four identically to a
+// plain cache miss and falls through to a live fetch. `{hit: true, content:
+// null}` is the narrower case of a file that passed every guard but still
+// failed to read (e.g. a transient I/O error): the caller preserves the
+// pre-existing behavior of warning and returning routingSummary only, rather
+// than retrying over the network.
+function readFreshOwnedFile(file, maxAgeSec) {
+  const opened = openNoFollow(file);
+  if (!opened) return { hit: false };
+  try {
+    if (!opened.st.isFile() || !ownedByUs(opened.st)) return { hit: false };
+    const ageSec = Math.floor(Date.now() / 1000) - Math.floor(opened.st.mtimeMs / 1000);
+    if (ageSec >= maxAgeSec) return { hit: false };
+    try {
+      return { hit: true, content: fs.readFileSync(opened.fd, 'utf8') };
+    } catch {
+      return { hit: true, content: null };
+    }
+  } finally {
+    try { fs.closeSync(opened.fd); } catch { /* best effort */ }
+  }
+}
+
 function writeCacheAtomic(cacheFile, content, warn) {
   // PID-suffixed tmp (like resolve-runner-targets.sh's `.tmp.$$`) so two
   // concurrent SessionStart hooks on the same cwd don't race on one tmp file.
@@ -242,21 +303,23 @@ function runSessionStart({ cwd, env }) {
   // defangUntrustedText/fenceReferenceOnly and reach systemMessage unfenced.
   // Treat a legacy-only hit as a miss so it falls through to a real fetch,
   // which re-populates the new cache with sanitized output.
+  //
+  // "Written exclusively by this runtime" does NOT mean "safe to trust
+  // blindly": the filename is predictable (md5 of cwd) inside a
+  // user-writable directory, so another local process can still plant a
+  // symlink — or a same-uid regular file — at that exact path before this
+  // runtime gets there. readFreshOwnedFile refuses to follow a symlink and
+  // checks ownership; anything short of "a fresh regular file we own" is
+  // treated the same as "no cache file" below.
   if (readCacheFile === newReadCacheFile) {
-    try {
-      const st = fs.statSync(readCacheFile);
-      const ageSec = Math.floor(Date.now() / 1000) - Math.floor(st.mtimeMs / 1000);
-      if (ageSec < 60) {
-        try {
-          return done(fs.readFileSync(readCacheFile, 'utf8'));
-        } catch {
-          warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
-          return done(routingSummary);
-        }
-      }
-    } catch {
-      // no cache file — fall through to fetch
+    const cached = readFreshOwnedFile(readCacheFile, 60);
+    if (cached.hit) {
+      if (cached.content !== null) return done(cached.content);
+      warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
+      return done(routingSummary);
     }
+    // no cache file, stale, a rejected symlink, or owned by someone else —
+    // fall through to a real fetch, which re-populates the cache.
   }
 
   // Cache miss: fetch recent failed runs.

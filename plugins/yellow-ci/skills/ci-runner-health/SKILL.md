@@ -504,6 +504,22 @@ else
   echo "Prerequisite missing: neither 'timeout' nor 'gtimeout' found on PATH. Install GNU coreutils (macOS: brew install coreutils) and retry."
   exit 1
 fi
+# Portability gate for the redaction pipeline below: it relies on GNU-only
+# sed constructs (\x01 hex escape, \| BRE alternation, the I case-insensitive
+# flag) that BSD/macOS sed neither errors on nor honors — it silently fails
+# to match them, so alternation- and case-insensitive rules (Authorization
+# headers, aws_secret_access_key, the generic catch-all) would never fire and
+# credentials would display unredacted. Detect a real GNU sed by name here,
+# before the SSH round-trip, mirroring the timeout/gtimeout probe above;
+# SED_CMD stays empty (checked below, after the fetch) when none is found, so
+# this fails closed rather than sanitizing incorrectly.
+if sed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
+  SED_CMD=sed
+elif command -v gsed >/dev/null 2>&1 && gsed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
+  SED_CMD=gsed
+else
+  SED_CMD=""
+fi
 RUNNER_LOG=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'JOURNALPROBE'
 journalctl -u 'actions.runner.*' --since '1 hour ago' --no-pager -n 20
 JOURNALPROBE
@@ -515,6 +531,9 @@ JOURNAL_STATUS=$?
 if [ "$JOURNAL_STATUS" -ne 0 ] || [ -z "$RUNNER_LOG" ]; then
   printf '[yellow-ci] Could not retrieve runner-agent logs from %s (status %s); not quoting output.\n' \
     "$host" "$JOURNAL_STATUS" >&2
+  REDACTED_LOG=""
+elif [ -z "$SED_CMD" ]; then
+  printf '[yellow-ci] Log sanitization requires GNU sed; found only a non-GNU sed (e.g. stock macOS) and no gsed on PATH. Refusing to display unredacted runner-agent logs.\n' >&2
   REDACTED_LOG=""
 else
 # Protection is tied to PROVENANCE, not marker shape: each specific rule
@@ -528,7 +547,7 @@ else
 # skip the tagged span and leave a real secret suffix exposed. SCRUB (first
 # line) strips any caller-supplied \x01 so the sentinel can't be forged from
 # the input. Mirrors `redact_secrets` in `hooks/scripts/lib/redact.sh`.
-REDACTED_LOG=$(printf '%s\n' "$RUNNER_LOG" | sed \
+REDACTED_LOG=$(printf '%s\n' "$RUNNER_LOG" | "$SED_CMD" \
   -e 's/\x01/?/g' \
   -e 's/ghp_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
   -e 's/ghs_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
@@ -555,9 +574,11 @@ REDACTED_LOG=$(printf '%s\n' "$RUNNER_LOG" | sed \
 fi
 ```
 
-Fail closed on both failure modes: if the SSH retrieval failed (non-zero
-`$JOURNAL_STATUS` or empty output) the log is dropped and nothing is quoted; if
-the sanitization pipeline itself errors, `$REDACTED_LOG` becomes the
+Fail closed on all three failure modes: if the SSH retrieval failed (non-zero
+`$JOURNAL_STATUS` or empty output) the log is dropped and nothing is quoted;
+if no GNU sed is available (`$SED_CMD` empty), the log is likewise dropped
+rather than run through a dialect that would silently under-redact it; if the
+sanitization pipeline itself errors, `$REDACTED_LOG` becomes the
 sanitization-failed placeholder above — never fall back to `$RUNNER_LOG` raw.
 Only a non-empty `$REDACTED_LOG` may be quoted, and only inside the
 runner-output fence from Step 4.
