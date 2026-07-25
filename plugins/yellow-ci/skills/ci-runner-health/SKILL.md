@@ -139,7 +139,22 @@ health playbook.
 Build the option list as an array — never string-concatenate `host`/`user`/
 `ssh_key` into one command line — and pass the validated `ssh_key` (Step 2)
 with `-i` plus `IdentitiesOnly=yes` when the runner entry sets one, otherwise
-leave key selection to the default:
+leave key selection to the default.
+
+**This construction is rebuilt in every block that invokes `ssh`, never
+shared across blocks.** Each fenced snippet below that runs `ssh` — the OS
+pre-probe, the health probe, and the journal probe — may execute as its own,
+separate Bash tool call, and a shell array or variable built in one fenced
+block does not survive into another (each is a fresh subprocess). Relying on
+an `ssh_opts` built earlier would let it silently expand to nothing, and
+`ssh` would fall back to the invoking user's own `ssh_config` — auth method,
+agent forwarding, and connect timeout would then be whatever that config
+allows. That is a silent downgrade of a security control, not a loud
+failure, so it cannot be handled with a one-time build plus a "run these in
+the same shell" instruction: validation or setup that exists only as prose
+for the model to honour is not a control. The array below, the `ssh_key`
+tilde expansion, and the `timeout`/`gtimeout` detection are therefore
+repeated verbatim at the top of every probe block that follows:
 
 ```bash
 ssh_opts=(
@@ -164,13 +179,12 @@ if [ -n "$ssh_key" ]; then
   ssh_opts+=(-i "$ssh_key" -o IdentitiesOnly=yes)
 fi
 
-# `timeout` is GNU coreutils; macOS ships without it (Homebrew installs it
-# as `gtimeout`, if installed at all). Detect once here — every probe below
-# runs under "${TIMEOUT_CMD:-timeout}" rather than a bare `timeout`, which
-# would exit 127 on stock macOS and be miscategorized as a connection failure.
-# The probes live in later blocks, same as `ssh_opts` above; the `:-timeout`
-# default means that if this assignment ever fails to reach them, they fall
-# back to the historical bare-`timeout` behavior instead of expanding empty.
+# `timeout` is GNU coreutils; macOS ships without it (Homebrew installs it as
+# `gtimeout`, if installed at all). This detection is repeated in every probe
+# block below rather than assumed to carry over from here, for the same
+# cross-block reason as `ssh_opts` above; each use is still guarded with
+# "${TIMEOUT_CMD:-timeout}" as defense in depth in case the detection above
+# it were ever dropped from a probe block.
 if command -v timeout >/dev/null 2>&1; then
   TIMEOUT_CMD=timeout
 elif command -v gtimeout >/dev/null 2>&1; then
@@ -194,6 +208,36 @@ corrupt the exact-match comparison below, wrongly skipping a healthy new
 runner as non-Linux:
 
 ```bash
+# Rebuilt here (Step 4): this block may run as a separate Bash tool call from
+# wherever ssh_opts/ssh_key/TIMEOUT_CMD were last built, and an empty
+# ssh_opts would silently drop the hardened SSH contract instead of failing
+# loudly — see the self-containment note above.
+ssh_opts=(
+  -o StrictHostKeyChecking=accept-new
+  -o BatchMode=yes
+  -o ConnectTimeout=3
+  -o ServerAliveInterval=60
+  -o ForwardAgent=no
+  -o PreferredAuthentications=publickey
+  -o PasswordAuthentication=no
+  -o KbdInteractiveAuthentication=no
+)
+if [ -n "$ssh_key" ]; then
+  case "$ssh_key" in
+    "~/"*) ssh_key="$HOME/${ssh_key#\~/}" ;;
+    "~")   ssh_key="$HOME" ;;
+  esac
+  ssh_opts+=(-i "$ssh_key" -o IdentitiesOnly=yes)
+fi
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=timeout
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=gtimeout
+else
+  echo "Prerequisite missing: neither 'timeout' nor 'gtimeout' found on PATH. Install GNU coreutils (macOS: brew install coreutils) and retry."
+  exit 1
+fi
+
 runner_os_err_file=$(mktemp) || {
   printf '[yellow-ci] Error: could not create a temporary file for the OS probe (mktemp failed — check that /tmp is writable and has free space).\n' >&2
   exit 1
@@ -262,6 +306,36 @@ stream to the caller.** Runner stdout/stderr is untrusted, and streaming it
 would bypass both the redaction step and the `runner-output` fence below:
 
 ```bash
+# Rebuilt here (Step 4): this block may run as a separate Bash tool call from
+# wherever ssh_opts/ssh_key/TIMEOUT_CMD were last built, and an empty
+# ssh_opts would silently drop the hardened SSH contract instead of failing
+# loudly — see the self-containment note above.
+ssh_opts=(
+  -o StrictHostKeyChecking=accept-new
+  -o BatchMode=yes
+  -o ConnectTimeout=3
+  -o ServerAliveInterval=60
+  -o ForwardAgent=no
+  -o PreferredAuthentications=publickey
+  -o PasswordAuthentication=no
+  -o KbdInteractiveAuthentication=no
+)
+if [ -n "$ssh_key" ]; then
+  case "$ssh_key" in
+    "~/"*) ssh_key="$HOME/${ssh_key#\~/}" ;;
+    "~")   ssh_key="$HOME" ;;
+  esac
+  ssh_opts+=(-i "$ssh_key" -o IdentitiesOnly=yes)
+fi
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=timeout
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=gtimeout
+else
+  echo "Prerequisite missing: neither 'timeout' nor 'gtimeout' found on PATH. Install GNU coreutils (macOS: brew install coreutils) and retry."
+  exit 1
+fi
+
 HEALTH_OUT=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'HEALTHCHECK'
 echo "=== DISK ==="
 df -h / /home 2>/dev/null | tail -n +2
@@ -354,6 +428,35 @@ the quotes survive intact for the remote shell to interpret:
 
 ```bash
 set -o pipefail
+# Rebuilt here (Step 4): this block may run as a separate Bash tool call from
+# wherever ssh_opts/ssh_key/TIMEOUT_CMD were last built, and an empty
+# ssh_opts would silently drop the hardened SSH contract instead of failing
+# loudly — see the self-containment note above.
+ssh_opts=(
+  -o StrictHostKeyChecking=accept-new
+  -o BatchMode=yes
+  -o ConnectTimeout=3
+  -o ServerAliveInterval=60
+  -o ForwardAgent=no
+  -o PreferredAuthentications=publickey
+  -o PasswordAuthentication=no
+  -o KbdInteractiveAuthentication=no
+)
+if [ -n "$ssh_key" ]; then
+  case "$ssh_key" in
+    "~/"*) ssh_key="$HOME/${ssh_key#\~/}" ;;
+    "~")   ssh_key="$HOME" ;;
+  esac
+  ssh_opts+=(-i "$ssh_key" -o IdentitiesOnly=yes)
+fi
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=timeout
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=gtimeout
+else
+  echo "Prerequisite missing: neither 'timeout' nor 'gtimeout' found on PATH. Install GNU coreutils (macOS: brew install coreutils) and retry."
+  exit 1
+fi
 RUNNER_LOG=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'JOURNALPROBE'
 journalctl -u 'actions.runner.*' --since '1 hour ago' --no-pager -n 20
 JOURNALPROBE

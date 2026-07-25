@@ -97,6 +97,9 @@ setup() {
 @test "redact: Authorization header does not consume a trailing URL" {
   result=$(echo 'curl -H "Authorization: Bearer TESTTOKEN0123456789ABCD" https://api.example.com/v1?x=1' | redact_secrets)
   [[ "$result" == *"https://api.example.com/v1?x=1"* ]]
+  # Assert the credential is actually gone, not just that the URL survived —
+  # without this the test passes even if the token leaks in full.
+  [[ "$result" != *"TESTTOKEN0123456789ABCD"* ]]
 }
 
 # --- Docker tokens ---

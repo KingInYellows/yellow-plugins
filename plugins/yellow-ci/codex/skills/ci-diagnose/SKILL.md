@@ -43,8 +43,9 @@ otherwise the advertised override could never be used from outside a GitHub
 checkout, which is exactly when it is most useful.
 
 When no override was given, check repository context — resolve the origin
-remote explicitly, accept only `github.com` remotes (SSH or HTTPS), and fail
-closed to `NO_REMOTE` on any command failure or non-GitHub host:
+remote explicitly, accept only `github.com` remotes (SCP-like SSH, `ssh://`,
+or HTTPS), and fail closed to `NO_REMOTE` on any command failure or
+non-GitHub host:
 
 ```bash
 REMOTE_URL=$(git remote get-url origin 2>/dev/null)
@@ -53,8 +54,8 @@ if [ "$GIT_REMOTE_STATUS" -ne 0 ] || [ -z "$REMOTE_URL" ]; then
   REPO_CONTEXT="NO_REMOTE"
 else
   REPO_CONTEXT=$(printf '%s\n' "$REMOTE_URL" \
-    | grep -oE '^(git@github\.com:|https://github\.com/)[^/]+/[^/]+$' \
-    | sed -E 's#^(git@github\.com:|https://github\.com/)##; s/\.git$//')
+    | grep -oE '^(git@github\.com:|https://github\.com/|ssh://git@github\.com(:[0-9]+)?/)[^/]+/[^/]+$' \
+    | sed -E 's#^(git@github\.com:|https://github\.com/|ssh://git@github\.com(:[0-9]+)?/)##; s/\.git$//')
   [ -z "$REPO_CONTEXT" ] && REPO_CONTEXT="NO_REMOTE"
 fi
 ```
@@ -62,9 +63,18 @@ fi
 Stderr from `git remote get-url` is discarded (`2>/dev/null`), not piped into
 the parser — an error message must never be mistaken for a repo slug. A
 failed command or an empty URL yields `NO_REMOTE` directly. Any URL that
-isn't a `github.com` SSH (`git@github.com:owner/repo(.git)`) or HTTPS
+isn't a `github.com` SCP-like SSH (`git@github.com:owner/repo(.git)`), full
+`ssh://` (`ssh://git@github.com/owner/repo(.git)`, optionally with a port —
+`ssh://git@github.com:2222/owner/repo(.git)`), or HTTPS
 (`https://github.com/owner/repo(.git)`) remote — including other hosts such
-as GitLab — falls through to `NO_REMOTE` as well.
+as GitLab, or a suffix-confusable host like `github.com.evil.com` — falls
+through to `NO_REMOTE` as well. The host segment is matched as a literal
+`github\.com` immediately followed by `:`, `/`, or an optional `:PORT/`, so a
+lookalike host with `github.com` as a prefix never satisfies the pattern.
+Bare `ssh://github.com/...` (no `git@` userinfo) and the legacy `git://`
+protocol are intentionally out of scope: GitHub requires the `git` user for
+SSH, and it disabled the unauthenticated `git://` protocol in 2021, so
+neither form is a legitimate remote to accept here.
 
 If `$REPO_CONTEXT` is `NO_REMOTE` **and no `--repo` override was given**: "Not
 in a Git repository with a GitHub remote. Navigate to your project root, or
