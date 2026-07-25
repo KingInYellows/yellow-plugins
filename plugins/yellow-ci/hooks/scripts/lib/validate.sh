@@ -499,6 +499,163 @@ _rt_check_runner_names() {
   return 0
 }
 
+# Validate that every runner target has the schema's other required fields
+# present: `type`, `mode`, and at least one `preferred_selector` item (`name`
+# presence is implicit — _rt_check_runner_names only sees "- name:" lines that
+# already exist). validate_runner_type/validate_runner_mode/
+# validate_selector_label below only check values that ARE present, so a
+# target that omits (or blanks) one of these fields would otherwise pass this
+# gate and reach emit_runner_json(), which renders it with an empty
+# "type":""/"mode":"" — malformed in the merged cache JSON, not skipped.
+# Returns 0 if every target has all required fields, 1 on the first gap
+# (error on stderr).
+_rt_check_required_fields() {
+  local filepath="$1"
+  local name field
+  while IFS=$'\t' read -r name field; do
+    printf '[yellow-ci] Error: Runner target %s is missing required field: %s\n' "$name" "$field" >&2
+    return 1
+  done < <(awk '
+  BEGIN { in_targets = 0; in_runner = 0; field = ""; name = ""; have_type = 0; have_mode = 0; have_selector = 0; reported = 0 }
+  /^runner_targets:/ { in_targets = 1; next }
+  in_targets && /^[a-z]/ { in_targets = 0; if (in_runner) flush_runner(); in_runner = 0; next }
+  in_targets && /^[[:space:]]*-[[:space:]]+name:/ {
+    if (in_runner) flush_runner()
+    in_runner = 1
+    name = $0
+    sub(/^[[:space:]]*-[[:space:]]+name:[[:space:]]*/, "", name)
+    sub(/[[:space:]]*$/, "", name)
+    have_type = 0; have_mode = 0; have_selector = 0; field = ""
+    next
+  }
+  in_runner && /^[[:space:]]+type:/ {
+    val = $0
+    sub(/^[[:space:]]+type:[[:space:]]*/, "", val); sub(/[[:space:]]*$/, "", val)
+    if (val != "") have_type = 1
+    field = ""; next
+  }
+  in_runner && /^[[:space:]]+mode:/ {
+    val = $0
+    sub(/^[[:space:]]+mode:[[:space:]]*/, "", val); sub(/[[:space:]]*$/, "", val)
+    if (val != "") have_mode = 1
+    field = ""; next
+  }
+  in_runner && /^[[:space:]]+preferred_selector:/ { field = "selector"; next }
+  in_runner && /^[[:space:]]+best_for:/ { field = "best_for"; next }
+  in_runner && /^[[:space:]]+avoid_for:/ { field = "avoid_for"; next }
+  in_runner && /^[[:space:]]+notes:/ { field = "notes"; next }
+  in_runner && /^[[:space:]]+[a-z_]+:/ { field = ""; next }
+  in_runner && field == "selector" && /^[[:space:]]+-[[:space:]]/ { have_selector = 1; next }
+  END { if (in_runner) flush_runner() }
+  function flush_runner() {
+    if (reported) return
+    if (!have_type) { printf "%s\ttype\n", name; reported = 1; return }
+    if (!have_mode) { printf "%s\tmode\n", name; reported = 1; return }
+    if (!have_selector) { printf "%s\tpreferred_selector\n", name; reported = 1; return }
+  }
+  ' "$filepath")
+  return 0
+}
+
+# Validate every runner target `type:` value against validate_runner_type.
+# Returns 0 if all types are valid, 1 on the first invalid type (error on stderr).
+_rt_check_runner_types() {
+  local filepath="$1"
+  local type_val
+  while IFS= read -r type_val; do
+    type_val=$(printf '%s' "$type_val" | sed 's/^[[:space:]]*type:[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    if [ -n "$type_val" ] && ! validate_runner_type "$type_val"; then
+      printf '[yellow-ci] Error: Invalid runner target type: %s (expected pool, static-family, or static-host)\n' "$type_val" >&2
+      return 1
+    fi
+  done < <(grep -E '^[[:space:]]+type:' "$filepath")
+  return 0
+}
+
+# Validate every runner target `mode:` value against validate_runner_mode.
+# Returns 0 if all modes are valid, 1 on the first invalid mode (error on stderr).
+_rt_check_runner_modes() {
+  local filepath="$1"
+  local mode_val
+  while IFS= read -r mode_val; do
+    mode_val=$(printf '%s' "$mode_val" | sed 's/^[[:space:]]*mode:[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    if [ -n "$mode_val" ] && ! validate_runner_mode "$mode_val"; then
+      printf '[yellow-ci] Error: Invalid runner target mode: %s (expected jit_ephemeral or persistent)\n' "$mode_val" >&2
+      return 1
+    fi
+  done < <(grep -E '^[[:space:]]+mode:' "$filepath")
+  return 0
+}
+
+# Extract preferred_selector/best_for/avoid_for/notes array items from a
+# runner targets file, tagged by field kind. Mirrors the field-tracking state
+# machine in resolve-runner-targets.sh's rt_extract_runners() awk script, but
+# only emits raw "<kind>\t<value>" pairs for validation here — no
+# pipe-delimited transport format (that lib is a downstream consumer of this
+# one, not a dependency of it).
+# Usage: _rt_extract_field_items "$filepath"
+# Output: one "<kind>\t<value>" line per array item, kind in
+#         {selector, best_for, avoid_for, notes}
+_rt_extract_field_items() {
+  local filepath="$1"
+  awk '
+  BEGIN { in_targets = 0; in_runner = 0; field = "" }
+  /^runner_targets:/ { in_targets = 1; next }
+  in_targets && /^[a-z]/ { in_targets = 0; in_runner = 0; next }
+  in_targets && /^[[:space:]]*-[[:space:]]+name:/ { in_runner = 1; field = ""; next }
+  in_runner && /^[[:space:]]+preferred_selector:/ { field = "selector"; next }
+  in_runner && /^[[:space:]]+best_for:/ { field = "best_for"; next }
+  in_runner && /^[[:space:]]+avoid_for:/ { field = "avoid_for"; next }
+  in_runner && /^[[:space:]]+notes:/ { field = "notes"; next }
+  in_runner && /^[[:space:]]+[a-z_]+:/ { field = ""; next }
+  in_runner && field != "" && /^[[:space:]]+-[[:space:]]/ {
+    val = $0
+    sub(/^[[:space:]]+-[[:space:]]+/, "", val)
+    sub(/[[:space:]]*$/, "", val)
+    printf "%s\t%s\n", field, val
+    next
+  }
+  ' "$filepath"
+}
+
+# Validate every preferred_selector label against validate_selector_label.
+# Returns 0 if all labels are valid, 1 on the first invalid label (error on stderr).
+_rt_check_selector_labels() {
+  local filepath="$1"
+  local kind value
+  while IFS=$'\t' read -r kind value; do
+    if [ "$kind" = "selector" ] && ! validate_selector_label "$value"; then
+      printf '[yellow-ci] Error: Invalid preferred_selector label: %s\n' "$value" >&2
+      return 1
+    fi
+  done < <(_rt_extract_field_items "$filepath")
+  return 0
+}
+
+# Reject a literal | or , in best_for/avoid_for/notes values — these are the
+# runner-targets cache's internal field/item delimiters (see the "Delimiter
+# limitation" note in resolve-runner-targets.sh); a value containing either
+# would be silently misparsed (split into extra items, or shifted into a
+# neighboring field) when the cache is generated.
+# Returns 0 if no reserved delimiter is found, 1 on the first hit (error on stderr).
+_rt_check_metadata_delimiters() {
+  local filepath="$1"
+  local kind value
+  while IFS=$'\t' read -r kind value; do
+    case "$kind" in
+      best_for|avoid_for|notes)
+        case "$value" in
+          *'|'*|*,*)
+            printf '[yellow-ci] Error: %s value contains a reserved | or , delimiter: %s\n' "$kind" "$value" >&2
+            return 1
+            ;;
+        esac
+        ;;
+    esac
+  done < <(_rt_extract_field_items "$filepath")
+  return 0
+}
+
 # Enforce the max-20 limits on runner targets and routing rules.
 # Returns 0 if within limits, 1 otherwise (error on stderr).
 _rt_check_target_counts() {
@@ -523,7 +680,10 @@ _rt_check_target_counts() {
 }
 
 # Validate a runner targets YAML file for structural correctness
-# Checks: file exists, size < 32KB, has schema: 1, has runner_targets section
+# Checks: file exists, size < 32KB, has schema: 1, has runner_targets section,
+# every target has type/mode/preferred_selector present, name/type/mode/
+# preferred_selector-labels are valid, best_for/avoid_for/notes contain no
+# reserved |/, delimiter, and the 20/20 count caps.
 # Usage: validate_runner_targets_file "$filepath"
 # Returns 0 on success, 1 on failure (with error on stderr)
 validate_runner_targets_file() {
@@ -562,7 +722,12 @@ validate_runner_targets_file() {
   fi
 
   _rt_check_runner_names "$filepath" || return 1
+  _rt_check_required_fields "$filepath" || return 1
   _rt_check_target_counts "$filepath" || return 1
+  _rt_check_runner_types "$filepath" || return 1
+  _rt_check_runner_modes "$filepath" || return 1
+  _rt_check_selector_labels "$filepath" || return 1
+  _rt_check_metadata_delimiters "$filepath" || return 1
 
   return 0
 }

@@ -201,9 +201,51 @@ failure, so it cannot be handled with a one-time build plus a "run these in
 the same shell" instruction: validation or setup that exists only as prose
 for the model to honour is not a control. The array below, the `ssh_key`
 tilde expansion, and the `timeout`/`gtimeout` detection are therefore
-repeated verbatim at the top of every probe block that follows:
+repeated verbatim at the top of every probe block that follows.
+
+**The same is true of the runner's own data — `host`, `user`, and
+`ssh_key` — not just the static contract above.** These are per-entry
+output from Step 2's validation, not ambient shell state, so a bare
+`$host`/`$user`/`$ssh_key` reference in a fresh block is exactly as unsafe
+as a bare `$ssh_opts` reference: it silently expands to nothing or to a
+stale value instead of failing loudly, and `ssh "$user@$host"` with both
+empty still "succeeds" in starting a connection attempt — to `@`, to
+nowhere. Bind the current target runner's validated `host`, `user`, and
+`ssh_key` as literals at the top of every block below (before the array),
+and re-assert the Step 2 shape check on the bound value before it reaches
+`ssh` — each block must be safe to audit standalone, without assuming
+Step 2 ran in a still-live process:
 
 ```bash
+# Bind this runner's Step 2-validated fields as literals before anything
+# below reads them — host/user/ssh_key are per-runner data, not static
+# config like the array below, so a bare reference to them in a fresh
+# block is exactly as unsafe as a bare `$ssh_opts` reference would be:
+# silently empty or stale, not a loud failure. `${var:?}` fails closed when
+# host/user are unset or empty; ssh_key uses the bare `${var?}` form since
+# an *empty* key is legitimately valid (use the default identity) and only
+# an *unset* key means the binding step itself was skipped.
+: "${host:?[yellow-ci] host not bound in this block}"
+: "${user:?[yellow-ci] user not bound in this block}"
+: "${ssh_key?[yellow-ci] ssh_key not bound in this block (empty string is valid)}"
+# Re-assert the Step 2 injection-relevant shape on the bound values — this
+# block must be safe to audit standalone, without assuming Step 2's
+# validation ran in a still-live process.
+case "$host" in
+  *[\;\&\|\$\`\'\"\\]*) printf '[yellow-ci] reject: shell metacharacter in bound host\n' >&2; exit 1 ;;
+esac
+printf '%s' "$user" | LC_ALL=C grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || {
+  printf '[yellow-ci] reject: bound user fails format check\n' >&2; exit 1; }
+if [ -n "$ssh_key" ]; then
+  case "$ssh_key" in
+    '~/'*|/*) : ;;
+    *) printf '[yellow-ci] reject: bound ssh_key must start with ~/ or /\n' >&2; exit 1 ;;
+  esac
+  case "$ssh_key" in *..*) printf '[yellow-ci] reject: bound ssh_key traversal\n' >&2; exit 1 ;; esac
+  printf '%s' "$ssh_key" | LC_ALL=C grep -Eq '^[A-Za-z0-9_./~-]+$' || {
+    printf '[yellow-ci] reject: bound ssh_key has disallowed characters\n' >&2; exit 1; }
+fi
+
 ssh_opts=(
   -o StrictHostKeyChecking=accept-new
   -o BatchMode=yes
@@ -256,9 +298,37 @@ runner as non-Linux:
 
 ```bash
 # Rebuilt here (Step 4): this block may run as a separate Bash tool call from
-# wherever ssh_opts/ssh_key/TIMEOUT_CMD were last built, and an empty
-# ssh_opts would silently drop the hardened SSH contract instead of failing
-# loudly — see the self-containment note above.
+# wherever host/user/ssh_key/ssh_opts/TIMEOUT_CMD were last built — see the
+# self-containment note above.
+# Bind this runner's Step 2-validated fields as literals before anything
+# below reads them — host/user/ssh_key are per-runner data, not static
+# config like the array below, so a bare reference to them in a fresh
+# block is exactly as unsafe as a bare `$ssh_opts` reference would be:
+# silently empty or stale, not a loud failure. `${var:?}` fails closed when
+# host/user are unset or empty; ssh_key uses the bare `${var?}` form since
+# an *empty* key is legitimately valid (use the default identity) and only
+# an *unset* key means the binding step itself was skipped.
+: "${host:?[yellow-ci] host not bound in this block}"
+: "${user:?[yellow-ci] user not bound in this block}"
+: "${ssh_key?[yellow-ci] ssh_key not bound in this block (empty string is valid)}"
+# Re-assert the Step 2 injection-relevant shape on the bound values — this
+# block must be safe to audit standalone, without assuming Step 2's
+# validation ran in a still-live process.
+case "$host" in
+  *[\;\&\|\$\`\'\"\\]*) printf '[yellow-ci] reject: shell metacharacter in bound host\n' >&2; exit 1 ;;
+esac
+printf '%s' "$user" | LC_ALL=C grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || {
+  printf '[yellow-ci] reject: bound user fails format check\n' >&2; exit 1; }
+if [ -n "$ssh_key" ]; then
+  case "$ssh_key" in
+    '~/'*|/*) : ;;
+    *) printf '[yellow-ci] reject: bound ssh_key must start with ~/ or /\n' >&2; exit 1 ;;
+  esac
+  case "$ssh_key" in *..*) printf '[yellow-ci] reject: bound ssh_key traversal\n' >&2; exit 1 ;; esac
+  printf '%s' "$ssh_key" | LC_ALL=C grep -Eq '^[A-Za-z0-9_./~-]+$' || {
+    printf '[yellow-ci] reject: bound ssh_key has disallowed characters\n' >&2; exit 1; }
+fi
+
 ssh_opts=(
   -o StrictHostKeyChecking=accept-new
   -o BatchMode=yes
@@ -353,10 +423,39 @@ stream to the caller.** Runner stdout/stderr is untrusted, and streaming it
 would bypass both the redaction step and the `runner-output` fence below:
 
 ```bash
+set -o pipefail
 # Rebuilt here (Step 4): this block may run as a separate Bash tool call from
-# wherever ssh_opts/ssh_key/TIMEOUT_CMD were last built, and an empty
-# ssh_opts would silently drop the hardened SSH contract instead of failing
-# loudly — see the self-containment note above.
+# wherever host/user/ssh_key/ssh_opts/TIMEOUT_CMD were last built — see the
+# self-containment note above.
+# Bind this runner's Step 2-validated fields as literals before anything
+# below reads them — host/user/ssh_key are per-runner data, not static
+# config like the array below, so a bare reference to them in a fresh
+# block is exactly as unsafe as a bare `$ssh_opts` reference would be:
+# silently empty or stale, not a loud failure. `${var:?}` fails closed when
+# host/user are unset or empty; ssh_key uses the bare `${var?}` form since
+# an *empty* key is legitimately valid (use the default identity) and only
+# an *unset* key means the binding step itself was skipped.
+: "${host:?[yellow-ci] host not bound in this block}"
+: "${user:?[yellow-ci] user not bound in this block}"
+: "${ssh_key?[yellow-ci] ssh_key not bound in this block (empty string is valid)}"
+# Re-assert the Step 2 injection-relevant shape on the bound values — this
+# block must be safe to audit standalone, without assuming Step 2's
+# validation ran in a still-live process.
+case "$host" in
+  *[\;\&\|\$\`\'\"\\]*) printf '[yellow-ci] reject: shell metacharacter in bound host\n' >&2; exit 1 ;;
+esac
+printf '%s' "$user" | LC_ALL=C grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || {
+  printf '[yellow-ci] reject: bound user fails format check\n' >&2; exit 1; }
+if [ -n "$ssh_key" ]; then
+  case "$ssh_key" in
+    '~/'*|/*) : ;;
+    *) printf '[yellow-ci] reject: bound ssh_key must start with ~/ or /\n' >&2; exit 1 ;;
+  esac
+  case "$ssh_key" in *..*) printf '[yellow-ci] reject: bound ssh_key traversal\n' >&2; exit 1 ;; esac
+  printf '%s' "$ssh_key" | LC_ALL=C grep -Eq '^[A-Za-z0-9_./~-]+$' || {
+    printf '[yellow-ci] reject: bound ssh_key has disallowed characters\n' >&2; exit 1; }
+fi
+
 ssh_opts=(
   -o StrictHostKeyChecking=accept-new
   -o BatchMode=yes
@@ -383,6 +482,20 @@ else
   exit 1
 fi
 
+# Portability gate for the redaction pipeline below (duplicated per the
+# self-containment note above): GNU-only sed constructs (\x01 hex escape,
+# \| BRE alternation, the I case-insensitive flag) are silently ignored by
+# BSD/macOS sed, so alternation- and case-insensitive rules would never
+# fire and credentials would display unredacted. Detect a real GNU sed by
+# name here, before the SSH round-trip; SED_CMD stays empty when none is
+# found, so this fails closed rather than sanitizing incorrectly.
+if sed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
+  SED_CMD=sed
+elif command -v gsed >/dev/null 2>&1 && gsed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
+  SED_CMD=gsed
+else
+  SED_CMD=""
+fi
 HEALTH_OUT=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'HEALTHCHECK'
 echo "=== DISK ==="
 df -h / /home 2>/dev/null | tail -n +2
@@ -400,12 +513,64 @@ curl -sI --connect-timeout 3 https://github.com -o /dev/null -w 'GitHub: %{http_
 HEALTHCHECK
 )
 HEALTH_STATUS=$?
+# Redact BEFORE this invocation exits — $HEALTH_OUT would not survive into
+# the Step 6 journal block's redaction pipeline any more than host/user
+# survive into this block from Step 1/2; the pipeline that sanitizes it
+# must run here, in the same subprocess that captured it. Reject a failed
+# retrieval BEFORE redaction: because stderr is folded in by 2>&1, an
+# auth/timeout/refused error would otherwise redact cleanly and then be
+# fenced and presented as if it were health data.
+if [ "$HEALTH_STATUS" -ne 0 ] || [ -z "$HEALTH_OUT" ]; then
+  printf '[yellow-ci] Could not retrieve health data from %s (status %s); not quoting output.\n' \
+    "$host" "$HEALTH_STATUS" >&2
+  REDACTED_HEALTH_OUT=""
+elif [ -z "$SED_CMD" ]; then
+  printf '[yellow-ci] Log sanitization requires GNU sed; found only a non-GNU sed (e.g. stock macOS) and no gsed on PATH. Refusing to display unredacted health output.\n' >&2
+  REDACTED_HEALTH_OUT=""
+else
+# Same provenance-tagged pipeline as the runner-agent journal below,
+# duplicated verbatim rather than shared, since a shell function defined
+# in that later block would not exist in this one either — the same
+# reason `ssh_opts` is rebuilt rather than referenced. Mirrors
+# `redact_secrets` in `hooks/scripts/lib/redact.sh`.
+REDACTED_HEALTH_OUT=$(printf '%s\n' "$HEALTH_OUT" | "$SED_CMD" \
+  -e 's/\x01/?/g' \
+  -e 's/ghp_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+  -e 's/ghs_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+  -e 's/gho_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+  -e 's/ghr_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+  -e 's/ghu_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+  -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/\x01REDACTED:github-pat]/g' \
+  -e 's/AKIA[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
+  -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=\x01REDACTED:aws-secret]/gI' \
+  -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*[A-Za-z][A-Za-z0-9_-]*\)[[:space:]]\+[^\x01[:space:]]\+\([[:space:]]\+[A-Za-z0-9_-]\+=[^\x01[:space:]]\+\)*/\1 \x01REDACTED]/gI' \
+  -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*\)[^\x01[:space:]]\+[[:space:]]*$/\1\x01REDACTED]/gI' \
+  -e 's/Bearer[[:space:]]\+[A-Za-z0-9._-]\{20,\}/Bearer [REDACTED]/g' \
+  -e 's/dckr_pat_[A-Za-z0-9_-]\{32,\}/\x01REDACTED:docker-token]/g' \
+  -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
+  -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
+  -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
+  -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
+  -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
+  -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
+  -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\x01[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
+  -e 's/\x01REDACTED/[REDACTED/g' \
+  -e 's/--- begin/[ESCAPED] begin/g' \
+  -e 's/--- end/[ESCAPED] end/g') || REDACTED_HEALTH_OUT='[REDACTED: sanitization failed]'
+fi
 ```
 
-`$HEALTH_OUT` must go through the same redaction pipeline used for the
-runner-agent journal below before any part of it is quoted, and may only be
-presented inside the `runner-output` fence. On a non-zero `$HEALTH_STATUS`,
-categorize per Step 5 and do not present the captured text as health data.
+Fail closed on all three failure modes, exactly as Step 6 does for the
+runner-agent journal: if the SSH retrieval failed (non-zero
+`$HEALTH_STATUS` or empty output) the output is dropped and nothing is
+quoted; if no GNU sed is available (`$SED_CMD` empty), the output is
+likewise dropped rather than run through a dialect that would silently
+under-redact it; if the sanitization pipeline itself errors,
+`$REDACTED_HEALTH_OUT` becomes the sanitization-failed placeholder above —
+never fall back to `$HEALTH_OUT` raw. Only a non-empty
+`$REDACTED_HEALTH_OUT` may be quoted, and only inside the `runner-output`
+fence from Step 4. Categorize a non-zero `$HEALTH_STATUS` per Step 5 and do
+not present the captured text as health data.
 
 Use adaptive parallelism: 1-3 runners at once; 4-10 runners max 5 concurrent;
 10+ in batches of half the runner count. Connection timeout 3s; wrap each probe
@@ -476,9 +641,37 @@ the quotes survive intact for the remote shell to interpret:
 ```bash
 set -o pipefail
 # Rebuilt here (Step 4): this block may run as a separate Bash tool call from
-# wherever ssh_opts/ssh_key/TIMEOUT_CMD were last built, and an empty
-# ssh_opts would silently drop the hardened SSH contract instead of failing
-# loudly — see the self-containment note above.
+# wherever host/user/ssh_key/ssh_opts/TIMEOUT_CMD were last built — see the
+# self-containment note above.
+# Bind this runner's Step 2-validated fields as literals before anything
+# below reads them — host/user/ssh_key are per-runner data, not static
+# config like the array below, so a bare reference to them in a fresh
+# block is exactly as unsafe as a bare `$ssh_opts` reference would be:
+# silently empty or stale, not a loud failure. `${var:?}` fails closed when
+# host/user are unset or empty; ssh_key uses the bare `${var?}` form since
+# an *empty* key is legitimately valid (use the default identity) and only
+# an *unset* key means the binding step itself was skipped.
+: "${host:?[yellow-ci] host not bound in this block}"
+: "${user:?[yellow-ci] user not bound in this block}"
+: "${ssh_key?[yellow-ci] ssh_key not bound in this block (empty string is valid)}"
+# Re-assert the Step 2 injection-relevant shape on the bound values — this
+# block must be safe to audit standalone, without assuming Step 2's
+# validation ran in a still-live process.
+case "$host" in
+  *[\;\&\|\$\`\'\"\\]*) printf '[yellow-ci] reject: shell metacharacter in bound host\n' >&2; exit 1 ;;
+esac
+printf '%s' "$user" | LC_ALL=C grep -Eq '^[a-z_][a-z0-9_-]{0,31}$' || {
+  printf '[yellow-ci] reject: bound user fails format check\n' >&2; exit 1; }
+if [ -n "$ssh_key" ]; then
+  case "$ssh_key" in
+    '~/'*|/*) : ;;
+    *) printf '[yellow-ci] reject: bound ssh_key must start with ~/ or /\n' >&2; exit 1 ;;
+  esac
+  case "$ssh_key" in *..*) printf '[yellow-ci] reject: bound ssh_key traversal\n' >&2; exit 1 ;; esac
+  printf '%s' "$ssh_key" | LC_ALL=C grep -Eq '^[A-Za-z0-9_./~-]+$' || {
+    printf '[yellow-ci] reject: bound ssh_key has disallowed characters\n' >&2; exit 1; }
+fi
+
 ssh_opts=(
   -o StrictHostKeyChecking=accept-new
   -o BatchMode=yes
@@ -626,3 +819,12 @@ the runner output. (This skill does not dispatch it directly.)
   shell (`classify_ssh_failure`), never by having the model read raw ssh
   stderr — remote-controlled probe output cannot influence which failure
   category is reported.
+- Every block that invokes `ssh` binds the target runner's own `host`,
+  `user`, and `ssh_key` as literals and re-checks their shape before use —
+  these do not persist from Step 1/2 parsing, or from an earlier probe
+  block, into a fresh Bash tool call any more than `ssh_opts` does, so each
+  block is self-contained and auditable on its own.
+- Health-probe output (`$HEALTH_OUT`) is redacted through the same
+  sanitization pipeline as the runner-agent journal, fail-closed, in the
+  same invocation that captures it — never deferred to a later block that
+  would not have access to it.

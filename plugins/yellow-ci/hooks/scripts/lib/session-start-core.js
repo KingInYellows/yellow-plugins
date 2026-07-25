@@ -103,9 +103,15 @@ function readRoutingSummary(env) {
   if (!opened) return '';
   try {
     if (!opened.st.isFile() || !ownedByUs(opened.st)) return '';
-    // head -c 500 — bounded by BYTES, like the bash hook.
-    const buf = fs.readFileSync(opened.fd);
-    const raw = buf.subarray(0, 500).toString('utf8');
+    // head -c 500 — bounded AT THE SYSCALL, not after the fact. Reading the
+    // whole file via readFileSync and only slicing the result afterward would
+    // still force a large same-uid file fully into memory first, defeating
+    // the point of bounding a read under this hook's ~3s startup budget.
+    // Reading into a fixed-size buffer via readSync caps the syscall itself.
+    const ROUTING_SUMMARY_MAX_BYTES = 500;
+    const buf = Buffer.alloc(ROUTING_SUMMARY_MAX_BYTES);
+    const bytesRead = fs.readSync(opened.fd, buf, 0, ROUTING_SUMMARY_MAX_BYTES, 0);
+    const raw = buf.subarray(0, bytesRead).toString('utf8');
     // The routing cache embeds `best_for` free text from a user-writable
     // runner-targets config (resolve-runner-targets.sh), so it is untrusted
     // the same way branch names are. Defang and fence it before it can reach
@@ -246,13 +252,26 @@ function cacheKeyFor(cwd) {
 // Cache-file size cap (Finding 2a), checked by readFreshOwnedFile against
 // the fstat'd size BEFORE the file is ever read into memory. A legitimate
 // cache is tiny — `{"failureCount":N,"branches":[...]}` with at most
-// GH_RUN_LIST_LIMIT entries — so derive the cap from the same per-branch
-// bound parseCachedFacts enforces (MAX_CACHED_BRANCH_LEN, defined next to
-// it below): GH_RUN_LIST_LIMIT branches at MAX_CACHED_BRANCH_LEN raw bytes
-// each, doubled for worst-case JSON-escaping headroom (git's ref-name rules
-// forbid control characters, so escaping only ever doubles a byte, never
-// inflates to `\uXXXX`), plus a small allowance for the object's own
-// punctuation, rounded up to a clean power of two.
+// GH_RUN_LIST_LIMIT entries, each truncated to MAX_WRITE_BRANCH_LEN (below)
+// before it is ever written — so this only needs headroom over that
+// write-time bound, not over MAX_CACHED_BRANCH_LEN's much larger
+// hostile-input ceiling.
+//
+// Correction: an earlier version of this comment tried to size this cap by
+// assuming a branch name's JS `.length` (UTF-16 code units) tracks its
+// UTF-8 byte size 1:1, with escaping "only ever doubling a byte". Neither
+// half holds for a real Unicode branch name: JSON.stringify does not escape
+// ordinary printable characters at all (git's ref-name rules forbid the
+// control characters that would force a `\uXXXX` escape), and a single BMP
+// code unit — e.g. most CJK characters — can itself take up to 3 bytes in
+// UTF-8, a ratio no "doubling" covers. Sizing this cap around that ratio
+// would just move the same bug to a longer valid branch name; truncating
+// what gets WRITTEN (MAX_WRITE_BRANCH_LEN) instead makes the per-branch
+// BYTE SIZE of a cache this process writes hold regardless of how many
+// bytes per character a given branch name needs. (Entry COUNT is bounded
+// separately, by trusting `gh run list --limit GH_RUN_LIST_LIMIT` to
+// respect its own flag — the same trust MAX_CACHED_BRANCH_LEN's comment
+// above already relies on, not something this cap re-derives.)
 const MAX_CACHE_FILE_BYTES = 8192;
 
 // Read the last-check result cache, refusing anything but a fresh,
@@ -270,14 +289,21 @@ function readFreshOwnedFile(file, maxAgeSec) {
   if (!opened) return { hit: false };
   try {
     if (!opened.st.isFile() || !ownedByUs(opened.st)) return { hit: false };
-    // Check the fstat'd size BEFORE reading (Finding 2a): a same-uid process
-    // could otherwise plant an oversized cache file and force it fully into
-    // memory before parseCachedFacts ever gets a chance to reject its shape.
+    // Reject on the fstat'd size taken at open time (Finding 2a) as a fast
+    // early-out for an already-oversized file — but this snapshot is NOT
+    // what bounds the read below. A same-uid process could hold this exact
+    // file open and grow it AFTER this check but before the read runs, so
+    // the read itself must also be bounded at the syscall (see
+    // readRoutingSummary above for the same pattern): reading to actual EOF
+    // via readFileSync would follow the file to whatever size it has grown
+    // to by then, regardless of what st.size said a moment ago.
     if (opened.st.size > MAX_CACHE_FILE_BYTES) return { hit: false };
     const ageSec = Math.floor(Date.now() / 1000) - Math.floor(opened.st.mtimeMs / 1000);
     if (ageSec >= maxAgeSec) return { hit: false };
     try {
-      return { hit: true, content: fs.readFileSync(opened.fd, 'utf8') };
+      const buf = Buffer.alloc(MAX_CACHE_FILE_BYTES);
+      const bytesRead = fs.readSync(opened.fd, buf, 0, MAX_CACHE_FILE_BYTES, 0);
+      return { hit: true, content: buf.subarray(0, bytesRead).toString('utf8') };
     } catch {
       return { hit: true, content: null };
     }
@@ -348,14 +374,30 @@ function renderOutput(routingSummary, failureCount, rawBranches) {
 // drift apart.
 //
 // MAX_CACHED_BRANCH_LEN bounds a single RAW (pre-sanitize) branch name.
-// git's ref-name rules forbid ASCII control characters, so worst-case JSON
-// escaping only ever doubles a byte (a literal `"` or `\` becomes 2 chars),
-// never inflates to a `\uXXXX` escape; 1024 is well above any real branch
-// name (git caps one path component at 255 bytes, and GitHub branch names
-// stay well under that in practice) while still bounding what a hostile
-// entry can force into memory before sanitizeBranchName's 120-char slice
-// (applied on both the live and cache paths — see renderOutput) ever runs.
+// git's ref-name rules forbid ASCII control characters, so a genuine LIVE
+// branch name's JSON escaping only ever doubles a byte (a literal `"` or
+// `\` becomes 2 chars) and never needs a `\uXXXX` escape. The one exception
+// is a lone (unpaired) UTF-16 surrogate, which JSON.stringify does escape
+// that way — that can only arise from MAX_WRITE_BRANCH_LEN's slice (below)
+// landing mid surrogate-pair, is bounded to a single truncation boundary
+// (~6 bytes), and does not change the headroom this bound relies on: 1024
+// is well above any real branch name (git caps one path component at 255
+// bytes, and GitHub branch names stay well under that in practice) while
+// still bounding what a hostile entry can force into memory before
+// sanitizeBranchName's 120-char slice (applied on both the live and cache
+// paths — see renderOutput) ever runs.
 const MAX_CACHED_BRANCH_LEN = 1024;
+
+// Write-time bound (cubic P3 finding) on a single RAW branch name, applied
+// once — right after a live `gh run list` fetch parses rawBranches, before
+// that array is either rendered or cached — so a VALID cache entry can never
+// itself outgrow MAX_CACHE_FILE_BYTES. renderOutput's sanitizeBranchName
+// only ever keeps the first 120 (already-defanged) characters of any branch
+// name, so nothing past that ever reaches the systemMessage; there is no
+// reason to carry more than a small safety margin over that into the cache.
+// Sized well below MAX_CACHED_BRANCH_LEN so a freshly-written cache always
+// also passes parseCachedFacts's (looser, hostile-input) read-side check.
+const MAX_WRITE_BRANCH_LEN = 256;
 
 // Parse and validate the last-check cache's JSON facts. Returns null on ANY
 // parse error or shape mismatch — including `JSON.parse('null')`, which
@@ -493,7 +535,11 @@ function runSessionStart({ cwd, env }) {
       failureCount = parsed.length;
       rawBranches = parsed
         .map((r) => r && r.headBranch)
-        .filter((b) => typeof b === 'string' && b.length > 0);
+        .filter((b) => typeof b === 'string' && b.length > 0)
+        // Bound BEFORE this feeds either renderOutput or the cache write
+        // below (see MAX_WRITE_BRANCH_LEN) — a valid Unicode branch name
+        // must never be able to grow the cache past MAX_CACHE_FILE_BYTES.
+        .map((b) => b.slice(0, MAX_WRITE_BRANCH_LEN));
     } else {
       warn('[yellow-ci] Warning: Unexpected GitHub API response format');
       failureCount = 0;

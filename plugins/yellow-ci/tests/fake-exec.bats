@@ -110,6 +110,210 @@ YAML
   [ "$status" -ne 0 ]
 }
 
+@test "runner-target validation: canonical config with full metadata accepted" {
+  cfg="$BATS_TEST_TMPDIR/full.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+      - pool:ares
+    best_for:
+      - heavy CI
+      - Terraform plan
+    avoid_for:
+      - tiny status jobs
+    notes:
+      - default heavy autoscaling pool
+routing_rules:
+  - prefer pool:ares for heavy CI
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: invalid type rejected" {
+  cfg="$BATS_TEST_TMPDIR/bad-type.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: not-a-real-type
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+}
+
+@test "runner-target validation: invalid mode rejected" {
+  cfg="$BATS_TEST_TMPDIR/bad-mode.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: always-on
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+}
+
+@test "runner-target validation: invalid selector label (space) rejected" {
+  cfg="$BATS_TEST_TMPDIR/bad-selector.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+}
+
+@test "runner-target validation: missing type/mode rejected (not silently emitted empty)" {
+  cfg="$BATS_TEST_TMPDIR/missing-type-mode.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing required field: type"* ]]
+}
+
+@test "runner-target validation: missing mode only rejected" {
+  cfg="$BATS_TEST_TMPDIR/missing-mode.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing required field: mode"* ]]
+}
+
+@test "runner-target validation: missing preferred_selector rejected" {
+  cfg="$BATS_TEST_TMPDIR/missing-selector.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing required field: preferred_selector"* ]]
+}
+
+@test "runner-target validation: blank type value rejected (present key, empty value)" {
+  cfg="$BATS_TEST_TMPDIR/blank-type.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type:
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+}
+
+@test "runner-target validation: second target missing mode rejected (first target valid)" {
+  cfg="$BATS_TEST_TMPDIR/second-missing-mode.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+  - name: atlas
+    type: static-host
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"atlas"* ]]
+}
+
+@test "runner-target validation: best_for value with comma rejected (reserved cache delimiter)" {
+  cfg="$BATS_TEST_TMPDIR/bad-comma.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+    best_for:
+      - heavy CI, terraform
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+}
+
+@test "runner-target validation: notes value with pipe rejected (reserved cache delimiter)" {
+  cfg="$BATS_TEST_TMPDIR/bad-pipe.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+    notes:
+      - shifts fields|malicious
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+}
+
+@test "runner-target validation: avoid_for value with comma rejected across multiple targets" {
+  cfg="$BATS_TEST_TMPDIR/bad-second-target.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+  - name: atlas
+    type: static-host
+    mode: persistent
+    preferred_selector:
+      - self-hosted
+    avoid_for:
+      - heavy jobs, gpu work
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+}
+
 @test "non-Linux probe rejection + probe orchestration are markdown-scoped (not executable)" {
   skip "The runner-health probe orchestration and the 'Linux runner targets only' skip live in skills/ci-runner-health/SKILL.md — LLM-interpreted markdown, not executable shell; review-gated (mirrors gt-workflow's documented bats scope limitation)."
 }
