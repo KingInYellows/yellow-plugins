@@ -51,6 +51,54 @@ setup() {
   [[ "$result" == *"Bearer [REDACTED]"* ]]
 }
 
+# The Basic-auth payloads below are BUILT AT RUNTIME rather than written as
+# literals. A committed base64 string that decodes to `user:password` is
+# indistinguishable from a real leaked credential to a secret scanner, and
+# GitGuardian fails the build on it — a fixture that only ever exercises
+# redaction should not itself look like the thing it is testing for.
+@test "redact: Authorization Basic scheme" {
+  payload=$(printf 'fixture:not-a-real-credential' | base64 | tr -d '\n')
+  result=$(echo "Authorization: Basic $payload" | redact_secrets)
+  [[ "$result" == *"Basic [REDACTED]"* ]]
+  [[ "$result" != *"$payload"* ]]
+}
+
+@test "redact: Authorization header lowercase" {
+  payload=$(printf 'fixture:not-a-real-credential' | base64 | tr -d '\n')
+  result=$(echo "authorization: basic $payload" | redact_secrets)
+  [[ "$result" == *"basic [REDACTED]"* ]]
+  [[ "$result" != *"$payload"* ]]
+}
+
+@test "redact: Proxy-Authorization header" {
+  payload=$(printf 'fixture:not-a-real-credential' | base64 | tr -d '\n')
+  result=$(echo "Proxy-Authorization: Basic $payload" | redact_secrets)
+  [[ "$result" == *"Basic [REDACTED]"* ]]
+  [[ "$result" != *"$payload"* ]]
+}
+
+@test "redact: Authorization header with no scheme (bare credential)" {
+  # Built at runtime for the same reason as the Basic payloads above: a
+  # literal `sk_live_...` is a real Stripe live-key prefix and trips secret
+  # scanners on a fixture that exists only to prove redaction works.
+  bare_cred=$(printf 'sk_live_%s' "$(printf 'a%.0s' {1..24})")
+  result=$(echo "Authorization: $bare_cred" | redact_secrets)
+  [[ "$result" == *"[REDACTED]"* ]]
+  [[ "$result" != *"$bare_cred"* ]]
+}
+
+@test "redact: Authorization Digest scheme (comma-separated params)" {
+  result=$(echo 'Authorization: Digest username="alice", realm="test", nonce="dcd98b7102dd2f0e", response="6629fae49393a05397450978507c4ef1"' | redact_secrets)
+  [[ "$result" == *"Digest [REDACTED]"* ]]
+  [[ "$result" != *"6629fae49393a05397450978507c4ef1"* ]]
+  [[ "$result" != *"dcd98b7102dd2f0e"* ]]
+}
+
+@test "redact: Authorization header does not consume a trailing URL" {
+  result=$(echo 'curl -H "Authorization: Bearer TESTTOKEN0123456789ABCD" https://api.example.com/v1?x=1' | redact_secrets)
+  [[ "$result" == *"https://api.example.com/v1?x=1"* ]]
+}
+
 # --- Docker tokens ---
 
 @test "redact: Docker Hub token" {

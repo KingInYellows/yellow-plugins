@@ -66,6 +66,8 @@ redact_secrets() {
     -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/\x01REDACTED:github-pat]/g' \
     -e 's/AKIA[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
     -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=\x01REDACTED:aws-secret]/gI' \
+    -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*[A-Za-z][A-Za-z0-9_-]*\)[[:space:]]\+[^\x01[:space:]]\+\([[:space:]]\+[A-Za-z0-9_-]\+=[^\x01[:space:]]\+\)*/\1 \x01REDACTED]/gI' \
+    -e 's/\(\(Authorization\|Proxy-Authorization\)[[:space:]]*:[[:space:]]*\)[^\x01[:space:]]\+[[:space:]]*$/\1\x01REDACTED]/gI' \
     -e 's/Bearer[[:space:]]\+[A-Za-z0-9._-]\{20,\}/Bearer [REDACTED]/g' \
     -e 's/dckr_pat_[A-Za-z0-9_-]\{32,\}/\x01REDACTED:docker-token]/g' \
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
