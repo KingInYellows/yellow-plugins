@@ -63,9 +63,27 @@ function resolveCacheReadPath(env, filename) {
 // caller's checks and the eventual read can't be raced apart by swapping the
 // path between calls. Returns null on any failure (missing, symlink rejected
 // via ELOOP, permission). Caller MUST close the returned fd.
+//
+// O_NONBLOCK guards the same predictable path against a FIFO: opening a FIFO
+// for reading with a plain O_RDONLY blocks the whole process until some
+// writer shows up, and this hook has a ~3s host deadline (see
+// HOOK_BUDGET_MS) — a local process that `mkfifo`s either cache path with no
+// writer attached would stall SessionStart indefinitely. O_NONBLOCK makes a
+// read-only open of a FIFO return immediately instead, and the caller's
+// existing `st.isFile()` check (both call sites check it BEFORE reading —
+// readRoutingSummary and readFreshOwnedFile) then rejects it, exactly like
+// the symlink case: never followed, never blocks, always falls through to a
+// cache miss. O_NONBLOCK has no effect on a real regular file (POSIX only
+// changes read()/open() blocking semantics for FIFOs, sockets, and some
+// device files), so ordinary cache hits are unaffected. Same
+// platform-support pattern as O_NOFOLLOW above: undefined on platforms that
+// lack it (e.g. Windows) reduces to a no-op via `|| 0`.
 function openNoFollow(file) {
   try {
-    const flags = fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0);
+    const flags =
+      fs.constants.O_RDONLY |
+      (fs.constants.O_NOFOLLOW || 0) |
+      (fs.constants.O_NONBLOCK || 0);
     const fd = fs.openSync(file, flags);
     return { fd, st: fs.fstatSync(fd) };
   } catch {
@@ -172,6 +190,13 @@ const HOOK_BUDGET_MS = 3000;
 const HOOK_RESERVE_MS = 400; // cache write + JSON emit + exit
 const HOOK_START_MS = Date.now();
 
+// `gh run list --limit N` below. Also the ceiling parseCachedFacts enforces
+// on a cached failureCount/branches: a same-uid cache writer must never be
+// able to claim more failures or candidate branches than a LIVE fetch could
+// ever produce. One constant, two consumers, so bumping the live limit is
+// the only way to change the cache's ceiling too.
+const GH_RUN_LIST_LIMIT = 3;
+
 function remainingBudgetMs() {
   return HOOK_BUDGET_MS - HOOK_RESERVE_MS - (Date.now() - HOOK_START_MS);
 }
@@ -200,7 +225,7 @@ function ghRunList(env) {
   const res = spawnSync(
     'gh',
     [
-      'run', 'list', '--status', 'failure', '--limit', '3',
+      'run', 'list', '--status', 'failure', '--limit', String(GH_RUN_LIST_LIMIT),
       '--json', 'databaseId,headBranch,displayTitle,conclusion,updatedAt',
       '-q', '[.[] | select(.conclusion == "failure")]',
     ],
@@ -218,20 +243,37 @@ function cacheKeyFor(cwd) {
   return crypto.createHash('md5').update(cwd).digest('hex').slice(0, 32);
 }
 
-// Read the last-check result cache, refusing anything but a fresh regular
-// file we own (see openNoFollow/ownedByUs above). `{hit: false}` covers "no
-// cache file", "stale", "a symlink" (rejected via O_NOFOLLOW/ELOOP), and
-// "owned by someone else" — the caller treats all four identically to a
-// plain cache miss and falls through to a live fetch. `{hit: true, content:
-// null}` is the narrower case of a file that passed every guard but still
-// failed to read (e.g. a transient I/O error): the caller preserves the
-// pre-existing behavior of warning and returning routingSummary only, rather
-// than retrying over the network.
+// Cache-file size cap (Finding 2a), checked by readFreshOwnedFile against
+// the fstat'd size BEFORE the file is ever read into memory. A legitimate
+// cache is tiny — `{"failureCount":N,"branches":[...]}` with at most
+// GH_RUN_LIST_LIMIT entries — so derive the cap from the same per-branch
+// bound parseCachedFacts enforces (MAX_CACHED_BRANCH_LEN, defined next to
+// it below): GH_RUN_LIST_LIMIT branches at MAX_CACHED_BRANCH_LEN raw bytes
+// each, doubled for worst-case JSON-escaping headroom (git's ref-name rules
+// forbid control characters, so escaping only ever doubles a byte, never
+// inflates to `\uXXXX`), plus a small allowance for the object's own
+// punctuation, rounded up to a clean power of two.
+const MAX_CACHE_FILE_BYTES = 8192;
+
+// Read the last-check result cache, refusing anything but a fresh,
+// sanely-sized regular file we own (see openNoFollow/ownedByUs above).
+// `{hit: false}` covers "no cache file", "stale", "a symlink" (rejected via
+// O_NOFOLLOW/ELOOP), "owned by someone else", and "larger than any
+// legitimate cache could be" (see MAX_CACHE_FILE_BYTES) — the caller treats
+// all five identically to a plain cache miss and falls through to a live
+// fetch. `{hit: true, content: null}` is the narrower case of a file that
+// passed every guard but still failed to read (e.g. a transient I/O error):
+// the caller preserves the pre-existing behavior of warning and returning
+// routingSummary only, rather than retrying over the network.
 function readFreshOwnedFile(file, maxAgeSec) {
   const opened = openNoFollow(file);
   if (!opened) return { hit: false };
   try {
     if (!opened.st.isFile() || !ownedByUs(opened.st)) return { hit: false };
+    // Check the fstat'd size BEFORE reading (Finding 2a): a same-uid process
+    // could otherwise plant an oversized cache file and force it fully into
+    // memory before parseCachedFacts ever gets a chance to reject its shape.
+    if (opened.st.size > MAX_CACHE_FILE_BYTES) return { hit: false };
     const ageSec = Math.floor(Date.now() / 1000) - Math.floor(opened.st.mtimeMs / 1000);
     if (ageSec >= maxAgeSec) return { hit: false };
     try {
@@ -297,12 +339,36 @@ function renderOutput(routingSummary, failureCount, rawBranches) {
   return output;
 }
 
+// Cache-fact bounds (Finding 2b). A same-uid local process can plant its own
+// JSON at the cache's predictable path (see the R20-B comment above the
+// cache-hit branch in runSessionStart), so parseCachedFacts must reject a
+// shape the LIVE path could never itself produce, not just an ill-typed one.
+// Both bounds derive from GH_RUN_LIST_LIMIT (the live `gh run list --limit`
+// above) rather than being picked independently, so the two paths can never
+// drift apart.
+//
+// MAX_CACHED_BRANCH_LEN bounds a single RAW (pre-sanitize) branch name.
+// git's ref-name rules forbid ASCII control characters, so worst-case JSON
+// escaping only ever doubles a byte (a literal `"` or `\` becomes 2 chars),
+// never inflates to a `\uXXXX` escape; 1024 is well above any real branch
+// name (git caps one path component at 255 bytes, and GitHub branch names
+// stay well under that in practice) while still bounding what a hostile
+// entry can force into memory before sanitizeBranchName's 120-char slice
+// (applied on both the live and cache paths — see renderOutput) ever runs.
+const MAX_CACHED_BRANCH_LEN = 1024;
+
 // Parse and validate the last-check cache's JSON facts. Returns null on ANY
 // parse error or shape mismatch — including `JSON.parse('null')`, which
 // succeeds and yields `typeof null === 'object'`, so a bare object check
 // alone would not catch it — so the caller degrades to a cache miss. A
 // malformed or hostile cache file must fall back to a live fetch, never
 // crash the hook and never be trusted as pre-rendered text.
+//
+// failureCount and branches.length are both capped at GH_RUN_LIST_LIMIT: a
+// live fetch can never produce more than that many failures or candidate
+// branches (see ghRunList), so a cached value above it can only mean a
+// hostile or corrupted file — degrade to a miss rather than rendering it.
+// Each branch string is additionally capped at MAX_CACHED_BRANCH_LEN.
 function parseCachedFacts(content) {
   let parsed;
   try {
@@ -311,8 +377,18 @@ function parseCachedFacts(content) {
     return null;
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
-  if (!Number.isInteger(parsed.failureCount) || parsed.failureCount < 0) return null;
-  if (!Array.isArray(parsed.branches) || !parsed.branches.every((b) => typeof b === 'string')) {
+  if (
+    !Number.isInteger(parsed.failureCount) ||
+    parsed.failureCount < 0 ||
+    parsed.failureCount > GH_RUN_LIST_LIMIT
+  ) {
+    return null;
+  }
+  if (
+    !Array.isArray(parsed.branches) ||
+    parsed.branches.length > GH_RUN_LIST_LIMIT ||
+    !parsed.branches.every((b) => typeof b === 'string' && b.length <= MAX_CACHED_BRANCH_LEN)
+  ) {
     return null;
   }
   return { failureCount: parsed.failureCount, branches: parsed.branches };

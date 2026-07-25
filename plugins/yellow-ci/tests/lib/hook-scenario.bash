@@ -16,6 +16,18 @@
 # conditions the bash goldens were captured under.
 
 HOOK_SCENARIO_MOCKS_DEFAULT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../mocks" && pwd)"
+
+# Derive the hook's predictable per-cwd cache key, md5(path) truncated to 32
+# hex chars. Shared so every caller — the scenario seeder below and the cache
+# regression tests in hook-parity.bats — uses the same portability fallback:
+# GNU coreutils ships `md5sum`, macOS ships `md5 -q` instead.
+hook_cache_key() {
+  if command -v md5sum >/dev/null 2>&1; then
+    printf '%s' "$1" | md5sum | cut -c1-32
+  else
+    printf '%s' "$1" | md5 -q | cut -c1-32
+  fi
+}
 HOOK_SCENARIO_ROUTING_TEXT='[yellow-ci] Runner routing: prefer pool:ares for heavy CI; pool:atlas for lightweight checks.'
 # R20-B: the last-check cache now stores raw FACTS (JSON), never a rendered
 # message — see session-start-core.js's renderOutput/parseCachedFacts. A hit
@@ -103,11 +115,7 @@ hook_scenario_setup() {
   # fall through to a live (mocked) `gh run list` instead.
   if [ "$case" = "cache-hit" ] || [ "$case" = "legacy-cache-not-trusted" ]; then
     local key
-    if command -v md5sum >/dev/null 2>&1; then
-      key=$(printf '%s' "$work" | md5sum | cut -c1-32)
-    else
-      key=$(printf '%s' "$work" | md5 -q | cut -c1-32)
-    fi
+    key=$(hook_cache_key "$work")
     if [ "$case" = "cache-hit" ]; then
       mkdir -p "$home/.local/share/yellow-ci"
       printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$home/.local/share/yellow-ci/last-check-$key"

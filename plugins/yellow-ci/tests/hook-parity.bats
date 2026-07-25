@@ -153,7 +153,7 @@ assert_parity_both() {
   cd "$HOOK_SCENARIO_WORKDIR"
 
   local key
-  key=$(printf '%s' "$PWD" | md5sum | cut -c1-32)
+  key=$(hook_cache_key "$PWD")
   local secret="$sandbox/secret.txt"
   printf 'SECRET-FILE-CONTENT-DO-NOT-LEAK\n' >"$secret"
   ln -sfn "$secret" "$HOME/.local/share/yellow-ci/last-check-$key"

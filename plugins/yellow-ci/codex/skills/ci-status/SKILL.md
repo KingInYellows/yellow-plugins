@@ -94,7 +94,9 @@ If `$RUN_STATUS` from step 1 is non-zero (`gh` failed):
 - Check `gh auth status` — the user may need to authenticate.
 - Confirm you are inside a GitHub repository with a remote.
 
-If `$RUN_STATUS` is zero but no runs are found (`$RUN_ROWS` is empty):
+If `$RUN_STATUS` is zero but no runs are found (`$RUN_ROWS` is empty): step 1's
+block already printed the bare line `No workflow runs found.`. Do not repeat it
+— present that one result to the user once, adding the explanatory clause:
 
 > No workflow runs found. This repository may not have GitHub Actions
 > configured.
