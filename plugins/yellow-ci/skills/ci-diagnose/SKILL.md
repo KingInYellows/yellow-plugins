@@ -73,12 +73,6 @@ pass `--repo owner/name`."
 
 ### Step 2: Resolve Run ID
 
-If the argument text after the skill name contains a run ID (digits only):
-
-- Validate it against `^[1-9][0-9]{0,19}$` (no leading zeros, max
-  9007199254740991). If invalid: "Invalid run ID. Must be a positive integer
-  (e.g., 123456789)".
-
 `REPO_OVERRIDE` was already extracted and validated in Step 1 (it gates the
 origin-remote check there); if `--repo` was not given it is unset/empty.
 
@@ -98,14 +92,44 @@ fi
 expands to nothing on every `gh` call below and the command falls back to
 `gh`'s own repo detection from the current directory.
 
-If no arguments, fetch the latest failed run:
+Both branches below must leave `RUN_ID` bound to a value that has passed
+`^[1-9][0-9]{0,19}$` validation — Step 3 calls `gh run view "$RUN_ID"`
+immediately after this step, so an unbound or unvalidated `$RUN_ID` must never
+reach it.
+
+**Explicit run ID.** If the argument text after the skill name contains a run
+ID (digits only), validate it against `^[1-9][0-9]{0,19}$` (no leading zeros,
+max 9007199254740991) and assign it to `RUN_ID`. If invalid: "Invalid run ID.
+Must be a positive integer (e.g., 123456789)" — stop.
+
+**Auto-select (no run ID given).** Capture the query result into `RUN_ID` —
+do not just print it — and gate on both the exit status and emptiness in the
+same block, before Step 3 can ever run with an unbound `$RUN_ID`:
 
 ```bash
-gh run list --status failure --limit 1 --json databaseId -q '.[0].databaseId // empty' "${REPO_ARGS[@]}"
+RUN_ID=$(gh run list --status failure --limit 1 --json databaseId \
+  -q '.[0].databaseId // empty' "${REPO_ARGS[@]}")
+LIST_STATUS=$?
+if [ "$LIST_STATUS" -ne 0 ]; then
+  echo "Could not query recent runs (gh exited $LIST_STATUS). Check 'gh auth status' and retry."
+  exit 1
+fi
+if [ -z "$RUN_ID" ]; then
+  echo "No recent CI failures found. List recent runs with the ci-status skill."
+  exit 1
+fi
+if ! printf '%s' "$RUN_ID" | grep -qE '^[1-9][0-9]{0,19}$'; then
+  echo "Auto-selected run ID ($RUN_ID) failed validation. Not proceeding."
+  exit 1
+fi
 ```
 
-If none found: "No recent CI failures found. List recent runs with the
-ci-status skill."
+`LIST_STATUS` non-zero means the `gh run list` query itself failed (auth
+error, rate limit, network) — distinct from a genuinely empty result, which
+means no failed runs exist. Both cases stop here rather than falling through
+to Step 3 with an empty or unvalidated `$RUN_ID`, and the trailing regex check
+means the auto-selected `RUN_ID` is validated exactly like the
+explicitly-passed one.
 
 ### Step 3: Fetch Run Details
 

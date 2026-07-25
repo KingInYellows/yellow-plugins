@@ -99,12 +99,34 @@ never warn-and-continue):
   `.corp`, `.home`, `.intra`, or `.private`. Public IPs and public-TLD hostnames
   are rejected — private network only.
 - **SSH user** — must match `^[a-z_][a-z0-9_-]{0,31}$`.
-- **SSH key path** (optional) — if provided, must start with `~` or `/`, contain
-  only safe characters, and contain no `..` or shell metacharacters.
+- **SSH key path** (optional) — if provided, must start with `~/` or `/`,
+  contain only safe characters, and contain no `..` or shell metacharacters.
+  Reject the `~user/...` form: it would pass a looser "starts with `~`" check,
+  but `ci-runner-health`'s expansion only resolves `~/`, so such a key would
+  reach `ssh` as a literal tilde path and silently fail the probe. Accepting
+  only the forms that are actually expanded keeps setup and health-check in
+  agreement on which key paths are usable.
 
-Security: pass every collected value through a **quoted heredoc** — never inline
-user input into a command line (input containing quotes, `$`, or `;` must not
-reach the shell unquoted). Validate each field before accepting it.
+**Security — never place a raw collected value inside a shell heredoc body.**
+A quoted delimiter (`<<'EOF'`) only blocks `$`/backtick expansion inside the
+body; it does not stop the body from containing a line that matches the
+delimiter itself. A value with an embedded newline followed by that line
+closes the heredoc early, and everything after it runs as shell commands —
+before any pattern check above ever sees the value. Do not "fix" this with a
+longer or more unusual delimiter either: this skill body is committed to the
+repo and world-readable, so a deliberately hostile answer can just reuse
+whatever delimiter is documented here — a unique delimiter only rules out
+accidental collision, not a chosen attack.
+
+Instead, treat every raw answer as opaque until it has been checked: write it
+to a fresh temp file with the `Write` tool (its content is a structured
+parameter, never parsed as shell) before it touches any Bash command, then run
+the pattern check above by reading that file's content (for example, `grep
+-Eq '<pattern>' "$tmpfile"`) — never by interpolating the raw text inline in a
+command string or heredoc body. Reject and re-prompt on any check failure, and
+delete the temp file once the field is accepted or rejected. Only a value that
+has passed its check — which already excludes newlines, quotes, `$`, `;`, and
+other shell metacharacters — may be reused afterward.
 
 ### Step 5: Preview and Confirm, Then Write Config
 
@@ -113,7 +135,10 @@ reach the shell unquoted). Validate each field before accepting it.
 block) and show it to the user. Then ask via `AskUserQuestion`: "Write this
 runner config? [Write / Edit / Cancel]". Only write after explicit
 confirmation; on a host without `AskUserQuestion`, obtain an equivalent explicit
-user confirmation first — never write config without one.
+user confirmation first — never write config without one. Write the confirmed
+content with the `Write` tool, not a shell heredoc or redirection — the
+rendered content still carries the collected `host`/`user`/`name` values, so
+Step 4's no-heredoc rule applies here too.
 
 Config shape (with runners):
 
