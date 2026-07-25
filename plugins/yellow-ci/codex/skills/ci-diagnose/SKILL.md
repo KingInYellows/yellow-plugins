@@ -54,8 +54,8 @@ if [ "$GIT_REMOTE_STATUS" -ne 0 ] || [ -z "$REMOTE_URL" ]; then
   REPO_CONTEXT="NO_REMOTE"
 else
   REPO_CONTEXT=$(printf '%s\n' "$REMOTE_URL" \
-    | grep -oE '^(git@github\.com:|https://github\.com/|ssh://git@github\.com(:[0-9]+)?/)[^/]+/[^/]+$' \
-    | sed -E 's#^(git@github\.com:|https://github\.com/|ssh://git@github\.com(:[0-9]+)?/)##; s/\.git$//')
+    | grep -oE '^(git@github\.com:|https://github\.com/|ssh://git@github\.com(:[1-9][0-9]{0,4})?/)[^/]+/[^/]+$' \
+    | sed -E 's#^(git@github\.com:|https://github\.com/|ssh://git@github\.com(:[1-9][0-9]{0,4})?/)##; s/\.git$//')
   [ -z "$REPO_CONTEXT" ] && REPO_CONTEXT="NO_REMOTE"
 fi
 ```
