@@ -30,12 +30,25 @@
 # EITHER location verbatim. But the legacy location can still hold raw text
 # written by the deleted bash hook — which never sanitized branch names — for
 # up to 60s after an upgrade, so a legacy-only hit could bypass
-# defangUntrustedText/fenceReferenceOnly entirely. The Node runtime now trusts
-# a cache hit only from the NEW (plugin-data) location, since that file is
-# written exclusively by this runtime and is already sanitized; `cache-hit`
-# was repointed to pre-seed the new location (still a genuine verbatim hit),
-# and `legacy-cache-not-trusted` was added to prove a legacy-only hit now
-# falls through to a live (mocked) fetch instead of being trusted.
+# defangUntrustedText/fenceReferenceOnly entirely. The Node runtime now reads
+# a cache hit only from the NEW (plugin-data) location; `cache-hit` was
+# repointed to pre-seed the new location, and `legacy-cache-not-trusted` was
+# added to prove a legacy-only hit falls through to a live (mocked) fetch
+# instead of being trusted.
+#
+# DELIBERATE DIVERGENCE (cache-hit, again — R20-B): even a NEW-location hit is
+# no longer trusted verbatim. A same-uid local process can plant a file at the
+# cache's predictable path (md5 of cwd) and pass the ownership check just as
+# easily as this runtime itself — ownership cannot prove provenance. The
+# last-check cache now stores raw FACTS (failureCount + candidate branch
+# names, as JSON) instead of a rendered message, and a hit is re-rendered
+# through the identical sanitize/fence pipeline (renderOutput) a live fetch
+# uses, prefixed with the freshly-read routing summary, on every read. Hostile
+# cache content can therefore only ever surface defanged inside a
+# reference-only fence, the same as a hostile branch name from the GitHub API
+# — regardless of who wrote the file. `cache-hit.golden.txt` was re-captured
+# accordingly (routing summary now included ahead of the failure line, where
+# it previously was not, since the cache no longer embeds a stale copy of it).
 #
 # STDOUT is compared JSON-semantically (jq -S -c) because the bash hook emitted
 # jq's pretty multi-line JSON while the Node port emits compact JSON — the

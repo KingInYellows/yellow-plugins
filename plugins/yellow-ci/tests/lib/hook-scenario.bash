@@ -17,7 +17,14 @@
 
 HOOK_SCENARIO_MOCKS_DEFAULT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../mocks" && pwd)"
 HOOK_SCENARIO_ROUTING_TEXT='[yellow-ci] Runner routing: prefer pool:ares for heavy CI; pool:atlas for lightweight checks.'
-HOOK_SCENARIO_CACHED_TEXT='[yellow-ci] CACHED: 1 recent failure(s) on branch(es): cached-branch. Use /ci:diagnose to investigate.'
+# R20-B: the last-check cache now stores raw FACTS (JSON), never a rendered
+# message — see session-start-core.js's renderOutput/parseCachedFacts. A hit
+# is re-rendered (sanitized + fenced) on every read, so this fixture's branch
+# name ("cached-branch") is distinct from the "failures" mock's branches
+# (main, feature-x) purely so a test can tell "did this come from the cache"
+# apart from "did this come from a live (mocked) fetch" — not because the
+# content needs to look different in shape.
+HOOK_SCENARIO_CACHED_TEXT='{"failureCount":1,"branches":["cached-branch"]}'
 
 # Build a PATH dir that mirrors the current PATH but EXCLUDES `gh`, so
 # `command -v gh` fails even though the real gh is installed — while every other
@@ -82,15 +89,17 @@ hook_scenario_setup() {
   esac
 
   # cache-hit: pre-seed a fresh (age ~0, <60s TTL) result cache in the NEW
-  # (plugin-data) location so gh is never consulted; the hook must echo the
-  # cached message verbatim. Only content written by this Node runtime lives
-  # here, so a hit is trusted as-is (see legacy-cache-not-trusted below for
-  # the untrusted counterpart).
+  # (plugin-data) location so gh is never consulted; the hook must re-render
+  # the cached facts (sanitize + fence) through the same path a live fetch
+  # uses, prefixed with the freshly-read routing summary — it does NOT echo
+  # the cache file's bytes verbatim (see HOOK_SCENARIO_CACHED_TEXT above).
+  # Only content written by this Node runtime lives here, so a hit is READ
+  # (see legacy-cache-not-trusted below for the untrusted counterpart).
   #
   # legacy-cache-not-trusted: pre-seed the same fresh result cache but ONLY in
   # the LEGACY location — simulating a cache file still held over from the
   # deleted bash hook right after an upgrade. That hook never sanitized branch
-  # names, so a legacy-only hit must NOT be trusted verbatim; the hook must
+  # names, so a legacy-only hit must NOT be trusted at all; the hook must
   # fall through to a live (mocked) `gh run list` instead.
   if [ "$case" = "cache-hit" ] || [ "$case" = "legacy-cache-not-trusted" ]; then
     local key

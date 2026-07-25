@@ -262,6 +262,62 @@ function writeCacheAtomic(cacheFile, content, warn) {
   }
 }
 
+// Build the systemMessage from FACTS: the routing-summary text (already
+// defanged/fenced by readRoutingSummary) plus a failure count and a list of
+// RAW candidate branch names. This is the only place fenceReferenceOnly is
+// called to build the failure line, and rawBranches is always run through
+// sanitizeBranchName (defang) here — regardless of whether it came from a
+// live `gh run list` fetch or from the last-check cache (see
+// parseCachedFacts below). Caching only ever stores what feeds INTO this
+// function, never its output, so a cache hit can no more bypass
+// sanitize/fence than a live fetch can. This also makes double-fencing
+// structurally impossible: fenced text (containing "--- begin/end ...
+// ---") is never a valid rawBranches entry, because nothing that has
+// already been through fenceReferenceOnly is ever written back into the
+// cache.
+function renderOutput(routingSummary, failureCount, rawBranches) {
+  const uniqueBranches = [...new Set(
+    rawBranches
+      .map(sanitizeBranchName)
+      // Re-filter: a name made entirely of stripped characters sanitizes
+      // to '', which would otherwise render as a stray ", " in the list.
+      .filter(Boolean)
+  )].sort();
+  const branches = uniqueBranches.join(', ');
+
+  let output = routingSummary || '';
+  if (failureCount > 0) {
+    const failureMsg = branches
+      ? `[yellow-ci] CI: ${failureCount} recent failure(s) on branch(es) ` +
+        fenceReferenceOnly('ci-branches', branches) +
+        ' Use /ci:diagnose to investigate.'
+      : `[yellow-ci] CI: ${failureCount} recent failure(s) detected. Use /ci:diagnose to investigate.`;
+    output = output ? `${output}\n${failureMsg}` : failureMsg;
+  }
+  return output;
+}
+
+// Parse and validate the last-check cache's JSON facts. Returns null on ANY
+// parse error or shape mismatch — including `JSON.parse('null')`, which
+// succeeds and yields `typeof null === 'object'`, so a bare object check
+// alone would not catch it — so the caller degrades to a cache miss. A
+// malformed or hostile cache file must fall back to a live fetch, never
+// crash the hook and never be trusted as pre-rendered text.
+function parseCachedFacts(content) {
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  if (!Number.isInteger(parsed.failureCount) || parsed.failureCount < 0) return null;
+  if (!Array.isArray(parsed.branches) || !parsed.branches.every((b) => typeof b === 'string')) {
+    return null;
+  }
+  return { failureCount: parsed.failureCount, branches: parsed.branches };
+}
+
 /**
  * @param {{cwd: string, env: NodeJS.ProcessEnv}} ctx
  * @returns {{systemMessage: string, stderr: string[]}}
@@ -294,29 +350,43 @@ function runSessionStart({ cwd, env }) {
   const newReadCacheFile = path.join(newCacheDir(env), cacheFileName);
   const readCacheFile = resolveCacheReadPath(env, cacheFileName);
 
-  // Cache freshness (60s TTL). A hit is trusted ONLY from the NEW location:
-  // that file is written exclusively by this Node runtime (see the assembly
-  // below), so its content is already sanitized/fenced. The legacy location
-  // can still hold raw text written by the deleted bash hook — which never
-  // sanitized branch names — for up to 60s after an upgrade; returning that
-  // verbatim would let attacker-controlled branch names bypass
-  // defangUntrustedText/fenceReferenceOnly and reach systemMessage unfenced.
-  // Treat a legacy-only hit as a miss so it falls through to a real fetch,
-  // which re-populates the new cache with sanitized output.
+  // Cache freshness (60s TTL). A hit is read ONLY from the NEW location: that
+  // file is written exclusively by this Node runtime (see the write below).
+  // The legacy location can still hold raw pre-sanitize text written by the
+  // deleted bash hook for up to 60s after an upgrade, so a legacy-only hit is
+  // treated as a miss and falls through to a real fetch, which re-populates
+  // the new cache.
   //
   // "Written exclusively by this runtime" does NOT mean "safe to trust
   // blindly": the filename is predictable (md5 of cwd) inside a
-  // user-writable directory, so another local process can still plant a
-  // symlink — or a same-uid regular file — at that exact path before this
-  // runtime gets there. readFreshOwnedFile refuses to follow a symlink and
-  // checks ownership; anything short of "a fresh regular file we own" is
-  // treated the same as "no cache file" below.
+  // user-writable directory, so another local process running as the SAME
+  // uid can still plant a file at that exact path — ownership alone cannot
+  // distinguish "we wrote this" from "another same-uid process wrote this".
+  // So the cache never stores a rendered message; it stores raw FACTS
+  // (failureCount + candidate branch names — see parseCachedFacts) and
+  // renderOutput() re-runs those facts through the identical sanitize/fence
+  // pipeline a live fetch uses, on EVERY read, regardless of who wrote the
+  // file. Hostile cache content can therefore only ever surface inside a
+  // reference-only fence, defanged, exactly like a hostile branch name from
+  // the GitHub API — it cannot bypass fencing no matter who planted it.
+  // readFreshOwnedFile's O_NOFOLLOW + ownership guard is kept as
+  // defense-in-depth (it still stops arbitrary-file disclosure via symlink
+  // before any of this parsing runs), it just isn't the only thing standing
+  // between a same-uid attacker and systemMessage anymore.
   if (readCacheFile === newReadCacheFile) {
     const cached = readFreshOwnedFile(readCacheFile, 60);
     if (cached.hit) {
-      if (cached.content !== null) return done(cached.content);
-      warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
-      return done(routingSummary);
+      if (cached.content === null) {
+        warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
+        return done(routingSummary);
+      }
+      const facts = parseCachedFacts(cached.content);
+      if (facts) {
+        return done(renderOutput(routingSummary, facts.failureCount, facts.branches));
+      }
+      // Malformed or wrong-shape JSON: fall through to a live fetch below,
+      // which re-populates the cache with valid facts. Do NOT emit the raw
+      // cache bytes and do NOT throw.
     }
     // no cache file, stale, a rejected symlink, or owned by someone else —
     // fall through to a real fetch, which re-populates the cache.
@@ -328,9 +398,13 @@ function runSessionStart({ cwd, env }) {
     return done(routingSummary);
   }
 
-  // Parse.
+  // Parse into FACTS only — failureCount plus RAW candidate branch names.
+  // Sanitizing/fencing happens exactly once, in renderOutput below, never
+  // here, so what gets cached at the bottom of this function is the same
+  // pre-render shape whether it's used now (live) or read back later (cache
+  // hit).
   let failureCount = 0;
-  let branches = '';
+  let rawBranches = [];
   const trimmed = failedJson.trim();
   if (trimmed !== '' && trimmed !== '[]' && trimmed !== 'null') {
     let parsed;
@@ -341,43 +415,30 @@ function runSessionStart({ cwd, env }) {
     }
     if (Array.isArray(parsed)) {
       failureCount = parsed.length;
-      const uniqueBranches = [...new Set(
-        parsed
-          .map((r) => r && r.headBranch)
-          .filter((b) => typeof b === 'string' && b.length > 0)
-          .map(sanitizeBranchName)
-          // Re-filter: a name made entirely of stripped characters sanitizes
-          // to '', which would otherwise render as a stray ", " in the list.
-          .filter(Boolean)
-      )].sort();
-      branches = uniqueBranches.join(', ');
+      rawBranches = parsed
+        .map((r) => r && r.headBranch)
+        .filter((b) => typeof b === 'string' && b.length > 0);
     } else {
       warn('[yellow-ci] Warning: Unexpected GitHub API response format');
       failureCount = 0;
     }
   }
 
-  // Assemble output: routing summary first, then a conditional failure line.
   // Branch names are attacker-controllable (anyone who can open a PR picks
-  // one) and this string lands in the SessionStart systemMessage, so the
-  // names are sanitized above and fenced as reference-only data here.
-  let output = routingSummary || '';
-  if (failureCount > 0) {
-    const failureMsg = branches
-      ? `[yellow-ci] CI: ${failureCount} recent failure(s) on branch(es) ` +
-        fenceReferenceOnly('ci-branches', branches) +
-        ' Use /ci:diagnose to investigate.'
-      : `[yellow-ci] CI: ${failureCount} recent failure(s) detected. Use /ci:diagnose to investigate.`;
-    output = output ? `${output}\n${failureMsg}` : failureMsg;
-  }
+  // one) and this string lands in the SessionStart systemMessage, so
+  // renderOutput sanitizes and fences them as reference-only data.
+  const output = renderOutput(routingSummary, failureCount, rawBranches);
 
-  // Write the result cache (best-effort). Create the plugin-data write dir only
-  // now — it is needed only for writing, so a mkdir failure must NOT suppress
-  // the freshly-computed output (the failure info still surfaces).
+  // Write the result cache (best-effort) as FACTS, not the rendered message
+  // — see the cache-hit comment above and parseCachedFacts/renderOutput.
+  // Create the plugin-data write dir only now — it is needed only for
+  // writing, so a mkdir failure must NOT suppress the freshly-computed
+  // output (the failure info still surfaces).
   const writeCacheDir = newCacheDir(env);
   try {
     fs.mkdirSync(writeCacheDir, { recursive: true });
-    writeCacheAtomic(path.join(writeCacheDir, cacheFileName), output, warn);
+    const cacheContent = JSON.stringify({ failureCount, branches: rawBranches });
+    writeCacheAtomic(path.join(writeCacheDir, cacheFileName), cacheContent, warn);
   } catch {
     warn(`[yellow-ci] Warning: Cannot create cache directory ${writeCacheDir}`);
   }
