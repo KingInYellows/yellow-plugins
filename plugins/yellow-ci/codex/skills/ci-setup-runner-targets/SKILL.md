@@ -131,8 +131,17 @@ RUNNER_JSON=$("$TIMEOUT_CMD" 15 gh api "repos/${OWNER}/${REPO}/actions/runners" 
 RUNNER_STATUS=$?
 ```
 
-Do not print, `cat`, or echo `$RUNNER_JSON` — carry it into the fencing step
-below.
+Do not print, `cat`, or echo `$RUNNER_JSON` — carry it into the gate below.
+
+If `$RUNNER_STATUS` is non-zero, the API call failed (auth error, rate limit,
+timeout, missing repo) and `$RUNNER_JSON` holds stderr text, not discovered
+runner data — stop here and fall back to the wizard (Step 3a) or YAML import
+(Step 3b) instead; do not format or fence `$RUNNER_JSON` in that case. Report
+that API discovery failed and let the user pick a fallback path via the same
+"How would you like to configure runner targets?" question. Only when
+`$RUNNER_STATUS` is zero does an empty `$RUNNER_JSON` mean "no registered
+runners found" — that genuine-empty case is not an error; continue below and
+handle it by prompting for JIT ephemeral pools as already documented.
 
 **Fence before use (mandatory).** Rewrite any literal `--- begin` / `--- end`
 sequence found inside `$RUNNER_JSON` so an embedded marker cannot terminate

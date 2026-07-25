@@ -24,6 +24,19 @@
 # Node runtime defangs it and wraps it in a reference-only fence, and those
 # goldens were re-captured to match.
 #
+# DELIBERATE DIVERGENCE (cache-hit / legacy-cache-not-trusted): the R38 cache
+# relocation gave the last-check result cache a read-only legacy fallback
+# (${HOME}/.cache/yellow-ci), and the port originally trusted a fresh hit from
+# EITHER location verbatim. But the legacy location can still hold raw text
+# written by the deleted bash hook — which never sanitized branch names — for
+# up to 60s after an upgrade, so a legacy-only hit could bypass
+# defangUntrustedText/fenceReferenceOnly entirely. The Node runtime now trusts
+# a cache hit only from the NEW (plugin-data) location, since that file is
+# written exclusively by this runtime and is already sanitized; `cache-hit`
+# was repointed to pre-seed the new location (still a genuine verbatim hit),
+# and `legacy-cache-not-trusted` was added to prove a legacy-only hit now
+# falls through to a live (mocked) fetch instead of being trusted.
+#
 # STDOUT is compared JSON-semantically (jq -S -c) because the bash hook emitted
 # jq's pretty multi-line JSON while the Node port emits compact JSON — the
 # decision is what must match, not the byte formatting. STDERR and EXIT_CODE are
@@ -85,7 +98,8 @@ assert_parity_both() {
 @test "SessionStart parity: routing-summary-absent" { assert_parity_both routing-summary-absent; }
 @test "SessionStart parity: gh-missing (routing only)" { assert_parity_both gh-missing; }
 @test "SessionStart parity: gh-unauthed (routing only)" { assert_parity_both gh-unauthed; }
-@test "SessionStart parity: cache-hit (via legacy read fallback)" { assert_parity_both cache-hit; }
+@test "SessionStart parity: cache-hit (new plugin-data location, trusted)" { assert_parity_both cache-hit; }
+@test "SessionStart parity: legacy-only cache hit is not trusted (falls through to live fetch)" { assert_parity_both legacy-cache-not-trusted; }
 @test "SessionStart parity: cache-miss-failures (routing + failure line)" { assert_parity_both cache-miss-failures; }
 @test "SessionStart parity: malformed-gh-json (routing only + stderr warning)" { assert_parity_both malformed-gh-json; }
 @test "SessionStart parity: rate-limited-gh (routing only)" { assert_parity_both rate-limited-gh; }

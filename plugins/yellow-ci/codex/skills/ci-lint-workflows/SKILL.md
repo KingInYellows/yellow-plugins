@@ -26,12 +26,61 @@ that file; otherwise lint every workflow under `.github/workflows/`.
 
 If the argument text after the skill name specifies a file:
 
-- **Validate the path** — reject if it contains `..`, starts with `/` or `~`,
-  or contains characters outside `[a-zA-Z0-9._/-]`. Respond: "Invalid file
-  path: must be a relative path within the repository."
-- Verify the resolved path is within `.github/workflows/`. Respond: "Path must
-  point to a file inside `.github/workflows/`."
-- Verify the file exists; respond "File not found: `<path>`" if missing.
+- **Validate the path before any `Read`/`Edit` — run this as a real check,
+  not as a reading comprehension exercise.** A named path can come from
+  attacker-influenced argument text, so validation that exists only as prose
+  for the model to honour is not a control. Run the function below via the
+  `Bash` tool and act on its exit status:
+
+```bash
+validate_workflow_path() {  # $1=path (relative, from argument text or a glob match)
+  local p="$1" workflows_dir target target_dir target_base resolved
+  [ -n "$p" ] || { printf '[yellow-ci] reject: empty path\n' >&2; return 1; }
+  printf '%s' "$p" | LC_ALL=C grep -q '[^[:print:]]' && {
+    printf '[yellow-ci] reject %s: control characters in path\n' "$p" >&2; return 1; }
+  case "$p" in
+    *..*|/*|~*|-*) printf '[yellow-ci] reject %s: unsafe path prefix\n' "$p" >&2; return 1 ;;
+  esac
+  printf '%s' "$p" | LC_ALL=C grep -Eq '^[a-zA-Z0-9._/-]+$' || {
+    printf '[yellow-ci] reject %s: disallowed characters in path\n' "$p" >&2; return 1; }
+  [ -e "$p" ] || { printf '[yellow-ci] reject %s: file not found\n' "$p" >&2; return 1; }
+  workflows_dir=$(cd .github/workflows 2>/dev/null && pwd -P) || {
+    printf '[yellow-ci] reject: .github/workflows not found\n' >&2; return 1; }
+  if [ -L "$p" ]; then
+    if command -v realpath >/dev/null 2>&1; then
+      target=$(realpath -- "$p" 2>/dev/null) || {
+        printf '[yellow-ci] reject %s: broken symlink\n' "$p" >&2; return 1; }
+    else
+      target=$(readlink -- "$p" 2>/dev/null) || {
+        printf '[yellow-ci] reject %s: broken symlink\n' "$p" >&2; return 1; }
+      case "$target" in
+        /*) : ;;
+        *) target="$(dirname -- "$p")/$target" ;;
+      esac
+    fi
+  else
+    target="$p"
+  fi
+  target_dir=$(cd -- "$(dirname -- "$target")" 2>/dev/null && pwd -P) || {
+    printf '[yellow-ci] reject %s: cannot resolve directory\n' "$p" >&2; return 1; }
+  target_base=$(basename -- "$target")
+  resolved="$target_dir/$target_base"
+  case "$resolved" in
+    "$workflows_dir"/*) : ;;
+    *) printf '[yellow-ci] reject %s: resolves outside .github/workflows/ (symlink escape)\n' "$p" >&2
+       return 1 ;;
+  esac
+  printf '%s\n' "$resolved"
+}
+```
+
+  A non-zero exit means reject the path; only the function's printed
+  resolved path — never the raw argument text — is passed to `Read`/`Edit`.
+  Map the reject reason to a response: "Invalid file path: must be a
+  relative path within the repository" for the prefix/character-class
+  checks; "Path must point to a file inside `.github/workflows/`" for a
+  containment failure (including a symlink escape); "File not found:
+  `<path>`" when the file does not exist.
 - Lint that file only for file-local rules; for W06/W07, also inspect the
   other workflow files needed to establish whether the repository uses
   self-hosted runners, without reporting findings from those files.
@@ -41,10 +90,13 @@ Otherwise:
 - Find all files matching `.github/workflows/*.yml` and
   `.github/workflows/*.yaml`.
 - If none found: "No workflow files found in `.github/workflows/`".
-- For each matched file, verify its resolved path is within
-  `.github/workflows/` (reject a symlink that resolves outside the
-  directory) before reading or editing it — the same check as the
-  named-file branch above.
+- Run `validate_workflow_path` (defined above) against each matched file too,
+  before reading or editing it — the same check as the named-file branch,
+  so a symlink inside the directory that resolves outside it is rejected the
+  same way. Unlike the named-file branch, a rejected glob match is skipped
+  (not a hard stop): note it in the report and continue with the remaining
+  files, since a single stray symlink should not block linting the rest of
+  the directory.
 
 ### Step 2: Read and Analyze
 

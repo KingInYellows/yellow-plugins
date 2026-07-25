@@ -81,16 +81,30 @@ hook_scenario_setup() {
     rate-limited-gh) export MOCK_GH_RUNLIST=ratelimit ;;
   esac
 
-  # cache-hit: pre-seed a fresh (age ~0, <60s TTL) result cache so gh is never
-  # consulted; the hook must echo the cached message verbatim.
-  if [ "$case" = "cache-hit" ]; then
+  # cache-hit: pre-seed a fresh (age ~0, <60s TTL) result cache in the NEW
+  # (plugin-data) location so gh is never consulted; the hook must echo the
+  # cached message verbatim. Only content written by this Node runtime lives
+  # here, so a hit is trusted as-is (see legacy-cache-not-trusted below for
+  # the untrusted counterpart).
+  #
+  # legacy-cache-not-trusted: pre-seed the same fresh result cache but ONLY in
+  # the LEGACY location — simulating a cache file still held over from the
+  # deleted bash hook right after an upgrade. That hook never sanitized branch
+  # names, so a legacy-only hit must NOT be trusted verbatim; the hook must
+  # fall through to a live (mocked) `gh run list` instead.
+  if [ "$case" = "cache-hit" ] || [ "$case" = "legacy-cache-not-trusted" ]; then
     local key
     if command -v md5sum >/dev/null 2>&1; then
       key=$(printf '%s' "$work" | md5sum | cut -c1-32)
     else
       key=$(printf '%s' "$work" | md5 -q | cut -c1-32)
     fi
-    printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$home/.cache/yellow-ci/last-check-$key"
+    if [ "$case" = "cache-hit" ]; then
+      mkdir -p "$home/.local/share/yellow-ci"
+      printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$home/.local/share/yellow-ci/last-check-$key"
+    else
+      printf '%s' "$HOOK_SCENARIO_CACHED_TEXT" >"$home/.cache/yellow-ci/last-check-$key"
+    fi
   fi
 
   # Set (not echo) the workdir so callers can invoke this directly and keep the

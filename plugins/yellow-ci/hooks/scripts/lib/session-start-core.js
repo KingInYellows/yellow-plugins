@@ -230,25 +230,33 @@ function runSessionStart({ cwd, env }) {
   }
 
   const cacheFileName = `last-check-${cacheKeyFor(cwd)}`;
+  const newReadCacheFile = path.join(newCacheDir(env), cacheFileName);
   const readCacheFile = resolveCacheReadPath(env, cacheFileName);
 
-  // Cache freshness (60s TTL). Read prefers the new location and falls back
-  // READ-ONLY to a legacy cache file (R38). Checked BEFORE creating the write
-  // dir, so a fresh cache (new OR legacy) is still served even when the new
-  // plugin-data dir cannot be created.
-  try {
-    const st = fs.statSync(readCacheFile);
-    const ageSec = Math.floor(Date.now() / 1000) - Math.floor(st.mtimeMs / 1000);
-    if (ageSec < 60) {
-      try {
-        return done(fs.readFileSync(readCacheFile, 'utf8'));
-      } catch {
-        warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
-        return done(routingSummary);
+  // Cache freshness (60s TTL). A hit is trusted ONLY from the NEW location:
+  // that file is written exclusively by this Node runtime (see the assembly
+  // below), so its content is already sanitized/fenced. The legacy location
+  // can still hold raw text written by the deleted bash hook — which never
+  // sanitized branch names — for up to 60s after an upgrade; returning that
+  // verbatim would let attacker-controlled branch names bypass
+  // defangUntrustedText/fenceReferenceOnly and reach systemMessage unfenced.
+  // Treat a legacy-only hit as a miss so it falls through to a real fetch,
+  // which re-populates the new cache with sanitized output.
+  if (readCacheFile === newReadCacheFile) {
+    try {
+      const st = fs.statSync(readCacheFile);
+      const ageSec = Math.floor(Date.now() / 1000) - Math.floor(st.mtimeMs / 1000);
+      if (ageSec < 60) {
+        try {
+          return done(fs.readFileSync(readCacheFile, 'utf8'));
+        } catch {
+          warn(`[yellow-ci] Warning: Cannot read cache file ${readCacheFile}`);
+          return done(routingSummary);
+        }
       }
+    } catch {
+      // no cache file — fall through to fetch
     }
-  } catch {
-    // no cache file — fall through to fetch
   }
 
   // Cache miss: fetch recent failed runs.
