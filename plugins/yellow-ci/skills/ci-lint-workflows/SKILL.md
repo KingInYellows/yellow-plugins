@@ -52,12 +52,12 @@ validate_workflow_path() {  # $1=path (relative, from argument text or a glob ma
       target=$(realpath -- "$p" 2>/dev/null) || {
         printf '[yellow-ci] reject %s: broken symlink\n' "$p" >&2; return 1; }
     else
-      target=$(readlink -- "$p" 2>/dev/null) || {
-        printf '[yellow-ci] reject %s: broken symlink\n' "$p" >&2; return 1; }
-      case "$target" in
-        /*) : ;;
-        *) target="$(dirname -- "$p")/$target" ;;
-      esac
+      # No realpath: a hand-rolled resolver can only ever dereference one hop
+      # at a time, so a chain (a.yml -> b.yml -> /outside) or a cycle
+      # (x.yml -> y.yml -> x.yml) would slip through a partial resolution.
+      # Fail closed instead of half-resolving.
+      printf '[yellow-ci] reject %s: symlink cannot be safely resolved without realpath\n' "$p" >&2
+      return 1
     fi
   else
     target="$p"
@@ -80,8 +80,9 @@ validate_workflow_path() {  # $1=path (relative, from argument text or a glob ma
   Map the reject reason to a response: "Invalid file path: must be a
   relative path within the repository" for the prefix/character-class
   checks; "Path must point to a file inside `.github/workflows/`" for a
-  containment failure (including a symlink escape); "File not found:
-  `<path>`" when the file does not exist.
+  containment failure (including a symlink escape or a symlink that cannot
+  be safely resolved); "File not found: `<path>`" when the file does not
+  exist.
 - Lint that file only for file-local rules; for W06/W07, also inspect the
   other workflow files needed to establish whether the repository uses
   self-hosted runners, without reporting findings from those files.

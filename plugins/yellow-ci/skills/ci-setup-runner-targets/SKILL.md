@@ -168,6 +168,34 @@ additional invisible (JIT ephemeral) pools, then fill in `type`, `mode`,
 labels pre-populated as `preferred_selector`, sourced only from the fenced,
 escaped values).
 
+**Validate discovered values (same rules as Step 3a).** A registered runner's
+`name` and `labels` are set by whoever registered it (see "Capture, never
+stream" above) and commonly contain spaces, uppercase letters, or other
+characters the wizard would reject. Validate every discovered runner against
+the identical Step 3a rules before it goes into the template — do not carry
+raw API values straight through:
+
+- `name` matches `^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$` (2-64, DNS-safe).
+- Each `preferred_selector` label matches `^[a-zA-Z0-9][a-zA-Z0-9._:-]*$`
+  (max 10 labels).
+- Once filled in, `best_for`/`avoid_for`/`notes` contain no literal `|` (see
+  Step 3a).
+- The 20-target / 20-rule maximum applies across discovered and
+  manually-added entries combined.
+
+On a validation failure, follow Error Handling below (report the rule and
+re-prompt) — with one addition specific to `name`: never silently normalize a
+non-conforming value (for example, lowercasing it or replacing spaces with
+hyphens). `name` is a matching key elsewhere — the per-repo override replaces
+a global entry by exact `name` match (see "Config locations" above), and the
+`runner-assignment` agent matches live GitHub inventory runners to
+`runner_targets` entries by exact `name` string to apply `best_for`/`avoid_for`
+scoring. Silently renaming risks collapsing two differently-named discovered
+runners onto the same normalized value, and always severs that exact-match
+link without telling the user. Instead, show the user the raw discovered
+`name`, propose a DNS-safe candidate as a starting point, and let them confirm
+or edit it before the runner is added to the template.
+
 ### Step 4: Preview and Confirm, Then Write and Regenerate Cache
 
 **Preview first (R32).** Render the exact canonical YAML and show it. Then ask

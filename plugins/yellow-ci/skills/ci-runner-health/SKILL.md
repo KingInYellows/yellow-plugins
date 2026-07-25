@@ -290,10 +290,22 @@ it into a variable — never let it stream directly to output — then run it
 through the same redaction-plus-fence-escape pipeline this plugin uses for CI
 log content before it is ever quoted or fenced:
 
+**Send the probe as a quoted heredoc, not a trailing argv** — matching the
+`HEALTH_OUT` probe in Step 4. If `'1 hour ago'` and `'actions.runner.*'` were
+passed as trailing arguments instead, the local shell would strip their
+quotes before OpenSSH ever sees them; OpenSSH then joins its remaining
+arguments with spaces into one command string for the remote shell, which
+re-splits `1 hour ago` into three words (`journalctl` fails to parse `1` as a
+timestamp) and re-globs `actions.runner.*` against the remote working
+directory. A quoted heredoc sends the command as one string over stdin, so
+the quotes survive intact for the remote shell to interpret:
+
 ```bash
 set -o pipefail
-RUNNER_LOG=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" -- \
-  journalctl -u 'actions.runner.*' --since '1 hour ago' --no-pager -n 20 2>&1)
+RUNNER_LOG=$("${TIMEOUT_CMD:-timeout}" 10 ssh "${ssh_opts[@]}" "$user@$host" 2>&1 << 'JOURNALPROBE'
+journalctl -u 'actions.runner.*' --since '1 hour ago' --no-pager -n 20
+JOURNALPROBE
+)
 JOURNAL_STATUS=$?
 # Reject a failed retrieval BEFORE redaction. Because stderr is folded in by
 # 2>&1, an auth/timeout/refused error would otherwise redact cleanly and then
