@@ -1,0 +1,70 @@
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_066c00e42464dc::t_c3e83401e89045 300-301,427-428,643-644
+  s_066c00e42464dc::t_20435f2ba953e5 203-216,219-247,302-330,425,429-457,484-497,515-559,562-572,645-673,821-829
+plugins/yellow-ci/hooks/scripts/lib/validate.sh
+  s_066c00e42464dc::t_671234798bd73f 683
+  s_066c00e42464dc::t_ceb6c243c413d5 725
+  s_066c00e42464dc::t_fb29b29dbf67f5 684-686
+  s_066c00e42464dc::t_f3f0b1634f9291 727-730
+  s_066c00e42464dc::t_bde61cc097340e 560-658
+  s_066c00e42464dc::t_e1a8e785b0725d 502-559
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_066c00e42464dc::t_3bdff853f2e7f2 62-67
+  s_066c00e42464dc::t_9976b344581a08 181,206-209,212-215,219
+  s_066c00e42464dc::t_92de60b2a334c7 86-91
+  s_066c00e42464dc::t_200e69559ba99b 231-235,238-246
+  s_066c00e42464dc::t_139859f13aff57 95-106,109-112,123-126
+  s_066c00e42464dc::t_5a1cee046bdd32 283-287,293
+  s_066c00e42464dc::t_6c9bdbf8f87f50 150,160-163,166-169,173
+  s_066c00e42464dc::t_be32fa0187ec50 236-237
+plugins/yellow-ci/codex/skills/ci-status/SKILL.md
+  s_066c00e42464dc::t_f4ada41854d727 35-39,50-53,55-64,68-71,73-76,99-100,105-107
+plugins/yellow-ci/hooks/scripts/lib/session-start-core.js
+  s_066c00e42464dc::t_88e3a2ca9f0951 377-388
+  s_066c00e42464dc::t_2ba27feef88c86 292-299,304-306
+  s_066c00e42464dc::t_992d3e9d1cfd17 391-401
+  s_066c00e42464dc::t_7d5c71ea37e0a0 538-542
+  s_066c00e42464dc::t_850f865550f6ed 106-114
+  s_066c00e42464dc::t_1d5b89202336b9 255-268
+  s_066c00e42464dc::t_95e74555cdb115 269-274
+plugins/yellow-ci/tests/fake-exec.bats
+  s_066c00e42464dc::t_7ce23c12af5b0e 113-182,261-316
+  s_066c00e42464dc::t_69e72d066871c4 183-260
+plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md
+  s_066c00e42464dc::t_f4ada41854d727 112-122,125-139,151,165-166,170-175,178-186,190-200
+  s_066c00e42464dc::t_5775faa4f276f4 203-207
+  s_066c00e42464dc::t_89ddffb83b34b9 156-161,167-169,187-189
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_066c00e42464dc::t_6a09f3f26c27cc 822-830
+  s_066c00e42464dc::t_47a563d8c9fcf3 426
+  s_066c00e42464dc::t_0cd4d4e59d57ec 204-217
+  s_066c00e42464dc::t_a66e75f812e917 220-248,303-331,430-458,646-674
+  s_066c00e42464dc::t_3d055860a30ff3 301-302,428-429,644-645
+  s_066c00e42464dc::t_28a7cdb0e4bc6f 485-498,516-560,563-573
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_066c00e42464dc::t_f4ada41854d727 61-66,85-90,94-105,108-111,122-125,149,159-162,165-168,172,180,205-208,211-214,218,230-245,282-286,292
+plugins/yellow-ci/skills/ci-status/SKILL.md
+  s_066c00e42464dc::t_ff9ee1af5ab4c8 36-40,51-54,56-65,69-72,74-77
+  s_066c00e42464dc::t_1ad50b6f90e9b5 100-101,106-108
+plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md
+  s_066c00e42464dc::t_57f62791686b56 113-123,126-140,152,166-167,171-176,179-187,191-201
+  s_066c00e42464dc::t_3ee33134988a89 206-208
+  s_066c00e42464dc::t_8d2029311e7ace 157-162,168-170,188-190
+  s_066c00e42464dc::t_9be0d7eff29334 204-205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "47cf0fbee3f0fb4cc1c2c200a48c55207f1501c8",
+  "prompts": {},
+  "sessions": {
+    "s_066c00e42464dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c9f67e6-baf0-4ff2-af6d-1bdfa914191e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
