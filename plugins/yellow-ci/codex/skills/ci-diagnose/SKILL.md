@@ -217,25 +217,36 @@ verbatim:
 ```bash
 REDACTED_LOG=$(
   set -o pipefail
+  # Protection is tied to PROVENANCE, not marker shape: each specific rule
+  # below tags the marker it creates with a sentinel (\x01) in place of the
+  # leading '[' at the moment of creation, so only markers *this pipeline*
+  # produced survive to the RESTORE step. A value that merely looks like a
+  # marker (forged input, or raw log content already reading
+  # `key=[REDACTED...]`) was never tagged and falls through to the catch-all
+  # like any other secret-shaped value — closing the gap where a
+  # marker-shaped prefix followed by `.moretext` used to make the catch-all
+  # skip the tagged span and leave a real secret suffix exposed. SCRUB
+  # (first line) strips any caller-supplied \x01 so the sentinel can't be
+  # forged from the input. Mirrors `redact_secrets` in
+  # `hooks/scripts/lib/redact.sh`.
   printf '%s' "$LOG_CONTENT" | sed \
     -e 's/\x01/?/g' \
-    -e 's/ghp_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
-    -e 's/ghs_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
-    -e 's/gho_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
-    -e 's/ghr_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
-    -e 's/ghu_[A-Za-z0-9_]\{36,255\}/[REDACTED:github-token]/g' \
-    -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/[REDACTED:github-pat]/g' \
-    -e 's/AKIA[0-9A-Z]\{16\}/[REDACTED:aws-access-key]/g' \
-    -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=[REDACTED:aws-secret]/gI' \
+    -e 's/ghp_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+    -e 's/ghs_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+    -e 's/gho_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+    -e 's/ghr_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+    -e 's/ghu_[A-Za-z0-9_]\{36,255\}/\x01REDACTED:github-token]/g' \
+    -e 's/github_pat_[A-Za-z0-9_]\{22,255\}/\x01REDACTED:github-pat]/g' \
+    -e 's/AKIA[0-9A-Z]\{16\}/\x01REDACTED:aws-access-key]/g' \
+    -e 's/\(aws_secret_access_key\|AWS_SECRET_ACCESS_KEY\)[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+=]\{40,\}/\1=\x01REDACTED:aws-secret]/gI' \
     -e 's/Bearer[[:space:]]\+[A-Za-z0-9._-]\{20,\}/Bearer [REDACTED]/g' \
-    -e 's/dckr_pat_[A-Za-z0-9_-]\{32,\}/[REDACTED:docker-token]/g' \
-    -e 's/npm_[A-Za-z0-9]\{36\}/[REDACTED:npm-token]/g' \
-    -e 's/pypi-[A-Za-z0-9_-]\{32,\}/[REDACTED:pypi-token]/g' \
-    -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/[REDACTED:jwt]/g' \
-    -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=[REDACTED:url-param]/gI' \
+    -e 's/dckr_pat_[A-Za-z0-9_-]\{32,\}/\x01REDACTED:docker-token]/g' \
+    -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
+    -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
+    -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
+    -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
-    -e 's/\(password\|secret\|token\|key\|credential\)\([[:space:]]*[=:][[:space:]]*\)\[REDACTED\(:[a-z-]\{1,\}\)\{0,1\}\]\([^[:alnum:]_]\|$\)/\1\2\x01REDACTED\3]\4/gI' \
     -e 's/\(password\|secret\|token\|key\|credential\)[[:space:]]*[=:][[:space:]]*[^\x01[:space:]][^[:space:]]\{7,\}/\1=[REDACTED]/gI' \
     -e 's/\x01REDACTED/[REDACTED/g' \
     | sed -e 's/--- begin/[ESCAPED] begin/g' -e 's/--- end/[ESCAPED] end/g'
