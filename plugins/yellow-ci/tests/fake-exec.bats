@@ -359,6 +359,111 @@ YAML
   [ "$status" -ne 0 ]
 }
 
+@test "runner-target validation: quoted routing rules with hostile content accepted" {
+  cfg="$BATS_TEST_TMPDIR/quoted-hostile.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+routing_rules:
+  - "owner: platform"
+  - "# urgent"
+  - "- leading dash"
+  - "*star"
+  - "yes"
+  - "1.2.3"
+  - "embedded \"quote\""
+  - "embedded \\backslash\\"
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: unquoted routing rule with ': ' rejected (would parse as a mapping)" {
+  cfg="$BATS_TEST_TMPDIR/unquoted-mapping.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+routing_rules:
+  - owner: platform
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mapping"* ]]
+}
+
+@test "runner-target validation: unquoted routing rule starting with '#' rejected (would truncate as a comment)" {
+  cfg="$BATS_TEST_TMPDIR/unquoted-comment.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - # urgent\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant character"* ]]
+}
+
+@test "runner-target validation: unquoted routing rule starting with '-' rejected" {
+  cfg="$BATS_TEST_TMPDIR/unquoted-leading-dash.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - - leading dash\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant character"* ]]
+}
+
+@test "runner-target validation: unquoted routing rule starting with '*' rejected" {
+  cfg="$BATS_TEST_TMPDIR/unquoted-star.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - *star\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant character"* ]]
+}
+
+@test "runner-target validation: unquoted routing rule 'yes' rejected (boolean literal)" {
+  cfg="$BATS_TEST_TMPDIR/unquoted-yes.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - yes\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"boolean/null literal"* ]]
+}
+
+@test "runner-target validation: unquoted routing rule '1.2.3' rejected (numeric-looking)" {
+  cfg="$BATS_TEST_TMPDIR/unquoted-numeric.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - 1.2.3\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"looks numeric"* ]]
+}
+
+@test "runner-target validation: malformed quoted routing rule (unescaped inner quote) rejected" {
+  cfg="$BATS_TEST_TMPDIR/malformed-quote.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - "bad "quote" here"\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Malformed quoted routing rule"* ]]
+}
+
+@test "runner-target validation: malformed quoted routing rule (unsupported escape) rejected" {
+  cfg="$BATS_TEST_TMPDIR/malformed-escape.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - "line\\nbreak"\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Malformed quoted routing rule"* ]]
+}
+
+@test "runner-target validation: safe unquoted routing rule still accepted (no runner_targets section)" {
+  cfg="$BATS_TEST_TMPDIR/local-override-safe.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+routing_rules:
+  - prefer pool:atlas for everything
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: unsafe unquoted routing rule rejected on a routing_rules-only (local override) file" {
+  cfg="$BATS_TEST_TMPDIR/local-override-unsafe.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - owner: platform\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"mapping"* ]]
+}
+
 @test "non-Linux probe rejection + probe orchestration are markdown-scoped (not executable)" {
   skip "The runner-health probe orchestration and the 'Linux runner targets only' skip live in skills/ci-runner-health/SKILL.md — LLM-interpreted markdown, not executable shell; review-gated (mirrors gt-workflow's documented bats scope limitation)."
 }

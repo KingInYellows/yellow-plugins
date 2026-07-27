@@ -333,3 +333,72 @@ more log"
   [[ "$result" == *"[REDACTED]"* ]]
   [[ "$result" != *"therealsecretvalue123456"* ]]
 }
+
+# --- Quoted values with embedded whitespace ---
+#
+# The generic catch-all's value pattern is a single contiguous non-whitespace
+# run, so a shell-style `PASSWORD="two words"` assignment only ever matches
+# (at most) the first token, leaking the remainder in cleartext. These guard
+# the quoted-value rules that handle complete double- and single-quoted
+# values, including embedded whitespace, for assignment forms and
+# dash-prefixed flag forms.
+
+@test "redact: double-quoted password with embedded whitespace" {
+  result=$(echo 'PASSWORD="short secret suffix"' | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"short"* ]]
+  [[ "$result" != *"secret suffix"* ]]
+}
+
+@test "redact: single-quoted token with embedded whitespace" {
+  result=$(echo "TOKEN='a b c'" | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"a b c"* ]]
+}
+
+@test "redact: export-prefixed double-quoted api key with embedded whitespace" {
+  result=$(echo 'export API_KEY="multi word value here"' | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"multi word value here"* ]]
+}
+
+@test "redact: long-flag quoted password with embedded whitespace" {
+  result=$(echo '--password "spaced secret"' | redact_secrets)
+  [[ "$result" == *"--password=[REDACTED:quoted]"* ]]
+  [[ "$result" != *"spaced secret"* ]]
+}
+
+@test "redact: short -p flag quoted password with embedded whitespace" {
+  result=$(echo 'mysql -u root -p "spaced secret" mydb' | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"spaced secret"* ]]
+  [[ "$result" == *"mydb"* ]]
+}
+
+@test "redact: unquoted single-token password is still fully redacted (no regression)" {
+  result=$(echo "PASSWORD=nospaces12345" | redact_secrets)
+  [[ "$result" == *"[REDACTED]"* ]]
+  [[ "$result" != *"nospaces12345"* ]]
+}
+
+@test "redact: colon-separated quoted secret" {
+  result=$(echo 'secret: "a value with spaces"' | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"a value with spaces"* ]]
+}
+
+@test "redact: two quoted secrets on one line both redacted" {
+  result=$(echo 'PASSWORD="a b" TOKEN="c d"' | redact_secrets)
+  [[ "$result" != *"a b"* ]]
+  [[ "$result" != *"c d"* ]]
+}
+
+@test "no-redact: quoted benign value with 'key' does not trigger (word not in denylist)" {
+  result=$(echo 'Cache key "linux-x64-node20-abc123" restored successfully' | redact_secrets)
+  [[ "$result" == 'Cache key "linux-x64-node20-abc123" restored successfully' ]]
+}
+
+@test "no-redact: quoted benign value after bare 'auth' substring without operator or dash" {
+  result=$(echo 'Configuring OAuth "scope1 scope2" provider' | redact_secrets)
+  [[ "$result" == 'Configuring OAuth "scope1 scope2" provider' ]]
+}

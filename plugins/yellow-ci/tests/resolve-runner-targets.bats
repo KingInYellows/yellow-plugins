@@ -117,6 +117,42 @@ write_config() {
   grep -q "atlas" "$CACHE_DIR/runner-targets-merged.json"
 }
 
+@test "resolve_runner_targets: quoted hostile routing rules round-trip verbatim through the merged cache" {
+  {
+    printf 'schema: 1\n'
+    printf 'runner_targets:\n'
+    printf '  - name: ares\n'
+    printf '    type: pool\n'
+    printf '    mode: jit_ephemeral\n'
+    printf '    preferred_selector:\n'
+    printf '      - self-hosted\n'
+    printf 'routing_rules:\n'
+    printf '  - "owner: platform"\n'
+    printf '  - "# urgent"\n'
+    printf '  - "- leading dash"\n'
+    printf '  - "*star"\n'
+    printf '  - "yes"\n'
+    printf '  - "1.2.3"\n'
+    printf '  - "embedded \\"quote\\""\n'
+    printf '  - "embedded \\\\backslash\\\\"\n'
+  } > "$GLOBAL_CFG"
+  run resolve_runner_targets
+  [ "$status" -eq 0 ]
+  if command -v jq >/dev/null 2>&1; then
+    run jq -e '.routing_rules == [
+      "owner: platform",
+      "# urgent",
+      "- leading dash",
+      "*star",
+      "yes",
+      "1.2.3",
+      "embedded \"quote\"",
+      "embedded \\backslash\\"
+    ]' "$CACHE_DIR/runner-targets-merged.json"
+    [ "$status" -eq 0 ]
+  fi
+}
+
 @test "resolve_runner_targets: stale cache is removed when config disappears" {
   write_config "$GLOBAL_CFG" "ares"
   resolve_runner_targets

@@ -101,8 +101,9 @@ Validate the content against the runner-targets schema: `schema: 1`; each
 target has a DNS-safe `name`, a `type` of `pool`/`static-family`/`static-host`,
 a `mode` of `jit_ephemeral`/`persistent`, `preferred_selector` labels matching
 `^[a-zA-Z0-9][a-zA-Z0-9._:-]*$`, `best_for`/`avoid_for`/`notes` values
-containing no literal `|` or `,` (see Step 3a), and at most 20 targets / 20
-rules.
+containing no literal `|` or `,` (see Step 3a), each `routing_rules` item is
+either a double-quoted scalar (see Step 4) or otherwise free of the
+YAML-significant shapes listed there, and at most 20 targets / 20 rules.
 Config files must use canonical format (2-space indent, block sequences only —
 no flow syntax `[a, b]`, no multi-line scalars, no tabs). On failure, report
 the specific error and re-prompt; on success, show a parsed summary.
@@ -253,11 +254,30 @@ runner_targets:
     notes:
       - [note1]
 routing_rules:
-  - [rule1]
+  - "[rule1]"
 ```
 
 Omit `best_for`/`avoid_for`/`notes` entirely when empty (never write empty
 arrays). Obtain the timestamp with `date -u +%Y-%m-%dT%H:%M:%SZ`.
+
+**Quote every routing rule.** Routing rules are free-form prose typed
+by the user, so render each one as a double-quoted YAML scalar, never as a
+bare word list item — do this unconditionally for every rule, regardless of
+its content, rather than trying to decide case by case whether a given rule
+"needs" it. To render a rule: escape every literal `\` as `\\` first, then
+escape every literal `"` as `\"` (that order matters — escaping quotes first
+would double-escape the backslashes just introduced), then wrap the escaped
+text in `"..."`. Unquoted free text can otherwise be read by a YAML parser as
+something other than the literal string the user typed: a rule starting with
+`-`, `*`, `&`, `!`, `|`, `>`, `%`, `@`, backtick, or `#` changes what kind of
+YAML node it is; one containing `: ` (colon-space) turns the list item into a
+mapping (`owner: platform` becomes a nested object, not a string); one
+containing ` #` mid-rule gets truncated at the `#` as a comment; and a rule
+that is exactly `yes`/`no`/`true`/`false`/`on`/`off`/`null` (any case) or that
+looks like a bare number (`1.2.3`) resolves to a boolean, null, or numeric
+value instead of a string. Quoting sidesteps all of these. The executable
+validator enforces this on read — a hand-edited file with an unquoted rule
+matching any of the shapes above is rejected rather than silently misparsed.
 
 After writing, the plugin's merged routing cache (the routing-summary the
 session-start hook reads, plus the merged-config JSON) needs to be

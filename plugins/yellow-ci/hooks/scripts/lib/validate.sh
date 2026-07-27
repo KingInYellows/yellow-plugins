@@ -700,6 +700,97 @@ _rt_check_target_counts() {
   return 0
 }
 
+# Extract routing_rules item values from a runner targets file, one per
+# line, with only the leading "- " sequence marker stripped (mirrors
+# resolve-runner-targets.sh's rt_extract_rules() extraction exactly, so this
+# validator sees precisely what that reader will see — including a quoted
+# scalar's surrounding quote characters, still present at this point).
+# Usage: _rt_extract_routing_rule_values "$filepath"
+# Output: one raw routing_rules value per line
+_rt_extract_routing_rule_values() {
+  local filepath="$1"
+  sed -n '/^routing_rules:/,/^[a-z]/{
+    /^[[:space:]]*-[[:space:]]/{ s/^[[:space:]]*-[[:space:]]*//; s/[[:space:]]*$//; p; }
+  }' "$filepath"
+}
+
+# Reject a routing_rules item that would be misread by a real YAML parser
+# instead of the plugin's own bash reader. The setup skill (SKILL.md Step 4)
+# always writes every routing rule as a double-quoted scalar (escaping `\`
+# and `"`), so this accepts that canonical quoted form outright. For
+# backward compatibility with already-written or hand-edited files, it also
+# accepts an UNQUOTED value as long as it isn't one of the shapes a YAML
+# parser would read as something other than the literal string: a leading
+# indicator character, an implicit mapping (": "  or a trailing bare ":"),
+# a comment truncation (" #"), a boolean/null literal, or a bare number.
+# Tightening this to require quoting unconditionally would reject
+# already-valid unquoted rules like "prefer pool:ares for heavy CI" (see
+# tests/fake-exec.bats / tests/resolve-runner-targets.bats fixtures) — the
+# asymmetry (writer always quotes, reader/validator also allows hazard-free
+# unquoted) is intentional, not a gap.
+# Returns 0 if every routing_rules item is safe, 1 on the first unsafe item
+# (error on stderr).
+_rt_check_routing_rules() {
+  local filepath="$1"
+  local value lower
+
+  while IFS= read -r value; do
+    case "$value" in
+      \"*)
+        # Quoted scalar: must be well-formed — starts and ends with an
+        # unescaped double quote, body using only \\ / \" escapes (nothing
+        # else, e.g. \n, is supported — matches what SKILL.md Step 4 emits).
+        if ! printf '%s' "$value" | grep -qP '^"(?:[^"\\]|\\\\|\\")*"$'; then
+          printf '[yellow-ci] Error: Malformed quoted routing rule (unescaped quote or unsupported escape): %s\n' "$value" >&2
+          return 1
+        fi
+        continue
+        ;;
+    esac
+
+    # Unquoted: reject a leading YAML indicator character.
+    case "$value" in
+      -*|'*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*)
+        printf '[yellow-ci] Error: Unquoted routing rule starts with a YAML-significant character (quote it): %s\n' "$value" >&2
+        return 1
+        ;;
+    esac
+
+    # Unquoted: reject an implicit mapping (": " anywhere, or a trailing ":").
+    case "$value" in
+      *': '*|*:)
+        printf '[yellow-ci] Error: Unquoted routing rule contains ": " or ends with ":" (parses as a YAML mapping, not a string): %s\n' "$value" >&2
+        return 1
+        ;;
+    esac
+
+    # Unquoted: reject a mid-rule comment start (" #").
+    case "$value" in
+      *' #'*)
+        printf '[yellow-ci] Error: Unquoted routing rule contains " #" (parses as a YAML comment): %s\n' "$value" >&2
+        return 1
+        ;;
+    esac
+
+    # Unquoted: reject a bare YAML 1.1 boolean/null literal (any case).
+    lower=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
+    case "$lower" in
+      yes|no|true|false|on|off|null|'~')
+        printf '[yellow-ci] Error: Unquoted routing rule is a YAML boolean/null literal (quote it): %s\n' "$value" >&2
+        return 1
+        ;;
+    esac
+
+    # Unquoted: reject a bare number (e.g. "1.2.3" resolves to a non-string).
+    if printf '%s' "$value" | grep -qE '^[+-]?[0-9]+(\.[0-9]+)*([eE][+-]?[0-9]+)?$'; then
+      printf '[yellow-ci] Error: Unquoted routing rule looks numeric (quote it): %s\n' "$value" >&2
+      return 1
+    fi
+  done < <(_rt_extract_routing_rule_values "$filepath")
+
+  return 0
+}
+
 # Validate a runner targets YAML file for structural correctness
 # Checks: file exists, size < 32KB, has schema: 1, has runner_targets section,
 # every target has type/mode/preferred_selector present, name/type/mode/
@@ -738,7 +829,12 @@ validate_runner_targets_file() {
       printf '[yellow-ci] Error: File must have runner_targets and/or routing_rules\n' >&2
       return 1
     fi
-    # routing_rules-only file — skip runner validation, return success.
+    # routing_rules-only file — skip runner validation, but still enforce
+    # the 20-rule cap and per-rule scalar safety below (a per-repo override
+    # is typically rules-only, so this is the common path for a hand-edited
+    # unsafe rule, not an edge case).
+    _rt_check_target_counts "$filepath" || return 1
+    _rt_check_routing_rules "$filepath" || return 1
     return 0
   fi
 
@@ -749,6 +845,7 @@ validate_runner_targets_file() {
   _rt_check_runner_modes "$filepath" || return 1
   _rt_check_selector_labels "$filepath" || return 1
   _rt_check_metadata_delimiters "$filepath" || return 1
+  _rt_check_routing_rules "$filepath" || return 1
 
   return 0
 }

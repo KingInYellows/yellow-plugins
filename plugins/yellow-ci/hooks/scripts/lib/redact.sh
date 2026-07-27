@@ -62,6 +62,19 @@ redact_secrets() {
   # pipeline (ci-diagnose, ci-runner-health SKILL.md) rather than leave a
   # silent-failure path here even though it is out of documented scope.
   # tests/redaction.bats covers the forged-marker and injected-sentinel cases.
+  #
+  # Quoted values with embedded whitespace: the generic catch-all's value
+  # pattern is a single contiguous non-whitespace run, so a shell-style
+  # `PASSWORD="two words"` assignment only ever matches (at most) the first
+  # token, leaking the rest in cleartext. The quoted-value rules below handle
+  # complete double- and single-quoted values for assignment forms (`KEY=`,
+  # `KEY:`, `export KEY=`) and dash-prefixed flag forms (`--password X`,
+  # `-p X`), tagged `[REDACTED:quoted]` per the same provenance scheme as the
+  # rest of this pipeline. The denylist deliberately omits a bare `key` (only
+  # `api_key`/`private_key` compounds) so ordinary phrases like `Cache key
+  # "linux-x64"` are not swept up; flag-form matching requires a literal
+  # leading `-`/`--` so bare words like `auth` in prose (`OAuth "scope"`)
+  # don't match without an operator or dash.
   local sed_cmd
   if sed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
     sed_cmd=sed
@@ -89,6 +102,12 @@ redact_secrets() {
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
+    -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"[^"\x01]*"/\1=\x01REDACTED:quoted]/gI' \
+    -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'[^'\x01]*'/\1=\x01REDACTED:quoted]/gI" \
+    -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"[^"\x01]*"/\1\2=\x01REDACTED:quoted]/gI' \
+    -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'[^'\x01]*'/\1\2=\x01REDACTED:quoted]/gI" \
+    -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"[^"\x01]*"/\1-p \x01REDACTED:quoted]/gI' \
+    -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'[^'\x01]*'/\1-p \x01REDACTED:quoted]/gI" \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
