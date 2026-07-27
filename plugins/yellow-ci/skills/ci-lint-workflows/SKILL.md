@@ -30,8 +30,12 @@ If the argument text after the skill name specifies a file:
 - **Validate the path before any `Read`/`Edit` — run this as a real check,
   not as a reading comprehension exercise.** A named path can come from
   attacker-influenced argument text, so validation that exists only as prose
-  for the model to honour is not a control. Run the function below via the
-  `Bash` tool and act on its exit status:
+  for the model to honour is not a control. Substitute the real candidate
+  path into `CANDIDATE=` and run the whole block below — definition plus
+  invocation — in one `Bash` tool call. Defining the function without also
+  calling it validates nothing and prints nothing; a function defined in one
+  `Bash` call does not exist in a later one, so define-and-call must always
+  happen together:
 
 ```bash
 validate_workflow_path() {  # $1=path (relative, from argument text or a glob match)
@@ -73,32 +77,102 @@ validate_workflow_path() {  # $1=path (relative, from argument text or a glob ma
   esac
   printf '%s\n' "$resolved"
 }
+
+# Substitute the real candidate path from the argument text, then run this
+# whole block (definition + call) in one Bash tool call.
+CANDIDATE="<the path named in the argument text>"
+if RESOLVED=$(validate_workflow_path "$CANDIDATE"); then
+  printf 'STATUS=ok RESOLVED=%s\n' "$RESOLVED"
+else
+  printf 'STATUS=reject\n'
+  exit 1
+fi
 ```
 
-  A non-zero exit means reject the path; only the function's printed
-  resolved path — never the raw argument text — is passed to `Read`/`Edit`.
-  Map the reject reason to a response: "Invalid file path: must be a
-  relative path within the repository" for the prefix/character-class
-  checks; "Path must point to a file inside `.github/workflows/`" for a
-  containment failure (including a symlink escape or a symlink that cannot
-  be safely resolved); "File not found: `<path>`" when the file does not
-  exist.
+  Gate on the printed `STATUS=` line — nothing survives from this call into
+  the next tool call, so never gate on a shell variable instead. `STATUS=ok
+  RESOLVED=<path>` means proceed: pass exactly that printed `<path>` — never
+  the raw argument text — to `Read`/`Edit`. `STATUS=reject` means reject the
+  path; map the reason `validate_workflow_path` printed to stderr to a
+  response: "Invalid file path: must be a relative path within the
+  repository" for the prefix/character-class checks; "Path must point to a
+  file inside `.github/workflows/`" for a containment failure (including a
+  symlink escape or a symlink that cannot be safely resolved); "File not
+  found: `<path>`" when the file does not exist.
 - Lint that file only for file-local rules; for W06/W07, also inspect the
   other workflow files needed to establish whether the repository uses
   self-hosted runners, without reporting findings from those files.
 
 Otherwise:
 
-- Find all files matching `.github/workflows/*.yml` and
-  `.github/workflows/*.yaml`.
-- If none found: "No workflow files found in `.github/workflows/`".
-- Run `validate_workflow_path` (defined above) against each matched file too,
-  before reading or editing it — the same check as the named-file branch,
-  so a symlink inside the directory that resolves outside it is rejected the
-  same way. Unlike the named-file branch, a rejected glob match is skipped
-  (not a hard stop): note it in the report and continue with the remaining
-  files, since a single stray symlink should not block linting the rest of
-  the directory.
+- Run the block below in one `Bash` tool call. It enumerates every
+  `.github/workflows/*.yml` and `*.yaml` file and validates each in the same
+  subprocess as the function definition — for the same reason as above, a
+  function defined in an earlier call would not exist here, so discovery,
+  validation, and printing all happen together:
+
+```bash
+validate_workflow_path() {  # $1=path (relative, from argument text or a glob match)
+  local p="$1" workflows_dir target target_dir target_base resolved
+  [ -n "$p" ] || { printf '[yellow-ci] reject: empty path\n' >&2; return 1; }
+  printf '%s' "$p" | LC_ALL=C grep -q '[^[:print:]]' && {
+    printf '[yellow-ci] reject %s: control characters in path\n' "$p" >&2; return 1; }
+  case "$p" in
+    *..*|/*|~*|-*) printf '[yellow-ci] reject %s: unsafe path prefix\n' "$p" >&2; return 1 ;;
+  esac
+  printf '%s' "$p" | LC_ALL=C grep -Eq '^[a-zA-Z0-9._/-]+$' || {
+    printf '[yellow-ci] reject %s: disallowed characters in path\n' "$p" >&2; return 1; }
+  [ -e "$p" ] || { printf '[yellow-ci] reject %s: file not found\n' "$p" >&2; return 1; }
+  workflows_dir=$(cd .github/workflows 2>/dev/null && pwd -P) || {
+    printf '[yellow-ci] reject: .github/workflows not found\n' >&2; return 1; }
+  if [ -L "$p" ]; then
+    if command -v realpath >/dev/null 2>&1; then
+      target=$(realpath -- "$p" 2>/dev/null) || {
+        printf '[yellow-ci] reject %s: broken symlink\n' "$p" >&2; return 1; }
+    else
+      printf '[yellow-ci] reject %s: symlink cannot be safely resolved without realpath\n' "$p" >&2
+      return 1
+    fi
+  else
+    target="$p"
+  fi
+  target_dir=$(cd -- "$(dirname -- "$target")" 2>/dev/null && pwd -P) || {
+    printf '[yellow-ci] reject %s: cannot resolve directory\n' "$p" >&2; return 1; }
+  target_base=$(basename -- "$target")
+  resolved="$target_dir/$target_base"
+  case "$resolved" in
+    "$workflows_dir"/*) : ;;
+    *) printf '[yellow-ci] reject %s: resolves outside .github/workflows/ (symlink escape)\n' "$p" >&2
+       return 1 ;;
+  esac
+  printf '%s\n' "$resolved"
+}
+
+matched=0
+for p in .github/workflows/*.yml .github/workflows/*.yaml; do
+  # An unmatched glob literal (no hits) is neither a symlink nor an existing
+  # path, so `continue`s here. `-e` alone would also skip a *broken* symlink
+  # (its target is gone, so `-e` is false too) — silently dropping it with no
+  # STATUS line instead of letting validate_workflow_path report it as a
+  # rejected broken symlink. `-L` catches that case before `-e` can hide it.
+  [ -L "$p" ] || [ -e "$p" ] || continue
+  matched=1
+  if RESOLVED=$(validate_workflow_path "$p"); then
+    printf 'STATUS=ok FILE=%s RESOLVED=%s\n' "$p" "$RESOLVED"
+  else
+    printf 'STATUS=reject FILE=%s\n' "$p"
+  fi
+done
+[ "$matched" -eq 1 ] || printf 'STATUS=none\n'
+```
+
+  `STATUS=none` means "No workflow files found in `.github/workflows/`" —
+  stop here. Otherwise, act on each printed line: `STATUS=ok FILE=...
+  RESOLVED=...` means lint that `RESOLVED` path; `STATUS=reject FILE=...`
+  means skip that file (note it in the report) and continue with the rest —
+  unlike the named-file branch, a rejected glob match is not a hard stop,
+  since a single stray symlink should not block linting the rest of the
+  directory.
 
 ### Step 2: Read and Analyze
 
