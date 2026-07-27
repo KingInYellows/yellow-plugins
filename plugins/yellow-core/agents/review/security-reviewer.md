@@ -141,6 +141,7 @@ line, finding, fix, confidence). No prose outside the structured output.
       "confidence": 75
     }
   ],
+  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
   "residual_risks": [],
   "testing_gaps": []
 }
