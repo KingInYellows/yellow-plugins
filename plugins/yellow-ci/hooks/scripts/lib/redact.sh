@@ -75,6 +75,20 @@ redact_secrets() {
   # "linux-x64"` are not swept up; flag-form matching requires a literal
   # leading `-`/`--` so bare words like `auth` in prose (`OAuth "scope"`)
   # don't match without an operator or dash.
+  #
+  # Escaped delimiters inside the quoted value: a naive `[^"]*` (or `[^']*`)
+  # value class treats an escaped `\"` (or `\'`) as the closing delimiter,
+  # ending the match early and leaking everything after it in cleartext —
+  # and worse, the `[REDACTED:quoted]` marker it still emits then shields
+  # that leaked suffix from the generic catch-all below (provenance-tagged
+  # markers are exempt from re-matching; see the PROTECT/RESTORE note
+  # above). Every quoted-value rule's value class is instead
+  # `\(\\.\|[^"\\\x01]\)*` (single-quoted: swap the `"` for `'`): the
+  # `\\.` alternative consumes an escaped pair (backslash + the character
+  # it escapes, whatever that is) as one unit, so a `\"`/`\'` inside the
+  # value can never be mistaken for the closing quote; only an
+  # unescaped quote — which can't be produced by either alternative in the
+  # group — can terminate the match.
   local sed_cmd
   if sed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
     sed_cmd=sed
@@ -102,12 +116,12 @@ redact_secrets() {
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
-    -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"[^"\x01]*"/\1=\x01REDACTED:quoted]/gI' \
-    -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'[^'\x01]*'/\1=\x01REDACTED:quoted]/gI" \
-    -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"[^"\x01]*"/\1\2=\x01REDACTED:quoted]/gI' \
-    -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'[^'\x01]*'/\1\2=\x01REDACTED:quoted]/gI" \
-    -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"[^"\x01]*"/\1-p \x01REDACTED:quoted]/gI' \
-    -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'[^'\x01]*'/\1-p \x01REDACTED:quoted]/gI" \
+    -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\\x01]\)*"/\1=\x01REDACTED:quoted]/gI' \
+    -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\\x01]\)*'/\1=\x01REDACTED:quoted]/gI" \
+    -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\\x01]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
+    -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\\x01]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
+    -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\\x01]\)*"/\1-p \x01REDACTED:quoted]/gI' \
+    -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\\x01]\)*'/\1-p \x01REDACTED:quoted]/gI" \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \

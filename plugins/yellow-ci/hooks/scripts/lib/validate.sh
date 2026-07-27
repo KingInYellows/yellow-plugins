@@ -492,7 +492,7 @@ _rt_check_yaml_syntax() {
 # on stderr).
 _rt_check_runner_names() {
   local filepath="$1"
-  local name
+  local name unwrapped
   while IFS= read -r name; do
     # Trim the "- name:" prefix and trailing whitespace.
     name=$(printf '%s' "$name" | sed 's/^[[:space:]]*-[[:space:]]*name:[[:space:]]*//' | sed 's/[[:space:]]*$//')
@@ -500,8 +500,32 @@ _rt_check_runner_names() {
       printf '[yellow-ci] Error: Runner target has a blank name\n' >&2
       return 1
     fi
-    if ! validate_runner_name "$name"; then
-      printf '[yellow-ci] Error: Invalid runner target name: %s\n' "$name" >&2
+    # Accept the canonical double-quoted form (SKILL.md Step 4 now always
+    # quotes name) or a legacy/hand-edited unquoted value, same
+    # quoted-or-safe-unquoted asymmetry as routing_rules/preferred_selector
+    # above. validate_runner_name's DNS-safe charset (lowercase alnum +
+    # hyphen only) can never itself contain `\` or `"`, so unquoting a valid
+    # name never needs escape-reversal — but a bare "on"/"no"/"off" or an
+    # all-digit name (e.g. "42") is DNS-safe-regex-valid AND a YAML
+    # boolean/numeric literal when left unquoted, hence the hazard check on
+    # the unquoted branch below.
+    case "$name" in
+      \"*)
+        if ! unwrapped=$(_rt_unquote_scalar "$name"); then
+          printf '[yellow-ci] Error: Malformed quoted runner target name (unescaped quote or unsupported escape): %s\n' "$name" >&2
+          return 1
+        fi
+        ;;
+      *)
+        unwrapped="$name"
+        if _rt_yaml_hazard_shape "$unwrapped"; then
+          printf '[yellow-ci] Error: Unquoted runner target name is YAML-significant (quote it): %s\n' "$name" >&2
+          return 1
+        fi
+        ;;
+    esac
+    if ! validate_runner_name "$unwrapped"; then
+      printf '[yellow-ci] Error: Invalid runner target name: %s\n' "$unwrapped" >&2
       return 1
     fi
   done < <(grep -E '^[[:space:]]*-[[:space:]]+name:' "$filepath")
@@ -636,17 +660,119 @@ _rt_extract_field_items() {
   ' "$filepath"
 }
 
+# Unwrap a possibly-quoted YAML scalar so downstream checks (charset,
+# delimiter-ban, hazard-shape) see the real underlying text rather than the
+# YAML surface syntax. Mirrors resolve-runner-targets.sh's
+# rt_unquote_rule_stream() single-value equivalent; duplicated here (rather
+# than sourced) because resolve-runner-targets.sh depends on this file, not
+# the other way around — same mirroring rationale as _rt_extract_field_items
+# above.
+# Usage: unwrapped=$(_rt_unquote_scalar "$raw") || return 1  # malformed quoting
+# Prints the unwrapped/unescaped text and returns 0 when $raw is either not
+# quoted (passed through unchanged) or a well-formed quoted scalar (only `\\`
+# and `\"` escapes, matching what SKILL.md Step 4 writes). Returns 1 without
+# printing anything usable when $raw starts with `"` but is not well-formed
+# (unescaped inner quote or an unsupported escape) — the caller must report
+# and stop in that case.
+_rt_unquote_scalar() {
+  local raw="$1"
+  case "$raw" in
+    \"*)
+      if ! printf '%s' "$raw" | grep -qP '^"(?:[^"\\]|\\\\|\\")*"$'; then
+        return 1
+      fi
+      printf '%s' "$raw" | awk '
+      {
+        s = $0
+        n = length(s)
+        inner = substr(s, 2, n - 2)
+        m = length(inner)
+        out = ""
+        i = 1
+        while (i <= m) {
+          c = substr(inner, i, 1)
+          if (c == "\\" && i < m) {
+            nc = substr(inner, i + 1, 1)
+            if (nc == "\\" || nc == "\"") { out = out nc; i += 2 }
+            else { out = out c; i += 1 }
+          } else { out = out c; i += 1 }
+        }
+        print out
+      }'
+      return 0
+      ;;
+    *)
+      printf '%s' "$raw"
+      return 0
+      ;;
+  esac
+}
+
+# Return 0 (true) if the given PLAIN (unquoted) scalar text would be misread
+# by a YAML parser as something other than the literal string it appears to
+# be: a leading indicator character, an implicit mapping (": " anywhere or a
+# trailing bare ":"), a comment truncation (" #"), a boolean/null literal (any
+# case), or a bare number. Extracted from _rt_check_routing_rules's unquoted-
+# value checks so preferred_selector/best_for/avoid_for/notes/name below can
+# share the same hazard-shape coverage instead of hand-duplicating it; does
+# NOT replace _rt_check_routing_rules's own checks (left as-is, still tested
+# directly), only reused by the newer callers.
+# Usage: _rt_yaml_hazard_shape "$value"
+_rt_yaml_hazard_shape() {
+  local value="$1" lower
+
+  case "$value" in
+    -*|'*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*) return 0 ;;
+  esac
+  case "$value" in
+    *': '*|*:) return 0 ;;
+  esac
+  case "$value" in
+    *' #'*) return 0 ;;
+  esac
+  lower=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
+  case "$lower" in
+    yes|no|true|false|on|off|null|'~') return 0 ;;
+  esac
+  if printf '%s' "$value" | grep -qE '^[+-]?[0-9]+(\.[0-9]+)*([eE][+-]?[0-9]+)?$'; then
+    return 0
+  fi
+  return 1
+}
+
 # Validate every preferred_selector label against validate_selector_label.
-# Unlike _rt_check_runner_types/_rt_check_runner_modes, there is no `[ -n
-# "$value" ] &&` guard here: validate_selector_label("") itself returns 1, so
-# a blank selector item is already rejected without a separate blank check.
-# Returns 0 if all labels are valid, 1 on the first invalid label (error on stderr).
+# Accepts either the canonical double-quoted form the setup skill now always
+# writes (SKILL.md Step 4) or a legacy/hand-edited unquoted label, same
+# quoted-or-safe-unquoted asymmetry as _rt_check_routing_rules — but a
+# selector label's own charset (^[a-zA-Z0-9][a-zA-Z0-9._:-]*$) is checked on
+# the UNWRAPPED value in both cases; quoting only prevents YAML from
+# misreading the value, it does not relax the label grammar.
+# Returns 0 if all labels are valid, 1 on the first invalid/hazardous/
+# malformed label (error on stderr).
 _rt_check_selector_labels() {
   local filepath="$1"
-  local kind value
+  local kind value unwrapped
   while IFS=$'\t' read -r kind value; do
-    if [ "$kind" = "selector" ] && ! validate_selector_label "$value"; then
-      printf '[yellow-ci] Error: Invalid preferred_selector label: %s\n' "$value" >&2
+    if [ "$kind" != "selector" ]; then
+      continue
+    fi
+    case "$value" in
+      \"*)
+        if ! unwrapped=$(_rt_unquote_scalar "$value"); then
+          printf '[yellow-ci] Error: Malformed quoted preferred_selector label (unescaped quote or unsupported escape): %s\n' "$value" >&2
+          return 1
+        fi
+        ;;
+      *)
+        unwrapped="$value"
+        if _rt_yaml_hazard_shape "$unwrapped"; then
+          printf '[yellow-ci] Error: Unquoted preferred_selector label is YAML-significant (quote it): %s\n' "$value" >&2
+          return 1
+        fi
+        ;;
+    esac
+    if ! validate_selector_label "$unwrapped"; then
+      printf '[yellow-ci] Error: Invalid preferred_selector label: %s\n' "$unwrapped" >&2
       return 1
     fi
   done < <(_rt_extract_field_items "$filepath")
@@ -669,6 +795,42 @@ _rt_check_metadata_delimiters() {
           *'|'*|*,*)
             printf '[yellow-ci] Error: %s value contains a reserved | or , delimiter: %s\n' "$kind" "$value" >&2
             return 1
+            ;;
+        esac
+        ;;
+    esac
+  done < <(_rt_extract_field_items "$filepath")
+  return 0
+}
+
+# Validate every best_for/avoid_for/notes item is either the canonical
+# double-quoted form the setup skill now always writes (SKILL.md Step 4) or a
+# legacy/hand-edited unquoted value free of YAML-significant shapes — same
+# quoted-or-safe-unquoted asymmetry as _rt_check_routing_rules and
+# _rt_check_selector_labels above. These fields are free text (no charset
+# restriction beyond the |/, delimiter ban already enforced by
+# _rt_check_metadata_delimiters), so unlike selector labels there is no
+# further grammar check on the unwrapped value here.
+# Returns 0 if every item is safe, 1 on the first hazardous/malformed item
+# (error on stderr).
+_rt_check_metadata_hazard_shapes() {
+  local filepath="$1"
+  local kind value unwrapped
+  while IFS=$'\t' read -r kind value; do
+    case "$kind" in
+      best_for|avoid_for|notes)
+        case "$value" in
+          \"*)
+            if ! unwrapped=$(_rt_unquote_scalar "$value"); then
+              printf '[yellow-ci] Error: Malformed quoted %s value (unescaped quote or unsupported escape): %s\n' "$kind" "$value" >&2
+              return 1
+            fi
+            ;;
+          *)
+            if _rt_yaml_hazard_shape "$value"; then
+              printf '[yellow-ci] Error: Unquoted %s value is YAML-significant (quote it): %s\n' "$kind" "$value" >&2
+              return 1
+            fi
             ;;
         esac
         ;;
@@ -712,6 +874,27 @@ _rt_extract_routing_rule_values() {
   sed -n '/^routing_rules:/,/^[a-z]/{
     /^[[:space:]]*-[[:space:]]/{ s/^[[:space:]]*-[[:space:]]*//; s/[[:space:]]*$//; p; }
   }' "$filepath"
+}
+
+# Reject a bare `-` sequence item (with nothing after it but optional
+# trailing whitespace) anywhere in routing_rules. A bare `-` is YAML null,
+# not an empty string, but _rt_extract_routing_rule_values's own extraction
+# pattern requires a `-` FOLLOWED BY at least one whitespace character to
+# match a sequence item at all (`-[[:space:]]`) — a line that is only `-`
+# with no trailing space never matches that pattern and so never reaches
+# _rt_check_routing_rules's per-value checks, or the resolver's identical
+# rt_extract_rules() extraction (resolve-runner-targets.sh): the item just
+# silently vanishes from both validation and the merged cache instead of
+# being rejected or counted. Run this BEFORE _rt_check_routing_rules so the
+# whole file fails closed instead of quietly dropping a rule.
+# Returns 0 if no null item is found, 1 on the first one (error on stderr).
+_rt_check_routing_rules_no_null() {
+  local filepath="$1"
+  if sed -n '/^routing_rules:/,/^[a-z]/{ /^[[:space:]]*-[[:space:]]*$/p; }' "$filepath" | grep -q .; then
+    printf '[yellow-ci] Error: routing_rules contains a bare "-" (null) sequence item — remove it or quote an explicit empty string as ""\n' >&2
+    return 1
+  fi
+  return 0
 }
 
 # Reject a routing_rules item that would be misread by a real YAML parser
@@ -794,8 +977,10 @@ _rt_check_routing_rules() {
 # Validate a runner targets YAML file for structural correctness
 # Checks: file exists, size < 32KB, has schema: 1, has runner_targets section,
 # every target has type/mode/preferred_selector present, name/type/mode/
-# preferred_selector-labels are valid, best_for/avoid_for/notes contain no
-# reserved |/, delimiter, and the 20/20 count caps.
+# preferred_selector-labels are valid (quoted-or-safe-unquoted), best_for/
+# avoid_for/notes contain no reserved |/, delimiter and are themselves
+# quoted-or-safe-unquoted, routing_rules has no bare-`-` null items, and the
+# 20/20 count caps.
 # Usage: validate_runner_targets_file "$filepath"
 # Returns 0 on success, 1 on failure (with error on stderr)
 validate_runner_targets_file() {
@@ -834,6 +1019,7 @@ validate_runner_targets_file() {
     # is typically rules-only, so this is the common path for a hand-edited
     # unsafe rule, not an edge case).
     _rt_check_target_counts "$filepath" || return 1
+    _rt_check_routing_rules_no_null "$filepath" || return 1
     _rt_check_routing_rules "$filepath" || return 1
     return 0
   fi
@@ -845,6 +1031,8 @@ validate_runner_targets_file() {
   _rt_check_runner_modes "$filepath" || return 1
   _rt_check_selector_labels "$filepath" || return 1
   _rt_check_metadata_delimiters "$filepath" || return 1
+  _rt_check_metadata_hazard_shapes "$filepath" || return 1
+  _rt_check_routing_rules_no_null "$filepath" || return 1
   _rt_check_routing_rules "$filepath" || return 1
 
   return 0

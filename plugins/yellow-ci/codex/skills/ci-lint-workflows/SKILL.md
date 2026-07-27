@@ -26,15 +26,34 @@ that file; otherwise lint every workflow under `.github/workflows/`.
 
 If the argument text after the skill name specifies a file:
 
-- **Validate the path before any `Read`/`Edit` — run this as a real check,
-  not as a reading comprehension exercise.** A named path can come from
-  attacker-influenced argument text, so validation that exists only as prose
-  for the model to honour is not a control. Substitute the real candidate
-  path into `CANDIDATE=` and run the whole block below — definition plus
-  invocation — in one `Bash` tool call. Defining the function without also
-  calling it validates nothing and prints nothing; a function defined in one
-  `Bash` call does not exist in a later one, so define-and-call must always
-  happen together:
+- **Never let the raw argument text touch shell source.** A quoted
+  assignment (`CANDIDATE="<value>"`) does not protect against this: Bash
+  still evaluates `$(...)` and backtick command substitution while
+  assigning a double-quoted string, so a value such as
+  `.github/workflows/$(touch /tmp/pwned).yml` executes `touch` the instant
+  the assignment line runs — before `validate_workflow_path` is ever called.
+  The allowlist would then only ever inspect the *already-expanded* residue,
+  so a `STATUS=reject` line could print after the damage is already done,
+  which is a misleadingly reassuring result. Validation that exists only as
+  prose for the model to honour is not a control, and neither is a shell
+  assignment holding attacker-influenced argument text — keep the raw bytes
+  out of shell source entirely:
+
+  1. **Bash call — mint a fresh path.** Run `mktemp` in its own `Bash` tool
+     call (for example `TMPFILE=$(mktemp) && printf 'TMPFILE=%s\n'
+     "$TMPFILE"`) and note the printed path. This path is generated locally,
+     never attacker-influenced, so it is safe to reuse as literal text later.
+  2. **Write call — store the raw value untouched.** Use the `Write` tool to
+     write the argument text *verbatim* — no quoting, escaping, or trimming
+     of your own — to that exact printed path. The `Write` tool's content is
+     a structured parameter, never shell-parsed, so this is the only way the
+     raw bytes reach disk without Bash interpreting them.
+  3. **Bash call — read, validate, decide.** Substitute the printed path into
+     `TMPFILE=` below and run the whole block — function definition, file
+     read, and call — in one `Bash` tool call. Defining the function without
+     also calling it validates nothing and prints nothing; a function
+     defined in one `Bash` call does not exist in a later one, so
+     define-and-call must always happen together:
 
 ```bash
 validate_workflow_path() {  # $1=path (relative, from argument text or a glob match)
@@ -77,9 +96,12 @@ validate_workflow_path() {  # $1=path (relative, from argument text or a glob ma
   printf '%s\n' "$resolved"
 }
 
-# Substitute the real candidate path from the argument text, then run this
-# whole block (definition + call) in one Bash tool call.
-CANDIDATE="<the path named in the argument text>"
+# Substitute the temp-file path printed by the prior `mktemp` Bash call —
+# never the raw argument text — then run this whole block (definition,
+# file read, and call) in one Bash tool call.
+TMPFILE="<the path printed by the mktemp call>"
+CANDIDATE=$(cat -- "$TMPFILE" 2>/dev/null)
+rm -f -- "$TMPFILE"
 if RESOLVED=$(validate_workflow_path "$CANDIDATE"); then
   printf 'STATUS=ok RESOLVED=%s\n' "$RESOLVED"
 else

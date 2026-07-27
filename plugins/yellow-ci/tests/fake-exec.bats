@@ -464,6 +464,198 @@ YAML
   [[ "$output" == *"mapping"* ]]
 }
 
+# --- preferred_selector quoting (round 6 gap: unquoted YAML-significant labels) ---
+
+@test "runner-target validation: unquoted selector label 'true' rejected (boolean literal)" {
+  cfg="$BATS_TEST_TMPDIR/selector-true.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - true\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: unquoted selector label '1.2.3' rejected (numeric-looking)" {
+  cfg="$BATS_TEST_TMPDIR/selector-numeric.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - 1.2.3\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: unquoted selector label 'tier:' rejected (trailing colon parses as mapping)" {
+  cfg="$BATS_TEST_TMPDIR/selector-trailing-colon.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - tier:\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: unquoted selector label 'on' rejected (boolean literal)" {
+  cfg="$BATS_TEST_TMPDIR/selector-on.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - on\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: quoted hostile selector labels (true, 1.2.3, tier:, on) accepted" {
+  cfg="$BATS_TEST_TMPDIR/selector-quoted-hostile.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - "true"
+      - "1.2.3"
+      - "tier:"
+      - "on"
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: quoted selector label still enforces the label charset" {
+  cfg="$BATS_TEST_TMPDIR/selector-quoted-bad-charset.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - "self hosted"
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Invalid preferred_selector label"* ]]
+}
+
+# --- best_for/avoid_for/notes quoting (round 6 gap: free-text metadata is more exposed) ---
+
+@test "runner-target validation: unquoted best_for 'owner: platform' rejected (mapping shape)" {
+  cfg="$BATS_TEST_TMPDIR/metadata-mapping.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    best_for:\n      - owner: platform\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: unquoted best_for starting with '#' rejected (comment truncation)" {
+  cfg="$BATS_TEST_TMPDIR/metadata-comment.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    best_for:\n      - #urgent\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: quoted best_for '#urgent' accepted (a real YAML parser would otherwise truncate it as a comment)" {
+  cfg="$BATS_TEST_TMPDIR/metadata-comment-quoted.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+    best_for:
+      - "#urgent"
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: unquoted notes starting with '-' rejected (nested sequence shape)" {
+  cfg="$BATS_TEST_TMPDIR/metadata-leading-dash.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    notes:\n      - - leading dash\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: unquoted avoid_for 'yes' rejected (boolean literal)" {
+  cfg="$BATS_TEST_TMPDIR/metadata-yes.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    avoid_for:\n      - yes\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: quoted hostile metadata values (': ', leading '#', leading '-', 'yes') accepted" {
+  cfg="$BATS_TEST_TMPDIR/metadata-quoted-hostile.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+    best_for:
+      - "owner: platform"
+    avoid_for:
+      - "yes"
+    notes:
+      - "- leading dash"
+      - "# leading hash"
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+# --- name quoting (round 6 gap: DNS-safe charset overlaps YAML booleans/numbers) ---
+
+@test "runner-target validation: unquoted runner name 'on' rejected (boolean literal, DNS-safe-regex-valid)" {
+  cfg="$BATS_TEST_TMPDIR/name-on.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: on\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: unquoted runner name '42' rejected (numeric, DNS-safe-regex-valid)" {
+  cfg="$BATS_TEST_TMPDIR/name-numeric.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: 42\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: quoted runner name 'on' accepted and still DNS-safe-validated" {
+  cfg="$BATS_TEST_TMPDIR/name-quoted-on.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: "on"
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+# --- routing_rules null sequence item (round 6 gap: bare '-' is YAML null, silently dropped) ---
+
+@test "runner-target validation: bare '-' routing_rules item rejected (YAML null, was silently dropped)" {
+  cfg="$BATS_TEST_TMPDIR/routing-null-item.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - prefer pool:ares for heavy CI\n  -\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"null"* ]]
+}
+
+@test "runner-target validation: bare '- ' (trailing space) routing_rules item rejected" {
+  cfg="$BATS_TEST_TMPDIR/routing-null-item-trailing-space.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - prefer pool:ares for heavy CI\n  - \n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"null"* ]]
+}
+
 @test "non-Linux probe rejection + probe orchestration are markdown-scoped (not executable)" {
   skip "The runner-health probe orchestration and the 'Linux runner targets only' skip live in skills/ci-runner-health/SKILL.md — LLM-interpreted markdown, not executable shell; review-gated (mirrors gt-workflow's documented bats scope limitation)."
 }

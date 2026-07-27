@@ -102,9 +102,11 @@ Validate the content against the runner-targets schema: `schema: 1`; each
 target has a DNS-safe `name`, a `type` of `pool`/`static-family`/`static-host`,
 a `mode` of `jit_ephemeral`/`persistent`, `preferred_selector` labels matching
 `^[a-zA-Z0-9][a-zA-Z0-9._:-]*$`, `best_for`/`avoid_for`/`notes` values
-containing no literal `|` or `,` (see Step 3a), each `routing_rules` item is
-either a double-quoted scalar (see Step 4) or otherwise free of the
-YAML-significant shapes listed there, and at most 20 targets / 20 rules.
+containing no literal `|` or `,` (see Step 3a); each `name`,
+`preferred_selector` label, `best_for`/`avoid_for`/`notes` item, and
+`routing_rules` item is either a double-quoted scalar (see Step 4) or
+otherwise free of the YAML-significant shapes listed there; and at most 20
+targets / 20 rules.
 Config files must use canonical format (2-space indent, block sequences only —
 no flow syntax `[a, b]`, no multi-line scalars, no tabs). On failure, report
 the specific error and re-prompt; on success, show a parsed summary.
@@ -243,17 +245,17 @@ Canonical format (2-space indent, block sequences only):
 # Generated on [ISO-8601-UTC]. Edit directly or re-run to reconfigure.
 schema: 1
 runner_targets:
-  - name: [name]
+  - name: "[name]"
     type: [type]
     mode: [mode]
     preferred_selector:
-      - [label1]
+      - "[label1]"
     best_for:
-      - [workload1]
+      - "[workload1]"
     avoid_for:
-      - [workload1]
+      - "[workload1]"
     notes:
-      - [note1]
+      - "[note1]"
 routing_rules:
   - "[rule1]"
 ```
@@ -261,24 +263,34 @@ routing_rules:
 Omit `best_for`/`avoid_for`/`notes` entirely when empty (never write empty
 arrays). Obtain the timestamp with `date -u +%Y-%m-%dT%H:%M:%SZ`.
 
-**Quote every routing rule.** Routing rules are free-form prose typed
-by the user, so render each one as a double-quoted YAML scalar, never as a
-bare word list item — do this unconditionally for every rule, regardless of
-its content, rather than trying to decide case by case whether a given rule
-"needs" it. To render a rule: escape every literal `\` as `\\` first, then
-escape every literal `"` as `\"` (that order matters — escaping quotes first
-would double-escape the backslashes just introduced), then wrap the escaped
-text in `"..."`. Unquoted free text can otherwise be read by a YAML parser as
-something other than the literal string the user typed: a rule starting with
-`-`, `*`, `&`, `!`, `|`, `>`, `%`, `@`, backtick, or `#` changes what kind of
-YAML node it is; one containing `: ` (colon-space) turns the list item into a
-mapping (`owner: platform` becomes a nested object, not a string); one
-containing ` #` mid-rule gets truncated at the `#` as a comment; and a rule
-that is exactly `yes`/`no`/`true`/`false`/`on`/`off`/`null` (any case) or that
-looks like a bare number (`1.2.3`) resolves to a boolean, null, or numeric
-value instead of a string. Quoting sidesteps all of these. The executable
-validator enforces this on read — a hand-edited file with an unquoted rule
-matching any of the shapes above is rejected rather than silently misparsed.
+**Quote every free-text or label value.** Every runner's `name`, every
+`preferred_selector` label, every `best_for`/`avoid_for`/`notes` item, and
+every routing rule are all rendered as double-quoted YAML scalars, never as
+a bare word list/mapping item — do this unconditionally for every value,
+regardless of its content, rather than trying to decide case by case whether
+a given value "needs" it (`type`/`mode` are drawn from a closed enum and
+never need this treatment). To render a value: escape every literal `\` as
+`\\` first, then escape every literal `"` as `\"` (that order matters —
+escaping quotes first would double-escape the backslashes just introduced),
+then wrap the escaped text in `"..."`. Unquoted free text can otherwise be
+read by a YAML parser as something other than the literal string typed: a
+value starting with `-`, `*`, `&`, `!`, `|`, `>`, `%`, `@`, backtick, or `#`
+changes what kind of YAML node it is; one containing `: ` (colon-space) turns
+the item into a mapping (`owner: platform` becomes a nested object, not a
+string); one that is only a trailing bare `:` with nothing after it (for
+example a `preferred_selector` label like `tier:`) is ambiguous with an empty
+mapping key for the same reason; one containing ` #` mid-value gets truncated
+at the `#` as a comment; and a value that is exactly
+`yes`/`no`/`true`/`false`/`on`/`off`/`null` (any case) or that looks like a
+bare number (`1.2.3`) resolves to a boolean, null, or numeric value instead of
+a string — this last case also applies to `name`, since a pool literally
+named `on` or `42` is DNS-safe-regex-valid but not string-shaped once
+unquoted. Quoting sidesteps all of these. Quoting a `preferred_selector`
+label or a `name` does not relax its own charset rule (Step 3a #1/#4 above)
+— the quoted text still must match the DNS-safe or label pattern once
+unwrapped. The executable validator enforces this on read for every one of
+these fields — a hand-edited file with an unquoted value matching any of the
+shapes above is rejected rather than silently misparsed.
 
 After writing, the plugin's merged routing cache (the routing-summary the
 session-start hook reads, plus the merged-config JSON) needs to be

@@ -402,3 +402,47 @@ more log"
   result=$(echo 'Configuring OAuth "scope1 scope2" provider' | redact_secrets)
   [[ "$result" == 'Configuring OAuth "scope1 scope2" provider' ]]
 }
+
+# --- Escaped quotes inside quoted values ---
+#
+# A `[^"]*`-style value class treats an escaped `\"` (or `\'` in the
+# single-quoted rules) as the closing delimiter, ending the match early and
+# leaking everything after it in cleartext — and the `[REDACTED:quoted]`
+# marker it still emits then shields that leaked suffix from the generic
+# catch-all (provenance-tagged markers are exempt from re-matching). These
+# guard that escaped delimiters are consumed as part of the value, not
+# treated as the terminator, across every quoted-value rule (assignment and
+# both flag forms).
+
+@test "redact: double-quoted assignment with escaped inner quote" {
+  result=$(printf '%s\n' 'PASSWORD="abc\"LEAKEDSUFFIX123"' | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"LEAKEDSUFFIX123"* ]]
+  [[ "$result" != *"abc"* ]]
+}
+
+@test "redact: single-quoted assignment with escaped inner quote" {
+  result=$(printf '%s\n' "TOKEN='a\\'LEAK2'" | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"LEAK2"* ]]
+}
+
+@test "redact: double-quoted value ending in an escaped backslash" {
+  result=$(printf '%s\n' 'API_KEY="trailing\\"' | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"trailing"* ]]
+}
+
+@test "redact: long-flag double-quoted value with escaped inner quote" {
+  result=$(printf '%s\n' '--password "esc\"aped leak3"' | redact_secrets)
+  [[ "$result" == *"--password=[REDACTED:quoted]"* ]]
+  [[ "$result" != *"leak3"* ]]
+  [[ "$result" != *"esc"* ]]
+}
+
+@test "redact: short -p flag double-quoted value with escaped inner quote" {
+  result=$(printf '%s\n' '-p "esc\"aped leak4"' | redact_secrets)
+  [[ "$result" == *"[REDACTED:quoted]"* ]]
+  [[ "$result" != *"leak4"* ]]
+  [[ "$result" != *"esc"* ]]
+}

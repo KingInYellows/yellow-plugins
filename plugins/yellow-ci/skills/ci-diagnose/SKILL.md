@@ -363,12 +363,12 @@ REDACTED_LOG=$(
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
-    -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"[^"\x01]*"/\1=\x01REDACTED:quoted]/gI' \
-    -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'[^'\x01]*'/\1=\x01REDACTED:quoted]/gI" \
-    -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"[^"\x01]*"/\1\2=\x01REDACTED:quoted]/gI' \
-    -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'[^'\x01]*'/\1\2=\x01REDACTED:quoted]/gI" \
-    -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"[^"\x01]*"/\1-p \x01REDACTED:quoted]/gI' \
-    -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'[^'\x01]*'/\1-p \x01REDACTED:quoted]/gI" \
+    -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\\x01]\)*"/\1=\x01REDACTED:quoted]/gI' \
+    -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\\x01]\)*'/\1=\x01REDACTED:quoted]/gI" \
+    -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\\x01]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
+    -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\\x01]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
+    -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\\x01]\)*"/\1-p \x01REDACTED:quoted]/gI' \
+    -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\\x01]\)*'/\1-p \x01REDACTED:quoted]/gI" \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \
