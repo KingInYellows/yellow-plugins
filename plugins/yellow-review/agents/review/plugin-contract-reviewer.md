@@ -208,6 +208,7 @@ No prose outside the JSON block.
       "migration_path": "<concrete remediation: deprecation stub, backwards-compat shim, version bump, or null when no migration is feasible>"
     }
   ],
+  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
   "residual_risks": [],
   "testing_gaps": []
 }

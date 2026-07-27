@@ -112,6 +112,7 @@ the JSON block.
       "suggested_fix": "<one-sentence concrete fix or null>"
     }
   ],
+  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
   "residual_risks": [],
   "testing_gaps": []
 }

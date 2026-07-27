@@ -202,6 +202,7 @@ shown below. Suppress findings with `confidence < 75` except P0 findings at
       "suggested_fix": "Concrete fix or null"
     }
   ],
+  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
   "residual_risks": [],
   "testing_gaps": []
 }
