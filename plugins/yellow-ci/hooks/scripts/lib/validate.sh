@@ -468,15 +468,24 @@ _rt_check_yaml_syntax() {
     printf '[yellow-ci] Error: Missing or unsupported schema version (expected: schema: 1)\n' >&2
     return 1
   fi
-  if grep -qP '\t' "$filepath"; then
+  # Literal-tab search: a bare `$'\t'` argument (bash ANSI-C quoting expands
+  # it to a real tab byte before grep ever sees it) needs no regex mode at
+  # all, so this works identically on GNU and BSD grep — unlike the `-P`
+  # (PCRE) flag this used to use, which is a GNU-only extension absent from
+  # BSD/macOS grep (exit 2, "invalid option").
+  if grep -q $'\t' "$filepath"; then
     printf '[yellow-ci] Error: Tabs found — use spaces only (canonical YAML)\n' >&2
     return 1
   fi
-  if grep -qE '^\s+\w+:\s*\[' "$filepath"; then
+  # `\s`/`\w` are GNU grep extensions honored even under `-E`; POSIX ERE (and
+  # BSD/macOS grep) has no such escapes, so `\s` and `\w` are taken literally
+  # as "s" and "w" there — silently defeating both checks below on macOS.
+  # `[[:space:]]`/`[[:alnum:]_]` are the portable POSIX ERE equivalents.
+  if grep -qE '^[[:space:]]+[[:alnum:]_]+:[[:space:]]*\[' "$filepath"; then
     printf '[yellow-ci] Error: Flow syntax [a, b] not supported — use block sequences\n' >&2
     return 1
   fi
-  if grep -qE '^\s+\w+:\s*[|>][-+]?\s*$' "$filepath"; then
+  if grep -qE '^[[:space:]]+[[:alnum:]_]+:[[:space:]]*[|>][-+]?[[:space:]]*$' "$filepath"; then
     printf '[yellow-ci] Error: Multi-line scalars (| or >) not supported\n' >&2
     return 1
   fi
@@ -660,6 +669,53 @@ _rt_extract_field_items() {
   ' "$filepath"
 }
 
+# Return 0 (true) if $raw is either not quoted (does not start with `"`) or
+# is a well-formed double-quoted YAML scalar using only the two escapes
+# SKILL.md Step 4 writes (`\\` and `\"`); return 1 if it starts with `"` but
+# has an unescaped inner quote, an unsupported escape (e.g. `\n`), or a
+# trailing lone backslash. Equivalent to the PCRE
+# `^"(?:[^"\\]|\\\\|\\")*"$` this used to be checked with — but `grep -P` is
+# a GNU-only extension: BSD/macOS grep has no `-P` and exits 2 on it,
+# rejecting every quoted value on macOS. Implemented as a left-to-right awk
+# scan instead (awk's `substr`/`length` are POSIX and behave identically
+# under GNU awk and macOS's bundled "one true awk"). Shared by
+# _rt_unquote_scalar below and _rt_check_routing_rules's quoted-scalar
+# branch so both use one portable well-formedness check.
+# Usage: _rt_quoted_scalar_valid "$raw"
+_rt_quoted_scalar_valid() {
+  local raw="$1"
+  case "$raw" in
+    \"*)
+      printf '%s' "$raw" | awk '
+      {
+        s = $0
+        n = length(s)
+        if (n < 2 || substr(s, n, 1) != "\"") { exit 1 }
+        inner = substr(s, 2, n - 2)
+        m = length(inner)
+        i = 1
+        while (i <= m) {
+          c = substr(inner, i, 1)
+          if (c == "\\") {
+            if (i == m) { exit 1 }
+            nc = substr(inner, i + 1, 1)
+            if (nc == "\\" || nc == "\"") { i += 2 } else { exit 1 }
+          } else if (c == "\"") {
+            exit 1
+          } else {
+            i += 1
+          }
+        }
+        exit 0
+      }'
+      return $?
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
 # Unwrap a possibly-quoted YAML scalar so downstream checks (charset,
 # delimiter-ban, hazard-shape) see the real underlying text rather than the
 # YAML surface syntax. Mirrors resolve-runner-targets.sh's
@@ -678,7 +734,7 @@ _rt_unquote_scalar() {
   local raw="$1"
   case "$raw" in
     \"*)
-      if ! printf '%s' "$raw" | grep -qP '^"(?:[^"\\]|\\\\|\\")*"$'; then
+      if ! _rt_quoted_scalar_valid "$raw"; then
         return 1
       fi
       printf '%s' "$raw" | awk '
@@ -717,12 +773,23 @@ _rt_unquote_scalar() {
 # share the same hazard-shape coverage instead of hand-duplicating it; does
 # NOT replace _rt_check_routing_rules's own checks (left as-is, still tested
 # directly), only reused by the newer callers.
+# A leading `[` or `{` is a flow-collection opener: `python3 -c
+# "import yaml; print(yaml.safe_load('notes:\n  - [wrong]'))"` confirms
+# PyYAML reads it as a list, not the string "[wrong]" — a silent type
+# misread, same hazard class as the other leading indicators below. Leading
+# `]`/`}` have no matching opener and so are a hard YAML syntax error rather
+# than a misread, but are rejected here too (fail closed) rather than let an
+# invalid-YAML config through. A leading `? ` is the explicit-mapping-key
+# indicator (confirmed via the same PyYAML check: it parses as a one-entry
+# dict, not the string). Trailing `]`/`}` (no leading opener, e.g. "wrong]")
+# are NOT rejected — confirmed safe: PyYAML reads them as the literal
+# string.
 # Usage: _rt_yaml_hazard_shape "$value"
 _rt_yaml_hazard_shape() {
   local value="$1" lower
 
   case "$value" in
-    -*|'*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*) return 0 ;;
+    -*|'*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*|'['*|'{'*|']'*|'}'*|'?'*) return 0 ;;
   esac
   case "$value" in
     *': '*|*:) return 0 ;;
@@ -923,7 +990,9 @@ _rt_check_routing_rules() {
         # Quoted scalar: must be well-formed — starts and ends with an
         # unescaped double quote, body using only \\ / \" escapes (nothing
         # else, e.g. \n, is supported — matches what SKILL.md Step 4 emits).
-        if ! printf '%s' "$value" | grep -qP '^"(?:[^"\\]|\\\\|\\")*"$'; then
+        # Delegates to _rt_quoted_scalar_valid (portable awk scan) rather
+        # than `grep -P`, a GNU-only extension absent from BSD/macOS grep.
+        if ! _rt_quoted_scalar_valid "$value"; then
           printf '[yellow-ci] Error: Malformed quoted routing rule (unescaped quote or unsupported escape): %s\n' "$value" >&2
           return 1
         fi
@@ -931,9 +1000,13 @@ _rt_check_routing_rules() {
         ;;
     esac
 
-    # Unquoted: reject a leading YAML indicator character.
+    # Unquoted: reject a leading YAML indicator character. Mirrors
+    # _rt_yaml_hazard_shape's leading-character set (see its comment for the
+    # PyYAML-verified rationale on [/{/]/}/? ) — duplicated rather than
+    # shared per this function's own file-header note (left as-is, still
+    # tested directly).
     case "$value" in
-      -*|'*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*)
+      -*|'*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*|'['*|'{'*|']'*|'}'*|'?'*)
         printf '[yellow-ci] Error: Unquoted routing rule starts with a YAML-significant character (quote it): %s\n' "$value" >&2
         return 1
         ;;

@@ -3,8 +3,11 @@
 
 setup() {
   SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../hooks/scripts" && pwd)"
+  TEST_LIB_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/lib" && pwd)"
   # shellcheck source=../hooks/scripts/lib/redact.sh
   . "${SCRIPT_DIR}/lib/redact.sh"
+  # shellcheck source=lib/redaction-fuzz.bash
+  . "${TEST_LIB_DIR}/redaction-fuzz.bash"
 }
 
 # --- GitHub tokens ---
@@ -445,4 +448,91 @@ more log"
   [[ "$result" == *"[REDACTED:quoted]"* ]]
   [[ "$result" != *"leak4"* ]]
   [[ "$result" != *"esc"* ]]
+}
+
+# --- Sentinel-interaction regression (an earlier specific rule's marker
+# breaking a quoted-value rule's ability to reach the true closing quote) ---
+#
+# ghp_/AKIA/etc. rules run BEFORE the quoted-value rules. If a quoted value
+# contains one of those tokens, the specific rule substitutes it with its
+# own `\x01REDACTED:<label>]` marker first. A quoted-value class that
+# excludes \x01 then can't advance past that marker to reach the real
+# closing quote — the match fails outright, and whatever came after the
+# marker (inside the same quotes) falls through to the generic catch-all
+# (partial redaction) or, for flag forms the catch-all doesn't recognize,
+# is left completely unredacted. See redact.sh's "Sentinel interaction" note.
+
+@test "redact: flag-form quoted value with an embedded GitHub token leaves no trailing cleartext" {
+  result=$(printf '%s\n' '--password "ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA TRAILINGLEAK1"' | redact_secrets)
+  [[ "$result" != *"TRAILINGLEAK1"* ]]
+  [[ "$result" != *"ghp_"* ]]
+}
+
+@test "redact: assignment-form quoted value with an embedded GitHub token leaves no trailing cleartext" {
+  result=$(printf '%s\n' 'PASSWORD="ghp_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB TRAILINGLEAK2"' | redact_secrets)
+  [[ "$result" != *"TRAILINGLEAK2"* ]]
+  [[ "$result" != *"ghp_"* ]]
+}
+
+@test "redact: -p flag quoted value with an embedded AWS key leaves no trailing cleartext" {
+  result=$(printf '%s\n' '-p "AKIAIOSFODNN7EXAMPLE TRAILINGLEAK3"' | redact_secrets)
+  [[ "$result" != *"TRAILINGLEAK3"* ]]
+  [[ "$result" != *"AKIA"* ]]
+}
+
+@test "no-redact: over-redaction guard, an adjacent non-secret assignment is untouched" {
+  result=$(echo 'PASSWORD="s3cret" BUILD_ID="not-a-secret-12345"' | redact_secrets)
+  [[ "$result" == *'BUILD_ID="not-a-secret-12345"'* ]]
+  [[ "$result" != *"s3cret"* ]]
+}
+
+@test "no-redact: over-redaction guard, trailing prose after a quoted secret is untouched" {
+  result=$(echo 'TOKEN="abc" and then normal text here' | redact_secrets)
+  [[ "$result" == *"and then normal text here"* ]]
+  [[ "$result" != *"abc"* ]]
+}
+
+# --- Property/fuzz test ---
+#
+# Three consecutive rounds of hand-enumerated fixtures each fixed the
+# previous round's leak and introduced a new one (see redact.sh's "Sentinel
+# interaction" note for the full chain). Enumerated cases only ever encode
+# the LAST bug found, so this generates randomized quoted-credential lines
+# (tests/lib/redaction-fuzz.bash) — combining quote style, escaped
+# delimiters, embedded specific-rule tokens, and trailing content — and
+# checks the invariant that actually matters: no byte of what went inside
+# the quotes survives redaction, across a wide combination of shapes rather
+# than a hand-picked few. Seeded (RANDOM=<seed>) so a failure is
+# reproducible: re-run this generator standalone with the same seed and it
+# reaches the same failing case at the same iteration index.
+
+@test "redact: property — no byte of a fuzzed quoted secret survives redaction" {
+  local seed=20260727
+  local iterations=200
+  RANDOM=$seed
+
+  local i out secret
+  for ((i = 0; i < iterations; i++)); do
+    fuzz_generate_case
+    out=$(printf '%s\n' "$FUZZ_LINE" | redact_secrets)
+
+    for secret in "${FUZZ_SECRET_CHUNKS[@]}"; do
+      if [[ "$out" == *"$secret"* ]]; then
+        printf 'FUZZ FAILURE (seed=%d iteration=%d): secret chunk survived redaction\n' "$seed" "$i" >&2
+        printf '  input:  %s\n' "$FUZZ_LINE" >&2
+        printf '  output: %s\n' "$out" >&2
+        printf '  leaked chunk: %s\n' "$secret" >&2
+        return 1
+      fi
+    done
+
+    if [ -n "$FUZZ_SAFE_MARKER" ] && [[ "$out" != *"$FUZZ_SAFE_MARKER"* ]]; then
+      printf 'FUZZ FAILURE (seed=%d iteration=%d): over-redaction, a marker OUTSIDE the quotes was swallowed\n' "$seed" "$i" >&2
+      printf '  input:  %s\n' "$FUZZ_LINE" >&2
+      printf '  output: %s\n' "$out" >&2
+      return 1
+    fi
+  done
+
+  printf 'Fuzz OK: seed=%d iterations=%d, zero leaks, zero over-redactions\n' "$seed" "$iterations"
 }

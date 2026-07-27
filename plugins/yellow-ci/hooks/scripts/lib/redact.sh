@@ -83,12 +83,50 @@ redact_secrets() {
   # that leaked suffix from the generic catch-all below (provenance-tagged
   # markers are exempt from re-matching; see the PROTECT/RESTORE note
   # above). Every quoted-value rule's value class is instead
-  # `\(\\.\|[^"\\\x01]\)*` (single-quoted: swap the `"` for `'`): the
+  # `\(\\.\|[^"\\]\)*` (single-quoted: swap the `"` for `'`): the
   # `\\.` alternative consumes an escaped pair (backslash + the character
   # it escapes, whatever that is) as one unit, so a `\"`/`\'` inside the
   # value can never be mistaken for the closing quote; only an
   # unescaped quote — which can't be produced by either alternative in the
   # group — can terminate the match.
+  #
+  # Sentinel interaction (the value class must NOT exclude \x01): an earlier
+  # rule in this same pipeline (github-token, AKIA, Authorization, docker,
+  # npm, pypi, jwt) may already have replaced part of the interior of this
+  # exact quoted region with its own `\x01REDACTED:<label>]` marker before a
+  # quoted-value rule ever runs — e.g. `--password "ghp_xxx TRAILING"` becomes
+  # `--password "\x01REDACTED:github-token] TRAILING"` by the time this rule
+  # sees it. A value class that excludes \x01 cannot advance past that
+  # sentinel to reach the real closing quote: the repetition stops dead right
+  # after the opening quote, the required closing `"` isn't there yet, the
+  # whole quoted-value rule fails to match, and everything from the sentinel
+  # onward — including the real secret suffix after it — falls through
+  # unmatched by this rule (and is either mangled by the generic catch-all
+  # into a partial redaction, or, for flag forms like `-p`/`--password` that
+  # the catch-all's `key[=:]value` shape doesn't recognize, left completely
+  # unredacted). The fix is to let the value class consume \x01 like any
+  # ordinary character instead of excluding it, so the match spans the
+  # ENTIRE quoted region — from the opening quote to the first unescaped
+  # closing quote — regardless of what an earlier rule already did to its
+  # interior. This is safe rather than reopening the "attacker forges the
+  # sentinel" hole the exclusion existed to close for the OTHER pipeline
+  # (the PROTECT/RESTORE catch-all guard above): SCRUB (the very first `-e`
+  # in this invocation) already replaced every attacker-supplied \x01 in the
+  # input with `?` before ANY pattern rule runs, so by the time a
+  # quoted-value rule executes, every \x01 remaining in the line was
+  # produced by a rule earlier IN THIS SAME invocation — never by the
+  # caller. And once a key on the secret denylist has matched, the entire
+  # quoted value is secret regardless of what an earlier rule already did to
+  # part of it, so swallowing an already-tagged marker into this rule's own
+  # `[REDACTED:quoted]` replacement loses nothing: RESTORE at the end of the
+  # pipeline only ever sees the one surviving marker, never a partial or
+  # doubled one. (Reordering the quoted-value rules to run BEFORE the
+  # token-specific rules would also close this gap — nothing would be left
+  # for them to clobber — but it was not taken: it would blur every quoted
+  # token-shaped secret's specific label (github-token, aws-access-key, ...)
+  # down to the generic `quoted` label, and restructuring rule order carries
+  # more risk of an undiscovered fourth interaction than widening one
+  # character class whose exclusion is now provably unnecessary.)
   local sed_cmd
   if sed --version </dev/null 2>/dev/null | grep -q 'GNU sed'; then
     sed_cmd=sed
@@ -116,12 +154,12 @@ redact_secrets() {
     -e 's/npm_[A-Za-z0-9]\{36\}/\x01REDACTED:npm-token]/g' \
     -e 's/pypi-[A-Za-z0-9_-]\{32,\}/\x01REDACTED:pypi-token]/g' \
     -e 's/eyJ[A-Za-z0-9_-]\{10,500\}\.eyJ[A-Za-z0-9_-]\{10,500\}\.[A-Za-z0-9_-]\{10,500\}/\x01REDACTED:jwt]/g' \
-    -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\\x01]\)*"/\1=\x01REDACTED:quoted]/gI' \
-    -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\\x01]\)*'/\1=\x01REDACTED:quoted]/gI" \
-    -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\\x01]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
-    -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\\x01]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
-    -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\\x01]\)*"/\1-p \x01REDACTED:quoted]/gI' \
-    -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\\x01]\)*'/\1-p \x01REDACTED:quoted]/gI" \
+    -e 's/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*"\(\\.\|[^"\\]\)*"/\1=\x01REDACTED:quoted]/gI' \
+    -e "s/\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]*[=:][[:space:]]*'\(\\\\.\\|[^'\\\\]\)*'/\1=\x01REDACTED:quoted]/gI" \
+    -e 's/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1\2=\x01REDACTED:quoted]/gI' \
+    -e "s/\(-\{1,2\}\)\(password\|passwd\|pwd\|secret\|token\|api_key\|apikey\|api-key\|auth\|credential\|private_key\|privatekey\|private-key\)[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1\2=\x01REDACTED:quoted]/gI" \
+    -e 's/\(^\|[[:space:]]\)-p[[:space:]]\+"\(\\.\|[^"\\]\)*"/\1-p \x01REDACTED:quoted]/gI' \
+    -e "s/\(^\|[[:space:]]\)-p[[:space:]]\+'\(\\\\.\\|[^'\\\\]\)*'/\1-p \x01REDACTED:quoted]/gI" \
     -e 's/\([?&]\)\(token\|api_key\|secret\|key\|password\)=[^&[:space:]]*/\1\2=\x01REDACTED:url-param]/gI' \
     -e 's/\(AWS\|GITHUB\|NPM\|DOCKER\)_[A-Z_]*=[^[:space:]]\+/\1_[REDACTED]/g' \
     -e '/-----BEGIN.*PRIVATE KEY-----/,/-----END.*PRIVATE KEY-----/c\[REDACTED:ssh-key]' \

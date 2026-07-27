@@ -656,6 +656,116 @@ YAML
   [[ "$output" == *"null"* ]]
 }
 
+# --- flow-collection hazard shapes (cubic P2: unquoted "- [wrong]"/"- {a: b}"
+# passed validation as text while a real YAML parser reads them as a flow
+# sequence/mapping — verified against `python3 -c "import yaml..."`) ---
+
+@test "runner-target validation: unquoted notes '[wrong]' rejected (parses as a YAML list, not a string)" {
+  cfg="$BATS_TEST_TMPDIR/notes-flow-seq.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    notes:\n      - [wrong]\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: unquoted notes '{a:1}' rejected (parses as a YAML mapping, not a string)" {
+  cfg="$BATS_TEST_TMPDIR/notes-flow-map.yaml"
+  # No ": " (colon-space) in the value, so this can't be caught by the
+  # pre-existing implicit-mapping check — only a dedicated leading-'{' check
+  # catches it. `python3 -c "import yaml; print(yaml.safe_load(open('...')))"`
+  # confirms this parses to {'notes': [{'a:1': None}]}, not the string "{a:1}".
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    notes:\n      - {a:1}\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
+@test "runner-target validation: quoted notes '\"[wrong]\"' and '\"{a: b}\"' accepted (real string, not a collection)" {
+  cfg="$BATS_TEST_TMPDIR/notes-flow-quoted.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+    notes:
+      - "[wrong]"
+      - "{a: b}"
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: unquoted routing rule starting with '[' rejected (flow sequence)" {
+  cfg="$BATS_TEST_TMPDIR/routing-flow-seq.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - [wrong]\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant character"* ]]
+}
+
+# --- GNU-grep-only portability (cubic P1/P2: `grep -P` and GNU-only `\s`/`\w`
+# escapes inside `grep -E` are absent from BSD/macOS grep — a `grep` stub on
+# PATH that rejects `-P` like BSD grep does, real grep for everything else,
+# reproduces the failure mode without needing an actual macOS host) ---
+
+_stub_grep_without_dash_P() {
+  cat >"$BATS_TEST_TMPDIR/grep" <<'SH'
+#!/bin/bash
+for arg in "$@"; do
+  case "$arg" in
+    -*P*) echo "grep: unknown option -- P" >&2; exit 2 ;;
+  esac
+done
+exec /usr/bin/grep "$@"
+SH
+  chmod +x "$BATS_TEST_TMPDIR/grep"
+  PATH="$BATS_TEST_TMPDIR:$PATH"
+}
+
+@test "runner-target validation: canonical fully-quoted config still validates without grep -P (BSD/macOS grep simulation)" {
+  _stub_grep_without_dash_P
+  cfg="$BATS_TEST_TMPDIR/canonical-quoted.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: "ares"
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - "self-hosted"
+      - "pool:ares"
+    best_for:
+      - "heavy CI"
+    notes:
+      - "default heavy autoscaling pool"
+routing_rules:
+  - "prefer pool:ares for heavy CI"
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: tabs still rejected without grep -P (was a fail-open false negative: grep -qP exit 2 made the 'if' false)" {
+  _stub_grep_without_dash_P
+  cfg="$BATS_TEST_TMPDIR/tab-file.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode:\tjit_ephemeral\n    preferred_selector:\n      - self-hosted\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Tabs found"* ]]
+}
+
+@test "runner-target validation: malformed quoted routing rule still rejected without grep -P" {
+  _stub_grep_without_dash_P
+  cfg="$BATS_TEST_TMPDIR/malformed-quote-noP.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - "bad "quote" here"\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Malformed quoted routing rule"* ]]
+}
+
 @test "non-Linux probe rejection + probe orchestration are markdown-scoped (not executable)" {
   skip "The runner-health probe orchestration and the 'Linux runner targets only' skip live in skills/ci-runner-health/SKILL.md — LLM-interpreted markdown, not executable shell; review-gated (mirrors gt-workflow's documented bats scope limitation)."
 }
