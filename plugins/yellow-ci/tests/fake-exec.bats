@@ -706,6 +706,254 @@ YAML
   [[ "$output" == *"YAML-significant character"* ]]
 }
 
+# --- per-field schema bounds (maxItems/maxLength) the executable gate must
+# enforce (cubic PRRT_kwDOQ3SUys6UMVNC: an 11-label preferred_selector import
+# passed silently before this) ---
+
+_gen_selector_count() {
+  local count="$1"
+  {
+    printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n'
+    for ((i = 1; i <= count; i++)); do printf '      - sel%d\n' "$i"; done
+  }
+}
+
+@test "runner-target validation: preferred_selector at 10 items (maxItems boundary) accepted" {
+  cfg="$BATS_TEST_TMPDIR/selector-10.yaml"
+  _gen_selector_count 10 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: preferred_selector at 11 items rejected (maxItems: 10)" {
+  cfg="$BATS_TEST_TMPDIR/selector-11.yaml"
+  _gen_selector_count 11 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"too many preferred_selector items (11, max 10)"* ]]
+}
+
+_gen_metadata_count() {
+  local field="$1" count="$2"
+  {
+    printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    %s:\n' "$field"
+    for ((i = 1; i <= count; i++)); do printf '      - item %d\n' "$i"; done
+  }
+}
+
+@test "runner-target validation: best_for at 10 items (maxItems boundary) accepted" {
+  cfg="$BATS_TEST_TMPDIR/best-for-10.yaml"
+  _gen_metadata_count best_for 10 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: best_for at 11 items rejected (maxItems: 10)" {
+  cfg="$BATS_TEST_TMPDIR/best-for-11.yaml"
+  _gen_metadata_count best_for 11 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"too many best_for items (11, max 10)"* ]]
+}
+
+@test "runner-target validation: avoid_for at 10 items (maxItems boundary) accepted" {
+  cfg="$BATS_TEST_TMPDIR/avoid-for-10.yaml"
+  _gen_metadata_count avoid_for 10 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: avoid_for at 11 items rejected (maxItems: 10)" {
+  cfg="$BATS_TEST_TMPDIR/avoid-for-11.yaml"
+  _gen_metadata_count avoid_for 11 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"too many avoid_for items (11, max 10)"* ]]
+}
+
+@test "runner-target validation: notes at 10 items (maxItems boundary) accepted" {
+  cfg="$BATS_TEST_TMPDIR/notes-10.yaml"
+  _gen_metadata_count notes 10 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: notes at 11 items rejected (maxItems: 10)" {
+  cfg="$BATS_TEST_TMPDIR/notes-11.yaml"
+  _gen_metadata_count notes 11 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"too many notes items (11, max 10)"* ]]
+}
+
+_gen_metadata_item_len() {
+  local field="$1" len="$2" text
+  text=$(printf 'x%.0s' $(seq 1 "$len"))
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    %s:\n      - %s\n' "$field" "$text"
+}
+
+@test "runner-target validation: best_for item at 200 chars (maxLength boundary) accepted" {
+  cfg="$BATS_TEST_TMPDIR/best-for-len200.yaml"
+  _gen_metadata_item_len best_for 200 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: best_for item at 201 chars rejected (maxLength: 200)" {
+  cfg="$BATS_TEST_TMPDIR/best-for-len201.yaml"
+  _gen_metadata_item_len best_for 201 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"best_for value exceeds 200 char limit (201 chars)"* ]]
+}
+
+@test "runner-target validation: avoid_for item at 201 chars rejected (maxLength: 200)" {
+  cfg="$BATS_TEST_TMPDIR/avoid-for-len201.yaml"
+  _gen_metadata_item_len avoid_for 201 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"avoid_for value exceeds 200 char limit (201 chars)"* ]]
+}
+
+@test "runner-target validation: notes item at 201 chars rejected (maxLength: 200)" {
+  cfg="$BATS_TEST_TMPDIR/notes-len201.yaml"
+  _gen_metadata_item_len notes 201 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"notes value exceeds 200 char limit (201 chars)"* ]]
+}
+
+@test "runner-target validation: quoted best_for item at 201 semantic chars still rejected (length checked on unwrapped value)" {
+  cfg="$BATS_TEST_TMPDIR/best-for-quoted-len201.yaml"
+  local text
+  text=$(printf 'x%.0s' $(seq 1 201))
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    best_for:\n      - "%s"\n' "$text" >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"best_for value exceeds 200 char limit (201 chars)"* ]]
+}
+
+_gen_routing_rule_len() {
+  local len="$1" text
+  text=$(printf 'x%.0s' $(seq 1 "$len"))
+  printf 'schema: 1\nrouting_rules:\n  - %s\n' "$text"
+}
+
+@test "runner-target validation: routing rule at 200 chars (maxLength boundary) accepted" {
+  cfg="$BATS_TEST_TMPDIR/rule-len200.yaml"
+  _gen_routing_rule_len 200 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: routing rule at 201 chars rejected (maxLength: 200)" {
+  cfg="$BATS_TEST_TMPDIR/rule-len201.yaml"
+  _gen_routing_rule_len 201 >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"routing rule exceeds 200 char limit (201 chars)"* ]]
+}
+
+@test "runner-target validation: quoted routing rule at 201 semantic chars still rejected (length checked on unwrapped value)" {
+  cfg="$BATS_TEST_TMPDIR/rule-quoted-len201.yaml"
+  local text
+  text=$(printf 'x%.0s' $(seq 1 201))
+  printf 'schema: 1\nrouting_rules:\n  - "%s"\n' "$text" >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"routing rule exceeds 200 char limit (201 chars)"* ]]
+}
+
+@test "runner-target validation: 20 runner targets (maxItems boundary) accepted" {
+  cfg="$BATS_TEST_TMPDIR/targets-20.yaml"
+  {
+    printf 'schema: 1\nrunner_targets:\n'
+    for ((i = 1; i <= 20; i++)); do
+      printf '  - name: runner%02d\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n' "$i"
+    done
+  } >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: 21 runner targets rejected (maxItems: 20)" {
+  cfg="$BATS_TEST_TMPDIR/targets-21.yaml"
+  {
+    printf 'schema: 1\nrunner_targets:\n'
+    for ((i = 1; i <= 21; i++)); do
+      printf '  - name: runner%02d\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n' "$i"
+    done
+  } >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Too many runner targets (21, max 20)"* ]]
+}
+
+@test "runner-target validation: 20 routing rules (maxItems boundary) accepted" {
+  cfg="$BATS_TEST_TMPDIR/rules-20.yaml"
+  {
+    printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\nrouting_rules:\n'
+    for ((i = 1; i <= 20; i++)); do printf '  - rule number %d\n' "$i"; done
+  } >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: 21 routing rules rejected (maxItems: 20)" {
+  cfg="$BATS_TEST_TMPDIR/rules-21.yaml"
+  {
+    printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\nrouting_rules:\n'
+    for ((i = 1; i <= 21; i++)); do printf '  - rule number %d\n' "$i"; done
+  } >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Too many routing rules (21, max 20)"* ]]
+}
+
+# --- `?`/`-` leading-indicator narrowing (cubic PRRT_kwDOQ3SUys6UMbDD: `?` is
+# only the YAML explicit-mapping-key indicator when followed by a space or
+# end-of-value — a legacy value like "?priority" is a plain string and must
+# not be rejected; PyYAML-verified, see validate.sh's _rt_yaml_hazard_shape
+# comment) ---
+
+@test "runner-target validation: unquoted routing rule '?priority' accepted (no space after '?' — plain string per YAML)" {
+  cfg="$BATS_TEST_TMPDIR/question-no-space.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - ?priority\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: unquoted routing rule '? priority' still rejected (space after '?' — explicit mapping key)" {
+  cfg="$BATS_TEST_TMPDIR/question-space.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - ? priority\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant character"* ]]
+}
+
+@test "runner-target validation: bare '?' routing rule still rejected (explicit mapping key, no value)" {
+  cfg="$BATS_TEST_TMPDIR/question-bare.yaml"
+  printf 'schema: 1\nrouting_rules:\n  - ?\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant character"* ]]
+}
+
+@test "runner-target validation: unquoted best_for '-standalone' accepted (no space after '-' — plain string per YAML)" {
+  cfg="$BATS_TEST_TMPDIR/dash-no-space.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    best_for:\n      - -standalone\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -eq 0 ]
+}
+
+@test "runner-target validation: bare '-' best_for item still rejected (block-sequence indicator, no value)" {
+  cfg="$BATS_TEST_TMPDIR/dash-bare-best-for.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name: ares\n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n    best_for:\n      - -\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"YAML-significant"* ]]
+}
+
 # --- GNU-grep-only portability (cubic P1/P2: `grep -P` and GNU-only `\s`/`\w`
 # escapes inside `grep -E` are absent from BSD/macOS grep — a `grep` stub on
 # PATH that rejects `-P` like BSD grep does, real grep for everything else,

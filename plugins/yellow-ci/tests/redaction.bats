@@ -481,9 +481,12 @@ more log"
 }
 
 @test "no-redact: over-redaction guard, an adjacent non-secret assignment is untouched" {
-  result=$(echo 'PASSWORD="s3cret" BUILD_ID="not-a-secret-12345"' | redact_secrets)
+  # The value is a fixed placeholder, not a credential: these rules key on the
+  # KEY name, never the value, so the literal text here is irrelevant to what
+  # the test proves. Kept scanner-inert so secret detectors do not flag it.
+  result=$(echo 'PASSWORD="REDACTME-PLACEHOLDER-A1" BUILD_ID="not-a-secret-12345"' | redact_secrets)
   [[ "$result" == *'BUILD_ID="not-a-secret-12345"'* ]]
-  [[ "$result" != *"s3cret"* ]]
+  [[ "$result" != *"REDACTME-PLACEHOLDER-A1"* ]]
 }
 
 @test "no-redact: over-redaction guard, trailing prose after a quoted secret is untouched" {

@@ -779,17 +779,28 @@ _rt_unquote_scalar() {
 # misread, same hazard class as the other leading indicators below. Leading
 # `]`/`}` have no matching opener and so are a hard YAML syntax error rather
 # than a misread, but are rejected here too (fail closed) rather than let an
-# invalid-YAML config through. A leading `? ` is the explicit-mapping-key
-# indicator (confirmed via the same PyYAML check: it parses as a one-entry
-# dict, not the string). Trailing `]`/`}` (no leading opener, e.g. "wrong]")
-# are NOT rejected — confirmed safe: PyYAML reads them as the literal
-# string.
+# invalid-YAML config through. Trailing `]`/`}` (no leading opener, e.g.
+# "wrong]") are NOT rejected — confirmed safe: PyYAML reads them as the
+# literal string.
+# `-` and `?` are indicators (block-sequence entry / explicit mapping key)
+# ONLY when followed by a space or end-of-value — PyYAML confirms `-tag` and
+# `?tag` parse as the literal string, but `- tag`/`? tag` and a bare `-`/`?`
+# do not (verified via `yaml.safe_load` on both forms), so only those
+# narrower shapes are rejected — a value like "?priority" is legitimate free
+# text and must not be rejected. Every other character in the case below
+# (*, &, !, |, >, %, @, `, ', #, [, {, ], }) was independently re-checked
+# against PyYAML for both the "no trailing space" and "with a space" forms
+# and is a hazard (parse error or silent misread) either way, so those stay
+# blanket-rejected regardless of what follows.
 # Usage: _rt_yaml_hazard_shape "$value"
 _rt_yaml_hazard_shape() {
   local value="$1" lower
 
   case "$value" in
-    -*|'*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*|'['*|'{'*|']'*|'}'*|'?'*) return 0 ;;
+    '-'|'- '*|'?'|'? '*) return 0 ;;
+  esac
+  case "$value" in
+    '*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*|'['*|'{'*|']'*|'}'*) return 0 ;;
   esac
   case "$value" in
     *': '*|*:) return 0 ;;
@@ -877,9 +888,11 @@ _rt_check_metadata_delimiters() {
 # _rt_check_selector_labels above. These fields are free text (no charset
 # restriction beyond the |/, delimiter ban already enforced by
 # _rt_check_metadata_delimiters), so unlike selector labels there is no
-# further grammar check on the unwrapped value here.
-# Returns 0 if every item is safe, 1 on the first hazardous/malformed item
-# (error on stderr).
+# further grammar check on the unwrapped value here beyond the schema's
+# maxLength: 200 bound, checked on the unwrapped/unescaped text (a quoted
+# value's escape sequences must not inflate the count).
+# Returns 0 if every item is safe, 1 on the first hazardous/malformed/
+# oversized item (error on stderr).
 _rt_check_metadata_hazard_shapes() {
   local filepath="$1"
   local kind value unwrapped
@@ -898,8 +911,13 @@ _rt_check_metadata_hazard_shapes() {
               printf '[yellow-ci] Error: Unquoted %s value is YAML-significant (quote it): %s\n' "$kind" "$value" >&2
               return 1
             fi
+            unwrapped="$value"
             ;;
         esac
+        if [ ${#unwrapped} -gt 200 ]; then
+          printf '[yellow-ci] Error: %s value exceeds 200 char limit (%d chars): %s\n' "$kind" "${#unwrapped}" "$value" >&2
+          return 1
+        fi
         ;;
     esac
   done < <(_rt_extract_field_items "$filepath")
@@ -926,6 +944,60 @@ _rt_check_target_counts() {
       return 1
     fi
   fi
+  return 0
+}
+
+# Enforce the schema's per-runner maxItems: 10 on preferred_selector,
+# best_for, avoid_for, and notes. Uses the same in_runner/field state machine
+# as _rt_check_required_fields (flush counts when the next "- name:" line, an
+# un-indent out of runner_targets, or EOF is reached) so a field's items are
+# only totaled once its block is known to be complete. Counts a line the same
+# way _rt_extract_field_items does (`/^[[:space:]]+-[[:space:]]/` — a bare
+# `-` item with nothing after it doesn't match either extractor and so is
+# invisible to both this count and the emitted JSON alike; that's a
+# pre-existing extraction limit, not something this check papers over).
+# Returns 0 if every field is within its 10-item cap, 1 on the first runner/
+# field that exceeds it (error on stderr).
+_rt_check_field_item_counts() {
+  local filepath="$1"
+  local name field_name count
+  while IFS=$'\t' read -r name field_name count; do
+    printf '[yellow-ci] Error: Runner target %s has too many %s items (%s, max 10)\n' "$name" "$field_name" "$count" >&2
+    return 1
+  done < <(awk '
+  BEGIN {
+    in_targets = 0; in_runner = 0; name = ""; field = ""
+    sel_count = 0; bf_count = 0; af_count = 0; nt_count = 0; reported = 0
+  }
+  /^runner_targets:/ { in_targets = 1; next }
+  in_targets && /^[a-z]/ { in_targets = 0; if (in_runner) flush(); in_runner = 0; next }
+  in_targets && /^[[:space:]]*-[[:space:]]+name:/ {
+    if (in_runner) flush()
+    in_runner = 1
+    name = $0
+    sub(/^[[:space:]]*-[[:space:]]+name:[[:space:]]*/, "", name)
+    sub(/[[:space:]]*$/, "", name)
+    field = ""; sel_count = 0; bf_count = 0; af_count = 0; nt_count = 0
+    next
+  }
+  in_runner && /^[[:space:]]+preferred_selector:/ { field = "selector"; next }
+  in_runner && /^[[:space:]]+best_for:/ { field = "best_for"; next }
+  in_runner && /^[[:space:]]+avoid_for:/ { field = "avoid_for"; next }
+  in_runner && /^[[:space:]]+notes:/ { field = "notes"; next }
+  in_runner && /^[[:space:]]+[a-z_]+:/ { field = ""; next }
+  in_runner && field == "selector" && /^[[:space:]]+-[[:space:]]/ { sel_count++; next }
+  in_runner && field == "best_for" && /^[[:space:]]+-[[:space:]]/ { bf_count++; next }
+  in_runner && field == "avoid_for" && /^[[:space:]]+-[[:space:]]/ { af_count++; next }
+  in_runner && field == "notes" && /^[[:space:]]+-[[:space:]]/ { nt_count++; next }
+  END { if (in_runner) flush() }
+  function flush() {
+    if (reported) return
+    if (sel_count > 10) { printf "%s\tpreferred_selector\t%d\n", name, sel_count; reported = 1; return }
+    if (bf_count > 10) { printf "%s\tbest_for\t%d\n", name, bf_count; reported = 1; return }
+    if (af_count > 10) { printf "%s\tavoid_for\t%d\n", name, af_count; reported = 1; return }
+    if (nt_count > 10) { printf "%s\tnotes\t%d\n", name, nt_count; reported = 1; return }
+  }
+  ' "$filepath")
   return 0
 }
 
@@ -982,7 +1054,7 @@ _rt_check_routing_rules_no_null() {
 # (error on stderr).
 _rt_check_routing_rules() {
   local filepath="$1"
-  local value lower
+  local value lower unwrapped
 
   while IFS= read -r value; do
     case "$value" in
@@ -996,17 +1068,31 @@ _rt_check_routing_rules() {
           printf '[yellow-ci] Error: Malformed quoted routing rule (unescaped quote or unsupported escape): %s\n' "$value" >&2
           return 1
         fi
+        # Length bound is checked on the unwrapped/unescaped text — the
+        # schema's maxLength: 200 constrains the string VALUE, not the raw
+        # quoted-file text (which can be longer once escapes are counted).
+        unwrapped=$(_rt_unquote_scalar "$value")
+        if [ ${#unwrapped} -gt 200 ]; then
+          printf '[yellow-ci] Error: routing rule exceeds 200 char limit (%d chars): %s\n' "${#unwrapped}" "$value" >&2
+          return 1
+        fi
         continue
         ;;
     esac
 
     # Unquoted: reject a leading YAML indicator character. Mirrors
     # _rt_yaml_hazard_shape's leading-character set (see its comment for the
-    # PyYAML-verified rationale on [/{/]/}/? ) — duplicated rather than
-    # shared per this function's own file-header note (left as-is, still
-    # tested directly).
+    # PyYAML-verified rationale, including the narrower `-`/`?` shapes —
+    # duplicated rather than shared per this function's own file-header note
+    # (left as-is, still tested directly).
     case "$value" in
-      -*|'*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*|'['*|'{'*|']'*|'}'*|'?'*)
+      '-'|'- '*|'?'|'? '*)
+        printf '[yellow-ci] Error: Unquoted routing rule starts with a YAML-significant character (quote it): %s\n' "$value" >&2
+        return 1
+        ;;
+    esac
+    case "$value" in
+      '*'*|'&'*|'!'*|'|'*|'>'*|'%'*|'@'*|'`'*|"'"*|'#'*|'['*|'{'*|']'*|'}'*)
         printf '[yellow-ci] Error: Unquoted routing rule starts with a YAML-significant character (quote it): %s\n' "$value" >&2
         return 1
         ;;
@@ -1042,6 +1128,12 @@ _rt_check_routing_rules() {
       printf '[yellow-ci] Error: Unquoted routing rule looks numeric (quote it): %s\n' "$value" >&2
       return 1
     fi
+
+    # Length bound: schema maxLength: 200 on the routing_rules item value.
+    if [ ${#value} -gt 200 ]; then
+      printf '[yellow-ci] Error: routing rule exceeds 200 char limit (%d chars): %s\n' "${#value}" "$value" >&2
+      return 1
+    fi
   done < <(_rt_extract_routing_rule_values "$filepath")
 
   return 0
@@ -1052,8 +1144,10 @@ _rt_check_routing_rules() {
 # every target has type/mode/preferred_selector present, name/type/mode/
 # preferred_selector-labels are valid (quoted-or-safe-unquoted), best_for/
 # avoid_for/notes contain no reserved |/, delimiter and are themselves
-# quoted-or-safe-unquoted, routing_rules has no bare-`-` null items, and the
-# 20/20 count caps.
+# quoted-or-safe-unquoted, routing_rules has no bare-`-` null items, the
+# 20/20 runner-targets/routing-rules count caps, the per-runner 10-item caps
+# on preferred_selector/best_for/avoid_for/notes, and the 200-char maxLength
+# on best_for/avoid_for/notes/routing_rules item values.
 # Usage: validate_runner_targets_file "$filepath"
 # Returns 0 on success, 1 on failure (with error on stderr)
 validate_runner_targets_file() {
@@ -1100,6 +1194,7 @@ validate_runner_targets_file() {
   _rt_check_runner_names "$filepath" || return 1
   _rt_check_required_fields "$filepath" || return 1
   _rt_check_target_counts "$filepath" || return 1
+  _rt_check_field_item_counts "$filepath" || return 1
   _rt_check_runner_types "$filepath" || return 1
   _rt_check_runner_modes "$filepath" || return 1
   _rt_check_selector_labels "$filepath" || return 1

@@ -5,6 +5,7 @@ argument-hint: '[workflow-file.yml]'
 allowed-tools:
   - Bash
   - Read
+  - Write
   - Glob
   - Grep
   - Edit

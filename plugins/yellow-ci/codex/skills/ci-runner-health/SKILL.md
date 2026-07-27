@@ -58,7 +58,21 @@ fi
 # Bound the read — a legitimate hand-edited config (YAML front matter plus a
 # Runner Notes section) fits well within 64 KiB; anything beyond that is not
 # read, so an oversized file can't be dumped wholesale into context.
-RAW_CONFIG=$(head -c 65536 "$CONFIG_PATH" 2>/dev/null)
+# `head -c` is a GNU coreutils extension: BSD/macOS head has no `-c` at all,
+# so it would error out and be mistaken for "config is empty" below rather
+# than truncated. A larger `dd` block size (e.g. `bs=4096 count=16`) is not a
+# safe substitute: `count=` bounds the number of read() calls, not bytes, and
+# a single read() is permitted to return fewer bytes than the requested block
+# size (short reads are ordinary on NFS, 9p/virtiofs, and other non-local
+# mounts — including the `/mnt/*` and devcontainer mounts this repo is
+# routinely edited from) — silently truncating the config well under 64 KiB
+# with no error. `bs=1` makes that failure mode structurally impossible: a
+# 1-byte read can only return 0 (EOF) or 1 byte, never a partial one, so
+# `count=65536` is an exact byte bound on any filesystem. The syscall
+# overhead (65536 single-byte reads) is negligible at this bound — low
+# single-digit milliseconds for a file capped at 64 KiB — so there is no real
+# performance cost to trade against the correctness gap above.
+RAW_CONFIG=$(dd if="$CONFIG_PATH" bs=1 count=65536 2>/dev/null)
 if [ -z "$RAW_CONFIG" ]; then
   printf '[yellow-ci] Runner config at %s is empty. Run the ci-setup skill to populate it.\n' "$CONFIG_PATH"
   exit 1
