@@ -35,7 +35,7 @@ const { generateManifests } = require('../../scripts/generate-manifests.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { loadCatalog, loadPluginSources } = require('../../scripts/lib/generate/catalog-reader.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { validateArtifacts } = require('../../scripts/validate-codex.js');
+const { validateArtifacts, runExposureLint } = require('../../scripts/validate-codex.js');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { computeCodexTwoWayDrift, computeCodexMarketplaceIssues } = require('../../scripts/validate-versions.js');
 
@@ -733,5 +733,130 @@ describe('four-way version drift (Claude plugin, Codex plugin, catalog track, ma
 
     const wrongPath = computeCodexMarketplaceIssues(['a'], [{ name: 'a', source: { path: './plugins/wrong' } }]);
     expect(wrongPath.some((i: string) => i.includes('source.path'))).toBe(true);
+  });
+});
+
+describe('reference sidecars (references/*.md)', () => {
+  function makeRefFixture(refFiles: Record<string, string>) {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'ref-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['with-refs'],
+        skills: { 'with-refs': { name: 'with-refs', description: 'Skill with references.' } },
+      },
+    ]);
+    const refDir = join(root, 'plugins', 'ref-plugin', 'skills', 'with-refs', 'references');
+    mkdirSync(refDir, { recursive: true });
+    for (const [file, content] of Object.entries(refFiles)) {
+      writeFileSync(join(refDir, file), content, 'utf8');
+    }
+    return { root, refDir };
+  }
+
+  it('copies flat references/*.md into the generated skill tree, byte-identical', () => {
+    const { root } = makeRefFixture({ 'extra.md': '# Extra reference\n\nDetails here.\n' });
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('ok');
+    const generated = join(root, 'plugins', 'ref-plugin', 'codex', 'skills', 'with-refs', 'references', 'extra.md');
+    expect(existsSync(generated)).toBe(true);
+    expect(readFileSync(generated, 'utf8')).toBe('# Extra reference\n\nDetails here.\n');
+
+    // Regeneration is drift-free: the copied reference matches its target.
+    const second = generateManifests({ mode: 'check', rootDir: root });
+    expect(second.status).toBe('ok');
+    expect(second.diffs).toEqual([]);
+  });
+
+  it('sweeps a generated reference whose source file was removed', () => {
+    const { root, refDir } = makeRefFixture({
+      'keep.md': 'Keep me.\n',
+      'remove.md': 'Remove me.\n',
+    });
+    const first = generateManifests({ mode: 'apply', rootDir: root });
+    expect(first.status).toBe('ok');
+    const generatedRefDir = join(root, 'plugins', 'ref-plugin', 'codex', 'skills', 'with-refs', 'references');
+    expect(existsSync(join(generatedRefDir, 'remove.md'))).toBe(true);
+
+    rmSync(join(refDir, 'remove.md'));
+    const second = generateManifests({ mode: 'apply', rootDir: root });
+    expect(second.status).toBe('ok');
+    expect(existsSync(join(generatedRefDir, 'remove.md'))).toBe(false);
+    expect(existsSync(join(generatedRefDir, 'keep.md'))).toBe(true);
+  });
+
+  it('still hard-errors on a non-references sidecar entry', () => {
+    const { root } = makeRefFixture({ 'extra.md': 'Fine.\n' });
+    writeFileSync(
+      join(root, 'plugins', 'ref-plugin', 'skills', 'with-refs', 'schema.yaml'),
+      'key: value\n',
+      'utf8'
+    );
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors.some((e: string) => e.includes('sidecar') && e.includes('schema.yaml'))).toBe(true);
+  });
+
+  it('rejects a nested directory inside references/', () => {
+    const { root, refDir } = makeRefFixture({ 'extra.md': 'Fine.\n' });
+    mkdirSync(join(refDir, 'nested'), { recursive: true });
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors.some((e: string) => e.includes('references/nested'))).toBe(true);
+  });
+
+  it('rejects a non-.md reference file', () => {
+    const { root, refDir } = makeRefFixture({ 'extra.md': 'Fine.\n' });
+    writeFileSync(join(refDir, 'data.json'), '{}\n', 'utf8');
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors.some((e: string) => e.includes('references/data.json'))).toBe(true);
+  });
+
+  it('rejects a symlinked reference file', () => {
+    const { root, refDir } = makeRefFixture({});
+    const external = mkdtempSync(join(tmpdir(), 'yellow-generate-codex-external-'));
+    fixtureRoots.push(external);
+    writeFileSync(join(external, 'real.md'), 'External content.\n', 'utf8');
+    symlinkSync(join(external, 'real.md'), join(refDir, 'linked.md'));
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors.some((e: string) => e.includes('references/linked.md'))).toBe(true);
+  });
+
+  it('rejects a symlinked references/ directory itself', () => {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'ref-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['with-refs'],
+        skills: { 'with-refs': { name: 'with-refs', description: 'Skill with references.' } },
+      },
+    ]);
+    const external = mkdtempSync(join(tmpdir(), 'yellow-generate-codex-external-'));
+    fixtureRoots.push(external);
+    writeFileSync(join(external, 'real.md'), 'External content.\n', 'utf8');
+    symlinkSync(external, join(root, 'plugins', 'ref-plugin', 'skills', 'with-refs', 'references'));
+    const result = generateManifests({ mode: 'apply', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors.some((e: string) => e.includes('references') && e.includes('symlink'))).toBe(true);
+  });
+
+  it('exposure lint fails on ${CLAUDE_PLUGIN_ROOT} inside a generated reference file', () => {
+    const { root } = makeRefFixture({
+      'env-ref.md': 'Read ${CLAUDE_PLUGIN_ROOT}/scripts/foo.sh for details.\n',
+    });
+    const generated = generateManifests({ mode: 'apply', rootDir: root });
+    expect(generated.status).toBe('ok');
+
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    const errors = runExposureLint({ rootDir: root, catalog, sources });
+    expect(
+      errors.some(
+        (e: string) =>
+          e.includes('codex/skills/with-refs/references/env-ref.md') && e.includes('CLAUDE_PLUGIN_ROOT')
+      )
+    ).toBe(true);
   });
 });
