@@ -184,8 +184,10 @@ The agent will:
 2. Report: pass (finding gone, no new issues), fail (finding still present),
    or warning (new findings introduced)
 
-**If finding still present:** Offer to revert: `git checkout -- "${FILE_PATH}"`
-If changes were stashed in Step 5: `git stash pop`
+**If finding still present:** Ask the user (matching the Error Handling
+table): [Revert + stash pop] — `git checkout -- "${FILE_PATH}"`, then
+`git stash pop` if changes were stashed in Step 5 — or [Retry] — return to
+Step 6 for another fix attempt.
 **If new findings introduced:** Show the new findings, ask user to proceed or revert.
 If user chooses to revert and changes were stashed in Step 5: `git stash pop`
 

@@ -393,8 +393,8 @@ done
 
 ### Step 8: M3 confirmation gate (AskUserQuestion)
 
-Per MEMORY.md "M3 before bulk writes — no threshold," every file write must
-be gated by AskUserQuestion. Show the user:
+Every file write must be gated by AskUserQuestion — there is no batch-size
+threshold below which confirmation may be skipped. Show the user:
 
 - Resolved `$REPORT_PATH` (repo-relative path shown to user)
 - Headline summary (one line)

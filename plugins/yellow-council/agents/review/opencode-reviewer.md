@@ -102,7 +102,17 @@ PACK_FILE=$(mktemp /tmp/council-opencode-pack-XXXXXX.txt)
 OUTPUT_FILE=$(mktemp /tmp/council-opencode-out-XXXXXX.json)
 STDERR_FILE=$(mktemp /tmp/council-opencode-err-XXXXXX.txt)
 
-# Write the pack to PACK_FILE here from your spawn prompt content
+# Write the pack content from your spawn prompt to PACK_FILE.
+# Substitute the actual pack text (verbatim, including all fenced sections)
+# from the spawn prompt below into a heredoc here. Bash variables do NOT
+# carry the pack content from the orchestrator — the LLM running this
+# agent writes it directly. Never use the Write tool (not in allowed-tools).
+#
+#   cat > "$PACK_FILE" <<'__EOF_COUNCIL_PACK__'
+#   <full pack content here, copy-pasted from the spawn prompt>
+#   __EOF_COUNCIL_PACK__
+#
+# Validate non-empty before invoking the CLI:
 [ -s "$PACK_FILE" ] || { printf '[opencode-reviewer] Error: empty pack file\n' >&2; exit 1; }
 
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \

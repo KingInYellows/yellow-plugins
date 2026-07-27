@@ -310,7 +310,8 @@ All todo files MUST include:
 
 - `status`: Current lifecycle state
 - `priority`: Urgency level (p1-p4)
-- `issue_id`: Unique identifier
+- `id`: Unique identifier (read as `.id` by `/debt:fix` and `/debt:sync`;
+  distinct from `linear_issue_id`, which links a synced Linear issue)
 - `tags`: Array of lowercase, hyphen-separated tags
 
 **Remediation**: Add missing fields to YAML frontmatter. See `lib/validate.sh`

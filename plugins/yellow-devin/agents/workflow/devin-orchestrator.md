@@ -63,7 +63,10 @@ POST to `${ORG_URL}/sessions` with:
 - `prompt`: task description with context
 - `title`: auto-generated from first ~80 chars of prompt
 - `repos`: auto-detected from git remote
-- `max_acu_limit`: set a cap to prevent cost overruns during auto-retry loops
+- `max_acu_limit`: set a cap to prevent cost overruns during auto-retry loops.
+  Use the limit from the spawn prompt if one was provided; otherwise ask the
+  user for a cap via AskUserQuestion before creating the session (do not pick
+  a number yourself)
 
 Check all three error layers (curl exit, HTTP status, jq parse).
 
@@ -164,8 +167,10 @@ For tasks with independent subtasks:
 
 - **Hard limit: 3 review-fix cycles** — prevents infinite loops and runaway
   costs
-- **Time-box orchestrations: 15 minutes** — track total elapsed time and abort
-  workflow after limit
+- **Time-box each poll loop: 15 minutes** — this is Step 3's max wall-clock,
+  applied per session poll loop, not to the whole orchestration. Combined with
+  the 3-cycle hard limit above, total polling should never exceed ~45 minutes;
+  track elapsed time and abort the workflow if it does
 - **Always preserve context on failure** — user needs info for manual recovery
 - **Sanitize context dumps** — strip tokens matching `cog_[a-zA-Z0-9_-]*`
 - **Announce state transitions** — tell user when polling starts, when review

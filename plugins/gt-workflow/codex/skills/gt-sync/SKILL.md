@@ -23,8 +23,9 @@ Optional arguments:
   through to `gt sync` so it does not prompt for (or perform) deletions (`gt
   sync` has no `--no-delete` flag itself)
 - `--force` — Restack even if the stack appears clean (still stopping at
-  conflicts for manual resolution) instead of skipping Phase 2 when there are no
-  divergence markers
+  conflicts for manual resolution) instead of skipping the restack step
+  (Phase 2 Step 3) when there are no divergence markers; `gt sync` itself
+  (Phase 2 Step 1) always runs regardless
 
 The argument text provided after the skill name (if any) is available as
 context for this invocation.

@@ -39,7 +39,9 @@ If the argument text is a plain text description, use it as the feature
 description.
 
 If no arguments are provided, use `AskUserQuestion` to ask: "What feature do you
-want to plan a stack for?"
+want to plan a stack for?" (`AskUserQuestion` is a Claude Code tool — on Codex,
+ask the same question in your reply and wait for the user's answer; this
+applies to every AskUserQuestion mention in this skill.)
 
 ### Phase 0: Read Convention File
 
@@ -205,8 +207,10 @@ Use AskUserQuestion to ask the user:
 
 Convert the visual stack plan from Phase 2 Step 2 into the structured
 `## Stack Decomposition` format defined by the `stack-decomposition-format`
-skill (invoke the `Skill` tool with `skill: "stack-decomposition-format"` if
-the exact field contract is needed).
+skill (on Claude Code, invoke the `Skill` tool with
+`skill: "stack-decomposition-format"` if the exact field contract is needed;
+on Codex, the skill is Codex-exposed — read and apply its contract directly,
+as there is no Skill tool to call).
 
 For each stack item, produce:
 
@@ -221,7 +225,11 @@ For each stack item, produce:
 ```
 
 Set `<!-- stack-topology: linear|parallel|mixed -->` based on the dependency
-graph. Set `<!-- stack-trunk: -->` to the trunk branch from Phase 1 Step 3.
+graph. Note: the `workflows:work` consumer currently supports only `linear`
+and `parallel` (see the `stack-decomposition-format` skill) — if the graph is
+genuinely mixed, tell the user that and offer to reorder the decomposition
+into linear or parallel form before emitting `mixed`. Set
+`<!-- stack-trunk: -->` to the trunk branch from Phase 1 Step 3.
 
 #### 2. Determine Output Destination
 

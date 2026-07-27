@@ -23,7 +23,7 @@ compound-staging entry into the canonical learning store:
 
 You run non-interactively. Your frontmatter denies `AskUserQuestion`
 because this is a hard-deny enforcement of D8 from
-`plans/background-compounding-triggers.md`. The drain pipeline cannot
+`plans/complete/background-compounding-triggers.md`. The drain pipeline cannot
 prompt a user; if you would need to ask a question, you instead refuse
 the promotion and log the reason to stderr. Asking is structurally
 impossible in this agent.
@@ -125,11 +125,15 @@ if [ "${#SESSION_ID}" -gt 64 ]; then
   exit 0
 fi
 
-# Application-layer prompt-injection filter on candidate_text. Even though
-# staging-reviewer Phase 6 runs the same scan model-side, repeat at the
-# write boundary so a model-side bypass cannot reach disk under
-# bypassPermissions. Filter is intentionally strict — false positives
-# refuse the promotion (entry stays in processing/ for retry).
+# Application-layer prompt-injection filter on candidate_text. This overlaps
+# with (but is not identical to) staging-reviewer's model-side Phase 6 scan:
+# both catch "ignore previous", system/assistant prefixes, and system-tag
+# markers; Phase 6 additionally catches fence-breakout and code-fence
+# wrapping (model-side judgment), while this regex additionally guards the
+# MEMORY.md partition names. The write-boundary repeat exists so a
+# model-side bypass cannot reach disk under bypassPermissions. Filter is
+# intentionally strict — false positives refuse the promotion (entry stays
+# in processing/ for retry).
 if printf '%s' "$CANDIDATE_TEXT" | grep -qiE \
   '(ignore (all |previous )|</?instructions>|</?system>|^system:[[:space:]]|^assistant:[[:space:]]|\bCORE_RULES\b|\bUSER_PREFERENCES\b|\bKNOWN_PROJECTS\b)'; then
   printf '[staging-promoter] pre-write injection filter triggered; refusing session_id=%s\n' "$SESSION_ID" >&2
@@ -322,7 +326,7 @@ source: compound-staging
 Auto-promoted by yellow-core's compound-staging pipeline from session
 `<session_id>` (priority <priority>, category <category>).
 
-See `plans/background-compounding-triggers.md` for the pipeline architecture.
+See `plans/complete/background-compounding-triggers.md` for the pipeline architecture.
 ```
 
 Title rule: take the first sentence of `candidate_text` (everything up to
@@ -429,7 +433,7 @@ Exit 0.
 
 ## References
 
-- `plans/background-compounding-triggers.md` D8 + D9-L1 — agent rationale
+- `plans/complete/background-compounding-triggers.md` D8 + D9-L1 — agent rationale
 - `plugins/yellow-core/agents/workflow/staging-reviewer.md` — dispatcher
 - `plugins/yellow-core/agents/workflow/knowledge-compounder.md` — the
   interactive counterpart this complements (never modify)

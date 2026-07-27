@@ -58,8 +58,9 @@ Parse JSON output and check:
    - Still present → Report FAIL
    - Gone → Continue to regression check
 
-2. **New findings introduced?** Compare results against a pre-fix baseline (if
-   available) or check for findings at lines modified by the fix.
+2. **New findings introduced?** Check for findings at lines modified by the
+   fix. (No pre-fix baseline is passed to this agent — the modified-lines
+   check is the mechanism.)
    - New findings found → Report WARNING with details
    - No new findings → Report PASS
 

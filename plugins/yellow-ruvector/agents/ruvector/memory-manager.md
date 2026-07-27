@@ -5,6 +5,7 @@ model: inherit
 skills:
   - agent-learning
   - ruvector-conventions
+  - memory-query
 tools:
   - ToolSearch
   - AskUserQuestion
@@ -52,7 +53,8 @@ When asked to record a learning:
 1. Determine `type` from context (`context`, `decision`, `project`, or `code`)
 2. Construct a plain-text entry with context + insight + action
 3. Quality gate: content must be >= 20 words with context + insight + action
-4. Dedup check: search for similar entries (cosine > 0.85 = likely duplicate)
+4. Dedup check: search for similar entries (cosine > 0.82 = likely duplicate,
+   per the `memory-query` skill's canonical constants)
 5. Use ToolSearch to discover MCP tools, then insert via `hooks_remember`
 
 If `hooks_remember` fails or returns an error: log '[memory-manager] Failed to store entry: <error>. Entry not saved.' Output `**Stored**: false — <error summary>` so callers can detect the failure. Do not retry.
@@ -84,8 +86,9 @@ When called to flush `pending-updates.jsonl`:
      Stop. Do not proceed.
 6. For `file_change` entries: prefer re-indexing via `/ruvector:index` or
    `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain` rather than inventing manual MCP insert schemas
-7. For `bash_result` entries with non-zero exit codes: consider as `context`
-   candidates
+7. For `bash_result` entries with non-zero exit codes: store as `context`
+   entries via `hooks_remember` when they pass the step 3 quality gate;
+   otherwise count them as skipped
 8. After processing, truncate the queue file via Write (empty content)
 9. Report: "Flushed N entries (M files re-indexed, K skipped, J invalid paths
    rejected)"

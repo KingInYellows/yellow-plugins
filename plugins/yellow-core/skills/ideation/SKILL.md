@@ -325,8 +325,8 @@ When strict mode is active, mention it in one line above the Phase 4 question:
   serendipitous cross-domain connections; a three-phase flow lets weak ideas
   surface, then filters them on warrant rather than on initial plausibility.
   Pattern adopted from the source-plan research note on multi-stage
-  ideation; refer to `plans/everyinc-merge.md` W3.11 for the underlying
-  citations.
+  ideation; refer to `plans/complete/everyinc-merge.md` W3.11 for the
+  underlying citations.
 - **Why Toulmin, not free-form rationale.** Structured slots
   (`[EVIDENCE]`, `[WARRANT]`, `[IDEA]`) reduce confabulation versus
   "explain why" free-form prompts and make warrant inspectable —

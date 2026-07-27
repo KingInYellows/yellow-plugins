@@ -59,10 +59,15 @@ calls fail with auth errors, announce the fallback to DeepWiki.
 
 "Devin Wiki unavailable — falling back to DeepWiki (public repos only)."
 
-- If repo is private: report "Cannot query private repos via DeepWiki. Check
-  that Devin MCP is configured correctly."
-- If repo is public: use DeepWiki MCP tools (`ask_question`,
-  `read_wiki_structure`, `read_wiki_contents`)
+Determine visibility with
+`gh repo view "$REPO" --json isPrivate -q .isPrivate 2>/dev/null` (treat a
+failed lookup — `gh` missing or unauthenticated — as unknown and attempt
+DeepWiki anyway):
+
+- If repo is private (`true`): report "Cannot query private repos via
+  DeepWiki. Check that Devin MCP is configured correctly."
+- If repo is public (`false` or unknown): use DeepWiki MCP tools
+  (`ask_question`, `read_wiki_structure`, `read_wiki_contents`)
 
 **Important:** The exact tool names are pinned in this command's
 `allowed-tools` frontmatter (`devin` server for primary, `deepwiki` server for

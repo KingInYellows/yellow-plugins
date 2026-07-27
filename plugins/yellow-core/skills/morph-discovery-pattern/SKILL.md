@@ -44,7 +44,7 @@ already optimal.
 1. Call ToolSearch("morph warpgrep")
 2. If found AND query is intent-based ("what calls this function?",
    "find similar patterns", "blast radius of this change"):
-   prefer morph warpgrep_codebase_search
+   prefer morph codebase_search (aka WarpGrep)
 3. If not found OR query is exact-match (specific string, regex):
    use built-in Grep
 4. No warning on fallback. No degradation message.

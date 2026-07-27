@@ -158,7 +158,10 @@ Therefore:
 ## Commit Message Sanitization
 
 Finding titles may contain shell metacharacters. Use printf for shell-safe
-quoting to prevent command injection:
+quoting to prevent command injection. (This section is illustrative — the
+executed version lives in the debt-fixer agent's step 6. The lowercase
+`$finding_title`/`$todo_path`/`$category`/`$severity` correspond to this
+file's `TITLE`/`NEW_TODO_PATH`/`CATEGORY`/`SEVERITY`.)
 
 ```bash
 # Extract and sanitize title

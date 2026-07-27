@@ -100,7 +100,7 @@ For query results, show each relationship as:
 ```
 [subject] --[predicate]--> [object]
   Valid: [from] → [to or "present"]
-  Source: [closet reference if available]
+  Source: [closet reference if available — a "closet" is the palace term for a summary pointing to original content, not a typo for "closest"]
 ```
 
 For timeline, show chronologically with dates.

@@ -99,9 +99,7 @@ resolution, and sequential stack review. Graphite-native workflow.
 - `agent-native-reviewer` — Conditional persona reviewing agent-native
   parity: every UI action has an agent tool equivalent, agents see the
   same data users see, shared workspace, primitives over workflows,
-  dynamic context injection. Adapted from upstream CE v3.3.2. References
-  `yellow-core:agent-native-architecture` and
-  `yellow-core:agent-native-audit` skills. New in Wave 3.
+  dynamic context injection. Adapted from upstream CE v3.3.2. New in Wave 3.
 - `pr-test-analyzer` — Test coverage and behavioral completeness
 - `comment-analyzer` — Comment accuracy and rot detection
 - `code-simplifier` — Simplification preserving functionality (runs as final

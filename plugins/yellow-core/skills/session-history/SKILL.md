@@ -103,6 +103,10 @@ Do not retry, do not fail — proceed with the available backends.
 
 ### Phase 2: Dispatch to session-historian
 
+Before dispatch, apply any vendor restriction parsed in Phase 0: set the
+availability-map entry of every restricted-out backend to `false` so the
+agent skips it (e.g., "Claude Code only" forces Devin and Codex to `false`).
+
 Spawn `session-historian` via Task with the parsed query, backend availability
 map, and time range. Use the **literal** 3-segment subagent type:
 

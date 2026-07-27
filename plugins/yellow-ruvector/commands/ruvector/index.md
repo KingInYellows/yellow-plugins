@@ -59,7 +59,11 @@ Filter out:
    ruvector indexing is unavailable and stop.
 2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
    If it errors, report that ruvector MCP is unavailable and stop.
-3. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain`.
+3. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain`. The tool
+   takes no file-list or path parameter — it analyzes repository structure
+   and git history itself from the project root. The Step 3 file list is
+   used only to validate scope and drive the progress/summary display; it
+   is not passed to the tool.
 4. If the MCP call errors with timeout, connection refused, or service
    unavailable: wait approximately 500 milliseconds and retry exactly once.
    If the retry also fails, report the failure and stop.

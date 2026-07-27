@@ -143,7 +143,8 @@ Otherwise, produce a structured report with:
 2. **Health score**: Use the formula from docs-conventions skill
 3. **Findings by severity**:
    - P1 (Critical): Missing README, undocumented public API
-   - P2 (Important): Stale docs (code changed, docs didn't)
+   - P2 (Important): Stale docs (code changed, docs didn't — or doc older
+     than the 90-day threshold with no source change, per Step 3)
    - P3 (Improvement): Missing sections, no cross-links
 4. **Recommendations**: Top 3 actionable next steps
 

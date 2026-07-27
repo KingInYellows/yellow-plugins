@@ -42,7 +42,7 @@ Based on the learning content, route to the appropriate `type` value:
 | Successful pattern, technique, best practice | `decision`                                      |
 | Code-specific implementation note            | `code`                                          |
 | Repo/project-wide background                 | `project`                                       |
-| Unclear                                      | Ask via AskUserQuestion with the four options   |
+| Unclear                                      | Ask via AskUserQuestion: the four types above plus `general` (the fallback type for when none fit) |
 
 Do not invent `namespace` parameters. The current MCP schema accepts `content`
 and optional `type`.
@@ -61,9 +61,14 @@ Build a structured plain-text entry:
 1. Call ToolSearch("hooks_remember"). If not found, report
    "ruvector not available. Run `/ruvector:setup` to initialize." and stop.
 2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
-   If it errors, report "ruvector not available right now. Check
+   If it errors, wait approximately 500 milliseconds and retry exactly once.
+   If the retry also fails, report "ruvector not available right now. Check
    `/ruvector:status` and try again." and stop.
-   If the retry also fails, skip dedup and proceed to Store Entry (Step 5).
+3. Dedup check (per the `memory-query` skill's canonical constants): call
+   `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with the entry
+   content and `top_k=1`. If the top result's score is > 0.82, report the
+   near-duplicate and skip storage. If the recall call itself fails, skip
+   dedup and proceed to Store Entry (Step 5).
 
 ### Step 5: Store Entry
 

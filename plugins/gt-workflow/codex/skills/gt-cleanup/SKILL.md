@@ -318,7 +318,9 @@ Note: N merged branches detected. Run gt-sync to clean those.
 #### 3. Dry Run Exit
 
 If `--dry-run` was passed, print "Dry run — no actions taken." Then proceed
-directly to Phase 6 (Worktree Cleanup Offer) — `--dry-run` is forwarded.
+directly to Phase 6 (Worktree Cleanup Offer) — Phase 6 reads `$DRY_RUN`
+itself and prints a preview note instead of invoking the worktree:cleanup
+skill (it is not passed as an argument to anything).
 
 #### 4. Nothing to Clean
 
@@ -332,6 +334,13 @@ before exiting — users may have stale worktrees even without stale branches.
 Walk through each non-empty category. **Actionable categories** (1, 2, 3, 5)
 get AskUserQuestion confirmation. **Warn-only categories** (4, 6) are displayed
 without prompting.
+
+**Host note:** `AskUserQuestion` and the `Skill` tool are Claude Code
+primitives. On Codex, wherever this skill says AskUserQuestion, present the
+same options as a numbered list in your reply and wait for the user's answer
+before acting; and in Phase 6, the `worktree:cleanup` skill is not
+Codex-exposed — report its unavailability via the existing graceful-degradation
+message instead of attempting the invocation.
 
 #### Actionable Categories (Orphaned, Closed PR, Stale, Behind Remote)
 

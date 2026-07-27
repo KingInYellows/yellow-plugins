@@ -52,9 +52,11 @@ User says any of:
 - "compound lifecycle"
 - "/yellow-core:compound-lifecycle"
 
-Also auto-invoked by `knowledge-compounder` when a freshly-written entry
-flags an older entry in the same `category` as superseded — passed via
-`$ARGUMENTS` as a narrow scope hint (e.g., a single file path).
+Auto-invocation by `knowledge-compounder` (on writing an entry that
+supersedes an older one in the same `category`) is a deferred integration —
+`knowledge-compounder` explicitly does not do this yet. Until it lands,
+invoke this skill manually in that situation, passing a narrow scope hint
+via `$ARGUMENTS` (e.g., a single file path).
 
 Do NOT use for: writing new entries (that's `knowledge-compounder`),
 searching the catalog (that's `learnings-researcher`), or general

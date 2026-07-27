@@ -63,7 +63,9 @@ For each `Consumes` entry:
   codebase (prior work may have diverged).
 
 On any failure, gate with AskUserQuestion — do not proceed silently:
-1. The artifact was renamed — provide the new path/name; update the shell.
+1. The artifact was renamed — label this option exactly `Other` (description:
+   "The artifact was renamed — provide the new path/name") so its free-text
+   field captures the new path; update the shell with the answer.
 2. The upstream shell's PR also renamed it — show me that PR to reconcile.
 3. Skip this Consumes check — accept stale references. (Choosing this MUST emit
    a visible `> WARNING: Consumes '<X>' could not be found at expand time` into

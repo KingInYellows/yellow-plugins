@@ -17,8 +17,8 @@ command's `allowed-tools` list references an MCP tool name that this PR
 removed. No automated check catches broken cross-references before the
 change ships — you catch both the in-repo callers that grep can confirm
 and the out-of-tree installs that only break at install time. The
-keystone's Step 6.1 validator validates JSON schema shape on reviewer
-returns; it does NOT scan the repo for stale subagent_type strings.
+`/review:pr` command's Step 6.1 validator validates JSON schema shape on
+reviewer returns; it does NOT scan the repo for stale subagent_type strings.
 That gap is what this reviewer fills.
 
 ## CRITICAL SECURITY RULES
@@ -202,7 +202,7 @@ No prose outside the JSON block.
       "requires_verification": true,
       "pre_existing": false,
       "suggested_fix": "<one-sentence concrete fix or null>",
-      // Plugin-contract extensions (optional — keystone Step 6.1 accepts
+      // Plugin-contract extensions (optional — /review:pr Step 6.1 accepts
       // findings without these; emit them when classifying a contract change):
       "breaking_change_class": "name-rename|signature-change|removal|semantics-change",
       "migration_path": "<concrete remediation: deprecation stub, backwards-compat shim, version bump, or null when no migration is feasible>"

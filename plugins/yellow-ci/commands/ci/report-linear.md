@@ -142,7 +142,7 @@ An open ci-failure issue already exists for this workflow:
 To file a new issue anyway, re-run with the run ID explicitly.
 ```
 
-### Step 8: Propose Issue to User (M3)
+### Step 8: Propose Issue to User (confirmation gate)
 
 Build and display the proposed Linear issue:
 

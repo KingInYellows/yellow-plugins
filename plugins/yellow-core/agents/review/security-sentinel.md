@@ -177,7 +177,7 @@ No other actions permitted.
 ### Executive Summary
 
 **Overall Risk**: Critical/High/Medium/Low | **Critical Issues**: Count | **High
-Priority**: Count **Recommendation**: Ship/Fix Critical/Comprehensive Review
+Priority**: Count | **Recommendation**: Ship/Fix Critical/Comprehensive Review
 Needed
 
 ### Critical Vulnerabilities (Severity: Critical)

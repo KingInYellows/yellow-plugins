@@ -90,6 +90,11 @@ gt log short
   nothing to amend.
 - If the current branch **equals trunk**, warn the user: amending trunk is
   dangerous. Use `AskUserQuestion` to confirm before proceeding.
+  (`AskUserQuestion` and the `Skill` tool are Claude Code primitives — on
+  Codex, ask confirmation questions as numbered options in your reply and
+  wait for the answer, and follow the Codex-exposed `audit-review` skill
+  directly instead of invoking a Skill tool; this applies throughout this
+  skill.)
 
 ### Phase 2: Audit (skip if `--no-verify`)
 

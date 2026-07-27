@@ -43,6 +43,10 @@ characters, use AskUserQuestion:
 Collect context to pass to Codex:
 
 ```bash
+# Task description from Step 2: $ARGUMENTS, or the AskUserQuestion answer
+# when $ARGUMENTS was empty/too short. Must be non-empty here.
+TASK_DESCRIPTION="<task description from Step 2>"
+
 # Current branch and recent commits
 BRANCH=$(git branch --show-current)
 RECENT_COMMITS=$(git log --oneline -5 2>/dev/null || true)

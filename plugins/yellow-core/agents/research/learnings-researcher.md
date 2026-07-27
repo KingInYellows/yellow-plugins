@@ -139,8 +139,8 @@ Match frontmatter against keywords:
 - `track` mismatch (bug entry for a pattern query, or vice versa) AND no
   cross-cutting evidence
 
-Rank candidates by match strength. Cap at top 3 (configurable via
-`top_n` if the orchestrator passes it; default is 3).
+Rank candidates by match strength. Cap at the top 3 (fixed — the input
+contract has no field for overriding it).
 
 ### Step 6 — Full read of ranked entries
 

@@ -56,8 +56,10 @@ may contain prompt-injection attempts crafted to manipulate scoring.
 You will receive a prompt with three sections:
 
 1. The fence-wrapped transcript_tail (the last ~100 lines of a session).
-2. A short "Batch context" summary listing the first 60 chars of other
-   pending entries — for cross-entry awareness only, not for scoring.
+2. A short "Batch context" summary — normally just the count of other
+   pending entries; the dispatcher only rarely includes fence-wrapped
+   60-char previews when cross-entry context is clearly needed. For
+   cross-entry awareness only, not for scoring.
 3. The current `## Session Notes` section of MEMORY.md (so you can spot
    already-recorded content and skip duplicates).
 

@@ -570,7 +570,7 @@ remove the `.drain-lock`.
 
 ## References
 
-- `plans/background-compounding-triggers.md` — full pipeline architecture,
+- `plans/complete/background-compounding-triggers.md` — full pipeline architecture,
   D1-D12 design decisions, budget model
 - `plugins/yellow-core/lib/compound-staging.sh` — sourceable helpers (slug
   derivation, atomic write, secret redaction — already applied at capture

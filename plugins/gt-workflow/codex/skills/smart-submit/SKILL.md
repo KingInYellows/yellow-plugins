@@ -163,7 +163,9 @@ Store this output as `$DIFF_OUTPUT` (pass it as context to each agent below).
 #### 1. Run the Audit
 
 Invoke the `Skill` tool with `skill: "audit-review"`, passing `$DIFF_OUTPUT`
-and `$GW_AUDIT_AGENTS` as context. It runs the appropriate quick-code-review
+and `$GW_AUDIT_AGENTS` as context. (On Codex there is no `Skill` tool — read
+the Codex-exposed `audit-review` skill and follow it directly with the same
+context.) It runs the appropriate quick-code-review
 / quick-security-scan / quick-error-check prompts (1-3 of them, per
 `$GW_AUDIT_AGENTS`) and returns a CRITICAL / MINOR / CLEAN verdict with
 file:line findings.
@@ -177,7 +179,9 @@ proceed with partial results or abort.
 **IF CRITICAL ISSUES** (secrets, production mocks, silent failures):
 
 1. Display blocking issues with file:line references
-2. Use AskUserQuestion to ask:
+2. Use AskUserQuestion (on Codex, which lacks that tool: present the same
+   options as a numbered list in your reply and wait for the user's answer)
+   to ask:
    - "Fix issues before submitting (Recommended)"
    - "Submit anyway"
    - "Abort"
