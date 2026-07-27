@@ -31,6 +31,11 @@ const { assertWithinRoot, NAME_RE } = require('./write');
 // approximation. Keep in sync if the source regex changes.
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
+// Reference sidecar files copied alongside SKILL.md must be flat *.md with
+// conservative names — nested directories and every other filename shape
+// keep the fail-closed hard error in buildCodexSkillTree.
+const REF_FILE_RE = /^[a-zA-Z0-9_-]+\.md$/;
+
 /**
  * Single source of truth for Codex-target membership — the twin to
  * emit-claude.js's isClaudeEnabled.
@@ -369,22 +374,107 @@ function buildCodexSkillTree(rootDir, name, source) {
       // the same "not found" error for consistency.
     }
 
-    // Only SKILL.md is copied below — there is no reference-file copy step
-    // yet. A skill with sidecar files (e.g. references/*.md, a top-level
-    // schema.yaml) would ship broken if its SKILL.md instructs the model to
-    // read them, so reject rather than silently drop them. Copying instead
-    // would also require extending generate-manifests.js's stale-artifact
-    // sweep (which currently only tracks <skillName>/SKILL.md) to recurse
-    // into sidecar paths, which is out of scope here.
+    // Only SKILL.md plus a flat references/ subdirectory of *.md files are
+    // copied below. Any OTHER sidecar entry (a top-level schema.yaml, a
+    // non-.md file, a nested directory inside references/) would ship
+    // broken if the SKILL.md instructs the model to read it, so reject
+    // rather than silently drop it — the fail-closed posture is preserved
+    // for everything outside the supported references/*.md shape.
     let sidecarEntries;
     try {
       sidecarEntries = readdirSync(skillDir).filter((entry) => entry !== 'SKILL.md');
     } catch (_) {
       sidecarEntries = []; // missing entirely; the SKILL.md open below reports it
     }
-    if (sidecarEntries.length > 0) {
-      errors.push(`plugins/${name}/skills/${skillName}: has sidecar file(s) not yet supported for Codex (${sidecarEntries.join(', ')}) — only SKILL.md is copied`);
+    const unsupportedSidecars = sidecarEntries.filter((entry) => entry !== 'references');
+    if (unsupportedSidecars.length > 0) {
+      errors.push(`plugins/${name}/skills/${skillName}: has sidecar file(s) not yet supported for Codex (${unsupportedSidecars.join(', ')}) — only SKILL.md and references/*.md are copied`);
       continue;
+    }
+
+    // Collect reference-file targets first; they are pushed only after the
+    // SKILL.md itself validates below, so a skill never emits references
+    // without its (normalized) SKILL.md.
+    const referenceTargets = [];
+    if (sidecarEntries.includes('references')) {
+      const refDir = join(skillDir, 'references');
+      // Same symlink posture as skillDir above: lstat rejects a symlinked
+      // references/ leaf outright; the literal expected-path comparison
+      // (not a prefix check) rejects any symlinked ancestor or in-plugin
+      // redirection; O_NOFOLLOW on each file read is the final-component
+      // second layer.
+      let refDirBad = false;
+      try {
+        if (lstatSync(refDir).isSymbolicLink()) {
+          refDirBad = true;
+        } else {
+          const refDirReal = realpathSync(refDir);
+          const refDirExpected = join(pluginRootReal, 'skills', skillName, 'references');
+          refDirBad = refDirReal !== refDirExpected;
+        }
+        if (refDirBad) {
+          errors.push(`plugins/${name}/skills/${skillName}/references: symlinked references directories (including a symlinked ancestor) are not allowed`);
+          continue;
+        }
+      } catch (err) {
+        errors.push(`plugins/${name}/skills/${skillName}/references: ${err.message}`);
+        continue;
+      }
+
+      let refEntries;
+      try {
+        refEntries = readdirSync(refDir, { withFileTypes: true });
+      } catch (err) {
+        errors.push(`plugins/${name}/skills/${skillName}/references: ${err.message}`);
+        continue;
+      }
+      let refEntryBad = false;
+      // Sort for deterministic target ordering across filesystems.
+      refEntries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      for (const entry of refEntries) {
+        // Flat *.md only — nested directories, non-.md files, and symlinks
+        // (isFile() is false for symlinks under withFileTypes) keep the
+        // hard error.
+        if (!entry.isFile() || !REF_FILE_RE.test(entry.name)) {
+          errors.push(`plugins/${name}/skills/${skillName}/references/${entry.name}: only flat, regular [a-zA-Z0-9_-]+.md reference files are supported for Codex`);
+          refEntryBad = true;
+          continue;
+        }
+        const refFile = join(refDir, entry.name);
+        let refFd;
+        try {
+          refFd = openSync(refFile, constants.O_RDONLY | constants.O_NOFOLLOW);
+        } catch (err) {
+          if (err.code === 'ELOOP') {
+            errors.push(`plugins/${name}/skills/${skillName}/references/${entry.name}: symlinked reference files are not allowed`);
+          } else {
+            errors.push(`plugins/${name}/skills/${skillName}/references/${entry.name}: ${err.message}`);
+          }
+          refEntryBad = true;
+          continue;
+        }
+        let refRaw;
+        try {
+          refRaw = readFileSync(refFd, 'utf8');
+        } catch (err) {
+          errors.push(`plugins/${name}/skills/${skillName}/references/${entry.name}: ${err.message}`);
+          refEntryBad = true;
+          continue;
+        } finally {
+          closeSync(refFd);
+        }
+        // Copied verbatim (no frontmatter normalization) — reference files
+        // are plain markdown, not skill manifests. Relative layout is
+        // preserved so skill-relative "sibling" Read stubs resolve
+        // identically in source and generated locations.
+        referenceTargets.push({
+          path: join(rootDir, 'plugins', name, skillsPath, skillName, 'references', entry.name),
+          bytes: refRaw,
+        });
+      }
+      if (refEntryBad) {
+        continue;
+      }
     }
 
     let fd;
@@ -453,6 +543,7 @@ function buildCodexSkillTree(rootDir, name, source) {
 
     const targetPath = join(rootDir, 'plugins', name, skillsPath, skillName, 'SKILL.md');
     targets.push({ path: targetPath, bytes: normalized });
+    targets.push(...referenceTargets);
   }
 
   if (errors.length > 0) {
