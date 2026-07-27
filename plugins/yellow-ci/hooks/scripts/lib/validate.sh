@@ -484,14 +484,23 @@ _rt_check_yaml_syntax() {
 }
 
 # Validate every runner target name in the file against validate_runner_name.
-# Returns 0 if all names are valid, 1 on the first invalid name (error on stderr).
+# A blank/whitespace-only name is a hard failure (schema-required, DNS-safe
+# name syntax) — not skipped, since validate_runner_name("") itself rejects
+# empty input and a naive `[ -n "$name" ] &&` guard would short-circuit past
+# that rejection entirely.
+# Returns 0 if all names are valid, 1 on the first invalid/blank name (error
+# on stderr).
 _rt_check_runner_names() {
   local filepath="$1"
   local name
   while IFS= read -r name; do
     # Trim the "- name:" prefix and trailing whitespace.
     name=$(printf '%s' "$name" | sed 's/^[[:space:]]*-[[:space:]]*name:[[:space:]]*//' | sed 's/[[:space:]]*$//')
-    if [ -n "$name" ] && ! validate_runner_name "$name"; then
+    if [ -z "$name" ]; then
+      printf '[yellow-ci] Error: Runner target has a blank name\n' >&2
+      return 1
+    fi
+    if ! validate_runner_name "$name"; then
       printf '[yellow-ci] Error: Invalid runner target name: %s\n' "$name" >&2
       return 1
     fi
@@ -500,13 +509,14 @@ _rt_check_runner_names() {
 }
 
 # Validate that every runner target has the schema's other required fields
-# present: `type`, `mode`, and at least one `preferred_selector` item (`name`
-# presence is implicit — _rt_check_runner_names only sees "- name:" lines that
-# already exist). validate_runner_type/validate_runner_mode/
-# validate_selector_label below only check values that ARE present, so a
-# target that omits (or blanks) one of these fields would otherwise pass this
-# gate and reach emit_runner_json(), which renders it with an empty
-# "type":""/"mode":"" — malformed in the merged cache JSON, not skipped.
+# present: `type`, `mode`, and at least one `preferred_selector` item. (`name`
+# blankness is NOT implicit from line presence — a "- name:" line can carry an
+# empty or whitespace-only value; that gap is rejected as a hard failure by
+# _rt_check_runner_names, which runs before this function.) validate_runner_type/
+# validate_runner_mode/validate_selector_label below only check values that ARE
+# present, so a target that omits (or blanks) one of these fields would
+# otherwise pass this gate and reach emit_runner_json(), which renders it with
+# an empty "type":""/"mode":"" — malformed in the merged cache JSON, not skipped.
 # Returns 0 if every target has all required fields, 1 on the first gap
 # (error on stderr).
 _rt_check_required_fields() {
@@ -558,6 +568,10 @@ _rt_check_required_fields() {
 }
 
 # Validate every runner target `type:` value against validate_runner_type.
+# The `[ -n "$type_val" ] &&` guard below is safe, not a gap: a blank/missing
+# `type:` value is already a hard failure from _rt_check_required_fields,
+# which runs earlier in validate_runner_targets_file — adding a second blank
+# check here would be a duplicate gate.
 # Returns 0 if all types are valid, 1 on the first invalid type (error on stderr).
 _rt_check_runner_types() {
   local filepath="$1"
@@ -573,6 +587,10 @@ _rt_check_runner_types() {
 }
 
 # Validate every runner target `mode:` value against validate_runner_mode.
+# The `[ -n "$mode_val" ] &&` guard below is safe, not a gap: a blank/missing
+# `mode:` value is already a hard failure from _rt_check_required_fields,
+# which runs earlier in validate_runner_targets_file — adding a second blank
+# check here would be a duplicate gate.
 # Returns 0 if all modes are valid, 1 on the first invalid mode (error on stderr).
 _rt_check_runner_modes() {
   local filepath="$1"
@@ -619,6 +637,9 @@ _rt_extract_field_items() {
 }
 
 # Validate every preferred_selector label against validate_selector_label.
+# Unlike _rt_check_runner_types/_rt_check_runner_modes, there is no `[ -n
+# "$value" ] &&` guard here: validate_selector_label("") itself returns 1, so
+# a blank selector item is already rejected without a separate blank check.
 # Returns 0 if all labels are valid, 1 on the first invalid label (error on stderr).
 _rt_check_selector_labels() {
   local filepath="$1"

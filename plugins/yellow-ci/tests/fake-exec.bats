@@ -223,6 +223,51 @@ YAML
   [[ "$output" == *"missing required field: preferred_selector"* ]]
 }
 
+@test "runner-target validation: blank name value rejected (present key, empty value)" {
+  cfg="$BATS_TEST_TMPDIR/blank-name.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name:
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"blank name"* ]]
+}
+
+@test "runner-target validation: whitespace-only name value rejected" {
+  cfg="$BATS_TEST_TMPDIR/whitespace-name.yaml"
+  printf 'schema: 1\nrunner_targets:\n  - name:    \n    type: pool\n    mode: jit_ephemeral\n    preferred_selector:\n      - self-hosted\n' >"$cfg"
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"blank name"* ]]
+}
+
+@test "runner-target validation: second target with blank name rejected (first target valid)" {
+  cfg="$BATS_TEST_TMPDIR/second-blank-name.yaml"
+  cat >"$cfg" <<'YAML'
+schema: 1
+runner_targets:
+  - name: ares
+    type: pool
+    mode: jit_ephemeral
+    preferred_selector:
+      - self-hosted
+  - name:
+    type: static-host
+    mode: persistent
+    preferred_selector:
+      - self-hosted
+YAML
+  run validate_runner_targets_file "$cfg"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"blank name"* ]]
+}
+
 @test "runner-target validation: blank type value rejected (present key, empty value)" {
   cfg="$BATS_TEST_TMPDIR/blank-type.yaml"
   cat >"$cfg" <<'YAML'
