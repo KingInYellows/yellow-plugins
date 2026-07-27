@@ -1,0 +1,31 @@
+plugins/yellow-ci/hooks/scripts/lib/validate.sh
+  s_066c00e42464dc::t_cfd35e4bfa58ee 590-593
+  s_066c00e42464dc::t_36e70f1dbff01e 512-519
+  s_066c00e42464dc::t_e4b37cb23ee0af 640-642
+  s_066c00e42464dc::t_d98f5fff4a5eb2 571-574
+  s_066c00e42464dc::t_177be4cffdc87f 487-492,499-503
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_066c00e42464dc::t_951a10a96a0cc5 227-235,319-327,455-463,587-596,690-698,813-822
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_066c00e42464dc::t_21ab2a57bd4087 588-597
+  s_066c00e42464dc::t_45ac493f6795b5 228-236,320-328,456-464,691-699
+  s_066c00e42464dc::t_8f9798ab004a45 814-823
+plugins/yellow-ci/tests/fake-exec.bats
+  s_066c00e42464dc::t_5dad6164cdfdc4 226-270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "769a78224af6bec72477944e9132a68977bafc5d",
+  "prompts": {},
+  "sessions": {
+    "s_066c00e42464dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c9f67e6-baf0-4ff2-af6d-1bdfa914191e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
