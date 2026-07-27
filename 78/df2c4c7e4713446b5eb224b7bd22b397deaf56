@@ -1,0 +1,49 @@
+plugins/yellow-ci/skills/ci-diagnose/SKILL.md
+  s_066c00e42464dc::t_7473ac26711fd4 366-371
+plugins/yellow-ci/tests/redaction.bats
+  s_066c00e42464dc::t_c57c1c849f4675 336-404
+plugins/yellow-ci/skills/ci-runner-health/SKILL.md
+  s_066c00e42464dc::t_9bcc34e9c818f6 604-609
+  s_066c00e42464dc::t_5db80747808668 840-845
+plugins/yellow-ci/hooks/scripts/lib/redact.sh
+  s_066c00e42464dc::t_784a607428a0cf 65-77
+  s_066c00e42464dc::t_1ef6117a491981 105-110
+plugins/yellow-ci/hooks/scripts/lib/resolve-runner-targets.sh
+  s_066c00e42464dc::t_a5760d0cdc8556 255,265-310
+  s_066c00e42464dc::t_1b64c632112aa5 20-24
+plugins/yellow-ci/tests/fake-exec.bats
+  s_066c00e42464dc::t_a7025100e86f3c 362-466
+plugins/yellow-ci/tests/resolve-runner-targets.bats
+  s_066c00e42464dc::t_ae8a984b4a210b 120-155
+plugins/yellow-ci/codex/skills/ci-diagnose/SKILL.md
+  s_066c00e42464dc::t_4e4367ebe2a4bd 365-370
+plugins/yellow-ci/codex/skills/ci-runner-health/SKILL.md
+  s_066c00e42464dc::t_4e4367ebe2a4bd 603-608,839-844
+plugins/yellow-ci/codex/skills/ci-setup-runner-targets/SKILL.md
+  s_066c00e42464dc::t_4e4367ebe2a4bd 104-106,257,263-280
+  s_066c00e42464dc::t_31f42eeb3bafee 281
+plugins/yellow-ci/skills/ci-setup-runner-targets/SKILL.md
+  s_066c00e42464dc::t_e83289a5c3f12f 258,265-281
+  s_066c00e42464dc::t_deab02142ea35f 105-107
+  s_066c00e42464dc::t_c5a86f8d32e20d 264
+  s_066c00e42464dc::t_a8d3ce8f98c35d 282
+plugins/yellow-ci/hooks/scripts/lib/validate.sh
+  s_066c00e42464dc::t_610d020ddd3ff3 832-837,848
+  s_066c00e42464dc::t_cb4c710719091d 703-793
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "78df2c4c7e4713446b5eb224b7bd22b397deaf56",
+  "prompts": {},
+  "sessions": {
+    "s_066c00e42464dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1c9f67e6-baf0-4ff2-af6d-1bdfa914191e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
