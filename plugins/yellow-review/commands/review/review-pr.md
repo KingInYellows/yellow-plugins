@@ -530,11 +530,11 @@ trigger them:
   `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`.
 - yellow-core cross-plugin: `architecture-strategist`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`,
-  `polyglot-reviewer`, `security-reviewer`, `performance-reviewer`
-  (Wave 2 personas in `yellow-core` whose agent bodies still emit the
-  legacy `finding`/`fix` prose shape rather than the compact-return JSON
-  schema), `security-sentinel`, `performance-oracle` (legacy-fallback
-  audit variants dispatched when `review_pipeline: legacy`).
+  `polyglot-reviewer`, `security-sentinel`, `performance-oracle`
+  (legacy-fallback audit variants dispatched when `review_pipeline:
+  legacy`). `security-reviewer` and `performance-reviewer` are NOT in
+  this list — they emit the compact-return JSON schema directly and
+  pass through Step 6 sub-step 0 unchanged.
 
 The aggregator in Step 6 normalizes legacy prose findings into the
 structured schema by inferring `confidence: 75`, `autofix_class:
@@ -566,8 +566,9 @@ Apply the aggregation steps from
      `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`.
    - yellow-core cross-plugin: `architecture-strategist`,
      `pattern-recognition-specialist`, `code-simplicity-reviewer`,
-     `polyglot-reviewer`, `security-reviewer`, `performance-reviewer`,
-     `security-sentinel`, `performance-oracle`.
+     `polyglot-reviewer`, `security-sentinel`, `performance-oracle`.
+     (`security-reviewer` and `performance-reviewer` emit the
+     compact-return schema directly — do not normalize them.)
 
    **Convert these to the compact-return schema BEFORE Step 1 validation
    runs** — otherwise the validator drops them as malformed and every
