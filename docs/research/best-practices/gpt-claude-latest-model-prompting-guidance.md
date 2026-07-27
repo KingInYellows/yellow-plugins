@@ -59,10 +59,11 @@ GPT-5](https://openai.com/business/guides-and-resources/a-practical-guide-to-bui
 **Confidence: medium** (defaults shift fast — treat as directional, not
 pinned):
 
-- Explicit dials to tune per task: `reasoning_effort`
+- Explicit dials to tune per task: the general GPT-5 API's `reasoning_effort`
   (minimal/low/medium/high) and `verbosity` (low/medium/high). Codex-specific
-  guidance recommends **"medium" reasoning effort as the default** for
-  interactive coding, reserving high/xhigh for harder, more autonomous tasks.
+  guidance adds an extra `xhigh` tier on top of that scale and recommends
+  **"medium" reasoning effort as the default** for interactive coding,
+  reserving high/xhigh for harder, more autonomous tasks.
 - Migrate agentic workflows to the **Responses API** rather than Chat
   Completions — only Responses persists chain-of-thought reasoning items
   across turns/tool calls, improving both performance and cache-driven cost.
