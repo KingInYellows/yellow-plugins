@@ -1385,6 +1385,73 @@ directly below the closing fence, in all twelve files.
 
 ---
 
+## Update — 2026-07-28
+
+### 31. Reviewer Convergence Reliability Tracks Verification Cost, Not Agreement Count
+
+**Refines anti-pattern #27** with a fourth data point that sharpens *why*
+agreement count alone predicts nothing, instead of just restating that it
+doesn't.
+
+PR #667: 6 of 21 independent reviewer personas (`simplicity`, `polyglot`,
+`maintainability`, `types`, `adversarial`, `codex`) each independently
+flagged that `scripts/validate-codex.js:491` re-literaled the `REF_FILE_RE`
+regex instead of importing the named constant `scripts/lib/generate/emit-codex.js`
+already exported. High agreement, and correct — applied and pushed (see the
+"Code-Level Instance" update in `multi-doc-schema-rename-drift.md`).
+
+Re-reading anti-pattern #27's own three data points against this axis, they
+already sort cleanly:
+
+- PR #528 (4/7 reviewers, **wrong**): a *tool/platform-behavior* claim —
+  "the `Skill` tool can only load `SKILL.md` files" — required knowing how
+  the tool actually resolves invocations, not something diffable from the
+  files in front of the reviewers.
+- PR #539 (8/15 reviewers, **right**) and anti-pattern #22 (7/7 reviewers,
+  **right**): #22's colon/wildcard-boundary bug is a *mechanical,
+  source-verifiable* claim — grep the grant string, see the collision. #539's
+  exit-code-API gap sits closer to behavior but was confirmed against the
+  `Skill` tool's actual (documented) return contract, not assumed.
+
+Both mechanical/source-verifiable cases were correct; the one purely
+behavioral case split. PR #667's `REF_FILE_RE` finding is a second
+mechanical case, and it was correct too — the pattern holds.
+
+- **Mechanical / source-verifiable claims** ("these two regex literals
+  differ," "this field is absent from the schema," "this constant is
+  defined twice") cost almost nothing to check — `grep`/`diff` the two sites
+  directly. Convergence on these is a strong, cheap-to-confirm signal: once
+  6 reviewers independently land on the same grep-verifiable fact, verifying
+  it costs one command and settles the question regardless of the count.
+- **Tool/platform-behavior claims** ("this hook doesn't fire on Codex," "the
+  `Skill` tool can only load `SKILL.md` files") require live invocation or
+  deep platform familiarity to check — this is exactly where reviewers share
+  the same wrong training-derived mental model, producing false consensus
+  that *feels* authoritative because many independently "confirmed" it
+  (PR #528's 4/7 false P1).
+
+**Rule:** Before weighing a converged-on finding by its agreement count,
+classify the claim by verification cost, not by how many reviewers stated
+it. If it reduces to a `grep`/`diff`-checkable fact, check it directly — the
+check is nearly free, and count stops mattering once you've looked. If it
+requires live behavior or deep platform knowledge, treat convergence as a
+prioritization signal only and still verify against a live invocation or a
+primary source, per anti-pattern #27. This does not supersede #27 — it names
+the axis #27's own examples were already sorted along.
+
+**Prevention checklist additions:**
+
+- [ ] When a finding claims two artifacts diverge (constants, regexes,
+      field lists), verify with `grep`/`diff` before weighing how many
+      reviewers flagged it — the check is cheaper than any confidence
+      calibration.
+- [ ] When a finding claims something about tool/platform *behavior* rather
+      than a diffable fact, do not shortcut to "N reviewers agree, apply
+      it" — reproduce the behavior or find a primary source per
+      anti-pattern #27, regardless of count.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2

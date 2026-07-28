@@ -3,7 +3,7 @@ title: "Multi-Document Schema-Rename Drift: Canonical Source Pattern"
 date: "2026-05-01"
 category: code-quality
 track: knowledge
-problem: "Renaming a schema field across 3+ coupled docs causes drift when each doc redocuments field names in its own prose"
+problem: "Renaming a schema field or shared constant across 3+ coupled docs or code sites (generator/sweep/validator) causes drift when each site redocuments or re-literals it instead of importing one canonical source"
 tags:
   - schema-migration
   - plugin-authoring
@@ -12,9 +12,14 @@ tags:
   - code-review
   - confidence-rubric
   - yellow-debt
+  - shared-constant-drift
+  - producer-consumer-contract
+  - single-source-of-truth
 components:
   - plugins/yellow-debt/agents/synthesis/audit-synthesizer.md
   - plugins/yellow-debt/README.md
+  - scripts/lib/generate/emit-codex.js
+  - scripts/validate-codex.js
 ---
 
 # Multi-Document Schema-Rename Drift: Canonical Source Pattern
@@ -159,7 +164,59 @@ Apply this pattern before any schema field rename:
 
 ---
 
+## Update — 2026-07-28
+
+### Code-Level Instance: Shared Regex Constant Across Generator and Validator
+
+PR #667 (yellow-plugins, Codex reference-file validation) surfaced the same
+canonical-source violation in code rather than documentation prose. The
+"accepted shape" of a Codex reference filename is a contract shared across
+three sites:
+
+1. The generator (`scripts/lib/generate/emit-codex.js`) — defines
+   `REF_FILE_RE` (the accepted reference-filename pattern), used by its own
+   `buildCodexSkillTree` sweep logic.
+2. `generate-manifests.js`'s stale-sweep logic — needs the same accepted
+   shape to detect stale/orphaned generated files.
+3. The validator (`scripts/validate-codex.js`) — needs the same shape to
+   accept/reject reference files during CI validation.
+
+`validate-codex.js:491` originally re-literaled the regex inline instead of
+importing the constant `emit-codex.js` already exported — the same "one
+canonical source, cross-reference everywhere else" violation this doc
+describes for doc prose, but in code. Six independent reviewer personas
+(`simplicity`, `polyglot`, `maintainability`, `types`, `adversarial`,
+`codex`) converged on it independently (see anti-pattern #31 in
+`claude-code-command-authoring-anti-patterns.md`); fixed by exporting
+`REF_FILE_RE` from `emit-codex.js` (`module.exports` at line 561) and
+importing it in `validate-codex.js` (`const { isCodexEnabled, REF_FILE_RE } =
+require('./lib/generate/emit-codex')` at line 62).
+
+**Generalized scope:** This doc's "One Canonical Source" guidance is not
+limited to markdown/doc prose — it applies equally to shared code constants
+(regex patterns, accepted-field enums, filename conventions) that 2+ modules
+independently need. The code-level analogue of the "Build-Time Grep
+Assertion" section above is: export the constant from its one producer
+module, `require`/`import` it everywhere else, and — if a lint pass exists
+for the surface — assert consumers import rather than re-literal it.
+
+**Prevention checklist additions (code-level):**
+
+- [ ] Before adding a regex/constant/enum that a validator or sweep step
+      needs, `grep` the repo for the same literal pattern — if a producer
+      module already defines it, import it instead of retyping it.
+- [ ] When a shared contract crosses 2+ files (producer, sweep/lint,
+      validator), treat it as an N-site contract: list every site that
+      encodes the same assumption before considering a shape change
+      complete.
+- [ ] Prefer exporting shared regex/constants from the producer module (the
+      generator) over duplicating them in each consumer — matches this
+      repo's `packages/domain` → `infrastructure` → `cli` one-way
+      dependency convention.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/build-errors/plugin-json-changelog-key-schema-drift-remote-validator.md` — Same class of drift in CI/manifest context
-- `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` — Anti-patterns in LLM-executed command prose
+- `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` — Anti-patterns in LLM-executed command prose; anti-pattern #31 is the reviewer-convergence signal that caught the PR #667 code-level instance of this doc's pattern
