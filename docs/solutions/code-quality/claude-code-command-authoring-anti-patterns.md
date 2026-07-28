@@ -1317,6 +1317,74 @@ way to the skill.
 
 ---
 
+## Update — 2026-07-27
+
+### 30. A `//` Comment Inside a Strict JSON Example Fence Is Invalid JSON
+
+**WRONG:**
+
+````markdown
+```json
+{
+  "residual_risks": [],
+  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
+  "testing_gaps": []
+}
+```
+````
+
+**RIGHT:**
+
+````markdown
+```json
+{
+  "residual_risks": [],
+  "testing_gaps": []
+}
+```
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").
+````
+
+**Rule:** Never put a `//` (or any non-JSON) comment inside a fenced
+```` ```json ```` block that a file's own instructions describe as strict —
+e.g. "No prose outside the JSON block." JSON has no comment syntax; a `//`
+line makes the fenced block invalid JSON. Worse, the fence is there
+specifically as a literal-copy example: an agent mirroring it verbatim
+reproduces a parse failure — the exact whole-return silent-drop class of bug
+the surrounding instructions exist to prevent. Move the annotation to a
+prose sentence immediately after the closing fence instead; this is the
+canonical pattern already used elsewhere in the pr-review-workflow SKILL.md.
+
+Twelve reviewer-agent files shipped this exact defect — one JSON demotion-
+bucket comment, copy-pasted into each new review persona as the roster grew:
+`plugins/yellow-review/agents/review/{adversarial,agent-cli-readiness,agent-native,cli-readiness,correctness,maintainability,plugin-contract,project-compliance,project-standards,reliability}-reviewer.md`
+plus `plugins/yellow-core/agents/review/{performance,security}-reviewer.md`.
+Caught by four independently-converging reviewers (`agent-native`,
+`maintainability`, `comment-analyzer`, `codex`) in PR #667; fixed in commit
+`d464f8c` by deleting the in-fence comment and restating it as prose
+directly below the closing fence, in all twelve files.
+
+**Prevention checklist additions:**
+
+- [ ] Before adding an inline `//` or `#` comment inside a fenced code
+      block, check the fence's declared language. If it's `json` (or any
+      format with no comment syntax), the comment is invalid content —
+      move it to prose before or after the fence instead.
+- [ ] When a file's own instructions say "no prose outside the JSON
+      block," treat every character inside that fence as literally
+      copy-pasteable output, not authoring shorthand — verify the fence
+      parses as JSON on its own, with nothing stripped.
+- [ ] If the same annotation was copy-pasted across multiple sibling
+      files (e.g. one comment cloned into every new persona in a
+      reviewer-agent roster), fix all of them in the same change — a
+      partial fix leaves the invalid pattern as the example new siblings
+      will keep copying.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2
