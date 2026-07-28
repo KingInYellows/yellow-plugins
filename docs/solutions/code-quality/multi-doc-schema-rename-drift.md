@@ -220,3 +220,39 @@ for the surface — assert consumers import rather than re-literal it.
 
 - `docs/solutions/build-errors/plugin-json-changelog-key-schema-drift-remote-validator.md` — Same class of drift in CI/manifest context
 - `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` — Anti-patterns in LLM-executed command prose; anti-pattern #31 is the reviewer-convergence signal that caught the PR #667 code-level instance of this doc's pattern
+
+---
+
+## Update — 2026-07-28 (PR #671, second instance)
+
+### Producer-Self-Contradiction: `scan-verifier.md`'s Own Description/Examples Left Stale Relative to Its Own Caveat
+
+PR #671 surfaced a third instance of this pattern, and a new variant: the
+producer/consumer split can happen *within a single agent file*, between
+its own prose sections, not only between separate files.
+
+`plugins/yellow-semgrep/commands/semgrep/fix.md` (the consumer of
+`scan-verifier`'s report) was updated earlier in the same PR to the
+WARNING-findings-at-modified-lines contract. But
+`plugins/yellow-semgrep/agents/semgrep/scan-verifier.md` — the producer of
+that report — was left internally split: its own Step 1 already disclaimed
+the regression-detection framing, yet its frontmatter `description`, both
+worked examples, and the `report` field's own
+`New findings: none | {count} detected` line still asserted the
+"regression" framing Step 1 rejected. Caught by comment-analyzer. Fixed by
+rewording the `description`, both examples, and the report field's line to
+`Findings at modified lines: none | {count} detected`.
+
+**Generalized scope:** the canonical-source violation is not limited to N
+*separate* documents disagreeing — a single document can be internally
+split between its authoritative section (here, Step 1's operative caveat)
+and its own descriptive/example prose that restates the same contract
+independently. See `doc-fix-mechanical-verification-gap.md`'s 2026-07-28
+update for this same PR's `fix.md`/`memory-manager.md` intra-file
+instances.
+
+**Prevention checklist addition:**
+
+- [ ] When a Step/rule's operative contract changes, treat the file's own
+      `description`, worked examples, and output-field docstrings as
+      additional consumer sites — not just other files.

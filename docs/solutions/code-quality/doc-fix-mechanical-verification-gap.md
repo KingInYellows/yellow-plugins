@@ -286,3 +286,70 @@ the docs were left asserted-unchanged instead. Flagged by
 project-compliance-reviewer, P2, routed to Residual Actionable Work
 (out of the review's P0/P1-only auto-apply scope) rather than fixed in the
 same PR. Prior recurrences: PR #601 (this doc's origin), #632, #644, #658.
+
+---
+
+## Update — 2026-07-28 (PR #671)
+
+**Recurrence, and a new nuance: the propagation gap can be intra-file, not
+just inter-file.** All five prior recurrences in this doc are inter-file —
+a fact changed in the source, a *different* file's citation/prose/config
+went stale. PR #671 (`agent/fix/deferred-review-followups`) surfaced the
+same substitution twice in one review pass, both times between sections of
+the *same file*.
+
+### Finding: `fix.md`'s Step 9 Rewording Left Three Sibling Sections Behind
+
+`plugins/yellow-semgrep/commands/semgrep/fix.md` reworded Step 9's contract
+from an unconditional "no regressions" claim (which `scan-verifier` cannot
+actually guarantee — it has no pre-fix baseline to diff against) to a
+WARNING-findings-at-modified-lines contract. That edit touched Step 9 only.
+Three other sections of the *same file*, each encoding the identical claim
+in independent prose, were left on the old vocabulary until three separate
+reviewer clusters caught each one:
+
+- Error Handling table row (correctness, agent-cli-readiness,
+  comment-analyzer): `"New findings introduced"` → `"WARNING: findings at
+  modified lines"`
+- Step 12's report line (comment-analyzer): `"✓ (finding resolved, no
+  regressions)"` → `"✓ (finding resolved, no findings at modified lines)"`
+- Step 10's commit trailer (reliability): `"Verified: pass"` (recorded even
+  for a WARNING-then-proceed outcome) → `"Verified: pass|warning (findings
+  at modified lines, not proven regression)"` — an unconditional `pass`
+  overstated verification in git history for exactly the outcome the
+  reworded contract now allows
+
+### Finding: `memory-manager.md`'s Step 8 Retention Rule Assumed a Signal Step 6 Never Defined
+
+`plugins/yellow-ruvector/agents/ruvector/memory-manager.md` Step 8 ("failed
+`file_change` re-index entries are retained for the next flush") depended
+on a per-entry failure signal Step 6 — in the same file — never actually
+produced (Step 6 offered `/ruvector:index` as an alternative path, but the
+agent has no way to invoke a slash command or read its result). Flagged by
+silent-failure-hunter and reliability. Fixed by rewriting Step 6 to mandate
+the batch-level `hooks_pretrain` MCP call exclusively and spell out the
+failure semantics Step 8's rule needs: on error, mark every `file_change`
+entry the batch covered as failed so Step 8 retains them; on success, treat
+them all as processed.
+
+**Distinct root cause (adds to the shared thesis):** Findings 1–5 are
+inter-file — the mechanical check is "grep other files for the stale
+claim." These two are intra-file — the check is "after rewording one
+section's contract, grep the *rest of the same file* for sibling sections
+(tables, report-string templates, commit-trailer templates, adjacent
+numbered steps) restating the same claim," which is easy to skip because
+the file already looks "handled" once one section was edited.
+
+**Prevention (in addition to the existing checklist):**
+
+6. **After rewording a contract/claim in one section of a file, grep the
+   rest of that same file** for every other prose restatement of the same
+   claim (error-handling tables, numbered-step report templates,
+   commit-trailer templates) before considering the file done — not just
+   other files the PR touched.
+
+See the project's `sweep-incomplete-application-orphaned-jargon.md`
+auto-memory note for PR #671's inter-file sibling instances
+(devin-orchestrator / debt-triage), and
+[multi-doc-schema-rename-drift.md](./multi-doc-schema-rename-drift.md) for
+PR #671's producer/consumer instance (`scan-verifier.md`).
