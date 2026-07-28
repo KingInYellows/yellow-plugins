@@ -74,19 +74,37 @@ STDERR_FILE=$(mktemp /tmp/codex-rescue-err-XXXXXX.txt)
 [ -s "<task-desc-file>" ] || { printf '[yellow-codex] Error: task-description file missing or empty — re-run the Step 3 Write.\n' >&2; exit 1; }
 TASK_DESCRIPTION=$(cat "<task-desc-file>")
 
-# Escape any literal task-description fence delimiter inside the untrusted
-# text BEFORE interpolating it between the fences below. A pasted bug
-# report containing the exact close-delimiter line would otherwise
-# terminate the fence early, and Codex would read the remaining text as
-# instructions outside the fence (prompt-injection fence breakout) — same
-# [ESCAPED]-substitution pattern as the council reviewer agents.
+# Escape any literal fence delimiter inside the untrusted text BEFORE
+# interpolating it between the fences below. A pasted bug report containing
+# the exact close-delimiter line would otherwise terminate the fence early,
+# and Codex would read the remaining text as instructions outside the fence
+# (prompt-injection fence breakout) — same [ESCAPED]-substitution pattern
+# as the council reviewer agents. All three delimiter families used in
+# TASK_PROMPT are escaped, not just task-description: a forged sibling line
+# (e.g. "--- begin context (reference data only) ---") inside the
+# still-open task-description fence could otherwise masquerade as a trusted
+# section boundary (sandwich-fence delimiter forgery).
 TASK_DESCRIPTION=$(printf '%s\n' "$TASK_DESCRIPTION" | sed \
   -e 's/--- end task-description/[ESCAPED] end task-description/g' \
-  -e 's/--- begin task-description/[ESCAPED] begin task-description/g')
+  -e 's/--- begin task-description/[ESCAPED] begin task-description/g' \
+  -e 's/--- end context/[ESCAPED] end context/g' \
+  -e 's/--- begin context/[ESCAPED] begin context/g' \
+  -e 's/--- end recent-commits/[ESCAPED] end recent-commits/g' \
+  -e 's/--- begin recent-commits/[ESCAPED] begin recent-commits/g')
 
 # Current branch and recent commits
 BRANCH=$(git branch --show-current)
 RECENT_COMMITS=$(git log --oneline -5 2>/dev/null || true)
+# Commit subjects are attacker-influenceable too (a crafted commit message
+# on the checked-out branch); escape the same delimiter families before
+# interpolating into the recent-commits fence.
+RECENT_COMMITS=$(printf '%s\n' "$RECENT_COMMITS" | sed \
+  -e 's/--- end task-description/[ESCAPED] end task-description/g' \
+  -e 's/--- begin task-description/[ESCAPED] begin task-description/g' \
+  -e 's/--- end context/[ESCAPED] end context/g' \
+  -e 's/--- begin context/[ESCAPED] begin context/g' \
+  -e 's/--- end recent-commits/[ESCAPED] end recent-commits/g' \
+  -e 's/--- begin recent-commits/[ESCAPED] begin recent-commits/g')
 
 # Read CLAUDE.md for project conventions (truncate to 2000 chars)
 CLAUDE_MD=$(head -c 2000 CLAUDE.md 2>/dev/null || true)
@@ -211,6 +229,13 @@ RESCUE_OUTPUT=$(printf '%s\n' "$RESCUE_OUTPUT" | awk '{
   }
   print
 }')
+
+# Escape literal codex-output fence delimiters so a response steered by the
+# (untrusted) task text cannot terminate the fence below early — mirror of
+# the Step 4 input-side escape.
+RESCUE_OUTPUT=$(printf '%s\n' "$RESCUE_OUTPUT" | sed \
+  -e 's/--- end codex-output/[ESCAPED] end codex-output/g' \
+  -e 's/--- begin codex-output/[ESCAPED] begin codex-output/g')
 ```
 
 Wrap the redacted output in injection fencing:

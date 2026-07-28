@@ -342,7 +342,7 @@ awk '
 }
 ' "$TEXT_FILE" > "$REDACTED_FILE"
 
-# --- Parse structured fields (same fields as `gemini-reviewer` Step 6) ---
+# --- Parse structured fields (same fields as `gemini-reviewer` Step 5) ---
 VERDICT=$(grep -m1 '^Verdict: ' "$REDACTED_FILE" 2>/dev/null | sed 's/^Verdict: //' | head -c 50)
 CONFIDENCE=$(grep -m1 '^Confidence: ' "$REDACTED_FILE" 2>/dev/null | sed 's/^Confidence: //' | head -c 20)
 SUMMARY=$(awk '/^Summary: / { sub(/^Summary: /, ""); print; exit }' "$REDACTED_FILE" | head -c 500)
@@ -396,7 +396,7 @@ if [ -n "$SESSION_ID" ]; then
 fi
 
 # --- Return structured findings to council.md (same format as
-# `gemini-reviewer` Step 8) ---
+# `gemini-reviewer` Step 5) ---
 printf 'verdict=%s\n' "$VERDICT"
 printf 'confidence=%s\n' "$CONFIDENCE"
 printf 'summary=%s\n' "$SUMMARY"
