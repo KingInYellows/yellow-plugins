@@ -265,7 +265,7 @@ Next steps:
 - **Credential validation**: Token format checked before any API call
 - **C1**: `get_issue` validates issue exists before delegation
 - **H1**: Re-fetch before status transition
-- **M3**: `AskUserQuestion` before `save_comment`; `save_issue` uses Tier 1
+- **Confirmation gate (M3)**: `AskUserQuestion` before `save_comment`; `save_issue` uses Tier 1
   auto-apply for the `→ In Progress` transition per two-tier safety model
 - **Token never echoed**: All token references use env var only; never print or
   log the token value

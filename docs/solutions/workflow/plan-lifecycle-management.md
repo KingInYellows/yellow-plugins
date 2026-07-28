@@ -120,7 +120,7 @@ default (Gate C PASS) commit omits the trailer.
 
 ### `Other` is the only AskUserQuestion free-text label
 
-Per MEMORY.md "AskUserQuestion 'Other' is the ONLY free-text button",
+Only the literal `Other` label opens free-text input, so
 the label of the override option in `/plan:complete` Phase 4 MUST be
 the literal string `Other`. Earlier drafts labelled it
 `Confirm with PR number`; that label shows as a click-only option and

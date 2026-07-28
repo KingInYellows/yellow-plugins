@@ -84,8 +84,14 @@ When called to flush `pending-updates.jsonl`:
    Options: [Flush and clear] / [Cancel]
    - If cancel: report "[memory-manager] Flush cancelled. Queue file unchanged."
      Stop. Do not proceed.
-6. For `file_change` entries: prefer re-indexing via `/ruvector:index` or
-   `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain` rather than inventing manual MCP insert schemas
+6. For `file_change` entries: re-index via
+   `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain` (an MCP call whose
+   error is directly observable to this agent) rather than inventing manual
+   MCP insert schemas; do not attempt to invoke the `/ruvector:index`
+   command — this agent has no way to run a slash command and check its
+   result. The call is batch-level (no per-file result): if it errors, mark
+   every `file_change` entry it covered as failed so step 8 retains them
+   for the next flush; if it succeeds, treat them all as processed
 7. For `bash_result` entries with non-zero exit codes: store as `context`
    entries via `hooks_remember` when they pass the step 3 quality gate;
    otherwise count them as skipped
@@ -96,7 +102,9 @@ When called to flush `pending-updates.jsonl`:
    the next flush instead of silently lost). Skipped/invalid entries are
    not retained.
 9. Report: "Flushed N entries (M files re-indexed, K skipped, J invalid paths
-   rejected)"
+   rejected, R retained for retry)" — the retained count is what tells the
+   caller a re-flush is needed; without it a partial flush is
+   indistinguishable from a full one
 
 If queue file doesn't exist or is empty, report: "No pending updates."
 

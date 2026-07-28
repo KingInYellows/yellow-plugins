@@ -66,13 +66,13 @@ POST to `${ORG_URL}/sessions` with:
 - `max_acu_limit`: set a cap to prevent cost overruns during auto-retry loops.
   Use the limit from the spawn prompt if one was provided; otherwise ask the
   user for a cap via AskUserQuestion before creating the session, offering a
-  few concrete caps as options (do not pick a number yourself; the built-in
-  `Other` choice already accepts a free-form number — do not add an
-  Other-labeled option of your own). Non-interactive callers must pass the
-  limit in the spawn prompt; if none was provided and no user is available
-  to ask, omit `max_acu_limit` (no cap — same as `/devin:delegate` without
-  `--max-acu`) and state that omission in the session report instead of
-  blocking on a question
+  few concrete caps as options plus an option labeled exactly `Other`
+  (description "Enter a custom ACU cap" — only the literal `Other` label
+  opens free-text input; do not pick a number yourself). Non-interactive
+  callers must pass the limit in the spawn prompt; if none was provided and
+  no user is available to ask, omit `max_acu_limit` (no cap — same as
+  `/devin:delegate` without `--max-acu`) and state that omission in the
+  session report's `Cap:` line instead of blocking on a question
 
 Check all three error layers (curl exit, HTTP status, jq parse).
 
@@ -138,6 +138,7 @@ ORCHESTRATION COMPLETE:
   URL:     {url}
   Iterations: {n}/3
   Total ACUs: {acus_consumed}
+  Cap: {max_acu_limit, or "none (max_acu_limit omitted — no user available)"}
   PRs: {count}
   Final status: exit
 ```
@@ -153,6 +154,7 @@ ORCHESTRATION CONTEXT (for manual recovery):
   Iteration: {n}/3
   Last status: {status}
   Total ACUs: {acus_consumed}
+  Cap: {max_acu_limit, or "none (max_acu_limit omitted — no user available)"}
   Issues found: {list}
   Recovery: /devin:message {id} "{suggested fix}"
 ```

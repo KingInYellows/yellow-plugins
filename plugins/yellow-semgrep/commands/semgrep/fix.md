@@ -205,7 +205,7 @@ Finding-ID: {id}
 Rule: {check_id}
 Severity: {severity}
 Fix-Type: autofix|llm
-Verified: pass"
+Verified: pass|warning (findings at modified lines, not proven regression)"
 ```
 
 If user had stashed changes in Step 5: `git stash pop`
@@ -243,7 +243,7 @@ Finding {id} — FIXED
   Severity:   {severity}
   File:       {path}:{line}
   Fix Type:   autofix | LLM
-  Verified:   ✓ (finding resolved, no regressions)
+  Verified:   ✓ (finding resolved, no findings at modified lines)
   Triage:     updated to 'fixed'
   Commit:     {short_sha}
 ```
@@ -260,6 +260,6 @@ Finding {id} — FIXED
 | Finding not present locally | "Already fixed locally" | [Mark fixed] [Skip] |
 | Autofix syntax check fails | Warning, fall through to LLM | Continue |
 | Fix does not resolve finding | "Fix did not resolve" | [Revert + stash pop] [Retry] |
-| New findings introduced | "New findings at modified lines" | [Proceed] [Revert] |
+| WARNING: findings at modified lines | "Findings at modified lines (not proven regression)" | [Proceed] [Revert] |
 | Triage POST fails | "Triage update failed" | Show manual URL |
 | Network failure | curl error message | Exit |
