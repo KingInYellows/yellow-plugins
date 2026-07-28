@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.27.1
+
+### Patch Changes
+
+- [#666](https://github.com/KingInYellows/yellow-plugins/pull/666)
+  [`5a0b9c5`](https://github.com/KingInYellows/yellow-plugins/commit/5a0b9c5190885e45927aa9afd63a779e69bacd67)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Prompt-quality
+  correctness pass across instructional markdown, driven by the updated
+  prompting-guidance research (docs/research/best-practices/
+  gpt-claude-latest-model-prompting-guidance.md and its 2026-07-27 addendum).
+
+  Fixes fall into four classes: (1) dangling or stale references — archived plan
+  paths, a nonexistent MCP tool name, "MEMORY.md" citations that do not resolve
+  for installed users, undefined jargon like "(M3)" and "the keystone"; (2)
+  contradictions between paired files — dedup-threshold drift (0.85 vs the
+  canonical 0.82), revert/retry option mismatches, doc claims the referenced
+  code disproves; (3) ambiguous or unactionable instructions — AskUserQuestion
+  free-text options not labeled `Other`, undefined shell variables in
+  illustrative bash, branches with no specified check; (4) Codex-exposed
+  gt-workflow skills assuming Claude-only primitives (AskUserQuestion, the Skill
+  tool) with no host branch — each now carries an "On Codex" fallback, with
+  generated codex/ artifacts regenerated. No command interfaces changed.
+
+- [#667](https://github.com/KingInYellows/yellow-plugins/pull/667)
+  [`4d34f11`](https://github.com/KingInYellows/yellow-plugins/commit/4d34f110ce47bc62a53dc0d6a20ade26c5c7de91)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Review-schema
+  definitions, Codex reference sidecars, and gt-cleanup split
+  - yellow-review: define `residual_risks`/`testing_gaps` as
+    aggregator-populated demotion buckets in the `pr-review-workflow` skill;
+    annotate the fields in all 10 structured persona JSON examples; correct the
+    legacy-format rosters in `review-pr.md` (two places) and `review-all.md`
+    that falsely listed `security-reviewer` and `performance-reviewer` as
+    legacy-prose emitters.
+  - yellow-core: fix `performance-reviewer` and `security-reviewer` output
+    schema — both emitted a 7-field shape that fell between the legacy-prose
+    normalizer and structured-schema validation, so `review-pr.md` Step 6.1
+    dropped their entire returns on every review that selected them. Both now
+    emit the 10-field compact-return contract. Also annotate the demotion-bucket
+    fields in both agents.
+  - gt-workflow: split `gt-cleanup` SKILL.md (561 → 359 lines, under the RULE
+    15a ceiling) by moving PR Status Lookups, Actionable Category mechanics, and
+    the Worktree Cleanup Offer into `references/*.md` behind skill-relative Read
+    stubs. Content restructure only — no interface change. Codex artifacts
+    regenerated with the new reference sidecars.
+
 ## 1.27.0
 
 ### Minor Changes
