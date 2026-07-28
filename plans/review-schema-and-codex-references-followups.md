@@ -82,14 +82,14 @@ are independent of Phase 3+4 and could be stacked as separate PRs
 
 ### Phase 1: Canonical field definitions (docs-only, yellow-review + yellow-core)
 
-- [ ] 1.1: Add prose definition to
+- [x] 1.1: Add prose definition to
       `plugins/yellow-review/skills/pr-review-workflow/SKILL.md` under
       `## Finding Output Format` (fields at ~lines 162-163): the two arrays
       are aggregator-populated demotion buckets per `review-pr.md` Step 7;
       reviewer agents ALWAYS emit them as empty arrays; include the
       qualifying conditions (P2/P3 + advisory + testing/maintainability
       contributors; testing wins on mixed sets).
-- [ ] 1.2: Add a one-line comment to the JSON example in the 10 yellow-review
+- [x] 1.2: Add a one-line comment to the JSON example in the 10 yellow-review
       persona files carrying the fields (adversarial, agent-cli-readiness,
       agent-native, cli-readiness, correctness, maintainability,
       plugin-contract, project-compliance, project-standards, reliability
@@ -101,12 +101,12 @@ are independent of Phase 3+4 and could be stacked as separate PRs
 > `plugins/*/agents/` returns exactly 12 — the 10 yellow-review personas
 > plus yellow-core's performance-reviewer.md and security-reviewer.md.
 <!-- /deepen-plan -->
-- [ ] 1.3: Inline-replicate the same one-line comment (verbatim) into
+- [x] 1.3: Inline-replicate the same one-line comment (verbatim) into
       `plugins/yellow-core/agents/review/performance-reviewer.md` and
       `security-reviewer.md` — cross-plugin, so no live skill reference
       (`skills:` frontmatter cannot cross plugins). Coordinate with Phase 2
       edits to the same JSON blocks.
-- [ ] 1.4: Do NOT edit `review-pr.md` / `review-all.md` (consume-only — they
+- [x] 1.4: Do NOT edit `review-pr.md` / `review-all.md` (consume-only — they
       already embody the definition) and do NOT touch the 5 prose-format
       yellow-review agents (pr-test-analyzer, comment-analyzer,
       code-simplifier, type-design-analyzer, silent-failure-hunter) — their
@@ -119,7 +119,7 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 
 ### Phase 2: Fix yellow-core reviewer output schema (behavior fix)
 
-- [ ] 2.1: Verify the silent-drop claim before changing anything: trace
+- [x] 2.1: Verify the silent-drop claim before changing anything: trace
       `review-pr.md` Step 6.1's required-field list (~line 589) against the
       JSON emitted by `performance-reviewer.md` (~lines 109-125) and
       `security-reviewer.md` (~line 142); confirm no normalizer path exists
@@ -139,12 +139,12 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 > confirmed: compact-return names are `title` and `suggested_fix`
 > (review-pr.md:493,503).
 <!-- /deepen-plan -->
-- [ ] 2.2: Align both agents' output format to the 10-field compact-return
+- [x] 2.2: Align both agents' output format to the 10-field compact-return
       contract (`title, severity, category, file, line, confidence,
       autofix_class, owner, requires_verification, pre_existing` per
       finding), keeping their existing `finding`/`fix` prose content as
       `title`/`suggested_fix` per the compact-return schema.
-- [ ] 2.3: Update the stale rosters that currently claim these two agents
+- [x] 2.3: Update the stale rosters that currently claim these two agents
       use the legacy prose format — both live in `review-pr.md` (Step 5
       list ~529-537 AND Step 6 sub-step 0 roster ~560-570).
 
@@ -156,14 +156,14 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 > lives entirely in review-pr.md's two rosters; the SKILL.md target was
 > dropped from 2.3 accordingly.
 <!-- /deepen-plan -->
-- [ ] 2.4: Verification: run a real `/review:pr` (or a dry harness) against a
+- [x] 2.4: Verification: run a real `/review:pr` (or a dry harness) against a
       diff that selects at least one of the two personas and confirm its
       findings survive Step 6.1 (non-zero surviving findings, no drop-count
       increment attributable to these agents).
 
 ### Phase 3: Generator support for Codex reference sidecars (scripts/, no changeset)
 
-- [ ] 3.1: `scripts/lib/generate/emit-codex.js` — extend
+- [x] 3.1: `scripts/lib/generate/emit-codex.js` — extend
       `buildCodexSkillTree()` to copy `references/*.md` (the `references/`
       subdir only; keep the hard error for any OTHER sidecar entry so the
       fail-closed posture is preserved) into
@@ -178,7 +178,7 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 > (it never descends into them today). Copied `references/*.md` need the
 > same rejection of symlinks and path escapes.
 <!-- /deepen-plan -->
-- [ ] 3.2: Extend the stale-artifact sweep so removed/renamed reference
+- [x] 3.2: Extend the stale-artifact sweep so removed/renamed reference
       files are deleted from `codex/skills/<skill>/references/` on
       regeneration.
 
@@ -189,7 +189,7 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 > (line ~498) and never recurses. Without 3.2, a removed reference file
 > persists on disk forever.
 <!-- /deepen-plan -->
-- [ ] 3.3: `scripts/validate-codex.js` — scan copied reference files with the
+- [x] 3.3: `scripts/validate-codex.js` — scan copied reference files with the
       SAME exposure-lint rules as SKILL.md bodies (including
       `claude-env-var-reference` and capability lint); update whatever rule
       currently asserts SKILL.md-only dirs.
@@ -206,7 +206,7 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 > up for subagent-reference/sentinel checks, identical to how source
 > references/ files are treated today (no new risk).
 <!-- /deepen-plan -->
-- [ ] 3.4: Tests: extend the `generate-manifests` integration tests
+- [x] 3.4: Tests: extend the `generate-manifests` integration tests
       (`tests/integration/`) with fixtures covering: skill with references/
       (copied), reference removal (swept), non-references sidecar (still
       hard-errors), and `${CLAUDE_PLUGIN_ROOT}` inside a reference file
@@ -218,12 +218,12 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 > tests/` returns nothing — no test exercises even the existing sidecar
 > hard-error path today.
 <!-- /deepen-plan -->
-- [ ] 3.5: `pnpm validate:generated` byte-identity gate must pass with the
+- [x] 3.5: `pnpm validate:generated` byte-identity gate must pass with the
       new targets; `pnpm test:unit` + `pnpm test:integration` green.
 
 ### Phase 4: Split gt-cleanup SKILL.md (gt-workflow)
 
-- [ ] 4.1: Move the three "conditional or late-sequence" blocks into
+- [x] 4.1: Move the three "conditional or late-sequence" blocks into
       `plugins/gt-workflow/skills/gt-cleanup/references/` behind imperative
       skill-relative Read stubs ("(sibling to this SKILL.md)" idiom, NO
       `${CLAUDE_PLUGIN_ROOT}`): Phase 2 #4 PR Status Lookups (~82 lines),
@@ -248,11 +248,11 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 > on both hosts. Treat stub-following on Codex as best-effort (see the
 > Proposed Solution annotation) pending the live smoke test.
 <!-- /deepen-plan -->
-- [ ] 4.2: Keep the host note added in PR #666 (Codex AskUserQuestion
+- [x] 4.2: Keep the host note added in PR #666 (Codex AskUserQuestion
       fallback) in the core file, and ensure moved content stays
       Codex-clean (no Claude-only env vars — it becomes Codex-exposed via
       Phase 3).
-- [ ] 4.3: Update the 9 "Phase N / Step N" comment anchors in
+- [x] 4.3: Update the 9 "Phase N / Step N" comment anchors in
       `plugins/gt-workflow/tests/gt-cleanup.bats` to the restructured
       section names; verify each anchor against the actual new location
       (read the section, don't just grep). Run `bats tests/` in
@@ -268,18 +268,18 @@ out of scope (count-only display is the intentional advisory-tier pattern).
 > anchors point into Actionable Categories (highest-risk relocation);
 > PR Status Lookups and Worktree Cleanup Offer have ZERO anchors.
 <!-- /deepen-plan -->
-- [ ] 4.4: `pnpm generate:manifests` — regenerate codex artifacts; confirm
+- [x] 4.4: `pnpm generate:manifests` — regenerate codex artifacts; confirm
       RULE 15a warning is gone for both copies in `pnpm validate:agents`.
 
 ### Phase 5: Ship
 
-- [ ] 5.1: New changeset (the existing `prompting-quality-pass` changeset may
+- [x] 5.1: New changeset (the existing `prompting-quality-pass` changeset may
       be consumed before this lands): `yellow-review` patch (doc
       definitions), `yellow-core` patch (doc + behavior fix — call the
       schema fix out as a distinct bullet), `gt-workflow` patch (content
       restructure, no interface change). `scripts/` changes need no
       changeset.
-- [ ] 5.2: Gates: `pnpm validate:schemas`, `pnpm validate:agents`,
+- [x] 5.2: Gates: `pnpm validate:schemas`, `pnpm validate:agents`,
       `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`,
       `pnpm test:integration`, gt-workflow bats suite. LF endings on all new
       files (`sed -i 's/\r$//'` on WSL2-created files).
