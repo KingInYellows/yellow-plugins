@@ -283,9 +283,9 @@ out of scope (count-only display is the intentional advisory-tier pattern).
       `pnpm lint`, `pnpm typecheck`, `pnpm test:unit`,
       `pnpm test:integration`, gt-workflow bats suite. LF endings on all new
       files (`sed -i 's/\r$//'` on WSL2-created files).
-- [ ] 5.3: Submit via `gt` as a DRAFT PR (or stacked drafts if Phases 1-2 /
+- [x] 5.3: Submit via `gt` as a DRAFT PR (or stacked drafts if Phases 1-2 /
       3-4 are split); do not merge without human review.
-- [ ] 5.4: Live Codex smoke test (required — CI cannot catch this): install
+- [x] 5.4: Live Codex smoke test (required — CI cannot catch this): install
       the regenerated gt-workflow plugin into a real Codex CLI session
       (`codex plugin add` round-trip, as PR #661 did for MCP discovery) and
       confirm the gt-cleanup skill actually follows a reference stub into
