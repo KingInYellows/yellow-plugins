@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.5.0
+
+### Minor Changes
+
+- [#664](https://github.com/KingInYellows/yellow-plugins/pull/664)
+  [`a2a3935`](https://github.com/KingInYellows/yellow-plugins/commit/a2a3935b9cee0e0e0bab2953518efb4b91c589e8)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Codex-pilot
+  shell 05: yellow-ci becomes the third Codex-enabled plugin (read-mostly
+  close-out), producing the final canonical marketplace order
+  `[gt-workflow, yellow-core, yellow-ci]`. Its six operational commands
+  (`ci-setup`, `ci-setup-runner-targets`, `ci-status`, `ci-diagnose`,
+  `ci-lint-workflows`, `ci-runner-health`) become thin `Skill` wrappers over new
+  host-neutral canonical skills, joined by the two existing reference skills
+  (`ci-conventions`, `diagnose-ci`) — eight skills exposed to Codex.
+  `failure-analyst`/`runner-diagnostics` diagnosis is folded inline into the
+  `ci-diagnose`/`ci-runner-health` skill bodies as host-neutral prose with a
+  built-in Codex `worker`/`explorer` delegation section (the agents stay
+  Claude-only). The `SessionStart` hook was ported from `session-start.sh` to a
+  dependency-free cross-host Node runtime, proven byte/semantic-equivalent via a
+  golden-fixture parity harness (both entrypoints, 9 scenarios) before the bash
+  script was deleted; runtime cache writes were relocated to a plugin-data dir
+  with a read-only legacy fallback (R38). Host-neutral skill bodies keep the
+  exposure lint clean while the `.claude/`-rooted config and env-var handling
+  stay in the non-linted command-wrapper/lib/hook layer (R31 × R15).
+  `ci-conventions`'s `references/` were relocated out of the skill directory so
+  it is generator-clean. `plugin_hooks` remains `removed` on codex-cli 0.144.x,
+  so the carried Codex hook is inert; `allow_implicit_invocation` is now honored
+  on 0.144.6 but deferred (blocked by this repo's SKILL.md-only generator).
+
+  <!-- markdownlint-disable-file MD041 -->
+
 ## 1.4.6
 
 ### Patch Changes
