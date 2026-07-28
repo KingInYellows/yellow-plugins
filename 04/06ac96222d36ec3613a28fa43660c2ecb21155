@@ -1,0 +1,19 @@
+.changeset/review-schema-codex-references-followups.md
+  s_ecffdbc39c3a6a::t_1bbaf9f5447917 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "0406ac96222d36ec3613a28fa43660c2ecb21155",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
