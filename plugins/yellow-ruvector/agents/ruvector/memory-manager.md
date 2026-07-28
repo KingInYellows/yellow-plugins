@@ -90,8 +90,9 @@ When called to flush `pending-updates.jsonl`:
    entries via `hooks_remember` when they pass the step 3 quality gate;
    otherwise count them as skipped
 8. After processing, rewrite the queue file via Write: empty content when
-   every qualifying entry stored successfully; otherwise ONLY the entries
-   whose `hooks_remember` call failed (so failed entries are retained for
+   every qualifying entry was processed successfully; otherwise ONLY the
+   entries whose processing failed — a failed `hooks_remember` store or a
+   failed `file_change` re-index alike (so failed entries are retained for
    the next flush instead of silently lost). Skipped/invalid entries are
    not retained.
 9. Report: "Flushed N entries (M files re-indexed, K skipped, J invalid paths

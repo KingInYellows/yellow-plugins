@@ -181,14 +181,16 @@ Spawn `scan-verifier` agent via Task:
 
 The agent will:
 1. Re-scan with `--config auto` (covers the target rule + all others in one pass)
-2. Report: pass (finding gone, no new issues), fail (finding still present),
-   or warning (new findings introduced)
+2. Report: PASS (finding gone, no findings at modified lines), FAIL (finding
+   still present), or WARNING (findings at the lines the fix modified — a
+   warning signal, not proven regression, since the agent has no pre-fix
+   baseline)
 
 **If finding still present:** Ask the user (matching the Error Handling
 table): [Revert + stash pop] — `git checkout -- "${FILE_PATH}"`, then
 `git stash pop` if changes were stashed in Step 5 — or [Retry] — return to
 Step 6 for another fix attempt.
-**If new findings introduced:** Show the new findings, ask user to proceed or revert.
+**If WARNING (findings at modified lines):** Show those findings, ask user to proceed or revert.
 If user chooses to revert and changes were stashed in Step 5: `git stash pop`
 
 ### Step 10: Commit
