@@ -1,0 +1,217 @@
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_ecffdbc39c3a6a::t_9037383e2d4cdd 167-168,172-177
+  s_2847d51bbefa00::t_e5188b7b68e9b6 169-171
+plans/review-schema-and-codex-references-followups.md
+  s_566fcceda11127::t_1c6cabc7f0d4b9 1-54,81-84,86-91,93-97,105-108,110-121,123-126,143-146,160-165,167-172,182-183,193-195,210-214,222-225,227-231,252-254,256-259,272-275,277-281,283-285,287,294-331
+  s_566fcceda11127::t_a5b4090ca1e85b 196-208
+  s_566fcceda11127::t_d541afa25485eb 332-344
+  s_566fcceda11127::t_2337527e8a0036 215-220
+  s_566fcceda11127::t_23f9d1855bc560 232-250
+  s_566fcceda11127::t_b53a8f0a762ed0 184-191
+  s_566fcceda11127::t_c7d1147089ec35 98-103
+  s_566fcceda11127::t_0ea4a3d183d754 260-270
+  s_566fcceda11127::t_79a99c051bcc77 55-80
+  s_566fcceda11127::t_711a1e332a44c9 127-141
+  s_566fcceda11127::t_7549a7cf64426d 148-158
+  s_566fcceda11127::t_b9e27f859d8422 173-180
+  s_566fcceda11127::t_8284e8840bb7d6 289-293
+  s_ecffdbc39c3a6a::t_f4a690506cb009 192
+  s_ecffdbc39c3a6a::t_e4c2e684d879cf 221
+  s_ecffdbc39c3a6a::t_575387c8341869 85
+  s_ecffdbc39c3a6a::t_03af425bfacd18 251
+  s_ecffdbc39c3a6a::t_7f7603fc2fef3e 147
+  s_ecffdbc39c3a6a::t_434df8a81c99e2 159
+  s_ecffdbc39c3a6a::t_fefec6896bda35 142
+  s_ecffdbc39c3a6a::t_3d73cba31d9fe5 276
+  s_ecffdbc39c3a6a::t_0a4a8a62d5a5f8 109
+  s_ecffdbc39c3a6a::t_d79feb2d97a006 282
+  s_ecffdbc39c3a6a::t_2f078e84c6efb1 226
+  s_ecffdbc39c3a6a::t_3be2df494daa5c 92
+  s_ecffdbc39c3a6a::t_4fd8fd40b03155 122
+  s_ecffdbc39c3a6a::t_04c14e56a2ff80 271
+  s_ecffdbc39c3a6a::t_dc6d9a5b1f744b 166
+  s_ecffdbc39c3a6a::t_59620d6b671b8a 181
+  s_ecffdbc39c3a6a::t_c366613a670e8d 255
+  s_ecffdbc39c3a6a::t_a64c2db650f17e 104
+  s_ecffdbc39c3a6a::t_50c6d897a2b91b 209
+  s_ecffdbc39c3a6a::t_70e56ca7af3478 288
+  s_ecffdbc39c3a6a::t_f3852ae53dfa74 286
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_ecffdbc39c3a6a::t_f155c77a15227f 127-128,135,140-144
+  s_ecffdbc39c3a6a::t_1acada898d0c82 152-155
+  s_ecffdbc39c3a6a::t_890792f32d1889 145
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_ecffdbc39c3a6a::t_24e3f4ec7c4f31 105-106,113,118-122
+  s_ecffdbc39c3a6a::t_1acada898d0c82 130-133
+  s_ecffdbc39c3a6a::t_19a054589536ed 123
+plugins/yellow-review/commands/review/review-all.md
+  s_ecffdbc39c3a6a::t_d99c76ed6cc32b 173-175,179-180
+plugins/yellow-review/commands/review/review-pr.md
+  s_ecffdbc39c3a6a::t_3bfba3a7a1123f 569-571
+  s_ecffdbc39c3a6a::t_209fd6a9d805dd 534-537
+  s_ecffdbc39c3a6a::t_11f75021112ffb 533
+scripts/lib/generate/emit-codex.js
+  s_ecffdbc39c3a6a::t_7e0bd6758c4e99 34-36,38
+  s_ecffdbc39c3a6a::t_f595e31e547eb9 377-382,389-391,395-477
+  s_ecffdbc39c3a6a::t_ae4dca48e19787 546
+  s_ecffdbc39c3a6a::t_0245daef4390bd 478-479
+  s_2847d51bbefa00::t_dce06e5f2d1e9d 561
+  s_3d62316ec95b77::t_12cf2a055e0d30 37
+scripts/generate-manifests.js
+  s_ecffdbc39c3a6a::t_f306ffc349ae8d 32
+  s_ecffdbc39c3a6a::t_93065e02a32697 499-543
+scripts/validate-codex.js
+  s_ecffdbc39c3a6a::t_f24e29c4366ada 449-451,460,462,464,466-468,502-503
+  s_ecffdbc39c3a6a::t_b3be453b439309 427-430,432-447,452-454,461,463,465,487,501
+  s_ecffdbc39c3a6a::t_ba9fc23f352662 54
+  s_ecffdbc39c3a6a::t_22df2387ca8278 130-137
+  s_ecffdbc39c3a6a::t_933f47d0adef09 469-486,488,499-500
+  s_ecffdbc39c3a6a::t_b8f6586d8439fc 455-459
+  s_ecffdbc39c3a6a::t_994ccc700a6cb0 489-490
+  s_ecffdbc39c3a6a::t_0fd0e637bc5e9f 497-498
+  s_2847d51bbefa00::t_ab5a65eaa41405 62
+  s_2847d51bbefa00::t_2d650caeb9c60d 491
+  s_2847d51bbefa00::t_49283ab3e7f483 492-496
+tests/integration/generate-manifests-codex.test.ts
+  s_ecffdbc39c3a6a::t_f85697a6017575 738-862
+  s_ecffdbc39c3a6a::t_a0caa98ce071a7 38
+  s_ecffdbc39c3a6a::t_03c0e4a5d50459 863-893,984
+  s_ecffdbc39c3a6a::t_4568d32b21eed3 894-928,956-983
+  s_ecffdbc39c3a6a::t_5b748aff52c60a 929-955
+plugins/gt-workflow/skills/gt-cleanup/SKILL.md
+  s_ecffdbc39c3a6a::t_57ed0d95e89529 262-264
+  s_ecffdbc39c3a6a::t_3dacb9fad0f437 253-256
+  s_ecffdbc39c3a6a::t_76722b5b832f0f 358-359
+  s_ecffdbc39c3a6a::t_a29da11b76ff3b 338-340,342
+  s_ecffdbc39c3a6a::t_ab67ca4be2cf93 169-173
+  s_ecffdbc39c3a6a::t_d10b3714da1cc0 333-334
+  s_ecffdbc39c3a6a::t_2a63d9a3edd38d 282-288
+  s_ecffdbc39c3a6a::t_472ebc774984f6 277-278
+  s_ecffdbc39c3a6a::t_9f0428d2031dfb 341
+  s_3d62316ec95b77::t_96fb70074c46bf 164-168
+plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_e55b5608f20817 1-5,11-21,23-29,31-43,47-50,58
+  s_ecffdbc39c3a6a::t_c7653eba50afd8 44-45,51-53,55
+  s_ecffdbc39c3a6a::t_95965b22261170 56-57
+  s_ecffdbc39c3a6a::t_a03d53980e85ef 6-10
+  s_ecffdbc39c3a6a::t_83946c6d645439 22,30,46,54
+plugins/gt-workflow/skills/gt-cleanup/references/pr-status-lookups.md
+  s_ecffdbc39c3a6a::t_70fd4c00594924 1-5,10-11,14-28,30-77,83-91
+  s_3d62316ec95b77::t_80c4982650724d 78-82
+  s_3d62316ec95b77::t_3f9c000223e79e 29
+  s_3d62316ec95b77::t_27281c64fe2d91 6-9,12-13
+plugins/gt-workflow/skills/gt-cleanup/references/actionable-categories.md
+  s_ecffdbc39c3a6a::t_b4bf5fe26d4924 1-36,43-51,53,55-56,58-99,104,108,109-111,114-122,127-128
+  s_3d62316ec95b77::t_9a975e34f00ecd 100-103,105-107,112-113
+  s_3d62316ec95b77::t_2f707bb89fbbf1 52,54,57
+  s_3d62316ec95b77::t_2026dd6dadab59 123-126
+  s_3d62316ec95b77::t_10f94ac0cc4059 37-42
+plugins/gt-workflow/tests/gt-cleanup.bats
+  s_ecffdbc39c3a6a::t_a3c2fea9dca1a5 2-6
+  s_ecffdbc39c3a6a::t_79e5dc905a8402 113-114
+  s_ecffdbc39c3a6a::t_9805424807c89f 124-125
+  s_ecffdbc39c3a6a::t_3754a7ba3cab45 137-138
+  s_ecffdbc39c3a6a::t_cb126ce90c6c38 235
+  s_ecffdbc39c3a6a::t_1b425ee97ab47c 73
+plugins/gt-workflow/codex/skills/gt-cleanup/references/pr-status-lookups.md
+  s_ecffdbc39c3a6a::t_0556167d165995 1-5,10-11,14-28,30-77,83-91
+  s_3d62316ec95b77::t_cadfdd6b563a0c 6-9,12-13,29,78-82
+plugins/gt-workflow/codex/skills/gt-cleanup/references/actionable-categories.md
+  s_ecffdbc39c3a6a::t_0556167d165995 1-36,43-51,53,55-56,58-99,104,108,109-111,114-122,127-128
+  s_3d62316ec95b77::t_cadfdd6b563a0c 37-42,52,54,57,100-103,105-107,112-113,123-126
+plugins/gt-workflow/codex/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_0556167d165995 1-5,11-21,23-29,31-43,47-50,58
+  s_ecffdbc39c3a6a::t_fedcac0a909b6e 44-45,51-53,55-57
+  s_ecffdbc39c3a6a::t_3d66b90962a6f0 6-10
+  s_ecffdbc39c3a6a::t_83946c6d645439 22,30,46,54
+plugins/gt-workflow/codex/skills/gt-cleanup/SKILL.md
+  s_ecffdbc39c3a6a::t_0556167d165995 168-172,252-255,261-263,281-287,332-333,337-339,341,357-358
+  s_ecffdbc39c3a6a::t_fedcac0a909b6e 276-277,340
+  s_3d62316ec95b77::t_cadfdd6b563a0c 163-167
+.changeset/review-schema-codex-references-followups.md
+  s_ecffdbc39c3a6a::t_1bbaf9f5447917 1-25
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 182-184
+  s_ecffdbc39c3a6a::t_ed695f0cface5e 185
+plugins/gt-workflow/CLAUDE.md
+  s_ecffdbc39c3a6a::t_39cea241a2e7cd 260-270
+  s_ecffdbc39c3a6a::t_c4ea466b98b179 220-225
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 210-212
+  s_ecffdbc39c3a6a::t_a7f33b40093a5e 213
+plugins/yellow-review/agents/review/cli-readiness-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 146-149
+plugins/yellow-review/agents/review/agent-native-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 209-212
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 216-218
+  s_ecffdbc39c3a6a::t_709319f6f7a4fc 219
+plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 267-270
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 155-157
+  s_ecffdbc39c3a6a::t_a8c4b852d1b521 158
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 120-122
+  s_ecffdbc39c3a6a::t_7267a452e0bfcf 123
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 126-128
+  s_ecffdbc39c3a6a::t_e8997a4193646a 129
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 125-127
+  s_ecffdbc39c3a6a::t_b3846166fb6e66 128
+docs/solutions/workflow/skill-split-caveat-and-claude-md-drift.md
+  s_ecffdbc39c3a6a::t_795ef9c9a32885 1-117
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_ecffdbc39c3a6a::t_0bad0eb15a219c 1320-1387
+  s_2847d51bbefa00::t_5bac9d58545c7b 1388-1454
+docs/solutions/code-quality/multi-doc-schema-rename-drift.md
+  s_2847d51bbefa00::t_0345f1eba33195 167-218,222
+  s_2847d51bbefa00::t_1554377ddeaecd 6,15-17,21-22
+tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
+  s_3d62316ec95b77::t_7a220b09ef1799 100,298
+docs/codex-distribution.md
+  s_3d62316ec95b77::t_5fb48e88db8ef7 83-88
+AGENTS.md
+  s_3d62316ec95b77::t_a9b4f1e70d41db 279-285
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "4d34f110ce47bc62a53dc0d6a20ade26c5c7de91",
+  "prompts": {},
+  "sessions": {
+    "s_2847d51bbefa00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c39ef9b-f26c-48bb-8767-7078c0e278b4",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    },
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_566fcceda11127": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "657d2744-fd9c-4470-b427-974a487a466a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
