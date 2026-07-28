@@ -1,0 +1,37 @@
+plans/review-schema-and-codex-references-followups.md
+  s_ecffdbc39c3a6a::t_f4a690506cb009 192
+  s_ecffdbc39c3a6a::t_e4c2e684d879cf 221
+  s_ecffdbc39c3a6a::t_575387c8341869 85
+  s_ecffdbc39c3a6a::t_03af425bfacd18 251
+  s_ecffdbc39c3a6a::t_7f7603fc2fef3e 147
+  s_ecffdbc39c3a6a::t_434df8a81c99e2 159
+  s_ecffdbc39c3a6a::t_fefec6896bda35 142
+  s_ecffdbc39c3a6a::t_3d73cba31d9fe5 276
+  s_ecffdbc39c3a6a::t_0a4a8a62d5a5f8 109
+  s_ecffdbc39c3a6a::t_d79feb2d97a006 282
+  s_ecffdbc39c3a6a::t_2f078e84c6efb1 226
+  s_ecffdbc39c3a6a::t_3be2df494daa5c 92
+  s_ecffdbc39c3a6a::t_4fd8fd40b03155 122
+  s_ecffdbc39c3a6a::t_04c14e56a2ff80 271
+  s_ecffdbc39c3a6a::t_dc6d9a5b1f744b 166
+  s_ecffdbc39c3a6a::t_59620d6b671b8a 181
+  s_ecffdbc39c3a6a::t_c366613a670e8d 255
+  s_ecffdbc39c3a6a::t_a64c2db650f17e 104
+  s_ecffdbc39c3a6a::t_50c6d897a2b91b 209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "8bbd412631fd2051432f9b74a6c52f33844b5cf3",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
