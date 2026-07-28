@@ -1,0 +1,51 @@
+plugins/gt-workflow/codex/skills/gt-setup/SKILL.md
+  s_2847d51bbefa00::t_645743c6ce12c0 216-218
+plugins/yellow-ruvector/README.md
+  s_2847d51bbefa00::t_6b4ea9f9fc9f9a 37
+plugins/yellow-debt/agents/scanners/architecture-scanner.md
+  s_2847d51bbefa00::t_a1bd9487797196 93
+plugins/gt-workflow/skills/gt-setup/SKILL.md
+  s_2847d51bbefa00::t_a7ee784d598fc3 217-219
+plugins/yellow-ruvector/commands/ruvector/index.md
+  s_2847d51bbefa00::t_c62a30d861f37f 103-104
+plugins/yellow-council/commands/council/council.md
+  s_2847d51bbefa00::t_a91d146d435a70 495
+  s_2847d51bbefa00::t_9cde979b8333c5 499
+  s_2847d51bbefa00::t_019d3d05bdedc6 394
+plugins/yellow-council/README.md
+  s_2847d51bbefa00::t_a690edecfa6a79 77
+plugins/yellow-debt/agents/remediation/debt-fixer.md
+  s_2847d51bbefa00::t_d8ec2285b73203 164
+plugins/yellow-ruvector/commands/ruvector/learn.md
+  s_ecffdbc39c3a6a::t_7741dede85578a 70-76
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_2847d51bbefa00::t_ead5585420b106 213-219
+  s_ecffdbc39c3a6a::t_61a3e058ea2808 289-292,294
+  s_ecffdbc39c3a6a::t_d09257744a454d 210,226-231,233
+  s_2847d51bbefa00::t_7649dcb27b5c0e 232,293
+  s_2847d51bbefa00::t_2cf497b345838c 273,275-284,287-288,295-297,310-316,345,365,387-389,398-399,408-409
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "1c5662239e302a994231def78ea7bd36bc852c93",
+  "prompts": {},
+  "sessions": {
+    "s_2847d51bbefa00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c39ef9b-f26c-48bb-8767-7078c0e278b4",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    },
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
