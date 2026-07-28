@@ -1,0 +1,30 @@
+plugins/yellow-codex/commands/codex/rescue.md
+  s_3d62316ec95b77::t_430361ee2a2eb1 232-238
+  s_3d62316ec95b77::t_971617a20068d9 77-86,89-93
+  s_3d62316ec95b77::t_c3b53255e2c3dc 98-107
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_3d62316ec95b77::t_f0e8f8059ade82 289
+  s_3d62316ec95b77::t_3c6df92c365041 218-232,241
+  s_3d62316ec95b77::t_d88c162155a4b3 325
+  s_3d62316ec95b77::t_2ac25a9059bf62 267
+  s_3d62316ec95b77::t_641c8a7ed0b05a 313-316
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_3d62316ec95b77::t_f835d4aac597da 345
+  s_3d62316ec95b77::t_5ba6faf3fc8711 399
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "c4d33c9da02391c34fa1558809307851c976558a",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
