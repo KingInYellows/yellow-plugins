@@ -161,6 +161,7 @@ while IFS= read -r changed_file; do
   git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
 done < <(git status --porcelain | cut -c4-)
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
 transition_todo_state "$todo_path" "ready"
 ```
 

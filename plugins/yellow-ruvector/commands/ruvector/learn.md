@@ -67,8 +67,13 @@ Build a structured plain-text entry:
 3. Dedup check (per the `memory-query` skill's canonical constants): call
    `mcp__plugin_yellow-ruvector_ruvector__hooks_recall` with the entry
    content and `top_k=1`. If the top result's score is > 0.82, report the
-   near-duplicate and skip storage. If the recall call itself fails, skip
-   dedup and proceed to Store Entry (Step 5).
+   near-duplicate and skip storage. If the recall call itself fails
+   (timeout, connection refused, service unavailable), wait ~500ms and
+   retry once; if the retry also fails, ABORT storage and report
+   "dedup check unavailable — entry not stored; retry when ruvector is
+   healthy" (per the `memory-query` canonical write path, which routes
+   dedup-check failures to the failure handler rather than storing
+   undeduplicated). Do NOT retry on validation or parameter errors.
 
 ### Step 5: Store Entry
 

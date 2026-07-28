@@ -213,9 +213,9 @@ setting. Then proceed to the interactive prompts below.
 
 #### Step 5: Branch Prefix Prompt
 
-(`AskUserQuestion` is a Claude Code tool — on Codex, ask each of the wizard
-questions in Steps 5 and 6 as a numbered-option list in your reply and wait
-for the user's answer before proceeding.)
+(`AskUserQuestion` is a Claude Code tool — on Codex, ask each question as a
+numbered-option list in your reply and wait for the user's answer before
+proceeding; this applies to every AskUserQuestion mention in this skill.)
 
 Use `AskUserQuestion` to ask: "What branch prefix should AI agents use?"
 

@@ -391,7 +391,7 @@ $(cat "$fenced_path")
 done
 ```
 
-### Step 8: M3 confirmation gate (AskUserQuestion)
+### Step 8: Confirmation gate (AskUserQuestion)
 
 Every file write must be gated by AskUserQuestion — there is no batch-size
 threshold below which confirmation may be skipped. Show the user:
@@ -492,11 +492,11 @@ This is the final output of the command. Exit 0.
 | Non-existent path | Reject with `[council] Error: path not found`; exit 1 |
 | Empty `debug`/`question` text | Reject with mode-specific usage; exit 1 |
 | `--paths` exceeds `COUNCIL_PATH_MAX_FILES` | Reject with limit message; exit 1 |
-| All 3 reviewers TIMEOUT/ERROR/UNAVAILABLE | Headline: "Council failed: 0 of 3 reviewers returned verdicts"; M3 still asks; user can save or cancel |
+| All 3 reviewers TIMEOUT/ERROR/UNAVAILABLE | Headline: "Council failed: 0 of 3 reviewers returned verdicts"; the confirmation gate still asks; user can save or cancel |
 | 1-2 of 3 reviewers fail | Headline: "Council ran with N of 3 reviewers"; synthesis proceeds with remaining |
 | yellow-codex not installed | Codex marked UNAVAILABLE; Gemini + OpenCode still run |
 | Slug collision >10 same-day | Error: "too many same-day collisions for slug X (>10)"; exit 1 |
-| User selects Cancel at M3 | Print "Report not saved"; cleanup temps; exit 0 |
+| User selects Cancel at the confirmation gate | Print "Report not saved"; cleanup temps; exit 0 |
 | `docs/council/` not writable | mkdir -p fails; exit 1 |
 | Bash < 4.3 | Pre-flight error; exit 1 |
 | `jq` missing | Pre-flight error; exit 1 |

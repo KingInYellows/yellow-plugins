@@ -34,7 +34,7 @@ Persistent vector memory and semantic code search for Claude Code agents via
 | Command                         | Description                                            |
 | ------------------------------- | ------------------------------------------------------ |
 | `/ruvector:setup`               | Install ruvector and initialize `.ruvector/` directory |
-| `/ruvector:index [path]`        | Index codebase (or specific path) for semantic search  |
+| `/ruvector:index [path]`        | Index codebase for semantic search (always repo-wide; `path` only narrows the preview) |
 | `/ruvector:search <query>`      | Search codebase by meaning using vector similarity     |
 | `/ruvector:status`              | Show ruvector health, DB stats, and queue status       |
 | `/ruvector:learn [description]` | Record a learning, mistake, or pattern                 |

@@ -100,6 +100,7 @@ timeout, permission denied).
 - **No files to index:** "No indexable files found. Check your path or
   .ruvectorignore."
 - **Large repo (>5000 files):** Use AskUserQuestion to confirm before
-  proceeding. Suggest indexing a subdirectory first.
+  proceeding. Warn that indexing is always repository-wide (there is no
+  subdirectory-scoped mode) and may take significant time.
 - **Interrupted:** Report progress so far. Re-running re-indexes all files
   through `hooks_pretrain`.
