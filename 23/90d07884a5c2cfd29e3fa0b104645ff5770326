@@ -1,10 +1,12 @@
-tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
-  s_ecffdbc39c3a6a::t_8db85412b27f9f 20,30,218,432
+docs/solutions/workflow/skill-split-caveat-and-claude-md-drift.md
+  s_ecffdbc39c3a6a::t_795ef9c9a32885 1-117
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_ecffdbc39c3a6a::t_0bad0eb15a219c 1320-1387
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.6.16",
-  "base_commit_sha": "f836cc23d14e83d73e8c07f9446b837927e1df01",
+  "base_commit_sha": "2390d07884a5c2cfd29e3fa0b104645ff5770326",
   "prompts": {},
   "sessions": {
     "s_ecffdbc39c3a6a": {

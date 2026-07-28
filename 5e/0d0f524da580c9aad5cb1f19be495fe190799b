@@ -1,10 +1,14 @@
-tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
-  s_ecffdbc39c3a6a::t_8db85412b27f9f 20,30,218,432
+tests/integration/generate-manifests-codex.test.ts
+  s_ecffdbc39c3a6a::t_03c0e4a5d50459 863-894
+scripts/validate-codex.js
+  s_ecffdbc39c3a6a::t_b3be453b439309 427-430,432-447,452-456,458,460,462,466-482
+  s_ecffdbc39c3a6a::t_ba9fc23f352662 54
+  s_ecffdbc39c3a6a::t_22df2387ca8278 130-137
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.6.16",
-  "base_commit_sha": "f836cc23d14e83d73e8c07f9446b837927e1df01",
+  "base_commit_sha": "5e0d0f524da580c9aad5cb1f19be495fe190799b",
   "prompts": {},
   "sessions": {
     "s_ecffdbc39c3a6a": {

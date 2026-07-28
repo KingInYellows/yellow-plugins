@@ -1,10 +1,13 @@
-tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
-  s_ecffdbc39c3a6a::t_8db85412b27f9f 20,30,218,432
+plugins/yellow-review/commands/review/review-all.md
+  s_ecffdbc39c3a6a::t_d99c76ed6cc32b 173-175,179-180
+plugins/yellow-review/commands/review/review-pr.md
+  s_ecffdbc39c3a6a::t_3bfba3a7a1123f 569-571
+  s_ecffdbc39c3a6a::t_209fd6a9d805dd 533-537
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.6.16",
-  "base_commit_sha": "f836cc23d14e83d73e8c07f9446b837927e1df01",
+  "base_commit_sha": "ff8f101cd6d8a3e9ac2820e5c3962128831fe0fb",
   "prompts": {},
   "sessions": {
     "s_ecffdbc39c3a6a": {

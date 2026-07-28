@@ -1,10 +1,11 @@
-tests/integration/__snapshots__/generate-manifests-characterization.test.ts.snap
-  s_ecffdbc39c3a6a::t_8db85412b27f9f 20,30,218,432
+scripts/generate-manifests.js
+  s_ecffdbc39c3a6a::t_f306ffc349ae8d 32
+  s_ecffdbc39c3a6a::t_93065e02a32697 499-543
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.6.16",
-  "base_commit_sha": "f836cc23d14e83d73e8c07f9446b837927e1df01",
+  "base_commit_sha": "796874a1c9ad5aaad93bfc8cf0ff74f4a1776dcd",
   "prompts": {},
   "sessions": {
     "s_ecffdbc39c3a6a": {
