@@ -35,6 +35,7 @@ If no question provided, ask the user what they want to know.
 
 - If `--repo` flag provided, set `REPO` to that value
 - Otherwise, detect from current git remote and assign to `REPO`:
+
   ```bash
   REPO=$(git remote get-url origin 2>/dev/null | sed -E 's#^.*(://|@)[^/:]+[:/]##; s#\.git$##')
   ```
@@ -60,14 +61,17 @@ calls fail with auth errors, announce the fallback to DeepWiki.
 "Devin Wiki unavailable — falling back to DeepWiki (public repos only)."
 
 Determine visibility with
-`gh repo view "$REPO" --json isPrivate -q .isPrivate 2>/dev/null` (treat a
-failed lookup — `gh` missing or unauthenticated — as unknown and attempt
-DeepWiki anyway):
+`gh repo view "$REPO" --json isPrivate -q .isPrivate 2>/dev/null`:
 
 - If repo is private (`true`): report "Cannot query private repos via
   DeepWiki. Check that Devin MCP is configured correctly."
-- If repo is public (`false` or unknown): use DeepWiki MCP tools
+- If repo is public (`false`): use DeepWiki MCP tools
   (`ask_question`, `read_wiki_structure`, `read_wiki_contents`)
+- If the lookup fails (`gh` missing, unauthenticated, network error) —
+  visibility is unknown: do NOT query DeepWiki silently, since the repo
+  identifier and question would go to a third-party service that only
+  serves public repos. Ask the user to confirm the repository is public
+  (or authenticate `gh`) before falling back.
 
 **Important:** The exact tool names are pinned in this command's
 `allowed-tools` frontmatter (`devin` server for primary, `deepwiki` server for

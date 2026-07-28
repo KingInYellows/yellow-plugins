@@ -69,8 +69,8 @@ Performance findings have a **higher effective threshold** than other personas
 because the cost of a miss is low (performance issues are easy to measure and
 fix later) and false positives waste engineering time on premature
 optimization. Suppress speculative findings rather than routing them through
-anchor 50 — an anchor-50 finding is emitted only when it is P0 severity (the
-exception stated in the anchor-50 bullet below).
+anchor 50 — suppress anchor-50 findings unless they are P0 severity (the
+same rule the anchor-50 bullet below states).
 
 - **Anchor 100** — the performance impact is verifiable: an N+1 with the loop
   and the per-iteration query both visible in the diff, an unbounded query

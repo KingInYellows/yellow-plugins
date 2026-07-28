@@ -104,7 +104,11 @@ during verification.
 
 ## Bottom line
 
-For Claude, keep being explicit and use XML structuring. For GPT-5.x, trim
+For Claude, keep being explicit; XML sectioning remains Anthropic's
+documented recommendation for complex prompts, but treat it as one workable
+format rather than a Claude-specific requirement — the addendum found no
+controlled evidence that format preference differs by vendor, so validate
+format choices per task and model. For GPT-5.x, trim
 scaffolding, use concrete constraints instead of vague verbosity asks,
 actively tune `reasoning_effort`/`verbosity`, and re-tune from scratch on
 every point release rather than reusing old prompts.
@@ -197,7 +201,8 @@ engineering for AI agents" post (Sept 2025) remains qualitative-only.
   API exposes attention weights); the closest follow-up benchmark, ReasonIF
   ([arXiv:2510.15211](https://arxiv.org/abs/2510.15211)), explicitly
   excluded Claude and GPT by design. Confidence: high.
-- Adjacent GPT-side evidence: "Mind Your Step (by Step)" (ICML 2025) found
+- Adjacent GPT-side evidence: "Mind Your Step (by Step)"
+  ([ICML 2025](https://icml.cc/virtual/2025/poster/45714)) found
   up to 36.3pp accuracy drops on o1-preview vs GPT-4o with reasoning
   enabled — but on cognitive-psychology tasks, not instruction-following
   constraints, so it is adjacent evidence rather than a replication.

@@ -76,7 +76,8 @@ Group by severity and rule.
 
 Alternatively — only when the CLI is unavailable or the scan targets a small
 explicit file list — use the MCP `semgrep_scan` tool:
-```
+
+```text
 mcp__plugin_yellow-semgrep_semgrep__semgrep_scan
   code_files: [{ path: "/absolute/path/to/file.py" }]
 ```
