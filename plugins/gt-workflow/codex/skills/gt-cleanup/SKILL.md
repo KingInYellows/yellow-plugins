@@ -339,8 +339,8 @@ without prompting.
 primitives. On Codex, wherever this skill says AskUserQuestion, present the
 same options as a numbered list in your reply and wait for the user's answer
 before acting; and in Phase 6, the `worktree:cleanup` skill is not
-Codex-exposed — report its unavailability via the existing graceful-degradation
-message instead of attempting the invocation.
+Codex-exposed — report its unavailability using the Codex-specific text in
+Phase 6's graceful-degradation message instead of attempting the invocation.
 
 #### Actionable Categories (Orphaned, Closed PR, Stale, Behind Remote)
 
@@ -534,9 +534,18 @@ If the user chooses "Yes", invoke the Skill tool with
 **Graceful degradation:** If the Skill call fails (yellow-core not installed or
 command not found), report:
 
+On Claude Code:
+
 ```
 worktree:cleanup skill not available. Install yellow-core via your host's
 plugin manager.
+```
+
+On Codex: `worktree:cleanup` is not part of yellow-core's Codex-exposed skill
+set, so installing yellow-core would not resolve this. Report:
+
+```
+worktree:cleanup skill not available on this platform.
 ```
 
 If `WT_COUNT` is 1 (only the main worktree), skip this phase silently.

@@ -100,7 +100,8 @@ yellow-ruvector (`docs/memory-routing-protocol.md`).
 - **Global palace only** — palace is at `~/.mempalace/`, no per-project support
   (no MEMPALACE_DIR env var documented)
 - **No AAAK compression** — AAAK is the palace's experimental lossy
-  summarization format (spec readable via the `mempalace_get_aaak_spec` MCP
+  summarization format (spec readable via the
+  `mcp__plugin_yellow-mempalace_mempalace__mempalace_get_aaak_spec` MCP
   tool); it is not used — all content stored verbatim
 
 ## Maintenance

@@ -5,6 +5,7 @@ model: haiku
 effort: low
 tools:
   - Bash
+  - Write
   - Read
   - Grep
   - Glob
@@ -46,6 +47,22 @@ the marketplace is read-only (`[Read, Grep, Glob]`). Same rationale as
 - The W1.5 validation rule allowlists this exact path:
   `plugins/yellow-council/agents/review/opencode-reviewer.md`.
 
+`Write` is also granted, narrowly: it is used ONLY in Step 3 to stage the
+untrusted council pack (PR diffs, issue bodies — attacker-influenced text) to
+the `$PACK_FILE` path created by `mktemp`. This closes a heredoc delimiter
+collision: a `cat > "$PACK_FILE" <<'__EOF_COUNCIL_PACK__'` heredoc embeds the
+delimiter and the untrusted pack body in the same shell command, so any pack
+line equal to the delimiter terminates the heredoc early and the remaining
+pack text is parsed as shell input — see
+`docs/solutions/security-issues/heredoc-delimiter-collision.md`. A per-run
+randomized delimiter does not close this: the generated command still
+contains both the delimiter and the untrusted body together, so the same
+primitive applies. `Write` takes the content as a structured parameter,
+never shell-parsed, so this does not grant any capability `Bash` did not
+already have (Bash can write files) — it only removes shell parsing of
+untrusted bytes. `Write` is bounded to the `$PACK_FILE` path under `/tmp`;
+no other use is permitted.
+
 The legitimate Bash surface for this agent covers ONLY:
 
 - `command -v opencode >/dev/null 2>&1` — pre-flight binary check
@@ -61,9 +78,11 @@ The legitimate Bash surface for this agent covers ONLY:
 - `printf` — structured findings output
 - `rm -f` — temp file cleanup
 
-NOT permitted: `git`, `gt`, `Edit`, `Write`, network operations beyond the
-opencode CLI itself, file modifications anywhere outside `/tmp` or
-`~/.local/share/opencode/<session>` (managed by opencode).
+NOT permitted: `git`, `gt`, `Edit`, network operations beyond the opencode CLI
+itself, file modifications anywhere outside `/tmp` or
+`~/.local/share/opencode/<session>` (managed by opencode). `Write` is
+permitted ONLY to stage `$PACK_FILE` per Step 3 above — never to any other
+path.
 
 ## Workflow
 
@@ -101,17 +120,20 @@ If the pack is empty or appears truncated, return ERROR (same as
 PACK_FILE=$(mktemp /tmp/council-opencode-pack-XXXXXX.txt)
 OUTPUT_FILE=$(mktemp /tmp/council-opencode-out-XXXXXX.json)
 STDERR_FILE=$(mktemp /tmp/council-opencode-err-XXXXXX.txt)
+```
 
-# Write the pack content from your spawn prompt to PACK_FILE.
-# Substitute the actual pack text (verbatim, including all fenced sections)
-# from the spawn prompt below into a heredoc here. Bash variables do NOT
-# carry the pack content from the orchestrator — the LLM running this
-# agent writes it directly. Never use the Write tool (not in allowed-tools).
-#
-#   cat > "$PACK_FILE" <<'__EOF_COUNCIL_PACK__'
-#   <full pack content here, copy-pasted from the spawn prompt>
-#   __EOF_COUNCIL_PACK__
-#
+Use the `Write` tool to write the pack content from your spawn prompt
+(verbatim, including all fenced sections) to the literal `$PACK_FILE` path
+printed above. Do NOT embed the pack content in a Bash heredoc — the pack is
+untrusted (PR diffs, issue bodies) and a heredoc delimiter shares the same
+shell command as that text, so a pack line matching the delimiter terminates
+the heredoc early and turns the remaining pack text into shell input (see
+`docs/solutions/security-issues/heredoc-delimiter-collision.md`). `Write`
+takes the content as a structured parameter — never shell-parsed — so this
+does not apply. Bash variables do NOT carry the pack content from the
+orchestrator; the LLM running this agent supplies it directly to `Write`.
+
+```bash
 # Validate non-empty before invoking the CLI:
 [ -s "$PACK_FILE" ] || { printf '[opencode-reviewer] Error: empty pack file\n' >&2; exit 1; }
 

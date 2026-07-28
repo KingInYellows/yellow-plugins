@@ -277,7 +277,9 @@ brings them into context.
 
 - **Invoked by users** via `/yellow-core:compound-lifecycle`
 - **Invoked by `knowledge-compounder`** when a freshly-written entry
-  flags an older entry as superseded (passed as a path scope hint)
+  flags an older entry as superseded (passed as a path scope hint) —
+  deferred integration, not yet implemented (see "When to Use" above);
+  invoke manually until it lands
 - **Reads** every entry in `docs/solutions/` (excluding
   `archived/` and `README.md`)
 - **Writes** `docs/solutions/<category>/<slug>.md` (in-place Updates) and

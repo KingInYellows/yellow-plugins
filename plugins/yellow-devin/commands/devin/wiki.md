@@ -33,10 +33,10 @@ If no question provided, ask the user what they want to know.
 
 ### Step 2: Determine Repository
 
-- If `--repo` flag provided, use that repository
-- Otherwise, detect from current git remote:
+- If `--repo` flag provided, set `REPO` to that value
+- Otherwise, detect from current git remote and assign to `REPO`:
   ```bash
-  git remote get-url origin 2>/dev/null | sed -E 's#^.*(://|@)[^/:]+[:/]##; s#\.git$##'
+  REPO=$(git remote get-url origin 2>/dev/null | sed -E 's#^.*(://|@)[^/:]+[:/]##; s#\.git$##')
   ```
 - If no repository can be determined, ask the user
 

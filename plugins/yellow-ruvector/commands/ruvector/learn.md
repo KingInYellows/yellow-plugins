@@ -42,7 +42,7 @@ Based on the learning content, route to the appropriate `type` value:
 | Successful pattern, technique, best practice | `decision`                                      |
 | Code-specific implementation note            | `code`                                          |
 | Repo/project-wide background                 | `project`                                       |
-| Unclear                                      | Ask via AskUserQuestion: the four types above plus `general` (the fallback type for when none fit) |
+| Unclear                                      | Ask via AskUserQuestion with the four types above as options; if none fit, use `general` as the fallback (not a fifth option) |
 
 Do not invent `namespace` parameters. The current MCP schema accepts `content`
 and optional `type`.

@@ -41,8 +41,8 @@ and an explicit exception to the W1.2 / W1.5 read-only-reviewer rule:
   not stage, commit, push, fetch, or modify files; it spawns `codex` and
   reads its output.
 - The W1.5 validation rule in `scripts/validate-agent-authoring.js`
-  allowlists this exact path (see `REVIEW_AGENT_ALLOWLIST`):
-  `plugins/yellow-codex/agents/review/codex-reviewer.md`.
+  allowlists this exact path, relative to `plugins/` (see
+  `REVIEW_AGENT_ALLOWLIST`): `yellow-codex/agents/review/codex-reviewer.md`.
 
 The legitimate Bash surface for this agent covers the workflow steps
 below and supporting utilities:

@@ -40,12 +40,23 @@ characters, use AskUserQuestion:
 
 ### Step 3: Gather Context
 
-Collect context to pass to Codex:
+Collect context to pass to Codex. The task description (from `$ARGUMENTS` or
+the Step 2 AskUserQuestion answer) may contain shell syntax such as `$(...)`
+or backticks — e.g. a pasted error message. Do NOT interpolate it directly
+into bash source. Instead, use the Write tool to save it verbatim to a temp
+file, then read the file's content back as plain data:
 
 ```bash
-# Task description from Step 2: $ARGUMENTS, or the AskUserQuestion answer
-# when $ARGUMENTS was empty/too short. Must be non-empty here.
-TASK_DESCRIPTION="<task description from Step 2>"
+TASK_DESC_FILE=$(mktemp /tmp/codex-rescue-task-XXXXXX.txt)
+```
+
+Use the Write tool to write the task description from Step 2, verbatim, to
+`$TASK_DESC_FILE`.
+
+```bash
+# Read back as plain data — command substitution here captures cat's stdout,
+# it does not re-evaluate the file's contents as shell source.
+TASK_DESCRIPTION=$(cat "$TASK_DESC_FILE")
 
 # Current branch and recent commits
 BRANCH=$(git branch --show-current)
@@ -141,7 +152,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   }
 
 RESCUE_OUTPUT=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
-rm -f "$OUTPUT_FILE" "$STDERR_FILE"
+rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$TASK_DESC_FILE"
 ```
 
 Note: NOT using `--ephemeral` — the user may want to resume the investigation

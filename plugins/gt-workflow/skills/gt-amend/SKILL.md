@@ -123,7 +123,9 @@ Store this output as `$DIFF_OUTPUT` and pass it to each audit agent below.
 
 #### 1. Run the Audit
 
-Invoke the `Skill` tool with `skill: "audit-review"`, passing `$DIFF_OUTPUT`
+Invoke the `Skill` tool with `skill: "audit-review"` (on Codex, per the
+Phase 1 guard-check note, follow the Codex-exposed `audit-review` skill
+directly instead — do not invoke a `Skill` tool), passing `$DIFF_OUTPUT`
 and `$GW_AUDIT_AGENTS` as context. It runs the appropriate quick-code-review
 / quick-security-scan / quick-error-check prompts (1-3 of them, per
 `$GW_AUDIT_AGENTS`) and returns a CRITICAL / MINOR / CLEAN verdict with
