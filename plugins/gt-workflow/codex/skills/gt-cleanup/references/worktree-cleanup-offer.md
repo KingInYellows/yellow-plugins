@@ -19,7 +19,7 @@ If `WT_COUNT` > 1:
 
 If `$DRY_RUN` is true, skip AskUserQuestion and instead print:
 
-```
+```text
 Note: $((WT_COUNT - 1)) git worktree(s) found. Run the worktree:cleanup skill with --dry-run to preview.
 ```
 
@@ -27,7 +27,7 @@ Then exit.
 
 Otherwise, proceed with AskUserQuestion:
 
-```
+```text
 You have $((WT_COUNT - 1)) git worktree(s). Would you like to scan and
 clean them up too?
 
@@ -43,7 +43,7 @@ command not found), report:
 
 On Claude Code:
 
-```
+```text
 worktree:cleanup skill not available. Install yellow-core via your host's
 plugin manager.
 ```
@@ -51,7 +51,7 @@ plugin manager.
 On Codex: `worktree:cleanup` is not part of yellow-core's Codex-exposed skill
 set, so installing yellow-core would not resolve this. Report:
 
-```
+```text
 worktree:cleanup skill not available on this platform.
 ```
 

@@ -166,8 +166,9 @@ tables.
 
 `residual_risks` and `testing_gaps` are aggregator-populated demotion
 buckets — reviewer agents ALWAYS emit them as empty arrays. The
-orchestrator (`review-pr.md` Step 7) moves a finding into one of them
-only when it qualifies for mode-aware demotion: severity P2/P3 AND
+orchestrator (`review-pr.md` Step 6, its mode-aware demotion
+sub-step) moves a finding into one of them only when it qualifies
+for mode-aware demotion: severity P2/P3 AND
 `autofix_class: advisory` AND every contributing reviewer is
 testing- or maintainability-flavored. Qualifying findings land in
 `testing_gaps` when any contributing reviewer is testing-flavored,

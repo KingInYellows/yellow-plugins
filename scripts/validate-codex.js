@@ -59,7 +59,7 @@ const addFormats = require('ajv-formats');
 
 const { loadCatalog, loadPluginSources } = require('./lib/generate/catalog-reader');
 const { isClaudeEnabled } = require('./lib/generate/emit-claude');
-const { isCodexEnabled } = require('./lib/generate/emit-codex');
+const { isCodexEnabled, REF_FILE_RE } = require('./lib/generate/emit-codex');
 const { assertWithinRoot } = require('./lib/generate/write');
 
 const DEFAULT_ROOT = resolve(__dirname, '..');
@@ -488,11 +488,12 @@ function collectCodexExposedFiles(rootDir, name, source) {
           for (const refEntry of refEntries) {
             if (refEntry.isSymbolicLink()) {
               errors.push(`${join(refDir, refEntry.name).slice(rootDir.length + 1)}: symlinked reference files are not allowed in generated output`);
-            } else if (!refEntry.isFile() || !/^[a-zA-Z0-9_-]+\.md$/.test(refEntry.name)) {
-              // Mirror buildCodexSkillTree's accepted shape (flat, regular
-              // [a-zA-Z0-9_-]+.md only): the generator never writes nested
-              // dirs or non-.md entries here, so anything else is corrupted
-              // or hand-planted content — error rather than silently skip.
+            } else if (!refEntry.isFile() || !REF_FILE_RE.test(refEntry.name)) {
+              // REF_FILE_RE is buildCodexSkillTree's accepted shape,
+              // imported so generator acceptance and validator rejection
+              // cannot drift: the generator never writes nested dirs or
+              // non-.md entries here, so anything else is corrupted or
+              // hand-planted content — error rather than silently skip.
               errors.push(`${join(refDir, refEntry.name).slice(rootDir.length + 1)}: only flat, regular [a-zA-Z0-9_-]+.md reference files are allowed in generated output`);
             } else {
               files.push(join(refDir, refEntry.name));

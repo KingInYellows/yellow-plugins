@@ -558,4 +558,5 @@ module.exports = {
   buildCodexPluginManifest,
   buildCodexHookConfig,
   buildCodexSkillTree,
+  REF_FILE_RE,
 };
