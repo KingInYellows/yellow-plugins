@@ -1,6 +1,6 @@
 ---
 name: diagnose-ci
-description: "CI debugging workflow guide for self-hosted runners. Use when learning CI debugging workflows, understanding failure patterns (F01-F12), or troubleshooting GitHub Actions on self-hosted runners."
+description: 'Reference guide (not an executable action) for CI debugging workflows and the F01-F12 failure-pattern catalog on self-hosted runners. Consult when you need to understand debugging workflows or failure patterns; to actually run a diagnosis, use the ci-diagnose skill instead.'
 user-invokable: true
 ---
 
@@ -9,87 +9,93 @@ user-invokable: true
 ## What It Does
 
 Explains how to understand and resolve GitHub Actions workflow failures on
-self-hosted runners, including the F01-F12 failure-pattern catalog.
+self-hosted runners, including the F01-F12 failure-pattern catalog. This is a
+**reference guide**, not an executable workflow — it documents the debugging
+approach so agents and commands can reference it during CI analysis.
 
 ## When to Use
 
-Use when learning CI debugging workflows, understanding failure patterns, or
-need guidance on troubleshooting self-hosted runner issues. This skill provides
-contextual knowledge that agents and commands reference during CI analysis.
+Consult this guide when learning CI debugging workflows, understanding failure
+patterns, or troubleshooting self-hosted runner issues. To actually diagnose a
+failed run, use the `ci-diagnose` skill; this guide only describes the approach.
 
 ## Usage
 
 ### Quick Start
 
-1. Check recent runs: `/ci:status`
-2. Diagnose a failure: `/ci:diagnose [run-id]`
-3. Check runner health: `/ci:runner-health [runner-name]`
+1. List recent runs — the `ci-status` skill.
+2. Diagnose a failure — the `ci-diagnose` skill (pass a run ID if you have one).
+3. Check runner health — the `ci-runner-health` skill (pass a runner name to
+   scope it).
 
 ### Common Failure Workflows
 
 #### Resource Exhaustion (F01 OOM, F02 Disk Full)
 
-Symptoms: Exit code 137, `Killed`, `No space left on device`
+Symptoms: exit code 137, `Killed`, `No space left on device`.
 
-Workflow:
+Approach:
 
-1. Run `/ci:diagnose` to confirm pattern
-2. Run `/ci:runner-health` to check current resource state
-3. If disk full: `/ci:runner-cleanup` to free space
-4. If OOM: Increase VM memory or reduce build parallelism
-5. Re-run the failed workflow
+1. Diagnose the failure to confirm the pattern (`ci-diagnose`).
+2. Check the runner's current resource state (`ci-runner-health`).
+3. If disk is full, preview what would be cleared (Docker images, caches, and
+   old logs) and obtain explicit user confirmation before deleting anything —
+   re-check the runner state immediately before deleting to avoid clearing
+   data from an active job.
+4. If out of memory, increase VM memory or reduce build parallelism.
+5. Re-run the failed workflow.
 
 #### Environment Drift (F03 Missing Deps, F06 Stale State)
 
-Symptoms: `command not found`, tests pass locally but fail in CI
+Symptoms: `command not found`, tests pass locally but fail in CI.
 
-Workflow:
+Approach:
 
-1. Run `/ci:diagnose` to identify missing tool or stale state
-2. Check workflow setup steps — pin tool versions
-3. Add `clean: true` to checkout step
-4. Run `/ci:lint-workflows` to catch other self-hosted pitfalls
+1. Diagnose to identify the missing tool or stale state (`ci-diagnose`).
+2. Check the workflow setup steps — pin tool versions.
+3. Add `clean: true` to the checkout step.
+4. Lint the workflows to catch other self-hosted pitfalls (`ci-lint-workflows`).
 
 #### Docker Issues (F04)
 
-Symptoms: `Cannot connect to Docker daemon`, rate limiting
+Symptoms: `Cannot connect to the Docker daemon`, rate limiting.
 
-Workflow:
+Approach:
 
-1. Run `/ci:diagnose` to confirm Docker pattern
-2. Check runner: `/ci:runner-health` — verify Docker status
-3. If rate limited: configure Docker Hub mirror or authenticate
-4. If daemon down: restart via SSH or `/ci:runner-cleanup`
+1. Diagnose to confirm the Docker pattern (`ci-diagnose`).
+2. Check the runner and verify Docker status (`ci-runner-health`).
+3. If rate limited, configure a Docker Hub mirror or authenticate.
+4. If the daemon is down, restart it on the runner over SSH.
 
 #### Flaky Tests (F07)
 
-Symptoms: Intermittent failures, passes on re-run
+Symptoms: intermittent failures, passes on re-run.
 
-Workflow:
+Approach:
 
-1. Run `/ci:diagnose` on last 3-5 failures to identify pattern
-2. Look for timing-dependent assertions
-3. Add retry annotation or increase timeouts
-4. Fix underlying race condition
+1. Diagnose the last 3-5 failures to identify the pattern (`ci-diagnose`).
+2. Look for timing-dependent assertions.
+3. Add a retry annotation or increase timeouts.
+4. Fix the underlying race condition.
 
 #### Runner Agent Issues (F09)
 
-Symptoms: Runner offline, heartbeat timeout, `Runner.Listener` crash
+Symptoms: runner offline, heartbeat timeout, `Runner.Listener` crash.
 
-Workflow:
+Approach:
 
-1. Check runner status: `/ci:runner-health runner-name`
-2. If offline: SSH and restart service
-3. If version mismatch: update runner binary
-4. If deregistered: re-register with new token
+1. Check runner status (`ci-runner-health`, scoped to the runner).
+2. If offline, SSH in and restart the runner service.
+3. If a version mismatch, update the runner binary.
+4. If deregistered, re-register with a new token.
 
 ## Failure Pattern Reference
 
-12 categories cover self-hosted runner issues (F01-F12). The `ci-conventions`
-skill contains the full pattern library with log signals, severity levels, and
-detailed fix suggestions.
+Twelve categories cover self-hosted runner issues (F01-F12). The `ci-conventions`
+reference documents the full pattern library with log signals, severity levels,
+and detailed fix suggestions.
 
 ## Prevention
 
-Run `/ci:lint-workflows` before pushing workflow changes to catch common
-self-hosted pitfalls (14 rules, W01-W14).
+Lint workflows before pushing changes to catch common self-hosted pitfalls
+(14 rules, W01-W14) — the `ci-lint-workflows` skill.

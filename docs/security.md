@@ -119,14 +119,31 @@ These plugins work entirely offline with no external network calls:
 
 ### Plugins with Hooks
 
-Four plugins execute shell-based hooks:
+Nine plugins execute hooks — yellow-ruvector, yellow-debt, yellow-core,
+yellow-composio, yellow-morph, yellow-research, and yellow-semgrep are shell;
+yellow-ci and gt-workflow run a dependency-free Node runtime:
 
 | Plugin | Hook Events | Purpose |
 |---|---|---|
 | yellow-ruvector | SessionStart, UserPromptSubmit, PostToolUse, Stop | Memory recall, edit tracking, session lifecycle |
-| yellow-ci | SessionStart | Check for recent CI failures (cached, 3s budget) |
+| yellow-ci | SessionStart | Check for recent CI failures (Node runtime, cached, 3s budget) |
 | yellow-debt | SessionStart | Remind about high/critical debt findings |
 | gt-workflow | PreToolUse, PostToolUse | Block `git push`, validate commit messages |
+| yellow-core | SessionStart, Stop | Drain the background compounding-pipeline staging queue; capture session transcript tail |
+| yellow-composio | SessionStart | Warn if `composio_mcp_url` is non-HTTPS (advisory only) |
+| yellow-morph | SessionStart | Pre-warm `@morphllm/morphmcp` install for fast first tool call |
+| yellow-research | SessionStart | Pre-warm context7 docs cache; emit `credential-status.json` for `/setup:all` |
+| yellow-semgrep | SessionStart | Emit `credential-status.json` for `/setup:all` |
+
+**yellow-ci SessionStart (Node port).** Ported from `session-start.sh` to a
+dependency-free Node runtime (`hooks/scripts/`); byte/semantic parity is gated by
+`tests/hook-parity.bats`. It is **fail-open** — always emits valid
+`{"continue": true}` JSON and never blocks startup. Runtime cache writes were
+relocated to a plugin-data dir (`${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}`)
+with a read-only fallback to the legacy `${HOME}/.cache/yellow-ci`. The hook is
+carried into the generated Codex manifest (`hooks/codex-hooks.json`) but is
+**inert on Codex** — `plugin_hooks` is `removed` on codex-cli 0.144.x — so its
+Codex-side behavior is schema/unit/parity-tested, not live-verified.
 
 ### yellow-ruvector Hooks (detailed)
 

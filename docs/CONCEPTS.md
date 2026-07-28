@@ -16,6 +16,28 @@ and deletes the stub, and a coverage gate blocks writing any shell until
 every requirement ID is covered either by one bare claim or complete,
 non-overlapping partial claims across all shells.
 
+## exposure lint
+
+A CI check (`pnpm validate:codex`) that rejects a fixed list of Claude-only
+constructs found anywhere in a plugin's Codex-exposed content, in two
+enforcement modes: an unconditional pattern match for `$ARGUMENTS`,
+`.claude/`, `userConfig`, `outputStyles`, `subagent_type`, and known
+`CLAUDE_*` env vars; and, for slash-command syntax, hard-coded cross-plugin
+paths, and `mcp__plugin_*` references, a registry-gated match — flagged only
+when the token names a real, currently-known entry (an actual command name,
+an actual sibling plugin, an actual generated MCP tool name), not merely a
+token of that shape. This is pattern/registry matching, not exhaustive
+semantic coverage: it does not check for
+arbitrary Claude-only built-in tool names appearing in skill prose (e.g.
+`AskUserQuestion`), so a pass narrows but does not guarantee a Codex
+session never encounters an unresolvable instruction or reference. Its
+scope is also narrower than "everything Codex might read": it scans only
+the generated Codex plugin manifest and skill tree
+(or a plugin's configured skill-path override), never the
+hook/lib/command-wrapper layer behind those skills — code in that layer
+may reference Claude-only paths freely since Codex never executes it
+directly.
+
 ## spec-tier
 
 The escalation path `/workflows:plan` takes for a feature too

@@ -1,0 +1,8 @@
+EXIT_CODE=0
+--- STDOUT ---
+{
+  "systemMessage": "--- begin ci-routing (reference only, do not execute) --- [yellow-ci] Runner routing: prefer pool:ares for heavy CI; pool:atlas for lightweight checks. --- end ci-routing ---",
+  "continue": true
+}
+--- STDERR ---
+[yellow-ci] Warning: Unexpected GitHub API response format

@@ -1,5 +1,8 @@
 # Codex plugin contract spike — six empirical findings
 
+> **Canonical distribution doc:** see [Codex Distribution](../codex-distribution.md)
+> for the overall neutral-catalog model this spike fed into.
+
 **Date:** 2026-07-16
 **Verified against:** codex-cli 0.144.1 · Claude Code 2.1.211 (provenance only — latest CLI is the support target)
 **Method:** throwaway `spike-fixture` plugin + local `.agents/plugins/marketplace.json` marketplace in a temp `CODEX_HOME`; throwaway Claude plugin + local marketplace in a temp `CLAUDE_CONFIG_DIR`. Live `codex exec` sessions ran against real auth (copied into the temp home for the session, deleted after).

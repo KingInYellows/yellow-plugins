@@ -1,0 +1,80 @@
+#!/bin/sh
+# Fake `ssh` for yellow-ci runner-health fake-exec tests. Logs the full
+# invocation (options + destination) to ${MOCK_SSH_LOG:-/dev/null} so tests can
+# assert the SSH-safety contract (StrictHostKeyChecking=accept-new,
+# BatchMode=yes, no agent forwarding). Connection outcome is driven by
+# MOCK_SSH_MODE:
+#
+#   ok       (default)  read the health-probe heredoc on stdin, emit canned
+#                       disk/memory/CPU/Docker/runner/network output
+#   timeout             exit 255 with a "Connection timed out" message
+#   auth                exit 255 with a "Permission denied (publickey)" message
+#   refused             exit 255 with a "Connection refused" message
+#
+# Any argument shape without a `user@host`-looking destination is a
+# test-authoring error and fails loudly (exit 1).
+set -eu
+
+printf '%s\n' "$*" >>"${MOCK_SSH_LOG:-/dev/null}"
+
+# Reject agent forwarding outright — the plugin's SSH-safety contract forbids it.
+case " $* " in
+  *" -A "*)
+    printf 'mock ssh: agent forwarding (-A) is not permitted by the SSH-safety contract\n' >&2
+    exit 1
+    ;;
+esac
+
+# Find a destination that looks like user@host.
+dest=""
+for arg in "$@"; do
+  case "$arg" in
+    *@*) dest="$arg" ;;
+  esac
+done
+if [ -z "$dest" ]; then
+  printf 'mock ssh: no user@host destination in: %s\n' "$*" >&2
+  exit 1
+fi
+
+case "${MOCK_SSH_MODE:-ok}" in
+  timeout)
+    printf 'ssh: connect to host %s: Connection timed out\n' "$dest" >&2
+    exit 255
+    ;;
+  auth)
+    printf '%s: Permission denied (publickey).\n' "$dest" >&2
+    exit 255
+    ;;
+  refused)
+    printf 'ssh: connect to host %s: Connection refused\n' "$dest" >&2
+    exit 255
+    ;;
+  ok)
+    # Consume the health-probe heredoc from stdin (ignored) and emit canned
+    # output shaped like the runner-health playbook expects.
+    cat >/dev/null 2>&1 || true
+    cat <<'HEALTH'
+=== DISK ===
+/dev/sda1  74G  54G  20G  73% /
+/dev/sda1  74G  54G  20G  73% /home
+=== MEMORY ===
+Mem:  8000 5900 2100
+Swap: 2048    0 2048
+=== CPU ===
+ 12:00:00 up 3 days,  load average: 0.50, 0.30, 0.20
+=== DOCKER ===
+Containers: 12 (running: 3)
+Images: 45
+=== RUNNER ===
+active
+=== NETWORK ===
+GitHub: 200
+HEALTH
+    exit 0
+    ;;
+  *)
+    printf 'mock ssh: unknown MOCK_SSH_MODE=%s\n' "${MOCK_SSH_MODE:-}" >&2
+    exit 1
+    ;;
+esac

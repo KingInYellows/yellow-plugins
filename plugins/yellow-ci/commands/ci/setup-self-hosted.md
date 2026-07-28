@@ -276,7 +276,10 @@ Check if a merged runner targets JSON cache exists:
 
 ```bash
 MERGED_TARGETS=""
-merged_file="${HOME}/.cache/yellow-ci/runner-targets-merged.json"
+merged_file="${CLAUDE_PLUGIN_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/yellow-ci}/runner-targets-merged.json"
+if [ ! -f "$merged_file" ]; then
+  merged_file="${HOME}/.cache/yellow-ci/runner-targets-merged.json"
+fi
 if [ -f "$merged_file" ]; then
   MERGED_TARGETS=$(cat "$merged_file" 2>/dev/null) || MERGED_TARGETS=""
 fi

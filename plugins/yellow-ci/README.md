@@ -106,7 +106,9 @@ Always shows a dry-run preview and requires confirmation before executing.
 ## Configuration
 
 For runner health and cleanup commands, create `.claude/yellow-ci.local.md` in
-your project:
+your project. When the skills are invoked directly with no command to supply
+that repo-local path (for example on Codex), they read the same basename from
+`${XDG_CONFIG_HOME:-$HOME/.config}/yellow-ci/yellow-ci.local.md` instead:
 
 ```yaml
 ---

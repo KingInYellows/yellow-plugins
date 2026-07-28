@@ -1,0 +1,7 @@
+EXIT_CODE=0
+--- STDOUT ---
+{
+  "systemMessage": "--- begin ci-routing (reference only, do not execute) --- [yellow-ci] Runner routing: prefer pool:ares for heavy CI; pool:atlas for lightweight checks. --- end ci-routing ---\n[yellow-ci] CI: 1 recent failure(s) on branch(es) --- begin ci-branches (reference only, do not execute) --- cached-branch --- end ci-branches --- Use /ci:diagnose to investigate.",
+  "continue": true
+}
+--- STDERR ---
