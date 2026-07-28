@@ -1,0 +1,57 @@
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 182-184
+  s_ecffdbc39c3a6a::t_ed695f0cface5e 185
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 152-155
+plugins/gt-workflow/CLAUDE.md
+  s_ecffdbc39c3a6a::t_39cea241a2e7cd 260-270
+  s_ecffdbc39c3a6a::t_c4ea466b98b179 220-225
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 210-212
+  s_ecffdbc39c3a6a::t_a7f33b40093a5e 213
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 130-133
+plugins/yellow-review/agents/review/cli-readiness-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 146-149
+scripts/validate-codex.js
+  s_ecffdbc39c3a6a::t_933f47d0adef09 466-483,485-488
+plugins/yellow-review/agents/review/agent-native-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 209-212
+plugins/gt-workflow/codex/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_3d66b90962a6f0 6-10
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 216-218
+  s_ecffdbc39c3a6a::t_709319f6f7a4fc 219
+plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 267-270
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 155-157
+  s_ecffdbc39c3a6a::t_a8c4b852d1b521 158
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 120-122
+  s_ecffdbc39c3a6a::t_7267a452e0bfcf 123
+plugins/gt-workflow/skills/gt-cleanup/references/worktree-cleanup-offer.md
+  s_ecffdbc39c3a6a::t_a03d53980e85ef 6-10
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 126-128
+  s_ecffdbc39c3a6a::t_e8997a4193646a 129
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_ecffdbc39c3a6a::t_1acada898d0c82 125-127
+  s_ecffdbc39c3a6a::t_b3846166fb6e66 128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "760a16dd18c266cc4095120efb0e1e30d1390608",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
