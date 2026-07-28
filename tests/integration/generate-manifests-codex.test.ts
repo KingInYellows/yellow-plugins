@@ -860,3 +860,35 @@ describe('reference sidecars (references/*.md)', () => {
     ).toBe(true);
   });
 });
+
+describe('exposure lint symlink defense (mirrors generator posture)', () => {
+  it('rejects a symlinked references/ directory in the generated tree instead of following it', () => {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'ref-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['with-refs'],
+        skills: { 'with-refs': { name: 'with-refs', description: 'Skill with references.' } },
+      },
+    ]);
+    const generated = generateManifests({ mode: 'apply', rootDir: root });
+    expect(generated.status).toBe('ok');
+
+    // Plant a symlinked references/ dir in the GENERATED tree pointing at
+    // external content the lint must not traverse into.
+    const external = mkdtempSync(join(tmpdir(), 'yellow-generate-codex-external-'));
+    fixtureRoots.push(external);
+    writeFileSync(join(external, 'outside.md'), 'External ${CLAUDE_PLUGIN_ROOT} content.\n', 'utf8');
+    symlinkSync(
+      external,
+      join(root, 'plugins', 'ref-plugin', 'codex', 'skills', 'with-refs', 'references')
+    );
+
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    const errors = runExposureLint({ rootDir: root, catalog, sources });
+    expect(errors.some((e: string) => e.includes('symlinked references directories'))).toBe(true);
+    // The external file must NOT have been linted (no traversal through the symlink).
+    expect(errors.some((e: string) => e.includes('outside.md'))).toBe(false);
+  });
+});
