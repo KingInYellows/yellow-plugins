@@ -29,7 +29,7 @@
 
 'use strict';
 
-const { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync } = require('fs');
+const { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync } = require('fs');
 const { dirname, join, relative, resolve, sep } = require('path');
 
 const { loadCatalog, loadPluginSources } = require('./lib/generate/catalog-reader');
@@ -496,6 +496,51 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
         for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
           if (entry.isDirectory()) {
             staleCandidates.push(join(skillsDir, entry.name, 'SKILL.md'));
+            // Reference sidecars: emit-codex.js writes flat *.md copies
+            // under <skill>/references/. The SKILL.md push above never
+            // descends, so a reference removed or renamed at the source
+            // would linger forever — enumerate the generated references
+            // files as stale candidates too (expectedPaths keeps the
+            // still-current ones alive).
+            const refDir = join(skillsDir, entry.name, 'references');
+            let refDirStat = null;
+            try {
+              refDirStat = lstatSync(refDir);
+            } catch (err) {
+              if (err.code !== 'ENOENT') {
+                errors.push(`cannot read ${refDir}: ${err.message}`);
+              }
+            }
+            if (refDirStat !== null) {
+              if (refDirStat.isSymbolicLink()) {
+                // The generator never writes symlinks; deleting through one
+                // could reach outside the generator-owned tree. Error, not
+                // sweep.
+                errors.push(
+                  `catalog/plugins/${name}.json: "targets.codex.componentPaths.skills" ("${skillsPath}") skill entry "${entry.name}" has a symlinked references directory — not allowed in generated output`
+                );
+              } else if (refDirStat.isDirectory()) {
+                try {
+                  for (const refEntry of readdirSync(refDir, { withFileTypes: true })) {
+                    if (refEntry.isFile()) {
+                      staleCandidates.push(join(refDir, refEntry.name));
+                    } else {
+                      // Only regular files are ever generated here; a
+                      // nested directory or symlink is foreign content.
+                      errors.push(
+                        `unexpected non-file entry in generated ${refDir}: ${refEntry.name}`
+                      );
+                    }
+                  }
+                } catch (err) {
+                  errors.push(`cannot read ${refDir}: ${err.message}`);
+                }
+              } else {
+                // A plain file named "references" is never generated; sweep
+                // it like any other stale artifact in the owned tree.
+                staleCandidates.push(refDir);
+              }
+            }
             continue;
           }
           if (!entry.isSymbolicLink()) {

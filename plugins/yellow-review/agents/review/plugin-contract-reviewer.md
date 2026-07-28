@@ -213,6 +213,10 @@ No prose outside the JSON block.
 }
 ```
 
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").
+
 `category` is always `"plugin-contract"` for this reviewer. The
 orchestrator uses it for grouping in the final report.
 

@@ -143,3 +143,7 @@ shown below. Suppress findings with `confidence < 75` except P0 findings at
   "testing_gaps": []
 }
 ```
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").

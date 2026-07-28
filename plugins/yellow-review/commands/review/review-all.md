@@ -170,12 +170,14 @@ aggregation rules change there, propagate the same change here.
 
 7. **Compact-return pass 1** (mirrors review-pr.md Step 5): launch all
    selected agents in parallel except `code-simplifier`. Wave 2 persona
-   agents return the structured JSON compact-return schema. Pre-Wave-2
+   agents return the structured JSON compact-return schema — including
+   the cross-plugin `security-reviewer` and `performance-reviewer`,
+   which must NOT be treated as legacy. Pre-Wave-2
    agents (`pr-test-analyzer`, `comment-analyzer`,
    `type-design-analyzer`, `silent-failure-hunter`, and the cross-plugin reviewers
    `architecture-strategist`, `pattern-recognition-specialist`,
-   `code-simplicity-reviewer`, `polyglot-reviewer`, `security-reviewer`,
-   `performance-reviewer`, `security-sentinel`, `performance-oracle`)
+   `code-simplicity-reviewer`, `polyglot-reviewer`,
+   `security-sentinel`, `performance-oracle`)
    return legacy prose
    format — do NOT drop these as malformed; they are normalized to
    compact-return in Step 8 sub-step 1 before validation. Drop only

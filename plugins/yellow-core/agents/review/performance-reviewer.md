@@ -102,25 +102,32 @@ same rule the anchor-50 bullet below states).
 
 ## Output Format
 
-Return findings in the standard reviewer schema (severity, category, file,
-line, finding, fix, confidence). One finding per issue. No prose outside the
-structured output.
+Return findings as JSON matching the compact-return schema. One finding per
+issue. No prose outside the structured output.
 
 ```json
 {
   "reviewer": "performance",
   "findings": [
     {
+      "title": "What is wrong, in one sentence.",
       "severity": "P0|P1|P2|P3",
       "category": "performance",
       "file": "path/to/file.ts",
       "line": 42,
-      "finding": "What is wrong, in one sentence.",
-      "fix": "How to address it, in one or two sentences.",
-      "confidence": 75
+      "confidence": 75,
+      "autofix_class": "safe_auto|gated_auto|manual|advisory",
+      "owner": "review-fixer|downstream-resolver|human|release",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "<one-sentence concrete fix or null>"
     }
   ],
   "residual_risks": [],
   "testing_gaps": []
 }
 ```
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").

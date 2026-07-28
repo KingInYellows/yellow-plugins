@@ -123,4 +123,8 @@ the JSON block.
 }
 ```
 
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").
+
 `category` is always `"reliability"` for this reviewer.

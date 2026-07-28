@@ -264,3 +264,7 @@ shown below. Cap findings at 5–7 per review. Suppress findings with
   "testing_gaps": []
 }
 ```
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").

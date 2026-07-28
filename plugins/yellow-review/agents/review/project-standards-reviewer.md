@@ -179,6 +179,10 @@ outside the JSON block.
 }
 ```
 
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").
+
 `category` is always `"project-standards"` for this reviewer. Each
 finding's `title` should reference the standards-file section being
 violated (e.g., `"Skill description must be single-line — see

@@ -1317,6 +1317,141 @@ way to the skill.
 
 ---
 
+## Update — 2026-07-27
+
+### 30. A `//` Comment Inside a Strict JSON Example Fence Is Invalid JSON
+
+**WRONG:**
+
+````markdown
+```json
+{
+  "residual_risks": [],
+  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
+  "testing_gaps": []
+}
+```
+````
+
+**RIGHT:**
+
+````markdown
+```json
+{
+  "residual_risks": [],
+  "testing_gaps": []
+}
+```
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").
+````
+
+**Rule:** Never put a `//` (or any non-JSON) comment inside a fenced
+```` ```json ```` block that a file's own instructions describe as strict —
+e.g. "No prose outside the JSON block." JSON has no comment syntax; a `//`
+line makes the fenced block invalid JSON. Worse, the fence is there
+specifically as a literal-copy example: an agent mirroring it verbatim
+reproduces a parse failure — the exact whole-return silent-drop class of bug
+the surrounding instructions exist to prevent. Move the annotation to a
+prose sentence immediately after the closing fence instead; this is the
+canonical pattern already used elsewhere in the pr-review-workflow SKILL.md.
+
+Twelve reviewer-agent files shipped this exact defect — one JSON demotion-
+bucket comment, copy-pasted into each new review persona as the roster grew:
+`plugins/yellow-review/agents/review/{adversarial,agent-cli-readiness,agent-native,cli-readiness,correctness,maintainability,plugin-contract,project-compliance,project-standards,reliability}-reviewer.md`
+plus `plugins/yellow-core/agents/review/{performance,security}-reviewer.md`.
+Caught by four independently-converging reviewers (`agent-native`,
+`maintainability`, `comment-analyzer`, `codex`) in PR #667; fixed in commit
+`d464f8c` by deleting the in-fence comment and restating it as prose
+directly below the closing fence, in all twelve files.
+
+**Prevention checklist additions:**
+
+- [ ] Before adding an inline `//` or `#` comment inside a fenced code
+      block, check the fence's declared language. If it's `json` (or any
+      format with no comment syntax), the comment is invalid content —
+      move it to prose before or after the fence instead.
+- [ ] When a file's own instructions say "no prose outside the JSON
+      block," treat every character inside that fence as literally
+      copy-pasteable output, not authoring shorthand — verify the fence
+      parses as JSON on its own, with nothing stripped.
+- [ ] If the same annotation was copy-pasted across multiple sibling
+      files (e.g. one comment cloned into every new persona in a
+      reviewer-agent roster), fix all of them in the same change — a
+      partial fix leaves the invalid pattern as the example new siblings
+      will keep copying.
+
+---
+
+## Update — 2026-07-28
+
+### 31. Reviewer Convergence Reliability Tracks Verification Cost, Not Agreement Count
+
+**Refines anti-pattern #27** with a fourth data point that sharpens *why*
+agreement count alone predicts nothing, instead of just restating that it
+doesn't.
+
+PR #667: 6 of 21 independent reviewer personas (`simplicity`, `polyglot`,
+`maintainability`, `types`, `adversarial`, `codex`) each independently
+flagged that `scripts/validate-codex.js:491` re-literaled the `REF_FILE_RE`
+regex instead of importing the named constant `scripts/lib/generate/emit-codex.js`
+already exported. High agreement, and correct — applied and pushed (see the
+"Code-Level Instance" update in `multi-doc-schema-rename-drift.md`).
+
+Re-reading anti-pattern #27's own three data points against this axis, they
+already sort cleanly:
+
+- PR #528 (4/7 reviewers, **wrong**): a *tool/platform-behavior* claim —
+  "the `Skill` tool can only load `SKILL.md` files" — required knowing how
+  the tool actually resolves invocations, not something diffable from the
+  files in front of the reviewers.
+- PR #539 (8/15 reviewers, **right**) and anti-pattern #22 (7/7 reviewers,
+  **right**): #22's colon/wildcard-boundary bug is a *mechanical,
+  source-verifiable* claim — grep the grant string, see the collision. #539's
+  exit-code-API gap sits closer to behavior but was confirmed against the
+  `Skill` tool's actual (documented) return contract, not assumed.
+
+Both mechanical/source-verifiable cases were correct; the one purely
+behavioral case split. PR #667's `REF_FILE_RE` finding is a second
+mechanical case, and it was correct too — the pattern holds.
+
+- **Mechanical / source-verifiable claims** ("these two regex literals
+  differ," "this field is absent from the schema," "this constant is
+  defined twice") cost almost nothing to check — `grep`/`diff` the two sites
+  directly. Convergence on these is a strong, cheap-to-confirm signal: once
+  6 reviewers independently land on the same grep-verifiable fact, verifying
+  it costs one command and settles the question regardless of the count.
+- **Tool/platform-behavior claims** ("this hook doesn't fire on Codex," "the
+  `Skill` tool can only load `SKILL.md` files") require live invocation or
+  deep platform familiarity to check — this is exactly where reviewers share
+  the same wrong training-derived mental model, producing false consensus
+  that *feels* authoritative because many independently "confirmed" it
+  (PR #528's 4/7 false P1).
+
+**Rule:** Before weighing a converged-on finding by its agreement count,
+classify the claim by verification cost, not by how many reviewers stated
+it. If it reduces to a `grep`/`diff`-checkable fact, check it directly — the
+check is nearly free, and count stops mattering once you've looked. If it
+requires live behavior or deep platform knowledge, treat convergence as a
+prioritization signal only and still verify against a live invocation or a
+primary source, per anti-pattern #27. This does not supersede #27 — it names
+the axis #27's own examples were already sorted along.
+
+**Prevention checklist additions:**
+
+- [ ] When a finding claims two artifacts diverge (constants, regexes,
+      field lists), verify with `grep`/`diff` before weighing how many
+      reviewers flagged it — the check is cheaper than any confidence
+      calibration.
+- [ ] When a finding claims something about tool/platform *behavior* rather
+      than a diffable fact, do not shortcut to "N reviewers agree, apply
+      it" — reproduce the behavior or find a primary source per
+      anti-pattern #27, regardless of count.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2

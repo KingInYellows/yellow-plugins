@@ -152,6 +152,10 @@ outside the JSON block.
 }
 ```
 
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").
+
 `category` is always `"project-compliance"` for this reviewer. Each
 finding's `title` should reference the convention being violated (e.g.,
 `"Conventional-commit prefix missing — see plugins/yellow-review/CLAUDE.md

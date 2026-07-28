@@ -97,7 +97,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-ci",
       "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
-      "version": "1.4.6",
+      "version": "1.5.0",
       "author": {
         "name": "KingInYellows"
       },
@@ -295,7 +295,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-ci/.claude-plugin/plug
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-ci",
-  "version": "1.4.6",
+  "version": "1.5.0",
   "description": "CI failure diagnosis, workflow linting, and runner health management for self-hosted GitHub Actions runners",
   "author": {
     "name": "KingInYellows",
