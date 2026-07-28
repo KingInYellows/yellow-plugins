@@ -1,0 +1,30 @@
+plugins/yellow-codex/commands/codex/rescue.md
+  s_ecffdbc39c3a6a::t_f5644d27e05f96 158
+  s_ecffdbc39c3a6a::t_be6c04b24d238f 50,53-58
+  s_ecffdbc39c3a6a::t_84b14189be3b66 69-80
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_ecffdbc39c3a6a::t_a19a1061f0deca 123-124,127-130,132,143-148
+  s_ecffdbc39c3a6a::t_a5cdf8e03f4f8d 174-176,178,204-206,208
+  s_ecffdbc39c3a6a::t_3b3d29a980b368 159,162-163
+  s_ecffdbc39c3a6a::t_c8ffc823f3c794 172-173,177,202-203,207
+  s_ecffdbc39c3a6a::t_4c8303b1a8af8b 164
+plugins/yellow-ruvector/commands/ruvector/index.md
+  s_ecffdbc39c3a6a::t_04169b7699c2af 33-37
+  s_ecffdbc39c3a6a::t_5a4808c33096f2 67-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "ff218d89905e1d6940c33f15bff3bc97aa78745c",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
