@@ -5,6 +5,7 @@ model: haiku
 effort: low
 tools:
   - Bash
+  - Write
   - Read
   - Grep
   - Glob
@@ -45,6 +46,22 @@ an explicit exception to the W1.5 read-only-reviewer rule:
   allowlists this exact path:
   `plugins/yellow-council/agents/review/gemini-reviewer.md`.
 
+`Write` is also granted, narrowly: it is used ONLY in Step 3 to stage the
+untrusted council pack (PR diffs, issue bodies — attacker-influenced text) to
+the `$PACK_FILE` path created by `mktemp`. This closes a heredoc delimiter
+collision: a `cat > "$PACK_FILE" <<'__EOF_COUNCIL_PACK__'` heredoc embeds the
+delimiter and the untrusted pack body in the same shell command, so any pack
+line equal to the delimiter terminates the heredoc early and the remaining
+pack text is parsed as shell input — see
+`docs/solutions/security-issues/heredoc-delimiter-collision.md`. A per-run
+randomized delimiter does not close this: the generated command still
+contains both the delimiter and the untrusted body together, so the same
+primitive applies. `Write` takes the content as a structured parameter,
+never shell-parsed, so this does not grant any capability `Bash` did not
+already have (Bash can write files) — it only removes shell parsing of
+untrusted bytes. `Write` is bounded to the `$PACK_FILE` path under `/tmp`;
+no other use is permitted.
+
 The legitimate Bash surface for this agent covers ONLY:
 
 - `command -v gemini >/dev/null 2>&1` — pre-flight binary check
@@ -58,8 +75,10 @@ The legitimate Bash surface for this agent covers ONLY:
 - `printf` — structured findings output
 - `rm -f` — temp file cleanup
 
-NOT permitted: `git`, `gt`, `Edit`, `Write`, network operations beyond the
-gemini CLI itself, file modifications anywhere outside `/tmp`.
+NOT permitted: `git`, `gt`, `Edit`, network operations beyond the
+gemini CLI itself, file modifications anywhere outside `/tmp`. `Write` is
+permitted ONLY to stage `$PACK_FILE` per Step 3 above — never to any other
+path.
 
 ## Workflow
 
@@ -102,17 +121,32 @@ and the shell command line readable), then expand the file into `-p`:
 PACK_FILE=$(mktemp /tmp/council-gemini-pack-XXXXXX.txt)
 OUTPUT_FILE=$(mktemp /tmp/council-gemini-out-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/council-gemini-err-XXXXXX.txt)
+printf 'PACK_FILE=%s\nOUTPUT_FILE=%s\nSTDERR_FILE=%s\n' \
+  "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
+```
 
-# Write the pack content from your spawn prompt to PACK_FILE.
-# Substitute the actual pack text (verbatim, including all fenced sections)
-# from the spawn prompt below into a heredoc here. Bash variables do NOT
-# carry the pack content from the orchestrator — the LLM running this
-# agent writes it directly. Never use the Write tool (not in allowed-tools).
-#
-#   cat > "$PACK_FILE" <<'__EOF_COUNCIL_PACK__'
-#   <full pack content here, copy-pasted from the spawn prompt>
-#   __EOF_COUNCIL_PACK__
-#
+Capture the three literal paths this prints — Bash variables do NOT survive
+across separate Bash invocations, so every later block in this procedure
+re-assigns them from the printed literals.
+
+Use the `Write` tool to write the pack content from your spawn prompt
+(verbatim, including all fenced sections) to the literal PACK_FILE path
+printed above. Do NOT embed the pack content in a Bash heredoc — the pack is
+untrusted (PR diffs, issue bodies) and a heredoc delimiter shares the same
+shell command as that text, so a pack line matching the delimiter terminates
+the heredoc early and turns the remaining pack text into shell input (see
+`docs/solutions/security-issues/heredoc-delimiter-collision.md`). `Write`
+takes the content as a structured parameter — never shell-parsed — so this
+does not apply. Bash variables do NOT carry the pack content from the
+orchestrator; the LLM running this agent supplies it directly to `Write`.
+
+```bash
+# Substitute the three literal paths printed by the mktemp block above —
+# do the same at the top of EVERY later bash block that references them.
+PACK_FILE="<literal pack-file path>"
+OUTPUT_FILE="<literal output-file path>"
+STDERR_FILE="<literal stderr-file path>"
+
 # Validate non-empty before invoking the CLI:
 [ -s "$PACK_FILE" ] || { printf '[gemini-reviewer] Error: empty pack file\n' >&2; exit 1; }
 
@@ -123,11 +157,22 @@ timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
     -o text \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 CLI_EXIT=$?
+printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
 ```
+
+Capture the printed CLI_EXIT value as well — later blocks substitute it
+alongside the three paths.
 
 ### Step 4: Handle exit code
 
 ```bash
+# Substitute the literal values printed by the Step 3 blocks — Bash
+# variables do not survive across separate Bash invocations.
+PACK_FILE="<literal pack-file path>"
+OUTPUT_FILE="<literal output-file path>"
+STDERR_FILE="<literal stderr-file path>"
+CLI_EXIT="<literal CLI_EXIT value>"
+
 case $CLI_EXIT in
   0)
     printf '[gemini-reviewer] CLI exit 0 — parsing output\n' >&2
@@ -172,10 +217,24 @@ esac
 
 ### Step 5: Apply credential redaction
 
+Steps 5-9 run as **one Bash invocation**. Bash variables do not survive
+across separate Bash tool calls, and every value produced from here on
+(`REDACTED_FILE`, `VERDICT`, `CONFIDENCE`, `SUMMARY`, `FINDINGS`,
+`ESCAPED_FILE`, `FENCED_OUTPUT_FILE`) must stay in scope through Step 9's
+cleanup. Only the inputs from the Step 3 blocks (`PACK_FILE`,
+`OUTPUT_FILE`, `STDERR_FILE`) need reconstructing, via literal substitution
+of the printed paths.
+
 Use the 11-pattern awk block from `council-patterns` SKILL.md. Apply to
 `$OUTPUT_FILE` in place:
 
 ```bash
+# Substitute the literal values printed by the Step 3 blocks — Bash
+# variables do not survive across separate Bash invocations.
+PACK_FILE="<literal pack-file path>"
+OUTPUT_FILE="<literal output-file path>"
+STDERR_FILE="<literal stderr-file path>"
+
 REDACTED_FILE=$(mktemp /tmp/council-gemini-redacted-XXXXXX.txt)
 awk '
 {
