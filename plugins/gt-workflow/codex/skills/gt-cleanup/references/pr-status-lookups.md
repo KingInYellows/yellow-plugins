@@ -3,11 +3,14 @@
 Moved verbatim from SKILL.md Phase 2 #4. Read when performing PR status
 lookups during the branch scan.
 
-For branches that have an upstream **and** whose track status does NOT contain
-`[gone]` (so: not orphaned and not already routed to the merged-branch hint),
-check PR status to determine:
+For every branch whose track status does NOT contain `[gone]` — including
+branches with no upstream configured (Orphaned candidates), since a missing
+local upstream does not guarantee GitHub has no PR open against that branch
+name — check PR status to determine:
 - Whether the branch belongs in the **Closed PR** category
 - Whether the branch should be excluded from the **Stale** category (has open PR)
+- Whether an **Orphaned** candidate should surface its open-PR state instead
+  of being silently deletion-eligible
 
 `[gone]`-tracked branches are skipped here on purpose — they were already
 classified in Section 3 Step 2 and belong to the `gt-sync` skill, so any
@@ -23,7 +26,7 @@ echo "Checking PR status for branch $i of $total..."
 Capture the repo identifier once before the loop to avoid redundant API calls:
 
 ```bash
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 if [ -z "$REPO" ]; then
   echo "ERROR: Could not determine GitHub repository. Ensure this directory is connected to a GitHub remote and 'gh' is authenticated."
   exit 1
@@ -72,7 +75,11 @@ triggering GitHub secondary rate limits. If `gh pr list` fails:
 Then classify:
 
 - `HAS_OPEN == true`: branch has an active PR — exclude from **Closed PR**
-  and **Stale** categories.
+  and **Stale** categories. If the branch also has no upstream (an Orphaned
+  candidate), it stays in **Orphaned** (dedup priority is unchanged) but is
+  additionally tagged `has_open_pr=true` so Phase 4 surfaces the open-PR
+  state in that branch's `<context>` / `PR status:` line instead of
+  presenting it as silently deletion-eligible.
 - `ALL_TERMINAL == true`: branch is a **Closed PR** candidate. If
   `CLOSED_NOT_MERGED == true` (no PR on the branch reached `state ==
   "MERGED"`, and at least one has `state == "CLOSED"` — meaning closed

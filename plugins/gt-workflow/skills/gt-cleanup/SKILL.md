@@ -161,9 +161,11 @@ state:
 
 #### 4. PR Status Lookups
 
-For branches that have an upstream **and** whose track status does NOT
-contain `[gone]`, PR status determines **Closed PR** membership and
-excludes open-PR branches from **Stale**. Read the file
+For every branch whose track status does NOT contain `[gone]` — including
+branches with no upstream (Orphaned candidates) — PR status determines
+**Closed PR** membership, excludes open-PR branches from **Stale**, and
+surfaces an open-PR flag on Orphaned candidates rather than letting a
+branch with an active PR go silently deletion-eligible. Read the file
 `references/pr-status-lookups.md` located in this skill's directory
 (sibling to this SKILL.md) for the full lookup procedure — the `[gone]`
 skip rationale, repo capture, the `gh pr list` + jq pipeline, rate-limit

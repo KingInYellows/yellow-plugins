@@ -80,10 +80,12 @@ pattern: [cross-host-hook-envelope-node-runtime](solutions/integration-issues/cr
   as `removed` (confirmed on codex-cli 0.144.1 and 0.144.6). Generated
   `codex-hooks.json` is schema/unit-tested but never fires — do not gate delivery
   on live Codex hook firing.
-- **The generator copies `SKILL.md` only.** `emit-codex.js` rejects any
-  allowlisted skill directory with sidecar files (`references/`, `agents/`, …).
-  A skill with sidecars must relocate them out of the skill directory before it
-  can be Codex-exposed.
+- **The generator copies `SKILL.md` plus a flat `references/` sidecar.**
+  `emit-codex.js` copies `SKILL.md` and any `references/[a-zA-Z0-9_-]+.md`
+  files verbatim, but rejects an allowlisted skill directory with any other
+  sidecar shape (nested directories, symlinks, non-`.md` files, a top-level
+  `agents/`, …). A skill with an unsupported sidecar must relocate it out of
+  the skill directory before it can be Codex-exposed.
 - **`allow_implicit_invocation` is honored but not yet shippable here.** On
   codex-cli 0.144.6 Codex parses `skills/<name>/agents/openai.yaml`
   `policy.allow_implicit_invocation` (reversing the 0.144.1 finding), but

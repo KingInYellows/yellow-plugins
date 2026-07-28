@@ -34,7 +34,7 @@ const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 // Reference sidecar files copied alongside SKILL.md must be flat *.md with
 // conservative names — nested directories and every other filename shape
 // keep the fail-closed hard error in buildCodexSkillTree.
-const REF_FILE_RE = /^[a-zA-Z0-9_-]+\.md$/;
+const REF_FILE_RE = /^[a-zA-Z0-9_][a-zA-Z0-9_-]*\.md$/;
 
 /**
  * Single source of truth for Codex-target membership — the twin to
