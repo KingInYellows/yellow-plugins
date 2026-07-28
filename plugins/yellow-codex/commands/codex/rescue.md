@@ -69,7 +69,20 @@ STDERR_FILE=$(mktemp /tmp/codex-rescue-err-XXXXXX.txt)
 # Substitute the literal path printed in Step 3 — read back as plain data
 # (command substitution captures cat's stdout; the file's contents are
 # never re-evaluated as shell source).
+# Fail loudly if the Step 3 Write never happened or wrote nothing — a
+# blank task would otherwise be sent to Codex silently.
+[ -s "<task-desc-file>" ] || { printf '[yellow-codex] Error: task-description file missing or empty — re-run the Step 3 Write.\n' >&2; exit 1; }
 TASK_DESCRIPTION=$(cat "<task-desc-file>")
+
+# Escape any literal task-description fence delimiter inside the untrusted
+# text BEFORE interpolating it between the fences below. A pasted bug
+# report containing the exact close-delimiter line would otherwise
+# terminate the fence early, and Codex would read the remaining text as
+# instructions outside the fence (prompt-injection fence breakout) — same
+# [ESCAPED]-substitution pattern as the council reviewer agents.
+TASK_DESCRIPTION=$(printf '%s\n' "$TASK_DESCRIPTION" | sed \
+  -e 's/--- end task-description/[ESCAPED] end task-description/g' \
+  -e 's/--- begin task-description/[ESCAPED] begin task-description/g')
 
 # Current branch and recent commits
 BRANCH=$(git branch --show-current)
