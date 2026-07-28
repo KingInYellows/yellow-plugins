@@ -530,7 +530,7 @@ trigger them:
   `code-simplifier`, `type-design-analyzer`, `silent-failure-hunter`.
 - yellow-core cross-plugin: `architecture-strategist`,
   `pattern-recognition-specialist`, `code-simplicity-reviewer`,
-  `polyglot-reviewer`, `security-sentinel`, `performance-oracle`
+  `polyglot-reviewer`, plus `security-sentinel` and `performance-oracle`
   (legacy-fallback audit variants dispatched when `review_pipeline:
   legacy`). `security-reviewer` and `performance-reviewer` are NOT in
   this list — they emit the compact-return JSON schema directly and

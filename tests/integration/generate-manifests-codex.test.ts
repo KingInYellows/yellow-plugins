@@ -891,4 +891,67 @@ describe('exposure lint symlink defense (mirrors generator posture)', () => {
     // The external file must NOT have been linted (no traversal through the symlink).
     expect(errors.some((e: string) => e.includes('outside.md'))).toBe(false);
   });
+
+  it('rejects a symlinked individual reference file inside a real generated references/ dir', () => {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'ref-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['with-refs'],
+        skills: { 'with-refs': { name: 'with-refs', description: 'Skill with references.' } },
+      },
+    ]);
+    const sourceRefDir = join(root, 'plugins', 'ref-plugin', 'skills', 'with-refs', 'references');
+    mkdirSync(sourceRefDir, { recursive: true });
+    writeFileSync(join(sourceRefDir, 'real.md'), 'Real reference.\n', 'utf8');
+    const generated = generateManifests({ mode: 'apply', rootDir: root });
+    expect(generated.status).toBe('ok');
+
+    // Plant a symlinked entry alongside the legitimately generated file, in
+    // the GENERATED references/ dir, pointing at external content the lint
+    // must not traverse into.
+    const external = mkdtempSync(join(tmpdir(), 'yellow-generate-codex-external-'));
+    fixtureRoots.push(external);
+    writeFileSync(join(external, 'outside.md'), 'External ${CLAUDE_PLUGIN_ROOT} content.\n', 'utf8');
+    const generatedRefDir = join(root, 'plugins', 'ref-plugin', 'codex', 'skills', 'with-refs', 'references');
+    symlinkSync(join(external, 'outside.md'), join(generatedRefDir, 'linked.md'));
+
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    const errors = runExposureLint({ rootDir: root, catalog, sources });
+    expect(
+      errors.some((e: string) => e.includes('references/linked.md') && e.includes('symlinked reference files'))
+    ).toBe(true);
+    // The external file must NOT have been linted (no traversal through the symlink).
+    expect(errors.some((e: string) => e.includes('CLAUDE_PLUGIN_ROOT'))).toBe(false);
+  });
+
+  it('rejects a symlinked SKILL.md in the generated tree', () => {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'plain-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['plain-skill'],
+        skills: { 'plain-skill': { name: 'plain-skill', description: 'A plain skill.' } },
+      },
+    ]);
+    const generated = generateManifests({ mode: 'apply', rootDir: root });
+    expect(generated.status).toBe('ok');
+
+    const external = mkdtempSync(join(tmpdir(), 'yellow-generate-codex-external-'));
+    fixtureRoots.push(external);
+    writeFileSync(
+      join(external, 'SKILL.md'),
+      '---\nname: plain-skill\ndescription: "target"\n---\n\nBody.\n',
+      'utf8'
+    );
+    const generatedSkillFile = join(root, 'plugins', 'plain-plugin', 'codex', 'skills', 'plain-skill', 'SKILL.md');
+    rmSync(generatedSkillFile);
+    symlinkSync(join(external, 'SKILL.md'), generatedSkillFile);
+
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    const errors = runExposureLint({ rootDir: root, catalog, sources });
+    expect(errors.some((e: string) => e.includes('symlinked SKILL.md is not allowed'))).toBe(true);
+  });
 });

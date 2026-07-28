@@ -452,8 +452,11 @@ function collectCodexExposedFiles(rootDir, name, source) {
       // SKILL.md bodies. ENOENT (no references/) is the common case. A
       // symlinked references/ dir (or one reached through a symlink) is
       // rejected via lstat + literal expected-path comparison, mirroring
-      // buildCodexSkillTree; regular files inside are safe to collect since
-      // withFileTypes isFile() is false for symlinked entries.
+      // buildCodexSkillTree. Individual entries inside are also lstat-typed
+      // (withFileTypes) below: a symlinked entry is rejected explicitly
+      // rather than silently skipped, since Dirent.isFile() is false for
+      // symlinks and would otherwise let a symlinked reference file pass
+      // this lint unread.
       const refDir = join(skillsDir, entry.name, 'references');
       let refDirStat = null;
       try {
@@ -483,7 +486,9 @@ function collectCodexExposedFiles(rootDir, name, source) {
             errors.push(`cannot read ${refDir}: ${err.message}`);
           }
           for (const refEntry of refEntries) {
-            if (refEntry.isFile() && refEntry.name.endsWith('.md')) {
+            if (refEntry.isSymbolicLink()) {
+              errors.push(`${join(refDir, refEntry.name).slice(rootDir.length + 1)}: symlinked reference files are not allowed in generated output`);
+            } else if (refEntry.isFile() && refEntry.name.endsWith('.md')) {
               files.push(join(refDir, refEntry.name));
             }
           }

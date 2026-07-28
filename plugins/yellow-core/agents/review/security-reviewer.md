@@ -142,7 +142,7 @@ the structured output.
       "owner": "review-fixer|downstream-resolver|human|release",
       "requires_verification": true,
       "pre_existing": false,
-      "suggested_fix": "How to address it, in one or two sentences, or null."
+      "suggested_fix": "<one-sentence concrete fix or null>"
     }
   ],
   "residual_risks": [],
