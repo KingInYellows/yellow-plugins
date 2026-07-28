@@ -174,11 +174,14 @@ outside the JSON block.
       "suggested_fix": "<one-sentence concrete fix or null>"
     }
   ],
-  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
   "residual_risks": [],
   "testing_gaps": []
 }
 ```
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").
 
 `category` is always `"project-standards"` for this reviewer. Each
 finding's `title` should reference the standards-file section being

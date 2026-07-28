@@ -463,22 +463,29 @@ function collectCodexExposedFiles(rootDir, name, source) {
           errors.push(`cannot read ${refDir}: ${err.message}`);
         }
       }
-      if (refDirStat !== null && refDirStat.isSymbolicLink()) {
-        errors.push(`${refDir.slice(rootDir.length + 1)}: symlinked references directories are not allowed in generated output`);
-      } else if (refDirStat !== null && refDirStat.isDirectory()) {
-        let refEntries = [];
-        try {
-          if (realpathSync(refDir) !== join(skillsDirReal, entry.name, 'references')) {
-            errors.push(`${refDir.slice(rootDir.length + 1)}: symlinked references directories (including a symlinked ancestor) are not allowed in generated output`);
-          } else {
-            refEntries = readdirSync(refDir, { withFileTypes: true });
+      if (refDirStat !== null) {
+        if (refDirStat.isSymbolicLink()) {
+          errors.push(`${refDir.slice(rootDir.length + 1)}: symlinked references directories are not allowed in generated output`);
+        } else if (!refDirStat.isDirectory()) {
+          // A plain file named "references" is never generated; error rather
+          // than silently skipping so a standalone validate:codex run is
+          // fail-closed (generate-manifests.js's sweep handles the same case).
+          errors.push(`${refDir.slice(rootDir.length + 1)}: unexpected non-directory "references" entry in generated output`);
+        } else {
+          let refEntries = [];
+          try {
+            if (realpathSync(refDir) !== join(skillsDirReal, entry.name, 'references')) {
+              errors.push(`${refDir.slice(rootDir.length + 1)}: symlinked references directories (including a symlinked ancestor) are not allowed in generated output`);
+            } else {
+              refEntries = readdirSync(refDir, { withFileTypes: true });
+            }
+          } catch (err) {
+            errors.push(`cannot read ${refDir}: ${err.message}`);
           }
-        } catch (err) {
-          errors.push(`cannot read ${refDir}: ${err.message}`);
-        }
-        for (const refEntry of refEntries) {
-          if (refEntry.isFile() && refEntry.name.endsWith('.md')) {
-            files.push(join(refDir, refEntry.name));
+          for (const refEntry of refEntries) {
+            if (refEntry.isFile() && refEntry.name.endsWith('.md')) {
+              files.push(join(refDir, refEntry.name));
+            }
           }
         }
       }

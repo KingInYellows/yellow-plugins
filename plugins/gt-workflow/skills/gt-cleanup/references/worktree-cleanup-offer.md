@@ -3,6 +3,11 @@
 Moved verbatim from SKILL.md Phase 6. Read when the branch cleanup summary
 (or a dry-run/nothing-to-clean exit) reaches Phase 6.
 
+The host note in SKILL.md Phase 4 (Codex AskUserQuestion fallback) applies
+to the prompt below — and on Codex, the `worktree:cleanup` skill is not
+Codex-exposed: skip the Skill invocation and go directly to the
+graceful-degradation message instead of attempting it.
+
 After the branch cleanup summary, check if any git worktrees exist beyond the
 main worktree:
 

@@ -260,8 +260,11 @@ shown below. Cap findings at 5–7 per review. Suppress findings with
       "command_type": "read|mutating|streaming|interactive|bulk"
     }
   ],
-  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
   "residual_risks": [],
   "testing_gaps": []
 }
 ```
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").

@@ -145,8 +145,11 @@ the structured output.
       "suggested_fix": "How to address it, in one or two sentences, or null."
     }
   ],
-  // aggregator-populated demotion buckets — always emit [] (see pr-review-workflow "Finding Output Format")
   "residual_risks": [],
   "testing_gaps": []
 }
 ```
+
+`residual_risks` and `testing_gaps` are aggregator-populated demotion
+buckets — always emit them as empty arrays (see pr-review-workflow
+"Finding Output Format").

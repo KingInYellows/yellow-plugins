@@ -217,11 +217,12 @@ plugin directory (see root `CLAUDE.md`'s bats list).
 - `tests/hook-parity.bats` — parity gate proving the Node hook runtime
   (`hooks/scripts/entrypoint-claude.js`) reproduces the deleted bash hooks'
   behavior exactly, against golden fixtures in `tests/fixtures/hooks/`.
-- `tests/gt-cleanup.bats` — the deterministic bash embedded in
-  `skills/gt-cleanup/SKILL.md`: flag parsing, branch classification, the
-  batch-cap-15 review queue, the `gt get` conflict-stop path, and the
-  `gt delete` not-tracked fallback. Fixture:
-  `tests/fixtures/gt-cleanup/branches-mixed.txt`.
+- `tests/gt-cleanup.bats` — the deterministic bash embedded in the
+  gt-cleanup skill: flag parsing and branch classification live in
+  `skills/gt-cleanup/SKILL.md`; the batch-cap-15 review queue, the
+  `gt get` conflict-stop path, and the `gt delete` not-tracked fallback
+  live in `skills/gt-cleanup/references/actionable-categories.md`.
+  Fixture: `tests/fixtures/gt-cleanup/branches-mixed.txt`.
 - `tests/smart-submit.bats` / `tests/gt-amend.bats` — the deterministic
   bash embedded in the matching `SKILL.md` (Phase 0's `.graphite.yml`
   clamping, Phase 4's submit-flag construction) plus the `--dry-run` /
@@ -256,7 +257,17 @@ above for why they're carried but currently inert.
 Generated artifacts (`pnpm generate:manifests`, never hand-edited):
 `.codex-plugin/plugin.json`, `hooks/codex-hooks.json`,
 `codex/skills/<name>/SKILL.md` (ten directories, frontmatter normalized to
-`name` + single-line `description` only).
+`name` + single-line `description` only), and
+`codex/skills/<name>/references/*.md` (flat reference sidecars copied
+verbatim alongside an allowlisted SKILL.md — currently gt-cleanup's three).
+
+A second live round-trip (2026-07-27, codex-cli 0.144.6, isolated
+`CODEX_HOME`, authenticated gpt-5.4 session) verified reference-stub
+following: all three `codex/skills/gt-cleanup/references/*.md` files were
+byte-identical at the install path, and a live session asked for the
+`CLOSED_NOT_MERGED` jq filter followed the "located in this skill's
+directory" Read stub and quoted content that exists only in
+`references/pr-status-lookups.md`.
 
 A live `codex plugin add` install/inspect/uninstall round-trip (codex-cli
 0.144.6, isolated `CODEX_HOME`) confirmed: the plugin installs cleanly from
