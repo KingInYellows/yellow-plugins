@@ -1,8 +1,9 @@
 #!/usr/bin/env bats
-# Coverage for the deterministic bash embedded in gt-cleanup/SKILL.md — flag
-# parsing (Phase 1 Step 1), branch classification (Phase 3), the batch-cap-15
-# "staging" queue (Phase 4, "Review individually"), and the gt-get
-# conflict-stop path (Phase 4, "For behind-remote sync"). Functions below are
+# Coverage for the deterministic bash embedded in the gt-cleanup skill — flag
+# parsing (SKILL.md Phase 1 Step 1), branch classification (SKILL.md Phase 2
+# #3), the batch-cap-15 "staging" queue and the gt-get conflict-stop path
+# (both now in references/actionable-categories.md — Phase 4 "Review
+# individually" / "For behind-remote sync"). Functions below are
 # hand-mirrored from the skill body (before/after-golden pattern, mirrors
 # plugins/yellow-core/tests/plan-status-parity.bats and this plugin's own
 # hooks/hook-parity.bats) — update both places together if the skill's bash
@@ -69,7 +70,7 @@ parse_flags() {
   fi
 }
 
-# --- Mirrors gt-cleanup/SKILL.md Phase 3 "Initial Classification" ---
+# --- Mirrors gt-cleanup/SKILL.md Phase 2 #3 "Initial Classification" ---
 classify_branch() {
   local upstream_ref="$1" track_status="$2" committer_date_unix="$3" now="$4" stale_days="$5"
 
@@ -109,7 +110,8 @@ classify_branch() {
   fi
 }
 
-# --- Mirrors gt-cleanup/SKILL.md Phase 4 "Review individually" batch cap ---
+# --- Mirrors gt-cleanup/references/actionable-categories.md (Phase 4)
+# "Review individually" batch cap ---
 cap_batch() {
   local count="$1" cap=15
   if [ "$count" -gt "$cap" ]; then
@@ -119,7 +121,8 @@ cap_batch() {
   fi
 }
 
-# --- Mirrors gt-cleanup/SKILL.md Phase 4 "For behind-remote sync" ---
+# --- Mirrors gt-cleanup/references/actionable-categories.md (Phase 4)
+# "For behind-remote sync" ---
 sync_behind_branches() {
   local branch
   for branch in "$@"; do
@@ -131,7 +134,8 @@ sync_behind_branches() {
   done
 }
 
-# --- Mirrors gt-cleanup/SKILL.md Phase 4 deletion fallback ---
+# --- Mirrors gt-cleanup/references/actionable-categories.md (Phase 4)
+# deletion fallback ---
 delete_branch_with_fallback() {
   local branch="$1"
   if gt delete "$branch" --force --no-interactive >/tmp/gt-delete-out 2>&1; then
@@ -228,7 +232,7 @@ delete_branch_with_fallback() {
 }
 
 @test "classify_branch: exactly at the stale-days boundary is clean, not stale" {
-  # SKILL.md Phase 3 Step 5 spec is strict "AGE_DAYS > STALE_DAYS" — a branch
+  # SKILL.md Phase 2 #5 spec is strict "AGE_DAYS > STALE_DAYS" — a branch
   # exactly at the threshold (30 days old vs a 30-day threshold) must stay
   # clean. Regression test for a prior -ge/-gt mismatch between this mirror
   # and the shipped skill (caught by review, not by the fixture-based test
