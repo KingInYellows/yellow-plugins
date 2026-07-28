@@ -6,7 +6,7 @@ plugins/yellow-council/agents/review/opencode-reviewer.md
   s_2847d51bbefa00::t_ead5585420b106 213-219
   s_2847d51bbefa00::t_7649dcb27b5c0e 232,285,398
   s_ecffdbc39c3a6a::t_d09257744a454d 210,226-231,233
-  s_ecffdbc39c3a6a::t_61a3e058ea2808 279-284,286,392-397,399,429-435
+  s_ecffdbc39c3a6a::t_61a3e058ea2808 279-284,286,392-397,399,429-435,429-434,435
 plugins/gt-workflow/skills/gt-setup/SKILL.md
   s_2847d51bbefa00::t_a7ee784d598fc3 217-219
 plugins/yellow-ruvector/commands/ruvector/learn.md
