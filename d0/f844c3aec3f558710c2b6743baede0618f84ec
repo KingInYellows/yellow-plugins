@@ -1,0 +1,22 @@
+plugins/yellow-ruvector/commands/ruvector/learn.md
+  s_ecffdbc39c3a6a::t_7741dede85578a 70-76
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_ecffdbc39c3a6a::t_61a3e058ea2808 275-282,388-395,425-432
+  s_ecffdbc39c3a6a::t_d09257744a454d 210,213-214,222-229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d0f844c3aec3f558710c2b6743baede0618f84ec",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
