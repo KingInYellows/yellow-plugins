@@ -926,6 +926,33 @@ describe('exposure lint symlink defense (mirrors generator posture)', () => {
     expect(errors.some((e: string) => e.includes('CLAUDE_PLUGIN_ROOT'))).toBe(false);
   });
 
+  it('rejects nested dirs and non-.md files planted in a generated references/ dir', () => {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'ref-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['with-refs'],
+        skills: { 'with-refs': { name: 'with-refs', description: 'Skill with references.' } },
+      },
+    ]);
+    const srcRefDir = join(root, 'plugins', 'ref-plugin', 'skills', 'with-refs', 'references');
+    mkdirSync(srcRefDir, { recursive: true });
+    writeFileSync(join(srcRefDir, 'real.md'), 'Real content.\n', 'utf8');
+    const generated = generateManifests({ mode: 'apply', rootDir: root });
+    expect(generated.status).toBe('ok');
+
+    // Hand-plant unsupported entries in the GENERATED references/ dir.
+    const genRefDir = join(root, 'plugins', 'ref-plugin', 'codex', 'skills', 'with-refs', 'references');
+    mkdirSync(join(genRefDir, 'nested'), { recursive: true });
+    writeFileSync(join(genRefDir, 'data.json'), '{}\n', 'utf8');
+
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    const errors = runExposureLint({ rootDir: root, catalog, sources });
+    expect(errors.some((e: string) => e.includes('references/nested') && e.includes('only flat, regular'))).toBe(true);
+    expect(errors.some((e: string) => e.includes('references/data.json') && e.includes('only flat, regular'))).toBe(true);
+  });
+
   it('rejects a symlinked SKILL.md in the generated tree', () => {
     const root = makeCodexFixtureRoot([
       {

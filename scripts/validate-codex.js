@@ -488,7 +488,13 @@ function collectCodexExposedFiles(rootDir, name, source) {
           for (const refEntry of refEntries) {
             if (refEntry.isSymbolicLink()) {
               errors.push(`${join(refDir, refEntry.name).slice(rootDir.length + 1)}: symlinked reference files are not allowed in generated output`);
-            } else if (refEntry.isFile() && refEntry.name.endsWith('.md')) {
+            } else if (!refEntry.isFile() || !/^[a-zA-Z0-9_-]+\.md$/.test(refEntry.name)) {
+              // Mirror buildCodexSkillTree's accepted shape (flat, regular
+              // [a-zA-Z0-9_-]+.md only): the generator never writes nested
+              // dirs or non-.md entries here, so anything else is corrupted
+              // or hand-planted content — error rather than silently skip.
+              errors.push(`${join(refDir, refEntry.name).slice(rootDir.length + 1)}: only flat, regular [a-zA-Z0-9_-]+.md reference files are allowed in generated output`);
+            } else {
               files.push(join(refDir, refEntry.name));
             }
           }
