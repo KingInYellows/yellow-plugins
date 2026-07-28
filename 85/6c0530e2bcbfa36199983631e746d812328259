@@ -1,0 +1,28 @@
+plugins/yellow-ci/agents/maintenance/runner-diagnostics.md
+  s_3d62316ec95b77::t_2702d84b3d6d80 44-45
+plugins/yellow-ruvector/agents/ruvector/memory-manager.md
+  s_3d62316ec95b77::t_18f26617a294aa 93-95
+plugins/yellow-mempalace/commands/mempalace/kg.md
+  s_3d62316ec95b77::t_5c89076857e234 99-100,104
+plugins/yellow-devin/agents/workflow/devin-orchestrator.md
+  s_3d62316ec95b77::t_9a5101efb1371d 68-75
+plugins/yellow-semgrep/commands/semgrep/fix.md
+  s_3d62316ec95b77::t_824361a8278e49 193
+  s_3d62316ec95b77::t_aeea3a004ae271 184-187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "856c0530e2bcbfa36199983631e746d812328259",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
