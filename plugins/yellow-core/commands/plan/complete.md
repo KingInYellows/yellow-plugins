@@ -74,8 +74,8 @@ rm -f "$GIT_TMP/plan-complete.count" "$GIT_TMP/plan-complete.override" "$GIT_TMP
 ## Phase 1: Filename validation + slug derivation
 
 Every Bash block is a fresh subprocess; argument and derived variables
-must be reconstructed in each block that uses them. See MEMORY.md "$VAR
-in bash code blocks". The block below derives both `CLEAN_ARG` and
+never survive from one block to the next and must be reconstructed in
+each block that uses them. The block below derives both `CLEAN_ARG` and
 `SLUG` so subsequent steps can re-derive consistently.
 
 ```bash
@@ -375,8 +375,8 @@ fi
 
 Prompt the user via `AskUserQuestion` with the
 following options. **The label of the free-text option MUST be the
-literal string `Other`** — per MEMORY.md "AskUserQuestion 'Other' is
-the ONLY free-text button", any other label (e.g.,
+literal string `Other`** — only the literal `Other` label opens
+free-text input; any other label (e.g.,
 `Confirm with PR number`) shows as a click-only option and does NOT
 open a text input.
 
@@ -408,9 +408,10 @@ set -euo pipefail
 # Validate the user-provided PR number is a bare positive integer.
 # Read the user's typed value through a QUOTED heredoc so no shell
 # metacharacter in the input (e.g. a stray quote or `$`) can break out
-# of the substitution before validation runs — this is the canonical
-# "free text into shell" pattern (MEMORY.md "Heredoc for user-supplied
-# free text"). The collision-resistant delimiter avoids premature close.
+# of the substitution before validation runs — never interpolate
+# user-typed free text directly into bash source; always route it
+# through a quoted heredoc like this one first.
+# The collision-resistant delimiter avoids premature close.
 # tr -d strips CR/LF so a multi-line paste cannot smuggle extra content
 # past the grep into the commit trailer (trailer injection).
 PR_NUM=$(tr -d '\r\n' <<'__EOF_PR_OVERRIDE__'
