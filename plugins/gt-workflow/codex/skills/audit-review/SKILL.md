@@ -111,15 +111,16 @@ Use the `Task` tool to launch the selected prompts in parallel in a
 
 First, verify all spawned/dispatched prompts completed successfully. If any
 failed or timed out, report to the caller which audit is missing so it can
-decide (via `AskUserQuestion`) whether to proceed with partial results or
-abort.
+ask the user (via `AskUserQuestion` on Claude Code, or a numbered-option
+reply on Codex) whether to proceed with partial results or abort.
 
 Synthesize findings from all completed prompts into one of:
 
 - **CRITICAL ISSUES** (secrets, production mocks, silent failures) — return
   this verdict with the blocking findings (file:line references) to the
-  caller. The caller is responsible for the `AskUserQuestion` gate ("Fix
-  issues before submitting" / "Submit anyway" / "Abort") — this skill does
+  caller. The caller is responsible for the user-facing gate ("Fix
+  issues before submitting" / "Submit anyway" / "Abort" — presented via its
+  host's question mechanism) — this skill does
   not prompt the user directly, since both callers need slightly different
   wording for their respective actions (submit vs. amend).
 - **MINOR ISSUES** (TODOs, style, minor logic) — return the warnings; the
@@ -135,4 +136,4 @@ Synthesize findings from all completed prompts into one of:
 - Dispatch failures reported back to the caller rather than silently
   swallowed
 - The caller retains ownership of the user-facing gate decision (this skill
-  never calls `AskUserQuestion` itself)
+  never prompts the user itself)

@@ -246,7 +246,7 @@ If annotation count is 0 after processing both agents' findings (neither agent
 produced actionable results): report "Both agents ran but produced no actionable
 findings for this plan. Plan unchanged at [path]." and stop.
 
-### Step 7: Confirm and Write (M3)
+### Step 7: Confirm and Write (user confirmation gate)
 
 Show via AskUserQuestion:
 
@@ -288,5 +288,5 @@ next?" with options:
 | research-conductor unavailable | "[deepen-plan] Warning: research-conductor unavailable — proceeding with codebase-only enrichment." | Warn, continue |
 | Both agents return no findings | "Both agents ran but produced no actionable findings. Plan unchanged." | Stop |
 | User cancels at idempotency check (Step 2) | "No changes made to [path]." | Stop |
-| User cancels at M3 confirmation (Step 7) | "No changes made to [path]." | Stop |
+| User cancels at the confirmation gate (Step 7) | "No changes made to [path]." | Stop |
 | Write fails (permissions, disk) | "Failed to write enriched plan at [path]. Check file permissions." | Stop |

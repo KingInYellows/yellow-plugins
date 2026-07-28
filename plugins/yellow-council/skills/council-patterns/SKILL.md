@@ -261,7 +261,7 @@ build_target_path() {
 ```
 
 Validate regex: `^[a-z0-9]+(-[a-z0-9]+)*$` (rejects leading hyphens, trailing
-hyphens, and consecutive hyphens — per MEMORY.md path rule).
+hyphens, and consecutive hyphens).
 
 ### Diff Truncation Algorithm (review mode)
 

@@ -182,6 +182,10 @@ End of conversation context. Respond only based on the task instructions above.
    sentinel.
 
 3. **Category Classifier** — determines the output category and filename slug.
+   If the dispatch prompt carries a `<consolidation-context>` block that
+   states a target category (the compound-lifecycle consolidation path),
+   use that category — validated against the enum below — instead of
+   re-deriving one.
    Required output format (one per line):
    ```
    CATEGORY: <one of: security-issues | build-errors | integration-issues | code-quality | workflow | logic-errors>

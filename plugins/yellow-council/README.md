@@ -74,7 +74,7 @@ Each invocation produces:
   plus three labeled raw reviewer outputs (each wrapped in injection fences
   and credential-redacted).
 
-The user is asked for confirmation (M3 gate) before the report file is written.
+The user is asked for confirmation before the report file is written.
 
 ## Configuration
 

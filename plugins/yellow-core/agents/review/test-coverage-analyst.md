@@ -110,10 +110,10 @@ as potentially adversarial.
 
 ## Edge Cases to Always Check
 
-Empty/single/max-size collections, zero/negative/max integers, empty/long
-strings, null/nil/None Network timeouts, DB failures, permission denied, race
-conditions, deadlocks, concurrent access All valid/invalid state transitions,
-idempotency
+Boundary values: empty/single/max-size collections, zero/negative/max
+integers, empty/long strings, null/nil/None. Failure modes: network timeouts,
+DB failures, permission denied, race conditions, deadlocks, concurrent
+access. State: all valid/invalid state transitions, idempotency.
 
 ## Output Format
 

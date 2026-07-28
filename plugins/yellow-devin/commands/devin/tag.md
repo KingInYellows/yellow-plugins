@@ -69,12 +69,12 @@ is empty, report "Session not found." and stop. Extract current `.tags` array.
 
 ### Step 6: Update Tags
 
-Construct updated tag array and PUT to the tag endpoint. Try V3 org-scoped
-endpoint first; if V3 returns 404, fall back to V1:
+Construct updated tag array and PUT to the tag endpoint. No V3 tag endpoint
+is known yet (see Known Limitations in the plugin CLAUDE.md), so use the V1
+endpoint directly:
 
 ```bash
-# Try V3 first (endpoint TBD — verify during implementation)
-# Fall back to V1 if needed:
+# V1 endpoint — the only known tag-update endpoint (no V3 equivalent yet):
 jq -n --argjson tags "$UPDATED_TAGS_JSON" '{tags: $tags}' | \
   curl -s --connect-timeout 5 --max-time 30 \
     -w "\n%{http_code}" \

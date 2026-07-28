@@ -118,7 +118,10 @@ and `mempalace_diary_write`.
 ### Writing Diary Entries
 
 1. Call `mcp__plugin_yellow-mempalace_mempalace__mempalace_diary_write` with agent_name, entry content, and topic
-2. Use verbatim format (not AAAK compression)
+2. Use verbatim format — never AAAK compression, the palace's experimental
+   lossy summarization format (spec readable via the
+   `mcp__plugin_yellow-mempalace_mempalace__mempalace_get_aaak_spec` MCP
+   tool)
 
 ## Graceful Degradation
 

@@ -30,9 +30,12 @@ If not found, suggest: "Run `/ruvector:setup` first to initialize ruvector."
 
 ### Step 2: Determine Scope
 
-- If `$ARGUMENTS` contains a path, index only that path
+- If `$ARGUMENTS` contains a path, validate it exists — then tell the user
+  up front: "Note: ruvector's `hooks_pretrain` has no path parameter — it
+  always indexes the entire repository. The requested path is used only for
+  validation and the file-list preview below." Do not imply scoped indexing
+  will occur.
 - If empty, index the full repository from project root
-- Validate the path exists before proceeding
 
 ### Step 3: Gather File List
 
@@ -59,7 +62,13 @@ Filter out:
    ruvector indexing is unavailable and stop.
 2. Warmup: call `mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities()`.
    If it errors, report that ruvector MCP is unavailable and stop.
-3. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain`.
+3. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain`. The tool
+   takes no file-list or path parameter — it analyzes repository structure
+   and git history itself from the project root, repository-wide, even when
+   a path argument was given (per the Step 2 disclosure). The Step 3 file
+   list is preview/validation display only; it is not passed to the tool,
+   and progress/summary output must describe repository-wide indexing — do
+   not present per-path counts as if only the requested path was indexed.
 4. If the MCP call errors with timeout, connection refused, or service
    unavailable: wait approximately 500 milliseconds and retry exactly once.
    If the retry also fails, report the failure and stop.
@@ -91,6 +100,7 @@ timeout, permission denied).
 - **No files to index:** "No indexable files found. Check your path or
   .ruvectorignore."
 - **Large repo (>5000 files):** Use AskUserQuestion to confirm before
-  proceeding. Suggest indexing a subdirectory first.
+  proceeding. Warn that indexing is always repository-wide (there is no
+  subdirectory-scoped mode) and may take significant time.
 - **Interrupted:** Report progress so far. Re-running re-indexes all files
   through `hooks_pretrain`.

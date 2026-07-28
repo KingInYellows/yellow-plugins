@@ -98,7 +98,7 @@ If yes:
   workspace. If validation fails, report the error and stop.
 - Post via `mcp__plugin_yellow-linear_linear__save_status_update` with
   `type: "initiative"`, the selected initiative as `initiative`, and the report
-  content as `body` (include `health` from the Step 3 assessment when known)
+  content as `body` (include `health` from the Step 2 health indicator when known)
 
 ## Error Handling
 

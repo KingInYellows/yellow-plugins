@@ -73,7 +73,9 @@ Then show the stack and exit.
 ### Phase 2: Interactive Navigation
 
 If no direct navigation argument was given, present options using
-AskUserQuestion:
+AskUserQuestion. (`AskUserQuestion` is a Claude Code tool — on Codex, present
+the same options as a numbered list in your reply and wait for the user's
+answer; this applies to every AskUserQuestion mention in this skill.)
 
 Ask: "Where do you want to go?"
 

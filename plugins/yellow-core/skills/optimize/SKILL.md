@@ -56,8 +56,8 @@ Trigger this skill (`/yellow-core:optimize`) when:
 
 Skip this skill and use `/workflows:plan` when the optimization target is
 not yet defined, or `/workflows:brainstorm` when there are no variants yet
-and the question is "what direction to even try" (the `ideation` skill is
-in flight on a sibling branch and can be used once that PR merges).
+and the question is "what direction to even try" (or use the `ideation`
+skill directly to generate grounded approaches to a soft problem).
 
 ## Usage
 

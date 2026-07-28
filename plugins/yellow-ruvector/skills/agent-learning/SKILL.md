@@ -96,8 +96,10 @@ final_score = sum(1 / (rank_i + 60)) for each signal i
 
 1. **Semantic similarity** — Vector cosine distance to query
 2. **Recency** — Time-decay: newer entries rank higher
-3. **Frequency** — Entries retrieved more often rank higher (validated
-   usefulness)
+
+(Retrieval frequency is not a usable signal: the recall result shape exposes
+only `content`, `type`, `score`, and `created` — there is no retrieval-count
+field to read.)
 
 ### Context Budget
 
@@ -107,7 +109,8 @@ final_score = sum(1 / (rank_i + 60)) for each signal i
 
 ### Dedup Threshold
 
-- Cosine similarity > 0.85 = likely duplicate
+- Cosine similarity > 0.82 = likely duplicate (canonical constant from the
+  `memory-query` skill's protocol constants)
 - Warn user before storing near-duplicates
 - Don't apply hard threshold on search results — always return top-k, filter
   below 0.5

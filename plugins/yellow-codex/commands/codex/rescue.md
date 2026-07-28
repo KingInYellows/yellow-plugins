@@ -40,16 +40,22 @@ characters, use AskUserQuestion:
 
 ### Step 3: Gather Context
 
-Collect context to pass to Codex:
+Collect context to pass to Codex. The task description (from `$ARGUMENTS` or
+the Step 2 AskUserQuestion answer) may contain shell syntax such as `$(...)`
+or backticks — e.g. a pasted error message. Do NOT interpolate it directly
+into bash source. Instead, use the Write tool to save it verbatim to a temp
+file, then read the file's content back as plain data:
 
 ```bash
-# Current branch and recent commits
-BRANCH=$(git branch --show-current)
-RECENT_COMMITS=$(git log --oneline -5 2>/dev/null || true)
-
-# Read CLAUDE.md for project conventions (truncate to 2000 chars)
-CLAUDE_MD=$(head -c 2000 CLAUDE.md 2>/dev/null || true)
+TASK_DESC_FILE=$(mktemp /tmp/codex-rescue-task-XXXXXX.txt) && printf '%s\n' "$TASK_DESC_FILE"
 ```
+
+Capture the literal path this prints. Use the Write tool to write the task
+description from Step 2, verbatim, to that literal path. Bash variables do
+NOT survive across separate Bash invocations — the Step 4 block below
+re-derives everything it needs and reads the task file by its literal path:
+substitute the printed path wherever `<task-desc-file>` appears (never
+reference `$TASK_DESC_FILE` across blocks).
 
 If the task description references specific files, read those files to include
 as context. If error logs or test output are mentioned, capture them.
@@ -59,6 +65,18 @@ as context. If error logs or test output are mentioned, capture them.
 ```bash
 OUTPUT_FILE=$(mktemp /tmp/codex-rescue-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-rescue-err-XXXXXX.txt)
+
+# Substitute the literal path printed in Step 3 — read back as plain data
+# (command substitution captures cat's stdout; the file's contents are
+# never re-evaluated as shell source).
+TASK_DESCRIPTION=$(cat "<task-desc-file>")
+
+# Current branch and recent commits
+BRANCH=$(git branch --show-current)
+RECENT_COMMITS=$(git log --oneline -5 2>/dev/null || true)
+
+# Read CLAUDE.md for project conventions (truncate to 2000 chars)
+CLAUDE_MD=$(head -c 2000 CLAUDE.md 2>/dev/null || true)
 
 TASK_PROMPT="Investigate and propose fixes for the following task.
 
@@ -137,7 +155,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
   }
 
 RESCUE_OUTPUT=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
-rm -f "$OUTPUT_FILE" "$STDERR_FILE"
+rm -f "$OUTPUT_FILE" "$STDERR_FILE" "<task-desc-file>"
 ```
 
 Note: NOT using `--ephemeral` — the user may want to resume the investigation

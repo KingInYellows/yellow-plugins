@@ -202,8 +202,9 @@ agent's result.
 Apply the confidence-rubric gate (matches Wave 2 yellow-review pattern):
 
 - **Suppress findings with `confidence < 75`** — except `safe_auto`
-  findings (which always emit at confidence 100 by definition) and P0
-  findings at `confidence ≥ 50`.
+  findings (which always emit at confidence 100 by definition) and P1
+  findings at `confidence ≥ 50` (P1 is this plugin's highest severity —
+  the personas emit only P1|P2|P3).
 - Group surviving findings by persona for the report.
 
 ### Step 7: Render report

@@ -138,13 +138,18 @@ Options: Yes (apply + commit) | No (discard + revert to ready)
 
 ### 6. Apply Fix Based on Response
 
-**If approved**:
+**If approved** (run as one Bash call — variables do not survive across
+separate bash blocks, so re-derive everything here):
 
 ```bash
+. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
+finding_title=$(extract_frontmatter "$todo_path" | yq -r '.title // "Untitled"')
+category=$(extract_frontmatter "$todo_path" | yq -r '.category')
+severity=$(extract_frontmatter "$todo_path" | yq -r '.severity')
 safe_title=$(printf '%s' "$finding_title" | LC_ALL=C tr -cd '[:alnum:][:space:]-_.' | cut -c1-72)
 gt modify -m "$(printf 'fix: resolve %s\n\nResolves todo: %s\nCategory: %s\nSeverity: %s' \
   "$safe_title" "$todo_path" "$category" "$severity")"
-. "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
 transition_todo_state "$todo_path" "complete"
 ```
 
@@ -156,6 +161,7 @@ while IFS= read -r changed_file; do
   git restore --staged --worktree -- "$changed_file" 2>/dev/null || rm -f -- "$changed_file"
 done < <(git status --porcelain | cut -c4-)
 . "${CLAUDE_PLUGIN_ROOT}/lib/validate.sh"
+todo_path="<todo-path-from-step-1>"   # same value as TODO_PATH in step 3
 transition_todo_state "$todo_path" "ready"
 ```
 

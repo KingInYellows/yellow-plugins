@@ -99,8 +99,10 @@ yellow-ruvector (`docs/memory-routing-protocol.md`).
   to stdout, corrupting JSON-RPC. If MCP fails, check for log contamination
 - **Global palace only** — palace is at `~/.mempalace/`, no per-project support
   (no MEMPALACE_DIR env var documented)
-- **No AAAK compression** — the experimental lossy format is not used;
-  all content stored verbatim
+- **No AAAK compression** — AAAK is the palace's experimental lossy
+  summarization format (spec readable via the
+  `mcp__plugin_yellow-mempalace_mempalace__mempalace_get_aaak_spec` MCP
+  tool); it is not used — all content stored verbatim
 
 ## Maintenance
 

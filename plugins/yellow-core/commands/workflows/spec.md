@@ -83,8 +83,10 @@ If `.ruvector/` does not exist, skip this section entirely.
    This is the same contract `/plan:complete` enforces — keep it
    `^[a-z0-9]+(-[a-z0-9]+)*$`, no `YYYY-MM-DD-` prefix on new specs.
 3. Collision-check `plans/specs/<slug>.md`. If a file already exists there, use
-   AskUserQuestion: Overwrite / Use a suffixed slug / Rename. Do not silently
-   overwrite. State the resolved path before proceeding.
+   AskUserQuestion: Overwrite / Use a suffixed slug / Other (description
+   "Type a new slug" — the free-text field only opens on an option labeled
+   exactly `Other`). Do not silently overwrite. State the resolved path
+   before proceeding.
 
 ## Step 2: Opening Questions
 
