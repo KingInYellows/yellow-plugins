@@ -1,0 +1,22 @@
+docs/solutions/code-quality/multi-doc-schema-rename-drift.md
+  s_2847d51bbefa00::t_0345f1eba33195 167-218,222
+  s_2847d51bbefa00::t_1554377ddeaecd 6,15-17,21-22
+docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md
+  s_2847d51bbefa00::t_5bac9d58545c7b 1388-1454
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "3549bde5c8e28123836b16bcc492a7e958e4bd82",
+  "prompts": {},
+  "sessions": {
+    "s_2847d51bbefa00": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c39ef9b-f26c-48bb-8767-7078c0e278b4",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

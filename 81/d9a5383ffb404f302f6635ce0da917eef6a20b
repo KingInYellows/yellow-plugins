@@ -1,0 +1,19 @@
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_ecffdbc39c3a6a::t_a19a1061f0deca 104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "81d9a5383ffb404f302f6635ce0da917eef6a20b",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}

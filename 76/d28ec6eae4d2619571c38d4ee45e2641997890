@@ -1,0 +1,28 @@
+plugins/yellow-core/agents/review/performance-reviewer.md
+  s_ecffdbc39c3a6a::t_19a054589536ed 123
+scripts/validate-codex.js
+  s_ecffdbc39c3a6a::t_b8f6586d8439fc 455-459
+  s_ecffdbc39c3a6a::t_994ccc700a6cb0 489-491
+plugins/yellow-review/commands/review/review-pr.md
+  s_ecffdbc39c3a6a::t_11f75021112ffb 533
+plugins/yellow-core/agents/review/security-reviewer.md
+  s_ecffdbc39c3a6a::t_890792f32d1889 145
+tests/integration/generate-manifests-codex.test.ts
+  s_ecffdbc39c3a6a::t_4568d32b21eed3 894-956
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "76d28ec6eae4d2619571c38d4ee45e2641997890",
+  "prompts": {},
+  "sessions": {
+    "s_ecffdbc39c3a6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5adaaa2f-0910-44d3-b42e-31b12a4a5b82",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
