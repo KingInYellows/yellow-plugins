@@ -120,10 +120,16 @@ If the pack is empty or appears truncated, return ERROR (same as
 PACK_FILE=$(mktemp /tmp/council-opencode-pack-XXXXXX.txt)
 OUTPUT_FILE=$(mktemp /tmp/council-opencode-out-XXXXXX.json)
 STDERR_FILE=$(mktemp /tmp/council-opencode-err-XXXXXX.txt)
+printf 'PACK_FILE=%s\nOUTPUT_FILE=%s\nSTDERR_FILE=%s\n' \
+  "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
 ```
 
+Capture the three literal paths this prints — Bash variables do NOT survive
+across separate Bash invocations, so every later block in this procedure
+re-assigns them from the printed literals.
+
 Use the `Write` tool to write the pack content from your spawn prompt
-(verbatim, including all fenced sections) to the literal `$PACK_FILE` path
+(verbatim, including all fenced sections) to the literal PACK_FILE path
 printed above. Do NOT embed the pack content in a Bash heredoc — the pack is
 untrusted (PR diffs, issue bodies) and a heredoc delimiter shares the same
 shell command as that text, so a pack line matching the delimiter terminates
@@ -134,6 +140,12 @@ does not apply. Bash variables do NOT carry the pack content from the
 orchestrator; the LLM running this agent supplies it directly to `Write`.
 
 ```bash
+# Substitute the three literal paths printed by the mktemp block above —
+# do the same at the top of EVERY later bash block that references them.
+PACK_FILE="<literal pack-file path>"
+OUTPUT_FILE="<literal output-file path>"
+STDERR_FILE="<literal stderr-file path>"
+
 # Validate non-empty before invoking the CLI:
 [ -s "$PACK_FILE" ] || { printf '[opencode-reviewer] Error: empty pack file\n' >&2; exit 1; }
 
@@ -144,7 +156,11 @@ timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
     "$(cat "$PACK_FILE")" \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 CLI_EXIT=$?
+printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
 ```
+
+Capture the printed CLI_EXIT value as well — later blocks substitute it
+alongside the three paths.
 
 ### Step 4: Detect SQLite migration state
 
@@ -153,6 +169,13 @@ performs a one-time database migration (2-5 minutes) that may exceed the
 council timeout. Detect via stderr keyword:
 
 ```bash
+# Substitute the literal values printed by the Step 3 blocks — Bash
+# variables do not survive across separate Bash invocations.
+PACK_FILE="<literal pack-file path>"
+OUTPUT_FILE="<literal output-file path>"
+STDERR_FILE="<literal stderr-file path>"
+CLI_EXIT="<literal CLI_EXIT value>"
+
 if grep -q 'sqlite-migration' "$STDERR_FILE" 2>/dev/null; then
   printf '[opencode-reviewer] OpenCode is performing a one-time SQLite migration after upgrade.\n' >&2
   printf '[opencode-reviewer] This typically takes 2-5 minutes; council results delayed.\n' >&2
@@ -176,6 +199,13 @@ fi
 ### Step 5: Extract session ID for cleanup
 
 ```bash
+# Substitute the literal values printed by the Step 3 blocks — Bash
+# variables do not survive across separate Bash invocations.
+PACK_FILE="<literal pack-file path>"
+OUTPUT_FILE="<literal output-file path>"
+STDERR_FILE="<literal stderr-file path>"
+CLI_EXIT="<literal CLI_EXIT value>"
+
 SESSION_ID=$(jq -r 'select(.part.snapshot.sessionID != null) | .part.snapshot.sessionID' "$OUTPUT_FILE" 2>/dev/null | head -1)
 ```
 
