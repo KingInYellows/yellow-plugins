@@ -423,6 +423,14 @@ function collectCodexExposedFiles(rootDir, name, source) {
     }
 
     for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+      // Dirent.isDirectory() is false for a symlink-to-directory, so without
+      // this branch a symlinked skill dir would be silently skipped — neither
+      // its SKILL.md nor its references/ would reach the exposure lint.
+      if (entry.isSymbolicLink()) {
+        errors.push(`${join(skillsDir, entry.name).slice(rootDir.length + 1)}: symlinked skill directories are not allowed in generated output`);
+        foundSkills.add(entry.name); // suppress the misleading missing-file error below
+        continue;
+      }
       if (!entry.isDirectory()) continue;
       // Symlink posture mirrors the generator (emit-codex.js): the generated
       // tree never legitimately contains symlinks, so reading through one
