@@ -988,7 +988,9 @@ describe('exposure lint symlink defense (mirrors generator posture)', () => {
         name: 'plain-plugin',
         codexEnabled: true,
         skillAllowlist: ['plain-skill'],
-        skills: { 'plain-skill': { name: 'plain-skill', description: 'A plain skill.' } },
+        skills: {
+          'plain-skill': { name: 'plain-skill', description: 'A plain skill.' },
+        },
       },
     ]);
     const generated = generateManifests({ mode: 'apply', rootDir: root });
@@ -998,28 +1000,46 @@ describe('exposure lint symlink defense (mirrors generator posture)', () => {
     // dir. Dirent.isDirectory() is false for a symlink-to-directory, so the
     // pre-fix loop skipped the entry entirely — neither its SKILL.md nor its
     // references/ reached the exposure lint.
-    const external = mkdtempSync(join(tmpdir(), 'yellow-generate-codex-external-'));
+    const external = mkdtempSync(
+      join(tmpdir(), 'yellow-generate-codex-external-')
+    );
     fixtureRoots.push(external);
     writeFileSync(
       join(external, 'SKILL.md'),
       '---\nname: plain-skill\ndescription: "target"\n---\n\nExternal ${CLAUDE_PLUGIN_ROOT} content.\n',
       'utf8'
     );
-    const generatedSkillDir = join(root, 'plugins', 'plain-plugin', 'codex', 'skills', 'plain-skill');
+    const generatedSkillDir = join(
+      root,
+      'plugins',
+      'plain-plugin',
+      'codex',
+      'skills',
+      'plain-skill'
+    );
     rmSync(generatedSkillDir, { recursive: true });
     symlinkSync(external, generatedSkillDir);
 
     const catalog = loadCatalog(join(root, 'catalog')).data;
-    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    const sources = loadPluginSources(
+      join(root, 'catalog'),
+      catalog.pluginOrder
+    ).sources;
     const errors = runExposureLint({ rootDir: root, catalog, sources });
     expect(
       errors.some(
-        (e: string) => e.includes('skills/plain-skill') && e.includes('symlinked skill directories are not allowed')
+        (e: string) =>
+          e.includes('skills/plain-skill') &&
+          e.includes('symlinked skill directories are not allowed')
       )
     ).toBe(true);
     // The external content must NOT have been linted (no traversal through the symlink).
-    expect(errors.some((e: string) => e.includes('CLAUDE_PLUGIN_ROOT'))).toBe(false);
+    expect(errors.some((e: string) => e.includes('CLAUDE_PLUGIN_ROOT'))).toBe(
+      false
+    );
     // The symlink error suppresses the misleading missing-generated-skill error.
-    expect(errors.some((e: string) => e.includes('missing generated skill file'))).toBe(false);
+    expect(
+      errors.some((e: string) => e.includes('missing generated skill file'))
+    ).toBe(false);
   });
 });

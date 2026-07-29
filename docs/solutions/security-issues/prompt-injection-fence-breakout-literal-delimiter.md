@@ -5,7 +5,7 @@ category: security-issues
 track: bug
 problem: 'Untrusted source containing literal fence-close string (e.g. "--- code end ---") exits injection fence early, exposing trailing content as agent instructions'
 tags: [prompt-injection, fence-breakout, injection-fencing, security-fencing, agent-authoring, multi-agent-review]
-components: [yellow-debt, yellow-ci, agent-security]
+components: [yellow-debt, yellow-ci, agent-security, plugins/yellow-codex/commands/codex/rescue.md]
 ---
 
 ## Problem
@@ -150,3 +150,56 @@ as auto-P1. Do not wait for empirical confirmation or additional rounds.
   skill is extracted and wired.
 - Sibling-file review: when hardening one agent in a directory, check all
   agents in that directory for the same gap before closing the PR.
+
+---
+
+## Update — 2026-07-28
+
+### Duplicated Escape Pipeline Escaped 2 of 3 Interpolated Variables in the Same Fence (PR #670)
+
+`plugins/yellow-codex/commands/codex/rescue.md` embedded three untrusted
+sources — `TASK_DESCRIPTION`, `RECENT_COMMITS`, and `CLAUDE_MD` — into one
+`TASK_PROMPT` context fence passed to `codex exec` under
+`approval_policy=never`. The Prevention checklist above ("grep the file for
+`--- begin` and verify each open has a matching substitution rule") would
+have passed a review of this file: the fence *did* have an escape/substitution
+step. The gap was granularity — the six-expression `sed` escape pipeline was
+copy-pasted at each of the three call sites instead of centralized, and the
+`CLAUDE_MD` call site was the one copy that missed the escape. A crafted
+`CLAUDE.md` on a checked-out branch could break out of the fence. 8 reviewers
+(security, pattern-recognition, agent-cli-readiness, adversarial,
+comment-analyzer, correctness, polyglot, codex) converged on this finding —
+consistent with the "Multi-Reviewer Convergence Pattern" section above.
+
+**Sharpened prevention — check per interpolated variable, not per fence:**
+a fence with N interpolated `$VAR`s needs N verifications that each one
+passes through the shared escape, not one verification that the fence has
+*an* escape step. `rg '--- begin'` finds the fence; it does not tell you
+whether every variable inside it is escaped.
+
+**Fix:** consolidate all three call sites into a single `escape_fences()`
+function so the delimiter list cannot diverge across call sites again —
+same duplicated-logic-diverges root cause as
+`docs/solutions/code-quality/multi-doc-schema-rename-drift.md` (there:
+`REF_FILE_RE` duplicated across two JS files instead of exported/imported;
+here: an escape pipeline duplicated across three call sites in one command
+file instead of a shared function). The fix in both cases is one canonical
+definition, not N copies kept in sync by review.
+
+Non-blocking note: the same verbatim-duplication class was flagged
+unfixed (P2, residual) in the same review — a 15-line Write-tool rationale
+duplicated between `plugins/yellow-council/agents/review/gemini-reviewer.md`
+and `opencode-reviewer.md`. Two separate files exhibiting the same
+root-cause class in one review is a signal this pattern is systemic to the
+repo's agent-authoring habits, not a one-off in `rescue.md`.
+
+#### Checklist addition
+
+- [ ] For every `--- begin/end ---` fence with more than one interpolated
+      `$VAR`, confirm each variable individually passes through the same
+      escape/substitution function — not just that the fence has escaping
+      somewhere
+- [ ] An escape/redaction/substitution pipeline used at more than one call
+      site is a named function (or sourced snippet), never copy-pasted —
+      copy-paste is the mechanism by which N-1 of N sites get updated and
+      the Nth is missed

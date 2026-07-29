@@ -427,7 +427,9 @@ function collectCodexExposedFiles(rootDir, name, source) {
       // this branch a symlinked skill dir would be silently skipped — neither
       // its SKILL.md nor its references/ would reach the exposure lint.
       if (entry.isSymbolicLink()) {
-        errors.push(`${join(skillsDir, entry.name).slice(rootDir.length + 1)}: symlinked skill directories are not allowed in generated output`);
+        errors.push(
+          `${join(skillsDir, entry.name).slice(rootDir.length + 1)}: symlinked skill directories are not allowed in generated output`
+        );
         foundSkills.add(entry.name); // suppress the misleading missing-file error below
         continue;
       }
