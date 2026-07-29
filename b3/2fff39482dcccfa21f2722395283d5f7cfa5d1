@@ -1,0 +1,27 @@
+plugins/yellow-codex/commands/codex/rescue.md
+  s_95e18d4ed456ab::t_c05ec0c21c01e1 89-102
+  s_95e18d4ed456ab::t_bb8d822dd763d7 110
+  s_95e18d4ed456ab::t_6fc6a004a26d2e 117
+  s_95e18d4ed456ab::t_e385b0e85a8dc2 195-200
+  s_95e18d4ed456ab::t_d15c92343544e3 114-116
+  s_95e18d4ed456ab::t_c9286b56b04233 212,215,217-222
+  s_95e18d4ed456ab::t_ed405e77f94c6f 74-75
+  s_95e18d4ed456ab::t_2284942dc04b97 213-214
+  s_95e18d4ed456ab::t_af683df632777e 76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b32fff39482dcccfa21f2722395283d5f7cfa5d1",
+  "prompts": {},
+  "sessions": {
+    "s_95e18d4ed456ab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46fd3ff8-0589-4324-aeeb-a38b796fd7bc",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
