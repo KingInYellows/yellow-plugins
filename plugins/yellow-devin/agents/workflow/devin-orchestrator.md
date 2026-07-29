@@ -64,20 +64,37 @@ POST to `${ORG_URL}/sessions` with:
 - `title`: auto-generated from first ~80 chars of prompt
 - `repos`: auto-detected from git remote
 - `max_acu_limit`: set a cap to prevent cost overruns during auto-retry loops.
-  Use the limit from the spawn prompt if one was provided; otherwise ask the
-  user for a cap via AskUserQuestion before creating the session, offering a
-  few concrete caps as options plus an option labeled exactly `Other`
-  (description "Enter a custom ACU cap" — only the literal `Other` label
-  opens free-text input; do not pick a number yourself). Validate the
-  `Other` free-text response against `^[0-9]+$` (positive integer, same
-  format `/devin:delegate --max-acu` requires); on mismatch, re-prompt once
-  via AskUserQuestion, and if the retry is still invalid, omit
-  `max_acu_limit` and state that in the report's `Cap:` line rather than
-  aborting session creation. Non-interactive callers must pass the limit
-  in the spawn prompt; if none was provided and
-  no user is available to ask, omit `max_acu_limit` (no cap — same as
-  `/devin:delegate` without `--max-acu`) and state that omission in the
-  session report's `Cap:` line instead of blocking on a question
+  Use the limit from the spawn prompt if one was provided and it matches
+  `^[0-9]+$` (positive integer, same format `/devin:delegate --max-acu`
+  requires). Otherwise follow exactly one of the two branches below:
+  - **Interactive (the default whenever non-interactive mode was not
+    declared):** ask the user for a cap via AskUserQuestion before creating
+    the session, offering a few concrete caps as options plus an option
+    labeled exactly `Other` (description "Enter a custom ACU cap" — only
+    the literal `Other` label opens free-text input; do not pick a number
+    yourself). Validate the `Other` free-text response against `^[0-9]+$`;
+    on mismatch, re-prompt once via AskUserQuestion. If the retry is still
+    invalid, ask a third AskUserQuestion: "The cap was invalid twice.
+    Launch without a cost cap — auto-retry loops will not stop on spend —
+    or pick a preset?" with `Launch uncapped` as the first option plus 1-2
+    of the same preset caps offered in the first question. Only an active
+    `Launch uncapped` selection may produce an uncapped session on this
+    path — never launch uncapped as an implicit default. Choosing a preset
+    uses that preset. The built-in `Other` escape re-enters `^[0-9]+$`
+    validation once more; if that input is again invalid, repeat this
+    third question — the loop exits only via a preset or `Launch
+    uncapped`.
+  - **Non-interactive (declared only):** this branch applies only when the
+    spawn prompt explicitly declares non-interactive mode (for example, it
+    states it is non-interactive or that no user is available). The
+    declaration is a documented input supplied by the caller, never a
+    runtime inference — without it, use the interactive branch. Declared
+    with no cap provided → omit `max_acu_limit` (no cap — same as
+    `/devin:delegate` without `--max-acu`, the documented non-interactive
+    default) and state that in the report's `Cap:` line. Declared with a
+    cap that fails `^[0-9]+$` → do NOT create the session; report the
+    invalid cap in the failure report (Step 6) — a caller that tried to
+    set a cap must never be silently launched uncapped.
 
 Check all three error layers (curl exit, HTTP status, jq parse).
 
@@ -143,7 +160,10 @@ ORCHESTRATION COMPLETE:
   URL:     {url}
   Iterations: {n}/3
   Total ACUs: {acus_consumed}
-  Cap: {max_acu_limit, or "none (max_acu_limit omitted — no user available)"}
+  Cap: {max_acu_limit; if uncapped, the branch-accurate string:
+       "none (uncapped — non-interactive default, no cap in spawn prompt)"
+       or "none (uncapped — user chose 'Launch uncapped' after invalid
+       input)"}
   PRs: {count}
   Final status: exit
 ```
@@ -159,7 +179,10 @@ ORCHESTRATION CONTEXT (for manual recovery):
   Iteration: {n}/3
   Last status: {status}
   Total ACUs: {acus_consumed}
-  Cap: {max_acu_limit, or "none (max_acu_limit omitted — no user available)"}
+  Cap: {max_acu_limit; if uncapped, the branch-accurate string:
+       "none (uncapped — non-interactive default, no cap in spawn prompt)"
+       or "none (uncapped — user chose 'Launch uncapped' after invalid
+       input)"}
   Issues found: {list}
   Recovery: /devin:message {id} "{suggested fix}"
 ```
