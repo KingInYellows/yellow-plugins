@@ -224,6 +224,33 @@ const DIRECT_CHECKS = [
 const SLASH_COMMAND_PATTERN = /(^|[\s`])\/([a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)*)\b(?!\/)/gm;
 
 /**
+ * Build the per-plugin-name RegExp registry for the sibling-path check,
+ * once per run (not per exposed file). Matches both the
+ * "plugins/<sibling>" path form and relative path-escape forms
+ * ("../<sibling>", "../../<sibling>", ...) so a Codex-exposed skill can't
+ * dodge the lint by referencing a sibling plugin via a relative path
+ * instead of the "plugins/" prefix. Every name is drawn from
+ * catalog.pluginOrder, which loadCatalog() already validated against
+ * NAME_RE (/^[a-zA-Z0-9_-]+$/) — no regex metacharacters can reach the
+ * dynamic RegExp, and the pattern has no nested quantifiers over
+ * overlapping variable-length input, so this is not a ReDoS vector
+ * despite being built from a template string. Sharing each compiled
+ * 'g'-flagged RegExp across files is safe because every consumer uses
+ * String.prototype.match, which always starts from index 0.
+ *
+ * @param {string[]} pluginOrder - the full plugin roster (self-exclusion
+ *   happens downstream in runRegistryGatedChecks).
+ * @returns {Map<string, RegExp>}
+ */
+function buildSiblingRegexps(pluginOrder) {
+  const regexps = new Map();
+  for (const sibling of pluginOrder) {
+    regexps.set(sibling, new RegExp(`(?:plugins/|(?:\\.\\./)+)${sibling}(?![a-zA-Z0-9_-])`, 'g'));
+  }
+  return regexps;
+}
+
+/**
  * Registry-gated checks — flag a literal construct ONLY when it matches a
  * real, currently-known name (an actual sibling plugin, an actual
  * generated mcp__plugin_* tool name), not any token shaped like one. This
@@ -234,27 +261,6 @@ const SLASH_COMMAND_PATTERN = /(^|[\s`])\/([a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)*)
  *
  * @returns {{ name: string, message: string, matches: string[] }[]}
  */
-function buildSiblingRegexps(siblingPluginNames) {
-  // Matches both the "plugins/<sibling>" path form and relative
-  // path-escape forms ("../<sibling>", "../../<sibling>", ...) so a
-  // Codex-exposed skill can't dodge this lint by referencing a sibling
-  // plugin via a relative path instead of the "plugins/" prefix.
-  // Each sibling name is drawn from catalog.pluginOrder, which
-  // loadCatalog() already validated against NAME_RE (/^[a-zA-Z0-9_-]+$/)
-  // before this function ever runs — no regex metacharacters can reach
-  // the dynamic RegExp below, and the pattern itself has no nested
-  // quantifiers over overlapping variable-length input, so this is not a
-  // ReDoS vector despite being built from a template string. Built once
-  // per run (not per exposed file): String.prototype.match with a global
-  // regex always starts from index 0, so sharing each compiled RegExp
-  // across files is safe.
-  const regexps = new Map();
-  for (const sibling of siblingPluginNames) {
-    regexps.set(sibling, new RegExp(`(?:plugins/|(?:\\.\\./)+)${sibling}(?![a-zA-Z0-9_-])`, 'g'));
-  }
-  return regexps;
-}
-
 function runRegistryGatedChecks(content, { pluginName, siblingRegexps, mcpToolNames, commandNames }) {
   const findings = [];
 
@@ -626,6 +632,7 @@ module.exports = {
   validateArtifacts,
   runExposureLint,
   runRegistryGatedChecks,
+  buildSiblingRegexps,
   buildMcpToolNameRegistry,
   buildCommandNameRegistry,
   DIRECT_CHECKS,

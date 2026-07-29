@@ -359,29 +359,15 @@ function buildCodexSkillTree(rootDir, name, source) {
     const skillDir = join(rootDir, 'plugins', name, 'skills', skillName);
     const skillFile = join(skillDir, 'SKILL.md');
 
-    // O_NOFOLLOW on the openSync() below only guards the final path
-    // component (SKILL.md itself); a symlinked skillDir — or a symlinked
-    // ANCESTOR, e.g. plugins/<name>/skills/ itself being a symlink out of
-    // the repo — would still be followed when the OS resolves the
-    // intermediate path components, since O_NOFOLLOW and a plain
-    // lstat(skillDir) both only ever inspect the final path segment. The
-    // lstat check below rejects skillDir itself being a symlink outright,
-    // including an IN-PLUGIN symlink (e.g. an allowlisted
-    // skills/allowed -> skills/private) — the realpath containment check
-    // that follows would otherwise miss that case, since the resolved
-    // target still lands inside pluginRootReal. The realpath check stays as
-    // a secondary defense for a symlinked ancestor above skillDir (e.g. a
-    // symlinked skills/ itself), which lstat(skillDir) alone can't see — but
-    // a prefix/containment comparison against pluginRootReal is not enough:
-    // an in-plugin ancestor symlink (e.g. plugins/<name>/skills itself
-    // pointing at ANOTHER directory still inside the same plugin root, such
-    // as plugins/<name>/skills -> plugins/<name>/other) resolves to a path
-    // that still starts with pluginRootReal, silently bypassing the
-    // allowlist (R-review). The canonical location of an allowlisted skill
-    // is always exactly pluginRootReal/skills/<skillName>, so compare
-    // against that literal expected path instead of a prefix — this rejects
-    // ANY symlink anywhere on skillDir's path (leaf or ancestor, in-plugin
-    // or external).
+    // Symlink posture lives in checkDirSymlinkContainment's docstring
+    // (lstat rejects the dir itself; literal expected-path comparison —
+    // never a prefix — rejects ancestors and in-plugin redirection like an
+    // allowlisted skills/allowed -> skills/private alias, R-review).
+    // Site-specifics: O_NOFOLLOW on the openSync() below only guards the
+    // final path component (SKILL.md itself), so this directory-level
+    // check must run first; the canonical location of an allowlisted skill
+    // is exactly pluginRootReal/skills/<skillName>, which is the literal
+    // expected path passed here.
     const skillDirCheck = checkDirSymlinkContainment(
       skillDir,
       join(pluginRootReal, 'skills', skillName)
