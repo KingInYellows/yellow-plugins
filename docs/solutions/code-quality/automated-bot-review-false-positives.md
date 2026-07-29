@@ -273,9 +273,17 @@ this extension is about cheapening each round that does run, by not
 dispatching a resolver for a thread the HEAD check would have shown as
 already stale.
 
-**Detection rule:** when a resolve/sweep pipeline is about to dispatch a
-resolver for a batch of new bot threads, run the FP7 HEAD check
+**Detection rule:** when a resolve/sweep pipeline is about to dispatch
+resolvers for a batch of new bot threads, run the FP7 HEAD check
 (`Read`/`grep` the live file at current HEAD, compare against the commit
-the bot's thread was generated against) across the whole batch first, and
-exclude threads that resolve to "bot saw a stale pre-push view" from the
-dispatch list — don't wait for the resolver to discover that on its own.
+the bot's thread was generated against) across the whole batch first —
+*before* clustering, not per dispatched resolver. Pipelines like
+`/review:resolve` dispatch one resolver per same-region *cluster* of
+threads, so a stale thread that survives into clustering can still shape
+cluster boundaries or drag a resolver spawn even if it would be declined
+later; build clusters only from threads that survive the HEAD check.
+Then close the loop on the excluded threads: reply with a short
+stale-view note and resolve them, since the resolve pipeline's own
+thread-resolution step only covers clusters it actually dispatched — an
+excluded thread that is merely skipped stays open and re-blocks any
+merge gate that requires all threads resolved.
