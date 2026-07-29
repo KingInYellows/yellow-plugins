@@ -1,0 +1,20 @@
+plugins/yellow-codex/commands/codex/rescue.md
+  s_3d62316ec95b77::t_6fcbb1dc98a995 72-74,77-85
+  s_3d62316ec95b77::t_aeaa9f80dd05a1 86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "abdaf1a38ca75f11c13e9595ce8f3e826542e34c",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
