@@ -232,11 +232,15 @@ function validateCodexTarget(name, codex, errors) {
  *   diffs: { path: string, state: 'differs'|'missing'|'stale' }[],
  *   written: string[],
  *   checked: number,
+ *   results: { [pluginName: string]: 'ok'|'error' },
  * }}
  */
 function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const errors = [];
-  const result = { status: 'ok', errors, diffs: [], written: [], checked: 0 };
+  // `results` is per-plugin reporting only: catalog-wide errors (catalog.json
+  // shape, pluginOrder, duplicates) do not attribute to a plugin, and both
+  // abort gates below keep their all-or-nothing semantics regardless of it.
+  const result = { status: 'ok', errors, diffs: [], written: [], checked: 0, results: {} };
 
   const catalogResult = loadCatalog(join(rootDir, 'catalog'));
   if (catalogResult.status === 'missing') {
@@ -251,6 +255,12 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   }
   const catalog = catalogResult.data;
 
+  // Populated for every plugin in pluginOrder, even on abort, so callers can
+  // inspect per-plugin state from a failed run.
+  for (const name of catalog.pluginOrder) {
+    result.results[name] = 'ok';
+  }
+
   const sourcesResult = loadPluginSources(join(rootDir, 'catalog'), catalog.pluginOrder);
   if (sourcesResult.status === 'invalid') {
     errors.push(...sourcesResult.errors);
@@ -263,12 +273,17 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // explicit name key: pkg.name must equal the catalog source name.
   const pkgs = {};
   for (const name of catalog.pluginOrder) {
+    const errorsBeforeValidate = errors.length;
     validateSource(name, sources[name], errors);
+    if (errors.length > errorsBeforeValidate) {
+      result.results[name] = 'error';
+    }
     const pkgPath = join(rootDir, 'plugins', name, 'package.json');
     try {
       assertWithinRoot(pkgPath, join(rootDir, 'plugins'));
     } catch (err) {
       errors.push(err.message);
+      result.results[name] = 'error';
       continue;
     }
     let pkg;
@@ -276,6 +291,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
     } catch (err) {
       errors.push(`cannot read plugins/${name}/package.json: ${err.message}`);
+      result.results[name] = 'error';
       continue;
     }
     // Valid JSON with a null/array/scalar root parses fine but would throw a
@@ -283,18 +299,21 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     // contract with an uncaught stack trace (mirrors catalog-reader's guard).
     if (pkg === null || typeof pkg !== 'object' || Array.isArray(pkg)) {
       errors.push(`plugins/${name}/package.json: top-level value must be an object`);
+      result.results[name] = 'error';
       continue;
     }
     if (pkg.name !== name) {
       errors.push(
         `plugins/${name}/package.json "name" is "${pkg.name}", expected "${name}"`
       );
+      result.results[name] = 'error';
       continue;
     }
     if (typeof pkg.version !== 'string' || !SEMVER_RE.test(pkg.version)) {
       errors.push(
         `plugins/${name}/package.json has invalid or missing version: "${pkg.version}"`
       );
+      result.results[name] = 'error';
       continue;
     }
     pkgs[name] = pkg;
@@ -312,7 +331,13 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       continue;
     }
     const targetPath = join(rootDir, 'plugins', name, '.claude-plugin', 'plugin.json');
-    assertWithinRoot(targetPath, join(rootDir, 'plugins'));
+    try {
+      assertWithinRoot(targetPath, join(rootDir, 'plugins'));
+    } catch (err) {
+      errors.push(err.message);
+      result.results[name] = 'error';
+      continue;
+    }
     targets.push({
       path: targetPath,
       bytes: serializeJson(buildPluginManifest(source, pkgs[name])),
@@ -333,14 +358,26 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     }
     const hookConfig = buildCodexHookConfig(source);
     const manifestTargetPath = join(rootDir, 'plugins', name, '.codex-plugin', 'plugin.json');
-    assertWithinRoot(manifestTargetPath, join(rootDir, 'plugins'));
+    try {
+      assertWithinRoot(manifestTargetPath, join(rootDir, 'plugins'));
+    } catch (err) {
+      errors.push(err.message);
+      result.results[name] = 'error';
+      continue;
+    }
     targets.push({
       path: manifestTargetPath,
       bytes: serializeJson(buildCodexPluginManifest(source, pkgs[name], hookConfig)),
     });
     if (hookConfig !== null) {
       const hooksTargetPath = join(rootDir, 'plugins', name, 'hooks', 'codex-hooks.json');
-      assertWithinRoot(hooksTargetPath, join(rootDir, 'plugins'));
+      try {
+        assertWithinRoot(hooksTargetPath, join(rootDir, 'plugins'));
+      } catch (err) {
+        errors.push(err.message);
+        result.results[name] = 'error';
+        continue;
+      }
       targets.push({
         path: hooksTargetPath,
         bytes: serializeJson(hookConfig),
@@ -349,10 +386,17 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     const skillTreeResult = buildCodexSkillTree(rootDir, name, source);
     if (skillTreeResult.status === 'error') {
       errors.push(...skillTreeResult.errors);
+      result.results[name] = 'error';
       continue;
     }
     for (const target of skillTreeResult.targets) {
-      assertWithinRoot(target.path, join(rootDir, 'plugins'));
+      try {
+        assertWithinRoot(target.path, join(rootDir, 'plugins'));
+      } catch (err) {
+        errors.push(err.message);
+        result.results[name] = 'error';
+        continue;
+      }
       targets.push(target);
     }
   }
@@ -369,6 +413,7 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // Scoped to the locations this generator exclusively owns per plugin.
   const expectedPaths = new Set(targets.map((t) => t.path));
   for (const name of catalog.pluginOrder) {
+    const sweepErrorsBefore = errors.length;
     const codex = sources[name].targets.codex;
     const skillsPath = (codex.componentPaths && codex.componentPaths.skills) || './codex/skills';
     const pluginRoot = join(rootDir, 'plugins', name);
@@ -587,8 +632,16 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
       if (expectedPaths.has(candidate) || !existsSync(candidate)) {
         continue;
       }
-      assertWithinRoot(candidate, join(rootDir, 'plugins'));
+      try {
+        assertWithinRoot(candidate, join(rootDir, 'plugins'));
+      } catch (err) {
+        errors.push(err.message);
+        continue;
+      }
       targets.push({ path: candidate, bytes: null });
+    }
+    if (errors.length > sweepErrorsBefore) {
+      result.results[name] = 'error';
     }
   }
   if (errors.length > 0) {
@@ -654,12 +707,12 @@ function main() {
   const known = new Set(['--check', '--dry-run']);
   const unknown = args.filter((a) => !known.has(a));
   if (unknown.length > 0) {
-    console.error(`[generate-manifests] Unknown argument(s): ${unknown.join(' ')}`);
+    console.error(`[generate-manifests] ERROR: Unknown argument(s): ${unknown.join(' ')}`);
     console.error('[generate-manifests] Usage: node scripts/generate-manifests.js [--check | --dry-run]');
     process.exit(1);
   }
   if (args.includes('--check') && args.includes('--dry-run')) {
-    console.error('[generate-manifests] --check and --dry-run are mutually exclusive');
+    console.error('[generate-manifests] ERROR: --check and --dry-run are mutually exclusive');
     process.exit(1);
   }
   const mode = args.includes('--check') ? 'check' : args.includes('--dry-run') ? 'dry-run' : 'apply';
@@ -683,12 +736,30 @@ function main() {
   const result = generateManifests({ mode, rootDir });
 
   if (result.status === 'error') {
+    // One loud line per errored plugin ahead of the detailed error list, with
+    // a CI annotation pointing at the plugin's catalog source (same
+    // IS_CI/::error shape as validate-plans.js and validate-solutions.js).
+    const IS_CI = process.env.GITHUB_ACTIONS === 'true';
+    for (const [name, state] of Object.entries(result.results)) {
+      if (state !== 'error') {
+        continue;
+      }
+      const count = result.errors.filter(
+        (e) => e.includes(`plugins/${name}/`) || e.includes(`plugins/${name}.json`)
+      ).length;
+      console.error(`[generate-manifests] ERROR: plugin ${name}: ${count} error(s)`);
+      if (IS_CI) {
+        console.log(
+          `::error file=catalog/plugins/${name}.json::plugin ${name}: ${count} generation error(s) — see job log for details`
+        );
+      }
+    }
     for (const error of result.errors) {
       console.error(`[generate-manifests] ERROR: ${error}`);
     }
     if (result.written.length > 0) {
       console.error(
-        `[generate-manifests] Note: ${result.written.length} target(s) were rewritten before the error: ${result.written.join(', ')}`
+        `[generate-manifests] NOTE: ${result.written.length} target(s) were rewritten before the error: ${result.written.join(', ')}`
       );
     }
     process.exit(1);

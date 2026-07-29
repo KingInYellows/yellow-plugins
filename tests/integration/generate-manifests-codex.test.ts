@@ -175,10 +175,13 @@ describe('path portability — plugin/skill names', () => {
         codexEnabled: true,
         skillAllowlist: ['bad name with spaces', 'C:\\bad\\backslash', '..\\wsl\\escape'],
       },
+      { name: 'untouched-plugin', codexEnabled: false },
     ]);
     const result = generateManifests({ mode: 'apply', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors.some((e: string) => e.includes('allowlist'))).toBe(true);
+    expect(result.results['exotic-plugin']).toBe('error');
+    expect(result.results['untouched-plugin']).toBe('ok');
   });
 });
 
@@ -203,6 +206,7 @@ describe('symlink and path-escape rejection (mirrors catalog-reader.js)', () => 
     const result = generateManifests({ mode: 'apply', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors.some((e: string) => e.includes('symlinked skill files are not allowed'))).toBe(true);
+    expect(result.results['symlink-plugin']).toBe('error');
   });
 
   it('rejects a path-escaping skill name in the allowlist', () => {

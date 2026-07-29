@@ -250,6 +250,8 @@ describe('source value-shape validation', () => {
     expect(result.errors).toContain(
       'catalog/plugins/yellow-core.json: "author" must be an object with a string "name"'
     );
+    expect(result.results['yellow-core']).toBe('error');
+    expect(result.results['yellow-review']).toBe('ok');
   });
 
   it('rejects a non-boolean targets flag (would silently drop the plugin)', () => {
@@ -310,6 +312,8 @@ describe('source value-shape validation', () => {
     expect(result.errors).toContain(
       'catalog/plugins/yellow-core.json: "description" must be a string'
     );
+    expect(result.results['yellow-core']).toBe('error');
+    expect(result.results['yellow-review']).toBe('ok');
   });
 
   it('rejects a non-array keywords (would emit a schema-invalid manifest)', () => {
@@ -418,6 +422,10 @@ describe('catalog.json validation', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors).toContain('catalog.json: duplicate pluginOrder entry "yellow-core"');
+    // Catalog-wide errors do not attribute to any plugin: the catalog is
+    // rejected before per-plugin results are computed, so `results` stays
+    // empty while `status` carries the global error.
+    expect(result.results).toEqual({});
   });
 
   it('rejects a non-object top-level catalog.json (array)', () => {
