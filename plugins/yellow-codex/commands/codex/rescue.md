@@ -175,6 +175,8 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
         gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
         # OpenAI / generic sk- API keys
         gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+        # Google API keys (Gemini, etc.)
+        gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
         # GitHub tokens (ghp_, gho_, ghs_, ghu_)
         gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
         # GitHub fine-grained PATs
@@ -217,7 +219,11 @@ survive into this block; only the printed literal path does.
 # Re-derive RESCUE_OUTPUT from the literal path printed in Step 4 (Bash
 # variables do NOT survive across separate Bash invocations), then delete
 # the handoff file.
-RESCUE_OUTPUT=$(cat "<output-file>" 2>/dev/null || true)
+# Fail loudly on a missing or zero-byte handoff file instead of silently
+# continuing with an empty RESCUE_OUTPUT — matches the documented "Empty
+# output" error-handling row below.
+[ -s "<output-file>" ] || { rm -f "<output-file>"; printf '[yellow-codex] Error: Codex returned no analysis. Retry /codex:rescue, or check the Step 4 error output above.\n' >&2; exit 1; }
+RESCUE_OUTPUT=$(cat "<output-file>")
 rm -f "<output-file>"
 
 # Redact credential patterns from RESCUE_OUTPUT line by line
@@ -232,6 +238,8 @@ RESCUE_OUTPUT=$(printf '%s\n' "$RESCUE_OUTPUT" | awk '{
   gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
   # OpenAI / generic sk- API keys
   gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+  # Google API keys (Gemini, etc.)
+  gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
   # GitHub tokens (ghp_, gho_, ghs_, ghu_)
   gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
   # GitHub fine-grained PATs
