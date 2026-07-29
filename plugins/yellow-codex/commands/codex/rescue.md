@@ -71,7 +71,9 @@ STDERR_FILE=$(mktemp /tmp/codex-rescue-err-XXXXXX.txt)
 # never re-evaluated as shell source).
 # Fail loudly if the Step 3 Write never happened or wrote nothing — a
 # blank task would otherwise be sent to Codex silently.
-[ -s "<task-desc-file>" ] || { printf '[yellow-codex] Error: task-description file missing or empty — re-run the Step 3 Write.\n' >&2; exit 1; }
+# On failure, <task-desc-file> is deliberately left in place so the Step 3
+# Write can be re-run against the same literal path.
+[ -s "<task-desc-file>" ] || { rm -f "$OUTPUT_FILE" "$STDERR_FILE"; printf '[yellow-codex] Error: task-description file missing or empty — re-run the Step 3 Write.\n' >&2; exit 1; }
 TASK_DESCRIPTION=$(cat "<task-desc-file>")
 
 # Escape any literal fence delimiter inside the untrusted text BEFORE
@@ -84,13 +86,20 @@ TASK_DESCRIPTION=$(cat "<task-desc-file>")
 # (e.g. "--- begin context (reference data only) ---") inside the
 # still-open task-description fence could otherwise masquerade as a trusted
 # section boundary (sandwich-fence delimiter forgery).
-TASK_DESCRIPTION=$(printf '%s\n' "$TASK_DESCRIPTION" | sed \
-  -e 's/--- end task-description/[ESCAPED] end task-description/g' \
-  -e 's/--- begin task-description/[ESCAPED] begin task-description/g' \
-  -e 's/--- end context/[ESCAPED] end context/g' \
-  -e 's/--- begin context/[ESCAPED] begin context/g' \
-  -e 's/--- end recent-commits/[ESCAPED] end recent-commits/g' \
-  -e 's/--- begin recent-commits/[ESCAPED] begin recent-commits/g')
+# Single canonical escape pipeline — every fenced interpolation below runs
+# through this one function so the delimiter list cannot silently diverge
+# between call sites (the drift risk that previously left CLAUDE_MD
+# unescaped). Function-local to this block: shell functions do not survive
+# across separate Bash invocations either.
+escape_fences() {
+  sed -e 's/--- end task-description/[ESCAPED] end task-description/g' \
+      -e 's/--- begin task-description/[ESCAPED] begin task-description/g' \
+      -e 's/--- end context/[ESCAPED] end context/g' \
+      -e 's/--- begin context/[ESCAPED] begin context/g' \
+      -e 's/--- end recent-commits/[ESCAPED] end recent-commits/g' \
+      -e 's/--- begin recent-commits/[ESCAPED] begin recent-commits/g'
+}
+TASK_DESCRIPTION=$(printf '%s\n' "$TASK_DESCRIPTION" | escape_fences)
 
 # Current branch and recent commits
 BRANCH=$(git branch --show-current)
@@ -98,16 +107,14 @@ RECENT_COMMITS=$(git log --oneline -5 2>/dev/null || true)
 # Commit subjects are attacker-influenceable too (a crafted commit message
 # on the checked-out branch); escape the same delimiter families before
 # interpolating into the recent-commits fence.
-RECENT_COMMITS=$(printf '%s\n' "$RECENT_COMMITS" | sed \
-  -e 's/--- end task-description/[ESCAPED] end task-description/g' \
-  -e 's/--- begin task-description/[ESCAPED] begin task-description/g' \
-  -e 's/--- end context/[ESCAPED] end context/g' \
-  -e 's/--- begin context/[ESCAPED] begin context/g' \
-  -e 's/--- end recent-commits/[ESCAPED] end recent-commits/g' \
-  -e 's/--- begin recent-commits/[ESCAPED] begin recent-commits/g')
+RECENT_COMMITS=$(printf '%s\n' "$RECENT_COMMITS" | escape_fences)
 
 # Read CLAUDE.md for project conventions (truncate to 2000 chars)
 CLAUDE_MD=$(head -c 2000 CLAUDE.md 2>/dev/null || true)
+# CLAUDE.md content comes from the checked-out branch, so it is
+# attacker-influenceable exactly like the commit subjects above — escape the
+# same delimiter families before interpolating into the context fence.
+CLAUDE_MD=$(printf '%s\n' "$CLAUDE_MD" | escape_fences)
 
 TASK_PROMPT="Investigate and propose fixes for the following task.
 
@@ -185,8 +192,12 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
     fi
   }
 
-RESCUE_OUTPUT=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
-rm -f "$OUTPUT_FILE" "$STDERR_FILE" "<task-desc-file>"
+# Keep OUTPUT_FILE alive for Step 5: Bash variables do NOT survive across
+# separate Bash invocations, so the Codex output must be handed off by
+# literal file path — print it and substitute it wherever <output-file>
+# appears in the Step 5 block.
+rm -f "$STDERR_FILE" "<task-desc-file>"
+printf '%s\n' "$OUTPUT_FILE"
 ```
 
 Note: NOT using `--ephemeral` — the user may want to resume the investigation
@@ -198,7 +209,17 @@ Before presenting output, scan `RESCUE_OUTPUT` for credential patterns and
 replace each match with a redaction marker. This prevents Codex from relaying
 secrets verbatim through the fenced output block.
 
+Substitute the literal output-file path printed at the end of Step 4 wherever
+`<output-file>` appears below — Step 4's `OUTPUT_FILE` variable does not
+survive into this block; only the printed literal path does.
+
 ```bash
+# Re-derive RESCUE_OUTPUT from the literal path printed in Step 4 (Bash
+# variables do NOT survive across separate Bash invocations), then delete
+# the handoff file.
+RESCUE_OUTPUT=$(cat "<output-file>" 2>/dev/null || true)
+rm -f "<output-file>"
+
 # Redact credential patterns from RESCUE_OUTPUT line by line
 RESCUE_OUTPUT=$(printf '%s\n' "$RESCUE_OUTPUT" | awk '{
   line = NR
