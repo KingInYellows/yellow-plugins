@@ -165,10 +165,10 @@ interface CliRun {
   stderr: string;
 }
 
-function runCli(root: string, args: string[]): CliRun {
+function runCli(root: string, args: string[], envExtra: Record<string, string> = {}): CliRun {
   try {
     const stdout = execFileSync('node', [SCRIPT, ...args], {
-      env: { ...process.env, GENERATE_MANIFESTS_ROOT: root },
+      env: { ...process.env, GENERATE_MANIFESTS_ROOT: root, ...envExtra },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -648,5 +648,42 @@ describe('--dry-run (subprocess)', () => {
     const root = makeFixtureRoot();
     expect(runCli(root, ['--bogus']).status).toBe(1);
     expect(runCli(root, ['--check', '--dry-run']).status).toBe(1);
+  });
+});
+
+describe('main() per-plugin error reporting (subprocess)', () => {
+  it('prints a loud per-plugin line and a ::error CI annotation for an errored plugin', () => {
+    const root = makeFixtureRoot();
+    const sourcePath = join(root, 'catalog', 'plugins', 'yellow-core.json');
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    source.description = null;
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
+
+    const result = runCli(root, ['--check'], { GITHUB_ACTIONS: 'true' });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: plugin yellow-core: 1 error(s)'
+    );
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: catalog/plugins/yellow-core.json: "description" must be a string'
+    );
+    expect(result.stdout).toContain(
+      '::error file=catalog/plugins/yellow-core.json::plugin yellow-core: 1 error(s) — see job log for details'
+    );
+  });
+
+  it('emits no ::error annotation outside GitHub Actions', () => {
+    const root = makeFixtureRoot();
+    const sourcePath = join(root, 'catalog', 'plugins', 'yellow-core.json');
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    source.description = null;
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
+
+    const result = runCli(root, ['--check'], { GITHUB_ACTIONS: '' });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: plugin yellow-core: 1 error(s)'
+    );
+    expect(result.stdout).not.toContain('::error');
   });
 });

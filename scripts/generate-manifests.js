@@ -237,9 +237,12 @@ function validateCodexTarget(name, codex, errors) {
  */
 function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const errors = [];
-  // `results` is per-plugin reporting only: catalog-wide errors (catalog.json
-  // shape, pluginOrder, duplicates) do not attribute to a plugin, and both
-  // abort gates below keep their all-or-nothing semantics regardless of it.
+  // `results` is per-plugin reporting only. Attributed error classes:
+  // source validation, package.json read/shape, target-assembly containment,
+  // and the stale-artifact sweep. NOT attributed (kept global): catalog-wide
+  // errors (catalog.json shape, pluginOrder, duplicates), a loadPluginSources
+  // abort, and write/delete-phase failures. Both abort gates below keep
+  // their all-or-nothing semantics regardless of it.
   const result = { status: 'ok', errors, diffs: [], written: [], checked: 0, results: {} };
 
   const catalogResult = loadCatalog(join(rootDir, 'catalog'));
@@ -255,8 +258,11 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   }
   const catalog = catalogResult.data;
 
-  // Populated for every plugin in pluginOrder, even on abort, so callers can
-  // inspect per-plugin state from a failed run.
+  // Populated for every plugin in pluginOrder so callers can inspect
+  // per-plugin state from a failed run — but only for the attributed error
+  // classes listed above: a run that aborts before per-plugin processing
+  // (loadPluginSources) or fails in the write phase reports status 'error'
+  // while entries here remain 'ok'.
   for (const name of catalog.pluginOrder) {
     result.results[name] = 'ok';
   }
@@ -747,10 +753,15 @@ function main() {
       const count = result.errors.filter(
         (e) => e.includes(`plugins/${name}/`) || e.includes(`plugins/${name}.json`)
       ).length;
-      console.error(`[generate-manifests] ERROR: plugin ${name}: ${count} error(s)`);
+      // The substring count is informational only; a path-containment error
+      // whose message carries an already-normalized path can escape the
+      // predicate, so never render a misleading "0 error(s)" for a plugin
+      // that IS marked 'error'.
+      const detail = count > 0 ? `${count} error(s)` : 'error(s) present — see error list';
+      console.error(`[generate-manifests] ERROR: plugin ${name}: ${detail}`);
       if (IS_CI) {
         console.log(
-          `::error file=catalog/plugins/${name}.json::plugin ${name}: ${count} generation error(s) — see job log for details`
+          `::error file=catalog/plugins/${name}.json::plugin ${name}: ${detail} — see job log for details`
         );
       }
     }
