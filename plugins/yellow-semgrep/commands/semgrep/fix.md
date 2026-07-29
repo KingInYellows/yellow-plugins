@@ -190,7 +190,8 @@ The agent will:
 table): [Revert + stash pop] — `git checkout -- "${FILE_PATH}"`, then
 `git stash pop` if changes were stashed in Step 5 — or [Retry] — return to
 Step 6 for another fix attempt.
-**If WARNING (findings at modified lines):** Show those findings, ask user to proceed or revert.
+**If WARNING (findings at modified lines):** Show those findings, ask user
+to proceed or revert.
 If user chooses to revert and changes were stashed in Step 5: `git stash pop`
 
 ### Step 10: Commit
@@ -207,6 +208,11 @@ Severity: {severity}
 Fix-Type: autofix|llm
 Verified: pass|warning (findings at modified lines, not proven regression)"
 ```
+
+Substitute one concrete value for the `Verified:` trailer: `pass` when
+Step 9 reported PASS, or `warning (findings at modified lines, not proven
+regression)` when the user proceeded after a WARNING — never emit the
+literal `pass|warning` alternation.
 
 If user had stashed changes in Step 5: `git stash pop`
 

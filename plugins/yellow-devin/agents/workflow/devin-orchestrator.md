@@ -68,8 +68,13 @@ POST to `${ORG_URL}/sessions` with:
   user for a cap via AskUserQuestion before creating the session, offering a
   few concrete caps as options plus an option labeled exactly `Other`
   (description "Enter a custom ACU cap" — only the literal `Other` label
-  opens free-text input; do not pick a number yourself). Non-interactive
-  callers must pass the limit in the spawn prompt; if none was provided and
+  opens free-text input; do not pick a number yourself). Validate the
+  `Other` free-text response against `^[0-9]+$` (positive integer, same
+  format `/devin:delegate --max-acu` requires); on mismatch, re-prompt once
+  via AskUserQuestion, and if the retry is still invalid, omit
+  `max_acu_limit` and state that in the report's `Cap:` line rather than
+  aborting session creation. Non-interactive callers must pass the limit
+  in the spawn prompt; if none was provided and
   no user is available to ask, omit `max_acu_limit` (no cap — same as
   `/devin:delegate` without `--max-acu`) and state that omission in the
   session report's `Cap:` line instead of blocking on a question

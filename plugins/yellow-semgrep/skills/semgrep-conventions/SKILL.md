@@ -204,7 +204,9 @@ Verified: pass|warning (findings at modified lines, not proven regression)
 
 `Verified:` takes `pass` when the re-scan is clean, or the `warning (...)`
 form when findings surfaced at the modified lines and the user chose to
-proceed — matching `/semgrep:fix` Step 10's trailer.
+proceed — matching `/semgrep:fix` Step 10's trailer. Substitute one
+concrete value; never emit the literal `pass|warning` alternation shown
+above.
 
 ## Finding ID Validation
 

@@ -323,7 +323,7 @@ reviewer clusters caught each one:
 
 `plugins/yellow-ruvector/agents/ruvector/memory-manager.md` Step 8 ("failed
 `file_change` re-index entries are retained for the next flush") depended
-on a per-entry failure signal Step 6 — in the same file — never actually
+on a per-entry failure signal that Step 6 — in the same file — never actually
 produced (Step 6 offered `/ruvector:index` as an alternative path, but the
 agent has no way to invoke a slash command or read its result). Flagged by
 silent-failure-hunter and reliability. Fixed by rewriting Step 6 to mandate
@@ -353,3 +353,64 @@ auto-memory note for PR #671's inter-file sibling instances
 (devin-orchestrator / debt-triage), and
 [multi-doc-schema-rename-drift.md](./multi-doc-schema-rename-drift.md) for
 PR #671's producer/consumer instance (`scan-verifier.md`).
+
+---
+
+## Update — 2026-07-29 (PR #671, RE-review pass)
+
+**Recurrence, and a new nuance: the unverified claim can be about tool
+authorization, not just prose/code accuracy.** The 2026-07-28 update above
+documented the fix to `plugins/yellow-ruvector/agents/ruvector/memory-manager.md`
+Step 6: rewriting it to mandate the batch-level `hooks_pretrain` MCP call
+exclusively (removing the `/ruvector:index` fallback the agent could never
+actually invoke). A second, independent review pass on the same PR found
+that fix was itself an unverified-capability-claim instance of this doc's
+thesis: the rewrite asserted the agent *could* call `hooks_pretrain`
+without checking whether the file's own frontmatter `tools:` list granted
+it. It didn't — confirmed by diffing commit `3c3353fe`, which shows the
+grant line
+(`- mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain`) being *added* to
+`tools:` for the first time, alongside the two entries the file already
+had (`hooks_remember`, `hooks_recall`). Before that commit, every
+`file_change` flush under the new "exclusively" wording would have failed
+permanently, and the Step 8/9 retention machinery built on top of it (to
+prevent silent loss) was unreachable code protecting against a failure
+mode it also caused. Four independent reviewers (correctness,
+plugin-contract, comment-analyzer, codex) converged. Fixed by adding the
+tool to the frontmatter grant (commit `3c3353fe`).
+
+**Distinct root cause (adds to the shared thesis):** findings 1–6 above
+check claims about what code or docs *say*. This one checks a claim about
+what the agent is *authorized to do* — wording a Step as "must call X
+exclusively" is itself an assertion ("this agent can invoke X") that needs
+the same mechanical verification as any other claim in this doc: read the
+file's own frontmatter `tools:` allowlist, not just the prose describing
+the intended call.
+
+**Validator gap (worth tracking, not yet closed):** no CI validator ties a
+body-mandated MCP tool reference in an agent's prompt text to its
+frontmatter `tools:` allowlist — `validate-agent-authoring.js` checks
+frontmatter shape and `subagent_type` references, but nothing cross-checks
+"this tool name appears in the prose as a mandated call" against "this
+tool name appears in `tools:`." Noted as a gap, not a documented
+false-negative; closing it would require parsing prose for tool-call
+mandates, which is a different kind of check than the validator's current
+structural rules.
+
+**Prevention (in addition to the existing checklist):**
+
+7. **"This agent's prose mandates a tool/MCP call exclusively"** — before
+   wording a Step as "must call X" or "X exclusively," grep the same
+   file's frontmatter `tools:` list for the exact tool name as written
+   there (MCP tools are listed fully-qualified,
+   e.g. `mcp__plugin_yellow-ruvector_ruvector__hooks_pretrain` — a grep
+   for the short name `hooks_pretrain` still matches as a substring here,
+   but don't assume that holds for every plugin's naming; see
+   `mcp-tool-rename-prefix-collision.md` in auto-memory for a case where
+   substring matching alone was insufficient). If the tool is absent from
+   `tools:`, either add the grant or don't word the step as exclusive. See
+   also
+   [subagent-frontmatter-field-catalog.md](./subagent-frontmatter-field-catalog.md)
+   for the mirror-image gotcha (`memory:` silently granting *more* than
+   the prose claims, rather than prose claiming *more* than the frontmatter
+   grants).
