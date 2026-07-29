@@ -248,3 +248,34 @@ independent check.
 diff view generated at some point during a multi-push session" as
 different levels of evidence — a bot's comment timestamp being after your
 push does not guarantee its content view is too.
+
+## Update — 2026-07-29
+
+### FP7 extension: apply the HEAD check before dispatching a resolver, not just before accepting a finding
+
+**What happened:** during a `/review:sweep-all` batch across three PRs
+(#670–#672), a push triggered a third round of bot threads on PR #670
+(2 → 5 → 2 threads across three rounds). Both of round 3's two threads
+were stale in exactly the FP7 sense — the bot was reviewing the pre-push
+commit, not current `HEAD`. Running the FP7 HEAD-vs-bot's-commit check
+*before* spawning a `pr-comment-resolver` for each thread (instead of
+after, as part of triaging the resolver's output) meant neither thread
+got a resolver spawned for it at all.
+
+**Why this matters beyond FP7's original framing:** FP7 as written
+frames the HEAD check as a triage step — "before accepting or declining."
+In a sweep-all/resolve pipeline, "declining" a stale finding still costs a
+full resolver dispatch if the check happens after the spawn instead of
+before it. The verification is identical; only its position in the
+pipeline changes what it saves. The [bounded one-extra-round policy](../code-quality/multi-agent-re-review-false-positive-patterns.md#update--2026-07-17)
+already caps *how many* re-verification rounds a resolve pipeline runs —
+this extension is about cheapening each round that does run, by not
+dispatching a resolver for a thread the HEAD check would have shown as
+already stale.
+
+**Detection rule:** when a resolve/sweep pipeline is about to dispatch a
+resolver for a batch of new bot threads, run the FP7 HEAD check
+(`Read`/`grep` the live file at current HEAD, compare against the commit
+the bot's thread was generated against) across the whole batch first, and
+exclude threads that resolve to "bot saw a stale pre-push view" from the
+dispatch list — don't wait for the resolver to discover that on its own.
