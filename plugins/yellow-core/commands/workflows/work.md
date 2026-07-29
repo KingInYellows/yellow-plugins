@@ -225,7 +225,8 @@ in order from bottom (item 1) to top:
      "Branch creation failed for [item]. [Skip this item / Stop here / Other]"
      — the retry path must be the option labeled exactly `Other` (with
      description "Retry with a different branch name") so its free-text field
-     captures the new name; a non-`Other` label never opens a text input.
+     captures the new name; only the literal `Other` label opens free-text
+     input.
 
 2. **Filter tasks:** From the plan's `## Implementation Plan`, select only the
    tasks whose IDs appear in this item's `Tasks:` field. Create TaskCreate

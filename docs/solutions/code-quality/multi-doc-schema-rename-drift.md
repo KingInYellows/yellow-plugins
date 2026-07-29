@@ -220,3 +220,95 @@ for the surface — assert consumers import rather than re-literal it.
 
 - `docs/solutions/build-errors/plugin-json-changelog-key-schema-drift-remote-validator.md` — Same class of drift in CI/manifest context
 - `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md` — Anti-patterns in LLM-executed command prose; anti-pattern #31 is the reviewer-convergence signal that caught the PR #667 code-level instance of this doc's pattern
+
+---
+
+## Update — 2026-07-28 (PR #671, second instance)
+
+### Producer-Self-Contradiction: `scan-verifier.md`'s Own Description/Examples Left Stale Relative to Its Own Caveat
+
+PR #671 surfaced a third instance of this pattern, and a new variant: the
+producer/consumer split can happen *within a single agent file*, between
+its own prose sections, not only between separate files.
+
+`plugins/yellow-semgrep/commands/semgrep/fix.md` (the consumer of
+`scan-verifier`'s report) was updated earlier in the same PR to the
+WARNING-findings-at-modified-lines contract. But
+`plugins/yellow-semgrep/agents/semgrep/scan-verifier.md` — the producer of
+that report — was left internally split: its own Step 1 already disclaimed
+the regression-detection framing, yet its frontmatter `description`, both
+worked examples, and the `report` field's own
+`New findings: none | {count} detected` line still asserted the
+"regression" framing Step 1 rejected. Caught by comment-analyzer. Fixed by
+rewording the `description`, both examples, and the report field's line to
+`Findings at modified lines: none | {count} detected`.
+
+**Generalized scope:** the canonical-source violation is not limited to N
+*separate* documents disagreeing — a single document can be internally
+split between its authoritative section (here, Step 1's operative caveat)
+and its own descriptive/example prose that restates the same contract
+independently. See `doc-fix-mechanical-verification-gap.md`'s 2026-07-28
+update for this same PR's `fix.md`/`memory-manager.md` intra-file
+instances.
+
+**Prevention checklist addition:**
+
+- [ ] When a Step/rule's operative contract changes, treat the file's own
+      `description`, worked examples, and output-field docstrings as
+      additional consumer sites — not just other files.
+
+---
+
+## Update — 2026-07-29 (PR #671, RE-review pass — one hop further out)
+
+**Recurrence.** A second, independent review pass on the same PR found the
+same canonical-source violation recurring one hop further out than either
+of the two prior instances above looked. The drift class keeps propagating
+outward each time the sweep boundary is redrawn from where the previous
+round stopped:
+
+- Prior pass, instance A (`doc-fix-mechanical-verification-gap.md`,
+  2026-07-28): `fix.md`'s Step 9 reword left sibling sections of the
+  *same file* behind (error-handling table, report-line template,
+  commit-trailer template).
+- Prior pass, instance B (this doc, 2026-07-28): `scan-verifier.md`'s own
+  description and worked examples were left stale relative to its own
+  Step 1 caveat — intra-file, a different file from instance A.
+- **This pass:** `plugins/yellow-semgrep/skills/semgrep-conventions/SKILL.md`
+  — the shared skill BOTH `fix.md` and `scan-verifier.md` cite as
+  canonical — still carried the old "no new findings introduced"
+  regression framing (in its decision tree) and a pass-only commit
+  template, after both consumer files had already been reworded in the
+  prior pass. Confirmed by diffing commit `3c3353fe`, which touches the
+  SKILL.md alongside five other sites in the same plugin. The fanout
+  extended to three more sites caught in the same review pass:
+  `plugins/yellow-semgrep/skills/semgrep-conventions/references/fix-patterns.md`
+  (a reference file the SKILL.md's decision tree explicitly points readers
+  at, left half-migrated between old and new phrasing); `plugins/yellow-semgrep/CLAUDE.md`
+  and `README.md` (the plugin's own catalog rows still advertised
+  "regression detection" after the agent's own description had already
+  disclaimed it); and `plugins/yellow-semgrep/commands/semgrep/fix.md`'s
+  own Step 11 report line, found unconditionally claiming "no findings at
+  modified lines" even on the WARNING-then-proceed path — a fourth site of
+  the same fanout, back inside the file instance A already touched.
+
+**Generalized scope (extends the canonical-source hierarchy):** when a
+contract reword's sweep boundary is drawn as "producer + consumer," it
+systematically misses: (a) the shared/canonical reference file both cite,
+(b) reference files *that* file itself cites, and (c) the plugin's own
+catalog description (`CLAUDE.md`, `README.md`) that summarizes the same
+agent's behavior in prose for humans browsing the marketplace. None of
+these are the producer or the consumer in the narrow sense, but all of
+them restate the same contract. A contract-wording sweep must grep the
+**entire plugin** — skill references, `CLAUDE.md`, `README.md` — not just
+the file that changed and its immediate consumer.
+
+**Prevention checklist addition:**
+
+- [ ] When rewording a contract that a SKILL.md documents as canonical,
+      grep every file that cites the skill
+      (`rg -l '<skill-name>' plugins/<name>/`), then separately grep the
+      plugin's `CLAUDE.md` and `README.md` for the same disclaimed
+      language. Both are sweep boundaries distinct from "producer +
+      consumer" and are not covered by fixing the producer and consumer
+      alone.

@@ -42,7 +42,8 @@ You are a Linear PR linker. Your job is to connect pull requests with their
 corresponding Linear issues by adding comments and suggesting status updates.
 
 **Reference:** Follow conventions in the `linear-workflows` skill for branch
-naming, issue ID validation (C1), agent write safety (M3), and error handling.
+naming, issue ID validation (C1), agent write safety (M3 — confirm status
+writes with the user before applying), and error handling.
 
 ## Workflow
 

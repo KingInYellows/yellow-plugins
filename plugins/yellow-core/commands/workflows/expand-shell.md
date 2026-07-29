@@ -63,16 +63,17 @@ For each `Consumes` entry:
   codebase (prior work may have diverged).
 
 On any failure, gate with AskUserQuestion — do not proceed silently:
-1. The artifact was renamed — label this option exactly `Other` (description:
-   "The artifact was renamed — provide the new path/name") so its free-text
-   field captures the new path; update the shell with the answer.
-2. The upstream shell's PR also renamed it — show me that PR to reconcile.
-3. Skip this Consumes check — accept stale references. (Choosing this MUST emit
+1. The upstream shell's PR also renamed it — show me that PR to reconcile.
+2. Skip this Consumes check — accept stale references. (Choosing this MUST emit
    a visible `> WARNING: Consumes '<X>' could not be found at expand time` into
    the generated plan so it is not lost.)
-4. Stop — I will reconcile `Consumes` manually before re-expanding. (Choosing
+3. Stop — I will reconcile `Consumes` manually before re-expanding. (Choosing
    this emits a visible warning listing the unresolved artifacts and stops
    WITHOUT writing the plan.)
+4. The artifact was renamed — label this option exactly `Other` (description:
+   "The artifact was renamed — provide the new path/name") so its free-text
+   field captures the new path; update the shell with the answer. Only the
+   literal `Other` label opens free-text input.
 
 ## Step 4: Pattern Survey
 

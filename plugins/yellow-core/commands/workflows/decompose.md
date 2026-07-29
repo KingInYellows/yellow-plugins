@@ -131,8 +131,8 @@ done
 ```
 
 On any collision, AskUserQuestion with options: Use a suffixed slug /
-Other (description "Type a new slug" — free-text opens only on the literal
-`Other` label) / Cancel decomposition. Shell slugs must satisfy
+Cancel decomposition / Other (description "Type a new slug" — only the
+literal `Other` label opens free-text input). Shell slugs must satisfy
 `^[a-z0-9]+(-[a-z0-9]+)*$` (no underscores/dots) — this is the exact form both
 `/workflows:pick-next-shell` and `/workflows:expand-shell` match against
 `plans/complete/` when resolving a `depends_on` entry (they accept an optional

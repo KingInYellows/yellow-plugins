@@ -70,7 +70,7 @@ Extract severity from the filename pattern
 (`{id}-{status}-{severity}-{slug}-{hash}.md`) or from frontmatter if the
 pattern doesn't match.
 
-## Step 5: Pre-Loop Overview (M3 Pattern)
+## Step 5: Pre-Loop Overview (user confirmation gate)
 
 Always present a summary first using AskUserQuestion before starting the loop:
 

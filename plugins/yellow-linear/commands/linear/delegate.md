@@ -213,7 +213,7 @@ if [ -z "$SESSION_URL" ]; then
 fi
 ```
 
-### Step 6: Post Comment on Linear Issue (M3)
+### Step 6: Post Comment on Linear Issue (confirmation gate)
 
 Build comment content:
 ```
@@ -229,7 +229,7 @@ Build comment content:
 whose body contains `SESSION_URL`. If found, skip comment creation and report
 "Comment already posted."
 
-**M3 confirmation**: Display the comment above via `AskUserQuestion` — "Post this
+**Confirmation gate**: Display the comment above via `AskUserQuestion` — "Post this
 comment to the Linear issue? [Yes / No]"
 
 If Yes: Call `save_comment` with the built body as `body` and the issue `id`
@@ -265,7 +265,7 @@ Next steps:
 - **Credential validation**: Token format checked before any API call
 - **C1**: `get_issue` validates issue exists before delegation
 - **H1**: Re-fetch before status transition
-- **M3**: `AskUserQuestion` before `save_comment`; `save_issue` uses Tier 1
+- **Confirmation gate (M3)**: `AskUserQuestion` before `save_comment`; `save_issue` uses Tier 1
   auto-apply for the `→ In Progress` transition per two-tier safety model
 - **Token never echoed**: All token references use env var only; never print or
   log the token value

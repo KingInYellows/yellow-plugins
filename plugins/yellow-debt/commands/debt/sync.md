@@ -159,7 +159,7 @@ fi
 printf '[sync] Found %d finding(s) to sync\n' "${#TODOS_TO_SYNC[@]}"
 ```
 
-### Step 7.5: Pre-flight Confirmation (M3)
+### Step 7.5: Pre-flight Confirmation (user confirmation gate)
 
 Before syncing, show the user what will be created:
 

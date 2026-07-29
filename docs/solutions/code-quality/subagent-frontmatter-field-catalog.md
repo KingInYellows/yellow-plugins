@@ -106,6 +106,31 @@ Do NOT include `Task` in a subagent's `tools` — subagents cannot spawn other s
 
 MCP tool naming: `mcp__plugin_<pluginName>_<serverName>__<toolName>`.
 
+### Prose that mandates a tool call needs a matching `tools:` grant
+
+The `memory:` gotcha above is frontmatter granting *more* than the prose
+claims (silent Read/Write/Edit expansion behind a documented read-only
+contract). This is the mirror case: prose in an agent's body mandating a
+tool call — e.g. "Step N must call `mcp__plugin_x_y__z` exclusively" —
+grants *nothing* by itself. If the tool name isn't also present in the
+frontmatter `tools:` list, the mandated call fails every time, silently
+turning any downstream logic that assumes it succeeded (retry counters,
+retention/fallback machinery) into dead code protecting against a failure
+mode the same edit caused.
+
+PR #671 (yellow-plugins) shipped exactly this: `memory-manager.md` Step 6
+was reworded to mandate `hooks_pretrain` exclusively without adding it to
+`tools:` first; four reviewers converged before it was caught and fixed by
+adding the (fully-qualified) tool name to the grant. See
+[doc-fix-mechanical-verification-gap.md](./doc-fix-mechanical-verification-gap.md)'s
+2026-07-29 update for the full incident.
+
+**No validator catches this.** `validate-agent-authoring.js` checks
+frontmatter shape and `subagent_type` references; nothing cross-checks a
+prose-mandated tool name against the `tools:` allowlist. Check manually:
+after wording a Step as "must call X" or "X exclusively," grep the same
+file's frontmatter `tools:` list for the exact tool name as written there.
+
 ### `isolation: worktree`
 
 Runs the subagent in a temporary git worktree (isolated repository copy). The worktree is created before the subagent starts and auto-cleaned up if no changes are made. Useful for parallel code changes or prototype work that may be discarded.
