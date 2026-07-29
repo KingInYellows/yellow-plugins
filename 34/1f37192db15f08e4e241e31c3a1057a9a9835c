@@ -1,0 +1,51 @@
+plugins/yellow-review/agents/review/correctness-reviewer.md
+  s_f4074862689008::t_96d77a6a4d2943 106,120-121
+  s_f4074862689008::t_877e3da246cc4a 122
+.changeset/polish-line-placeholder.md
+  s_f4074862689008::t_e043885be40810 1-10
+plugins/yellow-review/agents/review/reliability-reviewer.md
+  s_f4074862689008::t_96d77a6a4d2943 112,126-127
+  s_f4074862689008::t_680299198f855f 128
+plugins/yellow-review/agents/review/adversarial-reviewer.md
+  s_f4074862689008::t_96d77a6a4d2943 196,210-211
+  s_f4074862689008::t_1f6d16c3e762ed 212
+plugins/yellow-review/agents/review/project-standards-reviewer.md
+  s_f4074862689008::t_96d77a6a4d2943 168,182-183
+  s_f4074862689008::t_05beb08ce4754c 184
+plugins/yellow-review/commands/review/review-pr.md
+  s_f4074862689008::t_78b4ec6d48721f 511-513
+  s_f4074862689008::t_87d69960ee9af9 497
+plugins/yellow-review/agents/review/project-compliance-reviewer.md
+  s_f4074862689008::t_96d77a6a4d2943 141,155-156
+  s_f4074862689008::t_a4e19af4c073cc 157
+scripts/validate-codex.js
+  s_f4074862689008::t_43e7bf72497a1c 568
+  s_f4074862689008::t_2b805dd94d7eaa 237-258,262
+  s_f4074862689008::t_09275538bd5154 545
+scripts/lib/generate/emit-codex.js
+  s_f4074862689008::t_fda163032a0744 379-389,391-392
+  s_f4074862689008::t_38a8d033d2a430 264-285
+  s_f4074862689008::t_b18f87c09ff6fc 418-431
+plugins/yellow-review/agents/review/plugin-contract-reviewer.md
+  s_f4074862689008::t_96d77a6a4d2943 198,216-217
+  s_f4074862689008::t_fb2a72c9e08908 218
+plugins/yellow-review/agents/review/maintainability-reviewer.md
+  s_f4074862689008::t_96d77a6a4d2943 111,125-126
+  s_f4074862689008::t_93349a9974b6bb 127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "341f37192db15f08e4e241e31c3a1057a9a9835c",
+  "prompts": {},
+  "sessions": {
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
