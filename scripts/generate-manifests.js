@@ -238,8 +238,9 @@ function validateCodexTarget(name, codex, errors) {
 function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const errors = [];
   // `results` is per-plugin reporting only. Attributed error classes:
-  // source validation, package.json read/shape, target-assembly containment,
-  // and the stale-artifact sweep. NOT attributed (kept global): catalog-wide
+  // source validation, package.json read/shape, target assembly (path
+  // containment + skill-tree content validation), and the stale-artifact
+  // sweep. NOT attributed (kept global): catalog-wide
   // errors (catalog.json shape, pluginOrder, duplicates), a loadPluginSources
   // abort, and write/delete-phase failures. Both abort gates below keep
   // their all-or-nothing semantics regardless of it.
@@ -753,10 +754,11 @@ function main() {
       const count = result.errors.filter(
         (e) => e.includes(`plugins/${name}/`) || e.includes(`plugins/${name}.json`)
       ).length;
-      // The substring count is informational only; a path-containment error
-      // whose message carries an already-normalized path can escape the
-      // predicate, so never render a misleading "0 error(s)" for a plugin
-      // that IS marked 'error'.
+      // The substring count is informational only and the predicate can
+      // miss: it hardcodes '/' while join() uses path.sep (win32), and a
+      // path-escaping componentPaths override can bleed another plugin's
+      // name into a message. Cheap insurance — never render a misleading
+      // "0 error(s)" for a plugin that IS marked 'error'.
       const detail = count > 0 ? `${count} error(s)` : 'error(s) present — see error list';
       console.error(`[generate-manifests] ERROR: plugin ${name}: ${detail}`);
       if (IS_CI) {
