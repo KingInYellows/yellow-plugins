@@ -54,6 +54,21 @@ type on its own line in a free-text field.
 
 ## Fix
 
+**Threat model matters.** The unique-delimiter fix below closes the
+*accidental* case — a user typing a common word in a free-text field. It does
+**not** close the case where the content is attacker-influenced (PR diffs,
+issue bodies, or other externally-controlled text): the delimiter convention
+is committed to a public repo, so an adversary can read it and reproduce it
+in the payload, and a per-run randomized delimiter does not help either — the
+generated shell command still contains both the delimiter and the untrusted
+body together, so the same primitive applies. For attacker-influenced
+content, stage the value into a file via the `Write` tool (a structured
+parameter, never shell-parsed) instead of a heredoc, then have the shell read
+that fixed, attacker-free path — see
+`plugins/yellow-council/agents/review/gemini-reviewer.md` and
+`plugins/yellow-council/agents/review/opencode-reviewer.md` for the converted
+pattern.
+
 Use a long, unique, unlikely-to-appear-in-user-content delimiter:
 
 ```bash

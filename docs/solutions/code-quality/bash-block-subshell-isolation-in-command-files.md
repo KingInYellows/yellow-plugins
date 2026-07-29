@@ -17,6 +17,7 @@ components:
   - plugins/yellow-research/commands/research/setup.md
   - plugins/yellow-devin/commands/devin/setup.md
   - plugins/yellow-core/commands/setup/all.md
+  - plugins/yellow-codex/commands/codex/rescue.md
 ---
 
 # Bash Block Subshell Isolation in Command Files
@@ -287,3 +288,84 @@ that was only assigned in a prior code block (not the current one)?"
 
 If yes: apply Fix A (sentinel files), Fix B (state file), or Fix C (merge
 blocks) as appropriate.
+
+---
+
+## Update — 2026-07-28
+
+### Cross-Block Variable Loss Upstream of a Security Sanitizer Is a Silent No-Op, Not a Visible Bug (PR #670)
+
+`plugins/yellow-codex/commands/codex/rescue.md` Step 4 set `RESCUE_OUTPUT`
+from `codex exec` output; Step 5 fed `$RESCUE_OUTPUT` through two
+security-critical transforms — fence-escaping the codex output before
+embedding it, and credential redaction. Steps 4 and 5 are separate Bash
+tool invocations, so Step 5's `$RESCUE_OUTPUT` was unset per the root cause
+already documented above.
+
+Every prior concretization in this doc (setup summary blocks, `SKIP_CURL_PROBE`,
+`has_userconfig`) is a **correctness** bug: a wrong count, a wrong branch,
+something visibly off. This one is different in kind. An empty string run
+through `sed`-based fence-escaping and through a redaction filter still
+exits 0 and produces output — just empty output. Nothing errors. Nothing
+looks wrong at a glance; the step "ran." The two security controls silently
+became no-ops on every invocation, and a manual-verification claim in the
+PR body was credible despite the bug because a merged interactive shell
+session does carry the variable across what would otherwise be two
+separate Bash tool calls — this is a category of verification gap
+distinct from, but adjacent to, the mechanical-verification pattern in
+`docs/solutions/code-quality/doc-fix-mechanical-verification-gap.md`
+(assertion vs. actually re-running the check).
+
+**Verification rule:** any fix to a cross-block variable-survival bug must
+be verified by executing the affected blocks as two genuinely separate Bash
+tool invocations (not pasted into one shell), because a merged session
+passes on the broken version and gives false confidence.
+
+#### Fix D: literal-path handoff + re-derive + delete
+
+Distinct from Fix A (sentinel files), Fix B (state file), and Fix C (merge
+blocks): Step N writes the payload to a file and prints the file's literal
+path (not a variable name — the *path itself*, so the next Bash tool call's
+prompt text contains a concrete filesystem path). Step N+1 has that literal
+path substituted into its own text, re-reads the file at that path, and
+deletes it once done:
+
+```bash
+# Step 4 — write payload, print the literal path (not $OUTPUT_FILE)
+OUTPUT_FILE="$(mktemp)"
+codex exec ... > "$OUTPUT_FILE"
+printf 'Rescue output written to: %s\n' "$OUTPUT_FILE"
+```
+
+```bash
+# Step 5 — the literal path below is the one printed by Step 4, pasted
+# into this block's text by the agent (not read from environment)
+OUTPUT_FILE="/tmp/tmp.XXXXXXXXXX"   # <- literal path from Step 4's output
+[ -s "$OUTPUT_FILE" ] || { printf 'Error: rescue output missing or empty\n' >&2; exit 1; }
+RESCUE_OUTPUT="$(cat "$OUTPUT_FILE")"
+rm -f "$OUTPUT_FILE"
+# ... escape_fences "$RESCUE_OUTPUT" ...  (see security-issues/prompt-injection-fence-breakout-literal-delimiter.md)
+```
+
+Fix D differs from Fix B in what crosses the block boundary: B sources a
+fixed-path env file of key=value pairs; D carries a run-specific path
+forward as a literal string in the agent's own generated text, and the
+payload that survives is file *content*, not shell variables.
+
+**The `[ -s "$OUTPUT_FILE" ]` guard is load-bearing, not decorative.** If
+the literal path substitution is missed, or the block is re-run against a
+stale/deleted path, `cat` on a missing or empty file yields an empty
+string and reproduces the exact original bug — a security transform
+running on empty input that exits 0. Fix D is only safe when paired with a
+fail-closed guard immediately before the security transform; without the
+guard, D silently degrades to the same failure mode it was meant to fix.
+
+#### Checklist addition
+
+- [ ] If a variable crossing a bash-block boundary feeds a security
+      transform (redaction, escaping, permission check), verify the fix by
+      running the affected blocks as two separate Bash invocations — a
+      merged shell session will pass on the broken version
+- [ ] Any Fix D (literal-path handoff) is paired with a fail-closed
+      `[ -s "$FILE" ]` (or equivalent) guard immediately before the
+      security transform that consumes the file's content

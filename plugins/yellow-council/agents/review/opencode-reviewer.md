@@ -49,7 +49,10 @@ the marketplace is read-only (`[Read, Grep, Glob]`). Same rationale as
 
 `Write` is also granted, narrowly: it is used ONLY in Step 3 to stage the
 untrusted council pack (PR diffs, issue bodies — attacker-influenced text) to
-the `$PACK_FILE` path created by `mktemp`. This closes a heredoc delimiter
+the `$PACK_FILE` path — a not-yet-existing file inside a directory created by
+`mktemp -d` (never `mktemp` on the file itself: `Write` refuses to overwrite
+a file it has not first `Read` in the session, so the target must not
+already exist). This closes a heredoc delimiter
 collision: a `cat > "$PACK_FILE" <<'__EOF_COUNCIL_PACK__'` heredoc embeds the
 delimiter and the untrusted pack body in the same shell command, so any pack
 line equal to the delimiter terminates the heredoc early and the remaining
@@ -117,7 +120,8 @@ If the pack is empty or appears truncated, return ERROR (same as
 ### Step 3: Invoke OpenCode CLI
 
 ```bash
-PACK_FILE=$(mktemp /tmp/council-opencode-pack-XXXXXX.txt)
+PACK_DIR=$(mktemp -d /tmp/council-opencode-pack-XXXXXX)
+PACK_FILE="$PACK_DIR/pack.txt"
 OUTPUT_FILE=$(mktemp /tmp/council-opencode-out-XXXXXX.json)
 STDERR_FILE=$(mktemp /tmp/council-opencode-err-XXXXXX.txt)
 printf 'PACK_FILE=%s\nOUTPUT_FILE=%s\nSTDERR_FILE=%s\n' \
@@ -130,7 +134,12 @@ re-assigns them from the printed literals.
 
 Use the `Write` tool to write the pack content from your spawn prompt
 (verbatim, including all fenced sections) to the literal PACK_FILE path
-printed above. Do NOT embed the pack content in a Bash heredoc — the pack is
+printed above. The file does not yet exist — `mktemp -d` above created only
+the parent directory — so `Write` can create it directly without first
+needing to `Read` it (`Write` refuses to overwrite an existing file that has
+not been read in the session).
+
+Do NOT embed the pack content in a Bash heredoc — the pack is
 untrusted (PR diffs, issue bodies) and a heredoc delimiter shares the same
 shell command as that text, so a pack line matching the delimiter terminates
 the heredoc early and turns the remaining pack text into shell input (see
@@ -190,7 +199,8 @@ if grep -q 'sqlite-migration' "$STDERR_FILE" 2>/dev/null; then
     printf 'verdict=TIMEOUT\n'
     printf 'confidence=N/A\n'
     printf 'summary=OpenCode performing one-time SQLite migration; timed out at %ds. Run "opencode run test" interactively once, then retry.\n' "${COUNCIL_TIMEOUT:-600}"
-    rm -f "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
+    case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0
   fi
 fi
@@ -239,14 +249,16 @@ case $CLI_EXIT in
     printf 'confidence=N/A\n'
     printf "summary=OpenCode timed out at %ds. Council ran without OpenCode's verdict.\n" "${COUNCIL_TIMEOUT:-600}"
     [ -n "$SESSION_ID" ] && opencode session delete "$SESSION_ID" 2>/dev/null
-    rm -f "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
+    case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0
     ;;
   126|127)
     printf 'verdict=UNAVAILABLE\n'
     printf 'confidence=N/A\n'
     printf 'summary=OpenCode binary failed to execute (exit %d).\n' "$CLI_EXIT"
-    rm -f "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
+    case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0
     ;;
   *)
@@ -264,7 +276,8 @@ case $CLI_EXIT in
       printf 'summary=OpenCode CLI error (exit %d). Excerpt: %s\n' "$CLI_EXIT" "$ERR_PEEK"
     fi
     [ -n "$SESSION_ID" ] && opencode session delete "$SESSION_ID" 2>/dev/null
-    rm -f "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
+    case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0
     ;;
 esac
@@ -303,7 +316,8 @@ if [ -z "$ASSISTANT_TEXT" ]; then
   printf 'confidence=N/A\n'
   printf 'summary=OpenCode produced no assistant text. Check ~/.local/share/opencode/ for session logs.\n'
   [ -n "$SESSION_ID" ] && opencode session delete "$SESSION_ID" 2>/dev/null
-  rm -f "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
+  case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+  rm -f "$OUTPUT_FILE" "$STDERR_FILE"
   exit 0
 fi
 
@@ -342,11 +356,19 @@ awk '
 }
 ' "$TEXT_FILE" > "$REDACTED_FILE"
 
-# --- Parse structured fields (same fields as `gemini-reviewer` Step 6) ---
+# --- Parse structured fields (same fields as `gemini-reviewer` Step 5) ---
 VERDICT=$(grep -m1 '^Verdict: ' "$REDACTED_FILE" 2>/dev/null | sed 's/^Verdict: //' | head -c 50)
 CONFIDENCE=$(grep -m1 '^Confidence: ' "$REDACTED_FILE" 2>/dev/null | sed 's/^Confidence: //' | head -c 20)
 SUMMARY=$(awk '/^Summary: / { sub(/^Summary: /, ""); print; exit }' "$REDACTED_FILE" | head -c 500)
 FINDINGS=$(awk '/^Findings:/ { capture=1; next } /^Summary: / { capture=0 } capture' "$REDACTED_FILE")
+
+# Escape bare findings_block_begin/findings_block_end sentinel lines inside
+# FINDINGS — council.md's parse_reviewer_return delimits the findings block
+# on these exact lines (awk /^findings_block_begin$/.../^findings_block_end$/),
+# so reviewer output containing one verbatim would truncate the findings
+# early. VERDICT/CONFIDENCE/SUMMARY are unaffected (grep -m1 already matched
+# the earlier, real key=value lines), but escape defensively anyway.
+FINDINGS=$(printf '%s\n' "$FINDINGS" | sed -e 's/^findings_block_begin$/[ESCAPED] findings_block_begin/' -e 's/^findings_block_end$/[ESCAPED] findings_block_end/')
 
 # UNKNOWN fallback if Verdict: line absent
 if [ -z "$VERDICT" ]; then
@@ -396,7 +418,7 @@ if [ -n "$SESSION_ID" ]; then
 fi
 
 # --- Return structured findings to council.md (same format as
-# `gemini-reviewer` Step 8) ---
+# `gemini-reviewer` Step 5) ---
 printf 'verdict=%s\n' "$VERDICT"
 printf 'confidence=%s\n' "$CONFIDENCE"
 printf 'summary=%s\n' "$SUMMARY"
@@ -406,7 +428,8 @@ printf '%s\n' "$FINDINGS"
 printf 'findings_block_end\n'
 
 # --- Cleanup (preserve only the fenced output file) ---
-rm -f "$PACK_FILE" "$OUTPUT_FILE" "$TEXT_FILE" "$REDACTED_FILE" "$STDERR_FILE"
+case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+rm -f "$OUTPUT_FILE" "$TEXT_FILE" "$REDACTED_FILE" "$STDERR_FILE"
 # DO NOT delete $FENCED_OUTPUT_FILE — council.md reads it for the report file
 # council.md is responsible for unlinking $FENCED_OUTPUT_FILE after writing
 ```
