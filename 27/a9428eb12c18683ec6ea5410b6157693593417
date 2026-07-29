@@ -1,0 +1,25 @@
+scripts/validate-codex.js
+  s_f4074862689008::t_4e52335121d308 630
+  s_f4074862689008::t_459684e710ed6a 227-252
+  s_f4074862689008::t_73039b6c6b9495 226
+scripts/lib/generate/emit-codex.js
+  s_f4074862689008::t_281c052ac9445b 356-364
+.changeset/polish-line-placeholder.md
+  s_f4074862689008::t_29be3d40ea4ad7 7-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "27a9428eb12c18683ec6ea5410b6157693593417",
+  "prompts": {},
+  "sessions": {
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
