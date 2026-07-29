@@ -1,0 +1,40 @@
+plugins/yellow-core/commands/workflows/work.md
+  s_3d62316ec95b77::t_d63b80e9d9fc98 228-229
+plugins/yellow-devin/skills/devin-workflows/SKILL.md
+  s_3d62316ec95b77::t_a21544d7539494 188
+plugins/yellow-core/commands/workflows/spec.md
+  s_3d62316ec95b77::t_0fcb565892850a 87-88
+plugins/yellow-core/commands/plan/complete.md
+  s_3d62316ec95b77::t_81fd68f43fa1ae 77-78
+  s_3d62316ec95b77::t_473b29d6176adc 378-379
+  s_3d62316ec95b77::t_94377614b4ce0e 411-414
+plugins/yellow-linear/agents/workflow/linear-pr-linker.md
+  s_3d62316ec95b77::t_9885c9b4ee5888 45-46
+plugins/yellow-linear/commands/linear/delegate.md
+  s_3d62316ec95b77::t_620c0d9000c228 232
+  s_3d62316ec95b77::t_a47f3cde4b24a3 216
+plugins/yellow-core/commands/workflows/decompose.md
+  s_3d62316ec95b77::t_7f023c155cbc44 134-135
+plugins/yellow-debt/commands/debt/sync.md
+  s_3d62316ec95b77::t_0fc3cb9bc1655e 162
+plugins/yellow-core/commands/workflows/expand-shell.md
+  s_3d62316ec95b77::t_4350cb6a6f00dd 66-67,70,73-76
+.changeset/deferred-review-followups.md
+  s_3d62316ec95b77::t_9823321117156e 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "57bac197a9e709171fc17ef8207740f55cb08a92",
+  "prompts": {},
+  "sessions": {
+    "s_3d62316ec95b77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba25cfab-f510-46bc-a5f1-54dc61b634be",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
