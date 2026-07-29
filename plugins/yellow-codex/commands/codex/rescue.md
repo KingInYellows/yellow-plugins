@@ -265,9 +265,17 @@ RESCUE_OUTPUT=$(printf '%s\n' "$RESCUE_OUTPUT" | awk '{
 RESCUE_OUTPUT=$(printf '%s\n' "$RESCUE_OUTPUT" | sed \
   -e 's/--- end codex-output/[ESCAPED] end codex-output/g' \
   -e 's/--- begin codex-output/[ESCAPED] begin codex-output/g')
+
+# Print the sanitized output as this block's stdout, already wrapped in
+# injection fencing — the variable dies with this Bash invocation, so this
+# printf is the only way the redacted text reaches the presenting agent.
+printf '%s\n' "--- begin codex-output (reference only) ---"
+printf '%s\n' "$RESCUE_OUTPUT"
+printf '%s\n' "--- end codex-output ---"
 ```
 
-Wrap the redacted output in injection fencing:
+The block above emits the redacted output already wrapped in injection
+fencing:
 
 ```text
 --- begin codex-output (reference only) ---
