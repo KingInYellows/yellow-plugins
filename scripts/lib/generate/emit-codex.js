@@ -404,9 +404,15 @@ function buildCodexSkillTree(rootDir, name, source) {
       // redirection; O_NOFOLLOW on each file read is the final-component
       // second layer.
       let refDirBad = false;
+      let refDirNotDir = false;
       try {
-        if (lstatSync(refDir).isSymbolicLink()) {
+        const refDirStat = lstatSync(refDir);
+        if (refDirStat.isSymbolicLink()) {
           refDirBad = true;
+        } else if (!refDirStat.isDirectory()) {
+          // A plain file named "references" would otherwise surface as a raw
+          // ENOTDIR from readdirSync below — reject it with a targeted message.
+          refDirNotDir = true;
         } else {
           const refDirReal = realpathSync(refDir);
           const refDirExpected = join(pluginRootReal, 'skills', skillName, 'references');
@@ -414,6 +420,10 @@ function buildCodexSkillTree(rootDir, name, source) {
         }
         if (refDirBad) {
           errors.push(`plugins/${name}/skills/${skillName}/references: symlinked references directories (including a symlinked ancestor) are not allowed`);
+          continue;
+        }
+        if (refDirNotDir) {
+          errors.push(`plugins/${name}/skills/${skillName}/references: exists but is not a directory — only a flat references/ directory of *.md files is supported for Codex`);
           continue;
         }
       } catch (err) {

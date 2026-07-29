@@ -111,6 +111,13 @@ rules out extracting shared bash logic into a sourceable helper file
 inside a skill directory as a de-duplication strategy for anything meant
 to ship to Codex.
 
+> **Update (PR #667):** the constraint was narrowed — `references/*.md`
+> sidecars are now supported and copied through to the Codex output tree
+> (with their own validation in `validate-codex.js`). Any *other* sidecar
+> shape (non-`references/` subdirectories, non-`.md` files) still hard-fails
+> exactly as described above, and the shared-bash-helper de-duplication
+> strategy remains ruled out.
+
 ### 3. `codex.enabled`-gated exposure lint
 
 `runExposureLint()` in `validate-codex.js` (line 441) — which includes a

@@ -13,6 +13,7 @@
 
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -1048,5 +1049,114 @@ describe('exposure lint symlink defense (mirrors generator posture)', () => {
     expect(
       errors.some((e: string) => e.includes('missing generated skill file'))
     ).toBe(false);
+  });
+});
+
+describe('regeneration against a POLLUTED generated tree (stale-sweep branches)', () => {
+  // Unlike the exposure-lint suite above, these re-run generateManifests()
+  // itself after tampering with the GENERATED output tree, exercising the
+  // stale-sweep error/sweep branches in scripts/generate-manifests.js.
+  function makeGeneratedRefFixture() {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'ref-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['with-refs'],
+        skills: { 'with-refs': { name: 'with-refs', description: 'Skill with references.' } },
+      },
+    ]);
+    const srcRefDir = join(root, 'plugins', 'ref-plugin', 'skills', 'with-refs', 'references');
+    mkdirSync(srcRefDir, { recursive: true });
+    writeFileSync(join(srcRefDir, 'extra.md'), '# Extra\n', 'utf8');
+    const first = generateManifests({ mode: 'apply', rootDir: root });
+    expect(first.status).toBe('ok');
+    const genRefDir = join(root, 'plugins', 'ref-plugin', 'codex', 'skills', 'with-refs', 'references');
+    expect(existsSync(join(genRefDir, 'extra.md'))).toBe(true);
+    return { root, genRefDir };
+  }
+
+  it('errors (does not delete through) when the generated references/ dir was replaced with a symlink', () => {
+    const { root, genRefDir } = makeGeneratedRefFixture();
+    const external = mkdtempSync(join(tmpdir(), 'yellow-generate-codex-external-'));
+    fixtureRoots.push(external);
+    writeFileSync(join(external, 'victim.md'), 'Must survive.\n', 'utf8');
+    rmSync(genRefDir, { recursive: true, force: true });
+    symlinkSync(external, genRefDir);
+
+    const second = generateManifests({ mode: 'apply', rootDir: root });
+    expect(second.status).toBe('error');
+    expect(
+      second.errors.some((e: string) => e.includes('symlinked references directory'))
+    ).toBe(true);
+    // Nothing behind the symlink was swept.
+    expect(existsSync(join(external, 'victim.md'))).toBe(true);
+  });
+
+  it('sweeps a plain FILE named references in the generated tree and restores the real directory', () => {
+    const { root, genRefDir } = makeGeneratedRefFixture();
+    rmSync(genRefDir, { recursive: true, force: true });
+    writeFileSync(genRefDir, 'stale plain file\n', 'utf8');
+
+    const second = generateManifests({ mode: 'apply', rootDir: root });
+    expect(second.status).toBe('ok');
+    expect(lstatSync(genRefDir).isDirectory()).toBe(true);
+    expect(readFileSync(join(genRefDir, 'extra.md'), 'utf8')).toBe('# Extra\n');
+  });
+
+  it('errors on a foreign non-file entry (nested directory) inside the generated references/ dir', () => {
+    const { root, genRefDir } = makeGeneratedRefFixture();
+    mkdirSync(join(genRefDir, 'foreign-nested'), { recursive: true });
+
+    const second = generateManifests({ mode: 'apply', rootDir: root });
+    expect(second.status).toBe('error');
+    expect(
+      second.errors.some(
+        (e: string) => e.includes('unexpected non-file entry') && e.includes('foreign-nested')
+      )
+    ).toBe(true);
+  });
+});
+
+describe('validateArtifacts — non-object .codex-plugin/plugin.json (JSON.parse("null") guard)', () => {
+  function validateWithManifestBody(body: string) {
+    const root = makeCodexFixtureRoot([{ name: 'null-manifest-plugin', codexEnabled: true }]);
+    const generated = generateManifests({ mode: 'apply', rootDir: root });
+    expect(generated.status).toBe('ok');
+
+    // Corrupt the generated manifest: valid JSON, wrong top-level shape.
+    writeFileSync(
+      join(root, 'plugins', 'null-manifest-plugin', '.codex-plugin', 'plugin.json'),
+      body,
+      'utf8'
+    );
+
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    const ajv = new Ajv({ strict: true, allErrors: true, verbose: true, allowUnionTypes: true });
+    addFormats(ajv);
+    const schemasDir = join(__dirname, '..', '..', 'schemas');
+    return validateArtifacts({ rootDir: root, catalog, sources, ajv, schemasDir });
+  }
+
+  it('rejects a literal null manifest instead of throwing on the .hooks dereference', () => {
+    const errors = validateWithManifestBody('null\n');
+    expect(
+      errors.some(
+        (e: string) =>
+          e.includes('plugins/null-manifest-plugin/.codex-plugin/plugin.json') &&
+          e.includes('must be a JSON object')
+      )
+    ).toBe(true);
+  });
+
+  it('rejects an array manifest', () => {
+    const errors = validateWithManifestBody('[]\n');
+    expect(
+      errors.some(
+        (e: string) =>
+          e.includes('plugins/null-manifest-plugin/.codex-plugin/plugin.json') &&
+          e.includes('must be a JSON object')
+      )
+    ).toBe(true);
   });
 });

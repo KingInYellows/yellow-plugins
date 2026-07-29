@@ -680,33 +680,46 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   }
 
   result.checked = targets.length;
+  // Two passes, stale deletions first: a stale plain file can occupy a
+  // path a content write needs as a directory (e.g. a stale file named
+  // "references" where the generated references/ directory must be
+  // recreated) — sweeping before writing lets apply mode recover in one
+  // run instead of erroring on the occupied path.
+  for (const target of targets) {
+    if (target.bytes !== null) {
+      continue;
+    }
+    // Stale artifact (from the sweep above): exists on disk with no
+    // corresponding target. Report as drift; apply mode deletes it.
+    // Existence-only check — readFileSync would throw EISDIR for a stale
+    // symlink alias whose entry itself is swept (it may resolve to a
+    // directory), and its content is irrelevant here regardless.
+    if (!existsSync(target.path)) {
+      continue; // already gone
+    }
+    const rel = relative(rootDir, target.path);
+    result.diffs.push({ path: rel, state: 'stale' });
+    if (mode === 'apply') {
+      try {
+        unlinkSync(target.path);
+        result.written.push(rel);
+      } catch (err) {
+        errors.push(`cannot delete ${target.path}: ${err.message}`);
+      }
+    }
+  }
   for (const target of targets) {
     if (target.bytes === null) {
-      // Stale artifact (from the sweep above): exists on disk with no
-      // corresponding target. Report as drift; apply mode deletes it.
-      // Existence-only check — readFileSync would throw EISDIR for a stale
-      // symlink alias whose entry itself is swept (it may resolve to a
-      // directory), and its content is irrelevant here regardless.
-      if (!existsSync(target.path)) {
-        continue; // already gone
-      }
-      const rel = relative(rootDir, target.path);
-      result.diffs.push({ path: rel, state: 'stale' });
-      if (mode === 'apply') {
-        try {
-          unlinkSync(target.path);
-          result.written.push(rel);
-        } catch (err) {
-          errors.push(`cannot delete ${target.path}: ${err.message}`);
-        }
-      }
       continue;
     }
     let current = null;
     try {
       current = readFileSync(target.path, 'utf8');
     } catch (err) {
-      if (err.code !== 'ENOENT') {
+      // ENOTDIR: an ancestor component is a plain file (a stale artifact the
+      // pass above deletes in apply mode) — the target cannot exist there,
+      // so treat it as missing rather than a hard read error.
+      if (err.code !== 'ENOENT' && err.code !== 'ENOTDIR') {
         errors.push(`cannot read ${target.path}: ${err.message}`);
         continue;
       }

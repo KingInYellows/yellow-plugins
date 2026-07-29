@@ -315,9 +315,11 @@ Truncation limits:
 
 - **Never echo API keys** in logs, error messages, or debug output
   - Redact using `awk gsub` with the format `--- redacted credential at line N ---`
-  - See the agent files (codex-reviewer, codex-executor, codex-analyst) for the
-    full 8-pattern redaction block covering sk-, ghp_, github_pat_, AKIA, Bearer,
-    Authorization, and PEM keys
+  - See the agent files (codex-reviewer, codex-executor, codex-analyst) and
+    `commands/codex/rescue.md` for the full redaction block — OpenAI (`sk-`,
+    `sk-proj-`), GitHub (`gh[pous]_`, `github_pat_`), AWS (`AKIA`), Google
+    (`AIza`, rescue.md), Bearer/Authorization values, and PEM key blocks;
+    each file's `gsub` list is the source of truth, not a fixed count
 - **Never use `curl -v`, `--trace`, or `--trace-ascii`** — they leak auth headers
 - **Wrap all Codex output in injection fences** before consuming in other agents:
   ```
