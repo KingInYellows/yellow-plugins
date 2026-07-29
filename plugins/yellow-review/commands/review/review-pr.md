@@ -494,7 +494,7 @@ for the schema itself):
       "severity": "P0|P1|P2|P3",
       "category": "<reviewer category>",
       "file": "<repo-relative path>",
-      "line": <int>,
+      "line": 42,
       "confidence": 0,
       "autofix_class": "safe_auto|gated_auto|manual|advisory",
       "owner": "review-fixer|downstream-resolver|human|release",
@@ -507,6 +507,9 @@ for the schema itself):
   "testing_gaps": []
 }
 ```
+
+`line` must be an integer — the 1-based line number of the finding in
+`file`; the `42` above is an example value, not a literal.
 
 `plugin-contract-reviewer` extends this schema with two optional
 per-finding fields: `breaking_change_class` and `migration_path`. See

@@ -165,7 +165,7 @@ outside the JSON block.
       "severity": "P0|P1|P2|P3",
       "category": "project-standards",
       "file": "<repo-relative path>",
-      "line": <int>,
+      "line": 42,
       "confidence": 100,
       "autofix_class": "safe_auto|gated_auto|manual|advisory",
       "owner": "review-fixer|downstream-resolver|human|release",
@@ -178,6 +178,9 @@ outside the JSON block.
   "testing_gaps": []
 }
 ```
+
+`line` must be an integer — the 1-based line number of the finding in
+`file`; the `42` above is an example value, not a literal.
 
 `residual_risks` and `testing_gaps` are aggregator-populated demotion
 buckets — always emit them as empty arrays (see pr-review-workflow
