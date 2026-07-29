@@ -57,7 +57,7 @@ Parse JSON output and check:
 1. **Original finding resolved?** Look for `check_id` matches at the original
    location (allow for minor line shifts from the fix).
    - Still present → Report FAIL
-   - Gone → Continue to regression check
+   - Gone → Continue to modified-lines check
 
 2. **Findings at modified lines?** Check for findings at lines modified by
    the fix. (No pre-fix baseline is passed to this agent, so this cannot

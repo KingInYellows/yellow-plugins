@@ -34,8 +34,9 @@ START: Finding received with check_id, path, line
   │   ├─ Re-scan with same rule → finding gone?
   │   │   NO → "Fix did not resolve finding. [Revert] [Retry with LLM]"
   │   │
-  │   ├─ Full rescan → new findings introduced?
-  │   │   YES → "New findings at modified lines. [Proceed anyway] [Revert]"
+  │   ├─ Full rescan → findings at modified lines?
+  │   │   YES → "WARNING: findings at modified lines (not proven regression —
+  │   │         no pre-fix baseline). [Proceed] [Revert]"
   │   │
   │   └─ PASS → Proceed to triage update
   │

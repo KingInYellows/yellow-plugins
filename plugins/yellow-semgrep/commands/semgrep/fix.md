@@ -243,7 +243,8 @@ Finding {id} — FIXED
   Severity:   {severity}
   File:       {path}:{line}
   Fix Type:   autofix | LLM
-  Verified:   ✓ (finding resolved, no findings at modified lines)
+  Verified:   ✓ pass (no findings at modified lines) | ⚠ warning (findings at
+              modified lines — not proven regression, user chose to proceed)
   Triage:     updated to 'fixed'
   Commit:     {short_sha}
 ```

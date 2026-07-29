@@ -54,7 +54,7 @@ verify MCP tool availability.
 | Agent | Description |
 |---|---|
 | `finding-fixer` | Deterministic autofix first, LLM fallback for complex fixes |
-| `scan-verifier` | Post-fix re-scan and regression detection |
+| `scan-verifier` | Post-fix re-scan; flags findings at modified lines as a warning (no pre-fix baseline) |
 
 ## Skills
 

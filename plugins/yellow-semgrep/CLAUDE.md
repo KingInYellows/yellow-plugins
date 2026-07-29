@@ -125,7 +125,8 @@ Layer 3: LIFECYCLE (write state)  → REST API for triage mutations
 ### Agents (2)
 
 - `finding-fixer` — Deterministic autofix first, LLM fallback for complex fixes
-- `scan-verifier` — Post-fix re-scan and regression detection
+- `scan-verifier` — Post-fix re-scan; flags findings at modified lines as a
+  WARNING (no pre-fix baseline — not proven regressions)
 
 ### Skills (1)
 
