@@ -81,20 +81,31 @@ turns a stray file from a no-op into cross-PR scope pollution.
    don't belong to the current PR's diff.** A file present that the current
    session didn't intentionally create is a signal a background writer from
    an earlier step landed after the branch switch — verify before adding.
-3. **Run `pnpm validate:solutions` (or at minimum parse the new file's
-   frontmatter with a YAML parser) before treating a compounder's write as
-   done**, especially right after a background agent's completion is
-   reported. A spend-limit death mid-write produces a file that looks
-   complete at a glance (has a title, a body) but fails to parse — the kind
-   of defect a human skimming the diff will miss and a mechanical check
-   catches immediately.
+3. **Parse the new file's frontmatter directly against the worktree copy
+   before treating a compounder's write as done — don't rely on
+   `pnpm validate:solutions` for this.** That script diff-scopes against
+   committed content (`git diff <base>...HEAD` in
+   `scripts/validate-solutions.js`), so a file that's still untracked or
+   unstaged — exactly the state right after a background agent reports
+   completion — is invisible to it; it will report "0 files checked"
+   instead of catching a malformed write. Parse the frontmatter in place
+   instead, e.g.
+   `node -e "require('yaml').parse(require('fs').readFileSync(process.argv[1],'utf8').match(/^---\n([\s\S]*?)\n---/)[1])" docs/solutions/<category>/<slug>.md`.
+   A spend-limit death mid-write produces a file that looks complete at a
+   glance (has a title, a body) but fails to parse — the kind of defect a
+   human skimming the diff will miss and a mechanical check catches
+   immediately. Only fall back to `pnpm validate:solutions` once the file
+   is staged or committed.
 4. **Prefer deferring repo-file writes to the foreground/orchestrating
    session when a batch spans multiple branches**, rather than trusting a
-   background agent to land them autonomously. Of the two compounders in
-   this batch that shared the same hazard, the one that deferred its
-   repo-file edit (writing to a scratchpad and handing the content back to
-   the orchestrator to commit) avoided both failure modes; the one that
-   wrote directly caused both this and the #678 incident.
+   background agent to land them autonomously. Both compounders in this
+   batch wrote their `docs/solutions/` file directly from the background
+   process — #679's compounder finished its write after the session had
+   already switched branches, and #678's compounder died mid-write on a
+   spend limit. Neither failure could occur if the background agent
+   instead handed its content back to the foreground session (e.g. via a
+   scratchpad file) and let the orchestrator commit it once the checkout
+   was known to be stable.
 
 ## Generalizes to
 
