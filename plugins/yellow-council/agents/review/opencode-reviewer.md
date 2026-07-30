@@ -162,6 +162,7 @@ if [ "$PACK_BYTES" -gt 120000 ]; then
   printf 'confidence=N/A\n'
   printf 'summary=OpenCode pack is %s bytes (>120000 argv limit); CLI not invoked. Shrink the diff (see council-patterns "Diff Truncation Algorithm").\n' "$PACK_BYTES"
   case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+  rm -f "$OUTPUT_FILE" "$STDERR_FILE"
   exit 0
 fi
 
