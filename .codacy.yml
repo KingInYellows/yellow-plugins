@@ -1,4 +1,8 @@
+---
 # Codacy CLOUD configuration (read by the Codacy Cloud GitHub App).
+# The leading `---` is REQUIRED: Codacy's docs state the file "must start
+# with a line containing a triple dash" — without it the config may be
+# silently ignored and none of the exclusions below take effect.
 #
 # Three-file distinction — do not confuse these:
 #   .codacy.yml            (this file)  -> Codacy Cloud analysis config
@@ -14,7 +18,8 @@
 # frontmatter followed by a prose summary, never a top-level heading.
 # markdownlint MD041 ("first line should be a top-level heading") is a
 # structural false positive on every changeset. Consumed + deleted on
-# release. The other paths mirror .codacy/codacy.yaml's local excludes.
+# release. All four paths below mirror .codacy/codacy.yaml's local
+# excludes (that file already lists .changeset/** too).
 exclude_paths:
   - ".changeset/**"
   - "plans/**"
