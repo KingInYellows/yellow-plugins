@@ -158,7 +158,7 @@ PACK_BYTES=$(wc -c < "$PACK_FILE")
 if [ "$PACK_BYTES" -gt 120000 ]; then
   printf '[opencode-reviewer] Error: pack file is %s bytes (>120000 argv limit) — shrink the diff (see council-patterns "Diff Truncation Algorithm")\n' "$PACK_BYTES" >&2
   printf 'CLI_EXIT=skipped\n'
-  printf 'verdict=ERROR\n'
+  printf 'verdict=UNAVAILABLE\n'
   printf 'confidence=N/A\n'
   printf 'summary=OpenCode pack is %s bytes (>120000 argv limit); CLI not invoked. Shrink the diff (see council-patterns "Diff Truncation Algorithm").\n' "$PACK_BYTES"
   case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
@@ -379,9 +379,17 @@ FINDINGS=$(awk '/^Findings:/ { capture=1; next } /^Summary: / { capture=0 } capt
 # BEFORE the sentinel escape below so a cut that happens to end a line at
 # a bare sentinel string still gets escaped.
 FINDINGS_BYTES=$(printf '%s' "$FINDINGS" | wc -c)
-FINDINGS_LINES=$(printf '%s\n' "$FINDINGS" | wc -l)
+FINDINGS_LINES=$(printf '%s' "$FINDINGS" | grep -c '^')
 if [ "$FINDINGS_BYTES" -gt 20000 ] || [ "$FINDINGS_LINES" -gt 200 ]; then
-  FINDINGS=$(printf '%s\n' "$FINDINGS" | head -n 200 | head -c 20000)
+  # Truncate by lines first so a byte cut never has to run. If line
+  # truncation alone isn't enough, fall back to a byte cut and then drop
+  # the now-possibly-partial trailing line with `sed '$d'` — `head -c`
+  # can split a multi-byte UTF-8 character mid-sequence, which would
+  # otherwise corrupt the reviewer output.
+  FINDINGS=$(printf '%s\n' "$FINDINGS" | head -n 200)
+  if [ "$(printf '%s' "$FINDINGS" | wc -c)" -gt 20000 ]; then
+    FINDINGS=$(printf '%s' "$FINDINGS" | head -c 20000 | sed '$d')
+  fi
   FINDINGS="${FINDINGS}
 [truncated: findings exceeded 200 lines / 20000 bytes]"
 fi
