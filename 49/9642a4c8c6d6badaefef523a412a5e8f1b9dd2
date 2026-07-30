@@ -1,0 +1,19 @@
+docs/solutions/logic-errors/stale-ok-status-not-corrected-on-abort.md
+  s_43cc4f730492cc::t_34874c7b55bc9f 1-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "499642a4c8c6d6badaefef523a412a5e8f1b9dd2",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
