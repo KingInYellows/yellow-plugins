@@ -68,8 +68,10 @@ and never auto-commits. The user decides what to do with the verdicts.
 ### Agents (2)
 
 - `gemini-reviewer` — Gemini CLI wrapper. Invokes
-  `gemini -p "<prompt>" --approval-mode plan --skip-trust -o text`.
-  Spawned via `Task(subagent_type="yellow-council:review:gemini-reviewer")`.
+  `gemini -p "<short trusted pointer>" --approval-mode plan --skip-trust -o text < "$PACK_FILE"`
+  (pack fed via stdin; gemini appends `-p` text to stdin input — argv is
+  capped at ~128KiB). Spawned via
+  `Task(subagent_type="yellow-council:review:gemini-reviewer")`.
 - `opencode-reviewer` — OpenCode CLI wrapper. Invokes
   `opencode run --format json --variant high "<prompt>"` plus session cleanup
   via `opencode session delete <id>`. Spawned via

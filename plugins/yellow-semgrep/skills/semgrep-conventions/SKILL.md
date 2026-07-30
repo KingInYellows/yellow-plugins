@@ -199,14 +199,15 @@ Finding-ID: {id}
 Rule: {check_id}
 Severity: {severity}
 Fix-Type: autofix|llm
-Verified: pass|warning (findings at modified lines, not proven regression)
+Verified: pass|warning (findings at modified lines, not proven regression)|unverified (semgrep CLI unavailable)
 ```
 
-`Verified:` takes `pass` when the re-scan is clean, or the `warning (...)`
+`Verified:` takes `pass` when the re-scan is clean, the `warning (...)`
 form when findings surfaced at the modified lines and the user chose to
-proceed — matching `/semgrep:fix` Step 10's trailer. Substitute one
-concrete value; never emit the literal `pass|warning` alternation shown
-above.
+proceed, or `unverified (semgrep CLI unavailable)` when the user chose
+[Commit unverified] after a "Cannot verify — semgrep CLI not found"
+outcome — matching `/semgrep:fix` Step 10's trailer. Substitute one
+concrete value; never emit the literal alternation shown above.
 
 ## Finding ID Validation
 

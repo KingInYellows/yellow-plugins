@@ -150,11 +150,19 @@ STDERR_FILE="<literal stderr-file path>"
 
 # The pack is passed as a single argv element, which Linux caps at
 # ~128KiB (MAX_ARG_STRLEN). opencode run has no documented stdin input,
-# so fail loudly before the kernel returns an inscrutable E2BIG.
+# so fail loudly before the kernel returns an inscrutable E2BIG — but fail
+# in the same structured verdict= shape as every other failure path in
+# this file (Step 6 arms), so council.md's parse_reviewer_return gets a
+# deterministic partial result instead of a bare non-zero exit.
 PACK_BYTES=$(wc -c < "$PACK_FILE")
 if [ "$PACK_BYTES" -gt 120000 ]; then
   printf '[opencode-reviewer] Error: pack file is %s bytes (>120000 argv limit) — shrink the diff (see council-patterns "Diff Truncation Algorithm")\n' "$PACK_BYTES" >&2
-  exit 1
+  printf 'CLI_EXIT=skipped\n'
+  printf 'verdict=ERROR\n'
+  printf 'confidence=N/A\n'
+  printf 'summary=OpenCode pack is %s bytes (>120000 argv limit); CLI not invoked. Shrink the diff (see council-patterns "Diff Truncation Algorithm").\n' "$PACK_BYTES"
+  case "$PACK_FILE" in /tmp/council-opencode-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+  exit 0
 fi
 
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
@@ -168,7 +176,10 @@ printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
 ```
 
 Capture the printed CLI_EXIT value as well — later blocks substitute it
-alongside the three paths.
+alongside the three paths. If the pack-size guard fired (`CLI_EXIT=skipped`
+was printed), the CLI was never invoked: report the printed `verdict=` /
+`confidence=` / `summary=` triplet as this reviewer's final result and skip
+Steps 4-7, exactly as with the failure arms in Step 6.
 
 ### Step 4: Detect SQLite migration state
 

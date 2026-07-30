@@ -102,7 +102,7 @@ for that skill with an explicit error:
 
 ```text
 plugins/<name>/skills/<skillName>: has sidecar file(s) not yet supported
-for Codex (<list>) — only SKILL.md is copied
+for Codex (<list>) — only SKILL.md and references/*.md are copied
 ```
 
 This is a real, permanent constraint (not a bug to route around): a

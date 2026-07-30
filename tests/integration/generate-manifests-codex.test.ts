@@ -1103,6 +1103,34 @@ describe('regeneration against a POLLUTED generated tree (stale-sweep branches)'
     expect(readFileSync(join(genRefDir, 'extra.md'), 'utf8')).toBe('# Extra\n');
   });
 
+  it('check mode reports a plain FILE named references as drift without mutating or hard-erroring (ENOTDIR read path)', () => {
+    // Unlike apply mode (which unlinks the stale file before the content
+    // pass), check mode leaves the plain file in place, so the content
+    // pass's readFileSync hits ENOTDIR on paths behind it — the branch CI's
+    // --check invocations actually exercise on a polluted tree.
+    const { root, genRefDir } = makeGeneratedRefFixture();
+    rmSync(genRefDir, { recursive: true, force: true });
+    writeFileSync(genRefDir, 'stale plain file\n', 'utf8');
+
+    const second = generateManifests({ mode: 'check', rootDir: root });
+    expect(second.status).toBe('ok');
+    expect(
+      second.diffs.some(
+        (d: { path: string; state: string }) =>
+          d.state === 'stale' && d.path.endsWith('references')
+      )
+    ).toBe(true);
+    expect(
+      second.diffs.some(
+        (d: { path: string; state: string }) =>
+          d.state === 'missing' && d.path.endsWith('extra.md')
+      )
+    ).toBe(true);
+    // Check mode must not mutate: the stale plain file is still there.
+    expect(lstatSync(genRefDir).isFile()).toBe(true);
+    expect(readFileSync(genRefDir, 'utf8')).toBe('stale plain file\n');
+  });
+
   it('errors on a foreign non-file entry (nested directory) inside the generated references/ dir', () => {
     const { root, genRefDir } = makeGeneratedRefFixture();
     mkdirSync(join(genRefDir, 'foreign-nested'), { recursive: true });

@@ -212,7 +212,7 @@ Finding-ID: {id}
 Rule: {check_id}
 Severity: {severity}
 Fix-Type: autofix|llm
-Verified: pass|warning (findings at modified lines, not proven regression)"
+Verified: pass|warning (findings at modified lines, not proven regression)|unverified (semgrep CLI unavailable)"
 ```
 
 Substitute one concrete value for the `Verified:` trailer: `pass` when
@@ -220,7 +220,7 @@ Step 9 reported PASS, `warning (findings at modified lines, not proven
 regression)` when the user proceeded after a WARNING, or
 `unverified (semgrep CLI unavailable)` when the user chose
 [Commit unverified] after a "Cannot verify" outcome — never emit the
-literal `pass|warning` alternation.
+literal alternation shown above.
 
 If user had stashed changes in Step 5: `git stash pop`
 
@@ -258,7 +258,8 @@ Finding {id} — FIXED
   File:       {path}:{line}
   Fix Type:   autofix | LLM
   Verified:   ✓ pass (no findings at modified lines) | ⚠ warning (findings at
-              modified lines — not proven regression, user chose to proceed)
+              modified lines — not proven regression, user chose to proceed) |
+              ⊘ unverified (semgrep CLI unavailable — fix not re-scanned)
   Triage:     updated to 'fixed'
   Commit:     {short_sha}
 ```
@@ -276,5 +277,6 @@ Finding {id} — FIXED
 | Autofix syntax check fails | Warning, fall through to LLM | Continue |
 | Fix does not resolve finding | "Fix did not resolve" | [Revert + stash pop] [Retry] |
 | WARNING: findings at modified lines | "Findings at modified lines (not proven regression)" | [Proceed] [Revert] |
+| Cannot verify — semgrep CLI not found | "Cannot verify — semgrep CLI not found" | [Commit unverified] [Stop] |
 | Triage POST fails | "Triage update failed" | Show manual URL |
 | Network failure | curl error message | Exit |

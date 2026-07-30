@@ -346,13 +346,18 @@ background, deliberately kept out of the preload budget.
 **Gemini** (direct bash):
 ```bash
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  gemini -p "<full-pack-prompt>" \
+  gemini -p "The council pack above is your full task. Follow its instructions." \
     --approval-mode plan \
     --skip-trust \
     -o text \
+  < "$PACK_FILE" \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 ```
-- `-p`/`--prompt`: REQUIRED for non-interactive mode (positional prompt enters TUI)
+- `-p`/`--prompt`: REQUIRED for non-interactive mode (positional prompt enters TUI).
+  The pack itself is fed via stdin (`< "$PACK_FILE"`) — gemini appends the `-p`
+  text to stdin input — because a single argv element caps at ~128KiB on Linux
+  (MAX_ARG_STRLEN), which a large diff pack exceeds; `-p` carries only a short
+  trusted pointer to the pack
 - `--approval-mode plan`: read-only mode (no tool side effects)
 - `--skip-trust`: bypass workspace trust check (would force `default` approval otherwise)
 - `-o text`: V1 plain text capture; `-o json` is a V2 option (response/stats/error schema)
