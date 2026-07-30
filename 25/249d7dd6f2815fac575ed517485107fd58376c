@@ -1,0 +1,28 @@
+tests/integration/generate-manifests-codex.test.ts
+  s_f4074862689008::t_790ca9ffb19b81 1078-1083,1085
+  s_f4074862689008::t_c97718b6f36c37 1046-1077,1084,1086-1087
+.changeset/polish-line-placeholder.md
+  s_f4074862689008::t_d7df63fe2cfc27 11-13
+scripts/lib/generate/emit-codex.js
+  s_f4074862689008::t_c54219a9bd0334 264-281
+  s_f4074862689008::t_a32ec642eaf508 366
+scripts/validate-codex.js
+  s_f4074862689008::t_b2d00b2799edee 238-242
+  s_f4074862689008::t_b447a8b457b94c 265-268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "25249d7dd6f2815fac575ed517485107fd58376c",
+  "prompts": {},
+  "sessions": {
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
