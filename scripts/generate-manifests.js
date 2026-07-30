@@ -247,7 +247,13 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   // at any gate leaves later-stage checks unrun for every plugin, so 'ok'
   // is not proof a plugin's later stages were verified. Both abort gates
   // below keep their all-or-nothing semantics regardless of it.
-  const result = { status: 'ok', errors, diffs: [], written: [], checked: 0, results: {} };
+  // `Object.create(null)`, not `{}`: pluginOrder entries are only
+  // NAME_RE-constrained ([a-zA-Z0-9_-]+), which accepts "__proto__". Keying
+  // a plain object literal with that name hits the inherited accessor
+  // instead of creating an own property, silently dropping the plugin from
+  // every `Object.entries(result.results)` consumer (main()'s error
+  // reporting included).
+  const result = { status: 'ok', errors, diffs: [], written: [], checked: 0, results: Object.create(null) };
 
   const catalogResult = loadCatalog(join(rootDir, 'catalog'));
   if (catalogResult.status === 'missing') {

@@ -580,6 +580,28 @@ describe('catalog source safety', () => {
       'catalog/plugins/yellow-core.json: top-level value must be an object'
     );
   });
+
+  it('attributes a "__proto__" pluginOrder entry as its own result entry, not the inherited setter', () => {
+    // NAME_RE (`^[a-zA-Z0-9_-]+$`) accepts "__proto__". A plain object
+    // literal keyed by that name would hit the inherited accessor instead
+    // of creating an own property, silently dropping the plugin from
+    // `result.results` (and from every `Object.entries(result.results)`
+    // consumer, including main()'s per-plugin error reporting).
+    const root = makeFixtureRoot();
+    const catalogPath = join(root, 'catalog', 'catalog.json');
+    const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
+    catalog.pluginOrder.push('__proto__');
+    writeFileSync(catalogPath, JSON.stringify(catalog, null, 2) + '\n', 'utf8');
+
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'pluginOrder entry "__proto__" has no catalog/plugins/__proto__.json source file'
+    );
+    expect(Object.prototype.hasOwnProperty.call(result.results, '__proto__')).toBe(true);
+    expect(result.results['__proto__']).toBe('error');
+    expect(result.results['yellow-review']).toBe('ok');
+  });
 });
 
 describe('--check stale-artifact detection (subprocess)', () => {
