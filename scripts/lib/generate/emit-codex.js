@@ -262,6 +262,44 @@ function buildCodexHookConfig(source) {
 }
 
 /**
+ * Shared symlink-containment check for a copied-input directory (skill dir
+ * and its references/ dir): lstat rejects the directory itself being a
+ * symlink outright — including an in-plugin symlink whose resolved target
+ * still lands inside the plugin root — and the literal expected-path
+ * comparison rejects a symlinked ancestor or any in-plugin redirection.
+ * The comparison must never be a prefix check: an in-plugin ancestor
+ * symlink (e.g. plugins/<name>/skills -> plugins/<name>/other) resolves
+ * to a path that still starts with the plugin root, silently bypassing
+ * the allowlist (R-review).
+ *
+ * @param {string} dir - directory to check (unresolved path).
+ * @param {string} expectedRealPath - the literal canonical location the
+ *   directory must resolve to.
+ * @returns {{status: 'ok'}|{status: 'symlink'}|{status: 'notDir'}|{status: 'error', error: Error}}
+ *   'symlink' → the caller pushes its own location-specific error message;
+ *   'notDir' → exists but is a plain file; the caller decides whether that
+ *   deserves a targeted message or falls through to its normal read path;
+ *   'error' → the caller decides its own ENOENT policy.
+ */
+function checkDirSymlinkContainment(dir, expectedRealPath) {
+  try {
+    const stat = lstatSync(dir);
+    if (stat.isSymbolicLink()) {
+      return { status: 'symlink' };
+    }
+    if (!stat.isDirectory()) {
+      return { status: 'notDir' };
+    }
+    if (realpathSync(dir) !== expectedRealPath) {
+      return { status: 'symlink' };
+    }
+    return { status: 'ok' };
+  } catch (err) {
+    return { status: 'error', error: err };
+  }
+}
+
+/**
  * Copy the Codex-allowlisted subset of `plugins/<name>/skills/` into
  * `plugins/<name>/<codex.componentPaths.skills>/` (defaulting to
  * `plugins/<name>/codex/skills/` when unset — the same source and default
@@ -331,48 +369,29 @@ function buildCodexSkillTree(rootDir, name, source) {
     const skillDir = join(rootDir, 'plugins', name, 'skills', skillName);
     const skillFile = join(skillDir, 'SKILL.md');
 
-    // O_NOFOLLOW on the openSync() below only guards the final path
-    // component (SKILL.md itself); a symlinked skillDir — or a symlinked
-    // ANCESTOR, e.g. plugins/<name>/skills/ itself being a symlink out of
-    // the repo — would still be followed when the OS resolves the
-    // intermediate path components, since O_NOFOLLOW and a plain
-    // lstat(skillDir) both only ever inspect the final path segment. The
-    // lstat check below rejects skillDir itself being a symlink outright,
-    // including an IN-PLUGIN symlink (e.g. an allowlisted
-    // skills/allowed -> skills/private) — the realpath containment check
-    // that follows would otherwise miss that case, since the resolved
-    // target still lands inside pluginRootReal. The realpath check stays as
-    // a secondary defense for a symlinked ancestor above skillDir (e.g. a
-    // symlinked skills/ itself), which lstat(skillDir) alone can't see — but
-    // a prefix/containment comparison against pluginRootReal is not enough:
-    // an in-plugin ancestor symlink (e.g. plugins/<name>/skills itself
-    // pointing at ANOTHER directory still inside the same plugin root, such
-    // as plugins/<name>/skills -> plugins/<name>/other) resolves to a path
-    // that still starts with pluginRootReal, silently bypassing the
-    // allowlist (R-review). The canonical location of an allowlisted skill
-    // is always exactly pluginRootReal/skills/<skillName>, so compare
-    // against that literal expected path instead of a prefix — this rejects
-    // ANY symlink anywhere on skillDir's path (leaf or ancestor, in-plugin
-    // or external).
-    try {
-      if (lstatSync(skillDir).isSymbolicLink()) {
-        errors.push(`plugins/${name}/skills/${skillName}: symlinked skill directories (including a symlinked ancestor such as skills/) are not allowed`);
-        continue;
-      }
-      const skillDirReal = realpathSync(skillDir);
-      const skillDirExpected = join(pluginRootReal, 'skills', skillName);
-      if (skillDirReal !== skillDirExpected) {
-        errors.push(`plugins/${name}/skills/${skillName}: symlinked skill directories (including a symlinked ancestor such as skills/) are not allowed`);
-        continue;
-      }
-    } catch (err) {
-      if (err.code !== 'ENOENT') {
-        errors.push(`plugins/${name}/skills/${skillName}: ${err.message}`);
-        continue;
-      }
-      // Missing entirely — fall through to the open below, which reports
-      // the same "not found" error for consistency.
+    // Symlink posture lives in checkDirSymlinkContainment's docstring.
+    // Site-specifics: O_NOFOLLOW on the openSync() below only guards the
+    // final path component (SKILL.md itself), so this directory-level
+    // check must run first; the canonical location of an allowlisted skill
+    // is exactly pluginRootReal/skills/<skillName>, which is the literal
+    // expected path passed here.
+    const skillDirCheck = checkDirSymlinkContainment(
+      skillDir,
+      join(pluginRootReal, 'skills', skillName)
+    );
+    if (skillDirCheck.status === 'symlink') {
+      errors.push(`plugins/${name}/skills/${skillName}: symlinked skill directories (including a symlinked ancestor such as skills/) are not allowed`);
+      continue;
     }
+    if (skillDirCheck.status === 'error' && skillDirCheck.error.code !== 'ENOENT') {
+      errors.push(`plugins/${name}/skills/${skillName}: ${skillDirCheck.error.message}`);
+      continue;
+    }
+    // ENOENT: missing entirely — fall through to the open below, which
+    // reports the same "not found" error for consistency. 'notDir' (a plain
+    // file where the skill dir should be) also falls through: readdirSync
+    // below is caught and the SKILL.md open reports it, matching the
+    // pre-helper behavior.
 
     // Only SKILL.md plus a flat references/ subdirectory of *.md files are
     // copied below. Any OTHER sidecar entry (a top-level schema.yaml, a
@@ -398,36 +417,26 @@ function buildCodexSkillTree(rootDir, name, source) {
     const referenceTargets = [];
     if (sidecarEntries.includes('references')) {
       const refDir = join(skillDir, 'references');
-      // Same symlink posture as skillDir above: lstat rejects a symlinked
-      // references/ leaf outright; the literal expected-path comparison
-      // (not a prefix check) rejects any symlinked ancestor or in-plugin
-      // redirection; O_NOFOLLOW on each file read is the final-component
-      // second layer.
-      let refDirBad = false;
-      let refDirNotDir = false;
-      try {
-        const refDirStat = lstatSync(refDir);
-        if (refDirStat.isSymbolicLink()) {
-          refDirBad = true;
-        } else if (!refDirStat.isDirectory()) {
-          // A plain file named "references" would otherwise surface as a raw
-          // ENOTDIR from readdirSync below — reject it with a targeted message.
-          refDirNotDir = true;
-        } else {
-          const refDirReal = realpathSync(refDir);
-          const refDirExpected = join(pluginRootReal, 'skills', skillName, 'references');
-          refDirBad = refDirReal !== refDirExpected;
-        }
-        if (refDirBad) {
-          errors.push(`plugins/${name}/skills/${skillName}/references: symlinked references directories (including a symlinked ancestor) are not allowed`);
-          continue;
-        }
-        if (refDirNotDir) {
-          errors.push(`plugins/${name}/skills/${skillName}/references: exists but is not a directory — only a flat references/ directory of *.md files is supported for Codex`);
-          continue;
-        }
-      } catch (err) {
-        errors.push(`plugins/${name}/skills/${skillName}/references: ${err.message}`);
+      // Same symlink posture as skillDir above (shared helper); O_NOFOLLOW
+      // on each file read is the final-component second layer. Unlike the
+      // skillDir call site there is no ENOENT carve-out: references/ was
+      // just listed by readdirSync, so any error here is reported. A plain
+      // file named "references" ('notDir') would otherwise surface as a raw
+      // ENOTDIR from readdirSync below — reject it with a targeted message.
+      const refDirCheck = checkDirSymlinkContainment(
+        refDir,
+        join(pluginRootReal, 'skills', skillName, 'references')
+      );
+      if (refDirCheck.status === 'symlink') {
+        errors.push(`plugins/${name}/skills/${skillName}/references: symlinked references directories (including a symlinked ancestor) are not allowed`);
+        continue;
+      }
+      if (refDirCheck.status === 'notDir') {
+        errors.push(`plugins/${name}/skills/${skillName}/references: exists but is not a directory — only a flat references/ directory of *.md files is supported for Codex`);
+        continue;
+      }
+      if (refDirCheck.status === 'error') {
+        errors.push(`plugins/${name}/skills/${skillName}/references: ${refDirCheck.error.message}`);
         continue;
       }
 
