@@ -310,9 +310,11 @@ longer share files after the wording-fix move) plus a manual action:
 > and https://docs.codacy.com/repositories-configure/ignoring-files/
 <!-- /deepen-plan -->
 - [x] 4.2: Update the EXISTING memory file
-      `~/.claude/projects/-home-kinginyellow-projects-yellow-plugins/memory/codacy-md041-changeset-false-positive.md`
-      (do not create a sibling): the repo-file exclude is
-      necessary-but-insufficient — `markdownlint` is not in
+      `~/.claude/projects/<slug>/memory/codacy-md041-changeset-false-positive.md`
+      (`<slug>` is the machine-derived encoding of the repo path, e.g.
+      `-home-kinginyellow-projects-yellow-plugins` on this clone; it is
+      user/machine-specific — do not create a sibling): the repo-file
+      exclude is necessary-but-insufficient — `markdownlint` is not in
       `.codacy/codacy.yaml`'s `tools:` list and no workflow invokes
       `.codacy/cli.sh`; the gating check is the Codacy Cloud GitHub App
       reading dashboard config. Recommend against a third repo-file
