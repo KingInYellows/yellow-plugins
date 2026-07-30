@@ -324,7 +324,7 @@ Any time a plugin author or reviewer:
 
 ## Update — 2026-07-29
 
-### 7. Exposure-lint symlink containment is prefix-based; the generator's is literal — and finding 3's coverage gap is now partly closed
+### 7. Exposure-lint containment differs from generator containment
 
 Found during the `/review:pr` pass on PR #679 (branch
 `agent/fix/polish-line-placeholder-codex-dedup`), which also extracted

@@ -1463,8 +1463,8 @@ the axis #27's own examples were already sorted along.
 defect class — this time a `"line": <int>,` placeholder (not a `//`
 comment) inside the same strict ```json compact-return example fence.
 `<int>` is not valid JSON; an agent copying the fence verbatim reproduces
-a parse failure, the exact whole-return silent-drop class anti-pattern
-#30 exists to prevent.
+a parse failure, the exact whole-return silent-drop class anti-pattern #30
+exists to prevent.
 
 **WRONG:**
 
