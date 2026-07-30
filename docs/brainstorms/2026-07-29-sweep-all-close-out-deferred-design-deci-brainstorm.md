@@ -33,17 +33,25 @@ behavior:
      uncapped launch, since today's string is reused across both branches
      and is factually wrong on the interactive path.
 
-2. **generate-manifests failure scoping**
+2. **generate-manifests failure scoping** — **SUPERSEDED**, see
+   `plans/sweep-670-672-deferred-design-decisions.md:25-29`: apply mode
+   stays all-or-nothing atomic (no partial writes); only the *reporting*
+   becomes per-plugin (result object + error output). The scoping
+   description below is the brainstorm's original, since-revised framing —
+   left for rationale context, not as the design to implement.
    (`scripts/generate-manifests.js`, target-assembly + write loops around
-   lines 260–600). Moves from abort-all (one plugin's validation/pollution
-   error blocks regeneration of every plugin) to per-plugin scoping
-   (unaffected plugins regenerate normally; only the polluted/invalid
-   plugin's targets are held back) — with an explicit safeguard: each
-   plugin's validation result must be individually asserted/logged, never
-   folded into one global success flag.
+   lines 260–600). ~~Moves from abort-all (one plugin's
+   validation/pollution error blocks regeneration of every plugin) to
+   per-plugin scoping (unaffected plugins regenerate normally; only the
+   polluted/invalid plugin's targets are held back)~~ — with an explicit
+   safeguard: each plugin's validation result must be individually
+   asserted/logged, never folded into one global success flag.
 
 3. **Polish batch** — one dedicated PR bundling:
-   - `<int>` placeholder cleanup in 6 reviewer JSON fences
+   - `<int>` placeholder cleanup — **8 files**, not 6: the canonical
+     `plugins/yellow-review/commands/review/review-pr.md` plus its seven
+     reviewer-agent mirrors under `plugins/yellow-review/agents/review/`
+     (see `plans/sweep-670-672-deferred-design-decisions.md:32-34`)
    - the #667 plan's own deferred-P3 list (symlink helper dedup,
      `refDirBad` inlining, sibling-regex precompile)
    - error-message wording consistency in `generate-manifests.js`
@@ -142,6 +150,12 @@ make it).
   `codacy-md041-changeset-false-positive` recording the local-CLI vs.
   cloud-check config split, so the repo-file fix isn't attempted a third
   time.
+  > **Correction (2026-07-30):** superseded — see the correction at lines
+  > 119-123. The fix shipped as a committed root `.codacy.yml` (PR #680),
+  > not a dashboard change; the dashboard route above is retained only as
+  > fallback. The memory-doc update to
+  > `codacy-md041-changeset-false-positive` should record the root-file
+  > fix, not a dashboard-only split.
 
 ## Open Questions
 
@@ -166,3 +180,6 @@ make it).
   repo-settings access to perform the manual ignored-paths change — this
   brainstorm records the decision and rationale but the action itself is
   outside repo tooling and outside this session's reach.
+  > **Correction (2026-07-30):** moot — see the correction at lines
+  > 119-123. The fix shipped as a committed root `.codacy.yml` (PR #680),
+  > which needs only a normal repo commit, not Codacy dashboard access.

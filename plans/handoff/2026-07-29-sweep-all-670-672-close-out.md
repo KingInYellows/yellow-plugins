@@ -11,6 +11,12 @@ the loose ends left deliberately uncommitted or deferred.
 
 ## Workflow status
 
+> **Status: COMPLETE — retrospective record.** All three PRs merged, and
+> all follow-on work tracked in this handoff has since shipped (PRs
+> #676–#680). See the EXECUTED postscript at the bottom of this file for
+> final disposition; the "awaiting merge" language immediately below is
+> a point-in-time snapshot from 2026-07-29, superseded by that postscript.
+
 Batch complete. All three PRs are green from the sweep's perspective and
 awaiting the user's merge decision (Graphite queue). #670 and #671 are
 stacked (671 on 670); #672 is independent off main. No sweep work remains.
@@ -65,6 +71,10 @@ stacked (671 on 670); #672 is independent off main. No sweep work remains.
 - ?? plans/handoff/ (this file + the 2026-07-28 predecessor)
 
 ## Next concrete action
+
+> **SUPERSEDED — do not execute.** These steps were carried out on
+> 2026-07-29; see the EXECUTED postscript below before acting on
+> anything in this section.
 
 Decide placement for the two uncommitted docs/solutions files (open
 decision 1) and land them; then merge the three PRs via the Graphite queue

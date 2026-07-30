@@ -164,6 +164,18 @@ longer share files after the wording-fix move) plus a manual action:
       `results` entries as computed. Both `errors.length > 0` gates KEEP
       their abort semantics (reporting-only decision) — `status` stays
       the aggregate, and `--check` exit codes are unchanged.
+      **Non-success state, resolved:** "as computed" is documented
+      empty-map semantics, not an omission. `results` starts as `{}`
+      and the per-plugin pre-populate loop (`results[name] = 'ok'` for
+      every `pluginOrder` entry) runs only *after* `loadCatalog()`
+      succeeds — every catalog-wide abort path (missing catalog,
+      invalid shape, duplicate `pluginOrder`) returns before that loop,
+      so `results` stays `{}` on those paths. A caller therefore reads
+      `{}` as "catalog-wide abort, no plugin was evaluated" and never
+      mistakes it for per-plugin success; this is asserted directly
+      (duplicate `pluginOrder` case: `expect(result.results).toEqual({})`)
+      in PR #678's `tests/integration/generate-manifests.test.ts`. No
+      separate `skipped`/`unknown` state was needed — shipped as-is.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** Adding `results` is confirmed additive-safe: the only
