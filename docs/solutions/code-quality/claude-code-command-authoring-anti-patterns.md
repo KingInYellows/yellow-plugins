@@ -1535,6 +1535,58 @@ for the general meta-pattern this instantiates.
 
 ---
 
+## Update — 2026-07-30
+
+### 33. A Reviewer's "Verified" Citation Is a Claim, Not a Fact — Re-Verify Git Hashes Directly
+
+**Refines anti-pattern #27/#31.** Those entries establish that convergence
+count isn't a correctness signal and that mechanical/source-verifiable claims
+are cheap to check directly. This is the same failure at one further remove:
+a reviewer (in this case a *fix*, not just a finding) asserted a commit hash
+had been "verified," and that assertion was itself wrong — twice, back to
+back, in the same PR.
+
+PR #681 (docs-only, committing `plans/handoff/2026-07-29-sweep-all-670-672-close-out.md`):
+the handoff cited pre-rebase commit hashes for PR #670/#671 as evidence of
+what shipped. A correctness-reviewer flagged them as orphaned (discarded by
+the merge queue's rebase). The first fix round replaced them with hashes
+labeled "post-merge" and "verified" — but per the second reviewer's own
+report (not independently re-derived here, since the replaced hashes are
+no longer in the file to re-check), one of the replacement hashes wasn't an
+ancestor of `main` and two didn't exist in the repository at all. A second
+pass-2 simplifier, tasked only with *verifying* the correctness reviewer's
+suggested fix before applying it, ran `git log`/`git merge-base` directly
+instead of trusting the "verified" label and landed on the real merged
+squash commits — confirmed directly against this repo while writing this
+entry: `git cat-file -e 67865ade^{commit} && git merge-base --is-ancestor
+67865ade origin/main` and the same for `4b35a760` both succeed, and
+`git log -1 --format='%h %s'` for each resolves to the actual PR #670 and
+#671 merge-queue squash commits.
+
+**Rule:** A commit hash, PR number, or line offset labeled "verified" inside
+a review finding or a fix diff is a claim about primary-source state, not
+primary-source state itself. Before writing such a citation into a record
+(plan, handoff, solution doc), re-run the check yourself — `git log
+--oneline <hash>`, `git merge-base --is-ancestor <hash> main`, or `git show
+<hash>` — even when the citation already carries a "verified" label from an
+earlier reviewer or fix pass. Mechanical citations are exactly the
+cheap-to-check case anti-pattern #31 describes; "someone already verified
+it" is not a substitute for doing the check.
+
+**Prevention checklist additions:**
+
+- [ ] Before citing a commit hash, tag, or PR number as evidence in a plan,
+      handoff, or solution doc, confirm it resolves and is reachable from
+      the branch/tag you claim (`git cat-file -e`, `git merge-base
+      --is-ancestor`) — do not carry forward a prior reviewer's or fix
+      commit's "verified" label without re-running the check.
+- [ ] When a merge queue or rebase-and-squash flow is involved, treat
+      pre-merge hashes cited in earlier drafts as presumptively stale;
+      re-derive the merged squash hash from `main` rather than editing the
+      old value in place.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2

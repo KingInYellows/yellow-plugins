@@ -175,3 +175,72 @@ staleness verification before marking as mergeable.
 - `docs/solutions/code-quality/cross-plugin-documentation-correctness.md` --
   covers incorrect cross-references in documentation (different root cause:
   inferring names from convention rather than reading source)
+
+---
+
+## Update — 2026-07-30
+
+### Record-accuracy review for retrospective plan/handoff docs
+
+PR #681 committed 4 historical planning records (a deferred-design-decisions
+plan plus two session handoffs and a brainstorm) written *after* the work
+they describe had already shipped across PRs #677-#680. A 9-reviewer pass
+found the same failure class this doc already names (Option 2:
+"Convert to retrospective") wasn't followed all the way through, in three
+concrete ways that are worth adding as explicit checks for any retrospective
+plan/handoff PR:
+
+1. **Supersession drift within the document itself.** The plan's Phase 4
+   section header and its own task list said "no repo PR / manual dashboard
+   only," while a deepen-plan research note *elsewhere in the same file*,
+   and the actual shipped fix (PR #680, a committed root `.codacy.yml`),
+   said the opposite. The document contradicted itself because an earlier
+   research finding overturned the plan-of-record but the headline text was
+   never reconciled to match. When a plan's own later section supersedes an
+   earlier one, either edit the earlier section in place or add an explicit
+   forward-pointer ("see Phase 4 below — resolution differs from what this
+   section assumed") — don't leave both stated as if still current.
+2. **Missing PR cross-references and status marker.** A fully-checked
+   `- [x]` plan reads as "ready to complete" indefinitely unless it also
+   states *which PR* resolved each item and carries a status header noting
+   the record is a point-in-time snapshot, not living process. Add a status
+   line at the top (e.g. `> **Status: point-in-time record — all tasks
+   complete.** Implemented by: Phase 1 → PR #677, Phase 2 → PR #678, ...`)
+   so the checkbox state is traceable to evidence instead of just asserted.
+3. **Trailers/Open-decisions sections framed resolved items as still open.**
+   Handoff "Open decisions" and PR trailers described items that the
+   co-committed plan had already closed out, because the handoff was
+   drafted before the plan's final revision and never re-synced. Add
+   forward pointers ("see plan X, item Y — resolved") or a `SUPERSEDED`
+   marker rather than leaving stale open-question framing in a document
+   committed alongside its own resolution.
+
+**Rule:** when committing a plan or handoff as a retrospective record (not a
+live TODO), treat it as a mini-audit: reconcile every internal
+contradiction between an earlier section and a later correction, add PR
+cross-references next to every checked box, and mark any "open question"
+section that the co-committed material has already answered. A
+fully-checked plan with no PR trail and no supersession markers is not
+distinguishable from "still in progress" months later.
+
+**Prevention checklist additions:**
+
+- [ ] Grep the retrospective doc for count/date/status mentions that
+      appear in more than one place (e.g. "N phases", "no repo PR") and
+      confirm every occurrence agrees with the final resolution — a
+      deepen-plan correction applied to one paragraph but not to the
+      summary line at the top is the single most common instance of this
+      failure.
+- [ ] Every `- [x]` in a plan being committed retrospectively should be
+      traceable to a PR number, either inline or via a status header
+      mapping phases to PRs.
+- [ ] Before committing a handoff alongside the plan it hands off from,
+      re-read the handoff's "Open decisions"/trailers section against the
+      plan's final state — anything the plan already resolved needs a
+      forward pointer or `SUPERSEDED` marker, not to be left reading as
+      open.
+
+See also `docs/solutions/code-quality/claude-code-command-authoring-anti-patterns.md`
+anti-pattern #32 — a related but distinct failure from the same PR, about
+re-verifying reviewer-supplied "verified" commit-hash citations directly
+rather than trusting the label.
