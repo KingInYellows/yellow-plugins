@@ -1,0 +1,58 @@
+plans/sweep-670-672-deferred-design-decisions.md
+  s_f4074862689008::t_4bd84ae6dca4d9 250
+  s_f4074862689008::t_a6f953cd7291d6 226
+  s_3923eeae7a5598::t_0964d3ad9ce364 184-192
+  s_3923eeae7a5598::t_357c6ab1b8d22b 212-219
+  s_3923eeae7a5598::t_f87205781c7392 267-288
+  s_f4074862689008::t_5d3bf1dae8715f 253
+  s_3923eeae7a5598::t_56292b4c250d2b 330-339
+  s_3923eeae7a5598::t_69d04bf906a15c 1-40,51-77,79-104,127-134,136,138-142,144-152,176-183,194-197,199-206,208-211,221-225,227-231,245-249,251-252,254-256,258-263,265-266,290-329,340-367
+  s_f4074862689008::t_4cae6211868404 257
+  s_f4074862689008::t_8adfb9febd99c8 175
+  s_f4074862689008::t_81ec2dd83a7553 137
+  s_f4074862689008::t_10ad7fa7cf33ff 198
+  s_3923eeae7a5598::t_4c69353f7d1aae 153-174
+  s_3923eeae7a5598::t_371a761f6e85c9 232-243
+  s_f4074862689008::t_f9e6a6a04bb06e 207
+  s_3923eeae7a5598::t_007cc5a75f4249 105-125
+  s_f4074862689008::t_dac1745d943150 220
+  s_f4074862689008::t_277907fbc5861a 143
+  s_f4074862689008::t_9e090bb74c5852 289
+  s_f4074862689008::t_2812171ae71d56 78
+  s_f4074862689008::t_2cfd0e53b6726b 264
+  s_f4074862689008::t_2da54e83f0ac7f 135
+  s_f4074862689008::t_9b9968e50eb07d 193
+  s_f4074862689008::t_3f529595c2b6c5 244
+  s_f4074862689008::t_145c0752c8deab 126
+  s_3923eeae7a5598::t_c78a87fec910e8 41-50
+plans/handoff/2026-07-29-sweep-all-670-672-close-out.md
+  s_3923eeae7a5598::t_64746a7dff15b5 1-85
+plans/handoff/2026-07-28-pr666-667-deferred-review-followups.md
+  s_3923eeae7a5598::t_64746a7dff15b5 1-171
+docs/brainstorms/2026-07-29-sweep-all-close-out-deferred-design-deci-brainstorm.md
+  s_3923eeae7a5598::t_41e53bf2e9d205 1-163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "e14096335dfb520dfb4769323a6caa96406dbd2b",
+  "prompts": {},
+  "sessions": {
+    "s_3923eeae7a5598": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "58bb4232-8737-4c58-8d3f-dd28f327f91f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_f4074862689008": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8739746a-0846-4a97-b5f8-698584214f22",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
