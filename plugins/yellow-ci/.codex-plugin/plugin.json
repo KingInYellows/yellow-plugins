@@ -1,6 +1,6 @@
 {
   "name": "yellow-ci",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "interface": {
     "displayName": "Yellow CI",
     "category": "Developer Tools"
