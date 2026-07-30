@@ -165,10 +165,10 @@ interface CliRun {
   stderr: string;
 }
 
-function runCli(root: string, args: string[]): CliRun {
+function runCli(root: string, args: string[], envExtra: Record<string, string> = {}): CliRun {
   try {
     const stdout = execFileSync('node', [SCRIPT, ...args], {
-      env: { ...process.env, GENERATE_MANIFESTS_ROOT: root },
+      env: { ...process.env, GENERATE_MANIFESTS_ROOT: root, ...envExtra },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -250,6 +250,8 @@ describe('source value-shape validation', () => {
     expect(result.errors).toContain(
       'catalog/plugins/yellow-core.json: "author" must be an object with a string "name"'
     );
+    expect(result.results['yellow-core']).toBe('error');
+    expect(result.results['yellow-review']).toBe('ok');
   });
 
   it('rejects a non-boolean targets flag (would silently drop the plugin)', () => {
@@ -310,6 +312,8 @@ describe('source value-shape validation', () => {
     expect(result.errors).toContain(
       'catalog/plugins/yellow-core.json: "description" must be a string'
     );
+    expect(result.results['yellow-core']).toBe('error');
+    expect(result.results['yellow-review']).toBe('ok');
   });
 
   it('rejects a non-array keywords (would emit a schema-invalid manifest)', () => {
@@ -418,6 +422,10 @@ describe('catalog.json validation', () => {
     const result = generateManifests({ mode: 'check', rootDir: root });
     expect(result.status).toBe('error');
     expect(result.errors).toContain('catalog.json: duplicate pluginOrder entry "yellow-core"');
+    // Catalog-wide errors do not attribute to any plugin: the catalog is
+    // rejected before per-plugin results are computed, so `results` stays
+    // empty while `status` carries the global error.
+    expect(result.results).toEqual({});
   });
 
   it('rejects a non-object top-level catalog.json (array)', () => {
@@ -494,6 +502,11 @@ describe('inventory and order cross-checks (explicit names, both directions)', (
     expect(result.errors).toContain(
       'pluginOrder entry "yellow-core" has no catalog/plugins/yellow-core.json source file'
     );
+    // The loader's abort attributes the implicated plugin — the run that
+    // names a plugin broken must not report it 'ok' — while plugins the
+    // errors do not implicate keep their pre-populated 'ok'.
+    expect(result.results['yellow-core']).toBe('error');
+    expect(result.results['yellow-review']).toBe('ok');
   });
 
   it('a source file missing from the catalog order fails by name', () => {
@@ -566,6 +579,28 @@ describe('catalog source safety', () => {
     expect(result.errors).toContain(
       'catalog/plugins/yellow-core.json: top-level value must be an object'
     );
+  });
+
+  it('attributes a "__proto__" pluginOrder entry as its own result entry, not the inherited setter', () => {
+    // NAME_RE (`^[a-zA-Z0-9_-]+$`) accepts "__proto__". A plain object
+    // literal keyed by that name would hit the inherited accessor instead
+    // of creating an own property, silently dropping the plugin from
+    // `result.results` (and from every `Object.entries(result.results)`
+    // consumer, including main()'s per-plugin error reporting).
+    const root = makeFixtureRoot();
+    const catalogPath = join(root, 'catalog', 'catalog.json');
+    const catalog = JSON.parse(readFileSync(catalogPath, 'utf8'));
+    catalog.pluginOrder.push('__proto__');
+    writeFileSync(catalogPath, JSON.stringify(catalog, null, 2) + '\n', 'utf8');
+
+    const result = generateManifests({ mode: 'check', rootDir: root });
+    expect(result.status).toBe('error');
+    expect(result.errors).toContain(
+      'pluginOrder entry "__proto__" has no catalog/plugins/__proto__.json source file'
+    );
+    expect(Object.prototype.hasOwnProperty.call(result.results, '__proto__')).toBe(true);
+    expect(result.results['__proto__']).toBe('error');
+    expect(result.results['yellow-review']).toBe('ok');
   });
 });
 
@@ -640,5 +675,72 @@ describe('--dry-run (subprocess)', () => {
     const root = makeFixtureRoot();
     expect(runCli(root, ['--bogus']).status).toBe(1);
     expect(runCli(root, ['--check', '--dry-run']).status).toBe(1);
+  });
+});
+
+describe('main() per-plugin error reporting (subprocess)', () => {
+  it('prints a loud per-plugin line and a ::error CI annotation for an errored plugin', () => {
+    const root = makeFixtureRoot();
+    const sourcePath = join(root, 'catalog', 'plugins', 'yellow-core.json');
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    source.description = null;
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
+
+    const result = runCli(root, ['--check'], { GITHUB_ACTIONS: 'true' });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: plugin yellow-core: 1 error(s)'
+    );
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: catalog/plugins/yellow-core.json: "description" must be a string'
+    );
+    expect(result.stdout).toContain(
+      '::error file=catalog/plugins/yellow-core.json::plugin yellow-core: 1 error(s) — see job log for details'
+    );
+  });
+
+  it('emits no ::error annotation outside GitHub Actions', () => {
+    const root = makeFixtureRoot();
+    const sourcePath = join(root, 'catalog', 'plugins', 'yellow-core.json');
+    const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+    source.description = null;
+    writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
+
+    const result = runCli(root, ['--check'], { GITHUB_ACTIONS: '' });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: plugin yellow-core: 1 error(s)'
+    );
+    expect(result.stdout).not.toContain('::error');
+  });
+
+  it('reports a loud line and a ::error annotation for each of two errored plugins without short-circuiting', () => {
+    const root = makeFixtureRoot();
+    for (const name of ['yellow-core', 'yellow-review']) {
+      const sourcePath = join(root, 'catalog', 'plugins', `${name}.json`);
+      const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+      source.description = null;
+      writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
+    }
+
+    const result = runCli(root, ['--check'], { GITHUB_ACTIONS: 'true' });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: plugin yellow-core: 1 error(s)'
+    );
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: plugin yellow-review: 1 error(s)'
+    );
+
+    const annotationLines = result.stdout
+      .split('\n')
+      .filter((line) => line.startsWith('::error '));
+    expect(annotationLines).toHaveLength(2);
+    expect(annotationLines).toContain(
+      '::error file=catalog/plugins/yellow-core.json::plugin yellow-core: 1 error(s) — see job log for details'
+    );
+    expect(annotationLines).toContain(
+      '::error file=catalog/plugins/yellow-review.json::plugin yellow-review: 1 error(s) — see job log for details'
+    );
   });
 });
