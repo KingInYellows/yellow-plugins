@@ -1,0 +1,36 @@
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_43cc4f730492cc::t_cafddca145987c 153-156,160-165
+  s_43cc4f730492cc::t_b319c809bbf536 179-182
+plugins/yellow-ruvector/agents/ruvector/memory-manager.md
+  s_43cc4f730492cc::t_99521c0e25a8de 107-109,113
+plugins/yellow-semgrep/skills/semgrep-conventions/SKILL.md
+  s_43cc4f730492cc::t_be1eca24afeac1 202,205,207-210
+plugins/yellow-council/CLAUDE.md
+  s_43cc4f730492cc::t_c66ac38951ec20 71-74
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_43cc4f730492cc::t_2924b5753294c8 349,353,356-360
+plugins/yellow-semgrep/commands/semgrep/fix.md
+  s_43cc4f730492cc::t_bbc5c8e6506714 261-262
+  s_43cc4f730492cc::t_83527adb83063f 215,223
+  s_43cc4f730492cc::t_d86af78c55aedf 280
+tests/integration/generate-manifests-codex.test.ts
+  s_43cc4f730492cc::t_f126fffe5de284 1099-1126
+docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md
+  s_43cc4f730492cc::t_5d1f2637aae48f 105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "306ac1d2461b1b8d41870dc135707e73bbac9559",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
