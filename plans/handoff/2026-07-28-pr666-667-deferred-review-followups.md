@@ -1,5 +1,11 @@
 # Handoff: Deferred follow-ups from PR #666/#667 review loops
 
+> **Status: COMPLETE — retrospective record.** All deferred items tracked
+> in this handoff have since shipped or been resolved. See the AUDITED
+> postscript at the bottom of this file for final disposition; the workflow
+> status and next actions below are point-in-time snapshots from 2026-07-28,
+> superseded by that postscript.
+
 ## Current task
 
 PR #666 (prompt-quality pass, 14 plugins) and PR #667 (review-schema
@@ -147,9 +153,9 @@ time you read this). No implementation of the deferred items has started.
 - Whether Tier 1 ships as its own PR (recommended: small, security-focused)
   with Tiers 2-3 as a second PR, or everything as one. User has not chosen.
 - Item 16 is a genuine design question (fail-everything vs scope-per-plugin)
-  — worth an explicit user call, not a silent choice. *(Since decided —
+  — worth an explicit user call, not a silent choice. _(Since decided —
   reporting-only scoping, user call 2026-07-29; see the AUDITED
-  postscript below.)*
+  postscript below.)_
 
 ## In-flight changes
 

@@ -136,11 +136,15 @@ make it).
   uncapped launch — the current shared "no user available" string is
   wrong on the interactive path and must not be reused verbatim once the
   branches diverge. This is a three-site edit (~80, ~146, ~162).
-- **generate-manifests:** per-plugin failure scoping, replacing
-  global abort-all — contingent on each plugin's validation result being
-  individually asserted/logged (never folded into one aggregate
-  success/failure flag), specifically to avoid recreating the silent
-  per-plugin drop from `manifest-generator-value-shape-validation.md`.
+- **generate-manifests:** per-plugin result reporting (reporting-only
+  scoping; apply mode stays atomic) — add a `results` map tracking
+  each plugin's ok/error status alongside the existing global `status`,
+  with per-plugin log lines and CI annotations on error. Each plugin's
+  validation result must be individually asserted/logged (never folded
+  into one aggregate success/failure flag), specifically to avoid
+  recreating the silent per-plugin drop from
+  `manifest-generator-value-shape-validation.md`. Abort-all semantics
+  are preserved (no partial writes).
 - **Polish batch:** one dedicated PR now, covering the `<int>`
   placeholders, the #667 deferred-P3 list, and generate-manifests
   wording consistency. The opencode item is excluded pending

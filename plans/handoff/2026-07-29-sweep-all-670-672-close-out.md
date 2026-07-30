@@ -19,7 +19,7 @@ the loose ends left deliberately uncommitted or deferred.
 
 Batch complete. All three PRs are green from the sweep's perspective and
 awaiting the user's merge decision (Graphite queue). #670 and #671 are
-stacked (671 on 670); #672 is independent off main. No sweep work remains.
+stacked (671 on 670); #672 is independent of main. No sweep work remains.
 
 ## Active artifacts
 

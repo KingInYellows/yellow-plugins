@@ -17,7 +17,8 @@ Four decisions were deliberately deferred out of the #670–#672 sweep-all
 close-out and resolved in the brainstorm above: the devin-orchestrator's
 cap-safety behavior, generate-manifests' failure-scoping granularity, a
 polish batch, and the recurring Codacy MD041 false positive. This plan
-turns those decisions into three small PRs plus one out-of-repo action.
+turns those decisions into four PRs (the originally-planned out-of-repo
+dashboard action was superseded by a committed root `.codacy.yml` in PR #680).
 
 **Post-brainstorm refinements** (from research + spec-flow analysis, and
 one user decision made during planning):
@@ -192,8 +193,11 @@ longer share files after the wording-fix move) plus a manual action:
 > (per-file `LintResult[]` detail alongside a CLI-derived aggregate) and
 > the general non-breaking-API consensus: add an optional field old
 > consumers ignore; never fold per-item detail into the existing
-> `errors[]` or repurpose `status`. Populate `results` even on abort so
-> callers can inspect per-plugin state from a failed run.
+> `errors[]` or repurpose `status`. Note: the "populate `results` even
+> on abort" guidance here is superseded by the empty-map semantics
+> documented in task 2.1's resolution above — catalog-wide aborts
+> deliberately return `results: {}`, not a pre-populated map, so callers
+> can distinguish "no plugins evaluated" from per-plugin outcomes.
 > See: https://eslint.org/docs/latest/integrate/nodejs-api,
 > https://prettier.io/docs/cli
 <!-- /deepen-plan -->
