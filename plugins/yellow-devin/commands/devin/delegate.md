@@ -40,7 +40,14 @@ Parse `$ARGUMENTS` for:
 - **Task description:** All text not matching flags below
 - **`--tags t1,t2`:** Optional comma-separated tags (max 10, each max 32 chars,
   alphanumeric + dashes)
-- **`--max-acu N`:** Optional integer ACU limit
+- **`--max-acu N`:** Optional integer ACU limit — validate against
+  `^[1-9][0-9]*$` (positive integer, no leading zeros; required because
+  `jq --argjson` rejects leading-zero values as invalid JSON). On mismatch,
+  do not proceed to Step 5 — report that `--max-acu` failed validation and
+  abort before payload construction (a caller that tried to set a cap must
+  never be silently launched uncapped, per the orchestrator's cap-safety
+  principle). Do not echo the raw invalid value in the report — state only
+  that it failed the `^[1-9][0-9]*$` check.
 
 If task description is empty after parsing, ask user via AskUserQuestion.
 
@@ -123,9 +130,16 @@ payload=$(jq -n \
   --argjson repos "$REPOS_JSON" \
   '{prompt: $prompt, title: $title, tags: $tags, repos: $repos}')
 
-# Add max_acu_limit if specified
+# Add max_acu_limit if specified — re-validate here so jq --argjson can
+# never receive an unvalidated value, even if Step 2 was somehow bypassed
 if [ -n "$MAX_ACU" ]; then
-  payload=$(printf '%s' "$payload" | jq --argjson acu "$MAX_ACU" '. + {max_acu_limit: $acu}')
+  case "$MAX_ACU" in
+    ''|*[!0-9]*|0*)
+      printf 'ERROR: --max-acu failed validation; aborting before payload construction.\n' >&2
+      exit 1 ;;
+    *)
+      payload=$(printf '%s' "$payload" | jq --argjson acu "$MAX_ACU" '. + {max_acu_limit: $acu}') ;;
+  esac
 fi
 
 printf '%s' "$payload" | \
