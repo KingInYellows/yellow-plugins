@@ -238,12 +238,15 @@ function validateCodexTarget(name, codex, errors) {
 function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const errors = [];
   // `results` is per-plugin reporting only. Attributed error classes:
-  // source validation, package.json read/shape, target assembly (path
-  // containment + skill-tree content validation), and the stale-artifact
-  // sweep. NOT attributed (kept global): catalog-wide
-  // errors (catalog.json shape, pluginOrder, duplicates), a loadPluginSources
-  // abort, and write/delete-phase failures. Both abort gates below keep
-  // their all-or-nothing semantics regardless of it.
+  // loadPluginSources per-plugin failures (via its `badNames`), source
+  // validation, package.json read/shape, target assembly (path containment
+  // + skill-tree content validation), and the stale-artifact sweep. NOT
+  // attributed (kept global): catalog-wide errors (catalog.json shape,
+  // pluginOrder, duplicates) and write/delete-phase failures. An 'ok' entry
+  // therefore means "no attributed error before the run ended" — an abort
+  // at any gate leaves later-stage checks unrun for every plugin, so 'ok'
+  // is not proof a plugin's later stages were verified. Both abort gates
+  // below keep their all-or-nothing semantics regardless of it.
   const result = { status: 'ok', errors, diffs: [], written: [], checked: 0, results: {} };
 
   const catalogResult = loadCatalog(join(rootDir, 'catalog'));
@@ -261,9 +264,8 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
 
   // Populated for every plugin in pluginOrder so callers can inspect
   // per-plugin state from a failed run — but only for the attributed error
-  // classes listed above: a run that aborts before per-plugin processing
-  // (loadPluginSources) or fails in the write phase reports status 'error'
-  // while entries here remain 'ok'.
+  // classes listed above: a run that fails in the write phase reports
+  // status 'error' while entries here remain 'ok'.
   for (const name of catalog.pluginOrder) {
     result.results[name] = 'ok';
   }
@@ -271,6 +273,14 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
   const sourcesResult = loadPluginSources(join(rootDir, 'catalog'), catalog.pluginOrder);
   if (sourcesResult.status === 'invalid') {
     errors.push(...sourcesResult.errors);
+    // Attribute the plugins the loader itself implicates (missing /
+    // unreadable / misshapen source files) so a broken plugin is never
+    // affirmatively reported 'ok' by the very run that named it broken.
+    // badNames only ever contains pluginOrder entries — the same array
+    // that pre-populated `results` above.
+    for (const name of sourcesResult.badNames) {
+      result.results[name] = 'error';
+    }
     result.status = 'error';
     return result;
   }
@@ -337,6 +347,13 @@ function generateManifests({ mode = 'apply', rootDir = DEFAULT_ROOT } = {}) {
     if (!isClaudeEnabled(source)) {
       continue;
     }
+    // This containment check (and the codex-manifest / hooks / skill-tree /
+    // stale-sweep siblings below) is defense-in-depth: `name` is already
+    // NAME_RE-constrained by loadCatalog and skill-tree targets are
+    // containment-checked inside buildCodexSkillTree, so no valid catalog
+    // input can currently reach these catch blocks. They exist so a future
+    // loosening of an upstream guard degrades to an attributed error
+    // instead of an uncaught throw past the {status, errors} contract.
     const targetPath = join(rootDir, 'plugins', name, '.claude-plugin', 'plugin.json');
     try {
       assertWithinRoot(targetPath, join(rootDir, 'plugins'));

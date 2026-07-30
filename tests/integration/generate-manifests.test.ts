@@ -502,6 +502,11 @@ describe('inventory and order cross-checks (explicit names, both directions)', (
     expect(result.errors).toContain(
       'pluginOrder entry "yellow-core" has no catalog/plugins/yellow-core.json source file'
     );
+    // The loader's abort attributes the implicated plugin — the run that
+    // names a plugin broken must not report it 'ok' — while plugins the
+    // errors do not implicate keep their pre-populated 'ok'.
+    expect(result.results['yellow-core']).toBe('error');
+    expect(result.results['yellow-review']).toBe('ok');
   });
 
   it('a source file missing from the catalog order fails by name', () => {

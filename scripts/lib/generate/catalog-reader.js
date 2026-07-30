@@ -7,7 +7,8 @@
  * `scripts/lib/marketplace-reader.js` precedent) instead of throwing:
  *   - `loadCatalog`        → { status: 'ok', data } | { status: 'missing', path }
  *                            | { status: 'invalid', path, errors }
- *   - `loadPluginSources`  → { status: 'ok', sources } | { status: 'invalid', errors }
+ *   - `loadPluginSources`  → { status: 'ok', sources }
+ *                            | { status: 'invalid', errors, badNames }
  *
  * Safety properties (R1, R2):
  *   - every plugin name must match the `^[a-zA-Z0-9_-]+$` allowlist
@@ -199,17 +200,22 @@ function loadCatalog(catalogDir) {
  * @param {string} catalogDir - Absolute path to the catalog/ directory.
  * @param {string[]} pluginOrder - Validated canonical order from loadCatalog.
  * @returns {{ status: 'ok', sources: Record<string, object> }
- *          | { status: 'invalid', errors: string[] }}
+ *          | { status: 'invalid', errors: string[], badNames: string[] }}
+ *          On 'invalid', `badNames` lists the pluginOrder entries the errors
+ *          implicate (missing/unreadable/misshapen source files); errors not
+ *          tied to a pluginOrder entry (readdir failure, orphaned files)
+ *          contribute nothing to it.
  */
 function loadPluginSources(catalogDir, pluginOrder) {
   const pluginsDir = join(catalogDir, 'plugins');
   const errors = [];
+  const badNames = new Set();
 
   let fileNames;
   try {
     fileNames = readdirSync(pluginsDir).filter((f) => f.endsWith('.json'));
   } catch (err) {
-    return { status: 'invalid', errors: [`cannot read ${pluginsDir}: ${err.message}`] };
+    return { status: 'invalid', errors: [`cannot read ${pluginsDir}: ${err.message}`], badNames: [] };
   }
 
   const onDisk = new Set();
@@ -226,6 +232,7 @@ function loadPluginSources(catalogDir, pluginOrder) {
   for (const name of pluginOrder) {
     if (!onDisk.has(name)) {
       errors.push(`pluginOrder entry "${name}" has no catalog/plugins/${name}.json source file`);
+      badNames.add(name);
     }
   }
   const orderSet = new Set(pluginOrder);
@@ -235,7 +242,7 @@ function loadPluginSources(catalogDir, pluginOrder) {
     }
   }
   if (errors.length > 0) {
-    return { status: 'invalid', errors };
+    return { status: 'invalid', errors, badNames: [...badNames] };
   }
 
   const sources = {};
@@ -245,6 +252,7 @@ function loadPluginSources(catalogDir, pluginOrder) {
       assertWithinRoot(filePath, catalogDir);
     } catch (err) {
       errors.push(err.message);
+      badNames.add(name);
       continue;
     }
     const read = readJsonSource(filePath);
@@ -252,16 +260,18 @@ function loadPluginSources(catalogDir, pluginOrder) {
       errors.push(
         `catalog/plugins/${name}.json: ${read.status === 'missing' ? 'file disappeared during read' : read.error}`
       );
+      badNames.add(name);
       continue;
     }
     if (read.data === null || typeof read.data !== 'object' || Array.isArray(read.data)) {
       errors.push(`catalog/plugins/${name}.json: top-level value must be an object`);
+      badNames.add(name);
       continue;
     }
     sources[name] = read.data;
   }
   if (errors.length > 0) {
-    return { status: 'invalid', errors };
+    return { status: 'invalid', errors, badNames: [...badNames] };
   }
   return { status: 'ok', sources };
 }

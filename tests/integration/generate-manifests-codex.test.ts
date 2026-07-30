@@ -420,6 +420,7 @@ describe('stale-artifact sweep symlink containment (mirrors buildCodexSkillTree)
     expect(
       result.errors.some((e: string) => e.includes('componentPaths.skills') && e.includes('symlink'))
     ).toBe(true);
+    expect(result.results['sweep-symlink-plugin']).toBe('error');
     // The file outside the plugin directory must survive untouched.
     expect(readFileSync(markerPath, 'utf8')).toContain('evil-skill');
   });
@@ -448,6 +449,7 @@ describe('stale-artifact sweep source-skills overlap rejection', () => {
     expect(
       result.errors.some((e: string) => e.includes('componentPaths.skills') && e.includes('source'))
     ).toBe(true);
+    expect(result.results['source-overlap-plugin']).toBe('error');
   });
 });
 
@@ -477,6 +479,7 @@ describe('stale-artifact sweep source-skills overlap rejection via symlink indir
     expect(
       result.errors.some((e: string) => e.includes('componentPaths.skills') && e.includes('symlink'))
     ).toBe(true);
+    expect(result.results['symlink-overlap-plugin']).toBe('error');
     // The real source skill file must survive untouched — not deleted as a
     // stale generated artifact through the symlink.
     expect(readFileSync(markerPath, 'utf8')).toContain('real-skill');
