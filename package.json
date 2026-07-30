@@ -40,6 +40,7 @@
     "release:check": "pnpm run validate:schemas && pnpm run validate:versions && pnpm run validate:doc-counts && pnpm run typecheck && node scripts/validate-catalog-track.js",
     "changeset": "changeset",
     "apply:changesets": "changeset version && node scripts/sync-manifests.js",
+    "version-packages": "pnpm run apply:changesets && node scripts/catalog-version.js patch && vitest run tests/integration/generate-manifests-characterization.test.ts -u",
     "tag": "changeset tag",
     "catalog:version": "node scripts/catalog-version.js",
     "validate:versions": "node scripts/validate-versions.js",

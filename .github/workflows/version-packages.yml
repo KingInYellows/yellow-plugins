@@ -133,14 +133,23 @@ jobs:
         if: steps.detect.outputs.run_changesets == 'true'
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf # v1.7.0
         with:
-          # version: bumps plugin package.json files and propagates to
-          # plugin.json + marketplace.json via sync-manifests.js. Then
-          # catalog-version.js patch bumps the root package.json.
+          # version: bumps plugin package.json files, propagates to
+          # plugin.json + marketplace.json via sync-manifests.js, bumps the
+          # root package.json via catalog-version.js patch, and regenerates
+          # the manifest characterization snapshot so the Version PR cannot
+          # leave main latently red (see
+          # docs/solutions/logic-errors/... version-packages snapshot memory).
+          # MUST be a single pnpm-script invocation: changesets/action executes
+          # this command via exec without a shell, so `a && b` here passes
+          # "&&" and everything after it as literal ARGUMENTS to the first
+          # command — the catalog bump silently never ran (first seen on the
+          # v2.0.7 Version PR, 2026-07-30). Shell chaining only works inside
+          # the package.json script itself.
           # Note: The catalog version is hardcoded to 'patch' bump because it
           # represents a marketplace snapshot timestamp, not semantic compatibility.
           # Each release batch gets one patch increment regardless of whether
           # plugins had patch/minor/major bumps. See docs/operations/versioning.md.
-          version: pnpm apply:changesets && node scripts/catalog-version.js patch
+          version: pnpm run version-packages
           # publish: called after the Version Packages PR merges (no pending
           # changesets). Creates per-plugin + catalog tags.
           publish: bash scripts/ci/release-tags.sh
