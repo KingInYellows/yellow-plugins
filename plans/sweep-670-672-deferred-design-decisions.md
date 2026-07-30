@@ -4,8 +4,8 @@
 > Phase 1 → PR #677, Phase 2 → PR #678, Phase 3 → PR #679, Phase 4 → PR
 > #680 (committed root `.codacy.yml` — the deepen-plan research below
 > prevailed over the originally-planned manual dashboard route). All four
-> PRs were still OPEN (not merged) as of 2026-07-30; archive this plan
-> via `/plan:complete` only after they merge. Line numbers throughout are
+> PRs (#677, #678, #679, #680) are MERGED as of 2026-07-30; this plan is
+> eligible for archival via `/plan:complete`. Line numbers throughout are
 > authoring-time snapshots — re-locate by content, not line number.
 
 Source brainstorm:
@@ -75,8 +75,8 @@ one user decision made during planning):
 
 ## Proposed Solution
 
-Three PRs (1 → independent; 2 before 3 would also be fine — they no
-longer share files after the wording-fix move) plus a manual action:
+Four PRs (1 → independent; 2 before 3 would also be fine — they no
+longer share files after the wording-fix move):
 
 - **PR A — devin-orchestrator cap-safety** (changeset: yellow-devin,
   patch)
@@ -84,7 +84,11 @@ longer share files after the wording-fix move) plus a manual action:
   consistency** (scripts + tests only; no changeset)
 - **PR C — polish batch** (changeset: yellow-review, patch; emit-codex/
   validate-codex are scripts, no extra changeset entry needed)
-- **Manual — Codacy dashboard + memory update** (no repo PR)
+- **PR D — Codacy MD041 fix**: committed root `.codacy.yml` excluding
+  `.changeset/**` (no changeset — outside `plugins/`), plus the memory
+  update. The manual Codacy dashboard "Ignored files" route is retained
+  only as an explicitly-labeled fallback if the root file misbehaves —
+  it is not the primary fix.
 
 ## Implementation Plan
 

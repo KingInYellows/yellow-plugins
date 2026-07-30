@@ -94,8 +94,11 @@ turns a stray file from a no-op into cross-PR scope pollution.
    A spend-limit death mid-write produces a file that looks complete at a
    glance (has a title, a body) but fails to parse — the kind of defect a
    human skimming the diff will miss and a mechanical check catches
-   immediately. Only fall back to `pnpm validate:solutions` once the file
-   is staged or committed.
+   immediately. `pnpm validate:solutions` diffs `<base>...HEAD`, so
+   staging alone still doesn't make the file visible to it — only a
+   **commit** does. To run the full schema gate against worktree content
+   before committing, inject the path directly:
+   `VALIDATE_SOLUTIONS_DIFF=$'A\t<path>' pnpm validate:solutions`.
 4. **Prefer deferring repo-file writes to the foreground/orchestrating
    session when a batch spans multiple branches**, rather than trusting a
    background agent to land them autonomously. Both compounders in this
