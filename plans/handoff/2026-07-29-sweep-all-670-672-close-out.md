@@ -17,10 +17,12 @@ stacked (671 on 670); #672 is independent off main. No sweep work remains.
 
 ## Active artifacts
 
-- PR #670 — branch agent/fix/deferred-security-followups (4 sweep commits,
-  latest 4e0a3d2)
+- PR #670 — branch agent/fix/deferred-security-followups (4 sweep
+  commits; pre-rebase hashes were discarded by the merge queue — the
+  merged squash commit on main is 67865ade; cite by message/PR, not
+  pre-rebase hash)
 - PR #671 — branch agent/fix/deferred-review-followups (stacked on #670;
-  sweep commits 3c3353fe, a62fd04d)
+  sweep commits landed in merged squash commit 4b35a760)
 - PR #672 — branch agent/plan/archive-review-schema-and-codex-references-followups
   (untouched by sweep; clean review)
 - plans/handoff/2026-07-28-pr666-667-deferred-review-followups.md — the
@@ -80,6 +82,9 @@ bot-review corrections to the compounder-M3 doc), #670/#671/#672 merged
 via Graphite queue (required first landing #673 — snapshot regen; see
 memory: version-packages-breaks-characterization-snapshot), predecessor
 handoff audited (items 1–12 shipped; 13–19 were not), residual P2s +
-open Tier-4 items implemented in PR #676. Still deferred by design:
-devin-orchestrator cap semantics, generate-manifests pollution scoping
-(item 16), low-value polish (item 19).
+open Tier-4 items implemented in PR #676. Still deferred by design at
+that point: devin-orchestrator cap semantics, generate-manifests
+pollution scoping (item 16), low-value polish (item 19) — all three
+since decided (brainstorm + plans/sweep-670-672-deferred-design-decisions.md,
+committed alongside this file) and implemented via PRs #677, #678, #679,
+with the Codacy MD041 item shipping as PR #680.

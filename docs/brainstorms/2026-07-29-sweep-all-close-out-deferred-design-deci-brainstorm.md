@@ -99,7 +99,7 @@ is excluded from the batch and flagged as unresolved instead.
 
 **Item 4 — dashboard fix over another repo-file attempt:**
 Verified that `.codacy/codacy.yaml`'s `exclude_paths` already contains
-`.changeset/**` (added PR #560, 2026-05-28) and that `markdownlint` isn't
+`.changeset/**` (added PR #560, merged 2026-05-29) and that `markdownlint` isn't
 even in that file's `tools:` list — combined with no `.github/workflows/*.yml`
 invoking `.codacy/cli.sh`, this confirms the cloud GitHub App check (the
 one that actually gates PRs) reads its tool/exclude configuration from
@@ -107,6 +107,12 @@ the Codacy dashboard, not this repo file. A third attempt at the
 repo-file fix would repeat the same miss; the dashboard is the surface
 that needs the change, and it requires manual action (no repo commit can
 make it).
+
+> **Correction (2026-07-30):** superseded during planning — the plan's
+> Phase 4 research found a committed-file fix IS possible after all (a
+> ROOT-level `.codacy.yml` is read by Codacy Cloud; the prior attempt
+> used the wrong file). The fix shipped as PR #680; the dashboard route
+> above is retained only as fallback.
 
 ## Key Decisions
 
@@ -141,9 +147,8 @@ make it).
 
 - **Opencode "rationale-comment dedup"** (item 3): could not be confirmed
   or refuted by search. If it turns out to be real, the plausible
-  referent is the two "Same rationale as…" / "The canonical rationale
-  (the…" cross-references at
-  `plugins/yellow-council/agents/review/opencode-reviewer.md:41,52`.
+  referent is the "Same rationale as…" cross-reference at
+  `plugins/yellow-council/agents/review/opencode-reviewer.md:41`.
   Needs a closer manual read of that file (or the original review thread
   that raised it) before it can be scoped into a fix.
 - **Exact wording for the divergent `Cap:` line strings** (item 1): the

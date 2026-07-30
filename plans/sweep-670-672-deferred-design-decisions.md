@@ -1,5 +1,13 @@
 # Feature: Sweep-All Close-Out — Deferred Design Decisions
 
+> **Status: point-in-time record — all tasks complete.** Implemented by:
+> Phase 1 → PR #677, Phase 2 → PR #678, Phase 3 → PR #679, Phase 4 → PR
+> #680 (committed root `.codacy.yml` — the deepen-plan research below
+> prevailed over the originally-planned manual dashboard route). All four
+> PRs were still OPEN (not merged) as of 2026-07-30; archive this plan
+> via `/plan:complete` only after they merge. Line numbers throughout are
+> authoring-time snapshots — re-locate by content, not line number.
+
 Source brainstorm:
 `docs/brainstorms/2026-07-29-sweep-all-close-out-deferred-design-deci-brainstorm.md`
 
@@ -21,8 +29,9 @@ one user decision made during planning):
   normally" phrasing.
 - Item 3's generate-manifests wording fix moves INTO item 2's PR (same
   call sites; a separate polish pass would be immediately rewritten).
-- The `<int>` placeholder count is **7 files**, not the brainstorm's 6
-  (verified by grep, twice independently).
+- The `<int>` placeholder count is **8 files** (7 reviewer agents +
+  `review-pr.md:497`, per task 3.1's codebase note), not the brainstorm's
+  6 or this refinement's original 7.
 - Item 3's PR needs its own changeset (yellow-review, patch) — the CI
   changeset gate has no comment-only exemption.
 
@@ -47,9 +56,14 @@ one user decision made during planning):
 > (692 is mid-function inside the GENERATE_MANIFESTS_ROOT block);
 > correct range ~665-730. Task 2.1's "both gates keep abort semantics"
 > should also leave the line-659 aggregation check untouched.
+> *[Post-review correction: this note's own numbers were offset ~13 —
+> against the file as it stood at authoring, the third gate was at 646,
+> `main()` at 652, GENERATE_MANIFESTS_ROOT at 674. The structural claims
+> (three occurrences, aggregation-vs-abort distinction) are correct;
+> re-locate by content.]*
 <!-- /deepen-plan -->
-- 7 reviewer agent files contain a `"line": <int>,` placeholder inside a
-  strict JSON example fence; `emit-codex.js` duplicates its
+- 8 files (7 reviewer agents + `review-pr.md`) contain a `"line": <int>,`
+  placeholder inside a strict JSON example fence; `emit-codex.js` duplicates its
   symlink-rejection block (skillDir ~357-367 vs refDir ~406-428, the
   latter with two indirection flags); `validate-codex.js:253` compiles a
   RegExp inside a per-sibling loop that itself runs once per exposed
@@ -223,10 +237,11 @@ longer share files after the wording-fix move) plus a manual action:
 
 ### Phase 3: PR C — polish batch
 
-- [x] 3.1: Replace `"line": <int>,` in the 7 reviewer files
+- [x] 3.1: Replace `"line": <int>,` in the 8 files — `review-pr.md:497`
+      (the canonical schema) plus the 7 reviewer mirrors
       (reliability-, project-compliance-, project-standards-,
       plugin-contract-, adversarial-, maintainability-,
-      correctness-reviewer.md under their respective plugins) with a
+      correctness-reviewer.md under their respective plugins) — with a
       valid-JSON example value plus prose stating the type constraint
       outside the fence (anti-pattern #30 treatment).
 
@@ -256,14 +271,22 @@ longer share files after the wording-fix move) plus a manual action:
       validate-codex are covered by integration suites).
 - [x] 3.5: Record in the PR body: the "opencode rationale-comment
       dedup" item is EXCLUDED as unconfirmed (plausible referent:
-      opencode-reviewer.md:41,52 — needs a manual read before it can be
+      opencode-reviewer.md:41 — needs a manual read before it can be
       scoped).
 
-### Phase 4: Codacy MD041 (no repo PR)
+### Phase 4: Codacy MD041 (shipped as PR #680 — committed root `.codacy.yml`)
+
+> **Execution note (2026-07-30):** the deepen-plan research below
+> prevailed over task 4.1's original manual-dashboard framing — the fix
+> shipped as a committed root `.codacy.yml` (PR #680), with the
+> dashboard route retained only as fallback. 4.1's text is preserved
+> below as the pre-research plan of record.
 
 - [x] 4.1: USER MANUAL ACTION: Codacy dashboard → repo settings →
       ignored paths → add `.changeset/**`. Outside repo tooling; only
-      someone with dashboard access can do it.
+      someone with dashboard access can do it. *(Superseded in
+      execution — see the note above; the remaining manual step is the
+      pre-merge dashboard-subset check tracked in PR #680's body.)*
 
 <!-- deepen-plan: external -->
 > **Research:** A committed-file fix IS possible after all — the prior
@@ -301,15 +324,15 @@ Key files:
 
 - `plugins/yellow-devin/agents/workflow/devin-orchestrator.md` (~66-80,
   146, 162)
-- `scripts/generate-manifests.js` (gates ~302/~594, `main()` ~692-736,
-  CLI-arg prints ~670-676)
+- `scripts/generate-manifests.js` (gates ~302/~594/~646, `main()` ~652,
+  CLI-arg prints ~657-662 — authoring-time numbers; re-locate by content)
 - `tests/integration/generate-manifests.test.ts` (~235-363),
   `tests/integration/generate-manifests-codex.test.ts` (representative
   subset), `generate-manifests-characterization.test.ts` (must pass
   unchanged)
-- 7 reviewer agent files (paths in 3.1), `scripts/lib/generate/
-  emit-codex.js` (~357-367, ~406-428), `scripts/validate-codex.js`
-  (~237-289)
+- 8 files: `review-pr.md` + the 7 reviewer agents (paths in 3.1),
+  `scripts/lib/generate/emit-codex.js` (~357-367, ~406-428),
+  `scripts/validate-codex.js` (~237-289)
 
 ## Acceptance Criteria
 
@@ -324,9 +347,11 @@ Key files:
    byte-for-byte unchanged (characterization suite green, existing
    status assertions untouched); errored plugins produce per-plugin log
    lines and CI annotations.
-3. `rg '<int>' plugins/` returns nothing; emit-codex retains both
-   distinct symlink error messages; validate-codex compiles each sibling
-   regex once per run. All three PRs pass the CI baseline.
+3. `rg '"line": <int>,' plugins/` returns nothing (scoped form — see the
+   codebase note below; the broad `rg '<int>' plugins/` originally
+   written here false-positives on legitimate prose uses); emit-codex
+   retains both distinct symlink error messages; validate-codex compiles
+   each sibling regex once per run. All three PRs pass the CI baseline.
 
 <!-- deepen-plan: codebase -->
 > **Codebase:** This grep is over-broad and would fail on out-of-scope
@@ -337,9 +362,12 @@ Key files:
 > Use the scoped check instead: `rg '"line": <int>,' plugins/` returns
 > nothing (8 files fixed — the 7 reviewer agents + review-pr.md:497).
 <!-- /deepen-plan -->
-4. The Codacy memory file records the local-vs-cloud split; the
-   dashboard exclusion is in place (user-confirmed) and the next
-   changeset PR shows no MD041 failure.
+4. The Codacy memory file records the local-vs-cloud split (done —
+   including the root-file `---` requirement); the exclusion ships as a
+   committed root `.codacy.yml` (PR #680), with the dashboard route as
+   fallback only; the pre-merge dashboard-subset check is tracked in PR
+   #680's body; the next changeset PR after #680 merges shows no MD041
+   failure.
 
 ## Edge Cases
 

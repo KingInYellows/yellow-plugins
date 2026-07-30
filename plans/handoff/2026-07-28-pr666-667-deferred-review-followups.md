@@ -147,7 +147,9 @@ time you read this). No implementation of the deferred items has started.
 - Whether Tier 1 ships as its own PR (recommended: small, security-focused)
   with Tiers 2-3 as a second PR, or everything as one. User has not chosen.
 - Item 16 is a genuine design question (fail-everything vs scope-per-plugin)
-  — worth an explicit user call, not a silent choice.
+  — worth an explicit user call, not a silent choice. *(Since decided —
+  reporting-only scoping, user call 2026-07-29; see the AUDITED
+  postscript below.)*
 
 ## In-flight changes
 
@@ -156,6 +158,10 @@ None — working tree clean; all sweep work is pushed. Note this worktree
 merge, branches here are stale — start from main via gt repo sync.
 
 ## Next concrete action
+
+> **SUPERSEDED — do not execute.** The actions below were carried out on
+> 2026-07-29; see the AUDITED postscript at the bottom of this file
+> before acting on anything in this section.
 
 Verify both PRs merged (`gh pr view 666 --json state` / `667`), run
 `gt repo sync`, archive the plan via /yellow-core:plan:complete, then start
@@ -166,6 +172,11 @@ beginning with item 1 (gemini-reviewer.md Write-tool staging parity).
 
 ## AUDITED 2026-07-29 (session_01Pp9szNyFFYzYj7Jbw22szX)
 
-Line-by-line audit vs shipped PRs #670/#671: items 1–12 shipped; items
-13–15, 17, 18 implemented in follow-up PR #676; item 16 (design
-question) and item 19 (low-value polish) remain open by choice.
+Line-by-line audit vs shipped PRs #670/#671: items 1–12 shipped (item 9
+shipped its original ask — the documented default + `Other` option; the
+follow-on cap-semantics design question it surfaced stayed open and was
+later resolved by PR #677); items 13–15, 17, 18 implemented in follow-up
+PR #676; item 16 (design question) and item 19 (low-value polish)
+remained open by choice at audit time — since decided and implemented
+via plans/sweep-670-672-deferred-design-decisions.md (PRs #678 and #679
+respectively).
