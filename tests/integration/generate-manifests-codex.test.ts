@@ -1188,3 +1188,45 @@ describe('validateArtifacts — non-object .codex-plugin/plugin.json (JSON.parse
     ).toBe(true);
   });
 });
+
+describe('exposure lint registry-gated sibling-path detection (true-positive path)', () => {
+  it('flags a real sibling-plugin path reference but never the plugin referencing itself', () => {
+    const root = makeCodexFixtureRoot([
+      {
+        name: 'talkative-plugin',
+        codexEnabled: true,
+        skillAllowlist: ['chatty'],
+        skills: { chatty: { name: 'chatty', description: 'Skill referencing plugin paths.' } },
+      },
+      { name: 'sibling-plugin', codexEnabled: false },
+    ]);
+    // Rewrite the SOURCE skill body to reference the sibling by both the
+    // plugins/-prefixed and relative-escape forms, plus a SELF path that
+    // must be excluded by the pluginName self-skip.
+    writeFileSync(
+      join(root, 'plugins', 'talkative-plugin', 'skills', 'chatty', 'SKILL.md'),
+      '---\nname: chatty\ndescription: "Skill referencing plugin paths."\n---\n\n' +
+        'Background lives in plugins/sibling-plugin/agents/reviewer.md and\n' +
+        'also at ../sibling-plugin/README.md. This skill itself lives at\n' +
+        'plugins/talkative-plugin/skills/chatty.\n',
+      'utf8'
+    );
+    const generated = generateManifests({ mode: 'apply', rootDir: root });
+    expect(generated.status).toBe('ok');
+
+    const catalog = loadCatalog(join(root, 'catalog')).data;
+    const sources = loadPluginSources(join(root, 'catalog'), catalog.pluginOrder).sources;
+    const errors = runExposureLint({ rootDir: root, catalog, sources });
+
+    const siblingFindings = errors.filter((e: string) => e.includes('[sibling-plugin-path]'));
+    expect(siblingFindings.length).toBe(1);
+    // Assert on the "(found: ...)" match set, not the whole error string —
+    // the error's file-path prefix legitimately contains the plugin's own
+    // name.
+    const matchSet = siblingFindings[0].split('(found:')[1];
+    expect(matchSet).toContain('plugins/sibling-plugin');
+    expect(matchSet).toContain('../sibling-plugin');
+    // Self-exclusion: the plugin's own path must not appear in the match set.
+    expect(matchSet).not.toContain('talkative-plugin');
+  });
+});

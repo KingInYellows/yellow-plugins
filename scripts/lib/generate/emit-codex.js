@@ -261,16 +261,26 @@ function buildCodexHookConfig(source) {
   return Object.keys(merged).length > 0 ? { hooks: addCommandWindows(merged) } : null;
 }
 
-// Shared symlink-containment check for a copied-input directory (skill dir
-// and its references/ dir): lstat rejects the directory itself being a
-// symlink outright — including an in-plugin symlink whose resolved target
-// still lands inside the plugin root — and the literal expected-path
-// comparison (never a prefix check) rejects a symlinked ancestor or any
-// in-plugin redirection. Returns 'ok', 'symlink' (caller pushes its own
-// location-specific error message), 'notDir' (exists but is a plain file —
-// caller decides whether that deserves a targeted message or falls through
-// to its normal read path), or 'error' with the caught filesystem error
-// (caller decides its own ENOENT policy).
+/**
+ * Shared symlink-containment check for a copied-input directory (skill dir
+ * and its references/ dir): lstat rejects the directory itself being a
+ * symlink outright — including an in-plugin symlink whose resolved target
+ * still lands inside the plugin root — and the literal expected-path
+ * comparison rejects a symlinked ancestor or any in-plugin redirection.
+ * The comparison must never be a prefix check: an in-plugin ancestor
+ * symlink (e.g. plugins/<name>/skills -> plugins/<name>/other) resolves
+ * to a path that still starts with the plugin root, silently bypassing
+ * the allowlist (R-review).
+ *
+ * @param {string} dir - directory to check (unresolved path).
+ * @param {string} expectedRealPath - the literal canonical location the
+ *   directory must resolve to.
+ * @returns {{status: 'ok'}|{status: 'symlink'}|{status: 'notDir'}|{status: 'error', error: Error}}
+ *   'symlink' → the caller pushes its own location-specific error message;
+ *   'notDir' → exists but is a plain file; the caller decides whether that
+ *   deserves a targeted message or falls through to its normal read path;
+ *   'error' → the caller decides its own ENOENT policy.
+ */
 function checkDirSymlinkContainment(dir, expectedRealPath) {
   try {
     const stat = lstatSync(dir);
@@ -359,10 +369,7 @@ function buildCodexSkillTree(rootDir, name, source) {
     const skillDir = join(rootDir, 'plugins', name, 'skills', skillName);
     const skillFile = join(skillDir, 'SKILL.md');
 
-    // Symlink posture lives in checkDirSymlinkContainment's docstring
-    // (lstat rejects the dir itself; literal expected-path comparison —
-    // never a prefix — rejects ancestors and in-plugin redirection like an
-    // allowlisted skills/allowed -> skills/private alias, R-review).
+    // Symlink posture lives in checkDirSymlinkContainment's docstring.
     // Site-specifics: O_NOFOLLOW on the openSync() below only guards the
     // final path component (SKILL.md itself), so this directory-level
     // check must run first; the canonical location of an allowlisted skill

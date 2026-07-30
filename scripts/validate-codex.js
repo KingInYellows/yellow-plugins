@@ -235,8 +235,11 @@ const SLASH_COMMAND_PATTERN = /(^|[\s`])\/([a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)*)
  * dynamic RegExp, and the pattern has no nested quantifiers over
  * overlapping variable-length input, so this is not a ReDoS vector
  * despite being built from a template string. Sharing each compiled
- * 'g'-flagged RegExp across files is safe because every consumer uses
- * String.prototype.match, which always starts from index 0.
+ * 'g'-flagged RegExp across files is safe ONLY for consumers that call
+ * String.prototype.match(re), which always scans from index 0 — do NOT
+ * call .exec()/.test() on these regexes; both are stateful via lastIndex
+ * and would silently corrupt results across the files the Map is reused
+ * over.
  *
  * @param {string[]} pluginOrder - the full plugin roster (self-exclusion
  *   happens downstream in runRegistryGatedChecks).
@@ -259,6 +262,10 @@ function buildSiblingRegexps(pluginOrder) {
  * say the word "plugin" or describe an MCP server hypothetically; it must
  * not name one that actually exists elsewhere in this marketplace.
  *
+ * @param {string} content - raw file content to scan.
+ * @param {{ pluginName: string, siblingRegexps: Map<string, RegExp>,
+ *   mcpToolNames: Set<string>, commandNames: Set<string> }} options -
+ *   siblingRegexps is pre-built once per run via buildSiblingRegexps().
  * @returns {{ name: string, message: string, matches: string[] }[]}
  */
 function runRegistryGatedChecks(content, { pluginName, siblingRegexps, mcpToolNames, commandNames }) {
