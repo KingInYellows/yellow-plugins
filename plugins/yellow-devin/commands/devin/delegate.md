@@ -40,7 +40,9 @@ Parse `$ARGUMENTS` for:
 - **Task description:** All text not matching flags below
 - **`--tags t1,t2`:** Optional comma-separated tags (max 10, each max 32 chars,
   alphanumeric + dashes)
-- **`--max-acu N`:** Optional integer ACU limit
+- **`--max-acu N`:** Optional integer ACU limit — validate against
+  `^[1-9][0-9]*$` (positive integer, no leading zeros; required because
+  `jq --argjson` rejects leading-zero values as invalid JSON)
 
 If task description is empty after parsing, ask user via AskUserQuestion.
 
