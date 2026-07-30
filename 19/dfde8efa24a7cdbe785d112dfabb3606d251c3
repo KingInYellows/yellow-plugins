@@ -1,0 +1,22 @@
+plans/sweep-670-672-deferred-design-decisions.md
+  s_2ce1db4e09a1cf::t_e21dbe9c014e84 78-79,87-91
+  s_2ce1db4e09a1cf::t_30e6846f6e1b42 7-8
+docs/solutions/workflow/background-agent-repo-writes-during-batch.md
+  s_2ce1db4e09a1cf::t_32e66d541b4b55 97-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "19dfde8efa24a7cdbe785d112dfabb3606d251c3",
+  "prompts": {},
+  "sessions": {
+    "s_2ce1db4e09a1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef164321-e04e-4aa4-bbba-539764a2186a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
