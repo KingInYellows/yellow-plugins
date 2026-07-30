@@ -54,7 +54,7 @@
     {
       "name": "yellow-review",
       "description": "Multi-agent PR review with adaptive agent selection, parallel comment resolution, and sequential stack review",
-      "version": "3.2.6",
+      "version": "3.2.7",
       "author": {
         "name": "KingInYellows"
       },
