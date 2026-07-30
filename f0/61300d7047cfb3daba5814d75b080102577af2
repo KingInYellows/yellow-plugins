@@ -1,0 +1,40 @@
+plans/sweep-670-672-deferred-design-decisions.md
+  s_43cc4f730492cc::t_246c4231b7f267 327-328
+  s_43cc4f730492cc::t_483a22b5f17604 350-354
+  s_43cc4f730492cc::t_087f0dc626fdca 32-34
+  s_43cc4f730492cc::t_6876d477b7765d 277-283,287-289
+  s_43cc4f730492cc::t_fa41ba8112e5d5 240-241,244
+  s_43cc4f730492cc::t_9db3d01ed20d6b 3-10
+  s_43cc4f730492cc::t_f0db770d3fc108 365-370
+  s_43cc4f730492cc::t_157f2613dbdf3b 59-63
+  s_43cc4f730492cc::t_30cc34a1425902 333-335
+  s_43cc4f730492cc::t_d8c996888a1573 65-66
+  s_43cc4f730492cc::t_280a1531a2b077 274
+plans/handoff/2026-07-29-sweep-all-670-672-close-out.md
+  s_43cc4f730492cc::t_951a2b6381b964 20-23,25
+  s_43cc4f730492cc::t_23a7587a460820 85-90
+plans/handoff/2026-07-28-pr666-667-deferred-review-followups.md
+  s_43cc4f730492cc::t_9a72a1640ed2a2 162-165
+  s_43cc4f730492cc::t_4c08085860b3f1 150-152
+  s_43cc4f730492cc::t_69f9e7ad7ded00 175-182
+docs/brainstorms/2026-07-29-sweep-all-close-out-deferred-design-deci-brainstorm.md
+  s_43cc4f730492cc::t_a035217e70a929 102
+  s_43cc4f730492cc::t_24de392cd80c8d 111-116
+  s_43cc4f730492cc::t_b07c87454eaea3 150-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "f061300d7047cfb3daba5814d75b080102577af2",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
