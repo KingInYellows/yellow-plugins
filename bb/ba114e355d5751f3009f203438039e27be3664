@@ -1,0 +1,34 @@
+scripts/generate-manifests.js
+  s_43cc4f730492cc::t_7d10ca45da4c10 267-268,276-278,283
+  s_43cc4f730492cc::t_0a1961d1a7b4b1 279-282
+  s_43cc4f730492cc::t_bcaeb9d114a3c0 350-356
+  s_43cc4f730492cc::t_06341c909c8e03 241-249
+tests/integration/generate-manifests.test.ts
+  s_43cc4f730492cc::t_604ad66ce6eb5b 505-509
+tests/integration/generate-manifests-codex.test.ts
+  s_43cc4f730492cc::t_4cf4fc8a871361 482
+  s_43cc4f730492cc::t_c6a6120c9c1aa8 423
+  s_43cc4f730492cc::t_eadac2805cf508 452
+scripts/lib/generate/catalog-reader.js
+  s_43cc4f730492cc::t_251686a45fbb1d 255,263,268,274
+  s_43cc4f730492cc::t_c4d08d408b8cc4 235,245
+  s_43cc4f730492cc::t_3d237d53b50236 10-11
+  s_43cc4f730492cc::t_b6112a104cbb07 203-207,212
+  s_43cc4f730492cc::t_c3cf3bfe50fdb0 218
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "bbba114e355d5751f3009f203438039e27be3664",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
