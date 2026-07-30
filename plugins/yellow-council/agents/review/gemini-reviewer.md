@@ -108,7 +108,8 @@ exit 0
 
 Use the council-patterns SKILL flag combination. Capture the full pack from
 your spawn prompt, write it to a temp file (keeps the invocation auditable
-and the shell command line readable), then expand the file into `-p`:
+and the shell command line readable), then feed it via stdin to avoid
+MAX_ARG_STRLEN limits (single argv element is capped at ~128KiB on Linux):
 
 ```bash
 PACK_DIR=$(mktemp -d /tmp/council-gemini-pack-XXXXXX)
