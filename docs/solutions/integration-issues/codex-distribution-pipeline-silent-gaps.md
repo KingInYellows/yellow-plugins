@@ -102,7 +102,7 @@ for that skill with an explicit error:
 
 ```text
 plugins/<name>/skills/<skillName>: has sidecar file(s) not yet supported
-for Codex (<list>) — only SKILL.md is copied
+for Codex (<list>) — only SKILL.md and references/*.md are copied
 ```
 
 This is a real, permanent constraint (not a bug to route around): a
@@ -110,6 +110,13 @@ Codex-targeted skill must be fully self-contained in one file. It also
 rules out extracting shared bash logic into a sourceable helper file
 inside a skill directory as a de-duplication strategy for anything meant
 to ship to Codex.
+
+> **Update (PR #667):** the constraint was narrowed — `references/*.md`
+> sidecars are now supported and copied through to the Codex output tree
+> (with their own validation in `validate-codex.js`). Any *other* sidecar
+> shape (non-`references/` subdirectories, non-`.md` files) still hard-fails
+> exactly as described above, and the shared-bash-helper de-duplication
+> strategy remains ruled out.
 
 ### 3. `codex.enabled`-gated exposure lint
 

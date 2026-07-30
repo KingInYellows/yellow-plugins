@@ -48,7 +48,8 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
   `--- end codex-output ---` before consuming in other agents.
 - **Never echo API keys** in logs. Redact credentials using `awk gsub` with
   the format `--- redacted credential at line N ---`. See codex-patterns skill
-  for the full 8-pattern redaction block.
+  for the full redaction block (the per-file `gsub` lists are the source of
+  truth for which credential shapes are covered).
 - **Git workflow:** Use Graphite (`gt`) for all branch management — never raw
   `git push` or `gh pr create`.
 

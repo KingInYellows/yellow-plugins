@@ -192,6 +192,13 @@ table): [Revert + stash pop] — `git checkout -- "${FILE_PATH}"`, then
 Step 6 for another fix attempt.
 **If WARNING (findings at modified lines):** Show those findings, ask user
 to proceed or revert.
+**If "Cannot verify — semgrep CLI not found":** the fix was applied but
+never re-scanned. Show the verifier's install instruction
+(`pip install semgrep`), then ask the user: [Commit unverified] — proceed
+to Step 10 with the `unverified` trailer value — or [Stop] — `git stash
+pop` if changes were stashed in Step 5, then leave the fix uncommitted
+so it can be verified after installing the CLI. Never proceed to
+Step 10 with a `pass` or `warning` claim on this branch.
 If user chooses to revert and changes were stashed in Step 5: `git stash pop`
 
 ### Step 10: Commit
@@ -206,13 +213,15 @@ Finding-ID: {id}
 Rule: {check_id}
 Severity: {severity}
 Fix-Type: autofix|llm
-Verified: pass|warning (findings at modified lines, not proven regression)"
+Verified: pass|warning (findings at modified lines, not proven regression)|unverified (semgrep CLI unavailable)"
 ```
 
 Substitute one concrete value for the `Verified:` trailer: `pass` when
-Step 9 reported PASS, or `warning (findings at modified lines, not proven
-regression)` when the user proceeded after a WARNING — never emit the
-literal `pass|warning` alternation.
+Step 9 reported PASS, `warning (findings at modified lines, not proven
+regression)` when the user proceeded after a WARNING, or
+`unverified (semgrep CLI unavailable)` when the user chose
+[Commit unverified] after a "Cannot verify" outcome — never emit the
+literal alternation shown above.
 
 If user had stashed changes in Step 5: `git stash pop`
 
@@ -250,7 +259,8 @@ Finding {id} — FIXED
   File:       {path}:{line}
   Fix Type:   autofix | LLM
   Verified:   ✓ pass (no findings at modified lines) | ⚠ warning (findings at
-              modified lines — not proven regression, user chose to proceed)
+              modified lines — not proven regression, user chose to proceed) |
+              ⊘ unverified (semgrep CLI unavailable — fix not re-scanned)
   Triage:     updated to 'fixed'
   Commit:     {short_sha}
 ```
@@ -268,5 +278,6 @@ Finding {id} — FIXED
 | Autofix syntax check fails | Warning, fall through to LLM | Continue |
 | Fix does not resolve finding | "Fix did not resolve" | [Revert + stash pop] [Retry] |
 | WARNING: findings at modified lines | "Findings at modified lines (not proven regression)" | [Proceed] [Revert] |
+| Cannot verify — semgrep CLI not found | "Cannot verify — semgrep CLI not found" | [Commit unverified] [Stop] |
 | Triage POST fails | "Triage update failed" | Show manual URL |
 | Network failure | curl error message | Exit |

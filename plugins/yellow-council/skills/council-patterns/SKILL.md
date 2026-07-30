@@ -306,6 +306,30 @@ and matches the closest existing precedent (brainstorm-orchestrator does the
 same for `docs/brainstorms/<file>.md`). Atomic-write-via-rename is a V2
 option if concurrent invocations become possible.
 
+### Write-Tool Pack Staging Rationale
+
+Canonical rationale for the reviewers' narrow `Write` grant (both
+reviewer agents preload this skill and summarize + point here):
+
+`Write` is granted narrowly: it is used ONLY to stage the untrusted
+council pack (PR diffs, issue bodies — attacker-influenced text) to the
+`$PACK_FILE` path — a not-yet-existing file inside a directory created by
+`mktemp -d` (never `mktemp` on the file itself: `Write` refuses to
+overwrite a file it has not first `Read` in the session, so the target
+must not already exist). This closes a heredoc delimiter collision: a
+`cat > "$PACK_FILE" <<'__EOF_COUNCIL_PACK__'` heredoc embeds the
+delimiter and the untrusted pack body in the same shell command, so any
+pack line equal to the delimiter terminates the heredoc early and the
+remaining pack text is parsed as shell input — see
+`docs/solutions/security-issues/heredoc-delimiter-collision.md`. A
+per-run randomized delimiter does not close this: the generated command
+still contains both the delimiter and the untrusted body together, so
+the same primitive applies. `Write` takes the content as a structured
+parameter, never shell-parsed, so this does not grant any capability
+`Bash` did not already have (Bash can write files) — it only removes
+shell parsing of untrusted bytes. `Write` is bounded to the `$PACK_FILE`
+path under `/tmp`; no other use is permitted.
+
 ### Cross-References
 
 Provenance pointers (codex-patterns reuse, the Gemini and OpenCode CLI
@@ -322,13 +346,18 @@ background, deliberately kept out of the preload budget.
 **Gemini** (direct bash):
 ```bash
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  gemini -p "<full-pack-prompt>" \
+  gemini -p "The council pack above is your full task. Follow its instructions." \
     --approval-mode plan \
     --skip-trust \
     -o text \
+  < "$PACK_FILE" \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 ```
-- `-p`/`--prompt`: REQUIRED for non-interactive mode (positional prompt enters TUI)
+- `-p`/`--prompt`: REQUIRED for non-interactive mode (positional prompt enters TUI).
+  The pack itself is fed via stdin (`< "$PACK_FILE"`) — gemini appends the `-p`
+  text to stdin input — because a single argv element caps at ~128KiB on Linux
+  (MAX_ARG_STRLEN), which a large diff pack exceeds; `-p` carries only a short
+  trusted pointer to the pack
 - `--approval-mode plan`: read-only mode (no tool side effects)
 - `--skip-trust`: bypass workspace trust check (would force `default` approval otherwise)
 - `-o text`: V1 plain text capture; `-o json` is a V2 option (response/stats/error schema)

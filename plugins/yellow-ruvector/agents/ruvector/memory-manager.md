@@ -101,11 +101,20 @@ When called to flush `pending-updates.jsonl`:
    entries whose processing failed — a failed `hooks_remember` store or a
    failed `file_change` re-index alike (so failed entries are retained for
    the next flush instead of silently lost). Skipped/invalid entries are
-   not retained.
+   not retained. Retention is bounded: when retaining an entry, set (or
+   increment) a `flush_attempts` field on it — an absent field counts as 0.
+   An entry whose incremented `flush_attempts` would exceed 3 is NOT
+   retained (retained through failures 1-3, dropped on the 4th failure);
+   log it loudly instead
+   ('[memory-manager] Dropping entry after 4 failed flushes: <file_path or
+   summary> — last error: <error>') so a persistently-failing batch cannot
+   make every future flush retry the same doomed entries forever.
 9. Report: "Flushed N entries (M files re-indexed, K skipped, J invalid paths
-   rejected, R retained for retry)" — the retained count is what tells the
-   caller a re-flush is needed; without it a partial flush is
-   indistinguishable from a full one
+   rejected, R retained for retry, D dropped after 4 failed attempts)" —
+   the retained count is what tells the caller a re-flush is needed;
+   without it a partial flush is indistinguishable from a full one, and
+   the dropped count is what tells the caller data was lost rather than
+   deferred
 
 If queue file doesn't exist or is empty, report: "No pending updates."
 

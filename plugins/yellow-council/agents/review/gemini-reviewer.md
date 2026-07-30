@@ -47,22 +47,12 @@ an explicit exception to the W1.5 read-only-reviewer rule:
   `plugins/yellow-council/agents/review/gemini-reviewer.md`.
 
 `Write` is also granted, narrowly: it is used ONLY in Step 3 to stage the
-untrusted council pack (PR diffs, issue bodies — attacker-influenced text) to
-the `$PACK_FILE` path — a not-yet-existing file inside a directory created by
-`mktemp -d` (never `mktemp` on the file itself: `Write` refuses to overwrite
-a file it has not first `Read` in the session, so the target must not
-already exist). This closes a heredoc delimiter
-collision: a `cat > "$PACK_FILE" <<'__EOF_COUNCIL_PACK__'` heredoc embeds the
-delimiter and the untrusted pack body in the same shell command, so any pack
-line equal to the delimiter terminates the heredoc early and the remaining
-pack text is parsed as shell input — see
-`docs/solutions/security-issues/heredoc-delimiter-collision.md`. A per-run
-randomized delimiter does not close this: the generated command still
-contains both the delimiter and the untrusted body together, so the same
-primitive applies. `Write` takes the content as a structured parameter,
-never shell-parsed, so this does not grant any capability `Bash` did not
-already have (Bash can write files) — it only removes shell parsing of
-untrusted bytes. `Write` is bounded to the `$PACK_FILE` path under `/tmp`;
+untrusted council pack to the `$PACK_FILE` path — a not-yet-existing file
+inside a directory created by `mktemp -d`. The canonical rationale (the
+heredoc delimiter collision this closes, why per-run randomized delimiters
+do not help, and why the grant adds no capability Bash lacked) is in the
+preloaded `council-patterns` skill under "Write-Tool Pack Staging
+Rationale". `Write` is bounded to the `$PACK_FILE` path under `/tmp`;
 no other use is permitted.
 
 The legitimate Bash surface for this agent covers ONLY:
@@ -118,7 +108,8 @@ exit 0
 
 Use the council-patterns SKILL flag combination. Capture the full pack from
 your spawn prompt, write it to a temp file (keeps the invocation auditable
-and the shell command line readable), then expand the file into `-p`:
+and the shell command line readable), then feed it via stdin to avoid
+MAX_ARG_STRLEN limits (single argv element is capped at ~128KiB on Linux):
 
 ```bash
 PACK_DIR=$(mktemp -d /tmp/council-gemini-pack-XXXXXX)
@@ -159,11 +150,17 @@ STDERR_FILE="<literal stderr-file path>"
 # Validate non-empty before invoking the CLI:
 [ -s "$PACK_FILE" ] || { printf '[gemini-reviewer] Error: empty pack file\n' >&2; exit 1; }
 
+# Feed the pack via stdin, not "$(cat ...)" argv interpolation — a single
+# argv element is capped at ~128KiB on Linux (MAX_ARG_STRLEN), which a
+# large diff pack exceeds. gemini documents -p as "Appended to input on
+# stdin (if any)", so the pack arrives as input and -p carries only a
+# short trusted pointer to it.
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  gemini -p "$(cat "$PACK_FILE")" \
+  gemini -p "The council pack above is your full task. Follow its instructions." \
     --approval-mode plan \
     --skip-trust \
     -o text \
+  < "$PACK_FILE" \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 CLI_EXIT=$?
 printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
@@ -281,6 +278,27 @@ VERDICT=$(grep -m1 '^Verdict: ' "$REDACTED_FILE" 2>/dev/null | sed 's/^Verdict: 
 CONFIDENCE=$(grep -m1 '^Confidence: ' "$REDACTED_FILE" 2>/dev/null | sed 's/^Confidence: //' | head -c 20)
 SUMMARY=$(awk '/^Summary: / { sub(/^Summary: /, ""); print; exit }' "$REDACTED_FILE" | head -c 500)
 FINDINGS=$(awk '/^Findings:/ { capture=1; next } /^Summary: / { capture=0 } capture' "$REDACTED_FILE")
+
+# Cap FINDINGS (200 lines / 20000 bytes) so a runaway or hostile CLI
+# response cannot flood the council synthesis — VERDICT/CONFIDENCE/SUMMARY
+# already carry head -c caps; FINDINGS was the only unbounded field. Cap
+# BEFORE the sentinel escape below so a cut that happens to end a line at
+# a bare sentinel string still gets escaped.
+FINDINGS_BYTES=$(printf '%s' "$FINDINGS" | wc -c)
+FINDINGS_LINES=$(printf '%s' "$FINDINGS" | grep -c '^')
+if [ "$FINDINGS_BYTES" -gt 20000 ] || [ "$FINDINGS_LINES" -gt 200 ]; then
+  # Truncate by lines first so a byte cut never has to run. If line
+  # truncation alone isn't enough, fall back to a byte cut and then drop
+  # the now-possibly-partial trailing line with `sed '$d'` — `head -c`
+  # can split a multi-byte UTF-8 character mid-sequence, which would
+  # otherwise corrupt the reviewer output.
+  FINDINGS=$(printf '%s\n' "$FINDINGS" | head -n 200)
+  if [ "$(printf '%s' "$FINDINGS" | wc -c)" -gt 20000 ]; then
+    FINDINGS=$(printf '%s' "$FINDINGS" | head -c 20000 | sed '$d')
+  fi
+  FINDINGS="${FINDINGS}
+[truncated: findings exceeded 200 lines / 20000 bytes]"
+fi
 
 # Escape bare findings_block_begin/findings_block_end sentinel lines inside
 # FINDINGS — council.md's parse_reviewer_return delimits the findings block

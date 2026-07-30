@@ -94,7 +94,7 @@ BV_ERR_FILE=$(mktemp) || {
   printf '[review:resolve] Error: could not create a temporary file for branch verification.\n' >&2
   exit 1
 }
-CUR_PR=$(gh pr view --json number -q .number 2>"$BV_ERR_FILE")
+CUR_PR=$(gh pr view --json number -q .number 2>|"$BV_ERR_FILE")
 BV_EC=$?
 BV_ERR=$(cat "$BV_ERR_FILE")
 rm -f "$BV_ERR_FILE"

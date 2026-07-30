@@ -1363,9 +1363,12 @@ bucket comment, copy-pasted into each new review persona as the roster grew:
 `plugins/yellow-review/agents/review/{adversarial,agent-cli-readiness,agent-native,cli-readiness,correctness,maintainability,plugin-contract,project-compliance,project-standards,reliability}-reviewer.md`
 plus `plugins/yellow-core/agents/review/{performance,security}-reviewer.md`.
 Caught by four independently-converging reviewers (`agent-native`,
-`maintainability`, `comment-analyzer`, `codex`) in PR #667; fixed in commit
-`d464f8c` by deleting the in-fence comment and restating it as prose
-directly below the closing fence, in all twelve files.
+`maintainability`, `comment-analyzer`, `codex`) in PR #667; fixed there
+(pre-squash commit "fix: address review findings from agent-native,
+maintainability, comment-analyzer, ..." — the hash did not survive the
+merge-queue rebase, so cite the message, not a hash) by deleting the
+in-fence comment and restating it as prose directly below the closing
+fence, in all twelve files.
 
 **Prevention checklist additions:**
 

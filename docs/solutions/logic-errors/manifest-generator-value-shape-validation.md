@@ -212,3 +212,45 @@ every key you see referenced past a truthy/presence check
 (`source.X`, `source.X.Y`, `for (const k of [...]) source.X[k]`) and
 confirm each one has an explicit `typeof`/`null` guard before the fix is
 considered complete — not just the ones a reviewer already named.
+
+---
+
+## Update — 2026-07-30
+
+A 19-reviewer `/review:pr` pass on PR #676 found the same "apply-mode test
+proves a no-op, not the write path" root cause one level deeper, in the
+codex sibling of this doc's generator family: `scripts/lib/generate/emit-codex.js`
+added a new `refDirNotDir` guard (a plugin's `references/` entry existing as
+a plain file instead of a directory triggers `ENOTDIR` from `readdirSync`,
+now caught and turned into a targeted error) and `scripts/validate-codex.js`
+added a matching "exists but is not a regular file" branch for a SKILL.md
+path. `tests/integration/generate-manifests-codex.test.ts`'s existing
+apply-mode fixtures never reached either branch, so both landed untested —
+not because no test claimed apply-mode coverage (this doc's original
+Prevention bullet), but because **the mode the new branch actually needs
+exercising in is `check`, and the suite had zero check-mode coverage of a
+polluted source tree**. CI's real invocation is `--check` (drift
+detection), not `--apply`; a new guard tested only in apply-mode, or not
+tested against the check-mode code path CI actually runs, can ship with a
+false-green suite exactly like the apply-mode no-op case this doc already
+covers.
+
+**Fix**: a new test, `'check mode reports a plain FILE named references as
+drift without mutating or hard-erroring (ENOTDIR read path)'`
+(`tests/integration/generate-manifests-codex.test.ts:1099`), builds a
+polluted fixture tree (a plain file where `references/` should be a
+directory) and runs `generateManifests({ mode: 'check', rootDir: root })`
+(line 510) against it, asserting the ENOTDIR path surfaces as reported
+drift rather than a thrown exception or a silent pass. The mirror gap in
+`scripts/validate-codex.js`'s SKILL.md-is-not-a-regular-file branch was
+scored P2 and deferred (not fixed in this PR) — same untested-branch class,
+same fix shape when picked up.
+
+**Generalized lesson — extending this doc's Prevention section:** "any test
+claiming to cover apply mode must start from a stale fixture" is necessary
+but not sufficient. For any generator/validator with a `check` vs `apply`
+mode split, identify which mode CI's real invocation actually runs — here,
+`--check` — and audit new guard branches for coverage in *that* mode
+specifically, not just "some mode with a stale fixture." A branch fully
+covered in apply-mode tests can still ship with zero coverage on the exact
+path production CI exercises.
