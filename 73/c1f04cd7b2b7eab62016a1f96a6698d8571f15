@@ -1,0 +1,21 @@
+plugins/yellow-devin/CLAUDE.md
+  s_43cc4f730492cc::t_146be376b4ee34 74-79
+plugins/yellow-devin/agents/workflow/devin-orchestrator.md
+  s_43cc4f730492cc::t_c3264096795caa 91-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.17",
+  "base_commit_sha": "73c1f04cd7b2b7eab62016a1f96a6698d8571f15",
+  "prompts": {},
+  "sessions": {
+    "s_43cc4f730492cc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e6663061-fa64-47c9-9aa3-dfbeb2d1ba93",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
