@@ -1,5 +1,22 @@
 # yellow-codex
 
+## 0.2.10
+
+### Patch Changes
+
+- [#676](https://github.com/KingInYellows/yellow-plugins/pull/676)
+  [`339ccf4`](https://github.com/KingInYellows/yellow-plugins/commit/339ccf42a0a4be59176e994ec9531c988fa391e1)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Residual P2
+  fixes from the #670–#672 sweep-all batch: guard the `resolve-pr`
+  branch-verification redirect against zsh noclobber (`2>|`); drop drifting hard
+  pattern-counts from yellow-codex redaction prose; add the missing "Cannot
+  verify — semgrep CLI not found" branch (and `unverified` commit trailer) to
+  `/semgrep:fix`; bound memory-manager flush retries at 3 attempts per entry;
+  centralize the council reviewers' Write-grant rationale in the
+  council-patterns skill; feed the gemini council pack via stdin (ARG_MAX) and
+  guard the opencode pack size; cap reviewer FINDINGS output at 200 lines /
+  20000 bytes.
+
 ## 0.2.9
 
 ### Patch Changes
