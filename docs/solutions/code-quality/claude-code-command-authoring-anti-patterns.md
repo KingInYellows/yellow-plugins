@@ -1455,6 +1455,86 @@ the axis #27's own examples were already sorted along.
 
 ---
 
+## Update — 2026-07-29
+
+### 32. Anti-Pattern #30 Recurred With a Different Invalid-JSON Shape — Root Cause Is Schema Duplication, Not the Placeholder Syntax
+
+**Recurrence:** PR #679 fixed a second instance of the anti-pattern #30
+defect class — this time a `"line": <int>,` placeholder (not a `//`
+comment) inside the same strict ```json compact-return example fence.
+`<int>` is not valid JSON; an agent copying the fence verbatim reproduces
+a parse failure, the exact whole-return silent-drop class anti-pattern
+#30 exists to prevent.
+
+**WRONG:**
+
+```json
+"line": <int>,
+```
+
+**RIGHT:**
+
+```json
+"line": 42,
+```
+
+`line` must be an integer — the 1-based line number of the finding in
+`file`; `42` is an example value, not a literal — stated as prose
+immediately after the closing fence, the same pattern anti-pattern #30
+itself used.
+
+Landed in the canonical schema first, then its 7 mirrors, in one commit
+so the canonical/mirror pair could not drift:
+`plugins/yellow-review/commands/review/review-pr.md`, and
+`plugins/yellow-review/agents/review/{adversarial,correctness,maintainability,plugin-contract,project-compliance,project-standards,reliability}-reviewer.md`.
+
+**Root cause (maintainability reviewer): the recurrence is a duplication
+problem, not a placeholder-syntax problem.** The compact-return JSON
+schema is duplicated verbatim across roughly 13 files. Every
+single-token fix to that schema — PR #667's `//` comment, PR #679's
+`<int>` placeholder — turns into an N-file sweep by construction, and
+each sweep so far has been caught only by manual multi-agent review,
+never by an automated gate. The PR's own follow-up note names the fix
+directly: no automated guard `JSON.parse()`s the strict ```json fences
+under `plugins/**/*.md`; a lint that did would close this defect class
+outright regardless of which token breaks the fence next. A single
+canonical schema source (referenced, not re-literaled, per
+`multi-doc-schema-rename-drift.md`) would remove the duplication that
+makes an N-file sweep necessary in the first place. Neither fix has
+landed yet — captured here as the deferred long-term direction.
+
+**Residual gap found by the same review pass (pattern-recognition
+reviewer, sweep-incomplete-application-orphaned-jargon recurrence,
+deferred — not fixed in PR #679):** six sibling files still render the
+same schema with `"line": 42` but never got the new prose
+type-constraint sentence added elsewhere in this PR:
+`plugins/yellow-review/skills/pr-review-workflow/SKILL.md`,
+`plugins/yellow-review/agents/review/agent-native-reviewer.md`,
+`plugins/yellow-review/agents/review/agent-cli-readiness-reviewer.md`,
+`plugins/yellow-review/agents/review/cli-readiness-reviewer.md`, plus
+`plugins/yellow-core/agents/review/performance-reviewer.md:117` and
+`plugins/yellow-core/agents/review/security-reviewer.md:139` — the
+`review-pr.md` legacy-format roster's other first-class emitters of the
+same schema. Mechanical one-line insertion per file; the yellow-core pair
+needs its own changeset entry (yellow-review and yellow-core are
+separately versioned plugins). See
+`sweep-incomplete-application-orphaned-jargon.md` (project auto-memory)
+for the general meta-pattern this instantiates.
+
+**Prevention checklist additions:**
+
+- [ ] When a schema/example fence is duplicated across N files instead of
+      referenced from one canonical source, treat the duplication itself
+      as the defect to eventually fix, not just the fence content each
+      sweep happens to touch — every future single-token fix will recur
+      as an N-file sweep until the duplication is removed.
+- [ ] After fixing a JSON-example-fence defect in the files a sweep
+      actually touched, grep the whole repo for the same schema shape (a
+      distinctive field name or the fence's opening keys) to find sibling
+      emitters the sweep's own file list didn't cover.
+
+---
+
 ## Related Documentation
 
 - `docs/solutions/security-issues/yellow-ruvector-plugin-multi-agent-code-review.md` — Prompt injection fencing, jq @sh consolidation, TOCTOU in flock, CRLF on WSL2

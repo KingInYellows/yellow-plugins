@@ -319,3 +319,72 @@ Any time a plugin author or reviewer:
   — Codex's own *external* plugin contract (verified against OpenAI's
   docs); this doc instead covers gaps in *this repo's own* generator and
   validator code that implements that contract.
+
+---
+
+## Update — 2026-07-29
+
+### 7. Exposure-lint symlink containment is prefix-based; the generator's is literal — and finding 3's coverage gap is now partly closed
+
+Found during the `/review:pr` pass on PR #679 (branch
+`agent/fix/polish-line-placeholder-codex-dedup`), which also extracted
+emit-codex.js's shared symlink-containment check into
+`checkDirSymlinkContainment()` (the "Shared symlink-containment check"
+helper documented in `scripts/lib/generate/emit-codex.js`).
+
+**The asymmetry (adversarial reviewer, deferred — not fixed in PR #679):**
+`collectCodexExposedFiles()` in `scripts/validate-codex.js` gates its
+skills-directory containment check with a `startsWith` prefix comparison:
+
+```js
+const skillsDirReal = realpathSync(skillsDir);
+if (skillsDirReal !== pluginRootReal && !skillsDirReal.startsWith(pluginRootReal + sep)) {
+  errors.push(...);
+}
+```
+
+`checkDirSymlinkContainment()` in `emit-codex.js` — the generator
+function this exposure-lint check is supposed to mirror — instead does a
+**literal** equality comparison against the expected realpath:
+
+```js
+if (realpathSync(dir) !== expectedRealPath) {
+  return { status: 'symlink' };
+}
+```
+
+A `startsWith` prefix check accepts any resolved path that merely begins
+with the plugin root string — including an in-plugin ancestor symlink
+whose resolved target still falls under the plugin root but is not the
+literal expected directory. The generator's literal comparison already
+rejects that case; the exposure lint's prefix comparison does not. The
+adjacent "Same containment strategy" comment in `validate-codex.js`
+overclaims parity with the generator — correct it when this is picked
+up.
+
+**Blast radius, per the reviewer that found it:** defense-in-depth
+erosion only, not a live bypass today. `generate-manifests.js`'s
+destructive sweep has its own secondary literal check before any
+`unlinkSync`, and content read through a redirect still passes the
+exposure lint's content checks. It is still the same shape findings 1-3
+above already warn about: zero CI signal until a fixture specifically
+plants a symlinked ancestor that resolves inside the plugin root but
+isn't the literal expected directory.
+
+**Action (deferred, not yet fixed):** replace the `startsWith` prefix
+check in `collectCodexExposedFiles()` with the same literal
+`realpath !== expectedRealPath` comparison `checkDirSymlinkContainment()`
+uses, and correct the "Same containment strategy" comment once the check
+actually matches.
+
+**Finding 3's coverage gap is now partly closed.** The registry-gated
+exposure-lint checks finding 3 describes (sibling-plugin-path,
+hardcoded-mcp-tool-name, slash-command) had zero true-positive test
+coverage before PR #679 — a broken refactor could have silently disabled
+any of them with green CI, because a clean repo never exercises the
+detection path. PR #679 added a fixture test that plants sibling-path
+references (both regex-alternation branches) plus a self-exclusion
+assertion, closing that gap for the sibling-plugin-path check
+specifically. The `startsWith`-vs-literal asymmetry above is a live
+example of exactly the kind of defect that coverage gap could have
+hidden.
