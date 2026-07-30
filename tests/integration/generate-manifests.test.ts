@@ -691,4 +691,34 @@ describe('main() per-plugin error reporting (subprocess)', () => {
     );
     expect(result.stdout).not.toContain('::error');
   });
+
+  it('reports a loud line and a ::error annotation for each of two errored plugins without short-circuiting', () => {
+    const root = makeFixtureRoot();
+    for (const name of ['yellow-core', 'yellow-review']) {
+      const sourcePath = join(root, 'catalog', 'plugins', `${name}.json`);
+      const source = JSON.parse(readFileSync(sourcePath, 'utf8'));
+      source.description = null;
+      writeFileSync(sourcePath, JSON.stringify(source, null, 2) + '\n', 'utf8');
+    }
+
+    const result = runCli(root, ['--check'], { GITHUB_ACTIONS: 'true' });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: plugin yellow-core: 1 error(s)'
+    );
+    expect(result.stderr).toContain(
+      '[generate-manifests] ERROR: plugin yellow-review: 1 error(s)'
+    );
+
+    const annotationLines = result.stdout
+      .split('\n')
+      .filter((line) => line.startsWith('::error '));
+    expect(annotationLines).toHaveLength(2);
+    expect(annotationLines).toContain(
+      '::error file=catalog/plugins/yellow-core.json::plugin yellow-core: 1 error(s) — see job log for details'
+    );
+    expect(annotationLines).toContain(
+      '::error file=catalog/plugins/yellow-review.json::plugin yellow-review: 1 error(s) — see job log for details'
+    );
+  });
 });
