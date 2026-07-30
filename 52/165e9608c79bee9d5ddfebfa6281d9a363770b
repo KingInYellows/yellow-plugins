@@ -1,0 +1,21 @@
+package.json
+  s_2ce1db4e09a1cf::t_40fd42213a6c5d 43
+.github/workflows/version-packages.yml
+  s_2ce1db4e09a1cf::t_ed5c0fc11490a4 136-147,152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "52165e9608c79bee9d5ddfebfa6281d9a363770b",
+  "prompts": {},
+  "sessions": {
+    "s_2ce1db4e09a1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef164321-e04e-4aa4-bbba-539764a2186a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
