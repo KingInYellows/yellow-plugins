@@ -1,5 +1,15 @@
 # Feature: library-context cache loop closure (tier2 + runtime writeback)
 
+> **Status: SUPERSEDED — shipped in full by PR #598 (merged 2026-07-01,
+> commit `c5473226`), one day after this plan's last review pass.** Every
+> item below (tier2 reader/writers, `lc-cache-lookup-docs` +
+> `lc-cache-write` wrappers, SKILL.md Step 1/2 cache-first + writeback,
+> BPR inline wiring, reference.md Cache-section rewrite) exists on main;
+> `context7-cache.bats` is at 58 tests. RULE 13 merged the same day
+> (#597, `b9f96daf`). This plan was NOT the executed artifact — the work
+> shipped independently; task boxes below are ticked as shipped-via-#598,
+> not as executed-from-this-plan. Archived for the record.
+
 > **Reviewed against `main` 2026-06-30.** All three foundation PRs merged;
 > this plan is still unbuilt and valid. Staleness fixed in this pass:
 > (1) the codebase note below (PRs now on main, no stacking); (2) Phase 3.1 +
@@ -183,9 +193,9 @@ proposal doesn't exist in the codebase).
 
 ### Phase 1: Library functions + bin wrappers
 
-- [ ] 1.1 Add `_LC_TIER2_TTL=14400` and `_LC_TIER2_MAX_ENTRIES=50` constants to `plugins/yellow-research/hooks/lib/context7-cache.sh`.
-- [ ] 1.2 Add `_lc_lookup_docs(id, topic)` function — mirror `_lc_lookup` shape; key is `"$id|$topic"` (matches schema doc in reference.md).
-- [ ] 1.3 Add `_lc_write_tier1(name, id)` function — atomic-merge pattern (read JSON → add entry → write tmp + mv). Use `jq` to merge cleanly without race-clobbering tier2 entries.
+- [x] 1.1 Add `_LC_TIER2_TTL=14400` and `_LC_TIER2_MAX_ENTRIES=50` constants to `plugins/yellow-research/hooks/lib/context7-cache.sh`.
+- [x] 1.2 Add `_lc_lookup_docs(id, topic)` function — mirror `_lc_lookup` shape; key is `"$id|$topic"` (matches schema doc in reference.md).
+- [x] 1.3 Add `_lc_write_tier1(name, id)` function — atomic-merge pattern (read JSON → add entry → write tmp + mv). Use `jq` to merge cleanly without race-clobbering tier2 entries.
 
 <!-- deepen-plan: codebase -->
 > **Codebase (re-verified 2026-06-30):** The mutation form
@@ -207,7 +217,7 @@ proposal doesn't exist in the codebase).
 > `_lc_log "Warning: …"` on write failure rather than a raw `printf`, matching
 > the existing prefix.
 <!-- /deepen-plan -->
-- [ ] 1.4 Add `_lc_write_tier2(id, topic, docs)` function — atomic merge with LRU eviction. Use `jq` to insert/replace the new entry (`id|topic`) into tier2 with current `fetched_at`, then sort by `fetched_at` desc and take top `$_LC_TIER2_MAX_ENTRIES`. Updates to an existing key do not evict unrelated entries.
+- [x] 1.4 Add `_lc_write_tier2(id, topic, docs)` function — atomic merge with LRU eviction. Use `jq` to insert/replace the new entry (`id|topic`) into tier2 with current `fetched_at`, then sort by `fetched_at` desc and take top `$_LC_TIER2_MAX_ENTRIES`. Updates to an existing key do not evict unrelated entries.
 
 <!-- deepen-plan: external -->
 > **Research (idiomatic jq LRU + upsert in one pass):** do the upsert and the
@@ -235,9 +245,9 @@ proposal doesn't exist in the codebase).
 > the temp file into a JSON string (no argv/quoting hazard). Source: Perplexity
 > deep-research synthesis, jq manual (`sort_by`, slicing).
 <!-- /deepen-plan -->
-- [ ] 1.5 Create `plugins/yellow-research/bin/lc-cache-lookup-docs` wrapper. Same shape as `lc-cache-lookup` — source the lib + call `_lc_lookup_docs`. Two args: `<library-id> <topic>`.
-- [ ] 1.6 Create `plugins/yellow-research/bin/lc-cache-write` wrapper with subcommand dispatch (`tier1` / `tier2`). For tier2, read the docs body from the file path argument before calling `_lc_write_tier2`.
-- [ ] 1.7 Make both new wrappers executable (`chmod +x`).
+- [x] 1.5 Create `plugins/yellow-research/bin/lc-cache-lookup-docs` wrapper. Same shape as `lc-cache-lookup` — source the lib + call `_lc_lookup_docs`. Two args: `<library-id> <topic>`.
+- [x] 1.6 Create `plugins/yellow-research/bin/lc-cache-write` wrapper with subcommand dispatch (`tier1` / `tier2`). For tier2, read the docs body from the file path argument before calling `_lc_write_tier2`.
+- [x] 1.7 Make both new wrappers executable (`chmod +x`).
 
 <!-- deepen-plan: codebase -->
 > **Codebase (wrapper self-location + chmod gotcha):** the existing
@@ -254,18 +264,18 @@ proposal doesn't exist in the codebase).
 
 ### Phase 2: SKILL.md + BPR consumer wiring
 
-- [ ] 2.1 Update `plugins/yellow-research/skills/library-context/SKILL.md` Step 1: after the live `resolve-library-id` succeeds, add a writeback instruction (`bash ${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write tier1 <name> <id>`).
-- [ ] 2.2 Update SKILL.md Step 2: rewrite as cache-first symmetrically to Step 1. Lookup via `lc-cache-lookup-docs`; on miss, call MCP, then writeback via `lc-cache-write tier2` with the docs body in a temp file. Include cleanup of the temp file.
-- [ ] 2.3 Update `plugins/yellow-core/agents/research/best-practices-researcher.md` inlined block: matching tier1 writeback after step 1.3 MCP call, and a new step that wraps the existing Step 2 with cache-first + writeback. Renumber if needed. **RULE 13 constraint (context7 drift lint):** verified in `scripts/validate-agent-authoring.js:447-470` — because this agent lists a context7 tool in `tools:`, `validate:agents` requires either `skills: [library-context]` **or** the exact body sentinel `context7 unavailable — falling back to` (literal em dash U+2014, matched body-only after frontmatter strip). BPR has it at `best-practices-researcher.md:83` (HTML-comment annotation) and `:99` (body prose — the load-bearing one). Do NOT remove or ASCII-ify either occurrence while editing. Status caveat: RULE 13 is committed on branch `agent/feat/rule-13-context7-drift-lint` (commit `b2fa9fba`) but **not yet on `origin/main`** — so the gate only fires once RULE 13 merges; keep the sentinel regardless so the work stays green whichever merges first.
-- [ ] 2.4 Update the HTML annotation above the BPR inlined block to enumerate the (now growing) set of intentional deltas vs the canonical SKILL.md block.
+- [x] 2.1 Update `plugins/yellow-research/skills/library-context/SKILL.md` Step 1: after the live `resolve-library-id` succeeds, add a writeback instruction (`bash ${CLAUDE_PLUGIN_ROOT}/bin/lc-cache-write tier1 <name> <id>`).
+- [x] 2.2 Update SKILL.md Step 2: rewrite as cache-first symmetrically to Step 1. Lookup via `lc-cache-lookup-docs`; on miss, call MCP, then writeback via `lc-cache-write tier2` with the docs body in a temp file. Include cleanup of the temp file.
+- [x] 2.3 Update `plugins/yellow-core/agents/research/best-practices-researcher.md` inlined block: matching tier1 writeback after step 1.3 MCP call, and a new step that wraps the existing Step 2 with cache-first + writeback. Renumber if needed. **RULE 13 constraint (context7 drift lint):** verified in `scripts/validate-agent-authoring.js:447-470` — because this agent lists a context7 tool in `tools:`, `validate:agents` requires either `skills: [library-context]` **or** the exact body sentinel `context7 unavailable — falling back to` (literal em dash U+2014, matched body-only after frontmatter strip). BPR has it at `best-practices-researcher.md:83` (HTML-comment annotation) and `:99` (body prose — the load-bearing one). Do NOT remove or ASCII-ify either occurrence while editing. Status caveat: RULE 13 is committed on branch `agent/feat/rule-13-context7-drift-lint` (commit `b2fa9fba`) but **not yet on `origin/main`** — so the gate only fires once RULE 13 merges; keep the sentinel regardless so the work stays green whichever merges first.
+- [x] 2.4 Update the HTML annotation above the BPR inlined block to enumerate the (now growing) set of intentional deltas vs the canonical SKILL.md block.
 
 ### Phase 3: Reference + tests + validation
 
-- [ ] 3.1 Update `reference.md` **"Cache" section** (anchor by text, not line number — RULE 13's merge status shifts the numbers; on the RULE 13 branch it's ~L124-149, on current `main` ~L163-171). tier2 is no longer reserved. Rewrite the tier2 line (search: `reserved for future lazy population on cache miss — not pre-warmed`) to describe active lazy population, and rewrite the paragraph (search: `The lc-cache-lookup reader only consults tier1` … `That round also needs to design a cache-write contract for runtime hits`) to document the now-shipped tier2 lookup/write API, the LRU-by-`fetched_at` eviction rule, and the runtime writeback contract. Note: RULE 13 already removed the old "Out of scope (future PR)" phrasing — that literal string no longer exists; target the "reserved for a future round" / "cache-write contract" sentences instead.
-- [ ] 3.2 Add bats tests for `_lc_lookup_docs`: cache absent, fresh hit, miss, expired, corrupted JSON, empty args (mirror the existing tier1 lookup test set).
-- [ ] 3.3 Add bats tests for `_lc_write_tier1`: writes new entry, updates existing entry (idempotent), doesn't clobber tier2.
-- [ ] 3.4 Add bats tests for `_lc_write_tier2`: writes new entry, updates existing entry, evicts oldest when at 50-entry cap (fixture with 50 entries + write one more → confirm size stays 50 and oldest is gone).
-- [ ] 3.5 Add bats tests for the `lc-cache-write` wrapper subcommand dispatch + the tier2 file-path arg handling.
+- [x] 3.1 Update `reference.md` **"Cache" section** (anchor by text, not line number — RULE 13's merge status shifts the numbers; on the RULE 13 branch it's ~L124-149, on current `main` ~L163-171). tier2 is no longer reserved. Rewrite the tier2 line (search: `reserved for future lazy population on cache miss — not pre-warmed`) to describe active lazy population, and rewrite the paragraph (search: `The lc-cache-lookup reader only consults tier1` … `That round also needs to design a cache-write contract for runtime hits`) to document the now-shipped tier2 lookup/write API, the LRU-by-`fetched_at` eviction rule, and the runtime writeback contract. Note: RULE 13 already removed the old "Out of scope (future PR)" phrasing — that literal string no longer exists; target the "reserved for a future round" / "cache-write contract" sentences instead.
+- [x] 3.2 Add bats tests for `_lc_lookup_docs`: cache absent, fresh hit, miss, expired, corrupted JSON, empty args (mirror the existing tier1 lookup test set).
+- [x] 3.3 Add bats tests for `_lc_write_tier1`: writes new entry, updates existing entry (idempotent), doesn't clobber tier2.
+- [x] 3.4 Add bats tests for `_lc_write_tier2`: writes new entry, updates existing entry, evicts oldest when at 50-entry cap (fixture with 50 entries + write one more → confirm size stays 50 and oldest is gone).
+- [x] 3.5 Add bats tests for the `lc-cache-write` wrapper subcommand dispatch + the tier2 file-path arg handling.
 
 <!-- deepen-plan: codebase -->
 > **Codebase (bats conventions to mirror — `context7-cache.bats`, verified
@@ -286,13 +296,13 @@ proposal doesn't exist in the codebase).
 > reliably. The "eventual consistency / last-writer-wins" trade-off is the
 > documented standard (code + reference.md).
 <!-- /deepen-plan -->
-- [ ] 3.6 Run gates: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck` + `bats plugins/yellow-research/tests/`.
+- [x] 3.6 Run gates: `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck` + `bats plugins/yellow-research/tests/`.
 
 ### Phase 4: Changeset + commit + submit
 
-- [ ] 4.1 Add `.changeset/library-context-cache-loop-closure.md` — `yellow-research` minor (new helpers + new SKILL.md instructions) + `yellow-core` patch (BPR inlined block update).
-- [ ] 4.2 LF normalize all touched files.
-- [ ] 4.3 Branch **off `main`** (foundation PRs #536/#537/#538 all merged — no stacking on #537 needed). Commit via `gt commit -m "feat: ..."` and `gt submit --no-interactive`.
+- [x] 4.1 Add `.changeset/library-context-cache-loop-closure.md` — `yellow-research` minor (new helpers + new SKILL.md instructions) + `yellow-core` patch (BPR inlined block update).
+- [x] 4.2 LF normalize all touched files.
+- [x] 4.3 Branch **off `main`** (foundation PRs #536/#537/#538 all merged — no stacking on #537 needed). Commit via `gt commit -m "feat: ..."` and `gt submit --no-interactive`.
 
 ## Technical Details
 
@@ -488,6 +498,15 @@ _lc_write_tier1() {
 <!-- /deepen-plan -->
 
 ## Review changelog
+
+- **2026-07-31 — superseded-and-archived.** deepen-plan re-enrichment run
+  found the entire scope already merged as PR #598 (`c5473226`,
+  2026-07-01) with RULE 13 as #597 (`b9f96daf`) — verified directly:
+  `_lc_lookup_docs`/`_lc_write_tier1`/`_lc_write_tier2` + `_LC_TIER2_*`
+  constants in `context7-cache.sh`, both bin wrappers present, 58 bats
+  tests. Boxes ticked as shipped-via-#598; plan archived. The inline
+  deepen-plan annotations below predate the merge and are retained as
+  historical record only.
 
 - **2026-06-30 — reviewed against `main`.** Plan verified still unbuilt and
   structurally valid: `context7-cache.sh` remains tier1-only (no
