@@ -1,0 +1,19 @@
+plans/complete/library-context-cache-loop-closure.md
+  s_2ce1db4e09a1cf::t_b7d43ff9f5b4d0 3-12,196-198,220,248-250,267-270,274-278,299,303-305,502-510
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "7ef5720a94ca6a8540a0792cd33b45a2b4dda5f5",
+  "prompts": {},
+  "sessions": {
+    "s_2ce1db4e09a1cf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ef164321-e04e-4aa4-bbba-539764a2186a",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
