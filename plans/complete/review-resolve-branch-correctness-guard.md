@@ -137,18 +137,31 @@ fetch) and any mutation.
 
 ### Phase 2: Docs + changeset
 
-- [ ] (Optional) Update the `/review:resolve` one-liner in
+- [x] (Optional) Update the `/review:resolve` one-liner in
       `plugins/yellow-review/CLAUDE.md` (lines 47–49, 138–140) and
       `plugins/yellow-review/README.md` (line 29) to mention the branch guard.
       Optional because the one-liner describes function, not preconditions.
-- [ ] (Optional follow-up, NOT this change) Note that `sweep.md` Step 2a is now
+      **Resolved 2026-08-01: declined.** The one-liners describe function;
+      the guard is documented where preconditions live (`resolve-pr.md`
+      Error Handling + `pr-review-workflow` SKILL.md, both shipped). A
+      three-one-liner mention is not worth a `plugins/` changeset + version
+      bump.
+- [x] (Optional follow-up, NOT this change) Note that `sweep.md` Step 2a is now
       redundant defense-in-depth using the weaker mechanism — candidate to drop
       or delegate later. Leave it as-is here (no double-abort; it stops before
       `/review:resolve` is invoked).
-- [ ] (Optional follow-up) Confirm whether `review-all.md` Step 12 delegates to
+      **Resolved 2026-08-01: noted as specified.** Verified Step 2a still
+      present (`sweep.md:101` + its error-handling entry at `:174`); left
+      as-is per this item's own instruction. Remains a candidate for a
+      future sweep.md cleanup, deliberately not queued.
+- [x] (Optional follow-up) Confirm whether `review-all.md` Step 12 delegates to
       `/review:resolve` (inherits the check) or reimplements inline; file a
       note either way. Not blocking — Step 4.1's checkout makes it branch-safe
       regardless.
+      **Resolved 2026-08-01: confirmed delegation.** `review-all.md` Step 12
+      reads "run `/review:resolve` flow if any exist" — it delegates rather
+      than reimplementing, so it inherits Step 2b's branch guard, and Step
+      4.1's checkout makes it branch-safe regardless. No change needed.
 - [x] `pnpm changeset` → **patch** bump for `yellow-review` (behavior change
       inside an existing command; not a new command/skill/agent). Commit the
       `.changeset/*.md`.
