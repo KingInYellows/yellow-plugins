@@ -1,5 +1,19 @@
 # Feature: `library-context` Follow-ups (RULE 13 lint + cache hook)
 
+> **Status: SUPERSEDED — both PRs shipped independently of this plan.**
+> PR-A (RULE 13 context7 drift lint) merged as **#597** (`b9f96daf`,
+> 2026-07-01): `CONTEXT7_TOOLS`/`LIBRARY_CONTEXT_SENTINEL` constants and
+> the check live in `scripts/validate-agent-authoring.js`, the planned
+> test file `tests/integration/validate-agent-authoring-context7-rule.test.ts`
+> exists, and reference.md carries the "Adoption" section (task A.7).
+> PR-B (SessionStart cache pre-warm hook) merged as **#537**
+> (2026-05-18): all `_lc_*` functions live in
+> `hooks/lib/context7-cache.sh` with bats coverage folded into
+> `context7-cache.bats` (a superset of the planned separate file).
+> Surrounding scope shipped via #536/#538/#598. Task boxes below are
+> ticked as shipped-via-#597/#537, not as executed-from-this-plan.
+> Archived for the record.
+
 ## Problem Statement
 
 PR #536 shipped the canonical `library-context` skill at
@@ -101,28 +115,28 @@ when any tracked lockfile (`package-lock.json`, `pnpm-lock.yaml`,
 
 ### PR-A: RULE 13 lint
 
-- [ ] A.1 Verify PR #536 has merged to main (`gh pr view 536 --json mergedAt -q .mergedAt | grep -v null`); if not merged, stop. RULE 13 will fail CI on main without #536's `skills: [library-context]` frontmatter on `code-researcher`.
-- [ ] A.2 Sync main and create branch `agent/feat/rule-13-context7-drift-lint` off the post-#536 tip.
-- [ ] A.3 Add module-scope constants to `scripts/validate-agent-authoring.js` near `REVIEW_AGENT_DENIED_TOOLS` (~line 19): `CONTEXT7_TOOLS = new Set(['mcp__context7__resolve-library-id', 'mcp__context7__query-docs', 'mcp__context7__get-library-docs'])` and `LIBRARY_CONTEXT_SENTINEL = 'context7 unavailable — falling back to'` (write the em dash as `—` to be unambiguous in source).
-- [ ] A.4 Add RULE 13 logic in `validateAgentFile()` after line 318 (the `const skills = new Set(parseList(frontmatter, 'skills'))` line), still inside the `if (!hasAllowedTools)` gate: check `tools.some(t => CONTEXT7_TOOLS.has(t))`; if true, check `skills.has('library-context')` OR `content.includes(LIBRARY_CONTEXT_SENTINEL)`; if neither, push error with both fix paths named.
-- [ ] A.5 Error message format: ``${relative(filePath)}: references context7 tool without `skills: [library-context]` preload or drift sentinel in body (RULE 13). Fix: either add `library-context` to `skills:` frontmatter, OR include `context7 unavailable — falling back to` in the agent body.``
-- [ ] A.6 Create `tests/integration/validate-agent-authoring-context7-rule.test.ts` with 5 fixture tests using `writeAgent()` from the existing `tests/integration/helpers/validator-harness.ts`. Each fixture body uses `—` for the em dash, NOT `--`.
-- [ ] A.7 Delete the "Opt-in candidates for follow-up adoption" section from `plugins/yellow-research/skills/library-context/reference.md`. Replace with a one-paragraph "Adoption" section explaining the safe-chain pattern is documented for future use but not pre-tracked.
-- [ ] A.8 Run gates: `pnpm validate:schemas && pnpm test:integration && pnpm lint && pnpm typecheck`. Confirm `validate:agents` exits 0 against current `plugins/` tree (both existing consumers should pass — preload-exempt for code-researcher, inline-exempt for best-practices-researcher).
-- [ ] A.9 Add `.changeset/rule-13-context7-drift-lint.md`: `yellow-research` patch.
-- [ ] A.10 LF normalize (`sed -i 's/\r$//' ...`), commit, `gt submit --no-interactive`.
+- [x] A.1 Verify PR #536 has merged to main (`gh pr view 536 --json mergedAt -q .mergedAt | grep -v null`); if not merged, stop. RULE 13 will fail CI on main without #536's `skills: [library-context]` frontmatter on `code-researcher`.
+- [x] A.2 Sync main and create branch `agent/feat/rule-13-context7-drift-lint` off the post-#536 tip.
+- [x] A.3 Add module-scope constants to `scripts/validate-agent-authoring.js` near `REVIEW_AGENT_DENIED_TOOLS` (~line 19): `CONTEXT7_TOOLS = new Set(['mcp__context7__resolve-library-id', 'mcp__context7__query-docs', 'mcp__context7__get-library-docs'])` and `LIBRARY_CONTEXT_SENTINEL = 'context7 unavailable — falling back to'` (write the em dash as `—` to be unambiguous in source).
+- [x] A.4 Add RULE 13 logic in `validateAgentFile()` after line 318 (the `const skills = new Set(parseList(frontmatter, 'skills'))` line), still inside the `if (!hasAllowedTools)` gate: check `tools.some(t => CONTEXT7_TOOLS.has(t))`; if true, check `skills.has('library-context')` OR `content.includes(LIBRARY_CONTEXT_SENTINEL)`; if neither, push error with both fix paths named.
+- [x] A.5 Error message format: ``${relative(filePath)}: references context7 tool without `skills: [library-context]` preload or drift sentinel in body (RULE 13). Fix: either add `library-context` to `skills:` frontmatter, OR include `context7 unavailable — falling back to` in the agent body.``
+- [x] A.6 Create `tests/integration/validate-agent-authoring-context7-rule.test.ts` with 5 fixture tests using `writeAgent()` from the existing `tests/integration/helpers/validator-harness.ts`. Each fixture body uses `—` for the em dash, NOT `--`.
+- [x] A.7 Delete the "Opt-in candidates for follow-up adoption" section from `plugins/yellow-research/skills/library-context/reference.md`. Replace with a one-paragraph "Adoption" section explaining the safe-chain pattern is documented for future use but not pre-tracked.
+- [x] A.8 Run gates: `pnpm validate:schemas && pnpm test:integration && pnpm lint && pnpm typecheck`. Confirm `validate:agents` exits 0 against current `plugins/` tree (both existing consumers should pass — preload-exempt for code-researcher, inline-exempt for best-practices-researcher).
+- [x] A.9 Add `.changeset/rule-13-context7-drift-lint.md`: `yellow-research` patch.
+- [x] A.10 LF normalize (`sed -i 's/\r$//' ...`), commit, `gt submit --no-interactive`.
 
 ### PR-B: SessionStart cache hook
 
-- [ ] B.1 Branch `agent/feat/library-context-cache-hook` from main (independent of PR-A; no ordering dependency).
-- [ ] B.2 Read the existing `plugins/yellow-research/hooks/write-credential-status.sh` end-to-end to confirm the shape: where credential_hook_scaffold is called, where JSON output is emitted, what env vars are guarded. The new cache logic appends AFTER the credential-status scaffold call but BEFORE the JSON-output line.
-- [ ] B.3 Add the cache helper functions in the same file (or a sourced `lib/context7-cache.sh` in `plugins/yellow-research/lib/`). Functions: `_lc_cache_path` (md5 hash of CLAUDE_PROJECT_DIR), `_lc_cache_age` (now - file mtime), `_lc_scan_lockfiles` (returns deduped library names), `_lc_resolve_library_id` (HTTP call with optional API key), `_lc_write_cache_atomic` (tmp + mv).
-- [ ] B.4 Wire the pre-warm logic: if `CLAUDE_PLUGIN_DATA` is unset → warn to stderr, skip. If lockfiles absent → warn to stderr, skip. If cache age < 86400 (24h) → skip. Else scan lockfiles, take top 5 deduped names, call `_lc_resolve_library_id` for each (anonymous or authenticated based on `CONTEXT7_API_KEY`), write atomically.
-- [ ] B.5 Hook output: continue using the existing `write-credential-status.sh` output format (whatever it currently emits) — do not change. If pre-warm succeeds, optionally extend with `hookSpecificOutput.additionalContext` mentioning N libraries warmed. Errors during pre-warm are NEVER fatal — always emit `{"continue": true}`.
-- [ ] B.6 Bats tests in `plugins/yellow-research/tests/cache-context7.bats`: 6 cases covering no-lockfile, no-CLAUDE_PLUGIN_DATA, corrupted-cache (re-warms cleanly), fresh-cache (skips), successful warm with anonymous, successful warm with API key (mock the HTTP call).
-- [ ] B.7 Run gates: `pnpm validate:schemas && pnpm test:integration && bats plugins/yellow-research/tests/`.
-- [ ] B.8 Add `.changeset/library-context-cache-hook.md`: `yellow-research` minor (additive feature).
-- [ ] B.9 LF normalize, commit, `gt submit --no-interactive`.
+- [x] B.1 Branch `agent/feat/library-context-cache-hook` from main (independent of PR-A; no ordering dependency).
+- [x] B.2 Read the existing `plugins/yellow-research/hooks/write-credential-status.sh` end-to-end to confirm the shape: where credential_hook_scaffold is called, where JSON output is emitted, what env vars are guarded. The new cache logic appends AFTER the credential-status scaffold call but BEFORE the JSON-output line.
+- [x] B.3 Add the cache helper functions in the same file (or a sourced `lib/context7-cache.sh` in `plugins/yellow-research/lib/`). Functions: `_lc_cache_path` (md5 hash of CLAUDE_PROJECT_DIR), `_lc_cache_age` (now - file mtime), `_lc_scan_lockfiles` (returns deduped library names), `_lc_resolve_library_id` (HTTP call with optional API key), `_lc_write_cache_atomic` (tmp + mv).
+- [x] B.4 Wire the pre-warm logic: if `CLAUDE_PLUGIN_DATA` is unset → warn to stderr, skip. If lockfiles absent → warn to stderr, skip. If cache age < 86400 (24h) → skip. Else scan lockfiles, take top 5 deduped names, call `_lc_resolve_library_id` for each (anonymous or authenticated based on `CONTEXT7_API_KEY`), write atomically.
+- [x] B.5 Hook output: continue using the existing `write-credential-status.sh` output format (whatever it currently emits) — do not change. If pre-warm succeeds, optionally extend with `hookSpecificOutput.additionalContext` mentioning N libraries warmed. Errors during pre-warm are NEVER fatal — always emit `{"continue": true}`.
+- [x] B.6 Bats tests in `plugins/yellow-research/tests/cache-context7.bats`: 6 cases covering no-lockfile, no-CLAUDE_PLUGIN_DATA, corrupted-cache (re-warms cleanly), fresh-cache (skips), successful warm with anonymous, successful warm with API key (mock the HTTP call).
+- [x] B.7 Run gates: `pnpm validate:schemas && pnpm test:integration && bats plugins/yellow-research/tests/`.
+- [x] B.8 Add `.changeset/library-context-cache-hook.md`: `yellow-research` minor (additive feature).
+- [x] B.9 LF normalize, commit, `gt submit --no-interactive`.
 
 ## Technical Details
 
@@ -251,3 +265,13 @@ runtime queries from agents.
 - Closed cross-plugin skills issue: https://github.com/anthropics/claude-code/issues/15944
 - Context7 platform: https://glama.ai/mcp/servers/upstash/context7-mcp; https://github.com/upstash/context7
 - Claude Code hooks reference: https://code.claude.com/docs/en/hooks
+
+## Review changelog
+
+- **2026-08-01 — superseded-and-archived.** Verified against `origin/main`:
+  PR-A shipped as #597 (2026-07-01), PR-B as #537 (2026-05-18); every
+  deliverable confirmed present (validator constants + check, context7
+  rule test file, reference.md Adoption section, `_lc_*` hook functions,
+  bats coverage). Boxes ticked as shipped-via; plan archived. The
+  "opt-in adoption to 8 plugins" idea is deliberately not queued — see
+  reference.md's Adoption section.
