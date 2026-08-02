@@ -359,6 +359,13 @@ case "$CT" in
     CT=600
     ;;
 esac
+# Bound the digit-validated value: 0 DISABLES timeout(1) entirely, and
+# oversized integers overflow the +30 arithmetic (length check first so
+# arithmetic never touches an unbounded number).
+if [ "${#CT}" -gt 5 ] || [ "$(( 10#$CT ))" -lt 1 ] || [ "$(( 10#$CT ))" -gt 86400 ]; then
+  printf 'Warning: COUNCIL_TIMEOUT=%s out of range (1-86400 seconds); falling back to 600\n' "$CT" >&2
+  CT=600
+fi
 cd "${PACK_FILE%/pack.txt}" && \
 timeout --signal=TERM --kill-after=10 "$CT" \
   agy --sandbox \

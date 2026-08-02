@@ -134,7 +134,7 @@ Codex agent.)
 - **agy workspace trust in print mode is unverified.** The Antigravity CLI
   tracks `trustedWorkspaces` in its settings; the 2026-08-01 spike ran only
   in an already-trusted repo. If a first `/council` run in a new directory
-  hangs, run `agy -p "test"` interactively once — the reviewer's timeout
+  hangs, run bare `agy` once — interactive first-run onboarding handles trust and token migration (`-p` is explicitly noninteractive and may repeat the hang); the reviewer's timeout
   guard catches the hang and reports TIMEOUT either way.
 - **agy has no read-only mode.** `--sandbox` restricts the terminal only —
   the 2026-08-01 spike confirmed agy will create files in print mode with

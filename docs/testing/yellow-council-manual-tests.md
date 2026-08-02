@@ -190,7 +190,7 @@ environment before declaring failures:
   2026-08-01 the Gemini slot invokes `agy` (Antigravity CLI) — the legacy
   `gemini` binary stopped serving consumer subscriptions on 2026-06-18. If
   the agy invocation hangs (e.g. first run in a not-yet-trusted workspace),
-  run `agy -p "test"` interactively once and record the workaround in your
+  run bare `agy` once (interactive onboarding handles trust/token migration; `-p` is noninteractive) and record the workaround in your
   test run notes (or PR description if running pre-merge). See
   `docs/spikes/antigravity-cli-headless-2026-08.md`.
 - **OpenCode CLI v1.1.x → v1.14+ upgrade triggers a one-time SQLite

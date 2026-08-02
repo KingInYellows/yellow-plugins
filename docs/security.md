@@ -88,9 +88,11 @@ above:
 2. No API key or environment variable is configured by or read from plugin
    code; auth is subscription-based (Google AI Pro/Ultra or the free
    individual tier), same as the CLI it replaces
-3. `council:setup` does not verify authentication — run `agy -p "test"`
-   once interactively before the first `/council` invocation so onboarding
-   completes
+3. `council:setup` does not verify authentication — run bare `agy` once
+   before the first `/council` invocation so interactive onboarding
+   completes (trust + token migration; `-p` is explicitly noninteractive
+   and does not perform onboarding), then optionally `agy -p "test"` to
+   confirm headless auth works
 4. Credential lifecycle (re-auth, revocation) is entirely `agy`'s own; this
    repo provides no revoke path and does not manage the keyring entry
 

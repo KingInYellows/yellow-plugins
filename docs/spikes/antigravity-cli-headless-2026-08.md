@@ -142,7 +142,7 @@ config; assume lineage `google` for the slot. MCP config lives at
   classification — safe against unknown codes.
 - Behavior in an untrusted workspace (`trustedWorkspaces` setting) in print
   mode — this spike ran in an already-trusted repo. If a first `/council`
-  run in a new directory hangs, run `agy -p "test"` interactively once.
+  run in a new directory hangs, run bare `agy` once — its interactive onboarding handles workspace trust; `-p` is explicitly noninteractive and may repeat the hang.
 - Quota-exhaustion error strings — no official Antigravity catalog
   published; `RESOURCE_EXHAUSTED` remains the assumed floor (V2 shell 04
   concern, not Phase G).
@@ -150,10 +150,12 @@ config; assume lineage `google` for the slot. MCP config lives at
 ## Resulting invocation (adopted by gemini-reviewer.md)
 
 ```bash
+# CT = COUNCIL_TIMEOUT validated as plain decimal in 1..86400 (falls back
+# to 600 otherwise) — see gemini-reviewer.md Step 3 for the full guard.
 cd "$PACK_DIR" && \
-timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
+timeout --signal=TERM --kill-after=10 "$CT" \
   agy --sandbox \
-    --print-timeout "$(( ${COUNCIL_TIMEOUT:-600} + 30 ))s" \
+    --print-timeout "$(( 10#$CT + 30 ))s" \
     -p "Read the file $PACK_FILE in the current directory, in full. Its final line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that precede it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 # Step 5 gate: grep the output for "INGEST_TOKEN: <token>" — missing echo

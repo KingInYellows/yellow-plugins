@@ -179,6 +179,14 @@ case "$CT" in
     CT=600
     ;;
 esac
+# Bound the digit-validated value: 0 DISABLES timeout(1) entirely (leaving
+# only agy's internal cutoff and bypassing 124/137 classification), and
+# oversized integers overflow the +30 arithmetic. Length check first so the
+# arithmetic below never touches an unbounded number.
+if [ "${#CT}" -gt 5 ] || [ "$(( 10#$CT ))" -lt 1 ] || [ "$(( 10#$CT ))" -gt 86400 ]; then
+  printf '[gemini-reviewer] Warning: COUNCIL_TIMEOUT=%s out of range (1-86400 seconds); falling back to 600\n' "$CT" >&2
+  CT=600
+fi
 
 # Deliver the pack as a workspace file, NOT via stdin and NOT via argv
 # interpolation: agy ignores piped stdin (spike 2026-08-01), and a single
@@ -478,6 +486,7 @@ Known gotchas:
   consumer-subscription requests on 2026-06-18 — `command -v gemini`
   succeeding does not mean it works; this agent checks for `agy` only
 - First run in a not-yet-trusted workspace is unverified in print mode — if
-  a first `/council` invocation in a new directory hangs, run
-  `agy -p "test"` interactively once (the timeout guard catches the hang
-  and reports TIMEOUT either way)
+  a first `/council` invocation in a new directory hangs, run bare `agy`
+  once: its interactive first-run onboarding handles workspace trust and
+  token migration, whereas `-p` is explicitly noninteractive and may repeat
+  the hang (the timeout guard catches it and reports TIMEOUT either way)
