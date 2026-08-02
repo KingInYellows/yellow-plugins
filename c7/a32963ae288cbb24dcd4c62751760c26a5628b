@@ -1,0 +1,36 @@
+docs/brainstorms/2026-08-01-yellow-council-v2-rescope-brainstorm.md
+  s_d1407dc7c26789::t_3ddce58b047527 1-57
+plans/specs/yellow-council-v2-four-cli.md
+  s_d1407dc7c26789::t_512b43cff08460 97
+  s_d1407dc7c26789::t_19bfe6981947b9 222-227
+  s_d1407dc7c26789::t_d6d0c8c2ca7eaf 1-96,98-221,228-268
+plans/shells/yellow-council-v2-four-cli-03-synthesis-bias-mitigation.md
+  s_d1407dc7c26789::t_7b5544c2efd491 1-78
+plans/shells/yellow-council-v2-four-cli-05-evidence-verification-and-finalization.md
+  s_d1407dc7c26789::t_aebda5abdfd6ff 1-88
+plans/shells/yellow-council-v2-four-cli-02-claude-reviewer-fanout.md
+  s_d1407dc7c26789::t_5e5c6a7f7f8260 1-74
+plans/shells/yellow-council-v2-four-cli-04-quota-and-opencode-routing.md
+  s_d1407dc7c26789::t_99332949f25eae 1-91
+docs/research/yellow-council-v2-revalidation-2026-08-01.md
+  s_d1407dc7c26789::t_f204685da0c8c3 1,4
+  s_d1407dc7c26789::t_6135f77191f323 2-3,5-813
+plans/shells/yellow-council-v2-four-cli-01-codex-contract-normalization.md
+  s_d1407dc7c26789::t_834afc6274d349 1-59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "c7a32963ae288cbb24dcd4c62751760c26a5628b",
+  "prompts": {},
+  "sessions": {
+    "s_d1407dc7c26789": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3f299f8-a143-438f-a4ca-66861862d44e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
