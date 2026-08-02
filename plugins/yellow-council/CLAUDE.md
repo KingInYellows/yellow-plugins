@@ -78,7 +78,8 @@ and never auto-commits. The user decides what to do with the verdicts.
   `cd "$PACK_DIR" && agy --sandbox --print-timeout <duration> -p "<short trusted pointer to $PACK_FILE>"`
   (pack delivered as a workspace file — agy ignores piped stdin, and argv is
   capped at ~128KiB; cwd-isolated to the pack dir; pack ingestion verified
-  via INGEST_TOKEN echo). Spawned via
+  via a final-line INGEST_TOKEN echo — proves the file was read to its end,
+  not that instructions were followed). Spawned via
   `Task(subagent_type="yellow-council:review:gemini-reviewer")`.
 - `opencode-reviewer` — OpenCode CLI wrapper. Invokes
   `opencode run --format json --variant high "<prompt>"` plus session cleanup

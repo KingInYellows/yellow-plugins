@@ -131,14 +131,17 @@ Capture the three literal paths AND the token this prints — Bash variables
 do NOT survive across separate Bash invocations, so every later block in
 this procedure re-assigns them from the printed literals. The INGEST_TOKEN
 exists to make pack ingestion verifiable: it is written ONLY into the pack
-file (never into the `-p` prompt), so the CLI can echo it back only by
-actually reading the file — Step 5 rejects output that lacks the echo.
+file (never into the `-p` prompt) as the file's FINAL line, so the CLI can
+echo it back only by reading the file through to its end — Step 5 rejects
+output that lacks the echo. (Scope of the guarantee: it deterministically
+rejects the opened-nothing / stopped-early failure modes; it cannot prove
+the model *followed* the pack instructions.)
 
 Use the `Write` tool to create the file at the literal PACK_FILE path
-printed above, with this exact content: first line
-`INGEST_TOKEN: <the literal token printed above>`, then one blank line,
-then the pack content from your spawn prompt (verbatim, including all
-fenced sections). The file does not yet exist — `mktemp -d` above created
+printed above, with this exact content: the pack content from your spawn
+prompt (verbatim, including all fenced sections), then one blank line, then
+a FINAL line `INGEST_TOKEN: <the literal token printed above>`. The file
+does not yet exist — `mktemp -d` above created
 only the parent directory — so `Write` can create it directly without first
 needing to `Read` it (`Write` refuses to overwrite an existing file that has
 not been read in the session).
@@ -205,7 +208,7 @@ cd "${PACK_FILE%/pack.txt}" && \
 timeout --signal=TERM --kill-after=10 "$CT" \
   agy --sandbox \
     --print-timeout "$(( 10#$CT + 30 ))s" \
-    -p "Read the file ${PACK_FILE} in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that come after it. Do not create, modify, or delete any files." \
+    -p "Read the file ${PACK_FILE} in the current directory, in full. Its final line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that precede it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 CLI_EXIT=$?
 printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
@@ -299,10 +302,12 @@ STDERR_FILE="<literal stderr-file path>"
 INGEST_TOKEN="<literal ingest token>"
 
 # --- Verify pack ingestion (spike 2026-08-01) ---
-# The token lives ONLY in the pack file, never in the -p prompt, so its
-# presence in the output proves the CLI actually read the pack. Without
-# this check, a failed/partial file read would still exit 0 and produce a
-# plausible-looking verdict synthesized from nothing.
+# The token lives ONLY in the pack file, never in the -p prompt, and sits
+# on the file's FINAL line — so its presence in the output proves the CLI
+# opened the pack and read through to the end. Scope: this deterministically
+# rejects the opened-nothing / stopped-early failure modes (which would
+# otherwise exit 0 with a verdict synthesized from unread input); it cannot
+# prove the model followed the pack's instructions.
 if ! grep -q "INGEST_TOKEN: ${INGEST_TOKEN}" "$OUTPUT_FILE"; then
   printf '[gemini-reviewer] ingest token missing from CLI output — pack was not (fully) read\n' >&2
   printf 'verdict=ERROR\n'
@@ -455,8 +460,10 @@ invocation patterns:
   prohibition in the `-p` prompt, NOT by any flag (nothing replaces the
   retired `--approval-mode plan`; there is no `--skip-trust` equivalent)
 - Pack ingestion is verified via an INGEST_TOKEN echo: the token lives only
-  in the pack file, so its absence from output means the file was not read
-  and the verdict is withheld (ERROR)
+  in the pack file, on its FINAL line, so its absence from output means the
+  file was not read through to the end and the verdict is withheld (ERROR).
+  Scope: rejects opened-nothing / stopped-early reads; does not prove the
+  instructions were followed
 - `--print-timeout <Go duration>` (default `5m0s`) must be set ABOVE the
   external `timeout(1)` guard so exit-code 124/137 timeout classification
   stays authoritative

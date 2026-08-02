@@ -363,7 +363,7 @@ cd "${PACK_FILE%/pack.txt}" && \
 timeout --signal=TERM --kill-after=10 "$CT" \
   agy --sandbox \
     --print-timeout "$(( 10#$CT + 30 ))s" \
-    -p "Read the file ${PACK_FILE} in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that come after it. Do not create, modify, or delete any files." \
+    -p "Read the file ${PACK_FILE} in the current directory, in full. Its final line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that precede it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 ```
 - `-p`/`--print`/`--prompt`: non-interactive single prompt, plain-text
@@ -378,9 +378,11 @@ timeout --signal=TERM --kill-after=10 "$CT" \
   checkout out of agy's workspace; the `-p` prohibition line is the second
   layer. Nothing replaces the retired `--approval-mode plan`.
 - INGEST_TOKEN echo is MANDATORY: the token is written only into the pack
-  file (never the `-p` prompt), and the reviewer rejects output that lacks
-  the echoed token — otherwise a failed/partial file read still exits 0 and
-  yields a verdict synthesized from unread input
+  file (never the `-p` prompt) as the file's FINAL line, and the reviewer
+  rejects output that lacks the echoed token — otherwise an opened-nothing
+  or stopped-early file read still exits 0 and yields a verdict synthesized
+  from unread input. Scope: the echo proves the file was read through to
+  its end, not that the instructions were followed
 - `--print-timeout`: agy's internal print-mode cutoff defaults to `5m0s` —
   set it ABOVE the external `timeout(1)` guard so 124/137 timeout
   classification stays authoritative

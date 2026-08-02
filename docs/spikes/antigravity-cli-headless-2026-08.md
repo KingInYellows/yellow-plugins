@@ -83,10 +83,11 @@ $ agy --sandbox --add-dir "$D" -p "Read the file $D/pack.txt and reply with the 
 MARKER-BRAVO-9913     # exit 0
 ```
 
-This is the replacement pack-delivery mechanism: stage the pack to the
-mktemp dir (unchanged), pass `--add-dir "$PACK_DIR"`, and make `-p` a short
-trusted pointer instructing the CLI to read the pack file. No interactive
-permission prompt fired in `--sandbox` print mode for the file read.
+This test used `--add-dir`; the ADOPTED mechanism (see "Resulting
+invocation" below) instead runs agy with its cwd set to the pack dir —
+which both grants the read (cwd is the workspace) and keeps the repo
+checkout out of agy's workspace. Either way: no interactive permission
+prompt fired in `--sandbox` print mode for the file read.
 
 ### 6. `--sandbox` does NOT block file writes — write test
 
@@ -108,11 +109,16 @@ enforcement, honestly documented as weaker than the retired flag.
 Because pack delivery is now an agentic file read (not deterministic
 stdin), a failed or partial read would still exit 0 and produce a
 plausible verdict from unread input. Fix: write a random
-`INGEST_TOKEN: <hex>` line as the pack file's first line (token appears
+`INGEST_TOKEN: <hex>` line as the pack file's FINAL line (token appears
 ONLY in the file, never in `-p`), instruct the CLI to begin its response by
-echoing that line, and reject output lacking the echo. Verified: token
-echoed correctly from a cwd-isolated pack dir, no trust-prompt hang, no
-stray files created.
+echoing that line, and reject output lacking the echo. Placing the token
+last means the echo proves the file was read through to its end — a
+line-1 placement would pass on a read that stopped after the first line.
+Scope either way: the gate rejects opened-nothing / stopped-early reads;
+it cannot prove the instructions were followed. Verified: token echoed
+correctly from a cwd-isolated pack dir (the verification run below used a
+line-1 token; the mechanism is position-independent), no trust-prompt
+hang, no stray files created.
 
 ```bash
 $ cd "$D" && agy --sandbox --print-timeout 90s -p "Read the file $D/pack.txt in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, ..."
@@ -148,8 +154,8 @@ cd "$PACK_DIR" && \
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
   agy --sandbox \
     --print-timeout "$(( ${COUNCIL_TIMEOUT:-600} + 30 ))s" \
-    -p "Read the file $PACK_FILE in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that come after it. Do not create, modify, or delete any files." \
+    -p "Read the file $PACK_FILE in the current directory, in full. Its final line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that precede it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 # Step 5 gate: grep the output for "INGEST_TOKEN: <token>" — missing echo
-# → verdict=ERROR (pack not read), never a synthesized verdict.
+# → verdict=ERROR (pack not read to its end), never a synthesized verdict.
 ```
