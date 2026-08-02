@@ -1,0 +1,31 @@
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_d1407dc7c26789::t_9ab7ec1ac32c71 489-492
+  s_d1407dc7c26789::t_8b57ebda9c56d5 182-189
+docs/spikes/antigravity-cli-headless-2026-08.md
+  s_d1407dc7c26789::t_c2575a46ecccbc 153-154,156,158
+  s_d1407dc7c26789::t_1ab3b1a07f69f1 145
+docs/testing/yellow-council-manual-tests.md
+  s_d1407dc7c26789::t_1ab3b1a07f69f1 193
+docs/security.md
+  s_d1407dc7c26789::t_a61586eccf6782 91-95
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_d1407dc7c26789::t_03877889b8a50e 362-368
+plugins/yellow-council/CLAUDE.md
+  s_d1407dc7c26789::t_1ab3b1a07f69f1 137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "0bc5ad96eccabebcc631c7bc3c41ca33df94f0dd",
+  "prompts": {},
+  "sessions": {
+    "s_d1407dc7c26789": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3f299f8-a143-438f-a4ca-66861862d44e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
