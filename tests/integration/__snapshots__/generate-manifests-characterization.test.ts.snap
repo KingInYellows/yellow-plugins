@@ -167,7 +167,7 @@ exports[`manifest byte-identity baseline > .claude-plugin/marketplace.json raw b
     {
       "name": "yellow-council",
       "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
-      "version": "0.2.9",
+      "version": "0.2.10",
       "author": {
         "name": "KingInYellows"
       },
@@ -480,7 +480,7 @@ exports[`manifest byte-identity baseline > plugins/yellow-council/.claude-plugin
 "{
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "yellow-council",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
   "author": {
     "name": "KingInYellows",
