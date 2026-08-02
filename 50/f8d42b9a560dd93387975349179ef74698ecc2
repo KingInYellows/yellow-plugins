@@ -1,0 +1,40 @@
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_d1407dc7c26789::t_a5458177760ffc 349-361,363,365,369-370
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_d1407dc7c26789::t_d8defdeb6c06b5 107
+  s_d1407dc7c26789::t_94fdea615fa25b 165-179,188,190-199,205,207
+  s_d1407dc7c26789::t_15a0ad7cda161b 230,237,240
+  s_d1407dc7c26789::t_6e7456ddc3f945 269
+  s_d1407dc7c26789::t_7ab01878ea3edb 212,215-219
+.changeset/yellow-council-antigravity-migration.md
+  s_d1407dc7c26789::t_4c0d44cc88f9a2 2
+docs/testing/yellow-council-manual-tests.md
+  s_d1407dc7c26789::t_986fe1567df718 44
+  s_d1407dc7c26789::t_0b5488070d1d8b 221
+  s_d1407dc7c26789::t_13bf604489b82e 5
+docs/security.md
+  s_d1407dc7c26789::t_accd44220150d6 32-33
+  s_d1407dc7c26789::t_9ed8ee18d76d42 223-252,266
+  s_d1407dc7c26789::t_a613227351d12d 78-99
+plugins/yellow-council/README.md
+  s_d1407dc7c26789::t_32ca09e4d39df6 4-5
+plugins/yellow-council/CLAUDE.md
+  s_d1407dc7c26789::t_8302fdf2ae995b 140-153
+  s_d1407dc7c26789::t_27828793ddd03c 121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "50f8d42b9a560dd93387975349179ef74698ecc2",
+  "prompts": {},
+  "sessions": {
+    "s_d1407dc7c26789": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3f299f8-a143-438f-a4ca-66861862d44e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
