@@ -1,0 +1,51 @@
+plugins/yellow-council/skills/council-patterns/references/cross-references.md
+  s_d1407dc7c26789::t_7648aea795e813 13-19
+.changeset/yellow-council-antigravity-migration.md
+  s_d1407dc7c26789::t_ab700ae64ead90 1-5
+plugins/yellow-council/commands/council/setup.md
+  s_d1407dc7c26789::t_db47875ea11f88 147
+  s_d1407dc7c26789::t_a75ef599f00587 183-184
+  s_d1407dc7c26789::t_cd60674d0d7a23 13-17
+  s_d1407dc7c26789::t_7a7c0ac158a715 3
+  s_d1407dc7c26789::t_d5eee13614f369 170
+  s_d1407dc7c26789::t_fa39efe25f0267 43-47,50-58,60,62-64,66,70,72,74,76,79-83
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_d1407dc7c26789::t_b0684ee0a0e5f3 346-347,350-353,356-369
+docs/spikes/antigravity-cli-headless-2026-08.md
+  s_d1407dc7c26789::t_4f26491fc7441b 1-119
+docs/testing/yellow-council-manual-tests.md
+  s_d1407dc7c26789::t_174c2158df55be 189-195
+plugins/yellow-council/CLAUDE.md
+  s_d1407dc7c26789::t_ee30607703370f 129-140
+  s_d1407dc7c26789::t_50c657efef97b8 45-50
+  s_d1407dc7c26789::t_0a704dc8b678bc 21-23
+  s_d1407dc7c26789::t_9472878bcd7aa6 73-76
+plugins/yellow-council/README.md
+  s_d1407dc7c26789::t_e360f5dc2df279 16-18
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_d1407dc7c26789::t_f25155bf13de30 378-395,399-407
+  s_d1407dc7c26789::t_18a733f840a69c 19-22,28
+  s_d1407dc7c26789::t_75cc7cc1809a3a 109,112-116
+  s_d1407dc7c26789::t_34eaa566cc9bd3 204,207
+  s_d1407dc7c26789::t_d04ea93392e763 42
+  s_d1407dc7c26789::t_09a3d25d98a4a1 83-84,88
+  s_d1407dc7c26789::t_be2233774e3d0c 3
+  s_d1407dc7c26789::t_8e40239258f265 157-158,160-166,168-171
+  s_d1407dc7c26789::t_1c9b5b5e851345 61-62,66,73,75-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "99b840c70f735bcd3ccc95e2a4434e54570c6c68",
+  "prompts": {},
+  "sessions": {
+    "s_d1407dc7c26789": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3f299f8-a143-438f-a4ca-66861862d44e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
