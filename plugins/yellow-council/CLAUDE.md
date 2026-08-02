@@ -45,9 +45,12 @@ and never auto-commits. The user decides what to do with the verdicts.
 - **Read-only invocation.** Reviewers must NOT use
   `--dangerously-skip-permissions` (agy, OpenCode) or
   `--sandbox workspace-write` (Codex). Read-only behavior is enforced via
-  prompt design + safe defaults (agy `--sandbox`, OpenCode default
-  permissions, Codex `-c 'sandbox_mode="read-only"'
-  -c 'approval_policy="never"'`).
+  prompt design + safe defaults (OpenCode default permissions, Codex
+  `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"'`). For agy
+  there is NO read-only flag — `--sandbox` is terminal restrictions only
+  (spike-verified it can still write files in print mode); containment is
+  cwd-isolation to the throwaway pack dir plus an explicit prohibition in
+  the `-p` prompt. See Known Limitations.
 - **Path validation.** All `--paths` and file inputs validated via SKILL
   pattern (regex + `..` reject + existence check) before constructing shell
   args.
@@ -72,9 +75,10 @@ and never auto-commits. The user decides what to do with the verdicts.
 
 - `gemini-reviewer` — Antigravity CLI (`agy`) wrapper for the Google lineage
   slot. Invokes
-  `agy --sandbox --add-dir "$PACK_DIR" --print-timeout <duration> -p "<short trusted pointer to $PACK_FILE>"`
+  `cd "$PACK_DIR" && agy --sandbox --print-timeout <duration> -p "<short trusted pointer to $PACK_FILE>"`
   (pack delivered as a workspace file — agy ignores piped stdin, and argv is
-  capped at ~128KiB). Spawned via
+  capped at ~128KiB; cwd-isolated to the pack dir; pack ingestion verified
+  via INGEST_TOKEN echo). Spawned via
   `Task(subagent_type="yellow-council:review:gemini-reviewer")`.
 - `opencode-reviewer` — OpenCode CLI wrapper. Invokes
   `opencode run --format json --variant high "<prompt>"` plus session cleanup
@@ -131,6 +135,14 @@ Codex agent.)
   in an already-trusted repo. If a first `/council` run in a new directory
   hangs, run `agy -p "test"` interactively once — the reviewer's timeout
   guard catches the hang and reports TIMEOUT either way.
+- **agy has no read-only mode.** `--sandbox` restricts the terminal only —
+  the 2026-08-01 spike confirmed agy will create files in print mode with
+  no permission prompt. The reviewer mitigates by running agy with its cwd
+  in the throwaway pack dir (repo checkout stays out of the workspace) and
+  an explicit no-file-modification instruction in the prompt; this is
+  prompt-plus-containment enforcement, weaker than the retired
+  `--approval-mode plan`. Treat any unexpected file mutation after a
+  council run as a bug report for this plugin.
 - **agy `--dangerously-skip-permissions` is unsafe.** It auto-approves every
   tool permission request, including writes (same class as the retired
   gemini `--yolo`). yellow-council MUST NOT use it.

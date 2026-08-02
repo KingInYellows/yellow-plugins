@@ -346,22 +346,28 @@ background, deliberately kept out of the preload budget.
 **Gemini slot — Antigravity CLI `agy`** (direct bash; the legacy `gemini`
 CLI stopped serving consumer subscriptions 2026-06-18):
 ```bash
+cd "${PACK_FILE%/pack.txt}" && \
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
   agy --sandbox \
-    --add-dir "${PACK_FILE%/pack.txt}" \
     --print-timeout "$(( ${COUNCIL_TIMEOUT:-600} + 30 ))s" \
-    -p "Read the file ${PACK_FILE} — it contains your full task (a council review pack). Follow its instructions." \
+    -p "Read the file ${PACK_FILE} in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that come after it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 ```
 - `-p`/`--print`: non-interactive single prompt, plain-text response (agy has
   no `--output-format`/`-o` flag)
 - Pack delivery is a workspace file, NOT stdin: agy ignores piped stdin
   (spike 2026-08-01), and a single argv element caps at ~128KiB on Linux
-  (MAX_ARG_STRLEN), which a large diff pack exceeds — `--add-dir` grants
-  read access to the mktemp pack dir and `-p` carries only the short trusted
-  mktemp path pointer
-- `--sandbox`: terminal restrictions (closest analog to the retired
-  `--approval-mode plan`; no `--skip-trust` equivalent exists)
+  (MAX_ARG_STRLEN), which a large diff pack exceeds — `-p` carries only the
+  short trusted mktemp path pointer
+- `cd "$PACK_DIR"` containment is MANDATORY: `--sandbox` is terminal
+  restrictions only — spike-verified that agy CAN write files in print mode
+  with no prompt. Running from the throwaway pack dir keeps the repo
+  checkout out of agy's workspace; the `-p` prohibition line is the second
+  layer. Nothing replaces the retired `--approval-mode plan`.
+- INGEST_TOKEN echo is MANDATORY: the token is written only into the pack
+  file (never the `-p` prompt), and the reviewer rejects output that lacks
+  the echoed token — otherwise a failed/partial file read still exits 0 and
+  yields a verdict synthesized from unread input
 - `--print-timeout`: agy's internal print-mode cutoff defaults to `5m0s` —
   set it ABOVE the external `timeout(1)` guard so 124/137 timeout
   classification stays authoritative

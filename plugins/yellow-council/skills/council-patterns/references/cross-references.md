@@ -11,9 +11,11 @@ CLI Flag Pattern" section, which stays preloaded).
   Codex reviewer leg via Task spawn — do not duplicate the codex-patterns
   content here.
 - `docs/spikes/antigravity-cli-headless-2026-08.md` — verified Antigravity
-  CLI (agy 1.0.2) invocation for the Gemini slot: `agy --sandbox --add-dir
-  <pack-dir> --print-timeout <duration> -p "<pointer>"`. agy ignores piped
-  stdin; do NOT use `--dangerously-skip-permissions`.
+  CLI (agy 1.0.2) invocation for the Gemini slot: `cd <pack-dir> && agy
+  --sandbox --print-timeout <duration> -p "<pointer>"` with ingest-token
+  echo verification. agy ignores piped stdin; `--sandbox` does NOT block
+  writes (cwd containment + prompt prohibition instead); do NOT use
+  `--dangerously-skip-permissions`.
 - `docs/spikes/gemini-cli-output-format-2026-05-04.md` — provenance only:
   the retired consumer-tier Gemini CLI invocation this plugin used before
   Google's 2026-06-18 shutdown.

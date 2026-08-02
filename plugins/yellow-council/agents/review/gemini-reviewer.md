@@ -63,7 +63,9 @@ The legitimate Bash surface for this agent covers ONLY:
 - `mktemp /tmp/council-gemini-XXXXXX.txt` — output capture
 - `mktemp /tmp/council-gemini-err-XXXXXX.txt` — stderr capture
 - `timeout --signal=TERM --kill-after=10 ${COUNCIL_TIMEOUT:-600}` — timeout guard
-- `agy --sandbox --add-dir "$PACK_DIR" --print-timeout <duration> -p "..."` — Antigravity CLI invocation
+- `od -An -N8 -tx1 /dev/urandom` — ingest-token generation
+- `cd "$PACK_DIR"` — workspace containment (agy's cwd is the throwaway pack dir, never the repo)
+- `agy --sandbox --print-timeout <duration> -p "..."` — Antigravity CLI invocation
 - `awk '...'` — credential redaction
 - `grep` / `awk` / `sed` — output parsing
 - `printf` — structured findings output
@@ -120,18 +122,24 @@ PACK_DIR=$(mktemp -d /tmp/council-gemini-pack-XXXXXX)
 PACK_FILE="$PACK_DIR/pack.txt"
 OUTPUT_FILE=$(mktemp /tmp/council-gemini-out-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/council-gemini-err-XXXXXX.txt)
-printf 'PACK_FILE=%s\nOUTPUT_FILE=%s\nSTDERR_FILE=%s\n' \
-  "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE"
+INGEST_TOKEN=$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')
+printf 'PACK_FILE=%s\nOUTPUT_FILE=%s\nSTDERR_FILE=%s\nINGEST_TOKEN=%s\n' \
+  "$PACK_FILE" "$OUTPUT_FILE" "$STDERR_FILE" "$INGEST_TOKEN"
 ```
 
-Capture the three literal paths this prints — Bash variables do NOT survive
-across separate Bash invocations, so every later block in this procedure
-re-assigns them from the printed literals.
+Capture the three literal paths AND the token this prints — Bash variables
+do NOT survive across separate Bash invocations, so every later block in
+this procedure re-assigns them from the printed literals. The INGEST_TOKEN
+exists to make pack ingestion verifiable: it is written ONLY into the pack
+file (never into the `-p` prompt), so the CLI can echo it back only by
+actually reading the file — Step 5 rejects output that lacks the echo.
 
-Use the `Write` tool to write the pack content from your spawn prompt
-(verbatim, including all fenced sections) to the literal PACK_FILE path
-printed above. The file does not yet exist — `mktemp -d` above created only
-the parent directory — so `Write` can create it directly without first
+Use the `Write` tool to create the file at the literal PACK_FILE path
+printed above, with this exact content: first line
+`INGEST_TOKEN: <the literal token printed above>`, then one blank line,
+then the pack content from your spawn prompt (verbatim, including all
+fenced sections). The file does not yet exist — `mktemp -d` above created
+only the parent directory — so `Write` can create it directly without first
 needing to `Read` it (`Write` refuses to overwrite an existing file that has
 not been read in the session).
 
@@ -157,18 +165,24 @@ STDERR_FILE="<literal stderr-file path>"
 # Deliver the pack as a workspace file, NOT via stdin and NOT via argv
 # interpolation: agy ignores piped stdin (spike 2026-08-01), and a single
 # argv element is capped at ~128KiB on Linux (MAX_ARG_STRLEN), which a
-# large diff pack exceeds. --add-dir grants the CLI read access to the
-# mktemp pack dir; -p carries only a short trusted pointer (the mktemp
-# path — trusted, never pack content). --sandbox enables terminal
-# restrictions (agy has no --approval-mode plan equivalent). The internal
-# --print-timeout must exceed the external timeout(1) guard, or agy's
-# default 5m cutoff fires first and the 124/137 TIMEOUT classification
-# below never triggers.
+# large diff pack exceeds. -p carries only a short trusted pointer (the
+# mktemp path — trusted, never pack content).
+#
+# Containment (spike-verified 2026-08-01): --sandbox is terminal
+# restrictions ONLY — agy CAN still write files in print mode with no
+# prompt. Two mitigations: (1) cd into the throwaway pack dir so agy's
+# workspace is the mktemp dir, not the repo checkout; (2) the -p pointer
+# explicitly prohibits file creation/modification. Read-only behavior is
+# prompt-enforced, not flag-enforced — see Known Limitations in CLAUDE.md.
+#
+# The internal --print-timeout must exceed the external timeout(1) guard,
+# or agy's default 5m cutoff fires first and the 124/137 TIMEOUT
+# classification below never triggers.
+cd "${PACK_FILE%/pack.txt}" && \
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
   agy --sandbox \
-    --add-dir "${PACK_FILE%/pack.txt}" \
     --print-timeout "$(( ${COUNCIL_TIMEOUT:-600} + 30 ))s" \
-    -p "Read the file ${PACK_FILE} — it contains your full task (a council review pack). Follow its instructions." \
+    -p "Read the file ${PACK_FILE} in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that come after it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 CLI_EXIT=$?
 printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
@@ -254,6 +268,22 @@ applied to `$OUTPUT_FILE`:
 PACK_FILE="<literal pack-file path>"
 OUTPUT_FILE="<literal output-file path>"
 STDERR_FILE="<literal stderr-file path>"
+INGEST_TOKEN="<literal ingest token>"
+
+# --- Verify pack ingestion (spike 2026-08-01) ---
+# The token lives ONLY in the pack file, never in the -p prompt, so its
+# presence in the output proves the CLI actually read the pack. Without
+# this check, a failed/partial file read would still exit 0 and produce a
+# plausible-looking verdict synthesized from nothing.
+if ! grep -q "INGEST_TOKEN: ${INGEST_TOKEN}" "$OUTPUT_FILE"; then
+  printf '[gemini-reviewer] ingest token missing from CLI output — pack was not (fully) read\n' >&2
+  printf 'verdict=ERROR\n'
+  printf 'confidence=N/A\n'
+  printf 'summary=Pack ingestion could not be verified (agy output lacks the ingest token) — verdict withheld rather than risk a review of unread input.\n'
+  case "$PACK_FILE" in /tmp/council-gemini-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
+  rm -f "$OUTPUT_FILE" "$STDERR_FILE"
+  exit 0
+fi
 
 # --- Apply credential redaction ---
 REDACTED_FILE=$(mktemp /tmp/council-gemini-redacted-XXXXXX.txt)
@@ -280,6 +310,11 @@ awk '
   print line
 }
 ' "$OUTPUT_FILE" > "$REDACTED_FILE"
+
+# Strip the echoed ingest-token line so it never appears in findings,
+# summaries, or the fenced report (it was verified against $OUTPUT_FILE
+# above and has no further use).
+sed -i '/^INGEST_TOKEN: /d' "$REDACTED_FILE"
 
 # --- Parse structured fields ---
 VERDICT=$(grep -m1 '^Verdict: ' "$REDACTED_FILE" 2>/dev/null | sed 's/^Verdict: //' | head -c 50)
@@ -385,9 +420,15 @@ invocation patterns:
 - `-p`/`--print`/`--prompt` runs a single prompt non-interactively and
   prints the plain-text response (there is NO `--output-format`/`-o` flag)
 - `agy` does NOT read piped stdin — pack delivery is via a workspace file
-  (`--add-dir` + a `-p` pointer to the mktemp path)
-- `--sandbox` enables terminal restrictions (closest analog to the retired
-  `--approval-mode plan`; there is no `--skip-trust` equivalent)
+  (cwd set to the pack dir + a `-p` pointer to the mktemp path)
+- `--sandbox` is terminal restrictions ONLY — spike-verified that agy CAN
+  create files in print mode with no permission prompt. Read-only behavior
+  is enforced by cwd containment (pack dir, not repo) + an explicit
+  prohibition in the `-p` prompt, NOT by any flag (nothing replaces the
+  retired `--approval-mode plan`; there is no `--skip-trust` equivalent)
+- Pack ingestion is verified via an INGEST_TOKEN echo: the token lives only
+  in the pack file, so its absence from output means the file was not read
+  and the verdict is withheld (ERROR)
 - `--print-timeout <Go duration>` (default `5m0s`) must be set ABOVE the
   external `timeout(1)` guard so exit-code 124/137 timeout classification
   stays authoritative

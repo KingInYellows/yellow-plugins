@@ -13,10 +13,12 @@ Task G.1 of the yellow-council V2 revalidation record
 ## Verdict
 
 Migration is viable. Subscription auth carries over (R0 resolves favorably),
-headless print mode works — but **two invocation-breaking differences from
-Gemini CLI** were found: `agy` does not read piped stdin, and none of Gemini
-CLI's `--approval-mode` / `--skip-trust` / `-o` flags exist. Pack delivery
-must switch from stdin to a workspace file the CLI reads itself.
+headless print mode works — but **three invocation-breaking differences from
+Gemini CLI** were found: `agy` does not read piped stdin; none of Gemini
+CLI's `--approval-mode` / `--skip-trust` / `-o` flags exist; and `--sandbox`
+does NOT block file writes (no read-only mode exists at all). Pack delivery
+switches from stdin to a workspace file the CLI reads itself, verified via
+an ingest-token echo, with agy cwd-isolated to the throwaway pack dir.
 
 ## Verified findings
 
@@ -86,7 +88,39 @@ mktemp dir (unchanged), pass `--add-dir "$PACK_DIR"`, and make `-p` a short
 trusted pointer instructing the CLI to read the pack file. No interactive
 permission prompt fired in `--sandbox` print mode for the file read.
 
-### 6. Config relocation (affects lineage detection)
+### 6. `--sandbox` does NOT block file writes — write test
+
+```bash
+$ cd $(mktemp -d) && agy --sandbox --add-dir "$PWD" -p "Create a file named test.txt containing hello, then state whether you succeeded."
+I have created the file test.txt ... Status: Succeeded.     # exit 0, file exists on disk
+```
+
+No permission prompt fired. `--sandbox` is terminal restrictions only —
+there is NO read-only flag replacing Gemini CLI's `--approval-mode plan`.
+Adopted mitigations (both spike-verified in one combined run): (a) invoke
+agy with cwd set to the throwaway pack dir so the repo checkout is outside
+its workspace; (b) an explicit "Do not create, modify, or delete any files"
+instruction in the `-p` prompt. This is containment-plus-prompt
+enforcement, honestly documented as weaker than the retired flag.
+
+### 7. Ingest-token echo — deterministic pack-read verification
+
+Because pack delivery is now an agentic file read (not deterministic
+stdin), a failed or partial read would still exit 0 and produce a
+plausible verdict from unread input. Fix: write a random
+`INGEST_TOKEN: <hex>` line as the pack file's first line (token appears
+ONLY in the file, never in `-p`), instruct the CLI to begin its response by
+echoing that line, and reject output lacking the echo. Verified: token
+echoed correctly from a cwd-isolated pack dir, no trust-prompt hang, no
+stray files created.
+
+```bash
+$ cd "$D" && agy --sandbox --print-timeout 90s -p "Read the file $D/pack.txt in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, ..."
+INGEST_TOKEN: cafe1234beef
+DONE          # exit 0
+```
+
+### 8. Config relocation (affects lineage detection)
 
 `~/.gemini/antigravity-cli/settings.json` exists but holds only
 `colorScheme` / `enableTelemetry` / `trustedWorkspaces` — **no `model`
@@ -110,10 +144,12 @@ config; assume lineage `google` for the slot. MCP config lives at
 ## Resulting invocation (adopted by gemini-reviewer.md)
 
 ```bash
+cd "$PACK_DIR" && \
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
   agy --sandbox \
-    --add-dir "$PACK_DIR" \
     --print-timeout "$(( ${COUNCIL_TIMEOUT:-600} + 30 ))s" \
-    -p "Read the file $PACK_FILE — it contains your full task (a council review pack). Follow its instructions." \
+    -p "Read the file $PACK_FILE in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that come after it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
+# Step 5 gate: grep the output for "INGEST_TOKEN: <token>" — missing echo
+# → verdict=ERROR (pack not read), never a synthesized verdict.
 ```
