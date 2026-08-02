@@ -22,6 +22,21 @@ sweep: skill/doc lockstep, both configuration tables, component counts,
 manual e2e scenarios, and the final validation pass across everything the
 earlier shells shipped.
 
+**Verification handoff contract (same as the synthesis shell):** `verified`
+and `fuzzy-verified` both hold correctness (fuzzy surfaces a qualifier in the
+report); `unverified` fails correctness, so the finding cannot be
+"well-supported" (R15's AND rule). Bucket ties and verdict-splits follow
+R24's precedence exactly: single-reviewer findings split by verification;
+verdict-split beats agreement; agreement splits by verification. A Pass B
+verdict flip stays a `low-confidence-synthesis` tie
+annotation, never a bucket reassignment — flip flag and bucket are
+orthogonal. Verification (R25) runs concurrent with prompt construction, but
+this shell must gate correctness scoring and bucket assignment on
+`verify_finding()`'s return for each finding — Pass A may not finalize a
+finding's rubric output ahead of its own verification result. This rewires
+the self-assessed placeholder to the real result without changing the
+synthesis shell's mechanical combination rule.
+
 ## Produces
 
 - `verify_finding()` helper implementing the Tier 1/Tier 2 cascade with

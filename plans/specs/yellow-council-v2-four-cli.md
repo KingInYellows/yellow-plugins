@@ -11,7 +11,8 @@ non-Big-3 lineage (DeepSeek V4 Pro via OpenRouter). Because Claude both
 reviews and synthesizes, V2 ships a layered set of prompt-only synthesizer-bias
 mitigations (double-blind labels, 2-pass order-swap with flip-as-tie,
 self-participant instruction, rubric decomposition, style-bias normalization +
-synthesizer chain-of-thought) plus Tier 1-2 evidence verification so cited
+a structured enumerate-then-compare rationale requirement) plus Tier 1-2
+evidence verification so cited
 `<file>:<line>` claims are mechanically checked rather than self-assessed.
 Quota handling is deliberately slim: per-reviewer error-string detection
 emitting `verdict=QUOTA_EXHAUSTED` with the provider-reported reset ETA — no
@@ -54,15 +55,35 @@ verification (V3+); direct API auth paths.
   subprocess, no `Bash`), with tools `[Read, Grep, Glob, Write]` (`Write`
   solely to materialize the `fenced_output_path` temp file), `model: inherit`,
   `skills: [council-patterns]`, and emit the same 6-key block as R1.
+  - Enforcement honesty: Claude Code has no runtime path-scoping for
+    `Write` — granting the tool grants it repo-wide. The actual boundary is
+    (a) the R7 validator allowlist entry, which is a review gate, not a
+    runtime guard, and (b) the agent prompt's explicit constraint to write
+    ONLY the fenced-output temp file under `/tmp`. This is a documented,
+    deliberately accepted limitation for V2, not a claim of enforced
+    sandboxing.
+  - Recorded alternative (decide at PR-A, not now): if PR-A review finds
+    the prompt-level constraint too weak, switch to orchestrator-created
+    output files — `council.md` writes the fenced file itself from
+    claude-reviewer's returned text, and claude-reviewer drops `Write`
+    entirely. The spec default stays `[Read, Grep, Glob, Write]` unless
+    PR-A overturns it.
 - **R6.** The claude-reviewer prompt shall use contrarian framing: apply the
   shared rubric, never self-identify as Claude in output, cite findings as
-  `<file>:<line>`, bias toward edge cases / error paths / race conditions /
-  security boundaries, and prefer a defensible `REVISE` over reflex `APPROVE`.
+  `<file>:<line>` plus the verbatim quoted source line the finding is about
+  (the shared citation contract R22 verifies against for all four
+  reviewers — `verify_finding()` needs an expected string to compare
+  against, not just a location), bias toward edge cases / error paths /
+  race conditions / security boundaries, and prefer a defensible `REVISE`
+  over reflex `APPROVE`.
   - Acceptance: post-ship guardrail — if claude-reviewer's REVISE rate
     deviates from the other 3 reviewers' average by more than ±25%, re-tune.
 - **R7.** `scripts/validate-agent-authoring.js` `REVIEW_AGENT_ALLOWLIST` shall
   gain an entry for claude-reviewer documenting the `Write` exception, and
-  `pnpm validate:agents` shall pass.
+  `pnpm validate:agents` shall pass. This allowlist entry is a review-time
+  gate — it makes the exception visible and intentional, not accidental —
+  and does not runtime-restrict what paths `Write` can touch; see R5's
+  enforcement-honesty note for the actual boundary.
 - **R8.** Every per-reviewer loop in `council.md` (parse, synthesis input,
   headline counts, raw-output appendix / report assembly) shall cover all 4
   reviewers; the saved report shall include Claude's raw section.
@@ -70,29 +91,45 @@ verification (V3+); direct API auth paths.
 ### Synthesis bias mitigation
 
 - **R9.** Before synthesis, reviewer identities shall be replaced with labels
-  `R1`–`R4` randomized per invocation; the true mapping shall be restored in
-  the final report's attribution sections.
+  `S1`–`S4` randomized per invocation (chosen to avoid colliding with this
+  spec's own `R`-prefixed requirement ids); the true mapping shall be
+  restored in the final report's attribution sections.
 - **R10.** Before synthesis, each reviewer's findings text shall be
   normalized: markdown/formatting stripped or flattened so styling and
   verbosity differences cannot signal identity or inflate weight (style-bias
   countermeasure, per `docs/solutions/code-quality/llm-as-judge-style-bias-dominance.md`).
-- **R11.** The synthesizer prompt shall require chain-of-thought — enumerate
-  all findings first, then compare — before rendering any verdict, and shall
-  include a self-participant instruction: one anonymized reviewer may share
-  the synthesizer's model family, and findings must be weighed by cited
+- **R11.** The synthesizer prompt shall require a structured
+  enumerate-then-compare rationale — enumerate all findings first, then
+  compare — before rendering any verdict, and shall include a
+  self-participant instruction: one anonymized reviewer may share the
+  synthesizer's model family, and findings must be weighed by cited
   evidence, not rhetorical confidence.
-- **R12.** When 2-pass synthesis is enabled (default ON), synthesis shall run
-  twice with reversed reviewer order; any finding whose verdict or confidence
-  tier differs between passes shall be marked `low-confidence-synthesis` and
+- **R12.** When 2-pass synthesis is enabled (default ON), the two passes are
+  prompt-level reorderings evaluated within a single orchestrator context —
+  a positional-consistency check, NOT two independently invoked, isolated
+  passes. The synthesizer retains awareness of Pass A's order and findings
+  when constructing Pass B; full pass isolation requires the dedicated
+  synthesis subagent explicitly deferred to V3 (see Design's "Synthesis
+  locus" for the documented limitation and revisit trigger). Within that
+  constraint, any finding whose verdict or confidence tier differs between
+  the two reorderings shall be marked `low-confidence-synthesis` and
   presented as a tie showing both readings — never silently resolved. The
   headline shall report the low-confidence count and percentage.
 - **R13.** Users shall be able to disable the second pass globally
   (`COUNCIL_DOUBLE_PASS_SYNTHESIS=0`) or per-invocation
   (`/council review --single-pass`); when disabled, the headline shall omit
   the low-confidence annotation.
-- **R14.** When Pass A succeeds but Pass B hits a Claude quota wall, the run
-  shall ship Pass A's synthesis with a headline annotation naming the skipped
-  flip-analysis and the quota ETA; Pass B shall not be retried in-session.
+- **R14.** Pass A and Pass B are issued as two separate orchestrator steps
+  (sequential completions within the same context, not sub-steps of one
+  shared completion), so Pass A's result is already captured before Pass B
+  is requested. When Pass B's construction fails outright — a Claude quota
+  wall hit before Pass B starts or completes — the run shall ship Pass A's
+  synthesis with a headline annotation naming the skipped flip-analysis and
+  the quota ETA; Pass B shall not be retried in-session. If the quota wall
+  instead lands mid-way through Pass B's own completion, there is no partial
+  Pass B result to salvage: the run degrades to the same Pass-A-only
+  annotation and says so in the headline — inline synthesis cannot resume a
+  completion once the quota wall lands inside it.
 - **R15.** Synthesis shall score each finding on independent rubric
   dimensions — correctness of cited evidence (backed by R22
   verification), completeness, severity calibration, constraint adherence —
@@ -115,6 +152,15 @@ verification (V3+); direct API auth paths.
   gemini/agy — `RESOURCE_EXHAUSTED` floor plus any Phase-G-spike-verified
   strings; opencode — provider error passthrough from the
   `opencode run --format json` error event.
+  - Orchestrator-side detection: this per-reviewer matching only runs once
+    a reviewer agent has actually started, so it cannot fire when the
+    claude-reviewer Task fails to SPAWN at all (session/weekly limit hit
+    before the agent runs) — there is no reviewer process to do the
+    matching. In that case `council.md` itself shall classify the spawn
+    failure against the same claude quota-string match set above and
+    synthesize the R18 `QUOTA_EXHAUSTED` block on the slot's behalf, so the
+    ETA and classification survive instead of degrading to a generic
+    `ERROR`.
 - **R18.** On quota exhaustion a reviewer shall return the full 6-key block
   with `verdict=QUOTA_EXHAUSTED`, `confidence=N/A`, the parsed reset ETA in
   `summary=`, `fenced_output_path=/dev/null`, and an empty findings block —
@@ -123,9 +169,14 @@ verification (V3+); direct API auth paths.
 ### OpenCode fourth-lineage routing
 
 - **R19.** `opencode-reviewer` shall honor a `COUNCIL_OPENCODE_MODEL` env var
-  (default: the spike-verified slug for DeepSeek V4 Pro; empty = V1
-  behavior), passing `--model "$COUNCIL_OPENCODE_MODEL"` when set, without
-  disturbing the existing `PACK_BYTES` guard's early-exit envelope.
+  with three distinct states, distinguished by presence rather than by value
+  alone (a `${VAR+x}`-style presence check, not a plain `${VAR:-default}`
+  collapse of empty-and-unset): **unset** (the variable is not exported at
+  all) → default to the spike-verified slug for DeepSeek V4 Pro; **set but
+  empty** (exported as `""`) → V1 behavior, no `--model` flag passed at all;
+  **set non-empty** → pass `--model "$COUNCIL_OPENCODE_MODEL"` verbatim.
+  None of the three states disturb the existing `PACK_BYTES` guard's
+  early-exit envelope.
   - Acceptance: the routing recipe (slug form, auth mechanism) comes from the
     Task 4.0 spike (`opencode models` output is authoritative); the
     rescinded `defaultProvider`-in-`opencode.json` mechanism must not be used.
@@ -140,11 +191,21 @@ verification (V3+); direct API auth paths.
 ### Evidence verification
 
 - **R22.** A `verify_finding()` helper shall verify each finding's
-  `<file>:<line>` citation: Tier 1 mode-dependent exact match (`review` mode
-  → `git show HEAD:<file>`; `plan`/`debug`/`question` modes → working tree
+  `<file>:<line>` citation against its accompanying verbatim quoted source
+  line (R6): Tier 1 mode-dependent exact match — compare the quoted excerpt
+  against the actual line content at that citation (`review` mode →
+  `git show HEAD:<file>`; `plan`/`debug`/`question` modes → working tree
   with HEAD fallback; unknown or non-checkout context → skip to Tier 2);
-  Tier 2 fuzzy match via `rapidfuzz` `fuzz.ratio >= 85`; returning
-  `verified` / `fuzzy-verified` / `unverified`.
+  Tier 2 fuzzy match via `rapidfuzz` `fuzz.ratio(quoted_excerpt,
+  actual_line) >= 85` — `fuzz.ratio` needs two strings to compare, and line
+  existence alone cannot verify claim correctness; returning `verified` /
+  `fuzzy-verified` / `unverified`.
+  - Acceptance (citation safety): before any file read, `verify_finding()`
+    shall strictly parse the `<file>:<line>` citation, reject any path that
+    resolves outside the repository root (including traversal sequences),
+    and reject any line number that is not a bounded positive integer
+    within the target file's line count. Malformed or out-of-bounds
+    citations are treated as `unverified` without attempting a file read.
 - **R23.** `rapidfuzz` shall be an optional dependency: pre-flight import
   check, Tier 2 soft-skipped with a `pip install rapidfuzz` warning when
   absent, documented in CLAUDE.md.
@@ -205,10 +266,10 @@ the gemini slot's invocation is instead routed through OpenCode/OpenRouter
 
 1. Collect 4 reviewer blocks → parse (R3, R8)
 2. Normalize findings text: strip markdown/styling (R10)
-3. Anonymize: randomized R1–R4 labels (R9)
+3. Anonymize: randomized S1–S4 labels (R9)
 4. Verify citations: `verify_finding()` cascade, capped + concurrent (R22, R25)
-5. Pass A synthesis — CoT-first, self-participant instruction, per-finding
-   rubric dimensions (R11, R15)
+5. Pass A synthesis — enumerate-then-compare rationale first,
+   self-participant instruction, per-finding rubric dimensions (R11, R15)
 6. Pass B with reversed order unless disabled; flip → tie +
    `low-confidence-synthesis` (R12, R13, R14)
 7. Bucket assignment by the deterministic precedence rule (R24)
@@ -221,9 +282,20 @@ Phase 5 in V2.
 
 **Synthesis locus (decided at spec time):** synthesis is inline orchestrator
 logic in V2 — a dedicated synthesis Task subagent is explicitly rejected for
-V2 (extra Claude message per pass, more orchestration code in PR-B). Revisit
-only if post-V2 bias measurements show inline synthesis leaking lineage
-labels; the V3-grade alternative is CARE-style correlated-judge aggregation.
+V2 (extra Claude message per pass, more orchestration code in PR-B).
+
+**Documented limitation:** because both synthesis passes run inline, the
+R12 two-pass mechanism is a prompt-level reordering evaluated within a
+single orchestrator context, not two independently invoked, isolated
+passes — the synthesizer retains awareness of Pass A's order and findings
+when constructing Pass B, so it is a positional-consistency check, not a
+blind re-evaluation. R14's separate-orchestrator-step framing keeps Pass A's
+result safe from a Pass B quota failure, but it does not give the two passes
+independent context. Full pass isolation requires the dedicated synthesis
+subagent, deferred to V3. Revisit this decision if post-V2 bias measurements
+show inline synthesis leaking lineage labels, or if the R12 positional check
+proves too weak in practice; the V3-grade alternative is CARE-style
+correlated-judge aggregation.
 
 ### Quota detection
 

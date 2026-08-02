@@ -19,6 +19,21 @@ infrastructure. The rubric's "correctness of cited evidence" dimension is
 self-assessed in this shell and gets rewired to real verification by the
 final shell (that split is the R15 partial boundary).
 
+**Verification handoff contract:** correctness maps directly to
+`verify_finding()`'s three-state result once wired — `verified` and
+`fuzzy-verified` both hold correctness (fuzzy surfaces a qualifier in the
+report), `unverified` fails correctness and the finding cannot be
+"well-supported" (R15's AND rule). Bucket ties and verdict-splits follow
+R24's precedence exactly: single-reviewer findings split by verification;
+verdict-split beats agreement; agreement splits by verification. A Pass B
+verdict flip is a `low-confidence-synthesis` tie
+annotation only, never a bucket reassignment — flip flag and bucket are
+orthogonal. Verification (R25) runs concurrent with prompt construction, but
+correctness scoring and bucket assignment must await `verify_finding()`'s
+return for that finding; this shell's self-assessed placeholder must already
+honor that ordering and return a three-state-compatible result so the final
+shell can swap the input source without touching the combination rule.
+
 ## Produces
 
 - Pre-synthesis normalization stage (markdown/styling stripped from reviewer

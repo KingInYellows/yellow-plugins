@@ -59,8 +59,10 @@ shape this shell builds is unaffected either way.
    security bias, defensible-REVISE-over-reflex-APPROVE; note the symmetric
    ±25% REVISE-rate guardrail in the agent's docs.
 3. **Add the validator allowlist entry** — document the Write exception
-   (fenced-output file only, no repo mutation); confirm `validate:agents`
-   passes.
+   (prompt-constrained to the fenced-output temp file only). Note in the
+   allowlist entry that this is a review-time gate, not a runtime path
+   restriction — Claude Code has no mechanism to enforce a no-repo-mutation
+   boundary automatically; confirm `validate:agents` passes.
 4. **Extend the fan-out to 4** — add the Task spawn and audit every
    per-reviewer loop (parse, verdict indexing, headline counts, agreement/
    disagreement inputs, raw-output appendix) so Claude's output appears

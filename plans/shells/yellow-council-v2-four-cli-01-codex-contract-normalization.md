@@ -17,7 +17,9 @@ codex-only special case. Normalizing codex first makes the 4-way fan-out
 parser uniform. This shell is **cross-plugin**: it edits
 `plugins/yellow-codex/` (patch changeset for yellow-codex), plus a
 council-side cleanup in `plugins/yellow-council/` if any codex special-case
-exists in the parser.
+exists in the parser. Every plugin this shell actually edits gets its own
+changeset — yellow-codex patch always, plus a yellow-council patch too if
+step 3 touches `council.md` — per spec R30.
 
 ## Produces
 
@@ -46,13 +48,19 @@ exists in the parser.
    description.
 2. **Rewrite the return envelope** — emit the 6-key block with the shared
    verdict enum and case-statement normalization to `UNKNOWN`; preserve
-   P1/P2/P3 content inside the findings delimiters.
+   P1/P2/P3 content inside the findings delimiters. Carry over
+   gemini-reviewer's sentinel-escaping so untrusted codex output can't
+   truncate the block early: escape any literal `^findings_block_begin$` /
+   `^findings_block_end$` lines inside the findings text before emission,
+   mirroring the reference implementation.
 3. **Remove any codex special-case from the council parser** — grep the
    orchestrator for codex-specific parse branches; make parsing uniform.
-4. **Validate and ship** — schema/agent validators, patch changeset for
-   yellow-codex, verify a `/council review` run shows codex findings with
-   verdict/confidence/summary lines. Confirm no other marketplace consumer
-   depends on the old free-form output.
+4. **Validate and ship** — schema/agent validators, a changeset for every
+   plugin this shell actually touched (yellow-codex patch always, plus a
+   yellow-council patch if step 3 changed `council.md`), verify a
+   `/council review` run shows codex findings with verdict/confidence/summary
+   lines. Confirm no other marketplace consumer depends on the old free-form
+   output.
 
 ## Open Questions
 
