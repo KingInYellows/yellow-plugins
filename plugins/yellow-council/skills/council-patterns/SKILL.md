@@ -343,25 +343,58 @@ background, deliberately kept out of the preload budget.
 - Read-only mode via `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -c 'mcp_servers={}' --ephemeral` (`-s`/`-a` do not parse on `exec review`, codex-cli 0.140.0)
 - Pack must use the existing yellow-codex review prompt structure
 
-**Gemini** (direct bash):
+**Gemini slot — Antigravity CLI `agy`** (direct bash; the legacy `gemini`
+CLI stopped serving consumer subscriptions 2026-06-18):
 ```bash
-timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  gemini -p "The council pack above is your full task. Follow its instructions." \
-    --approval-mode plan \
-    --skip-trust \
-    -o text \
-  < "$PACK_FILE" \
+# Validate COUNCIL_TIMEOUT as plain decimal seconds before any arithmetic
+# touches it — unvalidated bash arithmetic on this env var breaks on
+# duration spellings like 10m/600s, breaks on invalid-octal spellings like
+# 08, and can EXECUTE a nested command substitution embedded in the value
+# (bash arithmetic evaluates array-subscript expressions). `10#` below
+# forces decimal interpretation.
+CT="${COUNCIL_TIMEOUT:-600}"
+case "$CT" in
+  ''|*[!0-9]*)
+    printf 'Warning: COUNCIL_TIMEOUT=%s is not a plain integer; falling back to 600\n' "$CT" >&2
+    CT=600
+    ;;
+esac
+# Bound the digit-validated value: 0 DISABLES timeout(1) entirely, and
+# oversized integers overflow the +30 arithmetic (length check first so
+# arithmetic never touches an unbounded number).
+if [ "${#CT}" -gt 5 ] || [ "$(( 10#$CT ))" -lt 1 ] || [ "$(( 10#$CT ))" -gt 86400 ]; then
+  printf 'Warning: COUNCIL_TIMEOUT=%s out of range (1-86400 seconds); falling back to 600\n' "$CT" >&2
+  CT=600
+fi
+cd "${PACK_FILE%/pack.txt}" && \
+timeout --signal=TERM --kill-after=10 "$CT" \
+  agy --sandbox \
+    --print-timeout "$(( 10#$CT + 30 ))s" \
+    -p "Read the file ${PACK_FILE} in the current directory, in full. Its final line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that precede it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 ```
-- `-p`/`--prompt`: REQUIRED for non-interactive mode (positional prompt enters TUI).
-  The pack itself is fed via stdin (`< "$PACK_FILE"`) — gemini appends the `-p`
-  text to stdin input — because a single argv element caps at ~128KiB on Linux
-  (MAX_ARG_STRLEN), which a large diff pack exceeds; `-p` carries only a short
-  trusted pointer to the pack
-- `--approval-mode plan`: read-only mode (no tool side effects)
-- `--skip-trust`: bypass workspace trust check (would force `default` approval otherwise)
-- `-o text`: V1 plain text capture; `-o json` is a V2 option (response/stats/error schema)
-- DO NOT use `--yolo` (issue #13561 — still prompts in some cases AND auto-approves writes)
+- `-p`/`--print`/`--prompt`: non-interactive single prompt, plain-text
+  response (agy has no `--output-format`/`-o` flag)
+- Pack delivery is a workspace file, NOT stdin: agy ignores piped stdin
+  (spike 2026-08-01), and a single argv element caps at ~128KiB on Linux
+  (MAX_ARG_STRLEN), which a large diff pack exceeds — `-p` carries only the
+  short trusted mktemp path pointer
+- `cd "$PACK_DIR"` containment is MANDATORY: `--sandbox` is terminal
+  restrictions only — spike-verified that agy CAN write files in print mode
+  with no prompt. Running from the throwaway pack dir keeps the repo
+  checkout out of agy's workspace; the `-p` prohibition line is the second
+  layer. Nothing replaces the retired `--approval-mode plan`.
+- INGEST_TOKEN echo is MANDATORY: the token is written only into the pack
+  file (never the `-p` prompt) as the file's FINAL line, and the reviewer
+  rejects output that lacks the echoed token — otherwise an opened-nothing
+  or stopped-early file read still exits 0 and yields a verdict synthesized
+  from unread input. Scope: the echo proves the file was read through to
+  its end, not that the instructions were followed
+- `--print-timeout`: agy's internal print-mode cutoff defaults to `5m0s` —
+  set it ABOVE the external `timeout(1)` guard so 124/137 timeout
+  classification stays authoritative
+- DO NOT use `--dangerously-skip-permissions` (auto-approves every tool
+  request including writes — same class as the retired gemini `--yolo`)
 
 **OpenCode** (direct bash):
 ```bash

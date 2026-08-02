@@ -2,7 +2,7 @@
 
 **Status:** Manual test checklist — no automated CI for these (no fresh-machine
 plugin install job exists in `.github/workflows/`).
-**Required environment:** working `gemini`, `opencode` CLIs (auth configured);
+**Required environment:** working `agy` (Antigravity CLI), `opencode` CLIs (auth configured);
 optional `yellow-codex` plugin installed for full 3-reviewer coverage.
 **Run before:** declaring yellow-council PRs mergeable.
 
@@ -41,7 +41,7 @@ blocking — failure means the PR is NOT mergeable.
      # Expected: "[council] Error: unknown mode "unknownmode""
      # Plus 4-mode help; exit 1
 
-8. (Advisory) Spot-check agent wiring (requires gemini or opencode installed):
+8. (Advisory) Spot-check agent wiring (requires agy or opencode installed):
      /council question "What is 2+2?"
      # Expected: synthesis report with at least one reviewer responding
      # M3 confirmation prompt appears before file write
@@ -186,11 +186,13 @@ verify they're redacted in the captured output:
 These observations from spike tests should be retried in the test
 environment before declaring failures:
 
-- **Gemini CLI in WSL2 hung after `.geminiignore` lookup** with no further
-  output. May be a per-session auth re-validation issue. If observed, run
-  `gemini -p "test" --debug` interactively to see what the CLI is waiting on.
-  Record the workaround in your test run notes (or PR description if running
-  pre-merge).
+- **Gemini CLI observations above predate the Antigravity migration.** As of
+  2026-08-01 the Gemini slot invokes `agy` (Antigravity CLI) — the legacy
+  `gemini` binary stopped serving consumer subscriptions on 2026-06-18. If
+  the agy invocation hangs (e.g. first run in a not-yet-trusted workspace),
+  run bare `agy` once (interactive onboarding handles trust/token migration; `-p` is noninteractive) and record the workaround in your
+  test run notes (or PR description if running pre-merge). See
+  `docs/spikes/antigravity-cli-headless-2026-08.md`.
 - **OpenCode CLI v1.1.x → v1.14+ upgrade triggers a one-time SQLite
   migration** that takes 2–5 minutes. Run `opencode run "test"` once
   interactively after upgrading before relying on the agent for time-bounded
@@ -216,7 +218,7 @@ Phase 2 (Per-Mode E2E):   plan=[PASS/FAIL] review=[..] debug=[..] question=[..]
 Phase 3 (Failure Paths):  timeout=[..] codex-absent=[..] all-fail=[..] cancel=[..] collision=[..]
 Phase 4 (Redaction):      [PASS — all 11 patterns redacted / FAIL — list patterns missed]
 
-Environment caveats observed: [none / gemini WSL2 hang / opencode migration / codex auth]
+Environment caveats observed: [none / agy WSL2 hang / opencode migration / codex auth]
 
 Test run outcome: [PASS / FAIL — Phase 1 steps 5 and 6 must PASS for the run to be declared successful]
 ```

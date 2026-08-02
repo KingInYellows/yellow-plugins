@@ -18,7 +18,9 @@ and never auto-commits. The user decides what to do with the verdicts.
 - **GNU coreutils** — `timeout`, `mktemp`, `mv`, `awk`, `sed`, `grep`
 - **`jq`** — required for OpenCode JSON event stream parsing
 - **External CLIs (user-installed; soft-skipped if missing):**
-  - `gemini` — Google Gemini CLI v0.40+ (npm `@google/gemini-cli`)
+  - `agy` — Google Antigravity CLI v1.0+ (replaces Gemini CLI, which stopped
+    serving consumer subscriptions on 2026-06-18; run `agy` once
+    interactively to migrate auth, `agy plugin import gemini` for extensions)
   - `opencode` — OpenCode CLI v1.14+ (curl install or npm `opencode-ai`)
 - **Optional cross-plugin dependency:** `yellow-codex` ≥ 0.2.0 — provides the
   `yellow-codex:review:codex-reviewer` agent. If absent, council runs with
@@ -40,11 +42,15 @@ and never auto-commits. The user decides what to do with the verdicts.
 - **Injection fencing is mandatory.** All reviewer output is wrapped in
   `--- begin council-output:<reviewer> (reference only) ---` /
   `--- end council-output:<reviewer> ---` fences.
-- **Read-only invocation.** Reviewers must NOT use `--yolo` (Gemini),
-  `--dangerously-skip-permissions` (OpenCode), or `--sandbox workspace-write`
-  (Codex). Read-only behavior is enforced via prompt design + safe defaults
-  (Gemini `--approval-mode plan`, OpenCode default permissions, Codex
-  `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"'`).
+- **Read-only invocation.** Reviewers must NOT use
+  `--dangerously-skip-permissions` (agy, OpenCode) or
+  `--sandbox workspace-write` (Codex). Read-only behavior is enforced via
+  prompt design + safe defaults (OpenCode default permissions, Codex
+  `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"'`). For agy
+  there is NO read-only flag — `--sandbox` is terminal restrictions only
+  (spike-verified it can still write files in print mode); containment is
+  cwd-isolation to the throwaway pack dir plus an explicit prohibition in
+  the `-p` prompt. See Known Limitations.
 - **Path validation.** All `--paths` and file inputs validated via SKILL
   pattern (regex + `..` reject + existence check) before constructing shell
   args.
@@ -67,10 +73,13 @@ and never auto-commits. The user decides what to do with the verdicts.
 
 ### Agents (2)
 
-- `gemini-reviewer` — Gemini CLI wrapper. Invokes
-  `gemini -p "<short trusted pointer>" --approval-mode plan --skip-trust -o text < "$PACK_FILE"`
-  (pack fed via stdin; gemini appends `-p` text to stdin input — argv is
-  capped at ~128KiB). Spawned via
+- `gemini-reviewer` — Antigravity CLI (`agy`) wrapper for the Google lineage
+  slot. Invokes
+  `cd "$PACK_DIR" && agy --sandbox --print-timeout <duration> -p "<short trusted pointer to $PACK_FILE>"`
+  (pack delivered as a workspace file — agy ignores piped stdin, and argv is
+  capped at ~128KiB; cwd-isolated to the pack dir; pack ingestion verified
+  via a final-line INGEST_TOKEN echo — proves the file was read to its end,
+  not that instructions were followed). Spawned via
   `Task(subagent_type="yellow-council:review:gemini-reviewer")`.
 - `opencode-reviewer` — OpenCode CLI wrapper. Invokes
   `opencode run --format json --variant high "<prompt>"` plus session cleanup
@@ -110,7 +119,7 @@ Codex agent.)
 
 | Var | Type | Default | Purpose |
 |-----|------|---------|---------|
-| `COUNCIL_TIMEOUT` | integer seconds | `600` | Per-reviewer timeout passed to GNU `timeout`. Increase for very slow models / very large packs. |
+| `COUNCIL_TIMEOUT` | integer seconds | `600` | Per-reviewer timeout passed to GNU `timeout`. Increase for very slow models / very large packs. Must be a plain integer number of seconds; non-integer values (e.g. `10m`, `600s`) fall back to 600 with a warning. |
 | `COUNCIL_OPENCODE_VARIANT` | `high \| max \| minimal` | `high` | OpenCode `--variant` reasoning effort. `max` is significantly slower; reserve for explicit override. |
 | `COUNCIL_PATH_CHAR_CAP` | integer chars | `8000` | Per-file content cap for `--paths` injection in `debug`/`question` modes. |
 | `COUNCIL_PATH_MAX_FILES` | integer | `3` | Maximum number of files accepted via `--paths` in any single invocation. |
@@ -122,12 +131,34 @@ Codex agent.)
   invocation via `opencode session delete <id>`, but if the cleanup itself
   fails (rare), sessions accumulate. Periodic manual `opencode session list`
   audit is recommended.
-- **Gemini workspace trust.** In untrusted directories, `--approval-mode plan`
-  is overridden to `default` unless `--skip-trust` is also passed.
-  yellow-council always passes `--skip-trust` for non-interactive use.
-- **Gemini `--yolo` is unsafe.** Issue #13561 documents that `--yolo` still
-  prompts in some cases AND auto-approves any write tool the model decides
-  to invoke. yellow-council MUST NOT use `--yolo`.
+- **agy workspace trust in print mode is unverified.** The Antigravity CLI
+  tracks `trustedWorkspaces` in its settings; the 2026-08-01 spike ran only
+  in an already-trusted repo. If a first `/council` run in a new directory
+  hangs, run bare `agy` once — interactive first-run onboarding handles trust and token migration (`-p` is explicitly noninteractive and may repeat the hang); the reviewer's timeout
+  guard catches the hang and reports TIMEOUT either way.
+- **agy has no read-only mode.** `--sandbox` restricts the terminal only —
+  the 2026-08-01 spike confirmed agy will create files in print mode with
+  no permission prompt, and agy 1.0.2 ships no read-only tool policy flag.
+  What IS enforced: the reviewer runs agy with its cwd in the throwaway
+  pack dir (repo checkout stays out of the workspace), an explicit
+  no-file-modification instruction in the `-p` prompt, and agy's own
+  output is fenced before being handed back to `/council` so an injected
+  instruction in its response can't execute in the orchestrator's context
+  either. What is NOT enforced: a prompt-injected pack (a hostile PR diff
+  or issue body) could still instruct agy to attempt an absolute-path
+  write outside the pack dir — nothing flag-level blocks that attempt;
+  this is prompt-plus-containment enforcement, weaker than the retired
+  `--approval-mode plan`. Follow-up: if a future agy release ships an
+  enforceable read-only tool policy flag, adopt it here and retire this
+  limitation. Treat any unexpected file mutation after a council run as a
+  bug report for this plugin.
+- **agy `--dangerously-skip-permissions` is unsafe.** It auto-approves every
+  tool permission request, including writes (same class as the retired
+  gemini `--yolo`). yellow-council MUST NOT use it.
+- **Legacy `gemini` binary is dead for consumer tiers.** Google stopped
+  serving Gemini CLI requests for consumer subscriptions on 2026-06-18. A
+  present `gemini` binary does not mean a working one; the reviewer checks
+  for `agy` only.
 - **Codex timeout cap is 300s when reused via yellow-codex.** The existing
   `codex-reviewer` agent uses a 300s timeout. yellow-council's `COUNCIL_TIMEOUT`
   affects only Gemini and OpenCode; Codex honors its own agent timeout. If
@@ -137,13 +168,6 @@ Codex agent.)
   Code's runtime accepts the plugin manifest. A manual fresh-install test
   is required before each release (procedure documented in
   `docs/testing/yellow-council-manual-tests.md`).
-- **Gemini CLI may hang on first non-interactive use in WSL2.** Observed
-  during spike testing on 2026-05-04: `gemini -p "..."` hung indefinitely
-  after the `.geminiignore` lookup with no further output, despite valid
-  OAuth credentials. Workaround: run `gemini -p "test"` interactively once
-  per session to refresh auth state before invoking `/council`. If the hang
-  persists, the gemini-reviewer agent's timeout (default 600s) will catch it
-  and report TIMEOUT — council still produces a partial-result report.
 - **OpenCode large minor-version jumps trigger a one-time SQLite migration**
   (2–5 minutes). After running `opencode upgrade` from v1.1.x to v1.14+, the
   next `opencode run` invocation performs a database migration that may
