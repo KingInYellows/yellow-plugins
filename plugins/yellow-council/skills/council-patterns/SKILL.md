@@ -343,25 +343,30 @@ background, deliberately kept out of the preload budget.
 - Read-only mode via `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -c 'mcp_servers={}' --ephemeral` (`-s`/`-a` do not parse on `exec review`, codex-cli 0.140.0)
 - Pack must use the existing yellow-codex review prompt structure
 
-**Gemini** (direct bash):
+**Gemini slot — Antigravity CLI `agy`** (direct bash; the legacy `gemini`
+CLI stopped serving consumer subscriptions 2026-06-18):
 ```bash
 timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
-  gemini -p "The council pack above is your full task. Follow its instructions." \
-    --approval-mode plan \
-    --skip-trust \
-    -o text \
-  < "$PACK_FILE" \
+  agy --sandbox \
+    --add-dir "${PACK_FILE%/pack.txt}" \
+    --print-timeout "$(( ${COUNCIL_TIMEOUT:-600} + 30 ))s" \
+    -p "Read the file ${PACK_FILE} — it contains your full task (a council review pack). Follow its instructions." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 ```
-- `-p`/`--prompt`: REQUIRED for non-interactive mode (positional prompt enters TUI).
-  The pack itself is fed via stdin (`< "$PACK_FILE"`) — gemini appends the `-p`
-  text to stdin input — because a single argv element caps at ~128KiB on Linux
-  (MAX_ARG_STRLEN), which a large diff pack exceeds; `-p` carries only a short
-  trusted pointer to the pack
-- `--approval-mode plan`: read-only mode (no tool side effects)
-- `--skip-trust`: bypass workspace trust check (would force `default` approval otherwise)
-- `-o text`: V1 plain text capture; `-o json` is a V2 option (response/stats/error schema)
-- DO NOT use `--yolo` (issue #13561 — still prompts in some cases AND auto-approves writes)
+- `-p`/`--print`: non-interactive single prompt, plain-text response (agy has
+  no `--output-format`/`-o` flag)
+- Pack delivery is a workspace file, NOT stdin: agy ignores piped stdin
+  (spike 2026-08-01), and a single argv element caps at ~128KiB on Linux
+  (MAX_ARG_STRLEN), which a large diff pack exceeds — `--add-dir` grants
+  read access to the mktemp pack dir and `-p` carries only the short trusted
+  mktemp path pointer
+- `--sandbox`: terminal restrictions (closest analog to the retired
+  `--approval-mode plan`; no `--skip-trust` equivalent exists)
+- `--print-timeout`: agy's internal print-mode cutoff defaults to `5m0s` —
+  set it ABOVE the external `timeout(1)` guard so 124/137 timeout
+  classification stays authoritative
+- DO NOT use `--dangerously-skip-permissions` (auto-approves every tool
+  request including writes — same class as the retired gemini `--yolo`)
 
 **OpenCode** (direct bash):
 ```bash

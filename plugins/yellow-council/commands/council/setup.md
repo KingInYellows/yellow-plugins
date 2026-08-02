@@ -1,6 +1,6 @@
 ---
 name: council:setup
-description: "Detect Gemini and OpenCode CLIs, verify their versions, and report yellow-codex availability for the Codex leg of the council. Run after first install or when /council fails."
+description: "Detect Antigravity (agy) and OpenCode CLIs, verify their versions, and report yellow-codex availability for the Codex leg of the council. Run after first install or when /council fails."
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -10,10 +10,11 @@ allowed-tools:
 
 # Set Up yellow-council
 
-Validate prerequisites, detect external CLIs (Gemini, OpenCode), verify
-versions, and report on yellow-codex availability for the Codex leg of the
-council. yellow-council does not bundle any CLIs; this command verifies the
-user-installed binaries are present and at compatible versions.
+Validate prerequisites, detect external CLIs (Antigravity `agy` for the
+Gemini slot, OpenCode), verify versions, and report on yellow-codex
+availability for the Codex leg of the council. yellow-council does not
+bundle any CLIs; this command verifies the user-installed binaries are
+present and at compatible versions.
 
 ## Workflow
 
@@ -39,51 +40,47 @@ case "$BASH_VER" in
 esac
 ```
 
-### Step 2: Detect Gemini CLI
+### Step 2: Detect Antigravity CLI (`agy`, Gemini slot)
+
+The legacy `gemini` CLI stopped serving consumer-subscription requests on
+2026-06-18 — a present `gemini` binary is not a working reviewer. The
+council's Google-lineage slot uses the Antigravity CLI (`agy`).
 
 ```bash
-if command -v gemini >/dev/null 2>&1; then
-  # npm-packaged CLIs may prefix output (e.g. `@google/gemini-cli/0.40.1 linux-x64 node-v22.11.0`)
-  # and may emit to stderr; extract bare semver to keep the case match version-format-agnostic.
-  GEMINI_RAW=$(gemini --version 2>&1 | head -1)
-  GEMINI_VERSION=$(printf '%s' "$GEMINI_RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-  printf '[yellow-council] gemini: ok (%s)\n' "${GEMINI_VERSION:-$GEMINI_RAW}"
-  case "$GEMINI_VERSION" in
-    0.40.*|0.4[1-9].*|0.[5-9][0-9].*|[1-9].*)
-      printf '[yellow-council] gemini version: compatible (>=0.40)\n' ;;
+if command -v agy >/dev/null 2>&1; then
+  # Extract bare semver to keep the case match version-format-agnostic
+  # (agy 1.0.2 prints a bare version; tolerate prefixed formats anyway).
+  AGY_RAW=$(agy --version 2>&1 | head -1)
+  AGY_VERSION=$(printf '%s' "$AGY_RAW" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  printf '[yellow-council] agy: ok (%s)\n' "${AGY_VERSION:-$AGY_RAW}"
+  case "$AGY_VERSION" in
+    [1-9].*|[1-9][0-9].*)
+      printf '[yellow-council] agy version: compatible (>=1.0)\n' ;;
     *)
-      printf '[yellow-council] gemini version: WARNING — %s may be too old. Recommend v0.40+ for council use.\n' "${GEMINI_VERSION:-$GEMINI_RAW}" ;;
+      printf '[yellow-council] agy version: WARNING — %s may be too old. Recommend v1.0+ for council use.\n' "${AGY_VERSION:-$AGY_RAW}" ;;
   esac
+  if command -v gemini >/dev/null 2>&1; then
+    printf '[yellow-council] note: legacy gemini binary also present — it is NOT used (consumer service ended 2026-06-18)\n'
+  fi
 else
-  printf '[yellow-council] gemini: NOT INSTALLED\n'
+  printf '[yellow-council] agy: NOT INSTALLED\n'
 fi
 ```
 
-If gemini is not installed, ask via AskUserQuestion:
+If agy is not installed, ask via AskUserQuestion:
 
-> "Gemini CLI not found. Council reviews require gemini for the Gemini leg. Install now?"
+> "Antigravity CLI (agy) not found. Council reviews require agy for the Gemini slot. Show install guidance?"
 >
-> Options: "Yes, install via npm" / "No, I'll install manually" / "Skip — council will run without Gemini"
+> Options: "Show install instructions" / "Skip — council will run without the Gemini slot"
 
-If user chooses **Yes, install via npm**:
-
-```bash
-npm install -g @google/gemini-cli@latest
-```
-
-Verify:
-
-```bash
-gemini --version 2>&1 | head -1
-```
-
-If user chooses **No, I'll install manually**: print install instructions and exit:
+If user chooses **Show install instructions**, print and exit:
 
 ```text
-[yellow-council] To install Gemini CLI manually:
-  npm install -g @google/gemini-cli            # via npm
-  brew install gemini-cli                      # macOS/Linux Homebrew
-  See: https://google-gemini.github.io/gemini-cli/
+[yellow-council] To install the Antigravity CLI:
+  See: https://antigravity.google/docs/cli (official install + migration guide)
+  After installing, run `agy` once interactively — first-run onboarding
+  migrates existing Gemini OAuth session tokens into the OS keyring.
+  Existing Gemini CLI extensions: agy plugin import gemini
 ```
 
 ### Step 3: Detect OpenCode CLI
@@ -147,7 +144,7 @@ Print a one-line summary:
 # variables from Steps 2-4 do not survive here.
 READY_COUNT=0
 
-if command -v gemini >/dev/null 2>&1; then
+if command -v agy >/dev/null 2>&1; then
   GEMINI_STATUS="installed"
   READY_COUNT=$((READY_COUNT + 1))
 else
@@ -170,7 +167,7 @@ fi
 
 printf '\n[yellow-council] Setup summary:\n'
 printf '  Required: bash 4.3+, timeout, jq — verified\n'
-printf '  Reviewers: %d of 3 available (Gemini=%s, OpenCode=%s, Codex=%s)\n' \
+printf '  Reviewers: %d of 3 available (Gemini[agy]=%s, OpenCode=%s, Codex=%s)\n' \
   "$READY_COUNT" "$GEMINI_STATUS" "$OPENCODE_STATUS" "$CODEX_STATUS"
 if [ "$READY_COUNT" -eq 0 ]; then
   printf '  Status: NOT READY — install at least one reviewer CLI before invoking /council\n'
@@ -183,6 +180,6 @@ fi
 
 ## Notes
 
-- `council:setup` does NOT verify CLI authentication (Gemini OAuth, OpenAI API key, OpenCode provider). Auth verification is the user's responsibility — first invocation of each CLI will prompt for auth if needed.
-- The `--variant` and `--approval-mode` flags used by reviewers are validated at invocation time, not at setup. If a flag is removed in a future CLI version, the corresponding reviewer will fail at runtime with a clear error.
+- `council:setup` does NOT verify CLI authentication (agy keyring session tokens, OpenAI API key, OpenCode provider). Auth verification is the user's responsibility — first invocation of each CLI will prompt for auth if needed; for agy, run it once interactively so first-run onboarding migrates existing Gemini OAuth tokens.
+- The `--variant` (OpenCode) and `--sandbox`/`--print-timeout` (agy) flags used by reviewers are validated at invocation time, not at setup. If a flag is removed in a future CLI version, the corresponding reviewer will fail at runtime with a clear error.
 - This setup is idempotent — running it repeatedly is safe.

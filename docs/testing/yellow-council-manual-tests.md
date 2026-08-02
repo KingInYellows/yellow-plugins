@@ -186,11 +186,13 @@ verify they're redacted in the captured output:
 These observations from spike tests should be retried in the test
 environment before declaring failures:
 
-- **Gemini CLI in WSL2 hung after `.geminiignore` lookup** with no further
-  output. May be a per-session auth re-validation issue. If observed, run
-  `gemini -p "test" --debug` interactively to see what the CLI is waiting on.
-  Record the workaround in your test run notes (or PR description if running
-  pre-merge).
+- **Gemini CLI observations above predate the Antigravity migration.** As of
+  2026-08-01 the Gemini slot invokes `agy` (Antigravity CLI) — the legacy
+  `gemini` binary stopped serving consumer subscriptions on 2026-06-18. If
+  the agy invocation hangs (e.g. first run in a not-yet-trusted workspace),
+  run `agy -p "test"` interactively once and record the workaround in your
+  test run notes (or PR description if running pre-merge). See
+  `docs/spikes/antigravity-cli-headless-2026-08.md`.
 - **OpenCode CLI v1.1.x → v1.14+ upgrade triggers a one-time SQLite
   migration** that takes 2–5 minutes. Run `opencode run "test"` once
   interactively after upgrading before relying on the agent for time-bounded

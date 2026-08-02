@@ -13,7 +13,9 @@ inline.
 
 ### Required external CLIs
 
-- **Gemini CLI** — `npm install -g @google/gemini-cli` (v0.40+)
+- **Antigravity CLI** — `agy` v1.0+ (Google's successor to Gemini CLI, which
+  stopped serving consumer subscriptions on 2026-06-18). Run `agy` once
+  interactively to migrate auth from an existing Gemini login.
 - **OpenCode CLI** — download-then-execute (v1.14+):
   ```bash
   TMP_INSTALLER="$(mktemp)" && trap 'rm -f "$TMP_INSTALLER"' EXIT
