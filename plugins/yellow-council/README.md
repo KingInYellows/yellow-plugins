@@ -1,8 +1,8 @@
 # yellow-council
 
 On-demand cross-lineage code review for Claude Code. Fans out to three external
-LLM CLIs (Codex, Gemini, OpenCode) in parallel and synthesizes their verdicts
-inline.
+LLM CLIs (Codex, Gemini (via Antigravity CLI), OpenCode) in parallel and
+synthesizes their verdicts inline.
 
 ## Install
 

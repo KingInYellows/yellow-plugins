@@ -346,15 +346,28 @@ background, deliberately kept out of the preload budget.
 **Gemini slot — Antigravity CLI `agy`** (direct bash; the legacy `gemini`
 CLI stopped serving consumer subscriptions 2026-06-18):
 ```bash
+# Validate COUNCIL_TIMEOUT as plain decimal seconds before any arithmetic
+# touches it — unvalidated bash arithmetic on this env var breaks on
+# duration spellings like 10m/600s, breaks on invalid-octal spellings like
+# 08, and can EXECUTE a nested command substitution embedded in the value
+# (bash arithmetic evaluates array-subscript expressions). `10#` below
+# forces decimal interpretation.
+CT="${COUNCIL_TIMEOUT:-600}"
+case "$CT" in
+  ''|*[!0-9]*)
+    printf 'Warning: COUNCIL_TIMEOUT=%s is not a plain integer; falling back to 600\n' "$CT" >&2
+    CT=600
+    ;;
+esac
 cd "${PACK_FILE%/pack.txt}" && \
-timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
+timeout --signal=TERM --kill-after=10 "$CT" \
   agy --sandbox \
-    --print-timeout "$(( ${COUNCIL_TIMEOUT:-600} + 30 ))s" \
+    --print-timeout "$(( 10#$CT + 30 ))s" \
     -p "Read the file ${PACK_FILE} in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that come after it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 ```
-- `-p`/`--print`: non-interactive single prompt, plain-text response (agy has
-  no `--output-format`/`-o` flag)
+- `-p`/`--print`/`--prompt`: non-interactive single prompt, plain-text
+  response (agy has no `--output-format`/`-o` flag)
 - Pack delivery is a workspace file, NOT stdin: agy ignores piped stdin
   (spike 2026-08-01), and a single argv element caps at ~128KiB on Linux
   (MAX_ARG_STRLEN), which a large diff pack exceeds — `-p` carries only the

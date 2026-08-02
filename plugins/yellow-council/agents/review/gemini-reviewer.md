@@ -104,7 +104,7 @@ section), return an ERROR finding:
 ```bash
 printf 'verdict=ERROR\n'
 printf 'confidence=N/A\n'
-printf 'summary=Council pack appears malformed; cannot invoke Gemini.\n'
+printf 'summary=Council pack appears malformed; cannot invoke the Antigravity CLI (agy).\n'
 exit 0
 ```
 
@@ -162,6 +162,21 @@ STDERR_FILE="<literal stderr-file path>"
 # Validate non-empty before invoking the CLI:
 [ -s "$PACK_FILE" ] || { printf '[gemini-reviewer] Error: empty pack file\n' >&2; exit 1; }
 
+# Validate COUNCIL_TIMEOUT as plain decimal seconds before any arithmetic
+# touches it. Unvalidated bash arithmetic on this env var (a) breaks on
+# duration spellings like 10m/600s, (b) breaks on invalid-octal spellings
+# like 08, and (c) can EXECUTE a nested command substitution for a value
+# like x[$(...)] (bash arithmetic evaluates array-subscript expressions) —
+# an injection vector. `10#` below forces decimal interpretation so a
+# validated leading-zero value never falls into octal parsing.
+CT="${COUNCIL_TIMEOUT:-600}"
+case "$CT" in
+  ''|*[!0-9]*)
+    printf '[gemini-reviewer] Warning: COUNCIL_TIMEOUT=%s is not a plain integer; falling back to 600\n' "$CT" >&2
+    CT=600
+    ;;
+esac
+
 # Deliver the pack as a workspace file, NOT via stdin and NOT via argv
 # interpolation: agy ignores piped stdin (spike 2026-08-01), and a single
 # argv element is capped at ~128KiB on Linux (MAX_ARG_STRLEN), which a
@@ -170,26 +185,38 @@ STDERR_FILE="<literal stderr-file path>"
 #
 # Containment (spike-verified 2026-08-01): --sandbox is terminal
 # restrictions ONLY — agy CAN still write files in print mode with no
-# prompt. Two mitigations: (1) cd into the throwaway pack dir so agy's
+# prompt. What IS enforced: (1) cd into the throwaway pack dir so agy's
 # workspace is the mktemp dir, not the repo checkout; (2) the -p pointer
-# explicitly prohibits file creation/modification. Read-only behavior is
-# prompt-enforced, not flag-enforced — see Known Limitations in CLAUDE.md.
+# explicitly prohibits file creation/modification; (3) the CLI's own
+# output is fenced (Step 5) before it is handed back to council.md, so an
+# injected instruction in agy's response cannot execute in the
+# orchestrator's context either. What is NOT enforced: a prompt-injected
+# pack (e.g. a hostile PR diff or issue body) could still instruct agy to
+# attempt an absolute-path write outside the pack dir — nothing
+# flag-level in agy 1.0.2 blocks that attempt. Read-only behavior here is
+# prompt-plus-containment, not flag-enforced. Follow-up: if a future agy
+# release ships an enforceable read-only tool policy flag, adopt it here
+# and retire this limitation — see Known Limitations in CLAUDE.md.
 #
 # The internal --print-timeout must exceed the external timeout(1) guard,
 # or agy's default 5m cutoff fires first and the 124/137 TIMEOUT
 # classification below never triggers.
 cd "${PACK_FILE%/pack.txt}" && \
-timeout --signal=TERM --kill-after=10 "${COUNCIL_TIMEOUT:-600}" \
+timeout --signal=TERM --kill-after=10 "$CT" \
   agy --sandbox \
-    --print-timeout "$(( ${COUNCIL_TIMEOUT:-600} + 30 ))s" \
+    --print-timeout "$(( 10#$CT + 30 ))s" \
     -p "Read the file ${PACK_FILE} in the current directory. Its first line is an INGEST_TOKEN line — begin your response by repeating that line exactly, then follow the pack instructions that come after it. Do not create, modify, or delete any files." \
   > "$OUTPUT_FILE" 2> "$STDERR_FILE"
 CLI_EXIT=$?
 printf 'CLI_EXIT=%s\n' "$CLI_EXIT"
+printf 'CT=%s\n' "$CT"
 ```
 
-Capture the printed CLI_EXIT value as well — later blocks substitute it
-alongside the three paths.
+Capture the printed CLI_EXIT and CT values as well — later blocks
+substitute them alongside the three paths. CT (not the raw
+`COUNCIL_TIMEOUT`) is what Step 4 must use for its timeout-duration
+message, since it is the value already validated as plain decimal
+seconds above.
 
 ### Step 4: Handle exit code
 
@@ -200,16 +227,17 @@ PACK_FILE="<literal pack-file path>"
 OUTPUT_FILE="<literal output-file path>"
 STDERR_FILE="<literal stderr-file path>"
 CLI_EXIT="<literal CLI_EXIT value>"
+CT="<literal CT value>"
 
 case $CLI_EXIT in
   0)
     printf '[gemini-reviewer] CLI exit 0 — parsing output\n' >&2
     ;;
   124|137)
-    printf '[gemini-reviewer] CLI timed out at %ds (exit %d)\n' "${COUNCIL_TIMEOUT:-600}" "$CLI_EXIT" >&2
+    printf '[gemini-reviewer] CLI timed out at %ds (exit %d)\n' "$CT" "$CLI_EXIT" >&2
     printf 'verdict=TIMEOUT\n'
     printf 'confidence=N/A\n'
-    printf "summary=Gemini timed out at %ds. Council ran without Gemini's verdict.\n" "${COUNCIL_TIMEOUT:-600}"
+    printf "summary=Gemini timed out at %ds. Council ran without Gemini's verdict.\n" "$CT"
     case "$PACK_FILE" in /tmp/council-gemini-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
     rm -f "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0
@@ -238,7 +266,7 @@ case $CLI_EXIT in
     printf '[gemini-reviewer] CLI error (exit %d, kind=%s): %s\n' "$CLI_EXIT" "$ERROR_KIND" "$ERR_PEEK" >&2
     printf 'verdict=ERROR\n'
     printf 'confidence=N/A\n'
-    printf 'summary=Gemini CLI error (%s, exit %d). Excerpt: %s\n' "$ERROR_KIND" "$CLI_EXIT" "$ERR_PEEK"
+    printf 'summary=Antigravity CLI (agy) error (%s, exit %d). Excerpt: %s\n' "$ERROR_KIND" "$CLI_EXIT" "$ERR_PEEK"
     case "$PACK_FILE" in /tmp/council-gemini-pack-*/pack.txt) rm -rf "${PACK_FILE%/pack.txt}" ;; *) rm -f "$PACK_FILE" ;; esac
     rm -f "$OUTPUT_FILE" "$STDERR_FILE"
     exit 0

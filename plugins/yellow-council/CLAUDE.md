@@ -118,7 +118,7 @@ Codex agent.)
 
 | Var | Type | Default | Purpose |
 |-----|------|---------|---------|
-| `COUNCIL_TIMEOUT` | integer seconds | `600` | Per-reviewer timeout passed to GNU `timeout`. Increase for very slow models / very large packs. |
+| `COUNCIL_TIMEOUT` | integer seconds | `600` | Per-reviewer timeout passed to GNU `timeout`. Increase for very slow models / very large packs. Must be a plain integer number of seconds; non-integer values (e.g. `10m`, `600s`) fall back to 600 with a warning. |
 | `COUNCIL_OPENCODE_VARIANT` | `high \| max \| minimal` | `high` | OpenCode `--variant` reasoning effort. `max` is significantly slower; reserve for explicit override. |
 | `COUNCIL_PATH_CHAR_CAP` | integer chars | `8000` | Per-file content cap for `--paths` injection in `debug`/`question` modes. |
 | `COUNCIL_PATH_MAX_FILES` | integer | `3` | Maximum number of files accepted via `--paths` in any single invocation. |
@@ -137,12 +137,20 @@ Codex agent.)
   guard catches the hang and reports TIMEOUT either way.
 - **agy has no read-only mode.** `--sandbox` restricts the terminal only —
   the 2026-08-01 spike confirmed agy will create files in print mode with
-  no permission prompt. The reviewer mitigates by running agy with its cwd
-  in the throwaway pack dir (repo checkout stays out of the workspace) and
-  an explicit no-file-modification instruction in the prompt; this is
-  prompt-plus-containment enforcement, weaker than the retired
-  `--approval-mode plan`. Treat any unexpected file mutation after a
-  council run as a bug report for this plugin.
+  no permission prompt, and agy 1.0.2 ships no read-only tool policy flag.
+  What IS enforced: the reviewer runs agy with its cwd in the throwaway
+  pack dir (repo checkout stays out of the workspace), an explicit
+  no-file-modification instruction in the `-p` prompt, and agy's own
+  output is fenced before being handed back to `/council` so an injected
+  instruction in its response can't execute in the orchestrator's context
+  either. What is NOT enforced: a prompt-injected pack (a hostile PR diff
+  or issue body) could still instruct agy to attempt an absolute-path
+  write outside the pack dir — nothing flag-level blocks that attempt;
+  this is prompt-plus-containment enforcement, weaker than the retired
+  `--approval-mode plan`. Follow-up: if a future agy release ships an
+  enforceable read-only tool policy flag, adopt it here and retire this
+  limitation. Treat any unexpected file mutation after a council run as a
+  bug report for this plugin.
 - **agy `--dangerously-skip-permissions` is unsafe.** It auto-approves every
   tool permission request, including writes (same class as the retired
   gemini `--yolo`). yellow-council MUST NOT use it.

@@ -29,6 +29,8 @@ once while online.
 - **yellow-review** — Uses `gh` CLI (GitHub CLI) for GraphQL API calls, not MCP
 - **yellow-browser-test** — Uses `agent-browser` CLI locally, no MCP
 - **yellow-debt** — Pure local analysis, no network calls
+- **yellow-council** — Ships no MCP server; reviewers are shelled-out CLIs
+  (`agy`, `opencode`, and Codex reused from yellow-codex)
 
 ## Setting Up Authentication
 
@@ -72,6 +74,28 @@ installation:
   (its `npx` startup command can still reach the npm registry on a cold
   machine — see [MCP Servers Inventory](#mcp-servers-inventory) above)
 - **deepwiki** (yellow-devin) — public repository documentation endpoint
+
+### CLI keyring auth (yellow-council)
+
+yellow-council's Gemini-lineage reviewer shells out to the Antigravity CLI
+(`agy`) rather than an MCP server, so it doesn't fit the three patterns
+above:
+
+1. `agy`'s first interactive run migrates any existing Gemini CLI OAuth
+   session tokens into the OS keyring (per Google's documentation) — Google
+   retired Gemini CLI for consumer subscription tiers on 2026-06-18, and
+   `agy` is the replacement
+2. No API key or environment variable is configured by or read from plugin
+   code; auth is subscription-based (Google AI Pro/Ultra or the free
+   individual tier), same as the CLI it replaces
+3. `council:setup` does not verify authentication — run `agy -p "test"`
+   once interactively before the first `/council` invocation so onboarding
+   completes
+4. Credential lifecycle (re-auth, revocation) is entirely `agy`'s own; this
+   repo provides no revoke path and does not manage the keyring entry
+
+See [Trust Boundaries](#trust-boundaries) below for the containment posture
+around `agy` having no read-only mode.
 
 ## Enterprise Rollout Recommendations
 
@@ -196,6 +220,36 @@ Before enabling any plugin with hooks:
 - yellow-review uses `gh` CLI which reads user's GitHub auth state
 - yellow-debt reads codebase files but only writes to `todos/` directory
 
+### External CLI Reviewers (yellow-council)
+
+`/council`'s Gemini-lineage reviewer shells out to the Antigravity CLI
+(`agy`) instead of talking to a remote MCP server, so its trust boundary
+doesn't match either pattern above:
+
+- **Credential store**: OS keyring, holding Gemini OAuth session tokens
+  migrated on `agy`'s first interactive run (per Google's documentation) —
+  no API key is configured by or read from plugin code
+- **Auth model**: subscription (Google AI Pro/Ultra or the free individual
+  tier), the same model the retired Gemini CLI used
+- **Data sent**: the council pack (diff, plan, or question content) is
+  staged to a throwaway pack directory and handed to `agy` as a workspace
+  file; `agy` may send that content to Google's Antigravity service to
+  produce a review
+- **Containment posture — weaker than the retired plan**: `agy` has no
+  read-only or `--approval-mode plan` equivalent; `--sandbox` restricts the
+  terminal only and does not block file writes (spike-verified
+  2026-08-01, `docs/spikes/antigravity-cli-headless-2026-08.md`). The
+  reviewer mitigates by running `agy` with its `cwd` isolated to the
+  throwaway pack directory — the real repo checkout is never inside its
+  workspace — plus a prompt-level instruction not to modify files. That is
+  a prompt-plus-containment control, not a CLI-enforced one. See
+  `plugins/yellow-council/CLAUDE.md` "Known Limitations" for the full
+  writeup, including the standing recommendation to treat any unexpected
+  file mutation after a `/council` run as a bug report.
+- **Never use** `agy --dangerously-skip-permissions` — it auto-approves
+  every tool permission request, including writes (same class as the
+  retired Gemini `--yolo`)
+
 ### Shell Commands
 
 Plugins that execute shell commands:
@@ -209,6 +263,7 @@ Plugins that execute shell commands:
 | yellow-browser-test | `agent-browser`, `npm`, `curl`, `gh` | Browser automation, setup            |
 | yellow-debt         | `git`, `gt`, `jq`, `yq`              | Codebase analysis, commit generation |
 | gt-workflow         | `gt`, `git`                          | Branch and PR management             |
+| yellow-council      | `agy`, `opencode`, `timeout`, `jq`, `mktemp` | Cross-lineage CLI code review |
 
 ### Prompt Injection Boundaries
 
