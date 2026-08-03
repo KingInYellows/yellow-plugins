@@ -22,7 +22,8 @@ findings in the same P1/P2/P3 format used by yellow-review agents.
 
 - You are report-only: NEVER edit files, NEVER call AskUserQuestion
 - You receive PR context (diff, title, base branch) from the spawning command
-- You invoke `codex exec review` and parse its output into structured findings
+- You invoke `codex exec` with `--output-schema` and parse its JSON result into
+  structured findings
 - You return findings to the spawning command for aggregation
 - You wrap ALL Codex output in injection fences before returning
 
@@ -33,9 +34,10 @@ the marketplace is read-only (`[Read, Grep, Glob]`). This is **intentional**
 and an explicit exception to the W1.2 / W1.5 read-only-reviewer rule:
 
 - `codex-reviewer` is fundamentally a CLI-invocation agent — its core
-  responsibility is running `codex exec review …` against the diff, then
-  parsing the structured output. That requires `Bash` for binary invocation
-  and for `git diff "${BASE_REF}...HEAD" | wc -c` size pre-flight.
+  responsibility is running `codex exec …` against the diff, then parsing
+  the structured output. That requires `Bash` for binary invocation, for the
+  `git diff "${BASE_REF}...HEAD" | wc -c` size pre-flight, and for writing
+  that same diff to the temp file Step 4 hands to Codex.
 - The "report-only, never edit files" guarantee in the bullet list above is
   enforced by prose discipline, not by the absence of `Bash`. The agent does
   not stage, commit, push, fetch, or modify files; it spawns `codex` and
@@ -173,26 +175,81 @@ not proceed to Step 4 (Codex invocation) or any subsequent steps.
 ```bash
 OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-reviewer-err-XXXXXX.txt)
+DIFF_FILE=$(mktemp /tmp/codex-reviewer-diff-XXXXXX.txt)
+SCHEMA_FILE="${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json"
 
-# -a/-s do not exist on the `exec review` subcommand (parse error, exit 2, on
-# codex-cli 0.140.0); posture is set via -c overrides, which take precedence
-# over ~/.codex/config.toml. mcp_servers={} clears the MCP tool surface —
-# stdio servers are not launched; on 0.140.0 remote-URL servers still log
-# fast-failing auth errors at startup but do not stall the run. --json makes
-# codex stream its JSONL event log to stdout (separate from -o, which only
-# captures the final message); that raw stream can echo untrusted diff
-# content unfenced, so it's discarded here rather than left to print
-# straight into this agent's own context ahead of Step 6's redaction pass —
-# $OUTPUT_FILE is the only channel Step 6 parses.
-timeout --signal=TERM --kill-after=10 300 codex exec review \
-  --base "$BASE_REF" \
+# --- Why plain `codex exec` and not `codex exec review` ---
+# The `review` subcommand silently ignores --output-schema: it always emits
+# its own hardcoded prose (a summary plus a "Review comment:" bullet list)
+# into -o, on every model, with no error raised. Step 6 parses $OUTPUT_FILE
+# with jq expecting the findings[]/overall_correctness object, so under
+# `exec review` it found nothing and degraded every Codex leg to
+# UNKNOWN/no-findings. Plain `exec` honours --output-schema and returns
+# conforming JSON. Verified against codex-cli 0.144.6; see
+# docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md.
+#
+# The diff is written to $DIFF_FILE and named in the prompt rather than
+# fetched by Codex itself. Plain `exec` has no --base selector, and telling
+# Codex to run `git diff` on its own makes it explore the wider repo until
+# it blows the 300s budget (measured: 66 tool calls, exit 124, no output).
+# Pointing it at a pre-computed file is deterministic, scopes the review to
+# exactly what Step 3 already size-checked, and keeps the diff out of the
+# argument vector (a 100K-token diff would exceed ARG_MAX inline).
+#
+# The diff is recomputed here rather than handed over from Step 3 on purpose:
+# Step 3 is a separate Bash tool call, so no variable it sets survives into
+# this block. Do NOT "optimize" this by writing $DIFF_FILE in Step 3 and
+# reusing the path here — that reintroduces exactly the cross-block handoff
+# problem Step 6 has to work around for $OUTPUT_FILE. A second local
+# `git diff` is cheap; a broken handoff is not.
+#
+# Budget note: this form converges in roughly 3-4 minutes against the 300s
+# cap below — less headroom than `exec review`'s built-in scoping had. A
+# timeout here is a scope/size symptom, not an auth or rate-limit one.
+git diff "${BASE_REF}...HEAD" > "$DIFF_FILE" 2>/dev/null
+
+# Fail closed if the schema is missing — without it Codex returns free prose
+# that Step 6 cannot parse, which would surface as an empty review rather
+# than as the packaging error it actually is. UNAVAILABLE, not ERROR: this is
+# the same class as Step 1's missing-codex / missing-jq arms (the tool is not
+# correctly installed), and it keeps an unset $CLAUDE_PLUGIN_ROOT — which
+# would collapse the path to /schemas/review-findings.json — from
+# escalating a packaging problem into a hard review failure.
+if [ ! -s "$SCHEMA_FILE" ]; then
+  printf '[codex-reviewer] Output schema not found at %s (CLAUDE_PLUGIN_ROOT=%s)\n' \
+    "$SCHEMA_FILE" "${CLAUDE_PLUGIN_ROOT:-<unset>}" >&2
+  rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
+  printf 'verdict=UNAVAILABLE\n'
+  printf 'confidence=N/A\n'
+  printf 'summary=Codex review output schema not found at %s — Codex review skipped. Reinstall yellow-codex if this persists.\n' "$SCHEMA_FILE"
+  exit 0
+fi
+
+# -s/-a are accepted by plain `exec`, but posture stays on -c overrides for
+# parity with the rest of the plugin and because -c takes precedence over
+# ~/.codex/config.toml (whose default may be danger-full-access).
+# mcp_servers={} clears the MCP tool surface — stdio servers are not
+# launched; remote-URL servers still log fast-failing auth errors at startup
+# but do not stall the run. --json makes codex stream its JSONL event log to
+# stdout (separate from -o, which only captures the final message); that raw
+# stream can echo untrusted diff content unfenced, so it's discarded here
+# rather than left to print straight into this agent's own context ahead of
+# Step 6's redaction pass — $OUTPUT_FILE is the only channel Step 6 parses.
+# </dev/null is required: plain `exec` appends stdin to the prompt and will
+# block waiting for EOF if stdin is left attached to a pipe or terminal.
+# read-only sandbox still permits command execution (it gates writes), so
+# Codex can read the files the diff touches for context.
+timeout --signal=TERM --kill-after=10 300 codex exec \
+  "You are a supplementary code reviewer. The complete diff under review has been written to the file ${DIFF_FILE}. Read that file and review ONLY the changes it contains. You may read the specific files it touches for additional context, but do NOT search or explore the wider repository. Report your findings as JSON matching the provided output schema. Use absolute file paths in code_location.absolute_file_path and 1-based line numbers." \
   -c 'approval_policy="never"' \
   -c 'sandbox_mode="read-only"' \
   -c 'mcp_servers={}' \
   --json \
   --ephemeral \
   -m "${CODEX_MODEL:-gpt-5.4}" \
+  --output-schema "$SCHEMA_FILE" \
   -o "$OUTPUT_FILE" \
+  </dev/null \
   >/dev/null \
   2>"$STDERR_FILE" || {
     codex_exit=$?
@@ -245,7 +302,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec review \
       printf 'confidence=N/A\n'
       printf 'summary=Codex CLI error (exit %d).\n' "$codex_exit"
     fi
-    rm -f "$OUTPUT_FILE" "$STDERR_FILE"
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
     exit 0
   }
 
@@ -272,7 +329,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec review \
 # between Step 4 and Step 6, the file is not cleaned up until the OS
 # temp-directory reaper (or a reboot) clears it. Documented as a known gap
 # rather than papered over with a trap that would not actually fire there.
-rm -f "$STDERR_FILE"
+rm -f "$STDERR_FILE" "$DIFF_FILE"
 printf 'OUTPUT_FILE=%s\n' "$OUTPUT_FILE" >&2
 ```
 
@@ -592,14 +649,21 @@ FINDINGS_LINES=$(printf '%s' "$FINDINGS" | grep -c '^')
 if [ "$FINDINGS_BYTES" -gt 20000 ] || [ "$FINDINGS_LINES" -gt 200 ]; then
   # Truncate by lines first so a byte cut never has to run. If line
   # truncation alone isn't enough, fall back to a byte cut and drop the
-  # now-possibly-partial trailing line with `sed '$d'` — but only when
-  # more than one line remains; a single huge line has no newline for
-  # sed to anchor on, so `$d` would delete all of it instead of the
-  # partial tail.
+  # now-possibly-partial trailing line with `sed '$d'` — but only when the
+  # cut left at least one newline behind; a single huge line has no newline
+  # for sed to anchor on, so `$d` would delete all of it instead of the
+  # partial tail. The test is `-ge 1`, not `-gt 1`: `wc -l` counts
+  # newlines, so a cut landing mid-SECOND-line leaves exactly one, and
+  # `-gt 1` would wrongly fall through and return the chopped tail.
+  # Accepted tradeoff: `$(...)` strips trailing newlines, so a cut that
+  # happens to land exactly on a line boundary is indistinguishable from a
+  # mid-line cut and loses one complete finding line. Erring toward
+  # dropping a whole line beats emitting a truncated one — the output is
+  # already explicitly marked as truncated below.
   FINDINGS=$(printf '%s\n' "$FINDINGS" | head -n 200)
   if [ "$(printf '%s' "$FINDINGS" | wc -c)" -gt 20000 ]; then
     FINDINGS_CUT=$(printf '%s' "$FINDINGS" | head -c 20000)
-    if [ "$(printf '%s' "$FINDINGS_CUT" | wc -l)" -gt 1 ]; then
+    if [ "$(printf '%s' "$FINDINGS_CUT" | wc -l)" -ge 1 ]; then
       FINDINGS=$(printf '%s' "$FINDINGS_CUT" | sed '$d')
     else
       FINDINGS=$(printf '%s' "$FINDINGS_CUT" | sed 's/[^[:print:][:space:]]*$//')

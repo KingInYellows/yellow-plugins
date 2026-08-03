@@ -59,7 +59,8 @@ identically without `yellow-codex` installed.
 - Large diffs (>128K tokens) cause hard errors -- no built-in truncation
 - Codex CLI is actively evolving (v0.140.0+) -- flags may change
 - Each invocation uses OpenAI API tokens; concurrent use may trigger rate limits
-- `--output-schema` may be ignored with certain model variants
+- `--output-schema` is silently ignored by the `codex exec review` subcommand
+  on every model -- use plain `codex exec` when structured JSON is required
 
 ## License
 

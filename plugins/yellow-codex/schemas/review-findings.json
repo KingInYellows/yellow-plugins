@@ -1,18 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Codex Review Findings",
-  "description": "Structured output schema for codex exec review --output-schema. Maps to yellow-review P1/P2/P3 convention.",
+  "description": "Structured output schema passed to `codex exec --output-schema`. Maps to yellow-review P1/P2/P3 convention. Shaped for OpenAI strict structured-output mode: every object sets additionalProperties:false, every key in properties is listed in required, and genuinely-optional fields are nullable unions rather than omitted keys. Constraint keywords (minimum/maximum/maxLength) are deliberately absent — strict mode rejects several of them, and the consuming jq in codex-reviewer.md Step 6 tolerates out-of-range values via its own fallbacks.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "findings": {
       "type": "array",
+      "description": "One entry per review finding; empty array when nothing was found",
       "items": {
         "type": "object",
+        "additionalProperties": false,
         "properties": {
           "title": {
             "type": "string",
-            "description": "Imperative description of the finding, max 80 chars",
-            "maxLength": 80
+            "description": "Imperative description of the finding, max 80 chars"
           },
           "body": {
             "type": "string",
@@ -20,40 +22,47 @@
           },
           "priority": {
             "type": "integer",
-            "description": "0 = critical (P1), 1 = important (P2), 2 = minor (P3), 3 = nit",
-            "minimum": 0,
-            "maximum": 3
+            "description": "0 = critical (P1), 1 = important (P2), 2 = minor (P3), 3 = nit"
           },
           "confidence_score": {
-            "type": "number",
-            "description": "Confidence in this finding (0.0 to 1.0)",
-            "minimum": 0,
-            "maximum": 1
+            "type": ["number", "null"],
+            "description": "Confidence in this finding from 0.0 to 1.0, or null if not assessed"
           },
           "category": {
-            "type": "string",
-            "description": "Finding category: security, correctness, quality, performance, style"
+            "type": ["string", "null"],
+            "description": "Finding category: security, correctness, quality, performance, style; null if uncategorized"
           },
           "code_location": {
-            "type": "object",
+            "type": ["object", "null"],
+            "description": "Where the finding lives, or null when it is not tied to a specific location",
+            "additionalProperties": false,
             "properties": {
               "absolute_file_path": {
                 "type": "string",
-                "description": "Absolute file path (matches Codex CLI built-in review schema naming)"
+                "description": "Absolute file path (Step 6 strips the repo root to make it repo-relative)"
               },
               "line_range": {
-                "type": "object",
+                "type": ["object", "null"],
+                "description": "1-based line span, or null when no specific line applies",
+                "additionalProperties": false,
                 "properties": {
-                  "start": { "type": "integer", "minimum": 1 },
-                  "end": { "type": "integer", "minimum": 1 }
+                  "start": { "type": "integer" },
+                  "end": { "type": "integer" }
                 },
                 "required": ["start", "end"]
               }
             },
-            "required": ["absolute_file_path"]
+            "required": ["absolute_file_path", "line_range"]
           }
         },
-        "required": ["title", "priority"]
+        "required": [
+          "title",
+          "body",
+          "priority",
+          "confidence_score",
+          "category",
+          "code_location"
+        ]
       }
     },
     "overall_correctness": {
@@ -66,11 +75,14 @@
       "description": "1-3 sentence summary of the review"
     },
     "overall_confidence_score": {
-      "type": "number",
-      "description": "Overall confidence in the review (0.0 to 1.0)",
-      "minimum": 0,
-      "maximum": 1
+      "type": ["number", "null"],
+      "description": "Overall confidence in the review from 0.0 to 1.0, or null if not assessed"
     }
   },
-  "required": ["findings", "overall_correctness", "overall_explanation"]
+  "required": [
+    "findings",
+    "overall_correctness",
+    "overall_explanation",
+    "overall_confidence_score"
+  ]
 }

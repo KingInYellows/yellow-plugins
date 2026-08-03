@@ -139,3 +139,46 @@ arguments`) or a differently-shaped drift recreates the misdiagnosis.
   invocation site in the plugin (agents, commands, skills, setup smoke
   test) in the same change — a partial fix that only touches `exec review`
   leaves plain `exec` sites silently broken, as happened here.
+
+## Update — 2026-08-03: `exec review` abandoned for plain `exec` (#696)
+
+The flag-level fixes above kept `codex exec review` as the review invocation.
+That subcommand turned out to have a deeper defect: **it silently ignores
+`--output-schema`.** On codex-cli 0.144.6, across `gpt-5.4` and
+`gpt-5.4-mini`, `exec review` always writes its own hardcoded prose (a summary
+plus a `Review comment:` bullet list) to `-o`, never a JSON object. No error is
+raised — the flag is simply dropped.
+
+`codex-reviewer.md` Step 6 parses `$OUTPUT_FILE` with `jq` expecting
+`findings[]`/`overall_correctness`, so every Codex review degraded to
+UNKNOWN/no-findings while looking healthy. This is the same class as
+`docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md`:
+a silently-dropped input lands in the benign bucket.
+
+Two further facts established empirically while fixing it:
+
+- **The schema itself was invalid for OpenAI strict mode.** Missing
+  `additionalProperties: false` and an incomplete `required` list each produce
+  a distinct 400. Genuinely-optional fields must become nullable unions
+  (`"type": ["number", "null"]`) rather than omitted keys. Downstream `jq`
+  needs no change — `null` and absent behave identically under `//`.
+- **Do not let Codex fetch the diff itself.** Plain `exec` has no `--base`
+  selector. Instructing it to run `git diff` makes it explore the wider repo
+  until the timeout expires (measured: 66 tool calls, exit 124, no output).
+  Writing the diff to a temp file and naming that file in the prompt converges
+  in roughly 3-4 minutes and scopes the review to exactly what the size
+  pre-flight already checked.
+
+Two smaller invariants worth carrying forward: plain `exec` appends stdin to
+the prompt, so `</dev/null` is required or it can block waiting for EOF; and
+`sandbox_mode="read-only"` gates filesystem *writes*, not command execution —
+Codex can still shell out to read files under it.
+
+### Prevention (addendum)
+
+- Verifying that a CLI *accepts* a flag is not the same as verifying it
+  *honours* it. For flags that shape machine-parsed output, assert on the
+  output's actual shape (`jq -e 'has("findings")'`), not on exit code 0.
+- The file-based form converges in roughly 3-4 minutes against the existing
+  300s cap — less headroom than `exec review`'s built-in scoping had. A
+  timeout on this path is a scope/size symptom, not auth or rate limiting.

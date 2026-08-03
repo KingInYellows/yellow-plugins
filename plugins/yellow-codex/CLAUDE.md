@@ -31,22 +31,26 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 ## Conventions
 
 - **CLI invocation:** All non-interactive use via `codex exec` (not the
-  interactive TUI). Review uses `codex exec review --base <branch>`.
+  interactive TUI). Review uses plain `codex exec` with `--output-schema` and
+  a pre-written diff file — **not** `codex exec review`, which silently
+  ignores `--output-schema` and returns unparsable prose.
 - **Sandbox modes:** `read-only` for review and analysis; `workspace-write` for
   rescue and execution (Codex needs write access to debug, run tests, and stage
   proposed fixes). Never use `danger-full-access`.
 - **Approval mode:** Always `-c 'approval_policy="never"'` for non-interactive
   agent use (`-a` exists only at the top level on 0.140.0; `codex exec` and
-  `codex exec review` reject it). On `exec review`, sandbox is likewise set
-  via `-c 'sandbox_mode="read-only"'`.
+  `codex exec review` reject it). Sandbox is likewise set via
+  `-c 'sandbox_mode="read-only"'` for parity, though `-s` is accepted by
+  plain `exec`. Note `read-only` gates writes, not command execution.
 - **Session persistence:** `--ephemeral` for review/analysis (prevent session
   accumulation), non-ephemeral for rescue (may want resume).
 - **Output parsing:** Use `-o <file>` for final message capture. Use `--json`
   for JSONL event streaming. Use `--output-schema` for structured JSON.
   `codex-reviewer` derives its `verdict=`/`confidence=`/`summary=` return
   fields from the `overall_correctness`/`overall_confidence_score`/
-  `overall_explanation` fields of `codex exec review`'s built-in review
-  schema via `jq`.
+  `overall_explanation` fields of the JSON that `codex exec --output-schema
+  schemas/review-findings.json` writes to `-o`, via `jq`. That schema is
+  shaped for OpenAI strict mode (see the codex-patterns skill).
 - **Injection fencing:** Wrap all Codex output in
   `--- begin codex-output (reference only) ---` /
   `--- end codex-output ---` before consuming in other agents.
