@@ -1,0 +1,23 @@
+plans/yellow-council-v2-four-cli-01-codex-contract-normalization.md
+  s_3702ffcf6d7e41::t_afafd4756ae69d 222
+plugins/yellow-review/references/review-pr/legacy-fallback.md
+  s_3702ffcf6d7e41::t_e7063108062e4e 23-27
+plugins/yellow-review/skills/pr-review-workflow/SKILL.md
+  s_3702ffcf6d7e41::t_1a71509282c955 342-349
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "60800456a8efff324e70838ef2b2b97944fdf561",
+  "prompts": {},
+  "sessions": {
+    "s_3702ffcf6d7e41": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55558d38-ec4a-45e3-a0f6-80b715fbf30d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
