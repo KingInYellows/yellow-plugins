@@ -219,7 +219,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       table at `:525-540`. Keep the two copies of the list in sync — they are
       documented as needing to match.
 
-- [ ] Step 9: Update the remaining yellow-review docs that describe the old
+- [x] Step 9: Update the remaining yellow-review docs that describe the old
       return shape: `plugins/yellow-review/references/review-pr/legacy-fallback.md:19-22`
       and `plugins/yellow-review/skills/pr-review-workflow/SKILL.md:334-344`.
 
