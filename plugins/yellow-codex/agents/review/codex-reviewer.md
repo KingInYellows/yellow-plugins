@@ -180,11 +180,12 @@ timeout --signal=TERM --kill-after=10 300 codex exec review \
     elif [ "$codex_exit" -eq 2 ]; then
       # Exit 2 is also clap's argument-parse error — check before blaming auth
       if grep -qE "unexpected argument|invalid value|unrecognized subcommand|required arguments" "$STDERR_FILE" 2>/dev/null; then
-        ERR_PEEK=$(grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null | tr '\n' ' ' | head -c 200)
-        # Redact before use — CLI stderr can echo partial keys or config
-        # from auth diagnostics. Never emit unredacted CLI output in
-        # summary=, same invariant Step 6 enforces for findings text.
-        ERR_PEEK=$(printf '%s' "$ERR_PEEK" | awk '{
+        # Redact BEFORE truncating (same invariant Step 6 enforces for
+        # SUMMARY/FINDINGS) — a credential straddling a byte cut would
+        # otherwise leave a remnant too short for the {20,}-style gsub
+        # patterns to match. CLI stderr can echo partial keys or config
+        # from auth diagnostics; never emit unredacted CLI output.
+        ERR_PEEK=$(grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null | tr '\n' ' ' | awk '{
           gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential ---")
           gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential ---")
           gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential ---")
@@ -193,7 +194,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec review \
           gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential ---")
           gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential ---")
           print
-        }')
+        }' | head -c 200)
         printf '[codex-reviewer] CLI argument parse error (flag drift?): %s\n' "$ERR_PEEK" >&2
         printf 'verdict=ERROR\n'
         printf 'confidence=N/A\n'
@@ -231,30 +232,34 @@ Each branch above **stops** after emitting — none fall through into Step 5's
 Read of `$OUTPUT_FILE`. (Rate-limit stays `ERROR` here: `QUOTA_EXHAUSTED` is a
 future enum addition, not yet defined.)
 
-### 5. Parse and Map Findings
+### 5. Finding Format Reference
 
-Use the Read tool on the literal `$OUTPUT_FILE` path printed at the end of
-Step 4 to see the Codex review JSON (the built-in review schema: `findings[]`
-with `priority` 0-3, `overall_correctness`, `overall_explanation`,
-`overall_confidence_score` — documented in the `codex-patterns` skill). Map
-each finding's `priority` to yellow-review convention:
+Codex's `findings[]` entries (`priority` 0-3, `title`, `body`,
+`confidence_score`, `code_location`) map to yellow-review convention:
 
 - Priority 0 → **P1** (critical)
 - Priority 1 → **P2** (important)
 - Priority 2-3 → **P3** (minor/nit)
 
-For each finding, format as:
+Step 6 below derives the formatted findings text mechanically with `jq`,
+reading `$OUTPUT_FILE` directly:
 
 ```
-**[P1] category — file:line** Title text.
+**[P1] codex — file:line** Title text.
   Finding: Body explanation.
-  Fix: Suggested fix if available.
   [codex] confidence: 0.XX
 ```
 
 Tag every finding with `[codex]` source marker for convergence analysis.
-Keep this formatted text in mind — you will assign it as a literal `FINDINGS=`
-value at the top of Step 6's combined Bash block below.
+This step is reference only — no action to take, no bash block to run.
+`FINDINGS` is never hand-transcribed: Codex's `body` text is free-form
+LLM prose that can quote arbitrary content from the reviewed diff
+(including quote characters, backticks, or `$(...)` sequences), so it
+must never be pasted into a bash string literal — only mechanically
+extracted from disk by `jq`, mirroring the precedent in
+`opencode-reviewer.md` (`SESSION_ID` is re-derived from `$OUTPUT_FILE`
+with a fresh `jq` call in every block that needs it, specifically so a
+CLI-produced value never has to be re-typed into shell source).
 
 ### 6. Redact, Derive Verdict, and Return Findings (single Bash invocation)
 
@@ -264,17 +269,23 @@ variables do not survive across
 separate Bash tool calls, and this stretch has no intervening non-Bash tool
 call to force a split, so every value produced here (`FINDINGS`, `VERDICT`,
 `CONFIDENCE`, `SUMMARY`, `FENCED_OUTPUT_FILE`) stays in scope for the rest
-of the block. Only two things need reconstructing at the top, via literal
-substitution: `OUTPUT_FILE` (the path printed at the end of Step 4) and
-`FINDINGS` (the P1/P2/P3 text you formatted in Step 5 — empty string if
-Codex reported zero findings). Do NOT split this block into separate Bash
-calls — the parsed fields cannot be reconstructed across a split.
+of the block. Only one thing needs reconstructing at the top, via literal
+substitution: `OUTPUT_FILE` (the path printed at the end of Step 4).
+`FINDINGS` is derived from it below with `jq`, not retyped — see Step 5.
+Do NOT split this block into separate Bash calls — the parsed fields
+cannot be reconstructed across a split.
 
 ```bash
-# Substitute the literal OUTPUT_FILE path printed at the end of Step 4, and
-# assign the literal FINDINGS text you formatted in Step 5.
+# Substitute the literal OUTPUT_FILE path printed at the end of Step 4.
 OUTPUT_FILE="<literal path printed by Step 4>"
-FINDINGS="<literal Step 5 findings text, or empty string>"
+
+# --- Derive FINDINGS mechanically from $OUTPUT_FILE — never retype
+# Codex's free-text finding bodies into a bash string literal (see Step 5).
+FINDINGS=$(jq -r '
+  .findings[]? |
+  (if .priority == 0 then "P1" elif .priority == 1 then "P2" else "P3" end) as $sev |
+  "**[\($sev)] codex — \(.code_location.absolute_file_path // "unknown"):\(.code_location.line_range.start // "?")** \(.title // "Untitled finding").\n  Finding: \(.body // "No description provided.")\n  [codex] confidence: \(.confidence_score // 0)\n"
+' "$OUTPUT_FILE" 2>/dev/null)
 
 # --- Redact credentials from FINDINGS. This MUST run before the injection
 # fencing below — never return unredacted Codex output. ---
@@ -324,7 +335,10 @@ rm -f "$OUTPUT_FILE"
 case "$OVERALL_CORRECTNESS" in
   "patch is correct") VERDICT="APPROVE" ;;
   "patch is incorrect") VERDICT="REVISE" ;;
-  *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;;
+  *)
+    printf '[codex-reviewer] Warning: no overall_correctness field found in Codex output — marked UNKNOWN\n' >&2
+    VERDICT="UNKNOWN"; CONFIDENCE="LOW"
+    ;;
 esac
 
 # Fixed integer, never a subjective "many" — a P1 (priority 0) count at or
@@ -352,6 +366,11 @@ fi
 # `findings_block_begin` would desync the findings-block extraction that
 # runs after it.
 SUMMARY=$(printf '%s' "$OVERALL_EXPLANATION" | awk '{
+  if (in_pem) {
+    print "--- redacted credential ---"
+    if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem=0
+    next
+  }
   gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential ---")
   gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential ---")
   gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential ---")
@@ -359,6 +378,11 @@ SUMMARY=$(printf '%s' "$OVERALL_EXPLANATION" | awk '{
   gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential ---")
   gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential ---")
   gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential ---")
+  if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+    print "--- redacted credential ---"
+    in_pem=1
+    next
+  }
   print
 }' | tr '\n' ' ' | sed 's/  */ /g' | head -c 500)
 
