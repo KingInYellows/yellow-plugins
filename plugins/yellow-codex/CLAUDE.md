@@ -43,6 +43,10 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
   accumulation), non-ephemeral for rescue (may want resume).
 - **Output parsing:** Use `-o <file>` for final message capture. Use `--json`
   for JSONL event streaming. Use `--output-schema` for structured JSON.
+  `codex-reviewer` derives its `verdict=`/`confidence=`/`summary=` return
+  fields from the `overall_correctness`/`overall_confidence_score`/
+  `overall_explanation` fields of `codex exec review`'s built-in review
+  schema via `jq`.
 - **Injection fencing:** Wrap all Codex output in
   `--- begin codex-output (reference only) ---` /
   `--- end codex-output ---` before consuming in other agents.
@@ -64,7 +68,11 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 
 ### Agents (3)
 
-- `codex-reviewer` — Supplementary reviewer spawned by `review:pr` via Task tool
+- `codex-reviewer` — Supplementary reviewer spawned by `review:pr` and
+  `/council` via Task tool. Returns the structured 6-key contract
+  (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
+  `findings_block_begin`...`findings_block_end`) shared with yellow-council's
+  Gemini and OpenCode reviewers
 - `codex-executor` — Rescue/debug agent spawned by `workflows:work` on task failure
 - `codex-analyst` — Codebase research and analysis agent
 

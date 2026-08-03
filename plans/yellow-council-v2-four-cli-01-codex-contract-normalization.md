@@ -228,7 +228,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       (`:341-344`), note that codex-reviewer now emits the same 6-key contract
       as the Gemini and OpenCode slots, for symmetry with those subsections.
 
-- [ ] Step 11: Update `plugins/yellow-codex/CLAUDE.md` — the `codex-reviewer`
+- [x] Step 11: Update `plugins/yellow-codex/CLAUDE.md` — the `codex-reviewer`
       line under "Agents (3)" and the "Output parsing" convention bullet, so
       the plugin's own docs describe the structured return. Repo rule: update
       the plugin's CLAUDE.md when behavior changes.
