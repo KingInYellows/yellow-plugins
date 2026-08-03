@@ -133,3 +133,77 @@ disclosure says so rather than claiming full coverage.
 handled non-verdict outcome, not a tool crash) — the size guard is now a
 member of the same closed set every other exit path in the file
 populates, not a bypass of it.
+
+---
+
+## Update — 2026-08-02
+
+During `/workflows:expand-shell` plan expansion (not code review) for
+yellow-council V2 shell 01, a repo pattern survey verifying the shell's own
+premise ("remove a codex special-case from council's parser") found a live
+instance of this failure family in production, of a variant this doc had
+not yet covered.
+
+**The variant:** unlike PR #676's cases above (a *new* enum member added
+later, consumer switch/case not extended to match), this is a producer
+(`codex-reviewer`) that **never conformed to an existing consumer contract
+from birth** — silently, since the reviewer was added, across **two
+independent consumers**, via **two different mechanisms**:
+
+1. `plugins/yellow-council/commands/council/council.md`'s
+   `parse_reviewer_return` (`:236-253`) is already uniform across all three
+   reviewers — it greps the same 6 fixed keys (`verdict=`, `confidence=`,
+   `summary=`, `fenced_output_path=`, the `findings_block_begin/end` block)
+   for every reviewer, no codex-specific branch exists. But `codex-reviewer`
+   has never emitted those keys, so every Codex return falls through to the
+   `"${verdict:-ERROR}"` default at `council.md:251` — the Codex leg of
+   `/council` has been silently degraded to `verdict=ERROR` in production.
+2. `plugins/yellow-review/commands/review/review-pr.md` Step 6.0
+   (`:563-574`) maintains a hand-written "legacy prose normalizer"
+   allowlist that converts pre-Wave-2 agents' prose findings into the
+   compact JSON schema before Step 1 validates required fields.
+   `codex-reviewer` is not on that list, so Step 1 (`:594-608`) drops its
+   return outright as malformed — `/review:pr` has also been silently
+   discarding every Codex finding.
+
+Both gaps produce plausible-looking output (an `ERROR` verdict reads as a
+legitimate outcome, not a parse failure; a missing finding reads as "Codex
+found nothing") and were invisible to CI and to normal code review, because
+neither consumer ever crashes or errors loudly — same "falls through to a
+plausible default" shape this doc's guidance already names, but here the
+producer never conformed even once, rather than a later addition breaking
+an established contract. As of this writing (2026-08-02) the remediation is
+scoped in a new plan (this session's plan-expansion output) but not yet
+landed — treat this as the discovered-state record, not a fixed bug.
+
+**How it was found:** neither gap surfaced via `/review:pr` or manual code
+review. Both were found because a `/workflows:expand-shell` pattern-survey
+subagent was dispatched to verify a shell's premise ("does a codex
+special-case exist to remove?") and grepped the actual parser instead of
+trusting the shell's description — the same grep that proved the shell's
+premise wrong also revealed the production bug. Plan-expansion premise
+verification is a detection surface for this failure class, distinct from
+and complementary to code review: it fires whenever a plan references an
+existing integration/contract, not only when code changes.
+
+**Added guidance — checking for the "never conformed" variant:**
+
+- When a new producer (reviewer, agent, tool) is added, grep every
+  documented consumer's parse contract (fixed-key `grep`, allowlist,
+  switch/case) for that producer's exact name/output shape — don't infer
+  conformance from "the command ran and produced plausible-looking text."
+- A conformance check that feeds each producer's real/sample output
+  through each consumer's parser and asserts the expected fields populate
+  is the check that catches this; "runs without erroring" does not, since
+  the silent fallback never throws.
+- Enumerate producer × consumer pairs directly from source when auditing
+  for this class — gaps present since a producer's introduction commit
+  generate no diff for review to have ever caught.
+- Treat "producer added, consumer allowlist/keys not updated" as a
+  distinct search target from ordinary logic bugs — it lives in the
+  parser/allowlist, not the producer's own code.
+
+**Components (this Update):**
+`plugins/yellow-council/commands/council/council.md`,
+`plugins/yellow-review/commands/review/review-pr.md`,
+`plugins/yellow-codex/agents/review/codex-reviewer.md`.
