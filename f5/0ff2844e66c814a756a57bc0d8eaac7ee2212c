@@ -1,0 +1,22 @@
+plugins/yellow-codex/CLAUDE.md
+  s_3702ffcf6d7e41::t_fb47223549df64 71-75
+  s_3702ffcf6d7e41::t_269d81198bd563 46-49
+plans/yellow-council-v2-four-cli-01-codex-contract-normalization.md
+  s_3702ffcf6d7e41::t_34f1cb1e00ec95 231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "f50ff2844e66c814a756a57bc0d8eaac7ee2212c",
+  "prompts": {},
+  "sessions": {
+    "s_3702ffcf6d7e41": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55558d38-ec4a-45e3-a0f6-80b715fbf30d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
