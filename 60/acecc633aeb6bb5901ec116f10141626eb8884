@@ -1,0 +1,25 @@
+.changeset/yellow-council-codex-contract-note.md
+  s_3702ffcf6d7e41::t_9f1f2683554118 1-8
+.changeset/yellow-review-codex-findings-fix.md
+  s_3702ffcf6d7e41::t_8606577a7c3eb7 1-11
+plans/yellow-council-v2-four-cli-01-codex-contract-normalization.md
+  s_3702ffcf6d7e41::t_8d66dc6b4ab9e3 236
+.changeset/yellow-codex-reviewer-contract-normalization.md
+  s_3702ffcf6d7e41::t_2f4a7c8ce7547b 1-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "60acecc633aeb6bb5901ec116f10141626eb8884",
+  "prompts": {},
+  "sessions": {
+    "s_3702ffcf6d7e41": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55558d38-ec4a-45e3-a0f6-80b715fbf30d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
