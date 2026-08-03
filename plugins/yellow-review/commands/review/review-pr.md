@@ -592,26 +592,44 @@ Apply the aggregation steps from
    from earlier steps in the agent's own execution can legitimately
    precede the verdict block).
 
-   Parse the value of that `verdict=` line:
+   Parse the value of that `verdict=` line, then decide extract-vs-skip by
+   the actual STRUCTURAL presence of a `findings_block_begin`/
+   `findings_block_end` sentinel pair in the return text — not by the
+   verdict enum alone, since `UNAVAILABLE` and `UNKNOWN` are ambiguous:
+   they are emitted both by arms that never carry a findings block AND by
+   arms that do.
 
-   - **`TIMEOUT`, `ERROR`, `UNAVAILABLE`, or `UNKNOWN`** — these arms
-     never emit a `findings_block_begin`/`findings_block_end` pair (see
-     `codex-reviewer.md` Steps 1/3/4), so there is nothing to extract.
-     Treat `codex-reviewer` as a skipped/failed reviewer: record it in
-     the Coverage "Reviewers skipped" list with the `summary=` line as
-     the reason, same as a spawn failure. Do NOT proceed to findings
-     extraction or emit an empty findings envelope for it — an empty
-     envelope reads as "Codex reviewed and found nothing," which is
-     false.
-   - **`APPROVE`, `REVISE`, or `REJECT`** — extract the text between the
-     `findings_block_begin` / `findings_block_end` sentinel lines (the
-     same extraction `council.md`'s `parse_reviewer_return` performs —
-     the findings block, not the raw envelope, is the prose input to the
-     conversion below). `[ESCAPED] findings_block_begin`/
-     `findings_block_end` lines inside the extracted text are cosmetic
-     sentinel-escape artifacts from `codex-reviewer`'s own
-     truncation-safe escaping — pass them through unchanged into the
-     finding text, do not strip them.
+   - **`TIMEOUT` or `ERROR`** — these arms genuinely never emit a
+     `findings_block_begin`/`findings_block_end` pair (see
+     `codex-reviewer.md` Step 4 — every branch there `exit 0`s
+     immediately after the 3-key partial, before Step 6's findings-block
+     emission). Treat `codex-reviewer` as a skipped/failed reviewer:
+     record it in the Coverage "Reviewers skipped" list with the
+     `summary=` line as the reason, same as a spawn failure. Do NOT
+     proceed to findings extraction or emit an empty findings envelope
+     for it — an empty envelope reads as "Codex reviewed and found
+     nothing," which is false.
+   - **Any other verdict** (`APPROVE`, `REVISE`, `REJECT`, and the
+     `UNAVAILABLE`/`UNKNOWN` arms that DO carry findings) — check whether
+     a `findings_block_begin`/`findings_block_end` sentinel pair is
+     actually present in the return text:
+     - **Present** — extract the text between the sentinel lines (the
+       same extraction `council.md`'s `parse_reviewer_return` performs —
+       the findings block, not the raw envelope, is the prose input to
+       the conversion below), regardless of verdict. For example,
+       `codex-reviewer.md` Step 3's diff-too-large arm emits
+       `verdict=UNAVAILABLE` together with a full findings block
+       carrying one P3 finding, and Step 6's fallback (no
+       `overall_correctness` field in the Codex result) emits
+       `verdict=UNKNOWN` then falls through to that same step's
+       unconditional findings-block emission — both must be extracted,
+       not discarded. `[ESCAPED] findings_block_begin`/
+       `findings_block_end` lines inside the extracted text are cosmetic
+       sentinel-escape artifacts from `codex-reviewer`'s own
+       truncation-safe escaping — pass them through unchanged into the
+       finding text, do not strip them.
+     - **Absent** — treat as skipped/failed, same as the TIMEOUT/ERROR
+       case above, using the `summary=` line as the reason.
 
    `codex-reviewer`'s return also includes a `fenced_output_path=` field
    pointing at a `/tmp/council-codex-fenced-*` file. Unlike `council.md`,
@@ -628,9 +646,13 @@ Apply the aggregation steps from
    - Parse `category` from the prefix word
    - Parse `file:line` from the trailing token
    - Use the `Finding:` line as `title` and the `Fix:` line as
-     `suggested_fix` (null when absent — `codex-reviewer`'s findings
-     never carry a `Fix:` line since its jq-derived format has no fix
-     field, so its `suggested_fix` is always null)
+     `suggested_fix` (null when absent). Most `codex-reviewer` findings
+     come from its jq-derived main-path format, which has no fix field
+     and so never carries a `Fix:` line (`suggested_fix` is null for
+     those). The diff-too-large arm's hand-written P3 finding
+     (`codex-reviewer.md` Step 3) is the one exception — it does include
+     a `Fix:` line — so parse for `Fix:` unconditionally rather than
+     assuming it is always absent.
    - Infer defaults: `confidence: 75`, `autofix_class: gated_auto`,
      `owner: downstream-resolver`, `requires_verification: true`,
      `pre_existing: false`
