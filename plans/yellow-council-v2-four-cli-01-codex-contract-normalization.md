@@ -209,7 +209,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       `council.md:197-199` (spawn-failure → `UNAVAILABLE` soft-skip for the
       optional yellow-codex dependency) intact — it is fan-out, not parsing.
 
-- [ ] Step 8: Patch the `/review:pr` consumer so codex findings stop being
+- [x] Step 8: Patch the `/review:pr` consumer so codex findings stop being
       dropped. In `plugins/yellow-review/commands/review/review-pr.md`
       Step 6.0 (`:563-574`): add a pre-normalization branch that, when a
       return begins with `verdict=`, extracts the text between

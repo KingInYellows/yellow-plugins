@@ -538,6 +538,12 @@ trigger them:
   legacy`). `security-reviewer` and `performance-reviewer` are NOT in
   this list — they emit the compact-return JSON schema directly and
   pass through Step 6 sub-step 0 unchanged.
+- yellow-codex cross-plugin: `codex-reviewer` — emits the structured
+  6-key council contract (`verdict=`/`confidence=`/`summary=`/
+  `fenced_output_path=`/`findings_block_begin`...`findings_block_end`),
+  not the bare legacy prose format. Step 6 sub-step 0 extracts the
+  findings block first, then applies the same prose conversion below to
+  its contents.
 
 The aggregator in Step 6 normalizes legacy prose findings into the
 structured schema by inferring `confidence: 75`, `autofix_class:
@@ -572,6 +578,23 @@ Apply the aggregation steps from
      `polyglot-reviewer`, `security-sentinel`, `performance-oracle`.
      (`security-reviewer` and `performance-reviewer` emit the
      compact-return schema directly — do not normalize them.)
+   - yellow-codex cross-plugin: `codex-reviewer` — via the
+     findings-block extraction branch below, not directly.
+
+   **Findings-block extraction (codex-reviewer only).** `codex-reviewer`
+   emits the structured 6-key council contract, not bare legacy prose —
+   its `Finding:`/`Fix:` findings are nested inside a
+   `findings_block_begin` / `findings_block_end` delimited block. Before
+   applying the prose conversion below, check whether the raw return
+   begins with `verdict=`. If it does, extract the text between the
+   `findings_block_begin` / `findings_block_end` sentinel lines (the same
+   extraction `council.md`'s `parse_reviewer_return` performs — the
+   findings block, not the raw envelope, is the prose input to the
+   conversion below). `[ESCAPED] findings_block_begin`/
+   `findings_block_end` lines inside the extracted text are cosmetic
+   sentinel-escape artifacts from `codex-reviewer`'s own truncation-safe
+   escaping — pass them through unchanged into the finding text, do not
+   strip them.
 
    **Convert these to the compact-return schema BEFORE Step 1 validation
    runs** — otherwise the validator drops them as malformed and every
