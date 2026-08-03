@@ -27,8 +27,13 @@ persona dispatch table and use the pre-Wave-2 adaptive selection:
   are nested inside the findings block, not returned as bare prose.
 
 Same graceful-degradation guard applies. The legacy path is a rollback
-escape hatch only — it skips the confidence-rubric aggregation in Step 6.
-Step 5 item 3 skips the learnings-researcher injection when
+escape hatch only — it skips the dedup / cross-reviewer-promotion /
+confidence-gate sub-steps of Step 6 (sub-steps 2, 3, 8 below), not Step 6
+in its entirety: sub-step 0 (legacy-prose normalization, including the
+`codex-reviewer` findings-block extraction) and sub-step 1 (validation)
+still run unconditionally, since every legacy-mode reviewer's raw prose
+must pass through them before it's usable at all. Step 5 item 3 skips the
+learnings-researcher injection when
 `review_pipeline: legacy`, even though Step 3d still runs the pre-pass
 (its output is discarded for the legacy path).
 
