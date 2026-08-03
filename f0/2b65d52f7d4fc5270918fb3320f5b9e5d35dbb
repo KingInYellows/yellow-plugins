@@ -1,0 +1,49 @@
+plugins/yellow-codex/README.md
+  s_ecdc1fcec127ee::t_740674e73bde0a 48-52
+  s_ecdc1fcec127ee::t_a12e41d1aa1b28 34-38
+plugins/yellow-review/commands/review/review-pr.md
+  s_ecdc1fcec127ee::t_df090e0792812b 595-632
+  s_ecdc1fcec127ee::t_76d91261c13800 649-655
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_ecdc1fcec127ee::t_8e333066372ae1 346-351
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_ecdc1fcec127ee::t_6a10b13125eebb 504-509
+  s_ecdc1fcec127ee::t_f364e408662e4b 497-501
+  s_ecdc1fcec127ee::t_7c620e6cdc8a6e 54-63
+  s_ecdc1fcec127ee::t_245c105a27326c 139
+  s_ecdc1fcec127ee::t_c86d2a68063171 391-431
+  s_ecdc1fcec127ee::t_c6e283f8ca9a11 180-185,195
+  s_16bfa6e7613d82::t_a1d7a08d921c08 338-367,371-380,383-388
+  s_ecdc1fcec127ee::t_e96043609675f2 215-223,225
+  s_ecdc1fcec127ee::t_e0d3d8964df0ce 255-270
+  s_ecdc1fcec127ee::t_d9a415b63e0fe0 317-322,328-329
+  s_ecdc1fcec127ee::t_3ecd4a844624fe 92-104,107-108
+  s_ecdc1fcec127ee::t_36bb2a7d462dca 323-327
+  s_ecdc1fcec127ee::t_902238fd2a08a9 332-337
+  s_ecdc1fcec127ee::t_ea17a7d26bbaf0 479
+  s_ecdc1fcec127ee::t_f0f11aae07cdb1 540-549,554,558
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "f02b65d52f7d4fc5270918fb3320f5b9e5d35dbb",
+  "prompts": {},
+  "sessions": {
+    "s_16bfa6e7613d82": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fc807-0d6a-7e71-8423-87bfe5dcd02d",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": null
+    },
+    "s_ecdc1fcec127ee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cb28b25-265b-4193-bb99-9e2500680d71",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": null
+    }
+  }
+}
