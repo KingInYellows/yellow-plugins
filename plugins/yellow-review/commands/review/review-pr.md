@@ -594,7 +594,13 @@ Apply the aggregation steps from
    `findings_block_end` lines inside the extracted text are cosmetic
    sentinel-escape artifacts from `codex-reviewer`'s own truncation-safe
    escaping — pass them through unchanged into the finding text, do not
-   strip them.
+   strip them. `codex-reviewer`'s return also includes a
+   `fenced_output_path=` field pointing at a `/tmp/council-codex-fenced-*`
+   file. Unlike `council.md`, this pipeline never reads that file — the
+   findings text is extracted directly from the return above. Unlink the
+   `fenced_output_path=` value (`rm -f`) right after extracting the
+   findings block, so this pipeline doesn't leak that temp file on every
+   run.
 
    **Convert these to the compact-return schema BEFORE Step 1 validation
    runs** — otherwise the validator drops them as malformed and every
