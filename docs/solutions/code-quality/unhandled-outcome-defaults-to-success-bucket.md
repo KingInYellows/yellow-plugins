@@ -207,3 +207,68 @@ existing integration/contract, not only when code changes.
 `plugins/yellow-council/commands/council/council.md`,
 `plugins/yellow-review/commands/review/review-pr.md`,
 `plugins/yellow-codex/agents/review/codex-reviewer.md`.
+
+---
+
+## Update — 2026-08-03
+
+The remediation scoped in the previous Update landed in PR #695
+(`agent/feat/yellow-council-v2-codex-contract-normalization`):
+`codex-reviewer.md` was normalized onto the 6-key contract
+(`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
+`findings_block_begin`...`findings_block_end`) already used by
+`gemini-reviewer.md`/`opencode-reviewer.md`, and both downstream consumers
+named above (`council.md`'s `parse_reviewer_return`, `review-pr.md`'s Step
+6.0 allowlist) were fixed in the same PR to stop silently discarding
+Codex's return.
+
+A follow-up 19-persona review + live Codex CLI smoke test of that same PR
+found five residual instances of the identical failure mechanism — a
+missing, absent, or malformed input silently producing a plausible-looking
+"nothing to report" or default value instead of a visible error — still
+inside `codex-reviewer.md`'s own Step 6 parsing logic:
+
+1. No `command -v jq` guard (mirrors the existing `command -v codex` check
+   in Step 1) — jq's absence degrades Step 6 to a plausible
+   `verdict=UNKNOWN`/no-findings return indistinguishable from a real
+   review (`codex-reviewer.md:284`).
+2. No `[ -s "$OUTPUT_FILE" ]` existence/non-empty guard before Step 6
+   parses it — a stale or missing handoff file produces the same
+   plausible-looking empty-findings/`UNKNOWN` result, mirroring
+   `gemini-reviewer.md:166`'s equivalent `PACK_FILE` guard, which
+   `codex-reviewer.md` lacks (`codex-reviewer.md:280-288`).
+3. The all-or-nothing FIELDS `jq` extraction can diverge from the
+   partial-output FINDINGS extraction on a single malformed field,
+   silently disabling the P1-count REJECT escalation while the findings
+   text still looks complete (`codex-reviewer.md:328`) — no
+   `jq empty "$OUTPUT_FILE"` upfront validity check exists to
+   short-circuit to `verdict=ERROR` before either extraction runs.
+4. `jq`'s stderr is suppressed (`2>/dev/null`) on every field extraction,
+   conflating "malformed JSON" with "valid JSON, field absent" — the
+   resulting warning text misdirects triage toward the wrong root cause
+   (`codex-reviewer.md:328-342`).
+5. `OVERALL_CONFIDENCE_SCORE` has no numeric-validation guard, unlike the
+   adjacent `P1_COUNT` guard a few lines above it — malformed input can
+   silently produce a confidently-wrong `HIGH` via string comparison in
+   the `awk` threshold call (`codex-reviewer.md:344-358`).
+
+All five are still-open findings as of this writing (2026-08-03) — fixing
+the contract-normalization bug did not fix the fallback-safety gaps in the
+new parsing logic that replaced the old one; the same "silently degrade to
+plausible default" mechanism this doc tracks simply moved from "producer
+never emits the contract" (previous Update) to "producer's own parser has
+no guard against malformed/missing input" — inside code written to close
+the first gap.
+
+**Added guidance — a fix for a "never conformed" gap can reintroduce the
+same mechanism internally:** when the fix for a never-conformed-consumer
+gap is "make the producer parse a new structured format," audit the new
+parsing code itself for the same class of gap — missing
+tool-availability checks, missing existence/non-empty guards on handoff
+files, and suppressed parser-error output are the concrete instances found
+here. Closing the contract at the interface does not guarantee the new
+implementation's own error paths don't default to a plausible-looking
+success state.
+
+**Components (this Update):**
+`plugins/yellow-codex/agents/review/codex-reviewer.md`.
