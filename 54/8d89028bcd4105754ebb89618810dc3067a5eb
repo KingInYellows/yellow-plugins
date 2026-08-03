@@ -1,0 +1,19 @@
+plans/yellow-council-v2-four-cli-01-codex-contract-normalization.md
+  s_3702ffcf6d7e41::t_d54bdc8d276884 243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "548d89028bcd4105754ebb89618810dc3067a5eb",
+  "prompts": {},
+  "sessions": {
+    "s_3702ffcf6d7e41": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55558d38-ec4a-45e3-a0f6-80b715fbf30d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
