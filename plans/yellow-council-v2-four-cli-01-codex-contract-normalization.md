@@ -233,7 +233,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       the plugin's own docs describe the structured return. Repo rule: update
       the plugin's CLAUDE.md when behavior changes.
 
-- [ ] Step 12: Derive the changeset set from `git diff --name-only` rather than
+- [x] Step 12: Derive the changeset set from `git diff --name-only` rather than
       from assumption — one `.changeset/<slug>.md` per plugin actually touched.
       Expected: `"yellow-codex": patch` (Steps 2-6, 11),
       `"yellow-review": patch` (Steps 8-9), `"yellow-council": patch`
