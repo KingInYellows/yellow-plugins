@@ -342,6 +342,11 @@ background, deliberately kept out of the preload budget.
 - 300s timeout (yellow-codex's own cap; council's 600s does NOT propagate)
 - Read-only mode via `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -c 'mcp_servers={}' --ephemeral` (`-s`/`-a` do not parse on `exec review`, codex-cli 0.140.0)
 - Pack must use the existing yellow-codex review prompt structure
+- Returns the same structured 6-key contract as the Gemini and OpenCode
+  slots below (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
+  `findings_block_begin`...`findings_block_end`) — `parse_reviewer_return`
+  handles all three reviewers uniformly, with no Codex-specific parse
+  branch
 
 **Gemini slot — Antigravity CLI `agy`** (direct bash; the legacy `gemini`
 CLI stopped serving consumer subscriptions 2026-06-18):

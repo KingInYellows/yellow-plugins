@@ -223,7 +223,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       return shape: `plugins/yellow-review/references/review-pr/legacy-fallback.md:19-22`
       and `plugins/yellow-review/skills/pr-review-workflow/SKILL.md:334-344`.
 
-- [ ] Step 10: Update `plugins/yellow-council/skills/council-patterns/SKILL.md`
+- [x] Step 10: Update `plugins/yellow-council/skills/council-patterns/SKILL.md`
       — in the "Reviewer-Specific CLI Flag Pattern → Codex" subsection
       (`:341-344`), note that codex-reviewer now emits the same 6-key contract
       as the Gemini and OpenCode slots, for symmetry with those subsections.
