@@ -201,7 +201,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       instead of only "P1/P2/P3 format". Keep `description:` single-line — no
       folded scalars.
 
-- [ ] Step 7: Verify R3 rather than editing for it — grep
+- [x] Step 7: Verify R3 rather than editing for it — grep
       `plugins/yellow-council/commands/council/council.md` for any
       `codex`-conditional parse branch and confirm `parse_reviewer_return`
       (`:236-253`) and the Step 7 report loop (`:374`) are reviewer-agnostic.
