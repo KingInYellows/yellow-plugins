@@ -134,14 +134,14 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
 
 ## Implementation
 
-- [ ] Step 1: Record the audit for the PR description — write the
+- [x] Step 1: Record the audit for the PR description — write the
       before/after gap table (what `codex-reviewer.md` Step 7 emits today vs.
       the 6 keys `parse_reviewer_return` greps for) into the PR body draft,
       including the finding that `council.md`'s Codex leg currently resolves to
       `verdict=ERROR` via the `"${verdict:-ERROR}"` fallback at
       `council.md:251`. No file edits in this step.
 
-- [ ] Step 2: In `plugins/yellow-codex/agents/review/codex-reviewer.md`, add a
+- [x] Step 2: In `plugins/yellow-codex/agents/review/codex-reviewer.md`, add a
       new `### 7a. Verdict, Confidence, and Summary Derivation` subsection
       before the return step. Parse the `codex exec review --json` result for
       `overall_correctness`, `overall_explanation`, and
@@ -158,13 +158,13 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       Step 4 below. Set `SUMMARY` from `overall_explanation` truncated with
       `head -c 500`, matching `gemini-reviewer.md:363`.
 
-- [ ] Step 3: In the same file, add the verdict enum case-statement verbatim
+- [x] Step 3: In the same file, add the verdict enum case-statement verbatim
       from `gemini-reviewer.md:406-409` —
       `case "$VERDICT" in APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;; *) VERDICT="UNKNOWN"; CONFIDENCE="LOW" ;; esac`
       — placed after all assignment paths in Step 7a and before any emit. This
       is R2.
 
-- [ ] Step 4: Rewrite `### 7. Return Findings` (`codex-reviewer.md:224-238`) to
+- [x] Step 4: Rewrite `### 7. Return Findings` (`codex-reviewer.md:224-238`) to
       emit the canonical block in this exact operation order, which must not be
       reordered: (a) run the existing Step 6 redaction awk over the findings
       text; (b) apply the 200-line / 20000-byte truncation cap copied from
@@ -179,7 +179,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       delete `$FENCED_OUTPUT_FILE` in the agent's cleanup; add the same
       "council.md owns this file" comment as `gemini-reviewer.md:450`.
 
-- [ ] Step 5: Give every early-exit path a structured return, so no outcome
+- [x] Step 5: Give every early-exit path a structured return, so no outcome
       falls through as unparseable prose. Full 6-key block (it has findings):
       Step 3 diff-too-large (`codex-reviewer.md:101-116`) →
       `verdict=UNAVAILABLE`, findings block retaining the existing P3
@@ -193,7 +193,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       (Rate-limit stays `ERROR` here: `QUOTA_EXHAUSTED` is added to the enum by
       spec R16 in shell 04. Do not add it now.)
 
-- [ ] Step 6: Update the file's own prose to match the new contract — rewrite
+- [x] Step 6: Update the file's own prose to match the new contract — rewrite
       the `Constraints` bullet at `codex-reviewer.md:248` ("If Codex is
       unavailable or fails, return empty findings gracefully") to state that
       every exit returns a structured verdict block, and update the
