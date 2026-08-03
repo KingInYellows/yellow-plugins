@@ -220,12 +220,15 @@ timeout --signal=TERM --kill-after=10 300 codex exec review \
     exit 0
   }
 
-# Keep $OUTPUT_FILE on disk — Steps 6-7 below need it and, per the note
-# there, must run as a separate Bash invocation from this one (Step 5's
-# Read call forces the split). Only its literal path (short, safe to
-# reprint) crosses the boundary, never its content.
+# Keep $OUTPUT_FILE on disk — Step 6 below needs it and, since each fenced
+# bash block is a separate Bash tool call with no shared shell state, must
+# run as a separate invocation from this one. Only its literal path (short,
+# safe to reprint) crosses the boundary, never its content. Printed to
+# stderr, not stdout: a stdout line here would precede the verdict= block
+# in this agent's final return and break review-pr.md's/council.md's
+# `verdict=`-line detection on the consuming end.
 rm -f "$STDERR_FILE"
-printf 'OUTPUT_FILE=%s\n' "$OUTPUT_FILE"
+printf 'OUTPUT_FILE=%s\n' "$OUTPUT_FILE" >&2
 ```
 
 Each branch above **stops** after emitting — none fall through into Step 5's

@@ -583,24 +583,43 @@ Apply the aggregation steps from
 
    **Findings-block extraction (codex-reviewer only).** `codex-reviewer`
    emits the structured 6-key council contract, not bare legacy prose —
-   its `Finding:`/`Fix:` findings are nested inside a
-   `findings_block_begin` / `findings_block_end` delimited block. Before
-   applying the prose conversion below, check whether the raw return
-   begins with `verdict=`. If it does, extract the text between the
-   `findings_block_begin` / `findings_block_end` sentinel lines (the same
-   extraction `council.md`'s `parse_reviewer_return` performs — the
-   findings block, not the raw envelope, is the prose input to the
-   conversion below). `[ESCAPED] findings_block_begin`/
-   `findings_block_end` lines inside the extracted text are cosmetic
-   sentinel-escape artifacts from `codex-reviewer`'s own truncation-safe
-   escaping — pass them through unchanged into the finding text, do not
-   strip them. `codex-reviewer`'s return also includes a
-   `fenced_output_path=` field pointing at a `/tmp/council-codex-fenced-*`
-   file. Unlike `council.md`, this pipeline never reads that file — the
-   findings text is extracted directly from the return above. Unlink the
-   `fenced_output_path=` value (`rm -f`) right after extracting the
-   findings block, so this pipeline doesn't leak that temp file on every
-   run.
+   its `Finding:` findings are nested inside a `findings_block_begin` /
+   `findings_block_end` delimited block. Before applying the prose
+   conversion below, check whether the raw return contains a line
+   matching `^verdict=` (the same test `council.md`'s
+   `parse_reviewer_return` uses — a per-line match anywhere in the
+   return, not a whole-text prefix test, since prior tool-call output
+   from earlier steps in the agent's own execution can legitimately
+   precede the verdict block).
+
+   Parse the value of that `verdict=` line:
+
+   - **`TIMEOUT`, `ERROR`, `UNAVAILABLE`, or `UNKNOWN`** — these arms
+     never emit a `findings_block_begin`/`findings_block_end` pair (see
+     `codex-reviewer.md` Steps 1/3/4), so there is nothing to extract.
+     Treat `codex-reviewer` as a skipped/failed reviewer: record it in
+     the Coverage "Reviewers skipped" list with the `summary=` line as
+     the reason, same as a spawn failure. Do NOT proceed to findings
+     extraction or emit an empty findings envelope for it — an empty
+     envelope reads as "Codex reviewed and found nothing," which is
+     false.
+   - **`APPROVE`, `REVISE`, or `REJECT`** — extract the text between the
+     `findings_block_begin` / `findings_block_end` sentinel lines (the
+     same extraction `council.md`'s `parse_reviewer_return` performs —
+     the findings block, not the raw envelope, is the prose input to the
+     conversion below). `[ESCAPED] findings_block_begin`/
+     `findings_block_end` lines inside the extracted text are cosmetic
+     sentinel-escape artifacts from `codex-reviewer`'s own
+     truncation-safe escaping — pass them through unchanged into the
+     finding text, do not strip them.
+
+   `codex-reviewer`'s return also includes a `fenced_output_path=` field
+   pointing at a `/tmp/council-codex-fenced-*` file. Unlike `council.md`,
+   this pipeline never reads that file — the findings text is extracted
+   directly from the return above. Unlink the `fenced_output_path=`
+   value (`rm -f`) right after processing the return (whichever branch
+   above was taken), so this pipeline doesn't leak that temp file on
+   every run.
 
    **Convert these to the compact-return schema BEFORE Step 1 validation
    runs** — otherwise the validator drops them as malformed and every
@@ -609,7 +628,9 @@ Apply the aggregation steps from
    - Parse `category` from the prefix word
    - Parse `file:line` from the trailing token
    - Use the `Finding:` line as `title` and the `Fix:` line as
-     `suggested_fix` (null when absent)
+     `suggested_fix` (null when absent — `codex-reviewer`'s findings
+     never carry a `Fix:` line since its jq-derived format has no fix
+     field, so its `suggested_fix` is always null)
    - Infer defaults: `confidence: 75`, `autofix_class: gated_auto`,
      `owner: downstream-resolver`, `requires_verification: true`,
      `pre_existing: false`

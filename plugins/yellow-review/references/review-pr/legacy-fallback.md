@@ -23,8 +23,8 @@ persona dispatch table and use the pre-Wave-2 adaptive selection:
   `codex-reviewer` returns the structured 6-key council contract
   (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
   `findings_block_begin`...`findings_block_end`) — its P1/P2/P3
-  `Finding:`/`Fix:` findings are nested inside the findings block, not
-  returned as bare prose.
+  `Finding:` findings (no `Fix:` line — Codex's schema has no fix field)
+  are nested inside the findings block, not returned as bare prose.
 
 Same graceful-degradation guard applies. The legacy path is a rollback
 escape hatch only — it skips the confidence-rubric aggregation in Step 6.
