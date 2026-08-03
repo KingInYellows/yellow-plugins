@@ -242,6 +242,29 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
 
 - [x] Step 13: Run the verification gates below and fix anything they surface.
 
+**Post-Step-13 correction (Phase 3 quality-check pass, two review iterations).**
+The `### 7a` and `### 7` headings described in Steps 2-4 above no longer
+exist as separate sections in the shipped file — a P1 cross-Bash-block
+variable-survival bug (Steps 6/7a/7 were separate fenced `bash` blocks;
+variables don't survive across separate Bash tool calls) forced merging
+them into one combined block under `### 6. Redact, Derive Verdict, and
+Return Findings (single Bash invocation)`, mirroring
+`gemini-reviewer.md`'s documented Steps 5-9 pattern. A second review
+iteration additionally found FINDINGS was being hand-retyped by the LLM
+into a bash string literal across the Step 5→6 boundary (a shell-injection
+risk from untrusted Codex-echoed content) — fixed by deriving FINDINGS
+mechanically via `jq` from `$OUTPUT_FILE` instead, so Step 5 is now
+reference-only documentation rather than an executable step. Two
+redaction-completeness gaps (SUMMARY missing the PEM state machine;
+`ERR_PEEK` truncating before redacting) were also found and fixed in the
+same pass. See commits `4b411fe` and `4e0f5c2` for the fixes and the
+per-fix verification (bash simulations of the PEM leak and the
+truncation-order leak). Deferred, out of scope: an output-size guard on
+`$OUTPUT_FILE` before Steps 5/6 parse it (pre-existing exposure, not
+introduced by this PR — the old code read the same file unbounded), and
+the `sk-ant-`/`AIza`/`ses_` redaction-pattern gap already named in this
+plan's Out of Scope section.
+
 ## Verification
 
 - Offline contract check (primary gate — no Codex CLI or auth required):
