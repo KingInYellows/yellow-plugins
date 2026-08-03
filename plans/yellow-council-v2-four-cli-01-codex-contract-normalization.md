@@ -240,7 +240,7 @@ is the shape: frontmatter `"<plugin-name>": patch`, blank line, prose body.
       (Step 10). Drop any of the three if its plugin ended up untouched. Run
       `sed -i 's/\r$//'` on each new changeset file (WSL2 CRLF).
 
-- [ ] Step 13: Run the verification gates below and fix anything they surface.
+- [x] Step 13: Run the verification gates below and fix anything they surface.
 
 ## Verification
 
