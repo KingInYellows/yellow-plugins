@@ -341,6 +341,33 @@ across a split.
 OUTPUT_FILE_RAW="<paste the OUTPUT_FILE line Step 4 printed to stderr>"
 OUTPUT_FILE="${OUTPUT_FILE_RAW#OUTPUT_FILE=}"
 
+# --- Validate the pasted handoff path BEFORE any parse or rm touches it.
+# The value above is model-substituted text: a miscopied paste (or
+# prompt-injected content masquerading as the Step 4 stderr line) could
+# name any writable file, which the error arms below would then pass to
+# rm -f, and a valid-JSON file at that path would be parsed as a forged
+# review. Require the exact mktemp shape Step 4 creates
+# (/tmp/codex-reviewer-XXXXXX.txt, 6 alphanumerics), a regular file, and
+# not a symlink; on mismatch fail closed WITHOUT deleting the path. ---
+OF_VALID=0
+case "$OUTPUT_FILE" in
+  /tmp/codex-reviewer-??????.txt)
+    OF_ID="${OUTPUT_FILE#/tmp/codex-reviewer-}"
+    OF_ID="${OF_ID%.txt}"
+    case "$OF_ID" in
+      *[!A-Za-z0-9]*) : ;;
+      *) if [ -f "$OUTPUT_FILE" ] && [ ! -L "$OUTPUT_FILE" ]; then OF_VALID=1; fi ;;
+    esac
+    ;;
+esac
+if [ "$OF_VALID" -ne 1 ]; then
+  printf '[codex-reviewer] OUTPUT_FILE handoff path failed validation (not the Step 4 mktemp shape, or not a regular non-symlink file) — refusing to parse or delete it\n' >&2
+  printf 'verdict=ERROR\n'
+  printf 'confidence=N/A\n'
+  printf 'summary=Step 4 to Step 6 OUTPUT_FILE handoff failed validation — re-run the review; no file was parsed or deleted.\n'
+  exit 0
+fi
+
 # --- Fail closed before any parsing: jq's absence is a documented
 # supported-but-degraded install state (see /codex:setup) — silently
 # falling through into jq calls with suppressed stderr would otherwise
