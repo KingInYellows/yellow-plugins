@@ -74,24 +74,34 @@ Per-mode `{{MODE_SPECIFIC_CONTEXT}}` block:
 
 ### Reviewer Output Schema
 
-Each reviewer returns a single text block carrying the structured 6-key
-contract, parsed by `parse_reviewer_return` in `council.md` (the
-authoritative definition site — these lines mirror it):
+Two distinct layers, easy to conflate:
+
+**Layer 1 — CLI output → reviewer agent (capitalized `Verdict:` format).**
+The external CLI's response to the pack uses the capitalized format the
+pack template above demands (`Verdict:` / `Confidence:` / `Findings:` /
+`Summary:`). Each reviewer AGENT parses that CLI output with these
+regexes:
 
 ```bash
-VERDICT=$(printf '%s' "$reviewer_output" | grep -m1 '^verdict=' | sed 's/^verdict=//')
-CONFIDENCE=$(printf '%s' "$reviewer_output" | grep -m1 '^confidence=' | sed 's/^confidence=//')
-SUMMARY=$(printf '%s' "$reviewer_output" | grep -m1 '^summary=' | sed 's/^summary=//')
-FENCED_PATH=$(printf '%s' "$reviewer_output" | grep -m1 '^fenced_output_path=' | sed 's/^fenced_output_path=//')
-FINDINGS=$(printf '%s' "$reviewer_output" | awk '/^findings_block_begin$/{flag=1;next} /^findings_block_end$/{flag=0} flag')
+VERDICT=$(grep -m1 '^Verdict: ' "$OUTPUT_FILE" | sed 's/^Verdict: //')
+CONFIDENCE=$(grep -m1 '^Confidence: ' "$OUTPUT_FILE" | sed 's/^Confidence: //')
+SUMMARY=$(awk '/^Summary: / { sub(/^Summary: /, ""); print; exit }' "$OUTPUT_FILE")
+# Findings: extract block between "Findings:" and "Summary:" lines
+FINDINGS=$(awk '/^Findings:/ { capture=1; next } /^Summary: / { capture=0 } capture' "$OUTPUT_FILE")
 ```
 
-(The capitalized `Verdict: / Confidence: / Findings: / Summary:` phrasing
-that appears in older prose is the legacy pre-6-key description of the
-same fields, not a parseable format — `parse_reviewer_return` recognizes
-only the lowercase `key=` lines and sentinel pair above.)
+**Layer 2 — reviewer agent → council (lowercase 6-key contract).** After
+parsing, redacting, and fencing, the agent's own Task-tool return carries
+the structured 6-key contract that `parse_reviewer_return` in `council.md`
+(the authoritative definition site) extracts uniformly for all three
+reviewers: `verdict=` / `confidence=` / `summary=` / `fenced_output_path=`
+plus the `findings_block_begin`...`findings_block_end` sentinel pair —
+lowercase `key=` lines, first occurrence wins (`grep -m1`). The
+capitalized Layer-1 lines never reach council.md directly. (Codex differs
+only at Layer 1 — its CLI emits strict-mode JSON parsed with `jq` per
+yellow-codex's `codex-patterns` skill; its Layer-2 return is identical.)
 
-If `Verdict:` line is absent, the reviewer agent must:
+If the CLI output's `Verdict:` line is absent, the reviewer agent must:
 
 1. Set `VERDICT=UNKNOWN`, `CONFIDENCE=LOW`
 2. Use the first 2K chars of the raw output as `SUMMARY` (truncated at word boundary)
