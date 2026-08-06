@@ -408,6 +408,22 @@ if ! JQ_VALIDATE_ERR=$(jq empty "$OUTPUT_FILE" 2>&1); then
   exit 0
 fi
 
+# Syntactic validity is not schema validity: {"findings":"oops", ...} passes
+# `jq empty`, then `.findings[]?` below silently yields nothing — an empty
+# findings list next to a parseable overall_correctness, i.e. a clean-looking
+# APPROVE for malformed output. Require the two shape properties every
+# extraction below depends on: .findings is an array and
+# .overall_correctness is a string (nullable fields are already handled by
+# the // fallbacks).
+if ! jq -e '(.findings | type) == "array" and ((.overall_correctness // "") | type) == "string"' "$OUTPUT_FILE" >/dev/null 2>&1; then
+  printf '[codex-reviewer] Codex output is valid JSON but does not match the review schema shape (.findings array / .overall_correctness string)\n' >&2
+  rm -f "$OUTPUT_FILE" 2>/dev/null
+  printf 'verdict=ERROR\n'
+  printf 'confidence=N/A\n'
+  printf 'summary=Codex output was valid JSON but not the review schema shape — unable to parse a review result.\n'
+  exit 0
+fi
+
 # Repo root for stripping Codex's machine-absolute code_location paths
 # down to the repo-relative form every other reviewer uses — otherwise
 # Codex findings never fingerprint-match against other reviewers' returns

@@ -258,7 +258,7 @@ pre-restack SHAs go dangling); items 3-5 in the second round:
 5. **Fixed.** `OVERALL_CONFIDENCE_SCORE` had no numeric-validation guard,
    unlike the adjacent `P1_COUNT` guard — malformed input could silently
    produce a confidently-wrong `HIGH` via string comparison in the `awk`
-   threshold call. Now guarded at `codex-reviewer.md:545-547` (decimal
+   threshold call. Now guarded at `codex-reviewer.md:561-563` (decimal
    case guard plus an in-awk 0-1 range check, defaulting to LOW).
 
 All five were open findings as of the review that surfaced them
