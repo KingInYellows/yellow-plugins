@@ -208,6 +208,22 @@ SCHEMA_FILE="${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json"
 # timeout here is a scope/size symptom, not an auth or rate-limit one.
 git diff "${BASE_REF}...HEAD" > "$DIFF_FILE" 2>/dev/null
 
+# Fail closed if the diff is empty — a failed `git diff` (bad $BASE_REF,
+# unfetched origin/main in a fresh worktree) with its stderr discarded above
+# would otherwise hand Codex an empty file, and the strict-mode schema has no
+# "nothing to review" arm: the likely result is a schema-conformant
+# "patch is correct" with zero findings, indistinguishable from a genuinely
+# clean review. ERROR, not UNAVAILABLE: this is a git/ref failure (same class
+# as the exit-code arms below), not a packaging problem.
+if [ ! -s "$DIFF_FILE" ]; then
+  printf '[codex-reviewer] Diff file empty — git diff %s...HEAD produced no output\n' "$BASE_REF" >&2
+  rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
+  printf 'verdict=ERROR\n'
+  printf 'confidence=N/A\n'
+  printf 'summary=git diff %s...HEAD produced no output — base ref missing or diff empty; unable to review.\n' "$BASE_REF"
+  exit 0
+fi
+
 # Fail closed if the schema is missing — without it Codex returns free prose
 # that Step 6 cannot parse, which would surface as an empty review rather
 # than as the packaging error it actually is. UNAVAILABLE, not ERROR: this is

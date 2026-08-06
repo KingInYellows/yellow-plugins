@@ -32,6 +32,10 @@ caller needs machine-parsable findings:
 
 ```bash
 git diff "${BASE_REF}...HEAD" > "$DIFF_FILE"
+# Guard before invoking: an empty $DIFF_FILE (failed/bad base ref) must fail
+# closed — the strict-mode schema has no "nothing to review" arm, so Codex
+# would return a clean-looking "patch is correct" for an empty file.
+[ -s "$DIFF_FILE" ] || { printf '[yellow-codex] Diff is empty — aborting.\n' >&2; exit 1; }
 
 codex exec \
   "You are a supplementary code reviewer. The complete diff under review has been written to the file ${DIFF_FILE}. Read that file and review ONLY the changes it contains. You may read the specific files it touches for additional context, but do NOT search or explore the wider repository. Report your findings as JSON matching the provided output schema. Use absolute file paths in code_location.absolute_file_path and 1-based line numbers." \

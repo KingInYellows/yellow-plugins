@@ -130,8 +130,9 @@ Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
   trigger 429 errors.
 - **Cost** — Each invocation uses OpenAI API tokens. Default model (`gpt-5.4`)
   is the most expensive.
-- **`--output-schema` known issue** — May be ignored with certain model variants.
-  Use `gpt-5.4` explicitly for schema enforcement.
+- **`--output-schema` is silently ignored by `codex exec review`** — on every
+  model; the subcommand, not the model, is the deciding factor. Use plain
+  `codex exec` (as `codex-reviewer` does) when structured JSON is required.
 - **Codex config is TOML** — `~/.codex/config.toml` (not JSON or YAML)
 - **Exit code ambiguity** — Codex may exit 0 on SIGTERM. Use `timeout`
   utility's exit 124 for timeout detection.
