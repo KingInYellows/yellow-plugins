@@ -1,0 +1,31 @@
+docs/solutions/security-issues/sandwich-fence-delimiter-forgery.md
+  s_2db87cc7495315::t_765ae76c9bd41b 197-253
+docs/solutions/workflow/gt-modify-no-c-flag-silent-unstaged-miss.md
+  s_2db87cc7495315::t_a8e0c374f95ecd 111-166
+docs/solutions/code-quality/session-level-review-command-patterns.md
+  s_2db87cc7495315::t_a8e0c374f95ecd 281-345
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_2db87cc7495315::t_54ce28611cd04a 286-317
+  s_2db87cc7495315::t_3cbfa49a182757 318-373
+docs/solutions/integration-issues/codex-cli-exec-review-flags-rejected-0140.md
+  s_2db87cc7495315::t_439af4617b2247 185-261
+  s_2db87cc7495315::t_b7c18fa41672c8 262-332
+docs/solutions/code-quality/parallel-multi-agent-review-orchestration.md
+  s_2db87cc7495315::t_a8e0c374f95ecd 427-503
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "c8de02dbb94a871c363c304b6dfa82085c0afdc6",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
