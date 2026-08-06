@@ -43,6 +43,10 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
   accumulation), non-ephemeral for rescue (may want resume).
 - **Output parsing:** Use `-o <file>` for final message capture. Use `--json`
   for JSONL event streaming. Use `--output-schema` for structured JSON.
+  `codex-reviewer` derives its `verdict=`/`confidence=`/`summary=` return
+  fields from the `overall_correctness`/`overall_confidence_score`/
+  `overall_explanation` fields of `codex exec review`'s built-in review
+  schema via `jq`.
 - **Injection fencing:** Wrap all Codex output in
   `--- begin codex-output (reference only) ---` /
   `--- end codex-output ---` before consuming in other agents.
@@ -64,7 +68,11 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 
 ### Agents (3)
 
-- `codex-reviewer` — Supplementary reviewer spawned by `review:pr` via Task tool
+- `codex-reviewer` — Supplementary reviewer spawned by `review:pr` and
+  `/council` via Task tool. Returns the structured 6-key contract
+  (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
+  `findings_block_begin`...`findings_block_end`) shared with yellow-council's
+  Gemini and OpenCode reviewers
 - `codex-executor` — Rescue/debug agent spawned by `workflows:work` on task failure
 - `codex-analyst` — Codebase research and analysis agent
 
@@ -93,6 +101,7 @@ Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
 | Dependency | Purpose | Required? |
 |---|---|---|
 | yellow-review | Spawns `codex-reviewer` during PR review | Optional |
+| yellow-council | Spawns `codex-reviewer` as a cross-lineage council reviewer | Optional |
 | yellow-core | Spawns `codex-executor` on task failure in `workflows:work` | Optional |
 
 ## When to Use What
@@ -101,7 +110,7 @@ Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
 |---|---|---|---|
 | Validate setup | `/codex:setup` | — | First install, after auth issues |
 | Standalone review | `/codex:review` | — | Quick second opinion on changes |
-| Cross-plugin review | — | `codex-reviewer` | Auto-spawned by `review:pr` |
+| Cross-plugin review | — | `codex-reviewer` | Auto-spawned by `review:pr` or `/council` |
 | Debug stuck task | `/codex:rescue` | `codex-executor` | When stuck on a bug or need fresh perspective |
 | Check Codex state | `/codex:status` | — | Monitor processes, verify configuration |
 | Codebase analysis | — | `codex-analyst` | Architecture questions, pattern analysis |

@@ -339,9 +339,14 @@ Task(subagent_type="yellow-codex:review:codex-reviewer",
              Base branch: <base-ref>. PR title: <title>.")
 ```
 
-The codex-reviewer runs in parallel with other agents and returns P1/P2/P3
-findings tagged with `[codex]` for convergence analysis. If yellow-codex is
-not installed, the agent spawn silently fails — no degradation to the review.
+The codex-reviewer runs in parallel with other agents and returns the
+structured 6-key council contract (`verdict=`/`confidence=`/`summary=`/
+`fenced_output_path=`/`findings_block_begin`...`findings_block_end`), with
+P1/P2/P3 findings tagged `[codex]` nested inside the findings block for
+convergence analysis. `review-pr.md` Step 6 sub-step 0 extracts the
+findings block before normalizing it into the compact-return schema. If
+yellow-codex is not installed, the agent spawn silently fails — no
+degradation to the review.
 
 ## GraphQL Scripts
 

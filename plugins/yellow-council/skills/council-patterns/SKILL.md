@@ -74,7 +74,13 @@ Per-mode `{{MODE_SPECIFIC_CONTEXT}}` block:
 
 ### Reviewer Output Schema
 
-Each reviewer returns a single Markdown text block parseable by these regexes:
+Two distinct layers, easy to conflate:
+
+**Layer 1 — CLI output → reviewer agent (capitalized `Verdict:` format).**
+The external CLI's response to the pack uses the capitalized format the
+pack template above demands (`Verdict:` / `Confidence:` / `Findings:` /
+`Summary:`). Each reviewer AGENT parses that CLI output with these
+regexes:
 
 ```bash
 VERDICT=$(grep -m1 '^Verdict: ' "$OUTPUT_FILE" | sed 's/^Verdict: //')
@@ -84,7 +90,18 @@ SUMMARY=$(awk '/^Summary: / { sub(/^Summary: /, ""); print; exit }' "$OUTPUT_FIL
 FINDINGS=$(awk '/^Findings:/ { capture=1; next } /^Summary: / { capture=0 } capture' "$OUTPUT_FILE")
 ```
 
-If `Verdict:` line is absent, the reviewer agent must:
+**Layer 2 — reviewer agent → council (lowercase 6-key contract).** After
+parsing, redacting, and fencing, the agent's own Task-tool return carries
+the structured 6-key contract that `parse_reviewer_return` in `council.md`
+(the authoritative definition site) extracts uniformly for all three
+reviewers: `verdict=` / `confidence=` / `summary=` / `fenced_output_path=`
+plus the `findings_block_begin`...`findings_block_end` sentinel pair —
+lowercase `key=` lines, first occurrence wins (`grep -m1`). The
+capitalized Layer-1 lines never reach council.md directly. (Codex differs
+only at Layer 1 — its CLI emits strict-mode JSON parsed with `jq` per
+yellow-codex's `codex-patterns` skill; its Layer-2 return is identical.)
+
+If the CLI output's `Verdict:` line is absent, the reviewer agent must:
 
 1. Set `VERDICT=UNKNOWN`, `CONFIDENCE=LOW`
 2. Use the first 2K chars of the raw output as `SUMMARY` (truncated at word boundary)
@@ -342,6 +359,13 @@ background, deliberately kept out of the preload budget.
 - 300s timeout (yellow-codex's own cap; council's 600s does NOT propagate)
 - Read-only mode via `-c 'sandbox_mode="read-only"' -c 'approval_policy="never"' -c 'mcp_servers={}' --ephemeral` (`-s`/`-a` do not parse on `exec review`, codex-cli 0.140.0)
 - Pack must use the existing yellow-codex review prompt structure
+- Returns the same structured 6-key contract as the Gemini and OpenCode
+  reviewers (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
+  `findings_block_begin`...`findings_block_end`) — the contract itself is
+  defined by `parse_reviewer_return` in `council.md`, not by the Gemini/
+  OpenCode subsections below (those document only CLI invocation flags and
+  redaction); `parse_reviewer_return` handles all three reviewers
+  uniformly, with no Codex-specific parse branch
 
 **Gemini slot — Antigravity CLI `agy`** (direct bash; the legacy `gemini`
 CLI stopped serving consumer subscriptions 2026-06-18):

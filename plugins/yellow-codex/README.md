@@ -31,11 +31,11 @@ install if needed.
 
 ## Agents
 
-| Agent            | Category | Description                                        |
-| ---------------- | -------- | -------------------------------------------------- |
-| `codex-reviewer` | Review   | Supplementary reviewer spawned by `review:pr`      |
-| `codex-executor` | Workflow | Rescue/debug agent spawned on task failure         |
-| `codex-analyst`  | Research | Codebase research and analysis                     |
+| Agent            | Category | Description                                                       |
+| ---------------- | -------- | ------------------------------------------------------------------ |
+| `codex-reviewer` | Review   | Supplementary reviewer spawned by `/review:pr` and `/council`; returns the structured 6-key contract |
+| `codex-executor` | Workflow | Rescue/debug agent spawned on task failure                        |
+| `codex-analyst`  | Research | Codebase research and analysis                                    |
 
 ## Skills
 
@@ -45,10 +45,11 @@ install if needed.
 
 ## Cross-Plugin Dependencies
 
-| Dependency     | Purpose                                      | Required? |
-| -------------- | -------------------------------------------- | --------- |
-| yellow-review  | Spawns `codex-reviewer` during PR review     | Optional  |
-| yellow-core    | Spawns `codex-executor` on task failure      | Optional  |
+| Dependency     | Purpose                                                     | Required? |
+| -------------- | ------------------------------------------------------------ | --------- |
+| yellow-review  | Spawns `codex-reviewer` during PR review                      | Optional  |
+| yellow-council | Spawns `codex-reviewer` as a cross-lineage council reviewer   | Optional  |
+| yellow-core    | Spawns `codex-executor` on task failure                       | Optional  |
 
 Codex is an enhancement, never a dependency. All existing workflows function
 identically without `yellow-codex` installed.

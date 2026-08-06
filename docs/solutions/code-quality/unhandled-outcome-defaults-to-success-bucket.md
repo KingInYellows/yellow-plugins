@@ -133,3 +133,154 @@ disclosure says so rather than claiming full coverage.
 handled non-verdict outcome, not a tool crash) — the size guard is now a
 member of the same closed set every other exit path in the file
 populates, not a bypass of it.
+
+---
+
+## Update — 2026-08-02
+
+During `/workflows:expand-shell` plan expansion (not code review) for
+yellow-council V2 shell 01, a repo pattern survey verifying the shell's own
+premise ("remove a codex special-case from council's parser") found a live
+instance of this failure family in production, of a variant this doc had
+not yet covered.
+
+**The variant:** unlike PR #676's cases above (a *new* enum member added
+later, consumer switch/case not extended to match), this is a producer
+(`codex-reviewer`) that **never conformed to an existing consumer contract
+from birth** — silently, since the reviewer was added, across **two
+independent consumers**, via **two different mechanisms**:
+
+1. `plugins/yellow-council/commands/council/council.md`'s
+   `parse_reviewer_return` (`:236-253`) is already uniform across all three
+   reviewers — it greps the same 6 fixed keys (`verdict=`, `confidence=`,
+   `summary=`, `fenced_output_path=`, the `findings_block_begin/end` block)
+   for every reviewer, no codex-specific branch exists. But `codex-reviewer`
+   has never emitted those keys, so every Codex return falls through to the
+   `"${verdict:-ERROR}"` default at `council.md:251` — the Codex leg of
+   `/council` has been silently degraded to `verdict=ERROR` in production.
+2. `plugins/yellow-review/commands/review/review-pr.md` Step 6.0
+   (`:563-574`) maintains a hand-written "legacy prose normalizer"
+   allowlist that converts pre-Wave-2 agents' prose findings into the
+   compact JSON schema before Step 1 validates required fields.
+   `codex-reviewer` is not on that list, so Step 1 (`:594-608`) drops its
+   return outright as malformed — `/review:pr` has also been silently
+   discarding every Codex finding.
+
+Both gaps produce plausible-looking output (an `ERROR` verdict reads as a
+legitimate outcome, not a parse failure; a missing finding reads as "Codex
+found nothing") and were invisible to CI and to normal code review, because
+neither consumer ever crashes or errors loudly — same "falls through to a
+plausible default" shape this doc's guidance already names, but here the
+producer never conformed even once, rather than a later addition breaking
+an established contract. As of this writing (2026-08-02) the remediation is
+scoped in a new plan (this session's plan-expansion output) but not yet
+landed — treat this as the discovered-state record, not a fixed bug.
+
+**How it was found:** neither gap surfaced via `/review:pr` or manual code
+review. Both were found because a `/workflows:expand-shell` pattern-survey
+subagent was dispatched to verify a shell's premise ("does a codex
+special-case exist to remove?") and grepped the actual parser instead of
+trusting the shell's description — the same grep that proved the shell's
+premise wrong also revealed the production bug. Plan-expansion premise
+verification is a detection surface for this failure class, distinct from
+and complementary to code review: it fires whenever a plan references an
+existing integration/contract, not only when code changes.
+
+**Added guidance — checking for the "never conformed" variant:**
+
+- When a new producer (reviewer, agent, tool) is added, grep every
+  documented consumer's parse contract (fixed-key `grep`, allowlist,
+  switch/case) for that producer's exact name/output shape — don't infer
+  conformance from "the command ran and produced plausible-looking text."
+- A conformance check that feeds each producer's real/sample output
+  through each consumer's parser and asserts the expected fields populate
+  is the check that catches this; "runs without erroring" does not, since
+  the silent fallback never throws.
+- Enumerate producer × consumer pairs directly from source when auditing
+  for this class — gaps present since a producer's introduction commit
+  generate no diff for review to have ever caught.
+- Treat "producer added, consumer allowlist/keys not updated" as a
+  distinct search target from ordinary logic bugs — it lives in the
+  parser/allowlist, not the producer's own code.
+
+**Components (this Update):**
+`plugins/yellow-council/commands/council/council.md`,
+`plugins/yellow-review/commands/review/review-pr.md`,
+`plugins/yellow-codex/agents/review/codex-reviewer.md`.
+
+---
+
+## Update — 2026-08-03
+
+The remediation scoped in the previous Update landed in PR #695
+(`agent/feat/yellow-council-v2-codex-contract-normalization`):
+`codex-reviewer.md` was normalized onto the 6-key contract
+(`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
+`findings_block_begin`...`findings_block_end`) already used by
+`gemini-reviewer.md`/`opencode-reviewer.md`, and both downstream consumers
+named above (`council.md`'s `parse_reviewer_return`, `review-pr.md`'s Step
+6.0 allowlist) were fixed in the same PR to stop silently discarding
+Codex's return.
+
+A follow-up 19-persona review + live Codex CLI smoke test of that same PR
+found five residual instances of the identical failure mechanism — a
+missing, absent, or malformed input silently producing a plausible-looking
+"nothing to report" or default value instead of a visible error — inside
+`codex-reviewer.md`'s own Step 6 parsing logic. Items 1-2 below were fixed
+in the first round of this PR's review-comment resolve pass (commit hashes
+are deliberately not cited — the branch is restacked repeatedly, so
+pre-restack SHAs go dangling); items 3-5 in the second round:
+
+1. **Fixed.** No `command -v jq` guard (mirrors the existing `command -v
+   codex` check in Step 1) — jq's absence degrades Step 6 to a plausible
+   `verdict=UNKNOWN`/no-findings return indistinguishable from a real
+   review. Now guarded at `codex-reviewer.md:98-104` (Step 1, before the
+   paid Codex invocation) and `codex-reviewer.md:377-384` (Step 6,
+   belt-and-braces re-check).
+2. **Fixed.** No `[ -s "$OUTPUT_FILE" ]` existence/non-empty guard before
+   Step 6 parses it — a stale or missing handoff file produced the same
+   plausible-looking empty-findings/`UNKNOWN` result, mirroring
+   `gemini-reviewer.md:166`'s equivalent `PACK_FILE` guard, which
+   `codex-reviewer.md` lacked. Now guarded at `codex-reviewer.md:385-392`.
+3. **Fixed.** The all-or-nothing FIELDS `jq` extraction could diverge from
+   the partial-output FINDINGS extraction on a single malformed field,
+   silently disabling the P1-count REJECT escalation while the findings
+   text still looked complete — no `jq empty "$OUTPUT_FILE"` upfront
+   validity check existed to short-circuit to `verdict=ERROR` before
+   either extraction ran. Now guarded at `codex-reviewer.md:402` (fails
+   closed to `verdict=ERROR` before any extraction).
+4. **Fixed.** `jq`'s stderr was suppressed (`2>/dev/null`) on every field
+   extraction, conflating "malformed JSON" with "valid JSON, field
+   absent" — the resulting warning text misdirected triage toward the
+   wrong root cause. The `jq empty` gate at `codex-reviewer.md:402` now
+   captures and surfaces the real jq parse error before the lenient
+   extractions run, so the two causes are distinguishable.
+5. **Fixed.** `OVERALL_CONFIDENCE_SCORE` had no numeric-validation guard,
+   unlike the adjacent `P1_COUNT` guard — malformed input could silently
+   produce a confidently-wrong `HIGH` via string comparison in the `awk`
+   threshold call. Now guarded at `codex-reviewer.md:561-563` (decimal
+   case guard plus an in-awk 0-1 range check, defaulting to LOW).
+
+All five were open findings as of the review that surfaced them
+(2026-08-03). Items 1-2 were fixed in PR #695's first resolve round;
+items 3-5 in its second, on 2026-08-06. The lesson
+stands: fixing the contract-normalization bug did not, on its own, fix
+the fallback-safety gaps in the new parsing logic that replaced the old
+one; the same "silently degrade to plausible default" mechanism this doc
+tracks simply moved from "producer never emits the contract" (previous
+Update) to "producer's own parser has no guard against malformed/missing
+input" — inside code written to close the first gap, and closing those
+took two further review rounds after the fix commit claimed resolution.
+
+**Added guidance — a fix for a "never-conformed" gap can reintroduce the
+same mechanism internally:** when the fix for a never-conformed-consumer
+gap is "make the producer parse a new structured format," audit the new
+parsing code itself for the same class of gap — missing
+tool-availability checks, missing existence/non-empty guards on handoff
+files, and suppressed parser-error output are the concrete instances found
+here. Closing the contract at the interface does not guarantee the new
+implementation's own error paths don't default to a plausible-looking
+success state.
+
+**Components (this Update):**
+`plugins/yellow-codex/agents/review/codex-reviewer.md`.
