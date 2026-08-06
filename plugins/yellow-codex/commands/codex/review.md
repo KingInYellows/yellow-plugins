@@ -88,9 +88,11 @@ printf '[yellow-codex] Reviewing %d files (~%d estimated tokens)\n' "$file_count
 
 Build and execute the review command:
 
-Substitute the literal `BASE_REF` value resolved in Step 2 (or the
-`--staged` marker) into this block — bash variables do not survive across
-separate Bash tool calls.
+Substitute the literal `BASE_REF` value resolved in Step 2 into this block —
+bash variables do not survive across separate Bash tool calls. For
+`--staged`, substitute the EMPTY string (`BASE_REF=""`): the branch below
+selects `git diff --cached` only when `BASE_REF` is empty, so substituting
+the literal `--staged` marker as a base ref would break the diff.
 
 ```bash
 OUTPUT_FILE=$(mktemp /tmp/codex-review-XXXXXX.txt)
