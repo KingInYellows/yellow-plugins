@@ -54,6 +54,11 @@ codex exec \
   --output-schema "$SCHEMA_FILE" \
   -o "$OUTPUT_FILE" \
   </dev/null
+
+# Clean up after consuming $OUTPUT_FILE — both files are mktemp-created and
+# leak into /tmp on every invocation otherwise (codex-reviewer.md removes
+# them on every exit path; do the same in any caller copying this snippet).
+rm -f "$OUTPUT_FILE" "$DIFF_FILE"
 ```
 
 **`exec review` silently ignores `--output-schema`.** It always emits its own

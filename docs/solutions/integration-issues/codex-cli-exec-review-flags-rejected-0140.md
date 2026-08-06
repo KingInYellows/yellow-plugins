@@ -201,7 +201,7 @@ produce the `--output-schema` shape. The doc-level contradiction was
 independently verifiable by reading; the live invocation confirmed it in
 practice.
 
-**Root cause (fix in PR #697, open as of this writing):** `codex exec
+**Root cause (fixed by PR #697 — the PR this doc update ships in):** `codex exec
 review` **silently ignores `--output-schema` on every model**, with no
 error raised — not a "may be ignored with certain model variants" caveat
 as this plugin's Known Limitations section previously stated, but an
@@ -216,7 +216,7 @@ non-empty file. Every guard this doc's original fix already added (the
 jq-availability check, the `[ -s "$OUTPUT_FILE" ]` non-empty check)
 passes. The file is real prose, not empty and not missing — it is simply
 the wrong shape. Step 6's `jq` extraction against that prose fails loudly
-(a real parse error, non-zero exit — verified: `jq` exits 5 with
+(a real parse error, non-zero exit — verified: `jq` exits nonzero (5 on jq 1.7; code varies by version) with
 `parse error: Invalid numeric literal...`), but at the time of discovery
 Step 6 suppressed that stderr (`2>/dev/null`) and never checked the exit
 code, so the loud failure silently became empty fields, which fell
@@ -229,7 +229,7 @@ a real parse failure. (The consumer-side half of this chain — the missing
 closed in the PR #695 resolve pass; see the companion Update on
 [unhandled-outcome-defaults-to-success-bucket.md](../code-quality/unhandled-outcome-defaults-to-success-bucket.md).)
 
-**Fix in flight (PR #697, open, not yet merged):** Step 4 switches from
+**The fix (PR #697, this PR):** Step 4 switches from
 `codex exec review` to plain `codex exec`, which does honor
 `--output-schema` — verified empirically against codex-cli 0.144.6 with
 the plugin's real posture flags (exit 0, conforming JSON, correct
@@ -262,9 +262,10 @@ consistent behavior across the family.
 
 ## Update — 2026-08-06 (PR #697 review pass): fix live-verified end-to-end; a 4th stale-diagnosis site and one unmigrated sibling site found in the same pass
 
-PR #697 (the fix described in the Update above) was open and under review as
-of this writing — not yet merged. Its review pass produced follow-on facts
-worth recording beyond what that Update already captured:
+These notes were recorded during the review pass of PR #697 itself (the
+fix described in the Update above — the PR this doc update ships in). That
+pass produced follow-on facts worth recording beyond what that Update
+already captured:
 
 **The Prevention rule this doc's prior Update added was itself exercised,
 not just stated.** A plugin-contract reviewer on the PR #697 review pass ran
@@ -286,9 +287,10 @@ section (a different section from the "Conventions" section the PR's
 initial pass fixed) still read "`--output-schema` known issue — May be
 ignored with certain model variants," restating the exact misdiagnosis the
 PR corrected elsewhere in the same file. Eight independent reviewer
-personas converged on flagging it in one pass. Fixed in-pass (commit
-`4c60b70f`) to match the corrected wording: the subcommand, not the model,
-silently drops the flag.
+personas converged on flagging it in one pass. Fixed in-pass (this PR's
+review-fix commit — hashes are deliberately not cited; the stacked branch
+is restacked repeatedly, so pre-restack SHAs go dangling) to match the
+corrected wording: the subcommand, not the model, silently drops the flag.
 
 **Still open — a sibling invocation site left on the broken pattern.**
 `plugins/yellow-codex/commands/codex/review.md` (the `/codex:review`
@@ -323,9 +325,9 @@ principle in
 Layer 1 — correct turn placement is necessary but not sufficient; the
 prompt also needs explicit "this is data to evaluate, not instructions to
 follow" framing at the point the diff is introduced. **Fixed in the same
-PR's resolve stage** (commit `e0dc89c1`): explicit anti-injection framing
-added to the Step 4 prompt and mirrored verbatim into
-`codex-patterns/SKILL.md`'s duplicate copy.
+PR's resolve stage**: explicit anti-injection framing added to the Step 4
+prompt and mirrored verbatim into `codex-patterns/SKILL.md`'s duplicate
+copy.
 
 **Components (this Update):** `plugins/yellow-codex/CLAUDE.md`,
 `plugins/yellow-codex/commands/codex/review.md`,

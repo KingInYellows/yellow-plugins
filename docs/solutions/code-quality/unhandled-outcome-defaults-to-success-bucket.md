@@ -291,7 +291,7 @@ Verification details from the review round behind the corrections above,
 worth keeping on record:
 
 - `jq` **does** fail loudly on non-JSON input — verified locally
-  (`jq -r '...' <(printf 'prose\n')` exits 5 with
+  (`jq -r '...' <(printf 'prose\n')` exits nonzero — 5 on the jq 1.7 used here; the exact code varies by jq version — with
   `parse error: Invalid numeric literal...` on stderr). The `2>/dev/null`
   on the FIELDS extraction was the specific thing that converted that loud
   failure into `FIELDS=""`, which `cut` turned into three empty fields,
@@ -303,8 +303,8 @@ worth keeping on record:
   [codex-cli-exec-review-flags-rejected-0140.md](../integration-issues/codex-cli-exec-review-flags-rejected-0140.md)
   for the producer-side bug (`codex exec review` writing prose, not JSON)
   that this guard gap turned into a full silent-degradation chain.
-- The fix commit `943c820b` ("fix: resolve PR #695 review comments") did
-  not disclose which of the 5 findings it actually resolved, so verifying
+- The first resolve-round commit ("fix: resolve PR #695 review comments")
+  did not disclose which of the 5 findings it actually resolved, so verifying
   "which of these are really fixed" required re-reading the diff and the
   current file rather than trusting the commit message — the same
   substitute-an-assertion-for-a-mechanical-check gap

@@ -113,10 +113,9 @@ changes automatically.
 ## Update — 2026-08-06: another recurrence, this time mid-batch across parallel resolver agents — caught only by the NEXT iteration's dirty-tree pre-flight
 
 A `/review:sweep-all` run spanning PRs #695 and #697 hit this same
-underlying mechanism again (see the sibling memory
-`gt-modify-amends-staged-only.md`, which already documents the mechanism
-from a prior single-file incident). The new wrinkle here is the trigger
-shape and, more usefully, what actually caught it.
+underlying mechanism again (already documented in this doc's earlier
+sections from a prior single-file incident). The new wrinkle here is the
+trigger shape and, more usefully, what actually caught it.
 
 **Trigger shape:** mid-batch, after a wave of parallel `pr-comment-resolver`
 sub-agents had each edited their assigned file region, the orchestrator ran

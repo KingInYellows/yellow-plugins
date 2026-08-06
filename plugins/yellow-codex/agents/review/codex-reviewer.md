@@ -215,25 +215,42 @@ SCHEMA_FILE="${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json"
 # Reconstruct it here with the actual value extracted/detected in Step 2
 # before running this block.
 git diff "${BASE_REF}...HEAD" > "$DIFF_FILE" 2>"$STDERR_FILE"
+DIFF_STATUS=$?
 
-# Fail closed if the diff is empty — a failed `git diff` (bad $BASE_REF,
-# unfetched origin/main in a fresh worktree) would otherwise hand Codex an
-# empty file, and the strict-mode schema has no "nothing to review" arm: the
-# likely result is a schema-conformant "patch is correct" with zero
-# findings, indistinguishable from a genuinely clean review. ERROR, not
-# UNAVAILABLE: this is a git/ref failure (same class as the exit-code arms
-# below), not a packaging problem. git's stderr is captured to $STDERR_FILE
-# (not discarded) so a real cause — bad ref, unfetched remote, permissions —
-# is visible in the returned diagnostic instead of a bare "produced no
-# output"; peeked with `head`, already an allowlisted Step 4 tool, rather
-# than introducing `cat`.
-if [ ! -s "$DIFF_FILE" ]; then
-  printf '[codex-reviewer] Diff file empty — git diff %s...HEAD produced no output\n' "$BASE_REF" >&2
-  head -c 500 "$STDERR_FILE" >&2
+# Fail closed if git diff failed OR the diff is empty. The status check
+# matters independently of the -s check: with an external diff/textconv
+# driver, git can write output for earlier files and then exit nonzero when
+# a later driver fails — a nonempty $DIFF_FILE that is silently PARTIAL.
+# An empty diff (bad $BASE_REF, unfetched origin/main in a fresh worktree)
+# would otherwise hand Codex an empty file, and the strict-mode schema has
+# no "nothing to review" arm: the likely result is a schema-conformant
+# "patch is correct" with zero findings, indistinguishable from a genuinely
+# clean review. ERROR, not UNAVAILABLE: a git/ref failure (same class as
+# the exit-code arms below), not a packaging problem. git's stderr is
+# captured to $STDERR_FILE and peeked through the same awk redaction
+# discipline every other CLI-stderr emission in this file uses (a git error
+# can echo a remote URL with embedded credentials); `head`/`awk` are both
+# allowlisted Step 4 tools.
+if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
+  printf '[codex-reviewer] git diff %s...HEAD failed (exit %d) or produced no output\n' "$BASE_REF" "$DIFF_STATUS" >&2
+  head -c 500 "$STDERR_FILE" | awk '{
+    line = NR
+    gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+    gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
+    gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+    gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+    gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
+    gsub(/ses_[A-Za-z0-9]{16,}/, "--- redacted credential at line " line " ---")
+    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+    print
+  }' >&2
   rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
   printf 'verdict=ERROR\n'
   printf 'confidence=N/A\n'
-  printf 'summary=git diff %s...HEAD produced no output — base ref missing or diff empty; unable to review.\n' "$BASE_REF"
+  printf 'summary=git diff %s...HEAD failed (exit %d) or produced no output — base ref missing, partial diff, or empty; unable to review.\n' "$BASE_REF" "$DIFF_STATUS"
   exit 0
 fi
 
@@ -561,7 +578,7 @@ FINDINGS=$(jq -r --arg repo_root "$REPO_ROOT" '
   (if $priority_valid then $raw_priority else 3 end) as $priority |
   (if $priority_valid then "" else " (priority \($raw_priority) out of range 0-3 — treated as P3)" end) as $priority_note |
   (if $priority == 0 then "P1" elif $priority == 1 then "P2" else "P3" end) as $sev |
-  (.code_location.absolute_file_path // "unknown") as $abs |
+  ((.code_location.absolute_file_path // "unknown") | gsub("[\r\n]"; " ")) as $abs |
   (.code_location.line_range.start) as $raw_line |
   (rel_path($abs)) as $loc |
   (if ($raw_line | type) == "number" and $raw_line > 0 then $raw_line else 1 end) as $line |
