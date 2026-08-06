@@ -33,7 +33,7 @@ install if needed.
 
 | Agent            | Category | Description                                                       |
 | ---------------- | -------- | ------------------------------------------------------------------ |
-| `codex-reviewer` | Review   | Supplementary reviewer spawned by `review:pr` and `/council`; returns the structured 6-key contract |
+| `codex-reviewer` | Review   | Supplementary reviewer spawned by `/review:pr` and `/council`; returns the structured 6-key contract |
 | `codex-executor` | Workflow | Rescue/debug agent spawned on task failure                        |
 | `codex-analyst`  | Research | Codebase research and analysis                                    |
 

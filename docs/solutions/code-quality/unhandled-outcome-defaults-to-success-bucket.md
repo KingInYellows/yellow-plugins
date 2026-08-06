@@ -225,42 +225,53 @@ Codex's return.
 A follow-up 19-persona review + live Codex CLI smoke test of that same PR
 found five residual instances of the identical failure mechanism — a
 missing, absent, or malformed input silently producing a plausible-looking
-"nothing to report" or default value instead of a visible error — still
-inside `codex-reviewer.md`'s own Step 6 parsing logic:
+"nothing to report" or default value instead of a visible error — inside
+`codex-reviewer.md`'s own Step 6 parsing logic. Items 1-2 below were fixed
+within this same PR's resolve pass (commit 943c820b); items 3-5 are
+addressed in the PR #695 resolve pass:
 
-1. No `command -v jq` guard (mirrors the existing `command -v codex` check
-   in Step 1) — jq's absence degrades Step 6 to a plausible
+1. **Fixed.** No `command -v jq` guard (mirrors the existing `command -v
+   codex` check in Step 1) — jq's absence degrades Step 6 to a plausible
    `verdict=UNKNOWN`/no-findings return indistinguishable from a real
-   review (`codex-reviewer.md:284`).
-2. No `[ -s "$OUTPUT_FILE" ]` existence/non-empty guard before Step 6
-   parses it — a stale or missing handoff file produces the same
+   review. Now guarded at `codex-reviewer.md:98-104` (Step 1, before the
+   paid Codex invocation) and `codex-reviewer.md:349-356` (Step 6,
+   belt-and-braces re-check).
+2. **Fixed.** No `[ -s "$OUTPUT_FILE" ]` existence/non-empty guard before
+   Step 6 parses it — a stale or missing handoff file produced the same
    plausible-looking empty-findings/`UNKNOWN` result, mirroring
    `gemini-reviewer.md:166`'s equivalent `PACK_FILE` guard, which
-   `codex-reviewer.md` lacks (`codex-reviewer.md:280-288`).
-3. The all-or-nothing FIELDS `jq` extraction can diverge from the
-   partial-output FINDINGS extraction on a single malformed field,
+   `codex-reviewer.md` lacked. Now guarded at `codex-reviewer.md:357-364`.
+3. **Fixed.** The all-or-nothing FIELDS `jq` extraction could diverge from
+   the partial-output FINDINGS extraction on a single malformed field,
    silently disabling the P1-count REJECT escalation while the findings
-   text still looks complete (`codex-reviewer.md:328`) — no
-   `jq empty "$OUTPUT_FILE"` upfront validity check exists to
-   short-circuit to `verdict=ERROR` before either extraction runs.
-4. `jq`'s stderr is suppressed (`2>/dev/null`) on every field extraction,
-   conflating "malformed JSON" with "valid JSON, field absent" — the
-   resulting warning text misdirects triage toward the wrong root cause
-   (`codex-reviewer.md:328-342`).
-5. `OVERALL_CONFIDENCE_SCORE` has no numeric-validation guard, unlike the
-   adjacent `P1_COUNT` guard a few lines above it — malformed input can
-   silently produce a confidently-wrong `HIGH` via string comparison in
-   the `awk` threshold call (`codex-reviewer.md:344-358`).
+   text still looked complete — no `jq empty "$OUTPUT_FILE"` upfront
+   validity check existed to short-circuit to `verdict=ERROR` before
+   either extraction ran. Now guarded at `codex-reviewer.md:375` (fails
+   closed to `verdict=ERROR` before any extraction).
+4. **Fixed.** `jq`'s stderr was suppressed (`2>/dev/null`) on every field
+   extraction, conflating "malformed JSON" with "valid JSON, field
+   absent" — the resulting warning text misdirected triage toward the
+   wrong root cause. The `jq empty` gate at `codex-reviewer.md:375` now
+   captures and surfaces the real jq parse error before the lenient
+   extractions run, so the two causes are distinguishable.
+5. **Fixed.** `OVERALL_CONFIDENCE_SCORE` had no numeric-validation guard,
+   unlike the adjacent `P1_COUNT` guard — malformed input could silently
+   produce a confidently-wrong `HIGH` via string comparison in the `awk`
+   threshold call. Now guarded at `codex-reviewer.md:518-520` (decimal
+   case guard plus an in-awk 0-1 range check, defaulting to LOW).
 
-All five are still-open findings as of this writing (2026-08-03) — fixing
-the contract-normalization bug did not fix the fallback-safety gaps in the
-new parsing logic that replaced the old one; the same "silently degrade to
-plausible default" mechanism this doc tracks simply moved from "producer
-never emits the contract" (previous Update) to "producer's own parser has
-no guard against malformed/missing input" — inside code written to close
-the first gap.
+All five were open findings as of the review that surfaced them
+(2026-08-03). Items 1-2 were fixed by commit 943c820b; items 3-5 were
+fixed in the PR #695 review-resolve pass on 2026-08-06. The lesson
+stands: fixing the contract-normalization bug did not, on its own, fix
+the fallback-safety gaps in the new parsing logic that replaced the old
+one; the same "silently degrade to plausible default" mechanism this doc
+tracks simply moved from "producer never emits the contract" (previous
+Update) to "producer's own parser has no guard against malformed/missing
+input" — inside code written to close the first gap, and closing those
+took two further review rounds after the fix commit claimed resolution.
 
-**Added guidance — a fix for a "never conformed" gap can reintroduce the
+**Added guidance — a fix for a "never-conformed" gap can reintroduce the
 same mechanism internally:** when the fix for a never-conformed-consumer
 gap is "make the producer parse a new structured format," audit the new
 parsing code itself for the same class of gap — missing

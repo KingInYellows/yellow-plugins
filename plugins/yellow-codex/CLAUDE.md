@@ -101,6 +101,7 @@ Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
 | Dependency | Purpose | Required? |
 |---|---|---|
 | yellow-review | Spawns `codex-reviewer` during PR review | Optional |
+| yellow-council | Spawns `codex-reviewer` as a cross-lineage council reviewer | Optional |
 | yellow-core | Spawns `codex-executor` on task failure in `workflows:work` | Optional |
 
 ## When to Use What
@@ -109,7 +110,7 @@ Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
 |---|---|---|---|
 | Validate setup | `/codex:setup` | — | First install, after auth issues |
 | Standalone review | `/codex:review` | — | Quick second opinion on changes |
-| Cross-plugin review | — | `codex-reviewer` | Auto-spawned by `review:pr` |
+| Cross-plugin review | — | `codex-reviewer` | Auto-spawned by `review:pr` or `/council` |
 | Debug stuck task | `/codex:rescue` | `codex-executor` | When stuck on a bug or need fresh perspective |
 | Check Codex state | `/codex:status` | — | Monitor processes, verify configuration |
 | Codebase analysis | — | `codex-analyst` | Architecture questions, pattern analysis |
