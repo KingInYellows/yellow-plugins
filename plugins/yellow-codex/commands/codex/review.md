@@ -177,7 +177,7 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/nul
   elif [ "$codex_exit" -eq 1 ] && grep -q "rate_limit_exceeded" "$STDERR_FILE" 2>/dev/null; then
     printf '[yellow-codex] Rate limited. Retrying in 5 seconds...\n'
     sleep 5
-    timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" 2>"$STDERR_FILE" || {
+    timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/null 2>"$STDERR_FILE" || {
       printf '[yellow-codex] Error: still rate limited. Try again later.\n'
     }
   else
