@@ -110,13 +110,27 @@ if [ -n "$BASE_REF" ]; then
 else
   git diff --cached > "$DIFF_FILE" 2>"$STDERR_FILE"
 fi
+DIFF_STATUS=$?
 
-# Fail closed on an empty diff — the strict-mode schema has no "nothing to
-# review" arm, so Codex would return a clean-looking "patch is correct" for
-# an empty file (same guard as codex-reviewer.md Step 4).
-if [ ! -s "$DIFF_FILE" ]; then
-  printf '[yellow-codex] Error: git diff produced no output — base ref missing or diff empty.\n' >&2
-  head -c 500 "$STDERR_FILE" >&2
+# Fail closed if git diff failed OR the diff is empty — a nonzero status
+# with a nonempty file can be a silently PARTIAL diff (external
+# diff/textconv driver failing partway), and an empty diff would make
+# strict-mode Codex return a clean-looking "patch is correct" (same guard
+# pair as codex-reviewer.md Step 4). The stderr peek runs through the same
+# credential redaction the rest of this file applies to CLI stderr.
+if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
+  printf '[yellow-codex] Error: git diff failed (exit %d) or produced no output — base ref missing, partial diff, or empty.\n' "$DIFF_STATUS" >&2
+  head -c 500 "$STDERR_FILE" | awk '{
+    line = NR
+    gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+    gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
+    gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+    gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+    print
+  }' >&2
   rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
   exit 1
 fi
