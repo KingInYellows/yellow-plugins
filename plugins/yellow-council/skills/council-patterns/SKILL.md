@@ -74,15 +74,22 @@ Per-mode `{{MODE_SPECIFIC_CONTEXT}}` block:
 
 ### Reviewer Output Schema
 
-Each reviewer returns a single Markdown text block parseable by these regexes:
+Each reviewer returns a single text block carrying the structured 6-key
+contract, parsed by `parse_reviewer_return` in `council.md` (the
+authoritative definition site — these lines mirror it):
 
 ```bash
-VERDICT=$(grep -m1 '^Verdict: ' "$OUTPUT_FILE" | sed 's/^Verdict: //')
-CONFIDENCE=$(grep -m1 '^Confidence: ' "$OUTPUT_FILE" | sed 's/^Confidence: //')
-SUMMARY=$(awk '/^Summary: / { sub(/^Summary: /, ""); print; exit }' "$OUTPUT_FILE")
-# Findings: extract block between "Findings:" and "Summary:" lines
-FINDINGS=$(awk '/^Findings:/ { capture=1; next } /^Summary: / { capture=0 } capture' "$OUTPUT_FILE")
+VERDICT=$(printf '%s' "$reviewer_output" | grep -m1 '^verdict=' | sed 's/^verdict=//')
+CONFIDENCE=$(printf '%s' "$reviewer_output" | grep -m1 '^confidence=' | sed 's/^confidence=//')
+SUMMARY=$(printf '%s' "$reviewer_output" | grep -m1 '^summary=' | sed 's/^summary=//')
+FENCED_PATH=$(printf '%s' "$reviewer_output" | grep -m1 '^fenced_output_path=' | sed 's/^fenced_output_path=//')
+FINDINGS=$(printf '%s' "$reviewer_output" | awk '/^findings_block_begin$/{flag=1;next} /^findings_block_end$/{flag=0} flag')
 ```
+
+(The capitalized `Verdict: / Confidence: / Findings: / Summary:` phrasing
+that appears in older prose is the legacy pre-6-key description of the
+same fields, not a parseable format — `parse_reviewer_return` recognizes
+only the lowercase `key=` lines and sentinel pair above.)
 
 If `Verdict:` line is absent, the reviewer agent must:
 
