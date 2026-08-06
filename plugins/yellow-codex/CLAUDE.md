@@ -31,10 +31,10 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
 ## Conventions
 
 - **CLI invocation:** All non-interactive use via `codex exec` (not the
-  interactive TUI). The `codex-reviewer` agent uses plain `codex exec` with
-  `--output-schema` and a pre-written diff file — **not** `codex exec
-  review`, which silently ignores `--output-schema` and returns unparsable
-  prose.
+  interactive TUI). Review surfaces (the `codex-reviewer` agent and
+  `/codex:review`) use plain `codex exec` with `--output-schema` and a
+  pre-written diff file — **not** `codex exec review`, which silently
+  ignores `--output-schema` and returns unparsable prose.
 - **Sandbox modes:** `read-only` for review and analysis; `workspace-write` for
   rescue and execution (Codex needs write access to debug, run tests, and stage
   proposed fixes). Never use `danger-full-access`.
