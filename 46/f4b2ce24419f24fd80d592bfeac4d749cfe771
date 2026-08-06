@@ -1,0 +1,24 @@
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2db87cc7495315::t_b2a391ace7f20d 344-370
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_2db87cc7495315::t_9da5067277446c 238,244
+  s_2db87cc7495315::t_0d8be843727ebc 265-266
+  s_2db87cc7495315::t_dff0243007107c 230-232
+  s_2db87cc7495315::t_29ec2701f12fd0 250,255,261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "46f4b2ce24419f24fd80d592bfeac4d749cfe771",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
