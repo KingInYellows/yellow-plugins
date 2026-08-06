@@ -1,0 +1,46 @@
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2db87cc7495315::t_54bfd8799aa6f6 385-388
+  s_2db87cc7495315::t_a50698764dac7d 383-384
+  s_63cb31fb8b9a68::t_0da4ca15afe6e7 54-63,92-104,107-108,139,180-185,195,215-223,225,255-270,317-329,332-367,371-380,391-431,479,497-501,504-509,540-549,554,558
+plugins/yellow-codex/README.md
+  s_2db87cc7495315::t_02e0706abbe120 36
+  s_2db87cc7495315::t_f939ddc3db3e48 34-35
+  s_2db87cc7495315::t_159742840e056a 37-38
+  s_e2317a5b7701f3::t_3ca52a38c119b1 48-52
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_2db87cc7495315::t_42dc05faea202c 346-351
+plugins/yellow-review/commands/review/review-pr.md
+  s_2db87cc7495315::t_3fd626acdf4bca 595-632,649-655
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "90dd470e917b2d5d9ba416217c233785cf2f191e",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_63cb31fb8b9a68": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ares-B-94914e4ed61ccb10",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e2317a5b7701f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ares-A-48fc4de63650f472",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
