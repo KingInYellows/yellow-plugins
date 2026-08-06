@@ -108,3 +108,59 @@ run `git add <file>` first.
 In automated agent workflows: always `git add <specific-file>` immediately after
 applying an edit, before the commit step. Never rely on gt to pick up unstaged
 changes automatically.
+---
+
+## Update — 2026-08-06: another recurrence, this time mid-batch across parallel resolver agents — caught only by the NEXT iteration's dirty-tree pre-flight
+
+A `/review:sweep-all` run spanning PRs #695 and #697 hit this same
+underlying mechanism again (see the sibling memory
+`gt-modify-amends-staged-only.md`, which already documents the mechanism
+from a prior single-file incident). The new wrinkle here is the trigger
+shape and, more usefully, what actually caught it.
+
+**Trigger shape:** mid-batch, after a wave of parallel `pr-comment-resolver`
+sub-agents had each edited their assigned file region, the orchestrator ran
+`gt modify -m "fix: ..."` to fold the resolver edits into the branch commit
+before pushing. Because the resolver edits were unstaged at that point, the
+amend was message-only — same underlying mechanism this doc already
+documents (non-interactive `gt modify` swallows the stage prompt) — but the
+scale made it worse than a single hand-edited file: **19 review threads were
+marked resolved and their fixes were reported as pushed, when in fact the
+push contained none of the resolver output.** `gt submit` reported success;
+nothing in that command's output distinguished "pushed the fixes" from
+"pushed a renamed commit with no new content."
+
+**What actually caught it:** not a check run at the point of the `gt modify`
+call itself (the existing `git status --short` Prevention step below would
+have caught it if run, but wasn't, in the heat of a multi-PR batch) — it was
+caught one PR later, when `/review:sweep-all`'s pre-flight check for the
+*next* PR in the batch found the working tree unexpectedly dirty (the 19
+resolver edits were still sitting unstaged, never cleared, from the previous
+PR's failed amend). The dirty-tree state was the detectable symptom;
+tracing it back revealed the fixes had never landed.
+
+**Recovery:** `git add <the exact resolver-edited paths>` (not `git add
+-A` — see
+[background-agent-repo-writes-during-batch.md](background-agent-repo-writes-during-batch.md)
+for why exact-path staging matters specifically during multi-branch/
+multi-agent batches), then
+`gt modify -c -m "fix: ..."` to create a proper commit containing the
+edits, then re-push and re-verify each of the 19 threads against the new
+commit content before re-confirming them resolved.
+
+**Added guidance — a batch-level backstop for this whole failure class:**
+this doc's existing Prevention section (verify `git status --short` before
+every `gt modify`/`gt commit`) is still correct but is a per-call discipline
+that's easy to skip under batch pressure with many resolver agents in
+flight. A **between-iteration dirty-tree pre-flight** — checking
+`git status --porcelain` is empty before starting the *next* unit of work in
+any loop that walks multiple PRs/branches/todos and uses `gt modify` to fold
+in agent-produced edits — is a cheap, structural backstop that catches this
+specific silent-miss class even when the per-call discipline lapses. Treat
+"is the tree clean before I start the next iteration" as a required gate in
+any sweep/batch loop, not just a nice-to-have sanity check.
+
+**Components (this Update):** `/review:sweep-all` batch loop
+(`plugins/yellow-review/commands/review/sweep-all.md`,
+`plugins/yellow-review/commands/review/sweep.md`), any orchestrator using
+`gt modify` to fold parallel-resolver output into a branch commit.

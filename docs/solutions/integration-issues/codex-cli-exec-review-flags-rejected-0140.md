@@ -182,3 +182,151 @@ Codex can still shell out to read files under it.
 - The file-based form converges in roughly 3-4 minutes against the existing
   300s cap — less headroom than `exec review`'s built-in scoping had. A
   timeout on this path is a scope/size symptom, not auth or rate limiting.
+
+## Update — 2026-08-06: `codex exec review` silently ignores `--output-schema`, on every model
+
+A plugin-contract reviewer on a later round of PR #695 (the same PR that
+layered a `jq`-based structured-extraction Step 6 on top of
+`codex exec review`'s `-o "$OUTPUT_FILE"` capture) tested the actual
+invocation against a live Codex CLI (reported as 0.144.6) instead of
+trusting Step 6's existing code comments, which assumed `-o` on
+`exec review` captures the review's structured JSON result.
+
+**This plugin's own documentation already contradicted that assumption
+before anyone ran the CLI:** `plugins/yellow-codex/CLAUDE.md`'s Conventions
+section states "Use `-o <file>` for final message capture. Use
+`--output-schema` for structured JSON" — two different flags for two
+different purposes — while Step 6 was built to expect `-o` alone to
+produce the `--output-schema` shape. The doc-level contradiction was
+independently verifiable by reading; the live invocation confirmed it in
+practice.
+
+**Root cause (fix in PR #697, open as of this writing):** `codex exec
+review` **silently ignores `--output-schema` on every model**, with no
+error raised — not a "may be ignored with certain model variants" caveat
+as this plugin's Known Limitations section previously stated, but an
+unconditional property of the `exec review` subcommand itself. It always
+writes its own hardcoded prose (a summary plus a `Review comment:` bullet
+list) to `-o`, regardless of model or schema flag.
+
+**This is a different failure shape from this doc's original `-a`/`-s`
+flag-rejection finding:** `-o`/`--output-schema` do not error at
+argument-parse time — the invocation exits 0 and writes a genuinely
+non-empty file. Every guard this doc's original fix already added (the
+jq-availability check, the `[ -s "$OUTPUT_FILE" ]` non-empty check)
+passes. The file is real prose, not empty and not missing — it is simply
+the wrong shape. Step 6's `jq` extraction against that prose fails loudly
+(a real parse error, non-zero exit — verified: `jq` exits 5 with
+`parse error: Invalid numeric literal...`), but at the time of discovery
+Step 6 suppressed that stderr (`2>/dev/null`) and never checked the exit
+code, so the loud failure silently became empty fields, which fell
+through to `VERDICT="UNKNOWN"` with zero findings. **The entire
+structured-extraction path degraded to "reviewed, found nothing"** —
+which reads as a clean review, and is strictly worse than the visible
+`ERROR` verdict the pre-6-key-contract `codex-reviewer` used to return on
+a real parse failure. (The consumer-side half of this chain — the missing
+`jq empty` fail-closed pre-check and suppressed stderr — was subsequently
+closed in the PR #695 resolve pass; see the companion Update on
+[unhandled-outcome-defaults-to-success-bucket.md](../code-quality/unhandled-outcome-defaults-to-success-bucket.md).)
+
+**Fix in flight (PR #697, open, not yet merged):** Step 4 switches from
+`codex exec review` to plain `codex exec`, which does honor
+`--output-schema` — verified empirically against codex-cli 0.144.6 with
+the plugin's real posture flags (exit 0, conforming JSON, correct
+P1/P2/P3 extraction). Plain `exec` has no `--base` selector, so the diff
+is written to a temp file and referenced in the prompt instead (an
+earlier approach — asking Codex to run `git diff` itself — was tested and
+rejected: it explored the wider repo until the 300s timeout, 66 tool
+calls, no output). `schemas/review-findings.json` is rewritten for
+OpenAI's strict mode. The PR also corrects the doc claims that
+contradicted this behavior across `CLAUDE.md`, `README.md`, and two
+skill files.
+
+**Added guidance — extending this doc's existing Prevention rule:**
+"verify flag acceptance empirically" is necessary but not sufficient — a
+flag can be *accepted*, parse cleanly, and still not do what its name (or
+a sibling flag's documentation) implies. When a plugin's correctness
+depends on an external CLI's *output shape* (not just its exit code),
+verify the actual output content live against the target CLI version and
+subcommand, not just "did it exit 0 and write a non-empty file." A CLI
+subcommand can pass every argument-parse and file-existence guard while
+silently ignoring a flag that looks load-bearing — and unlike a rejected
+flag (loud, exit 2), a wrong-shape success (quiet, exit 0, plausible file)
+has no failure signal at all short of inspecting the file's actual content
+against the schema the downstream parser expects. When two flags on
+related subcommands (`exec` vs `exec review`) are documented to do similar
+things, verify each subcommand independently rather than assuming
+consistent behavior across the family.
+
+**Components (this Update):** `plugins/yellow-codex/agents/review/codex-reviewer.md`, `plugins/yellow-codex/CLAUDE.md`, `plugins/yellow-codex/skills/*/SKILL.md` (fix landing in PR #697).
+
+## Update — 2026-08-06 (PR #697 review pass): fix live-verified end-to-end; a 4th stale-diagnosis site and one unmigrated sibling site found in the same pass
+
+PR #697 (the fix described in the Update above) was open and under review as
+of this writing — not yet merged. Its review pass produced follow-on facts
+worth recording beyond what that Update already captured:
+
+**The Prevention rule this doc's prior Update added was itself exercised,
+not just stated.** A plugin-contract reviewer on the PR #697 review pass ran
+the real Step 4 invocation against live `codex-cli 0.144.6` with the shipped
+`review-findings.json` schema and a trivial diff, then piped the actual JSON
+output through Step 6's unmodified `jq` extraction — confirming exit 0,
+exact strict-mode shape conformance, and correct P1/P2/P3 mapping
+end-to-end, not merely "the flag was accepted." This is precisely the check
+this doc's Prevention addendum calls for and whose absence is what let
+#695's original P0 (`exec review` writing prose, not JSON, while still
+exiting 0) go undetected until someone finally ran it live. Running this
+check — and not skipping it because the schema "looked" strict-mode-valid
+on paper — is now the concrete positive example to point to the next time
+this class of finding comes up.
+
+**A 4th misdiagnosis site, in the same file the PR had already corrected 3
+other places in.** `plugins/yellow-codex/CLAUDE.md`'s "Known Limitations"
+section (a different section from the "Conventions" section the PR's
+initial pass fixed) still read "`--output-schema` known issue — May be
+ignored with certain model variants," restating the exact misdiagnosis the
+PR corrected elsewhere in the same file. Eight independent reviewer
+personas converged on flagging it in one pass. Fixed in-pass (commit
+`4c60b70f`) to match the corrected wording: the subcommand, not the model,
+silently drops the flag.
+
+**Still open — a sibling invocation site left on the broken pattern.**
+`plugins/yellow-codex/commands/codex/review.md` (the `/codex:review`
+command, distinct from the `codex-reviewer` agent this PR fixed) still
+builds `CODEX_CMD=(codex exec review ...)` at its line 95, and its Step 5
+text still claims structured JSON "may be" available via `--output-schema`
+— the exact claim this PR's own live verification proved false for that
+subcommand. Six reviewer personas flagged it, all marking it pre-existing
+and out of scope for #697 rather than blocking the PR; tracked as an
+immediate follow-up. This is the partial-fix pattern this doc's own
+original Prevention bullet already warned about ("When updating flag syntax
+for one subcommand, sweep every other invocation site in the plugin... a
+partial fix... leaves [other] sites silently broken") — worth restating
+because the PR that most recently demonstrated the underlying defect also,
+in the same breath, reproduced the exact failure-to-sweep its own doc had
+already named. `codex-patterns/SKILL.md`'s Step 4 prompt is also duplicated
+verbatim between the agent and the skill with no single source of truth — a
+smaller instance of the same drift risk, managed this round via
+single-owner mirroring (see `parallel-multi-agent-review-orchestration.md`
+Session 3).
+
+**Input-trust gap, found and fixed in the same pass:** the adversarial and
+security reviewer personas independently flagged that Step 4's Codex prompt
+never framed the diff file's content as untrusted data rather than
+instructions — a diff containing a directive-shaped comment or string
+literal could steer Codex's verdict while remaining fully schema-conformant,
+since strict-mode conformance constrains shape, not semantic honesty. This
+is a different mechanism from the shape/parsing gaps above (an input-trust
+gap, not an output-shape gap) and is the concrete instance of the ROLP
+principle in
+[prompt-injection-defense-layering-2026.md](../security-issues/prompt-injection-defense-layering-2026.md)
+Layer 1 — correct turn placement is necessary but not sufficient; the
+prompt also needs explicit "this is data to evaluate, not instructions to
+follow" framing at the point the diff is introduced. **Fixed in the same
+PR's resolve stage** (commit `e0dc89c1`): explicit anti-injection framing
+added to the Step 4 prompt and mirrored verbatim into
+`codex-patterns/SKILL.md`'s duplicate copy.
+
+**Components (this Update):** `plugins/yellow-codex/CLAUDE.md`,
+`plugins/yellow-codex/commands/codex/review.md`,
+`plugins/yellow-codex/skills/codex-patterns/SKILL.md`.

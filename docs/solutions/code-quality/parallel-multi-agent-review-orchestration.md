@@ -424,3 +424,80 @@ separately from JSON stdout:
 - **Tests passing:** 62 bats (20 yellow-review + 42 yellow-ruvector)
 - **Plugins validated:** 9/9
 - **PR:** https://github.com/KingInYellows/yellow-plugins/pull/15
+---
+
+# Session 3: /review:sweep-all Batch Across a Two-PR Stack (2026-08-06)
+
+## Context
+
+A `/review:sweep-all` run covering PRs #695 and #697 (see the companion
+Update in this session on `session-level-review-command-patterns.md` for
+the stack-ordering half of this run). Two orchestration mechanics from this
+run are new relative to Sessions 1-2 above; the file-ownership grouping
+itself (10 parallel resolvers on one file, zero collisions) and the need to
+nudge idle teammates for their results are **not** new — see the existing
+File-Ownership Grouping pattern above and
+[mailbox-teammate-explicit-sendmessage.md](mailbox-teammate-explicit-sendmessage.md)
+respectively, both of which this run simply reconfirmed at scale.
+
+## Single-Owner Mirroring for Duplicated Content Across File-Ownership Groups
+
+File-ownership grouping (as documented above) assigns one agent per target
+file to prevent write races. It has a gap the existing pattern doesn't
+address: when the **same string is intentionally duplicated verbatim across
+two files** (here, a Step 4 prompt duplicated between
+`plugins/yellow-codex/agents/review/codex-reviewer.md` and
+`plugins/yellow-codex/skills/codex-patterns/SKILL.md` — see
+[codex-cli-exec-review-flags-rejected-0140.md](../integration-issues/codex-cli-exec-review-flags-rejected-0140.md)),
+naive file-ownership grouping assigns each copy to a different agent
+(because each copy lives in a different file), and those two agents have no
+shared context — nothing tells agent B that agent A is editing the *other*
+half of a pair that must stay byte-identical.
+
+**What this run did instead:** designated a single owner for the file
+containing the authoritative copy, and gave the agent responsible for the
+sibling file explicit "mirror from the authoritative copy" instructions
+rather than independently re-deriving the same edit. This avoided the two
+copies drifting apart — a real risk, since two agents independently fixing
+"the same" prompt text tend to produce non-identical wording even when
+solving the identical problem.
+
+**Generalizes to:** any file-ownership grouping where a review finding
+touches content that is deliberately duplicated across files (shared
+prompt strings, mirrored constant blocks, copy-pasted skill text). Detect
+this case during the grouping/mapping step (the same step that already
+maps findings to files in the existing pattern) — if two target files
+contain matching duplicated content for the same finding, do not spawn two
+independent agents; designate one owner and have any sibling-file agent
+mirror its output instead of re-solving.
+
+## Bot and Persona Reviewer Convergence Validates Review-Before-Resolve Ordering
+
+`/review:sweep`'s own design already runs `/review:pr` before
+`/review:resolve` specifically so resolve inherits any fixes review already
+applied (`plugins/yellow-review/commands/review/sweep.md`'s description:
+"cleanup of any open bot or human reviewer comment threads... without
+manually re-invoking"). This run produced a concrete measurement of that
+design paying off, not just a restatement of the intent: on PR #697, five
+independently-operating bot reviewers (devin, graphite, codex-connector,
+cubic, copilot) converged on the same two P1 findings the persona review
+agents had already found and fixed (an empty-diff guard and a CLAUDE.md
+contradiction — both are covered in this same batch's other Updates). Four
+of the PR's nine total unresolved threads were already fixed by the review
+pass before `/review:resolve` ever ran against them, purely because the
+bots had flagged issues review had already addressed.
+
+**Why this is worth recording as a distinct data point, not just
+reconfirmed intent:** it's evidence that independent bot reviewers and this
+plugin's persona reviewers are finding the *same* real issues (not
+disjoint, and not the bots finding things the personas miss or vice versa)
+on a concrete PR, which is a different claim from "review runs before
+resolve by design." It also means `/review:resolve`'s workload on a
+well-reviewed PR is systematically smaller than the raw open-thread count
+suggests — a batch or capacity-planning signal, not just a code pattern.
+
+**Components (this Session):**
+`plugins/yellow-codex/agents/review/codex-reviewer.md`,
+`plugins/yellow-codex/skills/codex-patterns/SKILL.md`,
+`plugins/yellow-review/commands/review/sweep.md`,
+`plugins/yellow-review/commands/review/sweep-all.md`.

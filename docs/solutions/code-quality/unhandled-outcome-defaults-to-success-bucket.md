@@ -284,3 +284,91 @@ success state.
 
 **Components (this Update):**
 `plugins/yellow-codex/agents/review/codex-reviewer.md`.
+
+## Update — 2026-08-06 (verification notes from the PR #695 re-review)
+
+Verification details from the review round behind the corrections above,
+worth keeping on record:
+
+- `jq` **does** fail loudly on non-JSON input — verified locally
+  (`jq -r '...' <(printf 'prose\n')` exits 5 with
+  `parse error: Invalid numeric literal...` on stderr). The `2>/dev/null`
+  on the FIELDS extraction was the specific thing that converted that loud
+  failure into `FIELDS=""`, which `cut` turned into three empty fields,
+  which the `case "$OVERALL_CORRECTNESS"` default turned into
+  `VERDICT="UNKNOWN"` with zero findings — a real parse error becoming a
+  silent, plausible-looking review. The `jq empty` fail-closed pre-check
+  (with captured stderr) added in the PR #695 resolve pass closes exactly
+  this conversion. See the companion Update on
+  [codex-cli-exec-review-flags-rejected-0140.md](../integration-issues/codex-cli-exec-review-flags-rejected-0140.md)
+  for the producer-side bug (`codex exec review` writing prose, not JSON)
+  that this guard gap turned into a full silent-degradation chain.
+- The fix commit `943c820b` ("fix: resolve PR #695 review comments") did
+  not disclose which of the 5 findings it actually resolved, so verifying
+  "which of these are really fixed" required re-reading the diff and the
+  current file rather than trusting the commit message — the same
+  substitute-an-assertion-for-a-mechanical-check gap
+  [doc-fix-mechanical-verification-gap.md](doc-fix-mechanical-verification-gap.md)
+  documents, here applied to a fix-commit's implicit completeness claim
+  rather than a doc's explicit one.
+- Still unaddressed after both rounds: no committed test feeds each
+  producer's real/sample output through both consumers' extraction — the
+  offline contract check remains a manual, at-authoring-time step.
+
+**Components (this Update):** `plugins/yellow-codex/agents/review/codex-reviewer.md`.
+
+## Update — 2026-08-06 (PR #697): moving diff acquisition from a CLI flag into the agent's own shell opened a new arm of the same defect class
+
+Context: fixing the `exec review` → plain `exec` defect (documented in the
+companion Update on
+[codex-cli-exec-review-flags-rejected-0140.md](../integration-issues/codex-cli-exec-review-flags-rejected-0140.md))
+required giving up `exec review`'s built-in `--base` diff selector, since
+plain `exec` has no such flag. PR #697 replaced it with
+`git diff "${BASE_REF}...HEAD" > "$DIFF_FILE" 2>/dev/null` run directly in
+the agent's own shell, with the file path handed to Codex in the prompt.
+
+That substitution created a new, previously-nonexistent failure arm: if
+`git diff` fails for any reason (bad `$BASE_REF`, detached HEAD with no
+matching ref, unfetched `origin/main` in a fresh worktree) the redirected
+stderr hides the error and `$DIFF_FILE` is silently written empty. Codex is
+then handed an empty file to review. Because the strict-mode schema has no
+"nothing to review" arm — only `overall_correctness` values that describe a
+real, reviewed patch — Codex's schema-conformant answer to "here is an
+empty diff" collapses to the nearest legitimate-looking bucket: a
+"patch is correct"-shaped verdict with zero findings, indistinguishable
+from a genuinely clean review.
+
+Five reviewers on the same PR #697 pass (reliability, agent-cli-readiness,
+codex, silent-failure-hunter, pattern-recognition-specialist) converged on
+this independently. Like the #695 residuals above (eventually closed in
+that PR's resolve pass), it was fixed before merge — in the same review
+pass that found it: a `[ ! -s "$DIFF_FILE" ]` fail-closed guard mirroring
+the existing `$SCHEMA_FILE`-missing check: on empty diff, emit
+`verdict=ERROR`, clean up temp files, and exit 0 rather than invoking
+Codex at all.
+
+**Why this is the same class, not a new one, and why it's worth a separate
+entry anyway:** every instance earlier in this doc is a *consumer*-side
+gap — a parser or branch that doesn't handle a shape the producer can
+emit. This one is a *producer*-side gap of the identical shape: the step
+that manufactures the review's input silently degraded to an empty-but-
+valid value, and nothing downstream — not the schema, not the parser — had
+an arm to represent "there was nothing to review" as distinct from "I
+reviewed it and it's fine." The generalizable trigger is the refactor
+itself: moving a "fetch the thing to review" step off of an already-
+hardened external interface (a CLI flag with its own validation) and into
+inline shell code the agent authors directly removes whatever implicit
+validation the old interface provided, without anyone deciding to remove
+it.
+
+**Prevention addition:** when a refactor moves a data-acquisition step
+from a flag/parameter on an external tool into shell code the agent's own
+prompt/script controls, audit that step for its own success guard as a
+first-class task — do not assume the replacement is validated just
+because the flag it replaces was. Check specifically whether the strict
+output schema has an arm for "no input to evaluate"; if it doesn't, gate
+on the input's presence before invoking the schema-constrained call at
+all, rather than expecting the schema to represent the absence.
+
+**Components (this Update):**
+`plugins/yellow-codex/agents/review/codex-reviewer.md`.
