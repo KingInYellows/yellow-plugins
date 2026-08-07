@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.2.8
+
+### Patch Changes
+
+- [#695](https://github.com/KingInYellows/yellow-plugins/pull/695)
+  [`83b273a`](https://github.com/KingInYellows/yellow-plugins/commit/83b273a047b4a56a33e552b4d3e92e8b1f135b59)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix
+  `/review:pr` silently dropping every `codex-reviewer` finding. Step 6 sub-step
+  0 now extracts the findings block from `codex-reviewer`'s structured
+  `verdict=`-prefixed return before applying the existing legacy-prose
+  normalizer, and `codex-reviewer` is added to both copies of the normalizer
+  list (Step 5 dispatch-table note and Step 6 sub-step 0), which previously
+  omitted it — causing Step 1 validation to drop the whole return as malformed
+  on every PR review. Also unlinks `codex-reviewer`'s `fenced_output_path` temp
+  file right after extracting the findings block, since `/review:pr` (unlike
+  `/council`) never reads it — closing a per-review `/tmp` file leak.
+
 ## 3.2.7
 
 ### Patch Changes
