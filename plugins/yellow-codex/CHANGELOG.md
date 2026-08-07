@@ -1,5 +1,72 @@
 # yellow-codex
 
+## 0.2.11
+
+### Patch Changes
+
+- [#698](https://github.com/KingInYellows/yellow-plugins/pull/698)
+  [`b11467b`](https://github.com/KingInYellows/yellow-plugins/commit/b11467bfde96ff83df1045cb1d8241079bfdfeaf)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Migrate
+  `/codex:review` off the broken `codex exec review` invocation onto the
+  canonical plain `codex exec` + strict-mode `--output-schema` pattern that
+  `codex-reviewer.md` and `codex-patterns/SKILL.md` established in #697:
+  pre-written diff file named in the prompt, fail-closed empty-diff and
+  schema-missing guards, anti-injection diff framing, `</dev/null` stdin
+  handling, and out-of-range priority diagnostics. Closes the last `exec review`
+  invocation site in the plugin (its `--output-schema` was silently ignored on
+  every model, so the "may be structured JSON" parsing branch was dead text).
+  Also re-widens the CLAUDE.md convention bullet to cover both review surfaces
+  now that both conform.
+
+- [#697](https://github.com/KingInYellows/yellow-plugins/pull/697)
+  [`1374672`](https://github.com/KingInYellows/yellow-plugins/commit/137467287e06471411ea7f20329b5aaedab1fc19)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Fix
+  `codex-reviewer` so its structured output actually arrives. Step 4 invoked
+  `codex exec review`, which silently ignores `--output-schema` and always
+  writes its own hardcoded prose to `-o` — so Step 6's `jq` parsing found no
+  `findings[]`/`overall_correctness` and every Codex review degraded to
+  UNKNOWN/no-findings while appearing healthy.
+
+  Step 4 now uses plain `codex exec`, which honours `--output-schema`. Because
+  plain `exec` has no `--base` selector, the diff is written to a temp file and
+  named in the prompt rather than fetched by Codex itself — instructing Codex to
+  run `git diff` made it explore the repository until the 300s timeout expired
+  (measured: 66 tool calls, exit 124, no output). The file-based form converges
+  in 3-4 minutes and scopes the review to exactly what Step 3 already
+  size-checked.
+
+  `schemas/review-findings.json` is rewritten for OpenAI strict
+  structured-output mode (`additionalProperties: false` on every object, every
+  key listed in `required`, nullable unions for optional fields). Step 6's `jq`
+  is unchanged — `null` and absent behave identically under `//`.
+
+  Also in this change:
+  - `</dev/null` on the invocation: plain `exec` appends stdin to the prompt and
+    blocks waiting for EOF if stdin is left attached.
+  - A fail-closed guard when the schema file is missing from the installation,
+    rather than silently falling back to unparsable prose.
+  - `$DIFF_FILE` cleanup on every exit path.
+  - Fixed the `FINDINGS` byte-cap guard: `wc -l` counts newlines, so a cut
+    landing mid-second-line leaves exactly one and the `-gt 1` test wrongly
+    returned the chopped tail. Now `-ge 1`, which accepts dropping one complete
+    line when the cut lands exactly on a boundary — preferable to emitting a
+    truncated one.
+  - Corrected the docs that asserted `exec review`'s `-o` file already contains
+    this JSON, and the "may be ignored with certain model variants" note — the
+    subcommand, not the model, is the deciding factor.
+
+- [#695](https://github.com/KingInYellows/yellow-plugins/pull/695)
+  [`83b273a`](https://github.com/KingInYellows/yellow-plugins/commit/83b273a047b4a56a33e552b4d3e92e8b1f135b59)
+  Thanks [@KingInYellow18](https://github.com/KingInYellow18)! - Normalize
+  `codex-reviewer` onto the structured 6-key return contract
+  (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
+  `findings_block_begin`...`findings_block_end`) already used by
+  yellow-council's Gemini and OpenCode reviewers. Every exit path — success,
+  diff-too-large, binary missing, timeout, auth failure, argument-parse error,
+  rate limit, and other CLI errors — now returns a structured verdict block
+  instead of free-text prose, fixing a silent bug where every Codex leg of
+  `/council` degraded to `verdict=ERROR` via the parser's default fallback.
+
 ## 0.2.10
 
 ### Patch Changes
