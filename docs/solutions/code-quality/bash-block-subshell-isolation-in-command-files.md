@@ -369,3 +369,83 @@ guard, D silently degrades to the same failure mode it was meant to fix.
 - [ ] Any Fix D (literal-path handoff) is paired with a fail-closed
       `[ -s "$FILE" ]` (or equivalent) guard immediately before the
       security transform that consumes the file's content
+
+## Update — 2026-08-06: third recurrence, this time the loss was total silence not a security no-op (PR #700)
+
+Third documented instance of cross-block variable loss in a yellow-codex
+command file (after the original setup-block bugs above, PR #259, and the
+`rescue.md` Step 4/5 security-transform no-op, PR #670, Update above).
+
+`plugins/yellow-codex/commands/codex/review.md` Step 4 ran `codex exec`,
+captured its output into `$REVIEW_OUTPUT`, and then deleted the temp file
+the output had been read from. Step 4b — written as its own standalone
+bash fence, per this doc's already-documented rule that each fence is a
+fresh subprocess — redacted `$REVIEW_OUTPUT` for credentials before it
+would be printed downstream. Because Step 4b is a separate Bash tool
+invocation from Step 4, `$REVIEW_OUTPUT` was unset when Step 4b ran; the
+redaction step redacted an empty string, and — the detail that made this
+worse than the `rescue.md` case — **nothing in Step 4b (or after it) ever
+printed the redacted result.** `/codex:review` silently discarded every
+real Codex finding on every invocation. Unlike the `rescue.md` case, this
+wasn't a security control silently degrading to a no-op on real data; the
+real data itself never reached the user at all.
+
+**Verification-gap parallel:** the `rescue.md` Update above notes a merged
+interactive shell session passes on the broken version, giving false
+confidence when a fix is verified by pasting both blocks into one session
+instead of two genuinely separate Bash tool calls. The same trap applies
+here in a different direction — this bug wasn't a security no-op that
+still "ran" and exited 0 looking normal; it was a complete absence of
+output, which is a more visible failure once someone actually looks at
+`/codex:review`'s output. It shipped anyway because the two-block split
+was itself new in this PR (there was no prior working version to diff
+against), and the mechanical-verification gap
+(`docs/solutions/code-quality/doc-fix-mechanical-verification-gap.md`)
+applies just as much to "did I actually run this end-to-end across two
+real Bash tool calls" as to doc-fix claims.
+
+**Fix (a new variant, distinct from Fixes A-D above):** merge Step 4b's
+redaction logic into Step 4's own fence — so capture and redaction happen
+in the same subprocess, no cross-block variable ever needs to survive —
+and end that fence with an explicit `printf` of the redacted result. The
+Step 4b heading in the command file was kept but repointed to explanatory
+prose only ("the redaction code itself lives inside Step 4's bash block
+above"), rather than removed, so a reader following the numbered steps
+still finds the redaction logic under the heading they expect.
+
+**Fix E: merge-and-print, with the heading kept as a pointer**
+
+```bash
+# Step 4 (single fence — capture AND redact together, no cross-block var)
+REVIEW_OUTPUT="$(codex exec ... < /dev/null)"
+rm -f "$CODEX_OUTPUT_FILE"
+# ... redact_credentials() runs on $REVIEW_OUTPUT right here, same fence ...
+printf '%s\n' "$REDACTED_OUTPUT"
+```
+
+```markdown
+### Step 4b: Redact Credentials from Output
+
+The redaction code itself lives INSIDE Step 4's bash block above (the
+result of a variable-survival bug documented in
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md
+— Step 4b as its own fence would scrub an empty string whose temp file
+Step 4 already deleted, and nothing would ever print the real result).
+```
+
+This differs from Fix C (merge blocks) mainly in explicitly calling out
+*why* the heading survives with no code under it — a maintainer scanning
+step headings for "where does X happen" needs the pointer, not just a
+deleted section.
+
+**General rule (an addition to the "when to merge vs. hand off" guidance
+already implicit in Fixes A-D):** when a later step's *entire purpose* is
+to transform a variable set by an earlier step, and there is no reason
+for a human or agent to pause between the two steps, default to merging
+them into one fence rather than splitting for readability — the split
+only pays for itself when something needs to happen between the steps
+(a review checkpoint, a literal-path handoff per Fix D). A step split
+that exists purely for document structure is exactly the shape that
+reintroduces this bug a fourth time.
+
+**Components (this Update):** `plugins/yellow-codex/commands/codex/review.md`.

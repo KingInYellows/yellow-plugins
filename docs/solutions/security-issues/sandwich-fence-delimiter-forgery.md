@@ -251,3 +251,73 @@ the same explicit first-match extraction `council.md` already uses.
   extraction instructions.
 
 **Components (this Update):** `plugins/yellow-codex/agents/review/codex-reviewer.md`, `plugins/yellow-review/commands/review/review-pr.md`.
+
+## Update — 2026-08-06 (#2): the escape_header fix landed with the wrong range (PR #700)
+
+The 2026-08-06 Update above records `escape_header` as "landed" for the
+forged-finding-header class of this bug — a jq helper in
+`codex-reviewer.md` that prefixes any line in Codex's `.title`/`.body`
+matching the legacy finding-header pattern with `[ESCAPED] ` before
+interpolation, so injected diff content can't fabricate a second finding
+record. PR #700 added new record-boundary splitters to the same file (the
+awk blocks that split the FINDINGS text back into individual records for
+field-shape validation and length-capping) using a wider pattern:
+`^\*\*\[P[0-9]\]` — any single digit 0-9. `escape_header`'s own match
+pattern was still `^\*\*\[P[0-3]\]`, copied from the original header
+template's four defined severities (P0-P3) rather than updated to track
+the splitter's wider range.
+
+**Effect:** a `**[P4]`-through-`**[P9]`-shaped line inside Codex's
+`.title`/`.body` free text — attacker-reachable diff-derived content, the
+same threat model as the original forged-header finding — passed through
+`escape_header` unescaped, because P4-P9 never matched its P[0-3] pattern.
+The two new splitters, matching P[0-9], *did* split on it. The real
+finding record got fragmented into two pieces at the injected line, and
+both fragments then failed field-shape validation (a fragment has no
+severity/category/file/line — the split boundary landed inside prose) and
+were silently dropped. Net effect: the injected content didn't just forge
+a fake finding — it caused the real finding to vanish entirely. Three
+reviewers (performance, security, reliability personas plus the Codex
+bot) reproduced this independently, which is a strong empirical signal
+for how directly this falls out of just reading the two regexes side by
+side once you know to compare them.
+
+**Fix:** widen `escape_header`'s match pattern to `P[0-9]`, so it once
+again exactly matches the range the splitters split on
+(`plugins/yellow-codex/agents/review/codex-reviewer.md`, commit
+`cda089c2`).
+
+**Why this is the same class as the header-forgery case above, not a new
+one:** the 2026-08-06 Update above already names the general fix pattern
+as "pre-interpolation scrubbing of the specific marker syntax... before
+that text is interpolated into a value another consumer parses
+structurally." What PR #700 shows is a second way that pairing can drift
+even after the scrub exists: the *consumer's* matching range (the
+splitter regex) changed independently of the *scrubber's* escaping range
+(`escape_header`'s regex), because they're two separate regex literals in
+the same file with no shared source of truth for "which severities are
+in scope." This is the same failure shape as the 2026-07-17 Update's
+"one scrub regex, multiple renderer wordings" — a detection/escaping
+regex calibrated against one snapshot of the thing it must track, which
+silently drifts out of sync when that thing (a splitter's range, a
+renderer's wording) changes at a different call site later.
+
+**General rule (an addition to the existing "grep every renderer" rule,
+same underlying discipline applied to a different pairing):** when a
+scrubbing/escaping regex exists specifically to stay ahead of a *sibling*
+matching regex in the same file (the record-splitter here; a renderer's
+delimiter format in the 2026-07-17 case), any change to the sibling regex
+must be treated as also changing the scrubbing regex's required range —
+grep for every regex in the file that matches on the same marker family
+(here: every `P[0-9]`/`P[0-3]`-shaped pattern) before considering a range
+change to any one of them complete.
+
+**Fix status (as of 2026-08-06, PR #700):**
+- `escape_header` range: **landed**, widened to `P[0-9]` matching the
+  splitters.
+- The `review-pr.md` first-occurrence extraction gap noted as "still
+  open" in the prior Update remains open — out of scope for PR #700,
+  which touched only `yellow-codex`.
+
+**Components (this Update):**
+`plugins/yellow-codex/agents/review/codex-reviewer.md`.
