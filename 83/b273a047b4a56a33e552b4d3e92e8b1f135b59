@@ -1,0 +1,71 @@
+plugins/yellow-codex/agents/review/codex-reviewer.md
+  s_2db87cc7495315::t_54bfd8799aa6f6 394-410,432-434,442-450,457-461,466
+  s_2db87cc7495315::t_a50698764dac7d 464-465
+  s_63cb31fb8b9a68::t_0da4ca15afe6e7 55-64,93-105,108-109,140,181-186,196,216-224,226,256-264,268-274,321-333,336-343,371-393,427-431,438-441,451-456,474-491,494-495,498-507,510-520,576,594-598,601-604,606,637,654,658
+  s_2db87cc7495315::t_80788ef5e94634 492-493,496-497,508-509
+  s_2db87cc7495315::t_bdada38db7bd96 556-563,565
+  s_2db87cc7495315::t_dfef9e353eda7b 265-267
+  s_2db87cc7495315::t_1496fe00696a43 638-648,651
+  s_2db87cc7495315::t_d8ef78cbbc1afb 605
+  s_2db87cc7495315::t_ccfd3abc6914c8 52-53
+  s_2db87cc7495315::t_c567015ddf8cec 54
+  s_63cb31fb8b9a68::t_b9a5cf4ddbafa8 467-471
+  s_2db87cc7495315::t_b2a391ace7f20d 344-370
+  s_2db87cc7495315::t_38762796a68b6a 411-426
+plugins/yellow-codex/README.md
+  s_2db87cc7495315::t_f939ddc3db3e48 34-35
+  s_2db87cc7495315::t_159742840e056a 37-38
+  s_e2317a5b7701f3::t_3ca52a38c119b1 48-52
+  s_e2317a5b7701f3::t_b10e55ce09fa4e 36
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_2db87cc7495315::t_42dc05faea202c 363-368
+  s_2db87cc7495315::t_f58bcdecad9887 77-83,86-90,93-104
+plugins/yellow-review/commands/review/review-pr.md
+  s_2db87cc7495315::t_3fd626acdf4bca 595-632,649-655
+plugins/yellow-codex/CLAUDE.md
+  s_2db87cc7495315::t_7e8f2f3888f02c 113
+  s_2db87cc7495315::t_27d5098a2b8ae6 104
+docs/solutions/code-quality/unhandled-outcome-defaults-to-success-bucket.md
+  s_2db87cc7495315::t_b223856af4cb32 264,275
+  s_2db87cc7495315::t_4fcf2fdfb0e830 228-229,234-235,237,239-241
+  s_2db87cc7495315::t_ce29aeb7be83dc 245-246,248-249,251-254,256-260,262,267-273
+  s_2db87cc7495315::t_3ec7d5fc69831c 263
+  s_2db87cc7495315::t_98298d25215579 274
+  s_2db87cc7495315::t_9da5067277446c 238,244
+  s_2db87cc7495315::t_0d8be843727ebc 265-266
+  s_2db87cc7495315::t_dff0243007107c 230-232
+  s_2db87cc7495315::t_29ec2701f12fd0 250,255
+  s_2db87cc7495315::t_c25f237de77851 261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "83b273a047b4a56a33e552b4d3e92e8b1f135b59",
+  "prompts": {},
+  "sessions": {
+    "s_2db87cc7495315": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "270e492c-16e4-4c2b-8556-5dedb6324c47",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_63cb31fb8b9a68": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ares-B-94914e4ed61ccb10",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_e2317a5b7701f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ares-A-48fc4de63650f472",
+        "model": "unknown"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
