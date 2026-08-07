@@ -132,9 +132,37 @@ If no BASE_REF is provided, detect it:
 BASE_REF=$(git merge-base HEAD origin/main 2>/dev/null || echo "origin/main")
 ```
 
+Whether extracted from PR context or detected, BASE_REF MUST match the
+branch-name allowlist `^[A-Za-z0-9_][A-Za-z0-9/_.-]*$` before it is
+substituted into any bash block below. Git accepts refnames containing
+`$`, `(`, and `)`, so an attacker-created base branch named `feat/$(cmd)`
+becomes command substitution the moment it lands in a double-quoted
+assignment. If the value fails the allowlist, do not run Steps 3-6 —
+return the ERROR arm of the 6-key contract immediately (verdict=ERROR,
+confidence=N/A, summary naming the allowlist failure). The merge-base
+fallback above always passes (a 40-hex SHA or the literal `origin/main`).
+Steps 3 and 4 re-check the allowlist in bash as a backstop — the same
+two-layer discipline as /codex:review Steps 2/3/4.
+
 ### 3. Pre-Flight Diff Size Check
 
 ```bash
+# BASE_REF is reconstructed here by literal substitution from Step 2 (bash
+# variables do not survive across Bash tool calls). SINGLE-QUOTED: a
+# double-quoted feat/$(cmd) refname would execute at assignment time.
+BASE_REF='<substitute the literal Step 2 value>'
+# Backstop re-check of the Step 2 allowlist before any use (empty is NOT
+# legal here — this agent has no --staged mode).
+case "$BASE_REF" in
+  ''|*[!A-Za-z0-9/_.-]*|[!A-Za-z0-9_]*)
+    printf '[codex-reviewer] BASE_REF failed the branch-name allowlist — returning ERROR\n' >&2
+    printf 'verdict=ERROR\n'
+    printf 'confidence=N/A\n'
+    printf 'summary=BASE_REF failed the branch-name allowlist (must match ^[A-Za-z0-9_][A-Za-z0-9/_.-]*$) — refusing to build a diff from it.\n'
+    exit 0
+    ;;
+esac
+
 diff_bytes=$(git diff "${BASE_REF}...HEAD" 2>/dev/null | wc -c)
 estimated_tokens=$((diff_bytes / 4))
 if [ "$estimated_tokens" -gt 100000 ]; then
@@ -177,6 +205,21 @@ OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-reviewer-err-XXXXXX.txt)
 DIFF_FILE=$(mktemp /tmp/codex-reviewer-diff-XXXXXX.txt)
 SCHEMA_FILE="${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json"
+
+# BASE_REF is reconstructed by literal substitution (see the BASE_REF
+# comment further down) — SINGLE-QUOTED, then the same allowlist backstop
+# as Step 3 before the value reaches git diff.
+BASE_REF='<substitute the literal Step 2 value>'
+case "$BASE_REF" in
+  ''|*[!A-Za-z0-9/_.-]*|[!A-Za-z0-9_]*)
+    printf '[codex-reviewer] BASE_REF failed the branch-name allowlist — returning ERROR\n' >&2
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
+    printf 'verdict=ERROR\n'
+    printf 'confidence=N/A\n'
+    printf 'summary=BASE_REF failed the branch-name allowlist (must match ^[A-Za-z0-9_][A-Za-z0-9/_.-]*$) — refusing to build a diff from it.\n'
+    exit 0
+    ;;
+esac
 
 # --- Why plain `codex exec` and not `codex exec review` ---
 # The `review` subcommand silently ignores --output-schema: it always emits
@@ -233,18 +276,28 @@ DIFF_STATUS=$?
 # allowlisted Step 4 tools.
 if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
   printf '[codex-reviewer] git diff %s...HEAD failed (exit %d) or produced no output\n' "$BASE_REF" "$DIFF_STATUS" >&2
+  # Canonical 11-pattern redaction (council-patterns SKILL.md). PEM state
+  # transitions test the ORIGINAL $0 before any mutation — never the
+  # redacted copy — so redaction cannot blind the END check (see
+  # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
   head -c 500 "$STDERR_FILE" | awk '{
+    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+    if (in_pem) {
+      print "--- redacted credential at line " NR " ---"
+      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+      next
+    }
     line = NR
     gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
-    gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
-    gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
-    gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
-    gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
-    gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+    gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+    gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
     gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
-    gsub(/ses_[A-Za-z0-9]{16,}/, "--- redacted credential at line " line " ---")
-    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
-    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
+    gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
+    gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
+    gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+    gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
     print
   }' >&2
   rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
@@ -316,15 +369,27 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
         # otherwise leave a remnant too short for the {20,}-style gsub
         # patterns to match. CLI stderr can echo partial keys or config
         # from auth diagnostics; never emit unredacted CLI output.
+        # Canonical 11-pattern redaction (council-patterns SKILL.md). PEM
+        # state transitions test the ORIGINAL $0 before any mutation (see
+        # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
         ERR_PEEK=$(grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null | awk '{
+          if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+          if (in_pem) {
+            print "--- redacted credential at line " NR " ---"
+            if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+            next
+          }
           line = NR
           gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
-          gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
-          gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
-          gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+          gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+          gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, "--- redacted credential at line " line " ---")
+          gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
+          gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
+          gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
           gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
-          gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
-          gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+          gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
+          gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+          gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
           print
         }' | tr '\n' ' ' | head -c 200)
         printf '[codex-reviewer] CLI argument parse error (flag drift?): %s\n' "$ERR_PEEK" >&2
@@ -547,10 +612,12 @@ fi
 # let a Codex-emitted line_range.start of 0 pass through unguarded,
 # producing "codex — path:0" with no approximate-location marker.
 # escape_header neutralizes any line inside Codex's free-text title/body
-# that itself matches the legacy "**[P0-3] category — file:line**" header
-# pattern review-pr.md's prose parser scans for — otherwise a quoted
-# example line inside Codex's own finding text would be mistaken for a
-# new finding boundary downstream, corrupting or dropping real findings.
+# that itself looks like a "**[P<digit>] ..." header — the FULL P0-9 digit
+# range, matching the ^\*\*\[P[0-9]\] record-boundary regex the field-shape
+# validator and the truncation cut below split on. A narrower range (P0-3)
+# would leave a quoted **[P4]-**[P9] line unescaped while the splitters
+# still treat it as a record boundary, fragmenting the real finding so
+# both halves fail field-shape validation and are silently dropped.
 # $raw_priority is range-checked the same way: the strict-mode schema
 # dropped minimum/maximum (see schemas/review-findings.json), so any
 # integer is schema-valid, but only 0-3 are documented severities. A
@@ -570,7 +637,7 @@ FINDINGS=$(jq -r --arg repo_root "$REPO_ROOT" '
   def escape_header($s):
     ($s // "")
     | split("\n")
-    | map(if test("^\\*\\*\\[P[0-3]\\]") then "[ESCAPED] " + . else . end)
+    | map(if test("^\\*\\*\\[P[0-9]\\]") then "[ESCAPED] " + . else . end)
     | join("\n");
   .findings[]? |
   (.priority) as $raw_priority |
@@ -597,44 +664,130 @@ FINDINGS=$(jq -r --arg repo_root "$REPO_ROOT" '
 # anyway so per-line numbering wouldn't survive). ---
 redact_credentials() {
   awk -v with_line="$1" '{
-    line = NR
-    label = (with_line == "1") ? ("--- redacted credential at line " line " ---") : "--- redacted credential ---"
+    label = (with_line == "1") ? ("--- redacted credential at line " NR " ---") : "--- redacted credential ---"
+    # A genuine finding-record header line marks a record boundary.
+    # FINDINGS is a concatenation of independently-untrusted Codex
+    # findings, so an unterminated "-----BEGIN ... PRIVATE KEY-----"
+    # marker in one record has two failure directions to balance:
+    #   - Carrying in_pem across the boundary is required to close a
+    #     PEM value genuinely split across two consecutive records
+    #     (the base64 body and END land in the next record) — dropping
+    #     it here would print that tail verbatim.
+    #   - Carrying it unboundedly lets one malformed or malicious
+    #     record swallow the header and confidence line of every later
+    #     record forever, since nothing else ever flips in_pem back
+    #     off — the field-shape validator then drops the entire
+    #     remaining findings block (a prompt-injected repo could use
+    #     this to suppress all review feedback after the first finding).
+    # The record that opened the unterminated BEGIN is dropped either
+    # way: its own confidence line sits after the BEGIN inside that
+    # same record and is already swallowed before any boundary is
+    # reached. So the only open question is how far the contamination
+    # is allowed to spread past that one record. pem_carried bounds it
+    # to exactly one additional record: the immediately following
+    # record gets a single chance to supply the matching END (closing
+    # a genuine split, at the cost of that record being dropped too,
+    # which is acceptable since it never had reliable content while
+    # in_pem was on); a second consecutive record with no END forces
+    # the state closed, so every record beyond the immediate neighbor
+    # is unaffected. Safe to key off ^\*\*\[P[0-9]\] here:
+    # escape_header() in the FINDINGS-building jq above already
+    # prefixes any attacker-forged copy of this pattern inside a
+    # title/body with "[ESCAPED] " before this function ever runs, so
+    # only a real jq-emitted header can match the anchor at this point.
+    # See docs/solutions/security-issues/
+    # awk-pem-state-machine-variable-mutation.md for the base state
+    # machine this extends.
+    if ($0 ~ /^\*\*\[P[0-9]\]/) {
+      if (in_pem) {
+        if (pem_carried) { in_pem = 0; pem_carried = 0 }
+        else pem_carried = 1
+      } else {
+        pem_carried = 0
+      }
+    }
+    # PEM state transitions (multi-line: BEGIN header, base64 body, END
+    # marker) test the ORIGINAL $0 BEFORE any gsub mutates it, and the END
+    # check also runs on the BEGIN line so a single-line BEGIN+END pair
+    # cannot leave in_pem stuck on — see
+    # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
+    # The BEGIN/END matches are UNANCHORED substrings on purpose: a
+    # full-line anchor (^...[[:space:]]*$) lets a key flattened onto one
+    # line, or quoted inline in prose, bypass redaction entirely.
+    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
     if (in_pem) {
       print label
-      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem=0
+      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
       next
     }
     # OpenAI project-scoped keys (must precede generic sk- pattern)
     gsub(/sk-proj-[a-zA-Z0-9_-]+/, label)
-    # Anthropic API keys (must precede generic sk- pattern)
-    gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, label)
-    # OpenAI / generic sk- API keys
-    gsub(/sk-[a-zA-Z0-9_-]{20,}/, label)
-    # Google API keys (Gemini) — matches council's 11-pattern redaction set
+    # Anthropic API keys (must precede generic sk- pattern). Minimum
+    # length matches the canonical council-patterns SKILL.md thresholds,
+    # expressed as a fixed-count prefix plus a greedy tail rather than
+    # {20,} — the mawk {N,} form only redacts the minimum-length span and
+    # leaves the rest of a longer credential exposed in the output
+    # (empirically verified: gsub(/sk-[a-zA-Z0-9_-]{20,}/, ...) against
+    # "sk-" + 32 chars redacts only the first 20 and prints the remaining
+    # 12 in plain text). {20}[...]* is bounded-then-greedy under both
+    # mawk and gawk and consumes the full credential.
+    gsub(/sk-ant-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, label)
+    # OpenAI / generic sk- API keys. The minimum length also guards
+    # against over-matching ordinary words containing the "sk-" substring
+    # (e.g. "risk-based authentication" contains "sk-based", which a bare
+    # `+` quantifier would redact as a credential).
+    gsub(/sk-[a-zA-Z0-9_-]{20}[a-zA-Z0-9_-]*/, label)
+    # Google API keys (Gemini) — matches the council 11-pattern redaction
+    # set. NOTE: no apostrophes anywhere inside this single-quoted awk
+    # program — one would terminate the bash quote and break the block.
     gsub(/AIza[0-9A-Za-z_-]{35}/, label)
     # GitHub tokens (ghp_, gho_, ghs_, ghu_)
-    gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, label)
+    gsub(/gh[pous]_[A-Za-z0-9_]{36}[A-Za-z0-9_]*/, label)
     # GitHub fine-grained PATs
-    gsub(/github_pat_[A-Za-z0-9_]{22,}/, label)
+    gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, label)
     # AWS access key IDs
     gsub(/AKIA[0-9A-Z]{16}/, label)
     # Bearer tokens
-    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, label)
+    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, label)
     # Authorization headers with token values
-    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, label)
-    # OpenCode session IDs — matches council's 11-pattern redaction set
-    gsub(/ses_[A-Za-z0-9]{16,}/, label)
-    # PEM private key blocks (multi-line: BEGIN header, base64 body, END marker)
-    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
-      print label
-      in_pem=1
-      next
-    }
+    gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, label)
+    # OpenCode session IDs — matches the council 11-pattern redaction set
+    gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, label)
     print
   }'
 }
 
 FINDINGS=$(printf '%s\n' "$FINDINGS" | redact_credentials 1)
+
+# --- Per-record field-shape validation. Records are delimited by header
+# lines matching ^\*\*\[P[0-9]\]. A well-formed record carries the exact
+# "**[P1-3] codex — <loc>:<line>**" header the jq above emits plus a
+# "  [codex] confidence:" line. Anything else — a record chopped upstream,
+# or output that never had the shape — is dropped fail-closed with a
+# count, never passed downstream where review-pr.md's prose parser would
+# misattribute its lines to a neighboring finding. Whitespace-only input
+# (zero findings) passes through without a spurious dropped-count note. ---
+FINDINGS=$(printf '%s\n' "$FINDINGS" | LC_ALL=C awk '
+  function flush() {
+    if (rec == "" || rec ~ /^[[:space:]]*$/) { rec = ""; return }
+    if (rec ~ /^\*\*\[P[123]\] codex — [^\n]*:[0-9]+\*\*/ && rec ~ /\n  \[codex\] confidence: /)
+      printf "%s", rec
+    else
+      dropped++
+    rec = ""
+  }
+  /^\*\*\[P[0-9]\]/ { flush() }
+  { rec = rec $0 "\n" }
+  END {
+    flush()
+    # Diagnostic goes to stderr: this awk runs inside the FINDINGS=$(...)
+    # command substitution, so an unredirected printf would land the note
+    # INSIDE the findings data itself — the exact downstream leak this
+    # validator exists to prevent.
+    if (dropped > 0)
+      printf "[codex-reviewer] dropped %d malformed finding record(s) during field-shape validation\n", dropped > "/dev/stderr"
+  }
+')
 
 # --- Derive VERDICT/CONFIDENCE/SUMMARY from the same Codex JSON result.
 # One jq call for the three short, single-line-safe fields (as a TSV row);
@@ -703,34 +856,34 @@ esac
 # --- Cap FINDINGS (200 lines / 20000 bytes) so a runaway or hostile CLI
 # response cannot flood downstream synthesis. Cap BEFORE the sentinel
 # escape below so a cut that happens to end a line at a bare sentinel
-# string still gets escaped. ---
+# string still gets escaped. The cut lands ONLY at complete finding-record
+# boundaries (records start at ^\*\*\[P[0-9]\] header lines): whole
+# records are accumulated while the running total stays within both caps,
+# and the remainder is dropped. A head -c / head -n cut could split a
+# record mid-body, leaving a partial record downstream parsers would
+# misread as a complete finding — the exact gap the field-shape validation
+# above exists to catch. Once a record is dropped, all later records are
+# dropped too (deterministic prefix, no cherry-picking); a single record
+# that alone exceeds a cap is dropped entirely (fail-safe: an oversized
+# single record is runaway/hostile output, and the marker names the cut). ---
 FINDINGS_BYTES=$(printf '%s' "$FINDINGS" | wc -c)
 FINDINGS_LINES=$(printf '%s' "$FINDINGS" | grep -c '^')
 if [ "$FINDINGS_BYTES" -gt 20000 ] || [ "$FINDINGS_LINES" -gt 200 ]; then
-  # Truncate by lines first so a byte cut never has to run. If line
-  # truncation alone isn't enough, fall back to a byte cut and drop the
-  # now-possibly-partial trailing line with `sed '$d'` — but only when the
-  # cut left at least one newline behind; a single huge line has no newline
-  # for sed to anchor on, so `$d` would delete all of it instead of the
-  # partial tail. The test is `-ge 1`, not `-gt 1`: `wc -l` counts
-  # newlines, so a cut landing mid-SECOND-line leaves exactly one, and
-  # `-gt 1` would wrongly fall through and return the chopped tail.
-  # Accepted tradeoff: `$(...)` strips trailing newlines, so a cut that
-  # happens to land exactly on a line boundary is indistinguishable from a
-  # mid-line cut and loses one complete finding line. Erring toward
-  # dropping a whole line beats emitting a truncated one — the output is
-  # already explicitly marked as truncated below.
-  FINDINGS=$(printf '%s\n' "$FINDINGS" | head -n 200)
-  if [ "$(printf '%s' "$FINDINGS" | wc -c)" -gt 20000 ]; then
-    FINDINGS_CUT=$(printf '%s' "$FINDINGS" | head -c 20000)
-    if [ "$(printf '%s' "$FINDINGS_CUT" | wc -l)" -ge 1 ]; then
-      FINDINGS=$(printf '%s' "$FINDINGS_CUT" | sed '$d')
-    else
-      FINDINGS=$(printf '%s' "$FINDINGS_CUT" | sed 's/[^[:print:][:space:]]*$//')
-    fi
-  fi
+  FINDINGS=$(printf '%s\n' "$FINDINGS" | LC_ALL=C awk -v max_lines=200 -v max_bytes=20000 '
+    function flush() {
+      if (rec == "") return
+      if (!truncated && total_lines + rec_lines <= max_lines && total_bytes + rec_bytes <= max_bytes) {
+        printf "%s", rec
+        total_lines += rec_lines; total_bytes += rec_bytes
+      } else truncated = 1
+      rec = ""; rec_lines = 0; rec_bytes = 0
+    }
+    /^\*\*\[P[0-9]\]/ { flush() }
+    { rec = rec $0 "\n"; rec_lines++; rec_bytes += length($0) + 1 }
+    END { flush() }
+  ')
   FINDINGS="${FINDINGS}
-[truncated: findings exceeded 200 lines / 20000 bytes]"
+[truncated: findings exceeded 200 lines / 20000 bytes — cut at the last complete finding record]"
 fi
 
 # --- Escape bare findings_block_begin/findings_block_end sentinel lines

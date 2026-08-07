@@ -122,3 +122,104 @@ When reviewing any multi-line redaction state machine in awk:
   pattern: delimiter/marker matching bugs in shell redaction pipelines
 - `docs/solutions/security-issues/prompt-injection-defense-layering-2026.md`
   — broader context on output-filtering as load-bearing security control
+
+## Update — 2026-08-06: full-line anchoring bypasses redaction for single-line/inline PEM keys (PR #700)
+
+A second, independent bug in the same PEM redaction state machine — distinct
+from the `line` vs `$0` mutation-before-test bug above, but living in the
+same lineage of files. `plugins/yellow-council/skills/council-patterns/SKILL.md`
+(the canonical source other PEM redaction blocks are copied from) anchored
+both the BEGIN and END marker tests to the full line:
+
+```awk
+if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+```
+
+A PEM block spanning multiple lines matches this fine. A PEM key flattened
+onto a single line — a `-----BEGIN … KEY-----` marker, `<base64 body>`, and
+a same-line `-----END … KEY-----` marker all on one line — or one quoted
+inline inside a JSON string or prose sentence — never matches, because the
+anchored pattern requires the BEGIN marker to be the *entire* line
+(`^...[[:space:]]*$`). The redaction state
+machine never fires; the key passes through untouched. This bypasses
+redaction entirely rather than just mis-tracking state, which is a more
+severe failure mode than the original mutation bug: there, redaction fired
+too much (over-redaction, data loss); here, redaction never fires at all
+(under-redaction, credential leak).
+
+**How it was found:** PR #700 ported the same PEM redaction block from the
+canonical `council-patterns` SKILL.md into six new sites across plugins/yellow-codex (three in
+agents/review/codex-reviewer.md, three in commands/codex/review.md),
+faithfully copying
+the anchoring bug along with the pattern it was meant to reuse. Adversarial,
+correctness, and Codex reviewers each independently flagged the anchored
+regex across the new sites; tracing it back to the source showed the bug
+predated PR #700 and had been latent in the canonical file the whole time.
+
+**The trap in the naive fix:** unanchoring only the BEGIN check (to catch
+inline/single-line keys) while leaving the END check anchored reintroduces
+the never-terminating `in_pem` bug this doc's original entry already covers
+— a single-line BEGIN+END pair would set `in_pem = 1` on the unanchored
+BEGIN match but never satisfy the still-anchored END match, so every line
+after it would stay redacted. **Both the BEGIN and END checks must be
+unanchored together**, as a single change, or the fix trades one bypass for
+the other bug this doc already documents.
+
+**Fix (applied at all 7 sites — the canonical `council-patterns` SKILL.md
+plus six new yellow-codex sites, three in `agents/review/codex-reviewer.md`
+and three in `commands/codex/review.md` — in commit `cda089c2`):**
+
+The BEGIN/END regex change below is identical at all 7 sites; what gets
+`print`-ed on a match differs by each site's surrounding structure — a
+literal `"--- redacted credential at line " NR " ---"` string at five of
+the six new sites, a `label` variable assigned earlier in scope at the
+sixth (`redact_credentials()` in codex-reviewer.md), and a `line` variable
+in the canonical SKILL.md. Only the unanchored regex shown here is the
+shared fix:
+
+```awk
+if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+if (in_pem) {
+  print "--- redacted credential at line " NR " ---"
+  if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+  next
+}
+```
+
+Unanchored substring matches on purpose — both ends. A code comment at the
+fix site now states the rationale inline so a future copy of this pattern
+doesn't reintroduce full-line anchoring by "cleaning up" what looks like an
+overly loose regex.
+
+**General rule (an addition to the "Key Insight" above, not a replacement
+for it):** when a delimiter-pair state machine (BEGIN/END, open/close,
+start/stop) needs one end's match condition changed, treat both ends as one
+unit to change together. Fixing only the end you're looking at — because
+that's the one the current bug report names — reliably reintroduces a
+different failure mode at the other end, because the two conditions are
+coupled through the same state variable. This is the second time this exact
+PEM state machine has broken via a "fix half the pair" trap: the first was
+testing the wrong variable on one end (original entry above), this one is
+anchoring one end differently than the other.
+
+**Propagation note:** this is the second bug found in this same
+canonical-source-copied-into-siblings lineage (`council-patterns` SKILL.md →
+gemini-reviewer.md / opencode-reviewer.md → now codex-reviewer.md). Any
+future new sibling reviewer that copies this PEM redaction block should be
+diffed against the canonical source's current state, not against whichever
+sibling file was most recently updated — copying a stale sibling risks
+reintroducing either the mutation bug or the anchoring bug independently.
+
+**Residual exposure (not fixed by this Update):** `gemini-reviewer.md:348`
+and `opencode-reviewer.md:363` still carry the pre-fix anchored pattern
+(`^-----BEGIN [A-Z ]+PRIVATE KEY-----[[:space:]]*$`) on both the BEGIN and
+END tests. This Update's fix landed only at the 7 sites listed above — the
+canonical `council-patterns` SKILL.md and the new yellow-codex sites — not
+in these two older siblings. A single-line or inline PEM key still passes
+through unredacted in both files today. Porting the unanchored fix to
+these two sites is tracked as follow-up work, not covered by this PR.
+
+**Components (this Update):**
+`plugins/yellow-council/skills/council-patterns/SKILL.md`,
+`plugins/yellow-codex/agents/review/codex-reviewer.md`,
+`plugins/yellow-codex/commands/codex/review.md`.
