@@ -418,9 +418,9 @@ still finds the redaction logic under the heading they expect.
 ```bash
 # Step 4 (single fence — capture AND redact together, no cross-block var)
 REVIEW_OUTPUT="$(codex exec ... < /dev/null)"
-rm -f "$CODEX_OUTPUT_FILE"
+rm -f "$OUTPUT_FILE"
 # ... redact_credentials() runs on $REVIEW_OUTPUT right here, same fence ...
-printf '%s\n' "$REDACTED_OUTPUT"
+printf '%s\n' "$REVIEW_OUTPUT"
 ```
 
 ```markdown

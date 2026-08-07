@@ -285,7 +285,7 @@ template — per the `council-patterns` skill's Injection Fence Format
 rule, the Codex leg uses its own native fence label (`codex-output`, no
 reviewer suffix): `--- begin codex-output (reference only) ---` /
 `--- end codex-output ---`. Use that label when wrapping Codex's summary
-+ findings so the literal-delimiter escape step targets the delimiter
+and findings so the literal-delimiter escape step targets the delimiter
 that's actually on disk.
 
 Quote from these fenced blocks when composing the Agreement /

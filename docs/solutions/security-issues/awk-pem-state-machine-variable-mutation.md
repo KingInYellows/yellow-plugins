@@ -136,10 +136,11 @@ if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
 ```
 
 A PEM block spanning multiple lines matches this fine. A PEM key flattened
-onto a single line — `-----BEGIN RSA PRIVATE KEY----- MIIEow... -----END
-RSA PRIVATE KEY-----`, or one quoted inline inside a JSON string or prose
-sentence — never matches, because the anchored pattern requires the BEGIN
-marker to be the *entire* line (`^...[[:space:]]*$`). The redaction state
+onto a single line — a `-----BEGIN … KEY-----` marker, `<base64 body>`, and
+a same-line `-----END … KEY-----` marker all on one line — or one quoted
+inline inside a JSON string or prose sentence — never matches, because the
+anchored pattern requires the BEGIN marker to be the *entire* line
+(`^...[[:space:]]*$`). The redaction state
 machine never fires; the key passes through untouched. This bypasses
 redaction entirely rather than just mis-tracking state, which is a more
 severe failure mode than the original mutation bug: there, redaction fired
@@ -165,12 +166,21 @@ unanchored together**, as a single change, or the fix trades one bypass for
 the other bug this doc already documents.
 
 **Fix (applied at all 7 sites — the canonical `council-patterns` SKILL.md
-plus 6 new codex-reviewer.md sites — in commit `cda089c2`):**
+plus six new yellow-codex sites, three in `agents/review/codex-reviewer.md`
+and three in `commands/codex/review.md` — in commit `cda089c2`):**
+
+The BEGIN/END regex change below is identical at all 7 sites; what gets
+`print`-ed on a match differs by each site's surrounding structure — a
+literal `"--- redacted credential at line " NR " ---"` string at five of
+the six new sites, a `label` variable assigned earlier in scope at the
+sixth (`redact_credentials()` in codex-reviewer.md), and a `line` variable
+in the canonical SKILL.md. Only the unanchored regex shown here is the
+shared fix:
 
 ```awk
 if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
 if (in_pem) {
-  print label
+  print "--- redacted credential at line " NR " ---"
   if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
   next
 }
@@ -199,6 +209,15 @@ future new sibling reviewer that copies this PEM redaction block should be
 diffed against the canonical source's current state, not against whichever
 sibling file was most recently updated — copying a stale sibling risks
 reintroducing either the mutation bug or the anchoring bug independently.
+
+**Residual exposure (not fixed by this Update):** `gemini-reviewer.md:348`
+and `opencode-reviewer.md:363` still carry the pre-fix anchored pattern
+(`^-----BEGIN [A-Z ]+PRIVATE KEY-----[[:space:]]*$`) on both the BEGIN and
+END tests. This Update's fix landed only at the 7 sites listed above — the
+canonical `council-patterns` SKILL.md and the new yellow-codex sites — not
+in these two older siblings. A single-line or inline PEM key still passes
+through unredacted in both files today. Porting the unanchored fix to
+these two sites is tracked as follow-up work, not covered by this PR.
 
 **Components (this Update):**
 `plugins/yellow-council/skills/council-patterns/SKILL.md`,

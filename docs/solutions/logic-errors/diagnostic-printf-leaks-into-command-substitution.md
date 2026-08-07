@@ -86,9 +86,9 @@ the surrounding `$(...)`.
 ## Detection
 
 ```bash
-# Any printf/print inside an awk program embedded in a command-substitution
+# Any printf/print/echo inside an awk program embedded in a command-substitution
 # pipeline that has no explicit stderr redirect is a candidate
-rg -n 'printf\s' plugins/*/agents/**/*.md plugins/*/commands/**/*.md \
+rg -n '(printf|print|echo)[[:space:]]' plugins/*/agents/**/*.md plugins/*/commands/**/*.md \
   | rg -v '>&2|"/dev/stderr"|> "/dev/stderr"'
 ```
 
