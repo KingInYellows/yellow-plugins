@@ -340,6 +340,107 @@ describe.skipIf(!runnable)('codex-reviewer.md Step 6 extraction conformance', ()
     expect(r.findings).not.toContain('[codex-reviewer]');
   });
 
+  it('bounds a permanently unterminated PEM BEGIN to two dropped records, not the whole block', () => {
+    // Regression: resetting in_pem unconditionally at every header line
+    // (the fix for the swallow bug below) let a genuinely split PEM leak
+    // its tail into the very next record (see the sibling test below).
+    // Carrying in_pem across exactly one record boundary closes that gap,
+    // but a BEGIN with no END anywhere still must not cascade past its
+    // immediate neighbor and wipe every later finding.
+    const r = runStep6(
+      JSON.stringify({
+        findings: [
+          finding({
+            title: 'Truncated key dump',
+            body: 'Log line got cut off after -----BEGIN RSA PRIVATE KEY----- with no closing marker anywhere in this finding.',
+            priority: 0,
+            code_location: {
+              absolute_file_path: `${REPO_ROOT}/src/a.ts`,
+              line_range: { start: 1, end: 2 },
+            },
+          }),
+          finding({
+            title: 'Unrelated finding two',
+            body: 'This finding has nothing to do with keys.',
+            priority: 1,
+            code_location: {
+              absolute_file_path: `${REPO_ROOT}/src/b.ts`,
+              line_range: { start: 5, end: 6 },
+            },
+          }),
+          finding({
+            title: 'Unrelated finding three',
+            body: 'Also nothing to do with keys.',
+            priority: 2,
+            code_location: {
+              absolute_file_path: `${REPO_ROOT}/src/c.ts`,
+              line_range: { start: 9, end: 10 },
+            },
+          }),
+        ],
+        overall_correctness: 'patch is incorrect',
+        overall_explanation: 'Three findings, the first quotes a truncated key.',
+        overall_confidence_score: 0.8,
+      })
+    );
+    // Findings 1 and 2 are collateral (bounded, acceptable) — but the
+    // block must not cascade forever: finding 3 must survive.
+    expect(r.findings).not.toContain('src/a.ts:1');
+    expect(r.findings).not.toContain('src/b.ts:5');
+    expect(r.findings).toContain('src/c.ts:9');
+    expect(splitRecords(r.findings)).toHaveLength(1);
+  });
+
+  it('redacts a PEM key split across two consecutive finding bodies with no leaked tail', () => {
+    // The P1 this test guards: with an unconditional reset, finding 2's
+    // body (the base64 body + END continuing finding 1's BEGIN) started
+    // fresh with in_pem=0 and printed verbatim — leaking key material.
+    const keyTail = 'MIIBVQIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEA1234567890abcdefXYZ';
+    const r = runStep6(
+      JSON.stringify({
+        findings: [
+          finding({
+            title: 'Leaked key part 1',
+            body: 'Key material split across log lines: -----BEGIN RSA PRIVATE KEY-----',
+            priority: 0,
+            code_location: {
+              absolute_file_path: `${REPO_ROOT}/src/x.ts`,
+              line_range: { start: 1, end: 2 },
+            },
+          }),
+          finding({
+            title: 'Leaked key part 2',
+            body: `${keyTail}\n-----END RSA PRIVATE KEY-----`,
+            priority: 0,
+            code_location: {
+              absolute_file_path: `${REPO_ROOT}/src/y.ts`,
+              line_range: { start: 5, end: 6 },
+            },
+          }),
+          finding({
+            title: 'Unrelated finding three',
+            body: 'Also nothing to do with keys.',
+            priority: 2,
+            code_location: {
+              absolute_file_path: `${REPO_ROOT}/src/z.ts`,
+              line_range: { start: 9, end: 10 },
+            },
+          }),
+        ],
+        overall_correctness: 'patch is incorrect',
+        overall_explanation: 'A key split across two findings.',
+        overall_confidence_score: 0.8,
+      })
+    );
+    // The key tail must never survive into the findings block or stdout,
+    // even though the record that leaked it (finding 2) has no BEGIN of
+    // its own to trigger a fresh state machine.
+    expect(r.findings).not.toContain(keyTail);
+    expect(r.stdout).not.toContain(keyTail);
+    // The record beyond the immediate neighbor is unaffected.
+    expect(r.findings).toContain('src/z.ts:9');
+  });
+
   it('escapes forged P4-P9 header lines so they cannot fragment a record', () => {
     // Regression: escape_header covered only P0-3 while the record
     // splitters match P0-9 — an unescaped **[P7] line fragmented the

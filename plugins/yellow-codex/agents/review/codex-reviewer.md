@@ -296,7 +296,7 @@ if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
     gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
     gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
     gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
-    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+    gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
     gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
     print
   }' >&2
@@ -388,7 +388,7 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
           gsub(/github_pat_[A-Za-z0-9_]{22}[A-Za-z0-9_]*/, "--- redacted credential at line " line " ---")
           gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
           gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, "--- redacted credential at line " line " ---")
-          gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
+          gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, "--- redacted credential at line " line " ---")
           gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, "--- redacted credential at line " line " ---")
           print
         }' | tr '\n' ' ' | head -c 200)
@@ -665,23 +665,47 @@ FINDINGS=$(jq -r --arg repo_root "$REPO_ROOT" '
 redact_credentials() {
   awk -v with_line="$1" '{
     label = (with_line == "1") ? ("--- redacted credential at line " NR " ---") : "--- redacted credential ---"
-    # A genuine finding-record header line marks a trust boundary and
-    # resets PEM state before it is tested below. FINDINGS is a
-    # concatenation of independently-untrusted Codex findings; without
-    # this reset, one finding quoting an unterminated
-    # "-----BEGIN ... PRIVATE KEY-----" marker (e.g. describing a
-    # truncated-key defect, never followed by its own END on the same
-    # record) leaves in_pem stuck on for every following line, replacing
-    # the header and confidence lines of every later record with the
-    # redacted label — the field-shape validator then drops the whole
-    # findings block. Safe to key off ^\*\*\[P[0-9]\] here: escape_header()
-    # in the FINDINGS-building jq above already prefixes any attacker-forged
-    # copy of this pattern inside a title/body with "[ESCAPED] " before
-    # this function ever runs, so only a real jq-emitted header can match
-    # the anchor at this point. See docs/solutions/security-issues/
+    # A genuine finding-record header line marks a record boundary.
+    # FINDINGS is a concatenation of independently-untrusted Codex
+    # findings, so an unterminated "-----BEGIN ... PRIVATE KEY-----"
+    # marker in one record has two failure directions to balance:
+    #   - Carrying in_pem across the boundary is required to close a
+    #     PEM value genuinely split across two consecutive records
+    #     (the base64 body and END land in the next record) — dropping
+    #     it here would print that tail verbatim.
+    #   - Carrying it unboundedly lets one malformed or malicious
+    #     record swallow the header and confidence line of every later
+    #     record forever, since nothing else ever flips in_pem back
+    #     off — the field-shape validator then drops the entire
+    #     remaining findings block (a prompt-injected repo could use
+    #     this to suppress all review feedback after the first finding).
+    # The record that opened the unterminated BEGIN is dropped either
+    # way: its own confidence line sits after the BEGIN inside that
+    # same record and is already swallowed before any boundary is
+    # reached. So the only open question is how far the contamination
+    # is allowed to spread past that one record. pem_carried bounds it
+    # to exactly one additional record: the immediately following
+    # record gets a single chance to supply the matching END (closing
+    # a genuine split, at the cost of that record being dropped too,
+    # which is acceptable since it never had reliable content while
+    # in_pem was on); a second consecutive record with no END forces
+    # the state closed, so every record beyond the immediate neighbor
+    # is unaffected. Safe to key off ^\*\*\[P[0-9]\] here:
+    # escape_header() in the FINDINGS-building jq above already
+    # prefixes any attacker-forged copy of this pattern inside a
+    # title/body with "[ESCAPED] " before this function ever runs, so
+    # only a real jq-emitted header can match the anchor at this point.
+    # See docs/solutions/security-issues/
     # awk-pem-state-machine-variable-mutation.md for the base state
     # machine this extends.
-    if ($0 ~ /^\*\*\[P[0-9]\]/) in_pem = 0
+    if ($0 ~ /^\*\*\[P[0-9]\]/) {
+      if (in_pem) {
+        if (pem_carried) { in_pem = 0; pem_carried = 0 }
+        else pem_carried = 1
+      } else {
+        pem_carried = 0
+      }
+    }
     # PEM state transitions (multi-line: BEGIN header, base64 body, END
     # marker) test the ORIGINAL $0 BEFORE any gsub mutates it, and the END
     # check also runs on the BEGIN line so a single-line BEGIN+END pair
@@ -726,7 +750,7 @@ redact_credentials() {
     # Bearer tokens
     gsub(/[Bb]earer [A-Za-z0-9_.\-]{20}[A-Za-z0-9_.\-]*/, label)
     # Authorization headers with token values
-    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20}[^ ]*/, label)
+    gsub(/[Aa]uthorization:[[:space:]]*([A-Za-z]+[[:space:]]+)?[^ ]{20}[^ ]*/, label)
     # OpenCode session IDs — matches the council 11-pattern redaction set
     gsub(/ses_[A-Za-z0-9]{16}[A-Za-z0-9]*/, label)
     print
