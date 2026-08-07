@@ -132,9 +132,37 @@ If no BASE_REF is provided, detect it:
 BASE_REF=$(git merge-base HEAD origin/main 2>/dev/null || echo "origin/main")
 ```
 
+Whether extracted from PR context or detected, BASE_REF MUST match the
+branch-name allowlist `^[A-Za-z0-9_][A-Za-z0-9/_.-]*$` before it is
+substituted into any bash block below. Git accepts refnames containing
+`$`, `(`, and `)`, so an attacker-created base branch named `feat/$(cmd)`
+becomes command substitution the moment it lands in a double-quoted
+assignment. If the value fails the allowlist, do not run Steps 3-6 —
+return the ERROR arm of the 6-key contract immediately (verdict=ERROR,
+confidence=N/A, summary naming the allowlist failure). The merge-base
+fallback above always passes (a 40-hex SHA or the literal `origin/main`).
+Steps 3 and 4 re-check the allowlist in bash as a backstop — the same
+two-layer discipline as /codex:review Steps 2/3/4.
+
 ### 3. Pre-Flight Diff Size Check
 
 ```bash
+# BASE_REF is reconstructed here by literal substitution from Step 2 (bash
+# variables do not survive across Bash tool calls). SINGLE-QUOTED: a
+# double-quoted feat/$(cmd) refname would execute at assignment time.
+BASE_REF='<substitute the literal Step 2 value>'
+# Backstop re-check of the Step 2 allowlist before any use (empty is NOT
+# legal here — this agent has no --staged mode).
+case "$BASE_REF" in
+  ''|*[!A-Za-z0-9/_.-]*|[!A-Za-z0-9_]*)
+    printf '[codex-reviewer] BASE_REF failed the branch-name allowlist — returning ERROR\n' >&2
+    printf 'verdict=ERROR\n'
+    printf 'confidence=N/A\n'
+    printf 'summary=BASE_REF failed the branch-name allowlist (must match ^[A-Za-z0-9_][A-Za-z0-9/_.-]*$) — refusing to build a diff from it.\n'
+    exit 0
+    ;;
+esac
+
 diff_bytes=$(git diff "${BASE_REF}...HEAD" 2>/dev/null | wc -c)
 estimated_tokens=$((diff_bytes / 4))
 if [ "$estimated_tokens" -gt 100000 ]; then
@@ -177,6 +205,21 @@ OUTPUT_FILE=$(mktemp /tmp/codex-reviewer-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-reviewer-err-XXXXXX.txt)
 DIFF_FILE=$(mktemp /tmp/codex-reviewer-diff-XXXXXX.txt)
 SCHEMA_FILE="${CLAUDE_PLUGIN_ROOT}/schemas/review-findings.json"
+
+# BASE_REF is reconstructed by literal substitution (see the BASE_REF
+# comment further down) — SINGLE-QUOTED, then the same allowlist backstop
+# as Step 3 before the value reaches git diff.
+BASE_REF='<substitute the literal Step 2 value>'
+case "$BASE_REF" in
+  ''|*[!A-Za-z0-9/_.-]*|[!A-Za-z0-9_]*)
+    printf '[codex-reviewer] BASE_REF failed the branch-name allowlist — returning ERROR\n' >&2
+    rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
+    printf 'verdict=ERROR\n'
+    printf 'confidence=N/A\n'
+    printf 'summary=BASE_REF failed the branch-name allowlist (must match ^[A-Za-z0-9_][A-Za-z0-9/_.-]*$) — refusing to build a diff from it.\n'
+    exit 0
+    ;;
+esac
 
 # --- Why plain `codex exec` and not `codex exec review` ---
 # The `review` subcommand silently ignores --output-schema: it always emits
@@ -238,10 +281,10 @@ if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
   # redacted copy — so redaction cannot blind the END check (see
   # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
   head -c 500 "$STDERR_FILE" | awk '{
-    if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
     if (in_pem) {
       print "--- redacted credential at line " NR " ---"
-      if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
       next
     }
     line = NR
@@ -330,10 +373,10 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
         # state transitions test the ORIGINAL $0 before any mutation (see
         # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
         ERR_PEEK=$(grep -m2 -E "^error:" "$STDERR_FILE" 2>/dev/null | awk '{
-          if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+          if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
           if (in_pem) {
             print "--- redacted credential at line " NR " ---"
-            if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+            if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
             next
           }
           line = NR
@@ -569,10 +612,12 @@ fi
 # let a Codex-emitted line_range.start of 0 pass through unguarded,
 # producing "codex — path:0" with no approximate-location marker.
 # escape_header neutralizes any line inside Codex's free-text title/body
-# that itself matches the legacy "**[P0-3] category — file:line**" header
-# pattern review-pr.md's prose parser scans for — otherwise a quoted
-# example line inside Codex's own finding text would be mistaken for a
-# new finding boundary downstream, corrupting or dropping real findings.
+# that itself looks like a "**[P<digit>] ..." header — the FULL P0-9 digit
+# range, matching the ^\*\*\[P[0-9]\] record-boundary regex the field-shape
+# validator and the truncation cut below split on. A narrower range (P0-3)
+# would leave a quoted **[P4]-**[P9] line unescaped while the splitters
+# still treat it as a record boundary, fragmenting the real finding so
+# both halves fail field-shape validation and are silently dropped.
 # $raw_priority is range-checked the same way: the strict-mode schema
 # dropped minimum/maximum (see schemas/review-findings.json), so any
 # integer is schema-valid, but only 0-3 are documented severities. A
@@ -592,7 +637,7 @@ FINDINGS=$(jq -r --arg repo_root "$REPO_ROOT" '
   def escape_header($s):
     ($s // "")
     | split("\n")
-    | map(if test("^\\*\\*\\[P[0-3]\\]") then "[ESCAPED] " + . else . end)
+    | map(if test("^\\*\\*\\[P[0-9]\\]") then "[ESCAPED] " + . else . end)
     | join("\n");
   .findings[]? |
   (.priority) as $raw_priority |
@@ -625,10 +670,13 @@ redact_credentials() {
     # check also runs on the BEGIN line so a single-line BEGIN+END pair
     # cannot leave in_pem stuck on — see
     # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
-    if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+    # The BEGIN/END matches are UNANCHORED substrings on purpose: a
+    # full-line anchor (^...[[:space:]]*$) lets a key flattened onto one
+    # line, or quoted inline in prose, bypass redaction entirely.
+    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
     if (in_pem) {
       print label
-      if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
       next
     }
     # OpenAI project-scoped keys (must precede generic sk- pattern)
@@ -680,8 +728,12 @@ FINDINGS=$(printf '%s\n' "$FINDINGS" | LC_ALL=C awk '
   { rec = rec $0 "\n" }
   END {
     flush()
+    # Diagnostic goes to stderr: this awk runs inside the FINDINGS=$(...)
+    # command substitution, so an unredirected printf would land the note
+    # INSIDE the findings data itself — the exact downstream leak this
+    # validator exists to prevent.
     if (dropped > 0)
-      printf "[codex-reviewer] dropped %d malformed finding record(s) during field-shape validation\n", dropped
+      printf "[codex-reviewer] dropped %d malformed finding record(s) during field-shape validation\n", dropped > "/dev/stderr"
   }
 ')
 

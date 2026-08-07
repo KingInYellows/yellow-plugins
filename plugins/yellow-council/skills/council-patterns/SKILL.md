@@ -133,11 +133,15 @@ BEFORE writing to `docs/council/<file>.md`:
   # PEM private key block — multi-line state machine
   # NOTE: test the ORIGINAL line ($0) for BEGIN/END so the redaction-replacement
   # of `line` does not blind the END check (otherwise in_pem never resets).
-  # Allow optional trailing whitespace so a hostile producer cannot bypass
-  # the BEGIN/END anchor by appending a single space or tab.
-  if ($0 ~ /^-----BEGIN [A-Z ]+PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+  # UNANCHORED substring match on purpose: a full-line anchor
+  # (^...[[:space:]]*$) lets a key flattened onto one line — or quoted
+  # inline in prose ("leaked key: -----BEGIN PRIVATE KEY----- MII…") —
+  # bypass redaction entirely because the BEGIN marker never matches.
+  # The END check running on the same line keeps a single-line
+  # BEGIN+body+END pair from leaving in_pem stuck on.
+  if ($0 ~ /-----BEGIN [A-Z ]+PRIVATE KEY-----/) in_pem = 1
   if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
-  if ($0 ~ /^-----END [A-Z ]+PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+  if ($0 ~ /-----END [A-Z ]+PRIVATE KEY-----/) in_pem = 0
   print line
 }
 ```

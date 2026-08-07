@@ -168,10 +168,10 @@ if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
   # redacted copy — so redaction cannot blind the END check (see
   # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
   head -c 500 "$STDERR_FILE" | awk '{
-    if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
     if (in_pem) {
       print "--- redacted credential at line " NR " ---"
-      if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
       next
     }
     line = NR
@@ -243,10 +243,10 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/nul
     # redacted copy — so redaction cannot blind the END check (see
     # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
     head -5 "$STDERR_FILE" 2>/dev/null | awk '{
-      if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+      if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
       if (in_pem) {
         print "--- redacted credential at line " NR " ---"
-        if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+        if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
         next
       }
       line = NR
@@ -275,30 +275,17 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/nul
   fi
 }
 
-# Read output
+# Read output, then redact IN THIS SAME BLOCK (Step 4b's prose explains
+# the jq-aware approach): REVIEW_OUTPUT is a shell variable and does not
+# survive across separate bash fences (see
+# docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md),
+# so a standalone Step 4b block would scrub an empty string while the real
+# output — whose temp file is deleted below — was silently lost.
 REVIEW_OUTPUT=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
 rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
-```
 
-### Step 4b: Redact Credentials from Output
-
-Before parsing or displaying, scrub any leaked credentials from the Codex
-output. Model responses may echo API keys, bearer tokens, or authorization
-headers found in the reviewed code.
-
-`REVIEW_OUTPUT` is (normally) the strict-mode JSON object Step 5 parses.
-Line-based whole-line redaction would corrupt that JSON — the object
-typically arrives on a single line, so replacing any "line" that trips a
-whole-line pattern (the PEM arm) would destroy the entire result. Redact
-JSON-aware instead: parse first, then apply the canonical 11 credential
-patterns (council-patterns SKILL.md) to every string VALUE while
-preserving structure. A PEM block inside a JSON string value has real
-newlines after decoding, so it is matched as a within-string span rather
-than line-by-line. Only when the output is not valid JSON (e.g., a Codex
-refusal — the case Step 5 reports as raw fenced output) fall back to the
-line-based awk block.
-
-```bash
+# Step 4b: JSON-aware credential redaction (rationale in the Step 4b prose
+# below).
 if command -v jq >/dev/null 2>&1 && REDACTED=$(printf '%s\n' "$REVIEW_OUTPUT" | jq '
   def redact:
     gsub("-----BEGIN [A-Z ]*PRIVATE KEY-----([\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----|[\\s\\S]*$)"; "--- redacted PEM key block ---")
@@ -323,10 +310,10 @@ else
   # fenced output. PEM state transitions test the ORIGINAL $0 (see
   # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
   REVIEW_OUTPUT=$(printf '%s\n' "$REVIEW_OUTPUT" | awk '{
-    if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
     if (in_pem) {
       print "--- redacted credential at line " NR " ---"
-      if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
       next
     }
     line = NR
@@ -343,7 +330,40 @@ else
     print
   }')
 fi
+
+# The redacted output printed here is the ONLY channel through which the
+# review result leaves this block for Step 5 to parse.
+printf '%s\n' "$REVIEW_OUTPUT"
 ```
+
+### Step 4b: Redact Credentials from Output
+
+Before parsing or displaying, scrub any leaked credentials from the Codex
+output. Model responses may echo API keys, bearer tokens, or authorization
+headers found in the reviewed code.
+
+`REVIEW_OUTPUT` is (normally) the strict-mode JSON object Step 5 parses.
+Line-based whole-line redaction would corrupt that JSON — the object
+typically arrives on a single line, so replacing any "line" that trips a
+whole-line pattern (the PEM arm) would destroy the entire result. Redact
+JSON-aware instead: parse first, then apply the canonical 11 credential
+patterns (council-patterns SKILL.md) to every string VALUE while
+preserving structure. A PEM block inside a JSON string value has real
+newlines after decoding, so it is matched as a within-string span rather
+than line-by-line. Only when the output is not valid JSON (e.g., a Codex
+refusal — the case Step 5 reports as raw fenced output) fall back to the
+line-based awk block.
+
+The redaction code itself lives INSIDE Step 4's bash block above (the
+`if command -v jq ...` / `else` fallback ending in the final
+`printf '%s\n' "$REVIEW_OUTPUT"`). It cannot be a standalone bash block
+here: `REVIEW_OUTPUT` is a shell variable, and shell variables do not
+survive across separate bash fences (see
+docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md)
+— a separate block would redact an empty string while the real output,
+whose temp file Step 4 already deleted, was silently lost. Step 4's final
+`printf` of the redacted `REVIEW_OUTPUT` is the only channel through which
+the review result reaches Step 5.
 
 ### Step 5: Parse Findings
 
