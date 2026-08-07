@@ -1,0 +1,21 @@
+plugins/yellow-council/commands/council/council.md
+  s_2feb58e848d20d::t_7ea2d0e9cb4291 293-310
+  s_2feb58e848d20d::t_5001a454e03943 317-320
+  s_2feb58e848d20d::t_7b68c511d1a71b 352-353
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "52064c0d14e977e2ac067b3ca2eb023dca809364",
+  "prompts": {},
+  "sessions": {
+    "s_2feb58e848d20d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "46cf0ad5-c154-44fd-a3d8-19281f5dd794",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
