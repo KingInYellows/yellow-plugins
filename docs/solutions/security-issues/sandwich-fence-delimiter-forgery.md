@@ -194,3 +194,60 @@ fixture.
 - `docs/solutions/security-issues/heredoc-delimiter-collision.md` — adjacent
   pattern: attacker-controlled content closing a shell heredoc early
 - MEMORY.md: "Sandwich Fence Delimiter Forgery" entry
+
+## Update — 2026-08-06: contract key lines and finding headers are forgeable too, not just `--- begin/end ---` fences
+
+A later review round on PR #695 (yellow-codex's 6-key contract
+normalization) found two instances of this doc's underlying mechanism —
+attacker-reachable text mimicking protocol syntax a downstream parser
+trusts — in files that never touch a `--- begin/end ---` fence at all:
+
+1. **Forged contract key lines** (`plugins/yellow-review/commands/review/review-pr.md:588-595`):
+   a reviewer's FINDINGS text — itself an LLM's free-text response to a
+   diff that can contain attacker-controlled content — is scanned for a
+   line matching `^verdict=` to detect the presence of the 6-key contract
+   block, using the same per-line, anywhere-in-the-return test
+   `council.md`'s `parse_reviewer_return` uses. `council.md`'s own value
+   extraction commits to first-occurrence semantics explicitly
+   (`grep -m1 '^verdict='`); `review-pr.md`'s instructions describe the
+   presence test but do not state the same first-match commitment for the
+   value extraction itself. A finding body containing an embedded newline
+   followed by a `verdict=`-shaped line is exactly the shape `^verdict=`
+   matches line-by-line; without an explicit, uniformly-applied
+   first-match rule, which of two `verdict=`-shaped lines "wins" is
+   unspecified behavior on the same protocol surface `council.md` has
+   already had to pin down.
+2. **Forged finding headers** (`plugins/yellow-codex/agents/review/codex-reviewer.md`,
+   Step 6's finding-header template): Codex's JSON `.title`/`.body` fields
+   are diff-derived free text, interpolated into the
+   `**[SEV] codex — file:line**` finding-header line. A line-leading `**[`
+   sequence embedded in injected diff content, once inside
+   `.title`/`.body`, survives into the reviewer's return and can be split
+   by `review-pr.md`'s prose-splitter as a second, fabricated finding
+   header — the same "content masquerading as protocol syntax" primitive
+   as fence-delimiter forgery, targeting a Markdown-bold split marker
+   instead of a `--- begin/end ---` fence.
+
+**Why these are the same class, not a new one:** both share the shape "the
+parser trusts a line-shaped pattern found anywhere in attacker-reachable
+text, rather than a value it can prove came from the agent's own
+controlled output slot." The fix pattern is the same as the fence case:
+pre-interpolation scrubbing of the specific marker syntax (line-leading
+`**[`, bare `key=` lines) from any field sourced from diff-derived or
+LLM-summarized text, before that text is interpolated into a value another
+consumer parses structurally — plus, for the key-line case, committing to
+the same explicit first-match extraction `council.md` already uses.
+
+**Fix status (as of 2026-08-06):**
+- `codex-reviewer.md` (item 2): **landed** in the PR #695 resolve pass —
+  an `escape_header` jq helper now prefixes any line in `.title`/`.body`
+  matching the legacy `**[P0-3] category — file:line**` header pattern
+  with `[ESCAPED] ` before interpolation, verified against a synthetic
+  injected-header payload.
+- `review-pr.md` (item 1): **still open** — the explicit first-occurrence
+  extraction rule for `verdict=`/`confidence=`/`summary=` (parity with
+  `council.md`'s `grep -m1`) and the scrubbing of bare `key=`-shaped lines
+  inside FINDINGS bodies have not yet been stated in `review-pr.md`'s
+  extraction instructions.
+
+**Components (this Update):** `plugins/yellow-codex/agents/review/codex-reviewer.md`, `plugins/yellow-review/commands/review/review-pr.md`.

@@ -278,3 +278,68 @@ Worth flagging because the rule was written down and an agent still
 defaulted to naive "P0/P1 only" severity filtering mid-session until
 corrected. When triaging findings for auto-apply, check `autofix_class`
 first — severity alone is never a routing signal for auto-apply eligibility.
+---
+
+## Update — 2026-08-06: `/review:sweep-all`'s PR-number sort worked for a stacked pair, but only because number order happened to equal stack order
+
+Pattern 7 above (`gt upstack restack` placement) documents restacking once
+after a fix loop completes, rather than mid-loop, within a *single* PR's
+fix pass. A `/review:sweep-all` run over a two-PR Graphite stack (#695
+parent, #697 child) surfaced the equivalent ordering question one level up
+— across PRs in a batch, not within one PR's fix loop — and the outcome is
+worth recording precisely, because the mechanism is narrower than "sweep
+picks the right order":
+
+**What actually happened:** `/review:sweep-all` sweeping #695 before #697
+meant #695's resolve-stage fixes were already committed, and — via `gt`'s
+automatic restack-on-push — already present in #697's branch, by the time
+#697's own review pass ran. #697's reviewers saw the post-fix state of the
+shared code their branch depended on, rather than reviewing a parent that
+was about to change underneath them. Sweeping child-before-parent would
+have produced findings against soon-to-be-obsolete parent content — the
+"stale findings" hazard in
+[rebase-stale-findings-and-merge-misframing.md](../workflow/rebase-stale-findings-and-merge-misframing.md),
+here preventable by batch ordering instead of after-the-fact re-verification.
+
+**Why this worked is narrower than it looks.** `sweep-all.md`'s Step 4 loop
+(`plugins/yellow-review/commands/review/sweep-all.md:131`) sorts strictly
+"in order from lowest PR number to highest" — it does **not** consult
+Graphite stack topology. `/review:all scope=stack` and
+`/review:resolve-stack` both use the dedicated `stack-traversal` skill
+(base-to-tip dependency order); `sweep-all` uses neither that skill nor any
+stack-awareness at all. In this run, PR-number order and stack order
+happened to coincide, because the parent (#695) was opened — and thus
+numbered — before its child (#697), which is the common case for a stack
+built incrementally. It is not a guaranteed property: nothing in
+`sweep-all`'s sort key ties PR number to stack position, so a batch
+containing a stack whose child PR number is lower than its parent's (e.g.
+an existing branch restacked onto a newly-created parent, or PR numbers
+from an unrelated interleaved PR) would sweep child-before-parent with no
+warning, reproducing the exact stale-review risk this run avoided by luck
+of numbering.
+
+**Push the restack before dispatching the next PR's review, not just
+before that PR's own resolve step.** No manual `gt upstack restack` call
+was needed between the two sweeps here — `gt` restacked automatically on
+each parent push — but the push itself has to land before the next PR's
+review agents are dispatched. If a parent's fixes were committed and
+restacked locally but not yet pushed when the child's review agents spawn,
+those agents fetch the child branch's remote state, which may not yet
+reflect the parent's fixes — reintroducing staleness even with correct PR
+ordering.
+
+**Follow-up worth tracking:** either document explicitly that
+`/review:sweep-all` is not stack-aware and users with multi-PR stacks
+should not rely on its PR-number sort for correctness (only convenience in
+the common case), or have `sweep-all` detect stack relationships among the
+PRs it's about to sweep and reorder base-to-tip using the same
+`stack-traversal` procedure `/review:all scope=stack` already uses. Given
+`sweep-all`'s own CLAUDE.md description position ("Distinct from
+`/review:all scope=all`... `sweep-all` is the lighter, fully-unattended
+batch alternative") this is a scope decision, not an obvious bug — but the
+current behavior should be stated, not left to be discovered by whichever
+future batch has a stack whose PR numbers run the other way.
+
+**Components (this Update):**
+`plugins/yellow-review/commands/review/sweep-all.md`,
+`plugins/yellow-review/skills/stack-traversal`.
