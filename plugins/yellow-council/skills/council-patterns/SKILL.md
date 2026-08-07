@@ -139,9 +139,9 @@ BEFORE writing to `docs/council/<file>.md`:
   # bypass redaction entirely because the BEGIN marker never matches.
   # The END check running on the same line keeps a single-line
   # BEGIN+body+END pair from leaving in_pem stuck on.
-  if ($0 ~ /-----BEGIN [A-Z ]+PRIVATE KEY-----/) in_pem = 1
+  if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
   if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
-  if ($0 ~ /-----END [A-Z ]+PRIVATE KEY-----/) in_pem = 0
+  if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
   print line
 }
 ```

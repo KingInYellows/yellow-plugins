@@ -60,9 +60,15 @@ codex exec \
 CODEX_STATUS=$?
 
 # Consume $OUTPUT_FILE BEFORE the cleanup rm below — the review result
-# exists nowhere else, and once removed it is gone. Read it here (or hand
-# the path to your parser) while the file still exists:
-REVIEW_JSON=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
+# exists nowhere else, and once removed it is gone. Read it here while
+# the file still exists. A non-zero $CODEX_STATUS means the invocation
+# itself failed, so guard the read: don't let a missing/partial
+# $OUTPUT_FILE from a failed run masquerade as an empty-but-valid result.
+if [ "$CODEX_STATUS" -eq 0 ]; then
+  REVIEW_JSON=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
+else
+  REVIEW_JSON=""
+fi
 
 # Clean up ONLY after consuming $OUTPUT_FILE — both files are mktemp-created
 # and leak into /tmp on every invocation otherwise (codex-reviewer.md removes

@@ -289,15 +289,15 @@ if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
     }
     line = NR
     gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
-    gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
-    gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/sk-ant-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+    gsub(/sk-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
     gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
-    gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
-    gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+    gsub(/gh[pous]_[A-Za-z0-9_]+/, "--- redacted credential at line " line " ---")
+    gsub(/github_pat_[A-Za-z0-9_]+/, "--- redacted credential at line " line " ---")
     gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
-    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
-    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
-    gsub(/ses_[A-Za-z0-9]{16,}/, "--- redacted credential at line " line " ---")
+    gsub(/[Bb]earer [A-Za-z0-9_.\-]+/, "--- redacted credential at line " line " ---")
+    gsub(/[Aa]uthorization:[[:space:]]*[^ ]+/, "--- redacted credential at line " line " ---")
+    gsub(/ses_[A-Za-z0-9]+/, "--- redacted credential at line " line " ---")
     print
   }' >&2
   rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
@@ -381,15 +381,15 @@ timeout --signal=TERM --kill-after=10 300 codex exec \
           }
           line = NR
           gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
-          gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
-          gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+          gsub(/sk-ant-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+          gsub(/sk-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
           gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
-          gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
-          gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+          gsub(/gh[pous]_[A-Za-z0-9_]+/, "--- redacted credential at line " line " ---")
+          gsub(/github_pat_[A-Za-z0-9_]+/, "--- redacted credential at line " line " ---")
           gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
-          gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
-          gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
-          gsub(/ses_[A-Za-z0-9]{16,}/, "--- redacted credential at line " line " ---")
+          gsub(/[Bb]earer [A-Za-z0-9_.\-]+/, "--- redacted credential at line " line " ---")
+          gsub(/[Aa]uthorization:[[:space:]]*[^ ]+/, "--- redacted credential at line " line " ---")
+          gsub(/ses_[A-Za-z0-9]+/, "--- redacted credential at line " line " ---")
           print
         }' | tr '\n' ' ' | head -c 200)
         printf '[codex-reviewer] CLI argument parse error (flag drift?): %s\n' "$ERR_PEEK" >&2
@@ -682,25 +682,25 @@ redact_credentials() {
     # OpenAI project-scoped keys (must precede generic sk- pattern)
     gsub(/sk-proj-[a-zA-Z0-9_-]+/, label)
     # Anthropic API keys (must precede generic sk- pattern)
-    gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, label)
+    gsub(/sk-ant-[a-zA-Z0-9_-]+/, label)
     # OpenAI / generic sk- API keys
-    gsub(/sk-[a-zA-Z0-9_-]{20,}/, label)
+    gsub(/sk-[a-zA-Z0-9_-]+/, label)
     # Google API keys (Gemini) — matches the council 11-pattern redaction
     # set. NOTE: no apostrophes anywhere inside this single-quoted awk
     # program — one would terminate the bash quote and break the block.
     gsub(/AIza[0-9A-Za-z_-]{35}/, label)
     # GitHub tokens (ghp_, gho_, ghs_, ghu_)
-    gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, label)
+    gsub(/gh[pous]_[A-Za-z0-9_]+/, label)
     # GitHub fine-grained PATs
-    gsub(/github_pat_[A-Za-z0-9_]{22,}/, label)
+    gsub(/github_pat_[A-Za-z0-9_]+/, label)
     # AWS access key IDs
     gsub(/AKIA[0-9A-Z]{16}/, label)
     # Bearer tokens
-    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, label)
+    gsub(/[Bb]earer [A-Za-z0-9_.\-]+/, label)
     # Authorization headers with token values
-    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, label)
+    gsub(/[Aa]uthorization:[[:space:]]*[^ ]+/, label)
     # OpenCode session IDs — matches the council 11-pattern redaction set
-    gsub(/ses_[A-Za-z0-9]{16,}/, label)
+    gsub(/ses_[A-Za-z0-9]+/, label)
     print
   }'
 }

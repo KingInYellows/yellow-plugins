@@ -86,8 +86,14 @@ function runStep6(fixtureContent: string): Step6Result {
     // The block deletes the fixture on every parse path; tolerate ENOENT.
     rmSync(fixturePath, { force: true });
     // The success path leaves a fenced output file for the orchestrator —
-    // clean it up so test runs don't accumulate temp files.
-    const fenced = /^fenced_output_path=(.*)$/m.exec(stdout);
+    // clean it up so test runs don't accumulate temp files. Restrict the
+    // match to the exact mktemp shape Step 6 emits
+    // (/tmp/council-codex-fenced-XXXXXX.txt) — stdout also carries
+    // untrusted findings text, so a fixture could otherwise forge a
+    // fenced_output_path= line naming an arbitrary file for deletion.
+    const fenced = /^fenced_output_path=(\/tmp\/council-codex-fenced-[A-Za-z0-9]{6}\.txt)$/m.exec(
+      stdout
+    );
     if (fenced?.[1]) rmSync(fenced[1], { force: true });
   }
 
@@ -110,6 +116,7 @@ function finding(overrides: Record<string, unknown> = {}): Record<string, unknow
     body: 'Example finding body explaining the issue.',
     confidence_score: 0.9,
     priority: 1,
+    category: null,
     code_location: {
       absolute_file_path: `${REPO_ROOT}/src/example.ts`,
       line_range: { start: 10, end: 12 },
