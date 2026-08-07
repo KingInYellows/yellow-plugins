@@ -42,11 +42,40 @@ Parse `$ARGUMENTS` to determine what to review:
   BASE_REF="origin/main"
   ```
 
+**Validate the resolved `BASE_REF` before ANY later step substitutes it
+into a bash block.** Git refnames may legally contain `$`, parentheses,
+and other shell-active characters, so an attacker-created base branch
+named `feat/$(cmd)` becomes command substitution the moment it is written
+into a double-quoted `BASE_REF="..."` assignment. Require the literal
+resolved value to match `^[A-Za-z0-9_][A-Za-z0-9/_.-]*$` (the same
+branch-name allowlist `/review:sweep` uses — first character alphanumeric
+or `_`, which also excludes a leading `-` flag-injection) — or to be
+exactly the empty string for `--staged`. On mismatch, sanitize the value
+for display (strip every byte outside `[A-Za-z0-9#/:._-]`) and fail
+closed without running Step 3 or Step 4:
+
+```text
+[yellow-codex] Error: base ref <sanitized value> contains characters outside the allowlist [A-Za-z0-9/_.-] — refusing to substitute it into a shell command.
+```
+
 ### Step 3: Pre-Flight Checks
 
 **Diff size estimation:**
 
+Substitute the Step 2 value via a SINGLE-QUOTED assignment (never double
+quotes — a refname like `feat/$(cmd)` would execute at assignment time in
+double quotes):
+
 ```bash
+BASE_REF='<substitute the literal Step 2 value; empty for --staged>'
+# Re-check the Step 2 allowlist before any use (empty is legal: --staged).
+case "$BASE_REF" in
+  *[!A-Za-z0-9/_.-]*|[!A-Za-z0-9_]*)
+    printf '[yellow-codex] Error: BASE_REF failed the branch-name allowlist — aborting.\n' >&2
+    exit 1
+    ;;
+esac
+
 if [ -n "$BASE_REF" ]; then
   diff_bytes=$(git diff "${BASE_REF}...HEAD" 2>/dev/null | wc -c)
 else
@@ -89,12 +118,24 @@ printf '[yellow-codex] Reviewing %d files (~%d estimated tokens)\n' "$file_count
 Build and execute the review command:
 
 Substitute the literal `BASE_REF` value resolved in Step 2 into this block —
-bash variables do not survive across separate Bash tool calls. For
-`--staged`, substitute the EMPTY string (`BASE_REF=""`): the branch below
+bash variables do not survive across separate Bash tool calls. The value
+MUST already have passed Step 2's `^[A-Za-z0-9_][A-Za-z0-9/_.-]*$`
+allowlist, and MUST be substituted as a SINGLE-QUOTED assignment (double
+quotes would execute a `feat/$(cmd)` refname at assignment time). For
+`--staged`, substitute the EMPTY string (`BASE_REF=''`): the branch below
 selects `git diff --cached` only when `BASE_REF` is empty, so substituting
 the literal `--staged` marker as a base ref would break the diff.
 
 ```bash
+BASE_REF='<substitute the literal Step 2 value; empty for --staged>'
+# Re-check the Step 2 allowlist before any use (empty is legal: --staged).
+case "$BASE_REF" in
+  *[!A-Za-z0-9/_.-]*|[!A-Za-z0-9_]*)
+    printf '[yellow-codex] Error: BASE_REF failed the branch-name allowlist — aborting.\n' >&2
+    exit 1
+    ;;
+esac
+
 OUTPUT_FILE=$(mktemp /tmp/codex-review-XXXXXX.txt)
 STDERR_FILE=$(mktemp /tmp/codex-review-err-XXXXXX.txt)
 DIFF_FILE=$(mktemp /tmp/codex-review-diff-XXXXXX.txt)
@@ -122,15 +163,28 @@ DIFF_STATUS=$?
 # credential redaction the rest of this file applies to CLI stderr.
 if [ "$DIFF_STATUS" -ne 0 ] || [ ! -s "$DIFF_FILE" ]; then
   printf '[yellow-codex] Error: git diff failed (exit %d) or produced no output — base ref missing, partial diff, or empty.\n' "$DIFF_STATUS" >&2
+  # Canonical 11-pattern redaction (council-patterns SKILL.md). PEM state
+  # transitions test the ORIGINAL $0 before any mutation — never the
+  # redacted copy — so redaction cannot blind the END check (see
+  # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
   head -c 500 "$STDERR_FILE" | awk '{
+    if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+    if (in_pem) {
+      print "--- redacted credential at line " NR " ---"
+      if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+      next
+    }
     line = NR
     gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+    gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
     gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
     gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
     gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
     gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
     gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
     gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/ses_[A-Za-z0-9]{16,}/, "--- redacted credential at line " line " ---")
     print
   }' >&2
   rm -f "$OUTPUT_FILE" "$STDERR_FILE" "$DIFF_FILE"
@@ -184,12 +238,26 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/nul
     }
   else
     printf '[yellow-codex] Error: codex exited with code %d\n' "$codex_exit"
+    # Canonical 11-pattern redaction (council-patterns SKILL.md). PEM state
+    # transitions test the ORIGINAL $0 before any mutation — never the
+    # redacted copy — so redaction cannot blind the END check (see
+    # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
     head -5 "$STDERR_FILE" 2>/dev/null | awk '{
+      if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+      if (in_pem) {
+        print "--- redacted credential at line " NR " ---"
+        if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+        next
+      }
       line = NR
       # OpenAI project keys (must precede generic sk- pattern)
       gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+      # Anthropic API keys (must precede generic sk- pattern)
+      gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
       # OpenAI / generic sk- API keys
       gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+      # Google API keys (Gemini)
+      gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
       # GitHub tokens (ghp_, gho_, ghs_, ghu_)
       gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
       # GitHub fine-grained PATs
@@ -197,11 +265,11 @@ timeout --signal=TERM --kill-after=10 300 "${CODEX_CMD[@]}" </dev/null >/dev/nul
       # AWS access keys
       gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
       # Bearer tokens in output
-      gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20,}/, "--- redacted credential at line " line " ---")
+      gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
       # Authorization headers with token values
       gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
-      # Generic private key blocks
-      gsub(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, "--- redacted credential at line " line " ---")
+      # OpenCode session IDs
+      gsub(/ses_[A-Za-z0-9]{16,}/, "--- redacted credential at line " line " ---")
       print
     }' >&2
   fi
@@ -218,36 +286,63 @@ Before parsing or displaying, scrub any leaked credentials from the Codex
 output. Model responses may echo API keys, bearer tokens, or authorization
 headers found in the reviewed code.
 
+`REVIEW_OUTPUT` is (normally) the strict-mode JSON object Step 5 parses.
+Line-based whole-line redaction would corrupt that JSON — the object
+typically arrives on a single line, so replacing any "line" that trips a
+whole-line pattern (the PEM arm) would destroy the entire result. Redact
+JSON-aware instead: parse first, then apply the canonical 11 credential
+patterns (council-patterns SKILL.md) to every string VALUE while
+preserving structure. A PEM block inside a JSON string value has real
+newlines after decoding, so it is matched as a within-string span rather
+than line-by-line. Only when the output is not valid JSON (e.g., a Codex
+refusal — the case Step 5 reports as raw fenced output) fall back to the
+line-based awk block.
+
 ```bash
-# Redact credential patterns from REVIEW_OUTPUT line by line
-REVIEW_OUTPUT=$(printf '%s\n' "$REVIEW_OUTPUT" | awk '{
-  line = NR
-  if (in_pem) {
-    print "--- redacted credential at line " line " ---"
-    if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem=0
-    next
-  }
-  # OpenAI project-scoped keys (must precede generic sk- pattern)
-  gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
-  # OpenAI / generic sk- API keys
-  gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
-  # Bearer tokens in output
-  gsub(/[Bb]earer [A-Za-z0-9_\.\-]{20,}/, "--- redacted credential at line " line " ---")
-  # Authorization headers with token values
-  gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
-  # AWS secret keys
-  gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
-  # GitHub tokens (ghp_, gho_, ghs_, ghu_, github_pat_)
-  gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
-  gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
-  # PEM private key blocks (multi-line: BEGIN header, base64 body, END marker)
-  if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
-    print "--- redacted credential at line " line " ---"
-    in_pem=1
-    next
-  }
-  print
-}')
+if command -v jq >/dev/null 2>&1 && REDACTED=$(printf '%s\n' "$REVIEW_OUTPUT" | jq '
+  def redact:
+    gsub("-----BEGIN [A-Z ]*PRIVATE KEY-----([\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----|[\\s\\S]*$)"; "--- redacted PEM key block ---")
+    | gsub("sk-proj-[a-zA-Z0-9_-]+"; "--- redacted credential ---")
+    | gsub("sk-ant-[a-zA-Z0-9_-]{20,}"; "--- redacted credential ---")
+    | gsub("sk-[a-zA-Z0-9_-]{20,}"; "--- redacted credential ---")
+    | gsub("AIza[0-9A-Za-z_-]{35}"; "--- redacted credential ---")
+    | gsub("gh[pous]_[A-Za-z0-9_]{36,}"; "--- redacted credential ---")
+    | gsub("github_pat_[A-Za-z0-9_]{22,}"; "--- redacted credential ---")
+    | gsub("AKIA[0-9A-Z]{16}"; "--- redacted credential ---")
+    | gsub("[Bb]earer [A-Za-z0-9_.\\-]{20,}"; "--- redacted credential ---")
+    | gsub("[Aa]uthorization:[[:space:]]*[^ ]{20,}"; "--- redacted credential ---")
+    | gsub("ses_[A-Za-z0-9]{16,}"; "--- redacted credential ---");
+  walk(if type == "string" then redact else . end)
+' 2>/dev/null); then
+  REVIEW_OUTPUT=$REDACTED
+else
+  # Not valid JSON (refusal / free prose) or jq unavailable — fall back to
+  # the canonical line-based 11-pattern awk block. Structure is already
+  # unparseable here, so whole-line PEM redaction cannot corrupt anything
+  # Step 5 would have parsed; Step 5's not-parseable arm reports it as raw
+  # fenced output. PEM state transitions test the ORIGINAL $0 (see
+  # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md).
+  REVIEW_OUTPUT=$(printf '%s\n' "$REVIEW_OUTPUT" | awk '{
+    if ($0 ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+    if (in_pem) {
+      print "--- redacted credential at line " NR " ---"
+      if ($0 ~ /^-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+      next
+    }
+    line = NR
+    gsub(/sk-proj-[a-zA-Z0-9_-]+/, "--- redacted credential at line " line " ---")
+    gsub(/sk-ant-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/sk-[a-zA-Z0-9_-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/AIza[0-9A-Za-z_-]{35}/, "--- redacted credential at line " line " ---")
+    gsub(/gh[pous]_[A-Za-z0-9_]{36,}/, "--- redacted credential at line " line " ---")
+    gsub(/github_pat_[A-Za-z0-9_]{22,}/, "--- redacted credential at line " line " ---")
+    gsub(/AKIA[0-9A-Z]{16}/, "--- redacted credential at line " line " ---")
+    gsub(/[Bb]earer [A-Za-z0-9_.\-]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/[Aa]uthorization:[[:space:]]*[^ ]{20,}/, "--- redacted credential at line " line " ---")
+    gsub(/ses_[A-Za-z0-9]{16,}/, "--- redacted credential at line " line " ---")
+    print
+  }')
+fi
 ```
 
 ### Step 5: Parse Findings
@@ -316,6 +411,7 @@ Note at bottom: "These findings are from Codex (OpenAI). Cross-reference with
 | Condition | Message | Action |
 |---|---|---|
 | `codex` not found | "codex CLI not found. Run /codex:setup first." | Stop |
+| Base ref fails the `^[A-Za-z0-9_][A-Za-z0-9/_.-]*$` allowlist | "base ref … outside the allowlist — refusing to substitute" | Stop |
 | No changes to review | "No changes to review." | Stop |
 | Empty diff at Step 4 (failed/bad base ref) | "git diff produced no output" + captured git stderr | Stop |
 | Schema missing at Step 4 | "output schema not found — reinstall yellow-codex" | Stop |

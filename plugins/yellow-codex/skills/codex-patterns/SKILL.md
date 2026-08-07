@@ -59,8 +59,13 @@ codex exec \
   </dev/null
 CODEX_STATUS=$?
 
-# Clean up after consuming $OUTPUT_FILE — both files are mktemp-created and
-# leak into /tmp on every invocation otherwise (codex-reviewer.md removes
+# Consume $OUTPUT_FILE BEFORE the cleanup rm below — the review result
+# exists nowhere else, and once removed it is gone. Read it here (or hand
+# the path to your parser) while the file still exists:
+REVIEW_JSON=$(cat "$OUTPUT_FILE" 2>/dev/null || true)
+
+# Clean up ONLY after consuming $OUTPUT_FILE — both files are mktemp-created
+# and leak into /tmp on every invocation otherwise (codex-reviewer.md removes
 # them on every exit path; do the same in any caller copying this snippet).
 # Capture codex's exit status BEFORE the cleanup rm and propagate it —
 # otherwise the successful rm masks an auth/schema/API failure as exit 0.
