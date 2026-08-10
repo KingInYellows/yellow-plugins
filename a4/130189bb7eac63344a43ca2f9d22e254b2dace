@@ -1,0 +1,23 @@
+plugins/yellow-council/agents/review/gemini-reviewer.md
+  s_9101bf3f47ec09::t_8f975b511705b0 346-354,356
+.changeset/yellow-council-pem-redaction-bypass.md
+  s_9101bf3f47ec09::t_33f2ce3b183794 1-15
+plugins/yellow-council/agents/review/opencode-reviewer.md
+  s_9101bf3f47ec09::t_ae1233b0b483f9 361-369,371
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "a4130189bb7eac63344a43ca2f9d22e254b2dace",
+  "prompts": {},
+  "sessions": {
+    "s_9101bf3f47ec09": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4cbd7d37-b29a-40bf-ab74-760730978964",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
