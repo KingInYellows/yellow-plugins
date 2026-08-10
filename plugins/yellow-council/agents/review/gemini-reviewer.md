@@ -343,11 +343,50 @@ awk '
   else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
   # Test ORIGINAL $0 for BEGIN/END — `line` is overwritten by the redaction
   # replacement above, so testing `line` for END would never reset in_pem.
-  # Allow optional trailing whitespace per council-patterns SKILL.md so a
-  # hostile producer cannot bypass the anchor by appending a single space.
-  if ($0 ~ /^-----BEGIN [A-Z ]+PRIVATE KEY-----[[:space:]]*$/) in_pem = 1
+  # UNANCHORED substring match on purpose (canonical form in council-patterns
+  # SKILL.md): a full-line anchor (^...[[:space:]]*$) lets a key flattened
+  # onto one line — or quoted inline in prose ("leaked key: -----BEGIN
+  # PRIVATE KEY----- MII…") — bypass redaction entirely because the BEGIN
+  # marker never matches. `[A-Z ]*` not `[A-Z ]+`, so the bare PKCS#8 header
+  # (-----BEGIN PRIVATE KEY-----, no algorithm word) matches as well. The END
+  # check running on the same line keeps a single-line BEGIN+body+END pair
+  # from leaving in_pem stuck on.
+  #
+  # BOUNDED SPAN: because BEGIN is unanchored it also matches prose that only
+  # quotes the marker ("the code hardcodes -----BEGIN RSA PRIVATE KEY-----").
+  # With no matching END such a line would pin in_pem to EOF and replace the
+  # whole remaining report with placeholders. PEM armor is base64 plus the
+  # Proc-Type/DEK-Info headers, so count consecutive lines that cannot be key
+  # material and leave PEM mode after 3 of them: a real key block stays fully
+  # redacted (base64 throughout, even when truncated with no END), while a
+  # stray prose mention costs 4 lines instead of the entire report.
+  # Presentation decoration is stripped before the body test, because a
+  # reviewer rarely emits a key as bare base64. Blockquote ("> "), list
+  # ("1. ", "- ") and diff ("-"/"+", no space — a key echoed from the review
+  # diff) prefixes would each make every body line fail the base64 check and
+  # drop out of PEM mode mid-key, printing the remainder verbatim.
+  # Blank lines are NEUTRAL — they neither reset nor increment the counter.
+  # Counting them as valid body would reset pem_stray on every paragraph gap
+  # in ordinary prose, so the cutoff would never be reached and a stray BEGIN
+  # would still swallow the report; counting them as stray would end
+  # redaction inside a key that contains one.
+  if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) { in_pem = 1; pem_stray = 0 }
   if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
-  if ($0 ~ /^-----END [A-Z ]+PRIVATE KEY-----[[:space:]]*$/) in_pem = 0
+  if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+  else if (in_pem) {
+    pem_body = $0
+    sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", pem_body)
+    sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", pem_body)
+    sub(/^[-+]/, "", pem_body)
+    sub(/^[[:space:]]+/, "", pem_body)
+    sub(/[[:space:]]+$/, "", pem_body)
+    if (pem_body != "") {
+      if (pem_body ~ /^[A-Za-z0-9+\/=]+$/ ||
+          pem_body ~ /^(Proc-Type|DEK-Info):/ ||
+          $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
+      else if (++pem_stray >= 3) in_pem = 0
+    }
+  }
   print line
 }
 ' "$OUTPUT_FILE" > "$REDACTED_FILE"
