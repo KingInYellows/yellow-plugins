@@ -65,6 +65,10 @@ PINNED_PROBE=CHANGELOG.md
 if [ -L "$PINNED_PROBE" ] || [ ! -f "$PINNED_PROBE" ]; then
   printf '[flow-namespace-gate] Error: pinned probe %s is a symlink or not a regular file.\n' "$PINNED_PROBE" >&2
   printf '[flow-namespace-gate] Refusing to back it up or append to it.\n' >&2
+  # $BAK already exists at this point and the EXIT trap is NOT installed yet,
+  # so nothing else would ever clean it up — remove it here or every run that
+  # trips this guard leaks a temp file.
+  rm -f "$BAK"
   exit 1
 fi
 PINNED_BAK=""
@@ -93,19 +97,41 @@ restorePinnedProbe() { # copies $PINNED_BAK back over $PINNED_PROBE if it was cr
   return 1
 }
 
+# A backup is deleted ONLY after its restore succeeded. Deleting it
+# unconditionally is what turns a failed restore (full disk, file made
+# read-only mid-run) into unrecoverable damage: this script mutates two
+# TRACKED files, so the backup is the only copy of the pre-run content —
+# including any uncommitted edits the operator had. On failure the backup is
+# kept, its path is printed, and the script exits non-zero so a green run can
+# never hide a damaged working tree.
 cleanup() {
+  cleanup_rc=0
+
   if [ "$PROBE_CREATED" -eq 1 ]; then
     rm -f "$PROBE"
   fi
-  restoreAllowlist
-  rm -f "$BAK"
-  restorePinnedProbe
-  # Unconditional, mirroring $BAK above: if restorePinnedProbe's cp failed,
-  # it returns without removing $PINNED_BAK, and it never touches $PINNED_BAK
-  # at all when PINNED_BAK_CREATED was never set (mktemp for it happens in
-  # section J, not at script startup) — in that case $PINNED_BAK is still ""
-  # and `rm -f ""` is a no-op. Either way this leaves nothing stray behind.
-  rm -f "$PINNED_BAK"
+
+  if restoreAllowlist; then
+    rm -f "$BAK"
+  else
+    printf 'ERROR: keeping the allowlist backup at %s — restore it by hand.\n' "$BAK" >&2
+    cleanup_rc=1
+  fi
+
+  # Returns 0 without touching $PINNED_BAK when nothing was ever backed up
+  # (its mktemp happens in the pinned-drift section, not at startup), in which
+  # case $PINNED_BAK is still "" and `rm -f ""` is a harmless no-op.
+  if restorePinnedProbe; then
+    rm -f "$PINNED_BAK"
+  else
+    printf 'ERROR: keeping the pinned-probe backup at %s — restore %s from it by hand.\n' \
+      "$PINNED_BAK" "$PINNED_PROBE" >&2
+    cleanup_rc=1
+  fi
+
+  if [ "$cleanup_rc" -ne 0 ]; then
+    exit 1
+  fi
 }
 trap cleanup EXIT
 
