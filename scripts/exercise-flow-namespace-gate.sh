@@ -28,6 +28,14 @@ GATE=scripts/validate-flow-namespace.js
 ALLOW=scripts/flow-namespace-allowlist.json
 PROBE=docs/testing/__flow-ns-gate-probe.md
 OLD="workflow"'s' # assembled, see NOTE above
+NS='ERROR-'"NAMESPACE" # assembled like validate-flow-namespace.js's own NS — never a literal catalog code
+
+if [ -e "$PROBE" ]; then
+  printf '[flow-namespace-gate] Error: probe file %s already exists.\n' "$PROBE" >&2
+  printf '[flow-namespace-gate] Move or delete it before running this script.\n' >&2
+  exit 1
+fi
+PROBE_CREATED=0
 
 BAK=$(mktemp) || exit 1
 if ! cp "$ALLOW" "$BAK"; then
@@ -48,20 +56,49 @@ restoreAllowlist() { # copies $BAK back over $ALLOW, reporting failure
 }
 
 cleanup() {
-  rm -f "$PROBE"
+  if [ "$PROBE_CREATED" -eq 1 ]; then
+    rm -f "$PROBE"
+  fi
   restoreAllowlist
   rm -f "$BAK"
 }
 trap cleanup EXIT
 
-check() { # name want_exit got_exit
-  if [ "$3" -eq "$2" ]; then
-    printf '  PASS  %s (exit %s)\n' "$1" "$3"
-    pass=$((pass + 1))
-  else
-    printf '  FAIL  %s (want exit %s, got %s)\n' "$1" "$2" "$3"
+writeProbe() { # fmt [args...] — printf's to $PROBE, marking it ours for cleanup's trap
+  fmt="$1"
+  shift
+  printf "$fmt" "$@" >"$PROBE" && PROBE_CREATED=1
+}
+
+runGate() { # outfile — runs the gate, capturing combined stdout+stderr, returns its exit code
+  node "$GATE" >"$1" 2>&1
+  return $?
+}
+
+check() { # name want_exit got_exit [want_code outfile]
+  name="$1"
+  want_exit="$2"
+  got_exit="$3"
+  want_code="${4:-}"
+  outfile="${5:-}"
+  if [ "$got_exit" -ne "$want_exit" ]; then
+    printf '  FAIL  %s (want exit %s, got %s)\n' "$name" "$want_exit" "$got_exit"
+    if [ -n "$outfile" ] && [ -f "$outfile" ]; then
+      printf '        --- captured output ---\n'
+      sed 's/^/        /' "$outfile"
+    fi
     fail=$((fail + 1))
+    return
   fi
+  if [ -n "$want_code" ] && ! grep -q -- "$want_code" "$outfile"; then
+    printf '  FAIL  %s (exit %s ok, but %s not found in output)\n' "$name" "$got_exit" "$want_code"
+    printf '        --- captured output ---\n'
+    sed 's/^/        /' "$outfile"
+    fail=$((fail + 1))
+    return
+  fi
+  printf '  PASS  %s (exit %s)\n' "$name" "$got_exit"
+  pass=$((pass + 1))
 }
 
 echo "=== A. clean tree exits 0 ==="
@@ -71,22 +108,24 @@ check "clean tree" 0 $?
 echo
 echo "=== B. ERROR-NAMESPACE-001: each banned shape in a NON-allowlisted file ==="
 for shape in "/${OLD}:work" "skill: \"${OLD}:work\"" "yellow-core:${OLD}:work"; do
-  printf '# gate probe\n\n%s\n' "$shape" >"$PROBE"
-  node "$GATE" >/dev/null 2>&1
-  check "shape [$shape]" 1 $?
+  writeProbe '# gate probe\n\n%s\n' "$shape"
+  OUT=$(mktemp) || exit 1
+  runGate "$OUT"
+  check "shape [$shape]" 1 $? "${NS}-001" "$OUT"
+  rm -f "$OUT"
   rm -f "$PROBE"
 done
 
 echo
 echo "=== C. singular 'workflow:' agent namespace must NOT trip the gate ==="
-printf '# gate probe\n\nyellow-core:workflow:knowledge-compounder\nworkflow:work\n' >"$PROBE"
+writeProbe '# gate probe\n\nyellow-core:workflow:knowledge-compounder\nworkflow:work\n'
 node "$GATE" >/dev/null 2>&1
 check "singular workflow: ignored" 0 $?
 rm -f "$PROBE"
 
 echo
 echo "=== D. non-command suffixes must NOT trip the gate ==="
-printf '# gate probe\n\n%s:worker  %s:planetary\n' "$OLD" "$OLD" >"$PROBE"
+writeProbe '# gate probe\n\n%s:worker  %s:planetary\n' "$OLD" "$OLD"
 node "$GATE" >/dev/null 2>&1
 check "workflows:worker / :planetary ignored" 0 $?
 rm -f "$PROBE"
@@ -105,8 +144,10 @@ fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 if [ $? -eq 2 ]; then
   echo "  SKIP  count drift (allowlist is empty — terminal state reached)"
 else
-  node "$GATE" >/dev/null 2>&1
-  check "count drift" 1 $?
+  OUT=$(mktemp) || exit 1
+  runGate "$OUT"
+  check "count drift" 1 $? "${NS}-002" "$OUT"
+  rm -f "$OUT"
 fi
 restoreAllowlist || exit 1
 
@@ -122,9 +163,11 @@ const a = JSON.parse(fs.readFileSync(p, "utf8"));
 a[probe] = { "work": 2, "plan": 1 };
 fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 ' "$ALLOW" "$PROBE"
-printf '# gate probe\n\n%s:work\n%s:plan\n%s:plan\n' "$OLD" "$OLD" "$OLD" >"$PROBE"
-node "$GATE" >/dev/null 2>&1
-check "same-total command substitution" 1 $?
+writeProbe '# gate probe\n\n%s:work\n%s:plan\n%s:plan\n' "$OLD" "$OLD" "$OLD"
+OUT=$(mktemp) || exit 1
+runGate "$OUT"
+check "same-total command substitution" 1 $? "${NS}-002" "$OUT"
+rm -f "$OUT"
 rm -f "$PROBE"
 restoreAllowlist || exit 1
 
@@ -136,8 +179,10 @@ const a = JSON.parse(fs.readFileSync(p, "utf8"));
 a["README.md"] = { "work": 3 };
 fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 ' "$ALLOW"
-node "$GATE" >/dev/null 2>&1
-check "stale allowlist entry (file is clean)" 1 $?
+OUT=$(mktemp) || exit 1
+runGate "$OUT"
+check "stale allowlist entry (file is clean)" 1 $? "${NS}-002" "$OUT"
+rm -f "$OUT"
 restoreAllowlist || exit 1
 
 echo
@@ -148,8 +193,10 @@ const a = JSON.parse(fs.readFileSync(p, "utf8"));
 a["docs/__deleted-by-a-later-sweep.md"] = { "work": 2 };
 fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 ' "$ALLOW"
-node "$GATE" >/dev/null 2>&1
-check "missing allowlist path" 1 $?
+OUT=$(mktemp) || exit 1
+runGate "$OUT"
+check "missing allowlist path" 1 $? "${NS}-003" "$OUT"
+rm -f "$OUT"
 restoreAllowlist || exit 1
 
 echo
