@@ -408,7 +408,25 @@ const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 //     real content past the intended closer — stays "provisionally kept" as
 //     an unclosed fence, which for RULE 18 meant illustrative unresolved
 //     dispatch examples were scanned as if they were live.
+//
+// Container prefixes: a fence can be nested inside a block quote (`>` lines)
+// or a list item (indented continuation lines). CommonMark scopes the
+// opener/closer match to content AFTER the container markup, not the raw
+// line. containerPrefixRe strips that markup — repeated `>` quote markers
+// (each optionally followed by one space) plus any amount of list-item
+// indentation — before the fence regexes run. This is a prefix-stripping
+// normalization, not a full CommonMark block parser: it does not verify the
+// opener and closer sit at the same container depth (e.g. a quote-nested
+// opener could in theory be matched against a differently-indented closer).
+// That's an accepted limitation, not a gap in the character+length check
+// above, which still guards against a mismatched-shape line closing early;
+// real documents don't mix container types mid-fence.
 const fenceOpenerRe = /^[ \t]{0,3}(`{3,}|~{3,})/;
+const containerPrefixRe = /^(?:[ \t]*>[ \t]?)*[ \t]*/;
+function stripContainerPrefix(line) {
+  const match = containerPrefixRe.exec(line);
+  return match ? line.slice(match[0].length) : line;
+}
 function stripFencedContent(content) {
   const lines = content
     .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
@@ -419,8 +437,9 @@ function stripFencedContent(content) {
   let fenceChar = '';
   let fenceLen = 0;
   for (const line of lines) {
+    const normalized = stripContainerPrefix(line);
     if (!inFence) {
-      const openerMatch = fenceOpenerRe.exec(line);
+      const openerMatch = fenceOpenerRe.exec(normalized);
       if (openerMatch) {
         inFence = true;
         fenceStart = kept.length;
@@ -430,7 +449,7 @@ function stripFencedContent(content) {
       kept.push(line); // provisional when opening — kept only if unclosed
     } else {
       const closerRe = new RegExp(`^[ \\t]{0,3}\\${fenceChar}{${fenceLen},}[ \\t]*\\r?$`);
-      if (closerRe.test(line)) {
+      if (closerRe.test(normalized)) {
         kept.length = fenceStart; // drop opener..closer inclusive
         kept.push(''); // preserve the blank the old regex replacement left
         inFence = false;
@@ -438,6 +457,18 @@ function stripFencedContent(content) {
         kept.push(line); // provisional fence content — kept only if unclosed
       }
     }
+  }
+  // Unclosed fence reaching EOF: per CommonMark, an unterminated fenced code
+  // block implicitly runs to the end of the document — everything from the
+  // opener onward is fence content, not prose. The "provisional keep" above
+  // exists only to be undone once a genuine matching closer shows up
+  // mid-document (see the block comment above); it was never meant to
+  // survive to EOF. Retroactively drop it with the same fenceStart
+  // truncation the closer branch uses, so an unresolvable example inside a
+  // never-closed fence is stripped like any other fenced content instead of
+  // being scanned as live.
+  if (inFence) {
+    kept.length = fenceStart;
   }
   return kept.join('\n');
 }

@@ -296,4 +296,123 @@ close it early.
     writeAgent(dir, 'demo-plugin/commands/caller.md', body);
     expect(runValidator(dir).status).toBe(0);
   });
+
+  it('ignores an unresolved dispatch example inside a fence that is never closed (EOF)', () => {
+    // The file ends while still "inside" the fence. Per CommonMark an
+    // unterminated fenced code block implicitly runs to EOF, so this whole
+    // region is fence content, not prose — RULE 18 must not scan it.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+\`\`\`text
+Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('ignores an unresolved dispatch example inside a block-quoted fence', () => {
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+> \`\`\`text
+> Invoke the Skill tool with skill: "flow:nonexistent"
+> \`\`\`
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('ignores an unresolved dispatch example inside a fence nested in an indented list item', () => {
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+- Example:
+
+  \`\`\`text
+  Invoke the Skill tool with skill: "flow:nonexistent"
+  \`\`\`
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('still reports an unresolvable dispatch in ordinary block-quoted prose with no fence', () => {
+    // Negative control for the block-quote fence case above: quoting alone
+    // (no fence markers) must not exempt a live dispatch from RULE 18.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+> Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+  });
+
+  it('still reports an unresolvable dispatch that follows a properly closed fence', () => {
+    // Negative control for the EOF fix above: content after a REAL closer
+    // must still be scanned as live, not swept up by the new EOF handling.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+\`\`\`text
+some illustrative example, unrelated
+\`\`\`
+
+Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+  });
 });
