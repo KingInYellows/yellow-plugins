@@ -1,6 +1,6 @@
 ---
-name: workflows:pick-next-shell
-description: Pick the lowest-numbered shell whose dependencies are archived in plans/complete/, expand it via /workflows:expand-shell, capture learnings, and halt for a fresh /workflows:work session. Reports deadlocks and the terminal state explicitly.
+name: flow:pick-next-shell
+description: Pick the lowest-numbered shell whose dependencies are archived in plans/complete/, expand it via /flow:expand-shell, capture learnings, and halt for a fresh /flow:work session. Reports deadlocks and the terminal state explicitly.
 argument-hint: ''
 allowed-tools:
   - Bash
@@ -10,7 +10,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# /workflows:pick-next-shell
+# /flow:pick-next-shell
 
 Orchestrate the next unit of work in a spec→shells project: find the next
 unblocked shell, expand it into a plan, capture planning learnings, then halt so
@@ -21,7 +21,7 @@ the next shell.
 
 ```bash
 if [ ! -d plans/shells ]; then
-  printf 'No shells directory found. Run /workflows:decompose first.\n' >&2
+  printf 'No shells directory found. Run /flow:decompose first.\n' >&2
   exit 1
 fi
 # Distinguish an unreadable dir from an empty one, so a permission error is not
@@ -81,14 +81,14 @@ cycle participant):
    - **In progress:** `plans/<dep-slug>.md` exists (the dep's shell was expanded
      and deleted, but the resulting plan has not been archived yet). Report
      "blocked on in-progress plan `plans/<dep-slug>.md` — implement it and run
-     `/plan:complete`, then re-run `/workflows:pick-next-shell`." and stop. Do
+     `/plan:complete`, then re-run `/flow:pick-next-shell`." and stop. Do
      NOT treat it as unsatisfiable (a dep is satisfied only once archived in
      `plans/complete/`, but an open plan means work-in-flight, not a missing
      requirement).
    - **Unsatisfiable:** no plan exists anywhere for the slug. Report each by
      name, REMOVE its edges from the graph (so it is not later miscounted as a
      cycle node), then offer recovery via AskUserQuestion: re-run
-     `/workflows:decompose` / edit the dependent shell's frontmatter yourself /
+     `/flow:decompose` / edit the dependent shell's frontmatter yourself /
      Cancel (stop and reconcile manually). Then stop. (Do not offer a "treat as
      satisfied" option — acting on it would require editing a shell, which the
      Rules forbid.)
@@ -101,12 +101,12 @@ cycle participant):
 
 ## Step 4: Expand the Picked Shell
 
-Invoke the Skill tool with `skill: "workflows:expand-shell"` and `args` set to
+Invoke the Skill tool with `skill: "flow:expand-shell"` and `args` set to
 the picked shell path. This writes `plans/<shell-slug>.md` and deletes the shell
 after your approval.
 
 The Skill tool returns no reliable exit status, so verify the expansion actually
-produced a plan before continuing — `/workflows:expand-shell` may stop early
+produced a plan before continuing — `/flow:expand-shell` may stop early
 (spec-drift Stop, an unreconciled `Consumes` failure, a Revise choice, or a
 Skill error). Substitute the actual `<shell-slug>` inline:
 
@@ -122,9 +122,9 @@ Only if the plan exists, check your task list and proceed to Step 5.
 ## Step 5: Capture Learnings (and optional enrich)
 
 - If yellow-research is installed, optionally invoke the Skill tool with
-  `skill: "workflows:deepen-plan"` and `args` set to the new plan path to enrich
+  `skill: "flow:deepen-plan"` and `args` set to the new plan path to enrich
   it. Skippable.
-- Invoke the Skill tool with `skill: "workflows:compound"` to capture planning
+- Invoke the Skill tool with `skill: "flow:compound"` to capture planning
   learnings (this is the yellow analogue of Turbo's self-improve step).
 
 ## Step 6: Halt
@@ -132,15 +132,15 @@ Only if the plan exists, check your task list and proceed to Step 5.
 Print and stop — do not auto-implement:
 
 > Plan ready at `plans/<shell-slug>.md`. Context is likely full — run `/clear`,
-> then `/workflows:work plans/<shell-slug>.md`. Ship it, run `/plan:complete`,
-> then `/workflows:pick-next-shell` for the next shell.
+> then `/flow:work plans/<shell-slug>.md`. Ship it, run `/plan:complete`,
+> then `/flow:pick-next-shell` for the next shell.
 
 ## Rules
 
 - Never edit plans or shells directly; never modify the spec. (The
-  `/workflows:expand-shell` you invoke in Step 4 may update a shell during its
+  `/flow:expand-shell` you invoke in Step 4 may update a shell during its
   own spec-drift reconciliation — that is expand-shell's responsibility and is
   not a violation of this rule.)
-- Never auto-implement the plan — halt for a fresh `/workflows:work` session.
+- Never auto-implement the plan — halt for a fresh `/flow:work` session.
 - Never return silently when shells remain but none are pickable — always report
   the deadlock or unsatisfiable dependency (Step 3).

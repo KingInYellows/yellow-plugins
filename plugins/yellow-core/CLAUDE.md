@@ -163,7 +163,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 - `debugging` — systematic root-cause debugging with causal-chain gate,
   prediction-for-uncertain-links hypothesis testing, three-failed-attempts
   smart escalation, and conditional defense-in-depth/post-mortem; routes to
-  `gt submit` / `/yellow-core:workflows:brainstorm` / `/yellow-core:workflows:compound`
+  `gt submit` / `/yellow-core:flow:brainstorm` / `/yellow-core:flow:compound`
 - `git-worktree` — git worktree management for parallel development;
   injects a `.ruvector/` symlink into new worktrees so the ruvector MCP
   server reaches the shared project DB instead of silently no-op'ing on

@@ -1,6 +1,6 @@
 # Common Graphite Commands
 
-Loaded by `/workflows:work` (commands/workflows/work.md). Content moved
+Loaded by `/flow:work` (commands/flow/work.md). Content moved
 verbatim from the command file (C6 progressive-disclosure split).
 
 ```bash

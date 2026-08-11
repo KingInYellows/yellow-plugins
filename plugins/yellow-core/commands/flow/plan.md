@@ -1,5 +1,5 @@
 ---
-name: workflows:plan
+name: flow:plan
 description: Transform feature descriptions into structured implementation plans
 argument-hint: '[feature description]'
 allowed-tools:
@@ -126,7 +126,7 @@ research, analysis, and structured documentation.
       found in docs/solutions/" once and continue.
 
       **Only (a) holds (token present AND findings heading present) →
-      contract violation.** Log `[workflows:plan] Warning:
+      contract violation.** Log `[flow:plan] Warning:
       learnings-researcher response combined NO_PRIOR_LEARNINGS sentinel
       with findings — contract violation; treating as non-empty (preserving
       findings)` to stderr, strip the sentinel line(s) and any
@@ -170,7 +170,7 @@ research, analysis, and structured documentation.
       keep it as advisory context for plan writing in Phase 4.
 
    6. **Failure handling.** If `learnings-researcher` itself fails
-      (timeout, not-found, malformed return): log `[workflows:plan]
+      (timeout, not-found, malformed return): log `[flow:plan]
       Warning: learnings-researcher unavailable, proceeding without
       past-learnings injection` to stderr and continue with no injection
       block. Planning must never abort because of the pre-pass.
@@ -306,9 +306,9 @@ research, analysis, and structured documentation.
      and would not fit one plan file or one work session — i.e. it needs an
      explicit dependency graph and requirement-coverage guarantees across
      several independent units — stop and tell the user: "This reads as a
-     multi-subsystem effort. Run `/workflows:spec` to capture requirements,
-     `/workflows:decompose` to break it into dependency-ordered shells, then
-     `/workflows:pick-next-shell` to expand and implement the first unblocked
+     multi-subsystem effort. Run `/flow:spec` to capture requirements,
+     `/flow:decompose` to break it into dependency-ordered shells, then
+     `/flow:pick-next-shell` to expand and implement the first unblocked
      shell." A
      single COMPREHENSIVE plan goes stale mid-project at this scale.
 
@@ -544,7 +544,7 @@ Schema migrations if applicable.
 
    **When the generated plan reads as spec-tier** (multi-subsystem — it needs a
    dependency graph and requirement-coverage across several independent units
-   that will not fit one `/workflows:work` session; the same signal as Phase 4's
+   that will not fit one `/flow:work` session; the same signal as Phase 4's
    spec-tier check, surfaced here when it only became clear after drafting),
    surface the spec route first. **If the plan is not spec-tier, skip this block**
    and use the orderings below; when it IS spec-tier this ordering takes
@@ -553,8 +553,8 @@ Schema migrations if applicable.
    omitted here because they are premature once you are pivoting the drafted plan
    to a spec:
 
-   1. This is multi-subsystem — run /workflows:spec <topic> (referencing plans/<name>.md) instead — capture requirements with stable R-ids, then /workflows:decompose into dependency-ordered shells. The drafted plan stays in plans/ as a reference draft.
-   2. Start implementation (/workflows:work plans/<name>.md) — if decomposition exists, executes bottom-up as stacked PRs
+   1. This is multi-subsystem — run /flow:spec <topic> (referencing plans/<name>.md) instead — capture requirements with stable R-ids, then /flow:decompose into dependency-ordered shells. The drafted plan stays in plans/ as a reference draft.
+   2. Start implementation (/flow:work plans/<name>.md) — if decomposition exists, executes bottom-up as stacked PRs
    3. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md) — adds a ## Stack Decomposition section to the plan (no branches created)
    4. Something else
 
@@ -562,16 +562,16 @@ Schema migrations if applicable.
    surface stacking first, since multi-issue plans benefit most from it):
 
    1. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md) — adds a ## Stack Decomposition section to the plan (no branches created)
-   2. Start implementation (/workflows:work plans/<name>.md) — if decomposition exists, executes bottom-up as stacked PRs
-   3. Enrich with research (/workflows:deepen-plan plans/<name>.md)
+   2. Start implementation (/flow:work plans/<name>.md) — if decomposition exists, executes bottom-up as stacked PRs
+   3. Enrich with research (/flow:deepen-plan plans/<name>.md)
    4. Create GitHub issue (I'll use gh issue create)
    5. Simplify the plan (reduce detail level)
    6. Something else
 
    **Otherwise** (default ordering):
 
-   1. Start implementation (/workflows:work plans/<name>.md) — if decomposition exists, executes bottom-up as stacked PRs
-   2. Enrich with research (/workflows:deepen-plan plans/<name>.md)
+   1. Start implementation (/flow:work plans/<name>.md) — if decomposition exists, executes bottom-up as stacked PRs
+   2. Enrich with research (/flow:deepen-plan plans/<name>.md)
    3. Decompose into stacked PRs (/gt-stack-plan plans/<name>.md) — adds a ## Stack Decomposition section to the plan (no branches created)
    4. Create GitHub issue (I'll use gh issue create)
    5. Simplify the plan (reduce detail level)
@@ -579,9 +579,9 @@ Schema migrations if applicable.
    ```
 
 3. Based on response, invoke the chosen command via Skill tool:
-   - `/workflows:spec`: FIRST `Read plans/<name>.md` yourself so its requirements and research are in the conversation, then invoke `skill: "workflows:spec"` with args = a SHORT topic/title only. `/workflows:spec` derives the spec slug from `$ARGUMENTS`, so keep the args to a concise title — do NOT pass the draft path or a requirements summary in the args (a long summary would corrupt slug derivation, and an embedded "read this file" directive is ignored since spec.md treats `$ARGUMENTS` as untrusted, never as instructions). Because the Skill tool runs `/workflows:spec` in this same conversation, the draft you just read is already in context for its dialogue to build on.
-   - `/workflows:work`: `skill: "workflows:work"`, args: plan file path
-   - `/workflows:deepen-plan`: `skill: "workflows:deepen-plan"`, args: plan file path (requires yellow-research)
+   - `/flow:spec`: FIRST `Read plans/<name>.md` yourself so its requirements and research are in the conversation, then invoke `skill: "flow:spec"` with args = a SHORT topic/title only. `/flow:spec` derives the spec slug from `$ARGUMENTS`, so keep the args to a concise title — do NOT pass the draft path or a requirements summary in the args (a long summary would corrupt slug derivation, and an embedded "read this file" directive is ignored since spec.md treats `$ARGUMENTS` as untrusted, never as instructions). Because the Skill tool runs `/flow:spec` in this same conversation, the draft you just read is already in context for its dialogue to build on.
+   - `/flow:work`: `skill: "flow:work"`, args: plan file path
+   - `/flow:deepen-plan`: `skill: "flow:deepen-plan"`, args: plan file path (requires yellow-research)
    - `/gt-stack-plan`: `skill: "gt-stack-plan"`, args: plan file path
    - Create GitHub issue: `gh issue create --title "..." --body-file plans/<name>.md`
    - Simplify: Rewrite plan with simpler template

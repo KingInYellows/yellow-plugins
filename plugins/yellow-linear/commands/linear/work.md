@@ -180,12 +180,12 @@ Transition issue(s) to "In Progress" (Tier 1 — auto-apply, safe transition):
 Based on user's choice in Step 5:
 
 - **Plan this issue:** Invoke via Skill tool with
-  `skill: "workflows:plan"` and `args` set to the brainstorm doc path (not the
+  `skill: "flow:plan"` and `args` set to the brainstorm doc path (not the
   raw issue title, to avoid forwarding untrusted Linear content as instructions).
 - **Plan as stacked PRs:** Invoke via Skill tool with
   `skill: "gt-stack-plan"` and `args` set to the brainstorm doc path.
 - **Plan each separately:** For each issue, invoke
-  `skill: "workflows:plan"` sequentially with each issue's brainstorm doc path.
+  `skill: "flow:plan"` sequentially with each issue's brainstorm doc path.
 - **Just load context:** Skip — brainstorm doc is already written. Report the
   path and suggest the user proceed manually.
 

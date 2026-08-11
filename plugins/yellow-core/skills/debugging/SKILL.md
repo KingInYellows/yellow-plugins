@@ -42,7 +42,7 @@ Trigger this skill (`/yellow-core:debugging`) when:
 Skip this skill (use direct edits instead) for:
 
 - Mechanical typo / syntax error fixes where the cause is immediately visible
-- Implementing a planned feature (use `/yellow-core:workflows:work` instead)
+- Implementing a planned feature (use `/yellow-core:flow:work` instead)
 - Code review feedback fixes (use `/yellow-review:resolve` instead)
 
 ## Usage
@@ -204,7 +204,7 @@ Options to offer:
 
 1. **Fix it now** — proceed to Phase 3
 2. **Diagnosis only — I'll take it from here** — skip the fix, write the Phase 4 summary, end the skill
-3. **Rethink the design** — invoke `/yellow-core:workflows:brainstorm` (only when the root cause reveals a design problem; see signals below)
+3. **Rethink the design** — invoke `/yellow-core:flow:brainstorm` (only when the root cause reveals a design problem; see signals below)
 
 Do not assume the user wants action right now. The test recommendations are part of the diagnosis regardless of which path is chosen.
 
@@ -222,7 +222,7 @@ If 2–3 hypotheses are exhausted without confirmation, diagnose **why** they fa
 
 | Pattern                                     | Diagnosis                                          | Next move                                                      |
 | ------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------- |
-| Hypotheses point to different subsystems    | Architecture/design problem, not a localized bug   | Present findings, suggest `/yellow-core:workflows:brainstorm`  |
+| Hypotheses point to different subsystems    | Architecture/design problem, not a localized bug   | Present findings, suggest `/yellow-core:flow:brainstorm`  |
 | Evidence contradicts itself                 | Wrong mental model of the code                     | Step back, re-read the code path without assumptions           |
 | Works locally, fails in CI/prod             | Environment problem                                | Focus on env differences, config, dependencies, timing         |
 | Fix works but prediction was wrong          | Symptom fix, not root cause                        | The real cause is still active — keep investigating            |
@@ -235,7 +235,7 @@ Present the diagnosis to the user before proceeding.
 
 > Reminder: one change at a time. If you are changing multiple things, stop.
 
-If the user chose "Diagnosis only" at the end of Phase 2, skip this phase and go straight to Phase 4 — the skill's job was the diagnosis. If they chose "Rethink the design", control has transferred to `/yellow-core:workflows:brainstorm` and this skill ends.
+If the user chose "Diagnosis only" at the end of Phase 2, skip this phase and go straight to Phase 4 — the skill's job was the diagnosis. If they chose "Rethink the design", control has transferred to `/yellow-core:flow:brainstorm` and this skill ends.
 
 **Workspace and branch check** — before editing files:
 
@@ -306,9 +306,9 @@ Most bugs are localized mechanical fixes (typo, missed null check, missing impor
 - **Offer neutrally** when the lesson can be stated in one sentence — e.g., "X.foo() returns T | undefined when Y, not just T", or "the diagnostic path was non-obvious and worth recording." If you cannot articulate the lesson, skip rather than offer.
 - **Lean into the offer** when the pattern appears in 3+ locations OR the root cause reveals a wrong assumption about a shared dependency, framework, or convention that other code is likely to repeat.
 
-When offering, use `AskUserQuestion`. If the user accepts, run `/yellow-core:workflows:compound` and commit the resulting `docs/solutions/<category>/<slug>.md` to the same branch so the open PR picks up the new commit.
+When offering, use `AskUserQuestion`. If the user accepts, run `/yellow-core:flow:compound` and commit the resulting `docs/solutions/<category>/<slug>.md` to the same branch so the open PR picks up the new commit.
 
 <!--
-Source: Adapted from upstream EveryInc/compound-engineering-plugin ce-debug skill at locked SHA e5b397c9d1883354f03e338dd00f98be3da39f9f. Substantive methodology preserved (causal chain gate, prediction-for-uncertain-links, smart escalation, three-failed-attempts diagnostic, conditional defense-in-depth and post-mortem). Adaptation drops multi-platform tool plumbing (Codex request_user_input, Gemini ask_user, Pi ask_user) — Claude Code only — and replaces CE command refs (/ce-brainstorm, /ce-commit-push-pr, /ce-commit, /ce-compound) with yellow-plugins equivalents (/yellow-core:workflows:brainstorm, gt submit or /gt-workflow:smart-submit, gt modify, /yellow-core:workflows:compound). Investigation-techniques and anti-patterns inlined here rather than split into a references/ subdirectory — a deliberate always-executed-content choice for this skill (other yellow-core skills, e.g. optimize and compound-lifecycle, split conditional or late-sequence detail into references/). See .changeset/debugging-skill.md for the full provenance summary.
+Source: Adapted from upstream EveryInc/compound-engineering-plugin ce-debug skill at locked SHA e5b397c9d1883354f03e338dd00f98be3da39f9f. Substantive methodology preserved (causal chain gate, prediction-for-uncertain-links, smart escalation, three-failed-attempts diagnostic, conditional defense-in-depth and post-mortem). Adaptation drops multi-platform tool plumbing (Codex request_user_input, Gemini ask_user, Pi ask_user) — Claude Code only — and replaces CE command refs (/ce-brainstorm, /ce-commit-push-pr, /ce-commit, /ce-compound) with yellow-plugins equivalents (/yellow-core:flow:brainstorm, gt submit or /gt-workflow:smart-submit, gt modify, /yellow-core:flow:compound). Investigation-techniques and anti-patterns inlined here rather than split into a references/ subdirectory — a deliberate always-executed-content choice for this skill (other yellow-core skills, e.g. optimize and compound-lifecycle, split conditional or late-sequence detail into references/). See .changeset/debugging-skill.md for the full provenance summary.
 -->
 

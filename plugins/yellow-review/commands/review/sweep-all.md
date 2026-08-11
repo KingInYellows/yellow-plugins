@@ -198,7 +198,7 @@ Then stop.
 
 Otherwise, with `attempted_count >= 1`:
 
-1. Invoke the `Skill` tool with `skill: "workflows:compound"` and
+1. Invoke the `Skill` tool with `skill: "flow:compound"` and
    `args: "sweep-all: attempted PRs <comma-separated attempted PR numbers>"`
    (e.g., `"sweep-all: attempted PRs #123, #124, #126"`). The args string is
    a free-text hint; `/workflows:compound` reads the conversation

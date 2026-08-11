@@ -1,6 +1,6 @@
 ---
-name: workflows:brainstorm
-description: Explore a feature or problem through iterative Q&A and optional research before planning. Produces docs/brainstorms/<date>-<topic>-brainstorm.md for /workflows:plan to auto-detect.
+name: flow:brainstorm
+description: Explore a feature or problem through iterative Q&A and optional research before planning. Produces docs/brainstorms/<date>-<topic>-brainstorm.md for /flow:plan to auto-detect.
 argument-hint: '[feature description or topic]'
 allowed-tools:
   - Bash
@@ -10,7 +10,7 @@ allowed-tools:
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
-# /workflows:brainstorm
+# /flow:brainstorm
 
 ## Pre-Flight
 

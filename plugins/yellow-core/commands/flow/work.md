@@ -1,5 +1,5 @@
 ---
-name: workflows:work
+name: flow:work
 description: "Execute implementation plans systematically with testing and quality checks"
 argument-hint: '[plan file path]'
 allowed-tools:
@@ -214,7 +214,7 @@ in order from bottom (item 1) to top:
      `<!-- stack-trunk: -->` metadata), then `gt create "<branch-name>"`.
      After checkout, verify with `git branch --show-current` that trunk is active.
    - **Mixed topology:** Not yet supported. If detected, report to the user:
-     "Mixed topology is not yet supported by workflows:work. Please restructure
+     "Mixed topology is not yet supported by flow:work. Please restructure
      as linear or parallel." and stop execution.
 
    If `gt create` fails (name collision, Graphite error):
@@ -269,7 +269,7 @@ in order from bottom (item 1) to top:
 
    ```markdown
    ## Stack Progress
-   <!-- Updated by workflows:work. Do not edit manually. -->
+   <!-- Updated by flow:work. Do not edit manually. -->
    - [x] 1. feat/branch-one (completed YYYY-MM-DD)
    - [ ] 2. feat/branch-two
    ```
@@ -475,7 +475,7 @@ Phase 3 (Quality Check) in stack summary mode.
    error (mirrors the Phase 3 polish-loop escalation). If the plan has
    no checkbox corresponding to this step (prose-only plan), skip
    silently. This writeback is what makes execution state survive the
-   session: a fresh `/workflows:work` run resumes from the first
+   session: a fresh `/flow:work` run resumes from the first
    unchecked box (step 0).
 
 2. **Follow Existing Patterns:**
@@ -563,7 +563,7 @@ it at a Phase 1b checkpoint.
    **Empty-RUN_DIR error path.** If `mktemp -d` fails (disk full,
    permission denied) the command produces empty output. If the captured
    path is empty, do NOT spawn reviewer agents — report the failure to
-   the user ("[/workflows:work] Could not create run directory; skipping
+   the user ("[/flow:work] Could not create run directory; skipping
    parallel review (run mktemp -d manually to diagnose)") and proceed to
    step 5 with an empty findings set, marked as "no parallel review
    coverage". Continuing with empty `$RUN_DIR` would cause every agent
@@ -874,7 +874,7 @@ Before running ANY `gt` subcommand not verbatim-quoted in the phases
 above — in particular branch creation, commit/amend, restack, submit,
 and conflict continue, the forms most often improvised from stale
 memory — Read
-`${CLAUDE_PLUGIN_ROOT}/references/workflows-work/graphite-command-reference.md`
+`${CLAUDE_PLUGIN_ROOT}/references/flow-work/graphite-command-reference.md`
 for the exact command forms. Do not rely on memorized `gt` syntax —
 several subcommands are deprecated aliases and improvised flags fail. If
 the Read fails, stop and report the path rather than guessing.

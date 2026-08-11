@@ -1,6 +1,6 @@
 ---
-name: workflows:spec
-description: Draft a requirements spec (stable R1..Rn IDs + design) through guided dialogue, written to plans/specs/<slug>.md as the input to /workflows:decompose. Produces a spec only — no code.
+name: flow:spec
+description: Draft a requirements spec (stable R1..Rn IDs + design) through guided dialogue, written to plans/specs/<slug>.md as the input to /flow:decompose. Produces a spec only — no code.
 argument-hint: '[feature or project description]'
 allowed-tools:
   - Bash
@@ -14,14 +14,14 @@ allowed-tools:
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
-# /workflows:spec
+# /flow:spec
 
 Draft a requirements specification through discussion, then write it to
 `plans/specs/<slug>.md`. The spec captures stable requirement IDs (`R1..Rn`)
-plus design decisions — it is the input to `/workflows:decompose`, which breaks
+plus design decisions — it is the input to `/flow:decompose`, which breaks
 it into dependency-ordered shells. **This command produces a spec only — never
 code.** Use it when a project is large and multi-subsystem; for a single-session
-effort, use `/workflows:plan` instead.
+effort, use `/flow:plan` instead.
 
 ## Pre-Flight
 
@@ -149,7 +149,7 @@ stays under `## Open Questions`.
 Summarize the spec (R-id count, design highlights) and gate with AskUserQuestion:
 Approve / Revise. On Revise, loop back to the relevant step. On Approve, print:
 
-> Spec ready at `plans/specs/<slug>.md`. Run `/workflows:decompose` to break it
+> Spec ready at `plans/specs/<slug>.md`. Run `/flow:decompose` to break it
 > into dependency-ordered shells.
 
 ## Rules

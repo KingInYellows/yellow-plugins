@@ -1,6 +1,6 @@
 ---
-name: workflows:decompose
-description: Decompose a spec from plans/specs/ into dependency-ordered shell files in plans/shells/, enforcing R-id coverage and depends_on traceability. Run /workflows:pick-next-shell next to start implementing.
+name: flow:decompose
+description: Decompose a spec from plans/specs/ into dependency-ordered shell files in plans/shells/, enforcing R-id coverage and depends_on traceability. Run /flow:pick-next-shell next to start implementing.
 argument-hint: '[spec path or slug]'
 allowed-tools:
   - Bash
@@ -10,13 +10,13 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# /workflows:decompose
+# /flow:decompose
 
 Break a requirements spec into **shells** — one structured unit of work per
 future session. Each shell captures wiring invariants (Produces / Consumes /
 Covers + `depends_on`) without committing to file paths, which are filled in
-later by `/workflows:expand-shell`. Shells are written to `plans/shells/` and
-scheduled by `/workflows:pick-next-shell`.
+later by `/flow:expand-shell`. Shells are written to `plans/shells/` and
+scheduled by `/flow:pick-next-shell`.
 
 ## Pre-Flight
 
@@ -47,14 +47,14 @@ anywhere else would leave each generated shell pointing at a missing file.
 ```bash
 SPEC_LIST=$(ls -t plans/specs/*.md 2>/dev/null)
 if [ -z "$SPEC_LIST" ]; then
-  printf '[decompose] No specs found in plans/specs/. Run /workflows:spec first.\n' >&2
+  printf '[decompose] No specs found in plans/specs/. Run /flow:spec first.\n' >&2
   exit 1
 fi
 printf '%s\n' "$SPEC_LIST" | head -10
 ```
 
 Read the spec. Enumerate its `R<N>` IDs from `## Requirements`. If there are
-none, use AskUserQuestion: re-run `/workflows:spec`, or stop. The spec slug =
+none, use AskUserQuestion: re-run `/flow:spec`, or stop. The spec slug =
 the resolved filename basename minus `.md`; it prefixes every shell filename.
 
 ## Step 2: Decompose Into Seams
@@ -82,7 +82,7 @@ a fresh-session handoff.
 **no** shell file (do not create anything under `plans/shells/`). Tell the user:
 
 > Decomposition produced one shell, so the spec is plan-shaped. Run
-> `/workflows:plan` against it instead of decomposing.
+> `/flow:plan` against it instead of decomposing.
 
 Then stop.
 
@@ -134,7 +134,7 @@ On any collision, AskUserQuestion with options: Use a suffixed slug /
 Cancel decomposition / Other (description "Type a new slug" — only the
 literal `Other` label opens free-text input). Shell slugs must satisfy
 `^[a-z0-9]+(-[a-z0-9]+)*$` (no underscores/dots) — this is the exact form both
-`/workflows:pick-next-shell` and `/workflows:expand-shell` match against
+`/flow:pick-next-shell` and `/flow:expand-shell` match against
 `plans/complete/` when resolving a `depends_on` entry (they accept an optional
 `YYYY-MM-DD-` archival prefix that may already be present in an archived plan's
 filename — `/plan:complete` preserves the filename verbatim and never adds one).
@@ -175,7 +175,7 @@ depends_on: []
 
 Invariants enforced at write time:
 - `spec-r-ids` holds the spec's full canonical R-id set (the drift guard
-  `/workflows:expand-shell` checks).
+  `/flow:expand-shell` checks).
 - Every `Consumes` entry traces to a `depends_on` shell's `Produces` (with that
   shell named in `depends_on`) or is marked "from existing codebase".
 - `## Open Questions` is always present (write `None` when empty) so structure
@@ -187,7 +187,7 @@ Invariants enforced at write time:
 Summarize the shells (count, NN order, `depends_on` edges, coverage table) and
 gate with AskUserQuestion: Approve / Revise. On Approve, print:
 
-> Wrote N shells to `plans/shells/`. Run `/workflows:pick-next-shell` to expand
+> Wrote N shells to `plans/shells/`. Run `/flow:pick-next-shell` to expand
 > and implement the first unblocked shell.
 
 ## Rules
