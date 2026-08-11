@@ -123,6 +123,13 @@ For each mode:
   fail loudly rather than silently falling back, otherwise the advertised
   flag would be non-functional.
   ```bash
+  # Re-derive REST — this is its own bash fence, i.e. a fresh subprocess, so
+  # Step 2's REST does not survive into it. Without this, `set -- $REST` sets
+  # $# to 0, the parse loop never runs, EXPLICIT_BASE stays empty, and
+  # `--base <ref>` silently falls through to the origin/main default —
+  # contradicting the loud-failure contract stated directly above.
+  REST=$(printf '%s' "$ARGUMENTS" | sed -E 's/^[^ ]+ *//')
+
   EXPLICIT_BASE=""
   # shellcheck disable=SC2086
   set -- $REST
@@ -159,10 +166,24 @@ For each mode:
       exit 1
     }
   fi
+
+  # Print the resolved base. The diff-assembly steps below run in a SEPARATE
+  # fence, i.e. a separate subprocess, so `$BASE_REF` does not survive to
+  # them. Without this line it expands empty there and
+  # `git diff "...HEAD"` succeeds against an empty range — handing reviewers
+  # no diff at all while every command reports success. That silent no-op is
+  # the same class of bug this step exists to remove, one stage further down.
+  printf 'BASE_REF=%s\n' "$BASE_REF"
   ```
-- Get diff: `git diff "${BASE_REF}...HEAD"`
+- Capture the printed `BASE_REF=` value and substitute it as a literal in the
+  commands below — do not reference `${BASE_REF}`, which is unset in their
+  subprocess.
+- Get diff: `git diff "<literal BASE_REF value printed above>...HEAD"`
+- If the diff is empty, stop and report `[council] Error: empty diff for the
+  resolved base — nothing to review`. Do NOT fan out reviewers on an empty
+  pack: every reviewer would return an unfounded APPROVE.
 - If diff exceeds 200K bytes: apply truncation algorithm (see skill — `git diff --stat` + first 200 lines + marker).
-- Per changed file: `git diff --name-only "${BASE_REF}...HEAD"` then read each file capped at 4K chars.
+- Per changed file: `git diff --name-only "<literal BASE_REF value printed above>...HEAD"` then read each file capped at 4K chars.
 - Pack: `## Task: review` + `### Diff` + truncated diff + `### Changed Files` + per-file content.
 
 **`debug` mode:** `$REST` starts with quoted symptom text, then optional `--paths file1,file2,...`.
