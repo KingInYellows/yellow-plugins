@@ -190,7 +190,7 @@ agents. All files LF (`sed -i 's/\r$//'` after WSL2 authoring).
   `plugins/yellow-council/package.json` description → mentions Claude
   (in-process) + the three CLIs, mirrored into
   `plugins/yellow-council/.claude-plugin/plugin.json` in the same commit.
-- [ ] Step 9: Create the changeset (`pnpm changeset`, `"yellow-council":
+- [x] Step 9: Create the changeset (`pnpm changeset`, `"yellow-council":
   minor` — new agent) describing the 4th slot; normalize line endings on all
   touched files (`sed -i 's/\r$//'`); run the CI baseline gate:
   `pnpm validate:schemas && pnpm test:unit && pnpm lint && pnpm typecheck`.
