@@ -310,6 +310,35 @@ Invoke the \`Skill\` tool with \`skill: '${target}'\`.
     expect(stderr).toContain('flow:nonexistent');
   });
 
+  it('reports a live dispatch sitting between two thematic breaks in the body', () => {
+    // The body is sliced free of frontmatter before RULE 18 scans it. If the
+    // fence stripper re-ran its leading-`---` frontmatter regex on that body,
+    // a body that OPENS with a thematic break and has another one later would
+    // look like a second frontmatter block, and everything between the two
+    // rules — including this live dispatch — would be deleted before scanning.
+    writeAgent(
+      dir,
+      'demo-plugin/commands/caller.md',
+      `---
+name: caller
+description: 'Fixture caller. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+---
+---
+
+Invoke the Skill tool with skill: "flow:nonexistent" to continue.
+
+---
+
+Trailing prose.
+`
+    );
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('flow:nonexistent');
+  });
+
   it('reports a malformed colon-bearing dispatch value instead of silently skipping it', () => {
     // `flow:spec.name` falls outside the old narrow `[a-zA-Z0-9_:-]`
     // character class (the stray `.`) — the old regex produced no match at

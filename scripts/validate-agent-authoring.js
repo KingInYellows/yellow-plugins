@@ -511,10 +511,17 @@ function listItemContentColumn(rest) {
   return match[1].length + match[2].length + effectiveGap;
 }
 
-function stripFencedContent(content) {
-  const lines = content
-    .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
-    .split('\n');
+// `stripFrontmatter` MUST be false when the caller has already sliced the
+// frontmatter off, or passes a mid-document section. The leading-`---` regex
+// below cannot tell a frontmatter block from a body that simply OPENS with a
+// `---` thematic break and contains another one later: it would delete
+// everything between them. That is a silent masking bug — a live
+// `skill: "<ns>:<cmd>"` sitting between two horizontal rules would never reach
+// RULE 18. Only a caller holding the ORIGINAL file content may strip here.
+function stripFencedContent(content, { stripFrontmatter = true } = {}) {
+  const lines = (
+    stripFrontmatter ? content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '') : content
+  ).split('\n');
   const kept = [];
   let inFence = false;
   let fenceStart = -1;
@@ -1222,7 +1229,11 @@ function validateSkillWrapperDrift(commandFiles, errors) {
     // `skill: "..."` syntax without actually invoking it) isn't mistaken
     // for a live wrapper invocation.
     const skillNames = new Set();
-    for (const match of stripFencedContent(usageSection).matchAll(SKILL_REF_RE)) {
+    // A mid-document section, not whole-file content: never strip frontmatter
+    // from it (a `---` rule inside the section is not a frontmatter fence).
+    for (const match of stripFencedContent(usageSection, {
+      stripFrontmatter: false,
+    }).matchAll(SKILL_REF_RE)) {
       skillNames.add(match[1]);
     }
     if (skillNames.size === 0) continue;
@@ -1416,7 +1427,12 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
     // syntax inside code fences as illustration, and those placeholders
     // ("plugin:skill-name", "yellow-X:skill-name") name nothing real.
     const seen = new Set();
-    for (const match of stripFencedContent(body).matchAll(SKILL_DISPATCH_VALUE_RE)) {
+    // `body` already had its frontmatter sliced off above — see
+    // stripFencedContent's `stripFrontmatter` note for why re-stripping here
+    // would eat a body that opens with a `---` thematic break.
+    for (const match of stripFencedContent(body, {
+      stripFrontmatter: false,
+    }).matchAll(SKILL_DISPATCH_VALUE_RE)) {
       const value = match[1] !== undefined ? match[1] : match[2];
       // No colon at all: a bare name, e.g. `skill: "old-name"` — RULE 17's
       // domain, not this rule's. This is the ONLY skip condition; every
