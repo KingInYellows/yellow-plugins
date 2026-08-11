@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
-  "description": "On-demand cross-lineage code review fanning out to Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
+  "description": "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex, Gemini, and OpenCode CLIs in parallel for advisory consensus",
   "author": {
     "name": "KingInYellows",
     "url": "https://github.com/KingInYellows"
