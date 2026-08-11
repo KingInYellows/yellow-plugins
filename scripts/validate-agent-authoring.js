@@ -1003,7 +1003,7 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
 // Scoped to the content of a "## Usage" section ONLY, not the whole body —
 // a naive whole-body scan false-flagged pre-existing, unrelated
 // cross-plugin composition references (e.g.
-// plugins/yellow-core/commands/workflows/work.md invoking
+// plugins/yellow-core/commands/flow/work.md invoking
 // `skill: "smart-submit"` as one step of a much larger multi-phase
 // document, where smart-submit belongs to a DIFFERENT plugin — a
 // legitimate pattern this rule was never meant to validate). Every false
@@ -1095,26 +1095,53 @@ function validateSkillWrapperDrift(commandFiles, errors) {
 //     RULE 17's business, so the two rules never double-report the same value.
 const NAMESPACED_SKILL_REF_RE = /\bskill:\s*"([a-zA-Z0-9_-]+:[a-zA-Z0-9_:-]+)"/g;
 
-// Documentation placeholders: reviewer agents that TEACH the dispatch syntax
-// spell it out in prose rather than in a code fence, so fence-stripping does
-// not reach them. These name nothing and never will. Kept as an explicit
-// literal list (same idiom as MODEL_RULE_ALLOWLIST above) rather than a
-// "looks like a placeholder" heuristic — a heuristic loose enough to catch
-// `plugin:skill-name` would also swallow real typos, which is the entire
-// class of bug this rule exists to catch.
+// Illustrative names used by the two reviewer agents that TEACH the
+// plugin-qualified dispatch syntax. They spell it out in prose rather than in
+// a code fence, so fence-stripping does not reach them, and the plugins they
+// name ("plugin", "yellow-X") do not exist.
+//
+// Note what these are NOT: they are not evidence that `plugin:skill` is a
+// bogus form. It is the documented Skill-tool form for plugin skills, and
+// this rule resolves it (see buildDispatchTargetIndex) — an early draft
+// indexed only commands and would have rejected every legitimate
+// plugin-qualified skill dispatch, e.g.
+// `skill: "gt-workflow:stack-decomposition-format"`.
+//
+// Kept as an explicit literal list (same idiom as MODEL_RULE_ALLOWLIST above)
+// rather than a "looks like a placeholder" heuristic — a heuristic loose
+// enough to catch `plugin:skill-name` would also swallow real typos, which is
+// the entire class of bug this rule exists to catch.
 const SKILL_DISPATCH_PLACEHOLDERS = new Set([
   'plugin:skill-name',
   'yellow-X:skill-name',
 ]);
 
 /**
- * Index every command `name:` declared under PLUGINS_DIR.
+ * Index every dispatchable namespaced target under PLUGINS_DIR.
+ *
+ * TWO kinds, and missing either one makes the rule wrong:
+ *
+ *   1. Command `name:` frontmatter — e.g. `flow:work`, `review:pr`. Already
+ *      namespaced in the file itself.
+ *   2. Plugin-qualified SKILL ids — `<plugin>:<skill-dir>`, e.g.
+ *      `gt-workflow:stack-decomposition-format`. This is the documented
+ *      Skill-tool form for plugin skills (the reviewer agents in
+ *      SKILL_DISPATCH_PLACEHOLDERS above teach exactly this syntax), and it
+ *      is namespaced only by virtue of the owning plugin's directory name —
+ *      the SKILL.md's own `name:` is bare.
+ *
+ * Indexing commands alone would reject every legitimate plugin-qualified
+ * skill dispatch. Today's call sites all happen to write skill ids bare, so
+ * that bug would have stayed invisible until the first author used the
+ * documented form.
  *
  * @param {string[]} commandFiles
- * @returns {Map<string, string>} command name -> declaring file path
+ * @param {string[]} skillFiles
+ * @returns {Map<string, string>} dispatch target -> declaring file path
  */
-function buildCommandNameIndex(commandFiles) {
+function buildDispatchTargetIndex(commandFiles, skillFiles) {
   const index = new Map();
+
   for (const filePath of commandFiles) {
     const content = fs.readFileSync(filePath, 'utf8');
     // extractFrontmatter returns the raw block STRING, not a parsed object —
@@ -1126,11 +1153,24 @@ function buildCommandNameIndex(commandFiles) {
       index.set(name.trim(), filePath);
     }
   }
+
+  for (const filePath of skillFiles) {
+    // plugins/<plugin>/**/skills/<skill>/SKILL.md — take the plugin from the
+    // first path segment and the skill from SKILL.md's parent directory, so
+    // nested layouts (e.g. codex/skills/<name>/) resolve the same way.
+    const relSegments = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    const pluginName = relSegments[0];
+    const skillDir = relSegments[relSegments.length - 2];
+    if (!pluginName || !skillDir) continue;
+    const qualified = `${pluginName}:${skillDir}`;
+    if (!index.has(qualified)) index.set(qualified, filePath);
+  }
+
   return index;
 }
 
-function validateSkillDispatchResolution(markdownFiles, commandFiles, errors) {
-  const commandNames = buildCommandNameIndex(commandFiles);
+function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors) {
+  const dispatchTargets = buildDispatchTargetIndex(commandFiles, skillFiles);
 
   for (const filePath of markdownFiles) {
     const content = fs.readFileSync(filePath, 'utf8');
@@ -1146,13 +1186,15 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, errors) {
     }
 
     for (const target of seen) {
-      if (commandNames.has(target)) continue;
+      if (dispatchTargets.has(target)) continue;
       if (SKILL_DISPATCH_PLACEHOLDERS.has(target)) continue;
       errors.push(
         `${relative(filePath)}: RULE 18 — dispatches \`skill: "${target}"\` ` +
-          `but no command under plugins/ declares \`name: ${target}\`. ` +
-          `Either the target was renamed and this caller was missed, or the ` +
-          `name is a typo — this dispatch fails at runtime.`
+          `but nothing under plugins/ provides it: no command declares ` +
+          `\`name: ${target}\`, and no plugin skill resolves as ` +
+          `\`<plugin>:<skill-dir>\`. Either the target was renamed and this ` +
+          `caller was missed, or the name is a typo — this dispatch fails ` +
+          `at runtime.`
       );
     }
   }
@@ -1343,7 +1385,7 @@ function main() {
   });
   validateCommandFiles(commandFiles, errors);
   validateSkillWrapperDrift(commandFiles, errors);
-  validateSkillDispatchResolution(markdownFiles, commandFiles, errors);
+  validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors);
   validateSkillFiles(skillFiles, { errors, warnings });
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);

@@ -443,8 +443,22 @@ tripping the gate — so this is a trade the gate makes knowingly.
       **Exercised, and it fires:** a typo'd target and a stale pre-rename
       target both exit 1. Probe C confirms that had RULE 18 existed before
       this migration, it would have caught all 9 broken
-      `skill: "workflows:*"` dispatches. 7 integration tests at
-      `tests/integration/validate-agent-authoring-rule18.test.ts`
+      `skill: "workflows:*"` dispatches. 9 integration tests at
+      `tests/integration/validate-agent-authoring-rule18.test.ts`.
+
+      **A first draft of this rule was wrong and would have blocked
+      legitimate authoring.** It indexed only command `name:` values, on the
+      premise "namespaced ⇒ command". But `<plugin>:<skill-dir>` is the
+      documented Skill-tool form for plugin skills
+      (`gt-workflow:stack-decomposition-format`), so the rule would have
+      rejected every use of it. It passed CI only because every *current*
+      call site happens to write skill ids bare — the bug would have stayed
+      invisible until the next author used the documented form. The tell was
+      sitting in the placeholder allowlist the whole time: the two strings
+      excluded as "documentation placeholders" come from reviewer agents
+      *teaching that exact syntax*. `buildDispatchTargetIndex` now indexes
+      both kinds, with a test asserting a plugin-qualified skill resolves and
+      a nonexistent one still fails
 - [ ] 4.3: `/flow` autocomplete check on a clean install — **deferred by
       construction; the only step of this plan an agent cannot perform.**
       Per [Bootstrap Safety](#bootstrap-safety), commands are served from the
@@ -538,6 +552,13 @@ major (currently 1.27.2) for a change that breaks nobody.
 - **`references/flow-work/` slug convention** (AGENTS.md:274-276) is
   unenforced by any validator. The rename plus `work.md:877` is a manual-review
   coupling.
+- **Directory paths are a separate reference shape the gate cannot see.**
+  The matcher requires `workflows:` with a colon, so `commands/workflows/…`
+  and `references/workflows-work/…` are invisible to it. Both had live stale
+  hits after the 1.1 move — the reference-doc path (fixed in PR1) and twelve
+  `commands/workflows/` paths including two inside `plugins/` (fixed in PR4).
+  Enumerate directory paths separately from the namespace sweep; a gate only
+  sees the shape it was written to see.
 
 ## Resolved Questions
 

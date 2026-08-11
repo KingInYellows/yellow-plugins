@@ -122,6 +122,53 @@ describe('RULE 18 — namespaced skill: dispatch resolution', () => {
     expect(runValidator(dir).status).toBe(0);
   });
 
+  it('resolves plugin-qualified SKILL ids, not just commands', () => {
+    // `<plugin>:<skill-dir>` is the documented Skill-tool form for plugin
+    // skills. An early draft of this rule indexed only commands and would
+    // have rejected every legitimate use of it — invisibly, because every
+    // current call site in this repo happens to write skill ids bare.
+    writeAgent(
+      dir,
+      'caller-plugin/commands/caller.md',
+      callerCommand('other-plugin:some-skill')
+    );
+    writeAgent(
+      dir,
+      'other-plugin/skills/some-skill/SKILL.md',
+      `---
+name: some-skill
+description: Fixture plugin skill. Use when testing RULE 18.
+---
+
+# some-skill
+
+## What It Does
+
+Fixture body.
+
+## When to Use
+
+Fixture body.
+
+## Usage
+
+Fixture body.
+`
+    );
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('still fails a plugin-qualified id whose skill directory does not exist', () => {
+    writeAgent(
+      dir,
+      'caller-plugin/commands/caller.md',
+      callerCommand('other-plugin:no-such-skill')
+    );
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('other-plugin:no-such-skill');
+  });
+
   it('ignores dispatch syntax shown inside a code fence', () => {
     writeAgent(
       dir,

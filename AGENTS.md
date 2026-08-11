@@ -298,7 +298,20 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   concern per the validator's own inline comment. RULE 17 is scoped to
   `## Usage` section content only so unrelated cross-plugin `skill: "..."`
   references elsewhere in a larger document (e.g. a multi-phase workflow command citing
-  another plugin's skill as one step) are not flagged.
+  another plugin's skill as one step) are not flagged by RULE 17.
+- A **namespaced** `skill: "<namespace>:<name>"` dispatch must resolve to
+  something that actually exists: either a command declaring
+  `name: <namespace>:<name>` in its frontmatter, or a plugin skill at
+  `plugins/<namespace>/**/skills/<name>/SKILL.md`. `RULE 18`
+  (`validateSkillDispatchResolution`) enforces this across every markdown
+  file under `plugins/`, resolving against **all** plugins because
+  cross-plugin dispatch is the normal case. It is the complement to RULE 17,
+  not a replacement: RULE 17's `SKILL_REF_RE` character class excludes `:`,
+  so it has never matched a namespaced value, and before RULE 18 nothing
+  verified that a namespaced dispatch target existed at all — a renamed
+  command silently broke every caller. RULE 18 scans whole bodies (namespaced
+  dispatch lives mid-document in multi-phase orchestrators), skips bare names
+  so the two rules never double-report, and ignores fenced syntax examples.
 
 ## Security & Prompt-Injection Rules
 
