@@ -414,18 +414,51 @@ const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 // opener/closer match to content AFTER the container markup, not the raw
 // line. containerPrefixRe strips that markup — repeated `>` quote markers
 // (each optionally followed by one space) plus any amount of list-item
-// indentation — before the fence regexes run. This is a prefix-stripping
-// normalization, not a full CommonMark block parser: it does not verify the
-// opener and closer sit at the same container depth (e.g. a quote-nested
-// opener could in theory be matched against a differently-indented closer).
-// That's an accepted limitation, not a gap in the character+length check
-// above, which still guards against a mismatched-shape line closing early;
-// real documents don't mix container types mid-fence.
+// indentation — before the fence regexes run.
+//
+// Container depth IS tracked (the count of `>` markers a line's prefix
+// consumes), because leaving a fence "open" past the point its enclosing
+// quote ends was itself a bug: per CommonMark, a block quote ends at the
+// first line that doesn't carry its `>` marker (a truly blank line has no
+// `>`, so it ends the quote — lazy continuation only applies to paragraph
+// text, not blank lines), and the quote ending also ends any fence scoped
+// inside it, closer or no closer. containerDepth() counts the `>` markers so
+// the loop below can detect that drop and treat it exactly like an explicit
+// closer: truncate the provisionally-kept fence content and resume ordinary
+// scanning. A closer line must also match the *same* depth as its opener to
+// count — a `>` line can't close a `> >` fence.
+//
+// When the container ends mid-fence, the line that ended it is treated as
+// plain content, deliberately NOT re-examined as a potential new fence
+// opener even if it happens to be fence-shaped itself. That's a conservative
+// choice, not full CommonMark fidelity: it means a legitimately reopened
+// nested fence landing exactly on a container boundary is scanned as prose
+// instead of being re-hidden. Given the two failure modes — treating a
+// closed example as if it's still hidden (misses a real broken dispatch) vs
+// treating truly-fenced text as prose (a rare false positive a human review
+// catches instantly) — this errs toward scanning, per the same reasoning
+// that drives the rest of this helper: a false positive is cheap, a
+// swallowed real finding is not.
+//
+// Remaining known limitation: this is a prefix-stripping normalization, not
+// a full CommonMark block parser. It does not model list-item nesting depth
+// (only block-quote `>` depth), so a fence's container-exit detection is
+// blockquote-only; list-indent changes are still handled solely by the
+// existing indentation tolerance in fenceOpenerRe/closerRe.
 const fenceOpenerRe = /^[ \t]{0,3}(`{3,}|~{3,})/;
 const containerPrefixRe = /^(?:[ \t]*>[ \t]?)*[ \t]*/;
 function stripContainerPrefix(line) {
   const match = containerPrefixRe.exec(line);
   return match ? line.slice(match[0].length) : line;
+}
+function containerDepth(line) {
+  const match = containerPrefixRe.exec(line);
+  if (!match) return 0;
+  let depth = 0;
+  for (const ch of match[0]) {
+    if (ch === '>') depth++;
+  }
+  return depth;
 }
 function stripFencedContent(content) {
   const lines = content
@@ -436,7 +469,22 @@ function stripFencedContent(content) {
   let fenceStart = -1;
   let fenceChar = '';
   let fenceLen = 0;
+  let fenceDepth = 0;
   for (const line of lines) {
+    const depth = containerDepth(line);
+    if (inFence && depth < fenceDepth) {
+      // The container (block quote) the fence opened inside has ended
+      // before a matching closer showed up. Per CommonMark the fence's
+      // scope ends with its container, so retroactively drop the
+      // provisionally-kept fence content exactly like an explicit closer
+      // would, then fall through to scan this line as ordinary text (see
+      // the block comment above for why it is not re-examined as a
+      // potential new opener).
+      kept.length = fenceStart;
+      inFence = false;
+      kept.push(line);
+      continue;
+    }
     const normalized = stripContainerPrefix(line);
     if (!inFence) {
       const openerMatch = fenceOpenerRe.exec(normalized);
@@ -445,11 +493,12 @@ function stripFencedContent(content) {
         fenceStart = kept.length;
         fenceChar = openerMatch[1][0];
         fenceLen = openerMatch[1].length;
+        fenceDepth = depth;
       }
       kept.push(line); // provisional when opening — kept only if unclosed
     } else {
       const closerRe = new RegExp(`^[ \\t]{0,3}\\${fenceChar}{${fenceLen},}[ \\t]*\\r?$`);
-      if (closerRe.test(normalized)) {
+      if (depth === fenceDepth && closerRe.test(normalized)) {
         kept.length = fenceStart; // drop opener..closer inclusive
         kept.push(''); // preserve the blank the old regex replacement left
         inFence = false;

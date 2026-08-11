@@ -415,4 +415,92 @@ Invoke the Skill tool with skill: "flow:nonexistent"
     expect(stderr).toContain('RULE 18');
     expect(stderr).toContain('flow:nonexistent');
   });
+
+  it('reports a live top-level dispatch that follows an unclosed fence inside a block quote', () => {
+    // The exact regression this round fixes: the fence never gets an
+    // explicit closer, but the block quote it lives in ends at the blank
+    // line (no `>` marker). Per CommonMark the quote ending also ends the
+    // fence scoped inside it, so the dispatch below is genuinely live,
+    // top-level prose — not fence content — and must be reported.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+> \`\`\`text
+> some fence content still inside the quote, fence never closed
+
+Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+  });
+
+  it('ignores an unresolved dispatch that stays inside the quote after an unclosed fence', () => {
+    // Same unclosed fence as above, but this time the quote never drops —
+    // every following line still carries its `>` marker, so the fence
+    // legitimately runs to EOF (existing behavior) and the dispatch stays
+    // hidden.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+> \`\`\`text
+> some fence content
+> Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('does not let a depth-1 line close a fence opened at depth 2', () => {
+    // The fence opens inside a doubly-nested quote (`> >`). The following
+    // line drops to a single `>` — a shallower container — so per the
+    // "closer must match the opener's depth" rule it cannot close the
+    // depth-2 fence; the depth-2 container has simply ended, taking the
+    // fence with it. The dispatch that follows, still under `> >`, is
+    // ordinary content at that point (not re-captured by any fence) and
+    // must be reported, proving the mismatched-depth line was never treated
+    // as a valid closer.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+> > \`\`\`text
+> > hidden fence content, must not be scanned
+> \`\`\`
+> > Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+  });
 });
