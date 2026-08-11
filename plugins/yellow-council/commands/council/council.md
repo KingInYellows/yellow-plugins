@@ -203,14 +203,27 @@ First, mint that path — run this BEFORE the spawns:
 # $STATE_FILE (see the note below this block), so path-based cleanup isn't
 # possible; pattern-based cleanup at the START of every run is the
 # substitute and needs no persisted state to survive across runs.
+#
+# CONCURRENCY: a second /council invocation in this SAME checkout on this
+# SAME machine may have its own CLAUDE_FENCED_FILE in flight right now — an
+# unconditional glob-and-unlink here would delete that run's live file out
+# from under it (concurrent /council runs are unsupported per $STATE_FILE's
+# own note above, but a stray leftover file must not make that unsupported
+# case actively destructive). Gate reclamation on file AGE, not mere
+# existence: claude-reviewer has no COUNCIL_TIMEOUT bound (see Known
+# Limitations in CLAUDE.md), but no real /council session plausibly holds a
+# single in-process reviewer open for a full day. STALE_MINUTES is set well
+# beyond any plausible run so only genuinely abandoned files — from a
+# session that ended hours or days ago — are ever in scope; a file that
+# young is left alone even if it turns out to be an orphan, and picked up
+# by a later invocation once it ages past the threshold.
 # Best-effort only: never abort the run over stale-file reclamation.
-for stale in /tmp/council-claude-fenced-*.txt; do
-  # No match leaves the literal glob pattern — skip it.
-  [ -e "$stale" ] || continue
-  # Belt-and-suspenders shape check even though pathname expansion already
+STALE_MINUTES=1440
+while IFS= read -r -d '' stale; do
+  # Belt-and-suspenders shape check even though `find -name` already
   # confines candidates to literal /tmp directory entries (a filename
-  # cannot itself contain `/`, so this `*` cannot traverse) — mirrors this
-  # file's other path guards rather than trusting the glob alone.
+  # cannot itself contain `/`, so this cannot traverse) — mirrors this
+  # file's other path guards rather than trusting the pattern alone.
   case "$stale" in
     *..*|/tmp/council-claude-fenced-*/*) continue ;;
     /tmp/council-claude-fenced-*.txt) ;;
@@ -221,7 +234,7 @@ for stale in /tmp/council-claude-fenced-*.txt; do
   # user/process in the shared /tmp namespace.
   [ -O "$stale" ] || continue
   rm -f -- "$stale" 2>/dev/null || true
-done
+done < <(find /tmp -maxdepth 1 -type f -name 'council-claude-fenced-*.txt' -mmin "+${STALE_MINUTES}" -print0 2>/dev/null)
 
 # claude-reviewer is in-process: it has `Write` but no `Bash`, so it has no
 # mktemp and no entropy source to mint a collision-safe temp path itself. A
@@ -333,60 +346,177 @@ parse_reviewer_return() {
   # non-enum verdict warning further down also reuses this helper, and that
   # warning fires for ANY reviewer, not only claude.
   local redact_awk='
+    function strip_deco(s) {
+      sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
+      sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
+      sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
+      # Diff "-"/"+" prefix (no space) — but never strip a leading dash off a
+      # real PEM delimiter run ("-----BEGIN"/"-----END"): that would corrupt
+      # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
+      # test below, since this helper also classifies the BEGIN line itself
+      # now, not just body lines.
+      if (s !~ /^-----/) sub(/^[-+]/, "", s)
+      sub(/^[[:space:]]+/, "", s)
+      sub(/[[:space:]]+$/, "", s)
+      return s
+    }
+    function cred_hit(re, minlen) {
+      # mawk (the default /usr/bin/awk on Debian/Ubuntu) does not support
+      # interval expressions ({n,}/{n}) — it matches them literally, so a
+      # `{20,}`-gated credential regex silently stops matching real secrets on
+      # a mawk host. match()+RLENGTH (POSIX, mawk-safe) reproduces the same
+      # trigger condition without interval syntax: `+` greedily consumes the
+      # run after the literal prefix, RLENGTH is prefix-plus-run length, so
+      # RLENGTH >= prefixlen+N is equivalent to {N,} / {N} for detection
+      # purposes (we only ever discard the matched text, never reuse it, so
+      # {N} exact and {N,} at-least are interchangeable here).
+      match($0, re)
+      return (RLENGTH >= minlen)
+    }
+    function is_base64_line(s, minlen) {
+      if (s !~ /^[A-Za-z0-9+\/=]+$/) return 0
+      return length(s) >= minlen
+    }
     {
       line = $0
-      if (line ~ /sk-proj-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /sk-ant-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /sk-[A-Za-z0-9]{20,}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /AIza[0-9A-Za-z_-]{35}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /gh[pous]_[A-Za-z0-9]{36,}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /github_pat_[A-Za-z0-9_]{40,}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /AKIA[0-9A-Z]{16}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /Bearer [A-Za-z0-9._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /Authorization: [A-Za-z0-9 ._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
-      else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
-      # PEM private key block, multi-line state machine. Canonical source
-      # and full rationale: council-patterns SKILL.md "11-Pattern Credential
-      # Redaction" — keep this copy in sync with it and with the Step 7 copy.
-      # Unanchored BEGIN match on purpose: a full-line anchor lets a
-      # flattened or inline-quoted key through undetected. The END test
-      # below anchors the TAIL only ([[:space:]]*$) — do NOT anchor the
-      # start too, that reintroduces the bypass documented in
+      # OpenAI / Anthropic / Google / GitHub / AWS / Bearer / Authorization
+      if (cred_hit("sk-proj-[A-Za-z0-9_-]+", 28)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("sk-ant-[A-Za-z0-9_-]+", 27)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("sk-[A-Za-z0-9]+", 23)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("AIza[0-9A-Za-z_-]+", 39)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("gh[pous]_[A-Za-z0-9]+", 40)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("github_pat_[A-Za-z0-9_]+", 51)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("AKIA[0-9A-Z]+", 20)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("Bearer [A-Za-z0-9._~+\\/-]+", 27)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("Authorization: [A-Za-z0-9 ._~+\\/-]+", 35)) line = "--- redacted credential at line " NR " ---"
+      else if (cred_hit("ses_[A-Za-z0-9]+", 20)) line = "--- redacted credential at line " NR " ---"
+      # PEM private key block — multi-line state machine.
+      # NOTE: test the ORIGINAL line ($0) for BEGIN/END so the redaction-replacement
+      # of `line` does not blind the END check (otherwise in_pem never resets).
+      # UNANCHORED substring match on purpose: a full-line anchor
+      # (^...[[:space:]]*$) lets a key flattened onto one line — or quoted
+      # inline in prose ("leaked key: -----BEGIN PRIVATE KEY----- MII…") —
+      # bypass redaction entirely because the BEGIN marker never matches.
+      # `[A-Z ]*` not `[A-Z ]+`, so the bare PKCS#8 header (-----BEGIN PRIVATE
+      # KEY-----, no algorithm word) matches as well.
+      #
+      # The END test below anchors the TAIL only ([[:space:]]*$), never a
+      # full-line ^...$ anchor — do NOT "fix" this by anchoring the start too,
+      # that reintroduces the exact bypass documented in
       # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
-      # pem_reclose re-arms redaction when a decoy bare END is immediately
-      # followed by more key body. pem_span caps a stray BEGIN at 200 lines
-      # so prose that merely quotes the marker cannot blind the rest of the
-      # output. pem_stray (>=3 consecutive non-key lines, hex-SHA safe) ends
-      # redaction early on such prose, after stripping blockquote, list,
-      # numbered-excerpt, and diff prefixes from the body test.
-      if (pem_reclose) {
-        pem_reclose = 0
-        if ($0 ~ /^[A-Za-z0-9+\/=]{20,}$/ && $0 ~ /[G-Zg-z+\/=]/) { in_pem = 1; pem_stray = 0 }
+      # A leading prefix (numbered excerpt, blockquote, JSON key) still matches
+      # because there is no ^ anchor; only trailing content after the marker is
+      # rejected. A hostile producer can embed a decoy END mid-body with garbage
+      # trailing it ("-----END PRIVATE KEY----- extra") specifically to disarm
+      # redaction early — the tail anchor makes that decoy fail the
+      # immediate-terminate path and fall through to the re-arm/stray logic
+      # below instead, so it fails closed (stays redacted) rather than open.
+      #
+      # REAL-BLOCK vs PROSE-MENTION discrimination happens once, at BEGIN time,
+      # via strip_deco(): if the BEGIN marker is essentially the WHOLE line
+      # (nothing left over after stripping known decoration — blockquote, list,
+      # numbered-excerpt, diff prefixes), this is a genuine key block: redact
+      # unbounded until a real END or EOF, no width floor, no releasing span
+      # cap — fail closed. If the BEGIN marker instead shares the line with
+      # other prose (a report merely MENTIONING "-----BEGIN ... KEY-----"),
+      # this is a stray mention: fall back to a bounded window (20-char body
+      # floor, hex-SHA exclusion, 3-line stray counter, 200-line span cap) so
+      # the report is not swallowed and Verdict:/Confidence: survive. Without
+      # this split, either every stray mention risks eating the whole report,
+      # or every real key gets a floor/cap that lets it leak (a narrow-wrapped
+      # or 200+-line key). A single line containing BOTH a BEGIN and an END is
+      # a self-contained inline key — redact just that line, no state change.
+      if (!in_pem && $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+        if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) {
+          line = "--- redacted PEM key block at line " NR " ---"
+        } else {
+          pem_check = strip_deco($0)
+          in_pem = 1
+          pem_stray = 0
+          pem_span = 0
+          if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+          else pem_real = 0
+        }
       }
-      if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) { in_pem = 1; pem_stray = 0; pem_span = 0 }
+      # PAIR-BOUND RE-ARM closes the gap the tail anchor alone leaves open: a
+      # decoy END with NOTHING trailing it ("-----END PRIVATE KEY-----" alone
+      # on its own line, injected mid-body) still passes the tail-anchor test
+      # and would terminate redaction one line early, exposing the real
+      # remaining key body. Checking only the SINGLE next line is not enough:
+      # an attacker can put one or more non-key lines (a comment, a blank
+      # separator, a stray line of prose) between the decoy END and the
+      # resumed key body to slip past a one-line check. Instead, after any
+      # clean END fires, watch a BOUNDED window of the next 5 lines for
+      # key-shaped content — after the SAME decoration stripping the body
+      # test uses, so a diff/blockquote/numbered-excerpt-decorated body line
+      # is recognized too, not just bare base64. The FIRST key-shaped line
+      # inside the window re-arms redaction in the SAME mode (real/prose) the
+      # block was in when the END fired; non-key lines inside the window
+      # decrement the window rather than cancel it outright, so a short run
+      # of separators cannot be used to cancel the watch early. If the window
+      # expires with no key-shaped line seen, watching stops and lines print
+      # normally again — the window cannot be unbounded, or a genuine END
+      # followed by an ordinary prose paragraph (the common case) would risk
+      # the report being swallowed forever waiting for a line that never
+      # comes (see the "normal report survives" check alongside this test).
+      # A decoy padded with MORE separator lines than the window covers
+      # defeats re-arm; this is an accepted, documented residual gap — the
+      # same bounded-heuristic trade-off as the pem_stray/pem_span limits
+      # below — because closing it completely would require watching
+      # indefinitely, which reintroduces the "swallow the whole report"
+      # failure the window exists to prevent.
+      if (pem_watch > 0) {
+        pem_check = strip_deco($0)
+        if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/) {
+          in_pem = 1
+          pem_stray = 0
+          pem_span = 0
+          pem_real = pem_prev_real
+          pem_watch = 0
+        } else {
+          pem_watch--
+        }
+      }
       if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
       if (in_pem) {
-        if (++pem_span > 200) {
+        if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+          pem_prev_real = pem_real
           in_pem = 0
-        } else if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
-          in_pem = 0
-          pem_reclose = 1
+          pem_watch = 5
+        } else if (pem_real) {
+          # Real block: unbounded, fail closed. No floor, no releasing cap —
+          # every line stays redacted until a genuine END or EOF, however
+          # narrow the wrapping or long the block.
         } else {
-          pem_body = $0
-          sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", pem_body)
-          sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", pem_body)
-          sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", pem_body)
-          sub(/^[-+]/, "", pem_body)
-          sub(/^[[:space:]]+/, "", pem_body)
-          sub(/[[:space:]]+$/, "", pem_body)
-          if (pem_body != "") {
-            if ((pem_body ~ /^[A-Za-z0-9+\/=]{20,}$/ && pem_body ~ /[G-Zg-z+\/=]/) ||
-                pem_body ~ /^(Proc-Type|DEK-Info):/ ||
-                $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
-            else if (++pem_stray >= 3) in_pem = 0
+          # Stray prose mention: bounded window so an ordinary report does not
+          # get swallowed by a BEGIN marker quoted in passing. PEM armor is
+          # base64 plus the Proc-Type/DEK-Info headers, so count consecutive
+          # lines that cannot be key material and leave PEM mode after 3 of
+          # them. The body test also requires at least one character outside
+          # the 0-9/a-f range: a bare 40- or 64-char hex token (git SHA, hash)
+          # is common in ordinary reviewer prose and would otherwise satisfy a
+          # length-only base64 check on every such line, resetting the stray
+          # counter forever. A hard span cap (200 lines) backstops the stray
+          # counter so this branch terminates even if some future input keeps
+          # fooling the body classifier.
+          if (++pem_span > 200) {
+            in_pem = 0
+          } else {
+            pem_body = strip_deco($0)
+            if (pem_body != "") {
+              if ((is_base64_line(pem_body, 20) && pem_body ~ /[G-Zg-z+\/=]/) ||
+                  pem_body ~ /^(Proc-Type|DEK-Info):/ ||
+                  $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
+              else if (++pem_stray >= 3) in_pem = 0
+            }
           }
         }
       }
+      # Blank lines are NEUTRAL — they neither reset nor increment pem_stray
+      # (is_base64_line("") is false and pem_body == "" short-circuits above).
+      # Counting them as valid body would reset pem_stray on every paragraph
+      # gap in ordinary prose, so the cutoff would never be reached; counting
+      # them as stray would end redaction inside a key that contains one.
       print line
     }
   '
@@ -786,61 +916,177 @@ for reviewer in claude codex gemini opencode; do
       # Canonical block: council-patterns SKILL.md "11-Pattern Credential
       # Redaction" — keep byte-identical with it.
       section_body=$(awk '
+      function strip_deco(s) {
+        sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
+        sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
+        sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
+        # Diff "-"/"+" prefix (no space) — but never strip a leading dash off a
+        # real PEM delimiter run ("-----BEGIN"/"-----END"): that would corrupt
+        # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
+        # test below, since this helper also classifies the BEGIN line itself
+        # now, not just body lines.
+        if (s !~ /^-----/) sub(/^[-+]/, "", s)
+        sub(/^[[:space:]]+/, "", s)
+        sub(/[[:space:]]+$/, "", s)
+        return s
+      }
+      function cred_hit(re, minlen) {
+        # mawk (the default /usr/bin/awk on Debian/Ubuntu) does not support
+        # interval expressions ({n,}/{n}) — it matches them literally, so a
+        # `{20,}`-gated credential regex silently stops matching real secrets on
+        # a mawk host. match()+RLENGTH (POSIX, mawk-safe) reproduces the same
+        # trigger condition without interval syntax: `+` greedily consumes the
+        # run after the literal prefix, RLENGTH is prefix-plus-run length, so
+        # RLENGTH >= prefixlen+N is equivalent to {N,} / {N} for detection
+        # purposes (we only ever discard the matched text, never reuse it, so
+        # {N} exact and {N,} at-least are interchangeable here).
+        match($0, re)
+        return (RLENGTH >= minlen)
+      }
+      function is_base64_line(s, minlen) {
+        if (s !~ /^[A-Za-z0-9+\/=]+$/) return 0
+        return length(s) >= minlen
+      }
       {
         line = $0
-        if (line ~ /sk-proj-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /sk-ant-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /sk-[A-Za-z0-9]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /AIza[0-9A-Za-z_-]{35}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /gh[pous]_[A-Za-z0-9]{36,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /github_pat_[A-Za-z0-9_]{40,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /AKIA[0-9A-Z]{16}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /Bearer [A-Za-z0-9._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /Authorization: [A-Za-z0-9 ._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
-        # PEM private key block, multi-line state machine. Canonical source
-        # and full rationale: council-patterns SKILL.md "11-Pattern
-        # Credential Redaction" — keep this copy byte-identical with it.
-        # Unanchored BEGIN match on purpose: a full-line anchor lets a
-        # flattened or inline-quoted key through undetected. The END test
-        # below anchors the TAIL only ([[:space:]]*$) — do NOT anchor the
-        # start too, that reintroduces the bypass documented in
+        # OpenAI / Anthropic / Google / GitHub / AWS / Bearer / Authorization
+        if (cred_hit("sk-proj-[A-Za-z0-9_-]+", 28)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("sk-ant-[A-Za-z0-9_-]+", 27)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("sk-[A-Za-z0-9]+", 23)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("AIza[0-9A-Za-z_-]+", 39)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("gh[pous]_[A-Za-z0-9]+", 40)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("github_pat_[A-Za-z0-9_]+", 51)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("AKIA[0-9A-Z]+", 20)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("Bearer [A-Za-z0-9._~+\\/-]+", 27)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("Authorization: [A-Za-z0-9 ._~+\\/-]+", 35)) line = "--- redacted credential at line " NR " ---"
+        else if (cred_hit("ses_[A-Za-z0-9]+", 20)) line = "--- redacted credential at line " NR " ---"
+        # PEM private key block — multi-line state machine.
+        # NOTE: test the ORIGINAL line ($0) for BEGIN/END so the redaction-replacement
+        # of `line` does not blind the END check (otherwise in_pem never resets).
+        # UNANCHORED substring match on purpose: a full-line anchor
+        # (^...[[:space:]]*$) lets a key flattened onto one line — or quoted
+        # inline in prose ("leaked key: -----BEGIN PRIVATE KEY----- MII…") —
+        # bypass redaction entirely because the BEGIN marker never matches.
+        # `[A-Z ]*` not `[A-Z ]+`, so the bare PKCS#8 header (-----BEGIN PRIVATE
+        # KEY-----, no algorithm word) matches as well.
+        #
+        # The END test below anchors the TAIL only ([[:space:]]*$), never a
+        # full-line ^...$ anchor — do NOT "fix" this by anchoring the start too,
+        # that reintroduces the exact bypass documented in
         # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
-        # pem_reclose re-arms redaction when a decoy bare END is immediately
-        # followed by more key body. pem_span caps a stray BEGIN at 200
-        # lines so prose that merely quotes the marker cannot blind the rest
-        # of the output. pem_stray (>=3 consecutive non-key lines, hex-SHA
-        # safe) ends redaction early on such prose, after stripping
-        # blockquote, list, numbered-excerpt, and diff prefixes from the
-        # body test.
-        if (pem_reclose) {
-          pem_reclose = 0
-          if ($0 ~ /^[A-Za-z0-9+\/=]{20,}$/ && $0 ~ /[G-Zg-z+\/=]/) { in_pem = 1; pem_stray = 0 }
+        # A leading prefix (numbered excerpt, blockquote, JSON key) still matches
+        # because there is no ^ anchor; only trailing content after the marker is
+        # rejected. A hostile producer can embed a decoy END mid-body with garbage
+        # trailing it ("-----END PRIVATE KEY----- extra") specifically to disarm
+        # redaction early — the tail anchor makes that decoy fail the
+        # immediate-terminate path and fall through to the re-arm/stray logic
+        # below instead, so it fails closed (stays redacted) rather than open.
+        #
+        # REAL-BLOCK vs PROSE-MENTION discrimination happens once, at BEGIN time,
+        # via strip_deco(): if the BEGIN marker is essentially the WHOLE line
+        # (nothing left over after stripping known decoration — blockquote, list,
+        # numbered-excerpt, diff prefixes), this is a genuine key block: redact
+        # unbounded until a real END or EOF, no width floor, no releasing span
+        # cap — fail closed. If the BEGIN marker instead shares the line with
+        # other prose (a report merely MENTIONING "-----BEGIN ... KEY-----"),
+        # this is a stray mention: fall back to a bounded window (20-char body
+        # floor, hex-SHA exclusion, 3-line stray counter, 200-line span cap) so
+        # the report is not swallowed and Verdict:/Confidence: survive. Without
+        # this split, either every stray mention risks eating the whole report,
+        # or every real key gets a floor/cap that lets it leak (a narrow-wrapped
+        # or 200+-line key). A single line containing BOTH a BEGIN and an END is
+        # a self-contained inline key — redact just that line, no state change.
+        if (!in_pem && $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) {
+          if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) {
+            line = "--- redacted PEM key block at line " NR " ---"
+          } else {
+            pem_check = strip_deco($0)
+            in_pem = 1
+            pem_stray = 0
+            pem_span = 0
+            if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+            else pem_real = 0
+          }
         }
-        if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) { in_pem = 1; pem_stray = 0; pem_span = 0 }
+        # PAIR-BOUND RE-ARM closes the gap the tail anchor alone leaves open: a
+        # decoy END with NOTHING trailing it ("-----END PRIVATE KEY-----" alone
+        # on its own line, injected mid-body) still passes the tail-anchor test
+        # and would terminate redaction one line early, exposing the real
+        # remaining key body. Checking only the SINGLE next line is not enough:
+        # an attacker can put one or more non-key lines (a comment, a blank
+        # separator, a stray line of prose) between the decoy END and the
+        # resumed key body to slip past a one-line check. Instead, after any
+        # clean END fires, watch a BOUNDED window of the next 5 lines for
+        # key-shaped content — after the SAME decoration stripping the body
+        # test uses, so a diff/blockquote/numbered-excerpt-decorated body line
+        # is recognized too, not just bare base64. The FIRST key-shaped line
+        # inside the window re-arms redaction in the SAME mode (real/prose) the
+        # block was in when the END fired; non-key lines inside the window
+        # decrement the window rather than cancel it outright, so a short run
+        # of separators cannot be used to cancel the watch early. If the window
+        # expires with no key-shaped line seen, watching stops and lines print
+        # normally again — the window cannot be unbounded, or a genuine END
+        # followed by an ordinary prose paragraph (the common case) would risk
+        # the report being swallowed forever waiting for a line that never
+        # comes (see the "normal report survives" check alongside this test).
+        # A decoy padded with MORE separator lines than the window covers
+        # defeats re-arm; this is an accepted, documented residual gap — the
+        # same bounded-heuristic trade-off as the pem_stray/pem_span limits
+        # below — because closing it completely would require watching
+        # indefinitely, which reintroduces the "swallow the whole report"
+        # failure the window exists to prevent.
+        if (pem_watch > 0) {
+          pem_check = strip_deco($0)
+          if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/) {
+            in_pem = 1
+            pem_stray = 0
+            pem_span = 0
+            pem_real = pem_prev_real
+            pem_watch = 0
+          } else {
+            pem_watch--
+          }
+        }
         if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
         if (in_pem) {
-          if (++pem_span > 200) {
+          if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+            pem_prev_real = pem_real
             in_pem = 0
-          } else if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
-            in_pem = 0
-            pem_reclose = 1
+            pem_watch = 5
+          } else if (pem_real) {
+            # Real block: unbounded, fail closed. No floor, no releasing cap —
+            # every line stays redacted until a genuine END or EOF, however
+            # narrow the wrapping or long the block.
           } else {
-            pem_body = $0
-            sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", pem_body)
-            sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", pem_body)
-            sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", pem_body)
-            sub(/^[-+]/, "", pem_body)
-            sub(/^[[:space:]]+/, "", pem_body)
-            sub(/[[:space:]]+$/, "", pem_body)
-            if (pem_body != "") {
-              if ((pem_body ~ /^[A-Za-z0-9+\/=]{20,}$/ && pem_body ~ /[G-Zg-z+\/=]/) ||
-                  pem_body ~ /^(Proc-Type|DEK-Info):/ ||
-                  $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
-              else if (++pem_stray >= 3) in_pem = 0
+            # Stray prose mention: bounded window so an ordinary report does not
+            # get swallowed by a BEGIN marker quoted in passing. PEM armor is
+            # base64 plus the Proc-Type/DEK-Info headers, so count consecutive
+            # lines that cannot be key material and leave PEM mode after 3 of
+            # them. The body test also requires at least one character outside
+            # the 0-9/a-f range: a bare 40- or 64-char hex token (git SHA, hash)
+            # is common in ordinary reviewer prose and would otherwise satisfy a
+            # length-only base64 check on every such line, resetting the stray
+            # counter forever. A hard span cap (200 lines) backstops the stray
+            # counter so this branch terminates even if some future input keeps
+            # fooling the body classifier.
+            if (++pem_span > 200) {
+              in_pem = 0
+            } else {
+              pem_body = strip_deco($0)
+              if (pem_body != "") {
+                if ((is_base64_line(pem_body, 20) && pem_body ~ /[G-Zg-z+\/=]/) ||
+                    pem_body ~ /^(Proc-Type|DEK-Info):/ ||
+                    $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
+                else if (++pem_stray >= 3) in_pem = 0
+              }
             }
           }
         }
+        # Blank lines are NEUTRAL — they neither reset nor increment pem_stray
+        # (is_base64_line("") is false and pem_body == "" short-circuits above).
+        # Counting them as valid body would reset pem_stray on every paragraph
+        # gap in ordinary prose, so the cutoff would never be reached; counting
+        # them as stray would end redaction inside a key that contains one.
         print line
       }
       ' "$fenced_path")
@@ -1131,7 +1377,7 @@ This is the final output of the command. Exit 0.
 | 1-3 of 4 reviewers fail | Headline: "Council ran with N of 4 reviewers"; synthesis proceeds with remaining |
 | yellow-codex not installed | Codex marked UNAVAILABLE; Claude + Gemini + OpenCode still run |
 | claude-reviewer spawn fails or returns nothing parseable | Recorded as `ERROR` by `parse_reviewer_return` like any other missing return; no not-installed branch exists (the reviewer is in-process); the other three still run |
-| claude-reviewer never returns at all | **No automatic recovery.** `COUNCIL_TIMEOUT` wraps only the three CLI reviewers; the in-process slot has no subprocess to kill, so the fan-out blocks. The agent is instructed to bound its own investigation and return partial findings, but that is prose, not a guard. Cancel the invocation and re-run. The fenced temp file, if it was written, is NOT reclaimed: the next run mints a different random `mktemp -u` suffix and nothing globs /tmp for orphans, so it stays until the OS reaps it. Deliberate — a glob sweep would risk deleting a concurrent run's in-flight file from another checkout on the same machine |
+| claude-reviewer never returns at all | **No automatic recovery.** `COUNCIL_TIMEOUT` wraps only the three CLI reviewers; the in-process slot has no subprocess to kill, so the fan-out blocks. The agent is instructed to bound its own investigation and return partial findings, but that is prose, not a guard. Cancel the invocation and re-run. The fenced temp file, if it was written, is NOT reclaimed immediately: the next run mints a different random `mktemp -u` suffix, and Step 4's stale-file sweep only reclaims files older than `STALE_MINUTES` (1440 = 24h) — so it stays until either the OS reaps `/tmp` or a later `/council` invocation runs after it has aged past the threshold. Deliberate — an unconditional glob-and-unlink would risk deleting a concurrent run's in-flight file from another checkout on the same machine; the age gate lets genuine orphans get reclaimed without that risk |
 | A reviewer returns a `fenced_output_path` outside `/tmp/council-<reviewer>-fenced-*.txt`, or one containing `..` or an extra `/` | Refused at every site that touches it, each warning on stderr: Step 7 does not read it (the appendix renders "output withheld: path refused (see stderr)"), and Steps 8/9 do not unlink it either — refusing to delete an attacker-named path matters more than reclaiming a temp file. A path that is a symlink is also refused at the read site |
 | Slug collision >10 same-day | Error: "too many same-day collisions for slug X (>10)"; exit 1 |
 | User selects Cancel at the confirmation gate | Print "Report not saved"; cleanup temps; exit 0 |
