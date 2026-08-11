@@ -13,6 +13,7 @@ plans/workflows-to-flow-namespace-migration.md
   s_0c38a1b007fa25::t_4b3ec0a38d4882 394-426
   s_0c38a1b007fa25::t_c0aa8364cd857a 459-463
   s_0c38a1b007fa25::t_11755507bd7092 564-565
+  s_c1e3326aa9a6ae::t_a71c660f79fd25 388,390-393
 ---
 {
   "schema_version": "authorship/3.0.0",
@@ -25,6 +26,14 @@ plans/workflows-to-flow-namespace-migration.md
         "tool": "claude",
         "id": "b815b1ef-5ccc-4094-ac08-3e95d80f9ef4",
         "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-fable-5"
       },
       "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
     }
