@@ -188,19 +188,56 @@ Per-invocation file count cap: `${COUNCIL_PATH_MAX_FILES:-3}`.
 
 ### Step 4: Parallel reviewer fan-out via Task
 
-Spawn all three reviewers in a SINGLE message (Claude Code runs them
-concurrently). The pack is the SAME for all three; only `{{REVIEWER_NAME}}`
-in the prompt template differs.
+Spawn all four reviewers in a SINGLE message (Claude Code runs them
+concurrently). The pack is the SAME for all four; only `{{REVIEWER_NAME}}`
+in the prompt template differs — plus one extra line in claude-reviewer's
+prompt carrying its fenced-output path (see below).
+
+First, mint that path — run this BEFORE the spawns:
+
+```bash
+# claude-reviewer is in-process: it has `Write` but no `Bash`, so it has no
+# mktemp and no entropy source to mint a collision-safe temp path itself. A
+# hardcoded path would break on the second /council run of a session — the
+# Write tool refuses to overwrite a file it has not Read, and /tmp files
+# outlive sessions. `-u` prints a name WITHOUT creating the file, so the
+# agent's single Write is a create rather than an overwrite.
+CLAUDE_FENCED_FILE=$(mktemp -u /tmp/council-claude-fenced-XXXXXX.txt)
+printf 'CLAUDE_FENCED_FILE=%s\n' "$CLAUDE_FENCED_FILE"
+```
+
+Capture the literal path this prints and substitute it verbatim into
+claude-reviewer's spawn prompt below — Bash variables do NOT survive across
+separate Bash tool calls, and the Task prompt is not shell-expanded, so
+passing the string `$CLAUDE_FENCED_FILE` would hand the agent a useless
+literal.
+
+Do NOT write this path to `$STATE_FILE` here: the parse block below opens with
+`: > "$STATE_FILE"`, which truncates anything written beforehand.
+claude-reviewer returns the same path back in its `fenced_output_path=` line,
+so `parse_reviewer_return` persists it exactly like the other three reviewers'
+paths, and the Step 8 / Step 9 cleanup loops unlink it with the rest.
 
 In a single tool-call message, invoke:
 
-1. `Task(subagent_type="yellow-codex:review:codex-reviewer", prompt=<pack with REVIEWER_NAME=Codex>)`
+1. `Task(subagent_type="yellow-council:review:claude-reviewer", prompt=<pack with REVIEWER_NAME=Claude, plus the fenced-output path line>)`
+   - Append one line to this reviewer's prompt only:
+     `Write your fenced output to this exact path: <literal CLAUDE_FENCED_FILE value>`
+   - This reviewer runs in-process, so there is no not-installed degradation
+     branch (unlike Codex). If the spawn itself fails or returns nothing
+     parseable, it falls through to the same missing-return handling as any
+     other reviewer and is recorded as `ERROR`.
+   - The pack's `## Required Output Format` block describes Layer-1
+     external-CLI output. claude-reviewer deliberately emits that shape only
+     into its fenced-output file and returns the lowercase Layer-2 6-key
+     contract; its agent body states this override explicitly.
+2. `Task(subagent_type="yellow-codex:review:codex-reviewer", prompt=<pack with REVIEWER_NAME=Codex>)`
    - If yellow-codex is not installed, the spawn fails. Catch and mark Codex
      as `UNAVAILABLE (yellow-codex not installed)` in synthesis.
-2. `Task(subagent_type="yellow-council:review:gemini-reviewer", prompt=<pack with REVIEWER_NAME=Gemini>)`
-3. `Task(subagent_type="yellow-council:review:opencode-reviewer", prompt=<pack with REVIEWER_NAME=OpenCode>)`
+3. `Task(subagent_type="yellow-council:review:gemini-reviewer", prompt=<pack with REVIEWER_NAME=Gemini>)`
+4. `Task(subagent_type="yellow-council:review:opencode-reviewer", prompt=<pack with REVIEWER_NAME=OpenCode>)`
 
-Wait for all three Tasks to return. Each reviewer returns:
+Wait for all four Tasks to return. Each reviewer returns:
 
 ```text
 verdict=<APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE>
