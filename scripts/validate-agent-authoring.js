@@ -85,6 +85,19 @@ const REVIEW_AGENT_ALLOWLIST = new Set([
   // plans/yellow-council-godmodeskill-integration.md (2026-05-04).
   'yellow-council/agents/review/gemini-reviewer.md',
   'yellow-council/agents/review/opencode-reviewer.md',
+  // claude-reviewer is the council's in-process slot and does NOT share the
+  // CLI-wrapper rationale above: it has no Bash at all and invokes no binary.
+  // Write is granted for exactly one file — the fenced-output path the
+  // orchestrator mints with `mktemp -u` and passes in the spawn prompt. With
+  // no Bash there is no mktemp, so the agent cannot mint a collision-safe
+  // path itself, and a hardcoded one breaks on the second /council run of a
+  // session (Write refuses to overwrite a file it has not Read). This entry
+  // is a review-time gate, NOT a runtime path restriction — Claude Code has
+  // no path-scoping for Write; the bound is the agent's "Tool Surface —
+  // Documented Exception" prompt constraint plus human review of any change
+  // to this list. See plans/yellow-council-v2-four-cli-02-claude-reviewer-fanout.md
+  // R5/R7 (2026-08-10).
+  'yellow-council/agents/review/claude-reviewer.md',
 ]);
 
 // V1/V2/V3/V4 — model/effort frontmatter lint rules (see M-A-01 plan).
