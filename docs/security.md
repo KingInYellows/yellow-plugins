@@ -261,13 +261,17 @@ Code with `tools: [Read, Grep, Glob, Write]` and no `Bash`, which makes its
 trust boundary different from the three CLI reviewers above in three ways
 that matter:
 
-- **`Write` on a `review/` agent.** Every other reviewer in the marketplace
-  is denied `Write` by the W1.5 rule in
-  `scripts/validate-agent-authoring.js`. `claude-reviewer` is allowlisted
-  there for one purpose: materializing its fenced-output file. The bound is
-  a prompt constraint plus that review-time gate — **Claude Code has no
-  runtime path-scoping for `Write`**, so nothing at execution time confines
-  it. This is weaker than a sandbox and is stated as such in the agent body.
+- **`Write` on a `review/` agent.** The W1.5 rule in
+  `scripts/validate-agent-authoring.js` denies `Write` to `review/` agents by
+  default; `gemini-reviewer` and `opencode-reviewer` are also allowlisted
+  exceptions, but for a different reason — they shell out to an external CLI
+  binary via `Bash` and need `Write` alongside it. `claude-reviewer` is the
+  only allowlisted reviewer with `Write` and no `Bash` at all: the exception
+  exists solely so it can materialize its fenced-output file in-process,
+  with no CLI invocation to justify it. The bound is a prompt constraint
+  plus that review-time gate — **Claude Code has no runtime path-scoping for
+  `Write`**, so nothing at execution time confines it. This is weaker than a
+  sandbox and is stated as such in the agent body.
 - **A two-hop path trust chain.** `council.md` mints the output path with
   `mktemp -u` in a Bash block, but the value reaches the agent because the
   orchestrating model copied the printed literal into the spawn prompt — a

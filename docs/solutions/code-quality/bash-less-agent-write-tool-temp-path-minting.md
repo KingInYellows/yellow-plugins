@@ -55,8 +55,12 @@ Move path minting to whichever side of the spawn boundary actually has
    ```bash
    CLAUDE_FENCED_FILE=$(mktemp -u /tmp/council-claude-fenced-XXXXXX.txt)
    ```
-2. Persist that value alongside the orchestrator's other per-reviewer state
-   rows (same mechanism already used for the CLI-wrapper reviewers' paths).
+2. Do NOT persist that value to the orchestrator's state file — if the same
+   block that parses reviewer returns later truncates that file (e.g.
+   `: > "$STATE_FILE"`), anything written beforehand is lost. Rely on the
+   reviewer echoing the path back in its own return contract instead (e.g.
+   `fenced_output_path=`), with independent cleanup for a malformed or
+   missing return.
 3. Pass the literal, already-resolved path as plain text inside the
    subagent's Task spawn prompt — reuse the same channel the rest of the
    review pack/diff context already travels over; no new plumbing needed.

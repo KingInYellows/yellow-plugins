@@ -158,9 +158,12 @@ agents. All files LF (`sed -i 's/\r$//'` after WSL2 authoring).
   Step 4 spawn block (~195–201) to 4 parallel Task spawns: add
   `subagent_type="yellow-council:review:claude-reviewer"`, and before the
   spawns mint `CLAUDE_FENCED_FILE=$(mktemp -u /tmp/council-claude-fenced-XXXXXX.txt)`
-  (persist it to `$STATE_FILE` alongside the other state rows) and pass the
-  literal path in claude-reviewer's spawn prompt. Claude is in-process — no
-  not-installed degradation branch (unlike Codex); a spawn failure still
+  (do NOT persist it to `$STATE_FILE` — the parse block below truncates that
+  file, so the value would be lost; rely on claude-reviewer returning it via
+  `fenced_output_path=` instead, with independent cleanup for a malformed
+  return) and pass the literal path in claude-reviewer's spawn prompt. Claude
+  is in-process — no not-installed degradation branch (unlike Codex); a
+  spawn failure still
   falls through to the existing missing-return handling as
   `ERROR`/`UNAVAILABLE`.
 - [x] Step 6: Audit every per-reviewer site in `council.md` for the 4th slot
