@@ -1,0 +1,71 @@
+plugins/yellow-linear/commands/linear/work.md
+  s_0c38a1b007fa25::t_4e8600fd32e45b 183,188
+plugins/yellow-research/commands/flow/deepen-plan.md
+  s_0c38a1b007fa25::t_9aa08c3c613937 41,123,283
+  s_0c38a1b007fa25::t_6f24c7737961a5 3
+  s_0c38a1b007fa25::t_f9980bae091f60 22,24,26,267,275
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+plugins/yellow-core/references/flow-work/graphite-command-reference.md
+  s_0c38a1b007fa25::t_e92493f3769ba7 3
+plugins/yellow-core/commands/flow/plan.md
+  s_0c38a1b007fa25::t_f9980bae091f60 309-311,547,556-557,565-566,573-574,582-584
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+  s_0c38a1b007fa25::t_9aa08c3c613937 129,173
+plugins/yellow-core/commands/flow/spec.md
+  s_0c38a1b007fa25::t_6f24c7737961a5 3
+  s_0c38a1b007fa25::t_f9980bae091f60 17,21,24,152
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+plugins/yellow-core/commands/flow/work.md
+  s_0c38a1b007fa25::t_3fda553f9f8215 272
+  s_0c38a1b007fa25::t_9aa08c3c613937 217,566
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+  s_0c38a1b007fa25::t_f9980bae091f60 478
+  s_0c38a1b007fa25::t_862ad8d7633b11 877
+plugins/yellow-core/commands/flow/decompose.md
+  s_0c38a1b007fa25::t_6f24c7737961a5 3
+  s_0c38a1b007fa25::t_9aa08c3c613937 50
+  s_0c38a1b007fa25::t_f9980bae091f60 13,18-19,57,85,137,178,190
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+plugins/yellow-core/commands/flow/expand-shell.md
+  s_0c38a1b007fa25::t_9aa08c3c613937 148
+  s_0c38a1b007fa25::t_f9980bae091f60 16,20,22,38,97,124
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+  s_0c38a1b007fa25::t_6f24c7737961a5 3
+plugins/yellow-core/commands/flow/compound.md
+  s_0c38a1b007fa25::t_f9980bae091f60 15,23-25,214
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+plugins/yellow-core/commands/flow/review.md
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+plugins/yellow-core/commands/flow/brainstorm.md
+  s_0c38a1b007fa25::t_6f24c7737961a5 3
+  s_0c38a1b007fa25::t_f9980bae091f60 13
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+plugins/yellow-core/commands/flow/pick-next-shell.md
+  s_0c38a1b007fa25::t_9aa08c3c613937 24
+  s_0c38a1b007fa25::t_f9980bae091f60 13,84,91,109,135-136,141,144
+  s_0c38a1b007fa25::t_4e8600fd32e45b 104,125,127
+  s_0c38a1b007fa25::t_6f24c7737961a5 3
+  s_0c38a1b007fa25::t_8ea013922c41e7 2
+plugins/yellow-review/commands/review/sweep-all.md
+  s_0c38a1b007fa25::t_4e8600fd32e45b 201
+plugins/yellow-core/CLAUDE.md
+  s_0c38a1b007fa25::t_5c14dbc4176926 166
+plugins/yellow-core/skills/debugging/SKILL.md
+  s_0c38a1b007fa25::t_5c14dbc4176926 45,207,225,238,309,312
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "24570e0fdb394faa0394b7c0e5ff763fade13d21",
+  "prompts": {},
+  "sessions": {
+    "s_0c38a1b007fa25": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b815b1ef-5ccc-4094-ac08-3e95d80f9ef4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
