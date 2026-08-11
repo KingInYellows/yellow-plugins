@@ -5,6 +5,11 @@ plugins/yellow-core/skills/multi-host-fleet/SKILL.md
 scripts/exercise-flow-namespace-gate.sh
   s_c1e3326aa9a6ae::t_6167c944b05281 95,98,103,108
   s_c1e3326aa9a6ae::t_878e2ef11ef96a 96-97,99-102,104-107,109-111
+  s_c1e3326aa9a6ae::t_b4c45efcc68a61 161
+  s_c1e3326aa9a6ae::t_171697334cc765 173
+  s_c1e3326aa9a6ae::t_6c12fc888a0fc9 131
+  s_c1e3326aa9a6ae::t_a78888f9073738 112
+  s_c1e3326aa9a6ae::t_ba414e294d68dc 149
 plugins/yellow-core/agents/research/learnings-researcher.md
   s_c1e3326aa9a6ae::t_cea4b16d20936b 211
 ---
