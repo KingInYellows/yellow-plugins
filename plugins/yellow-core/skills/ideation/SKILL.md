@@ -1,6 +1,6 @@
 ---
 name: ideation
-description: "Generate 3 grounded approaches to a soft problem, then hand the chosen one off to `brainstorm-orchestrator`. Use when the problem statement is still vague or `/workflows:brainstorm` narrows too quickly."
+description: "Generate 3 grounded approaches to a soft problem, then hand the chosen one off to `brainstorm-orchestrator`. Use when the problem statement is still vague or `/flow:brainstorm` narrows too quickly."
 argument-hint: '[problem statement; append --strict-warrant or --no-strict-warrant to override domain default]'
 user-invokable: true
 ---
@@ -55,13 +55,13 @@ Trigger this skill (`/yellow-core:ideation`) when:
 
 - The user has a problem but no solution direction yet ("we keep seeing flaky
   CI", "onboarding feels long", "error messages are confusing")
-- The user wants 2–3 strong options surfaced before committing — `/workflows:brainstorm`
+- The user wants 2–3 strong options surfaced before committing — `/flow:brainstorm`
   alone narrows too quickly when the problem statement is soft
 - A `compound` solution is missing for a recurring pain point and the team
   needs to compare approaches before drafting requirements
 - The user explicitly asks to "ideate", "explore options", or "give me ideas"
 
-Skip ideation and go straight to `/workflows:brainstorm` when the user already
+Skip ideation and go straight to `/flow:brainstorm` when the user already
 named a specific approach and is asking how to scope or execute it.
 
 ## Usage
@@ -242,7 +242,7 @@ questions yourself.
 **Graceful degradation:** if the Task tool spawn fails (subagent not
 registered, plugin not installed), surface the chosen approach and its
 warrant + next step + open question in plain markdown so the user can copy
-it into `/workflows:brainstorm` manually.
+it into `/flow:brainstorm` manually.
 
 ### Strict-Warrant Mode
 
@@ -313,7 +313,7 @@ When strict mode is active, mention it in one line above the Phase 4 question:
 - **brainstorm-orchestrator spawn errors.** Surface the chosen approach with
   its warrant in plain markdown and tell the user once: "[ideation] Could not
   spawn brainstorm-orchestrator — copy the approach into
-  `/workflows:brainstorm` manually."
+  `/flow:brainstorm` manually."
 - **No `Grep`/`Glob` access in the harness.** Phase 1 file-rooted grounding
   is best-effort; if the tools are absent, generate without that grounding
   and note in the Phase 4 output: "(Generated without codebase grounding —

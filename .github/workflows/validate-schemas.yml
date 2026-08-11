@@ -18,14 +18,23 @@ on:
       - 'docs/**'
       - 'plans/**'
       # validate-flow-namespace.js walks the WHOLE repo, so its inputs are
-      # much broader than any other validator's. Without these globs the gate
-      # would be green-by-absence on exactly the PRs it exists to check: the
-      # docs/ + RESEARCH/ sweep never touches a .js file, and the allowlist it
-      # shrinks is .json under scripts/ (not matched by 'scripts/**/*.js').
-      - 'scripts/**/*.json'
-      - 'RESEARCH/**'
-      - '*.md'
-      - '.github/**'
+      # much broader than any other validator's. These globs mirror its
+      # SCANNED_EXTENSIONS list one-for-one ('**' crosses directory
+      # separators, '*' does not), so no file the gate scans can change
+      # without triggering this workflow. Keep in sync with
+      # scripts/validate-flow-namespace.js.
+      - '**/*.md'
+      - '**/*.js'
+      - '**/*.cjs'
+      - '**/*.mjs'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.sh'
+      - '**/*.bats'
+      - '**/*.txt'
       - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
   push:
@@ -46,11 +55,20 @@ on:
       - 'packages/**/*.ts'
       - 'packages/**/*.json'
       - 'docs/**'
-      # Mirrors the flow-namespace globs above — see the comment there.
-      - 'scripts/**/*.json'
-      - 'RESEARCH/**'
-      - '*.md'
-      - '.github/**'
+      # Mirrors the flow-namespace SCANNED_EXTENSIONS globs above — see the
+      # comment there.
+      - '**/*.md'
+      - '**/*.js'
+      - '**/*.cjs'
+      - '**/*.mjs'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.sh'
+      - '**/*.bats'
+      - '**/*.txt'
       - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
   workflow_dispatch:
