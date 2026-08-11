@@ -1,6 +1,6 @@
 ---
 name: council
-description: "On-demand cross-lineage code review fanning out to Codex (via yellow-codex), Gemini, and OpenCode CLIs in parallel for advisory consensus. Modes: plan | review | debug | question."
+description: "On-demand cross-lineage code review fanning out to an in-process Claude reviewer plus the Codex (via yellow-codex), Gemini, and OpenCode CLIs in parallel for advisory consensus. Modes: plan | review | debug | question."
 argument-hint: '<plan|review|debug|question> [args]'
 allowed-tools:
   - Bash
@@ -16,8 +16,9 @@ skills:
 
 # /council — Cross-Lineage Code Review
 
-Fan out a context pack to Codex, Gemini, and OpenCode reviewers in parallel,
-synthesize their verdicts inline, and persist the full report to
+Fan out a context pack to four reviewers in parallel — an in-process Claude
+reviewer plus the Codex, Gemini, and OpenCode CLIs — synthesize their verdicts
+inline, and persist the full report to
 `docs/council/<date>-<mode>-<slug>.md`.
 
 Output is **advisory and on-demand only** — never blocks merges, never
@@ -252,7 +253,7 @@ findings_block_end
 Parse each return value into structured data. The function fills associative
 arrays — `REVIEWER_VERDICTS`, `REVIEWER_CONFIDENCES`, `REVIEWER_SUMMARIES`,
 `REVIEWER_FENCED_PATHS`, `REVIEWER_FINDINGS` — keyed by reviewer name
-(`codex`, `gemini`, `opencode`). Because each bash block is a fresh
+(`claude`, `codex`, `gemini`, `opencode`). Because each bash block is a fresh
 subprocess, arrays do NOT survive into Steps 7–9; the function therefore also
 persists each entry to `$STATE_FILE`, and every later block that reads
 reviewer state must start with the re-load snippet shown in Step 7. Summaries
@@ -360,13 +361,14 @@ The V1 synthesizer produces:
 
 ### Headline
 <One-line summary based on counts:>
-- All 3 reviewers APPROVE
+- All 4 reviewers APPROVE
 - Split — N APPROVE, M REVISE
-- All 3 reviewers REVISE
-- Council ran with N of 3 reviewers (<excluded reviewers> <reason>)
+- All 4 reviewers REVISE
+- Council ran with N of 4 reviewers (<excluded reviewers> <reason>)
 
 ### Agreement (cited by 2+ reviewers)
 - <file:line> — <finding>
+  - Claude: "<their phrasing>"
   - Codex: "<their phrasing>"
   - Gemini: "<their phrasing>"
   [...]
@@ -476,7 +478,7 @@ __EOF_COUNCIL_SYNTHESIS__
 )
 
 # Append reviewer raw output sections from fenced_output_path files
-for reviewer in codex gemini opencode; do
+for reviewer in claude codex gemini opencode; do
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
   if [ -n "$fenced_path" ] && [ -f "$fenced_path" ]; then
     REPORT_CONTENT="${REPORT_CONTENT}
@@ -597,9 +599,10 @@ This is the final output of the command. Exit 0.
 | Non-existent path | Reject with `[council] Error: path not found`; exit 1 |
 | Empty `debug`/`question` text | Reject with mode-specific usage; exit 1 |
 | `--paths` exceeds `COUNCIL_PATH_MAX_FILES` | Reject with limit message; exit 1 |
-| All 3 reviewers TIMEOUT/ERROR/UNAVAILABLE | Headline: "Council failed: 0 of 3 reviewers returned verdicts"; the confirmation gate still asks; user can save or cancel |
-| 1-2 of 3 reviewers fail | Headline: "Council ran with N of 3 reviewers"; synthesis proceeds with remaining |
-| yellow-codex not installed | Codex marked UNAVAILABLE; Gemini + OpenCode still run |
+| All 4 reviewers TIMEOUT/ERROR/UNAVAILABLE | Headline: "Council failed: 0 of 4 reviewers returned verdicts"; the confirmation gate still asks; user can save or cancel |
+| 1-3 of 4 reviewers fail | Headline: "Council ran with N of 4 reviewers"; synthesis proceeds with remaining |
+| yellow-codex not installed | Codex marked UNAVAILABLE; Claude + Gemini + OpenCode still run |
+| claude-reviewer spawn fails or returns nothing parseable | Recorded as `ERROR` by `parse_reviewer_return` like any other missing return; no not-installed branch exists (the reviewer is in-process); the other three still run |
 | Slug collision >10 same-day | Error: "too many same-day collisions for slug X (>10)"; exit 1 |
 | User selects Cancel at the confirmation gate | Print "Report not saved"; cleanup temps; exit 0 |
 | `docs/council/` not writable | mkdir -p fails; exit 1 |
@@ -611,7 +614,7 @@ This is the final output of the command. Exit 0.
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `COUNCIL_TIMEOUT` | 600 | Per-reviewer timeout in seconds |
+| `COUNCIL_TIMEOUT` | 600 | Per-reviewer timeout in seconds. Applies to the three CLI reviewers only — the in-process claude-reviewer spawns no subprocess and has nothing to bound with `timeout(1)` |
 | `COUNCIL_OPENCODE_VARIANT` | high | OpenCode reasoning effort (high/max/minimal) |
 | `COUNCIL_PATH_CHAR_CAP` | 8000 | Per-file content cap for `--paths` |
 | `COUNCIL_PATH_MAX_FILES` | 3 | Max `--paths` files per invocation |
