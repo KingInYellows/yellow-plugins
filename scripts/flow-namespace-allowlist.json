@@ -17,7 +17,7 @@
     "work": 4,
     "review": 1,
     "compound": 2,
-    "(collective)": 1
+    "(glob)": 1
   },
   "docs/operations/versioning.md": {
     "brainstorm": 1
@@ -73,13 +73,13 @@
     "brainstorm": 1
   },
   "RESEARCH/every-plugin-research.md": {
-    "(collective)": 4,
+    "(glob)": 4,
     "plan": 1,
     "review": 1,
     "brainstorm": 1
   },
   "RESEARCH/MERGE_PLAN.md": {
-    "(collective)": 7,
+    "(glob)": 7,
     "plan": 1,
     "brainstorm": 1,
     "work": 2

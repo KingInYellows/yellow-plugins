@@ -156,7 +156,7 @@ const COLLECTIVE_FORMS = ['\\\\?\\*(?!\\*)', '<[a-z-]+>'];
 // Two capturing groups, so scanFile() can bucket occurrences per command name —
 // the allowlist fingerprint needs the command, not just a total count. Group 1
 // is the command; group 2 is a collective form, which names no single command
-// and is bucketed under COLLECTIVE_KEY instead.
+// and is bucketed under one of the COLLECTIVE_KEYS instead.
 const STALE_RE = new RegExp(
   'workflows:(?:(' +
     COMMANDS.join('|') +
@@ -167,11 +167,27 @@ const STALE_RE = new RegExp(
 );
 
 /**
- * Fingerprint bucket for collective forms (`workflows:*`, `workflows:<cmd>`).
- * They match the namespace without naming one of the 10 commands, so they get
- * their own bucket rather than a `undefined` key.
+ * Fingerprint buckets for collective forms. They match the namespace without
+ * naming one of the 10 commands, so they need a key of their own rather than
+ * an `undefined` one — and the glob and the placeholder need SEPARATE keys.
+ *
+ * A single shared bucket would reintroduce the very blindness the fingerprint
+ * exists to remove: swapping an allowlisted `workflows:*` for a
+ * `workflows:<cmd>` in the same file leaves a shared count unchanged, so the
+ * gate would accept a newly-introduced retired-namespace reference. Keyed
+ * separately, that substitution shows up as drift like any other.
  */
-const COLLECTIVE_KEY = '(collective)';
+const COLLECTIVE_GLOB_KEY = '(glob)';
+const COLLECTIVE_PLACEHOLDER_KEY = '(placeholder)';
+
+/**
+ * Which collective bucket a group-2 match belongs to. The placeholder form is
+ * the only one that starts with `<`; the glob is `*` or its markdown-escaped
+ * `\*`, so anything else is the glob.
+ */
+function collectiveKeyFor(match) {
+  return match.startsWith('<') ? COLLECTIVE_PLACEHOLDER_KEY : COLLECTIVE_GLOB_KEY;
+}
 
 /**
  * Permanent exclusions — never swept, by design.
@@ -379,7 +395,7 @@ function scanFile(relPath) {
     if (matches.length > 0) {
       lines.push(i + 1);
       for (const m of matches) {
-        const key = m[1] || COLLECTIVE_KEY;
+        const key = m[1] || collectiveKeyFor(m[2]);
         counts[key] = (counts[key] || 0) + 1;
       }
     }
