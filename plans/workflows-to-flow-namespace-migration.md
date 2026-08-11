@@ -328,9 +328,11 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
       `workflow` → `floww`; `\b` alone is insufficient
       (`mcp-tool-rename-prefix-collision.md`). Used `perl`, not `sed`, so the
       replacement carries the same `(?![a-z-])` tail guard the gate matches
-      with — `sed` has no lookahead. 60 refs across 24 files, 6 plugins
-      (re-derived from this PR's own diff; `gt-workflow` and `yellow-research`
-      ended up swept in PR1 during review, so they are counted there).
+      with — `sed` has no lookahead. 59 refs across 23 files, 5 plugins
+      (re-derived from this PR's own diff; `gt-workflow`, `yellow-research`,
+      and `yellow-docs` ended up swept in PR1 during review — each turned out
+      to be a functional surface rather than prose — so they are counted
+      there).
 
       **Found a gate blind spot by hand:** `plugins/yellow-core/CLAUDE.md`
       documented the namespace as the glob `` `/workflows:*` ``, which matched
@@ -354,11 +356,13 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
       remaining count rose by 7 when the glob rule learned the markdown-
       escaped spelling `workflows:\*`, which had been invisible to it
 - [x] 2.4: Changeset (`patch`) for **every** plugin touched — CI keys on
-      `plugins/` paths, not semantics. **6 plugins**: the 7 this plan
-      predicted, minus `gt-workflow` and `yellow-research` (swept in PR1,
-      bumped by PR1's changeset), plus `yellow-docs`, which had one uncounted
-      reference. Derived from the commit's diff, not from `git status`, so a
-      concurrently-dirty tree cannot inflate it
+      `plugins/` paths, not semantics. **5 plugins**: the 7 this plan
+      predicted, minus `gt-workflow`, `yellow-research`, and `yellow-docs`,
+      all three swept in PR1 during review and bumped by PR1's changeset.
+      Derived from the commit's diff, not from `git status`, so a
+      concurrently-dirty tree cannot inflate it — and re-derived after every
+      review round that moved a file between PRs, because a changeset naming
+      an untouched plugin publishes a version of it for nothing
 
 ### PR3 — `docs/` (85 anchored / 92 unanchored) + `RESEARCH/` (10 / 14)
 
