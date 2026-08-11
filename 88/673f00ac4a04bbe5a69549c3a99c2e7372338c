@@ -1,0 +1,27 @@
+CONTRIBUTING.md
+  s_0c38a1b007fa25::t_c9018564744c87 342,411
+docs/CLAUDE.md
+  s_0c38a1b007fa25::t_a0678263cc0b3e 89
+AGENTS.md
+  s_0c38a1b007fa25::t_15ea693ebdb0a4 392
+.github/workflows/validate-schemas.yml
+  s_0c38a1b007fa25::t_92f2fbb989863c 1191
+.github/pull_request_template.md
+  s_0c38a1b007fa25::t_c68b90ef4a01ce 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "88673f00ac4a04bbe5a69549c3a99c2e7372338c",
+  "prompts": {},
+  "sessions": {
+    "s_0c38a1b007fa25": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b815b1ef-5ccc-4094-ac08-3e95d80f9ef4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
