@@ -46,3 +46,21 @@ multi-subsystem to fit in one plan file or one work session, redirecting to
 instead of drafting a plan directly. Note: the escalation check is
 qualitative (no numeric threshold) and can also fire in Phase 5, after a
 plan draft already exists.
+
+## council
+
+The multi-CLI review orchestrator (`/council`) that fans a single review
+request out to multiple independent reviewer agents and aggregates their
+verdicts into one report.
+
+## fenced-output path
+
+The dedicated file path a council reviewer agent writes its structured
+verdict/findings block to, so the orchestrator can safely re-ingest it
+without cross-contamination from the reviewer's own untrusted-input
+handling.
+
+## CLI-wrapper reviewer
+
+A council reviewer that shells out to an external LLM CLI (e.g. Gemini or
+OpenCode) via its own Bash tool.
