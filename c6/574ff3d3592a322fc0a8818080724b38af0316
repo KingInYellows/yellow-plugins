@@ -15,6 +15,8 @@ plugins/yellow-linear/commands/linear/sync.md
 scripts/validate-flow-namespace.js
   s_0c38a1b007fa25::t_48117bd4ebf0c6 125-132,140,142,144-145,151,153,155,157-158
   s_0c38a1b007fa25::t_962543d9307fa3 133-139,141
+  s_c1e3326aa9a6ae::t_beb62b2169a029 146-150,152,154,156,159-165
+  s_c1e3326aa9a6ae::t_9fb0570287238d 372-375
 plugins/gt-workflow/output-styles/stack-decomposition.md
   s_0c38a1b007fa25::t_9ab8abab304bb7 9,72,85,100,115,125,130,136
 plugins/yellow-core/CLAUDE.md
@@ -92,6 +94,8 @@ plugins/yellow-core/skills/multi-host-fleet/SKILL.md
   s_0c38a1b007fa25::t_9a2a9f5090e29e 1-37
 plugins/yellow-core/skills/git-worktree/SKILL.md
   s_0c38a1b007fa25::t_9ab8abab304bb7 179,185,192,198,203,235,277,279,286
+scripts/flow-namespace-allowlist.json
+  s_c1e3326aa9a6ae::t_9e652f194473a5 19-20,76
 ---
 {
   "schema_version": "authorship/3.0.0",
@@ -103,6 +107,14 @@ plugins/yellow-core/skills/git-worktree/SKILL.md
       "agent_id": {
         "tool": "claude",
         "id": "b815b1ef-5ccc-4094-ac08-3e95d80f9ef4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
         "model": "claude-opus-5"
       },
       "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
