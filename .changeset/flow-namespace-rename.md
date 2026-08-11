@@ -1,6 +1,6 @@
 ---
-"yellow-core": minor
-"yellow-research": minor
+"yellow-core": major
+"yellow-research": major
 "yellow-linear": patch
 "yellow-review": patch
 "gt-workflow": patch
@@ -36,9 +36,11 @@ gt-workflow takes a `patch`: its stack-decomposition skills, output styles,
 and docs name `/flow:work` / `/flow:plan` as the plan consumer, updated from
 the retired `workflows:` names.
 
-`minor`, not `major`: the discriminator in this repo's precedent is whether an
-external caller breaks, and there is no external install base for this
-marketplace. The singular `yellow-core:workflow:*` agent namespace is
+`major` for both: the old `/workflows:*` command files are deleted outright
+with no forwarding alias, and both AGENTS.md and `CONTRIBUTING.md` state the
+bump-type rule as major for "removal of a command" / "removed or breaking
+command interfaces" with no carve-out for a marketplace with no external
+install base. The singular `yellow-core:workflow:*` agent namespace is
 unchanged.
 
 A new CI gate, `pnpm validate:flow-namespace`, walks the whole repository

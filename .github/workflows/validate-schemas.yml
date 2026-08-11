@@ -71,6 +71,12 @@ on:
       - '**/*.txt'
       - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
+      # The recursive extension globs above (e.g. '**/*.md') would otherwise
+      # re-include .changeset/**, undoing the omission stated above. Safe to
+      # exclude: validate-flow-namespace.js's own EXCLUDED_DIRS also skips
+      # .changeset (see the comment there), so nothing under it needs this
+      # gate at push time either.
+      - '!.changeset/**'
   workflow_dispatch:
 
 # Cancel stale workflow runs

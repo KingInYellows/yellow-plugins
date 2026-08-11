@@ -54,12 +54,13 @@
  * directories. Every other validator in this repo roots at PLUGINS_DIR, which
  * is precisely why three separate prose censuses during planning each missed
  * `.github/` (ripgrep skips dotdirs by default) and `RESEARCH/`. The one
- * carve-out is machine-local gitignored state (`.claude/`, `.codex/`,
- * `.entire/`, `.ruvector/`) — see EXCLUDED_DIRS below — which cannot be part
- * of the commit and would otherwise turn per-developer state into a false
- * blocking failure. A directory or file that IS walked but cannot be read is
- * a hard error, not a silent skip: this is a completeness gate, so treating
- * an unreadable path as "nothing to scan" could let it go green while stale
+ * carve-out is machine-local gitignored state — see GIT_IGNORED below, which
+ * resolves every untracked path `.gitignore` covers (not a hand-enumerated
+ * subset) via `git ls-files`, so it cannot be part of the commit and would
+ * otherwise turn per-developer generated state into a false blocking
+ * failure. A directory or file that IS walked but cannot be read is a hard
+ * error, not a silent skip: this is a completeness gate, so treating an
+ * unreadable path as "nothing to scan" could let it go green while stale
  * references sit unseen underneath.
  *
  * Error codes (catalog: packages/domain/src/validation/errorCatalog.ts) are
@@ -82,6 +83,7 @@
 
 'use strict';
 
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -132,13 +134,10 @@ const STALE_RE = new RegExp('workflows:(?:' + COMMANDS.join('|') + ')(?![a-z-])'
  *   - Transient or generated content (`.changeset/**` is consumed by the
  *     version-packages PR; this migration's own changesets legitimately name
  *     the old namespace, and the gate runs on the PR before they are consumed).
- *   - Machine-local gitignored state (per `.gitignore`) that is never part of
- *     the commit and cannot be fixed by the migration: a stale reference
- *     there would be an unactionable, false-blocking failure. This is
- *     narrower than "everything .gitignore ignores" — it targets the
- *     directories that are large, per-developer, or tool-generated (agent
- *     memory, vector-index blobs, sibling-CLI session state), not every
- *     ignored pattern in the repo.
+ *   - Machine-local gitignored state — resolved dynamically via GIT_IGNORED
+ *     below, not hand-enumerated here. `.git` and `node_modules` stay
+ *     hardcoded because they're VCS/tooling internals worth naming
+ *     explicitly regardless of .gitignore's contents.
  *
  * Matched against repo-relative POSIX paths.
  */
@@ -150,11 +149,51 @@ const EXCLUDED_DIRS = [
   // migration's own plan doc lives here and narrates the old namespace
   'docs/brainstorms',
   'docs/solutions',
-  '.claude', // per-developer agent memory (gitignored)
-  '.codex', // Codex CLI per-developer state (gitignored)
-  '.entire', // Entire AI tool per-developer config (gitignored)
-  '.ruvector', // ruvector vector-index blobs, often a symlink (gitignored)
 ];
+
+/**
+ * Every path `.gitignore` covers that is NOT tracked, resolved once via
+ * `git ls-files` instead of hand-enumerated (the prior approach hardcoded
+ * `.claude/`, `.codex/`, `.entire/`, `.ruvector/` and missed everything else
+ * `.gitignore` covers — `.swarm/`, `.hive-mind/`, `.claude-flow/`, `memory/`,
+ * `coordination/`, build outputs, ... — turning any of those into a false
+ * blocking failure on a developer machine that has them).
+ *
+ * `--others` scopes this to *untracked* paths only, so a file that is both
+ * tracked and pattern-matched by `.gitignore` (e.g.
+ * plugins/yellow-debt/.debt/.gitignore, added before its ignore rule
+ * existed) is never swept up here — git tracks it, so it can enter a commit,
+ * so the gate must still scan it. `--directory` collapses a fully-ignored
+ * directory into a single trailing-slash entry instead of descending into
+ * every file beneath it, so isExcluded()'s prefix check can skip the whole
+ * subtree without the walk ever entering it.
+ *
+ * Resolved once at module load, before main() runs — --write-allowlist mode
+ * needs the same exclusion set as the gate mode. A failure here (e.g. ROOT
+ * is not inside a git work tree) is a hard error, not a silent empty set:
+ * running with no ignore resolution at all would make the gate fail loud
+ * every time a developer with local generated state runs it, exactly the
+ * false-blocking failure this exists to prevent.
+ */
+function gitIgnoredEntries() {
+  let out;
+  try {
+    out = execFileSync(
+      'git',
+      ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'],
+      { cwd: ROOT, encoding: 'utf8' }
+    );
+  } catch (err) {
+    console.error(
+      `[validate-flow-namespace] Error: could not list git-ignored paths under ` +
+        `${ROOT} — is it inside a git work tree? (${err.message})`
+    );
+    process.exit(1);
+  }
+  return out.split('\0').filter(Boolean).map(toPosix);
+}
+
+const GIT_IGNORED = gitIgnoredEntries();
 
 const EXCLUDED_FILES = [
   'CHANGELOG.md', // root, bot-generated release history
@@ -201,6 +240,10 @@ function isExcluded(relPath) {
   if (PLUGIN_CHANGELOG_RE.test(relPath)) return true;
   for (const dir of EXCLUDED_DIRS) {
     if (relPath === dir || relPath.startsWith(dir + '/')) return true;
+  }
+  for (const entry of GIT_IGNORED) {
+    const ignoredPath = entry.endsWith('/') ? entry.slice(0, -1) : entry;
+    if (relPath === ignoredPath || relPath.startsWith(ignoredPath + '/')) return true;
   }
   return false;
 }
