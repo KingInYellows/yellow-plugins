@@ -138,16 +138,26 @@ const COMMANDS = [
  * rule was added. A real glob is followed by a backtick, quote, or space,
  * never by a second asterisk.
  *
- * The leading `\\?` accepts the markdown-ESCAPED spelling `workflows:\*` as
- * well as the bare one. Prose that has to render a literal asterisk escapes
- * it, so the same reference is spelled both ways in the same repo —
- * RESEARCH/MERGE_PLAN.md uses the escaped form five times. Without this the
- * gate reports a file clean once its unescaped references are swept, while
- * escaped ones survive underneath. The `(?!\*)` bold guard still applies: in
- * `**bold**` the character after the colon is an unescaped `*`, so the
- * optional backslash simply does not participate.
+ * The glob is TWO alternatives, not one with an optional escape, because the
+ * bold guard must apply to exactly one of them:
+ *
+ *   `\\\*`      the markdown-ESCAPED spelling `workflows:\*`. Prose that has
+ *               to render a literal asterisk escapes it, so the same
+ *               reference is spelled both ways in the same repo —
+ *               RESEARCH/MERGE_PLAN.md uses the escaped form seven times.
+ *               NO bold guard here: the escape already proves the asterisk is
+ *               content, so a following `*` is markdown formatting around the
+ *               reference (`**workflows:\***`), not a second glob character.
+ *               Guarding this branch is what let a bolded escaped glob slip
+ *               through the gate.
+ *   `\*(?!\*)`  the bare spelling. The guard IS needed here: markdown bold
+ *               puts `**` directly after a colon-terminated phrase —
+ *               "**Template-driven workflows:**" — and an unguarded `\*`
+ *               matches that as `workflows:` + `*`, which is ordinary
+ *               English. Three such false positives appeared the moment this
+ *               rule was added.
  */
-const COLLECTIVE_FORMS = ['\\\\?\\*(?!\\*)', '<[a-z-]+>'];
+const COLLECTIVE_FORMS = ['\\\\\\*', '\\*(?!\\*)', '<[a-z-]+>'];
 
 // Shape 2 (unslashed) subsumes shapes 1 and 3 — see the module header.
 // The tail guard applies only to the command alternation: `*` and `<...>` are
