@@ -1,0 +1,41 @@
+.changeset/yellow-council-claude-reviewer-fanout.md
+  s_6c2a352ad27053::t_384c6e8d832bef 1-36
+plans/yellow-council-v2-four-cli-02-claude-reviewer-fanout.md
+  s_6c2a352ad27053::t_f478b64c979a9e 166
+  s_6c2a352ad27053::t_8b5cff29171280 176
+  s_6c2a352ad27053::t_b228aa1b80a617 150
+  s_6c2a352ad27053::t_46da9e6dbfccc2 121
+  s_272aff645fd807::t_fb3d3ea7f18c5b 1-120,122-133,135-141,143-149,151-156,158-165,167-175,177-181,183-233
+  s_6c2a352ad27053::t_45746209eee860 157
+  s_6c2a352ad27053::t_8a3e181d0ffd08 142
+  s_6c2a352ad27053::t_a236c2ff2a1f8c 182
+  s_6c2a352ad27053::t_228af5359549ec 134
+docs/CONCEPTS.md
+  s_272aff645fd807::t_4dc927d42c0f59 49-66
+docs/solutions/code-quality/bash-less-agent-write-tool-temp-path-minting.md
+  s_272aff645fd807::t_e932af15c00d71 1-149
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "8df92cb3678467d14b0684af301393a70f595f4d",
+  "prompts": {},
+  "sessions": {
+    "s_272aff645fd807": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "612ee0ae-3b97-4524-b10f-bd2899fbf1f1",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_6c2a352ad27053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83a0b595-f559-4808-81cd-5f19323d7a5c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
