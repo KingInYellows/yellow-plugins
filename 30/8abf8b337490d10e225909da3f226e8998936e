@@ -1,0 +1,29 @@
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_6c2a352ad27053::t_b47bd7b40164f3 3
+  s_6c2a352ad27053::t_71e6b555fabc5f 522
+  s_6c2a352ad27053::t_789be695d35fc3 351-354
+  s_6c2a352ad27053::t_cdd0971c3482d0 406-425
+  s_6c2a352ad27053::t_8d942076863fb6 107,115-123
+  s_6c2a352ad27053::t_df3e2d95e0b3eb 436
+  s_6c2a352ad27053::t_43b2b24b374fac 373-377
+  s_6c2a352ad27053::t_a60a05183d5939 24-33,37-38
+  s_6c2a352ad27053::t_73a817c9ca4ff8 199-203,208-224
+  s_6c2a352ad27053::t_bada3e5c8a66c1 48-51
+  s_6c2a352ad27053::t_ae374db5a8ebf7 124,225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "308abf8b337490d10e225909da3f226e8998936e",
+  "prompts": {},
+  "sessions": {
+    "s_6c2a352ad27053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "83a0b595-f559-4808-81cd-5f19323d7a5c",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
