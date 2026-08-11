@@ -123,9 +123,6 @@
     "pick-next-shell": 2,
     "work": 1
   },
-  "plugins/yellow-docs/commands/docs/review.md": {
-    "compound": 1
-  },
   "plugins/yellow-linear/CLAUDE.md": {
     "plan": 2,
     "work": 1

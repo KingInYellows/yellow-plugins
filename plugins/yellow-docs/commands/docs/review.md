@@ -246,7 +246,7 @@ AskUserQuestion: "Apply N safe-auto fixes?" with options
 ### Step 9: Compound (optional)
 
 If yellow-core is installed, offer to compound new learnings via
-`/workflows:compound`. Skip silently if not installed.
+`/flow:compound`. Skip silently if not installed.
 
 ## Graceful Degradation
 

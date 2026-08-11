@@ -4,6 +4,7 @@
 "yellow-linear": patch
 "yellow-review": patch
 "gt-workflow": patch
+"yellow-docs": patch
 ---
 
 Rename the `workflows:` command namespace to `flow:`. Native Claude Code's
@@ -35,6 +36,11 @@ end-of-loop learning capture dispatches `skill: "flow:compound"`.
 gt-workflow takes a `patch`: its stack-decomposition skills, output styles,
 and docs name `/flow:work` / `/flow:plan` as the plan consumer, updated from
 the retired `workflows:` names.
+
+yellow-docs takes a `patch`: `/docs:review` Step 9 offers a compound handoff
+to the user, and that offer named a command this release deletes. Swept here
+rather than in the follow-up prose PR — a handoff a user can accept at runtime
+is a functional surface, not prose.
 
 `major` for both: the old `/workflows:*` command files are deleted outright
 with no forwarding alias, and both AGENTS.md and `CONTRIBUTING.md` state the
