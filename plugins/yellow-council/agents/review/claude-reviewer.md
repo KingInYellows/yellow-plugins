@@ -261,7 +261,7 @@ what you can, return the findings you have confirmed, and say in the summary
 which areas you did not reach — a partial review returned promptly is worth
 far more to the council than a complete one that never arrives.
 
-**If you stopped early, you may not emit `APPROVE`.** The Review Stance below
+**If you stopped early, you may not emit `APPROVE`.** The Review Stance above
 defines `APPROVE` as a positive claim that you looked for a way to break this
 and could not find one; you cannot make that claim about code you did not
 read. On a truncated pass, emit `REVISE` if what you did read turned up

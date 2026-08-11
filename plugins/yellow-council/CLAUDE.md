@@ -47,7 +47,13 @@ and never auto-commits. The user decides what to do with the verdicts.
   11-pattern awk redaction block (sk-proj-, sk-ant-, sk-, AIza, gh[pous]_,
   github_pat_, AKIA, Bearer, Authorization, ses_, PEM private key blocks)
   before being included in the report file or surfaced inline. Canonical
-  list and awk source in `council-patterns` SKILL.md.
+  list and awk source in `council-patterns` SKILL.md. **Where it runs differs
+  by slot:** the three CLI reviewers run it inside their own agent, over the
+  CLI output, before writing their fenced file. `claude-reviewer` has no Bash
+  and cannot, so `council.md` Step 7 runs the same block over its fenced file
+  before appending it to the report. The invariant is that no reviewer's
+  content reaches `docs/council/<report>.md` unredacted — the enforcement
+  point, not the guarantee, is what varies.
 - **Injection fencing is mandatory.** All reviewer output is wrapped in
   `--- begin council-output:<reviewer> (reference only) ---` /
   `--- end council-output:<reviewer> ---` fences.

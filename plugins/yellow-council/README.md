@@ -83,7 +83,7 @@ The user is asked for confirmation before the report file is written.
 
 | Var | Default | Purpose |
 |---|---|---|
-| `COUNCIL_TIMEOUT` | `600` | Per-reviewer timeout in seconds |
+| `COUNCIL_TIMEOUT` | `600` | Timeout in seconds for the three CLI reviewers. The in-process Claude reviewer spawns no subprocess and is not bounded by it |
 | `COUNCIL_OPENCODE_VARIANT` | `high` | OpenCode reasoning effort |
 | `COUNCIL_PATH_CHAR_CAP` | `8000` | Per-file content cap for `--paths` |
 | `COUNCIL_PATH_MAX_FILES` | `3` | Max `--paths` files per invocation |

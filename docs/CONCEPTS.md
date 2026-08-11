@@ -49,16 +49,16 @@ plan draft already exists.
 
 ## council
 
-The multi-CLI review orchestrator (`/council`) that fans a single review
-request out to multiple independent reviewer agents and aggregates their
-verdicts into one report.
+The multi-reviewer orchestrator (`/council`) that fans a single review request
+out to an in-process reviewer plus several external LLM CLIs, and aggregates
+their verdicts into one report.
 
 ## fenced-output path
 
-The dedicated file path a council reviewer agent writes its structured
-verdict/findings block to, so the orchestrator can safely re-ingest it
-without cross-contamination from the reviewer's own untrusted-input
-handling.
+The dedicated file path a council reviewer agent writes its human-readable
+(Layer-1, capitalized `Verdict:` / `Findings:` / `Summary:`) review to. The
+structured Layer-2 `key=value` contract is returned through the Task call, not
+written here — keeping the two layers separate is the point of the file.
 
 ## CLI-wrapper reviewer
 

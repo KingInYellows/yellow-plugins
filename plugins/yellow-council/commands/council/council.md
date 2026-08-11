@@ -288,6 +288,25 @@ parse_reviewer_return() {
   summary=$(printf '%s' "$reviewer_output" | grep -m1 '^summary=' | sed 's/^summary=//')
   fenced_path=$(printf '%s' "$reviewer_output" | grep -m1 '^fenced_output_path=' | sed 's/^fenced_output_path=//')
   findings=$(printf '%s' "$reviewer_output" | awk '/^findings_block_begin$/{flag=1;next} /^findings_block_end$/{flag=0} flag')
+  # Constrain verdict/confidence to their enums HERE, at the single point of
+  # entry, before anything stores or renders them. Both are taken verbatim
+  # from reviewer-controlled output, and the Step 7 appendix interpolates the
+  # verdict UNFENCED into a report persisted at docs/council/<report>.md — so
+  # an arbitrary string after `verdict=` would otherwise land unfenced in a
+  # repo file. Validating at the source also protects the headline counts.
+  case "$verdict" in
+    APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;;
+    '') ;;
+    *)
+      printf '[council] Warning: %s returned a non-enum verdict (%s) — recording UNKNOWN\n' \
+        "$reviewer_name" "$verdict" >&2
+      verdict="UNKNOWN"
+      ;;
+  esac
+  case "$confidence" in
+    HIGH|MEDIUM|LOW|N/A|'') ;;
+    *) confidence="N/A" ;;
+  esac
   REVIEWER_VERDICTS[$reviewer_name]=$verdict
   REVIEWER_CONFIDENCES[$reviewer_name]=$confidence
   REVIEWER_SUMMARIES[$reviewer_name]=$summary
@@ -453,22 +472,25 @@ case "$MODE" in
 esac
 
 SLUG=$(build_slug "$SLUG_BASE")
-REPORT_PATH=$(build_target_path "$MODE" "$SLUG") || exit 1
-REPORT_PATH_ABS="${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}"
 
-# Ensure docs/council/ directory exists.
+# NOTE: the slug/path derivation that can exit (build_target_path returns
+# non-zero on >10 same-day collisions) is deliberately placed AFTER
+# council_cleanup_temps is defined, below — a shell function does not exist
+# until its definition has been executed, so an exit above that point could
+# not call it and would strand every reviewer's fenced output in /tmp.
 #
 # Any exit from here onward happens AFTER Step 4 spawned the reviewers, so all
 # four fenced-output files may already be on disk. Steps 8 and 9 own the normal
 # cleanup; an early exit reaches neither, so it must clean up for itself or the
 # run strands redacted reviewer output in /tmp. `council_cleanup_temps` below is
-# that snippet — paste it verbatim into any block with an early-exit path after
-# Step 4 (today: this block and Step 7).
+# that snippet. It is local to THIS fence — a function does not survive into
+# another bash block, so Step 7 defines its own `council_cleanup_claude_only`
+# rather than calling this one.
 #
 # Steps 8 and 9 do NOT call it: their cleanup is the normal path, inlined and
-# separately maintained. That means the shape-check logic exists in three
-# places — here, Step 8, and Step 9 — so a change to one must be mirrored to
-# the other two.
+# separately maintained. Counting the read guard in Step 7, the per-reviewer
+# shape-check therefore exists at FOUR sites — here, Step 7, Step 8, Step 9 —
+# so a change to one must be mirrored to the other three.
 council_cleanup_temps() {
   # `_v`/`_c` are declared too: an undeclared assignment inside a function
   # leaks into the caller's scope, and this snippet is pasted into other blocks.
@@ -499,11 +521,24 @@ council_cleanup_temps() {
   local claude_fenced
   claude_fenced="<literal CLAUDE_FENCED_FILE value from Step 4>"
   case "$claude_fenced" in
+    # Traversal/extra-separator arm FIRST — `*` matches `/` and `..`.
+    *..*|/tmp/council-claude-fenced-*/*)
+      printf '[council] Warning: claude fenced-path contains traversal or an extra separator (%s) — refusing to unlink it\n' "$claude_fenced" >&2 ;;
     /tmp/council-claude-fenced-*.txt) rm -f "$claude_fenced" ;;
     *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
   esac
 }
 
+# Now that council_cleanup_temps exists, derive the report path — this is the
+# first step here that can fail, and it must be able to clean up after itself.
+REPORT_PATH=$(build_target_path "$MODE" "$SLUG") || {
+  # build_target_path already printed the >10-collision error.
+  council_cleanup_temps
+  exit 1
+}
+REPORT_PATH_ABS="${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}"
+
+# Ensure docs/council/ directory exists.
 mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
   printf '[council] Error: cannot create %s\n' "$(dirname "$REPORT_PATH_ABS")" >&2
   council_cleanup_temps
@@ -516,16 +551,31 @@ mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
 ```bash
 # Re-load reviewer state — fresh subprocess (Steps 8 and 9 must start with
 # this same snippet before touching REVIEWER_* arrays)
-GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { printf '[council] Error: not in a git repository\n' >&2; exit 1; }
 STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
-# Both guards below exit after the fan-out, so both must run the Step 6
-# `council_cleanup_temps` snippet first — paste it in at the top of this block.
-[ -f "$STATE_FILE" ] || { printf '[council] Error: state file missing — Step 4 did not run\n' >&2; council_cleanup_temps; exit 1; }
+# Both guards below exit AFTER the fan-out, so both must clean up first.
+# Cleanup is INLINED here rather than calling Step 6's `council_cleanup_temps`:
+# that function was defined in a different bash fence, i.e. a different
+# subprocess, so it does not exist here. In both of these cases the state file
+# is missing or unusable, so the only reclaimable artifact is the path this
+# run minted — the same shape guard as everywhere else applies.
+council_cleanup_claude_only() {
+  local cf
+  cf="<literal CLAUDE_FENCED_FILE value from Step 4>"
+  case "$cf" in
+    *..*|/tmp/council-claude-fenced-*/*)
+      printf '[council] Warning: claude fenced-path contains traversal or an extra separator (%s) — refusing to unlink it\n' "$cf" >&2 ;;
+    /tmp/council-claude-fenced-*.txt) rm -f "$cf" ;;
+    *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
+  esac
+  [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
+}
+[ -f "$STATE_FILE" ] || { printf '[council] Error: state file missing — Step 4 did not run\n' >&2; council_cleanup_claude_only; exit 1; }
 declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_FENCED_PATHS
 while IFS=$'\t' read -r r v c fp; do
   REVIEWER_VERDICTS[$r]=$v; REVIEWER_CONFIDENCES[$r]=$c; REVIEWER_FENCED_PATHS[$r]=$fp
 done < "$STATE_FILE"
-[ "${#REVIEWER_VERDICTS[@]}" -gt 0 ] || { printf '[council] Error: state file empty — Step 4 was interrupted; re-run /council\n' >&2; council_cleanup_temps; exit 1; }
+[ "${#REVIEWER_VERDICTS[@]}" -gt 0 ] || { printf '[council] Error: state file empty — Step 4 was interrupted; re-run /council\n' >&2; council_cleanup_claude_only; exit 1; }
 
 # $SYNTHESIS_MD does not survive into this fresh subprocess — substitute the
 # Step 5 synthesis markdown inline via quoted heredoc:
@@ -545,8 +595,25 @@ __EOF_COUNCIL_SYNTHESIS__
 # weaker guarantee. Since the next step `cat`s this file straight into a report
 # that gets written to the repo, constrain it to the expected per-reviewer
 # /tmp shape and refuse anything else.
+# For the claude leg specifically we can do better than a shape check: this
+# command MINTED that path, so it can require exact identity. A shape-only
+# glob still admits any conforming string the reviewer composed — including
+# /tmp/council-claude-fenced-.txt, since `*` matches zero characters, which is
+# a fixed predictable name needing no entropy guess. Substitute the literal
+# printed in Step 4.
+CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
+
 for reviewer in claude codex gemini opencode; do
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
+  omit_reason=""
+  # Identity check for the leg whose path we minted; shape check for the rest.
+  if [ "$reviewer" = "claude" ] && [ -n "$fenced_path" ] \
+     && [ "$fenced_path" != "$CLAUDE_FENCED" ]; then
+    printf '[council] Warning: claude returned a fenced_output_path (%s) that is not the one this run minted — refusing to read it\n' \
+      "$fenced_path" >&2
+    omit_reason="output withheld: reported path did not match the path this run minted (see stderr)"
+    fenced_path=""
+  fi
   case "$fenced_path" in
     "") ;;
     # Traversal and extra-separator rejects MUST come before the shape arm:
@@ -569,18 +636,67 @@ for reviewer in claude codex gemini opencode; do
   # `! -L` per the skill's validate_path symlink rule — the shape check above
   # constrains the path text, not what it resolves to.
   if [ -n "$fenced_path" ] && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
+    if [ "$reviewer" = "claude" ]; then
+      # MANDATORY for this leg only. The plugin invariant is that every
+      # reviewer's output is credential-redacted before it reaches the report
+      # file. gemini/opencode/codex satisfy it inside their own agents, which
+      # run the 11-pattern awk block over their output before writing the
+      # fenced file. claude-reviewer has no Bash and cannot: its redaction is
+      # a prose rule with nothing executing it. Without this pass the
+      # invariant would silently lose a member and unredacted key material
+      # could land in docs/council/<report>.md — a file committed to the repo.
+      # Redaction only, never delimiter escaping: the fenced file's own
+      # `--- begin/end council-output:claude ---` lines are legitimate
+      # structure, and escaping them here would destroy the fence.
+      # Canonical block: council-patterns SKILL.md "11-Pattern Credential
+      # Redaction" — keep byte-identical with it.
+      section_body=$(awk '
+      {
+        line = $0
+        if (line ~ /sk-proj-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /sk-ant-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /sk-[A-Za-z0-9]{20,}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /AIza[0-9A-Za-z_-]{35}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /gh[pous]_[A-Za-z0-9]{36,}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /github_pat_[A-Za-z0-9_]{40,}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /AKIA[0-9A-Z]{16}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /Bearer [A-Za-z0-9._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /Authorization: [A-Za-z0-9 ._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
+        else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
+        if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+        if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
+        if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+        print line
+      }
+      ' "$fenced_path")
+    else
+      section_body=$(cat "$fenced_path")
+    fi
     REPORT_CONTENT="${REPORT_CONTENT}
 
 ## ${reviewer^} Output
 
-$(cat "$fenced_path")
+${section_body}
 "
   else
+    # Name WHY there is no output. A refused path and a genuinely silent
+    # reviewer previously rendered identically here, and this text is what
+    # persists into docs/council/<report>.md — where a later reader (or a V2
+    # round-2 council) has no access to this run's stderr.
+    if [ -z "$omit_reason" ]; then
+      if [ -z "$fenced_path" ]; then
+        omit_reason="reviewer reported no output path"
+      elif [ -L "$fenced_path" ]; then
+        omit_reason="output withheld: reported path is a symlink"
+      else
+        omit_reason="reported output file was missing"
+      fi
+    fi
     REPORT_CONTENT="${REPORT_CONTENT}
 
 ## ${reviewer^} Output
 
-(reviewer was ${REVIEWER_VERDICTS[$reviewer]} — no output captured)
+(verdict ${REVIEWER_VERDICTS[$reviewer]} — ${omit_reason})
 "
   fi
 done
@@ -657,8 +773,13 @@ done
 # cannot be re-derived later, because the mktemp suffix is random.
 CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
 case "$CLAUDE_FENCED" in
+  # Traversal/extra-separator arm FIRST, same as the per-reviewer guard above:
+  # `*` matches `/` and `..`, so a lone /tmp/council-claude-fenced-*.txt arm
+  # accepts /tmp/council-claude-fenced-../../etc/passwd.txt and would rm it.
+  *..*|/tmp/council-claude-fenced-*/*)
+    printf '[council] Warning: claude fenced-path contains traversal or an extra separator (%s) — refusing to unlink it\n' "$CLAUDE_FENCED" >&2 ;;
   /tmp/council-claude-fenced-*.txt) rm -f "$CLAUDE_FENCED" ;;
-  *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
+  *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned (expected /tmp/council-claude-fenced-*.txt)\n' >&2 ;;
 esac
 [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
 exit 0
@@ -745,8 +866,13 @@ done
 # cannot be re-derived later, because the mktemp suffix is random.
 CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
 case "$CLAUDE_FENCED" in
+  # Traversal/extra-separator arm FIRST, same as the per-reviewer guard above:
+  # `*` matches `/` and `..`, so a lone /tmp/council-claude-fenced-*.txt arm
+  # accepts /tmp/council-claude-fenced-../../etc/passwd.txt and would rm it.
+  *..*|/tmp/council-claude-fenced-*/*)
+    printf '[council] Warning: claude fenced-path contains traversal or an extra separator (%s) — refusing to unlink it\n' "$CLAUDE_FENCED" >&2 ;;
   /tmp/council-claude-fenced-*.txt) rm -f "$CLAUDE_FENCED" ;;
-  *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
+  *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned (expected /tmp/council-claude-fenced-*.txt)\n' >&2 ;;
 esac
 [ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
 
@@ -774,17 +900,17 @@ This is the final output of the command. Exit 0.
 |----------|----------|
 | Bare `/council` (no mode) | Print 4-mode help; exit 0 |
 | `/council fleet` | Print "fleet management not available in V1 — coming in V2"; exit 0 |
-| `/council unknownmode` | Print error + 4-mode help; exit 1 |
+| `/council unknownmode` | Print error + the one-line valid-modes list (not the full bare-`/council` help); exit 1 |
 | Path traversal in `--paths` | Reject with `[council] Error: path traversal not allowed`; exit 1 |
 | Shell metacharacters in path | Reject with `[council] Error: invalid characters in path`; exit 1 |
 | Non-existent path | Reject with `[council] Error: path not found`; exit 1 |
 | Empty `debug`/`question` text | Reject with mode-specific usage; exit 1 |
 | `--paths` exceeds `COUNCIL_PATH_MAX_FILES` | Reject with limit message; exit 1 |
-| All 4 reviewers TIMEOUT/ERROR/UNAVAILABLE | Headline: "Council failed: 0 of 4 reviewers returned verdicts"; the confirmation gate still asks; user can save or cancel |
+| All 4 reviewers TIMEOUT/ERROR/UNAVAILABLE | Headline: "Council ran with 0 of 4 reviewers (<all four> <reason>)" — the Step 5 template has no separate all-failed string; the confirmation gate still asks; user can save or cancel |
 | 1-3 of 4 reviewers fail | Headline: "Council ran with N of 4 reviewers"; synthesis proceeds with remaining |
 | yellow-codex not installed | Codex marked UNAVAILABLE; Claude + Gemini + OpenCode still run |
 | claude-reviewer spawn fails or returns nothing parseable | Recorded as `ERROR` by `parse_reviewer_return` like any other missing return; no not-installed branch exists (the reviewer is in-process); the other three still run |
-| claude-reviewer never returns at all | **No automatic recovery.** `COUNCIL_TIMEOUT` wraps only the three CLI reviewers; the in-process slot has no subprocess to kill, so the fan-out blocks. The agent is instructed to bound its own investigation and return partial findings, but that is prose, not a guard. Cancel the invocation and re-run; the fenced temp file, if written, is removed by the Step 9 unconditional unlink on the next completed run |
+| claude-reviewer never returns at all | **No automatic recovery.** `COUNCIL_TIMEOUT` wraps only the three CLI reviewers; the in-process slot has no subprocess to kill, so the fan-out blocks. The agent is instructed to bound its own investigation and return partial findings, but that is prose, not a guard. Cancel the invocation and re-run. The fenced temp file, if it was written, is NOT reclaimed: the next run mints a different random `mktemp -u` suffix and nothing globs /tmp for orphans, so it stays until the OS reaps it. Deliberate — a glob sweep would risk deleting a concurrent run.s in-flight file from another checkout on the same machine |
 | A reviewer returns a `fenced_output_path` outside `/tmp/council-<reviewer>-fenced-*.txt`, or one containing `..` or an extra `/` | Refused at every site that touches it, each warning on stderr: Step 7 does not read it (the appendix renders "no output captured"), and Steps 8/9 do not unlink it either — refusing to delete an attacker-named path matters more than reclaiming a temp file. A path that is a symlink is also refused at the read site |
 | Slug collision >10 same-day | Error: "too many same-day collisions for slug X (>10)"; exit 1 |
 | User selects Cancel at the confirmation gate | Print "Report not saved"; cleanup temps; exit 0 |
