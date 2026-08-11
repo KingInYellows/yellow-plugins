@@ -53,6 +53,20 @@ fi
 # prove pinned-fingerprint drift actually fails the gate. Backed up the same
 # way $ALLOW is, and restored by the same EXIT trap.
 PINNED_PROBE=CHANGELOG.md
+
+# Same reasoning as the $PROBE guard above, applied to a path we don't create
+# ourselves: -f alone follows symlinks, so a symlink planted at this path
+# (even one pointing at a legitimate file) would have `cp` below back up the
+# SYMLINK's TARGET rather than this repo's CHANGELOG.md, and later have
+# section J's `>>` append go through the symlink to whatever it resolves to
+# — potentially a file outside the repo. -L rejects a symlink outright,
+# dangling or not; the plain `-f` failure branch covers every other
+# non-regular case (missing, directory, device, ...).
+if [ -L "$PINNED_PROBE" ] || [ ! -f "$PINNED_PROBE" ]; then
+  printf '[flow-namespace-gate] Error: pinned probe %s is a symlink or not a regular file.\n' "$PINNED_PROBE" >&2
+  printf '[flow-namespace-gate] Refusing to back it up or append to it.\n' >&2
+  exit 1
+fi
 PINNED_BAK=""
 PINNED_BAK_CREATED=0
 
@@ -72,7 +86,6 @@ restorePinnedProbe() { # copies $PINNED_BAK back over $PINNED_PROBE if it was cr
     return 0
   fi
   if [ -f "$PINNED_BAK" ] && cp "$PINNED_BAK" "$PINNED_PROBE"; then
-    rm -f "$PINNED_BAK"
     PINNED_BAK_CREATED=0
     return 0
   fi
@@ -87,6 +100,12 @@ cleanup() {
   restoreAllowlist
   rm -f "$BAK"
   restorePinnedProbe
+  # Unconditional, mirroring $BAK above: if restorePinnedProbe's cp failed,
+  # it returns without removing $PINNED_BAK, and it never touches $PINNED_BAK
+  # at all when PINNED_BAK_CREATED was never set (mktemp for it happens in
+  # section J, not at script startup) — in that case $PINNED_BAK is still ""
+  # and `rm -f ""` is a no-op. Either way this leaves nothing stray behind.
+  rm -f "$PINNED_BAK"
 }
 trap cleanup EXIT
 
