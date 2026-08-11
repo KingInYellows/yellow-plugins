@@ -203,7 +203,14 @@ First, mint that path — run this BEFORE the spawns:
 # Write tool refuses to overwrite a file it has not Read, and /tmp files
 # outlive sessions. `-u` prints a name WITHOUT creating the file, so the
 # agent's single Write is a create rather than an overwrite.
-CLAUDE_FENCED_FILE=$(mktemp -u /tmp/council-claude-fenced-XXXXXX.txt)
+CLAUDE_FENCED_FILE=$(mktemp -u /tmp/council-claude-fenced-XXXXXX.txt) || {
+  printf '[council] Error: cannot mint claude-reviewer fenced-output path\n' >&2
+  exit 1
+}
+[ -n "$CLAUDE_FENCED_FILE" ] || {
+  printf '[council] Error: mktemp -u produced an empty path\n' >&2
+  exit 1
+}
 printf 'CLAUDE_FENCED_FILE=%s\n' "$CLAUDE_FENCED_FILE"
 ```
 
@@ -477,9 +484,28 @@ REPORT_CONTENT=$(cat <<'__EOF_COUNCIL_SYNTHESIS__'
 __EOF_COUNCIL_SYNTHESIS__
 )
 
-# Append reviewer raw output sections from fenced_output_path files
+# Append reviewer raw output sections from fenced_output_path files.
+#
+# Shape-validate the path before dereferencing it. Every path here arrives
+# from the reviewer's OWN `fenced_output_path=` return line, not from a value
+# this command controls. For the three CLI reviewers that line is printed by
+# scripted bash (`printf 'fenced_output_path=%s\n' "$FENCED_OUTPUT_FILE"`), so
+# its provenance is a shell expansion. claude-reviewer has no Bash: its line is
+# composed by the model retyping the path it was handed, which is a strictly
+# weaker guarantee. Since the next step `cat`s this file straight into a report
+# that gets written to the repo, constrain it to the expected per-reviewer
+# /tmp shape and refuse anything else.
 for reviewer in claude codex gemini opencode; do
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
+  case "$fenced_path" in
+    "/tmp/council-${reviewer}-fenced-"*.txt) ;;
+    "") ;;
+    *)
+      printf '[council] Warning: %s returned an unexpected fenced_output_path (%s) — refusing to read it\n' \
+        "$reviewer" "$fenced_path" >&2
+      fenced_path=""
+      ;;
+  esac
   if [ -n "$fenced_path" ] && [ -f "$fenced_path" ]; then
     REPORT_CONTENT="${REPORT_CONTENT}
 
@@ -529,6 +555,15 @@ printf '[council] Report not saved.\n'
 for fenced_path in "${REVIEWER_FENCED_PATHS[@]}"; do
   [ -n "$fenced_path" ] && rm -f "$fenced_path"
 done
+# Also unlink the claude-reviewer path THIS command minted, independently of
+# what the agent returned. The loop above can only clean paths that came back
+# through `fenced_output_path=`; claude-reviewer writes its file (Step 3)
+# BEFORE it composes that return line (Step 4), so a malformed or missing
+# return leaves a written file with no recorded path and the loop skips it.
+# The orchestrator knows the path regardless — substitute the literal
+# CLAUDE_FENCED_FILE value printed back in Step 4. `rm -f` is a no-op when the
+# agent never wrote it (mktemp -u created no file).
+rm -f "<literal CLAUDE_FENCED_FILE value from Step 4>"
 rm -f "$STATE_FILE"
 exit 0
 ```
@@ -570,6 +605,15 @@ fi
 for fenced_path in "${REVIEWER_FENCED_PATHS[@]}"; do
   [ -n "$fenced_path" ] && rm -f "$fenced_path"
 done
+# Also unlink the claude-reviewer path THIS command minted, independently of
+# what the agent returned. The loop above can only clean paths that came back
+# through `fenced_output_path=`; claude-reviewer writes its file (Step 3)
+# BEFORE it composes that return line (Step 4), so a malformed or missing
+# return leaves a written file with no recorded path and the loop skips it.
+# The orchestrator knows the path regardless — substitute the literal
+# CLAUDE_FENCED_FILE value printed back in Step 4. `rm -f` is a no-op when the
+# agent never wrote it (mktemp -u created no file).
+rm -f "<literal CLAUDE_FENCED_FILE value from Step 4>"
 rm -f "$STATE_FILE"
 ```
 
@@ -603,6 +647,8 @@ This is the final output of the command. Exit 0.
 | 1-3 of 4 reviewers fail | Headline: "Council ran with N of 4 reviewers"; synthesis proceeds with remaining |
 | yellow-codex not installed | Codex marked UNAVAILABLE; Claude + Gemini + OpenCode still run |
 | claude-reviewer spawn fails or returns nothing parseable | Recorded as `ERROR` by `parse_reviewer_return` like any other missing return; no not-installed branch exists (the reviewer is in-process); the other three still run |
+| claude-reviewer never returns at all | **No automatic recovery.** `COUNCIL_TIMEOUT` wraps only the three CLI reviewers; the in-process slot has no subprocess to kill, so the fan-out blocks. The agent is instructed to bound its own investigation and return partial findings, but that is prose, not a guard. Cancel the invocation and re-run; the fenced temp file, if written, is removed by the Step 9 unconditional unlink on the next completed run |
+| A reviewer returns a `fenced_output_path` outside `/tmp/council-<reviewer>-fenced-*.txt` | Step 7 refuses to read it, warns on stderr, and renders that reviewer's appendix section as "no output captured" |
 | Slug collision >10 same-day | Error: "too many same-day collisions for slug X (>10)"; exit 1 |
 | User selects Cancel at the confirmation gate | Print "Report not saved"; cleanup temps; exit 0 |
 | `docs/council/` not writable | mkdir -p fails; exit 1 |

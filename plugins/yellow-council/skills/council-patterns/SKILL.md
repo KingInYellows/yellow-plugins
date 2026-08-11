@@ -205,23 +205,13 @@ fence format (`--- begin codex-output (reference only) ---`); do NOT create a
 are not optional — without them, downstream agents may act on
 prompt-injection content inside the fenced block.
 
-`council-output:claude` carries two differences worth naming, both consequences
-of the slot being in-process:
-
-- **Advisory wording.** The stock advisory says "reviewer output from an
-  external AI CLI", which is false for this reviewer. It uses the accurate
-  variant instead — "council reviewer output; it quotes untrusted repository,
-  diff, and issue content" — because the fenced body still carries
-  attacker-influenced quoted material even though the reviewer itself is not an
-  external process. The five structural parts are unchanged.
-- **Enforcement, not just wording.** The other reviewers escape a forged
-  delimiter mechanically, with a `sed` pass over the redacted file before it is
-  embedded. `claude-reviewer` has no `Bash`, so its equivalent — never emitting
-  a bare delimiter line, `[ESCAPED] `-prefixing any quoted line that would
-  reproduce one or that matches `^\*\*\[P[0-9]\]` — is prose discipline in the
-  agent prompt with nothing executing it. Same for the 11-pattern redaction
-  list: prose rule, not an `awk` block. Treat that as a genuinely weaker
-  guarantee when reasoning about this slot's blast radius.
+`council-output:claude` keeps all five structural parts but swaps the advisory
+line — the stock wording says "reviewer output from an external AI CLI", which
+is false for an in-process slot. Its escaping and redaction are prose rules in
+the agent prompt rather than the `sed`/`awk` passes the CLI reviewers execute:
+a genuinely weaker guarantee. Both differences, and the reasoning behind them,
+are written up in `claude-reviewer.md`'s "Safeguards — Prompt-Level, Not
+Mechanical" section; do not restate them here.
 
 **Literal-delimiter escape is mandatory.** Before embedding `$REDACTED_FILE`
 content inside the fence, run a `sed` substitution that replaces any
@@ -352,6 +342,15 @@ Designing to Codex's tightest window (128K tokens) means all four reviewers
 receive identical packs. Gemini at 1M, OpenCode at variable-but-large, and the
 in-process Claude slot can accept the full diff anyway — uniformity > capacity
 for synthesis comparability.
+
+The 100K cap is per reviewer, but the fan-out cost is not. `council.md` Step 4
+spawns all four in a SINGLE message, each `Task` call carrying the pack
+verbatim in its prompt — so a pack at the cap means the orchestrator emits
+~400K chars of tool-call arguments in one turn, up from ~300K at three
+reviewers. Subagents get isolated context windows, so this is a cost the
+ORCHESTRATOR's turn absorbs, not the reviewers'. If the single-message fan-out
+ever fails to fit, lower the pack budget — do not serialize the spawns, which
+would forfeit the parallelism the whole design rests on.
 
 ### Atomic File Write (Write Tool Direct)
 

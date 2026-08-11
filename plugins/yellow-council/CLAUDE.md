@@ -150,6 +150,26 @@ Codex agent.)
   invocation via `opencode session delete <id>`, but if the cleanup itself
   fails (rare), sessions accumulate. Periodic manual `opencode session list`
   audit is recommended.
+- **The in-process slot has no timeout bound.** `COUNCIL_TIMEOUT` wraps the
+  three CLI reviewers in `timeout(1)`, which degrades an overrunning reviewer
+  to a `TIMEOUT` verdict. `claude-reviewer` spawns no subprocess, so there is
+  nothing to kill: a run that never returns blocks the whole fan-out with no
+  fallback. Mitigation is prompt-level only — the agent is instructed to scope
+  its reads to the pack's cited files plus one hop, and to return partial
+  findings rather than keep investigating. Worst case, cancel and re-run. This
+  is a real regression in the fan-out's worst-case bound versus the 3-reviewer
+  V1, accepted as the cost of the in-process slot.
+- **"Orchestrator-minted path" is a two-hop trust chain, not one.**
+  `council.md` mints `claude-reviewer`'s fenced-output path in a Bash block,
+  but the value reaches the agent because the orchestrating model copied the
+  printed literal into the spawn prompt — and that turn's context already
+  holds the untrusted pack. The `mktemp -u` suffix carries real entropy (no
+  attacker-chosen target is reachable) and both `council.md` Step 7 and the
+  agent itself now shape-check the path against
+  `/tmp/council-claude-fenced-*.txt`, so a substituted lookalike is refused
+  rather than read. What is NOT enforced: the substitution itself is an LLM
+  turn, not deterministic templating. Same class of prompt-plus-containment
+  enforcement as the agy limitation below.
 - **agy workspace trust in print mode is unverified.** The Antigravity CLI
   tracks `trustedWorkspaces` in its settings; the 2026-08-01 spike ran only
   in an already-trusted repo. If a first `/council` run in a new directory
