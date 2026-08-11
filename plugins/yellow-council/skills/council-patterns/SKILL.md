@@ -512,31 +512,17 @@ fi
 
 ### Synthesis Format (V1)
 
-The synthesizer in council.md produces:
+**The report template lives in `council.md` Step 5 and only there.** This
+section used to carry a second copy; it drifted (it lost the untrusted-quotes
+advisory and never gained the `### Reviewer Status` section that Step 5's
+synthesizer rule 4 requires), which is exactly the failure a duplicated
+template invites. Read Step 5 of
+`plugins/yellow-council/commands/council/council.md` for the current shape —
+Headline, the untrusted-quotes advisory, Agreement, Disagreement, Reviewer
+Status, Summary — and do not re-inline it here.
 
-```text
-## Council Report — <mode>: <topic> — <date>
-
-### Headline
-<All N reviewers APPROVE | Split — N APPROVE, M REVISE | etc.>
-Council ran with N of 4 reviewers. [If skipped: "<name> timed out at 600s" / "<name> not installed"]
-
-### Agreement (cited by 2+ reviewers)
-- <file:line> — <finding>
-  - Codex: "<their phrasing>"
-  - Gemini: "<their phrasing>"
-
-### Disagreement (unique to one reviewer or conflicting verdicts)
-- <finding> — Codex only
-- Verdict conflict at path/to/file.ts:42: Codex APPROVE, Gemini REVISE
-
-### Summary
-<2-3 sentences synthesizing the council's overall stance>
-
-Full reviewer outputs: see docs/council/<slug>.md
-```
-
-V1 synthesizer non-goals (deferred to V2):
+What this skill still owns is the V1 synthesizer's scope. V1 non-goals
+(deferred to V2):
 
 - No lineage-weighted quorum (V1 uses raw count)
 - No quote-verification pass against repo source

@@ -301,20 +301,10 @@ Contract rules:
 
 ## Notes
 
-**REVISE-rate guardrail (post-ship calibration).** The contrarian stance above
-is a deliberate bias, and a deliberate bias can drift into a broken one in
-either direction. The intended operating band is a `REVISE` rate within **±25
-percentage points of the mean `REVISE` rate of the other three reviewers**,
-measured across saved reports in `docs/council/`.
-
-- Drifting far **above** the band means this reviewer is manufacturing
-  findings — the contrarian framing has become reflexive rather than
-  evidence-driven, and the council's signal-to-noise ratio is falling.
-- Drifting far **below** the band means the framing is not landing at all and
-  this slot has collapsed into a fourth agreeing voice, which is the exact
-  failure mode an in-process reviewer in the synthesizer's own model family is
-  most at risk of.
-
-Either way the fix is prompt calibration in this file — tune the Review Stance
-section — not a change to the contract or to `council.md`. This guardrail is
-advisory and measured by hand; nothing enforces it automatically.
+**REVISE-rate guardrail (post-ship calibration).** Target band: this
+reviewer's `REVISE` rate within **±25 percentage points of the other three
+reviewers' mean**, tallied by hand from `docs/council/` reports. Above the
+band means findings are being manufactured; below means the contrarian framing
+is not landing and the slot has collapsed into a fourth agreeing voice. Either
+way the fix is tuning the Review Stance section above, not the contract.
+Advisory only — nothing computes or enforces this.
