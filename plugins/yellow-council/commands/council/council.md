@@ -485,8 +485,13 @@ council_cleanup_temps() {
   # in-process reviewer writes its file before it reports the path, so the
   # state file alone cannot be trusted to name it. The shape check makes a
   # missed substitution loud; the value cannot be re-derived (random suffix).
-  case "<literal CLAUDE_FENCED_FILE value from Step 4>" in
-    /tmp/council-claude-fenced-*.txt) rm -f "<literal CLAUDE_FENCED_FILE value from Step 4>" ;;
+  # ONE substitution point: bind it to a variable first, exactly as Steps 8
+  # and 9 do. Substituting the placeholder in two places invites a half-done
+  # edit where the check tests one string and the rm deletes another.
+  local claude_fenced
+  claude_fenced="<literal CLAUDE_FENCED_FILE value from Step 4>"
+  case "$claude_fenced" in
+    /tmp/council-claude-fenced-*.txt) rm -f "$claude_fenced" ;;
     *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
   esac
 }
@@ -764,7 +769,7 @@ This is the final output of the command. Exit 0.
 | yellow-codex not installed | Codex marked UNAVAILABLE; Claude + Gemini + OpenCode still run |
 | claude-reviewer spawn fails or returns nothing parseable | Recorded as `ERROR` by `parse_reviewer_return` like any other missing return; no not-installed branch exists (the reviewer is in-process); the other three still run |
 | claude-reviewer never returns at all | **No automatic recovery.** `COUNCIL_TIMEOUT` wraps only the three CLI reviewers; the in-process slot has no subprocess to kill, so the fan-out blocks. The agent is instructed to bound its own investigation and return partial findings, but that is prose, not a guard. Cancel the invocation and re-run; the fenced temp file, if written, is removed by the Step 9 unconditional unlink on the next completed run |
-| A reviewer returns a `fenced_output_path` outside `/tmp/council-<reviewer>-fenced-*.txt` | Step 7 refuses to read it, warns on stderr, and renders that reviewer's appendix section as "no output captured" |
+| A reviewer returns a `fenced_output_path` outside `/tmp/council-<reviewer>-fenced-*.txt`, or one containing `..` or an extra `/` | Refused at every site that touches it, each warning on stderr: Step 7 does not read it (the appendix renders "no output captured"), and Steps 8/9 do not unlink it either — refusing to delete an attacker-named path matters more than reclaiming a temp file. A path that is a symlink is also refused at the read site |
 | Slug collision >10 same-day | Error: "too many same-day collisions for slug X (>10)"; exit 1 |
 | User selects Cancel at the confirmation gate | Print "Report not saved"; cleanup temps; exit 0 |
 | `docs/council/` not writable | mkdir -p fails; exit 1 |
