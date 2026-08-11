@@ -1,0 +1,59 @@
+plans/workflows-to-flow-namespace-migration.md
+  s_c1e3326aa9a6ae::t_26fb7ad48eee5c 242-255
+  s_c1e3326aa9a6ae::t_ca7c8184c7ddfc 305,309-313
+tests/integration/validate-flow-namespace-error-codes.test.ts
+  s_c1e3326aa9a6ae::t_476cfba83754ae 101,108-126,128-133
+  s_69313f122f35b8::t_1c9f95ac2f366c 72-89,106
+  s_69313f122f35b8::t_c5ba481fe80341 107
+scripts/exercise-flow-namespace-gate.sh
+  s_69313f122f35b8::t_497f79f39d51b9 148
+  s_c1e3326aa9a6ae::t_f93f7634ab44b2 144
+  s_c1e3326aa9a6ae::t_cdc33416370f25 156
+  s_69313f122f35b8::t_a08406b73d453c 95,101-102
+  s_c1e3326aa9a6ae::t_ac37f33fe29a28 114-132
+  s_69313f122f35b8::t_820c21f7e0aef9 136
+scripts/flow-namespace-allowlist.json
+  s_c1e3326aa9a6ae::t_61aa14efe824b2 2-171
+plugins/yellow-review/commands/review/sweep-all.md
+  s_c1e3326aa9a6ae::t_e1d763cab4fd54 211,215
+  s_69313f122f35b8::t_8146a9df188728 101,112
+scripts/validate-flow-namespace.js
+  s_c1e3326aa9a6ae::t_3cbbe35ea223fd 225-229
+  s_69313f122f35b8::t_2abc96906d8ff3 526
+  s_69313f122f35b8::t_30d8c58278b371 182-184,188-193,196,207-210,212
+  s_69313f122f35b8::t_238212b4951c27 195
+  s_69313f122f35b8::t_1a8b078a1175fa 311-318,332,334-335,337,340-345,348-367,371-372
+  s_69313f122f35b8::t_03dcd04d2fe323 127-129
+  s_69313f122f35b8::t_886b5dbca59988 413,415
+  s_69313f122f35b8::t_f4a1f4f671c3da 130
+  s_69313f122f35b8::t_4cbf41aa052a81 457-461,465,475-482,484-486,491-492,503-505
+  s_c1e3326aa9a6ae::t_16a1ecd9dbd58d 136-144,159
+  s_69313f122f35b8::t_9fb148c6298561 185-187
+  s_69313f122f35b8::t_55dec1279c41a3 37,39,41-48
+  s_69313f122f35b8::t_b39caf2a979ab7 387,391-399
+  s_69313f122f35b8::t_5cd2bddd6f7bbc 400
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "2f563cb3d72c89c366df331baeea185c194e23b7",
+  "prompts": {},
+  "sessions": {
+    "s_69313f122f35b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54183b18-9897-49c2-831c-39d0efa416d0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    },
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
