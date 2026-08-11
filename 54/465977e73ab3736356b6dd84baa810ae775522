@@ -1,0 +1,27 @@
+docs/research/repo/background-compounding-triggers-repo-audit.md
+  s_c1e3326aa9a6ae::t_ef53468b3beb63 543
+AGENTS.md
+  s_c1e3326aa9a6ae::t_d2d9c375bfe099 315-318
+tests/integration/validate-agent-authoring-rule18.test.ts
+  s_c1e3326aa9a6ae::t_39ccd53b8382d0 197-298
+scripts/validate-agent-authoring.js
+  s_c1e3326aa9a6ae::t_29b8412cc22ed3 1121-1136
+  s_c1e3326aa9a6ae::t_5f7f6be9b02149 382-385,387-388,391-411,419-420,423-424,427-428,432-439
+  s_c1e3326aa9a6ae::t_0280fedd7d436e 1224-1232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "54465977e73ab3736356b6dd84baa810ae775522",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-fable-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
