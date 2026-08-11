@@ -669,3 +669,198 @@ allowed-tools:
     expect(stderr).toContain('flow:nonexistent');
   });
 });
+
+describe('RULE 18 — placeholder exemption is scoped to its two known teaching sites', () => {
+  // Codex P2 finding: an earlier version exempted "plugin:skill-name" and
+  // "yellow-X:skill-name" ANYWHERE under plugins/, so a live command that
+  // accidentally copied one of those strings would have silently passed
+  // RULE 18 even though nothing resolves it. The fix restricts the
+  // exemption to an exact (declaring file, placeholder) allowlist —
+  // SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST in scripts/validate-agent-
+  // authoring.js — naming the two real prose teaching sites.
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'rule18-placeholder-'));
+  });
+
+  afterEach(() => {
+    if (dir) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * A read-only reviewer AGENT (not command) whose body dispatches via
+   * `target` in prose, matching the frontmatter shape the two real
+   * allowlisted files use (`tools:`, not `allowed-tools:` — these live under
+   * agents/review/ so W1.5's read-only gate applies).
+   */
+  function reviewerAgent(target: string): string {
+    return `---
+name: fixture-reviewer
+description: 'Fixture reviewer agent. Use when testing RULE 18.'
+model: sonnet
+tools:
+  - Read
+  - Grep
+  - Glob
+---
+
+# fixture-reviewer
+
+Teaches the plugin-qualified dispatch syntax, e.g.
+\`Skill({skill: "${target}"})\`.
+`;
+  }
+
+  it('reports "plugin:skill-name" when used in a file NOT on the allowlist', () => {
+    writeAgent(dir, 'demo-plugin/commands/caller.md', callerCommand('plugin:skill-name'));
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('plugin:skill-name');
+  });
+
+  it('reports "yellow-X:skill-name" when used in a file NOT on the allowlist', () => {
+    writeAgent(dir, 'demo-plugin/commands/caller.md', callerCommand('yellow-X:skill-name'));
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('yellow-X:skill-name');
+  });
+
+  it('still passes for the real plugin-contract-reviewer.md teaching site', () => {
+    writeAgent(
+      dir,
+      'yellow-review/agents/review/plugin-contract-reviewer.md',
+      reviewerAgent('plugin:skill-name')
+    );
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('still passes for the real project-compliance-reviewer.md teaching site', () => {
+    writeAgent(
+      dir,
+      'yellow-review/agents/review/project-compliance-reviewer.md',
+      reviewerAgent('yellow-X:skill-name')
+    );
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('strict mode fails when a declared allowlist entry file no longer exists', () => {
+    // Neither of the two declared sites is present in this fixture tree at
+    // all — mirrors RULE 16's "declared sentinel file is missing" case.
+    writeAgent(dir, 'demo-plugin/commands/target.md', targetCommand('flow:work'));
+    const { status, stderr } = runValidator(dir, {
+      VALIDATE_PLACEHOLDER_ALLOWLIST_STRICT: '1',
+    });
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('declared placeholder-allowlist entry no longer exists');
+    expect(stderr).toContain('plugin-contract-reviewer.md');
+    expect(stderr).toContain('project-compliance-reviewer.md');
+  });
+
+  it('strict mode fails when a declared site exists but lost its placeholder text', () => {
+    writeAgent(
+      dir,
+      'yellow-review/agents/review/plugin-contract-reviewer.md',
+      `---
+name: fixture-reviewer
+description: 'Fixture reviewer agent. Use when testing RULE 18.'
+model: sonnet
+tools:
+  - Read
+  - Grep
+  - Glob
+---
+
+# fixture-reviewer
+
+No dispatch placeholder text in this body at all.
+` // no "plugin:skill-name" text anywhere
+    );
+    writeAgent(
+      dir,
+      'yellow-review/agents/review/project-compliance-reviewer.md',
+      reviewerAgent('yellow-X:skill-name')
+    );
+    const { status, stderr } = runValidator(dir, {
+      VALIDATE_PLACEHOLDER_ALLOWLIST_STRICT: '1',
+    });
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('declared placeholder "plugin:skill-name" no longer appears');
+    expect(stderr).toContain('plugin-contract-reviewer.md');
+    expect(stderr).not.toContain('project-compliance-reviewer.md: RULE 18');
+  });
+});
+
+describe('RULE 18 fence model — invalid backtick fence openers are not fences', () => {
+  // CommonMark: a BACKTICK fence's info string may not itself contain a
+  // backtick (tilde fences have no such restriction). A line like
+  // ```` ```lang`suffix ```` is therefore not a fence opener at all — the
+  // fence-stripping helper must leave it (and everything after it) as
+  // ordinary content, not swallow a live dispatch that follows as
+  // "unclosed fence" content.
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'rule18-fence-'));
+  });
+
+  afterEach(() => {
+    if (dir) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a live dispatch after a backtick opener whose info string contains a backtick', () => {
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+\`\`\`lang\`suffix
+this line is not really fence content — the opener above is invalid
+
+Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+  });
+
+  it('still treats a tilde opener with a backtick in its info string as a valid fence', () => {
+    // The backtick restriction is backtick-fence-only; a tilde fence's info
+    // string may contain a backtick and the fence still hides its contents.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+~~~lang\`suffix
+Invoke the Skill tool with skill: "flow:nonexistent"
+~~~
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+});

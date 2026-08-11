@@ -415,6 +415,17 @@ const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 // misread as a valid (0-indent) opener, which could truncate everything
 // after it as "unclosed fence" content and hide a live dispatch past it.
 //
+// A candidate BACKTICK marker only opens a fence if its info string (the
+// rest of the line after the marker run) contains no backtick — per
+// CommonMark, a backtick-fence info string cannot itself contain a
+// backtick (there is no such restriction for tilde fences). This is finding
+// 3 from the 5th review round: a line like ```` ```lang`suffix ```` was
+// being treated as a valid opener even though CommonMark does not read it
+// as a fence at all, so an absent closer let the EOF "unclosed fence"
+// truncation (below) discard a live dispatch that followed it. A rejected
+// candidate is left as ordinary content, scanned normally — the same
+// "scan more, not less" bias as the indented-code-block case above.
+//
 // A fence CLOSES on any of:
 //   - a matching marker (same char, length >= opener) at the same
 //     blockquote depth as the opener, indented at or within the same 0-3
@@ -553,15 +564,22 @@ function stripFencedContent(content) {
 
     if (indent - containerColumn <= 3) {
       const openerMatch = fenceOpenerRe.exec(rest.slice(containerColumn));
-      if (openerMatch) {
+      const marker = openerMatch ? openerMatch[1] : '';
+      const infoString = openerMatch
+        ? rest.slice(containerColumn + openerMatch[0].length)
+        : '';
+      const validOpener = openerMatch && (marker[0] !== '`' || !infoString.includes('`'));
+      if (validOpener) {
         inFence = true;
         fenceStart = kept.length;
-        fenceChar = openerMatch[1][0];
-        fenceLen = openerMatch[1].length;
+        fenceChar = marker[0];
+        fenceLen = marker.length;
         fenceDepth = depth;
         fenceListColumn = containerColumn;
       }
-      // else: indent within tolerance but not fence-shaped — ordinary text.
+      // else: indent within tolerance but either not fence-shaped, or a
+      // backtick opener whose info string itself contains a backtick — not
+      // a fence per CommonMark. Ordinary text either way.
     }
     // else: 4+ spaces past the container's content column — an indented
     // code block, not a fence opener. Left as ordinary content below, which
@@ -1292,13 +1310,33 @@ const SKILL_DISPATCH_VALUE_RE = /\bskill:\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)')/g;
 // plugin-qualified skill dispatch, e.g.
 // `skill: "gt-workflow:stack-decomposition-format"`.
 //
-// Kept as an explicit literal list (same idiom as MODEL_RULE_ALLOWLIST above)
-// rather than a "looks like a placeholder" heuristic — a heuristic loose
-// enough to catch `plugin:skill-name` would also swallow real typos, which is
-// the entire class of bug this rule exists to catch.
-const SKILL_DISPATCH_PLACEHOLDERS = new Set([
-  'plugin:skill-name',
-  'yellow-X:skill-name',
+// Scoped to an exact (declaring file, placeholder) pair — codex P2 finding:
+// an earlier version exempted these two strings ANYWHERE under plugins/, so
+// a live command that accidentally copied `skill: "plugin:skill-name"` or
+// `skill: "yellow-X:skill-name"` would have silently passed RULE 18 even
+// though nothing resolves it. Only the two known teaching sites below may use
+// their placeholder; the identical string anywhere else is a real,
+// unresolvable dispatch and must be reported like any other. Kept as an
+// explicit literal map (same idiom as MODEL_RULE_ALLOWLIST above) rather than
+// a "looks like a placeholder" heuristic — a heuristic loose enough to catch
+// `plugin:skill-name` would also swallow real typos, which is the entire
+// class of bug this rule exists to catch.
+//
+// The map's own staleness is linted below (see the fixtureRun-gated check
+// inside validateSkillDispatchResolution): if a listed file is deleted, or no
+// longer contains its declared placeholder, that is stale-allowlist rot and
+// becomes a hard error naming the entry — the same precedent RULE 16 sets for
+// MEMORY_PROTOCOL_SENTINEL_FILES — so the exemption cannot silently outlive
+// the prose it was carved out for.
+const SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST = new Map([
+  [
+    'yellow-review/agents/review/plugin-contract-reviewer.md',
+    new Set(['plugin:skill-name']),
+  ],
+  [
+    'yellow-review/agents/review/project-compliance-reviewer.md',
+    new Set(['yellow-X:skill-name']),
+  ],
 ]);
 
 /**
@@ -1388,10 +1426,20 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
       if (!value.includes(':')) continue;
       seen.add(value);
     }
+    if (seen.size === 0) continue;
+
+    // Placeholder allowlist is scoped per DECLARING FILE, not global — the
+    // identical placeholder string in any other file is a real, unresolvable
+    // dispatch (see SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST above).
+    const pluginsRelPath = path
+      .relative(PLUGINS_DIR, filePath)
+      .split(path.sep)
+      .join('/');
+    const allowedPlaceholders = SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST.get(pluginsRelPath);
 
     for (const target of seen) {
       if (dispatchTargets.has(target)) continue;
-      if (SKILL_DISPATCH_PLACEHOLDERS.has(target)) continue;
+      if (allowedPlaceholders && allowedPlaceholders.has(target)) continue;
       errors.push(
         `${relative(filePath)}: RULE 18 — dispatches \`skill: "${target}"\` ` +
           `but nothing under plugins/ provides it: no command declares ` +
@@ -1400,6 +1448,43 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
           `caller was missed, or the name is a typo — this dispatch fails ` +
           `at runtime.`
       );
+    }
+  }
+
+  // Stale-allowlist-rot check: a declared (file, placeholder) entry that no
+  // longer exists, or whose file no longer contains the placeholder, is a
+  // hard error naming the entry — mirrors RULE 16's declared-sentinel-file
+  // check (MEMORY_PROTOCOL_SENTINEL_FILES above) so this exemption cannot
+  // silently outlive the prose it was carved out for. Skipped in fixture
+  // runs by default (the temp-dir trees the RULE 18 integration tests build
+  // do not carry these two real files) unless a test opts back in, matching
+  // RULE 16's VALIDATE_SENTINEL_STRICT precedent.
+  const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
+  const strict = !fixtureRun || process.env.VALIDATE_PLACEHOLDER_ALLOWLIST_STRICT === '1';
+  if (strict) {
+    for (const [relPath, placeholders] of SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST) {
+      const absPath = path.join(PLUGINS_DIR, ...relPath.split('/'));
+      if (!fs.existsSync(absPath)) {
+        errors.push(
+          `${relPath}: RULE 18 — declared placeholder-allowlist entry no ` +
+            `longer exists. Remove it from SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST ` +
+            `(scripts/validate-agent-authoring.js) in the same commit that ` +
+            `deleted or moved this file.`
+        );
+        continue;
+      }
+      const declaringContent = fs.readFileSync(absPath, 'utf8');
+      for (const placeholder of placeholders) {
+        if (!declaringContent.includes(placeholder)) {
+          errors.push(
+            `${relPath}: RULE 18 — declared placeholder "${placeholder}" no ` +
+              `longer appears in this file. Remove the stale entry from ` +
+              `SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST (scripts/validate-agent-` +
+              `authoring.js), or restore the placeholder text if it was ` +
+              `edited by accident.`
+          );
+        }
+      }
     }
   }
 }
