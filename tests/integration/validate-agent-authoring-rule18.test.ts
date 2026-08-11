@@ -194,4 +194,106 @@ Fixture body.
     writeAgent(dir, 'demo-plugin/commands/caller.md', callerCommand('flow:work'));
     expect(runValidator(dir).status).toBe(0);
   });
+
+  /** A caller command whose body dispatches via a single-quoted skill value. */
+  function singleQuotedCallerCommand(target: string): string {
+    return `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+Some prose well away from any "## Usage" heading, mirroring the multi-phase
+orchestrators where namespaced dispatch actually appears.
+
+Invoke the \`Skill\` tool with \`skill: '${target}'\`.
+`;
+  }
+
+  it('resolves a single-quoted namespaced dispatch just like the double-quoted form', () => {
+    writeAgent(
+      dir,
+      'demo-plugin/commands/caller.md',
+      singleQuotedCallerCommand('flow:work')
+    );
+    writeAgent(dir, 'demo-plugin/commands/target.md', targetCommand('flow:work'));
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('fails a single-quoted namespaced dispatch that resolves to nothing', () => {
+    writeAgent(
+      dir,
+      'demo-plugin/commands/caller.md',
+      singleQuotedCallerCommand('flow:nonexistent')
+    );
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+  });
+
+  it('reports a malformed colon-bearing dispatch value instead of silently skipping it', () => {
+    // `flow:spec.name` falls outside the old narrow `[a-zA-Z0-9_:-]`
+    // character class (the stray `.`) — the old regex produced no match at
+    // all, so this shape was invisible to the rule even though it cannot
+    // resolve to any command and fails at runtime exactly like a typo.
+    writeAgent(dir, 'demo-plugin/commands/caller.md', callerCommand('flow:spec.name'));
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:spec.name');
+  });
+
+  it('ignores an unresolved dispatch example shown inside a tilde fence', () => {
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+~~~text
+Invoke the Skill tool with skill: "flow:nonexistent"
+~~~
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('ignores an unresolved dispatch example shown inside a four-backtick fence', () => {
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+\`\`\`\`text
+Invoke the Skill tool with skill: "flow:nonexistent"
+
+\`\`\`
+Even a three-backtick line nested inside a four-backtick fence must not
+close it early.
+\`\`\`
+\`\`\`\`
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
 });

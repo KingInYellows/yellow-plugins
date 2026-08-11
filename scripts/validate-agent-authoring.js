@@ -379,39 +379,64 @@ const colonlessSubagentPattern =
 // dispatch form; the canonical form is Task(subagent_type="plugin:dir:name").
 const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 
-// Strip YAML frontmatter and fenced code blocks. Shared by RULE 15b and the
-// colon-less/bareword subagent reference checks (fence-aware: teaching docs
-// show illustrative examples inside fences and must not trip the checks).
+// Strip YAML frontmatter and fenced code blocks. Shared by RULE 15b, RULE 18,
+// and the colon-less/bareword subagent reference checks (fence-aware:
+// teaching docs show illustrative examples inside fences and must not trip
+// the checks).
 // Fence markers are matched with up to 3 leading spaces of indent
-// (CommonMark still treats a ```-fence indented 1-3 spaces as a fence;
-// 4+ spaces is an indented code block, a distinct construct).
+// (CommonMark still treats a fence indented 1-3 spaces as a fence; 4+ spaces
+// is an indented code block, a distinct construct).
 // Implemented as a line scan rather than a single multiline regex: the lazy
 // [\s\S]*? close-fence search was measurably quadratic on files with many
-// near-miss ``` lines, and this helper now runs on every markdown file, not
-// just SKILL.md. Semantics match the old regex: each opener pairs with the
-// next bare-``` closer line; an unclosed trailing fence is left in place.
+// near-miss fence-marker lines, and this helper now runs on every markdown
+// file, not just SKILL.md.
+//
+// Covers all THREE CommonMark fence forms, not just plain ``` :
+//   - backtick fences of 3+ backticks
+//   - tilde fences of 3+ tildes (```` ``` ```` inside a tilde fence is
+//     literal content, not a nested fence — tilde fences exist precisely so
+//     authors can show backtick-fenced examples without escaping)
+//   - the closer must use the SAME character as the opener and be AT LEAST
+//     as long (a 4-backtick opener is not closed by a 3-backtick line — that
+//     line is content, e.g. a nested example inside the outer fence; only a
+//     4-or-more-backtick line closes it). Getting this wrong in either
+//     direction breaks the "syntax examples inside fences are ignored"
+//     guarantee: too loose and a nested short fence prematurely closes the
+//     outer one, spilling real content into the "stripped" region as if it
+//     were prose; too strict (original bug) and a longer opener is never
+//     recognized as closed, so everything after it — including unrelated
+//     real content past the intended closer — stays "provisionally kept" as
+//     an unclosed fence, which for RULE 18 meant illustrative unresolved
+//     dispatch examples were scanned as if they were live.
+const fenceOpenerRe = /^[ \t]{0,3}(`{3,}|~{3,})/;
 function stripFencedContent(content) {
   const lines = content
     .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
     .split('\n');
-  const opener = /^[ \t]{0,3}```/;
-  const closer = /^[ \t]{0,3}```[ \t]*\r?$/;
   const kept = [];
   let inFence = false;
   let fenceStart = -1;
+  let fenceChar = '';
+  let fenceLen = 0;
   for (const line of lines) {
     if (!inFence) {
-      if (opener.test(line)) {
+      const openerMatch = fenceOpenerRe.exec(line);
+      if (openerMatch) {
         inFence = true;
         fenceStart = kept.length;
+        fenceChar = openerMatch[1][0];
+        fenceLen = openerMatch[1].length;
       }
       kept.push(line); // provisional when opening — kept only if unclosed
-    } else if (closer.test(line)) {
-      kept.length = fenceStart; // drop opener..closer inclusive
-      kept.push(''); // preserve the blank the old regex replacement left
-      inFence = false;
     } else {
-      kept.push(line); // provisional fence content — kept only if unclosed
+      const closerRe = new RegExp(`^[ \\t]{0,3}\\${fenceChar}{${fenceLen},}[ \\t]*\\r?$`);
+      if (closerRe.test(line)) {
+        kept.length = fenceStart; // drop opener..closer inclusive
+        kept.push(''); // preserve the blank the old regex replacement left
+        inFence = false;
+      } else {
+        kept.push(line); // provisional fence content — kept only if unclosed
+      }
     }
   }
   return kept.join('\n');
@@ -1093,7 +1118,22 @@ function validateSkillWrapperDrift(commandFiles, errors) {
 //     `flow:plan`, yellow-review dispatches `flow:compound`.
 //   - Only namespaced values (containing `:`) are checked. Bare names stay
 //     RULE 17's business, so the two rules never double-report the same value.
-const NAMESPACED_SKILL_REF_RE = /\bskill:\s*"([a-zA-Z0-9_-]+:[a-zA-Z0-9_:-]+)"/g;
+//
+// Extraction is deliberately UNRESTRICTED inside the quotes — unlike RULE
+// 17's SKILL_REF_RE, it does not require the value to match a narrow
+// `[a-zA-Z0-9_-]` character class. An earlier version of this rule did, and
+// that class silently swallowed malformed dispatch targets: a value like
+// `flow:spec.name` (stray `.`) or `flow:spec/extra` (stray `/`) fell outside
+// the class, so the whole match failed and the rule said nothing about a
+// dispatch that will fail at runtime just the same as a plain typo. Casting
+// a wide net here and letting resolution (buildDispatchTargetIndex lookup)
+// be the actual gate means "value contains a `:` but isn't a real command or
+// placeholder" is always reported, regardless of which character broke it.
+// Also accepts single-quoted values (`skill: 'flow:spec'`) alongside the
+// documented double-quoted form, matching how RULE 17 already tolerates only
+// double quotes for its narrower bare-name case — namespaced dispatch has no
+// such narrower guarantee to lean on, so both quoting forms are captured.
+const SKILL_DISPATCH_VALUE_RE = /\bskill:\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)')/g;
 
 // Illustrative names used by the two reviewer agents that TEACH the
 // plugin-qualified dispatch syntax. They spell it out in prose rather than in
@@ -1181,8 +1221,15 @@ function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles
     // syntax inside code fences as illustration, and those placeholders
     // ("plugin:skill-name", "yellow-X:skill-name") name nothing real.
     const seen = new Set();
-    for (const match of stripFencedContent(body).matchAll(NAMESPACED_SKILL_REF_RE)) {
-      seen.add(match[1]);
+    for (const match of stripFencedContent(body).matchAll(SKILL_DISPATCH_VALUE_RE)) {
+      const value = match[1] !== undefined ? match[1] : match[2];
+      // No colon at all: a bare name, e.g. `skill: "old-name"` — RULE 17's
+      // domain, not this rule's. This is the ONLY skip condition; every
+      // colon-bearing value below is checked, resolved shapes and malformed
+      // ones alike, so a shape RULE 17's narrower class never reaches (like
+      // `flow:spec.name`) still gets reported instead of silently passing.
+      if (!value.includes(':')) continue;
+      seen.add(value);
     }
 
     for (const target of seen) {

@@ -312,6 +312,10 @@ and `pnpm test:lint-plugins` when `scripts/lint-plugins.sh` changes.
   command silently broke every caller. RULE 18 scans whole bodies (namespaced
   dispatch lives mid-document in multi-phase orchestrators), skips bare names
   so the two rules never double-report, and ignores fenced syntax examples.
+  It also exempts two literal prose placeholders — `plugin:skill-name` and
+  `yellow-X:skill-name` — by exact string match (`SKILL_DISPATCH_PLACEHOLDERS`),
+  not heuristic pattern matching, so these generic teaching examples don't need
+  a real backing command or skill.
 
 ## Security & Prompt-Injection Rules
 
