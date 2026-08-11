@@ -1,22 +1,23 @@
 ---
-"gt-workflow": patch
 "yellow-codex": patch
 "yellow-core": patch
 "yellow-docs": patch
 "yellow-linear": patch
-"yellow-research": patch
 "yellow-review": patch
 "yellow-ruvector": patch
 ---
 
 Sweep the remaining prose references to the retired `workflows:` command
-namespace under `plugins/` — 177 references across 42 files in 8 plugins — so
+namespace under `plugins/` — 60 references across 24 files in 6 plugins — so
 every documented invocation matches the `flow:` names the commands actually
 carry. Documentation only; no behavior changes.
 
-Eight plugins, not the seven the migration plan predicted: the list was
-re-derived from `git status` rather than trusted, and `yellow-docs` had a
-single reference nobody had counted.
+Six plugins, not the seven the migration plan predicted, and not the eight an
+earlier draft of this changeset claimed. The list is re-derived from this
+commit's own diff rather than trusted: `yellow-docs` had a single reference
+nobody had counted, while `gt-workflow` and `yellow-research` end up swept in
+the parent PR and carry their bumps in that PR's changeset — listing them here
+would publish new versions of two plugins this commit does not touch.
 
 Two findings worth recording:
 

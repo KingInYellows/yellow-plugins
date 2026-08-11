@@ -328,7 +328,9 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
       `workflow` → `floww`; `\b` alone is insufficient
       (`mcp-tool-rename-prefix-collision.md`). Used `perl`, not `sed`, so the
       replacement carries the same `(?![a-z-])` tail guard the gate matches
-      with — `sed` has no lookahead. 177 refs across 42 files, 8 plugins.
+      with — `sed` has no lookahead. 60 refs across 24 files, 6 plugins
+      (re-derived from this PR's own diff; `gt-workflow` and `yellow-research`
+      ended up swept in PR1 during review, so they are counted there).
 
       **Found a gate blind spot by hand:** `plugins/yellow-core/CLAUDE.md`
       documented the namespace as the glob `` `/workflows:*` ``, which matched
@@ -344,13 +346,17 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
       the one `flow:*` glob, or three legitimate prose uses ("shares the
       `flow:` namespace")
 - [x] 2.3: Remove swept paths from the gate allowlist in the same commit —
-      regenerated via `--write-allowlist`, never hand-edited. 60 files /
-      280 refs → **18 files / 108 refs**, now entirely `docs/` (90) and
-      `RESEARCH/` (18)
+      regenerated via `--write-allowlist`, never hand-edited. 41 files /
+      157 refs → **17 files / 102 refs**, now entirely `docs/` (13 files, 84
+      refs) and `RESEARCH/` (4 files, 18 refs). These are the validator's own
+      totals, not a transcription — the baseline moved when PR1's review
+      pulled the `gt-workflow` and `yellow-research` sweeps forward
 - [x] 2.4: Changeset (`patch`) for **every** plugin touched — CI keys on
-      `plugins/` paths, not semantics. **8 plugins, not the 7 this plan
-      predicted** — the list was re-derived from `git status` rather than
-      trusted, and `yellow-docs` had one uncounted reference
+      `plugins/` paths, not semantics. **6 plugins**: the 7 this plan
+      predicted, minus `gt-workflow` and `yellow-research` (swept in PR1,
+      bumped by PR1's changeset), plus `yellow-docs`, which had one uncounted
+      reference. Derived from the commit's diff, not from `git status`, so a
+      concurrently-dirty tree cannot inflate it
 
 ### PR3 — `docs/` (85 anchored / 92 unanchored) + `RESEARCH/` (10 / 14)
 
