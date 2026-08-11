@@ -17,7 +17,17 @@ on:
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
       - 'packages/**/*.json'
+      - 'docs/**'
       - 'docs/solutions/**'
+      # Mirrors validate-schemas.yml's flow-namespace globs — the gate walks
+      # the WHOLE repo (hidden dirs included), so fork PRs need the same
+      # broad trigger coverage or a stale `workflows:` reference can bypass
+      # this workflow's authoring target too. See the comment in
+      # validate-schemas.yml for why each of these is needed.
+      - 'scripts/**/*.json'
+      - 'RESEARCH/**'
+      - '*.md'
+      - '.github/**'
       - '.github/workflows/validate-schemas-fork.yml'
 
 concurrency:

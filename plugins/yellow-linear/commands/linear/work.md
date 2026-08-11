@@ -21,7 +21,7 @@ allowed-tools:
 # Work on Linear Issue
 
 Fetch Linear issue context, write a brainstorm doc for downstream consumption,
-and route to the appropriate workflow command (`/workflows:plan` or
+and route to the appropriate workflow command (`/flow:plan` or
 `/gt-stack-plan`).
 
 ## Workflow
@@ -149,7 +149,7 @@ Write the file using the Write tool.
 Present options via `AskUserQuestion`:
 
 **Single issue:**
-1. "Plan this issue (`/workflows:plan <issue-title>`)" (Recommended)
+1. "Plan this issue (`/flow:plan <issue-title>`)" (Recommended)
 2. "Plan as stacked PRs (`/gt-stack-plan <brainstorm-path>`)"
 3. "Just load context (skip planning)"
 
@@ -193,7 +193,7 @@ Based on user's choice in Step 5:
 - Report which plugin is needed
 - Output install command: `/plugin marketplace add KingInYellows/yellow-plugins <plugin-name>`
 - Describe the manual workflow equivalent:
-  - For `/workflows:plan`: "Read the brainstorm doc at `<path>` and create a
+  - For `/flow:plan`: "Read the brainstorm doc at `<path>` and create a
     plan manually in `plans/`."
   - For `/gt-stack-plan`: "Break the work into branches manually with
     `gt create <branch-name>`."

@@ -41,7 +41,7 @@ pnpm validate:snippets        # install-script generated blocks match scripts/sn
 pnpm validate:solutions       # diff-scoped slug-collision + frontmatter gate for docs/solutions/
 pnpm validate:generated       # catalog/ -> .claude-plugin/ + .agents/ byte-identity drift check
 pnpm validate:codex           # Codex artifact validation + exposure lint
-pnpm validate:flow-namespace  # no stale `workflows:` refs outside the shrinking allowlist
+pnpm validate:flow-namespace  # no unallowlisted refs to the ten renamed commands outside the shrinking allowlist
 pnpm generate:manifests       # regenerate .claude-plugin/ + .agents/ from catalog/ sources
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
 

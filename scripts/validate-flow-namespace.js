@@ -53,7 +53,14 @@
  * SCOPE — walks the whole repository from the root, INCLUDING hidden
  * directories. Every other validator in this repo roots at PLUGINS_DIR, which
  * is precisely why three separate prose censuses during planning each missed
- * `.github/` (ripgrep skips dotdirs by default) and `RESEARCH/`.
+ * `.github/` (ripgrep skips dotdirs by default) and `RESEARCH/`. The one
+ * carve-out is machine-local gitignored state (`.claude/`, `.codex/`,
+ * `.entire/`, `.ruvector/`) — see EXCLUDED_DIRS below — which cannot be part
+ * of the commit and would otherwise turn per-developer state into a false
+ * blocking failure. A directory or file that IS walked but cannot be read is
+ * a hard error, not a silent skip: this is a completeness gate, so treating
+ * an unreadable path as "nothing to scan" could let it go green while stale
+ * references sit unseen underneath.
  *
  * Error codes (catalog: packages/domain/src/validation/errorCatalog.ts) are
  * assembled via string concatenation so scripts/lint-error-codes.js does not
@@ -117,7 +124,7 @@ const STALE_RE = new RegExp('workflows:(?:' + COMMANDS.join('|') + ')(?![a-z-])'
 /**
  * Permanent exclusions — never swept, by design.
  *
- * Two classes:
+ * Three classes:
  *   - Dated records that would be FALSIFIED by rewriting (archived plans,
  *     brainstorms, solution docs, frozen audit snapshots, changelogs). The
  *     discriminator is "is this loaded as authoritative instruction, or is it
@@ -125,6 +132,13 @@ const STALE_RE = new RegExp('workflows:(?:' + COMMANDS.join('|') + ')(?![a-z-])'
  *   - Transient or generated content (`.changeset/**` is consumed by the
  *     version-packages PR; this migration's own changesets legitimately name
  *     the old namespace, and the gate runs on the PR before they are consumed).
+ *   - Machine-local gitignored state (per `.gitignore`) that is never part of
+ *     the commit and cannot be fixed by the migration: a stale reference
+ *     there would be an unactionable, false-blocking failure. This is
+ *     narrower than "everything .gitignore ignores" — it targets the
+ *     directories that are large, per-developer, or tool-generated (agent
+ *     memory, vector-index blobs, sibling-CLI session state), not every
+ *     ignored pattern in the repo.
  *
  * Matched against repo-relative POSIX paths.
  */
@@ -136,6 +150,10 @@ const EXCLUDED_DIRS = [
   // migration's own plan doc lives here and narrates the old namespace
   'docs/brainstorms',
   'docs/solutions',
+  '.claude', // per-developer agent memory (gitignored)
+  '.codex', // Codex CLI per-developer state (gitignored)
+  '.entire', // Entire AI tool per-developer config (gitignored)
+  '.ruvector', // ruvector vector-index blobs, often a symlink (gitignored)
 ];
 
 const EXCLUDED_FILES = [
@@ -198,8 +216,15 @@ function walk(dir, acc) {
   let entries;
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return acc; // unreadable directory — nothing to scan
+  } catch (err) {
+    // Fail loudly, not silently: this is a sweep-*completeness* gate, so
+    // treating an unreadable directory as "nothing to scan" can make it go
+    // green while stale `workflows:` references sit unseen underneath it.
+    console.error(
+      `[validate-flow-namespace] Error: could not read directory ` +
+        `${toPosix(path.relative(ROOT, dir))}: ${err.message}`
+    );
+    process.exit(1);
   }
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
@@ -219,8 +244,13 @@ function scanFile(relPath) {
   let content;
   try {
     content = fs.readFileSync(path.join(ROOT, relPath), 'utf8');
-  } catch {
-    return { count: 0, lines: [] };
+  } catch (err) {
+    // Same fail-loud reasoning as walk()'s readdirSync catch: an unreadable
+    // file must not be silently treated as clean.
+    console.error(
+      `[validate-flow-namespace] Error: could not read file ${relPath}: ${err.message}`
+    );
+    process.exit(1);
   }
   const lines = [];
   let count = 0;

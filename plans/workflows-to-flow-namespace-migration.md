@@ -72,7 +72,7 @@ merge time, so it does not block authoring the follow-up PRs.
 | 2 | Two changesets (yellow-core, yellow-research) | **Four plugins** have functional changes in PR1; up to **seven** need changesets across the sweep PRs |
 | 3 | New validator "needs an `ERROR-*` code or `validate:error-codes` fails" | Backwards. `lint-error-codes.js` fails when a script **hard-codes a literal** catalog code. Register in `errorCatalog.ts`, reference via string concatenation (`validate-solutions.js:22-24,83-87`) |
 | 4 | Four permanent decoys; terminal state is exactly those four | Falsified. `.changeset/*.md`, root `CHANGELOG.md`, and this migration's own solution doc all legitimately name the old namespace |
-| 5 | ~487 refs across four location classes | **489 across eight classes.** `RESEARCH/` (6) was missed entirely; `docs/brainstorms/` alone is 179 |
+| 5 | ~487 refs across four location classes | Superseded by the Reference Census below (re-derived against `main@72ca006d`), which is authoritative: **773** anchored `/workflows:<cmd>` references across **12** location classes. (An intermediate estimate of "489 across eight classes, `RESEARCH/` at 6, `docs/brainstorms/` at 179" was itself superseded by that re-derivation — the census corrects `RESEARCH/` to **10** and `docs/brainstorms/` to **173**.) |
 
 ## Reference Census
 
@@ -110,7 +110,7 @@ grows. PR2's headline "197 refs" is the anchored figure; **the gate will see
 280**.
 
 Ruling `docs/brainstorms/` historical is the single largest scope decision in
-this plan — it removes 179 of 489 references. The discriminator is *"is this
+this plan — it removes 173 of 773 references. The discriminator is *"is this
 loaded into a future session or cited as authoritative instruction, versus a
 dated closed record of a past decision?"* — not "is it old". Brainstorms are
 dated decision records in the same class as `plans/complete/**`, which the

@@ -25,6 +25,7 @@ on:
       - 'scripts/**/*.json'
       - 'RESEARCH/**'
       - '*.md'
+      - '.github/**'
       - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
   push:
@@ -49,6 +50,7 @@ on:
       - 'scripts/**/*.json'
       - 'RESEARCH/**'
       - '*.md'
+      - '.github/**'
       - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
   workflow_dispatch:
@@ -253,8 +255,9 @@ jobs:
 
                 # Sweep-completeness gate for the workflows: -> flow: command
                 # namespace migration. Walks the whole repo (hidden dirs
-                # included) and fails on any surviving reference not declared
-                # in scripts/flow-namespace-allowlist.json at its exact count.
+                # included) and fails on any unallowlisted reference to the
+                # ten renamed commands not declared in
+                # scripts/flow-namespace-allowlist.json at its exact count.
                 # Lives in this arm for the same reason the validators above
                 # do: it is in `pnpm validate:schemas`, and nothing in CI runs
                 # that script — only these matrix targets.

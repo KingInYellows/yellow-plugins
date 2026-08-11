@@ -73,27 +73,27 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
 
 ### Commands (16)
 
-- `/workflows:brainstorm` — explore requirements through dialogue and research before planning
-- `/workflows:spec` — draft a requirements spec (stable `R1..Rn` IDs + design)
+- `/flow:brainstorm` — explore requirements through dialogue and research before planning
+- `/flow:spec` — draft a requirements spec (stable `R1..Rn` IDs + design)
   through guided dialogue, written to `plans/specs/<slug>.md`; the entry point
   for large multi-subsystem projects that decompose into shells. Spec only — no
   code
-- `/workflows:decompose` — break a spec into dependency-ordered shell files in
+- `/flow:decompose` — break a spec into dependency-ordered shell files in
   `plans/shells/` with a blocking R-id coverage gate and `depends_on`
-  traceability; a single-shell result bails out to `/workflows:plan`
-- `/workflows:pick-next-shell` — pick the lowest-numbered shell whose
+  traceability; a single-shell result bails out to `/flow:plan`
+- `/flow:pick-next-shell` — pick the lowest-numbered shell whose
   `depends_on` are all archived in `plans/complete/` (exact-slug oracle),
-  expand it, capture learnings, and halt for a fresh `/workflows:work` session;
+  expand it, capture learnings, and halt for a fresh `/flow:work` session;
   reports cycles/unsatisfiable deps and the terminal state explicitly
-- `/workflows:expand-shell` — expand one shell into a concrete `- [ ]` checkbox
+- `/flow:expand-shell` — expand one shell into a concrete `- [ ]` checkbox
   plan in `plans/`, verifying `Consumes` against the live codebase and deleting
-  the shell only after approval; usually invoked by `/workflows:pick-next-shell`
-- `/workflows:plan` — transform feature descriptions into structured plans
-- `/workflows:work` — execute work plans systematically
-- `/workflows:review` — session-level review of plan adherence, cross-PR
+  the shell only after approval; usually invoked by `/flow:pick-next-shell`
+- `/flow:plan` — transform feature descriptions into structured plans
+- `/flow:work` — execute work plans systematically
+- `/flow:review` — session-level review of plan adherence, cross-PR
   coherence, and scope drift with autonomous P1 fix loop. Falls back to
   `/review:pr` redirect for PR number/URL/branch arguments.
-- `/workflows:compound` — document a recently solved problem to compound
+- `/flow:compound` — document a recently solved problem to compound
   knowledge. Pass `--in-pr` while on a feature branch with an open PR to
   draft both the solution doc and the MEMORY.md index line from the PR
   body + commit subjects instead of the live conversation transcript. This
@@ -109,7 +109,7 @@ Comprehensive dev toolkit for TypeScript, Python, Rust, and Go projects.
   the `Skill` tool); read-only dashboard of `plans/` (open) and
   `plans/complete/` (archived) with per-file checkbox progress; 100%
   open plans annotated `-- ready to complete`. Sibling of
-  `/plan:complete` and `/workflows:plan` (see "Plan namespace split"
+  `/plan:complete` and `/flow:plan` (see "Plan namespace split"
   below)
 - `/plan:complete` — archive a single open plan with two safety gates:
   Gate A scans for unchecked `- [ ]` boxes; Gate C verifies merged-PR
@@ -251,26 +251,26 @@ for why that opt-out exists.
   writes (single writer per key — subfield patching is forbidden by
   contract), NO-CACHE degradation everywhere. Storage:
   `${CLAUDE_PLUGIN_DATA}` → `~/.cache/yellow-plugins/repo-profile/`.
-  First consumer: `/workflows:plan` Phase 2. Bats coverage at
+  First consumer: `/flow:plan` Phase 2. Bats coverage at
   `plugins/yellow-core/tests/repo-profile.bats`
 
 ### Optional Plugin Dependencies
 
-- **gt-workflow** — `/workflows:work` delegates to `/smart-submit` for
+- **gt-workflow** — `/flow:work` delegates to `/smart-submit` for
   commit+submit and supports stack-aware execution when a
   `## Stack Decomposition` section exists in the plan (produced by
   `/gt-stack-plan`). Without gt-workflow, falls back to inline `gt modify -m` +
   `gt submit --no-interactive` and stack features are unavailable.
-- **yellow-codex** — `/workflows:work` offers Codex rescue
+- **yellow-codex** — `/flow:work` offers Codex rescue
   (`codex-executor`) when tests fail during stack execution. Without
   yellow-codex, the rescue option is silently omitted.
-- **yellow-review** — `/workflows:work` invokes `/review:pr` after submission;
-  `/workflows:review` falls back to `/review:pr` redirect for PR
+- **yellow-review** — `/flow:work` invokes `/review:pr` after submission;
+  `/flow:review` falls back to `/review:pr` redirect for PR
   number/URL/branch arguments. Without yellow-review, the redirect fallback
   shows an install notice.
-- **yellow-linear** — `/workflows:work` can invoke `/linear:sync --after-submit`
+- **yellow-linear** — `/flow:work` can invoke `/linear:sync --after-submit`
   as a fallback when native Linear GitHub automation is unavailable or needs
-  repair. `/workflows:plan` detects Linear issue context in brainstorm docs and
+  repair. `/flow:plan` detects Linear issue context in brainstorm docs and
   includes a `## Linear Issues` metadata section. Without yellow-linear, both
   features skip silently.
 - **yellow-research** — `best-practices-researcher` prefers
@@ -280,7 +280,7 @@ for why that opt-out exists.
   `WebSearch` silently when yellow-research is absent. This avoids
   duplicating the Ceramic MCP registration across plugins (single OAuth
   session).
-- **yellow-council** — `/workflows:work` Phase 3's polish loop escalates
+- **yellow-council** — `/flow:work` Phase 3's polish loop escalates
   persistent P1/P2 review findings to `/council review` (cross-lineage review)
   when the review→fix loop hits its 3-iteration cap and the user chooses
   Escalate. Without yellow-council, the Escalate option degrades gracefully —
@@ -355,9 +355,9 @@ Max 20x 5h window); the API-route fork is ~$0.13-0.17/drain.
 
 The plugin uses two distinct namespaces for plan-related commands:
 
-- **`/workflows:*`** — end-to-end workflows that produce new artifacts.
-  `/workflows:plan` writes a new plan file from a feature description;
-  `/workflows:work` executes one. Plan creation lives here because it is
+- **`/flow:*`** — end-to-end workflows that produce new artifacts.
+  `/flow:plan` writes a new plan file from a feature description;
+  `/flow:work` executes one. Plan creation lives here because it is
   one of several artifact-producing workflows (alongside `brainstorm`,
   `review`, `compound`).
 - **`/plan:*`** — lifecycle operations on existing plan artifacts.

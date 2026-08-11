@@ -6,7 +6,7 @@ description: "Structured format contract for Stack Decomposition sections in pla
 # Stack Decomposition Format
 
 Machine-readable contract between `gt-stack-plan` (producer) and
-`workflows:work` (consumer). Both commands must agree on this format.
+`flow:work` (consumer). Both commands must agree on this format.
 
 ## Section Structure
 
@@ -69,7 +69,7 @@ Actual output uses the full field format from Section Structure above.
 
 ### Linear
 
-Each item depends on the previous. `workflows:work` creates each branch on
+Each item depends on the previous. `flow:work` creates each branch on
 top of the last with `gt create`.
 
 ```markdown
@@ -82,7 +82,7 @@ top of the last with `gt create`.
 
 ### Parallel
 
-Items are independent, all branching off trunk. `workflows:work` checks out
+Items are independent, all branching off trunk. `flow:work` checks out
 trunk before creating each branch.
 
 ```markdown
@@ -97,7 +97,7 @@ trunk before creating each branch.
 
 Some items are stacked, others are parallel. The `Depends on` field determines
 the dependency graph. Note that while `mixed` topology is defined for forward-compatibility,
-the `workflows:work` consumer currently only supports `linear` and `parallel` topologies.
+the `flow:work` consumer currently only supports `linear` and `parallel` topologies.
 
 ```markdown
 <!-- stack-topology: mixed -->
@@ -112,7 +112,7 @@ the `workflows:work` consumer currently only supports `linear` and `parallel` to
 
 When `gt-stack-plan` is invoked without a plan file path, it writes the full
 `## Stack Decomposition` section to `.gt-stack-plan.md` in the repo root.
-This file uses the identical format and can be consumed by `workflows:work`.
+This file uses the identical format and can be consumed by `flow:work`.
 
 ## Idempotency
 
@@ -122,16 +122,16 @@ replacement preserves all content before and after the section.
 
 ## Progress Tracking
 
-When `workflows:work` executes a stack, it writes a `## Stack Progress`
+When `flow:work` executes a stack, it writes a `## Stack Progress`
 section after `## Stack Decomposition`:
 
 ```markdown
 ## Stack Progress
-<!-- Updated by workflows:work. Do not edit manually. -->
+<!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. feat/branch-slug-one (completed 2026-03-10)
 - [ ] 2. feat/branch-slug-two
 - [ ] 3. fix/branch-slug-three
 ```
 
-On resume, `workflows:work` reads this section and skips completed items,
+On resume, `flow:work` reads this section and skips completed items,
 cross-referencing with `gt log short` to verify branches exist.

@@ -112,9 +112,10 @@ forwarders to justify the multi-PR window.
   renamed), and must not (b) partially rewrite `workflow` → `floww`-style
   corruption in either direction of the rename.
 
-- **Four *permanent* decoy exclusions** — these are excluded from the CI
-  gate forever, not swept, because they are historical record or a
-  different (singular) namespace entirely:
+- **Three *permanent* decoy exclusions (plus one temporary allowlisted
+  entry)** — the three are excluded from the CI gate forever, not swept,
+  because they are historical record or a different (singular) namespace
+  entirely:
   1. The singular `yellow-core:workflow:*` agent `subagent_type` references
      (22 refs).
   2. Every `plugins/*/CHANGELOG.md`.
@@ -138,11 +139,12 @@ forwarders to justify the multi-PR window.
 
 - **Terminal/pass condition for the gate is explicit and shrinking, not
   binary.** The gate is seeded in PR1 with an allowlist covering all ~487
-  currently-known unswept sites plus the four permanent decoys. It passes
+  currently-known unswept sites plus the three permanent decoys. It passes
   (allows the bare `/workflows:` pattern) only for paths still on the
   allowlist. PR2-4 remove entries from the allowlist as they sweep prose.
   The gate is "done" — i.e., the migration is provably complete — only when
-  the allowlist contains exactly the four permanent decoys and nothing else.
+  the allowlist contains exactly the three permanent decoys and nothing
+  else.
   This explicit terminal condition is what makes the sweep machine-checked
   rather than decorative; losing it would silently regress this plan back
   to the assertion-based sweep pattern this repo has repeatedly gotten

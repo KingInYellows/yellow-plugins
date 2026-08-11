@@ -3,6 +3,7 @@
 "yellow-research": minor
 "yellow-linear": patch
 "yellow-review": patch
+"gt-workflow": patch
 ---
 
 Rename the `workflows:` command namespace to `flow:`. Native Claude Code's
@@ -30,6 +31,10 @@ yellow-linear command name changes.
 
 yellow-review takes a `patch` for the same reason: `/review:sweep-all`'s
 end-of-loop learning capture dispatches `skill: "flow:compound"`.
+
+gt-workflow takes a `patch`: its stack-decomposition skills, output styles,
+and docs name `/flow:work` / `/flow:plan` as the plan consumer, updated from
+the retired `workflows:` names.
 
 `minor`, not `major`: the discriminator in this repo's precedent is whether an
 external caller breaks, and there is no external install base for this

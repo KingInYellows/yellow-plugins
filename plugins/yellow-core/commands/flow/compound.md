@@ -20,9 +20,9 @@ to the `knowledge-compounder` agent for the full extraction pipeline.
 ## Usage
 
 ```
-/flow:compound                          # Document the most recent fix
-/flow:compound CRLF blocks git merge    # Provide a hint for context
-/flow:compound --in-pr                  # Use the current branch's PR as
+/flow:compound                               # Document the most recent fix
+/flow:compound CRLF blocks git merge         # Provide a hint for context
+/flow:compound --in-pr                       # Use the current branch's PR as
                                              # the source instead of the
                                              # conversation; doc + MEMORY.md
                                              # line are drafted from the PR

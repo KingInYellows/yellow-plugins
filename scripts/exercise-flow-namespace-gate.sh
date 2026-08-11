@@ -30,14 +30,26 @@ PROBE=docs/testing/__flow-ns-gate-probe.md
 OLD="workflow"'s' # assembled, see NOTE above
 
 BAK=$(mktemp) || exit 1
-cp "$ALLOW" "$BAK"
+if ! cp "$ALLOW" "$BAK"; then
+  printf 'ERROR: failed to back up %s to %s\n' "$ALLOW" "$BAK" >&2
+  rm -f "$BAK"
+  exit 1
+fi
 
 pass=0
 fail=0
 
+restoreAllowlist() { # copies $BAK back over $ALLOW, reporting failure
+  if [ -f "$BAK" ] && cp "$BAK" "$ALLOW"; then
+    return 0
+  fi
+  printf 'ERROR: failed to restore %s from %s\n' "$ALLOW" "$BAK" >&2
+  return 1
+}
+
 cleanup() {
   rm -f "$PROBE"
-  [ -f "$BAK" ] && cp "$BAK" "$ALLOW"
+  restoreAllowlist
   rm -f "$BAK"
 }
 trap cleanup EXIT
@@ -95,7 +107,7 @@ else
   node "$GATE" >/dev/null 2>&1
   check "count drift" 1 $?
 fi
-cp "$BAK" "$ALLOW"
+restoreAllowlist || exit 1
 
 echo
 echo "=== F. ERROR-NAMESPACE-002: allowlisted file that is now clean ==="
@@ -107,7 +119,7 @@ fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 ' "$ALLOW"
 node "$GATE" >/dev/null 2>&1
 check "stale allowlist entry (file is clean)" 1 $?
-cp "$BAK" "$ALLOW"
+restoreAllowlist || exit 1
 
 echo
 echo "=== G. ERROR-NAMESPACE-003: allowlisted path missing from disk ==="
@@ -119,7 +131,7 @@ fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 ' "$ALLOW"
 node "$GATE" >/dev/null 2>&1
 check "missing allowlist path" 1 $?
-cp "$BAK" "$ALLOW"
+restoreAllowlist || exit 1
 
 echo
 echo "=== H. tree restored, gate green again ==="

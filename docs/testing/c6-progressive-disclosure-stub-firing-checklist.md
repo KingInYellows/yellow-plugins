@@ -79,7 +79,7 @@ stub-firing rows.
 
 ### yellow-core / flow-work + setup-all commands
 
-- [ ] Run `/workflows:work` on a small plan to completion. If the agent
+- [ ] Run `/flow:work` on a small plan to completion. If the agent
       needs a gt form not spelled out in the phases, verify it Reads
       `plugins/yellow-core/references/flow-work/graphite-command-reference.md`
       rather than guessing syntax. (This stub is consulted-on-need; a run
@@ -93,22 +93,22 @@ stub-firing rows.
 
 ### yellow-core / flow-work non-stack resume (C9 companion)
 
-- [ ] Start `/workflows:work` on a plan with per-step `- [ ]` checkboxes,
+- [ ] Start `/flow:work` on a plan with per-step `- [ ]` checkboxes,
       let it complete 2+ steps, and confirm each completed step's box is
       flipped to `- [x]` in the plan file in the same loop iteration as
       its TaskUpdate (Phase 2 step 1k writeback). Then kill the session,
-      start a FRESH session, re-run `/workflows:work` on the same plan,
+      start a FRESH session, re-run `/flow:work` on the same plan,
       and verify it announces resume mode, marks the already-done steps'
       tasks completed in TaskList, and starts from the first unchecked
       box without re-executing completed steps (Phase 2 step 0).
-- [ ] Re-run `/workflows:work` on a plan whose every task checkbox is
+- [ ] Re-run `/flow:work` on a plan whose every task checkbox is
       already `- [x]`. Verify it announces the plan is already complete
       and proceeds directly to Phase 3 without re-executing any step.
-- [ ] Run `/workflows:work` on a plan whose implementation section is
+- [ ] Run `/flow:work` on a plan whose implementation section is
       fully ticked but which carries a separate unchecked checklist
       section (e.g. `### Manual Testing Checklist`). Verify step 0 does
       NOT treat those checklist items as the resume target.
-- [ ] Run `/workflows:work` on a prose-only plan (no task checkboxes) and
+- [ ] Run `/flow:work` on a prose-only plan (no task checkboxes) and
       verify the resume check announces "resume unavailable — running
       all steps" and the writeback is a silent no-op.
 

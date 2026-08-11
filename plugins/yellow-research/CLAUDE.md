@@ -2,7 +2,7 @@
 
 Deep research plugin with 6 bundled MCP servers. Three workflows:
 `/research:code` (inline, fast), `/research:deep` (multi-source, saved to
-`docs/research/`), and `/workflows:deepen-plan` (enrich plans with codebase +
+`docs/research/`), and `/flow:deepen-plan` (enrich plans with codebase +
 external research).
 
 ## MCP Servers
@@ -99,9 +99,9 @@ unavailable or returns `result.totalResults < 3`. See
   returns synthesized answer in-context. No file saved.
 - `/research:deep [topic]` — Multi-source deep research: conductor decides
   fan-out strategy, saves to `docs/research/<slug>.md`.
-- `/workflows:deepen-plan [plan path]` — Enrich an existing plan with codebase
+- `/flow:deepen-plan [plan path]` — Enrich an existing plan with codebase
   validation and external research, annotating inline. Optional step between
-  `/workflows:plan` and `/workflows:work`.
+  `/flow:plan` and `/flow:work`.
 
 ### Agents
 
@@ -189,7 +189,7 @@ These external tools improve research quality but are not required:
   avoid the dual-OAuth pop-up issue when users had context7 at user level
   too).
 - **yellow-core plugin** — provides the `repo-research-analyst` agent used by
-  `/workflows:deepen-plan` for codebase validation. Skips codebase research if
+  `/flow:deepen-plan` for codebase validation. Skips codebase research if
   not installed. Install:
   `/plugin marketplace add KingInYellows/yellow-plugins` (select yellow-core)
 - **grep MCP** — provides `mcp__grep__searchGitHub` for GitHub code search via
@@ -228,8 +228,8 @@ do not apply.
   degraded sources
 - `/research:code` — Actively coding, need quick answer about a library or API
 - `/research:deep` — Need a comprehensive report saved for later reference
-- `/workflows:deepen-plan` — Have a plan from `/workflows:plan` that needs
-  deeper validation before `/workflows:work`
+- `/flow:deepen-plan` — Have a plan from `/flow:plan` that needs
+  deeper validation before `/flow:work`
 - `research-conductor` auto-triggers via `/research:deep` and
-  `/workflows:deepen-plan` — do not call directly
+  `/flow:deepen-plan` — do not call directly
 - `code-researcher` auto-triggers via `/research:code` — do not call directly
