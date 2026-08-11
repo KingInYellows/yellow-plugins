@@ -407,8 +407,12 @@ tripping the gate — so this is a trade the gate makes knowingly.
 ### PR4 — Terminal condition
 
 - [ ] 4.1: Allowlist file contains **0 entries** (`{}`); the permanent
-      exclusions live in the script's `EXCLUDED_FILES` constant, not the
-      allowlist
+      exclusions are per-file, count-pinned entries in the script's
+      `PINNED_FILES` constant, not the allowlist. (Refined from the original
+      whole-file `EXCLUDED_FILES` list: a permanently-excluded file is still
+      walked and scanned, so a *new* stale reference introduced anywhere else
+      in it still fails the gate — see `PINNED_FILES`'s docblock in
+      `scripts/validate-flow-namespace.js`.)
 - [ ] 4.2: Add the standing dispatch-resolution validator (see
       [Pre-existing Blind Spot](#pre-existing-blind-spot-not-introduced-by-this-migration))
 - [ ] 4.3: `/flow` autocomplete check on a clean install
@@ -463,10 +467,11 @@ major (currently 1.27.2) for a change that breaks nobody.
 2. **No dangling dispatch** — all 9 `skill: "flow:*"` targets and all 12
    plugin-qualified refs resolve to a real command `name:`.
 3. **Gate terminal state** — the allowlist file contains 0 entries (`{}`),
-   with the permanent exclusions living in the script's `EXCLUDED_FILES`
-   constant, and a deliberately-reintroduced `workflows:` reference in a
-   non-excluded file fails CI (prove the gate fires; a gate never exercised
-   against a real removal is the
+   with the permanent exclusions living in the script's `PINNED_FILES`
+   constant (count-pinned, still scanned — not the old whole-file
+   `EXCLUDED_FILES` list), and a deliberately-reintroduced `workflows:`
+   reference in a non-pinned file fails CI (prove the gate fires; a gate
+   never exercised against a real removal is the
    `codex-distribution-pipeline-silent-gaps.md` failure mode, which produced
    zero CI signal for months).
 4. **The actual goal, on a clean install** — typing `/flow` narrows to exactly

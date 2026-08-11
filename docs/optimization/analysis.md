@@ -128,12 +128,16 @@ Largest command files (`wc -l`, verified):
 | 846 | `plugins/yellow-research/commands/research/setup.md` |
 | 844 | `plugins/yellow-core/commands/setup/claude-web.md` |
 | 834 | `plugins/yellow-core/commands/setup/all.md` |
-| 796 | `plugins/yellow-core/commands/flow/work.md` |
+| 796 | `plugins/yellow-core/commands/workflows/work.md` |
 | 639 | `plugins/yellow-devin/commands/devin/review-prs.md` |
 | 584 | `plugins/yellow-core/commands/worktree/cleanup.md` |
 | 577 | `plugins/yellow-devin/commands/devin/setup.md` |
-| 549 | `plugins/yellow-core/commands/flow/review.md` |
+| 549 | `plugins/yellow-core/commands/workflows/review.md` |
 | 543 | `plugins/gt-workflow/commands/gt-cleanup.md` |
+
+Paths above are as measured on 2026-07-01; `commands/workflows/` was renamed to
+`commands/flow/` in the 2026-08-10 namespace rename (line counts are this
+census's measured values and were not re-taken after the rename).
 
 12 command files exceed 500 lines (the 10 above plus
 `plugins/yellow-council/commands/council/council.md` at 527 and
@@ -373,7 +377,8 @@ What's good (verified unless noted):
   `/flow:spec` → `plans/specs/` → `/flow:decompose` →
   `plans/shells/` (with `depends_on`) → `/flow:pick-next-shell` →
   `/flow:expand-shell` (paths cited from each command's header; see
-  `plugins/yellow-core/commands/flow/pick-next-shell.md:130-136`).
+  `plugins/yellow-core/commands/workflows/pick-next-shell.md:130-136`; path as
+  measured on 2026-07-01, before the 2026-08-10 rename to `commands/flow/`).
   This mirrors turbo's plans/specs/shells almost exactly — convergent design.
 - Explicit halt-and-resume-from-file: "Context is likely full — run `/clear`,
   then `/flow:work plans/<shell-slug>.md`"
@@ -394,7 +399,9 @@ Gaps:
 - **Mid-plan progress writeback is stack-path only.** `/flow:work` writes
   `## Stack Progress` checkboxes back to the plan file only when a
   `## Stack Decomposition` section exists
-  (`plugins/yellow-core/commands/flow/work.md:250-268`) **[relayed]**; the
+  (`plugins/yellow-core/commands/workflows/work.md:250-268`; path as measured
+  on 2026-07-01, before the 2026-08-10 rename to `commands/flow/`)
+  **[relayed]**; the
   default single-branch path tracks progress in in-session TaskCreate state,
   which does not survive a fresh session.
 - **No general session-handoff artifact** (turbo `create-handoff`). The halt
@@ -430,8 +437,9 @@ Gaps (all verified this session):
   `plugins/yellow-core/agents/research/learnings-researcher.md:294-299` claims
   it is invoked by `/flow:plan` and `/flow:brainstorm`; neither
   dispatches it (plan.md uses ruvector `hooks_recall` at
-  `plugins/yellow-core/commands/flow/plan.md:52-58`; brainstorm has zero
-  references to learnings or docs/solutions).
+  `plugins/yellow-core/commands/workflows/plan.md:52-58`; path as measured on
+  2026-07-01, before the 2026-08-10 rename to `commands/flow/`; brainstorm has
+  zero references to learnings or docs/solutions).
 - **Setup-command drift**: 17 plugins each hand-roll setup.md (278 vs 74 vs 95
   lines for the same nominal job across yellow-ci/linear/debt) with only a
   weak shared skeleton **[relayed]**.

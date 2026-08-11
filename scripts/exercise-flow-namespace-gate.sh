@@ -48,6 +48,14 @@ if ! cp "$ALLOW" "$BAK"; then
   exit 1
 fi
 
+# PINNED_PROBE is a real PINNED_FILES entry (see validate-flow-namespace.js)
+# that section J below temporarily appends a fresh stale reference to, to
+# prove pinned-fingerprint drift actually fails the gate. Backed up the same
+# way $ALLOW is, and restored by the same EXIT trap.
+PINNED_PROBE=CHANGELOG.md
+PINNED_BAK=""
+PINNED_BAK_CREATED=0
+
 pass=0
 fail=0
 
@@ -59,12 +67,26 @@ restoreAllowlist() { # copies $BAK back over $ALLOW, reporting failure
   return 1
 }
 
+restorePinnedProbe() { # copies $PINNED_BAK back over $PINNED_PROBE if it was created
+  if [ "$PINNED_BAK_CREATED" -ne 1 ]; then
+    return 0
+  fi
+  if [ -f "$PINNED_BAK" ] && cp "$PINNED_BAK" "$PINNED_PROBE"; then
+    rm -f "$PINNED_BAK"
+    PINNED_BAK_CREATED=0
+    return 0
+  fi
+  printf 'ERROR: failed to restore %s from %s\n' "$PINNED_PROBE" "$PINNED_BAK" >&2
+  return 1
+}
+
 cleanup() {
   if [ "$PROBE_CREATED" -eq 1 ]; then
     rm -f "$PROBE"
   fi
   restoreAllowlist
   rm -f "$BAK"
+  restorePinnedProbe
 }
 trap cleanup EXIT
 
@@ -234,7 +256,27 @@ rm -f "$OUT"
 restoreAllowlist || exit 1
 
 echo
-echo "=== J. tree restored, gate green again ==="
+echo "=== J. ERROR-NAMESPACE-002: pinned file (PINNED_FILES) fingerprint drift ==="
+# CHANGELOG.md is a real PINNED_FILES entry with a fixed expected fingerprint.
+# Appending a brand-new stale reference must NOT be silently absorbed by the
+# pin — that's exactly the whole-file-exclusion blind spot PINNED_FILES
+# replaced. See validate-flow-namespace.js's PINNED_FILES docblock.
+PINNED_BAK=$(mktemp) || exit 1
+if ! cp "$PINNED_PROBE" "$PINNED_BAK"; then
+  printf 'ERROR: failed to back up %s to %s\n' "$PINNED_PROBE" "$PINNED_BAK" >&2
+  rm -f "$PINNED_BAK"
+  exit 1
+fi
+PINNED_BAK_CREATED=1
+printf '\n/%s:review new stale ref\n' "$OLD" >>"$PINNED_PROBE"
+OUT=$(mktemp) || exit 1
+runGate "$OUT"
+check "pinned file fingerprint drift" 1 $? "${NS}-002" "$OUT"
+rm -f "$OUT"
+restorePinnedProbe || exit 1
+
+echo
+echo "=== K. tree restored, gate green again ==="
 node "$GATE" >/dev/null 2>&1
 check "restored" 0 $?
 

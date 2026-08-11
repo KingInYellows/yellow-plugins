@@ -17,7 +17,7 @@ Evaluate `yellow-codex` against the Wave 2 keystone patterns shipped in PR #283 
 
 - `plugins/yellow-codex/agents/review/codex-reviewer.md` — supplementary reviewer spawned by `review:pr`
 - `plugins/yellow-codex/commands/codex/rescue.md` — `/codex:rescue` user-facing rescue command
-- `plugins/yellow-codex/agents/workflow/codex-executor.md` — rescue agent spawned by `/flow:work` or `/codex:rescue`
+- `plugins/yellow-codex/agents/workflow/codex-executor.md` — rescue agent spawned by `/workflows:work` (that command is `/flow:work` since the 2026-08-10 namespace rename) or `/codex:rescue`
 
 The plan's two anchor questions:
 
@@ -143,7 +143,7 @@ Today `codex-rescue` invokes `codex exec` (single-shot, non-interactive). Codex 
 
 ### O.2 — codex-executor as a Task-spawnable parallel reviewer
 
-`codex-executor` is currently only invoked by `/flow:work` and `/codex:rescue`. Making it directly spawnable as a `subagent_type` (like the Wave 2 personas) would let other commands compose it — e.g., `/review:pr` could fan out a Codex executor for each P1 finding to verify exploitability. Cost: requires a "non-interactive executor" prompt variant that is report-only, not patch-proposing.
+`codex-executor` is currently only invoked by `/workflows:work` (that command is `/flow:work` since the 2026-08-10 namespace rename) and `/codex:rescue`. Making it directly spawnable as a `subagent_type` (like the Wave 2 personas) would let other commands compose it — e.g., `/review:pr` could fan out a Codex executor for each P1 finding to verify exploitability. Cost: requires a "non-interactive executor" prompt variant that is report-only, not patch-proposing.
 
 ### O.3 — Native cross-vendor finding aggregation
 
