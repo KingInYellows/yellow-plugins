@@ -156,6 +156,16 @@ const COMMANDS = [
  *               matches that as `workflows:` + `*`, which is ordinary
  *               English. Three such false positives appeared the moment this
  *               rule was added.
+ *
+ *               `(?!\*)` only rules out BOLD, because bold closes with two
+ *               `*` characters. Markdown ITALIC closes with exactly one —
+ *               the same character the real glob uses — so
+ *               "*Template-driven workflows:*" still matches this
+ *               alternative. That case is not filtered by the regex; see
+ *               keepMatch() below, which applies a source-position check
+ *               (immediately preceded by `/` or a backtick) to this bare
+ *               alternative only, after the match, where the surrounding
+ *               line text is available.
  */
 const COLLECTIVE_FORMS = ['\\\\\\*', '\\*(?!\\*)', '<[a-z-]+>'];
 
@@ -197,6 +207,49 @@ const COLLECTIVE_PLACEHOLDER_KEY = '(placeholder)';
  */
 function collectiveKeyFor(match) {
   return match.startsWith('<') ? COLLECTIVE_PLACEHOLDER_KEY : COLLECTIVE_GLOB_KEY;
+}
+
+/**
+ * Discriminates a real bare-glob namespace reference (`/workflows:*`,
+ * `` `workflows:*` ``) from ordinary prose whose italic markup happens to
+ * close with a single `*` right after a colon-terminated phrase ending in
+ * the plain English word "workflows:" (`*Template-driven workflows:*`).
+ * COLLECTIVE_FORMS' `(?!\*)` guard already rules out bold (`**`); it cannot
+ * rule out italic, which closes with exactly one `*` — the same character
+ * the real glob uses — so this runs as a second pass over the match, in
+ * scanFile(), where the line text around it is available.
+ *
+ * Every real bare-glob reference in this repo is written with the WHOLE
+ * `workflows:*` phrase immediately preceded by a `/` or a backtick —
+ * `` `/workflows:*` `` (docs/guides/common-workflows.md) and
+ * `` `workflows:*` `` (RESEARCH/every-plugin-research.md, four
+ * occurrences). An italicized phrase instead has a space or other prose
+ * character right before "workflows" (`*Template-driven workflows:*`), so
+ * the check is on the character before the MATCH START (`m.index`, the `w`
+ * of `workflows:`) — not before the trailing `*`, which is always `:` and
+ * would make the check a no-op. A match at the very start of a line
+ * (`m.index === 0`) has no preceding character at all and is treated as
+ * "not proven", falling into the accepted false negative below.
+ *
+ * Applies ONLY to the unescaped bare `*` alternative (`m[2] === '*'`): the
+ * markdown-escaped `\*` spelling already proves intent (italic markup never
+ * produces a backslash), and the `<placeholder>` form is self-delimiting —
+ * widening this precedence requirement to either of them would be
+ * incorrect, not just unnecessary, so neither is passed through this check.
+ *
+ * This deliberately trades one direction of error for the other: a false
+ * positive here fails `pnpm validate:schemas` for every PR, and this gate
+ * has no allowlist escape hatch at the terminal (zero-entry) state a false
+ * positive would block reaching. The one accepted false negative — a bare
+ * glob written in loose prose without a preceding slash or backtick, e.g.
+ * "see workflows:* for the full list" — just leaves one stale reference for
+ * a human reviewer to catch, the same category of miss any heuristic scan
+ * already accepts elsewhere in this file.
+ */
+function keepMatch(line, m) {
+  if (m[2] !== '*') return true; // escaped glob, placeholder, or a named command
+  const prev = line[m.index - 1];
+  return prev === '/' || prev === '`';
 }
 
 /**
@@ -401,13 +454,12 @@ function scanFile(relPath) {
   const lines = [];
   const counts = {};
   content.split('\n').forEach((line, i) => {
-    const matches = [...line.matchAll(STALE_RE)];
-    if (matches.length > 0) {
-      lines.push(i + 1);
-      for (const m of matches) {
-        const key = m[1] || collectiveKeyFor(m[2]);
-        counts[key] = (counts[key] || 0) + 1;
-      }
+    const matches = [...line.matchAll(STALE_RE)].filter((m) => keepMatch(line, m));
+    if (matches.length === 0) return;
+    lines.push(i + 1);
+    for (const m of matches) {
+      const key = m[1] || collectiveKeyFor(m[2]);
+      counts[key] = (counts[key] || 0) + 1;
     }
   });
   return { counts, lines };

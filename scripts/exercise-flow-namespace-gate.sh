@@ -135,20 +135,33 @@ check "workflows:worker / :planetary ignored" 0 $?
 rm -f "$PROBE"
 
 echo
-echo "=== E. COLLECTIVE_FORMS: glob and placeholder namespace forms trip; double-asterisk markdown bold stays clean ==="
-printf '# gate probe\n\n%s:* the flow namespace\n' "$OLD" >"$PROBE"
+echo "=== E. COLLECTIVE_FORMS: glob and placeholder namespace forms trip; double-asterisk bold and single-asterisk italic around the ordinary word stay clean ==="
+writeProbe '# gate probe\n\n`%s:*` glob\n' "$OLD"
 node "$GATE" >/dev/null 2>&1
-check "collective glob form" 1 $?
+check "backtick-prefixed glob form" 1 $?
 rm -f "$PROBE"
 
-printf '# gate probe\n\n%s:<cmd> placeholder\n' "$OLD" >"$PROBE"
+writeProbe '# gate probe\n\n/%s:* glob\n' "$OLD"
+node "$GATE" >/dev/null 2>&1
+check "slash-prefixed glob form" 1 $?
+rm -f "$PROBE"
+
+writeProbe '# gate probe\n\n%s:<cmd> placeholder\n' "$OLD"
 node "$GATE" >/dev/null 2>&1
 check "collective placeholder form" 1 $?
 rm -f "$PROBE"
 
-printf '# gate probe\n\n**Template-driven %s:**\n' "$OLD" >"$PROBE"
+writeProbe '# gate probe\n\n**Template-driven %s:**\n' "$OLD"
 node "$GATE" >/dev/null 2>&1
 check "markdown bold double-asterisk ignored" 0 $?
+rm -f "$PROBE"
+
+# Regression probe: italic closes with a single `*`, the same character the
+# bare glob uses, right after the ordinary word "workflows:" — this is what
+# validate-flow-namespace.js's keepMatch() must NOT flag. See its docstring.
+writeProbe '# gate probe\n\n*Template-driven %s:*\n' "$OLD"
+node "$GATE" >/dev/null 2>&1
+check "markdown italic single-asterisk (ordinary word) ignored" 0 $?
 rm -f "$PROBE"
 
 echo

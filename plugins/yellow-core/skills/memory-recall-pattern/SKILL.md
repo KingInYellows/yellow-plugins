@@ -46,12 +46,12 @@ handle their own context seeding.
 > differ), so they are exempt from RULE 16's byte-identity check (the
 > containment scan still covers them like all plugins/ markdown) — on any
 > constant change, sweep them manually:
-> `plugins/yellow-core/commands/workflows/brainstorm.md`,
-> `plugins/yellow-core/commands/workflows/plan.md`,
-> `plugins/yellow-core/commands/workflows/spec.md`,
-> `plugins/yellow-core/commands/workflows/review.md`,
-> `plugins/yellow-core/commands/workflows/compound.md`,
-> `plugins/yellow-core/commands/workflows/work.md`,
+> `plugins/yellow-core/commands/flow/brainstorm.md`,
+> `plugins/yellow-core/commands/flow/plan.md`,
+> `plugins/yellow-core/commands/flow/spec.md`,
+> `plugins/yellow-core/commands/flow/review.md`,
+> `plugins/yellow-core/commands/flow/compound.md`,
+> `plugins/yellow-core/commands/flow/work.md`,
 > `plugins/yellow-review/commands/review/review-pr.md` (and
 > `plugins/yellow-review/references/review-pr/knowledge-compounding.md`),
 > `plugins/yellow-review/commands/review/resolve-pr.md`,
