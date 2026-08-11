@@ -588,16 +588,30 @@ hyphens, and consecutive hyphens).
 
 ### Diff Truncation Algorithm (review mode)
 
+`BASE_REF` is resolved in a DIFFERENT bash block than the one that runs this
+algorithm, and shell variables do not survive between blocks — see
+`docs/solutions/code-quality/bash-block-subshell-isolation-in-command-files.md`.
+Referencing `${BASE_REF}` here would expand to empty, silently turning
+`git diff "...HEAD"` into a diff against the empty tree (or tripping the
+caller's empty-diff guard) instead of reviewing the real change. The caller
+prints the resolved value and substitutes it as a literal; do the same here.
+Set `BASE` from that printed literal at the top of THIS block so the rest of
+the algorithm has a single reference:
+
 ```bash
+# Substitute the literal BASE_REF value the caller printed — do NOT write
+# ${BASE_REF}, which is unset in this subprocess.
+BASE="<literal BASE_REF value printed by the caller>"
+
 DIFF_FILE=$(mktemp /tmp/council-diff-XXXXXX.txt)
-git diff "${BASE_REF}...HEAD" > "$DIFF_FILE"
+git diff "${BASE}...HEAD" > "$DIFF_FILE"
 DIFF_BYTES=$(wc -c < "$DIFF_FILE")
 
 if [ "$DIFF_BYTES" -gt 200000 ]; then
   # Truncate: stat header + first 200 lines + marker
   {
     printf '### git diff --stat\n\n'
-    git diff --stat "${BASE_REF}...HEAD"
+    git diff --stat "${BASE}...HEAD"
     printf '\n### Raw diff (first 200 lines of %d total)\n\n' "$(wc -l < "$DIFF_FILE")"
     head -200 "$DIFF_FILE"
     printf '\n[... truncated — full diff is %d bytes; showing first 200 lines ...]\n' "$DIFF_BYTES"
