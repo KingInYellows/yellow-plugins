@@ -1,0 +1,22 @@
+scripts/exercise-flow-namespace-gate.sh
+  s_c1e3326aa9a6ae::t_7445bb95a65183 33-37
+plugins/yellow-core/skills/multi-host-fleet/SKILL.md
+  s_c1e3326aa9a6ae::t_cc05d941584f24 112
+  s_c1e3326aa9a6ae::t_a5319f2091af85 105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "97d781f30a07d7bb5acff5951c7ebe4d8b364f61",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
