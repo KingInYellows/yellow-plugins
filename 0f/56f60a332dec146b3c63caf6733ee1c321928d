@@ -1,0 +1,42 @@
+docs/optimization/analysis.md
+  s_c1e3326aa9a6ae::t_2d54058f665aed 402-404
+  s_c1e3326aa9a6ae::t_b35b3fb5b7744d 131,135,138-140
+  s_c1e3326aa9a6ae::t_6cba4ed59b9cbe 440-442
+  s_c1e3326aa9a6ae::t_61af5ffb78cf72 380-381
+  s_c1e3326aa9a6ae::t_55c284ae647424 141
+scripts/exercise-flow-namespace-gate.sh
+  s_c1e3326aa9a6ae::t_4961732f2251e8 259-262,264-279
+  s_c1e3326aa9a6ae::t_a10cb75d431c14 51-58,70-82,89
+  s_c1e3326aa9a6ae::t_3a7fc665e26c2e 263
+plans/workflows-to-flow-namespace-migration.md
+  s_c1e3326aa9a6ae::t_a2f20670af9141 410-415
+  s_c1e3326aa9a6ae::t_64e20b19eedc71 470-474
+docs/research/yellow-codex-expansion.md
+  s_c1e3326aa9a6ae::t_325d62246f600f 146
+  s_c1e3326aa9a6ae::t_87c129c52c2fb6 20
+scripts/validate-flow-namespace.js
+  s_c1e3326aa9a6ae::t_282311f24d7e9f 380-384
+  s_c1e3326aa9a6ae::t_abe12581e566dd 92-99,108,123
+  s_c1e3326aa9a6ae::t_b6b4899c229cda 686-704,709,711-743,748-757,764-782,797-810,812-815,818-821,827-829,834-835,837-839,843-845,863-880,892-897,899-903,907-909
+  s_c1e3326aa9a6ae::t_1022922d3560ec 307,374-379,385-410,413-425,432,445,451-463,472-473,480-489
+  s_c1e3326aa9a6ae::t_1d1734599b930a 281-289,302-306
+  s_c1e3326aa9a6ae::t_983833e11e957d 524-526
+  s_c1e3326aa9a6ae::t_153262ef5c7ae7 710
+  s_c1e3326aa9a6ae::t_0008d7dd5797a4 36-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0f56f60a332dec146b3c63caf6733ee1c321928d",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
