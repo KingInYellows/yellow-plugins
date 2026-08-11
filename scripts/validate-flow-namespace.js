@@ -137,8 +137,17 @@ const COMMANDS = [
  * a namespace reference. Three such false positives appeared the moment this
  * rule was added. A real glob is followed by a backtick, quote, or space,
  * never by a second asterisk.
+ *
+ * The leading `\\?` accepts the markdown-ESCAPED spelling `workflows:\*` as
+ * well as the bare one. Prose that has to render a literal asterisk escapes
+ * it, so the same reference is spelled both ways in the same repo —
+ * RESEARCH/MERGE_PLAN.md uses the escaped form five times. Without this the
+ * gate reports a file clean once its unescaped references are swept, while
+ * escaped ones survive underneath. The `(?!\*)` bold guard still applies: in
+ * `**bold**` the character after the colon is an unescaped `*`, so the
+ * optional backslash simply does not participate.
  */
-const COLLECTIVE_FORMS = ['\\*(?!\\*)', '<[a-z-]+>'];
+const COLLECTIVE_FORMS = ['\\\\?\\*(?!\\*)', '<[a-z-]+>'];
 
 // Shape 2 (unslashed) subsumes shapes 1 and 3 — see the module header.
 // The tail guard applies only to the command alternation: `*` and `<...>` are

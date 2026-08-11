@@ -347,10 +347,12 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
       `flow:` namespace")
 - [x] 2.3: Remove swept paths from the gate allowlist in the same commit —
       regenerated via `--write-allowlist`, never hand-edited. 41 files /
-      157 refs → **17 files / 102 refs**, now entirely `docs/` (13 files, 84
-      refs) and `RESEARCH/` (4 files, 18 refs). These are the validator's own
+      157 refs → **17 files / 109 refs**, now entirely `docs/` (13 files, 84
+      refs) and `RESEARCH/` (4 files, 25 refs). These are the validator's own
       totals, not a transcription — the baseline moved when PR1's review
-      pulled the `gt-workflow` and `yellow-research` sweeps forward
+      pulled the `gt-workflow` and `yellow-research` sweeps forward, and the
+      remaining count rose by 7 when the glob rule learned the markdown-
+      escaped spelling `workflows:\*`, which had been invisible to it
 - [x] 2.4: Changeset (`patch`) for **every** plugin touched — CI keys on
       `plugins/` paths, not semantics. **6 plugins**: the 7 this plan
       predicted, minus `gt-workflow` and `yellow-research` (swept in PR1,
