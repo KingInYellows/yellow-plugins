@@ -92,13 +92,14 @@ check "workflows:worker / :planetary ignored" 0 $?
 rm -f "$PROBE"
 
 echo
-echo "=== E. ERROR-NAMESPACE-002: allowlist count drift ==="
+echo "=== E. ERROR-NAMESPACE-002: allowlist count drift (fingerprint mismatch) ==="
 node -e '
 const fs = require("fs"), p = process.argv[1];
 const a = JSON.parse(fs.readFileSync(p, "utf8"));
 const k = Object.keys(a)[0];
 if (!k) { console.error("allowlist empty — count-drift probe not applicable"); process.exit(2); }
-a[k] += 1;
+const cmd = Object.keys(a[k])[0];
+a[k][cmd] += 1;
 fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 ' "$ALLOW"
 if [ $? -eq 2 ]; then
@@ -110,11 +111,29 @@ fi
 restoreAllowlist || exit 1
 
 echo
-echo "=== F. ERROR-NAMESPACE-002: allowlisted file that is now clean ==="
+echo "=== F. ERROR-NAMESPACE-002: same-total command substitution must trip the gate ==="
+# Recorded fingerprint says 2 of one command + 1 of another (total 3). The
+# probe file actually has 1 + 2 (also total 3) — a total-only allowlist would
+# see the totals match and miss this; per-command fingerprint comparison must
+# still catch the drift.
+node -e '
+const fs = require("fs"), p = process.argv[1], probe = process.argv[2];
+const a = JSON.parse(fs.readFileSync(p, "utf8"));
+a[probe] = { "work": 2, "plan": 1 };
+fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
+' "$ALLOW" "$PROBE"
+printf '# gate probe\n\n%s:work\n%s:plan\n%s:plan\n' "$OLD" "$OLD" "$OLD" >"$PROBE"
+node "$GATE" >/dev/null 2>&1
+check "same-total command substitution" 1 $?
+rm -f "$PROBE"
+restoreAllowlist || exit 1
+
+echo
+echo "=== G. ERROR-NAMESPACE-002: allowlisted file that is now clean ==="
 node -e '
 const fs = require("fs"), p = process.argv[1];
 const a = JSON.parse(fs.readFileSync(p, "utf8"));
-a["README.md"] = 3;
+a["README.md"] = { "work": 3 };
 fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 ' "$ALLOW"
 node "$GATE" >/dev/null 2>&1
@@ -122,11 +141,11 @@ check "stale allowlist entry (file is clean)" 1 $?
 restoreAllowlist || exit 1
 
 echo
-echo "=== G. ERROR-NAMESPACE-003: allowlisted path missing from disk ==="
+echo "=== H. ERROR-NAMESPACE-003: allowlisted path missing from disk ==="
 node -e '
 const fs = require("fs"), p = process.argv[1];
 const a = JSON.parse(fs.readFileSync(p, "utf8"));
-a["docs/__deleted-by-a-later-sweep.md"] = 2;
+a["docs/__deleted-by-a-later-sweep.md"] = { "work": 2 };
 fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
 ' "$ALLOW"
 node "$GATE" >/dev/null 2>&1
@@ -134,7 +153,7 @@ check "missing allowlist path" 1 $?
 restoreAllowlist || exit 1
 
 echo
-echo "=== H. tree restored, gate green again ==="
+echo "=== I. tree restored, gate green again ==="
 node "$GATE" >/dev/null 2>&1
 check "restored" 0 $?
 

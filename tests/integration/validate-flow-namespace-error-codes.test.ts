@@ -69,6 +69,24 @@ function extractAssembledCode(source: string, constName: string): string {
   return `ERROR-NAMESPACE${suffixMatch[1]}`;
 }
 
+/**
+ * Scans the script source for every `const NS_<NAME> = NS + '-NNN';`
+ * declaration (not just the ones {@link EXPECTED_PAIRINGS} already knows
+ * about) and returns the assembled `ERROR-NAMESPACE-NNN` code for each. This
+ * is what lets the "no orphan" assertion below catch a script-side NS_*
+ * constant that was added without a paired catalog entry — the it.each
+ * table above only re-checks constants someone already remembered to list.
+ */
+function extractAllAssembledCodes(source: string): string[] {
+  const constRe = /const (NS_[A-Z0-9_]+) = NS \+ '(-\d+)';/g;
+  const codes: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = constRe.exec(source)) !== null) {
+    codes.push(`ERROR-NAMESPACE${match[2]}`);
+  }
+  return codes;
+}
+
 describe('validate-flow-namespace.js error codes stay in sync with errorCatalog.ts', () => {
   const source = readFileSync(SCRIPT_PATH, 'utf8');
 
@@ -80,13 +98,38 @@ describe('validate-flow-namespace.js error codes stay in sync with errorCatalog.
     }
   );
 
-  it('the catalog defines no NAMESPACE_* code the script does not also assemble', () => {
+  it("the script assembles exactly the catalog's NAMESPACE_* codes, no more and no fewer", () => {
     const catalogNamespaceCodes = Object.entries(ERROR_CODES)
       .filter(([name]) => name.startsWith('NAMESPACE_'))
       .map(([, code]) => code);
 
-    const assembledCodes = EXPECTED_PAIRINGS.map((pair) => pair.catalogCode);
+    const scriptAssembledCodes = extractAllAssembledCodes(source);
 
-    expect(catalogNamespaceCodes.sort()).toEqual(assembledCodes.sort());
+    expect(
+      scriptAssembledCodes.sort(),
+      `script NS_* constants assemble to ${JSON.stringify(scriptAssembledCodes.sort())}, ` +
+        `catalog NAMESPACE_* codes are ${JSON.stringify(catalogNamespaceCodes.sort())} — ` +
+        'the two sets must be identical'
+    ).toEqual(catalogNamespaceCodes.sort());
+  });
+
+  it('EXPECTED_PAIRINGS covers every catalog NAMESPACE_* code', () => {
+    // extractAllAssembledCodes above proves the script and catalog agree as
+    // sets, but it.each only re-verifies constants someone already listed in
+    // EXPECTED_PAIRINGS. Without this assertion, that table could shrink to
+    // a single stale entry — losing per-pairing failure messages for the
+    // rest — and nothing would fail, because the set-equality check above
+    // never reads EXPECTED_PAIRINGS at all.
+    const catalogNamespaceCodes = Object.entries(ERROR_CODES)
+      .filter(([name]) => name.startsWith('NAMESPACE_'))
+      .map(([, code]) => code);
+    const tabledCodes = EXPECTED_PAIRINGS.map((pair) => pair.catalogCode);
+
+    expect(
+      tabledCodes.sort(),
+      `EXPECTED_PAIRINGS is missing catalog code(s): ${JSON.stringify(
+        catalogNamespaceCodes.filter((code) => !tabledCodes.includes(code))
+      )} — add the corresponding { scriptConst, catalogCode } entry`
+    ).toEqual(catalogNamespaceCodes.sort());
   });
 });

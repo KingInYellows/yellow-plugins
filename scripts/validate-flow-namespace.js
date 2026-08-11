@@ -34,15 +34,18 @@
  * docs/solutions/code-quality/mcp-tool-rename-prefix-collision.md.
  *
  * ALLOWLIST — `scripts/flow-namespace-allowlist.json`, keyed on
- * repo-relative POSIX path PLUS expected occurrence count:
+ * repo-relative POSIX path PLUS a per-command occurrence-count fingerprint:
  *
- *   { "plugins/gt-workflow/CLAUDE.md": 7, ... }
+ *   { "plugins/gt-workflow/CLAUDE.md": { "work": 5, "plan": 2 }, ... }
  *
- * The count is load-bearing. A path-only allowlist is non-monotonic: sweeping
- * N-1 of N references leaves the entry valid and hides partial completion.
- * Counts MUST be produced by this script's own `--write-allowlist` mode, so
- * they always come from the same matcher the gate enforces with. Never
- * transcribe them from an ad-hoc `rg` run.
+ * The fingerprint is load-bearing, not just its total. A path+total-only
+ * allowlist cannot catch a same-count substitution: if a PR removes one
+ * `workflows:work` reference from an allowlisted file but introduces a
+ * different `workflows:plan` reference elsewhere in the same file, the total
+ * is unchanged and a total-only gate reports nothing. Comparing per-command
+ * counts detects that. Fingerprints MUST be produced by this script's own
+ * `--write-allowlist` mode, so they always come from the same matcher the
+ * gate enforces with. Never transcribe them from an ad-hoc `rg` run.
  *
  * A declared allowlist path that is missing from disk is a HARD ERROR, per
  * the MEMORY_PROTOCOL_SENTINEL precedent in
@@ -121,16 +124,24 @@ const COMMANDS = [
 
 // Shape 2 (unslashed) subsumes shapes 1 and 3 — see the module header.
 // `-` must come last inside the character class so it is a literal.
-const STALE_RE = new RegExp('workflows:(?:' + COMMANDS.join('|') + ')(?![a-z-])', 'g');
+// Capturing group (rather than `(?:...)`) so scanFile() can bucket
+// occurrences per command name — the allowlist fingerprint needs the
+// command, not just a total count.
+const STALE_RE = new RegExp('workflows:(' + COMMANDS.join('|') + ')(?![a-z-])', 'g');
 
 /**
  * Permanent exclusions — never swept, by design.
  *
  * Three classes:
- *   - Dated records that would be FALSIFIED by rewriting (archived plans,
- *     brainstorms, solution docs, frozen audit snapshots, changelogs). The
- *     discriminator is "is this loaded as authoritative instruction, or is it
- *     a closed record of a past decision?" — not "is it old".
+ *   - Dated records that would be FALSIFIED by rewriting (archived plans in
+ *     plans/complete/**, brainstorms, solution docs, frozen audit snapshots,
+ *     changelogs). The discriminator is "is this loaded as authoritative
+ *     instruction, or is it a closed record of a past decision?" — not "is
+ *     it old". Active plans directly under plans/ (and plans/shells/,
+ *     plans/specs/, plans/handoff/) are live implementation instructions,
+ *     not closed records, so they ARE scanned: a stale reference there would
+ *     hand a future /workflows:work session to a command this migration
+ *     deleted.
  *   - Transient or generated content (`.changeset/**` is consumed by the
  *     version-packages PR; this migration's own changesets legitimately name
  *     the old namespace, and the gate runs on the PR before they are consumed).
@@ -145,8 +156,7 @@ const EXCLUDED_DIRS = [
   '.git',
   'node_modules',
   '.changeset',
-  'plans', // open plans AND plans/complete/** — dated records; this
-  // migration's own plan doc lives here and narrates the old namespace
+  'plans/complete', // archived plan records — dated, would be FALSIFIED by rewriting
   'docs/brainstorms',
   'docs/solutions',
 ];
@@ -169,12 +179,21 @@ const EXCLUDED_DIRS = [
  * subtree without the walk ever entering it.
  *
  * Resolved once at module load, before main() runs — --write-allowlist mode
- * needs the same exclusion set as the gate mode. A failure here (e.g. ROOT
- * is not inside a git work tree) is a hard error, not a silent empty set:
- * running with no ignore resolution at all would make the gate fail loud
- * every time a developer with local generated state runs it, exactly the
- * false-blocking failure this exists to prevent.
+ * needs the same exclusion set as the gate mode. If `git` is unavailable or
+ * ROOT is not inside a git work tree (a release tarball, an archived copy of
+ * the repo, a checkout without `.git`), this degrades to FALLBACK_IGNORED —
+ * the exact hardcoded list the pre-dynamic version of this script used —
+ * rather than aborting the process. Running `pnpm validate:schemas` in such
+ * an environment must still scan, just with less precise exclusions; hard
+ * `process.exit(1)`ing here would turn every git-less invocation into a
+ * false-blocking failure of the whole authoring matrix target. Falling back
+ * to an *empty* set instead would reintroduce that same false-blocking
+ * failure the dynamic lookup was added to fix (untracked local generated
+ * state would show up as stale references), so the fallback is the fixed
+ * list, not nothing.
  */
+const FALLBACK_IGNORED = ['.claude/', '.codex/', '.entire/', '.ruvector/'];
+
 function gitIgnoredEntries() {
   let out;
   try {
@@ -185,10 +204,12 @@ function gitIgnoredEntries() {
     );
   } catch (err) {
     console.error(
-      `[validate-flow-namespace] Error: could not list git-ignored paths under ` +
-        `${ROOT} — is it inside a git work tree? (${err.message})`
+      `[validate-flow-namespace] Warning: could not list git-ignored paths under ` +
+        `${ROOT} (${err.message}) — is it inside a git work tree? Falling back to a ` +
+        `hardcoded exclusion set (${FALLBACK_IGNORED.join(', ')}); results outside that ` +
+        'fixed list may be less accurate in this environment.'
     );
-    process.exit(1);
+    return FALLBACK_IGNORED;
   }
   return out.split('\0').filter(Boolean).map(toPosix);
 }
@@ -201,6 +222,11 @@ const EXCLUDED_FILES = [
   // Frozen audit snapshot living under a directory whose name suggests
   // living docs — classified per-file, not by directory.
   'docs/maintenance/plugin-audit-2026-06-10.md',
+  // This migration's own plan doc — narrates the old namespace ~32 times by
+  // design, describing the very rename this gate enforces. Every other
+  // active plan under plans/ (and plans/shells/, plans/specs/,
+  // plans/handoff/) is a live instruction and IS scanned.
+  'plans/workflows-to-flow-namespace-migration.md',
 ];
 
 /** `plugins/<name>/CHANGELOG.md` — per-plugin release history. */
@@ -282,7 +308,14 @@ function walk(dir, acc) {
   return acc;
 }
 
-/** @returns {{ count: number, lines: number[] }} */
+/**
+ * `counts` buckets occurrences by command name (e.g. `{ work: 3, plan: 1 }`)
+ * — the fingerprint a substitution (swap `workflows:work` for
+ * `workflows:plan` at unchanged total) has to disturb. See the module
+ * header's ALLOWLIST section.
+ *
+ * @returns {{ counts: Record<string, number>, lines: number[] }}
+ */
 function scanFile(relPath) {
   let content;
   try {
@@ -296,23 +329,47 @@ function scanFile(relPath) {
     process.exit(1);
   }
   const lines = [];
-  let count = 0;
+  const counts = {};
   content.split('\n').forEach((line, i) => {
-    const matches = line.match(STALE_RE);
-    if (matches) {
-      count += matches.length;
+    const matches = [...line.matchAll(STALE_RE)];
+    if (matches.length > 0) {
       lines.push(i + 1);
+      for (const m of matches) counts[m[1]] = (counts[m[1]] || 0) + 1;
     }
   });
-  return { count, lines };
+  return { counts, lines };
 }
 
-/** @returns {Map<string, number>} repo-relative path -> occurrence count */
+/** Sum of all per-command counts in a fingerprint. */
+function totalOf(counts) {
+  return Object.values(counts).reduce((a, b) => a + b, 0);
+}
+
+/** Renders a fingerprint as `cmd: n, cmd: n` for error messages, sorted for determinism. */
+function fmtCounts(counts) {
+  return Object.keys(counts)
+    .sort()
+    .map((cmd) => `${cmd}: ${counts[cmd]}`)
+    .join(', ');
+}
+
+/**
+ * True if two per-command fingerprints are identical, including a command
+ * present (non-zero) in one but absent from the other.
+ */
+function countsEqual(a, b) {
+  for (const cmd of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if ((a[cmd] || 0) !== (b[cmd] || 0)) return false;
+  }
+  return true;
+}
+
+/** @returns {Map<string, Record<string, number>>} repo-relative path -> per-command fingerprint */
 function scanRepo() {
   const found = new Map();
   for (const rel of walk(ROOT, [])) {
-    const { count } = scanFile(rel);
-    if (count > 0) found.set(rel, count);
+    const { counts } = scanFile(rel);
+    if (totalOf(counts) > 0) found.set(rel, counts);
   }
   return new Map([...found.entries()].sort((a, b) => a[0].localeCompare(b[0])));
 }
@@ -327,9 +384,19 @@ function loadAllowlist() {
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
       console.error(
         `[validate-flow-namespace] Error: ${toPosix(path.relative(ROOT, ALLOWLIST_FILE))} ` +
-          'must contain a JSON object mapping path -> expected count.'
+          'must contain a JSON object mapping path -> a per-command count fingerprint.'
       );
       process.exit(1);
+    }
+    for (const [relPath, entry] of Object.entries(parsed)) {
+      if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+        console.error(
+          `[validate-flow-namespace] Error: ${toPosix(path.relative(ROOT, ALLOWLIST_FILE))} ` +
+            `entry for ${relPath} must be an object mapping command name -> expected count ` +
+            '(e.g. { "work": 3, "plan": 1 }), produced via --write-allowlist.'
+        );
+        process.exit(1);
+      }
     }
     return parsed;
   } catch (err) {
@@ -343,9 +410,9 @@ function loadAllowlist() {
 
 function writeAllowlist(found) {
   const obj = {};
-  for (const [rel, count] of found) obj[rel] = count;
+  for (const [rel, counts] of found) obj[rel] = counts;
   fs.writeFileSync(ALLOWLIST_FILE, JSON.stringify(obj, null, 2) + '\n', 'utf8');
-  const total = [...found.values()].reduce((a, b) => a + b, 0);
+  const total = [...found.values()].reduce((a, counts) => a + totalOf(counts), 0);
   console.log(
     `[validate-flow-namespace] Wrote ${found.size} entr${found.size === 1 ? 'y' : 'ies'} ` +
       `(${total} reference${total === 1 ? '' : 's'}) to ` +
@@ -387,12 +454,15 @@ function main() {
   }
 
   // 2. Every file with a stale reference must be allowlisted at the exact
-  //    current count.
-  for (const [relPath, count] of found) {
+  //    current per-command fingerprint. Comparing the fingerprint (not just
+  //    the total) is what catches a same-count substitution — see the
+  //    module header's ALLOWLIST section.
+  for (const [relPath, counts] of found) {
+    const total = totalOf(counts);
     if (!(relPath in allowlist)) {
       const { lines } = scanFile(relPath);
       errors.push(
-        `${NS_STALE_REFERENCE} ${relPath}: ${count} reference${count === 1 ? '' : 's'} to the ` +
+        `${NS_STALE_REFERENCE} ${relPath}: ${total} reference${total === 1 ? '' : 's'} to the ` +
           `retired \`workflows:\` namespace (line${lines.length === 1 ? '' : 's'} ` +
           `${lines.join(', ')}). Rename to \`flow:\`, or add the file to ` +
           `${toPosix(path.relative(ROOT, ALLOWLIST_FILE))} via --write-allowlist if it is ` +
@@ -402,18 +472,24 @@ function main() {
       continue;
     }
     const expected = allowlist[relPath];
-    if (count !== expected) {
-      const direction = count < expected ? 'partially swept' : 'gained references';
+    if (!countsEqual(counts, expected)) {
+      const expectedTotal = totalOf(expected);
+      const direction =
+        total < expectedTotal
+          ? 'partially swept'
+          : total > expectedTotal
+            ? 'gained references'
+            : 'reference mix changed';
       errors.push(
-        `${NS_ALLOWLIST_COUNT_DRIFT} ${relPath}: allowlist declares ${expected} reference${
-          expected === 1 ? '' : 's'
-        } but found ${count} (${direction}). Finish the sweep for this file and remove its ` +
-          'entry, or re-run --write-allowlist if the new count is intended.'
+        `${NS_ALLOWLIST_COUNT_DRIFT} ${relPath}: allowlist declares {${fmtCounts(expected)}} ` +
+          `but found {${fmtCounts(counts)}} (${direction}). Finish the sweep for this file and ` +
+          'remove its entry, or re-run --write-allowlist if the new fingerprint is intended.'
       );
       annotate(
         relPath,
         scanFile(relPath).lines[0],
-        `${NS_ALLOWLIST_COUNT_DRIFT} allowlist count drift: expected ${expected}, found ${count}`
+        `${NS_ALLOWLIST_COUNT_DRIFT} allowlist count drift: expected {${fmtCounts(expected)}}, ` +
+          `found {${fmtCounts(counts)}}`
       );
     }
   }
@@ -424,8 +500,9 @@ function main() {
     if (!fs.existsSync(path.join(ROOT, relPath))) continue; // already reported above
     if (!found.has(relPath)) {
       errors.push(
-        `${NS_ALLOWLIST_COUNT_DRIFT} ${relPath}: allowlist declares ${allowlist[relPath]} ` +
-          'reference(s) but the file is now clean. Remove the entry in the same commit ' +
+        `${NS_ALLOWLIST_COUNT_DRIFT} ${relPath}: allowlist declares {${fmtCounts(
+          allowlist[relPath]
+        )}} reference(s) but the file is now clean. Remove the entry in the same commit ` +
           'that swept the file.'
       );
       annotate(
@@ -446,7 +523,7 @@ function main() {
     process.exit(1);
   }
 
-  const remaining = [...found.values()].reduce((a, b) => a + b, 0);
+  const remaining = [...found.values()].reduce((a, counts) => a + totalOf(counts), 0);
   if (remaining === 0) {
     console.log(
       '[validate-flow-namespace] ✓ no `workflows:` references remain outside permanent exclusions'

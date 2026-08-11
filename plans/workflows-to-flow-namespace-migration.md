@@ -239,14 +239,20 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
       bare `workflow:work` exit 0. The matcher additionally enumerates the 10
       command names with a `(?![a-z-])` tail guard, so `workflows:worker` and
       `workflows:planetary` also do not trip it (probe D)
-- [x] Allowlist keys on path **plus expected occurrence count**
-      (`"decompose.md": 12`). A path-only allowlist is non-monotonic — sweeping
-      N−1 of N refs leaves the entry valid and hides partial completion.
-      **The counts must be emitted by the script itself** (a `--write-allowlist`
-      mode), never transcribed from an ad-hoc `rg` run: the census above shows
-      anchored and unanchored differ by ~40%, so hand-copied counts are wrong
-      on day one and the hard-error rule below cannot catch a wrong *number*.
-      PR2/PR3's "shrink the allowlist" steps re-run that same mode
+- [x] Allowlist keys on path **plus a per-command occurrence fingerprint**
+      (`"decompose.md": { "work": 8, "plan": 4 }`). A path-only allowlist is
+      non-monotonic — sweeping N−1 of N refs leaves the entry valid and hides
+      partial completion. A path-plus-*total* allowlist is still blind to a
+      same-count substitution: dropping one `workflows:work` reference while
+      introducing a `workflows:plan` reference in the same file leaves the
+      total unchanged, so the gate reports nothing (raised in review on PR1;
+      the fingerprint is what closes it, and the exercise script probes that
+      exact substitution). **The fingerprints must be emitted by the script
+      itself** (a `--write-allowlist` mode), never transcribed from an ad-hoc
+      `rg` run: the census above shows anchored and unanchored differ by ~40%,
+      so hand-copied counts are wrong on day one and the hard-error rule below
+      cannot catch a wrong *number*. PR2/PR3's "shrink the allowlist" steps
+      re-run that same mode
 - [x] A declared allowlist path missing from disk is a **hard error**, per the
       `MEMORY_PROTOCOL_SENTINEL` precedent
       (`validate-agent-authoring.js:129-179`). Without this the allowlist rots
@@ -296,12 +302,15 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
       cites, which produced zero CI signal for months. Also confirm the
       inverse: a clean tree exits zero.
 
-      **Result — 10/10 probes passed against the real repo, all reverted:**
+      **Result — 11/11 probes passed against the real repo, all reverted:**
       clean tree → 0; each of the three banned shapes in a non-allowlisted
       file → 1 with `ERROR-NAMESPACE-001`; singular `workflow:` and
       `workflows:worker` → 0 (no false positive); inflated allowlist count →
-      1 with `-002`; allowlisted-but-now-clean file → 1 with `-002`;
-      allowlisted path missing from disk → 1 with `-003`; tree restored → 0.
+      1 with `-002`; **same-total command substitution inside an allowlisted
+      file → 1 with `-002`** (the probe for the per-command fingerprint —
+      a total-only allowlist passes this case); allowlisted-but-now-clean
+      file → 1 with `-002`; allowlisted path missing from disk → 1 with
+      `-003`; tree restored → 0.
       Probe script retained at `scripts/exercise-flow-namespace-gate.sh` so
       PR2–PR4 can re-run it after each sweep
 
