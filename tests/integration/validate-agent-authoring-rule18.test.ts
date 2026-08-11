@@ -158,6 +158,78 @@ Fixture body.
     expect(runValidator(dir).status).toBe(0);
   });
 
+  it('resolves a skill by its frontmatter name, not its directory name', () => {
+    // `name:` is the runtime identifier; the directory is just where the file
+    // lives. When they disagree, only the declared name resolves in a live
+    // session — so that is what the index must carry.
+    writeAgent(
+      dir,
+      'caller-plugin/commands/caller.md',
+      callerCommand('other-plugin:declared-name')
+    );
+    writeAgent(
+      dir,
+      'other-plugin/skills/directory-name/SKILL.md',
+      `---
+name: declared-name
+description: Fixture plugin skill. Use when testing RULE 18.
+---
+
+# declared-name
+
+## What It Does
+
+Fixture body.
+
+## When to Use
+
+Fixture body.
+
+## Usage
+
+Fixture body.
+`
+    );
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('rejects a skill id built from the directory when the frontmatter name differs', () => {
+    // The inverse of the case above, and the reason it matters: indexing the
+    // directory would let this stale id pass here and then fail to resolve at
+    // runtime — exactly the silent breakage RULE 18 exists to prevent.
+    writeAgent(
+      dir,
+      'caller-plugin/commands/caller.md',
+      callerCommand('other-plugin:directory-name')
+    );
+    writeAgent(
+      dir,
+      'other-plugin/skills/directory-name/SKILL.md',
+      `---
+name: declared-name
+description: Fixture plugin skill. Use when testing RULE 18.
+---
+
+# declared-name
+
+## What It Does
+
+Fixture body.
+
+## When to Use
+
+Fixture body.
+
+## Usage
+
+Fixture body.
+`
+    );
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('other-plugin:directory-name');
+  });
+
   it('still fails a plugin-qualified id whose skill directory does not exist', () => {
     writeAgent(
       dir,
@@ -466,6 +538,99 @@ allowed-tools:
 > \`\`\`text
 > some fence content
 > Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    expect(runValidator(dir).status).toBe(0);
+  });
+
+  it('reports a live top-level dispatch that follows a 4-space-indented fence-look-alike', () => {
+    // Finding 1 from the 4th review round: a standalone 4-space-indented
+    // line is a CommonMark INDENTED CODE BLOCK, not a fence opener — the
+    // earlier implementation stripped indentation unconditionally before
+    // checking, so this line was misread as a valid (0-indent) opener,
+    // which could swallow everything after it as "unclosed fence" content.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+    \`\`\`text
+    not a real fence — this is an indented code block
+    \`\`\`
+
+Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+  });
+
+  it('reports a live top-level dispatch that follows an unclosed fence inside a list item', () => {
+    // Finding 2 from the 4th review round: the fence opens inside a list
+    // item and is never explicitly closed, but the list item ends when the
+    // following prose outdents back to column 0. The dispatch below is
+    // genuinely live, top-level prose — not fence content — and must be
+    // reported.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+- Example:
+
+  \`\`\`text
+  Invoke the Skill tool with skill: "flow:example-only"
+
+Invoke the Skill tool with skill: "flow:nonexistent"
+`;
+    writeAgent(dir, 'demo-plugin/commands/caller.md', body);
+    const { status, stderr } = runValidator(dir);
+    expect(status).toBe(1);
+    expect(stderr).toContain('RULE 18');
+    expect(stderr).toContain('flow:nonexistent');
+    expect(stderr).not.toContain('flow:example-only');
+  });
+
+  it('ignores an unresolved dispatch that stays inside the list item after an unclosed fence', () => {
+    // Same unclosed fence as above, but this time the following line is
+    // MORE indented, still within the same list item's content column, so
+    // the fence legitimately stays open (runs to EOF) and the dispatch
+    // stays hidden — regression guard against over-eagerly closing on any
+    // indentation change rather than a genuine outdent.
+    const body = `---
+name: demo:caller
+description: 'Fixture caller command. Use when testing RULE 18.'
+allowed-tools:
+  - Bash
+  - Skill
+---
+
+# demo:caller
+
+## Phase 1
+
+- Example:
+
+  \`\`\`text
+  Invoke the Skill tool with skill: "flow:example-only"
+
+    Invoke the Skill tool with skill: "flow:nonexistent"
 `;
     writeAgent(dir, 'demo-plugin/commands/caller.md', body);
     expect(runValidator(dir).status).toBe(0);

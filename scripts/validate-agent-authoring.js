@@ -383,83 +383,123 @@ const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 // and the colon-less/bareword subagent reference checks (fence-aware:
 // teaching docs show illustrative examples inside fences and must not trip
 // the checks).
-// Fence markers are matched with up to 3 leading spaces of indent
-// (CommonMark still treats a fence indented 1-3 spaces as a fence; 4+ spaces
-// is an indented code block, a distinct construct).
 // Implemented as a line scan rather than a single multiline regex: the lazy
 // [\s\S]*? close-fence search was measurably quadratic on files with many
 // near-miss fence-marker lines, and this helper now runs on every markdown
 // file, not just SKILL.md.
 //
-// Covers all THREE CommonMark fence forms, not just plain ``` :
-//   - backtick fences of 3+ backticks
-//   - tilde fences of 3+ tildes (```` ``` ```` inside a tilde fence is
-//     literal content, not a nested fence — tilde fences exist precisely so
-//     authors can show backtick-fenced examples without escaping)
-//   - the closer must use the SAME character as the opener and be AT LEAST
-//     as long (a 4-backtick opener is not closed by a 3-backtick line — that
-//     line is content, e.g. a nested example inside the outer fence; only a
-//     4-or-more-backtick line closes it). Getting this wrong in either
-//     direction breaks the "syntax examples inside fences are ignored"
-//     guarantee: too loose and a nested short fence prematurely closes the
-//     outer one, spilling real content into the "stripped" region as if it
-//     were prose; too strict (original bug) and a longer opener is never
-//     recognized as closed, so everything after it — including unrelated
-//     real content past the intended closer — stays "provisionally kept" as
-//     an unclosed fence, which for RULE 18 meant illustrative unresolved
-//     dispatch examples were scanned as if they were live.
+// THE MODEL (4th rewrite of this helper — read this before changing it):
+// each line is modeled as (blockquote depth, list content column, content),
+// where "content" is the line with ONLY its verified `>` block-quote prefix
+// removed — never its indentation, which is load-bearing data, not noise:
 //
-// Container prefixes: a fence can be nested inside a block quote (`>` lines)
-// or a list item (indented continuation lines). CommonMark scopes the
-// opener/closer match to content AFTER the container markup, not the raw
-// line. containerPrefixRe strips that markup — repeated `>` quote markers
-// (each optionally followed by one space) plus any amount of list-item
-// indentation — before the fence regexes run.
+//   - blockquote depth is the count of `>` markers a line's prefix carries
+//     (unchanged from earlier rounds).
+//   - list content column is the indentation continuation lines of the
+//     current innermost list item must reach to still belong to it — e.g.
+//     for a line starting `- `, that's column 2. A stack of active columns
+//     is maintained as lines are scanned: a marker line pushes a new
+//     column, and any line (blank lines excepted — see below) whose
+//     indentation falls short of the top of the stack pops it, and
+//     everything shallower, back to whichever list item it still belongs
+//     to (or none).
 //
-// Container depth IS tracked (the count of `>` markers a line's prefix
-// consumes), because leaving a fence "open" past the point its enclosing
-// quote ends was itself a bug: per CommonMark, a block quote ends at the
-// first line that doesn't carry its `>` marker (a truly blank line has no
-// `>`, so it ends the quote — lazy continuation only applies to paragraph
-// text, not blank lines), and the quote ending also ends any fence scoped
-// inside it, closer or no closer. containerDepth() counts the `>` markers so
-// the loop below can detect that drop and treat it exactly like an explicit
-// closer: truncate the provisionally-kept fence content and resume ordinary
-// scanning. A closer line must also match the *same* depth as its opener to
-// count — a `>` line can't close a `> >` fence.
+// A fence OPENS only when, relative to the active list content column
+// (0 outside any list), the marker sits at 0-3 extra spaces of indent — the
+// same CommonMark tolerance as before, just measured from the container's
+// content column instead of from column 0. 4+ spaces past that column is an
+// INDENTED CODE BLOCK, not a fence opener, and is left as ordinary content
+// (scanned normally, not hidden) — this is finding 1 from the 4th review
+// round: the previous version stripped a line's indentation unconditionally
+// before checking, so a 4-space-indented fence-looking line at top level was
+// misread as a valid (0-indent) opener, which could truncate everything
+// after it as "unclosed fence" content and hide a live dispatch past it.
 //
-// When the container ends mid-fence, the line that ended it is treated as
+// A fence CLOSES on any of:
+//   - a matching marker (same char, length >= opener) at the same
+//     blockquote depth as the opener, indented at or within the same 0-3
+//     space tolerance past the opener's list content column (the same
+//     tolerance OPEN uses — a closer isn't required to line up EXACTLY with
+//     the opener's column, only to still be within it);
+//   - blockquote depth dropping below the opener's — per CommonMark a block
+//     quote ends at the first line lacking its `>` marker (a truly blank
+//     line has none, so it ends the quote; lazy continuation only applies
+//     to paragraph text) and the quote ending also ends any fence scoped
+//     inside it, closer or no closer;
+//   - the list content column active at fence-open time no longer being
+//     reachable — i.e. a later NON-BLANK line's indentation falls short of
+//     it, meaning the list item (or block within it) that contained the
+//     fence has ended. This is finding 2 from the 4th round: the earlier
+//     version tracked blockquote depth only, so an unclosed fence nested in
+//     a list item stayed "open" through EOF even after the surrounding
+//     prose plainly outdented back to top level, truncating a live dispatch
+//     that followed.
+//   - EOF, per CommonMark's "unterminated fence runs to end of document".
+//
+// Blank lines never end a list item on their own (loose lists tolerate a
+// blank line between an item's blocks), so they don't trigger the
+// list-column pop/close check — only a subsequent non-blank, under-indented
+// line does. Blank lines DO still end a block quote (no `>` marker to
+// carry), matching CommonMark and unchanged from earlier rounds. Content
+// inside a fence is never re-parsed as a list marker or examined for a new
+// column — it's literal.
+//
+// When a container ends mid-fence, the line that ended it is treated as
 // plain content, deliberately NOT re-examined as a potential new fence
-// opener even if it happens to be fence-shaped itself. That's a conservative
-// choice, not full CommonMark fidelity: it means a legitimately reopened
-// nested fence landing exactly on a container boundary is scanned as prose
-// instead of being re-hidden. Given the two failure modes — treating a
-// closed example as if it's still hidden (misses a real broken dispatch) vs
-// treating truly-fenced text as prose (a rare false positive a human review
-// catches instantly) — this errs toward scanning, per the same reasoning
-// that drives the rest of this helper: a false positive is cheap, a
-// swallowed real finding is not.
+// opener even if it happens to be fence-shaped itself (same conservative
+// choice earlier rounds made for the blockquote case, now extended to
+// lists): a legitimately reopened fence landing exactly on a container
+// boundary is scanned as prose instead of being re-hidden. Between the two
+// failure modes — treating closed prose as still-hidden fence content (which
+// can swallow a real, live broken dispatch) vs. treating truly-fenced text
+// as prose (a rare false positive a human review catches instantly) — this
+// helper always picks the side that scans more, not less: a false positive
+// is cheap, a swallowed finding is not.
 //
-// Remaining known limitation: this is a prefix-stripping normalization, not
-// a full CommonMark block parser. It does not model list-item nesting depth
-// (only block-quote `>` depth), so a fence's container-exit detection is
-// blockquote-only; list-indent changes are still handled solely by the
-// existing indentation tolerance in fenceOpenerRe/closerRe.
+// Honest limits: this is a normalization heuristic, not a full CommonMark
+// block parser. List content columns are computed from a single regex pass
+// per marker line (`-`, `*`, `+`, or `N.`/`N)` followed by whitespace) and
+// do not implement CommonMark's full list-item-start algorithm (tab
+// expansion, lazy continuation inside paragraphs, etc.) — it is accurate for
+// the straightforward single- and nested-bullet Markdown this repo's docs
+// actually use, not adversarial or exotic list constructs.
 const fenceOpenerRe = /^[ \t]{0,3}(`{3,}|~{3,})/;
-const containerPrefixRe = /^(?:[ \t]*>[ \t]?)*[ \t]*/;
-function stripContainerPrefix(line) {
-  const match = containerPrefixRe.exec(line);
-  return match ? line.slice(match[0].length) : line;
-}
-function containerDepth(line) {
-  const match = containerPrefixRe.exec(line);
-  if (!match) return 0;
+const blockquotePrefixRe = /^(?:[ \t]*>[ \t]?)*/;
+// A list-item marker at the very start of `rest` (already blockquote-
+// stripped): `-`/`*`/`+`, or `N.`/`N)`, followed by whitespace or EOL.
+const listMarkerRe = /^([ \t]*)([-*+]|\d+[.)])([ \t]+|$)/;
+
+function splitBlockquotePrefix(line) {
+  const match = blockquotePrefixRe.exec(line);
+  const prefix = match ? match[0] : '';
   let depth = 0;
-  for (const ch of match[0]) {
+  for (const ch of prefix) {
     if (ch === '>') depth++;
   }
-  return depth;
+  return { depth, rest: line.slice(prefix.length) };
 }
+
+function leadingIndentOf(str) {
+  let i = 0;
+  while (i < str.length && (str[i] === ' ' || str[i] === '\t')) i++;
+  return i;
+}
+
+// The content column a list item starting at `rest` establishes for its own
+// continuation lines, or -1 if `rest` doesn't open a list item here. Per
+// CommonMark, that column is the marker's indent plus the marker text plus
+// the whitespace after it — capped to 1 space if that whitespace is absent
+// or is 5+ characters (in both cases the rest of the line, if any, would
+// itself read as an indented code block inside the item, not the item's
+// normal content start).
+function listItemContentColumn(rest) {
+  const match = listMarkerRe.exec(rest);
+  if (!match) return -1;
+  const gap = match[3].length;
+  const effectiveGap = gap === 0 || gap >= 5 ? 1 : gap;
+  return match[1].length + match[2].length + effectiveGap;
+}
+
 function stripFencedContent(content) {
   const lines = content
     .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
@@ -470,52 +510,77 @@ function stripFencedContent(content) {
   let fenceChar = '';
   let fenceLen = 0;
   let fenceDepth = 0;
+  let fenceListColumn = 0;
+  const listStack = []; // ascending content columns of active list items
+
   for (const line of lines) {
-    const depth = containerDepth(line);
-    if (inFence && depth < fenceDepth) {
-      // The container (block quote) the fence opened inside has ended
-      // before a matching closer showed up. Per CommonMark the fence's
-      // scope ends with its container, so retroactively drop the
-      // provisionally-kept fence content exactly like an explicit closer
-      // would, then fall through to scan this line as ordinary text (see
-      // the block comment above for why it is not re-examined as a
-      // potential new opener).
-      kept.length = fenceStart;
-      inFence = false;
-      kept.push(line);
-      continue;
-    }
-    const normalized = stripContainerPrefix(line);
-    if (!inFence) {
-      const openerMatch = fenceOpenerRe.exec(normalized);
-      if (openerMatch) {
-        inFence = true;
-        fenceStart = kept.length;
-        fenceChar = openerMatch[1][0];
-        fenceLen = openerMatch[1].length;
-        fenceDepth = depth;
+    const { depth, rest } = splitBlockquotePrefix(line);
+    const isBlank = rest.trim() === '';
+    const indent = leadingIndentOf(rest);
+
+    if (inFence) {
+      const containerEnded = depth < fenceDepth || (!isBlank && indent < fenceListColumn);
+      if (containerEnded) {
+        // The container (block quote or list item) the fence opened inside
+        // ended before a matching closer showed up — see the block comment
+        // above for why this line is kept as plain content rather than
+        // re-examined as a potential new opener.
+        kept.length = fenceStart;
+        inFence = false;
+        kept.push(line);
+        continue;
       }
-      kept.push(line); // provisional when opening — kept only if unclosed
-    } else {
+      const contentForClose = indent >= fenceListColumn ? rest.slice(fenceListColumn) : rest;
       const closerRe = new RegExp(`^[ \\t]{0,3}\\${fenceChar}{${fenceLen},}[ \\t]*\\r?$`);
-      if (depth === fenceDepth && closerRe.test(normalized)) {
+      if (depth === fenceDepth && closerRe.test(contentForClose)) {
         kept.length = fenceStart; // drop opener..closer inclusive
         kept.push(''); // preserve the blank the old regex replacement left
         inFence = false;
       } else {
         kept.push(line); // provisional fence content — kept only if unclosed
       }
+      continue;
+    }
+
+    // Not in a fence. Pop any list contexts this line has outdented past
+    // (blank lines never end a list item on their own — see block comment).
+    if (!isBlank) {
+      while (listStack.length && indent < listStack[listStack.length - 1]) {
+        listStack.pop();
+      }
+    }
+    const containerColumn = listStack.length ? listStack[listStack.length - 1] : 0;
+
+    if (indent - containerColumn <= 3) {
+      const openerMatch = fenceOpenerRe.exec(rest.slice(containerColumn));
+      if (openerMatch) {
+        inFence = true;
+        fenceStart = kept.length;
+        fenceChar = openerMatch[1][0];
+        fenceLen = openerMatch[1].length;
+        fenceDepth = depth;
+        fenceListColumn = containerColumn;
+      }
+      // else: indent within tolerance but not fence-shaped — ordinary text.
+    }
+    // else: 4+ spaces past the container's content column — an indented
+    // code block, not a fence opener. Left as ordinary content below, which
+    // means it IS scanned normally (finding 1: scanning is the safe side).
+    kept.push(line); // provisional when opening — kept only if unclosed
+
+    if (!isBlank) {
+      const newColumn = listItemContentColumn(rest);
+      if (newColumn !== -1) listStack.push(newColumn);
     }
   }
   // Unclosed fence reaching EOF: per CommonMark, an unterminated fenced code
   // block implicitly runs to the end of the document — everything from the
   // opener onward is fence content, not prose. The "provisional keep" above
-  // exists only to be undone once a genuine matching closer shows up
-  // mid-document (see the block comment above); it was never meant to
-  // survive to EOF. Retroactively drop it with the same fenceStart
-  // truncation the closer branch uses, so an unresolvable example inside a
-  // never-closed fence is stripped like any other fenced content instead of
-  // being scanned as live.
+  // exists only to be undone once a genuine matching closer or container
+  // exit shows up mid-document; it was never meant to survive to EOF.
+  // Retroactively drop it with the same fenceStart truncation the other
+  // branches use, so an unresolvable example inside a never-closed fence is
+  // stripped like any other fenced content instead of being scanned as live.
   if (inFence) {
     kept.length = fenceStart;
   }
@@ -1276,13 +1341,25 @@ function buildDispatchTargetIndex(commandFiles, skillFiles) {
 
   for (const filePath of skillFiles) {
     // plugins/<plugin>/**/skills/<skill>/SKILL.md — take the plugin from the
-    // first path segment and the skill from SKILL.md's parent directory, so
-    // nested layouts (e.g. codex/skills/<name>/) resolve the same way.
+    // first path segment, so nested layouts (e.g. codex/skills/<name>/)
+    // resolve the same way.
+    //
+    // The skill half comes from the frontmatter `name:`, NOT the directory.
+    // `name:` is the runtime identifier; the directory is only where the file
+    // happens to live. Indexing the directory would register an id the
+    // runtime does not expose whenever the two disagree, so a dispatch to that
+    // stale directory-qualified value would pass this rule and then fail to
+    // resolve in a live session — precisely the class RULE 18 exists to catch.
+    // The directory remains the fallback for a SKILL.md with no parseable
+    // `name:`, which RULE 15's structural gate reports separately.
     const relSegments = path.relative(PLUGINS_DIR, filePath).split(path.sep);
     const pluginName = relSegments[0];
     const skillDir = relSegments[relSegments.length - 2];
     if (!pluginName || !skillDir) continue;
-    const qualified = `${pluginName}:${skillDir}`;
+    const skillFm = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    const declaredName = skillFm ? parseScalar(skillFm, 'name') : null;
+    const skillName = (declaredName || '').trim() || skillDir;
+    const qualified = `${pluginName}:${skillName}`;
     if (!index.has(qualified)) index.set(qualified, filePath);
   }
 
