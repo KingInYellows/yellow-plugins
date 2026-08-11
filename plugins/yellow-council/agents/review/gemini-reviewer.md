@@ -348,9 +348,32 @@ awk '
   # onto one line — or quoted inline in prose ("leaked key: -----BEGIN
   # PRIVATE KEY----- MII…") — bypass redaction entirely because the BEGIN
   # marker never matches. `[A-Z ]*` not `[A-Z ]+`, so the bare PKCS#8 header
-  # (-----BEGIN PRIVATE KEY-----, no algorithm word) matches as well. The END
-  # check running on the same line keeps a single-line BEGIN+body+END pair
-  # from leaving in_pem stuck on.
+  # (-----BEGIN PRIVATE KEY-----, no algorithm word) matches as well.
+  #
+  # The END test below anchors the TAIL only ([[:space:]]*$), never a
+  # full-line ^...$ anchor — do NOT "fix" this by anchoring the start too,
+  # that reintroduces the exact bypass documented in
+  # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
+  # A leading prefix (numbered excerpt, blockquote, JSON key) still matches
+  # because there is no ^ anchor; only trailing content after the marker is
+  # rejected. A hostile producer can embed a decoy END mid-body with garbage
+  # trailing it ("-----END PRIVATE KEY----- extra") specifically to disarm
+  # redaction early — the tail anchor makes that decoy fail the
+  # immediate-terminate path and fall through to the stray/span logic below
+  # instead, so it fails closed (stays redacted) rather than open. Known
+  # cost: a JSON-quoted inline key with trailing punctuation on the END line
+  # ("...-----END...-----",) also misses the immediate-terminate path —
+  # accepted, since it still gets redacted via the stray/span path, just not
+  # on that same line.
+  #
+  # PAIR-BOUND RE-ARM closes the gap the tail anchor alone leaves open: a
+  # decoy END with NOTHING trailing it ("-----END PRIVATE KEY-----" alone on
+  # its own line, injected mid-body) still passes the tail-anchor test and
+  # would terminate redaction one line early, exposing the real remaining
+  # key body. Remember that a clean END just fired (pem_reclose) and
+  # re-enter PEM mode if the very next line still looks like key body — real
+  # key material continuing right after a supposed END is the signature of
+  # a decoy, not a real block boundary.
   #
   # BOUNDED SPAN: because BEGIN is unanchored it also matches prose that only
   # quotes the marker ("the code hardcodes -----BEGIN RSA PRIVATE KEY-----").
@@ -359,32 +382,52 @@ awk '
   # Proc-Type/DEK-Info headers, so count consecutive lines that cannot be key
   # material and leave PEM mode after 3 of them: a real key block stays fully
   # redacted (base64 throughout, even when truncated with no END), while a
-  # stray prose mention costs 4 lines instead of the entire report.
+  # stray prose mention costs 4 lines instead of the entire report. The body
+  # test also requires at least one character outside the 0-9/a-f range: a
+  # bare 40- or 64-char hex token (git SHA, hash) is common in ordinary
+  # reviewer prose and would otherwise satisfy a length-only base64 check on
+  # every such line, resetting the stray counter forever and blinding the
+  # rest of the report the same way an unbounded stray BEGIN would. A hard
+  # span cap (200 lines) backstops both the stray counter and the re-arm
+  # check so the machine terminates even if some future input keeps fooling
+  # the body classifier — no real PEM key runs that long.
   # Presentation decoration is stripped before the body test, because a
   # reviewer rarely emits a key as bare base64. Blockquote ("> "), list
-  # ("1. ", "- ") and diff ("-"/"+", no space — a key echoed from the review
-  # diff) prefixes would each make every body line fail the base64 check and
-  # drop out of PEM mode mid-key, printing the remainder verbatim.
+  # ("1. ", "- "), numbered-excerpt ("13 | ") and diff ("-"/"+", no space —
+  # a key echoed from the review diff) prefixes would each make every body
+  # line fail the base64 check and drop out of PEM mode mid-key, printing
+  # the remainder verbatim.
   # Blank lines are NEUTRAL — they neither reset nor increment the counter.
   # Counting them as valid body would reset pem_stray on every paragraph gap
   # in ordinary prose, so the cutoff would never be reached and a stray BEGIN
   # would still swallow the report; counting them as stray would end
   # redaction inside a key that contains one.
-  if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) { in_pem = 1; pem_stray = 0 }
+  if (pem_reclose) {
+    pem_reclose = 0
+    if ($0 ~ /^[A-Za-z0-9+\/=]{20,}$/ && $0 ~ /[G-Zg-z+\/=]/) { in_pem = 1; pem_stray = 0 }
+  }
+  if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) { in_pem = 1; pem_stray = 0; pem_span = 0 }
   if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
-  if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
-  else if (in_pem) {
-    pem_body = $0
-    sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", pem_body)
-    sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", pem_body)
-    sub(/^[-+]/, "", pem_body)
-    sub(/^[[:space:]]+/, "", pem_body)
-    sub(/[[:space:]]+$/, "", pem_body)
-    if (pem_body != "") {
-      if (pem_body ~ /^[A-Za-z0-9+\/=]+$/ ||
-          pem_body ~ /^(Proc-Type|DEK-Info):/ ||
-          $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
-      else if (++pem_stray >= 3) in_pem = 0
+  if (in_pem) {
+    if (++pem_span > 200) {
+      in_pem = 0
+    } else if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+      in_pem = 0
+      pem_reclose = 1
+    } else {
+      pem_body = $0
+      sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", pem_body)
+      sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", pem_body)
+      sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", pem_body)
+      sub(/^[-+]/, "", pem_body)
+      sub(/^[[:space:]]+/, "", pem_body)
+      sub(/[[:space:]]+$/, "", pem_body)
+      if (pem_body != "") {
+        if ((pem_body ~ /^[A-Za-z0-9+\/=]{20,}$/ && pem_body ~ /[G-Zg-z+\/=]/) ||
+            pem_body ~ /^(Proc-Type|DEK-Info):/ ||
+            $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
+        else if (++pem_stray >= 3) in_pem = 0
+      }
     }
   }
   print line
