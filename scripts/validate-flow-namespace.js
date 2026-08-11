@@ -365,8 +365,9 @@ const EXCLUDED_FILES = [
   // upstream history, and the inventory-diff table + "your state" prose
   // are a dated snapshot of THIS repo pinned to the doc's 2026-04-28
   // generation date — both are point-in-time records, not present-tense
-  // claims, so they're preserved verbatim. The doc's two present-tense
-  // own-repo references (what brainstorm-orchestrator "drives", what
+  // claims, so they're preserved verbatim. The doc's present-tense
+  // own-repo references (what brainstorm-orchestrator "drives", the
+  // yellow-codex/yellow-core Codex-delegation overlap note, what
   // yellow-codex runs "outside of") were live claims about current
   // behavior and have been swept to `flow:*` directly in the file.
   //
@@ -383,6 +384,23 @@ const EXCLUDED_FILES = [
   'RESEARCH/MERGE_PLAN.md',
   'RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/MANIFEST.md',
   'RESEARCH/01-plugin-inventory.md',
+  // Dated repo audit (2026-05-18) with two fenced blocks presented as
+  // verbatim captures of pre-rename source: a "Lines 159–161" quote from
+  // knowledge-compounder.md and compound.md's captured frontmatter
+  // (`name: workflows:compound`). Both predate the 2026-08-10 rename, so
+  // rewriting the quoted tokens would make the captures disagree with the
+  // source actually inspected. Each fence carries an in-place annotation
+  // giving the post-rename equivalent; the file's own prose (describing
+  // the repo today) is on `flow:*` and was swept normally.
+  'docs/research/repo/background-compounding-triggers-repo-audit.md',
+  // Revalidation doc whose revision-2 provenance (2026-08-01, one week
+  // before the 2026-08-10 rename) records the command used to re-enrich
+  // it: `/yellow-research:workflows:deepen-plan`. Preserved verbatim in
+  // both provenance sites (the Date line and the References source list),
+  // each annotated with the post-rename equivalent. The body's own
+  // `/flow:brainstorm` → `/flow:spec` → `/flow:decompose` pipeline mention
+  // is a live statement about what happens next and was swept normally.
+  'docs/research/yellow-council-v2-revalidation-2026-08-01.md',
 ];
 
 /** `plugins/<name>/CHANGELOG.md` — per-plugin release history. */

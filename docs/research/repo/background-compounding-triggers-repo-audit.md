@@ -252,9 +252,11 @@ Both gates are inline prompt instructions — they cannot be disabled without mo
 Lines 159–161:
 
 ```markdown
-When spawned by `/flow:compound`, all findings are worthy (user explicitly
+When spawned by `/workflows:compound`, all findings are worthy (user explicitly
 requested compounding) — apply Routing Decision directly without severity filter.
 ```
+
+(that command is `/flow:compound` since the 2026-08-10 namespace rename)
 
 This is a **severity-filter bypass** only — it does NOT suppress M3 confirmation. There is currently NO fully non-interactive code path. The `staging-reviewer` cannot delegate to `knowledge-compounder` as-is without hitting AskUserQuestion.
 
@@ -546,7 +548,7 @@ The test harness pattern: `mktemp -d` for staging dir, `CLAUDE_PROJECT_DIR=<tmpd
 
 ```yaml
 ---
-name: flow:compound
+name: workflows:compound
 description: Document a recently solved problem to compound team knowledge into memory or solution docs
 argument-hint: '[optional: brief context about the fix]'
 allowed-tools:
@@ -559,6 +561,8 @@ allowed-tools:
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 ```
+
+(the `name:` field is `flow:compound` since the 2026-08-10 namespace rename)
 
 ### Step structure
 

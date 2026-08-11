@@ -302,7 +302,7 @@ The single confirmed obsolete item plus stale-UNIQUE candidates flagged above. F
 # git rm -r plugins/yellow-composio
 # Update: .claude-plugin/marketplace.json, README.md plugin table
 # yellow-codex: introduced in PR #239 (v0.1.0). Possible overlap with yellow-core
-# workflows:work Codex delegation. Confirm whether you actually run codex:rescue,
+# flow:work Codex delegation. Confirm whether you actually run codex:rescue,
 # codex:review, codex:status before keeping.
 # git rm -r plugins/yellow-codex
 # Update: .claude-plugin/marketplace.json, README.md plugin table
