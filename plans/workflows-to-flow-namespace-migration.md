@@ -189,6 +189,18 @@ deferrable to the sweep.
 These are read as authoritative by every agent authoring PR2–4, including the
 agent executing this plan. Leaving them stale self-poisons the follow-up work.
 
+**Scope ruling — per-plugin `plugins/<name>/CLAUDE.md` files stay in PR2.**
+They are auto-loaded too, so the 1.3 rationale reaches them, and PR1 leaves
+`plugins/yellow-core/CLAUDE.md` internally inconsistent: its Commands list
+still reads `/workflows:*` while its debugging-skill line now reads
+`/yellow-core:flow:brainstorm`. Held to PR2 anyway on two grounds. First,
+scope: those files are *plugin content* (they ship in the plugin, so editing
+them is a plugin change requiring a changeset), whereas every 1.3 file is
+repo-level authoring instruction. Second, blast radius: the inconsistency is
+descriptive prose about which commands exist, not an instruction that would
+mislead a sweeping agent into *writing* the old namespace — and it is
+allowlisted at an exact count, so PR2 cannot quietly half-fix it.
+
 - [x] `AGENTS.md:392`
 - [x] `CONTRIBUTING.md:342,411`
 - [x] `docs/CLAUDE.md:89` — loaded as project context every session
@@ -255,7 +267,24 @@ agent executing this plan. Leaving them stale self-poisons the follow-up work.
       and `.git/`
 - [x] Wire into `validate:schemas` in `package.json:20`, plus a focused
       `validate:flow-namespace` script and the two matching entries in
-      `CLAUDE.md`'s Common Commands list
+      `CLAUDE.md`'s Common Commands list.
+
+      **`package.json` alone would have shipped the gate dead.** Nothing in
+      CI runs `pnpm validate:schemas` — `validate-schemas.yml` dispatches
+      nine *matrix targets* that each invoke validators directly, which is
+      why the `authoring` target's own comment says its validators "were
+      previously only run locally via `pnpm validate:schemas` … never
+      enforced on a PR". The gate is therefore added to the `authoring` arm
+      of **both** `validate-schemas.yml` and `validate-schemas-fork.yml`
+      (fork PRs mirror that arm and would otherwise get weaker enforcement).
+
+      The workflow's `paths:` filter also had to widen. It matched
+      `scripts/**/*.js` but not `scripts/**/*.json`, and covered
+      `docs/solutions/**` but not `docs/**`, `RESEARCH/**`, or root `*.md` —
+      so **PR3 would not have triggered the workflow at all** (it touches
+      only docs/, RESEARCH/, and the `.json` allowlist). Widened on both the
+      `pull_request` and `push` triggers. Trade-off accepted: the nine-job
+      matrix now also runs on docs-only PRs
 - [x] `sed -i 's/\r$//'` the new script — WSL2 produces CRLF, which blocks
       merges here. Applied to both `validate-flow-namespace.js` and the
       generated `flow-namespace-allowlist.json`
@@ -295,6 +324,16 @@ agent executing this plan. Leaving them stale self-poisons the follow-up work.
       `plugins/` paths, not semantics
 
 ### PR3 — `docs/` (85 anchored / 92 unanchored) + `RESEARCH/` (10 / 14)
+
+**Known gate blind spot for this PR to close by hand.**
+`docs/research/repo/background-compounding-triggers-repo-audit.md` names
+`/workflows:review-staged`, which the gate's `(?![a-z-])` tail guard drops
+because `review-staged` extends the command name `review`. It is a
+*pre-existing* error either way — the command has always been
+`/compound:review-staged`, never `/workflows:review-staged` — so the correct
+fix is the right namespace, not `flow:`. The tail guard is deliberate (it is
+what keeps `workflows:worker` from tripping the gate), so this is a trade the
+gate makes knowingly, not a bug to fix in the matcher.
 
 - [ ] 3.1: Sweep `docs/` excluding `brainstorms/` and `solutions/`
 - [ ] 3.2: `RESEARCH/MERGE_PLAN.md`, `RESEARCH/01-plugin-inventory.md` — live

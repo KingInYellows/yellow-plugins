@@ -144,11 +144,13 @@ jobs:
               # Authoring + meta validators (mirror of the main workflow's
               # `authoring` target). Fork PRs get the same enforcement so a
               # fork contributor sees identical blocking signals for authoring
-              # rules, setup:all coverage, ERROR-* codes, and snippet drift.
+              # rules, setup:all coverage, ERROR-* codes, snippet drift, and
+              # flow: namespace sweep completeness.
               node scripts/validate-agent-authoring.js
               node scripts/validate-setup-all.js
               node scripts/lint-error-codes.js
               node scripts/sync-shell-snippets.js --check
+              node scripts/validate-flow-namespace.js
               ;;
             codex)
               # Codex-artifact schema validation + the R15 exposure lint

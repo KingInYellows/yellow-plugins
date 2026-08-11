@@ -15,8 +15,17 @@ on:
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
       - 'packages/**/*.json'
-      - 'docs/solutions/**'
+      - 'docs/**'
       - 'plans/**'
+      # validate-flow-namespace.js walks the WHOLE repo, so its inputs are
+      # much broader than any other validator's. Without these globs the gate
+      # would be green-by-absence on exactly the PRs it exists to check: the
+      # docs/ + RESEARCH/ sweep never touches a .js file, and the allowlist it
+      # shrinks is .json under scripts/ (not matched by 'scripts/**/*.js').
+      - 'scripts/**/*.json'
+      - 'RESEARCH/**'
+      - '*.md'
+      - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
   push:
     branches:
@@ -35,7 +44,12 @@ on:
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
       - 'packages/**/*.json'
-      - 'docs/solutions/**'
+      - 'docs/**'
+      # Mirrors the flow-namespace globs above — see the comment there.
+      - 'scripts/**/*.json'
+      - 'RESEARCH/**'
+      - '*.md'
+      - '.github/pull_request_template.md'
       - '.github/workflows/validate-schemas.yml'
   workflow_dispatch:
 
@@ -235,6 +249,17 @@ jobs:
 
                 echo "::group::Install-snippet drift"
                 node scripts/sync-shell-snippets.js --check
+                echo "::endgroup::"
+
+                # Sweep-completeness gate for the workflows: -> flow: command
+                # namespace migration. Walks the whole repo (hidden dirs
+                # included) and fails on any surviving reference not declared
+                # in scripts/flow-namespace-allowlist.json at its exact count.
+                # Lives in this arm for the same reason the validators above
+                # do: it is in `pnpm validate:schemas`, and nothing in CI runs
+                # that script — only these matrix targets.
+                echo "::group::flow: namespace sweep completeness"
+                node scripts/validate-flow-namespace.js
                 echo "::endgroup::"
                 ;;
               plans)

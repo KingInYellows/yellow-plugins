@@ -77,11 +77,11 @@ stub-firing rows.
       before Step 9a/9b execution, and that the findings table is fenced
       with `--- begin review-findings ---` / `--- end review-findings ---`.
 
-### yellow-core / workflows-work + setup-all commands
+### yellow-core / flow-work + setup-all commands
 
 - [ ] Run `/workflows:work` on a small plan to completion. If the agent
       needs a gt form not spelled out in the phases, verify it Reads
-      `plugins/yellow-core/references/workflows-work/graphite-command-reference.md`
+      `plugins/yellow-core/references/flow-work/graphite-command-reference.md`
       rather than guessing syntax. (This stub is consulted-on-need; a run
       where every gt command was already inline is a vacuous PASS.)
 - [ ] Run `/setup:all`. Verify a Read of
@@ -91,7 +91,7 @@ stub-firing rows.
       dashboard). Skip-detection: a dashboard missing the version-drift
       line proves Step 1.7 was improvised away.
 
-### yellow-core / workflows-work non-stack resume (C9 companion)
+### yellow-core / flow-work non-stack resume (C9 companion)
 
 - [ ] Start `/workflows:work` on a plan with per-step `- [ ]` checkboxes,
       let it complete 2+ steps, and confirm each completed step's box is
