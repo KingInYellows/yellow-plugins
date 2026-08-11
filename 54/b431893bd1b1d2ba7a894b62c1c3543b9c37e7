@@ -1,5 +1,5 @@
 .changeset/yellow-council-pem-redaction-bypass.md
-  s_dbe8034b0f3e9c::t_847d345750ed37 25-30
+  s_dbe8034b0f3e9c::t_847d345750ed37 25-30,25-26
   s_9101bf3f47ec09::t_33f2ce3b183794 1-15
   s_dbe8034b0f3e9c::t_5d3c21c206c10e 16-24
 plugins/yellow-council/agents/review/gemini-reviewer.md
