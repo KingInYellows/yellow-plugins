@@ -20,7 +20,7 @@ Pick one:
     docs/solutions/<category>/<existing>.md / etc.>"
 
 See CONTRIBUTING.md "Solution Docs" for the policy and skip criteria.
-Run `/workflows:compound --in-pr` to draft the doc + MEMORY.md line from
+Run `/flow:compound --in-pr` to draft the doc + MEMORY.md line from
 the PR body and commits.
 -->
 

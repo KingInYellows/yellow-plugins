@@ -1188,7 +1188,7 @@ jobs:
           DOC_CHANGES="$(git diff --name-only "$BASE_REF"...HEAD -- 'docs/solutions/' 2>&1 || true)"
 
           if [ -z "$DOC_CHANGES" ]; then
-            echo "::warning::This PR closes a P0/P1-labeled issue but contains no docs/solutions/ change. Consider running /workflows:compound --in-pr to capture the learning. Closing issues:"
+            echo "::warning::This PR closes a P0/P1-labeled issue but contains no docs/solutions/ change. Consider running /flow:compound --in-pr to capture the learning. Closing issues:"
             while IFS= read -r line; do
               [ -z "$line" ] && continue
               echo "::warning::  $line"

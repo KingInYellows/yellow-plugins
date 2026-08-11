@@ -339,7 +339,7 @@ to the code change, and MEMORY.md never points at a doc that does not exist
 on `main`. Run while on the feature branch with an open draft PR:
 
 ```bash
-/workflows:compound --in-pr
+/flow:compound --in-pr
 ```
 
 The `knowledge-compounder` agent reads your PR body and commit subjects
@@ -408,7 +408,7 @@ closing keywords do not trigger the warning. Author judgment fills the gap.
 
 ### How `--in-pr` mode differs from the standard flow
 
-Without `--in-pr`, `/workflows:compound` extracts the solution from the
+Without `--in-pr`, `/flow:compound` extracts the solution from the
 **live conversation context** (the in-session transcript). That mode runs
 the full 6-subagent extraction pipeline and is best when the learning was
 just figured out and the PR body has not yet been written.

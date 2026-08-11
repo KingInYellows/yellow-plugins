@@ -86,7 +86,7 @@ it doesn't prompt users when a new version is available. Users can run
 
 `docs/solutions/` captures recurring engineering learnings. The default
 authoring pattern is **in-PR co-shipped** — while on a feature branch with
-an open draft PR, run `/workflows:compound --in-pr` and the
+an open draft PR, run `/flow:compound --in-pr` and the
 `knowledge-compounder` agent will draft both the solution doc and the
 MEMORY.md index line from the PR body and commits. CI gates new docs on
 exact-slug uniqueness (`ERROR-SOL-001`) and required frontmatter
