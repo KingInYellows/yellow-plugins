@@ -350,21 +350,39 @@ const EXCLUDED_FILES = [
   // active plan under plans/ (and plans/shells/, plans/specs/,
   // plans/handoff/) is a live instruction and IS scanned.
   'plans/workflows-to-flow-namespace-migration.md',
-  // The next two are the sharpest case for per-file classification: their
-  // `workflows:` references are claims about the UPSTREAM EveryInc plugin's
+  // The next four are the sharpest case for per-file classification.
+  // `every-plugin-research.md` is upstream changelog analysis: every
+  // `workflows:` reference is a claim about the UPSTREAM EveryInc plugin's
   // own `workflows:*` namespace and its v2.38.0 rename to `ce:*` — a
   // different project's history. Rewriting them to `flow:` would state a
   // falsehood about someone else's repo, which is a strictly worse outcome
-  // than a stale-looking string. `every-plugin-research.md` is the upstream
-  // changelog analysis; `MERGE_PLAN.md` is the concept-fork comparison whose
-  // central claim ("your commands are named workflows:* like upstream's
-  // pre-v2.38.0 naming") is only true in the old vocabulary.
+  // than a stale-looking string.
+  //
+  // `MERGE_PLAN.md` is the concept-fork comparison. Its remaining
+  // `workflows:` references are NOT all upstream-only: the doc's central
+  // claim ("your commands are named workflows:* like upstream's
+  // pre-v2.38.0 naming") is a true-in-the-old-vocabulary claim about
+  // upstream history, and the inventory-diff table + "your state" prose
+  // are a dated snapshot of THIS repo pinned to the doc's 2026-04-28
+  // generation date — both are point-in-time records, not present-tense
+  // claims, so they're preserved verbatim. The doc's two present-tense
+  // own-repo references (what brainstorm-orchestrator "drives", what
+  // yellow-codex runs "outside of") were live claims about current
+  // behavior and have been swept to `flow:*` directly in the file.
+  //
+  // `upstream-snapshots/.../MANIFEST.md` and `01-plugin-inventory.md` are
+  // pinned historical snapshot/survey — provenance records that preserve
+  // pre-rename command names verbatim (the fetch-manifest's `Fetched by`
+  // field and the inventory's per-plugin command lists), each annotated
+  // in-place with the post-rename equivalent rather than rewritten.
   //
   // These are permanent, so they live here rather than in the allowlist —
   // that keeps the allowlist strictly a sweep-progress ledger that can reach
   // empty at the terminal condition.
   'RESEARCH/every-plugin-research.md',
   'RESEARCH/MERGE_PLAN.md',
+  'RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/MANIFEST.md',
+  'RESEARCH/01-plugin-inventory.md',
 ];
 
 /** `plugins/<name>/CHANGELOG.md` — per-plugin release history. */

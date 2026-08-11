@@ -4,7 +4,7 @@
 **Locked SHA:** `e5b397c9d1883354f03e338dd00f98be3da39f9f`
 **Release tag at SHA:** `compound-engineering-v3.3.2` (released 2026-04-29)
 **Fetched:** 2026-04-29 (Wave 1+2); extended 2026-04-30 with Wave 3 references
-**Fetched by:** `/yellow-core:flow:work` Phase 0 for `plans/everyinc-merge.md` backbone (Wave 1 + Wave 2 prep + keystone); extended 2026-04-30 for `plans/everyinc-merge-wave3.md` Phase 0.2.
+**Fetched by:** `/yellow-core:workflows:work` Phase 0 for `plans/everyinc-merge.md` backbone (Wave 1 + Wave 2 prep + keystone); extended 2026-04-30 for `plans/everyinc-merge-wave3.md` Phase 0.2. (command renamed to `/yellow-core:flow:work` in the 2026-08 namespace migration.)
 **Cap policy:** `>500 line` files in this snapshot tree are reference-only; we are not porting them whole. Files exceeding the cap (extract sub-patterns only):
 
 | File | Lines | Extraction policy |

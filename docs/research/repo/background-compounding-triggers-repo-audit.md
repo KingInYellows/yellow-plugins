@@ -540,7 +540,7 @@ The test harness pattern: `mktemp -d` for staging dir, `CLAUDE_PROJECT_DIR=<tmpd
 
 ## Item 10 — `compound.md`: Structure and Conventions for `compound/review-staged.md`
 
-**File:** `plugins/yellow-core/commands/workflows/compound.md` (99 lines total)
+**File:** `plugins/yellow-core/commands/flow/compound.md` (99 lines total)
 
 ### Frontmatter
 
@@ -600,7 +600,7 @@ Step 4: Report Results
 | `plugins/yellow-core/hooks/scripts/stop.sh` | Mirrors ruvector stop.sh structure; adds background subshell (prewarm-morph pattern lines 79–86); writes JSONL to staging |
 | `plugins/yellow-core/hooks/scripts/session-start.sh` | Mirrors yellow-ci structure; filesystem-only checks; spawns reviewer via disown if threshold met |
 | `plugins/yellow-core/agents/workflow/staging-reviewer.md` | New non-interactive agent; ruvector dedup + promote via knowledge-compounder with `mode: background` |
-| `plugins/yellow-core/commands/compound/review-staged.md` | Sibling to compound.md; manual drain trigger (note: plan places this under `commands/compound/`, not `commands/workflows/`) |
+| `plugins/yellow-core/commands/compound/review-staged.md` | Sibling to compound.md; manual drain trigger (note: plan places this under `commands/compound/`, not `commands/flow/`) |
 | `plugins/yellow-core/tests/stop.bats` | 5 tests per Item 9 spec |
 | `plugins/yellow-core/tests/session-start.bats` | 5 tests per Item 9 spec |
 

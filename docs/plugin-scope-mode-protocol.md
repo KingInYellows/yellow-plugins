@@ -78,7 +78,7 @@ co-ship with the code change.
 | Default | OFF (standard mode: live conversation is the source) |
 | Precondition | on a feature branch with an open PR |
 
-Defined in `plugins/yellow-core/commands/workflows/compound.md` Step 2.
+Defined in `plugins/yellow-core/commands/flow/compound.md` Step 2.
 
 ### Adopters
 
@@ -120,7 +120,7 @@ instead of a mode flag.
 | path-like but missing (ends `.md`, starts `./`/`../`/`plans/`) | error + list recent plans, stop |
 | PR number / URL / branch name | redirect to `/review:pr` (yellow-review), with install notice fallback |
 
-Defined in `plugins/yellow-core/commands/workflows/review.md` Step 1
+Defined in `plugins/yellow-core/commands/flow/review.md` Step 1
 ("Argument Disambiguation").
 
 ### Adopters
