@@ -1,0 +1,29 @@
+scripts/exercise-flow-namespace-gate.sh
+  s_c1e3326aa9a6ae::t_e1a5f2b409663b 147-150
+  s_c1e3326aa9a6ae::t_a4964ae3fdac55 111-115
+  s_c1e3326aa9a6ae::t_646d510c2e68d2 128
+  s_c1e3326aa9a6ae::t_cef226180b4e3c 31
+  s_c1e3326aa9a6ae::t_ff032819c5fa17 182-185
+  s_c1e3326aa9a6ae::t_0c8fa6c221e4d7 166-170
+  s_c1e3326aa9a6ae::t_d9393e43b51dd3 67-96,98,100-101
+  s_c1e3326aa9a6ae::t_802db73def371a 59-61
+  s_c1e3326aa9a6ae::t_7058995e1ba369 196-199
+  s_c1e3326aa9a6ae::t_dffc88abe9fa01 121
+  s_c1e3326aa9a6ae::t_a7c347b6877ee9 32-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "01c2dfd72722eda9e2b172e02c19ccc6265e6ddb",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
