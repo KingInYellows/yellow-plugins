@@ -34,3 +34,27 @@ Three consequences of being in-process are surfaced rather than hidden:
 available)`: `READY_COUNT` seeds at 1, the previously unreachable
 zero-reviewer branch becomes a `MINIMAL` status, and the full-council
 threshold moves to 4.
+
+Because claude-reviewer's own redaction and fence-escaping rules are
+prompt-level prose with nothing executing them, `council.md` mechanically
+enforces both invariants for this leg from the orchestrator side:
+
+- The 11-pattern credential/PEM `awk` redaction block (canonical copy in the
+  `council-patterns` skill) now runs twice for the claude leg — once in
+  `parse_reviewer_return` over `summary=`/`findings_block` and any non-enum
+  `verdict=`, before Step 5 synthesis ever sees them, and once in Step 7 over
+  the fenced-file appendix, before it lands in the persisted report. Both
+  copies are mawk-safe: no `{n,}` interval expressions, since mawk (the
+  default `/usr/bin/awk` on Debian/Ubuntu) matches those literally instead of
+  treating them as quantifiers; a `match()`+`RLENGTH` helper reproduces the
+  same minimum-length gate without interval syntax.
+- Step 7 rebuilds claude-reviewer's injection-fence sandwich unconditionally
+  rather than trusting the file's own begin/end delimiters — the file it
+  wrote may be missing either delimiter or carry a forged extra copy, so
+  every delimiter-shaped line is escaped first, then `council.md`'s own
+  fresh begin/end pair wraps the result.
+- Step 4's reclamation of orphaned fenced-output files from a prior
+  claude-reviewer run that never reached cleanup is age-gated (24 hours):
+  only files older than that are swept, so a second concurrent `/council`
+  invocation's own in-flight file is never at risk of being deleted out from
+  under it.
