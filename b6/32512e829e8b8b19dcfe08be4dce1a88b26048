@@ -1,0 +1,28 @@
+tests/integration/validate-agent-authoring-rule18.test.ts
+  s_c1e3326aa9a6ae::t_dda85fc2d103f1 737,746
+  s_c1e3326aa9a6ae::t_7e95d94569a111 769-782,787
+  s_c1e3326aa9a6ae::t_69e89a06af0760 672-692,717-736,738-745,747-768,783-786,788-866
+  s_c1e3326aa9a6ae::t_81d93f1375540f 693-716
+scripts/validate-agent-authoring.js
+  s_c1e3326aa9a6ae::t_93b9ebeedb0a25 1313-1339
+  s_c1e3326aa9a6ae::t_9503b922786411 1429-1438,1442,1453-1487
+  s_c1e3326aa9a6ae::t_e9c71070f38409 418-428
+  s_c1e3326aa9a6ae::t_75c7182f102b72 567-572,575-576,580-582
+  s_c1e3326aa9a6ae::t_41ec61ab846458 1488-1489
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "b632512e829e8b8b19dcfe08be4dce1a88b26048",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
