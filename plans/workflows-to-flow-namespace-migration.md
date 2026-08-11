@@ -406,16 +406,56 @@ tripping the gate — so this is a trade the gate makes knowingly.
 
 ### PR4 — Terminal condition
 
-- [ ] 4.1: Allowlist file contains **0 entries** (`{}`); the permanent
-      exclusions are per-file, count-pinned entries in the script's
-      `PINNED_FILES` constant, not the allowlist. (Refined from the original
-      whole-file `EXCLUDED_FILES` list: a permanently-excluded file is still
-      walked and scanned, so a *new* stale reference introduced anywhere else
-      in it still fails the gate — see `PINNED_FILES`'s docblock in
-      `scripts/validate-flow-namespace.js`.)
-- [ ] 4.2: Add the standing dispatch-resolution validator (see
-      [Pre-existing Blind Spot](#pre-existing-blind-spot-not-introduced-by-this-migration))
-- [ ] 4.3: `/flow` autocomplete check on a clean install
+- [x] 4.1: Allowlist file contains **0 entries** (`{}`) — reached in PR3. The
+      permanent exemptions are per-file, count-pinned entries in the script's
+      `PINNED_FILES` constant, not the allowlist. Audited every surviving
+      `workflows:` token repo-wide and confirmed each falls in a declared
+      class (`plugins/*/CHANGELOG.md`, `plans/complete/**`,
+      `docs/brainstorms/**`, the pinned historical files, and the gate
+      script's own regex).
+
+      **Refined during review from the original whole-file `EXCLUDED_FILES`
+      list.** A whole-file exclusion switched scanning off for the entire
+      file, so a *new* stale reference added later to a document that merely
+      *contained* dated captures would never be caught. A pinned file is
+      walked and scanned like any other; only its recorded fingerprint is
+      permitted, and any drift fails the gate with instructions to re-pin
+      deliberately. That matters most for the mixed documents — live prose
+      alongside verbatim historical captures — which is exactly the class the
+      old design was blindest to
+- [x] 4.2: Add the standing dispatch-resolution validator (see
+      [Pre-existing Blind Spot](#pre-existing-blind-spot-not-introduced-by-this-migration)).
+      Landed as **RULE 18** in `validate-agent-authoring.js`, deliberately a
+      standing rule rather than a migration one-off. It indexes every command
+      `name:` under `plugins/` and requires every namespaced
+      `skill: "<ns>:<cmd>"` to resolve to one.
+
+      Three differences from RULE 17, each a place a naive version breaks:
+      it scans the whole body (namespaced dispatch lives mid-document in
+      multi-phase orchestrators — the very files that were RULE 17's false
+      positives); it resolves against **every** plugin (cross-plugin dispatch
+      is the normal case); and it skips bare names so the two rules never
+      double-report. Two prose placeholders that teach the syntax
+      (`plugin:skill-name`, `yellow-X:skill-name`) are an explicit literal
+      allowlist, not a heuristic — a heuristic loose enough to catch them
+      would swallow real typos.
+
+      **Exercised, and it fires:** a typo'd target and a stale pre-rename
+      target both exit 1. Probe C confirms that had RULE 18 existed before
+      this migration, it would have caught all 9 broken
+      `skill: "workflows:*"` dispatches. 7 integration tests at
+      `tests/integration/validate-agent-authoring-rule18.test.ts`
+- [ ] 4.3: `/flow` autocomplete check on a clean install — **deferred by
+      construction; the only step of this plan an agent cannot perform.**
+      Per [Bootstrap Safety](#bootstrap-safety), commands are served from the
+      published plugin cache, so `/flow` cannot appear until this stack
+      merges, `version-packages.yml` publishes the bump, and the user runs
+      `/plugin marketplace update`. Deliberately left unchecked rather than
+      ticked-with-a-caveat: this is the migration's actual success criterion
+      (Acceptance Criterion 4), and a green CI gate proves the *absence of a
+      string*, which is not the same thing. **Owner: the user, post-merge.**
+      `/plan:complete` Gate A will correctly refuse to archive this plan
+      until it is verified and ticked
 
 ## Technical Specifications
 
@@ -447,6 +487,11 @@ RULE 17 has never matched any `skill: "workflows:spec"` value and will not
 match `skill: "flow:spec"` either. No validator anywhere resolves a namespaced
 `skill:` dispatch target to a real command `name:`. PR4 should add one as a
 **standing** rule, not a one-off migration check.
+
+**CLOSED in PR4** by RULE 18 (`validateSkillDispatchResolution`). RULE 17 is
+left exactly as it was — its `## Usage` scoping and bare-name resolution are
+correct for the wrapper idiom it targets, and widening its character class
+would have inherited its scoping onto a rule that needs the opposite.
 
 ### Bump Type Rationale
 
@@ -549,7 +594,8 @@ Both open questions were closed before PR1 began.
 - [x] 1. agent/feat/flow-namespace-rename-and-gate (completed 2026-08-10)
 - [x] 2. agent/docs/flow-namespace-sweep-plugins (completed 2026-08-11)
 - [x] 3. agent/docs/flow-namespace-sweep-docs-research (completed 2026-08-11)
-- [ ] 4. agent/chore/flow-namespace-terminal-condition
+- [x] 4. agent/chore/flow-namespace-terminal-condition (completed 2026-08-11;
+      box 4.3 intentionally open — post-merge user verification, see above)
 
 ## References
 

@@ -1068,6 +1068,96 @@ function validateSkillWrapperDrift(commandFiles, errors) {
   }
 }
 
+// RULE 18 — namespaced `skill:` dispatch targets must resolve to a real
+// command `name:`.
+//
+// RULE 17 above cannot do this and never could: its SKILL_REF_RE character
+// class `[a-zA-Z0-9_-]` EXCLUDES the colon, so a namespaced value like
+// `skill: "flow:spec"` has never matched it. That blind spot was found while
+// renaming the `workflows:` namespace to `flow:` — nine live dispatch targets
+// pointed at command names that would have silently stopped resolving at
+// runtime, and no validator anywhere would have said a word.
+//
+// This is deliberately a STANDING rule, not a migration one-off. The failure
+// it catches — a command gets renamed, its callers do not — recurs on every
+// rename, and the migration that motivated it is the least interesting
+// instance.
+//
+// Differences from RULE 17, all deliberate:
+//   - Scans the WHOLE body, not just a `## Usage` section. Namespaced
+//     dispatch happens mid-document in multi-phase orchestrators (that is
+//     exactly why RULE 17 scoped itself to `## Usage` — those files were its
+//     false positives). Here they are the intended subjects.
+//   - Resolves against EVERY plugin's commands, not the owning plugin's.
+//     Cross-plugin dispatch is the normal case: yellow-linear dispatches
+//     `flow:plan`, yellow-review dispatches `flow:compound`.
+//   - Only namespaced values (containing `:`) are checked. Bare names stay
+//     RULE 17's business, so the two rules never double-report the same value.
+const NAMESPACED_SKILL_REF_RE = /\bskill:\s*"([a-zA-Z0-9_-]+:[a-zA-Z0-9_:-]+)"/g;
+
+// Documentation placeholders: reviewer agents that TEACH the dispatch syntax
+// spell it out in prose rather than in a code fence, so fence-stripping does
+// not reach them. These name nothing and never will. Kept as an explicit
+// literal list (same idiom as MODEL_RULE_ALLOWLIST above) rather than a
+// "looks like a placeholder" heuristic — a heuristic loose enough to catch
+// `plugin:skill-name` would also swallow real typos, which is the entire
+// class of bug this rule exists to catch.
+const SKILL_DISPATCH_PLACEHOLDERS = new Set([
+  'plugin:skill-name',
+  'yellow-X:skill-name',
+]);
+
+/**
+ * Index every command `name:` declared under PLUGINS_DIR.
+ *
+ * @param {string[]} commandFiles
+ * @returns {Map<string, string>} command name -> declaring file path
+ */
+function buildCommandNameIndex(commandFiles) {
+  const index = new Map();
+  for (const filePath of commandFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    // extractFrontmatter returns the raw block STRING, not a parsed object —
+    // parseScalar is the accessor the rest of this file pairs it with.
+    const frontmatter = extractFrontmatter(content);
+    if (!frontmatter) continue;
+    const name = parseScalar(frontmatter, 'name');
+    if (typeof name === 'string' && name.trim()) {
+      index.set(name.trim(), filePath);
+    }
+  }
+  return index;
+}
+
+function validateSkillDispatchResolution(markdownFiles, commandFiles, errors) {
+  const commandNames = buildCommandNameIndex(commandFiles);
+
+  for (const filePath of markdownFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const fmBlockMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+    const body = fmBlockMatch ? content.slice(fmBlockMatch[0].length) : content;
+
+    // Fence-strip first: authoring guides show the `skill: "plugin:name"`
+    // syntax inside code fences as illustration, and those placeholders
+    // ("plugin:skill-name", "yellow-X:skill-name") name nothing real.
+    const seen = new Set();
+    for (const match of stripFencedContent(body).matchAll(NAMESPACED_SKILL_REF_RE)) {
+      seen.add(match[1]);
+    }
+
+    for (const target of seen) {
+      if (commandNames.has(target)) continue;
+      if (SKILL_DISPATCH_PLACEHOLDERS.has(target)) continue;
+      errors.push(
+        `${relative(filePath)}: RULE 18 — dispatches \`skill: "${target}"\` ` +
+          `but no command under plugins/ declares \`name: ${target}\`. ` +
+          `Either the target was renamed and this caller was missed, or the ` +
+          `name is a typo — this dispatch fails at runtime.`
+      );
+    }
+  }
+}
+
 // RULE 15 — SKILL.md authoring rules (see the constant block above for the
 // rule catalog and rationale). RULE 15 sub-rules push warning-tier findings
 // only; ctx.errors receives just the malformed-YAML structural gate below —
@@ -1253,6 +1343,7 @@ function main() {
   });
   validateCommandFiles(commandFiles, errors);
   validateSkillWrapperDrift(commandFiles, errors);
+  validateSkillDispatchResolution(markdownFiles, commandFiles, errors);
   validateSkillFiles(skillFiles, { errors, warnings });
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);
