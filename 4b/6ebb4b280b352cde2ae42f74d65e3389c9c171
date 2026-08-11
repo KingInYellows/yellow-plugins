@@ -1,0 +1,25 @@
+plugins/yellow-core/agents/workflow/knowledge-compounder.md
+  s_c1e3326aa9a6ae::t_0bf61bdc1f70b5 3,66,251,354
+plugins/yellow-linear/CLAUDE.md
+  s_c1e3326aa9a6ae::t_0bf61bdc1f70b5 35,87-88
+plugins/yellow-core/agents/research/learnings-researcher.md
+  s_c1e3326aa9a6ae::t_0bf61bdc1f70b5 211,300,302
+plugins/yellow-review/CLAUDE.md
+  s_c1e3326aa9a6ae::t_0bf61bdc1f70b5 60,156,161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4b6ebb4b280b352cde2ae42f74d65e3389c9c171",
+  "prompts": {},
+  "sessions": {
+    "s_c1e3326aa9a6ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e4293351-d1ef-45dc-9e70-cc04655b0d32",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
