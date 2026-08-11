@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+#
+# exercise-flow-namespace-gate.sh
+#
+# Proves that scripts/validate-flow-namespace.js actually fires. A gate that
+# ships unexercised emits no CI signal — the exact failure mode documented in
+# docs/solutions/integration-issues/codex-distribution-pipeline-silent-gaps.md,
+# which went unnoticed for months.
+#
+# Every probe writes into the real repository and is reverted before exit, so
+# a failed run leaves nothing behind except (possibly) the probe file, which
+# the gate itself would then flag on the next run.
+#
+# NOTE ON THE BANNED LITERAL: the probe strings are assembled by concatenation
+# (`${OLD}:work` where OLD='workflow'+'s') rather than written out, so this
+# file does not itself contain the pattern the gate bans and needs no
+# permanent allowlist entry. Same idiom scripts/validate-solutions.js uses to
+# stay out of scripts/lint-error-codes.js's way.
+#
+# Usage: bash scripts/exercise-flow-namespace-gate.sh
+# Exit:  0 = every probe behaved as expected, 1 = at least one did not.
+
+set -uo pipefail
+
+cd "$(dirname "$0")/.." || exit 1
+
+GATE=scripts/validate-flow-namespace.js
+ALLOW=scripts/flow-namespace-allowlist.json
+PROBE=docs/testing/__flow-ns-gate-probe.md
+OLD="workflow"'s' # assembled, see NOTE above
+
+BAK=$(mktemp) || exit 1
+cp "$ALLOW" "$BAK"
+
+pass=0
+fail=0
+
+cleanup() {
+  rm -f "$PROBE"
+  [ -f "$BAK" ] && cp "$BAK" "$ALLOW"
+  rm -f "$BAK"
+}
+trap cleanup EXIT
+
+check() { # name want_exit got_exit
+  if [ "$3" -eq "$2" ]; then
+    printf '  PASS  %s (exit %s)\n' "$1" "$3"
+    pass=$((pass + 1))
+  else
+    printf '  FAIL  %s (want exit %s, got %s)\n' "$1" "$2" "$3"
+    fail=$((fail + 1))
+  fi
+}
+
+echo "=== A. clean tree exits 0 ==="
+node "$GATE" >/dev/null 2>&1
+check "clean tree" 0 $?
+
+echo
+echo "=== B. ERROR-NAMESPACE-001: each banned shape in a NON-allowlisted file ==="
+for shape in "/${OLD}:work" "skill: \"${OLD}:work\"" "yellow-core:${OLD}:work"; do
+  printf '# gate probe\n\n%s\n' "$shape" >"$PROBE"
+  node "$GATE" >/dev/null 2>&1
+  check "shape [$shape]" 1 $?
+  rm -f "$PROBE"
+done
+
+echo
+echo "=== C. singular 'workflow:' agent namespace must NOT trip the gate ==="
+printf '# gate probe\n\nyellow-core:workflow:knowledge-compounder\nworkflow:work\n' >"$PROBE"
+node "$GATE" >/dev/null 2>&1
+check "singular workflow: ignored" 0 $?
+rm -f "$PROBE"
+
+echo
+echo "=== D. non-command suffixes must NOT trip the gate ==="
+printf '# gate probe\n\n%s:worker  %s:planetary\n' "$OLD" "$OLD" >"$PROBE"
+node "$GATE" >/dev/null 2>&1
+check "workflows:worker / :planetary ignored" 0 $?
+rm -f "$PROBE"
+
+echo
+echo "=== E. ERROR-NAMESPACE-002: allowlist count drift ==="
+node -e '
+const fs = require("fs"), p = process.argv[1];
+const a = JSON.parse(fs.readFileSync(p, "utf8"));
+const k = Object.keys(a)[0];
+if (!k) { console.error("allowlist empty — count-drift probe not applicable"); process.exit(2); }
+a[k] += 1;
+fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
+' "$ALLOW"
+if [ $? -eq 2 ]; then
+  echo "  SKIP  count drift (allowlist is empty — terminal state reached)"
+else
+  node "$GATE" >/dev/null 2>&1
+  check "count drift" 1 $?
+fi
+cp "$BAK" "$ALLOW"
+
+echo
+echo "=== F. ERROR-NAMESPACE-002: allowlisted file that is now clean ==="
+node -e '
+const fs = require("fs"), p = process.argv[1];
+const a = JSON.parse(fs.readFileSync(p, "utf8"));
+a["README.md"] = 3;
+fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
+' "$ALLOW"
+node "$GATE" >/dev/null 2>&1
+check "stale allowlist entry (file is clean)" 1 $?
+cp "$BAK" "$ALLOW"
+
+echo
+echo "=== G. ERROR-NAMESPACE-003: allowlisted path missing from disk ==="
+node -e '
+const fs = require("fs"), p = process.argv[1];
+const a = JSON.parse(fs.readFileSync(p, "utf8"));
+a["docs/__deleted-by-a-later-sweep.md"] = 2;
+fs.writeFileSync(p, JSON.stringify(a, null, 2) + "\n");
+' "$ALLOW"
+node "$GATE" >/dev/null 2>&1
+check "missing allowlist path" 1 $?
+cp "$BAK" "$ALLOW"
+
+echo
+echo "=== H. tree restored, gate green again ==="
+node "$GATE" >/dev/null 2>&1
+check "restored" 0 $?
+
+echo
+printf 'RESULT: %s passed, %s failed\n' "$pass" "$fail"
+[ "$fail" -eq 0 ]

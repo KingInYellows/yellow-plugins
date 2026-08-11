@@ -30,7 +30,7 @@ pnpm lint                     # eslint .js/.ts
 pnpm test:unit                # vitest run --dir packages
 pnpm test:integration         # vitest run --dir tests/integration
 
-pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + codex
+pnpm validate:schemas         # marketplace + plugin + setup-all + agent-authoring + error-codes + snippets + solutions + generated + codex + flow-namespace
 pnpm validate:marketplace     # .claude-plugin/marketplace.json only
 pnpm validate:plugins         # plugin manifests + plugin-specific rules
 pnpm validate:setup-all       # yellow-core's setup:all coverage vs marketplace
@@ -41,6 +41,7 @@ pnpm validate:snippets        # install-script generated blocks match scripts/sn
 pnpm validate:solutions       # diff-scoped slug-collision + frontmatter gate for docs/solutions/
 pnpm validate:generated       # catalog/ -> .claude-plugin/ + .agents/ byte-identity drift check
 pnpm validate:codex           # Codex artifact validation + exposure lint
+pnpm validate:flow-namespace  # no stale `workflows:` refs outside the shrinking allowlist
 pnpm generate:manifests       # regenerate .claude-plugin/ + .agents/ from catalog/ sources
 pnpm generate:snippets        # regenerate install-script generated blocks from snippets/
 

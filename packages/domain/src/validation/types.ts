@@ -27,6 +27,7 @@ export enum ErrorCategory {
   PLAN_LIFECYCLE = 'PLAN_LIFECYCLE',
   SETUP_COVERAGE = 'SETUP_COVERAGE',
   DISTRIBUTION = 'DISTRIBUTION',
+  NAMESPACE_MIGRATION = 'NAMESPACE_MIGRATION',
 }
 
 /** Structured validation error with specification traceability. */
