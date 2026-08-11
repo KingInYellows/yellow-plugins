@@ -498,15 +498,27 @@ __EOF_COUNCIL_SYNTHESIS__
 for reviewer in claude codex gemini opencode; do
   fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
   case "$fenced_path" in
-    "/tmp/council-${reviewer}-fenced-"*.txt) ;;
     "") ;;
+    # Traversal and extra-separator rejects MUST come before the shape arm:
+    # `*` in a case pattern matches `/` and `..` freely, so a lone
+    # "/tmp/council-${reviewer}-fenced-"*.txt arm accepts
+    # /tmp/council-claude-fenced-../../etc/passwd.txt and would cat it into
+    # the report. Mirrors the skill's validate_path `..` reject.
+    *..*|"/tmp/council-${reviewer}-fenced-"*/*)
+      printf '[council] Warning: %s returned a fenced_output_path with traversal or an extra separator (%s) — refusing to read it\n' \
+        "$reviewer" "$fenced_path" >&2
+      fenced_path=""
+      ;;
+    "/tmp/council-${reviewer}-fenced-"*.txt) ;;
     *)
       printf '[council] Warning: %s returned an unexpected fenced_output_path (%s) — refusing to read it\n' \
         "$reviewer" "$fenced_path" >&2
       fenced_path=""
       ;;
   esac
-  if [ -n "$fenced_path" ] && [ -f "$fenced_path" ]; then
+  # `! -L` per the skill's validate_path symlink rule — the shape check above
+  # constrains the path text, not what it resolves to.
+  if [ -n "$fenced_path" ] && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
     REPORT_CONTENT="${REPORT_CONTENT}
 
 ## ${reviewer^} Output
