@@ -25,12 +25,11 @@ Reviewer agents (`claude-reviewer.md`, `gemini-reviewer.md`,
 `opencode-reviewer.md`) and the `/council` orchestrator command read this skill
 at agent spawn time via `skills:` frontmatter preload.
 
-`claude-reviewer` is the in-process slot: it has no `Bash` and invokes no CLI,
-so the CLI-invocation, timeout, and `awk`/`sed` sections below are N/A for it.
-What it DOES share with the other three: the Layer-2 6-key return contract, the
-verdict enum and UNKNOWN fallback, the findings cap, the injection fence
-format, and the redaction pattern list — which it applies as prose discipline
-rather than as an executed `awk` block.
+`claude-reviewer` is the in-process slot — no `Bash`, no CLI to wrap. See
+"Claude slot" under Reviewer-Specific CLI Flag Pattern below for what that
+makes N/A. What it DOES share with the other three: the Layer-2 6-key return
+contract, the verdict enum and UNKNOWN fallback, the findings cap, the
+injection fence format, and the redaction pattern list.
 
 ## When to Use
 
@@ -412,15 +411,10 @@ background, deliberately kept out of the preload budget.
   degradation verdicts it can emit are `UNKNOWN` and `ERROR`; `TIMEOUT` and
   `UNAVAILABLE` describe external-CLI failure modes.
 - `Write` is granted for exactly one file: the fenced-output path `council.md`
-  mints with `mktemp -u` and passes in the spawn prompt. Without `Bash` the
-  agent has no entropy source of its own, and a hardcoded path fails on the
-  second `/council` run of a session because `Write` refuses to overwrite a
-  file it has not `Read`. See
+  mints with `mktemp -u` and passes in the spawn prompt. Rationale:
   `docs/solutions/code-quality/bash-less-agent-write-tool-temp-path-minting.md`.
-- Redaction and delimiter escaping are prose rules in the agent prompt, not
-  executed code — a real reduction in guarantee, recorded in the agent's
-  "Safeguards — Prompt-Level, Not Mechanical" section and in the fence-label
-  notes above.
+- Redaction and delimiter escaping are prose rules, not executed code — see
+  the fence-label note above.
 
 **Codex** (via `Task(subagent_type="yellow-codex:review:codex-reviewer")`):
 - 300s timeout (yellow-codex's own cap; council's 600s does NOT propagate)
@@ -520,12 +514,12 @@ template invites. Read Step 5 of
 Headline, the untrusted-quotes advisory, Agreement, Disagreement, Reviewer
 Status, Summary — and do not re-inline it here.
 
-What this skill still owns is the V1 synthesizer's scope. V1 non-goals
-(deferred to V2):
+What this skill still owns is the V1 synthesizer's scope. Two non-goals are
+specific to synthesis and live only here:
 
-- No lineage-weighted quorum (V1 uses raw count)
-- No quote-verification pass against repo source
-- No XML-structured findings parsing (V1 stays in markdown)
-- No confidence weighting beyond reviewer's own P1/P2/P3
+- No confidence weighting beyond the reviewer's own P1/P2/P3
 - No reviewer ranking
-- No `/council history` browse command (V2)
+
+The rest (lineage-weighted quorum, quote verification, XML evidence contract,
+`/council history`) are deferred features listed in `council.md`'s
+"V2 Trajectory" section — read them there rather than tracking a second copy.

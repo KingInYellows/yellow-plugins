@@ -150,15 +150,13 @@ Codex agent.)
   invocation via `opencode session delete <id>`, but if the cleanup itself
   fails (rare), sessions accumulate. Periodic manual `opencode session list`
   audit is recommended.
-- **The in-process slot has no timeout bound.** `COUNCIL_TIMEOUT` wraps the
-  three CLI reviewers in `timeout(1)`, which degrades an overrunning reviewer
-  to a `TIMEOUT` verdict. `claude-reviewer` spawns no subprocess, so there is
-  nothing to kill: a run that never returns blocks the whole fan-out with no
-  fallback. Mitigation is prompt-level only — the agent is instructed to scope
-  its reads to the pack's cited files plus one hop, and to return partial
-  findings rather than keep investigating. Worst case, cancel and re-run. This
-  is a real regression in the fan-out's worst-case bound versus the 3-reviewer
-  V1, accepted as the cost of the in-process slot.
+- **The in-process slot has no timeout bound.** `COUNCIL_TIMEOUT` covers only
+  the three CLI reviewers; a `claude-reviewer` run that never returns blocks
+  the whole fan-out with no fallback (detail: `council.md`'s Failure Modes
+  table, "claude-reviewer never returns at all"). Mitigation is prompt-level
+  only — see `claude-reviewer.md` Step 2, "Keep this bounded." Worst case,
+  cancel and re-run. A real regression versus the 3-reviewer V1, accepted as
+  the cost of the in-process slot.
 - **"Orchestrator-minted path" is a two-hop trust chain, not one.**
   `council.md` mints `claude-reviewer`'s fenced-output path in a Bash block,
   but the value reaches the agent because the orchestrating model copied the

@@ -456,9 +456,44 @@ SLUG=$(build_slug "$SLUG_BASE")
 REPORT_PATH=$(build_target_path "$MODE" "$SLUG") || exit 1
 REPORT_PATH_ABS="${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}"
 
-# Ensure docs/council/ directory exists
+# Ensure docs/council/ directory exists.
+#
+# Any exit from here onward happens AFTER Step 4 spawned the reviewers, so all
+# four fenced-output files may already be on disk. Steps 8 and 9 own the normal
+# cleanup; an early exit reaches neither, so it must clean up for itself or the
+# run strands redacted reviewer output in /tmp. `council_cleanup_temps` below is
+# that snippet — reproduce it verbatim at every early-exit site after Step 4.
+council_cleanup_temps() {
+  local sf r fp
+  sf="$(git rev-parse --show-toplevel 2>/dev/null)/.git/council-state.tsv"
+  if [ -f "$sf" ]; then
+    # Same per-reviewer shape check as Steps 7/8/9 — $STATE_FILE holds the raw
+    # reviewer-supplied value, so an unguarded rm here is an arbitrary delete.
+    while IFS=$'\t' read -r r _v _c fp; do
+      case "$fp" in
+        "") ;;
+        *..*|"/tmp/council-${r}-fenced-"*/*)
+          printf '[council] Warning: refusing to unlink %s path with traversal or an extra separator (%s)\n' "$r" "$fp" >&2 ;;
+        "/tmp/council-${r}-fenced-"*.txt) rm -f "$fp" ;;
+        *)
+          printf '[council] Warning: refusing to unlink unexpected %s fenced_output_path (%s)\n' "$r" "$fp" >&2 ;;
+      esac
+    done < "$sf"
+    rm -f "$sf"
+  fi
+  # Substitute the literal CLAUDE_FENCED_FILE value printed in Step 4 — the
+  # in-process reviewer writes its file before it reports the path, so the
+  # state file alone cannot be trusted to name it. The shape check makes a
+  # missed substitution loud; the value cannot be re-derived (random suffix).
+  case "<literal CLAUDE_FENCED_FILE value from Step 4>" in
+    /tmp/council-claude-fenced-*.txt) rm -f "<literal CLAUDE_FENCED_FILE value from Step 4>" ;;
+    *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
+  esac
+}
+
 mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
   printf '[council] Error: cannot create %s\n' "$(dirname "$REPORT_PATH_ABS")" >&2
+  council_cleanup_temps
   exit 1
 }
 ```
@@ -470,12 +505,14 @@ mkdir -p "$(dirname "$REPORT_PATH_ABS")" || {
 # this same snippet before touching REVIEWER_* arrays)
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
 STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
-[ -f "$STATE_FILE" ] || { printf '[council] Error: state file missing — Step 4 did not run\n' >&2; exit 1; }
+# Both guards below exit after the fan-out, so both must run the Step 6
+# `council_cleanup_temps` snippet first — paste it in at the top of this block.
+[ -f "$STATE_FILE" ] || { printf '[council] Error: state file missing — Step 4 did not run\n' >&2; council_cleanup_temps; exit 1; }
 declare -A REVIEWER_VERDICTS REVIEWER_CONFIDENCES REVIEWER_FENCED_PATHS
 while IFS=$'\t' read -r r v c fp; do
   REVIEWER_VERDICTS[$r]=$v; REVIEWER_CONFIDENCES[$r]=$c; REVIEWER_FENCED_PATHS[$r]=$fp
 done < "$STATE_FILE"
-[ "${#REVIEWER_VERDICTS[@]}" -gt 0 ] || { printf '[council] Error: state file empty — Step 4 was interrupted; re-run /council\n' >&2; exit 1; }
+[ "${#REVIEWER_VERDICTS[@]}" -gt 0 ] || { printf '[council] Error: state file empty — Step 4 was interrupted; re-run /council\n' >&2; council_cleanup_temps; exit 1; }
 
 # $SYNTHESIS_MD does not survive into this fresh subprocess — substitute the
 # Step 5 synthesis markdown inline via quoted heredoc:
@@ -564,8 +601,28 @@ if [ -f "$STATE_FILE" ]; then
   while IFS=$'\t' read -r r v c fp; do REVIEWER_FENCED_PATHS[$r]=$fp; done < "$STATE_FILE"
 fi
 printf '[council] Report not saved.\n'
-for fenced_path in "${REVIEWER_FENCED_PATHS[@]}"; do
-  [ -n "$fenced_path" ] && rm -f "$fenced_path"
+# Shape-check before unlinking, exactly as Step 7 does before reading. Step 7's
+# guard filters only that block's local copy; $STATE_FILE still holds the RAW
+# value `parse_reviewer_return` persisted, so an unguarded `rm -f` here would
+# delete an attacker-chosen path — a strictly worse outcome than the arbitrary
+# READ the Step 7 guard closed. Iterate keys, not values: the pattern is
+# per-reviewer.
+for reviewer in "${!REVIEWER_FENCED_PATHS[@]}"; do
+  fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
+  case "$fenced_path" in
+    "") ;;
+    *..*|"/tmp/council-${reviewer}-fenced-"*/*)
+      printf '[council] Warning: refusing to unlink %s path with traversal or an extra separator (%s)\n' \
+        "$reviewer" "$fenced_path" >&2
+      ;;
+    "/tmp/council-${reviewer}-fenced-"*.txt)
+      rm -f "$fenced_path"
+      ;;
+    *)
+      printf '[council] Warning: refusing to unlink unexpected %s fenced_output_path (%s)\n' \
+        "$reviewer" "$fenced_path" >&2
+      ;;
+  esac
 done
 # Also unlink the claude-reviewer path THIS command minted, independently of
 # what the agent returned. The loop above can only clean paths that came back
@@ -575,7 +632,17 @@ done
 # The orchestrator knows the path regardless — substitute the literal
 # CLAUDE_FENCED_FILE value printed back in Step 4. `rm -f` is a no-op when the
 # agent never wrote it (mktemp -u created no file).
-rm -f "<literal CLAUDE_FENCED_FILE value from Step 4>"
+#
+# The shape check makes a MISSED substitution loud. Every other placeholder in
+# this file fails visibly (Step 7's heredoc text lands in the report; Step 9's
+# $REPORT_PATH_ABS trips the existence check), but a bare `rm -f` on an
+# unsubstituted placeholder silently succeeds — and unlike those, this value
+# cannot be re-derived later, because the mktemp suffix is random.
+CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
+case "$CLAUDE_FENCED" in
+  /tmp/council-claude-fenced-*.txt) rm -f "$CLAUDE_FENCED" ;;
+  *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
+esac
 rm -f "$STATE_FILE"
 exit 0
 ```
@@ -601,9 +668,13 @@ literal absolute path from Step 6 for `$REPORT_PATH_ABS`, or re-run the
 Step 6 derivation first):
 
 ```bash
+# Record the verification result but do NOT exit on it yet — the cleanup below
+# must run whether or not the write landed, or a failed verification strands
+# every reviewer's fenced output in /tmp. Exit code is applied at the end.
+WRITE_OK=1
 if [ ! -f "$REPORT_PATH_ABS" ]; then
   printf '[council] Error: file write reported success but file not found at %s\n' "$REPORT_PATH_ABS" >&2
-  exit 1
+  WRITE_OK=0
 fi
 
 # Cleanup fenced output files and state file (content is in the report file).
@@ -614,8 +685,28 @@ declare -A REVIEWER_FENCED_PATHS
 if [ -f "$STATE_FILE" ]; then
   while IFS=$'\t' read -r r v c fp; do REVIEWER_FENCED_PATHS[$r]=$fp; done < "$STATE_FILE"
 fi
-for fenced_path in "${REVIEWER_FENCED_PATHS[@]}"; do
-  [ -n "$fenced_path" ] && rm -f "$fenced_path"
+# Shape-check before unlinking, exactly as Step 7 does before reading. Step 7's
+# guard filters only that block's local copy; $STATE_FILE still holds the RAW
+# value `parse_reviewer_return` persisted, so an unguarded `rm -f` here would
+# delete an attacker-chosen path — a strictly worse outcome than the arbitrary
+# READ the Step 7 guard closed. Iterate keys, not values: the pattern is
+# per-reviewer.
+for reviewer in "${!REVIEWER_FENCED_PATHS[@]}"; do
+  fenced_path="${REVIEWER_FENCED_PATHS[$reviewer]}"
+  case "$fenced_path" in
+    "") ;;
+    *..*|"/tmp/council-${reviewer}-fenced-"*/*)
+      printf '[council] Warning: refusing to unlink %s path with traversal or an extra separator (%s)\n' \
+        "$reviewer" "$fenced_path" >&2
+      ;;
+    "/tmp/council-${reviewer}-fenced-"*.txt)
+      rm -f "$fenced_path"
+      ;;
+    *)
+      printf '[council] Warning: refusing to unlink unexpected %s fenced_output_path (%s)\n' \
+        "$reviewer" "$fenced_path" >&2
+      ;;
+  esac
 done
 # Also unlink the claude-reviewer path THIS command minted, independently of
 # what the agent returned. The loop above can only clean paths that came back
@@ -625,8 +716,21 @@ done
 # The orchestrator knows the path regardless — substitute the literal
 # CLAUDE_FENCED_FILE value printed back in Step 4. `rm -f` is a no-op when the
 # agent never wrote it (mktemp -u created no file).
-rm -f "<literal CLAUDE_FENCED_FILE value from Step 4>"
+#
+# The shape check makes a MISSED substitution loud. Every other placeholder in
+# this file fails visibly (Step 7's heredoc text lands in the report; Step 9's
+# $REPORT_PATH_ABS trips the existence check), but a bare `rm -f` on an
+# unsubstituted placeholder silently succeeds — and unlike those, this value
+# cannot be re-derived later, because the mktemp suffix is random.
+CLAUDE_FENCED="<literal CLAUDE_FENCED_FILE value from Step 4>"
+case "$CLAUDE_FENCED" in
+  /tmp/council-claude-fenced-*.txt) rm -f "$CLAUDE_FENCED" ;;
+  *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
+esac
 rm -f "$STATE_FILE"
+
+# Apply the verification result now that cleanup has run.
+[ "$WRITE_OK" -eq 1 ] || exit 1
 ```
 
 ### Step 10: Inline conversation output
