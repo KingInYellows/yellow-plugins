@@ -197,6 +197,32 @@ prompt carrying its fenced-output path (see below).
 First, mint that path — run this BEFORE the spawns:
 
 ```bash
+# Reclaim orphaned fenced files from a PRIOR run that never reached Step
+# 7/8/9 cleanup — e.g. the user cancelled a blocked claude-reviewer fan-out
+# before parsing ever ran. This path is deliberately never persisted to
+# $STATE_FILE (see the note below this block), so path-based cleanup isn't
+# possible; pattern-based cleanup at the START of every run is the
+# substitute and needs no persisted state to survive across runs.
+# Best-effort only: never abort the run over stale-file reclamation.
+for stale in /tmp/council-claude-fenced-*.txt; do
+  # No match leaves the literal glob pattern — skip it.
+  [ -e "$stale" ] || continue
+  # Belt-and-suspenders shape check even though pathname expansion already
+  # confines candidates to literal /tmp directory entries (a filename
+  # cannot itself contain `/`, so this `*` cannot traverse) — mirrors this
+  # file's other path guards rather than trusting the glob alone.
+  case "$stale" in
+    *..*|/tmp/council-claude-fenced-*/*) continue ;;
+    /tmp/council-claude-fenced-*.txt) ;;
+    *) continue ;;
+  esac
+  [ ! -L "$stale" ] || continue
+  # Only unlink files this user owns — refuse anything dropped by another
+  # user/process in the shared /tmp namespace.
+  [ -O "$stale" ] || continue
+  rm -f -- "$stale" 2>/dev/null || true
+done
+
 # claude-reviewer is in-process: it has `Write` but no `Bash`, so it has no
 # mktemp and no entropy source to mint a collision-safe temp path itself. A
 # hardcoded path would break on the second /council run of a session — the
@@ -224,7 +250,11 @@ Do NOT write this path to `$STATE_FILE` here: the parse block below opens with
 `: > "$STATE_FILE"`, which truncates anything written beforehand.
 claude-reviewer returns the same path back in its `fenced_output_path=` line,
 so `parse_reviewer_return` persists it exactly like the other three reviewers'
-paths, and the Step 8 / Step 9 cleanup loops unlink it with the rest.
+paths, and the Step 8 / Step 9 cleanup loops unlink it with the rest. If the
+fan-out itself never returns (cancelled or hung before parsing runs), none of
+that happens and this run's file is orphaned in `/tmp` with no recoverable
+path — the stale-file sweep at the top of this block is what reclaims it, on
+the NEXT invocation, instead.
 
 In a single tool-call message, invoke:
 
@@ -299,26 +329,68 @@ parse_reviewer_return() {
   # a bypassed prose rule must not carry credential material into synthesis.
   # Canonical list: council-patterns SKILL.md "11-Pattern Credential
   # Redaction" — keep this copy in sync with Step 7's.
-  if [ "$reviewer_name" = "claude" ]; then
-    local redact_awk='
-      {
-        line = $0
-        if (line ~ /sk-proj-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /sk-ant-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /sk-[A-Za-z0-9]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /AIza[0-9A-Za-z_-]{35}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /gh[pous]_[A-Za-z0-9]{36,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /github_pat_[A-Za-z0-9_]{40,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /AKIA[0-9A-Z]{16}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /Bearer [A-Za-z0-9._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /Authorization: [A-Za-z0-9 ._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
-        else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
-        if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
-        if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
-        if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
-        print line
+  # Defined unconditionally (not just under the claude branch below): the
+  # non-enum verdict warning further down also reuses this helper, and that
+  # warning fires for ANY reviewer, not only claude.
+  local redact_awk='
+    {
+      line = $0
+      if (line ~ /sk-proj-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /sk-ant-[A-Za-z0-9_-]{20,}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /sk-[A-Za-z0-9]{20,}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /AIza[0-9A-Za-z_-]{35}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /gh[pous]_[A-Za-z0-9]{36,}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /github_pat_[A-Za-z0-9_]{40,}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /AKIA[0-9A-Z]{16}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /Bearer [A-Za-z0-9._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /Authorization: [A-Za-z0-9 ._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
+      else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
+      # PEM private key block, multi-line state machine. Canonical source
+      # and full rationale: council-patterns SKILL.md "11-Pattern Credential
+      # Redaction" — keep this copy in sync with it and with the Step 7 copy.
+      # Unanchored BEGIN match on purpose: a full-line anchor lets a
+      # flattened or inline-quoted key through undetected. The END test
+      # below anchors the TAIL only ([[:space:]]*$) — do NOT anchor the
+      # start too, that reintroduces the bypass documented in
+      # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
+      # pem_reclose re-arms redaction when a decoy bare END is immediately
+      # followed by more key body. pem_span caps a stray BEGIN at 200 lines
+      # so prose that merely quotes the marker cannot blind the rest of the
+      # output. pem_stray (>=3 consecutive non-key lines, hex-SHA safe) ends
+      # redaction early on such prose, after stripping blockquote, list,
+      # numbered-excerpt, and diff prefixes from the body test.
+      if (pem_reclose) {
+        pem_reclose = 0
+        if ($0 ~ /^[A-Za-z0-9+\/=]{20,}$/ && $0 ~ /[G-Zg-z+\/=]/) { in_pem = 1; pem_stray = 0 }
       }
-    '
+      if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) { in_pem = 1; pem_stray = 0; pem_span = 0 }
+      if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
+      if (in_pem) {
+        if (++pem_span > 200) {
+          in_pem = 0
+        } else if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+          in_pem = 0
+          pem_reclose = 1
+        } else {
+          pem_body = $0
+          sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", pem_body)
+          sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", pem_body)
+          sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", pem_body)
+          sub(/^[-+]/, "", pem_body)
+          sub(/^[[:space:]]+/, "", pem_body)
+          sub(/[[:space:]]+$/, "", pem_body)
+          if (pem_body != "") {
+            if ((pem_body ~ /^[A-Za-z0-9+\/=]{20,}$/ && pem_body ~ /[G-Zg-z+\/=]/) ||
+                pem_body ~ /^(Proc-Type|DEK-Info):/ ||
+                $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
+            else if (++pem_stray >= 3) in_pem = 0
+          }
+        }
+      }
+      print line
+    }
+  '
+  if [ "$reviewer_name" = "claude" ]; then
     summary=$(printf '%s\n' "$summary" | awk "$redact_awk")
     findings=$(printf '%s\n' "$findings" | awk "$redact_awk")
   fi
@@ -343,8 +415,15 @@ parse_reviewer_return() {
   case "$verdict" in
     APPROVE|REVISE|REJECT|UNKNOWN|TIMEOUT|ERROR|UNAVAILABLE) ;;
     *)
+      # Log the rejected value through the same redaction pass as
+      # summary/findings, not raw — a malformed `verdict=` (e.g. after a
+      # reviewer follows injected pack content) can carry credential-shaped
+      # text, and this diagnostic goes straight to stderr/log, outside any
+      # of this command's later fencing or redaction.
+      local redacted_verdict
+      redacted_verdict=$(printf '%s\n' "$verdict" | awk "$redact_awk")
       printf '[council] Warning: %s returned a non-enum verdict (%s) — recording UNKNOWN\n' \
-        "$reviewer_name" "$verdict" >&2
+        "$reviewer_name" "$redacted_verdict" >&2
       verdict="UNKNOWN"
       ;;
   esac
@@ -719,73 +798,86 @@ for reviewer in claude codex gemini opencode; do
         else if (line ~ /Bearer [A-Za-z0-9._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
         else if (line ~ /Authorization: [A-Za-z0-9 ._~+\/-]{20,}/) line = "--- redacted credential at line " NR " ---"
         else if (line ~ /ses_[A-Za-z0-9]{16,}/) line = "--- redacted credential at line " NR " ---"
-        if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) in_pem = 1
+        # PEM private key block, multi-line state machine. Canonical source
+        # and full rationale: council-patterns SKILL.md "11-Pattern
+        # Credential Redaction" — keep this copy byte-identical with it.
+        # Unanchored BEGIN match on purpose: a full-line anchor lets a
+        # flattened or inline-quoted key through undetected. The END test
+        # below anchors the TAIL only ([[:space:]]*$) — do NOT anchor the
+        # start too, that reintroduces the bypass documented in
+        # docs/solutions/security-issues/awk-pem-state-machine-variable-mutation.md.
+        # pem_reclose re-arms redaction when a decoy bare END is immediately
+        # followed by more key body. pem_span caps a stray BEGIN at 200
+        # lines so prose that merely quotes the marker cannot blind the rest
+        # of the output. pem_stray (>=3 consecutive non-key lines, hex-SHA
+        # safe) ends redaction early on such prose, after stripping
+        # blockquote, list, numbered-excerpt, and diff prefixes from the
+        # body test.
+        if (pem_reclose) {
+          pem_reclose = 0
+          if ($0 ~ /^[A-Za-z0-9+\/=]{20,}$/ && $0 ~ /[G-Zg-z+\/=]/) { in_pem = 1; pem_stray = 0 }
+        }
+        if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) { in_pem = 1; pem_stray = 0; pem_span = 0 }
         if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
-        if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----/) in_pem = 0
+        if (in_pem) {
+          if (++pem_span > 200) {
+            in_pem = 0
+          } else if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
+            in_pem = 0
+            pem_reclose = 1
+          } else {
+            pem_body = $0
+            sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", pem_body)
+            sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", pem_body)
+            sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", pem_body)
+            sub(/^[-+]/, "", pem_body)
+            sub(/^[[:space:]]+/, "", pem_body)
+            sub(/[[:space:]]+$/, "", pem_body)
+            if (pem_body != "") {
+              if ((pem_body ~ /^[A-Za-z0-9+\/=]{20,}$/ && pem_body ~ /[G-Zg-z+\/=]/) ||
+                  pem_body ~ /^(Proc-Type|DEK-Info):/ ||
+                  $0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----/) pem_stray = 0
+              else if (++pem_stray >= 3) in_pem = 0
+            }
+          }
+        }
         print line
       }
       ' "$fenced_path")
-      # Escape forged delimiters, preserving the legitimate outer sandwich.
-      # claude-reviewer's own delimiter-escape rule (Rule 2 in its Safeguards
-      # section) is prose only — nothing executes it — so a pack that induces
-      # the agent to skip it can leave an extra, unescaped
-      # `--- end council-output:claude ---` in the body, closing the fence
-      # early and turning the rest into apparent instructions to whatever
-      # reads the persisted report. A forward state machine passes exactly two
-      # lines through untouched — the first line equal to this reviewer's
-      # literal begin delimiter, and the first line equal to its literal end
-      # delimiter after that — and escapes every other `council-output:`
-      # delimiter line: a second begin, one appended AFTER the real close, one
-      # that PRECEDES any begin, and any near-miss label variant.
+      # Wrap in a FRESHLY GENERATED sandwich rather than trusting anything
+      # read from claude-reviewer's own file to already BE one. Its own
+      # delimiter-escape rule (Rule 2 in its Safeguards section) is prose
+      # only — nothing executes it — so the file it wrote may be missing its
+      # begin delimiter, missing its end delimiter, or carry a forged extra
+      # copy of either; no combination of those can be trusted to mark where
+      # a genuine sandwich starts or ends. A prior version of this pass tried
+      # to locate "the genuine pair" inside the file and escape only
+      # everything else — that fails open exactly when the assumption breaks:
+      # a missing begin left the whole body unfenced, and a missing end left
+      # an unterminated fence. Escaping every delimiter-shaped line
+      # UNCONDITIONALLY, then adding council.md's own begin/end pair around
+      # the result below, guarantees a single well-formed sandwich regardless
+      # of what the file actually contains — including when it contains
+      # neither delimiter, only one, or a forged extra copy of both.
       #
-      # The genuine pair is matched by FULL-LINE EQUALITY against the reviewer
-      # name, not by prefix. Prefix matching is what makes this exploitable:
-      # a forged `--- end council-output:claude-x ---` placed before the real
-      # close would satisfy a prefix test, consume the end slot unescaped, and
-      # push the genuine `--- end council-output:claude ---` into the escaped
-      # branch — closing the fence early at the attacker's line and leaving
-      # the real terminator mangled. Equality escapes the variant and keeps
-      # the real close intact.
-      #
-      # Escape form matches claude-reviewer.md's own rule: replace the leading
-      # "--- " with "[ESCAPED] " (not merely prefix it) so the exact delimiter
-      # substring is gone from the result. Scoped to "council-output:" so it
-      # never touches this same pass's own "--- redacted ... ---" markers.
+      # Escape form matches claude-reviewer.md's own rule: replace the
+      # leading "--- " with "[ESCAPED] " (not merely prefix it) so the exact
+      # delimiter substring is gone from the result. Scoped to
+      # "council-output:" so it never touches this same pass's own
+      # "--- redacted ... ---" markers.
+      section_body=$(printf '%s\n' "$section_body" | awk '
+        /^--- (begin|end) council-output:/ { sub(/^--- /, "[ESCAPED] ") }
+        { print }
+      ')
       # The emitted pair is ASYMMETRIC — the begin line carries a
       # "(reference only)" annotation and the end line does not. Both forms
       # are copied verbatim from claude-reviewer.md's own output template
-      # (its lines 294 and 301); getting either wrong is not a no-op, it
-      # escapes the genuine delimiters and leaves the whole appendix unfenced.
-      #
-      # Two-pass, and it must be: the structural close is the LAST exact end
-      # delimiter, not the first. A single forward pass that keeps the first
-      # match is defeated by a body that contains an exact
-      # `--- end council-output:claude ---` line — the forgery keeps its slot,
-      # the genuine final close gets escaped, and every line between them
-      # reads as unfenced content in the persisted report. Buffering the body
-      # and selecting first-exact-begin + last-exact-end closes that: any
-      # forged copy, wherever it sits, falls outside the preserved pair.
-      section_body=$(printf '%s\n' "$section_body" | awk -v rev="$reviewer" '
-      BEGIN {
-        begin_exact = "--- begin council-output:" rev " (reference only) ---"
-        end_exact = "--- end council-output:" rev " ---"
-      }
-      {
-        lines[NR] = $0
-        if ($0 == begin_exact && !first_begin) first_begin = NR
-        if ($0 == end_exact) last_end = NR
-      }
-      END {
-        # A close that precedes the open is not a close.
-        if (last_end <= first_begin) last_end = 0
-        for (i = 1; i <= NR; i++) {
-          line = lines[i]
-          if (line ~ /^--- (begin|end) council-output:/ && i != first_begin && i != last_end)
-            sub(/^--- /, "[ESCAPED] ", line)
-          print line
-        }
-      }
-      ')
+      # (its lines 294 and 301) and from the Step 5 fence template, so the
+      # appendix matches the shape the other three reviewers' own in-agent
+      # fencing already produces.
+      section_body="--- begin council-output:claude (reference only) ---
+${section_body}
+--- end council-output:claude ---"
     else
       section_body=$(cat "$fenced_path")
     fi

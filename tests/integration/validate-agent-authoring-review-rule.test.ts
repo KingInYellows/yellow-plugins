@@ -95,6 +95,45 @@ describe('validate-agent-authoring W1.5 read-only reviewer rule', () => {
     expect(stderr).not.toMatch(/codex-reviewer\.md.*review\/ agent/);
   });
 
+  it('honors REVIEW_AGENT_ALLOWLIST for claude-reviewer.md when tools: match its granted set (Write only)', () => {
+    writeAgent(
+      tmpRoot,
+      'yellow-council/agents/review/claude-reviewer.md',
+      REVIEW_AGENT_CLEAN.replace('clean-reviewer', 'claude-reviewer').replace(
+        '  - Glob',
+        '  - Glob\n  - Write'
+      )
+    );
+
+    const { status, stderr } = runValidator(tmpRoot);
+
+    expect(status).toBe(0);
+    expect(stderr).not.toMatch(/claude-reviewer\.md.*review\/ agent/);
+  });
+
+  it('still flags claude-reviewer.md gaining Bash — a per-file allowlist entry does not cover tools outside its granted set', () => {
+    // claude-reviewer's REVIEW_AGENT_ALLOWLIST entry grants Write only (it
+    // has no CLI to invoke, unlike codex/gemini/opencode-reviewer). Bare
+    // set-membership on the old REVIEW_AGENT_ALLOWLIST (a Set of paths) would
+    // have let ANY denied tool ride the exception; the fix keys the
+    // exception to a per-file allowed-tool set, so Bash — outside that
+    // set — must still trip W1.5.
+    writeAgent(
+      tmpRoot,
+      'yellow-council/agents/review/claude-reviewer.md',
+      REVIEW_AGENT_BASH_VIOLATOR.replace(
+        'synth-violator',
+        'claude-reviewer'
+      ).replace('  - Bash', '  - Write\n  - Bash')
+    );
+
+    const { status, stderr } = runValidator(tmpRoot);
+
+    expect(status).toBeGreaterThan(0);
+    expect(stderr).toMatch(/claude-reviewer\.md/);
+    expect(stderr).toMatch(/review\/ agent must not include Bash/);
+  });
+
   it('passes a clean review agent with [Read, Grep, Glob] only', () => {
     writeAgent(
       tmpRoot,

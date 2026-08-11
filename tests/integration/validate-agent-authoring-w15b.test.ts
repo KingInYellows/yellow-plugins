@@ -146,10 +146,12 @@ Body for W1.5b fixture.
 `;
 
 // An allowlisted CLI-wrapper reviewer (codex-reviewer) with memory: and no
-// deny — W1.5b must skip allowlisted agents (same allowlist as W1.5).
+// deny. REVIEW_AGENT_ALLOWLIST documents a specific tools: grant (Bash for
+// codex-reviewer), not a blanket exemption from the memory: auto-grant —
+// W1.5b must still fire here, same as for any non-allowlisted review agent.
 const ALLOWLISTED_FM_MEMORY_NO_DENY = `---
 name: codex-reviewer
-description: Codex reviewer fixture. Use when verifying the W1.5b allowlist skip.
+description: Codex reviewer fixture. Use when verifying W1.5b still fires for an allowlisted agent.
 model: inherit
 memory: project
 tools:
@@ -328,14 +330,15 @@ describe('validate-agent-authoring W1.5b (memory: requires disallowedTools)', ()
     expect(result.status).toBe(0);
   });
 
-  it('skips allowlisted reviewers (codex-reviewer) even with memory: and no deny', () => {
+  it('still fires for an allowlisted reviewer (codex-reviewer) with memory: and no deny — allowlist is not a memory: exemption', () => {
     writeAgent(
       pluginsDir,
       'yellow-codex/agents/review/codex-reviewer.md',
       ALLOWLISTED_FM_MEMORY_NO_DENY
     );
     const result = runValidator(pluginsDir);
-    expect(result.status).toBe(0);
+    expect(result.status).not.toBe(0);
+    expect(result.stdout + result.stderr).toMatch(/W1\.5b/);
   });
 
   it('fires on memory: project with a trailing inline comment (no deny) — the bypass fix', () => {

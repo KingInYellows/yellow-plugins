@@ -142,7 +142,13 @@ Correct pattern — orchestrator (has Bash) mints, subagent (no Bash) creates:
 ```bash
 # In the orchestrator, before spawning the Bash-less subagent:
 CLAUDE_FENCED_FILE=$(mktemp -u /tmp/council-claude-fenced-XXXXXX.txt)
-# persist to state, then pass the literal value in the Task spawn prompt
+# Pass the literal value in the Task spawn prompt. Do NOT persist it to the
+# state file — see point 2 above: a later `: > "$STATE_FILE"` truncation
+# destroys anything written beforehand. Recover the path from the subagent's
+# own `fenced_output_path=` return line, and reclaim files orphaned by a
+# cancelled or hung fan-out with a pattern-based sweep over the mint glob at
+# the START of the next run (guard it: skip symlinks, require `-O`, and
+# reject any candidate containing `..` or an extra `/`).
 ```
 
 Source: `plans/yellow-council-v2-four-cli-02-claude-reviewer-fanout.md`
