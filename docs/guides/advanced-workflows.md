@@ -35,12 +35,12 @@ patterns. Read [Common Workflows](./common-workflows.md) first.
 | Missing Credential | Effect | Alternative |
 |---|---|---|
 | Linear OAuth | `/linear:create` fails | Create issues manually |
-| `DEVIN_SERVICE_USER_TOKEN` / `DEVIN_ORG_ID` | `/linear:delegate` fails | Implement manually via `/workflows:work` |
+| `DEVIN_SERVICE_USER_TOKEN` / `DEVIN_ORG_ID` | `/linear:delegate` fails | Implement manually via `/flow:work` |
 
 ### Without Linear
 
-Skip steps 2-3. Use `/workflows:plan` to break the spec into implementation
-tasks, then `/workflows:work` to implement.
+Skip steps 2-3. Use `/flow:plan` to break the spec into implementation
+tasks, then `/flow:work` to implement.
 
 ---
 
@@ -93,21 +93,21 @@ Use `/debt:status` at any time for a dashboard of current debt levels.
 ### Deep Research Chain
 
 ```
-/research:deep → /workflows:brainstorm → /workflows:plan → /workflows:work <plan-path>
+/research:deep → /flow:brainstorm → /flow:plan → /flow:work <plan-path>
 ```
 
 1. **`/research:deep`** — Multi-source deep research saved to
    `docs/research/<slug>.md`. Use for comprehensive reports, competitive
    analysis, or technology evaluation.
 
-2. **`/workflows:brainstorm`** — Reference the research output file when
+2. **`/flow:brainstorm`** — Reference the research output file when
    starting the brainstorm. The brainstorm command auto-detects brainstorm docs
    but does not auto-detect research files — mention the path explicitly.
 
-3. **`/workflows:plan`** — Transform brainstorm into actionable plan. The plan
+3. **`/flow:plan`** — Transform brainstorm into actionable plan. The plan
    command auto-detects the most recent brainstorm doc.
 
-4. **`/workflows:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
+4. **`/flow:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
    plan. Pass the file path explicitly.
 
 ### Quick Research (No Files)
@@ -129,10 +129,10 @@ Example: Feature with research, implementation, review, and tracking.
 
 ```
 /research:deep "state management patterns"
-/workflows:brainstorm
-/workflows:plan
+/flow:brainstorm
+/flow:plan
 /gt-stack-plan
-/workflows:work plans/...
+/flow:work plans/...
 /smart-submit
 /review:pr
 /review:resolve

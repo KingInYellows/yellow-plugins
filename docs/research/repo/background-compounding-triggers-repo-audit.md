@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-18
 **Branch:** agent/docs/compound-staging-plan
-**Purpose:** Feed the `/workflows:plan` phase for the two-tier background compounding pipeline
+**Purpose:** Feed the `/flow:plan` phase for the two-tier background compounding pipeline
 
 ---
 
@@ -252,7 +252,7 @@ Both gates are inline prompt instructions — they cannot be disabled without mo
 Lines 159–161:
 
 ```markdown
-When spawned by `/workflows:compound`, all findings are worthy (user explicitly
+When spawned by `/flow:compound`, all findings are worthy (user explicitly
 requested compounding) — apply Routing Decision directly without severity filter.
 ```
 
@@ -546,7 +546,7 @@ The test harness pattern: `mktemp -d` for staging dir, `CLAUDE_PROJECT_DIR=<tmpd
 
 ```yaml
 ---
-name: workflows:compound
+name: flow:compound
 description: Document a recently solved problem to compound team knowledge into memory or solution docs
 argument-hint: '[optional: brief context about the fix]'
 allowed-tools:
@@ -571,7 +571,7 @@ Step 4: Report Results
 
 ### Conventions to mirror in `compound/review-staged.md`
 
-1. **Name field:** `workflows:review-staged` (sibling to `workflows:compound`) — **SUPERSEDED:** plan and brainstorm both place this command at `commands/compound/review-staged.md` invoked as `/compound:review-staged`. Use the `compound:` prefix.
+1. **Name field:** `workflows:review-staged` (sibling to `flow:compound`) — **SUPERSEDED:** plan and brainstorm both place this command at `commands/compound/review-staged.md` invoked as `/compound:review-staged`. Use the `compound:` prefix.
 2. **allowed-tools:** `Bash`, `Read`, `Task`, `ToolSearch`, plus ruvector MCP tools (same list)
 3. **Step 1 guard:** Check `docs/solutions/` exists AND check that staging dir has entries; if staging is empty, output a message and stop
 4. **Step 2:** `Task(subagent_type: "yellow-core:workflow:staging-reviewer")` — not `knowledge-compounder` directly
@@ -583,7 +583,7 @@ Step 4: Report Results
 
 | Property | `compound.md` | `review-staged.md` |
 |---|---|---|
-| Trigger | User ran `/workflows:compound` | User ran `/compound:review-staged` |
+| Trigger | User ran `/flow:compound` | User ran `/compound:review-staged` |
 | Agent spawned | `knowledge-compounder` | `staging-reviewer` (new) |
 | Context passed | Last 25 turns + $ARGUMENTS | Staging dir path (derived, not from user) |
 | M3 gate | In `knowledge-compounder` | None (non-interactive by design) |

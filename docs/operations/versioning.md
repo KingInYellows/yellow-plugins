@@ -95,7 +95,7 @@ A changeset file looks like this:
 "yellow-review": patch
 ---
 
-Add workflows:brainstorm command to yellow-core. Fix silent failure in yellow-review PR comment resolver.
+Add flow:brainstorm command to yellow-core. Fix silent failure in yellow-review PR comment resolver.
 ```
 
 The `pnpm changeset` CLI creates these files for you interactively. You can

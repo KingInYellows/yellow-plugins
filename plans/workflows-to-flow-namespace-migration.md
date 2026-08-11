@@ -366,22 +366,43 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
 
 ### PR3 — `docs/` (85 anchored / 92 unanchored) + `RESEARCH/` (10 / 14)
 
-**Known gate blind spot for this PR to close by hand.**
-`docs/research/repo/background-compounding-triggers-repo-audit.md` names
-`/workflows:review-staged`, which the gate's `(?![a-z-])` tail guard drops
-because `review-staged` extends the command name `review`. It is a
-*pre-existing* error either way — the command has always been
-`/compound:review-staged`, never `/workflows:review-staged` — so the correct
-fix is the right namespace, not `flow:`. The tail guard is deliberate (it is
-what keeps `workflows:worker` from tripping the gate), so this is a trade the
-gate makes knowingly, not a bug to fix in the matcher.
+**Known gate blind spot — inspected, no change needed.**
+`docs/research/repo/background-compounding-triggers-repo-audit.md:574` names
+`workflows:review-staged`, which the gate's `(?![a-z-])` tail guard drops
+because `review-staged` extends the command name `review`. Reading the full
+line, it quotes a **superseded proposal** and corrects itself in the same
+sentence ("**SUPERSEDED:** … Use the `compound:` prefix"). It is a faithful
+record of a rejected name, not a stale reference, so it is left as written.
+The tail guard is deliberate — it is what keeps `workflows:worker` from
+tripping the gate — so this is a trade the gate makes knowingly.
 
-- [ ] 3.1: Sweep `docs/` excluding `brainstorms/` and `solutions/`
-- [ ] 3.2: `RESEARCH/MERGE_PLAN.md`, `RESEARCH/01-plugin-inventory.md` — live
-      analysis, sweep
-- [ ] 3.3: `RESEARCH/upstream-snapshots/<sha>/MANIFEST.md:7` — self-authored
-      provenance metadata, not vendored content; sweep-safe
-- [ ] 3.4: Shrink allowlist
+- [x] 3.1: Sweep `docs/` excluding `brainstorms/` and `solutions/` — all 14
+      allowlisted files (90 refs). Each was checked for historical framing
+      first; none makes a claim that renaming would falsify, because they all
+      describe *this* repo's commands
+- [x] 3.2: `RESEARCH/01-plugin-inventory.md` — swept (it inventories this
+      repo's public command surface).
+
+      **`RESEARCH/MERGE_PLAN.md` is NOT swept — this plan's instruction to
+      sweep it was wrong.** Reading it, its `workflows:` references are
+      claims about the *upstream EveryInc* plugin: its central finding is
+      that "yellow-core's commands … match upstream's pre-v2.38.0 naming
+      (`workflows:*` instead of `ce-*`)", and P0.1 offers "keep `workflows:*`
+      as your fork's branding" as a live option. Rewriting it to `flow:`
+      would state a falsehood about another project's history. The same
+      applies to `RESEARCH/every-plugin-research.md` (7 refs), which the plan
+      never classified at all — it is upstream changelog analysis.
+
+      Both are now **permanent exclusions in the script**, not allowlist
+      entries, so the allowlist stays purely a sweep-progress ledger that can
+      reach empty. This is the plan's own "classify per-file, not by
+      directory" rule applied to the case it missed
+- [x] 3.3: `RESEARCH/upstream-snapshots/<sha>/MANIFEST.md:7` — self-authored
+      provenance metadata, not vendored content; sweep-safe. Swept. The
+      vendored snapshot content beside it is untouched
+- [x] 3.4: Shrink allowlist — **reached the terminal state early: 0 entries.**
+      `--write-allowlist` now emits `{}` and the gate reports "no `workflows:`
+      references remain outside permanent exclusions"
 
 ### PR4 — Terminal condition
 
@@ -519,7 +540,7 @@ Both open questions were closed before PR1 began.
 <!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. agent/feat/flow-namespace-rename-and-gate (completed 2026-08-10)
 - [x] 2. agent/docs/flow-namespace-sweep-plugins (completed 2026-08-11)
-- [ ] 3. agent/docs/flow-namespace-sweep-docs-research
+- [x] 3. agent/docs/flow-namespace-sweep-docs-research (completed 2026-08-11)
 - [ ] 4. agent/chore/flow-namespace-terminal-condition
 
 ## References

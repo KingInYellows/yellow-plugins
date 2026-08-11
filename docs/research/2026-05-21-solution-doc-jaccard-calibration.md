@@ -138,7 +138,7 @@ No similarity scoring, no stop-word list, no threshold calibration, no
 `intentional_variant: true` opt-out semantics.
 
 The orphan-MEMORY-reference problem (the original pain point from PR #548)
-is addressed by the `knowledge-compounder` in-PR mode (`/workflows:compound
+is addressed by the `knowledge-compounder` in-PR mode (`/flow:compound
 --in-pr`), which is what actually delivers value.
 
 ## When to revisit

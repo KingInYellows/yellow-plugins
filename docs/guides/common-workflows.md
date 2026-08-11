@@ -9,8 +9,8 @@ missing.
 ### Minimum Viable Install
 
 Only **yellow-core** is required. It provides the foundational workflow commands:
-`/workflows:brainstorm`, `/workflows:plan`, `/workflows:work`,
-`/workflows:review`, `/workflows:compound`.
+`/flow:brainstorm`, `/flow:plan`, `/flow:work`,
+`/flow:review`, `/flow:compound`.
 
 ### Full Install
 
@@ -25,7 +25,7 @@ missing — commands report what's unavailable rather than failing silently.
 
 | Plugin | Depends On | Without It |
 |---|---|---|
-| yellow-core | None | `/workflows:*` commands unavailable; yellow-review cross-plugin agents don't load |
+| yellow-core | None | `/flow:*` commands unavailable; yellow-review cross-plugin agents don't load |
 | yellow-review | yellow-core (cross-plugin agents) | Only yellow-review's own agents run |
 | yellow-debt | yellow-linear (for `/debt:sync`) | Cannot push findings to Linear |
 | yellow-ci | gh CLI | All commands fail with auth error |
@@ -63,23 +63,23 @@ The most common workflow chain. Use for any feature implementation.
 ### Full Chain
 
 ```
-/workflows:brainstorm → /workflows:plan → /gt-stack-plan → /workflows:work → /smart-submit → /review:pr → /review:resolve → /linear:sync
+/flow:brainstorm → /flow:plan → /gt-stack-plan → /flow:work → /smart-submit → /review:pr → /review:resolve → /linear:sync
 ```
 
 ### Step by Step
 
-1. **`/workflows:brainstorm`** — Explore the problem space through dialogue.
+1. **`/flow:brainstorm`** — Explore the problem space through dialogue.
    Captures decisions in `docs/brainstorms/YYYY-MM-DD-<topic>-brainstorm.md`.
    Skip if requirements are already clear.
 
-2. **`/workflows:plan`** — Transform the brainstorm into an actionable plan at
+2. **`/flow:plan`** — Transform the brainstorm into an actionable plan at
    `plans/YYYY-MM-DD-<topic>-plan.md`. Creates task breakdown, identifies
    files to modify, and sets acceptance criteria.
 
 3. **`/gt-stack-plan`** — Plan how to split the implementation into stacked PRs.
    Skip for single-PR features.
 
-4. **`/workflows:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
+4. **`/flow:work plans/YYYY-MM-DD-<topic>-plan.md`** — Execute the
    plan. **Important:** pass the plan file path explicitly. Creates commits via
    Graphite.
 
@@ -99,7 +99,7 @@ The most common workflow chain. Use for any feature implementation.
 ### Minimum Viable Chain (yellow-core + gt-workflow)
 
 ```
-/workflows:plan → /workflows:work <plan-path> → /smart-submit
+/flow:plan → /flow:work <plan-path> → /smart-submit
 ```
 
 ### Without Linear
@@ -184,7 +184,7 @@ Reviews all your open non-draft PRs.
 ### Manual Capture
 
 ```
-/workflows:compound [brief context]
+/flow:compound [brief context]
 ```
 
 Run after solving a significant problem. Captures the solution in

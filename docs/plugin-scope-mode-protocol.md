@@ -57,15 +57,15 @@ recording is skipped rather than prompted.)
 
 ### Non-adopters (interactive-only surfaces)
 
-`/review:all`, `/workflows:work`, `/workflows:review`,
-`/workflows:compound`, `/debt:audit`, and all setup commands have no
+`/review:all`, `/flow:work`, `/flow:review`,
+`/flow:compound`, `/debt:audit`, and all setup commands have no
 `--non-interactive` mode today. Their gates (AskUserQuestion
 checkpoints, push confirmations) are always live. (`/review:all` has
 its own scope grammar — Interface 5 below.)
 
 ## Interface 2: `--in-pr` flag
 
-Switches `/workflows:compound` from live-conversation sourcing to
+Switches `/flow:compound` from live-conversation sourcing to
 PR-context sourcing (PR body + commit subjects) so a solution doc can
 co-ship with the code change.
 
@@ -82,7 +82,7 @@ Defined in `plugins/yellow-core/commands/workflows/compound.md` Step 2.
 
 ### Adopters
 
-`/workflows:compound` only. No other surface accepts `--in-pr`.
+`/flow:compound` only. No other surface accepts `--in-pr`.
 
 ## Interface 3: Debt scanner file interface
 
@@ -107,9 +107,9 @@ The five yellow-debt scanner agents plus `audit-synthesizer`. This is a
 file-based interface, deliberately different from Interfaces 1–2: scanner
 output is machine-merged, so a structured file beats flag plumbing.
 
-## Interface 4: Positional-type detection (`/workflows:review`)
+## Interface 4: Positional-type detection (`/flow:review`)
 
-`/workflows:review` dispatches on the TYPE of its positional argument
+`/flow:review` dispatches on the TYPE of its positional argument
 instead of a mode flag.
 
 ### Contract
@@ -125,10 +125,10 @@ Defined in `plugins/yellow-core/commands/workflows/review.md` Step 1
 
 ### Adopters
 
-`/workflows:review` only. The two nearest comparisons do not dispatch
+`/flow:review` only. The two nearest comparisons do not dispatch
 across types: `/review:pr` accepts PR#/URL/branch/blank but resolves
 every shape to the same PR-number extraction and downstream route, and
-`/workflows:work` validates a single expected type (a plan path).
+`/flow:work` validates a single expected type (a plan path).
 `/review:all`'s `scope=` values are keyword dispatch, not type dispatch
 (Interface 5 below).
 
@@ -166,7 +166,7 @@ the citation trail is recorded in
 `plans/tier-2-structural-optimizations.md`.
 
 No yellow-plugins surface implements this today — `/review:pr` always
-diffs a PR, `/workflows:review` takes a plan file, `/debt:audit` scans a
+diffs a PR, `/flow:review` takes a plan file, `/debt:audit` scans a
 tree. This section is a recommendation for new surfaces, explicitly
 marked not-yet-uniform; adopting it on existing surfaces is out of scope
 (see the non-goal at the top).

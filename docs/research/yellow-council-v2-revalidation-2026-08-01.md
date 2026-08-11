@@ -1,7 +1,7 @@
 # yellow-council V2 Revalidation: Four-CLI Architecture + Subscription-Auth Hardening
 
-**Date:** 2026-05-08 (revision 2: 2026-08-01, re-enriched via `/yellow-research:workflows:deepen-plan`)
-**Status:** RESEARCH RECORD — supersedes the retired plan `plans/yellow-council-v2-four-cli.md` (deleted 2026-08-01). Not an active plan: the feature is being re-scoped via `/workflows:brainstorm` → `/workflows:spec` → `/workflows:decompose`; this document is the validated input to that pipeline. Codebase-verified 2026-08-01: 0 of the original 27 tasks landed; yellow-council still at 0.2.9 with 2 reviewer agents. Exception: Phase G (Antigravity migration) is an urgent standalone bugfix that should ship regardless of re-scoping.
+**Date:** 2026-05-08 (revision 2: 2026-08-01, re-enriched via `/yellow-research:flow:deepen-plan`)
+**Status:** RESEARCH RECORD — supersedes the retired plan `plans/yellow-council-v2-four-cli.md` (deleted 2026-08-01). Not an active plan: the feature is being re-scoped via `/flow:brainstorm` → `/flow:spec` → `/flow:decompose`; this document is the validated input to that pipeline. Codebase-verified 2026-08-01: 0 of the original 27 tasks landed; yellow-council still at 0.2.9 with 2 reviewer agents. Exception: Phase G (Antigravity migration) is an urgent standalone bugfix that should ship regardless of re-scoping.
 **Canonical successor artifacts (start here for fresh-session work):** the re-scope decisions that supersede this record's Phase 3 live in `docs/brainstorms/2026-08-01-yellow-council-v2-rescope-brainstorm.md`; the ratified requirements (R1–R30) are in `plans/specs/yellow-council-v2-four-cli.md`; the dependency-ordered implementation units are `plans/shells/yellow-council-v2-four-cli-01..05-*.md`. This research record remains valid for everything the brainstorm/spec did NOT touch (Phases G, 0, 1, 2, 4, 5, 6) — see the SUPERSEDED banner in Phase 3 below for what changed there.
 **Source research:** `docs/research/multi-cli-code-review-claude-codex-gemini-opencode.md`
 **Current plugin state:** `plugins/yellow-council/` V1 (3 reviewers: Codex via yellow-codex, Gemini, OpenCode; single-shot; descriptive synthesis). **The Gemini slot is currently non-functional** — Google shut off Gemini CLI for consumer-subscription tiers on 2026-06-18 (see Phase G).
@@ -786,7 +786,7 @@ The plan is successful when:
 
 ## References
 
-External research sources used by `/yellow-research:workflows:deepen-plan` (revision 2, 2026-08-01; supersedes the May 2026 source list):
+External research sources used by `/yellow-research:flow:deepen-plan` (revision 2, 2026-08-01; supersedes the May 2026 source list):
 
 **Gemini CLI shutdown / Antigravity:**
 - Google Developers Blog — "An important update: Transitioning Gemini CLI to Antigravity CLI" (2026-05-19) — official shutdown date (2026-06-18), enterprise/API-key exemption, `agy` replacement

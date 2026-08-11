@@ -350,6 +350,21 @@ const EXCLUDED_FILES = [
   // active plan under plans/ (and plans/shells/, plans/specs/,
   // plans/handoff/) is a live instruction and IS scanned.
   'plans/workflows-to-flow-namespace-migration.md',
+  // The next two are the sharpest case for per-file classification: their
+  // `workflows:` references are claims about the UPSTREAM EveryInc plugin's
+  // own `workflows:*` namespace and its v2.38.0 rename to `ce:*` — a
+  // different project's history. Rewriting them to `flow:` would state a
+  // falsehood about someone else's repo, which is a strictly worse outcome
+  // than a stale-looking string. `every-plugin-research.md` is the upstream
+  // changelog analysis; `MERGE_PLAN.md` is the concept-fork comparison whose
+  // central claim ("your commands are named workflows:* like upstream's
+  // pre-v2.38.0 naming") is only true in the old vocabulary.
+  //
+  // These are permanent, so they live here rather than in the allowlist —
+  // that keeps the allowlist strictly a sweep-progress ledger that can reach
+  // empty at the terminal condition.
+  'RESEARCH/every-plugin-research.md',
+  'RESEARCH/MERGE_PLAN.md',
 ];
 
 /** `plugins/<name>/CHANGELOG.md` — per-plugin release history. */
