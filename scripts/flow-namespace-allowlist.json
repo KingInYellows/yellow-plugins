@@ -69,14 +69,6 @@
   "plugins/yellow-codex/CLAUDE.md": {
     "work": 3
   },
-  "plugins/yellow-core/agents/research/learnings-researcher.md": {
-    "compound": 1,
-    "plan": 1,
-    "brainstorm": 1
-  },
-  "plugins/yellow-core/agents/workflow/knowledge-compounder.md": {
-    "compound": 4
-  },
   "plugins/yellow-core/commands/plan/complete.md": {
     "plan": 1,
     "expand-shell": 1,
@@ -120,16 +112,8 @@
     "pick-next-shell": 2,
     "work": 1
   },
-  "plugins/yellow-linear/CLAUDE.md": {
-    "plan": 2,
-    "work": 1
-  },
   "plugins/yellow-linear/commands/linear/sync.md": {
     "work": 1
-  },
-  "plugins/yellow-review/CLAUDE.md": {
-    "compound": 2,
-    "review": 1
   },
   "plugins/yellow-review/commands/review/resolve-pr.md": {
     "compound": 1

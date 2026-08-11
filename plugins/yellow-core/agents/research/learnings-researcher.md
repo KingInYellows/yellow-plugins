@@ -208,7 +208,7 @@ NO_PRIOR_LEARNINGS
 
 (advisory) docs/solutions/ scanned for: <keyword list>. No frontmatter or
 content matches strong enough to surface. The caller's work may be worth
-capturing with /workflows:compound after it lands — the absence is itself
+capturing with /flow:compound after it lands — the absence is itself
 useful signal.
 ```
 
@@ -297,9 +297,9 @@ Invoked by:
 - `/review:pr` Step 3d — pre-pass before reviewer dispatch
 - `/review:review-all` — same pre-pass, run per PR in the batch
 - `/docs:review` — learnings pre-pass before document-review personas
-- `/workflows:plan` Phase 1 — pre-pass alongside the ruvector recall
+- `/flow:plan` Phase 1 — pre-pass alongside the ruvector recall
   (empty Diff field)
-- `/workflows:brainstorm` (`brainstorm-orchestrator` Phase 0b) — pre-pass
+- `/flow:brainstorm` (`brainstorm-orchestrator` Phase 0b) — pre-pass
   after TOPIC confirmation, before the first question round
 - Standalone via `Task` with `subagent_type: "yellow-core:research:learnings-researcher"`
 
