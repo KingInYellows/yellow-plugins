@@ -208,7 +208,7 @@ NO_PRIOR_LEARNINGS
 
 (advisory) docs/solutions/ scanned for: <keyword list>. No frontmatter or
 content matches strong enough to surface. The caller's work may be worth
-capturing with /flow:compound after it lands — the absence is itself
+capturing with /flow:compound after it lands — the absence is itself a
 useful signal.
 ```
 

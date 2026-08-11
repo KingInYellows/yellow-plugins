@@ -135,7 +135,24 @@ check "workflows:worker / :planetary ignored" 0 $?
 rm -f "$PROBE"
 
 echo
-echo "=== E. ERROR-NAMESPACE-002: allowlist count drift (fingerprint mismatch) ==="
+echo "=== E. COLLECTIVE_FORMS: glob and placeholder namespace forms trip; double-asterisk markdown bold stays clean ==="
+printf '# gate probe\n\n%s:* the flow namespace\n' "$OLD" >"$PROBE"
+node "$GATE" >/dev/null 2>&1
+check "collective glob form" 1 $?
+rm -f "$PROBE"
+
+printf '# gate probe\n\n%s:<cmd> placeholder\n' "$OLD" >"$PROBE"
+node "$GATE" >/dev/null 2>&1
+check "collective placeholder form" 1 $?
+rm -f "$PROBE"
+
+printf '# gate probe\n\n**Template-driven %s:**\n' "$OLD" >"$PROBE"
+node "$GATE" >/dev/null 2>&1
+check "markdown bold double-asterisk ignored" 0 $?
+rm -f "$PROBE"
+
+echo
+echo "=== F. ERROR-NAMESPACE-002: allowlist count drift (fingerprint mismatch) ==="
 node -e '
 const fs = require("fs"), p = process.argv[1];
 const a = JSON.parse(fs.readFileSync(p, "utf8"));
@@ -156,7 +173,7 @@ fi
 restoreAllowlist || exit 1
 
 echo
-echo "=== F. ERROR-NAMESPACE-002: same-total command substitution must trip the gate ==="
+echo "=== G. ERROR-NAMESPACE-002: same-total command substitution must trip the gate ==="
 # Recorded fingerprint says 2 of one command + 1 of another (total 3). The
 # probe file actually has 1 + 2 (also total 3) — a total-only allowlist would
 # see the totals match and miss this; per-command fingerprint comparison must
@@ -176,7 +193,7 @@ rm -f "$PROBE"
 restoreAllowlist || exit 1
 
 echo
-echo "=== G. ERROR-NAMESPACE-002: allowlisted file that is now clean ==="
+echo "=== H. ERROR-NAMESPACE-002: allowlisted file that is now clean ==="
 node -e '
 const fs = require("fs"), p = process.argv[1];
 const a = JSON.parse(fs.readFileSync(p, "utf8"));
@@ -190,7 +207,7 @@ rm -f "$OUT"
 restoreAllowlist || exit 1
 
 echo
-echo "=== H. ERROR-NAMESPACE-003: allowlisted path missing from disk ==="
+echo "=== I. ERROR-NAMESPACE-003: allowlisted path missing from disk ==="
 node -e '
 const fs = require("fs"), p = process.argv[1];
 const a = JSON.parse(fs.readFileSync(p, "utf8"));
@@ -204,7 +221,7 @@ rm -f "$OUT"
 restoreAllowlist || exit 1
 
 echo
-echo "=== I. tree restored, gate green again ==="
+echo "=== J. tree restored, gate green again ==="
 node "$GATE" >/dev/null 2>&1
 check "restored" 0 $?
 
