@@ -30,7 +30,11 @@ PROBE=docs/testing/__flow-ns-gate-probe.md
 OLD="workflow"'s' # assembled, see NOTE above
 NS='ERROR-'"NAMESPACE" # assembled like validate-flow-namespace.js's own NS — never a literal catalog code
 
-if [ -e "$PROBE" ]; then
+# -e alone is not enough: it is FALSE for a dangling symlink, so a symlink
+# planted at this path would slip past the guard and `>` would follow it,
+# writing (and later deleting) an arbitrary file outside the repo. -L catches
+# every symlink, dangling or not.
+if [ -e "$PROBE" ] || [ -L "$PROBE" ]; then
   printf '[flow-namespace-gate] Error: probe file %s already exists.\n' "$PROBE" >&2
   printf '[flow-namespace-gate] Move or delete it before running this script.\n' >&2
   exit 1

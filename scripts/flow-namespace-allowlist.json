@@ -108,9 +108,6 @@
   "plugins/yellow-core/skills/memory-remember-pattern/SKILL.md": {
     "compound": 1
   },
-  "plugins/yellow-core/skills/multi-host-fleet/SKILL.md": {
-    "work": 2
-  },
   "plugins/yellow-core/skills/optimize/references/failure-modes.md": {
     "compound": 1
   },

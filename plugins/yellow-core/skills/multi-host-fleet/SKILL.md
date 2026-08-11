@@ -102,14 +102,14 @@ secrets-manager patterns below.
 **GitHub Actions:**
 
 ```yaml
-- name: Run /workflows:work
+- name: Run /flow:work
   env:
     PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
     EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
     SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
     COMPOSIO_MCP_URL: ${{ vars.COMPOSIO_MCP_URL }}
     COMPOSIO_API_KEY: ${{ secrets.COMPOSIO_API_KEY }}
-  run: claude -p "/workflows:work ..." 
+  run: claude -p "/flow:work ..."
 ```
 
 Add each canonical env var name to **Repository Settings → Secrets and
