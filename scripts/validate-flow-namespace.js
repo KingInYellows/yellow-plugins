@@ -122,12 +122,47 @@ const COMMANDS = [
   'work',
 ];
 
+/**
+ * Collective forms that name the namespace as a whole rather than one command:
+ * `workflows:*` (glob) and `workflows:<cmd>` (angle-bracket placeholder).
+ *
+ * These are NOT covered by the COMMANDS list, and they are exactly the shape a
+ * sweep misses — they appear in overview prose and namespace-split sections
+ * that a per-command find-and-replace never touches. PR2 found a live one at
+ * plugins/yellow-core/CLAUDE.md by hand, not by the gate; this closes that.
+ *
+ * The glob is `\*(?!\*)`, not a bare `\*`. Markdown bold puts `**` directly
+ * after a colon-terminated phrase — "**Template-driven workflows:**" — and a
+ * bare `\*` matches that as `workflows:` + `*`, which is ordinary English, not
+ * a namespace reference. Three such false positives appeared the moment this
+ * rule was added. A real glob is followed by a backtick, quote, or space,
+ * never by a second asterisk.
+ */
+const COLLECTIVE_FORMS = ['\\*(?!\\*)', '<[a-z-]+>'];
+
 // Shape 2 (unslashed) subsumes shapes 1 and 3 — see the module header.
-// `-` must come last inside the character class so it is a literal.
-// Capturing group (rather than `(?:...)`) so scanFile() can bucket
-// occurrences per command name — the allowlist fingerprint needs the
-// command, not just a total count.
-const STALE_RE = new RegExp('workflows:(' + COMMANDS.join('|') + ')(?![a-z-])', 'g');
+// The tail guard applies only to the command alternation: `*` and `<...>` are
+// self-delimiting, and applying `(?![a-z-])` to them would be a no-op anyway.
+//
+// Two capturing groups, so scanFile() can bucket occurrences per command name —
+// the allowlist fingerprint needs the command, not just a total count. Group 1
+// is the command; group 2 is a collective form, which names no single command
+// and is bucketed under COLLECTIVE_KEY instead.
+const STALE_RE = new RegExp(
+  'workflows:(?:(' +
+    COMMANDS.join('|') +
+    ')(?![a-z-])|(' +
+    COLLECTIVE_FORMS.join('|') +
+    '))',
+  'g'
+);
+
+/**
+ * Fingerprint bucket for collective forms (`workflows:*`, `workflows:<cmd>`).
+ * They match the namespace without naming one of the 10 commands, so they get
+ * their own bucket rather than a `undefined` key.
+ */
+const COLLECTIVE_KEY = '(collective)';
 
 /**
  * Permanent exclusions — never swept, by design.
@@ -334,7 +369,10 @@ function scanFile(relPath) {
     const matches = [...line.matchAll(STALE_RE)];
     if (matches.length > 0) {
       lines.push(i + 1);
-      for (const m of matches) counts[m[1]] = (counts[m[1]] || 0) + 1;
+      for (const m of matches) {
+        const key = m[1] || COLLECTIVE_KEY;
+        counts[key] = (counts[key] || 0) + 1;
+      }
     }
   });
   return { counts, lines };

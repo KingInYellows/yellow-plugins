@@ -1,6 +1,6 @@
 ---
 name: optimize
-description: "Run a metric-driven optimization pass: parallel candidate variants scored against an LLM-as-judge analytic rubric. Use when comparing approaches against a measurable goal — anywhere 'better' can be expressed as a per-criterion rubric. For session-level plan-adherence and scope-drift review, use /workflows:review instead."
+description: "Run a metric-driven optimization pass: parallel candidate variants scored against an LLM-as-judge analytic rubric. Use when comparing approaches against a measurable goal — anywhere 'better' can be expressed as a per-criterion rubric. For session-level plan-adherence and scope-drift review, use /flow:review instead."
 argument-hint: '[path to optimization spec YAML, or describe the optimization goal to scaffold one interactively]'
 user-invokable: true
 ---
@@ -54,8 +54,8 @@ Trigger this skill (`/yellow-core:optimize`) when:
 - The user explicitly asks to "optimize", "tune", "compare variants", or
   "judge which version is better" of a specific artifact
 
-Skip this skill and use `/workflows:plan` when the optimization target is
-not yet defined, or `/workflows:brainstorm` when there are no variants yet
+Skip this skill and use `/flow:plan` when the optimization target is
+not yet defined, or `/flow:brainstorm` when there are no variants yet
 and the question is "what direction to even try" (or use the `ideation`
 skill directly to generate grounded approaches to a soft problem).
 

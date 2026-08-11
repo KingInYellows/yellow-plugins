@@ -324,13 +324,33 @@ allowlisted at an exact count, so PR2 cannot quietly half-fix it.
 
 ### PR2 — `plugins/` prose sweep (197 refs, 43 files, 7 plugins)
 
-- [ ] 2.1: Sweep with an **anchored** pattern. Unanchored replace corrupts
+- [x] 2.1: Sweep with an **anchored** pattern. Unanchored replace corrupts
       `workflow` → `floww`; `\b` alone is insufficient
-      (`mcp-tool-rename-prefix-collision.md`)
-- [ ] 2.2: Verify with a prefix-bleed grep for corrupted hybrids afterward
-- [ ] 2.3: Remove swept paths from the gate allowlist in the same commit
-- [ ] 2.4: Changeset (`patch`) for **every** plugin touched — CI keys on
-      `plugins/` paths, not semantics
+      (`mcp-tool-rename-prefix-collision.md`). Used `perl`, not `sed`, so the
+      replacement carries the same `(?![a-z-])` tail guard the gate matches
+      with — `sed` has no lookahead. 177 refs across 42 files, 8 plugins.
+
+      **Found a gate blind spot by hand:** `plugins/yellow-core/CLAUDE.md`
+      documented the namespace as the glob `` `/workflows:*` ``, which matched
+      none of the gate's 10 enumerated command names. This is the
+      "sweep misses N+1" mode the gate exists to prevent, so the matcher was
+      widened to ban the collective forms `workflows:*` and `workflows:<cmd>`.
+      That rule then needed a `(?!\*)` guard: markdown bold puts `**` right
+      after a colon-terminated phrase (`**Template-driven workflows:**`), and
+      a bare `\*` matched three of those as false positives
+- [x] 2.2: Verify with a prefix-bleed grep for corrupted hybrids afterward.
+      Zero hits for `floww`/`flowflow`/`workflows-flow`/`flow:flow`. Every
+      `flow:` token in `plugins/` resolves to one of the 10 command names,
+      the one `flow:*` glob, or three legitimate prose uses ("shares the
+      `flow:` namespace")
+- [x] 2.3: Remove swept paths from the gate allowlist in the same commit —
+      regenerated via `--write-allowlist`, never hand-edited. 60 files /
+      280 refs → **18 files / 108 refs**, now entirely `docs/` (90) and
+      `RESEARCH/` (18)
+- [x] 2.4: Changeset (`patch`) for **every** plugin touched — CI keys on
+      `plugins/` paths, not semantics. **8 plugins, not the 7 this plan
+      predicted** — the list was re-derived from `git status` rather than
+      trusted, and `yellow-docs` had one uncounted reference
 
 ### PR3 — `docs/` (85 anchored / 92 unanchored) + `RESEARCH/` (10 / 14)
 
@@ -486,7 +506,7 @@ Both open questions were closed before PR1 began.
 ## Stack Progress
 <!-- Updated by flow:work. Do not edit manually. -->
 - [x] 1. agent/feat/flow-namespace-rename-and-gate (completed 2026-08-10)
-- [ ] 2. agent/docs/flow-namespace-sweep-plugins
+- [x] 2. agent/docs/flow-namespace-sweep-plugins (completed 2026-08-11)
 - [ ] 3. agent/docs/flow-namespace-sweep-docs-research
 - [ ] 4. agent/chore/flow-namespace-terminal-condition
 

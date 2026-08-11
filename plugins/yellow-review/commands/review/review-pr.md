@@ -403,7 +403,7 @@ and continue with the dispatch table above.
 > `plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md`
 > §"When the convention applies" — SKILL.md §Subagent Failure Convention
 > is the load stub) is
-> reserved for prose-emitting orchestrators like `/workflows:work`
+> reserved for prose-emitting orchestrators like `/flow:work`
 > Phase 3. Compact-return JSON already gives Step 6 a deterministic
 > failure signal — malformed/missing schema fields drop the entire
 > return as part of validation. Layering RUN_DIR on top would
@@ -556,7 +556,7 @@ findings are dropped as malformed.
 After all dispatched Tasks return, log any agent that returned a failure
 status or no result file with `agent name + failure reason` and surface
 those entries in the user-visible summary alongside successful findings —
-matching the "Failed agents (if any)" bullet in `/workflows:work` Phase 3
+matching the "Failed agents (if any)" bullet in `/flow:work` Phase 3
 so reviewers can see which concerns were NOT evaluated. Partial failures
 do not block Step 6; only the total-failure case (every dispatched Task
 failed) aborts with error before Step 6.

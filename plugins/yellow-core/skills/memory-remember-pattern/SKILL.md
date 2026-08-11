@@ -147,7 +147,7 @@ Note: If `memory-recall-pattern` already ran earlier in the same session,
 the MCP server is warm and the warmup step is not needed before this
 pattern. Only add a warmup call before this pattern if it runs in a
 workflow that does not use `memory-recall-pattern` (e.g.,
-`/workflows:compound`).
+`/flow:compound`).
 
 ## Anti-Patterns
 

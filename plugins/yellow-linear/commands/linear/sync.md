@@ -118,7 +118,7 @@ Review" when suggesting "In Review"), skip the transition silently.
 Apply via `save_issue` (pass the issue `id` and the new status `id` as
 `state`) only after the appropriate tier check passes.
 
-**Note:** When invoked programmatically from `/workflows:work` after PR
+**Note:** When invoked programmatically from `/flow:work` after PR
 submission (via Skill tool), the caller passes `--after-submit` to enable Tier 1
 auto-apply. This preserves existing manual behavior while enabling automation.
 

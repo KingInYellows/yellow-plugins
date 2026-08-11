@@ -41,7 +41,7 @@ rename via `git mv`, commits, and submits via `gt submit --no-interactive`.
 Review and merge land via the normal PR flow.
 
 Sibling commands: `/plan:status` (read-only dashboard),
-`/workflows:plan` (creates plans). See `plugins/yellow-core/CLAUDE.md`
+`/flow:plan` (creates plans). See `plugins/yellow-core/CLAUDE.md`
 for the namespace split.
 
 ## Input
@@ -157,7 +157,7 @@ A file-provenance tier runs first: it asks git+GitHub directly "which
 merged PR last touched this exact file?" instead of pattern-matching a
 slug against a PR's title/branch. This is exact, not fuzzy, and catches
 the routine case a slug-match can't: a plan expanded from a shell and
-implemented in the same PR (`/workflows:expand-shell` + `/workflows:work`
+implemented in the same PR (`/flow:expand-shell` + `/flow:work`
 bundled into one PR) has a branch name derived from the FEATURE, not the
 plan slug — e.g. plan slug `claude-code-codex-plugin-pilot-02-codex-tooling`
 merged via branch `agent/feat/codex-pilot-02-codex-tooling`, which shares

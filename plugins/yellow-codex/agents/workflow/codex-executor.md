@@ -1,6 +1,6 @@
 ---
 name: codex-executor
-description: "Debugging and rescue agent using OpenAI Codex CLI. Independently explores codebase and proposes fixes for stuck tasks. Spawned by workflows:work or manually via /codex:rescue."
+description: "Debugging and rescue agent using OpenAI Codex CLI. Independently explores codebase and proposes fixes for stuck tasks. Spawned by flow:work or manually via /codex:rescue."
 model: inherit
 tools:
   - Bash

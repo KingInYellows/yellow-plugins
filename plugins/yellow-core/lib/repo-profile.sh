@@ -3,7 +3,7 @@
 #
 # Cache I/O only: key derivation, freshness-checked get, atomic whole-object
 # put. Profile DERIVATION lives in consumers (first adopter:
-# /workflows:plan Phase 2). Protocol adapted from CE
+# /flow:plan Phase 2). Protocol adapted from CE
 # ce-plan/references/repo-profile-cache.md.
 #
 #   rp_get        → prints "HIT" + profile JSON | "MISS" + write path | "NO-CACHE"
