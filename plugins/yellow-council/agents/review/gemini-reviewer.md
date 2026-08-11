@@ -425,20 +425,39 @@ function is_base64_line(s, minlen) {
   # decoy END with NOTHING trailing it ("-----END PRIVATE KEY-----" alone
   # on its own line, injected mid-body) still passes the tail-anchor test
   # and would terminate redaction one line early, exposing the real
-  # remaining key body. If the very next line still looks like key body —
-  # after the SAME decoration stripping the body test uses, so a
-  # diff/blockquote/numbered-excerpt-decorated body line is recognized
-  # too, not just bare base64 — real key material is still flowing, and we
-  # re-enter the SAME mode (real/prose) the block was in when the decoy
-  # END fired.
-  if (pem_reclose) {
-    pem_reclose = 0
+  # remaining key body. Checking only the SINGLE next line is not enough:
+  # an attacker can put one or more non-key lines (a comment, a blank
+  # separator, a stray line of prose) between the decoy END and the
+  # resumed key body to slip past a one-line check. Instead, after any
+  # clean END fires, watch a BOUNDED window of the next 5 lines for
+  # key-shaped content — after the SAME decoration stripping the body
+  # test uses, so a diff/blockquote/numbered-excerpt-decorated body line
+  # is recognized too, not just bare base64. The FIRST key-shaped line
+  # inside the window re-arms redaction in the SAME mode (real/prose) the
+  # block was in when the END fired; non-key lines inside the window
+  # decrement the window rather than cancel it outright, so a short run
+  # of separators cannot be used to cancel the watch early. If the window
+  # expires with no key-shaped line seen, watching stops and lines print
+  # normally again — the window cannot be unbounded, or a genuine END
+  # followed by an ordinary prose paragraph (the common case) would risk
+  # the report being swallowed forever waiting for a line that never
+  # comes (see the "normal report survives" check alongside this test).
+  # A decoy padded with MORE separator lines than the window covers
+  # defeats re-arm; this is an accepted, documented residual gap — the
+  # same bounded-heuristic trade-off as the pem_stray/pem_span limits
+  # below — because closing it completely would require watching
+  # indefinitely, which reintroduces the "swallow the whole report"
+  # failure the window exists to prevent.
+  if (pem_watch > 0) {
     pem_check = strip_deco($0)
     if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/) {
       in_pem = 1
       pem_stray = 0
       pem_span = 0
       pem_real = pem_prev_real
+      pem_watch = 0
+    } else {
+      pem_watch--
     }
   }
   if (in_pem) line = "--- redacted PEM key block at line " NR " ---"
@@ -446,7 +465,7 @@ function is_base64_line(s, minlen) {
     if ($0 ~ /-----END [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) {
       pem_prev_real = pem_real
       in_pem = 0
-      pem_reclose = 1
+      pem_watch = 5
     } else if (pem_real) {
       # Real block: unbounded, fail closed. No floor, no releasing cap —
       # every line stays redacted until a genuine END or EOF, however
