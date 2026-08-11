@@ -462,9 +462,17 @@ REPORT_PATH_ABS="${CLAUDE_PROJECT_DIR:-$(pwd)}/${REPORT_PATH}"
 # four fenced-output files may already be on disk. Steps 8 and 9 own the normal
 # cleanup; an early exit reaches neither, so it must clean up for itself or the
 # run strands redacted reviewer output in /tmp. `council_cleanup_temps` below is
-# that snippet — reproduce it verbatim at every early-exit site after Step 4.
+# that snippet — paste it verbatim into any block with an early-exit path after
+# Step 4 (today: this block and Step 7).
+#
+# Steps 8 and 9 do NOT call it: their cleanup is the normal path, inlined and
+# separately maintained. That means the shape-check logic exists in three
+# places — here, Step 8, and Step 9 — so a change to one must be mirrored to
+# the other two.
 council_cleanup_temps() {
-  local sf r fp
+  # `_v`/`_c` are declared too: an undeclared assignment inside a function
+  # leaks into the caller's scope, and this snippet is pasted into other blocks.
+  local sf r _v _c fp
   sf="$(git rev-parse --show-toplevel 2>/dev/null)/.git/council-state.tsv"
   if [ -f "$sf" ]; then
     # Same per-reviewer shape check as Steps 7/8/9 — $STATE_FILE holds the raw
@@ -599,10 +607,14 @@ If user selects **Cancel**:
 
 ```bash
 # Self-contained: fresh subprocess, so re-load state inline
-GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
-STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
+# Do NOT `|| exit 1` here: this line sits INSIDE the cleanup section, so
+# exiting on it skips the very unlinks this section exists to guarantee. A
+# missing git root only costs us the state file's contents — the minted claude
+# path is still known by substitution and is still unlinked below.
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || GIT_ROOT=""
+STATE_FILE="${GIT_ROOT:+$GIT_ROOT/.git/council-state.tsv}"
 declare -A REVIEWER_FENCED_PATHS
-if [ -f "$STATE_FILE" ]; then
+if [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ]; then
   while IFS=$'\t' read -r r v c fp; do REVIEWER_FENCED_PATHS[$r]=$fp; done < "$STATE_FILE"
 fi
 printf '[council] Report not saved.\n'
@@ -648,7 +660,7 @@ case "$CLAUDE_FENCED" in
   /tmp/council-claude-fenced-*.txt) rm -f "$CLAUDE_FENCED" ;;
   *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
 esac
-rm -f "$STATE_FILE"
+[ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
 exit 0
 ```
 
@@ -684,10 +696,14 @@ fi
 
 # Cleanup fenced output files and state file (content is in the report file).
 # Self-contained: fresh subprocess, so re-load state inline.
-GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 1
-STATE_FILE="$GIT_ROOT/.git/council-state.tsv"
+# Do NOT `|| exit 1` here: this line sits INSIDE the cleanup section, so
+# exiting on it skips the very unlinks this section exists to guarantee. A
+# missing git root only costs us the state file's contents — the minted claude
+# path is still known by substitution and is still unlinked below.
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || GIT_ROOT=""
+STATE_FILE="${GIT_ROOT:+$GIT_ROOT/.git/council-state.tsv}"
 declare -A REVIEWER_FENCED_PATHS
-if [ -f "$STATE_FILE" ]; then
+if [ -n "$STATE_FILE" ] && [ -f "$STATE_FILE" ]; then
   while IFS=$'\t' read -r r v c fp; do REVIEWER_FENCED_PATHS[$r]=$fp; done < "$STATE_FILE"
 fi
 # Shape-check before unlinking, exactly as Step 7 does before reading. Step 7's
@@ -732,7 +748,7 @@ case "$CLAUDE_FENCED" in
   /tmp/council-claude-fenced-*.txt) rm -f "$CLAUDE_FENCED" ;;
   *) printf '[council] Warning: claude fenced-path placeholder was not substituted — a /tmp file may be orphaned\n' >&2 ;;
 esac
-rm -f "$STATE_FILE"
+[ -n "$STATE_FILE" ] && rm -f "$STATE_FILE"
 
 # Apply the verification result now that cleanup has run.
 [ "$WRITE_OK" -eq 1 ] || exit 1
