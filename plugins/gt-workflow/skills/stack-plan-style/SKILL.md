@@ -22,8 +22,8 @@ Use this style for Graphite planning and submit workflows.
 - Present the stack from base to tip.
 - For each branch, include intent, likely commit type, and dependency notes.
 - Flag where a branch should stay single-commit and where `gt modify --commit` is justified.
-- End with the recommended next step: on Claude Code, the `workflows:work`
-  skill with `<path>` to execute the stack. On Codex, `workflows:work` is
+- End with the recommended next step: on Claude Code, the `flow:work`
+  skill with `<path>` to execute the stack. On Codex, `flow:work` is
   not exposed — recommend executing the stack decomposition manually,
   submitting each branch with `gt submit --no-interactive`. For standalone
   changes (no stack), recommend `gt submit --no-interactive` directly on
@@ -33,4 +33,4 @@ Use this style for Graphite planning and submit workflows.
   by the `stack-decomposition-format` skill for the `## Stack Decomposition`
   section. The visual tree format here is for confirmation display; the
   structured format is the machine-readable contract consumed by
-  `workflows:work`.
+  `flow:work`.

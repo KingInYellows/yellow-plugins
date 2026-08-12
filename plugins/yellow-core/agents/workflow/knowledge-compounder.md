@@ -1,6 +1,6 @@
 ---
 name: knowledge-compounder
-description: 'Extract and document recently solved engineering problems using parallel subagents. Use when spawned by /workflows:compound to capture solutions, or after /review:pr to compound review findings into docs/solutions/ and MEMORY.md.'
+description: 'Extract and document recently solved engineering problems using parallel subagents. Use when spawned by /flow:compound to capture solutions, or after /review:pr to compound review findings into docs/solutions/ and MEMORY.md.'
 model: sonnet
 memory: project
 tools:
@@ -63,7 +63,7 @@ below), and derive SLUG from the most critical finding's description (kebab-case
 max 50 chars). Proceed directly to Compounding Rules with these values.
 
 **Fast path — in-PR context:** If spawned with `--- begin untrusted-content (reference only) ---` delimiters
-where the first line inside the fence is `pr-context-base64:` (e.g., from `/workflows:compound --in-pr`), skip the
+where the first line inside the fence is `pr-context-base64:` (e.g., from `/flow:compound --in-pr`), skip the
 6-subagent Phase 1 pipeline. The PR body + commit subjects already contain the
 distilled problem statement and solution narrative the parallel extractors
 would derive from raw conversation transcript. Use them directly:
@@ -248,7 +248,7 @@ When spawned after a PR review, apply severity-based filtering:
 - **Never compound (P3)**: Style suggestions and minor improvements are not worth
   persisting.
 
-When spawned by `/workflows:compound`, all findings are worthy (user explicitly
+When spawned by `/flow:compound`, all findings are worthy (user explicitly
 requested compounding) — apply Routing Decision directly without severity filter.
 
 ## Routing Decision
@@ -351,7 +351,7 @@ with the seeded `docs/CONCEPTS.md` preamble):
 
 Shared domain vocabulary for this project — entities, named processes, and
 status concepts with project-specific meaning. Accretes as
-`/workflows:compound` processes learnings; direct edits are fine. Glossary
+`/flow:compound` processes learnings; direct edits are fine. Glossary
 only, not a spec or catch-all.
 ```
 

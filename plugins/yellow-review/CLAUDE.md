@@ -57,7 +57,7 @@ resolution, and sequential stack review. Graphite-native workflow.
   between — fully unattended
 - `/review:sweep-all` — Run `/review:sweep` on every open non-draft PR you
   authored sequentially, with one upfront confirmation, skip-and-continue per
-  PR, end-of-loop summary, and a single `/workflows:compound` pass at the end
+  PR, end-of-loop summary, and a single `/flow:compound` pass at the end
 
 ### Agents (16)
 
@@ -153,12 +153,12 @@ resolution, and sequential stack review. Graphite-native workflow.
 - **`/review:sweep-all`** — Loop `/review:sweep` over every open non-draft
   PR you authored, sequentially. One upfront M3 confirmation shows the PR
   list; after Proceed, runs unattended end-to-end. Skip-and-continue on
-  per-PR failure, summary table, and an end-of-loop `/workflows:compound`
+  per-PR failure, summary table, and an end-of-loop `/flow:compound`
   pass to capture learnings. Best for clearing review + resolve backlog
   across multiple open PRs at once. Distinct from `/review:all scope=all`
   (which runs the deeper review pipeline per PR with per-PR push gates) —
   `sweep-all` is the lighter, fully-unattended batch alternative.
-- **`/workflows:review`** (yellow-core) — Session-level review against a plan
+- **`/flow:review`** (yellow-core) — Session-level review against a plan
   file. Evaluates plan adherence, cross-PR coherence, and scope drift.
   Complementary to `/review:pr` (per-PR code quality) — use both for full
   coverage.

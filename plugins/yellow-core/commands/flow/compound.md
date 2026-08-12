@@ -1,5 +1,5 @@
 ---
-name: workflows:compound
+name: flow:compound
 description: Document a recently solved problem to compound team knowledge into memory or solution docs
 argument-hint: '[--in-pr] [optional: brief context about the fix]'
 allowed-tools:
@@ -12,7 +12,7 @@ allowed-tools:
   - mcp__plugin_yellow-ruvector_ruvector__hooks_capabilities
 ---
 
-# /workflows:compound
+# /flow:compound
 
 Capture a recently solved engineering problem while context is fresh. Delegates
 to the `knowledge-compounder` agent for the full extraction pipeline.
@@ -20,9 +20,9 @@ to the `knowledge-compounder` agent for the full extraction pipeline.
 ## Usage
 
 ```
-/workflows:compound                          # Document the most recent fix
-/workflows:compound CRLF blocks git merge    # Provide a hint for context
-/workflows:compound --in-pr                  # Use the current branch's PR as
+/flow:compound                               # Document the most recent fix
+/flow:compound CRLF blocks git merge         # Provide a hint for context
+/flow:compound --in-pr                       # Use the current branch's PR as
                                              # the source instead of the
                                              # conversation; doc + MEMORY.md
                                              # line are drafted from the PR
@@ -211,7 +211,7 @@ After the knowledge-compounder agent completes:
 7. Call `mcp__plugin_yellow-ruvector_ruvector__hooks_remember` with the
    extracted content as `content` and `type=project`. This is Auto tier — no
    user prompt needed (user already opted in by running
-   `/workflows:compound`). If error (timeout, connection refused, service
+   `/flow:compound`). If error (timeout, connection refused, service
    unavailable): wait approximately 500 milliseconds, retry exactly once. If
    retry also fails: note "[ruvector] Warning: remember failed after retry —
    learning not persisted" and continue. Do NOT retry on validation or

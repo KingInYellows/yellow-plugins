@@ -1,5 +1,5 @@
 ---
-name: workflows:review
+name: flow:review
 description: 'Session-level review of plan adherence, cross-PR coherence, and scope drift with autonomous P1 fix loop'
 argument-hint: '[plan file path | PR number/URL/branch]'
 allowed-tools:

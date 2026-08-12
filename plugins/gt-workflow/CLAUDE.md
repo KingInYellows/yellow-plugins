@@ -109,9 +109,9 @@ layer):
   audit agents (configurable via `audit.agents` in `.graphite.yml`, default 3),
   generates conventional commit, submits via Graphite. Use when committing
   standalone changes outside a plan.
-- **`/workflows:work`** (yellow-core) — Plan-driven implementation. Delegates to
+- **`/flow:work`** (yellow-core) — Plan-driven implementation. Delegates to
   `/smart-submit` in its final phase. Use when executing a structured plan from
-  `/workflows:plan`.
+  `/flow:plan`.
 
 Both paths use `gt submit --no-interactive` for submission. Both read
 `.graphite.yml` for repo-level behavior overrides (draft mode, audit agent
@@ -291,14 +291,14 @@ to work.
 ## Stack Decomposition Format
 
 `gt-stack-plan` produces a `## Stack Decomposition` section in plan documents.
-`workflows:work` (yellow-core) consumes it for bottom-up stacked PR execution.
+`flow:work` (yellow-core) consumes it for bottom-up stacked PR execution.
 
 Format contract:
 - `## Stack Decomposition` heading with `<!-- stack-topology: linear|parallel|mixed -->`
   and `<!-- stack-trunk: main -->` HTML comment metadata
 - Numbered `### N. type/branch-name` subsections, each with required fields:
   **Type**, **Description**, **Scope**, **Tasks**, **Depends on**; optional: **Linear**
-- `workflows:work` writes a `## Stack Progress` section to track completion
+- `flow:work` writes a `## Stack Progress` section to track completion
 
 See `output-styles/stack-decomposition.md` for the full specification with
 examples for all topologies. The `stack-decomposition-format` skill is an
@@ -309,7 +309,7 @@ the other.
 ### Input Integrations
 
 - **Linear issues** — `/gt-stack-plan` reads a `## Linear Issues` section from
-  plan files (written by `/workflows:plan` when Linear context is detected).
+  plan files (written by `/flow:plan` when Linear context is detected).
   When present, defaults to 1:1 issue-to-branch mapping with
   `feat/<ISSUE-ID>-<slug>` naming and includes issue IDs as `Linear:` fields in
   the `## Stack Decomposition` output. This is input-only (reads plan metadata)
@@ -319,6 +319,6 @@ the other.
 
 - **ruvector** — Not directly integrated. gt-workflow commands are thin
   wrappers around Graphite CLI; memory operations happen in calling workflows
-  (e.g., `/workflows:work`). Graceful skip if yellow-ruvector not installed.
+  (e.g., `/flow:work`). Graceful skip if yellow-ruvector not installed.
 - **morph** — Not applicable. gt-workflow operates on git/Graphite CLI, not
   file editing.

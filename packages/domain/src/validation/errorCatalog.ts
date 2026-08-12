@@ -138,6 +138,28 @@ export const ERROR_CODES = {
   SETUP_CREDENTIAL_LIST_DRIFT: 'ERROR-SETUP-006',
   SETUP_EXAMPLE_DRIFT: 'ERROR-SETUP-007',
 
+  // Namespace Migration Errors (NAMESPACE) — scripts/validate-flow-namespace.js
+  // gates the whole repo against surviving references to the retired
+  // `workflows:` command namespace (renamed to `flow:`; see
+  // plans/workflows-to-flow-namespace-migration.md). The sweep runs across
+  // several PRs, so the gate carries a shrinking allowlist keyed on path PLUS
+  // expected occurrence count — a path-only allowlist is non-monotonic and
+  // would hide a partially-swept file.
+  //
+  // Prefix choice: NAMESPACE was picked for substring-safety against every
+  // existing prefix (lint-error-codes.js findPrefixCollisions, R14). The
+  // obvious short form `NS` is NOT safe — it is a substring of `INST`.
+  //
+  // Same ESM/CJS bridge constraint as SOL_*/PLAN_*/SETUP_*: the catalog is
+  // ESM, scripts/ is CJS, so the validator assembles the same strings via
+  // concatenation (`const NS = 'ERROR-' + 'NAMESPACE';`) and
+  // `scripts/lint-error-codes.js` (CODE_PATTERN /ERROR-[A-Z]+-\d+/g) does not
+  // detect split-string assembly. Any change to the entries below requires a
+  // paired edit in scripts/validate-flow-namespace.js.
+  NAMESPACE_STALE_REFERENCE: 'ERROR-NAMESPACE-001',
+  NAMESPACE_ALLOWLIST_COUNT_DRIFT: 'ERROR-NAMESPACE-002',
+  NAMESPACE_ALLOWLIST_PATH_MISSING: 'ERROR-NAMESPACE-003',
+
   // Codex Distribution Errors (DIST) — see ./error-codes.json for the
   // canonical values; re-exported here (not redeclared as literals) so
   // scripts/lint-error-codes.js's CATALOG must scan error-codes.json too
@@ -379,6 +401,11 @@ export function getErrorCodesByCategory(): Record<ErrorCategory, string[]> {
       ERROR_CODES.DIST_HOOK_CONTRACT_VIOLATION,
       ERROR_CODES.DIST_WINDOWS_PATH_PORTABILITY_FAILURE,
       ERROR_CODES.DIST_MCP_AUTH_CONFIG_FAILURE,
+    ],
+    [ErrorCategory.NAMESPACE_MIGRATION]: [
+      ERROR_CODES.NAMESPACE_STALE_REFERENCE,
+      ERROR_CODES.NAMESPACE_ALLOWLIST_COUNT_DRIFT,
+      ERROR_CODES.NAMESPACE_ALLOWLIST_PATH_MISSING,
     ],
   };
 }

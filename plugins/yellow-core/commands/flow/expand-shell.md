@@ -1,6 +1,6 @@
 ---
-name: workflows:expand-shell
-description: Expand one shell from plans/shells/ into a concrete checkbox plan in plans/, verifying Consumes against the live codebase, then deleting the shell only after approval. Run /workflows:work on the resulting plan next.
+name: flow:expand-shell
+description: Expand one shell from plans/shells/ into a concrete checkbox plan in plans/, verifying Consumes against the live codebase, then deleting the shell only after approval. Run /flow:work on the resulting plan next.
 argument-hint: '[shell path]'
 allowed-tools:
   - Bash
@@ -13,13 +13,13 @@ allowed-tools:
   - TaskOutput
 ---
 
-# /workflows:expand-shell
+# /flow:expand-shell
 
 Expand a single shell into a normal yellow plan at `plans/<shell-slug>.md` —
 checkbox tasks with concrete file paths and named symbols, grounded against the
-current codebase. The expanded plan is consumed unchanged by `/workflows:work`.
+current codebase. The expanded plan is consumed unchanged by `/flow:work`.
 The source shell is deleted only after you approve. Usually invoked by
-`/workflows:pick-next-shell`, but runs standalone to (re-)expand a chosen shell.
+`/flow:pick-next-shell`, but runs standalone to (re-)expand a chosen shell.
 
 ## Step 1: Load the Shell + Guard Inputs
 
@@ -35,7 +35,7 @@ Run these guards before any work:
   "Shell `<shell-slug>` was already expanded — plan at `plans/<shell-slug>.md`.
   Delete it and re-run to redo, or review `plans/<shell-slug>.md` to confirm it
   is complete (a concurrent expansion may still be mid-verification), then run
-  `/workflows:work plans/<shell-slug>.md`."
+  `/flow:work plans/<shell-slug>.md`."
 - If neither the shell nor the expanded plan exists, report the inconsistency
   and stop.
 
@@ -94,7 +94,7 @@ spec-level or design-level decisions.
 ## Step 6: Write the Expanded Plan
 
 Write `plans/<shell-slug>.md` using yellow's standard plan shape so
-`/workflows:work` consumes it unchanged:
+`/flow:work` consumes it unchanged:
 
 ```markdown
 # Feature: <Shell Title>
@@ -121,7 +121,7 @@ Write `plans/<shell-slug>.md` using yellow's standard plan shape so
 - `path/to/file.ts` — <why it matters>
 ```
 
-Tasks MUST be `- [ ]` checkbox items (that is what `/workflows:work` parses).
+Tasks MUST be `- [ ]` checkbox items (that is what `/flow:work` parses).
 The shell's Produces/Consumes/Covers are NOT carried verbatim into the plan —
 they are captured by the `## Origin` block and realized by the Implementation
 steps.
@@ -145,7 +145,7 @@ filename inline; the `||` branch keeps the failure visible even when the block
 runs as one unit):
 
 ```bash
-rm -f -- "plans/shells/<shell-file>" || printf 'WARNING: plans/shells/<shell-file> could not be deleted — remove it manually before running /workflows:pick-next-shell, or it will be re-picked.\n' >&2
+rm -f -- "plans/shells/<shell-file>" || printf 'WARNING: plans/shells/<shell-file> could not be deleted — remove it manually before running /flow:pick-next-shell, or it will be re-picked.\n' >&2
 ```
 
 (`rm -f` ignores a missing file but still fails on a permission error; the

@@ -32,7 +32,7 @@ cycles, and documents.
 - `/linear:setup` — Validate Linear MCP visibility, first-use OAuth readiness,
   and Graphite availability
 - `/linear:work` — Start working on a Linear issue: loads context, writes
-  brainstorm doc, routes to `/workflows:plan` or `/gt-stack-plan`
+  brainstorm doc, routes to `/flow:plan` or `/gt-stack-plan`
 - `/linear:create` — Create a Linear issue from current context
 - `/linear:sync` — Sync current branch with its Linear issue (load context, link
   PR, update status). Supports `--after-submit` for Tier 1 auto-apply.
@@ -84,8 +84,8 @@ For advanced workflows, agents can call Linear MCP tools directly (e.g.,
 
 ## Cross-Plugin Dependencies
 
-- **yellow-core** (optional) — `/linear:work` routes to `/workflows:plan` and
-  `/workflows:work` via Skill tool. Without it, `/linear:work` writes the
+- **yellow-core** (optional) — `/linear:work` routes to `/flow:plan` and
+  `/flow:work` via Skill tool. Without it, `/linear:work` writes the
   brainstorm doc but cannot invoke planning commands; suggests manual workflow.
 - **gt-workflow** (optional) — `/linear:work` routes to `/gt-stack-plan` via
   Skill tool. Without it, suggests manual branch creation with `gt create`.

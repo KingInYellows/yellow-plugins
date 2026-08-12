@@ -19,15 +19,15 @@ TypeScript, Python, Rust, and Go.
 
 | Command                 | Description                                                        |
 | ----------------------- | ------------------------------------------------------------------ |
-| `/workflows:brainstorm` | Explore requirements through dialogue and research before planning |
-| `/workflows:spec`       | Draft a requirements spec (stable `R1..Rn` IDs + design) to `plans/specs/<slug>.md` via guided dialogue; entry point for multi-subsystem projects |
-| `/workflows:decompose`  | Break a spec into dependency-ordered shell files in `plans/shells/` with a blocking R-id coverage gate; single-shell specs bail out to `/workflows:plan` |
-| `/workflows:pick-next-shell` | Pick the lowest-numbered shell whose `depends_on` are archived in `plans/complete/`, expand it, and halt for a fresh `/workflows:work` session; reports cycles and the terminal state |
-| `/workflows:expand-shell` | Expand one shell into a concrete `- [ ]` checkbox plan in `plans/`, verifying `Consumes` against the live codebase and deleting the shell only after approval |
-| `/workflows:plan`       | Transform feature descriptions into structured plans               |
-| `/workflows:work`       | Execute work plans systematically                                  |
-| `/workflows:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |
-| `/workflows:compound`   | Document a recently solved problem to compound knowledge. Pass `--in-pr` while on a feature branch with an open PR to draft the doc + MEMORY.md line from the PR body and commits (the default pattern in CONTRIBUTING.md "Solution Docs") |
+| `/flow:brainstorm` | Explore requirements through dialogue and research before planning |
+| `/flow:spec`       | Draft a requirements spec (stable `R1..Rn` IDs + design) to `plans/specs/<slug>.md` via guided dialogue; entry point for multi-subsystem projects |
+| `/flow:decompose`  | Break a spec into dependency-ordered shell files in `plans/shells/` with a blocking R-id coverage gate; single-shell specs bail out to `/flow:plan` |
+| `/flow:pick-next-shell` | Pick the lowest-numbered shell whose `depends_on` are archived in `plans/complete/`, expand it, and halt for a fresh `/flow:work` session; reports cycles and the terminal state |
+| `/flow:expand-shell` | Expand one shell into a concrete `- [ ]` checkbox plan in `plans/`, verifying `Consumes` against the live codebase and deleting the shell only after approval |
+| `/flow:plan`       | Transform feature descriptions into structured plans               |
+| `/flow:work`       | Execute work plans systematically                                  |
+| `/flow:review`     | Session-level review of plan adherence, cross-PR coherence, and scope drift |
+| `/flow:compound`   | Document a recently solved problem to compound knowledge. Pass `--in-pr` while on a feature branch with an open PR to draft the doc + MEMORY.md line from the PR body and commits (the default pattern in CONTRIBUTING.md "Solution Docs") |
 | `/compound:review-staged` | Manually drain the background-compounding staging ledger (M3-gated) |
 | `/plan:status`          | Read-only dashboard of `plans/` (open) and `plans/complete/` (archived) with per-file checkbox progress |
 | `/plan:complete`        | Archive a completed plan with two safety gates: Gate A scans for unchecked task boxes; Gate C verifies merged-PR evidence in three tiers — file-provenance (commit-to-PR lookup) first, then a strict slug match, then a loose token-coverage fallback |

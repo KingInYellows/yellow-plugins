@@ -1,6 +1,6 @@
 ---
-name: workflows:deepen-plan
-description: "Enrich an existing plan with codebase validation and external research, annotating inline. Use when a plan needs deeper validation before starting /workflows:work."
+name: flow:deepen-plan
+description: "Enrich an existing plan with codebase validation and external research, annotating inline. Use when a plan needs deeper validation before starting /flow:work."
 argument-hint: '[plan file path]'
 allowed-tools:
   - Bash
@@ -19,11 +19,11 @@ Enrich an existing plan file with codebase validation and external research.
 Reads the plan, auto-extracts research queries, runs codebase research first
 (to validate assumptions), then external research (to fill gaps), and annotates
 the plan inline with findings. Writes the enriched plan back in-place so
-`/workflows:work` picks it up seamlessly.
+`/flow:work` picks it up seamlessly.
 
-Pipeline: `/workflows:plan` → `/workflows:deepen-plan` → `/workflows:work`
+Pipeline: `/flow:plan` → `/flow:deepen-plan` → `/flow:work`
 
-Note: This command shares the `workflows:` namespace with yellow-core by
+Note: This command shares the `flow:` namespace with yellow-core by
 convention — it bridges yellow-core's planning pipeline with yellow-research's
 enrichment capabilities. The command requires yellow-research to be installed.
 
@@ -38,7 +38,7 @@ If `$ARGUMENTS` is empty or blank:
    enrich?" with each filename as an option.
 3. If user selects a plan, use that path for the rest of the workflow.
 4. If no plan files exist, stop: "No plan files found in plans/. Run
-   /workflows:plan first."
+   /flow:plan first."
 
 If `$ARGUMENTS` is provided:
 
@@ -120,7 +120,7 @@ to derive a meaningful query, skip it.
 
 If zero queries can be derived (all sections empty or trivial): stop with
 "Plan sections too sparse for research enrichment. Add more detail and try
-again, or run /workflows:plan to generate a more detailed plan."
+again, or run /flow:plan to generate a more detailed plan."
 
 ### Step 4: Codebase Research
 
@@ -264,7 +264,7 @@ Options: "Yes, write enriched plan" / "No, cancel"
 If Cancel: stop with "No changes made to [path]."
 
 If Yes: write the annotated plan content back to the same file path using the
-Write tool. The file is overwritten in-place — `/workflows:work` reads from
+Write tool. The file is overwritten in-place — `/flow:work` reads from
 the same path and will see the enriched version.
 
 ### Step 8: Next Steps
@@ -272,7 +272,7 @@ the same path and will see the enriched version.
 Show via AskUserQuestion: "Plan enriched at [path]. What would you like to do
 next?" with options:
 
-- "Start implementation (/workflows:work [path])"
+- "Start implementation (/flow:work [path])"
 - "Review the enriched plan"
 - "Done"
 
@@ -280,7 +280,7 @@ next?" with options:
 
 | Error | Message | Action |
 |---|---|---|
-| `$ARGUMENTS` empty, no plans exist | "No plan files found in plans/. Run /workflows:plan first." | Stop |
+| `$ARGUMENTS` empty, no plans exist | "No plan files found in plans/. Run /flow:plan first." | Stop |
 | Plan file not found at given path | "Plan file not found at [path]." | Stop, list available plans |
 | Path contains `..` or starts with `/` or `~` | "Invalid path. Plan file must be a relative path within the project." | Stop |
 | Zero research queries extracted | "Plan sections too sparse for research enrichment." | Stop |

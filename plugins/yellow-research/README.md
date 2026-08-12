@@ -5,7 +5,7 @@ EXA, Parallel Task, and ast-grep MCP servers with three workflows:
 
 - **`/research:code`** — Inline code research for active development
 - **`/research:deep`** — Multi-source deep research saved to `docs/research/`
-- **`/workflows:deepen-plan`** — Enrich plans with codebase + external research
+- **`/flow:deepen-plan`** — Enrich plans with codebase + external research
 
 ## Installation
 
@@ -149,7 +149,7 @@ Executive summary of findings.
 | `/research:setup` | Check which API keys and MCP sources are active |
 | `/research:code [topic]` | Inline code research — returns answer in-context, no file saved |
 | `/research:deep [topic]` | Multi-source deep research — saves report to `docs/research/<slug>.md` |
-| `/workflows:deepen-plan [path]` | Enrich a plan with codebase validation + external research |
+| `/flow:deepen-plan [path]` | Enrich a plan with codebase validation + external research |
 
 ## Graceful Degradation
 

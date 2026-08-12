@@ -17,7 +17,26 @@ on:
       - 'api/cli-contracts/*.json'
       - 'packages/**/*.ts'
       - 'packages/**/*.json'
+      - 'docs/**'
       - 'docs/solutions/**'
+      # Mirrors validate-schemas.yml's flow-namespace globs — the gate walks
+      # the WHOLE repo (hidden dirs included), so fork PRs need the same
+      # broad trigger coverage or a stale `workflows:` reference can bypass
+      # this workflow's authoring target too. The globs mirror the gate's
+      # SCANNED_EXTENSIONS list one-for-one; keep in sync with
+      # scripts/validate-flow-namespace.js.
+      - '**/*.md'
+      - '**/*.js'
+      - '**/*.cjs'
+      - '**/*.mjs'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.json'
+      - '**/*.yml'
+      - '**/*.yaml'
+      - '**/*.sh'
+      - '**/*.bats'
+      - '**/*.txt'
       - '.github/workflows/validate-schemas-fork.yml'
 
 concurrency:
@@ -144,11 +163,13 @@ jobs:
               # Authoring + meta validators (mirror of the main workflow's
               # `authoring` target). Fork PRs get the same enforcement so a
               # fork contributor sees identical blocking signals for authoring
-              # rules, setup:all coverage, ERROR-* codes, and snippet drift.
+              # rules, setup:all coverage, ERROR-* codes, snippet drift, and
+              # flow: namespace sweep completeness.
               node scripts/validate-agent-authoring.js
               node scripts/validate-setup-all.js
               node scripts/lint-error-codes.js
               node scripts/sync-shell-snippets.js --check
+              node scripts/validate-flow-namespace.js
               ;;
             codex)
               # Codex-artifact schema validation + the R15 exposure lint

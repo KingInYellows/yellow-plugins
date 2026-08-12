@@ -63,7 +63,7 @@ Decompose a feature into stacked PRs, ordered by dependency (plan-only).
 - Explores codebase to understand scope
 - Proposes ordered stack with branch names, commit types, and sizes
 - Writes a structured `## Stack Decomposition` section to the plan file
-- Does **not** create branches — use `/workflows:work` to execute bottom-up
+- Does **not** create branches — use `/flow:work` to execute bottom-up
 
 ```
 /gt-stack-plan add user authentication with OAuth

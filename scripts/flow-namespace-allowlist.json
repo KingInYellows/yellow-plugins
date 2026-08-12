@@ -1,0 +1,150 @@
+{
+  "docs/CONCEPTS.md": {
+    "compound": 1,
+    "decompose": 2,
+    "pick-next-shell": 2,
+    "plan": 1,
+    "spec": 1
+  },
+  "docs/guides/advanced-workflows.md": {
+    "work": 5,
+    "plan": 4,
+    "brainstorm": 3
+  },
+  "docs/guides/common-workflows.md": {
+    "brainstorm": 3,
+    "plan": 4,
+    "work": 4,
+    "review": 1,
+    "compound": 2
+  },
+  "docs/operations/versioning.md": {
+    "brainstorm": 1
+  },
+  "docs/optimization/analysis.md": {
+    "review": 2,
+    "brainstorm": 5,
+    "plan": 4,
+    "work": 4,
+    "spec": 1,
+    "decompose": 1,
+    "pick-next-shell": 1,
+    "expand-shell": 1,
+    "compound": 1
+  },
+  "docs/plugin-scope-mode-protocol.md": {
+    "work": 2,
+    "review": 5,
+    "compound": 3
+  },
+  "docs/research/2026-05-21-solution-doc-jaccard-calibration.md": {
+    "compound": 1
+  },
+  "docs/research/model-selection-token-context-optimization.md": {
+    "plan": 1
+  },
+  "docs/research/repo/background-compounding-triggers-repo-audit.md": {
+    "plan": 1,
+    "compound": 4
+  },
+  "docs/research/ruvector-latest-featureset-and-plugin-ideation.md": {
+    "work": 2
+  },
+  "docs/research/yellow-codex-expansion.md": {
+    "work": 2
+  },
+  "docs/research/yellow-council-v2-revalidation-2026-08-01.md": {
+    "deepen-plan": 2,
+    "brainstorm": 1,
+    "spec": 1,
+    "decompose": 1
+  },
+  "docs/review-surface-routing-protocol.md": {
+    "work": 2,
+    "review": 1
+  },
+  "plugins/yellow-codex/agents/workflow/codex-executor.md": {
+    "work": 1
+  },
+  "plugins/yellow-codex/CLAUDE.md": {
+    "work": 3
+  },
+  "plugins/yellow-core/commands/plan/complete.md": {
+    "plan": 1,
+    "expand-shell": 1,
+    "work": 1
+  },
+  "plugins/yellow-core/commands/plan/status.md": {
+    "plan": 1
+  },
+  "plugins/yellow-core/lib/repo-profile.sh": {
+    "plan": 1
+  },
+  "plugins/yellow-core/skills/brainstorming/SKILL.md": {
+    "brainstorm": 2,
+    "plan": 1
+  },
+  "plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md": {
+    "work": 2
+  },
+  "plugins/yellow-core/skills/create-agent-skills/SKILL.md": {
+    "review": 1
+  },
+  "plugins/yellow-core/skills/git-worktree/SKILL.md": {
+    "review": 5,
+    "work": 4
+  },
+  "plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md": {
+    "compound": 1
+  },
+  "plugins/yellow-core/skills/memory-remember-pattern/SKILL.md": {
+    "compound": 1
+  },
+  "plugins/yellow-core/skills/optimize/references/failure-modes.md": {
+    "compound": 1
+  },
+  "plugins/yellow-core/skills/optimize/SKILL.md": {
+    "review": 1,
+    "plan": 1,
+    "brainstorm": 1
+  },
+  "plugins/yellow-core/skills/session-handoff/SKILL.md": {
+    "pick-next-shell": 2,
+    "work": 1
+  },
+  "plugins/yellow-linear/commands/linear/sync.md": {
+    "work": 1
+  },
+  "plugins/yellow-review/commands/review/resolve-pr.md": {
+    "compound": 1
+  },
+  "plugins/yellow-review/commands/review/review-pr.md": {
+    "work": 2
+  },
+  "plugins/yellow-ruvector/CLAUDE.md": {
+    "brainstorm": 2,
+    "plan": 2,
+    "work": 3
+  },
+  "RESEARCH/01-plugin-inventory.md": {
+    "deepen-plan": 1,
+    "plan": 1,
+    "work": 1,
+    "review": 1,
+    "compound": 1,
+    "brainstorm": 1
+  },
+  "RESEARCH/every-plugin-research.md": {
+    "plan": 1,
+    "review": 1,
+    "brainstorm": 1
+  },
+  "RESEARCH/MERGE_PLAN.md": {
+    "plan": 1,
+    "brainstorm": 1,
+    "work": 2
+  },
+  "RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/MANIFEST.md": {
+    "work": 1
+  }
+}
