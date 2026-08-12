@@ -1,0 +1,19 @@
+plugins/yellow-council/skills/council-patterns/SKILL.md
+  s_69313f122f35b8::t_e4e35197e534be 527-536,538-541,543,550
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6de0a7c8d92940a770266bca9864b7eeb40f4e7e",
+  "prompts": {},
+  "sessions": {
+    "s_69313f122f35b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54183b18-9897-49c2-831c-39d0efa416d0",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
