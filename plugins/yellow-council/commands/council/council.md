@@ -544,20 +544,42 @@ parse_reviewer_return() {
     # the pass is idempotent (redacted placeholder lines contain no
     # credential-shaped text), and Step 7 must keep its own pass because the
     # CLI legs reach it without ever passing through this branch.
-    if [ -n "$fenced_path" ] && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
-      local redacted_tmp
+    # `fenced_path` is REVIEWER-CONTROLLED — it is parsed out of the agent's
+    # own return. Writing to or truncating it on that authority alone lets a
+    # prompt-injected return name any path and have this branch overwrite it.
+    # Accept it only when it is byte-identical to the path the orchestrator
+    # minted, exactly as Step 7's identity check does; anything else is
+    # refused here and left for Step 7 to reject too. `! -L` per the skill's
+    # validate_path symlink rule — the identity check constrains the path
+    # text, not what it resolves to.
+    local claude_fenced redacted_tmp
+    claude_fenced="<literal CLAUDE_FENCED_FILE value from Step 4>"
+    if [ -n "$fenced_path" ] && [ "$fenced_path" = "$claude_fenced" ] \
+       && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
+      # Fail CLOSED at every branch: once claude has written its RAW output to
+      # this path, any outcome other than "the redacted copy is installed"
+      # must leave nothing readable behind. Skipping on error would hand Step
+      # 5 the unredacted file, which is the failure this whole pass exists to
+      # prevent.
       redacted_tmp=$(mktemp "${fenced_path}.redacted.XXXXXX") || redacted_tmp=""
-      if [ -n "$redacted_tmp" ]; then
-        if awk "$redact_awk" "$fenced_path" > "$redacted_tmp"; then
-          mv "$redacted_tmp" "$fenced_path"
-        else
-          # Fail CLOSED: an unredacted fenced file must never reach Step 5.
-          rm -f "$redacted_tmp"
-          printf '[council] Error: redaction of %s failed — truncating\n' \
-            "$fenced_path" >&2
-          : > "$fenced_path"
-        fi
+      if [ -z "$redacted_tmp" ]; then
+        printf '[council] Error: cannot stage redaction of %s — truncating\n' \
+          "$fenced_path" >&2
+        : > "$fenced_path"
+      elif ! awk "$redact_awk" "$fenced_path" > "$redacted_tmp"; then
+        rm -f "$redacted_tmp"
+        printf '[council] Error: redaction of %s failed — truncating\n' \
+          "$fenced_path" >&2
+        : > "$fenced_path"
+      elif ! mv "$redacted_tmp" "$fenced_path"; then
+        rm -f "$redacted_tmp"
+        printf '[council] Error: cannot install redacted %s — truncating\n' \
+          "$fenced_path" >&2
+        : > "$fenced_path"
       fi
+    elif [ -n "$fenced_path" ] && [ "$fenced_path" != "$claude_fenced" ]; then
+      printf '[council] Warning: claude returned an unexpected fenced path (%s) — not redacting it\n' \
+        "$fenced_path" >&2
     fi
   fi
   # Constrain verdict/confidence to their enums HERE, at the single point of
