@@ -474,6 +474,18 @@ const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 // expansion, lazy continuation inside paragraphs, etc.) — it is accurate for
 // the straightforward single- and nested-bullet Markdown this repo's docs
 // actually use, not adversarial or exotic list constructs.
+//
+// KNOWN LIMIT, measured rather than assumed: a block quote opening directly
+// on a list-marker line (`- > ```text`) is not recognized as a container, so
+// a fenced example inside it is scanned as live prose and reported. That is
+// the FALSE-POSITIVE direction — a human sees the error immediately and the
+// example is inert — which is the side this helper deliberately errs toward.
+// The reverse was checked too: quoted lists followed by indented-code
+// look-alikes, four-space-indented list markers, and nested-list fences all
+// still report a live dispatch correctly, so no broken dispatch is hidden by
+// this gap. Fixing it means splitting a block-quote prefix out of list
+// content and threading a second depth through the fence state, which has
+// more regression surface than the false positive costs.
 const fenceOpenerRe = /^[ \t]{0,3}(`{3,}|~{3,})/;
 // `{0,3}`, not `*`: a block-quote marker may carry at most three leading
 // spaces. At four the line is an indented code block and the `>` is literal
