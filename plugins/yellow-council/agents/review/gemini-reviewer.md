@@ -329,26 +329,32 @@ fi
 # --- Apply credential redaction ---
 REDACTED_FILE=$(mktemp /tmp/council-gemini-redacted-XXXXXX.txt)
 awk '
-function strip_deco(s,   pfx) {
-  sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
-  sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
-  sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
-  # Diff "-"/"+" prefix (no space) — but never strip a leading dash off a
-  # real PEM delimiter run ("-----BEGIN"/"-----END"): that would corrupt
-  # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
-  # test below, since this helper also classifies the BEGIN line itself
-  # now, not just body lines.
-  # Combined diffs (git diff --cc, merge output) carry ONE prefix character
-  # PER PARENT, so "++"/"--" is normal and a single strip leaves the marker
-  # unrecognisable. Strip repeatedly, but never off a line that is ALREADY a
-  # valid delimiter: that would corrupt "-----BEGIN" into "----BEGIN" and
-  # break every anchored test below. Bounded to 8 so a line of pure dashes
-  # cannot spin.
-  pfx = 0
-  while (pfx++ < 8 && s ~ /^[-+]/ && s !~ /^-----BEGIN/ && s !~ /^-----END/) {
-    sub(/^[-+]/, "", s)
-  }
-  sub(/^[[:space:]]+/, "", s)
+function strip_deco(s,   prev, guard) {
+  # Strip to a FIXPOINT rather than in one fixed pass. Decoration nests in
+  # arbitrary order and depth: a blockquote inside a list item
+  # ("- > <header>"), a combined diff with one prefix character per parent
+  # ("++"/"--"), a numbered excerpt wrapping either. A single ordered pass
+  # removes whichever layer it happens to reach first and leaves the rest, so
+  # the marker never normalises, the anchored classifier fails, and the block
+  # drops to the bounded path where a narrowly wrapped body leaks.
+  #
+  # Repeating until nothing changes removes every layer regardless of order
+  # or count, so there is no ceiling to exceed. It terminates because each
+  # iteration either shortens s or exits; `guard` is a belt-and-braces bound
+  # against a future substitution that could rewrite without shrinking, not a
+  # limit on legitimate nesting depth.
+  guard = 0
+  do {
+    prev = s
+    sub(/^[[:space:]]*([>|][[:space:]]*)*/, "", s)
+    sub(/^([-*+]|[0-9]+[.)])[[:space:]]+/, "", s)
+    sub(/^[0-9]+[[:space:]]*\|[[:space:]]*/, "", s)
+    # Never strip a leading dash off a line that is ALREADY a valid PEM
+    # delimiter: that corrupts "-----BEGIN" into "----BEGIN" and breaks every
+    # anchored test downstream.
+    if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
+    sub(/^[[:space:]]+/, "", s)
+  } while (s != prev && ++guard < 64)
   sub(/[[:space:]]+$/, "", s)
   return s
 }

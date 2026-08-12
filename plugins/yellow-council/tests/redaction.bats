@@ -216,6 +216,29 @@ assert_survives_under_all() {
   assert_redacted_under_all "$input" "$NARROW_BODY"
 }
 
+@test "a key nested in a blockquote inside a list item is fully redacted" {
+  # Decoration NESTS. `- > <header>` needs the list strip and the blockquote
+  # strip in the other order than a single ordered pass applies them, so one
+  # layer survived, the marker never normalised, and the block dropped to the
+  # bounded path. The stripper now runs to a fixpoint, so order stops
+  # mattering.
+  local input
+  input="$(printf -- '- > %s\n- > %s\n- > %s\n- > %s\n- > %s' \
+    "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$NARROW_BODY"
+}
+
+@test "a key behind more diff prefixes than any fixed ceiling is fully redacted" {
+  # An earlier fix bounded prefix stripping to eight, which is a ceiling an
+  # octopus merge — or simply hostile output — can step over, leaving one
+  # prefix and downgrading the block to the bounded path. Fixpoint stripping
+  # has no ceiling to exceed.
+  local input
+  input="$(printf -- '+++++++++++%s\n+++++++++++%s\n+++++++++++%s\n+++++++++++%s\n+++++++++++%s' \
+    "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$NARROW_BODY"
+}
+
 @test "a line of pure dashes does not hang the prefix stripper" {
   # The repeated strip is bounded; a horizontal rule must terminate.
   local input
