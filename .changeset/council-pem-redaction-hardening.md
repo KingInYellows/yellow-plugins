@@ -35,3 +35,17 @@ Adds `plugins/yellow-council/tests/redaction.bats`, which extracts the live
 awk program from each file that ships it (rather than testing a copy that
 drifts), asserts all copies are byte-identical, and pins both failure
 directions — leaks and over-redaction — under every awk on the host.
+
+Round two, from continued review of the above:
+
+- Decoration stripping consumed a `+` run one character per pass while copying
+  the remainder, so an attacker-supplied run was quadratic in its length — a
+  100k-character run took roughly ten seconds and could outlast the timeout
+  meant to bound the redaction step. `+` runs are now taken whole, and a line
+  longer than any real marker fails closed rather than being normalized at all.
+- A key serialized as JSON strings (OpenCode runs with `--format json`) or as
+  markdown table cells wraps the marker rather than preceding it, so leading
+  decoration stripping left the wrapper, the anchored classifier failed, and a
+  narrow body leaked on the bounded path. Matched wrappers are now normalized
+  on both the BEGIN and the END line — the END too, or the block never closes
+  and redaction swallows `Verdict:` through EOF.

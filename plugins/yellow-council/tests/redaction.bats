@@ -262,6 +262,58 @@ assert_survives_under_all() {
   assert_redacted_under_all "$input" "$NARROW_BODY"
 }
 
+@test "a key serialized as JSON strings is fully redacted" {
+  # OpenCode runs with --format json, so a reviewer can legitimately render a
+  # key as quoted strings. Quotes WRAP the marker rather than precede it, so
+  # leading-decoration stripping alone leaves them, the anchored classifier
+  # fails, and a narrow body leaks on the bounded path.
+  local input
+  input="$(printf '"%s",\n"%s",\n"%s",\n"%s",\n"%s",\n"%s"' \
+    "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$NARROW_BODY"
+}
+
+@test "a serialized key still releases the report at its END marker" {
+  # The companion direction: normalizing the BEGIN line without also
+  # normalizing the END line means the wrapped END never matches the tail
+  # anchor, the block never closes, and redaction swallows Verdict: through
+  # EOF — trading a leak for a verdict-suppression vector.
+  local input
+  input="$(printf '"%s",\n"%s",\n"%s"\nVerdict: APPROVE' \
+    "$BEGIN_PK" "$NARROW_BODY" "$END_PK")"
+  assert_survives_under_all "$input" "Verdict: APPROVE"
+}
+
+@test "a key rendered as markdown table cells is fully redacted" {
+  local input
+  input="$(printf '| %s |\n| %s |\n| %s |\n| %s |\n| %s |\n| %s |' \
+    "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" "$END_PK")"
+  assert_redacted_under_all "$input" "$NARROW_BODY"
+}
+
+@test "an absurdly long decoration run fails closed instead of stalling" {
+  # A dash run must be consumed one character per pass, and each pass copies
+  # the remainder, so an attacker-supplied run is quadratic in its length. The
+  # program refuses lines past a length no real marker reaches and treats them
+  # as real keys. Assert BOTH halves: the secret is redacted, and the run
+  # completes fast enough that the guard is real rather than merely eventual.
+  local prefix input start elapsed
+  # 100k is the size the quadratic cost was measured at (~10s under the host
+  # awk). A smaller run completes fast enough to pass even unbounded, which
+  # would make this test decorative.
+  prefix="$(printf -- '-%.0s' $(seq 1 100000))"
+  input="$(printf -- '%s%s\n%s\n%s\n%s\n%s\n%s' \
+    "$prefix" "$BEGIN_PK" "$NARROW_BODY" "$NARROW_BODY" "$NARROW_BODY" \
+    "$NARROW_BODY" "$END_PK")"
+  start=$SECONDS
+  assert_redacted_under_all "$input" "$NARROW_BODY"
+  elapsed=$((SECONDS - start))
+  [ "$elapsed" -lt 10 ] || {
+    echo "decoration stripping took ${elapsed}s — the length cap is not bounding it" >&2
+    return 1
+  }
+}
+
 @test "a line of pure dashes does not hang the prefix stripper" {
   # The repeated strip is bounded; a horizontal rule must terminate.
   local input
