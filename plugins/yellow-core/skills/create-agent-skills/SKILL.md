@@ -36,7 +36,7 @@ sections below as authoring reference.
 - Complex workflows requiring multiple files
 - Reference documentation, scripts, templates
 - Supporting files in same directory
-- Examples: `/workflows:review`, `/git-worktree`
+- Examples: `/flow:review`, `/git-worktree`
 
 **Both use identical YAML frontmatter format.**
 

@@ -176,31 +176,31 @@ worktree-manager.sh clean
 
 ## When to Use
 
-### Code Review (/workflows:review)
+### Code Review (/flow:review)
 
 When reviewing a PR and you're not on the target branch:
 
 ```bash
 # Workflow offers worktree option
-/workflows:review
+/flow:review
 
 # Choose worktree option
 # Skill automatically creates worktree for PR branch
 # You can review without affecting your current work
 ```
 
-### Parallel Feature Development (/workflows:work)
+### Parallel Feature Development (/flow:work)
 
 When working on multiple features:
 
 ```bash
 # Start feature 1
-/workflows:work
+/flow:work
 # Creates worktree for feature-1
 
 # In another terminal, start feature 2
 cd .worktrees/feature-2
-/workflows:work
+/flow:work
 # Both features developed independently
 ```
 
@@ -232,7 +232,7 @@ $ git branch --show-current
 feature-auth
 
 # PR needs review on different branch
-$ /workflows:review pr-123
+$ /flow:review pr-123
 
 # Workflow detects branch mismatch, offers worktree option
 # Select "Create worktree for isolated review"
@@ -274,16 +274,16 @@ $ cd /home/user/myproject
 
 ## Integration with Workflows
 
-### /workflows:review Integration
+### /flow:review Integration
 
-When `/workflows:review` detects you're not on the target branch:
+When `/flow:review` detects you're not on the target branch:
 
 1. Offers worktree option
 2. Calls this skill: `/git-worktree create pr-review-<number>`
 3. Switches to worktree
 4. Proceeds with review in isolation
 
-### /workflows:work Integration
+### /flow:work Integration
 
 When starting feature work:
 

@@ -20,4 +20,4 @@ verbatim from SKILL.md (C6 progressive-disclosure split).
   rubric definition before reranking is the typical recovery.
 - **knowledge-compounder spawn fails.** Surface the winner and full
   judge_telemetry to the user in markdown so they can compound it
-  manually via `/workflows:compound`.
+  manually via `/flow:compound`.

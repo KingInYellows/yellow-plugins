@@ -16,7 +16,7 @@ Use this convention for orchestrators spawning **prose-emitting**
 agents. Prose stdout cannot be deterministically parsed for
 partial-failure signals; a file-based result is the structural signal.
 The concrete marker differs by adopter shape: JSON-result adopters
-(e.g. `/workflows:work` reviewers, below) signal via a `status` field
+(e.g. `/flow:work` reviewers, below) signal via a `status` field
 inside the result file, while file-based-artifact adopters (e.g.
 `/research:deep`, below) signal via a fixed-prefix confirmation line
 (`SYNTHESIS_WRITTEN:`) plus the artifact's existence on disk. The
@@ -25,7 +25,7 @@ the JSON-shaped ones.
 
 Current adopters:
 
-- `/workflows:work` Phase 3 reviewers (canonical) — structured JSON
+- `/flow:work` Phase 3 reviewers (canonical) — structured JSON
   result files per reviewer agent
 - `/research:deep` ⇄ `research-conductor` (yellow-research) — a single
   prose-emitting subagent returning a long research synthesis; the

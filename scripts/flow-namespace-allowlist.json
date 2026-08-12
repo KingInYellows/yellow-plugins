@@ -16,7 +16,8 @@
     "plan": 4,
     "work": 4,
     "review": 1,
-    "compound": 2
+    "compound": 2,
+    "(glob)": 1
   },
   "docs/operations/versioning.md": {
     "brainstorm": 1
@@ -63,69 +64,6 @@
     "work": 2,
     "review": 1
   },
-  "plugins/yellow-codex/agents/workflow/codex-executor.md": {
-    "work": 1
-  },
-  "plugins/yellow-codex/CLAUDE.md": {
-    "work": 3
-  },
-  "plugins/yellow-core/commands/plan/complete.md": {
-    "plan": 1,
-    "expand-shell": 1,
-    "work": 1
-  },
-  "plugins/yellow-core/commands/plan/status.md": {
-    "plan": 1
-  },
-  "plugins/yellow-core/lib/repo-profile.sh": {
-    "plan": 1
-  },
-  "plugins/yellow-core/skills/brainstorming/SKILL.md": {
-    "brainstorm": 2,
-    "plan": 1
-  },
-  "plugins/yellow-core/skills/create-agent-skills/references/subagent-failure-convention.md": {
-    "work": 2
-  },
-  "plugins/yellow-core/skills/create-agent-skills/SKILL.md": {
-    "review": 1
-  },
-  "plugins/yellow-core/skills/git-worktree/SKILL.md": {
-    "review": 5,
-    "work": 4
-  },
-  "plugins/yellow-core/skills/mcp-integration-patterns/SKILL.md": {
-    "compound": 1
-  },
-  "plugins/yellow-core/skills/memory-remember-pattern/SKILL.md": {
-    "compound": 1
-  },
-  "plugins/yellow-core/skills/optimize/references/failure-modes.md": {
-    "compound": 1
-  },
-  "plugins/yellow-core/skills/optimize/SKILL.md": {
-    "review": 1,
-    "plan": 1,
-    "brainstorm": 1
-  },
-  "plugins/yellow-core/skills/session-handoff/SKILL.md": {
-    "pick-next-shell": 2,
-    "work": 1
-  },
-  "plugins/yellow-linear/commands/linear/sync.md": {
-    "work": 1
-  },
-  "plugins/yellow-review/commands/review/resolve-pr.md": {
-    "compound": 1
-  },
-  "plugins/yellow-review/commands/review/review-pr.md": {
-    "work": 2
-  },
-  "plugins/yellow-ruvector/CLAUDE.md": {
-    "brainstorm": 2,
-    "plan": 2,
-    "work": 3
-  },
   "RESEARCH/01-plugin-inventory.md": {
     "deepen-plan": 1,
     "plan": 1,
@@ -135,11 +73,13 @@
     "brainstorm": 1
   },
   "RESEARCH/every-plugin-research.md": {
+    "(glob)": 4,
     "plan": 1,
     "review": 1,
     "brainstorm": 1
   },
   "RESEARCH/MERGE_PLAN.md": {
+    "(glob)": 7,
     "plan": 1,
     "brainstorm": 1,
     "work": 2

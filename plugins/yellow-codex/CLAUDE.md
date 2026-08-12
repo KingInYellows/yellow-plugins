@@ -8,7 +8,7 @@ codebase research.
 ## Core Principle
 
 Codex is an **enhancement, never a dependency**. All existing workflows
-(`review:pr`, `workflows:work`, `research:code`) function identically without
+(`review:pr`, `flow:work`, `research:code`) function identically without
 `yellow-codex` installed. When present, Codex provides a second opinion on
 reviews, a rescue path for stuck tasks, and an alternative research lens.
 
@@ -78,7 +78,7 @@ reviews, a rescue path for stuck tasks, and an alternative research lens.
   (`verdict=`/`confidence=`/`summary=`/`fenced_output_path=`/
   `findings_block_begin`...`findings_block_end`) shared with yellow-council's
   Gemini and OpenCode reviewers
-- `codex-executor` — Rescue/debug agent spawned by `workflows:work` on task failure
+- `codex-executor` — Rescue/debug agent spawned by `flow:work` on task failure
 - `codex-analyst` — Codebase research and analysis agent
 
 ### Skills (1)
@@ -107,7 +107,7 @@ Override via `CODEX_MODEL` env var or `~/.codex/config.toml`.
 |---|---|---|
 | yellow-review | Spawns `codex-reviewer` during PR review | Optional |
 | yellow-council | Spawns `codex-reviewer` as a cross-lineage council reviewer | Optional |
-| yellow-core | Spawns `codex-executor` on task failure in `workflows:work` | Optional |
+| yellow-core | Spawns `codex-executor` on task failure in `flow:work` | Optional |
 
 ## When to Use What
 

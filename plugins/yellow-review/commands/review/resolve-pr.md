@@ -128,7 +128,7 @@ classification):
    and checkout guidance, then stop.
 3. **`BV_EC` ≠ 0 and `BV_ERR` contains** `no pull requests found`,
    `no open pull requests`, or `no pull requests associated` (case-insensitive
-   substring — the same strings `/workflows:compound` uses to classify this
+   substring — the same strings `/flow:compound` uses to classify this
    state) — the current branch has no associated PR. Report checkout guidance
    and stop.
 4. **`BV_EC` ≠ 0 with any other stderr** — the check could not run (auth, rate

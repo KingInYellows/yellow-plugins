@@ -122,12 +122,135 @@ const COMMANDS = [
   'work',
 ];
 
+/**
+ * Collective forms that name the namespace as a whole rather than one command:
+ * `workflows:*` (glob) and `workflows:<cmd>` (angle-bracket placeholder).
+ *
+ * These are NOT covered by the COMMANDS list, and they are exactly the shape a
+ * sweep misses — they appear in overview prose and namespace-split sections
+ * that a per-command find-and-replace never touches. PR2 found a live one at
+ * plugins/yellow-core/CLAUDE.md by hand, not by the gate; this closes that.
+ *
+ * The glob is `\*(?!\*)`, not a bare `\*`. Markdown bold puts `**` directly
+ * after a colon-terminated phrase — "**Template-driven workflows:**" — and a
+ * bare `\*` matches that as `workflows:` + `*`, which is ordinary English, not
+ * a namespace reference. Three such false positives appeared the moment this
+ * rule was added. A real glob is followed by a backtick, quote, or space,
+ * never by a second asterisk.
+ *
+ * The glob is TWO alternatives, not one with an optional escape, because the
+ * bold guard must apply to exactly one of them:
+ *
+ *   `\\\*`      the markdown-ESCAPED spelling `workflows:\*`. Prose that has
+ *               to render a literal asterisk escapes it, so the same
+ *               reference is spelled both ways in the same repo —
+ *               RESEARCH/MERGE_PLAN.md uses the escaped form seven times.
+ *               NO bold guard here: the escape already proves the asterisk is
+ *               content, so a following `*` is markdown formatting around the
+ *               reference (`**workflows:\***`), not a second glob character.
+ *               Guarding this branch is what let a bolded escaped glob slip
+ *               through the gate.
+ *   `\*(?!\*)`  the bare spelling. The guard IS needed here: markdown bold
+ *               puts `**` directly after a colon-terminated phrase —
+ *               "**Template-driven workflows:**" — and an unguarded `\*`
+ *               matches that as `workflows:` + `*`, which is ordinary
+ *               English. Three such false positives appeared the moment this
+ *               rule was added.
+ *
+ *               `(?!\*)` only rules out BOLD, because bold closes with two
+ *               `*` characters. Markdown ITALIC closes with exactly one —
+ *               the same character the real glob uses — so
+ *               "*Template-driven workflows:*" still matches this
+ *               alternative. That case is not filtered by the regex; see
+ *               keepMatch() below, which applies a source-position check
+ *               (immediately preceded by `/` or a backtick) to this bare
+ *               alternative only, after the match, where the surrounding
+ *               line text is available.
+ */
+const COLLECTIVE_FORMS = ['\\\\\\*', '\\*(?!\\*)', '<[a-z-]+>'];
+
 // Shape 2 (unslashed) subsumes shapes 1 and 3 — see the module header.
-// `-` must come last inside the character class so it is a literal.
-// Capturing group (rather than `(?:...)`) so scanFile() can bucket
-// occurrences per command name — the allowlist fingerprint needs the
-// command, not just a total count.
-const STALE_RE = new RegExp('workflows:(' + COMMANDS.join('|') + ')(?![a-z-])', 'g');
+// The tail guard applies only to the command alternation: `*` and `<...>` are
+// self-delimiting, and applying `(?![a-z-])` to them would be a no-op anyway.
+//
+// Two capturing groups, so scanFile() can bucket occurrences per command name —
+// the allowlist fingerprint needs the command, not just a total count. Group 1
+// is the command; group 2 is a collective form, which names no single command
+// and is bucketed under one of the COLLECTIVE_KEYS instead.
+const STALE_RE = new RegExp(
+  'workflows:(?:(' +
+    COMMANDS.join('|') +
+    ')(?![a-z-])|(' +
+    COLLECTIVE_FORMS.join('|') +
+    '))',
+  'g'
+);
+
+/**
+ * Fingerprint buckets for collective forms. They match the namespace without
+ * naming one of the 10 commands, so they need a key of their own rather than
+ * an `undefined` one — and the glob and the placeholder need SEPARATE keys.
+ *
+ * A single shared bucket would reintroduce the very blindness the fingerprint
+ * exists to remove: swapping an allowlisted `workflows:*` for a
+ * `workflows:<cmd>` in the same file leaves a shared count unchanged, so the
+ * gate would accept a newly-introduced retired-namespace reference. Keyed
+ * separately, that substitution shows up as drift like any other.
+ */
+const COLLECTIVE_GLOB_KEY = '(glob)';
+const COLLECTIVE_PLACEHOLDER_KEY = '(placeholder)';
+
+/**
+ * Which collective bucket a group-2 match belongs to. The placeholder form is
+ * the only one that starts with `<`; the glob is `*` or its markdown-escaped
+ * `\*`, so anything else is the glob.
+ */
+function collectiveKeyFor(match) {
+  return match.startsWith('<') ? COLLECTIVE_PLACEHOLDER_KEY : COLLECTIVE_GLOB_KEY;
+}
+
+/**
+ * Discriminates a real bare-glob namespace reference (`/workflows:*`,
+ * `` `workflows:*` ``) from ordinary prose whose italic markup happens to
+ * close with a single `*` right after a colon-terminated phrase ending in
+ * the plain English word "workflows:" (`*Template-driven workflows:*`).
+ * COLLECTIVE_FORMS' `(?!\*)` guard already rules out bold (`**`); it cannot
+ * rule out italic, which closes with exactly one `*` — the same character
+ * the real glob uses — so this runs as a second pass over the match, in
+ * scanFile(), where the line text around it is available.
+ *
+ * Every real bare-glob reference in this repo is written with the WHOLE
+ * `workflows:*` phrase immediately preceded by a `/` or a backtick —
+ * `` `/workflows:*` `` (docs/guides/common-workflows.md) and
+ * `` `workflows:*` `` (RESEARCH/every-plugin-research.md, four
+ * occurrences). An italicized phrase instead has a space or other prose
+ * character right before "workflows" (`*Template-driven workflows:*`), so
+ * the check is on the character before the MATCH START (`m.index`, the `w`
+ * of `workflows:`) — not before the trailing `*`, which is always `:` and
+ * would make the check a no-op. A match at the very start of a line
+ * (`m.index === 0`) has no preceding character at all and is treated as
+ * "not proven", falling into the accepted false negative below.
+ *
+ * Applies ONLY to the unescaped bare `*` alternative (`m[2] === '*'`): the
+ * markdown-escaped `\*` spelling already proves intent (italic markup never
+ * produces a backslash), and the `<placeholder>` form is self-delimiting —
+ * widening this precedence requirement to either of them would be
+ * incorrect, not just unnecessary, so neither is passed through this check.
+ *
+ * This deliberately trades one direction of error for the other: a false
+ * positive here fails `pnpm validate:schemas` for every PR, and this gate
+ * has no allowlist escape hatch at the terminal (zero-entry) state a false
+ * positive would block reaching. The one accepted false negative — a bare
+ * glob written in loose prose without a preceding slash or backtick, e.g.
+ * "see workflows:* for the full list" — just leaves one stale reference for
+ * a human reviewer to catch, the same category of miss any heuristic scan
+ * already accepts elsewhere in this file.
+ */
+function keepMatch(line, m) {
+  if (m[2] !== '*') return true; // escaped glob, placeholder, or a named command
+  const prev = line[m.index - 1];
+  return prev === '/' || prev === '`';
+}
 
 /**
  * Permanent exclusions — never swept, by design.
@@ -331,10 +454,12 @@ function scanFile(relPath) {
   const lines = [];
   const counts = {};
   content.split('\n').forEach((line, i) => {
-    const matches = [...line.matchAll(STALE_RE)];
-    if (matches.length > 0) {
-      lines.push(i + 1);
-      for (const m of matches) counts[m[1]] = (counts[m[1]] || 0) + 1;
+    const matches = [...line.matchAll(STALE_RE)].filter((m) => keepMatch(line, m));
+    if (matches.length === 0) return;
+    lines.push(i + 1);
+    for (const m of matches) {
+      const key = m[1] || collectiveKeyFor(m[2]);
+      counts[key] = (counts[key] || 0) + 1;
     }
   });
   return { counts, lines };

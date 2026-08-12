@@ -238,7 +238,7 @@ Before storing, check for near-duplicates:
 Note: If Pattern 1 (Recall-Before-Act) already ran earlier in the same
 session, the MCP server is warm and the warmup step is not needed before
 Pattern 2. Only add a warmup call before Pattern 2 if it runs in a
-workflow that does not use Pattern 1 (e.g., `/workflows:compound`).
+workflow that does not use Pattern 1 (e.g., `/flow:compound`).
 
 ### Pattern 3: Morph-Discovery
 

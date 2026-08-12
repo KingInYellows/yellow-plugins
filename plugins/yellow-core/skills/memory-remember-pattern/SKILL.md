@@ -46,9 +46,9 @@ context already captured in files).
 > as context-specific paraphrases, so they are exempt from RULE 16's
 > byte-identity check (the containment scan still covers them) — on any
 > constant or tier-rule change, sweep them manually:
-> `plugins/yellow-core/commands/workflows/review.md`,
-> `plugins/yellow-core/commands/workflows/compound.md`,
-> `plugins/yellow-core/commands/workflows/work.md`,
+> `plugins/yellow-core/commands/flow/review.md`,
+> `plugins/yellow-core/commands/flow/compound.md`,
+> `plugins/yellow-core/commands/flow/work.md`,
 > `plugins/yellow-review/commands/review/review-pr.md` (and
 > `plugins/yellow-review/references/review-pr/knowledge-compounding.md`),
 > `plugins/yellow-review/commands/review/review-all.md`, and
@@ -56,7 +56,7 @@ context already captured in files).
 > carries no protocol constants and lacks the recall-based dedup its
 > purpose implies — open maintainer question; do not silently "fix").
 >
-> (`plugins/yellow-core/commands/workflows/brainstorm.md`, `plan.md`,
+> (`plugins/yellow-core/commands/flow/brainstorm.md`, `plan.md`,
 > `spec.md`, `plugins/yellow-review/commands/review/resolve-pr.md`, and
 > `plugins/yellow-ruvector/commands/ruvector/memory.md` are recall-only —
 > they never call `hooks_remember`; see the `memory-recall-pattern` skill's
@@ -147,7 +147,7 @@ Note: If `memory-recall-pattern` already ran earlier in the same session,
 the MCP server is warm and the warmup step is not needed before this
 pattern. Only add a warmup call before this pattern if it runs in a
 workflow that does not use `memory-recall-pattern` (e.g.,
-`/workflows:compound`).
+`/flow:compound`).
 
 ## Anti-Patterns
 

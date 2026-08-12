@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: Reference guide for iterative brainstorm dialogues — question techniques, YAGNI, approach exploration, and research escalation. Use when running /workflows:brainstorm or authoring brainstorm-style agents.
+description: Reference guide for iterative brainstorm dialogues — question techniques, YAGNI, approach exploration, and research escalation. Use when running /flow:brainstorm or authoring brainstorm-style agents.
 user-invokable: false
 ---
 
@@ -13,7 +13,7 @@ YAGNI principles, approach exploration patterns, and research escalation rules.
 
 ## When to Use
 
-Load when running `/workflows:brainstorm` or authoring brainstorm-style agents.
+Load when running `/flow:brainstorm` or authoring brainstorm-style agents.
 Used by `brainstorm-orchestrator` to guide question design, YAGNI gates,
 approach formatting, and research escalation decisions.
 
@@ -92,7 +92,7 @@ approach solves the problem, recommend it.
 - Recommend full when: requirements are stable, the infrastructure will be
   reused, or the MVP path would require rework
 
-**Avoid duplicating `/workflows:plan` logic.** Approach exploration in a
+**Avoid duplicating `/flow:plan` logic.** Approach exploration in a
 brainstorm covers WHAT to build and WHY. Implementation details (file
 structure, test strategy, specific API design) belong in the plan.
 
