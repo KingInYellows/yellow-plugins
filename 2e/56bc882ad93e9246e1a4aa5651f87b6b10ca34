@@ -1,0 +1,22 @@
+scripts/validate-agent-authoring.js
+  s_44086bc4cefe03::t_716ebfd9de3199 520-532
+  s_44086bc4cefe03::t_38672a723ae0ed 591-597,599,604-620,623
+tests/integration/validate-agent-authoring-rule18.test.ts
+  s_44086bc4cefe03::t_9fa3bbf42b8fe6 659-707
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "2e56bc882ad93e9246e1a4aa5651f87b6b10ca34",
+  "prompts": {},
+  "sessions": {
+    "s_44086bc4cefe03": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c892ae64-321b-4803-8573-afdef91d0406",
+        "model": "claude-opus-5"
+      },
+      "human_author": "KingInYellow18 <KingInYellow18@proton.me>"
+    }
+  }
+}
