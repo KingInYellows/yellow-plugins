@@ -542,7 +542,7 @@ The test harness pattern: `mktemp -d` for staging dir, `CLAUDE_PROJECT_DIR=<tmpd
 
 ## Item 10 — `compound.md`: Structure and Conventions for `compound/review-staged.md`
 
-**File:** `plugins/yellow-core/commands/flow/compound.md` (99 lines total)
+**File:** `plugins/yellow-core/commands/flow/compound.md` (222 lines total)
 
 ### Frontmatter
 

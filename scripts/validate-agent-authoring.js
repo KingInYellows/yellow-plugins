@@ -379,40 +379,271 @@ const colonlessSubagentPattern =
 // dispatch form; the canonical form is Task(subagent_type="plugin:dir:name").
 const taskBarewordPattern = /\bTask\(\s*([a-z0-9-]+)\s*\)\s*:/g;
 
-// Strip YAML frontmatter and fenced code blocks. Shared by RULE 15b and the
-// colon-less/bareword subagent reference checks (fence-aware: teaching docs
-// show illustrative examples inside fences and must not trip the checks).
-// Fence markers are matched with up to 3 leading spaces of indent
-// (CommonMark still treats a ```-fence indented 1-3 spaces as a fence;
-// 4+ spaces is an indented code block, a distinct construct).
+// Strip YAML frontmatter and fenced code blocks. Shared by RULE 15b, RULE 18,
+// and the colon-less/bareword subagent reference checks (fence-aware:
+// teaching docs show illustrative examples inside fences and must not trip
+// the checks).
 // Implemented as a line scan rather than a single multiline regex: the lazy
 // [\s\S]*? close-fence search was measurably quadratic on files with many
-// near-miss ``` lines, and this helper now runs on every markdown file, not
-// just SKILL.md. Semantics match the old regex: each opener pairs with the
-// next bare-``` closer line; an unclosed trailing fence is left in place.
-function stripFencedContent(content) {
-  const lines = content
-    .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
-    .split('\n');
-  const opener = /^[ \t]{0,3}```/;
-  const closer = /^[ \t]{0,3}```[ \t]*\r?$/;
+// near-miss fence-marker lines, and this helper now runs on every markdown
+// file, not just SKILL.md.
+//
+// THE MODEL (4th rewrite of this helper — read this before changing it):
+// each line is modeled as (blockquote depth, list content column, content),
+// where "content" is the line with ONLY its verified `>` block-quote prefix
+// removed — never its indentation, which is load-bearing data, not noise:
+//
+//   - blockquote depth is the count of `>` markers a line's prefix carries
+//     (unchanged from earlier rounds).
+//   - list content column is the indentation continuation lines of the
+//     current innermost list item must reach to still belong to it — e.g.
+//     for a line starting `- `, that's column 2. A stack of active columns
+//     is maintained as lines are scanned: a marker line pushes a new
+//     column, and any line (blank lines excepted — see below) whose
+//     indentation falls short of the top of the stack pops it, and
+//     everything shallower, back to whichever list item it still belongs
+//     to (or none).
+//
+// A fence OPENS only when, relative to the active list content column
+// (0 outside any list), the marker sits at 0-3 extra spaces of indent — the
+// same CommonMark tolerance as before, just measured from the container's
+// content column instead of from column 0. 4+ spaces past that column is an
+// INDENTED CODE BLOCK, not a fence opener, and is left as ordinary content
+// (scanned normally, not hidden) — this is finding 1 from the 4th review
+// round: the previous version stripped a line's indentation unconditionally
+// before checking, so a 4-space-indented fence-looking line at top level was
+// misread as a valid (0-indent) opener, which could truncate everything
+// after it as "unclosed fence" content and hide a live dispatch past it.
+//
+// A candidate BACKTICK marker only opens a fence if its info string (the
+// rest of the line after the marker run) contains no backtick — per
+// CommonMark, a backtick-fence info string cannot itself contain a
+// backtick (there is no such restriction for tilde fences). This is finding
+// 3 from the 5th review round: a line like ```` ```lang`suffix ```` was
+// being treated as a valid opener even though CommonMark does not read it
+// as a fence at all, so an absent closer let the EOF "unclosed fence"
+// truncation (below) discard a live dispatch that followed it. A rejected
+// candidate is left as ordinary content, scanned normally — the same
+// "scan more, not less" bias as the indented-code-block case above.
+//
+// A fence CLOSES on any of:
+//   - a matching marker (same char, length >= opener) at the same
+//     blockquote depth as the opener, indented at or within the same 0-3
+//     space tolerance past the opener's list content column (the same
+//     tolerance OPEN uses — a closer isn't required to line up EXACTLY with
+//     the opener's column, only to still be within it);
+//   - blockquote depth dropping below the opener's — per CommonMark a block
+//     quote ends at the first line lacking its `>` marker (a truly blank
+//     line has none, so it ends the quote; lazy continuation only applies
+//     to paragraph text) and the quote ending also ends any fence scoped
+//     inside it, closer or no closer;
+//   - the list content column active at fence-open time no longer being
+//     reachable — i.e. a later NON-BLANK line's indentation falls short of
+//     it, meaning the list item (or block within it) that contained the
+//     fence has ended. This is finding 2 from the 4th round: the earlier
+//     version tracked blockquote depth only, so an unclosed fence nested in
+//     a list item stayed "open" through EOF even after the surrounding
+//     prose plainly outdented back to top level, truncating a live dispatch
+//     that followed.
+//   - EOF, per CommonMark's "unterminated fence runs to end of document".
+//
+// Blank lines never end a list item on their own (loose lists tolerate a
+// blank line between an item's blocks), so they don't trigger the
+// list-column pop/close check — only a subsequent non-blank, under-indented
+// line does. Blank lines DO still end a block quote (no `>` marker to
+// carry), matching CommonMark and unchanged from earlier rounds. Content
+// inside a fence is never re-parsed as a list marker or examined for a new
+// column — it's literal.
+//
+// When a container ends mid-fence, the line that ended it is treated as
+// plain content, deliberately NOT re-examined as a potential new fence
+// opener even if it happens to be fence-shaped itself (same conservative
+// choice earlier rounds made for the blockquote case, now extended to
+// lists): a legitimately reopened fence landing exactly on a container
+// boundary is scanned as prose instead of being re-hidden. Between the two
+// failure modes — treating closed prose as still-hidden fence content (which
+// can swallow a real, live broken dispatch) vs. treating truly-fenced text
+// as prose (a rare false positive a human review catches instantly) — this
+// helper always picks the side that scans more, not less: a false positive
+// is cheap, a swallowed finding is not.
+//
+// Honest limits: this is a normalization heuristic, not a full CommonMark
+// block parser. List content columns are computed from a single regex pass
+// per marker line (`-`, `*`, `+`, or `N.`/`N)` followed by whitespace) and
+// do not implement CommonMark's full list-item-start algorithm (tab
+// expansion, lazy continuation inside paragraphs, etc.) — it is accurate for
+// the straightforward single- and nested-bullet Markdown this repo's docs
+// actually use, not adversarial or exotic list constructs.
+//
+// KNOWN LIMIT, measured rather than assumed: a block quote opening directly
+// on a list-marker line (`- > ```text`) is not recognized as a container, so
+// a fenced example inside it is scanned as live prose and reported. That is
+// the FALSE-POSITIVE direction — a human sees the error immediately and the
+// example is inert — which is the side this helper deliberately errs toward.
+// The reverse was checked too: quoted lists followed by indented-code
+// look-alikes, four-space-indented list markers, and nested-list fences all
+// still report a live dispatch correctly, so no broken dispatch is hidden by
+// this gap. Fixing it means splitting a block-quote prefix out of list
+// content and threading a second depth through the fence state, which has
+// more regression surface than the false positive costs.
+const fenceOpenerRe = /^[ \t]{0,3}(`{3,}|~{3,})/;
+// `{0,3}`, not `*`: a block-quote marker may carry at most three leading
+// spaces. At four the line is an indented code block and the `>` is literal
+// content, so `    > ```text` must NOT be read as a depth-1 quote wrapping a
+// fence opener — doing so hid every following quoted line as fence content
+// through EOF and let a broken dispatch evade RULE 18. Matches the same
+// three-space bound `fenceOpenerRe` above already applies.
+const blockquotePrefixRe = /^(?:[ \t]{0,3}>[ \t]?)*/;
+// A list-item marker at the very start of `rest` (already blockquote-
+// stripped): `-`/`*`/`+`, or `N.`/`N)`, followed by whitespace or EOL.
+const listMarkerRe = /^([ \t]*)([-*+]|\d+[.)])([ \t]+|$)/;
+
+function splitBlockquotePrefix(line) {
+  const match = blockquotePrefixRe.exec(line);
+  const prefix = match ? match[0] : '';
+  let depth = 0;
+  for (const ch of prefix) {
+    if (ch === '>') depth++;
+  }
+  return { depth, rest: line.slice(prefix.length) };
+}
+
+function leadingIndentOf(str) {
+  let i = 0;
+  while (i < str.length && (str[i] === ' ' || str[i] === '\t')) i++;
+  return i;
+}
+
+// The content column a list item starting at `rest` establishes for its own
+// continuation lines, or -1 if `rest` doesn't open a list item here. Per
+// CommonMark, that column is the marker's indent plus the marker text plus
+// the whitespace after it — capped to 1 space if that whitespace is absent
+// or is 5+ characters (in both cases the rest of the line, if any, would
+// itself read as an indented code block inside the item, not the item's
+// normal content start).
+function listItemContentColumn(rest) {
+  const match = listMarkerRe.exec(rest);
+  if (!match) return -1;
+  const gap = match[3].length;
+  const effectiveGap = gap === 0 || gap >= 5 ? 1 : gap;
+  return match[1].length + match[2].length + effectiveGap;
+}
+
+// A fence opener starting at `column` of `rest`, or null. Returns the marker
+// character and run length the matching closer must reproduce. A backtick
+// opener whose info string itself contains a backtick is not a fence per
+// CommonMark, so it is rejected here rather than at each call site.
+function fenceOpenerAt(rest, column) {
+  const openerMatch = fenceOpenerRe.exec(rest.slice(column));
+  if (!openerMatch) return null;
+  const marker = openerMatch[1];
+  const infoString = rest.slice(column + openerMatch[0].length);
+  if (marker[0] === '`' && infoString.includes('`')) return null;
+  return { char: marker[0], len: marker.length };
+}
+
+// `stripFrontmatter` MUST be false when the caller has already sliced the
+// frontmatter off, or passes a mid-document section. The leading-`---` regex
+// below cannot tell a frontmatter block from a body that simply OPENS with a
+// `---` thematic break and contains another one later: it would delete
+// everything between them. That is a silent masking bug — a live
+// `skill: "<ns>:<cmd>"` sitting between two horizontal rules would never reach
+// RULE 18. Only a caller holding the ORIGINAL file content may strip here.
+function stripFencedContent(content, { stripFrontmatter = true } = {}) {
+  const lines = (
+    stripFrontmatter ? content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '') : content
+  ).split('\n');
   const kept = [];
   let inFence = false;
   let fenceStart = -1;
+  let fenceChar = '';
+  let fenceLen = 0;
+  let fenceDepth = 0;
+  let fenceListColumn = 0;
+  const listStack = []; // ascending content columns of active list items
+
   for (const line of lines) {
-    if (!inFence) {
-      if (opener.test(line)) {
-        inFence = true;
-        fenceStart = kept.length;
+    const { depth, rest } = splitBlockquotePrefix(line);
+    const isBlank = rest.trim() === '';
+    const indent = leadingIndentOf(rest);
+
+    if (inFence) {
+      const containerEnded = depth < fenceDepth || (!isBlank && indent < fenceListColumn);
+      if (containerEnded) {
+        // The container (block quote or list item) the fence opened inside
+        // ended before a matching closer showed up — see the block comment
+        // above for why this line is kept as plain content rather than
+        // re-examined as a potential new opener.
+        kept.length = fenceStart;
+        inFence = false;
+        kept.push(line);
+        continue;
       }
-      kept.push(line); // provisional when opening — kept only if unclosed
-    } else if (closer.test(line)) {
-      kept.length = fenceStart; // drop opener..closer inclusive
-      kept.push(''); // preserve the blank the old regex replacement left
-      inFence = false;
-    } else {
-      kept.push(line); // provisional fence content — kept only if unclosed
+      const contentForClose = indent >= fenceListColumn ? rest.slice(fenceListColumn) : rest;
+      const closerRe = new RegExp(`^[ \\t]{0,3}\\${fenceChar}{${fenceLen},}[ \\t]*\\r?$`);
+      if (depth === fenceDepth && closerRe.test(contentForClose)) {
+        kept.length = fenceStart; // drop opener..closer inclusive
+        kept.push(''); // preserve the blank the old regex replacement left
+        inFence = false;
+      } else {
+        kept.push(line); // provisional fence content — kept only if unclosed
+      }
+      continue;
     }
+
+    // Not in a fence. Pop any list contexts this line has outdented past
+    // (blank lines never end a list item on their own — see block comment).
+    if (!isBlank) {
+      while (listStack.length && indent < listStack[listStack.length - 1]) {
+        listStack.pop();
+      }
+    }
+    const containerColumn = listStack.length ? listStack[listStack.length - 1] : 0;
+
+    // The content column this line's own list marker establishes, if it
+    // opens one. Needed BEFORE the fence test: a fence may open on the very
+    // same line as the marker, at that column rather than the container's.
+    const openedColumn = isBlank ? -1 : listItemContentColumn(rest);
+
+    let opener = null;
+    let openerColumn = containerColumn;
+    if (indent - containerColumn <= 3) {
+      opener = fenceOpenerAt(rest, containerColumn);
+    }
+    // else: 4+ spaces past the container's content column — an indented
+    // code block, not a fence opener. Left as ordinary content below, which
+    // means it IS scanned normally (finding 1: scanning is the safe side).
+    if (!opener && openedColumn !== -1) {
+      // A fence opening ON the marker line (`- ```text`): CommonMark starts
+      // the item's content at the marker's content column, so the fence
+      // begins there. Testing only the container column leaves the opener
+      // unrecognized and scans the whole item body as live prose — a false
+      // positive on legitimate illustrative examples.
+      opener = fenceOpenerAt(rest, openedColumn);
+      if (opener) openerColumn = openedColumn;
+    }
+    if (opener) {
+      inFence = true;
+      fenceStart = kept.length;
+      fenceChar = opener.char;
+      fenceLen = opener.len;
+      fenceDepth = depth;
+      fenceListColumn = openerColumn;
+    }
+    kept.push(line); // provisional when opening — kept only if unclosed
+
+    if (openedColumn !== -1) listStack.push(openedColumn);
+  }
+  // Unclosed fence reaching EOF: per CommonMark, an unterminated fenced code
+  // block implicitly runs to the end of the document — everything from the
+  // opener onward is fence content, not prose. The "provisional keep" above
+  // exists only to be undone once a genuine matching closer or container
+  // exit shows up mid-document; it was never meant to survive to EOF.
+  // Retroactively drop it with the same fenceStart truncation the other
+  // branches use, so an unresolvable example inside a never-closed fence is
+  // stripped like any other fenced content instead of being scanned as live.
+  if (inFence) {
+    kept.length = fenceStart;
   }
   return kept.join('\n');
 }
@@ -1003,7 +1234,7 @@ function validateMemoryProtocolSentinel(markdownFiles, errors) {
 // Scoped to the content of a "## Usage" section ONLY, not the whole body —
 // a naive whole-body scan false-flagged pre-existing, unrelated
 // cross-plugin composition references (e.g.
-// plugins/yellow-core/commands/workflows/work.md invoking
+// plugins/yellow-core/commands/flow/work.md invoking
 // `skill: "smart-submit"` as one step of a much larger multi-phase
 // document, where smart-submit belongs to a DIFFERENT plugin — a
 // legitimate pattern this rule was never meant to validate). Every false
@@ -1034,7 +1265,11 @@ function validateSkillWrapperDrift(commandFiles, errors) {
     // `skill: "..."` syntax without actually invoking it) isn't mistaken
     // for a live wrapper invocation.
     const skillNames = new Set();
-    for (const match of stripFencedContent(usageSection).matchAll(SKILL_REF_RE)) {
+    // A mid-document section, not whole-file content: never strip frontmatter
+    // from it (a `---` rule inside the section is not a frontmatter fence).
+    for (const match of stripFencedContent(usageSection, {
+      stripFrontmatter: false,
+    }).matchAll(SKILL_REF_RE)) {
       skillNames.add(match[1]);
     }
     if (skillNames.size === 0) continue;
@@ -1063,6 +1298,268 @@ function validateSkillWrapperDrift(commandFiles, errors) {
             `via \`skill: "${skillName}"\` but plugins/${pluginName}/skills/` +
             `${skillName}/SKILL.md does not exist`
         );
+      }
+    }
+  }
+}
+
+// RULE 18 — namespaced `skill:` dispatch targets must resolve to a real
+// command `name:`.
+//
+// RULE 17 above cannot do this and never could: its SKILL_REF_RE character
+// class `[a-zA-Z0-9_-]` EXCLUDES the colon, so a namespaced value like
+// `skill: "flow:spec"` has never matched it. That blind spot was found while
+// renaming the `workflows:` namespace to `flow:` — nine live dispatch targets
+// pointed at command names that would have silently stopped resolving at
+// runtime, and no validator anywhere would have said a word.
+//
+// This is deliberately a STANDING rule, not a migration one-off. The failure
+// it catches — a command gets renamed, its callers do not — recurs on every
+// rename, and the migration that motivated it is the least interesting
+// instance.
+//
+// Differences from RULE 17, all deliberate:
+//   - Scans the WHOLE body, not just a `## Usage` section. Namespaced
+//     dispatch happens mid-document in multi-phase orchestrators (that is
+//     exactly why RULE 17 scoped itself to `## Usage` — those files were its
+//     false positives). Here they are the intended subjects.
+//   - Resolves against EVERY plugin's commands, not the owning plugin's.
+//     Cross-plugin dispatch is the normal case: yellow-linear dispatches
+//     `flow:plan`, yellow-review dispatches `flow:compound`.
+//   - Only namespaced values (containing `:`) are checked. Bare names stay
+//     RULE 17's business, so the two rules never double-report the same value.
+//
+// Extraction is deliberately UNRESTRICTED inside the quotes — unlike RULE
+// 17's SKILL_REF_RE, it does not require the value to match a narrow
+// `[a-zA-Z0-9_-]` character class. An earlier version of this rule did, and
+// that class silently swallowed malformed dispatch targets: a value like
+// `flow:spec.name` (stray `.`) or `flow:spec/extra` (stray `/`) fell outside
+// the class, so the whole match failed and the rule said nothing about a
+// dispatch that will fail at runtime just the same as a plain typo. Casting
+// a wide net here and letting resolution (buildDispatchTargetIndex lookup)
+// be the actual gate means "value contains a `:` but isn't a real command or
+// placeholder" is always reported, regardless of which character broke it.
+// Also accepts single-quoted values (`skill: 'flow:spec'`) alongside the
+// documented double-quoted form, matching how RULE 17 already tolerates only
+// double quotes for its narrower bare-name case — namespaced dispatch has no
+// such narrower guarantee to lean on, so both quoting forms are captured.
+const SKILL_DISPATCH_VALUE_RE = /\bskill:\s*(?:"([^"\r\n]*)"|'([^'\r\n]*)')/g;
+
+// Illustrative names used by the two reviewer agents that TEACH the
+// plugin-qualified dispatch syntax. They spell it out in prose rather than in
+// a code fence, so fence-stripping does not reach them, and the plugins they
+// name ("plugin", "yellow-X") do not exist.
+//
+// Note what these are NOT: they are not evidence that `plugin:skill` is a
+// bogus form. It is the documented Skill-tool form for plugin skills, and
+// this rule resolves it (see buildDispatchTargetIndex) — an early draft
+// indexed only commands and would have rejected every legitimate
+// plugin-qualified skill dispatch, e.g.
+// `skill: "gt-workflow:stack-decomposition-format"`.
+//
+// Scoped to an exact (declaring file, placeholder) pair — codex P2 finding:
+// an earlier version exempted these two strings ANYWHERE under plugins/, so
+// a live command that accidentally copied `skill: "plugin:skill-name"` or
+// `skill: "yellow-X:skill-name"` would have silently passed RULE 18 even
+// though nothing resolves it. Only the two known teaching sites below may use
+// their placeholder; the identical string anywhere else is a real,
+// unresolvable dispatch and must be reported like any other. Kept as an
+// explicit literal map (same idiom as MODEL_RULE_ALLOWLIST above) rather than
+// a "looks like a placeholder" heuristic — a heuristic loose enough to catch
+// `plugin:skill-name` would also swallow real typos, which is the entire
+// class of bug this rule exists to catch.
+//
+// The map's own staleness is linted below (see the fixtureRun-gated check
+// inside validateSkillDispatchResolution): if a listed file is deleted, or no
+// longer contains its declared placeholder, that is stale-allowlist rot and
+// becomes a hard error naming the entry — the same precedent RULE 16 sets for
+// MEMORY_PROTOCOL_SENTINEL_FILES — so the exemption cannot silently outlive
+// the prose it was carved out for.
+const SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST = new Map([
+  [
+    'yellow-review/agents/review/plugin-contract-reviewer.md',
+    new Set(['plugin:skill-name']),
+  ],
+  [
+    'yellow-review/agents/review/project-compliance-reviewer.md',
+    new Set(['yellow-X:skill-name']),
+  ],
+]);
+
+/**
+ * Index every dispatchable namespaced target under PLUGINS_DIR.
+ *
+ * TWO kinds, and missing either one makes the rule wrong:
+ *
+ *   1. Command `name:` frontmatter — e.g. `flow:work`, `review:pr`. Already
+ *      namespaced in the file itself.
+ *   2. Plugin-qualified SKILL ids — `<plugin>:<skill-dir>`, e.g.
+ *      `gt-workflow:stack-decomposition-format`. This is the documented
+ *      Skill-tool form for plugin skills (the reviewer agents in
+ *      SKILL_DISPATCH_PLACEHOLDERS above teach exactly this syntax), and it
+ *      is namespaced only by virtue of the owning plugin's directory name —
+ *      the SKILL.md's own `name:` is bare.
+ *
+ * Indexing commands alone would reject every legitimate plugin-qualified
+ * skill dispatch. Today's call sites all happen to write skill ids bare, so
+ * that bug would have stayed invisible until the first author used the
+ * documented form.
+ *
+ * @param {string[]} commandFiles
+ * @param {string[]} skillFiles
+ * @returns {Map<string, string>} dispatch target -> declaring file path
+ */
+function buildDispatchTargetIndex(commandFiles, skillFiles) {
+  const index = new Map();
+
+  for (const filePath of commandFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    // extractFrontmatter returns the raw block STRING, not a parsed object —
+    // parseScalar is the accessor the rest of this file pairs it with.
+    const frontmatter = extractFrontmatter(content);
+    if (!frontmatter) continue;
+    const name = parseScalar(frontmatter, 'name');
+    if (typeof name === 'string' && name.trim()) {
+      index.set(name.trim(), filePath);
+    }
+  }
+
+  for (const filePath of skillFiles) {
+    // plugins/<plugin>/**/skills/<skill>/SKILL.md — take the plugin from the
+    // first path segment, so nested layouts (e.g. codex/skills/<name>/)
+    // resolve the same way.
+    //
+    // The skill half comes from the frontmatter `name:`, NOT the directory.
+    // `name:` is the runtime identifier; the directory is only where the file
+    // happens to live. Indexing the directory would register an id the
+    // runtime does not expose whenever the two disagree, so a dispatch to that
+    // stale directory-qualified value would pass this rule and then fail to
+    // resolve in a live session — precisely the class RULE 18 exists to catch.
+    // A SKILL.md with no parseable `name:` is SKIPPED rather than indexed
+    // under its directory: synthesizing a target from the directory registers
+    // an id the runtime may never expose, so a dispatch to it would pass this
+    // rule and fail in a live session. `validateSkillDispatchResolution`
+    // reports the missing `name:` as a hard error instead — RULE 15's
+    // sub-rules are all warning-tier and none of them checks `name:`, so
+    // nothing else catches it.
+    const relSegments = path.relative(PLUGINS_DIR, filePath).split(path.sep);
+    const pluginName = relSegments[0];
+    const skillDir = relSegments[relSegments.length - 2];
+    if (!pluginName || !skillDir) continue;
+    const skillFm = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    const declaredName = skillFm ? parseScalar(skillFm, 'name') : null;
+    const skillName = (declaredName || '').trim();
+    if (!skillName) continue;
+    const qualified = `${pluginName}:${skillName}`;
+    if (!index.has(qualified)) index.set(qualified, filePath);
+  }
+
+  return index;
+}
+
+function validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors) {
+  // `name:` is the runtime identifier a `skill: "<plugin>:<name>"` dispatch
+  // resolves against. Without it there is no target to validate, and the
+  // directory is not a safe stand-in (see buildDispatchTargetIndex). Hard
+  // error rather than advisory: every RULE 15 sub-rule is warning-tier, so an
+  // advisory here would let a nameless skill reach a release unnoticed.
+  for (const filePath of skillFiles) {
+    const skillFm = extractFrontmatter(fs.readFileSync(filePath, 'utf8'));
+    const declaredName = skillFm ? parseScalar(skillFm, 'name') : null;
+    if (!(declaredName || '').trim()) {
+      errors.push(
+        `[RULE 18] ${relative(filePath)}: SKILL.md has no \`name:\` in its ` +
+          `frontmatter. \`name:\` is the runtime identifier a ` +
+          `\`skill: "<plugin>:<name>"\` dispatch resolves against; a skill ` +
+          `without one cannot be dispatched to and is not indexed as a target.`
+      );
+    }
+  }
+
+  const dispatchTargets = buildDispatchTargetIndex(commandFiles, skillFiles);
+
+  for (const filePath of markdownFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const fmBlockMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+    const body = fmBlockMatch ? content.slice(fmBlockMatch[0].length) : content;
+
+    // Fence-strip first: authoring guides show the `skill: "plugin:name"`
+    // syntax inside code fences as illustration, and those placeholders
+    // ("plugin:skill-name", "yellow-X:skill-name") name nothing real.
+    const seen = new Set();
+    // `body` already had its frontmatter sliced off above — see
+    // stripFencedContent's `stripFrontmatter` note for why re-stripping here
+    // would eat a body that opens with a `---` thematic break.
+    for (const match of stripFencedContent(body, {
+      stripFrontmatter: false,
+    }).matchAll(SKILL_DISPATCH_VALUE_RE)) {
+      const value = match[1] !== undefined ? match[1] : match[2];
+      // No colon at all: a bare name, e.g. `skill: "old-name"` — RULE 17's
+      // domain, not this rule's. This is the ONLY skip condition; every
+      // colon-bearing value below is checked, resolved shapes and malformed
+      // ones alike, so a shape RULE 17's narrower class never reaches (like
+      // `flow:spec.name`) still gets reported instead of silently passing.
+      if (!value.includes(':')) continue;
+      seen.add(value);
+    }
+    if (seen.size === 0) continue;
+
+    // Placeholder allowlist is scoped per DECLARING FILE, not global — the
+    // identical placeholder string in any other file is a real, unresolvable
+    // dispatch (see SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST above).
+    const pluginsRelPath = path
+      .relative(PLUGINS_DIR, filePath)
+      .split(path.sep)
+      .join('/');
+    const allowedPlaceholders = SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST.get(pluginsRelPath);
+
+    for (const target of seen) {
+      if (dispatchTargets.has(target)) continue;
+      if (allowedPlaceholders && allowedPlaceholders.has(target)) continue;
+      errors.push(
+        `${relative(filePath)}: RULE 18 — dispatches \`skill: "${target}"\` ` +
+          `but nothing under plugins/ provides it: no command declares ` +
+          `\`name: ${target}\`, and no plugin skill resolves as ` +
+          `\`<plugin>:<skill-dir>\`. Either the target was renamed and this ` +
+          `caller was missed, or the name is a typo — this dispatch fails ` +
+          `at runtime.`
+      );
+    }
+  }
+
+  // Stale-allowlist-rot check: a declared (file, placeholder) entry that no
+  // longer exists, or whose file no longer contains the placeholder, is a
+  // hard error naming the entry — mirrors RULE 16's declared-sentinel-file
+  // check (MEMORY_PROTOCOL_SENTINEL_FILES above) so this exemption cannot
+  // silently outlive the prose it was carved out for. Skipped in fixture
+  // runs by default (the temp-dir trees the RULE 18 integration tests build
+  // do not carry these two real files) unless a test opts back in, matching
+  // RULE 16's VALIDATE_SENTINEL_STRICT precedent.
+  const fixtureRun = Boolean(process.env.VALIDATE_PLUGINS_DIR);
+  const strict = !fixtureRun || process.env.VALIDATE_PLACEHOLDER_ALLOWLIST_STRICT === '1';
+  if (strict) {
+    for (const [relPath, placeholders] of SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST) {
+      const absPath = path.join(PLUGINS_DIR, ...relPath.split('/'));
+      if (!fs.existsSync(absPath)) {
+        errors.push(
+          `${relPath}: RULE 18 — declared placeholder-allowlist entry no ` +
+            `longer exists. Remove it from SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST ` +
+            `(scripts/validate-agent-authoring.js) in the same commit that ` +
+            `deleted or moved this file.`
+        );
+        continue;
+      }
+      const declaringContent = fs.readFileSync(absPath, 'utf8');
+      for (const placeholder of placeholders) {
+        if (!declaringContent.includes(placeholder)) {
+          errors.push(
+            `${relPath}: RULE 18 — declared placeholder "${placeholder}" no ` +
+              `longer appears in this file. Remove the stale entry from ` +
+              `SKILL_DISPATCH_PLACEHOLDER_ALLOWLIST (scripts/validate-agent-` +
+              `authoring.js), or restore the placeholder text if it was ` +
+              `edited by accident.`
+          );
+        }
       }
     }
   }
@@ -1253,6 +1750,7 @@ function main() {
   });
   validateCommandFiles(commandFiles, errors);
   validateSkillWrapperDrift(commandFiles, errors);
+  validateSkillDispatchResolution(markdownFiles, commandFiles, skillFiles, errors);
   validateSkillFiles(skillFiles, { errors, warnings });
   validateMemoryProtocolSentinel(markdownFiles, errors);
   validateStagingPromoterFrontmatter(agentFiles, errors);
