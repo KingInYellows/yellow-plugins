@@ -174,6 +174,19 @@ Codex agent.)
   rather than read. What is NOT enforced: the substitution itself is an LLM
   turn, not deterministic templating. Same class of prompt-plus-containment
   enforcement as the agy limitation below.
+- **A cancelled claude-reviewer leaves its raw output readable until the
+  sweep.** `claude-reviewer` creates its fenced-output file with the `Write`
+  tool under the ordinary process umask (0644 on a default umask 022), and
+  `council.md` takes the mode down to 0600 in Step 4 — but Step 4 only runs
+  when the slot returns and parses. If the in-process reviewer is cancelled or
+  hangs, the `chmod` never executes and the file, holding RAW un-redacted
+  review text, stays world-readable in `/tmp` until the age-gated sweep
+  reclaims it (`STALE_MINUTES=1440`, so up to 24 hours) or the OS reaps
+  `/tmp`. Closing this properly means minting the path inside a private
+  `mktemp -d`, which every path guard in `council.md` rejects on purpose —
+  see the `chmod` site for why that trade was taken. On a multi-user host,
+  cancel a hung `/council` and remove `/tmp/council-claude-fenced-*.txt`
+  by hand rather than waiting for the sweep.
 - **agy workspace trust in print mode is unverified.** The Antigravity CLI
   tracks `trustedWorkspaces` in its settings; the 2026-08-01 spike ran only
   in an already-trusted repo. If a first `/council` run in a new directory
