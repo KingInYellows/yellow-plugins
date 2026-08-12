@@ -6,6 +6,10 @@ or a literal command output captured during the survey. No files were modified.
 
 Survey date: 2026-04-26. Repo HEAD: `9ea2a7f` (`main`).
 
+> **2026-08 update:** the `workflows:` command namespace surveyed below was
+> later renamed to `flow:` in the 2026-08 namespace migration. Command names
+> in this document reflect the pinned `9ea2a7f` state, not the current repo.
+
 ---
 
 ## 1. Repo shape

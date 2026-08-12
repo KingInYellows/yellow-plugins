@@ -23,10 +23,10 @@ when ruled.
 | `/smart-submit` audit | gt-workflow | 3 parallel audit agents (code review, security, silent failures) on UNCOMMITTED work, then stage/commit/submit | "submit this", "ship it" — pre-commit gate, not a review destination (draft) |
 | `/gt-amend` audit | gt-workflow | 1–3 parallel audit agents on UNCOMMITTED follow-up edits, then amend the current branch commit/re-submit | "amend this", "add this to the current PR", "fold this fix in" — existing-PR follow-up gate, not a review destination (draft) |
 | `/review:pr` | yellow-review | Adaptive multi-agent review of one OPEN PR (tiered persona pipeline, learnings pre-pass, confidence-rubric aggregation, auto-applies P0/P1 `safe_auto` fixes) | "review PR #N", "review this PR" — the default single-PR review surface (draft) |
-| `/council` | yellow-council | Cross-lineage advisory fan-out to Codex + Gemini + OpenCode CLIs; consensus verdict, no fix application | "second opinion", "cross-check with other models", `/workflows:work` polish-loop escalation (draft) |
+| `/council` | yellow-council | Cross-lineage advisory fan-out to Codex + Gemini + OpenCode CLIs; consensus verdict, no fix application | "second opinion", "cross-check with other models", `/flow:work` polish-loop escalation (draft) |
 | `/codex:review` | yellow-codex | Single supplementary Codex CLI review of diff or PR; P1/P2/P3 findings | "what does Codex think" — standalone second opinion; NOTE: `/review:pr` auto-spawns the `codex-reviewer` agent (not this command) when yellow-codex is installed and diff > 100 lines (draft) |
 | `/devin:review-prs` | yellow-devin | Reviews a batch of Devin-authored PRs LOCALLY via yellow-review's multi-agent pipeline (gh-based fallback if absent); remediation is a per-PR choice — fix locally, message the Devin cloud session, or comment on the PR | "review my Devin PRs", "check Devin's work" — explicit invocation only, never auto-routed (draft) |
-| `/workflows:review` | yellow-core | SESSION-level review: plan adherence, cross-PR coherence, scope drift, autonomous P1 fix loop | "review this session/plan against the plan" — plan-file scope; redirects PR-number args to `/review:pr` (draft) |
+| `/flow:review` | yellow-core | SESSION-level review: plan adherence, cross-PR coherence, scope drift, autonomous P1 fix loop | "review this session/plan against the plan" — plan-file scope; redirects PR-number args to `/review:pr` (draft) |
 | `/docs:review` | yellow-docs | Multi-persona review of a PLANNING DOCUMENT (PRD, brainstorm, spec, ADR) | "review this plan/spec/PRD" (document path, not PR) (draft) |
 
 > **Scope of this table:** the batch-review surfaces `/review:all` and
@@ -55,7 +55,7 @@ when ruled.
    is one lineage, council is three. Is `/codex:review` still a distinct
    user-facing surface, or should "second opinion" always route to `/council`
    (which subsumes the Codex leg)?
-3. **Auto-escalation** — `/workflows:work`'s polish loop already escalates to
+3. **Auto-escalation** — `/flow:work`'s polish loop already escalates to
    `/council` on a stuck review cap. Should `/review:pr` gain the same
    escalation, or stay single-surface?
 4. **Batch review** — `/review:all` and `/review:sweep-all` (yellow-review)

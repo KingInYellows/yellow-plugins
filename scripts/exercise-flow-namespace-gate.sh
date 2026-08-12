@@ -48,6 +48,32 @@ if ! cp "$ALLOW" "$BAK"; then
   exit 1
 fi
 
+# PINNED_PROBE is a real PINNED_FILES entry (see validate-flow-namespace.js)
+# that section J below temporarily appends a fresh stale reference to, to
+# prove pinned-fingerprint drift actually fails the gate. Backed up the same
+# way $ALLOW is, and restored by the same EXIT trap.
+PINNED_PROBE=CHANGELOG.md
+
+# Same reasoning as the $PROBE guard above, applied to a path we don't create
+# ourselves: -f alone follows symlinks, so a symlink planted at this path
+# (even one pointing at a legitimate file) would have `cp` below back up the
+# SYMLINK's TARGET rather than this repo's CHANGELOG.md, and later have
+# section J's `>>` append go through the symlink to whatever it resolves to
+# — potentially a file outside the repo. -L rejects a symlink outright,
+# dangling or not; the plain `-f` failure branch covers every other
+# non-regular case (missing, directory, device, ...).
+if [ -L "$PINNED_PROBE" ] || [ ! -f "$PINNED_PROBE" ]; then
+  printf '[flow-namespace-gate] Error: pinned probe %s is a symlink or not a regular file.\n' "$PINNED_PROBE" >&2
+  printf '[flow-namespace-gate] Refusing to back it up or append to it.\n' >&2
+  # $BAK already exists at this point and the EXIT trap is NOT installed yet,
+  # so nothing else would ever clean it up — remove it here or every run that
+  # trips this guard leaks a temp file.
+  rm -f "$BAK"
+  exit 1
+fi
+PINNED_BAK=""
+PINNED_BAK_CREATED=0
+
 pass=0
 fail=0
 
@@ -59,12 +85,53 @@ restoreAllowlist() { # copies $BAK back over $ALLOW, reporting failure
   return 1
 }
 
+restorePinnedProbe() { # copies $PINNED_BAK back over $PINNED_PROBE if it was created
+  if [ "$PINNED_BAK_CREATED" -ne 1 ]; then
+    return 0
+  fi
+  if [ -f "$PINNED_BAK" ] && cp "$PINNED_BAK" "$PINNED_PROBE"; then
+    PINNED_BAK_CREATED=0
+    return 0
+  fi
+  printf 'ERROR: failed to restore %s from %s\n' "$PINNED_PROBE" "$PINNED_BAK" >&2
+  return 1
+}
+
+# A backup is deleted ONLY after its restore succeeded. Deleting it
+# unconditionally is what turns a failed restore (full disk, file made
+# read-only mid-run) into unrecoverable damage: this script mutates two
+# TRACKED files, so the backup is the only copy of the pre-run content —
+# including any uncommitted edits the operator had. On failure the backup is
+# kept, its path is printed, and the script exits non-zero so a green run can
+# never hide a damaged working tree.
 cleanup() {
+  cleanup_rc=0
+
   if [ "$PROBE_CREATED" -eq 1 ]; then
     rm -f "$PROBE"
   fi
-  restoreAllowlist
-  rm -f "$BAK"
+
+  if restoreAllowlist; then
+    rm -f "$BAK"
+  else
+    printf 'ERROR: keeping the allowlist backup at %s — restore it by hand.\n' "$BAK" >&2
+    cleanup_rc=1
+  fi
+
+  # Returns 0 without touching $PINNED_BAK when nothing was ever backed up
+  # (its mktemp happens in the pinned-drift section, not at startup), in which
+  # case $PINNED_BAK is still "" and `rm -f ""` is a harmless no-op.
+  if restorePinnedProbe; then
+    rm -f "$PINNED_BAK"
+  else
+    printf 'ERROR: keeping the pinned-probe backup at %s — restore %s from it by hand.\n' \
+      "$PINNED_BAK" "$PINNED_PROBE" >&2
+    cleanup_rc=1
+  fi
+
+  if [ "$cleanup_rc" -ne 0 ]; then
+    exit 1
+  fi
 }
 trap cleanup EXIT
 
@@ -234,7 +301,27 @@ rm -f "$OUT"
 restoreAllowlist || exit 1
 
 echo
-echo "=== J. tree restored, gate green again ==="
+echo "=== J. ERROR-NAMESPACE-002: pinned file (PINNED_FILES) fingerprint drift ==="
+# CHANGELOG.md is a real PINNED_FILES entry with a fixed expected fingerprint.
+# Appending a brand-new stale reference must NOT be silently absorbed by the
+# pin — that's exactly the whole-file-exclusion blind spot PINNED_FILES
+# replaced. See validate-flow-namespace.js's PINNED_FILES docblock.
+PINNED_BAK=$(mktemp) || exit 1
+if ! cp "$PINNED_PROBE" "$PINNED_BAK"; then
+  printf 'ERROR: failed to back up %s to %s\n' "$PINNED_PROBE" "$PINNED_BAK" >&2
+  rm -f "$PINNED_BAK"
+  exit 1
+fi
+PINNED_BAK_CREATED=1
+printf '\n/%s:review new stale ref\n' "$OLD" >>"$PINNED_PROBE"
+OUT=$(mktemp) || exit 1
+runGate "$OUT"
+check "pinned file fingerprint drift" 1 $? "${NS}-002" "$OUT"
+rm -f "$OUT"
+restorePinnedProbe || exit 1
+
+echo
+echo "=== K. tree restored, gate green again ==="
 node "$GATE" >/dev/null 2>&1
 check "restored" 0 $?
 

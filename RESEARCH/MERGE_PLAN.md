@@ -189,7 +189,7 @@ These five agents should survive as additions to whatever review pipeline you ad
 
 - **plugins/yellow-core/agents/workflow/knowledge-compounder.md** — Writes solutions to docs/solutions/. This *is* your equivalent of upstream's ce-compound skill execution path. If you adopt ce-compound, you can delete this; otherwise keep.
 
-- **plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md** — Drives /workflows:brainstorm. Upstream removed this orchestrator and folded the logic into ce-brainstorm skill itself (#519, #580). If you migrate to skills-first, delete this. If not, keep.
+- **plugins/yellow-core/agents/workflow/brainstorm-orchestrator.md** — Drives /flow:brainstorm. Upstream removed this orchestrator and folded the logic into ce-brainstorm skill itself (#519, #580). If you migrate to skills-first, delete this. If not, keep.
 
 - **plugins/yellow-debt/agents/scanners/\* (5 agents) + debt-fixer + audit-synthesizer** — All unique. Keep all 7. The audit-synthesizer orchestration pattern (parallel scanners → synthesizer) is essentially a tech-debt-flavored version of upstream's tiered persona pipeline; the architecture works, don't break it.
 
@@ -302,14 +302,14 @@ The single confirmed obsolete item plus stale-UNIQUE candidates flagged above. F
 # git rm -r plugins/yellow-composio
 # Update: .claude-plugin/marketplace.json, README.md plugin table
 # yellow-codex: introduced in PR #239 (v0.1.0). Possible overlap with yellow-core
-# workflows:work Codex delegation. Confirm whether you actually run codex:rescue,
+# flow:work Codex delegation. Confirm whether you actually run codex:rescue,
 # codex:review, codex:status before keeping.
 # git rm -r plugins/yellow-codex
 # Update: .claude-plugin/marketplace.json, README.md plugin table
 ```
 > Open question: do you actively use /composio:setup? If not, delete plugins/yellow-composio (saves marketplace clutter, no functional loss).
 >
-> Open question: do you run /codex:rescue, /codex:review, /codex:status from yellow-codex outside of workflows:work? If no, delete plugins/yellow-codex and lean on yellow-core's Codex delegation only.
+> Open question: do you run /codex:rescue, /codex:review, /codex:status from yellow-codex outside of flow:work? If no, delete plugins/yellow-codex and lean on yellow-core's Codex delegation only.
 >
 > Open question (the big one): if you adopt P0.1 option (a) — full migration to ce-\* skills — then plugins/yellow-core/commands/workflows/{plan,work,review,brainstorm,compound}.md and the brainstorm-orchestrator agent become OBSOLETE in favor of upstream's skill versions. Add to delete list only if you commit to (a). Under option (c) (parallel deprecation), keep them; under (b) (stay on workflows:\*), keep them.
 

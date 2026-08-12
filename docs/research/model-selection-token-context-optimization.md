@@ -242,7 +242,7 @@ Yes, with calibration:
 
 2. **`gemini-reviewer` + `opencode-reviewer`: add `model: haiku` + `effort: low`** (`plugins/yellow-council/agents/review/`). CLI relay agents. Measurable cost reduction on every `/council` invocation. Validate with 5 `/council review` runs.
 
-3. **`learnings-researcher`: add `model: haiku` + `effort: low`** (`plugins/yellow-core/agents/research/learnings-researcher.md`). Retrieval task, no reasoning complexity. Affects every `/review:pr` (Wave 2 pre-pass) and `/workflows:plan` invocation.
+3. **`learnings-researcher`: add `model: haiku` + `effort: low`** (`plugins/yellow-core/agents/research/learnings-researcher.md`). Retrieval task, no reasoning complexity. Affects every `/review:pr` (Wave 2 pre-pass) and `/flow:plan` invocation.
 
 4. **`runner-assignment`: add `model: haiku` + `effort: low`** (`plugins/yellow-ci/agents/ci/runner-assignment.md`). Label matching. Affects only `/ci:setup-self-hosted`.
 

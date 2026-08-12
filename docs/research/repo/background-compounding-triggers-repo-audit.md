@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-18
 **Branch:** agent/docs/compound-staging-plan
-**Purpose:** Feed the `/workflows:plan` phase for the two-tier background compounding pipeline
+**Purpose:** Feed the `/flow:plan` phase for the two-tier background compounding pipeline
 
 ---
 
@@ -255,6 +255,8 @@ Lines 159–161:
 When spawned by `/workflows:compound`, all findings are worthy (user explicitly
 requested compounding) — apply Routing Decision directly without severity filter.
 ```
+
+(that command is `/flow:compound` since the 2026-08-10 namespace rename)
 
 This is a **severity-filter bypass** only — it does NOT suppress M3 confirmation. There is currently NO fully non-interactive code path. The `staging-reviewer` cannot delegate to `knowledge-compounder` as-is without hitting AskUserQuestion.
 
@@ -540,7 +542,7 @@ The test harness pattern: `mktemp -d` for staging dir, `CLAUDE_PROJECT_DIR=<tmpd
 
 ## Item 10 — `compound.md`: Structure and Conventions for `compound/review-staged.md`
 
-**File:** `plugins/yellow-core/commands/workflows/compound.md` (99 lines total)
+**File:** `plugins/yellow-core/commands/flow/compound.md` (99 lines total)
 
 ### Frontmatter
 
@@ -560,6 +562,8 @@ allowed-tools:
 ---
 ```
 
+(the `name:` field is `flow:compound` since the 2026-08-10 namespace rename)
+
 ### Step structure
 
 ```text
@@ -571,7 +575,7 @@ Step 4: Report Results
 
 ### Conventions to mirror in `compound/review-staged.md`
 
-1. **Name field:** `workflows:review-staged` (sibling to `workflows:compound`) — **SUPERSEDED:** plan and brainstorm both place this command at `commands/compound/review-staged.md` invoked as `/compound:review-staged`. Use the `compound:` prefix.
+1. **Name field:** `workflows:review-staged` (sibling to `flow:compound`) — **SUPERSEDED:** plan and brainstorm both place this command at `commands/compound/review-staged.md` invoked as `/compound:review-staged`. Use the `compound:` prefix.
 2. **allowed-tools:** `Bash`, `Read`, `Task`, `ToolSearch`, plus ruvector MCP tools (same list)
 3. **Step 1 guard:** Check `docs/solutions/` exists AND check that staging dir has entries; if staging is empty, output a message and stop
 4. **Step 2:** `Task(subagent_type: "yellow-core:workflow:staging-reviewer")` — not `knowledge-compounder` directly
@@ -583,7 +587,7 @@ Step 4: Report Results
 
 | Property | `compound.md` | `review-staged.md` |
 |---|---|---|
-| Trigger | User ran `/workflows:compound` | User ran `/compound:review-staged` |
+| Trigger | User ran `/flow:compound` | User ran `/compound:review-staged` |
 | Agent spawned | `knowledge-compounder` | `staging-reviewer` (new) |
 | Context passed | Last 25 turns + $ARGUMENTS | Staging dir path (derived, not from user) |
 | M3 gate | In `knowledge-compounder` | None (non-interactive by design) |
@@ -600,7 +604,7 @@ Step 4: Report Results
 | `plugins/yellow-core/hooks/scripts/stop.sh` | Mirrors ruvector stop.sh structure; adds background subshell (prewarm-morph pattern lines 79–86); writes JSONL to staging |
 | `plugins/yellow-core/hooks/scripts/session-start.sh` | Mirrors yellow-ci structure; filesystem-only checks; spawns reviewer via disown if threshold met |
 | `plugins/yellow-core/agents/workflow/staging-reviewer.md` | New non-interactive agent; ruvector dedup + promote via knowledge-compounder with `mode: background` |
-| `plugins/yellow-core/commands/compound/review-staged.md` | Sibling to compound.md; manual drain trigger (note: plan places this under `commands/compound/`, not `commands/workflows/`) |
+| `plugins/yellow-core/commands/compound/review-staged.md` | Sibling to compound.md; manual drain trigger (note: plan places this under `commands/compound/`, not `commands/flow/`) |
 | `plugins/yellow-core/tests/stop.bats` | 5 tests per Item 9 spec |
 | `plugins/yellow-core/tests/session-start.bats` | 5 tests per Item 9 spec |
 

@@ -126,8 +126,8 @@ Framing (per advisor): the win isn't surfacing tools — it's **wiring ruvector'
 **I2. Learned review-persona / agent routing.**
 `hooks_route` / `hooks_route_enhanced` / `hooks_swarm_recommend` do **Q-learning task→agent routing with AST/diff/coverage signals** — the review pipeline currently selects conditional personas (adversarial-reviewer, security-reviewer, performance-reviewer…) by **static diff heuristics.** **Sketch:** feed the diff to `hooks_route_enhanced` as an *advisory* signal alongside the existing rules; record which personas actually produced surviving findings via `hooks_learn`, so selection improves over PRs. **Advisory only** — never let a learned router *suppress* an always-on persona. Vendor's 80%+ routing accuracy is **[vendor-stated]**; treat as a hint source, verify empirically.
 
-**I3. Co-edit / file-sequence prediction for review grouping & `/workflows:work`.**
-`hooks_coedit_record` / `hooks_coedit_suggest` learn "files edited together" via git-history Markov chains — directly useful for the repo's **file-based review grouping** ("one agent per file") and for pre-warming context in `/workflows:work`. **Sketch:** after edits, `coedit_record`; when planning a change, `coedit_suggest(file)` to surface likely-related files (e.g., "touched `plugin.json` → also usually touch `marketplace.json` + `setup/all.md`", a rule the repo enforces manually today).
+**I3. Co-edit / file-sequence prediction for review grouping & `/flow:work`.**
+`hooks_coedit_record` / `hooks_coedit_suggest` learn "files edited together" via git-history Markov chains — directly useful for the repo's **file-based review grouping** ("one agent per file") and for pre-warming context in `/flow:work`. **Sketch:** after edits, `coedit_record`; when planning a change, `coedit_suggest(file)` to surface likely-related files (e.g., "touched `plugin.json` → also usually touch `marketplace.json` + `setup/all.md`", a rule the repo enforces manually today).
 
 ### Tier 2 — high value, needs a decision on shared state
 

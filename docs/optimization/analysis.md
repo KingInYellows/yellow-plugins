@@ -135,6 +135,10 @@ Largest command files (`wc -l`, verified):
 | 549 | `plugins/yellow-core/commands/workflows/review.md` |
 | 543 | `plugins/gt-workflow/commands/gt-cleanup.md` |
 
+Paths above are as measured on 2026-07-01; `commands/workflows/` was renamed to
+`commands/flow/` in the 2026-08-10 namespace rename (line counts are this
+census's measured values and were not re-taken after the rename).
+
 12 command files exceed 500 lines (the 10 above plus
 `plugins/yellow-council/commands/council/council.md` at 527 and
 `plugins/yellow-core/commands/statusline/setup.md` at 538) **[relayed]** for the
@@ -325,11 +329,11 @@ Gaps:
     convention for skills.
   - CE's **negative disambiguation** ("prefer ce-brainstorm for exploratory
     framing", CE:`skills/ce-plan/SKILL.md:3`). This repo has confusable pairs
-    that would benefit: `optimize` vs `/workflows:review`, `debugging` vs
+    that would benefit: `optimize` vs `/flow:review`, `debugging` vs
     `/codex:rescue`, `ideation` vs `brainstorming`, `session-history` vs
     ruvector recall. Only `ideation` does it today
     (`plugins/yellow-core/skills/ideation/SKILL.md:3` names
-    `/workflows:brainstorm` as the boundary).
+    `/flow:brainstorm` as the boundary).
 
 ### 3.2 Token efficiency / progressive disclosure — 2/5
 
@@ -368,15 +372,16 @@ diverges:
 What's good (verified unless noted):
 
 - A real artifact pipeline exists and is arguably richer than CE's:
-  `/workflows:brainstorm` → `docs/brainstorms/…` → `/workflows:plan` →
-  `plans/…` → `/workflows:work`, plus the large-project track
-  `/workflows:spec` → `plans/specs/` → `/workflows:decompose` →
-  `plans/shells/` (with `depends_on`) → `/workflows:pick-next-shell` →
-  `/workflows:expand-shell` (paths cited from each command's header; see
-  `plugins/yellow-core/commands/workflows/pick-next-shell.md:130-136`).
+  `/flow:brainstorm` → `docs/brainstorms/…` → `/flow:plan` →
+  `plans/…` → `/flow:work`, plus the large-project track
+  `/flow:spec` → `plans/specs/` → `/flow:decompose` →
+  `plans/shells/` (with `depends_on`) → `/flow:pick-next-shell` →
+  `/flow:expand-shell` (paths cited from each command's header; see
+  `plugins/yellow-core/commands/workflows/pick-next-shell.md:130-136`; path as
+  measured on 2026-07-01, before the 2026-08-10 rename to `commands/flow/`).
   This mirrors turbo's plans/specs/shells almost exactly — convergent design.
 - Explicit halt-and-resume-from-file: "Context is likely full — run `/clear`,
-  then `/workflows:work plans/<shell-slug>.md`"
+  then `/flow:work plans/<shell-slug>.md`"
   (`pick-next-shell.md:133-135`, verified) — same philosophy as turbo's
   fresh-session halts (turbo:`README.md:101-110`).
 - Cross-plugin degradation contracts are documented per optional dependency
@@ -388,13 +393,15 @@ Gaps:
   scope handling; turbo declares one convention for all review skills
   (turbo:`claude/SKILL-CONVENTIONS.md:17`) and CE uses `mode:` tokens +
   structured return envelopes (CE:`skills/ce-work/SKILL.md:363-391`). Here,
-  `/review:pr` has `--non-interactive`, `/workflows:compound` has `--in-pr`,
+  `/review:pr` has `--non-interactive`, `/flow:compound` has `--in-pr`,
   debt scanners have their own JSON outputs — per-command inventions with no
   shared contract document.
-- **Mid-plan progress writeback is stack-path only.** `/workflows:work` writes
+- **Mid-plan progress writeback is stack-path only.** `/flow:work` writes
   `## Stack Progress` checkboxes back to the plan file only when a
   `## Stack Decomposition` section exists
-  (`plugins/yellow-core/commands/workflows/work.md:250-268`) **[relayed]**; the
+  (`plugins/yellow-core/commands/workflows/work.md:250-268`; path as measured
+  on 2026-07-01, before the 2026-08-10 rename to `commands/flow/`)
+  **[relayed]**; the
   default single-branch path tracks progress in in-session TaskCreate state,
   which does not survive a fresh session.
 - **No general session-handoff artifact** (turbo `create-handoff`). The halt
@@ -428,10 +435,11 @@ Gaps (all verified this session):
   `multi-host-fleet`).
 - **Stale integration claims.**
   `plugins/yellow-core/agents/research/learnings-researcher.md:294-299` claims
-  it is invoked by `/workflows:plan` and `/workflows:brainstorm`; neither
+  it is invoked by `/flow:plan` and `/flow:brainstorm`; neither
   dispatches it (plan.md uses ruvector `hooks_recall` at
-  `plugins/yellow-core/commands/workflows/plan.md:52-58`; brainstorm has zero
-  references to learnings or docs/solutions).
+  `plugins/yellow-core/commands/workflows/plan.md:52-58`; path as measured on
+  2026-07-01, before the 2026-08-10 rename to `commands/flow/`; brainstorm has
+  zero references to learnings or docs/solutions).
 - **Setup-command drift**: 17 plugins each hand-roll setup.md (278 vs 74 vs 95
   lines for the same nominal job across yellow-ci/linear/debt) with only a
   weak shared skeleton **[relayed]**.
@@ -479,8 +487,8 @@ Gaps (all verified this session):
 3. **Plan/brainstorm-time retrieval from docs/solutions/.** CE runs
    `learnings-researcher` at plan time (CE:`skills/ce-plan/SKILL.md:302-321`);
    here only `/review:pr`, `/review:review-all`, and `/docs:review` dispatch it
-   (verified dispatch sites), while `/workflows:plan` consults only ruvector
-   and `/workflows:brainstorm` consults nothing. The 99-doc solutions corpus is
+   (verified dispatch sites), while `/flow:plan` consults only ruvector
+   and `/flow:brainstorm` consults nothing. The 99-doc solutions corpus is
    invisible to the two commands that shape new work.
 4. **General session-handoff artifact (turbo create-handoff).** No equivalent;
    see §3.3.
@@ -512,7 +520,7 @@ T = turbo pattern.
   "integration context") with concrete trigger scenarios; adopt turbo-style
   quoted trigger phrases where user-invoked. (T; §3.1)
 - C2. Add CE-style negative-disambiguation clauses to confusable siblings:
-  optimize↔workflows:review, debugging↔codex:rescue, ideation↔brainstorming,
+  optimize↔flow:review, debugging↔codex:rescue, ideation↔brainstorming,
   session-history↔ruvector recall, memory systems. (CE; §3.1)
 - C3. Fix verified doc drift: yellow-core CLAUDE.md "Skills (13)" → 18 with the
   5 missing entries; `learnings-researcher.md:294-299` stale Integration list.
@@ -541,7 +549,7 @@ T = turbo pattern.
   and align the review/debt/docs surfaces to it. (T `SKILL-CONVENTIONS.md:15-17`,
   CE mode tokens; §3.3)
 - C9. Extend `## Stack Progress`-style plan-file checkbox writeback to the
-  default (non-stack) `/workflows:work` path so execution state survives a
+  default (non-stack) `/flow:work` path so execution state survives a
   fresh session. (T shells / CE U-ID pattern; §3.3)
 - C10. Add validator rules for the currently-aspirational authoring standards:
   SKILL.md line ceiling (warning tier), three-heading template where claimed,
@@ -566,7 +574,7 @@ T = turbo pattern.
   artifact capturing task, state, in-flight changes, next action; complements
   the existing halt-and-`/clear` pattern for non-shell work.
   (T `create-handoff`)
-- C15. **Learnings pre-pass for /workflows:plan and /workflows:brainstorm**:
+- C15. **Learnings pre-pass for /flow:plan and /flow:brainstorm**:
   dispatch the existing `learnings-researcher` (Haiku, already built) the way
   `/review:pr` Step 3d does; also makes its Integration section true again.
   (CE plan-time retrieval; §3.6.3)

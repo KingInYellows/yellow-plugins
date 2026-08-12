@@ -33,24 +33,64 @@
  * "harden" against it — see
  * docs/solutions/code-quality/mcp-tool-rename-prefix-collision.md.
  *
- * ALLOWLIST — `scripts/flow-namespace-allowlist.json`, keyed on
- * repo-relative POSIX path PLUS a per-command occurrence-count fingerprint:
+ * TWO TIERS, both fingerprint-checked, neither a silent whole-file skip:
  *
- *   { "plugins/gt-workflow/CLAUDE.md": { "work": 5, "plan": 2 }, ... }
+ * 1. ALLOWLIST — `scripts/flow-namespace-allowlist.json`, keyed on
+ *    repo-relative POSIX path PLUS a per-command occurrence-count fingerprint:
  *
- * The fingerprint is load-bearing, not just its total. A path+total-only
- * allowlist cannot catch a same-count substitution: if a PR removes one
- * `workflows:work` reference from an allowlisted file but introduces a
- * different `workflows:plan` reference elsewhere in the same file, the total
- * is unchanged and a total-only gate reports nothing. Comparing per-command
- * counts detects that. Fingerprints MUST be produced by this script's own
- * `--write-allowlist` mode, so they always come from the same matcher the
- * gate enforces with. Never transcribe them from an ad-hoc `rg` run.
+ *      { "plugins/gt-workflow/CLAUDE.md": { "work": 5, "plan": 2 }, ... }
  *
- * A declared allowlist path that is missing from disk is a HARD ERROR, per
- * the MEMORY_PROTOCOL_SENTINEL precedent in
- * scripts/validate-agent-authoring.js. Without it the allowlist rots silently
- * as later sweep PRs delete entries, and moving an allowlisted file passes
+ *    This is the SHRINKING sweep-progress ledger. It must reach zero entries
+ *    at the migration's terminal state; every entry here represents a file
+ *    the sweep has not finished yet.
+ *
+ * 2. PINNED_FILES — a `const` map in THIS script (not JSON; see its
+ *    docblock below). This is the PERMANENT tier: dated records whose
+ *    `workflows:` occurrences must never be rewritten, because rewriting
+ *    would falsify a historical claim. Unlike the old whole-file
+ *    `EXCLUDED_FILES` list this replaces, a pinned file is still WALKED AND
+ *    SCANNED — its live prose stays under the gate, and only the pinned
+ *    occurrences are permitted. A newly-introduced stale reference anywhere
+ *    else in a pinned file still fails the gate, because it changes the
+ *    file's fingerprint away from what's pinned.
+ *
+ * Both tiers compare fingerprints, not just totals — that's what catches a
+ * same-count substitution: if a PR removes one `workflows:work` reference
+ * from a file but introduces a different `workflows:plan` reference
+ * elsewhere in the same file, the total is unchanged and a total-only gate
+ * reports nothing. Comparing per-command counts detects that.
+ *
+ * PINNED_FILES goes one step further than the allowlist, because it is
+ * permanent rather than shrinking: its fingerprint is `{ counts, digest }`,
+ * where `digest` is a hash over the ORDERED list of individual occurrences
+ * (each one's command plus its normalized line text — see
+ * computeOccurrenceDigest() below), not just their per-command totals. A
+ * per-command COUNT-only fingerprint cannot see a same-command substitution
+ * — replacing one preserved `workflows:review` occurrence with a *different*
+ * `workflows:review` occurrence elsewhere in the same pinned file leaves the
+ * aggregate count for `review` unchanged, so a counts-only comparison sees
+ * nothing. The digest changes because the occurrence CONTENT changed even
+ * though the counts didn't. The allowlist tier does not carry this — it is a
+ * shrinking sweep-progress ledger that reaches zero entries at the
+ * migration's terminal state, so a transient same-command substitution
+ * there is a smaller and self-resolving risk; PINNED_FILES has no such
+ * terminal state; its entries live forever, so the stronger check earns its
+ * keep only there.
+ *
+ * Fingerprints for BOTH tiers MUST be produced by this script's own matcher
+ * — `--write-allowlist` for the allowlist, `--print-pinned-fingerprints` for
+ * PINNED_FILES — so they always come from the same matcher the gate
+ * enforces with. Never transcribe them from an ad-hoc `rg` run. Because
+ * PINNED_FILES's digest is sensitive to a pinned line's exact text, editing
+ * the prose on ANY line a pinned occurrence sits on — even a wording
+ * tweak that leaves the `workflows:` token itself untouched — changes the
+ * digest and forces a deliberate re-pin via `--print-pinned-fingerprints`.
+ * That is the intended cost of touching pinned content, not a bug.
+ *
+ * A declared path that is missing from disk is a HARD ERROR in EITHER tier,
+ * per the MEMORY_PROTOCOL_SENTINEL precedent in
+ * scripts/validate-agent-authoring.js. Without it a ledger rots silently as
+ * later sweep PRs delete entries, and moving a declared file passes
  * unnoticed.
  *
  * SCOPE — walks the whole repository from the root, INCLUDING hidden
@@ -71,31 +111,65 @@
  * flag this file as re-implementing them.
  *
  * Usage:
- *   node scripts/validate-flow-namespace.js                  # gate (CI)
- *   node scripts/validate-flow-namespace.js --write-allowlist # regenerate
+ *   node scripts/validate-flow-namespace.js                        # gate (CI)
+ *   node scripts/validate-flow-namespace.js --write-allowlist       # regenerate the allowlist
+ *   node scripts/validate-flow-namespace.js --print-pinned-fingerprints
+ *       # print the CURRENT per-command fingerprint for every PINNED_FILES
+ *       # path, computed by this script's own matcher, formatted to paste
+ *       # into the PINNED_FILES literal below. Run this after editing a
+ *       # pinned file's preserved captures, or after adding a new path to
+ *       # PINNED_FILES with a placeholder fingerprint. Never hand-transcribe.
  *
  * Env:
- *   FLOW_NS_ROOT=<dir>          repo root override (tests)
+ *   FLOW_NS_ROOT=<dir>          repo root override (tests). PINNED_FILES's
+ *                               missing-path HARD ERROR (see below) is
+ *                               scoped to the real repository root and does
+ *                               NOT apply when this points at a synthetic
+ *                               fixture tree — a small test fixture has no
+ *                               reason to contain CHANGELOG.md,
+ *                               AUDIT_REPORT.md, or any other PINNED_FILES
+ *                               path. The fixture root is still walked and
+ *                               scanned exactly like the real repo; a
+ *                               PINNED_FILES path just has no effect if it
+ *                               is absent from the fixture. CI always runs
+ *                               against the real root, so the hard check
+ *                               still applies there.
  *   FLOW_NS_ALLOWLIST=<file>    allowlist path override (tests)
  *   GITHUB_ACTIONS=true         emit `::error file=` annotations
  *
  * Exit codes:
  *   0 - clean
- *   1 - stale references, count drift, or a missing allowlist path
+ *   1 - stale references, count drift, or a missing allowlist/pinned path
  */
 
 'use strict';
 
 const { execFileSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const ROOT = path.resolve(process.env.FLOW_NS_ROOT || path.join(__dirname, '..'));
+const REAL_ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(process.env.FLOW_NS_ROOT || REAL_ROOT);
 const ALLOWLIST_FILE = path.resolve(
   process.env.FLOW_NS_ALLOWLIST || path.join(ROOT, 'scripts', 'flow-namespace-allowlist.json')
 );
 const IS_CI = process.env.GITHUB_ACTIONS === 'true';
 const WRITE_MODE = process.argv.includes('--write-allowlist');
+const PRINT_PINNED_MODE = process.argv.includes('--print-pinned-fingerprints');
+
+/**
+ * Whether PINNED_FILES' missing-path HARD ERROR is enforced for this run.
+ * See the FLOW_NS_ROOT entry in the module header's Env list — a
+ * FLOW_NS_ROOT-overridden fixture root has no reason to contain any of
+ * PINNED_FILES's real-repo paths, so requiring their existence there would
+ * make the documented override unusable for anything but a full repo clone.
+ * A fixture run still walks and scans whatever the fixture actually
+ * contains; nothing about PINNED_FILES's declaration affects scanning, only
+ * this existence check and the fingerprint comparison that follows it (both
+ * of which simply have nothing to compare when a pinned path is absent).
+ */
+const ENFORCE_PINNED_EXISTENCE = ROOT === REAL_ROOT;
 
 // Catalog code prefixes assembled via concatenation. See the module header.
 const NS = 'ERROR-' + 'NAMESPACE';
@@ -253,14 +327,15 @@ function keepMatch(line, m) {
 }
 
 /**
- * Permanent exclusions — never swept, by design.
+ * Whole-subtree exclusions — never walked, never scanned, no fingerprint.
  *
- * Three classes:
- *   - Dated records that would be FALSIFIED by rewriting (archived plans in
- *     plans/complete/**, brainstorms, solution docs, frozen audit snapshots,
- *     changelogs). The discriminator is "is this loaded as authoritative
- *     instruction, or is it a closed record of a past decision?" — not "is
- *     it old". Active plans directly under plans/ (and plans/shells/,
+ * These are BULK categories where every file underneath is uniformly out of
+ * scope, so per-file fingerprint pinning (see PINNED_FILES below) would add
+ * bookkeeping without adding safety:
+ *   - Directories of archived/closed records (plans/complete/**, brainstorms,
+ *     solution docs) — the discriminator is "is this loaded as authoritative
+ *     instruction, or is it a closed record of a past decision?", not "is it
+ *     old". Active plans directly under plans/ (and plans/shells/,
  *     plans/specs/, plans/handoff/) are live implementation instructions,
  *     not closed records, so they ARE scanned: a stale reference there would
  *     hand a future /workflows:work session to a command this migration
@@ -272,6 +347,12 @@ function keepMatch(line, m) {
  *     below, not hand-enumerated here. `.git` and `node_modules` stay
  *     hardcoded because they're VCS/tooling internals worth naming
  *     explicitly regardless of .gitignore's contents.
+ *
+ * A single MIXED file — one that carries both live prose and a preserved
+ * dated capture — must NOT go here: whole-subtree exclusion switches off
+ * scanning for both halves, so a newly-introduced stale reference in the live
+ * half would pass unnoticed. That per-file case is PINNED_FILES, below,
+ * which stays scanned and fingerprint-locked instead.
  *
  * Matched against repo-relative POSIX paths.
  */
@@ -339,18 +420,171 @@ function gitIgnoredEntries() {
 
 const GIT_IGNORED = gitIgnoredEntries();
 
-const EXCLUDED_FILES = [
-  'CHANGELOG.md', // root, bot-generated release history
-  'AUDIT_REPORT.md', // dated snapshot
+/**
+ * PINNED_FILES — permanent, per-file, fingerprint-checked. Replaces the old
+ * whole-file `EXCLUDED_FILES` list. Every path below is WALKED AND SCANNED
+ * like any other file; what's "pinned" is the expected fingerprint, not the
+ * file's visibility to the gate.
+ *
+ * Each entry is `{ counts, digest }`:
+ *   - `counts` — the per-command occurrence-count fingerprint, same shape
+ *     the allowlist uses (e.g. `{ work: 2, plan: 1 }`).
+ *   - `digest` — a hash (computeOccurrenceDigest() below) over the ORDERED
+ *     list of individual occurrences — each one's command plus its
+ *     normalized line text — not just their totals. `counts` alone cannot
+ *     see a same-command substitution: swapping one preserved
+ *     `workflows:review` occurrence for a *different* `workflows:review`
+ *     occurrence elsewhere in the same file leaves the aggregate count for
+ *     `review` unchanged. `digest` catches that, because the occurrence
+ *     CONTENT changed even though the totals didn't.
+ *
+ * A pinned file whose live fingerprint no longer matches the value recorded
+ * here — in `counts`, in `digest`, or both — is reported under
+ * `NS_ALLOWLIST_COUNT_DRIFT` (count drift), the same code the shrinking
+ * allowlist uses. The comparison itself runs inline in main(), using
+ * `countsEqual()` for `counts` and a direct string comparison against
+ * `computeOccurrenceDigest()`'s output for `digest`; `fingerprintDriftMessage()`
+ * renders the result, stating plainly whether the counts changed, the
+ * occurrence content changed, or both — those mean different things to a
+ * maintainer deciding how to react. The code is named by its constant rather
+ * than spelled out, because `lint-error-codes.js` fails any scripts/ file
+ * containing a literal catalog code — see the module header's note on
+ * assembling them by concatenation.
+ *
+ * This is a permanent ledger, not a sweep-progress one: pinned entries are
+ * NOT removed as the migration completes, and MUST NOT be moved into
+ * `scripts/flow-namespace-allowlist.json` (that file must reach zero entries
+ * at the migration's terminal state; PINNED_FILES has no such target).
+ *
+ * Regenerate BOTH `counts` and `digest` together with
+ * `node scripts/validate-flow-namespace.js --print-pinned-fingerprints`
+ * (see its docblock near WRITE_MODE) — never hand-transcribe from `rg`, and
+ * never hand-edit `digest` alone. Because `digest` is sensitive to a pinned
+ * occurrence's exact line text, editing the prose on a line a pinned
+ * occurrence sits on forces a re-pin, even if the `workflows:` token itself
+ * is untouched. That is the intended cost of touching pinned content, not a
+ * bug — see the module header's TWO TIERS section.
+ *
+ * Two classes below:
+ *   - All-historical: every `workflows:` occurrence in the file is a dated
+ *     record. Pinning these is strictly safer than leaving them off any
+ *     ledger (a future edit that adds a *new* live reference still fails the
+ *     gate, because the fingerprint no longer matches).
+ *   - MIXED: the file carries both live prose (swept to `flow:` normally)
+ *     and specific preserved captures (verbatim quotes, dated command names,
+ *     provenance fields). Whole-file exclusion was a blind spot for these —
+ *     it also stopped scanning the live half. Pinning fixes that: the live
+ *     prose is scanned like normal, and the fingerprint only covers the
+ *     preserved occurrences.
+ */
+const PINNED_FILES = {
+  // All-historical — bot-generated / dated / provenance records.
+  // Every `digest` below was produced by
+  // `node scripts/validate-flow-namespace.js --print-pinned-fingerprints`
+  // (see this map's docblock) — never hand-transcribed.
+  'CHANGELOG.md': {
+    counts: { brainstorm: 1, compound: 1 }, // root, bot-generated release history
+    digest: 'c3f4fc1220dcba1c',
+  },
+  'AUDIT_REPORT.md': {
+    counts: { brainstorm: 1, plan: 1, work: 1, compound: 1, 'deepen-plan': 1 }, // dated snapshot
+    digest: 'dd490db6ccb6911c',
+  },
   // Frozen audit snapshot living under a directory whose name suggests
   // living docs — classified per-file, not by directory.
-  'docs/maintenance/plugin-audit-2026-06-10.md',
-  // This migration's own plan doc — narrates the old namespace ~32 times by
-  // design, describing the very rename this gate enforces. Every other
-  // active plan under plans/ (and plans/shells/, plans/specs/,
-  // plans/handoff/) is a live instruction and IS scanned.
-  'plans/workflows-to-flow-namespace-migration.md',
-];
+  'docs/maintenance/plugin-audit-2026-06-10.md': { counts: { plan: 1 }, digest: '665a236fffd9d21d' },
+  // This migration's own plan doc — narrates the old namespace by design,
+  // describing the very rename this gate enforces. Every other active plan
+  // under plans/ (and plans/shells/, plans/specs/, plans/handoff/) is a live
+  // instruction and IS scanned against the shrinking allowlist instead.
+  'plans/workflows-to-flow-namespace-migration.md': {
+    counts: {
+      '(glob)': 8,
+      '(placeholder)': 9,
+      plan: 3,
+      work: 4,
+      'deepen-plan': 1,
+      spec: 1,
+    },
+    digest: '68e5cdced31e82c2',
+  },
+  // `every-plugin-research.md` is upstream changelog analysis: every
+  // `workflows:` reference is a claim about the UPSTREAM EveryInc plugin's
+  // own `workflows:*` namespace and its v2.38.0 rename to `ce:*` — a
+  // different project's history. Rewriting them to `flow:` would state a
+  // falsehood about someone else's repo, which is a strictly worse outcome
+  // than a stale-looking string.
+  'RESEARCH/every-plugin-research.md': {
+    counts: { '(glob)': 4, plan: 1, review: 1, brainstorm: 1 },
+    digest: '996fd2ab2f53934e',
+  },
+  // `MERGE_PLAN.md` is the concept-fork comparison. Its remaining
+  // `workflows:` references are NOT all upstream-only: the doc's central
+  // claim ("your commands are named workflows:* like upstream's
+  // pre-v2.38.0 naming") is a true-in-the-old-vocabulary claim about
+  // upstream history, and the inventory-diff table + "your state" prose
+  // are a dated snapshot of THIS repo pinned to the doc's 2026-04-28
+  // generation date — both are point-in-time records, not present-tense
+  // claims, so they're preserved verbatim. The doc's present-tense
+  // own-repo references (what brainstorm-orchestrator "drives", the
+  // yellow-codex/yellow-core Codex-delegation overlap note, what
+  // yellow-codex runs "outside of") were live claims about current
+  // behavior and have been swept to `flow:*` directly in the file.
+  'RESEARCH/MERGE_PLAN.md': { counts: { '(glob)': 7, plan: 1 }, digest: 'd88fd2f698eb05e0' },
+  // `upstream-snapshots/.../MANIFEST.md` and `01-plugin-inventory.md` are
+  // pinned historical snapshot/survey — provenance records that preserve
+  // pre-rename command names verbatim (the fetch-manifest's `Fetched by`
+  // field and the inventory's per-plugin command lists), each annotated
+  // in-place with the post-rename equivalent rather than rewritten.
+  'RESEARCH/upstream-snapshots/e5b397c9d1883354f03e338dd00f98be3da39f9f/MANIFEST.md': {
+    counts: { work: 1 },
+    digest: '78b9a18ec0f85082',
+  },
+  'RESEARCH/01-plugin-inventory.md': {
+    counts: {
+      'deepen-plan': 1,
+      plan: 1,
+      work: 1,
+      review: 1,
+      compound: 1,
+      brainstorm: 1,
+    },
+    digest: '75dcc1ae48fd6bbf',
+  },
+
+  // MIXED — live prose (scanned normally) plus preserved dated captures.
+  //
+  // Dated repo audit (2026-05-18) with two fenced blocks presented as
+  // verbatim captures of pre-rename source: a "Lines 159–161" quote from
+  // knowledge-compounder.md and compound.md's captured frontmatter
+  // (`name: workflows:compound`). Both predate the 2026-08-10 rename, so
+  // rewriting the quoted tokens would make the captures disagree with the
+  // source actually inspected. Each fence carries an in-place annotation
+  // giving the post-rename equivalent; the file's own prose (describing
+  // the repo today) is on `flow:*` and IS scanned.
+  'docs/research/repo/background-compounding-triggers-repo-audit.md': {
+    counts: { compound: 2 },
+    digest: '572701f2e17863af',
+  },
+  // Revalidation doc whose revision-2 provenance (2026-08-01, one week
+  // before the 2026-08-10 rename) records the command used to re-enrich
+  // it: `/yellow-research:workflows:deepen-plan`. Preserved verbatim in
+  // both provenance sites (the Date line and the References source list),
+  // each annotated with the post-rename equivalent. The body's own
+  // `/flow:brainstorm` → `/flow:spec` → `/flow:decompose` pipeline mention
+  // is a live statement about what happens next and IS scanned.
+  'docs/research/yellow-council-v2-revalidation-2026-08-01.md': {
+    counts: { 'deepen-plan': 2 },
+    digest: '6b3f2cc2015cac9a',
+  },
+  // Wave 3 research deliverable dated 2026-04-30, evaluating `codex-executor`
+  // as it stood before the 2026-08-10 rename. Both dated-evaluation sites
+  // (scope list, "Other observed expansion opportunities") preserve the
+  // pre-rename `/workflows:work` name verbatim, each annotated in-place with
+  // the post-rename `/flow:work` equivalent. The rest of the file's prose is
+  // unaffected by the rename and IS scanned.
+  'docs/research/yellow-codex-expansion.md': { counts: { work: 2 }, digest: '4fba602677459bf3' },
+};
 
 /** `plugins/<name>/CHANGELOG.md` — per-plugin release history. */
 const PLUGIN_CHANGELOG_RE = /^plugins\/[^/]+\/CHANGELOG\.md$/;
@@ -385,7 +619,9 @@ const SELF_REL = toPosix(path.relative(ROOT, __filename));
 
 function isExcluded(relPath) {
   if (relPath === SELF_REL) return true;
-  if (EXCLUDED_FILES.includes(relPath)) return true;
+  // PINNED_FILES paths are NOT excluded here — they must be walked and
+  // scanned like any other file. Their fingerprint is checked in main(),
+  // not gated out of the walk. See PINNED_FILES's docblock.
   if (PLUGIN_CHANGELOG_RE.test(relPath)) return true;
   for (const dir of EXCLUDED_DIRS) {
     if (relPath === dir || relPath.startsWith(dir + '/')) return true;
@@ -437,7 +673,13 @@ function walk(dir, acc) {
  * `workflows:plan` at unchanged total) has to disturb. See the module
  * header's ALLOWLIST section.
  *
- * @returns {{ counts: Record<string, number>, lines: number[] }}
+ * `occurrences` is the same matches in FILE ORDER, each carrying its command
+ * key plus the raw line it sits on — the input computeOccurrenceDigest()
+ * needs to catch a same-command substitution in PINNED_FILES, which `counts`
+ * alone cannot see. Only the PINNED_FILES tier consumes it; the allowlist
+ * tier uses `counts` only.
+ *
+ * @returns {{ counts: Record<string, number>, lines: number[], occurrences: Array<{ key: string, line: string }> }}
  */
 function scanFile(relPath) {
   let content;
@@ -453,6 +695,7 @@ function scanFile(relPath) {
   }
   const lines = [];
   const counts = {};
+  const occurrences = [];
   content.split('\n').forEach((line, i) => {
     const matches = [...line.matchAll(STALE_RE)].filter((m) => keepMatch(line, m));
     if (matches.length === 0) return;
@@ -460,9 +703,10 @@ function scanFile(relPath) {
     for (const m of matches) {
       const key = m[1] || collectiveKeyFor(m[2]);
       counts[key] = (counts[key] || 0) + 1;
+      occurrences.push({ key, line });
     }
   });
-  return { counts, lines };
+  return { counts, lines, occurrences };
 }
 
 /** Sum of all per-command counts in a fingerprint. */
@@ -487,6 +731,37 @@ function countsEqual(a, b) {
     if ((a[cmd] || 0) !== (b[cmd] || 0)) return false;
   }
   return true;
+}
+
+/**
+ * Whitespace-normalizes a line before it is folded into
+ * computeOccurrenceDigest()'s hash material, so a change in this file's own
+ * `STALE_RE` regex behavior aside, purely incidental re-indentation of a
+ * pinned line does not itself force a re-pin — only a change to the line's
+ * actual text does.
+ */
+function normalizeOccurrenceLine(line) {
+  return line.trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Stable per-occurrence digest for the PINNED_FILES permanent tier. A
+ * per-command COUNT is blind to a same-command substitution — replacing one
+ * preserved `workflows:review` occurrence with a *different* one of the same
+ * command, elsewhere in the same file, leaves the aggregate count for
+ * `review` unchanged. This digest is a SHA-256 over the ORDERED list of
+ * (command-key, normalized line text) pairs, so it changes whenever ANY
+ * individual occurrence's line text changes or the occurrences are
+ * reordered, even when the aggregate counts do not. Truncated to 16 hex
+ * characters — this is a drift trip-wire, not a security boundary, so
+ * collision resistance far beyond what a maintainer needs to trust a diff
+ * is unnecessary length.
+ */
+function computeOccurrenceDigest(occurrences) {
+  const material = occurrences
+    .map((o) => `${o.key}\t${normalizeOccurrenceLine(o.line)}`)
+    .join('\n');
+  return crypto.createHash('sha256').update(material, 'utf8').digest('hex').slice(0, 16);
 }
 
 /** @returns {Map<string, Record<string, number>>} repo-relative path -> per-command fingerprint */
@@ -545,24 +820,170 @@ function writeAllowlist(found) {
   );
 }
 
+/**
+ * Hard-errors if any declared PINNED_FILES path is missing from disk,
+ * exactly like the gate-mode check in main() below, but invoked from the two
+ * fingerprint-GENERATION modes (`--write-allowlist`,
+ * `--print-pinned-fingerprints`) before either takes its early return. Both
+ * modes read PINNED_FILES to decide what to exclude or what to print; a
+ * deleted or renamed pinned path must fail loudly there too, not just in
+ * gate mode — otherwise `--print-pinned-fingerprints` would happily print an
+ * empty `{ counts: {}, digest: '<empty-hash>' }` for a file that no longer
+ * exists, which looks like a valid (if unusual) fingerprint rather than the
+ * configuration error it actually is.
+ *
+ * Scoped by ENFORCE_PINNED_EXISTENCE — see its docblock and the FLOW_NS_ROOT
+ * entry in the module header's Env list: a FLOW_NS_ROOT-overridden fixture
+ * root has no reason to contain any PINNED_FILES path.
+ *
+ * @param {string} invokedAs the flag name, for the error message
+ */
+function reportMissingPinnedPaths(invokedAs) {
+  if (!ENFORCE_PINNED_EXISTENCE) return;
+  const missing = Object.keys(PINNED_FILES).filter(
+    (relPath) => !fs.existsSync(path.join(ROOT, relPath))
+  );
+  if (missing.length === 0) return;
+  for (const relPath of missing) {
+    console.error(
+      `${NS_ALLOWLIST_PATH_MISSING} ${relPath}: declared in PINNED_FILES (${SELF_REL}) but not ` +
+        `found on disk. ${invokedAs} cannot produce a fingerprint for a path that does not exist ` +
+        '— if the file moved, update its key in this script; if it was deleted, remove the entry.'
+    );
+  }
+  process.exit(1);
+}
+
+/**
+ * `--print-pinned-fingerprints` — prints the CURRENT `{ counts, digest }`
+ * fingerprint for every PINNED_FILES path, computed by this script's own
+ * matcher (a fresh scanFile() per path, not the pre-scanned `found` map —
+ * this needs each file's ordered occurrences, which `found` does not carry),
+ * formatted ready to paste into the PINNED_FILES literal above. This is the
+ * only sanctioned way to produce a pinned fingerprint — never hand-transcribe
+ * one from an ad-hoc `rg` run, and never hand-edit `digest` alone.
+ *
+ * Callers must run reportMissingPinnedPaths() first — this function assumes
+ * every PINNED_FILES path exists (or, under a FLOW_NS_ROOT fixture override,
+ * that a missing one is expected and scanFile() reading it is not attempted
+ * here because it is simply skipped).
+ */
+function printPinnedFingerprints() {
+  const keys = Object.keys(PINNED_FILES).sort();
+  console.log(
+    '[validate-flow-namespace] Current fingerprints for PINNED_FILES — paste into the map in ' +
+      `${SELF_REL}:\n`
+  );
+  for (const relPath of keys) {
+    if (!fs.existsSync(path.join(ROOT, relPath))) continue; // fixture root only; see the docblock above
+    const { counts, occurrences } = scanFile(relPath);
+    const digest = computeOccurrenceDigest(occurrences);
+    console.log(`  ${JSON.stringify(relPath)}: ${JSON.stringify({ counts, digest })},`);
+  }
+}
+
 function annotate(relPath, line, message) {
   if (IS_CI) console.error(`::error file=${relPath},line=${line}::${message}`);
+}
+
+/**
+ * Renders the `NS_ALLOWLIST_COUNT_DRIFT` (count-drift) message for one ledger
+ * entry. The two ledgers compare differently: the allowlist compares
+ * `counts` only (`countsEqual()`), while PINNED_FILES compares both `counts`
+ * and `digest` (computeOccurrenceDigest()) — see PINNED_FILES's docblock for
+ * why the digest exists. The guidance differs too: the allowlist is a
+ * shrinking sweep-progress ledger (drift usually means "finish the sweep"),
+ * while PINNED_FILES is a permanent pin on dated content (drift usually
+ * means a NEW stale reference appeared, or a preserved occurrence's line
+ * text changed, and must not be silently re-pinned away without checking).
+ *
+ * @param {'pinned'|'allowlist'} kind
+ * @param {object} expected for 'pinned', `{ counts, digest }`; for
+ *   'allowlist', a plain counts object
+ * @param {Record<string, number>} foundCounts
+ * @param {Array<{key: string, line: string}>} [foundOccurrences] only used
+ *   for kind === 'pinned'
+ */
+function fingerprintDriftMessage(kind, relPath, expected, foundCounts, foundOccurrences) {
+  if (kind === 'pinned') {
+    const foundDigest = computeOccurrenceDigest(foundOccurrences || []);
+    const countsMatch = countsEqual(expected.counts, foundCounts);
+    const digestMatch = expected.digest === foundDigest;
+    const what =
+      !countsMatch && !digestMatch
+        ? 'Both the per-command COUNTS and the OCCURRENCE CONTENT changed'
+        : !countsMatch
+          ? 'The per-command COUNTS changed'
+          : 'The OCCURRENCE CONTENT changed — a preserved line was swapped for a different ' +
+            'occurrence of the same command, or its text was edited — while the per-command ' +
+            'COUNTS stayed the same';
+    return (
+      `${NS_ALLOWLIST_COUNT_DRIFT} ${relPath}: PINNED_FILES declares ` +
+      `{${fmtCounts(expected.counts)}} (digest ${expected.digest}) but found ` +
+      `{${fmtCounts(foundCounts)}} (digest ${foundDigest}). ${what}. This path is a PERMANENT ` +
+      'pin on dated/historical content (see PINNED_FILES in scripts/validate-flow-namespace.js), ' +
+      'not a sweep-in-progress entry. Re-pin deliberately, with ' +
+      '`node scripts/validate-flow-namespace.js --print-pinned-fingerprints` to regenerate BOTH ' +
+      'counts and digest, only if the new occurrence is genuinely historical; if it is a live ' +
+      'claim, rename it to `flow:` instead.'
+    );
+  }
+  const expectedTotal = totalOf(expected);
+  const foundTotal = totalOf(foundCounts);
+  const direction =
+    foundTotal < expectedTotal
+      ? 'partially swept'
+      : foundTotal > expectedTotal
+        ? 'gained references'
+        : 'reference mix changed';
+  return (
+    `${NS_ALLOWLIST_COUNT_DRIFT} ${relPath}: allowlist declares {${fmtCounts(expected)}} ` +
+    `but found {${fmtCounts(foundCounts)}} (${direction}). Finish the sweep for this file and ` +
+    'remove its entry, or re-run --write-allowlist if the new fingerprint is intended.'
+  );
 }
 
 function main() {
   const found = scanRepo();
 
   if (WRITE_MODE) {
-    writeAllowlist(found);
+    reportMissingPinnedPaths('--write-allowlist'); // before the early return — see its docblock
+    // PINNED_FILES entries are a separate, permanent ledger — they must
+    // never be written into the shrinking allowlist, even though they are
+    // now scanned like any other file and so appear in `found`.
+    const sweepOnly = new Map([...found].filter(([relPath]) => !(relPath in PINNED_FILES)));
+    writeAllowlist(sweepOnly);
+    return;
+  }
+
+  if (PRINT_PINNED_MODE) {
+    reportMissingPinnedPaths('--print-pinned-fingerprints'); // before the early return
+    printPinnedFingerprints();
     return;
   }
 
   const allowlist = loadAllowlist();
   const errors = [];
 
-  // 1. A declared path that no longer exists on disk is a hard error. Without
-  //    this the allowlist rots as sweep PRs delete entries, and moving an
-  //    allowlisted file passes silently.
+  // 0. A path declared in BOTH ledgers is a maintainer authoring mistake:
+  //    permanent pins must not live in the shrinking allowlist (module
+  //    header's ALLOWLIST section) and vice versa. Fail loudly rather than
+  //    silently preferring one ledger over the other.
+  const dualDeclared = Object.keys(PINNED_FILES).filter((relPath) => relPath in allowlist);
+  if (dualDeclared.length > 0) {
+    console.error(
+      '[validate-flow-namespace] ✗ configuration error: ' +
+        `${dualDeclared.join(', ')} ${dualDeclared.length === 1 ? 'is' : 'are'} declared in ` +
+        `BOTH PINNED_FILES (${SELF_REL}) and the allowlist ` +
+        `(${toPosix(path.relative(ROOT, ALLOWLIST_FILE))}). A permanent pin must not also live in ` +
+        'the shrinking allowlist. Remove it from whichever ledger is wrong.'
+    );
+    process.exit(1);
+  }
+
+  // 1. A declared path that no longer exists on disk is a hard error, in
+  //    EITHER ledger. Without this a ledger rots as sweep PRs delete entries,
+  //    and moving a declared file passes silently.
   for (const relPath of Object.keys(allowlist)) {
     if (!fs.existsSync(path.join(ROOT, relPath))) {
       errors.push(
@@ -577,50 +998,75 @@ function main() {
       );
     }
   }
+  // Scoped to the real repo root — see ENFORCE_PINNED_EXISTENCE's docblock
+  // and the FLOW_NS_ROOT entry in the module header's Env list. A
+  // FLOW_NS_ROOT-overridden fixture root has no reason to contain any
+  // PINNED_FILES path, so this hard check would otherwise make the
+  // documented override unusable for anything but a full repo clone.
+  if (ENFORCE_PINNED_EXISTENCE) {
+    for (const relPath of Object.keys(PINNED_FILES)) {
+      if (!fs.existsSync(path.join(ROOT, relPath))) {
+        errors.push(
+          `${NS_ALLOWLIST_PATH_MISSING} ${relPath}: declared in PINNED_FILES (${SELF_REL}) but ` +
+            'not found on disk. If the file moved, update its key in the same commit; if it was ' +
+            'deleted, remove the entry.'
+        );
+        annotate(
+          SELF_REL,
+          1,
+          `${NS_ALLOWLIST_PATH_MISSING} pinned path not found: ${relPath}`
+        );
+      }
+    }
+  }
 
-  // 2. Every file with a stale reference must be allowlisted at the exact
-  //    current per-command fingerprint. Comparing the fingerprint (not just
-  //    the total) is what catches a same-count substitution — see the
-  //    module header's ALLOWLIST section.
+  // 2. Every file with a stale reference must be declared — in the allowlist
+  //    or in PINNED_FILES — at the exact current per-command fingerprint.
+  //    Comparing the fingerprint (not just the total) is what catches a
+  //    same-count substitution — see the module header's ALLOWLIST section.
   for (const [relPath, counts] of found) {
     const total = totalOf(counts);
-    if (!(relPath in allowlist)) {
+    const pinned = relPath in PINNED_FILES;
+    const allowlisted = relPath in allowlist;
+
+    if (!pinned && !allowlisted) {
       const { lines } = scanFile(relPath);
       errors.push(
         `${NS_STALE_REFERENCE} ${relPath}: ${total} reference${total === 1 ? '' : 's'} to the ` +
           `retired \`workflows:\` namespace (line${lines.length === 1 ? '' : 's'} ` +
           `${lines.join(', ')}). Rename to \`flow:\`, or add the file to ` +
-          `${toPosix(path.relative(ROOT, ALLOWLIST_FILE))} via --write-allowlist if it is ` +
-          'a dated record that must not be rewritten.'
+          `${toPosix(path.relative(ROOT, ALLOWLIST_FILE))} via --write-allowlist if it is being ` +
+          'swept in stages, or to PINNED_FILES in this script if it is a dated record that must ' +
+          'never be rewritten.'
       );
       annotate(relPath, lines[0], `${NS_STALE_REFERENCE} stale \`workflows:\` reference`);
       continue;
     }
+
+    if (pinned) {
+      const expected = PINNED_FILES[relPath];
+      const { lines, occurrences } = scanFile(relPath);
+      const countsMatch = countsEqual(counts, expected.counts);
+      const digestMatch = expected.digest === computeOccurrenceDigest(occurrences);
+      if (!countsMatch || !digestMatch) {
+        const msg = fingerprintDriftMessage('pinned', relPath, expected, counts, occurrences);
+        errors.push(msg);
+        annotate(relPath, lines[0], msg);
+      }
+      continue;
+    }
+
     const expected = allowlist[relPath];
     if (!countsEqual(counts, expected)) {
-      const expectedTotal = totalOf(expected);
-      const direction =
-        total < expectedTotal
-          ? 'partially swept'
-          : total > expectedTotal
-            ? 'gained references'
-            : 'reference mix changed';
-      errors.push(
-        `${NS_ALLOWLIST_COUNT_DRIFT} ${relPath}: allowlist declares {${fmtCounts(expected)}} ` +
-          `but found {${fmtCounts(counts)}} (${direction}). Finish the sweep for this file and ` +
-          'remove its entry, or re-run --write-allowlist if the new fingerprint is intended.'
-      );
-      annotate(
-        relPath,
-        scanFile(relPath).lines[0],
-        `${NS_ALLOWLIST_COUNT_DRIFT} allowlist count drift: expected {${fmtCounts(expected)}}, ` +
-          `found {${fmtCounts(counts)}}`
-      );
+      const msg = fingerprintDriftMessage('allowlist', relPath, expected, counts);
+      errors.push(msg);
+      annotate(relPath, scanFile(relPath).lines[0], msg);
     }
   }
 
-  // 3. An allowlisted file that exists but is now clean should lose its entry,
-  //    so the allowlist shrinks monotonically toward the terminal state.
+  // 3a. An allowlisted file that exists but is now clean should lose its
+  //     entry, so the allowlist shrinks monotonically toward the terminal
+  //     state.
   for (const relPath of Object.keys(allowlist)) {
     if (!fs.existsSync(path.join(ROOT, relPath))) continue; // already reported above
     if (!found.has(relPath)) {
@@ -638,6 +1084,24 @@ function main() {
     }
   }
 
+  // 3b. A pinned file that exists but no longer carries its expected
+  //     occurrences is also drift — the preserved historical capture went
+  //     missing — even though `found` never listed it (found only holds
+  //     files with a non-zero live count). Unlike the allowlist case above,
+  //     this is NOT "remove the entry": a permanent pin going to zero is
+  //     unexpected and needs a maintainer to look, not a silent shrink.
+  for (const relPath of Object.keys(PINNED_FILES)) {
+    if (!fs.existsSync(path.join(ROOT, relPath))) continue; // already reported above, or a FLOW_NS_ROOT fixture
+    if (!found.has(relPath)) {
+      const expected = PINNED_FILES[relPath];
+      if (totalOf(expected.counts) > 0) {
+        const msg = fingerprintDriftMessage('pinned', relPath, expected, {}, []);
+        errors.push(msg);
+        annotate(SELF_REL, 1, msg);
+      }
+    }
+  }
+
   if (errors.length > 0) {
     console.error('[validate-flow-namespace] ✗ namespace migration is not clean:');
     for (const e of errors) console.error(`  ${e}`);
@@ -649,15 +1113,24 @@ function main() {
   }
 
   const remaining = [...found.values()].reduce((a, counts) => a + totalOf(counts), 0);
-  if (remaining === 0) {
+  const pinnedTotal = [...found.entries()].reduce(
+    (a, [relPath, counts]) => a + (relPath in PINNED_FILES ? totalOf(counts) : 0),
+    0
+  );
+  const sweepRemaining = remaining - pinnedTotal;
+  if (sweepRemaining === 0) {
     console.log(
-      '[validate-flow-namespace] ✓ no `workflows:` references remain outside permanent exclusions'
+      '[validate-flow-namespace] ✓ no `workflows:` references remain outside permanent pins ' +
+        `(${pinnedTotal} pinned reference${pinnedTotal === 1 ? '' : 's'} across ` +
+        `${Object.keys(PINNED_FILES).length} permanent file${
+          Object.keys(PINNED_FILES).length === 1 ? '' : 's'
+        })`
     );
   } else {
     console.log(
-      `[validate-flow-namespace] ✓ ${remaining} allowlisted \`workflows:\` reference` +
-        `${remaining === 1 ? '' : 's'} across ${found.size} file${found.size === 1 ? '' : 's'} ` +
-        '(sweep in progress — counts match the allowlist exactly)'
+      `[validate-flow-namespace] ✓ ${sweepRemaining} allowlisted \`workflows:\` reference` +
+        `${sweepRemaining === 1 ? '' : 's'} (sweep in progress — counts match the allowlist ` +
+        `exactly), plus ${pinnedTotal} permanently pinned reference${pinnedTotal === 1 ? '' : 's'}`
     );
   }
 }
