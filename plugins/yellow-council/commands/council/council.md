@@ -355,12 +355,12 @@ parse_reviewer_return() {
       # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
       # test below, since this helper also classifies the BEGIN line itself
       # now, not just body lines.
-      if (s !~ /^-----/) sub(/^[-+]/, "", s)
+      if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
       sub(/^[[:space:]]+/, "", s)
       sub(/[[:space:]]+$/, "", s)
       return s
     }
-    function cred_hit(re, minlen) {
+    function cred_hit(re, minlen,   s) {
       # mawk (the default /usr/bin/awk on Debian/Ubuntu) does not support
       # interval expressions ({n,}/{n}) — it matches them literally, so a
       # `{20,}`-gated credential regex silently stops matching real secrets on
@@ -370,8 +370,17 @@ parse_reviewer_return() {
       # RLENGTH >= prefixlen+N is equivalent to {N,} / {N} for detection
       # purposes (we only ever discard the matched text, never reuse it, so
       # {N} exact and {N,} at-least are interchangeable here).
-      match($0, re)
-      return (RLENGTH >= minlen)
+      # match() returns only the LEFTMOST occurrence. A short placeholder
+      # sharing the same literal prefix would shadow a real credential
+      # later on the same line, emitting the whole line unredacted. Walk
+      # every start position, advancing ONE character rather than past the
+      # whole match: a longer occurrence can begin inside a shorter one.
+      s = $0
+      while (match(s, re)) {
+        if (RLENGTH >= minlen) return 1
+        s = substr(s, RSTART + 1)
+      }
+      return 0
     }
     function is_base64_line(s, minlen) {
       if (s !~ /^[A-Za-z0-9+\/=]+$/) return 0
@@ -434,7 +443,7 @@ parse_reviewer_return() {
           in_pem = 1
           pem_stray = 0
           pem_span = 0
-          if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+          if (pem_check ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
           else pem_real = 0
         }
       }
@@ -465,9 +474,10 @@ parse_reviewer_return() {
       # below — because closing it completely would require watching
       # indefinitely, which reintroduces the "swallow the whole report"
       # failure the window exists to prevent.
-      if (pem_watch > 0) {
+      if (!in_pem && pem_watch > 0) {
         pem_check = strip_deco($0)
-        if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/) {
+        if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/ &&
+            pem_check ~ /[0-9+\/=]/) {
           in_pem = 1
           pem_stray = 0
           pem_span = 0
@@ -523,6 +533,32 @@ parse_reviewer_return() {
   if [ "$reviewer_name" = "claude" ]; then
     summary=$(printf '%s\n' "$summary" | awk "$redact_awk")
     findings=$(printf '%s\n' "$findings" | awk "$redact_awk")
+    # Redact the PERSISTED file too, not just these locals. Every Bash block
+    # runs in a fresh subprocess, so REVIEWER_SUMMARIES/REVIEWER_FINDINGS die
+    # when this one exits — and Step 5 runs later, in a different block. If
+    # the only sanitized copy is in memory, Step 5 has nothing to read and
+    # falls back to the raw Task return still sitting in model context,
+    # which defeats this redaction entirely. Sanitizing the file that
+    # $STATE_FILE points at is what actually survives to synthesis.
+    # Step 7 redacts this same file again before appending it to the report;
+    # the pass is idempotent (redacted placeholder lines contain no
+    # credential-shaped text), and Step 7 must keep its own pass because the
+    # CLI legs reach it without ever passing through this branch.
+    if [ -n "$fenced_path" ] && [ -f "$fenced_path" ] && [ ! -L "$fenced_path" ]; then
+      local redacted_tmp
+      redacted_tmp=$(mktemp "${fenced_path}.redacted.XXXXXX") || redacted_tmp=""
+      if [ -n "$redacted_tmp" ]; then
+        if awk "$redact_awk" "$fenced_path" > "$redacted_tmp"; then
+          mv "$redacted_tmp" "$fenced_path"
+        else
+          # Fail CLOSED: an unredacted fenced file must never reach Step 5.
+          rm -f "$redacted_tmp"
+          printf '[council] Error: redaction of %s failed — truncating\n' \
+            "$fenced_path" >&2
+          : > "$fenced_path"
+        fi
+      fi
+    fi
   fi
   # Constrain verdict/confidence to their enums HERE, at the single point of
   # entry, before anything stores or renders them. Both are taken verbatim
@@ -586,7 +622,18 @@ values arrive here stripped of any fencing. `parse_reviewer_return` already
 ran the 11-pattern credential redaction over claude's summary + findings
 before storing them (Step 4) — the three CLI legs' fields need no equivalent
 pass here because they derive from a `REDACTED_FILE` the agent already
-redacted. Before composing the synthesis from them, wrap each reviewer's
+redacted.
+
+**Read every reviewer's summary and findings from the sanitized file at that
+reviewer's `$STATE_FILE` path — never from the Task return in context.** The
+Bash arrays Step 4 filled do not exist here: each Bash block runs in its own
+subprocess, so `REVIEWER_SUMMARIES`/`REVIEWER_FINDINGS` are gone by the time
+this step runs. The raw Task return IS still in context, and synthesizing
+from it silently bypasses Step 4's redaction — the sanitized bytes live only
+in the file on disk. Step 4 redacts that file in place for the claude leg;
+the CLI legs write theirs already redacted.
+
+Before composing the synthesis from them, wrap each reviewer's
 summary + findings in the full sandwich fence from the `council-patterns`
 skill ("Injection Fence Format"), escaping any embedded literal begin/end
 delimiter line first with an `[ESCAPED]` prefix (mechanical substitution, per
@@ -925,12 +972,12 @@ for reviewer in claude codex gemini opencode; do
         # "-----BEGIN..." into "----BEGIN..." and break every anchored marker
         # test below, since this helper also classifies the BEGIN line itself
         # now, not just body lines.
-        if (s !~ /^-----/) sub(/^[-+]/, "", s)
+        if (s !~ /^-----BEGIN/ && s !~ /^-----END/) sub(/^[-+]/, "", s)
         sub(/^[[:space:]]+/, "", s)
         sub(/[[:space:]]+$/, "", s)
         return s
       }
-      function cred_hit(re, minlen) {
+      function cred_hit(re, minlen,   s) {
         # mawk (the default /usr/bin/awk on Debian/Ubuntu) does not support
         # interval expressions ({n,}/{n}) — it matches them literally, so a
         # `{20,}`-gated credential regex silently stops matching real secrets on
@@ -940,8 +987,17 @@ for reviewer in claude codex gemini opencode; do
         # RLENGTH >= prefixlen+N is equivalent to {N,} / {N} for detection
         # purposes (we only ever discard the matched text, never reuse it, so
         # {N} exact and {N,} at-least are interchangeable here).
-        match($0, re)
-        return (RLENGTH >= minlen)
+        # match() returns only the LEFTMOST occurrence. A short placeholder
+        # sharing the same literal prefix would shadow a real credential
+        # later on the same line, emitting the whole line unredacted. Walk
+        # every start position, advancing ONE character rather than past the
+        # whole match: a longer occurrence can begin inside a shorter one.
+        s = $0
+        while (match(s, re)) {
+          if (RLENGTH >= minlen) return 1
+          s = substr(s, RSTART + 1)
+        }
+        return 0
       }
       function is_base64_line(s, minlen) {
         if (s !~ /^[A-Za-z0-9+\/=]+$/) return 0
@@ -1004,7 +1060,7 @@ for reviewer in claude codex gemini opencode; do
             in_pem = 1
             pem_stray = 0
             pem_span = 0
-            if (pem_check ~ /^-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
+            if (pem_check ~ /-----BEGIN [A-Z ]*PRIVATE KEY-----[[:space:]]*$/) pem_real = 1
             else pem_real = 0
           }
         }
@@ -1035,9 +1091,10 @@ for reviewer in claude codex gemini opencode; do
         # below — because closing it completely would require watching
         # indefinitely, which reintroduces the "swallow the whole report"
         # failure the window exists to prevent.
-        if (pem_watch > 0) {
+        if (!in_pem && pem_watch > 0) {
           pem_check = strip_deco($0)
-          if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/) {
+          if (is_base64_line(pem_check, 20) && pem_check ~ /[G-Zg-z+\/=]/ &&
+              pem_check ~ /[0-9+\/=]/) {
             in_pem = 1
             pem_stray = 0
             pem_span = 0
